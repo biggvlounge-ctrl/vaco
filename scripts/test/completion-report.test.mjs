@@ -23,6 +23,22 @@ import { fileURLToPath } from 'node:url';
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const DOC = path.join(REPO_ROOT, 'dev-docs', 'COMPLETION_BY_APP.md');
 
+// **This check runs everywhere, and that took a deliberate fix rather
+// than an exemption.** `scripts/package-release.mjs` extracts the
+// release archive — correctly without node_modules — and re-runs this
+// suite inside it. The report scores suites by executing them, so its
+// first version counted *passes*, which differ there: a suite that
+// boots a real server skips itself when its dependencies are absent.
+// The document appeared to have drifted, and the release script
+// deleted a perfectly good tarball over it.
+//
+// Skipping this test when dependencies are missing was the easy answer
+// and the wrong one: it would have retired the check in the one place
+// that reads the archive a deployer actually receives. Instead the
+// report now records each suite's *size* (passes plus skips), which is
+// identical in both environments — verified by generating in a
+// dependency-free extract and diffing. So no skip, and the committed
+// document is checkable anywhere.
 test('the committed completion report matches what the script emits', () => {
   assert.ok(fs.existsSync(DOC), 'dev-docs/COMPLETION_BY_APP.md is missing — run `node scripts/completion-report.mjs`');
 

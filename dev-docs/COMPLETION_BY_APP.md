@@ -11,7 +11,7 @@ each app's test suite actually executed. Nothing here is recalled.
 `scripts/test/completion-report.test.mjs` fails if this file drifts
 from what the script emits, which is the failure mode that made
 `COMPLETION_AUDIT.md` read 31 apps and 522 tests when the real numbers
-were 34 and 1020.
+were 34 and 1091.
 
 ---
 
@@ -56,15 +56,23 @@ anything it can:
 | Express backends in the manifest | **34** |
 | Overall criteria met | **99%** (259/260) |
 | Apps at 100% | **33 / 34** |
-| Tests passing | **1020** |
-| Tests skipped | **71** |
+| Tests | **1091** |
 | Apps with no test suite | **0** |
 
-The test count is lower than `scripts/run-all-tests.mjs`'s, and both
-are right: this table counts only the 34 Express backends in the
-manifest. The full run also covers the Vite frontends (VDP, VENVS),
-the shared `scripts/` suites, `world-layer` and `vaco-mcp` — real
-tests, but not any single manifest app's.
+Two notes on that test count, so it is not read as contradicting
+anything else:
+
+- It is **lower than `scripts/run-all-tests.mjs`'s**, and both are
+  right. This table counts only the 34 Express backends in the
+  manifest. The full run also covers the Vite frontends (VDP, VENVS),
+  the shared `scripts/` suites, `world-layer` and `vaco-mcp` — real
+  tests, but not any single manifest app's.
+- It counts each suite's **size**, passing plus skipped, not passes
+  alone. Suites that boot a real server skip themselves when the app's
+  dependencies are absent, so counting passes would make this document
+  read differently depending on where it was generated. Every suite
+  here is at zero failures — that is the "Suite passes" column, and it
+  is checked separately.
 
 ---
 
@@ -79,7 +87,7 @@ tests, but not any single manifest app's.
 | `hvntz` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 14 |
 | `shield` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 12 |
 | `v3` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 70 |
-| `v4-proxy` | **100%** | 7/7 | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | 30 |
+| `v4-proxy` | **100%** | 7/7 | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | 42 |
 | `v4-search` | **100%** | 7/7 | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | 15 |
 | `vaca` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 17 |
 | `vacay` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 22 |
@@ -105,7 +113,7 @@ tests, but not any single manifest app's.
 | `vulture-studios` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 11 |
 | `vxllage` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 13 |
 | `yap` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 20 |
-| `vacon-c` | **87%** | 7/8 | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | 234 |
+| `vacon-c` | **87%** | 7/8 | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | 293 |
 
 `—` means the criterion does not apply to that app and is excluded
 from both halves of its fraction — an app is never marked down for

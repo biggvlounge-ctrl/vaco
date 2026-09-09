@@ -140,6 +140,15 @@ function runSuite(appPath, files) {
   const out = `${r.stdout || ''}${r.stderr || ''}`;
   const num = (re) => Number((out.match(re) || [])[1] ?? 0);
   const counts = { pass: num(/^# pass (\d+)/m), fail: num(/^# fail (\d+)/m), skip: num(/^# skipped (\d+)/m) };
+  // **The count has to be the same wherever this runs.** A suite whose
+  // dependencies are absent skips rather than fails, by the convention
+  // `v4-proxy/test/server.test.js` established — so `pass` alone is 34
+  // for vaco-analytics in a developed checkout and 28 inside the
+  // release-archive extract, and a document recording it would "drift"
+  // every time the release script looked at it. `pass + skip` is the
+  // suite's real size and is identical in both, which is what makes the
+  // committed report checkable anywhere rather than only here.
+  counts.total = counts.pass + counts.skip;
 
   // Trust the exit code over the parsed summary, the same rule
   // `run-all-tests.mjs` follows: a suite that crashes before printing
@@ -324,8 +333,7 @@ const totalApplies = apps.reduce((n, a) => n + a.applies.length, 0);
 const totalMet = apps.reduce((n, a) => n + a.met.length, 0);
 const overall = percent(totalMet, totalApplies);
 
-const totalTests = apps.reduce((n, a) => n + (a.tests?.pass ?? 0), 0);
-const totalSkip = apps.reduce((n, a) => n + (a.tests?.skip ?? 0), 0);
+const totalTests = apps.reduce((n, a) => n + (a.tests?.total ?? 0), 0);
 
 // -- the document -------------------------------------------------------
 
@@ -333,7 +341,7 @@ const tick = (v) => (v === null ? '—' : (v ? '✅' : '❌'));
 
 const rows = apps.map((a) => `| \`${a.name}\` | **${a.pct}%** | ${a.met.length}/${a.applies.length} `
   + `| ${CRITERIA.map((c) => tick(a.results.find((r) => r.key === c.key).value)).join(' | ')} `
-  + `| ${a.tests ? a.tests.pass : 0} |`).join('\n');
+  + `| ${a.tests ? a.tests.total : 0} |`).join('\n');
 
 // Context for a shortfall that is a known, sequenced decision rather
 // than an oversight. Keyed `app:criterion` and printed only where that
@@ -416,15 +424,23 @@ anything it can:
 | Express backends in the manifest | **${apps.length}** |
 | Overall criteria met | **${overall}%** (${totalMet}/${totalApplies}) |
 | Apps at 100% | **${apps.filter((a) => a.pct === 100).length} / ${apps.length}** |
-| Tests passing | **${totalTests}** |
-| Tests skipped | **${totalSkip}** |
+| Tests | **${totalTests}** |
 | Apps with no test suite | **${apps.filter((a) => a.tests === null).length}** |
 
-The test count is lower than \`scripts/run-all-tests.mjs\`'s, and both
-are right: this table counts only the ${apps.length} Express backends in the
-manifest. The full run also covers the Vite frontends (VDP, VENVS),
-the shared \`scripts/\` suites, \`world-layer\` and \`vaco-mcp\` — real
-tests, but not any single manifest app's.
+Two notes on that test count, so it is not read as contradicting
+anything else:
+
+- It is **lower than \`scripts/run-all-tests.mjs\`'s**, and both are
+  right. This table counts only the ${apps.length} Express backends in the
+  manifest. The full run also covers the Vite frontends (VDP, VENVS),
+  the shared \`scripts/\` suites, \`world-layer\` and \`vaco-mcp\` — real
+  tests, but not any single manifest app's.
+- It counts each suite's **size**, passing plus skipped, not passes
+  alone. Suites that boot a real server skip themselves when the app's
+  dependencies are absent, so counting passes would make this document
+  read differently depending on where it was generated. Every suite
+  here is at zero failures — that is the "Suite passes" column, and it
+  is checked separately.
 
 ---
 
@@ -460,5 +476,5 @@ if (process.argv.includes('--check')) {
 } else {
   fs.writeFileSync(OUT, doc);
   process.stdout.write(`Wrote dev-docs/COMPLETION_BY_APP.md (${apps.length} apps, `
-    + `${overall}% of ${totalApplies} applicable criteria met, ${totalTests} tests passing).\n`);
+    + `${overall}% of ${totalApplies} applicable criteria met, ${totalTests} tests).\n`);
 }
