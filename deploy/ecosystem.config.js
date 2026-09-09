@@ -1,13 +1,21 @@
 // VACO -- pm2 process list for production deployment.
 //
-// Generated from the same authoritative app/path/port manifest as
-// start-ecosystem.sh: 28 real Express backends. The 2 Vite
-// frontends (vdp, venvs) are deliberately NOT pm2-managed here --
-// they get a real production build (npm run build) and are served
-// as static files by nginx instead, since the Vite dev server used
-// by start-ecosystem.sh (for local dev) is not meant to hold
-// production traffic. See the deployment guide for the full build
-// + nginx steps.
+// **GENERATED FILE -- do not edit.** Re-run:
+//
+//     node deploy/generate-ecosystem-config.js
+//
+// after adding or removing an app in start-ecosystem.sh's own APPS
+// array, which is the authoritative app/path/port manifest for this
+// ecosystem. `scripts/test/deploy-readme.test.mjs` fails if this file
+// stops matching that manifest, which is how six apps that had quietly
+// dropped out of the pm2 deployment were found.
+//
+// 34 real Express backends. The 2 Vite frontends (venvs, vdp)
+// are deliberately NOT pm2-managed here -- they get a real production
+// build (npm run build) and are served as static files by nginx
+// instead, since the Vite dev server used by start-ecosystem.sh (for
+// local dev) is not meant to hold production traffic. See the
+// deployment guide for the full build + nginx steps.
 //
 // Usage:
 //   pm2 start ecosystem.config.js
@@ -239,6 +247,54 @@ module.exports = {
       cwd: "./vulture-studios",
       script: "server.js",
       env: { PORT: "8815", NODE_ENV: "production" },
+      max_restarts: 10,
+      min_uptime: "10s",
+    },
+    {
+      name: "vex",
+      cwd: "./vex",
+      script: "server.js",
+      env: { PORT: "8816", NODE_ENV: "production" },
+      max_restarts: 10,
+      min_uptime: "10s",
+    },
+    {
+      name: "vex-trading",
+      cwd: "./vex-trading",
+      script: "server.js",
+      env: { PORT: "8817", NODE_ENV: "production" },
+      max_restarts: 10,
+      min_uptime: "10s",
+    },
+    {
+      name: "vaco-notify",
+      cwd: "./vaco-notify",
+      script: "server.js",
+      env: { PORT: "8818", NODE_ENV: "production" },
+      max_restarts: 10,
+      min_uptime: "10s",
+    },
+    {
+      name: "vaco-audit",
+      cwd: "./vaco-audit",
+      script: "server.js",
+      env: { PORT: "8819", NODE_ENV: "production" },
+      max_restarts: 10,
+      min_uptime: "10s",
+    },
+    {
+      name: "vaco-operator",
+      cwd: "./vaco-operator",
+      script: "server.js",
+      env: { PORT: "8820", NODE_ENV: "production" },
+      max_restarts: 10,
+      min_uptime: "10s",
+    },
+    {
+      name: "vaco-media",
+      cwd: "./vaco-media",
+      script: "server.js",
+      env: { PORT: "8821", NODE_ENV: "production" },
       max_restarts: 10,
       min_uptime: "10s",
     },

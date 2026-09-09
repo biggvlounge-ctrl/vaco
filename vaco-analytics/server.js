@@ -33,6 +33,9 @@ import { createPersistentStore } from "./persistence.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 import { createServiceAuth } from "./lib/serviceAuth.cjs";
+import shieldAuth from "./lib/shieldAuth.cjs";
+
+const { requireCallingService } = shieldAuth;
 import tracingModule from './lib/tracing.cjs';
 const { traceMiddleware } = tracingModule;
 
@@ -71,8 +74,19 @@ app.get("/api/health", (_req, res) => {
   res.json({ ok: true, apps: getApps(store) });
 });
 
-// audit-route-guards: open -- telemetry ingest from services; no human principal exists
-app.post("/api/metrics/ingest", (req, res) => {
+// **"From services" is now enforced, not just asserted.** This carried
+// an `audit-route-guards: open` marker whose reason was "telemetry
+// ingest from services; no human principal exists" — true as a
+// description of intent, but nothing held callers to it. The app-level
+// `serviceAuth` accepts a user session OR a service credential, so any
+// bearer token could write telemetry, and the header block above says
+// exactly why that matters: a poisoned baseline hides the anomaly
+// rather than raising it.
+//
+// Every real caller already sends `serviceHeaders()` — checked across
+// all seven pushMetric implementations — so requiring what the reason
+// already claimed costs nothing and closes the gap.
+app.post("/api/metrics/ingest", requireCallingService(), (req, res) => {
   const { app: appId, metric, value, timestamp } = req.body || {};
   try {
     const event = ingestMetric(store, { app: appId, metric, value, timestamp });
@@ -178,8 +192,26 @@ async function notifyAnomaly(result) {
   }
 }
 
-// audit-route-guards: open -- stateless evaluation over posted metrics; writes no record
-app.post("/api/intelligence/evaluate", async (req, res) => {
+// **Not stateless, and it was declared as if it were.** This carried
+// `audit-route-guards: open -- stateless evaluation over posted
+// metrics; writes no record`, and both halves of that were false:
+// `evaluateMetric` does `store.alerts.push(result)` and
+// `store.nextAlertId++` on every anomaly, `durable(store)` commits it,
+// and the handler then pages a responder through vaco-notify.
+//
+// The app-level `serviceAuth` middleware kept anonymous callers out
+// (verified: no credential answers 401), but it only proves *some*
+// credential is present — an unvalidated `Authorization: Bearer
+// anything` satisfies it, because identifying a caller and authorising
+// one are different jobs and this route did the second nowhere. Driven
+// against a running server, a fabricated bearer token returned 200 and
+// left a persisted alert row behind.
+//
+// Nothing in the repo calls this route from a UI, and there is no user
+// whose session could reasonably authorise "evaluate the whole app's
+// telemetry and page whoever owns it" — which is exactly the case
+// `requireCallingService` exists for.
+app.post("/api/intelligence/evaluate", requireCallingService(), async (req, res) => {
   const { app: appId, metric, category, threshold } = req.body || {};
   if (!appId || !metric) {
     return res.status(400).json({ error: "'app' and 'metric' are required." });

@@ -301,6 +301,42 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
+    location /vaco-notify/ {
+        rewrite ^/vaco-notify/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8818;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /vaco-audit/ {
+        rewrite ^/vaco-audit/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8819;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /vaco-operator/ {
+        rewrite ^/vaco-operator/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8820;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /vaco-media/ {
+        rewrite ^/vaco-media/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8821;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
     # The front door: vaco-shell, the real app launcher + session host.
     location / {
         proxy_pass http://127.0.0.1:8789;

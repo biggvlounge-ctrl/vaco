@@ -52,6 +52,7 @@ cd "$REPO_ROOT"
 SHIELD_TARGETS=(
   chopz chopz/chopz-shop cvnvo dreams hvntz v3 v4-proxy vaca vacay vaco-audit vaco-shell vacon-c vaco-notify vago vavlt-stvdios venvm void vex voidmagic voken
   vsafe vulture-flix vulture-music vulture-pods vulture-studios vxllage vaco-media
+  vaco-analytics
 )
 
 # Apps that record operator-grade decisions in vaco-audit. This is

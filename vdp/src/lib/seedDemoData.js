@@ -19,25 +19,43 @@
 // DEGVCHI's own real purchase+equip functions — that's the real
 // mechanic this task's "seed sample avatars" maps onto.
 //
-// `demo-user` (the app's own default login id — see `shieldAuth.js`'s
-// `login("demo-user")` call in `App.jsx`) is deliberately one of the
-// four seeded identities below, so a presenter who just clicks "Log
-// in" during the live walkthrough sees their own order history and
-// equipped outfit already populated, not an empty state to explain
-// away before the real demo starts.
+// **Seeds one identity: whoever is signed in.** This used to run at
+// mount for all four identities below, and it seeded nothing at all —
+// verified against a real V3, not reasoned about. Two separate reasons,
+// both of which had to be fixed:
+//
+//   no session   The boot effect fired before any session existed, so
+//                every transfer went out with no `Authorization` header
+//                and V3 answered 401. Eighteen requests, eighteen
+//                refusals, nothing seeded. The header used to promise
+//                that a presenter who clicks "Log in" finds their order
+//                history already populated; that was a claim about code
+//                that could not run.
+//   wrong payer  `/api/vcoin/transfer` is `actorOrService('fromUserId')`
+//                — the session must belong to the payer. A browser has
+//                no service credential and must not have one, so VDP can
+//                only ever move the signed-in user's own money. Seeding
+//                `demo-maya` from `demo-user`'s session is not a timing
+//                bug to fix; it is the authorization boundary working.
+//
+// So the seed now takes the session's `userId` and runs only that
+// person's entries. The other three stay in the tables because a Shell
+// handoff can sign any of them in (`adoptToken` in `App.jsx`).
 //
 // Payment goes through the exact same real `transferVCoin` V3 client
-// call the live UI uses (`v3Client.js`) — venvs-mock-backend auto-
-// starts every fresh userId at 1000 VCoin, so these seed purchases
-// succeed the same way a real first-time buyer's would. Each item is
-// wrapped in its own try/catch so a V3 backend that isn't reachable
-// yet at app boot degrades to a console warning per skipped item,
-// never a crashed app shell.
+// call the live UI uses (`v3Client.js`). Each item is wrapped in its own
+// try/catch so a V3 that isn't reachable degrades to a console warning
+// per skipped item, never a crashed app shell.
 
 import { orderMenuItem } from "./foodDistrict.js";
 import { purchaseWearable, equipWearable } from "./degvchi.js";
 import { transferVCoin } from "./v3Client.js";
 
+// The default when nobody injects one — the same real V3 client the
+// live UI uses. Injectable per the ecosystem's standing rule that
+// cross-app calls are parameters, not imports reached for at the call
+// site: without that, this module could only be tested by stubbing
+// `global.fetch`, which tests `fetch` rather than the seed.
 const seedTransferFn = (from, to, amount, reason) =>
   transferVCoin({ fromUserId: from, toUserId: to, amount, reason });
 
@@ -63,20 +81,20 @@ const DEMO_AVATARS = [
   { userId: "demo-priya", outfit: ["BOOBI Couture Virtual Corset Gown", "ANCÓR Virtual Anchor Pin"] },
 ];
 
-async function seedFoodDistrictOrders(foodDistrictStore) {
+async function seedFoodDistrictOrders(foodDistrictStore, userId, transferFn) {
   if (!foodDistrictStore || foodDistrictStore.orders.length > 0) return;
-  for (const order of DEMO_ORDERS) {
+  for (const order of DEMO_ORDERS.filter((o) => o.buyerId === userId)) {
     try {
-      await orderMenuItem(foodDistrictStore, { ...order, transferFn: seedTransferFn });
+      await orderMenuItem(foodDistrictStore, { ...order, transferFn });
     } catch (err) {
       console.warn(`seedDemoData: skipped food order ${order.brandSlug}/${order.itemName} for ${order.buyerId} — ${err.message}`);
     }
   }
 }
 
-async function seedAvatars(degvchiStore) {
+async function seedAvatars(degvchiStore, userId, transferFn) {
   if (!degvchiStore || degvchiStore.ownership.length > 0) return;
-  for (const avatar of DEMO_AVATARS) {
+  for (const avatar of DEMO_AVATARS.filter((a) => a.userId === userId)) {
     for (const itemName of avatar.outfit) {
       const wearable = degvchiStore.wearables.find((w) => w.name === itemName);
       if (!wearable) {
@@ -84,7 +102,7 @@ async function seedAvatars(degvchiStore) {
         continue;
       }
       try {
-        await purchaseWearable(degvchiStore, { wearableId: wearable.id, buyerId: avatar.userId, transferFn: seedTransferFn });
+        await purchaseWearable(degvchiStore, { wearableId: wearable.id, buyerId: avatar.userId, transferFn });
         equipWearable(degvchiStore, avatar.userId, wearable.id);
       } catch (err) {
         console.warn(`seedDemoData: skipped avatar wearable "${itemName}" for ${avatar.userId} — ${err.message}`);
@@ -98,7 +116,14 @@ async function seedAvatars(degvchiStore) {
 // (VDP has no server-side persistence layer for these two stores, see
 // `persistence.js`'s own header), so the guard is trivially true today,
 // but stays correct if either store is ever persisted across mounts.
-export async function seedDemoData({ foodDistrictStore, degvchiStore } = {}) {
-  await seedFoodDistrictOrders(foodDistrictStore);
-  await seedAvatars(degvchiStore);
+// **No `userId`, no seed.** Refusing here rather than falling back to a
+// default is the whole point: a seed with nobody signed in is the
+// eighteen-refusal boot this replaced, and a silent no-op would let it
+// come back unnoticed.
+export async function seedDemoData({
+  foodDistrictStore, degvchiStore, userId, transferFn = seedTransferFn,
+} = {}) {
+  if (!userId) throw new Error("seedDemoData requires the signed-in userId — V3 authorises each transfer against the payer's own session");
+  await seedFoodDistrictOrders(foodDistrictStore, userId, transferFn);
+  await seedAvatars(degvchiStore, userId, transferFn);
 }

@@ -65,13 +65,18 @@ function ledgerFor(sessionUserId) {
   return fn;
 }
 
-test('the seed spends only the signed-in user\'s own money', async (t) => {
+test('the seed spends only the signed-in user\'s own money', async () => {
   const food = createFoodDistrict();
   const wardrobe = degvchi();
   const ledger = ledgerFor('demo-user');
-  t.mock.method(global, 'fetch', ledger);
 
-  await seedDemoData({ foodDistrictStore: food, degvchiStore: wardrobe, userId: 'demo-user' });
+  await seedDemoData({
+    foodDistrictStore: food, degvchiStore: wardrobe, userId: 'demo-user', transferFn: ledger,
+  });
+
+  // Every leg the seed sent was payable by the session that sent it.
+  assert.ok(ledger.moves.length > 0, 'nothing was charged at all');
+  assert.deepEqual([...new Set(ledger.moves.map((m) => m.fromUserId))], ['demo-user']);
 
   // Read the orders, not the ledger stub — the stub is my model of V3,
   // the store is what the UI will render.
@@ -92,7 +97,10 @@ test('a different signed-in identity seeds their own set, not demo-user\'s', asy
   const food = createFoodDistrict();
   const wardrobe = degvchi();
 
-  await seedDemoData({ foodDistrictStore: food, degvchiStore: wardrobe, userId: 'demo-maya' });
+  await seedDemoData({
+    foodDistrictStore: food, degvchiStore: wardrobe, userId: 'demo-maya',
+    transferFn: ledgerFor('demo-maya'),
+  });
 
   assert.ok(food.orders.length > 0, 'demo-maya has entries in the table and got none of them');
   assert.deepEqual([...new Set(food.orders.map((o) => o.buyerId))], ['demo-maya']);
@@ -102,7 +110,10 @@ test('an identity with no entries seeds nothing and does not throw', async () =>
   const food = createFoodDistrict();
   const wardrobe = degvchi();
 
-  await seedDemoData({ foodDistrictStore: food, degvchiStore: wardrobe, userId: 'somebody-else' });
+  await seedDemoData({
+    foodDistrictStore: food, degvchiStore: wardrobe, userId: 'somebody-else',
+    transferFn: ledgerFor('somebody-else'),
+  });
 
   assert.equal(food.orders.length, 0);
   assert.equal(wardrobe.ownership.length, 0);
@@ -123,10 +134,18 @@ test('seeding with nobody signed in is refused, not silently skipped', async () 
 test('a store that already has orders is left alone', async () => {
   const food = createFoodDistrict();
   const wardrobe = degvchi();
-  await seedDemoData({ foodDistrictStore: food, degvchiStore: wardrobe, userId: 'demo-user' });
+  const ledger = ledgerFor('demo-user');
+  await seedDemoData({
+    foodDistrictStore: food, degvchiStore: wardrobe, userId: 'demo-user', transferFn: ledger,
+  });
   const after = food.orders.length;
+  const charged = ledger.moves.length;
 
-  await seedDemoData({ foodDistrictStore: food, degvchiStore: wardrobe, userId: 'demo-user' });
+  await seedDemoData({
+    foodDistrictStore: food, degvchiStore: wardrobe, userId: 'demo-user', transferFn: ledger,
+  });
+
+  assert.equal(ledger.moves.length, charged, 'the second run charged again');
 
   assert.equal(food.orders.length, after,
     'the second run double-charged a user who was already seeded');

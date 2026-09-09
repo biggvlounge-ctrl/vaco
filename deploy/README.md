@@ -101,27 +101,36 @@ is which app" needs relearning.
 **Verified**: `docker compose config` (real YAML parsing + variable
 interpolation, no daemon required) validates the generated
 `docker-compose.yml` cleanly — confirmed the required-secret guard
-rejects a missing `ANTHROPIC_API_KEY` with the real, intended error
-message, then validates clean once one is set; confirmed cross-app
-URLs resolve to the correct real service name + port per app (spot-
-checked `vulture-studios` → `v3`/`vaco-analytics`/`vulture-flix`/
-`vulture-music`, all four real, all correctly scoped — no unrelated
-var leaked in); confirmed exactly 24 named volumes, matching the real
-persisted-app list. `deploy/nginx-docker.conf`'s braces balance (31/31)
-and all 31 expected `location` blocks appear exactly once, no
+rejects a missing `VACO_SERVICE_TOKENS` with the real, intended error
+message, then validates clean once all 29 required vars are set;
+confirmed cross-app URLs resolve to the correct real service name +
+port per app (spot-checked `vulture-studios` → `shield`/`v3`/
+`vaco-analytics`/`vaco-audit`/`vaco-operator`/`vulture-flix`/
+`vulture-music`, all seven real, all correctly scoped — no unrelated
+var leaked in); confirmed exactly 28 named volumes, each declared once
+and mounted by exactly one service, matching the real persisted-app
+list. `deploy/nginx-docker.conf`'s braces balance (40 open, 40 close)
+and all 36 expected `location` blocks appear exactly once, no
 duplicates. **Not verified**: an actual `docker compose up --build` —
-this sandbox's Docker daemon can't start here (no permission to raise
-the ulimits `dockerd` needs in this container), so no real image was
-ever built or run. Run `docker compose up --build` yourself as the
-real first test before trusting this in production.
+this sandbox has the Docker CLI but no daemon it can start (no
+permission to raise the ulimits `dockerd` needs in this container), so
+no real image was ever built or run. Run `docker compose up --build`
+yourself as the real first test before trusting this in production.
+
+The counts in this file are held against the generated artifacts by
+`scripts/test/deploy-readme.test.mjs`, so a number here that drifts
+from what the generators emit fails the suite rather than sitting
+quietly wrong.
 
 ## VPS deployment (pm2 + nginx)
 
 ## `ecosystem.config.js`
-A real [pm2](https://pm2.keymetrics.io/) process list for the 26
-backend apps (the 2 Vite frontends are deliberately excluded — they
+A real [pm2](https://pm2.keymetrics.io/) process list for the
+**34 backends** (the 2 Vite frontends are deliberately excluded — they
 get a real production build and are served as static files by nginx
-instead; see below).
+instead; see below). Four fewer entries than the Compose service
+count above, which additionally carries nginx and LiveKit as
+image-based services and the 2 Vite frontends as built containers.
 
 ```
 pm2 start deploy/ecosystem.config.js
@@ -135,21 +144,41 @@ pm2 reload deploy/ecosystem.config.js --update-env
 ```
 
 Regenerate after adding/removing an app in `start-ecosystem.sh`'s own
-`APPS` array — this file is not meant to be hand-edited; re-run the
-same generation this file was built with (see the deployment guide)
-so it never drifts from the real manifest.
+`APPS` array — this file is not hand-edited:
 
-**Live-verified this session**: `pm2 start` brought up all 26 apps
-online, every one answered a real `GET /api/health` with `200`, `pm2
-reload deploy/ecosystem.config.js --update-env` completed cleanly with
-the app still answering afterward, and `pm2 save` / `pm2 startup`
-both ran and produced their real expected output.
+```
+node deploy/generate-ecosystem-config.js
+```
+
+**That generator did not exist until 2026-09-09, and the file had
+drifted.** Its header said "generated from the same authoritative
+manifest" and this README said to re-run "the same generation this
+file was built with", but nothing in the repository could regenerate
+it, so the only way to add an app was by hand. Six were missed:
+`vaco-audit`, `vaco-operator`, `vaco-media`, `vaco-notify`, `vex` and
+`vex-trading`. A real `pm2 start` would have reported 28/28 online and
+green while the decision log, the operator-authority service, the
+media layer and the notification channel were all simply not running —
+and every caller of those four fails soft by standing rule, so nothing
+would have said so. The file is now genuinely generated from the
+manifest and `scripts/test/deploy-readme.test.mjs` fails if it drifts
+again.
+
+**Live-verified when the pm2 path was built**: `pm2 start` brought up
+all 26 apps online, every one answered a real `GET /api/health` with
+`200`, `pm2 reload deploy/ecosystem.config.js --update-env` completed
+cleanly with the app still answering afterward, and `pm2 save` / `pm2
+startup` both ran and produced their real expected output. That run
+was real, and it **has not been repeated at 34** — it happened when
+the manifest held 26 apps, and the six restored above have never been
+started under pm2 at all. Treat it as evidence the pm2 *path* works,
+not as a current all-green.
 
 ## `generate-nginx-conf.js`
 Generates a real nginx reverse-proxy config from the same manifest —
 one domain, path-based routing (`https://yourdomain.com/void/`,
 `/vago/`, etc.), one Let's Encrypt certificate, rather than a
-subdomain (and per-subdomain cert) for every one of the 26+ apps.
+subdomain (and per-subdomain cert) for every one of the 34 apps.
 
 ```
 node deploy/generate-nginx-conf.js yourdomain.com
@@ -157,7 +186,7 @@ node deploy/generate-nginx-conf.js yourdomain.com
 
 Writes `deploy/nginx-vaco.conf.example`. `cvnvo`'s location block
 carries real WebSocket upgrade headers (its real-time messaging,
-Phase 13) that the other 25 don't need. The path prefix is stripped
+Phase 13) that the other 32 don't need. The path prefix is stripped
 before proxying (`rewrite ^/void/(.*)$ /$1 break;`) so each backend's
 own real `/api/...` routes resolve unchanged — matching exactly how
 every VDP/VENVS district client already builds its request URL
@@ -166,12 +195,23 @@ every VDP/VENVS district client already builds its request URL
 **Not live-verified against a real nginx**: this sandbox's outbound
 package mirrors couldn't install `nginx` to run a real `nginx -t`
 against the generated file. What *is* verified: the generated config's
-braces are balanced (29 open, 29 close) and every one of the 28
-expected `location` blocks (26 backends + `/vdp/` + `/venvs/` + the
+braces are balanced (40 open, 40 close) and every one of the 36
+expected `location` blocks (33 backends + `/vdp/` + `/venvs/` + the
 `/` root) appears exactly once, no duplicates — a real bug this
 generator had on its first pass (`cvnvo` emitted twice) and was fixed
 before committing. Run `nginx -t` yourself as the first real check on
 your actual server before reloading nginx with it.
+
+(33 backends rather than 34 because the 34th, `vaco-shell`, *is* the
+`/` root — the app store is what a bare `https://yourdomain.com/`
+serves, so it has no prefixed location of its own.)
+
+The committed `nginx-vaco.conf.example` was itself four apps stale
+until 2026-09-09 — `vaco-audit`, `vaco-media`, `vaco-notify` and
+`vaco-operator` had no location block, so on a real VPS those four
+would have 404'd at the reverse proxy no matter how healthy the
+backends were. Same root cause as the pm2 drift above, caught the same
+way: regenerate, then hold the output against the manifest in a test.
 
 ## Committed example
 `nginx-vaco.conf.example` in this directory is the real output of

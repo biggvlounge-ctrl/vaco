@@ -562,6 +562,7 @@ services:
     container_name: vaco-analytics
     environment:
       PORT: 8790
+      SHIELD_API_URL: "http://shield:8812"
       VACO_NOTIFY_URL: "http://vaco-notify:8818"
       VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
       VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"

@@ -32,14 +32,62 @@ const read = (p) => fs.readFileSync(path.join(REPO_ROOT, p), 'utf8');
 const readme = read('deploy/README.md');
 const compose = read('docker-compose.yml');
 const nginx = read('deploy/nginx-docker.conf');
+const nginxExample = read('deploy/nginx-vaco.conf.example');
 const ecosystem = read('deploy/ecosystem.config.js');
+const startScript = read('start-ecosystem.sh');
 
 // Every count the README states, found rather than assumed — so a
 // number added later is covered without editing this file.
-function claims(re) {
+//
+// **Whitespace is normalised first, and that is load-bearing.** The
+// README is hard-wrapped, so where the line break happens to fall
+// decides whether "36 expected `location` blocks" is one space or a
+// newline. Twice now a pattern written with a literal space matched
+// nothing and the test reported "the README no longer states a count"
+// — or worse, silently checked one of two claims — against a README
+// that stated it perfectly well. Collapsing runs of whitespace to a
+// single space makes a claim's wrapping irrelevant to whether it is
+// checked, which is the only version of this that can be trusted.
+function claims(re, within = readme) {
+  const flat = within.replace(/\s+/g, ' ');
   // matchAll requires the global flag; the callers below write plain
   // patterns, so add it here rather than at every call site.
-  return [...readme.matchAll(new RegExp(re.source, `${re.flags}g`))].map((m) => Number(m[1]));
+  return [...flat.matchAll(new RegExp(re.source, `${re.flags}g`))].map((m) => Number(m[1]));
+}
+
+// **Which nginx file is a given count about?** The README documents
+// two generated nginx configs — `nginx-docker.conf` for Compose and
+// `nginx-vaco.conf.example` for the bare-metal VPS path — and states
+// location and brace counts for both, in the same words. Checking
+// every such claim against one file was a real bug in this test: it
+// happened to pass only while the two configs coincidentally agreed,
+// and would have reported the VPS section wrong the moment they
+// diverged (as they had, by four apps, when this was written).
+//
+// A count is attributed to whichever config its own `## ` section
+// names. A section that names neither states no nginx counts, so
+// there is nothing to attribute.
+function nginxSections() {
+  return readme.split(/\n(?=## )/).map((body) => {
+    if (body.includes('nginx-docker.conf')) return { body, file: nginx, name: 'nginx-docker.conf' };
+    if (body.includes('nginx-vaco.conf.example') || body.includes('generate-nginx-conf.js')) {
+      return { body, file: nginxExample, name: 'nginx-vaco.conf.example' };
+    }
+    return null;
+  }).filter(Boolean);
+}
+
+// The authoritative app/path/port list. `start-ecosystem.sh`'s APPS
+// array is what every deploy generator reads; parsed here the same way
+// they parse it, so this test fails for the same reason they would.
+function manifestApps() {
+  const m = startScript.match(/APPS=\(([\s\S]*?)\n\)/);
+  assert.ok(m, 'start-ecosystem.sh no longer has an APPS=( ... ) manifest');
+  return m[1].split('\n').map((l) => l.trim()).filter((l) => l.startsWith('"'))
+    .map((l) => {
+      const [name, appPath, cmd, port] = l.slice(1, -1).split(':');
+      return { name, appPath, cmd, port };
+    });
 }
 
 test('the README states the real number of Compose services', () => {
@@ -87,21 +135,84 @@ test('the README states the real backend and frontend split', () => {
 });
 
 test('the README states the real nginx location and brace counts', () => {
-  const locations = (nginx.match(/^\s*location\s/gm) || []).length;
-  const open = (nginx.match(/\{/g) || []).length;
-  const close = (nginx.match(/\}/g) || []).length;
+  const sections = nginxSections();
+  assert.ok(sections.length > 0, 'the README no longer documents either generated nginx config');
 
-  assert.equal(open, close, `the generated nginx config does not balance: ${open} open, ${close} close`);
+  let checkedLocations = 0;
+  for (const { body, file, name } of sections) {
+    const locations = (file.match(/^\s*location\s/gm) || []).length;
+    const open = (file.match(/\{/g) || []).length;
+    const close = (file.match(/\}/g) || []).length;
 
-  const statedLocations = claims(/(\d+) `location` blocks/);
-  assert.ok(statedLocations.length > 0, 'the README no longer states a location-block count');
-  for (const n of statedLocations) {
-    assert.equal(n, locations, `README says ${n} location blocks; nginx-docker.conf has ${locations}`);
+    assert.equal(open, close, `${name} does not balance: ${open} open, ${close} close`);
+
+    // "36 `location` blocks" and "36 expected `location` blocks" are
+    // both how the README words it; the optional adjective is why an
+    // earlier version of this pattern silently matched nothing and
+    // reported "the README no longer states a count" against a README
+    // that stated two.
+    for (const n of claims(/(\d+)(?: expected)? `location` blocks/, body)) {
+      checkedLocations += 1;
+      assert.equal(n, locations, `README says ${n} location blocks; ${name} has ${locations}`);
+    }
+    for (const n of claims(/\((\d+) open/, body)) {
+      assert.equal(n, open, `README says ${n} open braces; ${name} has ${open}`);
+    }
   }
 
-  const statedBraces = claims(/\((\d+) open/);
-  for (const n of statedBraces) {
-    assert.equal(n, open, `README says ${n} open braces; nginx-docker.conf has ${open}`);
+  assert.ok(checkedLocations > 0, 'the README no longer states a location-block count');
+});
+
+// **The drift this test was extended to catch.** Compose and nginx are
+// generated from `start-ecosystem.sh`'s APPS manifest, and their
+// generators say so. `ecosystem.config.js` said so too and was not:
+// no generator for it existed, so it was hand-maintained, and it had
+// silently fallen six apps behind — vaco-audit, vaco-operator,
+// vaco-media, vaco-notify, vex, vex-trading. `pm2 start` would have
+// reported every process online while four services the rest of the
+// ecosystem calls were simply absent, and every caller of those four
+// fails soft on signals by standing rule, so nothing would have said
+// so. The generator now exists; this holds its output to the manifest.
+test('every backend in the manifest is in the pm2 process list', () => {
+  const backends = manifestApps().filter((a) => a.cmd === 'npm start');
+  const listed = [...ecosystem.matchAll(/name:\s*["']([^"']+)/g)].map((m) => m[1]);
+
+  const missing = backends.filter((a) => !listed.includes(a.name)).map((a) => a.name);
+  const extra = listed.filter((n) => !backends.some((a) => a.name === n));
+
+  assert.deepEqual(missing, [],
+    'these manifest backends have no pm2 entry — re-run `node deploy/generate-ecosystem-config.js`');
+  assert.deepEqual(extra, [],
+    'these pm2 entries are not in start-ecosystem.sh\'s manifest');
+
+  // Ports too: a right name on a wrong port is a process that starts,
+  // passes its own health check, and is unreachable at the address
+  // nginx proxies to.
+  for (const app of backends) {
+    const entry = ecosystem.match(new RegExp(`name: "${app.name}"[\\s\\S]{0,200}?PORT: "(\\d+)"`));
+    assert.ok(entry, `no PORT found for ${app.name} in ecosystem.config.js`);
+    assert.equal(entry[1], app.port, `${app.name}: pm2 says port ${entry[1]}, the manifest says ${app.port}`);
+  }
+});
+
+// The same question for the committed nginx example, which had drifted
+// the same way — four apps with no location block, so a real VPS would
+// have 404'd them at the reverse proxy however healthy the backend.
+// `vaco-shell` is deliberately absent: it IS the `/` root.
+test('every backend in the manifest has an nginx location block', () => {
+  const backends = manifestApps().filter((a) => a.cmd === 'npm start');
+  for (const file of [{ src: nginx, name: 'nginx-docker.conf' },
+    { src: nginxExample, name: 'nginx-vaco.conf.example' }]) {
+    const locs = [...file.src.matchAll(/^\s*location\s+(\S+)/gm)].map((m) => m[1]);
+    const missing = backends
+      .filter((a) => a.name !== 'vaco-shell' && !locs.includes(`/${a.name}/`))
+      .map((a) => a.name);
+    assert.deepEqual(missing, [],
+      `${file.name} has no location block for these manifest backends — re-run the nginx generator`);
+    assert.ok(locs.includes('/'), `${file.name} has no \`/\` root block for vaco-shell`);
+
+    const dups = locs.filter((l, i) => locs.indexOf(l) !== i);
+    assert.deepEqual(dups, [], `${file.name} emits duplicate location blocks`);
   }
 });
 
