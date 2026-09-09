@@ -27,16 +27,44 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const APP_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+// **These need `npm install` to have run, and one place runs them where
+// it deliberately has not** — the same situation `v4-proxy/test/
+// server.test.js` documents, reached the same way and resolved
+// identically rather than with a second invention.
+//
+// `scripts/package-release.mjs` extracts the release archive and re-runs
+// the whole suite inside it, to prove the archive is what it claims.
+// `git archive` correctly excludes `node_modules`, so `node server.js`
+// there dies with `Cannot find package 'express'` and all six of these
+// fail — six failures that say nothing about the archive and everything
+// about a missing dependency tree. It took the release verification
+// down and deleted a perfectly good tarball.
+//
+// So: skip when the dependency is absent, and **say so in the skip
+// reason** rather than passing quietly. `run-all-tests.mjs` prints the
+// skipped count, so a skip here is visible in every run.
+const SKIP = fs.existsSync(path.join(APP_DIR, 'node_modules', 'express'))
+  ? false
+  : 'vaco-analytics/node_modules is absent — these spawn a real server and need `npm install` first';
+
 const PORT = 9741;
 const BASE = `http://localhost:${PORT}`;
 const SERVICE = { 'X-Service-Name': 'probe', 'X-Service-Token': 'tok-probe' };
 
 let child;
+// The boot output, kept so a failure to come up can say *why*. This was
+// `stdio: 'ignore'`, and the only thing a broken boot could report was
+// "vaco-analytics never came up" — true, useless, and exactly the kind
+// of message that turns a one-line dependency problem into an
+// investigation.
+let bootLog = '';
 
 async function waitForHealth() {
   for (let i = 0; i < 120; i += 1) {
@@ -46,7 +74,10 @@ async function waitForHealth() {
     } catch { /* not listening yet */ }
     await new Promise((r) => setTimeout(r, 100));
   }
-  throw new Error('vaco-analytics never came up');
+  throw new Error(
+    'vaco-analytics did not answer /api/health within 12s.\n'
+    + `--- its output was ---\n${bootLog || '(nothing)'}`,
+  );
 }
 
 function post(p, body, headers = {}) {
@@ -58,6 +89,7 @@ function post(p, body, headers = {}) {
 }
 
 test.before(async () => {
+  if (SKIP) return;
   child = spawn(process.execPath, ['server.js'], {
     cwd: APP_DIR,
     env: {
@@ -69,19 +101,21 @@ test.before(async () => {
       // That path fails soft by design and must not affect these.
       VACO_SERVICE_TOKEN: '',
     },
-    stdio: 'ignore',
+    stdio: ['ignore', 'pipe', 'pipe'],
   });
+  child.stdout.on('data', (d) => { bootLog += d; });
+  child.stderr.on('data', (d) => { bootLog += d; });
   await waitForHealth();
 });
 
 test.after(() => { if (child) child.kill(); });
 
-test('no credential at all cannot reach the evaluator', async () => {
+test('no credential at all cannot reach the evaluator', { skip: SKIP }, async () => {
   const res = await post('/api/intelligence/evaluate', { app: 'x', metric: 'm' });
   assert.equal(res.status, 401);
 });
 
-test('a bearer token is not a licence to write alerts and page people', async () => {
+test('a bearer token is not a licence to write alerts and page people', { skip: SKIP }, async () => {
   // **The regression.** This returned 200 and wrote a row. Note the
   // token is invented — nothing validates it, which is the point:
   // serviceAuth identifies, it does not authorise, and the route has
@@ -96,7 +130,7 @@ test('a bearer token is not a licence to write alerts and page people', async ()
   assert.match(body.error, /requireCallingService/);
 });
 
-test('a trusted service credential still works', async () => {
+test('a trusted service credential still works', { skip: SKIP }, async () => {
   // The guard has to refuse the wrong caller without breaking the right
   // one — a test that only checked the 403 would pass on a route that
   // refused everybody.
@@ -107,7 +141,7 @@ test('a trusted service credential still works', async () => {
   assert.equal(body.reason, 'insufficient_data');
 });
 
-test('a refused evaluation writes no alert row', async () => {
+test('a refused evaluation writes no alert row', { skip: SKIP }, async () => {
   // Read the store through the app's own listing rather than trusting
   // the status code: a 403 that still wrote would be the worst outcome
   // and the status alone cannot rule it out.
@@ -131,7 +165,7 @@ test('a refused evaluation writes no alert row', async () => {
     'a refused evaluation still wrote an alert row — the guard runs after the write');
 });
 
-test('the same evaluation on a service credential does raise the alert', async () => {
+test('the same evaluation on a service credential does raise the alert', { skip: SKIP }, async () => {
   // The control for the test above: if the fixture could not produce an
   // anomaly at all, "no alert row" would pass for the wrong reason.
   const app = `guard-probe-ok-${Date.now()}`;
@@ -149,7 +183,7 @@ test('the same evaluation on a service credential does raise the alert', async (
   assert.equal(after.alerts.length, 1);
 });
 
-test('telemetry ingest requires the service credential its reason claims', async () => {
+test('telemetry ingest requires the service credential its reason claims', { skip: SKIP }, async () => {
   // The header block above `/api/metrics/ingest` says a poisoned
   // baseline hides the anomaly rather than raising it. Its declared
   // reason said "from services" and nothing enforced it, so any bearer
