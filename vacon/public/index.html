@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VACON</title>
+<link rel="stylesheet" href="/vaco-design.css" />
+<style>
+  .agent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: var(--vaco-space-3); }
+  .match-bar { height: 6px; border-radius: var(--vaco-radius-pill); background: var(--vaco-surface-hover); overflow: hidden; }
+  .match-fill { height: 100%; background: var(--vaco-accent); }
+  .keyword { font-family: var(--vaco-font-mono); font-size: var(--vaco-text-xs); }
+</style>
+</head>
+<body class="vaco">
+<script src="/vaco-ui.js"></script>
+<script>
+// VACON — the operating network: MIA plus the named executive agents.
+//
+// **What routing here actually is.** MIA matches a question against
+// each agent's domain keywords on word boundaries and weights by
+// specificity. It is a real, deterministic router — not a model
+// deciding. Showing which keywords matched is the honest way to
+// present that, because a routing decision you cannot inspect is
+// indistinguishable from a guess.
+//
+// The agents themselves are not autonomous. Invoking one calls through
+// v4-proxy to a real model if an API key is configured; without one the
+// routing above still works and is still the real product.
+
+var el = VACO.el;
+
+function renderAgents(body) {
+  return VACO.api('/api/agents').then(function (data) {
+    var agents = data.agents || data || [];
+    var grid = el('div', 'agent-grid');
+    agents.forEach(function (a) {
+      var lines = el('div', 'vaco-stack-sm');
+      lines.appendChild(el('p', 'vaco-small vaco-dim', a.role || a.description || ''));
+      if (a.represents) lines.appendChild(VACO.badge(a.represents));
+      if (a.domainKeywords && a.domainKeywords.length) {
+        lines.appendChild(el('span', 'vaco-label', 'Domain'));
+        lines.appendChild(el('p', 'keyword vaco-faint', a.domainKeywords.slice(0, 10).join(' · ')));
+      }
+      grid.appendChild(VACO.card(a.name || a.id, [lines]));
+    });
+    if (!agents.length) return el('div', 'vaco-empty', 'No agents registered.');
+    return grid;
+  });
+}
+
+function renderRoute(body) {
+  var out = el('div', 'vaco-stack');
+
+  out.appendChild(VACO.card('Ask the network', [
+    el('p', 'vaco-small vaco-dim',
+      'MIA routes on word boundaries and weights by specificity, so "trip" no longer matches "ip". '
+      + 'Every match is shown with the keywords that caused it.'),
+    VACO.form([
+      { name: 'query', label: 'Question', placeholder: 'how do I get a package across town today?', width: '360px' },
+    ], function (values) {
+      return VACO.post('/api/route', { query: values.query }).then(function (result) {
+        while (out.childNodes.length > 1) out.removeChild(out.lastChild);
+        var matches = result.matchedAgents || result.matches || [];
+        if (!matches.length) {
+          out.appendChild(VACO.notice('No agent claimed that question. That is a real answer, not a failure — '
+            + 'it means no registered domain covers it.', 'warn'));
+          VACO.mount(body, out);
+          return;
+        }
+        var top = matches[0].score || 1;
+        matches.forEach(function (m) {
+          var lines = el('div', 'vaco-stack-sm');
+          var bar = el('div', 'match-bar');
+          var fill = el('div', 'match-fill');
+          fill.style.width = Math.round(((m.score || 0) / top) * 100) + '%';
+          bar.appendChild(fill);
+          lines.appendChild(bar);
+          lines.appendChild(el('p', 'vaco-small vaco-dim', 'score ' + (m.score || 0)));
+          if (m.matched && m.matched.length) {
+            lines.appendChild(el('p', 'keyword vaco-faint', 'matched: ' + m.matched.join(', ')));
+          }
+          lines.appendChild(VACO.button('Invoke', function () {
+            return VACO.post('/api/agents/' + encodeURIComponent(m.agentId || m.id) + '/invoke',
+              { query: values.query })
+              .then(function (r) {
+                VACO.toast('Agent replied.');
+                lines.appendChild(el('pre', 'vaco-mono vaco-small',
+                  JSON.stringify(r, null, 2).slice(0, 1200)));
+              })
+              .catch(function (err) {
+                lines.appendChild(VACO.notice(
+                  'No completion: ' + VACO.escapeHtml(err.message)
+                  + ' — expected here, since v4-proxy has no API key configured. The routing above is still real.',
+                  'warn'));
+              });
+          }));
+          out.appendChild(VACO.card(m.agentName || m.agentId || m.id, [lines]));
+        });
+        VACO.mount(body, out);
+      });
+    }, 'Route'),
+  ]));
+
+  return VACO.mount(body, out);
+}
+
+function renderHistory(body) {
+  return VACO.api('/api/route/history').then(function (data) {
+    var history = data.history || data || [];
+    return VACO.card('Routing history', [
+      el('p', 'vaco-small vaco-dim',
+        'Every routing decision the network has made. This is the audit trail that makes a deterministic router worth having.'),
+      VACO.table([
+        { key: 'query', label: 'Question' },
+        { label: 'Routed to', render: function (h) {
+          return (h.matchedAgents || []).map(function (m) { return m.agentId || m.id; }).join(', ') || '—'; } },
+        { key: 'at', label: 'When', render: function (h) {
+          var t = h.at || h.createdAt;
+          return t ? new Date(t).toLocaleString() : '—'; } },
+      ], history, { empty: 'Nothing routed yet.' }),
+    ]);
+  });
+}
+
+VACO.app({
+  id: 'vacon',
+  name: 'VACON',
+  tagline: 'The operating network',
+  //: VACON's identity: a cool slate-indigo. Infrastructure rather than
+  //: product — deliberately quieter than the consumer apps it routes to.
+  accent: '#8a90b8',
+  accentDim: '#6a7196',
+  accentInk: '#0a0c14',
+  tabs: [
+    { id: 'route', label: 'Route', heading: 'Ask MIA', render: renderRoute },
+    { id: 'agents', label: 'Agents', heading: 'The executive agents', render: renderAgents },
+    { id: 'history', label: 'History', heading: 'Routing audit trail', render: renderHistory },
+  ],
+});
+</script>
+</body>
+</html>

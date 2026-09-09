@@ -1,0 +1,16 @@
+[project]
+name = "vexbusiness-strategy"
+version = "0.1.0"
+description = "Vex Business — feature engine, market regime engine, signal engine, 50-point opportunity engine, statistical engine (Master Directive Sections 11-15). Phase 5: the feature engine (Section 11) is real and implemented (strategy/features.py). Sections 12-15 remain real, unstarted scope."
+requires-python = ">=3.12"
+dependencies = ["vexbusiness-domain"]
+
+[tool.uv.sources]
+vexbusiness-domain = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["strategy"]

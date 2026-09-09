@@ -1,0 +1,31 @@
+{
+  "name": "vexbusiness-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Vex Business — Next.js frontend. A real dashboard reporting the API's own live safety posture, plus (Phase 13) a real client panel that runs the live pipeline (feature/regime/signal/opportunity/risk/execution) against a clearly-labeled synthetic demo bar series via a same-origin proxy route.",
+  "scripts": {
+    "dev": "next dev -p 9001",
+    "build": "next build",
+    "start": "next start -p 9001",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.62.0",
+    "next": "^16.3.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "autoprefixer": "^10.4.0",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.1",
+    "postcss": "^8.4.0",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.7.0"
+  }
+}

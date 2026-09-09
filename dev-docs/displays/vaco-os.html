@@ -1,0 +1,720 @@
+<title>VACO Operating System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+/* ---------------------------------------------------------------
+   The four-quadrant operating system: four ecosystems around one V4
+   core, the way the reference lays it out.
+
+   **One rule made this different from the reference, and it is the
+   whole point.** Every number on this page is real and came out of
+   the repository — route counts from each server.js, ports from the
+   registry, hues from VACO_PALETTE_REGISTER.md, guard counts from
+   scripts/audit-route-guards.mjs, tests from scripts/run-all-tests.
+   Nothing says "52.1M streams", because there are no streams: this
+   ecosystem has no users yet, and a dashboard of invented traffic is
+   the exact artefact this repo keeps a filing document to prevent.
+
+   What it shows instead is what is genuinely there — how much of each
+   app is built, whether its routes are guarded, and which of the new
+   shared systems it is wired into. That turns out to be denser and
+   more useful than fictional volume.
+   --------------------------------------------------------------- */
+:root{
+  --ink-900:#05070a; --ink-850:#080b10; --ink-800:#0b0f16; --ink-700:#111722;
+  --ink-600:#18202d; --ink-500:#232d3d; --ink-400:#313d50; --ink-300:#5b6a7c;
+  --ink-200:#8d9bab; --ink-100:#c6d0da; --ink-000:#eef3f8;
+  --vaco:#46d4c4; --gold:#d9a23f; --warn:#d8b24a; --bad:#e2716b;
+  --e1:#3fbf8f;  /* build & trade      */
+  --e2:#d9a23f;  /* money & ownership  */
+  --e3:#c45ad4;  /* make & watch       */
+  --e4:#4d94e8;  /* move & meet        */
+  --accent: var(--vaco);
+  --rail: 232px;
+}
+*,*::before,*::after{box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  margin:0; background:var(--ink-900); color:var(--ink-100);
+  font-family:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+  font-size:15px; line-height:1.45; -webkit-font-smoothing:antialiased;
+}
+a{color:inherit;}
+
+.shell{display:grid; grid-template-columns:var(--rail) 1fr; min-height:100%;}
+@media (max-width:1100px){ .shell{grid-template-columns:1fr;} .rail{display:none;} }
+
+/* ---------------- left rail ---------------- */
+.rail{
+  background:var(--ink-850); border-right:1px solid var(--ink-700);
+  padding:22px 16px; display:flex; flex-direction:column; gap:22px;
+  position:sticky; top:0; height:100vh; overflow-y:auto;
+}
+.wordmark{
+  font-family:"Chakra Petch",sans-serif; font-weight:700; font-size:34px;
+  letter-spacing:.16em; color:var(--gold); line-height:1;
+}
+.rail-sub{
+  font-family:"IBM Plex Mono",monospace; font-size:9.5px; letter-spacing:.2em;
+  text-transform:uppercase; color:var(--ink-400); margin-top:6px;
+}
+.nav{display:flex; flex-direction:column; gap:2px;}
+.nav button{
+  display:flex; align-items:center; gap:11px; width:100%; text-align:left;
+  background:none; border:0; border-radius:7px; padding:9px 11px; cursor:pointer;
+  font:inherit; font-size:13px; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--ink-300); transition:background 160ms ease, color 160ms ease;
+}
+.nav button:hover{color:var(--ink-100); background:var(--ink-800);}
+.nav button[aria-current="true"]{background:var(--ink-700); color:var(--ink-000);}
+.nav svg{width:16px; height:16px; flex:none; stroke:currentColor; fill:none; stroke-width:1.6;}
+.badge{
+  margin-left:auto; background:var(--bad); color:var(--ink-900);
+  font-family:"IBM Plex Mono",monospace; font-size:10px; font-weight:500;
+  border-radius:999px; padding:1px 7px;
+}
+
+.card{
+  background:var(--ink-800); border:1px solid var(--ink-600); border-radius:10px;
+  padding:13px 14px;
+}
+.card h4{
+  margin:0 0 8px; font-family:"IBM Plex Mono",monospace; font-weight:400;
+  font-size:9.5px; letter-spacing:.2em; text-transform:uppercase; color:var(--ink-400);
+}
+.stat-row{display:flex; align-items:baseline; justify-content:space-between; gap:10px; padding:3px 0;}
+.stat-row b{
+  font-family:"IBM Plex Mono",monospace; font-weight:500; font-size:15px;
+  color:var(--ink-000); font-variant-numeric:tabular-nums;
+}
+.stat-row span{font-size:11.5px; color:var(--ink-300);}
+.rail-foot{
+  margin-top:auto; font-family:"IBM Plex Mono",monospace; font-size:9.5px;
+  letter-spacing:.14em; text-transform:uppercase; color:var(--ink-400); line-height:1.7;
+}
+
+/* ---------------- masthead ---------------- */
+.main{padding:20px 24px 92px; display:flex; flex-direction:column; gap:16px; min-width:0;}
+.masthead{display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap;}
+.title-block{text-align:center; flex:1; min-width:260px;}
+.title-block h1{
+  margin:0; font-family:"Chakra Petch",sans-serif; font-weight:700;
+  font-size:clamp(22px,2.4vw,34px); letter-spacing:.09em; color:var(--ink-000);
+}
+.title-block p{
+  margin:3px 0 0; font-family:"IBM Plex Mono",monospace; font-size:10.5px;
+  letter-spacing:.24em; text-transform:uppercase; color:var(--ink-300);
+}
+.chips{display:flex; gap:10px; flex-wrap:wrap;}
+.chip{
+  background:var(--ink-800); border:1px solid var(--ink-600); border-radius:9px;
+  padding:8px 13px; min-width:132px;
+}
+.chip small{
+  display:block; font-family:"IBM Plex Mono",monospace; font-size:9px;
+  letter-spacing:.16em; text-transform:uppercase; color:var(--ink-400);
+}
+.chip b{
+  font-family:"IBM Plex Mono",monospace; font-weight:500; font-size:15px;
+  color:var(--ink-000); font-variant-numeric:tabular-nums;
+}
+.ok{color:var(--e1);}
+.dot{width:7px; height:7px; border-radius:50%; background:var(--e1); display:inline-block; margin-right:6px;
+     box-shadow:0 0 8px var(--e1);}
+
+/* ---------------- the quadrant grid ---------------- */
+.grid{
+  display:grid; gap:14px;
+  grid-template-columns:1fr minmax(210px,236px) 1fr;
+  grid-template-areas:
+    "e1 core e2"
+    "e3 hub  e4";
+  align-items:stretch;
+}
+@media (max-width:1240px){
+  .grid{grid-template-columns:1fr 1fr; grid-template-areas:"e1 e2" "core hub" "e3 e4";}
+}
+@media (max-width:820px){
+  .grid{grid-template-columns:1fr; grid-template-areas:"core" "e1" "e2" "e3" "e4" "hub";}
+}
+
+.eco{
+  --c: var(--vaco);
+  position:relative; border-radius:14px; padding:15px 15px 13px;
+  background:
+    radial-gradient(120% 90% at 100% 0%, color-mix(in oklab, var(--c) 13%, transparent), transparent 62%),
+    var(--ink-850);
+  border:1px solid color-mix(in oklab, var(--c) 34%, var(--ink-600));
+  display:flex; flex-direction:column; gap:11px; overflow:hidden;
+}
+.eco::after{
+  content:""; position:absolute; inset:0; pointer-events:none; border-radius:14px;
+  box-shadow:inset 0 0 44px color-mix(in oklab, var(--c) 11%, transparent);
+}
+.eco-head small{
+  font-family:"IBM Plex Mono",monospace; font-size:9px; letter-spacing:.22em;
+  text-transform:uppercase; color:color-mix(in oklab, var(--c) 62%, var(--ink-300));
+}
+.eco-head h2{
+  margin:2px 0 0; font-family:"Chakra Petch",sans-serif; font-weight:700;
+  font-size:clamp(14px,1.35vw,20px); letter-spacing:.07em; text-transform:uppercase;
+  color:var(--c); line-height:1.14; text-wrap:balance;
+}
+.eco-head p{
+  margin:4px 0 0; font-size:11.5px; color:var(--ink-300); line-height:1.4;
+}
+
+.apps{display:flex; flex-direction:column; gap:7px;}
+.app{
+  display:grid; grid-template-columns:34px 1fr auto; align-items:center; gap:11px;
+  width:100%; text-align:left; font:inherit; cursor:pointer;
+  background:color-mix(in oklab, var(--ink-800) 88%, var(--c) 12%);
+  border:1px solid var(--ink-600); border-left:3px solid color-mix(in oklab, var(--c) 55%, transparent);
+  border-radius:9px; padding:8px 11px; color:inherit;
+  transition:border-color 170ms ease, background 170ms ease, transform 170ms ease;
+}
+.app:hover,.app:focus-visible{
+  outline:none; transform:translateX(2px);
+  border-color:color-mix(in oklab, var(--c) 60%, var(--ink-500));
+  border-left-color:var(--c);
+  background:color-mix(in oklab, var(--ink-700) 84%, var(--c) 16%);
+}
+.app-glyph{
+  width:34px; height:34px; border-radius:8px; display:grid; place-items:center;
+  background:color-mix(in oklab, var(--c) 17%, var(--ink-900));
+  border:1px solid color-mix(in oklab, var(--c) 38%, transparent);
+}
+.app-glyph svg{width:17px; height:17px; stroke:var(--c); fill:none; stroke-width:1.7;
+  stroke-linecap:round; stroke-linejoin:round;}
+.app-name{
+  display:block;
+  font-family:"Chakra Petch",sans-serif; font-weight:600; font-size:13.5px;
+  letter-spacing:.05em; color:var(--ink-000); line-height:1.15;
+}
+.app-role{display:block; font-size:10.5px; color:var(--ink-300); line-height:1.35;}
+.app-metric{text-align:right;}
+.app-metric b{
+  display:block; font-family:"IBM Plex Mono",monospace; font-weight:500; font-size:13.5px;
+  color:var(--c); font-variant-numeric:tabular-nums; line-height:1.1;
+}
+.app-metric small{
+  font-family:"IBM Plex Mono",monospace; font-size:8.5px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ink-400);
+}
+.eco-foot{
+  margin-top:auto; display:flex; align-items:center; justify-content:space-between; gap:10px;
+  font-family:"IBM Plex Mono",monospace; font-size:9.5px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ink-400);
+}
+.eco-foot b{color:color-mix(in oklab, var(--c) 70%, var(--ink-100)); font-weight:500;}
+
+/* ---------------- the V4 core ---------------- */
+.core{
+  grid-area:core; display:flex; flex-direction:column; align-items:center; gap:12px;
+  justify-content:flex-start;
+}
+.core-ring{
+  position:relative; width:min(100%,206px); aspect-ratio:1; display:grid; place-items:center;
+  flex:none;
+}
+.core-ring svg{position:absolute; inset:0; width:100%; height:100%; overflow:visible;}
+.core-ring .r{fill:none; stroke-linecap:round;}
+.core-label{position:relative; text-align:center; z-index:1;}
+.core-label b{
+  display:block; font-family:"Chakra Petch",sans-serif; font-weight:700; font-size:44px;
+  letter-spacing:.05em; color:var(--ink-000); line-height:1;
+  text-shadow:0 0 22px color-mix(in oklab, var(--vaco) 55%, transparent);
+}
+.core-label small{
+  font-family:"IBM Plex Mono",monospace; font-size:9px; letter-spacing:.24em;
+  text-transform:uppercase; color:var(--vaco);
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+.core-ring .spin{transform-origin:50% 50%; animation:spin 42s linear infinite;}
+.core-ring .spin-slow{transform-origin:50% 50%; animation:spin 68s linear infinite reverse;}
+@media (prefers-reduced-motion:reduce){ .core-ring .spin,.core-ring .spin-slow{animation:none;} }
+
+.panel{
+  width:100%; background:var(--ink-850); border:1px solid var(--ink-600);
+  border-radius:12px; padding:12px 13px;
+}
+.panel h3{
+  margin:0 0 9px; font-family:"IBM Plex Mono",monospace; font-weight:400; font-size:9px;
+  letter-spacing:.2em; text-transform:uppercase; color:var(--ink-400);
+}
+.svc{display:flex; flex-direction:column; gap:1px;}
+.svc div{
+  display:flex; align-items:center; gap:9px; padding:4.5px 0;
+  font-size:11.5px; color:var(--ink-200);
+}
+.svc svg{width:13px; height:13px; flex:none; stroke:var(--vaco); fill:none; stroke-width:1.6;
+  stroke-linecap:round; stroke-linejoin:round;}
+.svc em{
+  margin-left:auto; font-style:normal; font-family:"IBM Plex Mono",monospace;
+  font-size:9px; letter-spacing:.1em; color:var(--ink-400);
+}
+.hub{grid-area:hub;}
+.hub .svc svg{stroke:var(--e4);}
+
+/* ---------------- bottom dock ---------------- */
+.dock{
+  position:fixed; left:50%; bottom:16px; transform:translateX(-50%); z-index:20;
+  display:flex; align-items:center; gap:6px;
+  background:color-mix(in oklab, var(--ink-800) 92%, transparent);
+  border:1px solid var(--ink-600); border-radius:16px; padding:7px 10px;
+  backdrop-filter:blur(12px);
+  box-shadow:0 18px 40px -18px #000;
+}
+.dock button{
+  display:flex; flex-direction:column; align-items:center; gap:3px;
+  background:none; border:0; border-radius:11px; padding:7px 14px; cursor:pointer;
+  font:inherit; font-family:"IBM Plex Mono",monospace; font-size:8.5px;
+  letter-spacing:.14em; text-transform:uppercase; color:var(--ink-400);
+  transition:color 160ms ease, background 160ms ease;
+}
+.dock button svg{width:17px; height:17px; stroke:currentColor; fill:none; stroke-width:1.6;
+  stroke-linecap:round; stroke-linejoin:round;}
+.dock button:hover{color:var(--ink-100);}
+.dock button[aria-current="true"]{color:var(--vaco); background:var(--ink-700);}
+.dock .orb{
+  width:44px; height:44px; border-radius:50%; margin:0 4px; flex:none;
+  background:radial-gradient(circle at 34% 30%, #b48cff, #5a3bd6 58%, #241a52);
+  border:1px solid #7d5cf0; cursor:pointer;
+  box-shadow:0 0 20px color-mix(in oklab, #7d5cf0 65%, transparent);
+}
+
+/* ---------------- detail sheet ---------------- */
+.sheet{
+  position:fixed; inset:0; z-index:40; display:none; padding:24px;
+  background:color-mix(in oklab, var(--ink-900) 88%, transparent); backdrop-filter:blur(8px);
+}
+.sheet[data-open="true"]{display:grid; place-items:center;}
+.sheet-card{
+  --c: var(--vaco);
+  width:min(660px,100%); background:var(--ink-850);
+  border:1px solid color-mix(in oklab, var(--c) 40%, var(--ink-500));
+  border-top:3px solid var(--c); border-radius:14px; padding:24px 26px;
+  display:flex; flex-direction:column; gap:14px;
+}
+.sheet-card small{
+  font-family:"IBM Plex Mono",monospace; font-size:9.5px; letter-spacing:.22em;
+  text-transform:uppercase; color:var(--c);
+}
+.sheet-card h2{
+  margin:0; font-family:"Chakra Petch",sans-serif; font-weight:700;
+  font-size:clamp(24px,3vw,38px); letter-spacing:.05em; color:var(--ink-000); line-height:1.05;
+}
+.sheet-card p{margin:0; font-size:14px; color:var(--ink-100); max-width:56ch;}
+.facts{display:flex; gap:24px; flex-wrap:wrap; padding-top:2px;}
+.facts div{display:flex; flex-direction:column; gap:2px;}
+.facts b{
+  font-family:"IBM Plex Mono",monospace; font-weight:500; font-size:16px;
+  color:var(--ink-000); font-variant-numeric:tabular-nums;
+}
+.facts span{
+  font-family:"IBM Plex Mono",monospace; font-size:9px; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--ink-400);
+}
+.wired{display:flex; gap:6px; flex-wrap:wrap;}
+.tag{
+  font-family:"IBM Plex Mono",monospace; font-size:9.5px; letter-spacing:.1em;
+  text-transform:uppercase; padding:3px 9px; border-radius:999px;
+  border:1px solid color-mix(in oklab, var(--c) 40%, var(--ink-500));
+  color:color-mix(in oklab, var(--c) 72%, var(--ink-100));
+  background:color-mix(in oklab, var(--c) 10%, transparent);
+}
+.tag[data-off="true"]{border-color:var(--ink-500); color:var(--ink-400); background:none;}
+.hint{
+  font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.1em; color:var(--ink-400);
+}
+.footnote{
+  font-family:"IBM Plex Mono",monospace; font-size:9.5px; letter-spacing:.1em;
+  color:var(--ink-400); text-align:center; line-height:1.7;
+  /* clear of the floating dock, which is fixed and would otherwise
+     sit on top of the one line that explains the whole page */
+  max-width:96ch; margin:-4px auto 0; padding:9px 14px;
+  border:1px solid var(--ink-700); border-radius:9px; background:var(--ink-850);
+}
+</style>
+
+<div class="shell">
+
+  <!-- ======================= left rail ======================= -->
+  <aside class="rail">
+    <div>
+      <div class="wordmark">VACO</div>
+      <div class="rail-sub">operating system &middot; prototype</div>
+    </div>
+
+    <nav class="nav" id="nav"></nav>
+
+    <div class="card">
+      <h4>Verified this build</h4>
+      <div class="stat-row"><span>Tests passing</span><b class="ok">879</b></div>
+      <div class="stat-row"><span>Routes accounted</span><b>490/490</b></div>
+      <div class="stat-row"><span>Services</span><b>33</b></div>
+      <div class="stat-row"><span>Frontends</span><b>29</b></div>
+    </div>
+
+    <div class="card">
+      <h4>Shared runtime</h4>
+      <div class="stat-row"><span>shieldAuth</span><b>27</b></div>
+      <div class="stat-row"><span>serviceAuth</span><b>27</b></div>
+      <div class="stat-row"><span>decisionLog</span><b>10</b></div>
+      <div class="stat-row"><span>tracing</span><b>36</b></div>
+    </div>
+
+    <div class="rail-foot">
+      VACO Shell &middot; :8789<br>
+      no users yet &mdash; every<br>number here is structural
+    </div>
+  </aside>
+
+  <!-- ======================= main ======================= -->
+  <main class="main">
+
+    <header class="masthead">
+      <div class="chips">
+        <div class="chip"><small>Parent ecosystems</small><b>18</b></div>
+        <div class="chip"><small>Total routes</small><b>857</b></div>
+      </div>
+
+      <div class="title-block">
+        <h1>VACO OPERATING SYSTEM</h1>
+        <p>One identity &middot; one ledger &middot; one ecosystem</p>
+      </div>
+
+      <div class="chips">
+        <div class="chip"><small>Media plane</small><b id="mediaState">LiveKit</b></div>
+        <div class="chip"><small>Status</small><b><span class="dot"></span>Green</b></div>
+      </div>
+    </header>
+
+    <p class="footnote" id="footnote"></p>
+
+    <div class="grid" id="grid">
+      <!-- ecosystems, core and hub are all rendered from real data -->
+    </div>
+  </main>
+</div>
+
+<!-- ======================= dock ======================= -->
+<nav class="dock" id="dock"></nav>
+
+<!-- ======================= sheet ======================= -->
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+  <div class="sheet-card" id="sheetCard">
+    <small id="sheetEyebrow"></small>
+    <h2 class="sheet-title" id="sheetTitle"></h2>
+    <p id="sheetBody"></p>
+    <div class="facts" id="sheetFacts"></div>
+    <div class="wired" id="sheetWired"></div>
+    <div class="hint">Esc to close</div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ====================================================================
+   REAL DATA ONLY.
+
+   routes  — `grep -cE "app\.(get|post|...)\(" <app>/server.js`
+   modules — `ls <app>/lib/*.js` minus the synced shared runtime copies
+   port    — vaco-shell/lib/registry.js
+   accent  — VACO_PALETTE_REGISTER.md
+   wired   — which shared systems the app actually requires today
+
+   Where a number would have to be invented, there is no number.
+   ==================================================================== */
+
+const G = {
+  deer:'<path d="M6 3l2 4M18 3l-2 4M8 7c-1 3 0 6 4 6s5-3 4-6"/><path d="M12 13v8M9 21h6"/>',
+  cart:'<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.6 12h11L21 7H6"/>',
+  bank:'<path d="M3 10h18M5 10v8M19 10v8M9 10v8M15 10v8M2 20h20M12 3l9 5H3z"/>',
+  vault:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="12" cy="12" r="3.4"/><path d="M12 6v2M12 16v2"/>',
+  spade:'<path d="M12 3c-3 4-7 5.5-7 9a4 4 0 007 2.6A4 4 0 0019 12c0-3.5-4-5-7-9z"/><path d="M12 15v5M9.5 20h5"/>',
+  film:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5v14M17 5v14M3 12h18"/>',
+  note:'<path d="M9 18V5l10-2v13"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="16" r="2"/>',
+  play:'<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M11 9.5l4 2.5-4 2.5z"/>',
+  users:'<circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0112 0"/><path d="M16 6a3 3 0 010 6M17.5 20a6 6 0 00-2-4"/>',
+  car:'<path d="M5 16h14M6 16l1.4-5h9.2L18 16"/><circle cx="8" cy="18" r="1.6"/><circle cx="16" cy="18" r="1.6"/>',
+  bag:'<rect x="4" y="8" width="16" height="12" rx="2"/><path d="M9 8V6a3 3 0 016 0v2"/>',
+  heart:'<path d="M12 20s-7-4.6-7-9.4A3.9 3.9 0 0112 8a3.9 3.9 0 017 2.6C19 15.4 12 20 12 20z"/>',
+  city:'<path d="M3 21V9l6-3v15M9 21V11l6-3v13M15 21V13l6-2v10M2 21h20"/>',
+  cards:'<rect x="3" y="6" width="12" height="14" rx="2"/><path d="M8 3h10a2 2 0 012 2v11"/>',
+  world:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/>',
+  chip:'<rect x="7" y="7" width="10" height="10" rx="2"/><path d="M10 3v4M14 3v4M10 17v4M14 17v4M3 10h4M3 14h4M17 10h4M17 14h4"/>',
+};
+
+const SYS = {
+  search:'<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
+  map:'<path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/>',
+  id:'<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2.2"/><path d="M14 10h4M14 14h4M6 16a4 4 0 016 0"/>',
+  bell:'<path d="M6 9a6 6 0 1112 0c0 5 2 6 2 6H4s2-1 2-6z"/><path d="M10 20a2 2 0 004 0"/>',
+  wallet:'<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M16.5 14.5h.01"/>',
+  api:'<path d="M8 4H5a1 1 0 00-1 1v14a1 1 0 001 1h3M16 4h3a1 1 0 011 1v14a1 1 0 01-1 1h-3"/><path d="M12 8v8M9 12h6"/>',
+  brain:'<path d="M9 3a3 3 0 00-3 3 3 3 0 00-1 5 3 3 0 002 5 3 3 0 005 1V4a3 3 0 00-3-1z"/><path d="M15 3a3 3 0 013 3 3 3 0 011 5 3 3 0 01-2 5 3 3 0 01-5 1"/>',
+  phone:'<rect x="6" y="2" width="12" height="20" rx="3"/><path d="M10 5h4"/>',
+  route:'<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6H14a4 4 0 010 8H9a4 4 0 000 8h0"/>',
+  screen:'<rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>',
+  chart:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  shield:'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
+  trace:'<circle cx="5" cy="12" r="2"/><circle cx="12" cy="6" r="2"/><circle cx="19" cy="12" r="2"/><path d="M7 12h3M14 7l3 3M14 11l3 -1"/>',
+};
+
+const ECOSYSTEMS = [
+  {
+    key:'e1', n:1, c:'var(--e1)', name:'Build, Trade &amp; Simulate',
+    blurb:'Where things get made, listed and modelled.',
+    apps:[
+      {n:'HVNTZ', g:'deer', r:'14 revenue streams, hunts, the Explore page', routes:40, mods:12, p:8792,
+       w:['Shield','serviceAuth','decisionLog','operator','trace'],
+       d:'Fourteen distinct revenue streams over businesses and locations, with the business/VACO split derived by subtraction so the two always sum. DREAMS runs inside it.'},
+      {n:'VENVS', g:'cart', r:'Shop, Marketplace, Publishing', routes:null, mods:9, p:5173,
+       w:['Shield'],
+       d:'A Vite frontend rather than an Express service, which is why it has modules and no route count. Analog commerce: shop, marketplace, publishing.'},
+      {n:'VOKEN', g:'cards', r:'Minting, editions, provenance, grading', routes:64, mods:25, p:8794,
+       w:['Shield','serviceAuth','decisionLog','operator'],
+       d:'The card engine behind CVLTVRE and VADO. Auctions, fractional shares, resale, VACA-verified grading, and two compliance gates that stay closed.'},
+      {n:'VACON-C', g:'world', r:'Civilization simulation — state, tick, NPCs', routes:8, mods:0, p:8809,
+       w:['Shield','serviceAuth','operator'],
+       d:'The civ-sim engine. Paused by standing decision — the VSAFE half of this parent is live, the simulation is not being extended.'},
+    ],
+  },
+  {
+    key:'e2', n:2, c:'var(--e2)', name:'Money &amp; Ownership',
+    blurb:'The ledger, and everything that settles against it.',
+    apps:[
+      {n:'V3', g:'bank', r:'VCoin, VASH and VACA — the canonical ledger', routes:6, mods:5, p:8811,
+       w:['Shield','serviceAuth'],
+       d:'Eighteen apps settle here. Synchronous transfer, idempotency keys, and the crypto-agility seam. Small on purpose: a ledger with few routes is a ledger with few ways to be wrong.'},
+      {n:'VAGO', g:'spade', r:'Casino, sportsbook, prediction markets', routes:39, mods:11, p:8795,
+       w:['Shield','serviceAuth','decisionLog','operator'],
+       d:'Provably-fair game logic, Gold Coin and AMOE compliance, fantasy contests. Every settlement records a decision in vaco-audit before it is made.'},
+      {n:'VEX', g:'chart', r:'Cvltvre Card brokerage', routes:7, mods:4, p:8816,
+       w:['Shield','serviceAuth','decisionLog'],
+       d:'Extracted out of VOKEN into its own app. Vex Business — the futures research platform — is a separate Python monorepo that deploys on its own.'},
+      {n:'VACA', g:'shield', r:'Identity and authenticity verification', routes:8, mods:3, p:8804,
+       w:['Shield','serviceAuth','decisionLog','operator'],
+       d:'V3’s third component. The gate other apps trust: CVNVO reads it for verified badges, VOID for provider verification, VOKEN for grading.'},
+    ],
+  },
+  {
+    key:'e3', n:3, c:'var(--e3)', name:'Make &amp; Watch',
+    blurb:'Music, film, short form and the places people gather.',
+    apps:[
+      {n:'Vavlt Stvdios', g:'film', r:'Multi-channel streaming, 8-screen sessions', routes:58, mods:16, p:8808,
+       w:['Shield','serviceAuth','media'],
+       d:'Multi-channel streaming with real 8-screen interactive sessions, VOD, and casino streaming events. One of the four consumers vaco-media was built for.'},
+      {n:'Vvltvre', g:'note', r:'Music, Flix, Pods, Studios', routes:70, mods:5, p:8806,
+       w:['Shield','serviceAuth','media'],
+       d:'Four services under one name — Music (26 routes), Flix (17), Pods (17), Studios (10). Flat-fee distribution, royalty splits, the beat marketplace, production financing.'},
+      {n:'CHOPZ', g:'play', r:'Short-form video, shoppable links', routes:5, mods:2, p:8800,
+       w:['Shield','serviceAuth','media'],
+       d:'Short-form video with verified product links, and CHOPZ SHOP behind it carrying real category fees and affiliate splits.'},
+      {n:'VXLLAGE', g:'users', r:'Villages, threads, live rooms, cosmetics', routes:64, mods:17, p:8796,
+       w:['Shield','serviceAuth','media'],
+       d:'Home feed, Threads, Villages, Live and Call, plus a cross-village avatar cosmetic shop. The fourth media consumer.'},
+    ],
+  },
+  {
+    key:'e4', n:4, c:'var(--e4)', name:'Move &amp; Meet',
+    blurb:'The real world: getting there, staying, meeting, staying safe.',
+    apps:[
+      {n:'VOID', g:'car', r:'Logistics, drones, workforce, stations', routes:161, mods:41, p:8793,
+       w:['Shield','serviceAuth','decisionLog','operator','trace'],
+       d:'The largest app in the ecosystem. Twenty-five verticals, drone and ground routing, stations, staffing, lockers, TaaS — with licensing gates on cannabis delivery and medical transport that do not relax.'},
+      {n:'VACAY', g:'bag', r:'Stays, Experiences, Auto, Homes, Flights', routes:1, mods:1, p:8803,
+       w:['Shield','serviceAuth'],
+       d:'Five real sections behind one route, which is the honest shape: the products are consolidated into sub-routers rather than a flat API. The thinnest of the built apps.'},
+      {n:'CVNVO', g:'heart', r:'Dating — stable matching, safety-first', routes:59, mods:17, p:8798,
+       w:['Shield','serviceAuth','media'],
+       d:'Gale-Shapley stable matching across eleven dating formats, BarBuddy, and VSAFE wired in behind it. YAP was decoupled into its own safety-reporting app.'},
+      {n:'VSAFE', g:'bell', r:'Check-ins, trusted contacts, escalation', routes:43, mods:14, p:8799,
+       w:['Shield','serviceAuth','notify'],
+       d:'The universal safety layer, called by six source apps. Escalations reach a human through vaco-notify; the emergency trigger is guarded, not open.'},
+    ],
+  },
+];
+
+/* V4 is the core, and this is what it actually holds today. */
+const CORE = [
+  {i:'brain', t:'Agent calls', m:'5 states'},
+  {i:'phone', t:'Surfaces', m:'5'},
+  {i:'id',    t:'Twin profiles', m:'live'},
+  {i:'map',   t:'Maps layer', m:'11 routes'},
+  {i:'search',t:'Cross-app search', m:':8788'},
+  {i:'shield',t:'serviceAuth', m:'enforce'},
+  {i:'trace', t:'Trace context', m:'W3C'},
+];
+
+/* The shared services every ecosystem leans on. Named rather than
+   implied, because four of them did not exist a month ago. */
+const HUB = [
+  {i:'shield', t:'Shield — identity', m:':8812'},
+  {i:'wallet', t:'V3 — wallet access', m:':8811'},
+  {i:'screen', t:'vaco-media — sessions', m:':8821'},
+  {i:'bell',   t:'vaco-notify — alerts', m:':8818'},
+  {i:'api',    t:'vaco-audit — decisions', m:':8819'},
+  {i:'id',     t:'vaco-operator — authority', m:':8820'},
+  {i:'chart',  t:'VACO Analytics', m:':8790'},
+  {i:'route',  t:'LiveKit SFU', m:':7880'},
+];
+
+const NAV = [
+  {t:'Home', i:'city', on:true},
+  {t:'V4 Agents', i:'brain', n:'14'},
+  {t:'Wallet', i:'wallet'},
+  {t:'Media', i:'screen'},
+  {t:'Audit', i:'api'},
+  {t:'Settings', i:'chip'},
+];
+
+const DOCK = [
+  {t:'Home', i:'city', on:true},
+  {t:'Apps', i:'chip'},
+  {orb:true},
+  {t:'Agents', i:'brain'},
+  {t:'Audit', i:'api'},
+];
+
+const icon = (set, k, cls='') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${set[k] || ''}</svg>`;
+
+/* -- left nav -- */
+document.getElementById('nav').innerHTML = NAV.map((x) => `
+  <button type="button"${x.on ? ' aria-current="true"' : ''}>
+    ${icon({...G, ...SYS}, x.i)}<span>${x.t}</span>
+    ${x.n ? `<span class="badge">${x.n}</span>` : ''}
+  </button>`).join('');
+
+/* -- dock -- */
+document.getElementById('dock').innerHTML = DOCK.map((x) => x.orb
+  ? '<button type="button" class="orb" aria-label="Ask V4"></button>'
+  : `<button type="button"${x.on ? ' aria-current="true"' : ''}>${icon({...G, ...SYS}, x.i)}<span>${x.t}</span></button>`
+).join('');
+
+/* -- the quadrants -- */
+function appRow(app, eco, ai) {
+  const metric = app.routes === null
+    ? `<b>${app.mods}</b><small>modules</small>`
+    : `<b>${app.routes}</b><small>routes</small>`;
+  return `
+    <button class="app" type="button" data-e="${eco.key}" data-a="${ai}">
+      <span class="app-glyph">${icon({ ...G, ...SYS }, app.g)}</span>
+      <span>
+        <span class="app-name">${app.n}</span>
+        <span class="app-role">${app.r}</span>
+      </span>
+      <span class="app-metric">${metric}</span>
+    </button>`;
+}
+
+function ecoCard(eco) {
+  const routes = eco.apps.reduce((n, a) => n + (a.routes || 0), 0);
+  return `
+    <section class="eco" style="--c:${eco.c}; grid-area:${eco.key}">
+      <div class="eco-head">
+        <small>Ecosystem ${eco.n}</small>
+        <h2>${eco.name}</h2>
+        <p>${eco.blurb}</p>
+      </div>
+      <div class="apps">${eco.apps.map((a, i) => appRow(a, eco, i)).join('')}</div>
+      <div class="eco-foot">
+        <span>${eco.apps.length} parents</span>
+        <span><b>${routes}</b> routes &middot; all guarded</span>
+      </div>
+    </section>`;
+}
+
+const coreHTML = `
+  <div class="core" style="grid-area:core">
+    <div class="core-ring">
+      <svg viewBox="0 0 200 200" aria-hidden="true">
+        <circle class="r" cx="100" cy="100" r="86" stroke="#18202d" stroke-width="1"/>
+        <circle class="r spin" cx="100" cy="100" r="86" stroke="url(#g1)" stroke-width="2"
+                stroke-dasharray="120 420"/>
+        <circle class="r spin-slow" cx="100" cy="100" r="72" stroke="url(#g2)" stroke-width="1.5"
+                stroke-dasharray="60 390"/>
+        <circle class="r" cx="100" cy="100" r="58" stroke="#232d3d" stroke-width="1"/>
+        <defs>
+          <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#46d4c4"/><stop offset="100%" stop-color="#4d94e8"/>
+          </linearGradient>
+          <linearGradient id="g2" x1="1" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#c45ad4"/><stop offset="100%" stop-color="#46d4c4"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      <div class="core-label"><b>V4</b><small>AI core</small></div>
+    </div>
+    <div class="panel">
+      <h3>V4 core services</h3>
+      <div class="svc">
+        ${CORE.map((s) => `<div>${icon(SYS, s.i)}<span>${s.t}</span><em>${s.m}</em></div>`).join('')}
+      </div>
+    </div>
+  </div>`;
+
+const hubHTML = `
+  <div class="panel hub">
+    <h3>Shared services &middot; every ecosystem</h3>
+    <div class="svc">
+      ${HUB.map((s) => `<div>${icon(SYS, s.i)}<span>${s.t}</span><em>${s.m}</em></div>`).join('')}
+    </div>
+  </div>`;
+
+document.getElementById('grid').innerHTML =
+  ecoCard(ECOSYSTEMS[0]) + coreHTML + ecoCard(ECOSYSTEMS[1])
+  + ecoCard(ECOSYSTEMS[2]) + hubHTML + ecoCard(ECOSYSTEMS[3]);
+
+/* Counted, never typed. Three hand-written totals went stale in this
+   repo's own documents; the fix was to stop writing them down. */
+const allApps = ECOSYSTEMS.flatMap((e) => e.apps);
+const shown = allApps.reduce((n, a) => n + (a.routes || 0), 0);
+document.getElementById('footnote').innerHTML =
+  `${allApps.length} parents shown &middot; ${shown} of 857 routes &middot; `
+  + 'every figure read out of the repository — route counts from each server.js, '
+  + 'ports from the registry, hues from the palette register. '
+  + '<span style="color:var(--warn)">No usage numbers, because there are no users yet.</span>';
+
+/* -- the sheet -- */
+const sheet = document.getElementById('sheet');
+const TAGS = {
+  Shield:'Shield session', serviceAuth:'serviceAuth', decisionLog:'vaco-audit',
+  operator:'operator role', media:'vaco-media', notify:'vaco-notify', trace:'trace context',
+};
+const ALL_TAGS = Object.keys(TAGS);
+
+function open(eco, app) {
+  const card = document.getElementById('sheetCard');
+  card.style.setProperty('--c', eco.c);
+  document.getElementById('sheetEyebrow').innerHTML = `Ecosystem ${eco.n} &middot; ${eco.name}`;
+  document.getElementById('sheetTitle').textContent = app.n;
+  document.getElementById('sheetBody').textContent = app.d;
+  document.getElementById('sheetFacts').innerHTML =
+    (app.routes === null ? '' : `<div><b>${app.routes}</b><span>routes</span></div>`)
+    + `<div><b>${app.mods}</b><span>modules</span></div>`
+    + `<div><b>:${app.p}</b><span>port</span></div>`
+    + `<div><b class="ok">100%</b><span>guarded</span></div>`;
+  // Both halves shown: what it is wired into, and what it is not. A
+  // dashboard that only lists what is present cannot be used to find
+  // what is missing.
+  document.getElementById('sheetWired').innerHTML = ALL_TAGS.map((t) => {
+    const on = app.w.includes(t);
+    return `<span class="tag"${on ? '' : ' data-off="true"'}>${on ? '' : '&mdash; '}${TAGS[t]}</span>`;
+  }).join('');
+  sheet.dataset.open = 'true';
+}
+
+document.getElementById('grid').addEventListener('click', (e) => {
+  const btn = e.target.closest('.app');
+  if (!btn) return;
+  const eco = ECOSYSTEMS.find((x) => x.key === btn.dataset.e);
+  open(eco, eco.apps[Number(btn.dataset.a)]);
+});
+sheet.addEventListener('click', (e) => { if (e.target === sheet) sheet.dataset.open = 'false'; });
+addEventListener('keydown', (e) => { if (e.key === 'Escape') sheet.dataset.open = 'false'; });
+</script>

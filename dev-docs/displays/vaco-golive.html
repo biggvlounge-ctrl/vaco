@@ -1,0 +1,707 @@
+<title>VACO Go-Live Brief</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+  :root {
+    --bg:        #F1F3F2;
+    --surface:   #FFFFFF;
+    --surface-2: #E9EDEB;
+    --ink:       #141F1D;
+    --ink-soft:  #3A4A46;
+    --muted:     #5F6E6A;
+    --rule:      #D5DCD9;
+    --rule-soft: #E4E9E7;
+    --accent:    #0B6E5F;
+    --accent-bg: #DFEEEA;
+    --warm:      #A9541F;
+    --warm-bg:   #F4E7DD;
+    --danger:    #983026;
+    --danger-bg: #F5E2DF;
+
+    --sans: 'Archivo', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --serif: 'Source Serif 4', ui-serif, Georgia, 'Times New Roman', serif;
+    --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:        #0E1513;
+      --surface:   #161F1D;
+      --surface-2: #1D2A26;
+      --ink:       #E4EAE7;
+      --ink-soft:  #C2CDC9;
+      --muted:     #8B9A95;
+      --rule:      #2A3733;
+      --rule-soft: #212D2A;
+      --accent:    #58C4AC;
+      --accent-bg: #12332C;
+      --warm:      #DE9059;
+      --warm-bg:   #35251A;
+      --danger:    #E8776B;
+      --danger-bg: #3A1F1B;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg:        #0E1513;
+    --surface:   #161F1D;
+    --surface-2: #1D2A26;
+    --ink:       #E4EAE7;
+    --ink-soft:  #C2CDC9;
+    --muted:     #8B9A95;
+    --rule:      #2A3733;
+    --rule-soft: #212D2A;
+    --accent:    #58C4AC;
+    --accent-bg: #12332C;
+    --warm:      #DE9059;
+    --warm-bg:   #35251A;
+    --danger:    #E8776B;
+    --danger-bg: #3A1F1B;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 17px;
+    line-height: 1.62;
+    margin: 0;
+    padding: 0 1.5rem 6rem;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 47rem; margin: 0 auto; }
+
+  /* ---- masthead ---- */
+
+  header.masthead {
+    padding: 4.5rem 0 2.25rem;
+    border-bottom: 2px solid var(--ink);
+    margin-bottom: 3rem;
+  }
+  .eyebrow {
+    font-family: var(--sans);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 1rem;
+  }
+  h1 {
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: clamp(2.2rem, 6vw, 3.1rem);
+    line-height: 1.04;
+    letter-spacing: -0.022em;
+    text-wrap: balance;
+    margin: 0 0 1rem;
+  }
+  .standfirst {
+    font-size: 1.14rem;
+    color: var(--ink-soft);
+    margin: 0;
+    max-width: 38rem;
+  }
+  .byline {
+    font-family: var(--mono);
+    font-size: 0.76rem;
+    color: var(--muted);
+    margin-top: 1.75rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.4rem;
+  }
+
+  /* ---- sections ---- */
+
+  section { margin-bottom: 3.5rem; }
+
+  h2 {
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 1.45rem;
+    letter-spacing: -0.012em;
+    line-height: 1.2;
+    text-wrap: balance;
+    margin: 0 0 0.5rem;
+    padding-top: 1.1rem;
+    border-top: 1px solid var(--rule);
+  }
+  h2 .kicker {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+  }
+  h3 {
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 1.02rem;
+    letter-spacing: 0.002em;
+    margin: 2.25rem 0 0.55rem;
+  }
+  p { margin: 0 0 1.05rem; }
+  p.lead { color: var(--ink-soft); font-size: 1.06rem; margin-bottom: 1.5rem; }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  strong { font-weight: 600; color: var(--ink); }
+  code {
+    font-family: var(--mono);
+    font-size: 0.855em;
+    background: var(--surface-2);
+    padding: 0.1em 0.34em;
+    border-radius: 3px;
+  }
+
+  ul, ol { margin: 0 0 1.05rem; padding-left: 1.2rem; }
+  li { margin-bottom: 0.5rem; }
+  li::marker { color: var(--muted); }
+
+  /* ---- measured-data panel ---- */
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 1.5rem 1.6rem;
+    margin: 0 0 1.5rem;
+  }
+  .panel-label {
+    font-family: var(--sans);
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 1rem;
+  }
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+    gap: 1.4rem 1.5rem;
+    margin: 0;
+  }
+  .metric dt {
+    font-family: var(--sans);
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    color: var(--muted);
+    margin-bottom: 0.22rem;
+  }
+  .metric dd {
+    font-family: var(--mono);
+    font-size: 1.42rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    margin: 0;
+    line-height: 1.15;
+  }
+  .metric dd .unit {
+    font-size: 0.82rem;
+    font-weight: 400;
+    color: var(--muted);
+    margin-left: 0.15em;
+  }
+
+  /* ---- tables ---- */
+
+  .scroller { overflow-x: auto; margin: 0 0 1.4rem; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--sans);
+    font-size: 0.895rem;
+    min-width: 30rem;
+  }
+  caption {
+    caption-side: bottom;
+    text-align: left;
+    font-family: var(--sans);
+    font-size: 0.76rem;
+    color: var(--muted);
+    padding-top: 0.7rem;
+    line-height: 1.5;
+  }
+  th {
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid var(--ink);
+    padding: 0 0.85rem 0.55rem 0;
+    vertical-align: bottom;
+  }
+  td {
+    padding: 0.72rem 0.85rem 0.72rem 0;
+    border-bottom: 1px solid var(--rule-soft);
+    vertical-align: top;
+    color: var(--ink-soft);
+  }
+  td:first-child { color: var(--ink); font-weight: 500; }
+  th:last-child, td:last-child { padding-right: 0; }
+  .num {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    color: var(--ink);
+  }
+  tr.total td {
+    border-top: 1px solid var(--ink);
+    border-bottom: none;
+    font-weight: 600;
+    color: var(--ink);
+    padding-top: 0.8rem;
+  }
+
+  /* ---- verdict pills ---- */
+
+  .pill {
+    display: inline-block;
+    font-family: var(--sans);
+    font-size: 0.66rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.22em 0.6em;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+  .pill.hire  { background: var(--accent-bg); color: var(--accent); }
+  .pill.defer { background: var(--surface-2); color: var(--muted); }
+  .pill.care  { background: var(--warm-bg);   color: var(--warm); }
+  .pill.stop  { background: var(--danger-bg); color: var(--danger); }
+
+  /* ---- callouts ---- */
+
+  .note {
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    padding: 1.15rem 1.3rem;
+    margin: 0 0 1.4rem;
+    border-radius: 0 4px 4px 0;
+  }
+  .note.warn { border-left-color: var(--warm); }
+  .note.stop { border-left-color: var(--danger); }
+  .note > :last-child { margin-bottom: 0; }
+  .note-title {
+    font-family: var(--sans);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 0.55rem;
+  }
+  .note.warn .note-title { color: var(--warm); }
+  .note.stop .note-title { color: var(--danger); }
+
+  /* ---- code block ---- */
+
+  pre {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    line-height: 1.65;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 1.1rem 1.2rem;
+    overflow-x: auto;
+    margin: 0 0 1.4rem;
+    color: var(--ink-soft);
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+  pre .c { color: var(--muted); }
+  pre .k { color: var(--accent); }
+
+  /* ---- screening questions ---- */
+
+  .qlist { counter-reset: q; list-style: none; padding: 0; margin: 0 0 1.4rem; }
+  .qlist > li {
+    counter-increment: q;
+    display: grid;
+    grid-template-columns: 2.1rem 1fr;
+    gap: 0 0.9rem;
+    padding: 1.15rem 0;
+    border-bottom: 1px solid var(--rule-soft);
+    margin: 0;
+  }
+  .qlist > li:first-child { border-top: 1px solid var(--rule-soft); }
+  .qlist > li::before {
+    content: counter(q);
+    font-family: var(--mono);
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--accent);
+    padding-top: 0.15rem;
+  }
+  .qlist .ask { font-style: italic; color: var(--ink); margin: 0 0 0.5rem; }
+  .qlist .tell { font-size: 0.94rem; color: var(--muted); margin: 0; }
+  .qlist .tell strong { color: var(--ink-soft); }
+
+  /* ---- footer ---- */
+
+  footer {
+    border-top: 1px solid var(--rule);
+    padding-top: 1.5rem;
+    font-family: var(--sans);
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+  footer p { margin-bottom: 0.6rem; }
+
+  @media (max-width: 34rem) {
+    body { font-size: 16px; padding: 0 1.1rem 4rem; }
+    header.masthead { padding-top: 3rem; }
+    .panel { padding: 1.2rem 1.15rem; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">Scope &amp; cost brief</p>
+    <h1>Getting VACO live</h1>
+    <p class="standfirst">
+      Four things stand between a verified codebase and a running site. This is what each
+      one costs, which to hand to a contractor, which to do yourself, and which to leave
+      alone until it hurts.
+    </p>
+    <p class="byline">
+      <span>28 Aug 2026</span>
+      <span>build fd89817</span>
+      <span>879 tests · 33 suites</span>
+      <span>490/490 routes accounted</span>
+    </p>
+  </header>
+
+  <section>
+    <h2><span class="kicker">Measured, not estimated</span>What the ecosystem actually needs to run</h2>
+    <p class="lead">
+      Hosting quotes hang on one number, so I booted six real servers and measured them
+      rather than guessing.
+    </p>
+
+    <div class="panel">
+      <p class="panel-label">Resident memory, six servers booted cold</p>
+      <dl class="metrics">
+        <div class="metric"><dt>Average per backend</dt><dd>63.3<span class="unit">MB</span></dd></div>
+        <div class="metric"><dt>Spread across six</dt><dd>62.7–64.1<span class="unit">MB</span></dd></div>
+        <div class="metric"><dt>34 backends</dt><dd>2.15<span class="unit">GB</span></dd></div>
+        <div class="metric"><dt>Deps, all 35 apps</dt><dd>273<span class="unit">MB</span></dd></div>
+      </dl>
+    </div>
+
+    <p>
+      The consistency is the useful part — <span class="num">62.7, 63.2, 63.3, 63.6, 62.7, 64.1</span>
+      — because every backend runs the same three dependencies and the same shared modules.
+      There is no outlier app waiting to surprise you.
+    </p>
+
+    <div class="scroller">
+      <table>
+        <caption>Idle floor. Under real traffic Node heaps grow, so this is a floor and not a target.</caption>
+        <thead>
+          <tr><th>Component</th><th>Memory</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>34 Express backends × 63 MB</td><td class="num">2.15 GB</td></tr>
+          <tr><td>2 Vite frontends, nginx, LiveKit SFU</td><td class="num">~0.5 GB</td></tr>
+          <tr><td>Docker daemon and host OS</td><td class="num">~0.4 GB</td></tr>
+          <tr class="total"><td>Idle floor</td><td class="num">~3.0 GB</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note warn">
+      <p class="note-title">Sizing verdict</p>
+      <p>
+        <strong>4 GB is too tight. 8 GB / 4 vCPU / 80 GB SSD is the honest target.</strong>
+        Disk is comfortable — the base image is <code>node:22-alpine</code> shared across all
+        36 services, and each app adds only 4.6 MB of dependencies on top of it.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="kicker">The four blockers</span>What to buy, and what to leave</h2>
+
+    <div class="scroller">
+      <table>
+        <thead>
+          <tr><th>#</th><th>Blocker</th><th>Cost</th><th>Verdict</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td>First real <code>docker&nbsp;compose&nbsp;build</code></td>
+            <td class="num">$200–500</td>
+            <td><span class="pill hire">Hire it out</span></td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td>TLS certificate and domain</td>
+            <td class="num">bundled</td>
+            <td><span class="pill hire">Same person</span></td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td>LiveKit SFU carrying real audio</td>
+            <td class="num">$150–300</td>
+            <td><span class="pill care">Managed, not self-hosted</span></td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td>JSON store → Postgres</td>
+            <td class="num">$8k–26k</td>
+            <td><span class="pill defer">Defer</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>
+      Numbers 1 and 3 are one job — standard DevOps, three to eight hours, and
+      <code>certbot --nginx</code> is an hour of it. Budget for one round of first-build
+      fixes: there are 36 build contexts and a single bad <code>COPY</code> fails everything.
+    </p>
+
+    <div class="note stop">
+      <p class="note-title">Tell whoever you hire this, first</p>
+      <p>
+        <code>.env.example</code> ships the service-token allowlist with every value empty.
+        <code>serviceAuth</code> <strong>throws</strong> on an entry like <code>chopz:</code>
+        rather than silently dropping that caller — so following the old quickstart produced
+        every guarded service crash-looping at startup, not a degraded system. The generator
+        step is now documented, and it is not optional:
+      </p>
+      <pre><code><span class="c"># after cp .env.example .env, before compose up</span>
+node scripts/generate-service-tokens.mjs &gt;&gt; .env</code></pre>
+    </div>
+
+    <h3>On the SFU</h3>
+    <p>
+      Self-hosting means <code>use_external_ip</code>, UDP forwarding, and TURN for
+      restrictive networks — that is a WebRTC specialist at $300–800, not a generalist.
+      <strong>Use LiveKit Cloud instead.</strong> About an hour of configuration, you pay
+      usage, and you find out whether the product actually needs real audio before you pay
+      somebody to run infrastructure for it.
+    </p>
+  </section>
+
+  <section>
+    <h2><span class="kicker">Recurring</span>What you pay every month</h2>
+
+    <div class="scroller">
+      <table>
+        <caption>Estimates. Hosting and freelance rates move; treat these as a bracket, not a quote.</caption>
+        <thead>
+          <tr><th>Line</th><th>Lean</th><th>Comfortable</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>VPS, 8–16 GB</td><td class="num">$35 <span style="color:var(--muted)">Hetzner</span></td><td class="num">$48–96 <span style="color:var(--muted)">DO / Linode</span></td></tr>
+          <tr><td>Domain (.com)</td><td class="num">$15/yr</td><td class="num">$15/yr</td></tr>
+          <tr><td>TLS certificate</td><td class="num">$0</td><td class="num">$0</td></tr>
+          <tr><td>Off-host backups</td><td class="num">$5</td><td class="num">$5</td></tr>
+          <tr><td>LiveKit Cloud</td><td class="num">free tier</td><td class="num">~$50</td></tr>
+          <tr class="total"><td>Per month</td><td class="num">~$40</td><td class="num">~$90–150</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <p class="note-title">Do not pay for a certificate</p>
+      <p>
+        Let's Encrypt is free and auto-renewing. Anyone quoting you for an SSL certificate
+        as a line item is quoting for something the tooling already does for nothing.
+      </p>
+    </div>
+
+    <div class="note warn">
+      <p class="note-title">The line item nobody quotes</p>
+      <p>
+        <strong><code>ANTHROPIC_API_KEY</code> usage.</strong> V4 proxies to the model, and
+        that is metered per token. If agents actually get used this will be your largest
+        bill — larger than the server, by a wide margin. Set a spend cap before you launch,
+        not after.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="kicker">Blocker #4, in depth</span>The Postgres job, and who can do it</h2>
+
+    <p class="lead">
+      This is the one that can quietly break your ledger, so it gets its own section. The
+      first thing to understand is that it is not the job it sounds like.
+    </p>
+
+    <h3>It is not a database migration</h3>
+    <p>
+      There is no SQL in this repo to translate. <code>lib/persistence.js</code> is a
+      recursive <strong>Proxy</strong> over a plain in-memory object tree — routes do
+      <code>store.accounts[id].vcoin -= amount</code> and the Proxy catches the mutation and
+      flushes to disk. A contractor billing themselves as a Postgres migration expert will
+      arrive expecting tables and find none.
+    </p>
+
+    <p>The shape is far better than the headline suggests:</p>
+
+    <pre><code><span class="c">md5      lines  file</span>
+8e8989d9   177   × <span class="k">28 apps</span>          <span class="c">← byte-identical, every one</span>
+b573d8ba   109   vaco-shell         <span class="c">← ESM port, same design</span>
+db6e8246    78   vaco-analytics     <span class="c">← ESM port, same design</span>
+a3ed4c80    29   venvs   <span class="c">┐</span>
+e09178c7    28   vdp     <span class="c">┘ browser localStorage — NOT in scope</span></code></pre>
+
+    <p>
+      <strong>One design, three source files.</strong> Not thirty investigations. And
+      <code>commit(store)</code> already exists as the durability seam, with a
+      <code>FLUSHERS</code> WeakMap, so the swap point is a single function. Whoever takes
+      this is replacing a storage backend behind a seam that has already been cut for them.
+    </p>
+
+    <h3>Two routes — insist on the first</h3>
+    <div class="scroller">
+      <table>
+        <thead>
+          <tr><th>Route</th><th>What changes</th><th>Effort</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Postgres JSONB</td>
+            <td>Object tree stays. One row per store, a row lock around each mutation. Business logic essentially untouched.</td>
+            <td class="num">80–150 h</td>
+          </tr>
+          <tr>
+            <td>Full normalization</td>
+            <td>Real tables per app; every <code>store.x.y.z</code> access rewritten as a query.</td>
+            <td class="num">3–5× that</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      If a candidate proposes full normalization out of the gate, that is a signal about
+      them, not about the codebase. Decline it.
+    </p>
+
+    <h3>Who to go to</h3>
+    <p>
+      Not Fiverr, at any price. Not a DBA or query-tuning specialist either — there are no
+      queries here to tune. What you want is a <strong>senior or staff Node.js backend
+      engineer with real transactional-correctness experience</strong>: someone who has
+      swapped a datastore before and talks fluently about isolation levels and
+      read-modify-write windows.
+    </p>
+    <ul>
+      <li><strong>Toptal, Gun.io, Braintrust, Arc</strong> — vetted, roughly $100–200/hr. You get a real senior and somebody to escalate to.</li>
+      <li><strong>A small Node-specialist consultancy</strong> — higher rate, but they carry accountability for the outcome rather than the hours.</li>
+      <li><strong>Someone from your own network, moonlighting</strong> — cheapest good option by a wide margin, if you have the person.</li>
+      <li><strong>Upwork, top-rated-plus only</strong> — possible, but you do all the screening yourself.</li>
+    </ul>
+
+    <h3>Screen them in ten minutes</h3>
+    <p>Three questions. The answers separate the people who can do this from the ones who will quietly break your ledger.</p>
+
+    <ol class="qlist">
+      <li>
+        <p class="ask">“The store is a recursive Proxy over a plain object. Every route mutates it synchronously and <code>commit()</code> flushes before responding. How do you preserve that atomicity across two containers?”</p>
+        <p class="tell"><strong>Good answer</strong> names row locks or serializable transactions <em>and immediately asks about the read-modify-write window.</em> “Just add Postgres” means they did not hear the question.</p>
+      </li>
+      <li>
+        <p class="ask">“How will you prove you didn't break anything?”</p>
+        <p class="tell"><strong>The only acceptable answer</strong> is “I run your 879 tests and they pass unmodified.” If they propose editing tests to fit the new store, end the call.</p>
+      </li>
+      <li>
+        <p class="ask">“What happens to the deep-mutation catching in <code>reactive()</code>?”</p>
+        <p class="tell"><strong>If they have not noticed it is a Proxy</strong>, they have not read the code they are quoting on.</p>
+      </li>
+    </ol>
+
+    <h3>How to buy it</h3>
+    <p>
+      <strong>Pilot one app, fixed price, before committing to the rest.</strong> Do
+      <code>vaco-notify</code> first — no money moves through it, so a mistake is cheap, and
+      it proves the adapter end to end. That is <span class="num">$1,500–3,000</span>. Then,
+      and only then, V3 and the money apps with real scrutiny.
+    </p>
+    <p>Full job on the JSONB route: <strong>80–150 hours, $8,000–26,000.</strong></p>
+  </section>
+
+  <section>
+    <h2><span class="kicker">The frugal option</span>Consider not hiring anyone yet</h2>
+    <p>
+      You have <strong>34 apps, not one app that needs 34 replicas.</strong> That is already
+      horizontal. You scale by putting apps on more boxes and moving them around — not by
+      running two copies of V3.
+    </p>
+    <p>
+      The one-container limit only bites when a <em>single</em> app outgrows a single
+      container, and nothing here is close. Spend the $8–26k when a specific app is
+      measurably straining. Until then it buys you nothing you can feel.
+    </p>
+  </section>
+
+  <section>
+    <h2><span class="kicker">Bottom line</span>The number</h2>
+
+    <div class="scroller">
+      <table>
+        <thead>
+          <tr><th>Path</th><th>Up front</th><th>Monthly</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Live, no audio<br><span style="color:var(--muted);font-weight:400">domain + box + contractor for #1 and #3</span></td><td class="num">$250–550</td><td class="num">~$40</td></tr>
+          <tr><td>Live with audio<br><span style="color:var(--muted);font-weight:400">add LiveKit Cloud configuration</span></td><td class="num">$400–850</td><td class="num">~$90</td></tr>
+          <tr><td>Fully de-risked<br><span style="color:var(--muted);font-weight:400">add Postgres, 2–5 weeks</span></td><td class="num">+$8k–26k</td><td class="num">+$0–60</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <p class="note-title">Recommendation</p>
+      <p>
+        Go live on the first row. <strong>Under $600 up front and about $40 a month.</strong>
+        Blocker #4 is not a launch requirement and buying it now is buying capacity you have
+        no traffic for.
+      </p>
+    </div>
+  </section>
+
+  <footer>
+    <p>
+      Every figure on this page that describes the codebase was measured against build
+      <code>fd89817</code> — memory by booting servers, file counts by hashing them, service
+      and volume counts from the Compose generator's own output. The prices are estimates
+      and will drift.
+    </p>
+    <p>
+      Deliverable to hand a contractor: <code>vaco-2026-08-28-fd89817.tar.gz</code> — 4.0 MB,
+      2,291 files, verified by extraction. They do not need repository access.
+    </p>
+  </footer>
+
+</div>

@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VOID</title>
+<link rel="stylesheet" href="/vaco-design.css" />
+<style>
+  /* Layout only. Every colour and size comes from the design system. */
+  .day-row {
+    display: grid;
+    grid-template-columns: 64px 1fr auto;
+    gap: var(--vaco-space-3);
+    align-items: center;
+    padding: var(--vaco-space-3) 0;
+    border-top: 1px solid var(--vaco-border-subtle);
+  }
+  .day-row:first-child { border-top: 0; }
+  .day-time { font-variant-numeric: tabular-nums; font-weight: var(--vaco-weight-bold); }
+  .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--vaco-space-3); }
+  .stat { display: flex; flex-direction: column; gap: 2px; }
+  .stat-value { font-size: var(--vaco-text-xl); font-weight: var(--vaco-weight-bold); font-variant-numeric: tabular-nums; }
+  /* Utilisation reads as a bar because the number alone hides the gap
+     between "six hours of work" and "eight hours away from home". */
+  .util-track { height: 6px; border-radius: var(--vaco-radius-pill); background: var(--vaco-surface-hover); overflow: hidden; }
+  .util-fill { height: 100%; background: var(--vaco-accent); }
+</style>
+</head>
+<body class="vaco">
+<script src="/vaco-ui.js"></script>
+<script>
+// VOID — the provider-facing frontend.
+//
+// `VOID_SERVICE_APPS_AND_THE_WORKDAY.md` named this exact gap: "No
+// provider-facing frontend. Everything above is API-only. The day plan
+// is the screen a provider would open first, and it does not exist
+// yet." So the day plan is the first tab, not a secondary one.
+//
+// Everything here is a real client of VOID's own 157 routes. No
+// scheduling, pricing, or eligibility logic lives in this file — the
+// server decides, this renders what it decided, including the
+// rejections.
+
+var el = VACO.el;
+
+function fmtTime(ts) {
+  return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+// The provider being viewed. Defaults to the signed-in user, because a
+// provider is a user — but stays editable, since a dispatcher looking
+// at someone else's day is a real use of this screen.
+function providerId() {
+  return document.getElementById('providerInput')
+    ? document.getElementById('providerInput').value.trim()
+    : (VACO.userId() || '');
+}
+
+function providerPicker(onChange) {
+  var row = el('div', 'vaco-row');
+  row.appendChild(el('span', 'vaco-label', 'Provider'));
+  var input = el('input', 'vaco-input');
+  input.id = 'providerInput';
+  input.value = VACO.userId() || '';
+  input.placeholder = 'provider id';
+  input.style.width = '180px';
+  row.appendChild(input);
+  row.appendChild(VACO.button('Load', onChange, 'primary'));
+  return row;
+}
+
+// -- My Day -----------------------------------------------------------
+
+function renderDay(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(providerPicker(function () { VACO.render(); }));
+
+  var id = providerId();
+  if (!id) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in, or enter a provider id, to build a day.'));
+    return VACO.mount(body, out);
+  }
+
+  // A whole working day, today. Real timestamps because the engine
+  // filters jobs by scheduledFor and would return an empty plan for a
+  // window with nothing in it.
+  var start = new Date(); start.setHours(6, 0, 0, 0);
+  var end = new Date(); end.setHours(22, 0, 0, 0);
+
+  return Promise.all([
+    VACO.post('/api/provider/' + encodeURIComponent(id) + '/service-day',
+      { dayStart: start.getTime(), dayEnd: end.getTime() }),
+    VACO.post('/api/provider/' + encodeURIComponent(id) + '/skill-suggestions',
+      { dayStart: start.getTime(), dayEnd: end.getTime() }).catch(function () { return null; }),
+    VACO.api('/api/provider/' + encodeURIComponent(id) + '/capabilities')
+      .catch(function () { return null; }),
+  ]).then(function (results) {
+    var day = results[0], suggestions = results[1], caps = results[2];
+    var s = day.summary;
+
+    // The headline: what the day is worth and what it actually costs in
+    // hours, side by side.
+    var stats = el('div', 'stat-row');
+    function stat(label, value, node) {
+      var wrap = el('div', 'stat');
+      wrap.appendChild(el('span', 'vaco-label', label));
+      wrap.appendChild(node || el('span', 'stat-value', value));
+      return wrap;
+    }
+    stats.appendChild(stat('Earnings', null, (function () {
+      var v = el('span', 'stat-value');
+      v.appendChild(VACO.price(s.totalEarnings, { freeLabel: false }));
+      return v;
+    }())));
+    stats.appendChild(stat('Jobs', s.jobCount));
+    stats.appendChild(stat('Verticals', s.verticalsSpanned));
+    stats.appendChild(stat('Worked', s.workedMinutes + 'm'));
+    stats.appendChild(stat('Travel', s.travelMinutes + 'm'));
+    out.appendChild(VACO.card(null, [stats]));
+
+    // Utilisation, with travel shown against it. Surfacing unpaid travel
+    // is deliberate — it is the most common thing gig platforms hide.
+    var util = el('div', 'vaco-stack-sm');
+    var utilHead = el('div', 'vaco-row-tight');
+    utilHead.appendChild(el('span', 'vaco-label', 'Utilisation'));
+    utilHead.appendChild(el('span', 'vaco-spacer'));
+    utilHead.appendChild(el('strong', 'vaco-num', s.utilisationPercent + '%'));
+    util.appendChild(utilHead);
+    var track = el('div', 'util-track');
+    var fill = el('div', 'util-fill');
+    fill.style.width = s.utilisationPercent + '%';
+    track.appendChild(fill);
+    util.appendChild(track);
+    util.appendChild(el('p', 'vaco-small vaco-faint',
+      'Worked minutes against worked plus travel. Travel is unpaid here and on every comparable platform — it is shown rather than hidden.'));
+    out.appendChild(VACO.card(null, [util]));
+
+    // The schedule itself, chronological on purpose: a provider reading
+    // their day wants it in order, not optimally resequenced.
+    if (day.plan.length) {
+      var sched = el('div', 'vaco-stack-sm');
+      day.plan.forEach(function (item) {
+        var row = el('div', 'day-row');
+        row.appendChild(el('span', 'day-time', fmtTime(item.scheduledFor)));
+        var mid = el('div', 'vaco-stack-sm');
+        mid.appendChild(el('strong', null, item.verticalName || item.verticalId));
+        mid.appendChild(el('span', 'vaco-small vaco-dim',
+          'ends ' + fmtTime(item.endsAt)
+          + (item.travelMinutes ? ' · ' + item.travelMinutes + 'm travel to get here' : ' · no travel')));
+        row.appendChild(mid);
+        row.appendChild(VACO.price(item.earns, { freeLabel: false }));
+        sched.appendChild(row);
+      });
+      out.appendChild(VACO.card('The day', [sched]));
+    } else {
+      out.appendChild(VACO.card('The day', [el('div', 'vaco-empty',
+        'No jobs fit this day. Every reason is listed below — nothing is silently dropped.')]));
+    }
+
+    // Every rejection with its reason. "Why isn't this job in my day" is
+    // always answerable, which is the half most schedulers leave out.
+    if (day.rejected && day.rejected.length) {
+      out.appendChild(VACO.card('Not scheduled — ' + day.rejected.length, [
+        VACO.table([
+          { key: 'jobId', label: 'Job' },
+          { key: 'verticalId', label: 'Vertical' },
+          { key: 'reason', label: 'Why not' },
+        ], day.rejected, { empty: 'Nothing rejected.' }),
+      ]));
+    }
+
+    // The growth loop: what one more skill would have earned today, from
+    // real open jobs rather than a marketing estimate.
+    if (suggestions && suggestions.length) {
+      out.appendChild(VACO.card('Add a skill', [
+        el('p', 'vaco-small vaco-dim',
+          'What each of these would have earned you today, from jobs actually open right now. Licensing-gated verticals are never suggested.'),
+        VACO.table([
+          { key: 'verticalName', label: 'Vertical', render: function (r) { return r.verticalName || r.verticalId; } },
+          { key: 'additionalJobs', label: 'Extra jobs', num: true },
+          { label: 'Would have earned', num: true, render: function (r) { return VACO.price(r.additionalEarnings, { freeLabel: false }); } },
+        ], suggestions),
+      ]));
+    }
+
+    if (caps && caps.skills) {
+      out.appendChild(VACO.card('Skills held', [
+        VACO.table([
+          { key: 'verticalId', label: 'Vertical' },
+          { label: 'Status', render: function (r) { return VACO.badge(r.status || (r.verified ? 'verified' : 'claimed')); } },
+        ], caps.skills, { empty: 'No skills claimed yet.' }),
+      ]));
+    }
+
+    VACO.mount(body, out);
+  });
+}
+
+// -- Services ---------------------------------------------------------
+
+function renderServices(body) {
+  return VACO.api('/api/services').then(function (data) {
+    var services = Array.isArray(data) ? data : (data.services || data.verticals || []);
+    var cards = services.map(function (v) {
+      // A licensing-gated vertical is called out first, because that is
+      // the one property that changes whether you may work it at all.
+      var trailing = v.licensingGated ? VACO.badge('licence required', 'danger') : null;
+      var lines = el('div', 'vaco-stack-sm');
+
+      if (v.services && v.services.length) {
+        lines.appendChild(el('p', 'vaco-small vaco-dim', v.services.join(' · ')));
+      }
+
+      var meta = el('div', 'vaco-row-tight');
+      if (v.archetype) meta.appendChild(VACO.badge(v.archetype));
+      if (typeof v.takeRate === 'number') meta.appendChild(VACO.badge(Math.round(v.takeRate * 100) + '% take'));
+      if (v.pricingUnit) meta.appendChild(VACO.badge(v.pricingUnit));
+      lines.appendChild(meta);
+
+      // Vetting is the safety gate. Showing it on the card is the
+      // difference between "we check people" as a claim and as a fact
+      // you can read per vertical.
+      var gates = el('div', 'vaco-row-tight');
+      if (v.requiredVetting && v.requiredVetting !== 'none') {
+        gates.appendChild(VACO.badge(v.requiredVetting, 'warn'));
+      }
+      if (v.requiresIntroSession) gates.appendChild(VACO.badge('meet first', 'warn'));
+      if (gates.childNodes.length) lines.appendChild(gates);
+
+      return VACO.card(v.name || v.verticalId, [lines], { trailing: trailing });
+    });
+    return VACO.grid(cards, true);
+  });
+}
+
+// -- Jobs -------------------------------------------------------------
+
+function renderJobs(body) {
+  var out = el('div', 'vaco-stack');
+
+  out.appendChild(VACO.card('Request a job', [
+    VACO.form([
+      { name: 'verticalId', label: 'Vertical', placeholder: 'courier', width: '150px' },
+      { name: 'customerId', label: 'Customer', value: VACO.userId() || '', width: '130px' },
+      { name: 'description', label: 'Description', placeholder: 'what needs doing', width: '220px' },
+      { name: 'offeredPrice', label: 'Price', type: 'number', min: 1, value: 40, width: '90px' },
+    ], function (values) {
+      return VACO.post('/api/job', values).then(function (job) {
+        VACO.toast('Job ' + job.id + ' requested in ' + job.verticalId, 'money');
+        VACO.render();
+      });
+    }, 'Request'),
+  ]));
+
+  var id = VACO.userId();
+  if (!id) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to see your jobs.'));
+    return VACO.mount(body, out);
+  }
+
+  return VACO.api('/api/jobs/user/' + encodeURIComponent(id)).then(function (data) {
+    var jobs = data.jobs || data;
+    out.appendChild(VACO.card('Your jobs', [
+      VACO.table([
+        { key: 'id', label: 'Job' },
+        { key: 'verticalId', label: 'Vertical' },
+        { key: 'description', label: 'Description' },
+        { label: 'Price', num: true, render: function (r) { return VACO.price(r.offeredPrice, { freeLabel: false }); } },
+        { label: 'Status', render: function (r) { return VACO.badge(r.status); } },
+      ], jobs, { empty: 'No jobs yet — request one above.' }),
+    ]));
+    VACO.mount(body, out);
+  });
+}
+
+// -- Network ----------------------------------------------------------
+
+function renderNetwork(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Stations, drones, and docks are <strong>not built as hardware</strong>. '
+    + 'This is the real network model the routing and dispatch engines run against.'));
+
+  return VACO.api('/api/health').then(function (health) {
+    var stats = el('div', 'stat-row');
+    Object.keys(health).forEach(function (key) {
+      if (typeof health[key] !== 'number') return;
+      var wrap = el('div', 'stat');
+      wrap.appendChild(el('span', 'vaco-label', key.replace(/([A-Z])/g, ' $1')));
+      wrap.appendChild(el('span', 'stat-value', health[key]));
+      stats.appendChild(wrap);
+    });
+    out.appendChild(VACO.card('Network', [stats]));
+
+    return VACO.api('/api/no-fly-zones').then(function (data) {
+      var zones = data.zones || data.noFlyZones || [];
+      out.appendChild(VACO.card('No-fly zones', [
+        VACO.table([
+          { key: 'id', label: 'Zone' },
+          { key: 'name', label: 'Name' },
+          { key: 'radiusKm', label: 'Radius km', num: true },
+        ], zones, { empty: 'No no-fly zones registered.' }),
+      ]));
+      VACO.mount(body, out);
+    });
+  });
+}
+
+VACO.app({
+  id: 'void',
+  name: 'VOID',
+  tagline: 'Real-world execution',
+  //: VOID's identity: a deep indigo. Logistics at night, and distinct
+  //: from every sibling app's hue in the register.
+  accent: '#7c85e8',
+  accentDim: '#5a63c9',
+  accentInk: '#080b14',
+  tabs: [
+    { id: 'day', label: 'My Day', heading: 'The service day',
+      blurb: 'One provider, several verticals, one schedule. Given what you can do, where you are, and when you are free — what does a full day look like?',
+      render: renderDay },
+    { id: 'services', label: 'Services', heading: '25 service verticals',
+      blurb: 'Each its own service app under VOID. One provider pool, one settlement, one safety layer — that is what makes a cross-vertical day possible at all.',
+      render: renderServices },
+    { id: 'jobs', label: 'Jobs', heading: 'Marketplace',
+      blurb: 'Every vertical runs through one request → match → accept → complete → pay → rate loop.',
+      render: renderJobs },
+    { id: 'network', label: 'Network', heading: 'Stations & airspace',
+      render: renderNetwork },
+  ],
+});
+</script>
+</body>
+</html>

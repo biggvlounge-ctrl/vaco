@@ -1,0 +1,19 @@
+{
+  "name": "v4-search-layer",
+  "version": "1.0.0",
+  "description": "Canonical cross-ecosystem search infrastructure for V4 — every app with a search feature routes through this instead of building its own.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "vulture-music",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Vvltvre Music/Distribution -- flat-fee, artist-retained-ownership release distribution, grounded in DistroKid/TuneCore's real per-release pricing model and gamma.'s real multi-format (music/video/podcast) scope.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

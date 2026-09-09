@@ -1,0 +1,44 @@
+# VACO -- LiveKit SFU configuration.
+#
+# **Why this file exists.** `vaco-media/lib/transport/livekit.js` mints
+# real, correctly-signed LiveKit join tokens and has since it was
+# written. Its own header said what was missing, plainly:
+#
+#   "What this file cannot do is carry media -- that needs an actual
+#    SFU process, and `deploy/` does not run one yet."
+#
+# This is that process. The control plane decides who may join; this
+# carries the packets once they have been let in.
+#
+# **No keys here, deliberately.** livekit-server reads its API key and
+# secret from the LIVEKIT_KEYS environment variable, which compose fills
+# from `.env`. A secret in a mounted config file is a secret in the
+# repository the first time somebody fills it in "just to test".
+#
+# **Single UDP port rather than a range.** LiveKit's default is a
+# 50000-60000 range, which Compose has to publish port by port and which
+# makes `docker compose up` slow and noisy. `udp_port` puts all RTC
+# traffic on one port. It is the documented small-deployment setting and
+# it is what makes this runnable on a laptop.
+
+port: 7880
+
+rtc:
+  tcp_port: 7881
+  udp_port: 7882
+  # False because inside Compose the useful address is the service name
+  # on the `vaco` network, not whatever the container thinks its public
+  # IP is. A real deployment behind a load balancer sets this true and
+  # supplies node_ip.
+  use_external_ip: false
+
+# Room lifecycle. Deliberately short: a room outliving its session is a
+# room somebody can rejoin after the grant that admitted them expired,
+# which would make the control plane's TTL advisory rather than real.
+room:
+  empty_timeout: 300
+  departure_timeout: 20
+
+logging:
+  level: info
+  json: false

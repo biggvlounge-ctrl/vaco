@@ -1,0 +1,662 @@
+<title>VACO Ecosystem Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+/* ---------------------------------------------------------------
+   The poster's look, carrying the shapes' content.
+
+   From the poster: the dark neon one-pager, the V4 core with its
+   service list, the phone with a radial launcher and V4 at the
+   centre, the app-to-app connection strip, the closing pillars.
+
+   From the shapes work, which settled later and wins wherever the
+   two disagree: five figures — ✕ ■ ◆ ▲ ○ — named for what you do
+   in them rather than for the loudest brand inside, with each app's
+   name forming one edge. VACON and the Shell stay off, because this
+   is what the public sees.
+
+   And one thing neither had: the connection strip is verified. The
+   poster listed four app-to-app links "by design"; two are wired,
+   one runs the other way, and two are not built. All four are shown
+   with what is actually true, because a diagram of integrations
+   nobody checked is how "citation is not presence" happens again.
+   --------------------------------------------------------------- */
+:root{
+  --ink-900:#04060a; --ink-850:#070a10; --ink-800:#0a0e15; --ink-700:#101620;
+  --ink-600:#18202c; --ink-500:#222c3b; --ink-400:#303c4e; --ink-300:#5a697b;
+  --ink-200:#8c9aaa; --ink-100:#c5cfd9; --ink-000:#eef3f8;
+  --vaco:#46d4c4; --gold:#d9a23f; --warn:#d8b24a; --bad:#e2716b; --good:#3fbf8f;
+}
+*,*::before,*::after{box-sizing:border-box;}
+body{
+  margin:0; background:var(--ink-900); color:var(--ink-100);
+  font-family:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+  font-size:15px; line-height:1.5; -webkit-font-smoothing:antialiased;
+  background-image:
+    radial-gradient(80vw 60vh at 20% -10%, rgba(70,212,196,.07), transparent 60%),
+    radial-gradient(70vw 50vh at 90% 30%, rgba(196,90,212,.06), transparent 60%);
+  background-attachment:fixed;
+}
+.wrap{max-width:1180px; margin:0 auto; padding:34px 22px 70px; display:flex; flex-direction:column; gap:34px;}
+
+/* ---------------- hero ---------------- */
+.hero{display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:30px; align-items:start;}
+@media (max-width:900px){ .hero{grid-template-columns:1fr;} }
+.wordmark{
+  font-family:"Chakra Petch",sans-serif; font-weight:700; font-size:clamp(44px,7vw,86px);
+  letter-spacing:.14em; color:var(--gold); line-height:.92; margin:0;
+}
+.hero h2{
+  margin:6px 0 0; font-family:"Chakra Petch",sans-serif; font-weight:600;
+  font-size:clamp(17px,2vw,26px); letter-spacing:.16em; text-transform:uppercase; color:var(--ink-000);
+}
+.tagline{
+  margin:5px 0 0; font-family:"IBM Plex Mono",monospace; font-size:11px;
+  letter-spacing:.24em; text-transform:uppercase; color:var(--vaco);
+}
+.hero p.lede{margin:16px 0 0; max-width:56ch; color:var(--ink-200); font-size:14.5px;}
+
+/* the V4 core column */
+.core{
+  background:var(--ink-850); border:1px solid var(--ink-600); border-radius:14px; padding:16px;
+  display:flex; flex-direction:column; gap:13px;
+}
+.core-top{display:flex; align-items:center; gap:13px;}
+.core-orb{
+  width:62px; height:62px; flex:none; border-radius:50%; display:grid; place-items:center;
+  background:radial-gradient(circle at 34% 30%, #6ee7db, #2f7fd6 55%, #14204a);
+  box-shadow:0 0 26px rgba(70,212,196,.42), inset 0 0 18px rgba(0,0,0,.45);
+  font-family:"Chakra Petch",sans-serif; font-weight:700; font-size:21px; color:#04060a;
+  letter-spacing:.03em;
+}
+.core-top b{display:block; font-family:"Chakra Petch",sans-serif; font-size:17px; letter-spacing:.1em; color:var(--ink-000);}
+.core-top small{
+  font-family:"IBM Plex Mono",monospace; font-size:9px; letter-spacing:.2em;
+  text-transform:uppercase; color:var(--vaco);
+}
+.svc{display:flex; flex-direction:column; gap:0;}
+.svc div{display:flex; align-items:center; gap:9px; padding:5px 0; font-size:12px; color:var(--ink-200);
+  border-top:1px solid var(--ink-700);}
+.svc div:first-child{border-top:0;}
+.svc svg{width:13px; height:13px; flex:none; stroke:var(--vaco); fill:none; stroke-width:1.6; stroke-linecap:round;}
+.svc em{margin-left:auto; font-style:normal; font-family:"IBM Plex Mono",monospace; font-size:9px; color:var(--ink-400);}
+
+/* ---------------- section headers ---------------- */
+.band{text-align:center;}
+.band h3{
+  margin:0; font-family:"Chakra Petch",sans-serif; font-weight:700;
+  font-size:clamp(17px,2.4vw,30px); letter-spacing:.1em; text-transform:uppercase; color:var(--ink-000);
+}
+.band h3 i{font-style:normal; color:var(--vaco);}
+.band p{margin:6px 0 0; font-family:"IBM Plex Mono",monospace; font-size:10.5px;
+  letter-spacing:.18em; text-transform:uppercase; color:var(--ink-400);}
+
+/* ---------------- the five shapes ---------------- */
+.shapes{display:grid; grid-template-columns:repeat(auto-fit,minmax(196px,1fr)); gap:14px;}
+.shape{
+  --c:var(--vaco);
+  position:relative; border-radius:14px; padding:15px 14px 13px; overflow:hidden;
+  background:radial-gradient(120% 80% at 50% 0%, color-mix(in oklab, var(--c) 14%, transparent), transparent 62%), var(--ink-850);
+  border:1px solid color-mix(in oklab, var(--c) 32%, var(--ink-600));
+  display:flex; flex-direction:column; gap:11px;
+}
+.fig{width:100%; aspect-ratio:1; display:block; overflow:visible; max-width:180px; margin:0 auto;}
+.fig .outline{fill:none; stroke:color-mix(in oklab, var(--c) 30%, var(--ink-600)); stroke-width:1.2;
+  stroke-linejoin:round; stroke-linecap:round;}
+.fig .halo{fill:none; stroke:var(--c); stroke-width:2; stroke-linejoin:round; stroke-linecap:round;
+  opacity:.36; filter:drop-shadow(0 0 6px color-mix(in oklab, var(--c) 65%, transparent));}
+.fig text{
+  font-family:"Chakra Petch",sans-serif; font-weight:700; letter-spacing:.1em;
+  text-anchor:middle; dominant-baseline:middle; text-transform:uppercase;
+}
+.shape h4{
+  margin:0; text-align:center; font-family:"Chakra Petch",sans-serif; font-weight:700;
+  font-size:14px; letter-spacing:.13em; text-transform:uppercase; color:var(--c); line-height:1.2;
+}
+.shape .note{
+  margin:0; text-align:center; font-family:"IBM Plex Mono",monospace; font-size:9.5px;
+  letter-spacing:.1em; color:var(--ink-400);
+}
+.members{display:flex; flex-direction:column; gap:3px; margin-top:auto;}
+.member{
+  display:flex; align-items:baseline; gap:8px; padding:3.5px 8px; border-radius:6px;
+  background:color-mix(in oklab, var(--ink-800) 90%, var(--c) 10%);
+  border-left:2px solid color-mix(in oklab, var(--c) 55%, transparent);
+  font-size:11.5px; color:var(--ink-100);
+}
+.member b{font-family:"Chakra Petch",sans-serif; font-weight:600; letter-spacing:.04em;}
+.member span{
+  margin-left:auto; font-family:"IBM Plex Mono",monospace; font-size:9px; color:var(--ink-400);
+  font-variant-numeric:tabular-nums;
+}
+
+/* ---------------- phone ---------------- */
+.stage{display:grid; grid-template-columns:328px minmax(0,1fr); gap:30px; align-items:center;}
+@media (max-width:860px){ .stage{grid-template-columns:1fr;} }
+.phone{
+  width:328px; aspect-ratio:9/19; border-radius:40px; padding:11px; margin:0 auto;
+  background:linear-gradient(#1b2331,#080c12); border:1px solid var(--ink-500);
+  box-shadow:0 30px 70px -26px #000, inset 0 0 0 1px rgba(255,255,255,.03);
+}
+.screen{
+  width:100%; height:100%; border-radius:31px; background:var(--ink-900);
+  border:1px solid var(--ink-700); overflow:hidden; position:relative;
+  display:flex; flex-direction:column;
+}
+.status-bar{
+  display:flex; justify-content:space-between; align-items:center; padding:11px 18px 5px;
+  font-family:"IBM Plex Mono",monospace; font-size:10px; color:var(--ink-200);
+}
+.phone-head{
+  display:flex; align-items:center; justify-content:space-between; padding:2px 16px 8px;
+}
+.phone-head b{font-family:"Chakra Petch",sans-serif; font-weight:700; font-size:19px;
+  letter-spacing:.13em; color:var(--gold);}
+.pill{
+  font-family:"IBM Plex Mono",monospace; font-size:7.5px; letter-spacing:.12em; text-transform:uppercase;
+  border:1px solid var(--ink-600); border-radius:999px; padding:3px 8px; color:var(--ink-300);
+  display:flex; align-items:center; gap:5px;
+}
+.pill i{width:5px; height:5px; border-radius:50%; background:var(--good); box-shadow:0 0 6px var(--good);}
+
+/* the radial launcher */
+.radial{flex:1; position:relative; display:grid; place-items:center; min-height:0;}
+.radial svg.orbits{position:absolute; inset:0; width:100%; height:100%;}
+.hubbtn{
+  position:relative; z-index:2; width:96px; height:96px; border-radius:50%; cursor:pointer;
+  border:1px solid color-mix(in oklab, var(--vaco) 45%, transparent);
+  background:radial-gradient(circle at 36% 30%, #6ee7db22, #0a1420 62%), var(--ink-850);
+  box-shadow:0 0 30px rgba(70,212,196,.28);
+  display:grid; place-items:center; color:inherit; font:inherit;
+  transition:box-shadow 220ms ease, transform 220ms ease;
+}
+.hubbtn:hover{transform:scale(1.04); box-shadow:0 0 42px rgba(70,212,196,.45);}
+.hubbtn b{font-family:"Chakra Petch",sans-serif; font-weight:700; font-size:26px; color:var(--ink-000);
+  letter-spacing:.04em; display:block; line-height:1;}
+.hubbtn small{font-family:"IBM Plex Mono",monospace; font-size:6.5px; letter-spacing:.18em;
+  text-transform:uppercase; color:var(--vaco);}
+.sat{
+  position:absolute; z-index:2; width:66px; transform:translate(-50%,-50%);
+  display:flex; flex-direction:column; align-items:center; gap:2px;
+  background:none; border:0; padding:0; cursor:pointer; color:inherit; font:inherit;
+}
+.sat-dot{
+  width:34px; height:34px; border-radius:11px; display:grid; place-items:center;
+  background:color-mix(in oklab, var(--sc) 20%, var(--ink-850));
+  border:1px solid color-mix(in oklab, var(--sc) 55%, transparent);
+  box-shadow:0 0 12px color-mix(in oklab, var(--sc) 40%, transparent);
+  transition:transform 200ms ease, box-shadow 200ms ease;
+}
+.sat:hover .sat-dot,.sat:focus-visible .sat-dot{
+  transform:scale(1.14); box-shadow:0 0 22px color-mix(in oklab, var(--sc) 75%, transparent); outline:none;
+}
+.sat-dot svg{width:17px; height:17px; stroke:var(--sc); fill:none; stroke-width:1.8;
+  stroke-linecap:round; stroke-linejoin:round;}
+.sat em{
+  font-style:normal; font-family:"IBM Plex Mono",monospace; font-size:6.5px; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--ink-300); text-align:center; line-height:1.2;
+}
+.tapnote{
+  text-align:center; font-family:"IBM Plex Mono",monospace; font-size:7.5px; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--ink-400); padding-bottom:4px;
+}
+.phone-nav{
+  display:flex; justify-content:space-around; padding:8px 6px 14px; border-top:1px solid var(--ink-700);
+}
+.phone-nav div{display:flex; flex-direction:column; align-items:center; gap:2px;
+  font-family:"IBM Plex Mono",monospace; font-size:6.5px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--ink-400);}
+.phone-nav div:first-child{color:var(--gold);}
+.phone-nav svg{width:15px; height:15px; stroke:currentColor; fill:none; stroke-width:1.7;
+  stroke-linecap:round; stroke-linejoin:round;}
+
+.stage-copy h3{
+  margin:0 0 8px; font-family:"Chakra Petch",sans-serif; font-weight:700;
+  font-size:clamp(18px,2.3vw,28px); letter-spacing:.07em; text-transform:uppercase; color:var(--ink-000);
+}
+.stage-copy p{margin:0 0 12px; color:var(--ink-200); max-width:52ch; font-size:14px;}
+.readout{
+  background:var(--ink-850); border:1px solid var(--ink-600); border-radius:11px;
+  padding:13px 15px; min-height:112px;
+}
+.readout small{font-family:"IBM Plex Mono",monospace; font-size:9px; letter-spacing:.2em;
+  text-transform:uppercase; color:var(--ink-400);}
+.readout b{display:block; font-family:"Chakra Petch",sans-serif; font-weight:700; font-size:21px;
+  letter-spacing:.05em; color:var(--ink-000); margin:3px 0 5px;}
+.readout p{margin:0; font-size:13px; color:var(--ink-200); max-width:52ch;}
+.readout .meta{
+  margin-top:9px; display:flex; gap:16px; flex-wrap:wrap;
+  font-family:"IBM Plex Mono",monospace; font-size:9.5px; letter-spacing:.1em; color:var(--ink-400);
+}
+.readout .meta b{display:inline; font-family:"IBM Plex Mono",monospace; font-size:9.5px;
+  color:var(--ink-100); font-weight:500; margin:0;}
+
+/* ---------------- connections ---------------- */
+.links{display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:10px;}
+.link{
+  display:flex; align-items:flex-start; gap:11px; padding:12px 14px;
+  background:var(--ink-850); border:1px solid var(--ink-600); border-radius:11px;
+  border-left:3px solid var(--st);
+}
+.link .k{
+  font-family:"IBM Plex Mono",monospace; font-size:8px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--st); border:1px solid color-mix(in oklab, var(--st) 45%, transparent);
+  border-radius:999px; padding:2px 7px; white-space:nowrap; margin-top:1px;
+}
+.link b{display:block; font-family:"Chakra Petch",sans-serif; font-weight:600; font-size:13px;
+  letter-spacing:.04em; color:var(--ink-000); line-height:1.25;}
+.link span{display:block; font-size:11.5px; color:var(--ink-300); line-height:1.4; margin-top:2px;}
+.link code{font-family:"IBM Plex Mono",monospace; font-size:10px; color:var(--ink-200);}
+
+/* ---------------- pillars ---------------- */
+.pillars{display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px;}
+.pillar{
+  background:var(--ink-850); border:1px solid var(--ink-600); border-radius:13px; padding:16px 15px;
+  display:flex; flex-direction:column; gap:8px;
+}
+.pillar-ico{
+  width:38px; height:38px; border-radius:10px; display:grid; place-items:center;
+  background:color-mix(in oklab, var(--pc) 16%, var(--ink-900));
+  border:1px solid color-mix(in oklab, var(--pc) 40%, transparent);
+}
+.pillar-ico svg{width:19px; height:19px; stroke:var(--pc); fill:none; stroke-width:1.7;
+  stroke-linecap:round; stroke-linejoin:round;}
+.pillar b{font-family:"Chakra Petch",sans-serif; font-weight:700; font-size:13.5px;
+  letter-spacing:.1em; text-transform:uppercase; color:var(--pc);}
+.pillar p{margin:0; font-size:12px; color:var(--ink-300); line-height:1.45;}
+
+.foot{
+  font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.1em; color:var(--ink-400);
+  text-align:center; line-height:1.8; border-top:1px solid var(--ink-700); padding-top:18px;
+}
+</style>
+
+<div class="wrap">
+
+  <!-- ===================== hero ===================== -->
+  <header class="hero">
+    <div>
+      <h1 class="wordmark">VACO</h1>
+      <h2>Operating System</h2>
+      <p class="tagline">One identity &middot; one ledger &middot; one ecosystem</p>
+      <p class="lede">
+        Eighteen public applications in five groups, over one shared spine: Shield holds
+        identity, V3 holds the money and the proof behind it, V4 is the agent you talk to. Each group is a shape,
+        and the names of the apps inside it are what draw the shape.
+      </p>
+    </div>
+
+    <div class="core">
+      <div class="core-top">
+        <div class="core-orb">V4</div>
+        <div>
+          <b>V4</b>
+          <small>AI operating system</small>
+        </div>
+      </div>
+      <div class="svc" id="coreSvc"></div>
+    </div>
+  </header>
+
+  <!-- ===================== the five shapes ===================== -->
+  <section>
+    <div class="band" style="margin-bottom:16px">
+      <h3><i>18</i> applications &middot; <i>5</i> shapes &middot; one experience</h3>
+      <p>The name of each app is one edge of its group</p>
+    </div>
+    <div class="shapes" id="shapes"></div>
+  </section>
+
+  <!-- ===================== the phone ===================== -->
+  <section class="stage">
+    <div class="phone">
+      <div class="screen">
+        <div class="status-bar"><span>9:41</span><span>&#9679;&#9679;&#9679; &nbsp;&#9663;</span></div>
+        <div class="phone-head">
+          <b>VACO</b>
+          <span class="pill"><i></i>All systems green</span>
+        </div>
+        <div class="radial" id="radial"></div>
+        <div class="tapnote">Tap the centre for V4</div>
+        <div class="phone-nav" id="phoneNav"></div>
+      </div>
+    </div>
+
+    <div class="stage-copy">
+      <h3>Everything one tap from the centre</h3>
+      <p>
+        The apps ring the agent rather than sitting in a list, each in its own registered
+        hue. Tap one to read it; tap the middle to ask V4 instead of hunting for the app
+        that would have answered.
+      </p>
+      <div class="readout" id="readout"></div>
+    </div>
+  </section>
+
+  <!-- ===================== connections ===================== -->
+  <section>
+    <div class="band" style="margin-bottom:14px">
+      <h3>App-to-app connections</h3>
+      <p>Checked against the code, not asserted</p>
+    </div>
+    <div class="links" id="links"></div>
+  </section>
+
+  <!-- ===================== pillars ===================== -->
+  <section class="pillars" id="pillars"></section>
+
+  <p class="foot" id="foot"></p>
+</div>
+
+<script>
+"use strict";
+
+/* ===================================================================
+   Data. Hues are the registered accents from VACO_PALETTE_REGISTER.md;
+   ports and route counts were read out of the repository. Four apps
+   have no accent filed and inherit VACO teal rather than being given
+   an invented one.
+   =================================================================== */
+const VACO = '#46d4c4';
+
+const I = {
+  brain:'<path d="M9 3a3 3 0 00-3 3 3 3 0 00-1 5 3 3 0 002 5 3 3 0 005 1V4a3 3 0 00-3-1z"/><path d="M15 3a3 3 0 013 3 3 3 0 011 5 3 3 0 01-2 5 3 3 0 01-5 1"/>',
+  search:'<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
+  map:'<path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/>',
+  id:'<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2.2"/><path d="M14 10h4M14 14h4"/>',
+  bell:'<path d="M6 9a6 6 0 1112 0c0 5 2 6 2 6H4s2-1 2-6z"/><path d="M10 20a2 2 0 004 0"/>',
+  wallet:'<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M16.5 14.5h.01"/>',
+  api:'<path d="M8 4H5a1 1 0 00-1 1v14a1 1 0 001 1h3M16 4h3a1 1 0 011 1v14a1 1 0 01-1 1h-3"/><path d="M12 8v8M9 12h6"/>',
+  trace:'<circle cx="5" cy="12" r="2"/><circle cx="12" cy="6" r="2"/><circle cx="19" cy="12" r="2"/><path d="M7 12h3M14 7l3 3M14 11l3-1"/>',
+  cards:'<rect x="3" y="6" width="12" height="14" rx="2"/><path d="M8 3h10a2 2 0 012 2v11"/>',
+  art:'<circle cx="12" cy="12" r="9"/><circle cx="9" cy="9.5" r="1.2"/><circle cx="15" cy="9.5" r="1.2"/><path d="M12 21a3 3 0 000-6 2 2 0 010-4"/>',
+  chart:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  note:'<path d="M9 18V5l10-2v13"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="16" r="2"/>',
+  film:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5v14M17 5v14M3 12h18"/>',
+  users:'<circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0112 0"/><path d="M16 6a3 3 0 010 6"/>',
+  play:'<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M11 9.5l4 2.5-4 2.5z"/>',
+  car:'<path d="M5 16h14M6 16l1.4-5h9.2L18 16"/><circle cx="8" cy="18" r="1.6"/><circle cx="16" cy="18" r="1.6"/>',
+  deer:'<path d="M6 3l2 4M18 3l-2 4M8 7c-1 3 0 6 4 6s5-3 4-6"/><path d="M12 13v8M9 21h6"/>',
+  heart:'<path d="M12 20s-7-4.6-7-9.4A3.9 3.9 0 0112 8a3.9 3.9 0 017 2.6C19 15.4 12 20 12 20z"/>',
+  bag:'<rect x="4" y="8" width="16" height="12" rx="2"/><path d="M9 8V6a3 3 0 016 0v2"/>',
+  world:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/>',
+  spade:'<path d="M12 3c-3 4-7 5.5-7 9a4 4 0 007 2.6A4 4 0 0019 12c0-3.5-4-5-7-9z"/><path d="M12 15v5"/>',
+  bank:'<path d="M3 10h18M5 10v8M19 10v8M12 10v8M2 20h20M12 3l9 5H3z"/>',
+  cart:'<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.6 12h11L21 7H6"/>',
+  home:'<path d="M4 11l8-7 8 7v8a1 1 0 01-1 1h-4v-6H9v6H5a1 1 0 01-1-1z"/>',
+  shield:'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
+  star:'<path d="M12 3l2.6 5.6 6.1.8-4.5 4.2 1.2 6L12 16.8 6.6 19.6l1.2-6L3.3 9.4l6.1-.8z"/>',
+  spark:'<path d="M12 3v5M12 16v5M3 12h5M16 12h5M6 6l3 3M15 15l3 3M18 6l-3 3M9 15l-3 3"/>',
+};
+
+const GROUPS = [
+  { shape:'ex', name:'Collect &amp; Trade', note:'cards, art, brokerage', c:'#e0559b',
+    apps:[
+      {n:'VOKEN',   a:'#e0559b', p:8794, r:64, i:'cards', d:'The card engine — minting, editions, provenance, value scores, auctions and fractional shares.'},
+      {n:'CVLTVRE', a:'#e0559b', p:8794, r:null, i:'star',  d:'The card brand people actually hold: collect, trade and auction anything with real cultural weight.'},
+      {n:'VADO',    a:null,      p:8794, r:null, i:'art',   d:'The Art District — galleries, exhibitions, art frames and auctions. Parent #18, no accent filed yet.'},
+      {n:'VEX',     a:'#6b8299', p:8816, r:7,   i:'chart', d:'Cvltvre Card brokerage, extracted out of VOKEN into its own app.'},
+    ]},
+  { shape:'square', name:'Watch &amp; Post', note:'music, video, villages', c:'#c45ad4',
+    apps:[
+      {n:'Vvltvre',       a:'#c45ad4', p:8806, r:70, i:'note',  d:'Music, Flix, Pods and Studios — one family across four services. Flat-fee distribution, royalty splits, the beat marketplace.'},
+      {n:'Vavlt Stvdios', a:'#9b6ef0', p:8808, r:58, i:'film',  d:'Multi-channel streaming with real 8-screen interactive sessions, VOD and casino streaming events.'},
+      {n:'VXLLAGE',       a:'#3fbf8f', p:8796, r:64, i:'users', d:'Home feed, Threads, Villages, Live and Call, plus a cross-village avatar cosmetic shop.'},
+      {n:'CHOPZ',         a:'#5fd44f', p:8800, r:5,  i:'play',  d:'Short-form video with verified product links, and CHOPZ SHOP behind it carrying real category fees.'},
+    ]},
+  { shape:'diamond', name:'Meet &amp; Move', note:'dating, stays, delivery, local', c:'#7c85e8',
+    apps:[
+      {n:'VOID',  a:'#7c85e8', p:8793, r:161, i:'car',   d:'The largest app here — 25 verticals, drone and ground routing, stations, staffing, lockers, TaaS.'},
+      {n:'HVNTZ', a:'#a3c94f', p:8792, r:40,  i:'deer',  d:'Fourteen revenue streams over businesses and locations, hunts, and the Explore page. DREAMS runs inside it.'},
+      {n:'CVNVO', a:'#e2716b', p:8798, r:59,  i:'heart', d:'Stable matching across eleven dating formats, BarBuddy, and VSAFE wired in behind it.'},
+      {n:'VACAY', a:'#f0845e', p:8803, r:1,   i:'bag',   d:'Stays, Experiences, Auto, Homes and Flights consolidated into sub-routers behind one route.'},
+    ]},
+  { shape:'triangle', name:'Play &amp; Wager', note:'the world, the sim, the casino', c:'#d9a23f',
+    apps:[
+      {n:'VDP',     a:null,      p:5174, r:null, i:'world', d:'The walkable world — districts for most apps, avatars, the resort. A Vite frontend, so modules rather than routes.'},
+      {n:'VACON-C', a:'#7d9e5c', p:8809, r:8,    i:'world', d:'Civilization simulation — state, tick, NPCs, missions. Paused by standing decision.'},
+      {n:'VAGO',    a:'#d9a23f', p:8795, r:39,   i:'spade', d:'Casino, sportsbook, prediction markets, fantasy contests, Gold Coin and AMOE compliance.'},
+    ]},
+  { shape:'circle', name:'Buy, Pay &amp; Ask', note:'market, ledger, agents', c:'#3faf6e',
+    apps:[
+      {n:'VENVS', a:null,      p:5173, r:null, i:'cart',  d:'Analog commerce — Shop, Marketplace and Publishing. A Vite frontend.'},
+      {n:'V3',    a:'#3faf6e', p:8811, r:6,    i:'bank',  d:'VCoin, VASH and VACA — currency, cashout and blockchain identity. Eighteen apps settle here.'},
+      // V4 goes in the middle. The circle is the only shape here with a
+      // meaningful interior, and the agent is what the other two are
+      // reached through -- on the rim it would read as their peer.
+      {n:'V4',    a:null,      p:8787, r:28,   i:'brain', center:true,
+       d:'Call an agent — ring, live call, text fallback, on any of five surfaces.'},
+    ]},
+];
+
+const CORE_SVC = [
+  {i:'brain',  t:'Agent calls', m:'5 states'},
+  {i:'id',     t:'Surfaces', m:'5'},
+  {i:'search', t:'Cross-app search', m:':8788'},
+  {i:'map',    t:'Maps layer', m:'11 routes'},
+  {i:'shield', t:'Identity &mdash; Shield', m:':8812'},
+  {i:'wallet', t:'Wallet &mdash; V3', m:':8811'},
+  {i:'bell',   t:'Notifications', m:':8818'},
+  {i:'api',    t:'Decisions &mdash; audit', m:':8819'},
+  {i:'trace',  t:'Trace context', m:'W3C'},
+];
+
+/* **Every one of these was checked by grepping for the caller's
+   `*_API_URL` read.** The older poster listed four "by design";
+   two are wired, one runs the other way, and two do not exist. */
+const LINKS = [
+  {s:'wired', t:'VOID trip data &rarr; CVNVO safety',
+   d:'CVNVO reads <code>VOID_API_URL</code> and stores a <code>voidRideId</code> on a date event.'},
+  {s:'wired', t:'HVNTZ &rarr; Vavlt Stvdios',
+   d:'Runs the other way from the old diagram: <code>hvntz/server.js</code> POSTs to Vavlt Stvdios <code>/api/posts</code>.'},
+  {s:'wired', t:'VXLLAGE &rarr; Vavlt Stvdios',
+   d:'Not on the old diagram at all. <code>vxllage/lib/vavltStvdiosClient.js</code>.'},
+  {s:'wired', t:'VACAY &rarr; VOID',
+   d:'Also missing from the old diagram. VACAY reads <code>VOID_API_URL</code> for transport.'},
+  {s:'wired', t:'CVNVO &rarr; VSAFE, VACA, YAP, HVNTZ',
+   d:'Four live integrations from one app: safety check-ins, verified badges, reporting, hunt dates.'},
+  {s:'unbuilt', t:'HVNTZ onboarding &rarr; DREAMS',
+   d:'Claimed by design, not wired: DREAMS reads no <code>HVNTZ_API_URL</code>. DREAMS runs inside HVNTZ but does not call it.'},
+  {s:'unbuilt', t:'VOID fulfilment &rarr; CHOPZ + VENVS',
+   d:'Claimed by design, not wired: CHOPZ reads only <code>CHOPZ_SHOP_API_URL</code>.'},
+];
+
+const PILLARS = [
+  {i:'shield', c:'#3fbf8f', t:'One identity', d:'Shield is the single session authority. 27 apps carry its middleware; no app invents its own login.'},
+  {i:'wallet', c:'#d9a23f', t:'One ledger',   d:'V3 holds all three: VCoin, VASH and VACA. Every money split rounds one side and derives the other, so the two always sum.'},
+  {i:'api',    c:'#4d94e8', t:'One record',   d:'Decisions with a loser are written to vaco-audit before they are made — and refused if they cannot be.'},
+  {i:'brain',  c:'#c45ad4', t:'One agent',    d:'V4 answers across all of it: 14 named agents, five surfaces, every invocation attributed.'},
+];
+
+const ico = (k, cls='') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${I[k]||''}</svg>`;
+
+/* ---- shape geometry: the names are the edges ---- */
+const SHAPES = {
+  square:{ outline:'<rect class="outline" x="15" y="15" width="70" height="70" rx="2"/><rect class="halo" x="15" y="15" width="70" height="70" rx="2"/>',
+    size:9.2, slots:[{x:50,y:15,r:0},{x:85,y:50,r:90},{x:50,y:85,r:0},{x:15,y:50,r:-90}] },
+  ex:{ outline:'<path class="outline" d="M15 15 85 85M85 15 15 85"/><path class="halo" d="M15 15 85 85M85 15 15 85"/>',
+    size:9.2, slots:[{x:26,y:26,r:45},{x:74,y:26,r:-45},{x:74,y:74,r:45},{x:26,y:74,r:-45}] },
+  diamond:{ outline:'<path class="outline" d="M50 11 89 50 50 89 11 50Z"/><path class="halo" d="M50 11 89 50 50 89 11 50Z"/>',
+    size:8.2, slots:[{x:70,y:30,r:45},{x:70,y:70,r:-45},{x:30,y:70,r:45},{x:30,y:30,r:-45}] },
+  triangle:{ outline:'<path class="outline" d="M50 14 87 83 13 83Z"/><path class="halo" d="M50 14 87 83 13 83Z"/>',
+    size:8.8, slots:[{x:31,y:49,r:-62},{x:69,y:49,r:62},{x:50,y:83,r:0}] },
+  circle:{ outline:'<circle class="outline" cx="50" cy="50" r="35"/><circle class="halo" cx="50" cy="50" r="35"/>',
+    size:8.4, slots:null },
+};
+function slotsFor(g){
+  const s = SHAPES[g.shape];
+  if (s.slots) return s.slots;
+  // The circle alone can hold a name in its middle. An app marked
+  // `center` goes there; the rest space evenly from the top, so two on
+  // the ring land at top and bottom by construction rather than by luck.
+  const onRing = g.apps.filter((a) => !a.center).length;
+  let i = 0;
+  return g.apps.map((a) => {
+    if (a.center) return { x:50, y:50, r:0 };
+    const t = -Math.PI/2 + (i++ * 2*Math.PI)/onRing;
+    return { x:50+Math.cos(t)*34, y:50+Math.sin(t)*34, r:0 };
+  });
+}
+function figure(g){
+  const geo = SHAPES[g.shape];
+  const slots = slotsFor(g);
+  // Type answers to the longest name, not to the shape — otherwise
+  // "Vavlt Stvdios" collides with its neighbour on the square.
+  const longest = Math.max(...g.apps.map((a) => a.n.length));
+  const size = (geo.size * Math.min(1, 8 / longest)).toFixed(2);
+  const words = g.apps.map((a, i) => {
+    const s = slots[i]; if (!s) return '';
+    const hue = a.a || VACO;
+    return `<text x="${s.x}" y="${s.y}" transform="rotate(${s.r} ${s.x} ${s.y})"`
+      + ` font-size="${size}" fill="${hue}"`
+      + ` style="paint-order:stroke;stroke:#04060a;stroke-width:2px;stroke-linejoin:round;`
+      + `filter:drop-shadow(0 0 3px ${hue})">${a.n}</text>`;
+  }).join('');
+  return `<svg class="fig" viewBox="0 0 100 100" role="img" aria-label="${g.name.replace(/&amp;/g,'and')}">${geo.outline}${words}</svg>`;
+}
+
+/* ---- render ---- */
+document.getElementById('coreSvc').innerHTML =
+  CORE_SVC.map((s) => `<div>${ico(s.i)}<span>${s.t}</span><em>${s.m}</em></div>`).join('');
+
+document.getElementById('shapes').innerHTML = GROUPS.map((g) => `
+  <article class="shape" style="--c:${g.c}">
+    ${figure(g)}
+    <h4>${g.name}</h4>
+    <p class="note">${g.note}</p>
+    <div class="members">
+      ${g.apps.map((a) => `<div class="member"><b>${a.n}</b><span>${a.r === null ? 'frontend' : a.r + ' routes'}</span></div>`).join('')}
+    </div>
+  </article>`).join('');
+
+/* ---- radial launcher ----
+   **Two levels, because eighteen satellites in a phone is a mess.**
+   The first version put all of them on two rings and the labels
+   collided — which defeats the ring, whose whole job is that each app
+   is legible in its own hue. So it mirrors the shape system instead:
+   five figures first, then the apps that draw the one you picked. */
+const ALL = GROUPS.flatMap((g) => g.apps.map((a) => ({ ...a, group:g })));
+
+const MINI = {
+  square:'<rect x="5" y="5" width="14" height="14" rx="1.5"/>',
+  ex:'<path d="M6 6l12 12M18 6L6 18"/>',
+  diamond:'<path d="M12 4l8 8-8 8-8-8z"/>',
+  triangle:'<path d="M12 5l7.5 14h-15z"/>',
+  circle:'<circle cx="12" cy="12" r="7.5"/>',
+};
+
+const radial = document.getElementById('radial');
+let openGroup = null;
+
+function satHTML(list, radius, cx, cy){
+  return list.map((item, i) => {
+    const t = -Math.PI/2 + (i*2*Math.PI)/list.length;
+    const x = cx + Math.cos(t)*radius, y = cy + Math.sin(t)*radius;
+    return `<button class="sat" type="button" style="--sc:${item.hue}; left:${x}px; top:${y}px"
+              data-k="${item.key}"><span class="sat-dot">${item.svg}</span><em>${item.label}</em></button>`;
+  }).join('');
+}
+
+function layoutRadial(){
+  const rect = radial.getBoundingClientRect();
+  const cx = rect.width/2, cy = rect.height/2;
+  const R = Math.max(76, Math.min(cx, cy) - 32);
+
+  let items, hubSvg, hubLabel, hubKey;
+  if (openGroup === null) {
+    items = GROUPS.map((g, i) => ({
+      key:'g'+i, hue:g.c, label:g.name.replace(/&amp;/g,'&'),
+      svg:`<svg viewBox="0 0 24 24" aria-hidden="true">${MINI[g.shape]}</svg>`,
+    }));
+    hubSvg = '<b>V4</b><small>ask</small>'; hubKey = 'V4'; hubLabel = '';
+  } else {
+    const g = GROUPS[openGroup];
+    items = g.apps.map((a) => ({
+      key:a.n, hue:a.a || VACO, label:a.n,
+      svg:`<svg viewBox="0 0 24 24" aria-hidden="true">${I[a.i]||''}</svg>`,
+    }));
+    hubSvg = `<svg viewBox="0 0 24 24" style="width:30px;height:30px;stroke:${g.c};fill:none;stroke-width:1.6">${MINI[g.shape]}</svg>`
+      + '<small style="display:block;margin-top:3px">back</small>';
+    hubKey = 'back';
+  }
+
+  radial.innerHTML =
+    `<svg class="orbits" viewBox="0 0 ${rect.width} ${rect.height}" aria-hidden="true">
+       <circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="#101620"/>
+     </svg>`
+    + satHTML(items, R, cx, cy)
+    + `<button class="hubbtn" type="button" data-k="${hubKey}"><span>${hubSvg}</span></button>`;
+}
+
+const readout = document.getElementById('readout');
+const V4CARD = '<small>Centre</small><b>V4</b>'
+  + '<p>Ask once and it routes: fourteen named agents behind one call flow, on five surfaces. '
+  + 'Every invocation is attributed before the agent answers.</p>'
+  + '<div class="meta"><span>port <b>:8787</b></span><span>routes <b>28</b></span>'
+  + '<span>agents <b>14</b></span></div>';
+
+function showApp(app){
+  readout.innerHTML = `<small>${app.group.name} &middot; ${app.group.note}</small><b>${app.n}</b>`
+    + `<p>${app.d}</p><div class="meta">`
+    + `<span>port <b>:${app.p}</b></span>`
+    + (app.r === null ? '<span>build <b>frontend</b></span>' : `<span>routes <b>${app.r}</b></span>`)
+    + `<span>accent <b>${app.a || 'not filed'}</b></span></div>`;
+}
+function showGroup(g){
+  readout.innerHTML = `<small>${g.note}</small><b>${g.name}</b>`
+    + `<p>${g.apps.length} apps, each one an edge of this shape: `
+    + `${g.apps.map((a) => a.n).join(', ')}.</p>`
+    + `<div class="meta"><span>apps <b>${g.apps.length}</b></span>`
+    + `<span>routes <b>${g.apps.reduce((n,a) => n + (a.r||0), 0)}</b></span>`
+    + '<span>guarded <b>100%</b></span></div>';
+}
+
+radial.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-k]'); if (!b) return;
+  const k = b.dataset.k;
+  if (k === 'V4') { readout.innerHTML = V4CARD; return; }
+  if (k === 'back') { openGroup = null; layoutRadial(); readout.innerHTML = V4CARD; return; }
+  if (k.startsWith('g') && openGroup === null) {
+    openGroup = Number(k.slice(1)); layoutRadial(); showGroup(GROUPS[openGroup]); return;
+  }
+  const app = ALL.find((a) => a.n === k);
+  if (app) showApp(app);
+});
+radial.addEventListener('mouseover', (e) => {
+  const b = e.target.closest('[data-k]'); if (!b) return;
+  const k = b.dataset.k;
+  if (k === 'V4' || k === 'back') return;
+  if (k.startsWith('g') && openGroup === null) { showGroup(GROUPS[Number(k.slice(1))]); return; }
+  const app = ALL.find((a) => a.n === k); if (app) showApp(app);
+});
+
+document.getElementById('phoneNav').innerHTML =
+  [['home','Home'],['wallet','Wallet'],['brain','V4'],['users','Agents'],['id','Profile']]
+    .map(([i,t]) => `<div>${ico(i)}<span>${t}</span></div>`).join('');
+
+document.getElementById('links').innerHTML = LINKS.map((l) => `
+  <div class="link" style="--st:${l.s === 'wired' ? 'var(--good)' : 'var(--warn)'}">
+    <span class="k">${l.s === 'wired' ? 'wired' : 'not built'}</span>
+    <span><b>${l.t}</b><span>${l.d}</span></span>
+  </div>`).join('');
+
+document.getElementById('pillars').innerHTML = PILLARS.map((p) => `
+  <div class="pillar" style="--pc:${p.c}">
+    <div class="pillar-ico">${ico(p.i)}</div>
+    <b>${p.t}</b><p>${p.d}</p>
+  </div>`).join('');
+
+const apps = ALL.length;
+const routes = ALL.reduce((n, a) => n + (a.r || 0), 0);
+document.getElementById('foot').innerHTML =
+  `${apps} public apps &middot; ${GROUPS.length} shapes &middot; ${routes} of 857 routes shown &middot; `
+  + '879 tests &middot; 490/490 routes accounted<br>'
+  + 'VACON and the Shell are ours to run, not apps anyone opens &mdash; neither takes an edge. '
+  + '<span style="color:var(--warn)">No usage figures: there are no users yet.</span>';
+
+layoutRadial();
+readout.innerHTML = V4CARD;
+addEventListener('resize', () => { layoutRadial(); });
+</script>

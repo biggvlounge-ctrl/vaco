@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VACO Notify</title>
+<link rel="stylesheet" href="/vaco-design.css" />
+<style>
+  .sev { font-size: var(--vaco-text-xs); letter-spacing: 0.06em; text-transform: uppercase; }
+  .undelivered-count { font-size: 32px; font-weight: var(--vaco-weight-medium); line-height: 1; }
+</style>
+</head>
+<body class="vaco">
+<script src="/vaco-ui.js"></script>
+<script>
+// VACO Notify — the one channel.
+//
+// **The number this page exists to show is `undeliveredAlerts`.** Every
+// other surface in this ecosystem records alerts; the gap was that none
+// of them delivered one. So the first thing on the first tab is a count
+// of notifications that claimed to page a human and did not — because a
+// notification service whose failures are only visible in a log has
+// reproduced the bug it was built to fix.
+
+var el = VACO.el;
+
+var SEV_KIND = { signal: 'info', alert: 'warn', critical: 'danger' };
+
+function sevBadge(severity) {
+  return VACO.badge(severity, SEV_KIND[severity] || 'info');
+}
+
+function renderStatus(body) {
+  var out = el('div', 'vaco-stack');
+
+  return VACO.api('/api/health').then(function (health) {
+    var count = health.undeliveredAlerts;
+    var card = VACO.card('Alerts that reached nobody', [
+      el('div', 'undelivered-count' + (count > 0 ? ' vaco-danger' : ''), String(count)),
+      el('p', 'vaco-small vaco-dim', count > 0
+        ? 'Each of these was raised and no channel accepted it. That is the failure this service exists to make visible rather than silent.'
+        : 'Every alert raised so far was accepted by at least one channel.'),
+    ], { trailing: count > 0 ? VACO.badge('action needed', 'danger') : VACO.badge('clear', 'money') });
+    out.appendChild(card);
+
+    out.appendChild(VACO.card('Channels', [
+      el('p', 'vaco-small', 'Working today, with no vendor account: '
+        + health.channels.join(', ') + '.'),
+      el('p', 'vaco-small vaco-dim', 'A webhook target works with Slack, Discord, PagerDuty and '
+        + 'Opsgenie as-is. Not implemented: ' + health.unimplementedChannels.join(', ')
+        + ' — these need a vendor, and are refused at subscribe time rather than stubbed, '
+        + 'because a stub that accepts a message and drops it is the exact bug this service closes.'),
+    ]));
+
+    out.appendChild(VACO.card('Delivery attempts by severity', [
+      VACO.table(
+        [{ key: 'severity', label: 'Severity' }, { key: 'attempts', label: 'Attempts' }, { key: 'meaning', label: 'Posture' }],
+        [
+          { severity: 'signal', attempts: health.attemptsBySeverity.signal, meaning: 'best effort — a dropped one costs a data point' },
+          { severity: 'alert', attempts: health.attemptsBySeverity.alert, meaning: 'retried, and a total failure is recorded' },
+          { severity: 'critical', attempts: health.attemptsBySeverity.critical, meaning: 'must not fail silently' },
+        ],
+      ),
+    ]));
+
+    return VACO.mount(body, out);
+  });
+}
+
+function renderNotifications(body) {
+  var out = el('div', 'vaco-stack');
+  return VACO.api('/api/notifications?limit=50').then(function (data) {
+    if (data.notifications.length === 0) {
+      out.appendChild(VACO.notice('Nothing has been sent yet.'));
+      return VACO.mount(body, out);
+    }
+    data.notifications.forEach(function (n) {
+      var delivered = n.status === 'delivered';
+      out.appendChild(VACO.card(n.title, [
+        el('p', 'vaco-small vaco-dim', n.body || ''),
+        el('p', 'vaco-small vaco-mono', n.app + ' · ' + new Date(n.createdAt).toLocaleString()),
+        n.deliveries.length > 0
+          ? VACO.table([{ key: 'subscription', label: 'To' }, { key: 'channel', label: 'Channel' }, { key: 'result', label: 'Result' }],
+            n.deliveries.map(function (d) {
+              return { subscription: d.subscription, channel: d.channel, result: d.ok ? 'delivered' : (d.error || 'failed') };
+            }))
+          : el('p', 'vaco-small vaco-danger', 'No subscription matched — nobody was configured to hear this.'),
+      ], { trailing: delivered ? VACO.badge('delivered', 'money') : VACO.badge('undelivered', 'danger') }));
+    });
+    return VACO.mount(body, out);
+  });
+}
+
+function renderSubscriptions(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'A subscription is <strong>who hears about what</strong>. Deliberately not a broadcast: '
+    + 'an ad-budget alert and a safety escalation should not land in the same place by default. '
+    + 'A pager that cries wolf gets muted, and then the real one is missed.'));
+
+  return VACO.api('/api/subscriptions').then(function (data) {
+    out.appendChild(VACO.card('Current subscriptions', [
+      VACO.table([
+        { key: 'name', label: 'Name' },
+        { key: 'channel', label: 'Channel' },
+        { key: 'minSeverity', label: 'From severity' },
+        { key: 'apps', label: 'Apps' },
+      ], data.subscriptions.map(function (s) {
+        return {
+          name: s.name, channel: s.channel, minSeverity: s.minSeverity,
+          apps: s.apps ? s.apps.join(', ') : 'all',
+        };
+      })),
+    ]));
+
+    out.appendChild(VACO.card('Add a subscription', [
+      VACO.form([
+        { name: 'operatorId', label: 'Operator', value: VACO.userId() || '', width: '140px' },
+        { name: 'name', label: 'Name', width: '140px' },
+        { name: 'channel', label: 'Channel', options: ['console', 'file', 'webhook'] },
+        { name: 'target', label: 'Target (webhook URL)', width: '220px' },
+        { name: 'minSeverity', label: 'From', options: ['alert', 'critical', 'signal'] },
+      ], function (values) {
+        var payload = { operatorId: values.operatorId, name: values.name, channel: values.channel, minSeverity: values.minSeverity };
+        if (values.target) payload.target = values.target;
+        return VACO.post('/api/subscriptions', payload).then(function (s) {
+          VACO.toast('Subscribed "' + s.name + '".');
+          return renderSubscriptions(body);
+        });
+      }, 'Subscribe'),
+    ]));
+
+    return VACO.mount(body, out);
+  });
+}
+
+VACO.app({
+  id: 'vaco-notify',
+  name: 'VACO Notify',
+  tagline: 'The one channel — escalations, alerts, signals',
+  //: Notify's identity: signal amber. It sits deliberately between
+  //: VAGO's casino brass (40°) and HVNTZ's lime (78°) at ~52°, and it
+  //: is the one place a warm alerting colour is the *subject* rather
+  //: than a semantic overlay. Chosen over red: this service is not an
+  //: emergency, it is the thing that tells you about one, and a console
+  //: that always looks alarming stops being read.
+  accent: '#d8b24a',
+  accentDim: '#b0902f',
+  accentInk: '#12100a',
+  tabs: [
+    { id: 'status', label: 'Status', heading: 'Delivery', render: renderStatus },
+    { id: 'sent', label: 'Sent', heading: 'Recent notifications', render: renderNotifications },
+    { id: 'subs', label: 'Subscriptions', heading: 'Who hears what', render: renderSubscriptions },
+  ],
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "name": "cvnvo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CVNVO (Convo) -- the ecosystem's dating app. Trust/safety-first, Hinge-model mutual-compatibility matching (real Gale-Shapley), not Tinder-style swipe volume.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "ws": "^8.21.3"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

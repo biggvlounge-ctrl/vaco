@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>VACO Analytics — Wallboard</title>
+<style>
+  :root {
+    --bg: #0b0f14;
+    --card-bg: #131a23;
+    --border: #232d3a;
+    --text: #e6edf3;
+    --text-dim: #8b98a5;
+    --accent: #4fd1c5;
+    --stale: #f0883e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: 24px;
+  }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 20px;
+  }
+  h1 { font-size: 20px; margin: 0; letter-spacing: 0.02em; }
+  #status { color: var(--text-dim); font-size: 13px; }
+  #status.stale { color: var(--stale); }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+  }
+  .app-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .app-card h2 {
+    font-size: 15px;
+    margin: 0 0 12px 0;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .metric-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-top: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .metric-row:first-of-type { border-top: none; }
+  .metric-name { color: var(--text-dim); }
+  .metric-value { font-variant-numeric: tabular-nums; }
+  #empty { color: var(--text-dim); font-size: 14px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>VACO Analytics — Ecosystem Wallboard</h1>
+  <span id="status">connecting…</span>
+</header>
+<div id="grid" class="grid"></div>
+<p id="empty" style="display:none;">No metrics reported yet. POST to /api/metrics/ingest to see data here.</p>
+
+<script>
+  // Self-hosted, dependency-free substitute for the source doc's
+  // Geckoboard recommendation -- a real, live, always-on wallboard
+  // pulling from the same real /api/dashboard endpoint this repo's
+  // server.js serves, polling on an interval rather than a push
+  // subscription (no websocket/SSE endpoint exists yet).
+  const REFRESH_MS = 5000;
+  const grid = document.getElementById('grid');
+  const empty = document.getElementById('empty');
+  const status = document.getElementById('status');
+
+  async function refresh() {
+    try {
+      const res = await fetch('/api/dashboard');
+      if (!res.ok) throw new Error('bad response ' + res.status);
+      const data = await res.json();
+      render(data);
+      status.textContent = 'live — updated ' + new Date(data.generatedAt).toLocaleTimeString();
+      status.classList.remove('stale');
+    } catch (err) {
+      status.textContent = 'connection lost — retrying…';
+      status.classList.add('stale');
+    }
+  }
+
+  function render(data) {
+    grid.innerHTML = '';
+    if (!data.apps || data.apps.length === 0) {
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+    for (const appEntry of data.apps) {
+      const card = document.createElement('div');
+      card.className = 'app-card';
+      const h2 = document.createElement('h2');
+      h2.textContent = appEntry.app;
+      card.appendChild(h2);
+      for (const m of appEntry.metrics) {
+        const row = document.createElement('div');
+        row.className = 'metric-row';
+        row.innerHTML =
+          '<span class="metric-name">' + m.metric + '</span>' +
+          '<span class="metric-value">latest ' + m.latest + ' · avg ' + m.avg + ' · n=' + m.count + '</span>';
+        card.appendChild(row);
+      }
+      grid.appendChild(card);
+    }
+  }
+
+  refresh();
+  setInterval(refresh, REFRESH_MS);
+</script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "name": "vulture-studios",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Vvltvre Studios -- VVLTVRE -> STUDIOS, the real production-financing arm: greenlight a project, raise real financing from investors in exchange for real proportional equity, move it through a real production pipeline, and distribute the completed project into Vvltvre Flix -- the real Universal-Studios-style fund-and-produce model, distinct from every other Vvltvre division's distribution-only posture.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

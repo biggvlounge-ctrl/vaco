@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>V4 Search</title>
+<link rel="stylesheet" href="/vaco-design.css" />
+<style>
+  .result { display: flex; flex-direction: column; gap: 4px; padding: var(--vaco-space-3) 0;
+            border-top: 1px solid var(--vaco-border-subtle); }
+  .result:first-child { border-top: 0; }
+  .result-app { font-size: var(--vaco-text-xs); letter-spacing: 0.06em; text-transform: uppercase; color: var(--vaco-accent); }
+</style>
+</head>
+<body class="vaco">
+<script src="/vaco-ui.js"></script>
+<script>
+// V4 Search — cross-app search routing.
+//
+// The smallest service in the ecosystem: one real endpoint that fans a
+// query out to whichever apps can answer it and merges the results.
+//
+// **It searches only the apps that are running.** A result set that
+// looks thin usually means a sibling service is down rather than that
+// nothing matched, so failures are reported per app rather than
+// swallowed into an empty list — an empty result you cannot explain is
+// worse than a short one you can.
+
+var el = VACO.el;
+
+function renderSearch(body) {
+  var out = el('div', 'vaco-stack');
+
+  out.appendChild(VACO.card('Search across the ecosystem', [
+    VACO.form([
+      { name: 'query', label: 'Query', placeholder: 'try: courier, coffee, tee', width: '340px' },
+    ], function (values) {
+      return VACO.post('/api/search', values).then(function (data) {
+        while (out.childNodes.length > 1) out.removeChild(out.lastChild);
+
+        var results = data.results || [];
+        var errors = data.errors || data.failed || [];
+
+        if (errors.length) {
+          out.appendChild(VACO.notice(
+            'Some apps could not be reached: <strong>'
+            + VACO.escapeHtml(errors.map(function (e) { return e.app || e; }).join(', '))
+            + '</strong>. Their results are missing from the list below rather than silently absent.',
+            'warn'));
+        }
+
+        if (!results.length) {
+          out.appendChild(el('div', 'vaco-empty',
+            'No matches. If apps failed above, that is the likelier reason than a genuinely empty result.'));
+          VACO.mount(body, out);
+          return;
+        }
+
+        var list = el('div', null);
+        results.forEach(function (r) {
+          var row = el('div', 'result');
+          row.appendChild(el('span', 'result-app', r.app || r.source || 'unknown'));
+          row.appendChild(el('strong', null, r.title || r.name || r.id));
+          if (r.description || r.summary) {
+            row.appendChild(el('span', 'vaco-small vaco-dim', r.description || r.summary));
+          }
+          list.appendChild(row);
+        });
+        out.appendChild(VACO.card(results.length + ' result(s)', [list]));
+        VACO.mount(body, out);
+      });
+    }, 'Search'),
+  ]));
+
+  return VACO.mount(body, out);
+}
+
+function renderAbout(body) {
+  return VACO.api('/api/health').then(function (health) {
+    var rows = Object.keys(health)
+      .filter(function (k) { return typeof health[k] !== 'object'; })
+      .map(function (k) { return { field: k.replace(/([A-Z])/g, ' $1'), value: String(health[k]) }; });
+
+    var out = el('div', 'vaco-stack');
+    out.appendChild(VACO.card('Service', [
+      VACO.table([{ key: 'field', label: 'Property' }, { key: 'value', label: 'Value' }], rows),
+    ]));
+
+    if (Array.isArray(health.searchableApps)) {
+      out.appendChild(VACO.card('Apps it fans out to', [
+        el('p', 'vaco-mono vaco-small', health.searchableApps.join(' · ')),
+      ]));
+    }
+
+    out.appendChild(VACO.notice(
+      'There is <strong>no index and no ranking model</strong> here. This is a fan-out router: it asks each app '
+      + 'and merges what comes back. Relevance is whatever each app decides it is, which is honest but means '
+      + 'results are not comparable across apps.'));
+    return out;
+  });
+}
+
+VACO.app({
+  id: 'v4-search',
+  name: 'V4 Search',
+  tagline: 'Cross-app routing',
+  //: V4 Search's identity: the same periwinkle family as V4's proxy,
+  //: one step cooler — they are two halves of the same layer.
+  accent: '#7d92e0',
+  accentDim: '#5f73c2',
+  accentInk: '#06091a',
+  tabs: [
+    { id: 'search', label: 'Search', heading: 'One query, every app', render: renderSearch },
+    { id: 'about', label: 'About', heading: 'What this service is', render: renderAbout },
+  ],
+});
+</script>
+</body>
+</html>

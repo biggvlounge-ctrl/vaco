@@ -1,0 +1,12 @@
+{
+  "name": "vaco-mcp",
+  "version": "1.0.0",
+  "description": "Exposes VACO's already-guarded routes to an MCP client as tools. A client of the ecosystem, never a way around it.",
+  "type": "module",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "engines": { "node": ">=22" }
+}

@@ -1,0 +1,723 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VACO</title>
+
+<!-- The shared design system. Every colour, size, and component shape on
+     this page comes from it — this file adds layout only. That is the
+     proof the tokens survive a real consumer, which is the step
+     VISUAL_DESIGN_COHESION_DIRECTIVE.md asked for. -->
+<link rel="stylesheet" href="/vaco-design.css" />
+
+<style>
+  /* Page-specific layout only. No colours, no sizes — if something here
+     needed a new colour, it would belong in vaco-design.css instead. */
+  /* Masthead, brand, and wallet now come from the design system —
+     this page used to duplicate them, which made the store an
+     exception to the system it publishes. */
+  .wordmark { font-size: var(--vaco-text-xl); letter-spacing: 0.14em; }
+  main { padding-top: var(--vaco-space-6); padding-bottom: var(--vaco-space-8); }
+  .view { display: none; }
+  .view[data-active="true"] { display: block; }
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    gap: var(--vaco-space-3);
+    flex-wrap: wrap;
+  }
+  .tile-head { display: flex; align-items: flex-start; gap: var(--vaco-space-3); }
+  .tile-head h3 { flex: 1; }
+  .tile-desc {
+    color: var(--vaco-text-dim);
+    font-size: var(--vaco-text-sm);
+    flex: 1;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .tile-foot {
+    display: flex;
+    align-items: center;
+    gap: var(--vaco-space-2);
+    padding-top: var(--vaco-space-1);
+  }
+  /* The storefront tile is a card with a button, not a link — clicking
+     the body must not navigate away mid-purchase. */
+  .store-tile { display: flex; flex-direction: column; gap: var(--vaco-space-2); }
+  .brand-rail { display: flex; gap: var(--vaco-space-2); flex-wrap: wrap; }
+  .merch-art {
+    height: 108px;
+    border-radius: var(--vaco-radius-sm);
+    background:
+      radial-gradient(circle at 30% 25%, var(--vaco-accent-soft), transparent 60%),
+      var(--vaco-bg-raised);
+    border: 1px solid var(--vaco-border-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--vaco-text-faint);
+    font-size: var(--vaco-text-xs);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .auth-form { display: flex; gap: var(--vaco-space-2); flex-wrap: wrap; align-items: center; }
+  /* A long brand name must not squeeze the quantity field to nothing. */
+  .qty { width: 58px; flex: 0 0 auto; }
+  .tile-foot .vaco-badge { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+</style>
+</head>
+
+<body class="vaco">
+
+<header class="vaco-masthead">
+  <div class="vaco-container vaco-masthead-inner">
+    <span class="vaco-brand-mark wordmark">VACO</span>
+    <nav class="vaco-tabs" id="tabs" style="border-bottom: 0;" role="tablist">
+      <button class="vaco-tab" role="tab" data-view="store" aria-selected="true">App Store</button>
+      <button class="vaco-tab" role="tab" data-view="merch" aria-selected="false">Merch</button>
+      <button class="vaco-tab" role="tab" data-view="library" aria-selected="false">Library</button>
+      <button class="vaco-tab" role="tab" data-view="ecosystem" aria-selected="false">Ecosystem</button>
+      <button class="vaco-tab" role="tab" data-view="insight" aria-selected="false">Insight</button>
+    </nav>
+    <span class="vaco-spacer"></span>
+    <div class="vaco-row-tight" id="identityBox"></div>
+  </div>
+</header>
+
+<main class="vaco-container">
+
+  <!-- ================= App Store ================= -->
+  <section class="view" data-view="store" data-active="true">
+    <div class="vaco-stack">
+      <div class="section-head">
+        <h1 class="vaco-h1">App Store</h1>
+        <span class="vaco-badge" id="storeCount"></span>
+        <span class="vaco-spacer"></span>
+        <select class="vaco-select" id="storeFilter">
+          <option value="">All apps</option>
+          <option value="free">Free</option>
+          <option value="one-time">One-time purchase</option>
+          <option value="subscription">Subscription</option>
+        </select>
+      </div>
+
+      <div class="vaco-notice">
+        <div>
+          Purchases move <strong>real VCoin through the V3 ledger</strong> — the
+          publisher is paid and the store takes its rate as two separate,
+          individually auditable transfers. Sign in above to install anything.
+        </div>
+      </div>
+
+      <div class="vaco-grid vaco-grid-wide" id="storeGrid"></div>
+    </div>
+  </section>
+
+  <!-- ================= Merch ================= -->
+  <section class="view" data-view="merch">
+    <div class="vaco-stack">
+      <div class="section-head">
+        <h1 class="vaco-h1">VACO Merch</h1>
+        <span class="vaco-badge vaco-badge-accent">Zero inventory</span>
+      </div>
+      <p class="vaco-body vaco-dim" style="max-width: 62ch;">
+        One storefront across every app brand. Nothing is manufactured until
+        an order exists — no stock, no warehousing, no minimums.
+      </p>
+
+      <div class="vaco-notice vaco-notice-warn">
+        <div>
+          <strong>Orders are recorded, not fulfilled.</strong> No live
+          Printify, Printful, or Fourthwall API is connected, and there is no
+          AI illustration layer — product art must come from elsewhere. The
+          money split below is real; the shipping is not.
+        </div>
+      </div>
+
+      <div class="brand-rail" id="brandRail"></div>
+      <div class="vaco-grid" id="merchGrid"></div>
+
+      <h2 class="vaco-h2" style="margin-top: var(--vaco-space-4);">Your orders</h2>
+      <div id="ordersBox"></div>
+    </div>
+  </section>
+
+  <!-- ================= Library ================= -->
+  <section class="view" data-view="library">
+    <div class="vaco-stack">
+      <h1 class="vaco-h1">Library</h1>
+      <p class="vaco-body vaco-dim">
+        Everything you own, however you got it. Free apps produce an
+        entitlement too, so this is the one answer to "what do I have".
+      </p>
+      <div id="libraryBox"></div>
+    </div>
+  </section>
+
+  <!-- ================= Ecosystem launcher ================= -->
+  <section class="view" data-view="ecosystem">
+    <div class="vaco-stack">
+      <h1 class="vaco-h1">Ecosystem</h1>
+      <p class="vaco-body vaco-dim" style="max-width: 62ch;">
+        Every running service, including the infrastructure apps that are not
+        sold in the store. Opening a tile carries your Shield session token
+        along on the link.
+      </p>
+      <p class="vaco-label">Consumer apps</p>
+      <div class="vaco-grid" id="consumerGrid"></div>
+      <p class="vaco-label" style="margin-top: var(--vaco-space-4);">Infrastructure</p>
+      <div class="vaco-grid" id="infraGrid"></div>
+    </div>
+  </section>
+
+  <!-- ================= Insight ================= -->
+  <section class="view" data-view="insight">
+    <div class="vaco-stack">
+      <h1 class="vaco-h1">Insight</h1>
+      <p class="vaco-body vaco-dim" style="max-width: 62ch;">
+        Routes a question through VACON to whichever executive agent owns the
+        domain. The routing is real; the completion needs an API key behind
+        v4-proxy.
+      </p>
+      <form class="vaco-row" id="insightForm">
+        <input class="vaco-input" id="insightInput" style="flex: 1; min-width: 260px;"
+               placeholder="e.g. how do I get a package across town today?" />
+        <button class="vaco-btn vaco-btn-primary" type="submit">Ask</button>
+      </form>
+      <pre class="vaco-card vaco-mono vaco-small" id="insightResult"
+           style="white-space: pre-wrap; overflow-x: auto; margin: 0;">Ask something to route it.</pre>
+    </div>
+  </section>
+
+</main>
+
+<div class="vaco-toast-host" id="toastHost"></div>
+
+<script>
+  const SESSION_KEY = 'shell.sessionToken';
+
+  const state = {
+    session: null,
+    apps: [],
+    listings: [],
+    library: [],
+    products: [],
+    brands: [],
+    orders: [],
+    balance: null,
+    brandFilter: null,
+  };
+
+  // -- plumbing --------------------------------------------------------
+
+  async function api(path, options) {
+    const res = await fetch(path, options);
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || `${path} failed (${res.status})`);
+    return body;
+  }
+
+  function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  function toast(message, kind) {
+    const node = el('div', 'vaco-toast' + (kind ? ` vaco-toast-${kind}` : ''), message);
+    document.getElementById('toastHost').appendChild(node);
+    setTimeout(() => node.remove(), 4200);
+  }
+
+  // Every price on the page renders through here, so "free" is presented
+  // the same way everywhere rather than as an accidental "0".
+  function priceNode(listing) {
+    if (listing.pricingModel === 'free') return el('span', 'vaco-price-free', 'Free');
+    const node = el('span', 'vaco-price', String(listing.priceVcoin));
+    if (listing.pricingModel === 'subscription') {
+      const wrap = el('span');
+      wrap.appendChild(node);
+      wrap.appendChild(el('span', 'vaco-faint vaco-small', ` / ${listing.subscriptionPeriod === 'yearly' ? 'yr' : 'mo'}`));
+      return wrap;
+    }
+    return node;
+  }
+
+  // -- identity --------------------------------------------------------
+
+  function renderIdentity() {
+    const box = document.getElementById('identityBox');
+    box.innerHTML = '';
+
+    if (state.session) {
+      if (state.balance !== null) {
+        const wallet = el('div', 'wallet');
+        wallet.appendChild(el('span', 'vaco-price vaco-num', String(state.balance)));
+        box.appendChild(wallet);
+      }
+      box.appendChild(el('span', 'vaco-small vaco-dim', state.session.userId));
+      const out = el('button', 'vaco-btn vaco-btn-ghost vaco-btn-sm', 'Sign out');
+      out.onclick = () => {
+        state.session = null;
+        state.balance = null;
+        state.library = [];
+        state.orders = [];
+        localStorage.removeItem(SESSION_KEY);
+        renderAll();
+      };
+      box.appendChild(out);
+      return;
+    }
+
+    const form = el('form', 'auth-form');
+    const user = el('input', 'vaco-input');
+    user.placeholder = 'user id';
+    user.style.width = '130px';
+    const pass = el('input', 'vaco-input');
+    pass.type = 'password';
+    pass.placeholder = 'password';
+    pass.style.width = '130px';
+
+    const signIn = el('button', 'vaco-btn vaco-btn-primary vaco-btn-sm', 'Sign in');
+    signIn.type = 'submit';
+    const register = el('button', 'vaco-btn vaco-btn-sm', 'Register');
+    register.type = 'button';
+
+    async function authenticate(route) {
+      const userId = user.value.trim();
+      const password = pass.value;
+      if (!userId) return;
+      try {
+        // A password is optional: Shield still issues a plain session for a
+        // claimed userId, which is what the demo flow uses.
+        const path = password ? route : '/api/session';
+        const session = await api(path, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(password ? { userId, password } : { userId }),
+        });
+        state.session = session;
+        localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+        await refreshUser();
+        renderAll();
+        toast(`Signed in as ${session.userId}`);
+      } catch (err) {
+        toast(err.message, 'danger');
+      }
+    }
+
+    form.onsubmit = (e) => { e.preventDefault(); authenticate('/api/login'); };
+    register.onclick = () => authenticate('/api/register');
+
+    form.append(user, pass, signIn, register);
+    box.appendChild(form);
+  }
+
+  async function refreshUser() {
+    if (!state.session) return;
+    const userId = state.session.userId;
+    const [wallet, library, orders] = await Promise.all([
+      api(`/api/wallet/${encodeURIComponent(userId)}`).catch(() => null),
+      api(`/api/store/library/${encodeURIComponent(userId)}`).catch(() => ({ library: [] })),
+      api(`/api/merch/customers/${encodeURIComponent(userId)}/orders`).catch(() => ({ orders: [] })),
+    ]);
+    state.balance = wallet ? wallet.balance : null;
+    state.library = library.library;
+    state.orders = orders.orders;
+  }
+
+  function ownedAppIds() {
+    return new Set(state.library.filter((e) => e.access && e.access.allowed).map((e) => e.appId));
+  }
+
+  // -- App Store -------------------------------------------------------
+
+  function renderStore() {
+    const grid = document.getElementById('storeGrid');
+    const filter = document.getElementById('storeFilter').value;
+    const owned = ownedAppIds();
+    grid.innerHTML = '';
+
+    const listings = state.listings.filter((l) => !filter || l.pricingModel === filter);
+    document.getElementById('storeCount').textContent = `${listings.length} apps`;
+
+    if (!listings.length) {
+      grid.appendChild(el('div', 'vaco-empty', 'Nothing matches that filter.'));
+      return;
+    }
+
+    for (const listing of listings) {
+      const card = el('div', 'vaco-card store-tile');
+
+      const head = el('div', 'tile-head');
+      head.appendChild(el('h3', 'vaco-h3', listing.name));
+      head.appendChild(priceNode(listing));
+      card.appendChild(head);
+
+      card.appendChild(el('p', 'tile-desc', listing.summary || listing.description || ''));
+
+      const foot = el('div', 'tile-foot');
+      if (listing.bundle) foot.appendChild(el('span', 'vaco-badge', listing.bundle));
+
+      const isOwned = owned.has(listing.appId);
+      if (isOwned) {
+        foot.appendChild(el('span', 'vaco-badge vaco-badge-money', 'Installed'));
+        foot.appendChild(el('span', 'vaco-spacer'));
+        if (listing.url) {
+          const open = el('a', 'vaco-btn vaco-btn-sm', 'Open');
+          open.href = state.session
+            ? `${listing.url}/?shieldToken=${encodeURIComponent(state.session.sessionToken)}`
+            : listing.url;
+          open.target = '_blank';
+          open.rel = 'noopener';
+          foot.appendChild(open);
+        }
+      } else {
+        foot.appendChild(el('span', 'vaco-spacer'));
+        const btn = el('button', 'vaco-btn vaco-btn-primary vaco-btn-sm',
+          listing.pricingModel === 'free' ? 'Install' : `Buy · ${listing.priceVcoin}`);
+        btn.disabled = !state.session;
+        btn.title = state.session ? '' : 'Sign in to install';
+        btn.onclick = () => install(listing, btn);
+        foot.appendChild(btn);
+      }
+      card.appendChild(foot);
+      grid.appendChild(card);
+    }
+  }
+
+  async function install(listing, btn) {
+    btn.disabled = true;
+    btn.textContent = 'Installing…';
+    try {
+      const result = await api('/api/store/install', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: state.session.userId, appId: listing.appId }),
+      });
+      await refreshUser();
+      renderAll();
+      if (result.charged > 0) {
+        toast(`${listing.name} installed — ${result.charged} VC charged, `
+          + `${result.publisherPayout} to the publisher, ${result.storeFee} store fee.`, 'money');
+      } else {
+        toast(`${listing.name} installed.`);
+      }
+    } catch (err) {
+      toast(err.message, 'danger');
+      renderStore();
+    }
+  }
+
+  // -- Merch -----------------------------------------------------------
+
+  // A merch brand is usually a registry app, but not always: VACO itself
+  // sells merch and is the shell, not an app in its own registry.
+  const NON_APP_BRANDS = { vaco: 'VACO' };
+
+  function brandLabel(appBrandId) {
+    const app = state.apps.find((a) => a.id === appBrandId);
+    return (app && app.name) || NON_APP_BRANDS[appBrandId] || appBrandId;
+  }
+
+  function renderMerch() {
+    const rail = document.getElementById('brandRail');
+    rail.innerHTML = '';
+
+    const all = el('button', 'vaco-btn vaco-btn-sm' + (state.brandFilter ? '' : ' vaco-btn-primary'),
+      `All brands · ${state.products.length}`);
+    all.onclick = () => { state.brandFilter = null; renderMerch(); };
+    rail.appendChild(all);
+
+    for (const brand of state.brands) {
+      const label = brandLabel(brand.appBrandId);
+      const btn = el('button', 'vaco-btn vaco-btn-sm' + (state.brandFilter === brand.appBrandId ? ' vaco-btn-primary' : ''),
+        `${label} · ${brand.products}`);
+      btn.onclick = () => { state.brandFilter = brand.appBrandId; renderMerch(); };
+      rail.appendChild(btn);
+    }
+
+    const grid = document.getElementById('merchGrid');
+    grid.innerHTML = '';
+    const products = state.products.filter((p) => !state.brandFilter || p.appBrandId === state.brandFilter);
+
+    for (const product of products) {
+      const card = el('div', 'vaco-card store-tile');
+
+      // A placeholder that says what it is. Faking product photography
+      // would misrepresent a store with no illustration layer.
+      const art = el('div', 'merch-art', product.productType.replace('-', ' '));
+      card.appendChild(art);
+
+      const head = el('div', 'tile-head');
+      head.appendChild(el('h3', 'vaco-h3', product.name));
+      head.appendChild(el('span', 'vaco-price', String(product.retailPriceVcoin)));
+      card.appendChild(head);
+
+      const brandName = brandLabel(product.appBrandId);
+      const foot = el('div', 'tile-foot');
+      foot.appendChild(el('span', 'vaco-badge', brandName));
+      foot.appendChild(el('span', 'vaco-spacer'));
+
+      const qty = el('input', 'vaco-input vaco-num qty');
+      qty.type = 'number';
+      qty.min = '1';
+      qty.value = '1';
+      qty.setAttribute('aria-label', `Quantity of ${product.name}`);
+      foot.appendChild(qty);
+
+      const buy = el('button', 'vaco-btn vaco-btn-primary vaco-btn-sm', 'Order');
+      buy.disabled = !state.session;
+      buy.title = state.session ? '' : 'Sign in to order';
+      buy.onclick = () => order(product, Number(qty.value), buy);
+      foot.appendChild(buy);
+
+      card.appendChild(foot);
+      grid.appendChild(card);
+    }
+
+    renderOrders();
+  }
+
+  async function order(product, quantity, btn) {
+    btn.disabled = true;
+    btn.textContent = 'Ordering…';
+    try {
+      const result = await api('/api/merch/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customerId: state.session.userId, productId: product.productId, quantity }),
+      });
+      await refreshUser();
+      renderAll();
+      toast(`Order #${result.id} placed — ${result.total} VC: `
+        + `${result.fulfilmentCost} fulfilment, ${result.brandPayout} to the brand, `
+        + `${result.platformFee} platform.`, 'money');
+    } catch (err) {
+      toast(err.message, 'danger');
+      renderMerch();
+    }
+  }
+
+  const ORDER_BADGE = {
+    placed: 'vaco-badge-warn',
+    submitted: 'vaco-badge-info',
+    'in-production': 'vaco-badge-info',
+    shipped: 'vaco-badge-accent',
+    delivered: 'vaco-badge-money',
+    cancelled: 'vaco-badge-danger',
+  };
+
+  function renderOrders() {
+    const box = document.getElementById('ordersBox');
+    box.innerHTML = '';
+    if (!state.session) {
+      box.appendChild(el('div', 'vaco-empty', 'Sign in to see your orders.'));
+      return;
+    }
+    if (!state.orders.length) {
+      box.appendChild(el('div', 'vaco-empty', 'No orders yet.'));
+      return;
+    }
+
+    const wrap = el('div', 'vaco-table-wrap');
+    const table = el('table', 'vaco-table');
+    table.innerHTML = `<thead><tr>
+      <th>Order</th><th>Product</th><th class="vaco-num">Qty</th>
+      <th class="vaco-num">Paid</th><th class="vaco-num">Brand</th>
+      <th class="vaco-num">Platform</th><th>Status</th></tr></thead>`;
+    const body = el('tbody');
+
+    for (const o of state.orders) {
+      const product = state.products.find((p) => p.productId === o.productId);
+      const row = el('tr');
+      row.appendChild(el('td', 'vaco-mono', `#${o.id}`));
+      row.appendChild(el('td', null, product ? product.name : o.productId));
+      row.appendChild(el('td', 'vaco-num', String(o.quantity)));
+      row.appendChild(el('td', 'vaco-num', String(o.total)));
+      row.appendChild(el('td', 'vaco-num', String(o.brandPayout)));
+      row.appendChild(el('td', 'vaco-num', String(o.platformFee)));
+      const status = el('td');
+      status.appendChild(el('span', `vaco-badge ${ORDER_BADGE[o.status] || ''}`, o.status));
+      row.appendChild(status);
+      body.appendChild(row);
+    }
+    table.appendChild(body);
+    wrap.appendChild(table);
+    box.appendChild(wrap);
+  }
+
+  // -- Library ---------------------------------------------------------
+
+  function renderLibrary() {
+    const box = document.getElementById('libraryBox');
+    box.innerHTML = '';
+    if (!state.session) {
+      box.appendChild(el('div', 'vaco-empty', 'Sign in to see your library.'));
+      return;
+    }
+    if (!state.library.length) {
+      box.appendChild(el('div', 'vaco-empty', 'Nothing installed yet. The App Store tab is the place to start.'));
+      return;
+    }
+
+    const grid = el('div', 'vaco-grid vaco-grid-wide');
+    for (const entry of state.library) {
+      const card = el('div', 'vaco-card store-tile');
+      const head = el('div', 'tile-head');
+      head.appendChild(el('h3', 'vaco-h3', entry.name || entry.appId));
+      if (entry.pricePaid > 0) {
+        head.appendChild(el('span', 'vaco-price vaco-num', String(entry.pricePaid)));
+      } else {
+        head.appendChild(el('span', 'vaco-price-free', 'Free'));
+      }
+      card.appendChild(head);
+
+      const foot = el('div', 'tile-foot');
+      if (entry.access.allowed) {
+        foot.appendChild(el('span', 'vaco-badge vaco-badge-money', 'Active'));
+        if (entry.expiresAt) {
+          const days = Math.max(0, Math.ceil((entry.expiresAt - Date.now()) / 86400000));
+          foot.appendChild(el('span', 'vaco-badge', `renews in ${days}d`));
+        }
+      } else {
+        foot.appendChild(el('span', 'vaco-badge vaco-badge-danger', entry.access.reason));
+      }
+      foot.appendChild(el('span', 'vaco-spacer'));
+
+      if (entry.pricePaid > 0 && entry.access.allowed) {
+        const refundBtn = el('button', 'vaco-btn vaco-btn-danger vaco-btn-sm', 'Refund');
+        refundBtn.onclick = async () => {
+          refundBtn.disabled = true;
+          try {
+            await api('/api/store/refund', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId: state.session.userId, appId: entry.appId, reason: 'requested in store' }),
+            });
+            await refreshUser();
+            renderAll();
+            toast(`${entry.name || entry.appId} refunded — publisher and store each returned their share.`, 'money');
+          } catch (err) {
+            toast(err.message, 'danger');
+            refundBtn.disabled = false;
+          }
+        };
+        foot.appendChild(refundBtn);
+      }
+
+      if (entry.url && entry.access.allowed) {
+        const open = el('a', 'vaco-btn vaco-btn-sm', 'Open');
+        open.href = `${entry.url}/?shieldToken=${encodeURIComponent(state.session.sessionToken)}`;
+        open.target = '_blank';
+        open.rel = 'noopener';
+        foot.appendChild(open);
+      }
+      card.appendChild(foot);
+      grid.appendChild(card);
+    }
+    box.appendChild(grid);
+  }
+
+  // -- Ecosystem launcher ----------------------------------------------
+
+  function renderApps() {
+    const consumer = document.getElementById('consumerGrid');
+    const infra = document.getElementById('infraGrid');
+    consumer.innerHTML = '';
+    infra.innerHTML = '';
+
+    for (const app of state.apps) {
+      const grid = app.category === 'infra' ? infra : consumer;
+      const tile = el('a', 'vaco-tile' + (app.url ? '' : ' vaco-tile-disabled'));
+      // Real SSO handoff: the Shield session token rides along on the
+      // outbound link. Each app's own origin still has to read and adopt
+      // it — a separate per-app change, not automatic.
+      tile.href = app.url
+        ? (state.session ? `${app.url}/?shieldToken=${encodeURIComponent(state.session.sessionToken)}` : app.url)
+        : '#';
+      tile.target = '_blank';
+      tile.rel = 'noopener';
+      tile.appendChild(el('h3', 'vaco-h3', app.name));
+      tile.appendChild(el('p', 'tile-desc', app.description));
+      if (!app.url) tile.appendChild(el('span', 'vaco-badge vaco-badge-warn', 'no live server yet'));
+      grid.appendChild(tile);
+    }
+  }
+
+  // -- Insight ---------------------------------------------------------
+
+  document.getElementById('insightForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const query = document.getElementById('insightInput').value.trim();
+    if (!query) return;
+    const result = document.getElementById('insightResult');
+    result.textContent = 'Routing via VACON…';
+    try {
+      const card = await api(`/api/insight?query=${encodeURIComponent(query)}&invoke=true`);
+      let text = `Matched: ${JSON.stringify(card.matchedAgents, null, 2)}`;
+      if (card.completion) {
+        text += `\n\nCompletion:\n${JSON.stringify(card.completion, null, 2)}`;
+      } else if (card.completionError) {
+        text += `\n\nNo completion: ${card.completionError}\n(expected here — no ANTHROPIC_API_KEY behind v4-proxy. The routing above is still real.)`;
+      }
+      result.textContent = text;
+    } catch (err) {
+      result.textContent = `Error: ${err.message}`;
+    }
+  });
+
+  // -- tabs ------------------------------------------------------------
+
+  document.getElementById('tabs').addEventListener('click', (e) => {
+    const tab = e.target.closest('.vaco-tab');
+    if (!tab) return;
+    for (const t of document.querySelectorAll('.vaco-tab')) {
+      t.setAttribute('aria-selected', String(t === tab));
+    }
+    for (const v of document.querySelectorAll('.view')) {
+      v.dataset.active = String(v.dataset.view === tab.dataset.view);
+    }
+  });
+
+  document.getElementById('storeFilter').addEventListener('change', renderStore);
+
+  // -- boot ------------------------------------------------------------
+
+  function renderAll() {
+    renderIdentity();
+    renderStore();
+    renderMerch();
+    renderLibrary();
+    renderApps();
+  }
+
+  async function boot() {
+    const saved = localStorage.getItem(SESSION_KEY);
+    if (saved) {
+      try { state.session = JSON.parse(saved); } catch { /* ignore a corrupt entry */ }
+    }
+
+    const [apps, listings, products, brands] = await Promise.all([
+      api('/api/apps'),
+      api('/api/store/listings'),
+      api('/api/merch/products'),
+      api('/api/merch/brands'),
+    ]);
+    state.apps = apps.apps;
+    state.listings = listings.listings;
+    state.products = products.products;
+    state.brands = brands.brands;
+
+    await refreshUser();
+    renderAll();
+  }
+
+  boot().catch((err) => toast(err.message, 'danger'));
+</script>
+</body>
+</html>

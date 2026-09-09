@@ -1,0 +1,48 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "timezone": "America/Chicago",
+  "schedule": ["before 6am on monday"],
+  "prConcurrentLimit": 3,
+  "prHourlyLimit": 2,
+  "labels": ["dependencies"],
+  "rangeStrategy": "bump",
+  "postUpdateOptions": ["npmDedupe"],
+  "packageRules": [
+    {
+      "description": "Patch and minor updates to the four runtime dependencies this ecosystem actually has, batched into one PR. express, cors and dotenv are the entire runtime surface of 33 services; a separate PR per app would be 33 PRs for one version bump.",
+      "matchPackageNames": ["express", "cors", "dotenv"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "runtime dependencies",
+      "automerge": false
+    },
+    {
+      "description": "Node itself is pinned in two Dockerfiles, CI, and every engines field, and scripts/test/node-version.test.mjs holds all four to the same major. A Renovate bump that moved one would fail that test rather than drift silently -- which is the intended behaviour, so it stays a PR a human reads.",
+      "matchDatasources": ["node-version", "docker"],
+      "matchPackageNames": ["node"],
+      "groupName": "node runtime",
+      "automerge": false
+    },
+    {
+      "description": "The LiveKit server image carries the media plane. A major here can change the token claim shape that vaco-media/lib/transport/livekit.js signs, and that adapter deliberately has no SDK to warn it -- so majors are never grouped away where they are easy to miss.",
+      "matchPackageNames": ["livekit/livekit-server"],
+      "separateMajorMinor": true,
+      "automerge": false
+    },
+    {
+      "description": "Security fixes should not wait for Monday.",
+      "matchUpdateTypes": ["patch"],
+      "vulnerabilityAlerts": {
+        "enabled": true,
+        "schedule": ["at any time"]
+      }
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "labels": ["security"],
+    "schedule": ["at any time"]
+  },
+  "ignorePaths": [
+    "**/node_modules/**"
+  ]
+}

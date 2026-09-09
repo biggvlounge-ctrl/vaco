@@ -1,0 +1,15 @@
+[project]
+name = "vexbusiness-domain"
+version = "0.1.0"
+description = "Vex Business — pure trading domain concepts (Master Directive Section 6: DOMAIN). No database, no broker, no frontend dependency — every other package depends on this one, this one depends on nothing internal."
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.9",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["domain"]

@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>V3</title>
+<link rel="stylesheet" href="/vaco-design.css" />
+<style>
+  .balance-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--vaco-space-4); }
+  .balance { display: flex; flex-direction: column; gap: 2px; }
+  .balance-value { font-size: var(--vaco-text-3xl); font-weight: var(--vaco-weight-bold); font-variant-numeric: tabular-nums; }
+  .flow { display: flex; align-items: center; gap: var(--vaco-space-2); font-variant-numeric: tabular-nums; }
+  .flow-arrow { color: var(--vaco-text-faint); }
+  .in  { color: var(--vaco-money); }
+  .out { color: var(--vaco-danger); }
+</style>
+</head>
+<body class="vaco">
+<script src="/vaco-ui.js"></script>
+<script>
+// V3 — the ledger console.
+//
+// Every app in this ecosystem settles here. Until now the ledger had no
+// surface at all, which meant the only way to answer "where did that
+// money go" was to curl it.
+//
+// **This is an operator console, not a wallet app.** It reads balances
+// and the real transaction log, and it can move money — which is why
+// the transfer form states plainly that a transfer is final. There is
+// no reversal endpoint by design: a correction is another transfer in
+// the opposite direction, so the history stays true.
+
+var el = VACO.el;
+
+function renderWallet(body) {
+  var out = el('div', 'vaco-stack');
+
+  out.appendChild(VACO.card('Look up an account', [
+    VACO.form([{ name: 'userId', label: 'Account', value: VACO.userId() || '', width: '180px' }],
+      function (values) { return load(out, body, values.userId); }, 'Load'),
+  ]));
+
+  if (VACO.userId()) return load(out, body, VACO.userId());
+  out.appendChild(el('div', 'vaco-empty', 'Enter an account id, or sign in.'));
+  return VACO.mount(body, out);
+}
+
+function load(out, body, userId) {
+  return Promise.all([
+    VACO.api('/api/vcoin/balance/' + encodeURIComponent(userId)),
+    VACO.api('/api/vash/balance/' + encodeURIComponent(userId)).catch(function () { return { balance: 0 }; }),
+    VACO.api('/api/vcoin/transactions/' + encodeURIComponent(userId)).catch(function () { return { transactions: [] }; }),
+  ]).then(function (r) {
+    while (out.childNodes.length > 1) out.removeChild(out.lastChild);
+
+    var pair = el('div', 'balance-pair');
+    [['VCoin', r[0].balance, 'The spendable currency every app transacts in.'],
+     ['VASH', r[1].balance, 'Cashed out from VCoin at a fixed rate. One direction only.']]
+      .forEach(function (b) {
+        var box = el('div', 'balance');
+        box.appendChild(el('span', 'vaco-label', b[0]));
+        box.appendChild(el('span', 'balance-value', VACO.round(b[1])));
+        box.appendChild(el('span', 'vaco-small vaco-faint', b[2]));
+        pair.appendChild(box);
+      });
+    out.appendChild(VACO.card(userId, [pair]));
+
+    var txs = r[2].transactions || [];
+    out.appendChild(VACO.card('Transactions — ' + txs.length, [
+      el('p', 'vaco-small vaco-dim',
+        'The reason string on each line is what makes cross-app money auditable: it names the app and the thing that was paid for.'),
+      VACO.table([
+        { label: 'Flow', render: function (t) {
+          var incoming = t.toUserId === userId;
+          var flow = el('span', 'flow');
+          flow.appendChild(el('span', null, t.fromUserId));
+          flow.appendChild(el('span', 'flow-arrow', '→'));
+          flow.appendChild(el('span', null, t.toUserId));
+          flow.className = 'flow ' + (incoming ? 'in' : 'out');
+          return flow;
+        } },
+        { label: 'Amount', num: true, render: function (t) {
+          var node = el('span', 'vaco-num ' + (t.toUserId === userId ? 'in' : 'out'));
+          node.textContent = (t.toUserId === userId ? '+' : '−') + VACO.round(t.amount);
+          return node;
+        } },
+        { key: 'reason', label: 'Reason' },
+        { key: 'createdAt', label: 'When', render: function (t) {
+          return t.createdAt ? new Date(t.createdAt).toLocaleString() : '—'; } },
+      ], txs, { empty: 'No transactions for this account.' }),
+    ]));
+    VACO.mount(body, out);
+  }).catch(function (err) {
+    while (out.childNodes.length > 1) out.removeChild(out.lastChild);
+    out.appendChild(VACO.notice('Could not load: ' + VACO.escapeHtml(err.message), 'danger'));
+    VACO.mount(body, out);
+  });
+}
+
+function renderTransfer(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    '<strong>A transfer is final.</strong> There is no reversal endpoint, deliberately — a correction is another '
+    + 'transfer in the opposite direction, so the history stays true rather than being edited.', 'warn'));
+
+  out.appendChild(VACO.card('Move VCoin', [
+    VACO.form([
+      { name: 'fromUserId', label: 'From', value: VACO.userId() || '', width: '140px' },
+      { name: 'toUserId', label: 'To', placeholder: 'recipient', width: '140px' },
+      { name: 'amount', label: 'Amount', type: 'number', min: 1, value: 10, width: '100px' },
+      { name: 'reason', label: 'Reason', placeholder: 'why', width: '200px' },
+    ], function (values) {
+      return VACO.post('/api/vcoin/transfer', values).then(function (result) {
+        VACO.toast('Transferred ' + values.amount + ' to ' + values.toUserId + '.', 'money');
+        VACO.refreshBalances().then(VACO.renderIdentity);
+        out.appendChild(VACO.card('Result', [
+          el('pre', 'vaco-mono vaco-small', JSON.stringify(result, null, 2)),
+        ]));
+        VACO.mount(body, out);
+      });
+    }, 'Transfer'),
+  ]));
+
+  out.appendChild(VACO.card('Cash out to VASH', [
+    el('p', 'vaco-small vaco-dim',
+      'One direction only: VCoin becomes VASH at a fixed rate, and VASH does not convert back. '
+      + 'The write is flushed to disk before the response, so an acknowledged cashout survives a crash.'),
+    VACO.form([
+      { name: 'userId', label: 'Account', value: VACO.userId() || '', width: '140px' },
+      { name: 'vcoinAmount', label: 'VCoin', type: 'number', min: 1, value: 100, width: '100px' },
+    ], function (values) {
+      return VACO.post('/api/vash/cashout', values).then(function (result) {
+        VACO.toast('Cashed out — VASH ' + VACO.round(result.vashBalance), 'money');
+        VACO.refreshBalances().then(VACO.renderIdentity);
+      });
+    }, 'Cash out'),
+  ]));
+
+  return VACO.mount(body, out);
+}
+
+function renderSystem(body) {
+  return VACO.api('/api/health').then(function (health) {
+    var out = el('div', 'vaco-stack');
+
+    var rows = Object.keys(health)
+      .filter(function (k) { return typeof health[k] !== 'object'; })
+      .map(function (k) { return { field: k, value: String(health[k]) }; });
+    out.appendChild(VACO.card('Ledger', [
+      VACO.table([{ key: 'field', label: 'Setting' }, { key: 'value', label: 'Value' }], rows),
+    ]));
+
+    // The crypto posture is a real, deliberate stance about
+    // post-quantum migration and worth surfacing rather than burying.
+    if (health.crypto) {
+      var c = health.crypto;
+      out.appendChild(VACO.card('Signing', [
+        el('p', 'vaco-small vaco-dim',
+          'V3 is crypto-agile: the signature algorithm is swappable, and the migration target is recorded '
+          + 'rather than assumed. Post-quantum readiness is reported honestly, including what is blocking it.'),
+        VACO.table([{ key: 'field', label: 'Property' }, { key: 'value', label: 'Value' }],
+          Object.keys(c).map(function (k) { return { field: k, value: String(c[k]) }; })),
+      ]));
+    }
+
+    if (health.idempotency) {
+      out.appendChild(VACO.card('Idempotency', [
+        el('p', 'vaco-small vaco-dim',
+          'A retried transfer carrying the same Idempotency-Key replays the first result instead of charging twice.'),
+        VACO.table([{ key: 'field', label: 'Property' }, { key: 'value', label: 'Value' }],
+          Object.keys(health.idempotency).map(function (k) {
+            return { field: k, value: String(health.idempotency[k]) };
+          })),
+      ]));
+    }
+    return out;
+  });
+}
+
+VACO.app({
+  id: 'v3',
+  name: 'V3',
+  tagline: 'The ledger',
+  //: V3's identity: money green, and the one app allowed to use it as
+  //: its accent — everywhere else green is reserved as the semantic
+  //: money colour, so the ledger owning it is consistent rather than a
+  //: collision.
+  accent: '#3faf6e',
+  accentDim: '#2c8b55',
+  accentInk: '#04140b',
+  tabs: [
+    { id: 'wallet', label: 'Accounts', heading: 'Balances & history', render: renderWallet },
+    { id: 'transfer', label: 'Move money', heading: 'Transfer & cash out', render: renderTransfer },
+    { id: 'system', label: 'System', heading: 'Ledger configuration', render: renderSystem },
+  ],
+});
+</script>
+</body>
+</html>

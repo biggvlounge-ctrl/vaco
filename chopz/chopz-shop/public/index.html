@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CHOPZ SHOP</title>
+<link rel="stylesheet" href="/vaco-design.css" />
+<style>
+  .product-art {
+    height: 120px;
+    border-radius: var(--vaco-radius-sm);
+    border: 1px solid var(--vaco-border-subtle);
+    background: linear-gradient(145deg, var(--vaco-accent-soft), transparent 68%), var(--vaco-bg-raised);
+  }
+  .cart-line { display: flex; align-items: center; gap: var(--vaco-space-3);
+               padding: var(--vaco-space-2) 0; border-top: 1px solid var(--vaco-border-subtle); }
+  .cart-line:first-child { border-top: 0; }
+  .fee-note { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body class="vaco">
+<script src="/vaco-ui.js"></script>
+<script>
+// CHOPZ SHOP — the affiliate commerce layer under CHOPZ.
+//
+// Real client of its own API. Category fees, cart totals, and
+// attribution are all server-decided.
+//
+// **The fee is shown per category, before checkout.** Affiliate
+// platforms usually bury the take rate; showing it on the product is
+// the difference between a creator knowing what they earn and finding
+// out at payout.
+
+var el = VACO.el;
+var cart = [];
+
+function renderCatalogue(body) {
+  var out = el('div', 'vaco-stack');
+
+  return VACO.api('/chopz-shop/products').then(function (data) {
+    var products = data.products || data || [];
+    if (!products.length) {
+      out.appendChild(el('div', 'vaco-empty', 'No products in the catalogue.'));
+      return VACO.mount(body, out);
+    }
+
+    out.appendChild(VACO.grid(products.map(function (p) {
+      var lines = el('div', 'vaco-stack-sm');
+      lines.appendChild(el('div', 'product-art'));
+
+      var row = el('div', 'vaco-row-tight');
+      row.appendChild(VACO.price(p.price || p.priceVcoin, { freeLabel: false }));
+      row.appendChild(el('span', 'vaco-spacer'));
+      if (p.category) row.appendChild(VACO.badge(p.category));
+      lines.appendChild(row);
+
+      // The category's real fee, stated on the product rather than
+      // discovered at payout.
+      if (typeof p.feePercent === 'number' || typeof p.categoryFeePercent === 'number') {
+        var fee = p.feePercent !== undefined ? p.feePercent : p.categoryFeePercent;
+        lines.appendChild(el('p', 'vaco-small vaco-faint', fee + '% platform fee on this category'));
+      }
+
+      lines.appendChild(VACO.button('Add to cart', function () {
+        cart.push({ productId: p.id, quantity: 1, name: p.name, price: p.price || p.priceVcoin });
+        VACO.toast(p.name + ' added — ' + cart.length + ' in cart.');
+      }));
+
+      return VACO.card(p.name || ('Product ' + p.id), [lines]);
+    }), true));
+    VACO.mount(body, out);
+  });
+}
+
+function renderCart(body) {
+  var out = el('div', 'vaco-stack');
+
+  if (!cart.length) {
+    out.appendChild(el('div', 'vaco-empty', 'Cart is empty. Add something from the catalogue.'));
+    return VACO.mount(body, out);
+  }
+
+  var lines = el('div', 'vaco-stack-sm');
+  var total = 0;
+  cart.forEach(function (item, index) {
+    total += (item.price || 0) * item.quantity;
+    var row = el('div', 'cart-line');
+    row.appendChild(el('span', null, item.name || ('Product ' + item.productId)));
+    row.appendChild(el('span', 'vaco-spacer'));
+    row.appendChild(VACO.price(item.price, { freeLabel: false }));
+    row.appendChild(VACO.button('Remove', function () {
+      cart.splice(index, 1);
+      VACO.render();
+    }, 'ghost vaco-btn-sm'));
+    lines.appendChild(row);
+  });
+
+  var totalRow = el('div', 'fee-note');
+  totalRow.appendChild(el('strong', null, 'Total'));
+  totalRow.appendChild(VACO.price(total, { freeLabel: false }));
+  lines.appendChild(el('hr', 'vaco-divider'));
+  lines.appendChild(totalRow);
+
+  // One checkout for the whole cart, not one order per item — which is
+  // what makes the category fee arithmetic worth having.
+  lines.appendChild(VACO.button('Check out', function () {
+    if (!VACO.userId()) throw new Error('Sign in to check out.');
+    return VACO.post('/chopz-shop/cart-checkout', {
+      buyerId: VACO.userId(),
+      items: cart.map(function (i) { return { productId: i.productId, quantity: i.quantity }; }),
+    }).then(function (result) {
+      cart = [];
+      VACO.toast('Checked out — ' + (result.orderIds ? result.orderIds.length : 1) + ' order(s).', 'money');
+      VACO.refreshBalances().then(VACO.renderIdentity);
+      VACO.render();
+    });
+  }, 'primary'));
+
+  out.appendChild(VACO.card('Cart — ' + cart.length + ' item(s)', [lines]));
+  return VACO.mount(body, out);
+}
+
+function renderAffiliate(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'An affiliate link carries real attribution: a click is recorded against the link, and a resulting order '
+    + 'credits the creator who drove it.'));
+
+  out.appendChild(VACO.card('Create a link', [
+    VACO.form([
+      { name: 'creatorId', label: 'Creator', value: VACO.userId() || '', width: '130px' },
+      { name: 'productId', label: 'Product id', width: '110px' },
+    ], function (values) {
+      return VACO.post('/chopz-shop/affiliate/links', values)
+        .then(function (l) { VACO.toast('Link ' + l.id + ' created.'); VACO.render(); });
+    }, 'Create'),
+  ]));
+
+  return VACO.api('/chopz-shop/affiliate/links').then(function (data) {
+    var links = data.links || data || [];
+    out.appendChild(VACO.card('Links', [
+      VACO.table([
+        { key: 'id', label: 'Id' },
+        { key: 'creatorId', label: 'Creator' },
+        { key: 'productId', label: 'Product' },
+        { key: 'clickCount', label: 'Clicks', num: true },
+        { label: '', render: function (l) {
+          return VACO.button('Record click', function () {
+            return VACO.post('/chopz-shop/affiliate/links/' + l.id + '/click', {})
+              .then(function () { VACO.toast('Click recorded.'); VACO.render(); });
+          }, 'sm');
+        } },
+      ], links, { empty: 'No affiliate links yet.' }),
+    ]));
+    VACO.mount(body, out);
+  });
+}
+
+VACO.app({
+  id: 'chopz-shop',
+  name: 'CHOPZ SHOP',
+  tagline: 'Affiliate commerce',
+  //: CHOPZ SHOP's identity: a deeper teal-green — clearly a sibling of
+  //: CHOPZ's spring green, one step calmer because this is the part
+  //: where money changes hands.
+  accent: '#2fb37a',
+  accentDim: '#219060',
+  accentInk: '#02140c',
+  tabs: [
+    { id: 'catalogue', label: 'Catalogue', heading: 'Products', render: renderCatalogue },
+    { id: 'cart', label: 'Cart', heading: 'Checkout', render: renderCart },
+    { id: 'affiliate', label: 'Affiliate', heading: 'Links & attribution', render: renderAffiliate },
+  ],
+});
+</script>
+</body>
+</html>

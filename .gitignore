@@ -1,0 +1,50 @@
+logs/
+**/data/
+
+# CALL (call/) has two real, source-tracked directories the generic
+# **/data/ rule above would otherwise silently swallow: a Python
+# package literally named `data/` (packages/data/ -- Master Directive
+# Section 5's own named layout, real ORM models, not runtime state --
+# caught directly via a real empty-wheel build from hatchling's own
+# git-aware packaging, not assumed) and `call/data/sample/` (the
+# Master Directive's own real seed/demo-data directory -- currently
+# just a real README explaining it's honestly empty, not runtime
+# output). Both carved out below; CALL's own `data/output/` (its real
+# runtime-generated directory, see call/.gitignore) stays genuinely
+# gitignored.
+!call/packages/data/
+!call/packages/data/data/
+!call/data/
+!call/data/sample/
+
+# Real secrets, and a real near-miss rather than a precaution.
+#
+# `deploy/README.md` and `dev-docs/DEPLOYMENT_INVENTORY.md` both tell a
+# deployer to run `cp .env.example .env` and fill in
+# ANTHROPIC_API_KEY. Nothing here ignored the result, so the very next
+# `git add -A` would have committed a live key -- and this repo has 17
+# `.env.example` templates, so that path exists in seventeen places,
+# not one. Caught while booting v4-proxy, which is the one service that
+# hard-fails without the key.
+#
+# `.env.example` files stay tracked on purpose: they are the templates,
+# and they carry no values.
+.env
+**/.env
+!.env.example
+!**/.env.example
+
+# Store snapshots from scripts/backup-stores.mjs, if the destination
+# is ever pointed inside the repo. The default is ../vaco-backups,
+# deliberately outside it -- a backup committed alongside the thing it
+# backs up protects against nothing.
+vaco-backups/
+
+# Release archives built by scripts/package-release.mjs.
+#
+# Ignored rather than tracked for two reasons. A 3.8MB binary that
+# changes wholesale every commit is the wrong thing to keep in git
+# history; and the script refuses to package a dirty tree, so an
+# untracked archive sitting in the root would make the *next* run
+# refuse itself. It is a build output -- rebuild it, do not store it.
+vaco-*.tar.gz

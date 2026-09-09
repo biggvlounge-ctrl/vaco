@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Vex Trading</title>
+<link rel="stylesheet" href="/vaco-design.css" />
+<style>
+  .app-note { font-size: var(--vaco-text-sm); color: var(--vaco-ink-dim); line-height: 1.5; }
+  .app-foot { display: flex; align-items: center; gap: var(--vaco-space-3);
+              flex-wrap: wrap; margin-top: var(--vaco-space-2); }
+</style>
+</head>
+<body class="vaco">
+<script src="/vaco-ui.js"></script>
+<script>
+// Vex Trading — the parent front door for VEX and Vex Business.
+//
+// **Rebuilt onto the design system.** This page previously carried its
+// own hand-rolled stylesheet with its own `--bg`/`--panel`/`--accent`
+// tokens, which is why it was the one frontend in the ecosystem that
+// failed the smoke harness the moment the harness stopped working from
+// a hand-maintained target list and started reading the service
+// manifest instead. The design-system files were already being synced
+// into this app's public/ — nothing consumed them. A synced file
+// nobody imports is drift that `--check` cannot see.
+//
+// **This app holds no money and no state.** Three routes: health, a
+// list of its two sub-apps, and one by id. It is a launcher, so the
+// only thing it must get right is telling the truth about whether the
+// thing you are about to click is actually up.
+
+var el = VACO.el;
+
+// Reachability comes from the server, which probes each sub-app's own
+// /api/health. Rendering it as a badge rather than prose matters here:
+// this page exists to be glanced at.
+function statusBadge(app) {
+  return app.reachable
+    ? VACO.badge('API up', 'money')
+    : VACO.badge('API unreachable', 'danger');
+}
+
+function appCard(app) {
+  var foot = el('div', 'app-foot');
+  var launch = VACO.button('Open ' + app.name, function () {
+    window.open(app.uiUrl, '_blank', 'noopener');
+  }, 'primary');
+  // An unreachable sub-app is still worth linking — it may be a service
+  // that simply is not started locally — but the button should not
+  // promise more than the badge above it does.
+  if (!app.reachable) launch.classList.remove('vaco-btn-primary');
+  foot.appendChild(launch);
+  foot.appendChild(el('span', 'app-note', app.uiNote || ''));
+
+  return VACO.card(app.name, [
+    el('p', 'app-note', app.description || ''),
+    foot,
+  ], { trailing: statusBadge(app) });
+}
+
+function renderApps(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Two real, independently-run apps under one front door. '
+    + '<strong>VEX</strong> is the Cvltvre Card brokerage, gated pending broker-dealer registration. '
+    + '<strong>Vex Business</strong> is the internal futures-research platform — its live-trading '
+    + 'interlock is disabled by default and is never bypassed from here.', 'warn'));
+
+  return VACO.api('/api/apps').then(function (data) {
+    out.appendChild(VACO.grid(data.apps.map(appCard)));
+    return VACO.mount(body, out);
+  });
+}
+
+function renderDetail(body) {
+  var out = el('div', 'vaco-stack');
+
+  out.appendChild(VACO.card('Look up a sub-app', [
+    VACO.form([{ name: 'id', label: 'App id', placeholder: 'vex', width: '200px' }],
+      function (values) {
+        return VACO.api('/api/apps/' + encodeURIComponent(values.id)).then(function (app) {
+          while (out.childNodes.length > 1) out.removeChild(out.lastChild);
+          var rows = Object.keys(app)
+            .filter(function (k) { return typeof app[k] !== 'object'; })
+            .map(function (k) {
+              return { field: k.replace(/([A-Z])/g, ' $1'), value: String(app[k]) };
+            });
+          out.appendChild(VACO.card(app.name, [
+            VACO.table([{ key: 'field', label: 'Field' }, { key: 'value', label: 'Value' }], rows),
+          ], { trailing: statusBadge(app) }));
+          VACO.mount(body, out);
+        });
+      }, 'Load'),
+  ]));
+
+  return VACO.mount(body, out);
+}
+
+VACO.app({
+  id: 'vex-trading',
+  name: 'Vex Trading',
+  tagline: 'The front door for VEX and Vex Business',
+  //: Vex Trading's identity: brushed bronze — the only warm neutral in
+  //: the register. Two constraints drove it. It must not read as VEX
+  //: (#6b8299, cool graphite-blue), and a user launching VEX from here
+  //: will have both open at once, so hue separation had to be real
+  //: rather than a shade difference. And it is a lobby, not a terminal:
+  //: like VACON it routes to the apps that do the work, so it stays
+  //: deliberately quieter than either of them.
+  accent: '#a89080',
+  accentDim: '#8a7466',
+  accentInk: '#120e0b',
+  tabs: [
+    { id: 'apps', label: 'Apps', heading: 'Vex Trading', render: renderApps },
+    { id: 'detail', label: 'Detail', heading: 'One sub-app', render: renderDetail },
+  ],
+});
+</script>
+</body>
+</html>

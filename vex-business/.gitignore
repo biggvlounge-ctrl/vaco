@@ -1,0 +1,23 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+*.egg-info/
+dist/
+
+# Node / Next.js
+node_modules/
+.next/
+next-env.d.ts
+
+# Env
+.env
+
+# CALL's own real runtime data (not the same as ../data/, the whole
+# ecosystem's own gitignored convention -- this is CALL's own,
+# separate seed/output area)
+data/output/
+*.tsbuildinfo

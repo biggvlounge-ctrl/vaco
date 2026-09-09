@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Vvltvre Music</title>
+<link rel="stylesheet" href="/vaco-design.css" />
+<style>
+  .split-bar { display: flex; height: 10px; border-radius: var(--vaco-radius-pill); overflow: hidden; background: var(--vaco-surface-hover); }
+  .split-seg { height: 100%; }
+</style>
+</head>
+<body class="vaco">
+<script src="/vaco-ui.js"></script>
+<script>
+// Vvltvre Music / Distribution — flat-fee release distribution.
+//
+// Real client of its own 26 routes. Royalty splits, label deal shapes,
+// and beat licence terms are all server-decided.
+//
+// **The split bar is the point of this screen.** Unrecouped advances
+// and silent splits are the oldest complaint in music; showing who owns
+// what percentage, as a shape rather than a paragraph, is the honest
+// version.
+
+var el = VACO.el;
+
+function splitBar(collaborators) {
+  var bar = el('div', 'split-bar');
+  var hues = ['var(--vaco-accent)', 'var(--vaco-info)', 'var(--vaco-money)', 'var(--vaco-warn)'];
+  (collaborators || []).forEach(function (c, i) {
+    var seg = el('div', 'split-seg');
+    seg.style.width = (c.sharePercent || c.share || 0) + '%';
+    seg.style.background = hues[i % hues.length];
+    seg.title = (c.userId || c.name) + ' — ' + (c.sharePercent || c.share || 0) + '%';
+    bar.appendChild(seg);
+  });
+  return bar;
+}
+
+function renderReleases(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Flat-fee distribution: the artist pays once and keeps the royalties, rather than surrendering a percentage forever. '
+    + 'Splits below are real records — every collaborator is paid from the same ledger entry.'));
+
+  out.appendChild(VACO.card('Look up an artist', [
+    VACO.form([{ name: 'artistId', label: 'Artist', value: VACO.userId() || '', width: '160px' }],
+      function (values) {
+        return Promise.all([
+          VACO.api('/api/artists/' + encodeURIComponent(values.artistId) + '/releases'),
+          VACO.api('/api/artists/' + encodeURIComponent(values.artistId) + '/summary').catch(function () { return null; }),
+        ]).then(function (r) {
+          var releases = r[0].releases || r[0] || [];
+          var summary = r[1];
+          while (out.childNodes.length > 2) out.removeChild(out.lastChild);
+
+          if (summary) {
+            out.appendChild(VACO.card('Summary', [
+              VACO.table(Object.keys(summary).filter(function (k) { return typeof summary[k] !== 'object'; })
+                .map(function (k) { return { key: k, label: k.replace(/([A-Z])/g, ' $1') }; }),
+                [summary]),
+            ]));
+          }
+
+          out.appendChild(VACO.grid(releases.map(function (rel) {
+            var lines = el('div', 'vaco-stack-sm');
+            lines.appendChild(el('p', 'vaco-small vaco-dim', (rel.releaseType || 'release') + ' · ' + (rel.trackCount || 0) + ' tracks'));
+            if (rel.collaborators && rel.collaborators.length) {
+              lines.appendChild(splitBar(rel.collaborators));
+              lines.appendChild(el('p', 'vaco-small vaco-faint',
+                rel.collaborators.map(function (c) {
+                  return (c.userId || c.name) + ' ' + (c.sharePercent || c.share || 0) + '%';
+                }).join(' · ')));
+            }
+            return VACO.card(rel.title || ('Release ' + rel.id), [lines],
+              { trailing: VACO.badge(rel.status) });
+          }), true));
+
+          if (!releases.length) out.appendChild(el('div', 'vaco-empty', 'No releases for that artist yet.'));
+          VACO.mount(body, out);
+        });
+      }, 'Load'),
+  ]));
+
+  return VACO.mount(body, out);
+}
+
+function renderBeats(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'The beat marketplace: producers license instrumentals, and a purchase moves real VCoin. '
+    + 'Licence terms travel with the purchase rather than living in a DM.'));
+
+  return VACO.api('/api/beats').then(function (data) {
+    var beats = data.beats || [];
+    if (!beats.length) {
+      out.appendChild(el('div', 'vaco-empty', 'No beats listed yet.'));
+      return VACO.mount(body, out);
+    }
+    out.appendChild(VACO.grid(beats.map(function (b) {
+      var lines = el('div', 'vaco-stack-sm');
+      lines.appendChild(el('p', 'vaco-small vaco-dim',
+        [b.bpm ? b.bpm + ' bpm' : null, b.key, b.genre].filter(Boolean).join(' · ')));
+      var row = el('div', 'vaco-row-tight');
+      row.appendChild(VACO.price(b.priceVcoin || b.price, { freeLabel: false }));
+      row.appendChild(el('span', 'vaco-spacer'));
+      row.appendChild(VACO.button('License', function () {
+        if (!VACO.userId()) throw new Error('Sign in to license a beat.');
+        return VACO.post('/api/beat-purchases', { beatId: b.id, buyerId: VACO.userId() })
+          .then(function () {
+            VACO.toast('Licensed "' + (b.title || b.id) + '".', 'money');
+            VACO.refreshBalances().then(VACO.renderIdentity);
+          });
+      }, 'primary'));
+      lines.appendChild(row);
+      return VACO.card(b.title || ('Beat ' + b.id), [lines],
+        { trailing: b.licenseType ? VACO.badge(b.licenseType) : null });
+    }), true));
+    VACO.mount(body, out);
+  });
+}
+
+function renderDeals(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Label deals are modelled as real shapes — distribution, profit-share, and full label deals differ in '
+    + 'recoupment and ownership, and the difference is in the data rather than a PDF.'));
+
+  out.appendChild(VACO.card('Look up a deal', [
+    VACO.form([{ name: 'id', label: 'Deal id', type: 'number', min: 1, value: 1, width: '90px' }],
+      function (values) {
+        return VACO.api('/api/label-deals/' + values.id).then(function (deal) {
+          var rows = Object.keys(deal)
+            .filter(function (k) { return typeof deal[k] !== 'object'; })
+            .map(function (k) { return { field: k.replace(/([A-Z])/g, ' $1'), value: String(deal[k]) }; });
+          while (out.childNodes.length > 2) out.removeChild(out.lastChild);
+          out.appendChild(VACO.card('Deal ' + values.id, [
+            VACO.table([{ key: 'field', label: 'Term' }, { key: 'value', label: 'Value' }], rows),
+          ]));
+          VACO.mount(body, out);
+        });
+      }, 'Load'),
+  ]));
+
+  return VACO.mount(body, out);
+}
+
+VACO.app({
+  id: 'vulture-music',
+  name: 'Vvltvre Music',
+  tagline: 'Distribution & beats',
+  //: Vvltvre Music's identity: an orchid-magenta. Part of the Vvltvre
+  //: family's warm band, distinct from CVLTVRE's pink by sitting
+  //: further toward violet.
+  accent: '#c45ad4',
+  accentDim: '#a03cb0',
+  accentInk: '#180420',
+  tabs: [
+    { id: 'releases', label: 'Releases', heading: 'Catalogue & splits', render: renderReleases },
+    { id: 'beats', label: 'Beats', heading: 'Beat marketplace', render: renderBeats },
+    { id: 'deals', label: 'Deals', heading: 'Label deals', render: renderDeals },
+  ],
+});
+</script>
+</body>
+</html>

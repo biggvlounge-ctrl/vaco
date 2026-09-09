@@ -1,0 +1,16 @@
+{
+  "name": "vaco-audit",
+  "version": "1.0.0",
+  "description": "The one decision log. Who decided what, when, and on what inputs — append-only, for every operator-grade route in the ecosystem.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": { "node": ">=22" },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  }
+}

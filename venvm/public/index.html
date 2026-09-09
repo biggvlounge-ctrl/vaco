@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VENVM</title>
+<link rel="stylesheet" href="/vaco-design.css" />
+<style>
+  .pipeline { display: flex; align-items: center; gap: var(--vaco-space-2); flex-wrap: wrap; }
+  .stage {
+    padding: var(--vaco-space-2) var(--vaco-space-3);
+    border-radius: var(--vaco-radius-pill);
+    border: 1px solid var(--vaco-border);
+    font-size: var(--vaco-text-xs);
+    white-space: nowrap;
+  }
+  .stage-done { background: var(--vaco-accent-soft); border-color: var(--vaco-accent); color: var(--vaco-accent); }
+  .stage-arrow { color: var(--vaco-text-faint); }
+  .platform-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--vaco-space-3); }
+  .aspect-box { border: 1px solid var(--vaco-border); border-radius: var(--vaco-radius-sm);
+                background: var(--vaco-bg-raised); display: flex; align-items: center; justify-content: center;
+                color: var(--vaco-text-faint); font-size: var(--vaco-text-xs); }
+</style>
+</head>
+<body class="vaco">
+<script src="/vaco-ui.js"></script>
+<script>
+// VENVM — the AI production and marketing pipeline.
+//
+// **The most important thing on this page is what it refuses to
+// claim.** VENVM models a production process; it does not generate
+// media. There is no image, video, or audio generation anywhere in this
+// ecosystem. A "generated" script is a recorded request moving through
+// real stages, and a reformat returns real target dimensions rather
+// than a re-encoded file.
+//
+// Saying that plainly is the difference between a pipeline tool and a
+// demo that implies capabilities nobody built.
+
+var el = VACO.el;
+var STAGES = ['script-ready', 'storyboard-ready', 'render-queued', 'rendered'];
+
+function pipeline(current) {
+  var row = el('div', 'pipeline');
+  var reachedIndex = STAGES.indexOf(current);
+  STAGES.forEach(function (stage, i) {
+    if (i) row.appendChild(el('span', 'stage-arrow', '→'));
+    row.appendChild(el('span', 'stage' + (i <= reachedIndex ? ' stage-done' : ''), stage));
+  });
+  return row;
+}
+
+function renderScripts(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    '<strong>VENVM cannot generate pixels.</strong> A script request moves through real stages and a production job '
+    + 'records real state, but no model produces media here. Anything downstream needs art from elsewhere.', 'warn'));
+
+  out.appendChild(VACO.card('Request a script', [
+    VACO.form([
+      { name: 'brief', label: 'Brief', placeholder: 'a 30s spot for a coffee shop', width: '280px' },
+      { name: 'requesterId', label: 'Requester', value: VACO.userId() || '', width: '130px' },
+    ], function (values) {
+      return VACO.post('/api/scripts', values).then(function (s) {
+        VACO.toast('Script ' + s.id + ' requested.');
+        VACO.render();
+      });
+    }, 'Request'),
+  ]));
+
+  out.appendChild(VACO.card('Look up a script', [
+    VACO.form([{ name: 'id', label: 'Script id', type: 'number', min: 1, value: 1, width: '100px' }],
+      function (values) {
+        return VACO.api('/api/scripts/' + values.id).then(function (s) {
+          while (out.childNodes.length > 3) out.removeChild(out.lastChild);
+          var lines = el('div', 'vaco-stack-sm');
+          lines.appendChild(VACO.badge(s.status));
+          lines.appendChild(el('p', 'vaco-small vaco-dim', s.brief || ''));
+          if (s.body) lines.appendChild(el('pre', 'vaco-mono vaco-small', s.body));
+          lines.appendChild(VACO.button('Advance to generated', function () {
+            return VACO.post('/api/scripts/' + values.id + '/generate', {})
+              .then(function () { VACO.toast('Marked generated — no model ran.'); });
+          }));
+          out.appendChild(VACO.card('Script ' + values.id, [lines]));
+          VACO.mount(body, out);
+        });
+      }, 'Load'),
+  ]));
+
+  return VACO.mount(body, out);
+}
+
+function renderReformat(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.card('Cross-platform reformat', [
+    el('p', 'vaco-small vaco-dim',
+      'One source, four platform targets. This returns the real dimensions and safe areas each platform needs — '
+      + 'it does not re-encode a file, because there is no media here to re-encode.'),
+    VACO.form([
+      { name: 'sourceWidth', label: 'Source width', type: 'number', min: 1, value: 1920, width: '110px' },
+      { name: 'sourceHeight', label: 'Source height', type: 'number', min: 1, value: 1080, width: '110px' },
+    ], function (values) {
+      return VACO.post('/api/reformat', values).then(function (result) {
+        while (out.childNodes.length > 1) out.removeChild(out.lastChild);
+        var targets = result.targets || result.outputs || result;
+        var grid = el('div', 'platform-grid');
+        Object.keys(targets).forEach(function (platform) {
+          var t = targets[platform];
+          if (!t || typeof t !== 'object') return;
+          var cell = el('div', 'vaco-stack-sm');
+          var box = el('div', 'aspect-box');
+          // The box is drawn at the real aspect ratio, so a vertical
+          // target actually looks vertical.
+          box.style.aspectRatio = (t.width || 1) + ' / ' + (t.height || 1);
+          box.textContent = t.width + '×' + t.height;
+          cell.appendChild(box);
+          cell.appendChild(el('span', 'vaco-small', platform));
+          if (t.safeAreaPercent) {
+            cell.appendChild(el('span', 'vaco-small vaco-faint', 'safe area ' + t.safeAreaPercent + '%'));
+          }
+          grid.appendChild(cell);
+        });
+        out.appendChild(VACO.card('Targets', [grid]));
+        VACO.mount(body, out);
+      });
+    }, 'Reformat'),
+  ]));
+  return VACO.mount(body, out);
+}
+
+function renderJobs(body) {
+  var out = el('div', 'vaco-stack');
+
+  out.appendChild(VACO.card('Start a production job', [
+    VACO.form([{ name: 'scriptId', label: 'Script id', type: 'number', min: 1, value: 1, width: '100px' }],
+      function (values) {
+        return VACO.post('/api/production-jobs', values)
+          .then(function (j) { VACO.toast('Job ' + j.id + ' created.'); VACO.render(); });
+      }, 'Create'),
+  ]));
+
+  out.appendChild(VACO.card('Track a job', [
+    VACO.form([{ name: 'id', label: 'Job id', type: 'number', min: 1, value: 1, width: '90px' }],
+      function (values) {
+        return VACO.api('/api/production-jobs/' + values.id).then(function (job) {
+          while (out.childNodes.length > 2) out.removeChild(out.lastChild);
+          var lines = el('div', 'vaco-stack-sm');
+          lines.appendChild(pipeline(job.stage));
+          lines.appendChild(el('p', 'vaco-small vaco-dim', 'Script ' + job.scriptId));
+
+          var actions = el('div', 'vaco-row-tight');
+          [['Storyboard', 'storyboard'], ['Queue render', 'queue-render'], ['Mark rendered', 'mark-rendered']]
+            .forEach(function (pair) {
+              actions.appendChild(VACO.button(pair[0], function () {
+                return VACO.post('/api/production-jobs/' + values.id + '/' + pair[1], {})
+                  .then(function () { VACO.toast(pair[0] + ' recorded.'); });
+              }, 'sm'));
+            });
+          lines.appendChild(actions);
+          lines.appendChild(el('p', 'vaco-small vaco-faint',
+            'Each stage records real state. None of them renders anything.'));
+          out.appendChild(VACO.card('Job ' + values.id, [lines]));
+          VACO.mount(body, out);
+        });
+      }, 'Track'),
+  ]));
+
+  return VACO.mount(body, out);
+}
+
+function renderConsent(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Likeness consent is a <strong>hard gate</strong>: using someone’s likeness without a live, unrevoked consent '
+    + 'record throws rather than warns. Consent can be revoked at any time, and revocation takes effect immediately.',
+    'warn'));
+
+  return VACO.api('/api/consent-scopes').then(function (data) {
+    var scopes = data.scopes || data.consentScopes || data || [];
+    out.appendChild(VACO.card('Consent scopes', [
+      el('p', 'vaco-small vaco-dim', 'What a person can agree to, separately. Consent to one is not consent to all.'),
+      VACO.table([{ key: 'scope', label: 'Scope', render: function (s) { return typeof s === 'string' ? s : (s.scope || s.name); } },
+                  { key: 'description', label: 'Meaning', render: function (s) { return typeof s === 'string' ? '—' : (s.description || '—'); } }],
+        Array.isArray(scopes) ? scopes : [], { empty: 'No scopes defined.' }),
+    ]));
+
+    out.appendChild(VACO.card('Grant consent', [
+      VACO.form([
+        { name: 'subjectId', label: 'Subject', value: VACO.userId() || '', width: '130px' },
+        { name: 'grantedToId', label: 'Granted to', placeholder: 'who may use it', width: '150px' },
+        { name: 'scope', label: 'Scope', placeholder: 'scope name', width: '140px' },
+      ], function (values) {
+        return VACO.post('/api/likeness-consents', values)
+          .then(function (c) { VACO.toast('Consent ' + c.id + ' recorded.'); });
+      }, 'Grant'),
+    ]));
+
+    VACO.mount(body, out);
+  });
+}
+
+VACO.app({
+  id: 'venvm',
+  name: 'VENVM',
+  tagline: 'Production pipeline',
+  //: VENVM's identity: a violet-purple, one step warmer than Vault
+  //: Studios' electric violet — related, since both are production
+  //: tools, without being confusable.
+  accent: '#a45ce0',
+  accentDim: '#8340bd',
+  accentInk: '#12061c',
+  tabs: [
+    { id: 'scripts', label: 'Scripts', heading: 'Script requests', render: renderScripts },
+    { id: 'reformat', label: 'Reformat', heading: 'Cross-platform targets', render: renderReformat },
+    { id: 'jobs', label: 'Pipeline', heading: 'Production jobs', render: renderJobs },
+    { id: 'consent', label: 'Consent', heading: 'Likeness consent', render: renderConsent },
+  ],
+});
+</script>
+</body>
+</html>

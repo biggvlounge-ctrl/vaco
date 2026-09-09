@@ -1,0 +1,19 @@
+{
+  "name": "vex",
+  "version": "0.1.0",
+  "private": true,
+  "description": "VEX -- the real Robinhood-style Cvltvre Card brokerage. Extracted from VOKEN (Phase 1) into its own standalone app: owns broker accounts, trade orders, and the vex-brokerage compliance gate; calls VOKEN's own API for the Cvltvre Card catalog it trades against, the same way every other real cross-app client in this ecosystem works.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

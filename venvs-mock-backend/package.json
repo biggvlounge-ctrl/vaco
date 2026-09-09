@@ -1,0 +1,19 @@
+{
+  "name": "venvs-mock-backend",
+  "version": "0.1.0",
+  "description": "Mock stand-in for V3 (VCoin/VASH ledger) and Shield (session/auth) -- inferred API contract, since neither real service exists in this environment.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

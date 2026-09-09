@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VSAFE</title>
+<link rel="stylesheet" href="/vaco-design.css" />
+<style>
+  .safety-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--vaco-space-3); }
+  .big { font-size: var(--vaco-text-2xl); font-weight: var(--vaco-weight-bold); font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body class="vaco">
+<script src="/vaco-ui.js"></script>
+<script>
+// VSAFE — the ecosystem's shared safety layer.
+//
+// Six apps already call into this service; until now none of them, and
+// no person, had a screen for it. Real client of VSAFE's own 43 routes.
+//
+// **Nothing here simulates safety.** A check-in that escalates does so
+// because the server's timer says so. An ID verification badge reflects
+// a real verification record. Where a capability is not connected —
+// there is no SMS or push channel — this page says so rather than
+// implying someone will be contacted.
+
+var el = VACO.el;
+
+function renderCheckIns(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'A check-in is a timer with a consequence: miss it and VSAFE escalates to your trusted contacts. '
+    + '<strong>Escalation is recorded, not delivered</strong> — no SMS, push, or call channel is connected, '
+    + 'so a real deployment needs one before this protects anyone.', 'warn'));
+
+  var id = VACO.userId();
+  if (!id) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to start a check-in.'));
+    return VACO.mount(body, out);
+  }
+
+  out.appendChild(VACO.card('Start a check-in', [
+    VACO.form([
+      { name: 'minutes', label: 'Check back in', type: 'number', min: 1, value: 60, width: '90px' },
+      { name: 'note', label: 'Context', placeholder: 'where you are going', width: '220px' },
+    ], function (values) {
+      return VACO.post('/api/check-ins', {
+        userId: id,
+        expectedReturnAt: Date.now() + values.minutes * 60000,
+        note: values.note,
+      }).then(function (c) {
+        VACO.toast('Check-in ' + c.id + ' armed for ' + values.minutes + ' minutes.');
+        VACO.render();
+      });
+    }, 'Arm'),
+  ]));
+
+  out.appendChild(VACO.card('Look up a check-in', [
+    VACO.form([{ name: 'id', label: 'Check-in id', type: 'number', min: 1, value: 1, width: '100px' }],
+      function (values) {
+        return VACO.api('/api/check-ins/' + values.id + '/full-status').then(function (status) {
+          var lines = el('div', 'vaco-stack-sm');
+          lines.appendChild(el('div', 'vaco-row-tight', ''));
+          lines.appendChild(VACO.badge(status.status || 'unknown'));
+          Object.keys(status).forEach(function (k) {
+            if (typeof status[k] === 'object') return;
+            lines.appendChild(el('p', 'vaco-small vaco-dim', k + ': ' + status[k]));
+          });
+          out.appendChild(VACO.card('Check-in ' + values.id, [lines]));
+          VACO.mount(body, out);
+        });
+      }, 'Status'),
+  ]));
+
+  return VACO.mount(body, out);
+}
+
+function renderIdentity(body) {
+  var out = el('div', 'vaco-stack');
+  var id = VACO.userId();
+  if (!id) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to see your verification status.'));
+    return VACO.mount(body, out);
+  }
+
+  var grid = el('div', 'safety-grid');
+
+  grid.appendChild(VACO.card('ID verification', [
+    (function () {
+      var node = el('div', 'vaco-stack-sm');
+      node.appendChild(el('p', 'vaco-small vaco-dim', 'Checking…'));
+      VACO.api('/api/id-verification/' + encodeURIComponent(id) + '/verified')
+        .then(function (v) {
+          VACO.mount(node, [
+            v.verified ? VACO.badge('verified', 'money') : VACO.badge('not verified', 'warn'),
+            el('p', 'vaco-small vaco-dim',
+              v.verified
+                ? 'Other apps in the ecosystem can trust this identity claim.'
+                : 'Unverified. Apps that gate on identity will refuse the gated actions.'),
+          ]);
+        })
+        .catch(function () { VACO.mount(node, el('p', 'vaco-small vaco-faint', 'No verification record.')); });
+      return node;
+    }()),
+  ]));
+
+  grid.appendChild(VACO.card('Screen time today', [
+    (function () {
+      var node = el('div', 'vaco-stack-sm');
+      node.appendChild(el('p', 'big', '…'));
+      VACO.api('/api/screen-time/' + encodeURIComponent(id) + '/daily-total')
+        .then(function (t) {
+          var mins = t.totalMinutes !== undefined ? t.totalMinutes : (t.minutes || 0);
+          VACO.mount(node, [
+            el('p', 'big', mins + 'm'),
+            el('p', 'vaco-small vaco-dim',
+              'Tracked so a dating or social app can nudge toward a break rather than optimise for time-on-app.'),
+          ]);
+        })
+        .catch(function () { VACO.mount(node, el('p', 'vaco-small vaco-faint', 'No screen time recorded today.')); });
+      return node;
+    }()),
+  ]));
+
+  grid.appendChild(VACO.card('Privacy settings', [
+    (function () {
+      var node = el('div', null);
+      node.textContent = 'Loading…';
+      VACO.api('/api/privacy-settings/' + encodeURIComponent(id))
+        .then(function (s) {
+          var rows = Object.keys(s).map(function (k) { return { setting: k, value: String(s[k]) }; });
+          VACO.mount(node, VACO.table(
+            [{ key: 'setting', label: 'Setting' }, { key: 'value', label: 'Value' }], rows));
+        })
+        .catch(function () { node.textContent = 'No privacy settings stored.'; });
+      return node;
+    }()),
+  ]));
+
+  out.appendChild(grid);
+  return VACO.mount(body, out);
+}
+
+function renderFakeCalls(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'A scheduled fake call is an exit from a situation that has turned uncomfortable — the phone rings, you leave. '
+    + '<strong>No real call is placed</strong>; VSAFE records that one is due, and the app showing this must ring.'));
+
+  var id = VACO.userId();
+  if (!id) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to schedule a call.'));
+    return VACO.mount(body, out);
+  }
+
+  out.appendChild(VACO.card('Schedule one', [
+    VACO.form([{ name: 'minutes', label: 'In', type: 'number', min: 1, value: 15, width: '80px' }],
+      function (values) {
+        return VACO.post('/api/fake-calls', {
+          userId: id, scheduledFor: Date.now() + values.minutes * 60000,
+        }).then(function () { VACO.toast('Fake call scheduled.'); VACO.render(); });
+      }, 'Schedule'),
+  ]));
+
+  return VACO.api('/api/fake-calls/due/' + encodeURIComponent(id)).then(function (data) {
+    var due = data.calls || data || [];
+    out.appendChild(VACO.card('Due now', [
+      VACO.table([
+        { key: 'id', label: 'Id' },
+        { key: 'scheduledFor', label: 'Scheduled', render: function (c) { return new Date(c.scheduledFor).toLocaleTimeString(); } },
+      ], due, { empty: 'Nothing due.' }),
+    ]));
+    VACO.mount(body, out);
+  }).catch(function () {
+    out.appendChild(el('div', 'vaco-empty', 'No scheduled calls.'));
+    VACO.mount(body, out);
+  });
+}
+
+VACO.app({
+  id: 'vsafe',
+  name: 'VSAFE',
+  tagline: 'Shared safety layer',
+  //: VSAFE's identity: a clear signal blue. Calm authority rather than
+  //: alarm red — the colour of a service you want to be boring.
+  accent: '#4d94e8',
+  accentDim: '#3573c2',
+  accentInk: '#04101c',
+  tabs: [
+    { id: 'checkins', label: 'Check-ins', heading: 'Timed check-ins', render: renderCheckIns },
+    { id: 'identity', label: 'Identity', heading: 'Verification & privacy', render: renderIdentity },
+    { id: 'calls', label: 'Exit calls', heading: 'Scheduled fake calls', render: renderFakeCalls },
+  ],
+});
+</script>
+</body>
+</html>

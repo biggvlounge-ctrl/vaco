@@ -1,0 +1,20 @@
+{
+  "name": "vaco-shell",
+  "version": "0.1.0",
+  "description": "VACO — the ecosystem's real app launcher and shared session host, sitting on top of the already-real Shield session contract.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

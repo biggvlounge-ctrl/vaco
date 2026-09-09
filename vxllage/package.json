@@ -1,0 +1,20 @@
+{
+  "name": "vxllage",
+  "version": "0.1.0",
+  "private": true,
+  "description": "VXLLAGE -- X/Twitter-primary social app blending Reddit/Discord/Clubhouse/Zoom as secondary registers. Per the standing correction, Home (the X-style feed) is the deepest surface, built first.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

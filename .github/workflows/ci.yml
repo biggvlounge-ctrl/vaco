@@ -1,0 +1,193 @@
+# VACO — continuous integration.
+#
+# **Why this exists.** 404 tests were written across 18 suites and
+# nothing ran them automatically. Every regression was caught by
+# whoever happened to run `npm test` in the right directory. The
+# acceleration matrix called this the largest cheap win in the repo,
+# and it is cheap for a specific reason: every step below was already
+# built. Only the trigger was missing.
+#
+#   node scripts/run-all-tests.mjs   discovers and runs every suite
+#   ./sync-design-system.sh --check  already had a drift mode
+#   node scripts/smoke-frontend.mjs  already drove a real browser
+#
+# **Three jobs rather than one**, because they fail for different
+# reasons and a developer should be able to tell which at a glance:
+# `tests` is logic, `design-system` is drift, `smoke` is the whole
+# ecosystem actually booting and rendering.
+#
+# **vex-business is deliberately not covered here.** It is a Python
+# monorepo with its own toolchain (uv, pytest, alembic, its own
+# docker-compose) and it holds the live-trading interlock. It needs its
+# own workflow with its own review, not a bolted-on step in a Node
+# pipeline. Flagged, not forgotten.
+
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # 30 independent package.json files with 30 lockfiles. This is
+      # the concrete cost the acceleration matrix's workspace
+      # recommendation (§1) would remove; until then, cache the lot
+      # keyed on every lockfile so an unchanged dependency set is a
+      # restore rather than 30 installs.
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: '**/node_modules'
+          key: ${{ runner.os }}-node22-${{ hashFiles('**/package-lock.json', '!**/node_modules/**') }}
+          restore-keys: ${{ runner.os }}-node22-
+
+      - name: Install dependencies
+        run: ./install-ecosystem.sh --ci
+
+      # Exits non-zero if any suite fails, and prints the full output of
+      # only the failures. Suites are discovered, not listed, so a new
+      # app is covered without editing this file.
+      - name: Run every test suite
+        run: node scripts/run-all-tests.mjs
+
+  design-system:
+    name: Design system drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # The shared layer owns structure, the per-app layer owns colour.
+      # `--check` fails when an app's copy has drifted from the source,
+      # which is the failure mode that produced a page rendering
+      # "unstyled" rather than "broken" — the kind nothing else catches.
+      - name: Check design system is in sync across all apps
+        run: ./sync-design-system.sh --check
+
+      # The auth middleware is synced the same way and for the same
+      # reason (per-app Docker build contexts). This check is stricter
+      # than the design system's: it also fails when a copy is present
+      # but nothing in the app requires it, because a synced file nobody
+      # imports is drift that a byte comparison cannot see — which is
+      # exactly how vex-trading shipped with an unused design system.
+      #
+      # For this file that failure mode is a security hole rather than
+      # an unstyled page: an app carrying shieldAuth.js and mounting
+      # nothing is an app with unauthenticated money routes.
+      - name: Check shared auth runtime is in sync and actually used
+        run: ./sync-shared-runtime.sh --check
+
+      # Generated from start-ecosystem.sh's manifest. If either differs
+      # from what is committed, someone edited a generated file by hand
+      # and the next deploy would silently drop or misconfigure a
+      # service — that is how docker-compose.yml lost `vex` once.
+      - name: Check deploy config matches the manifest
+        run: |
+          node deploy/generate-docker-compose.js
+          node deploy/generate-nginx-conf.js --docker
+          git diff --exit-code docker-compose.yml deploy/nginx-docker.conf
+
+      # `.env.example` is the file an operator actually follows, and it
+      # was maintained by hand while docker-compose.yml derived the same
+      # list from source. It drifted: sixteen callers listed against
+      # nineteen real ones. Because compose marks each token `:?`, that
+      # gap does not surface as a missing feature — it surfaces as a
+      # stack that refuses to start, naming a variable the example file
+      # never mentioned. Both blocks are generated now; this fails if
+      # someone wires a new caller without refreshing them.
+      - name: Check .env.example lists every real service caller
+        run: node scripts/generate-service-tokens.mjs --check
+
+      # A ratchet on the one security question unit tests structurally
+      # cannot see: which requests can reach this handler. 464 tests were
+      # green while an unauthenticated POST drained wallets, because
+      # every one of them called a library function and none sent a
+      # request. This does not check that a guard is the RIGHT one — it
+      # checks that the number of routes nobody has asked the question
+      # about never goes up.
+      - name: Check no app gained unguarded mutating routes
+        run: node scripts/audit-route-guards.mjs --check
+
+  smoke:
+    name: Frontend smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Booting 30 services to find out the logic is broken wastes ten
+    # minutes. Let the fast job answer that first.
+    needs: tests
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: '**/node_modules'
+          key: ${{ runner.os }}-node22-${{ hashFiles('**/package-lock.json', '!**/node_modules/**') }}
+          restore-keys: ${{ runner.os }}-node22-
+
+      - name: Install dependencies
+        run: ./install-ecosystem.sh --ci
+
+      # smoke-frontend.mjs resolves Playwright normally now rather than
+      # from a hardcoded workstation path, so a local install here is
+      # all it needs.
+      - name: Install Playwright and Chromium
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+
+      - name: Boot the ecosystem
+        run: |
+          ./start-ecosystem.sh
+          # start-ecosystem.sh polls each app's own /api/health, so by
+          # the time it returns the services are up. This second wait
+          # is only for anything still settling.
+          sleep 5
+
+      # `--all` reads the same APPS manifest start-ecosystem.sh uses, so
+      # the target list cannot drift from the service list.
+      - name: Smoke every frontend in a real browser
+        run: node scripts/smoke-frontend.mjs --all
+
+      # Logs are the only way to diagnose a boot failure after the fact,
+      # and a failed run is exactly when they are wanted.
+      - name: Upload service logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ecosystem-logs
+          path: logs/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Stop the ecosystem
+        if: always()
+        run: ./stop-ecosystem.sh

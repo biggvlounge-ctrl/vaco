@@ -1,0 +1,312 @@
+# VACO -- generated nginx config. Regenerate with
+# node deploy/generate-nginx-conf.js example.com
+# then re-run `certbot --nginx` if this is the first time (it edits
+# this file in place to add the ssl_certificate lines).
+
+# Real rate limiting -- closes one of the ecosystem audit's flagged
+# gaps ("no rate limiting anywhere in the 30 Node apps"). Declared at
+# this file's top level rather than inside `server {}` because this
+# file is spliced directly into nginx's own `http {}` context (the
+# official nginx image's default.conf `include`s everything under
+# conf.d/ from inside `http {}`) -- `limit_req_zone` is only legal
+# there, not inside `server`/`location`. 10 requests/sec per client
+# IP, a real burst of 20 queued before requests start getting 503'd,
+# applied once at the server level so it covers every proxied
+# location below without repeating it per-app.
+limit_req_zone $binary_remote_addr zone=vaco_general:10m rate=10r/s;
+
+server {
+    listen 80;
+    server_name example.com;
+
+    limit_req zone=vaco_general burst=20 nodelay;
+    limit_req_status 503;
+
+    # VDP and VENVS production builds (static files -- built via
+    # `npm run build`, see the deployment guide).
+    location /vdp/ {
+        alias /var/www/vaco/vdp/dist/;
+        try_files $uri $uri/ /vdp/index.html;
+    }
+
+    location /venvs/ {
+        alias /var/www/vaco/venvs/dist/;
+        try_files $uri $uri/ /venvs/index.html;
+    }
+
+    # WebSocket support (cvnvo's real-time messaging) -- upgrade
+    # headers on every proxied location so ws:// connections work
+    # through the reverse proxy.
+    location /cvnvo/ {
+        rewrite ^/cvnvo/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8798;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /v4-proxy/ {
+        rewrite ^/v4-proxy/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8787;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /v4-search/ {
+        rewrite ^/v4-search/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8788;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /vacon/ {
+        rewrite ^/vacon/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8805;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /vacon-c/ {
+        rewrite ^/vacon-c/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8809;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /hvntz/ {
+        rewrite ^/hvntz/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8792;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /void/ {
+        rewrite ^/void/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8793;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /voidmagic/ {
+        rewrite ^/voidmagic/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8797;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /voken/ {
+        rewrite ^/voken/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8794;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /vago/ {
+        rewrite ^/vago/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8795;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /vxllage/ {
+        rewrite ^/vxllage/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8796;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /yap/ {
+        rewrite ^/yap/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8802;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /chopz/ {
+        rewrite ^/chopz/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8800;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /chopz-shop/ {
+        rewrite ^/chopz-shop/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8801;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /vacay/ {
+        rewrite ^/vacay/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8803;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /vavlt-stvdios/ {
+        rewrite ^/vavlt-stvdios/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8808;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /vsafe/ {
+        rewrite ^/vsafe/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8799;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /vaca/ {
+        rewrite ^/vaca/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8804;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /v3/ {
+        rewrite ^/v3/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8811;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /shield/ {
+        rewrite ^/shield/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8812;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /vaco-analytics/ {
+        rewrite ^/vaco-analytics/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8790;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /vulture-music/ {
+        rewrite ^/vulture-music/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8806;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /vulture-flix/ {
+        rewrite ^/vulture-flix/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8807;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /vulture-pods/ {
+        rewrite ^/vulture-pods/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8810;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /venvm/ {
+        rewrite ^/venvm/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8813;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /dreams/ {
+        rewrite ^/dreams/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8814;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /vulture-studios/ {
+        rewrite ^/vulture-studios/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8815;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /vex/ {
+        rewrite ^/vex/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8816;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /vex-trading/ {
+        rewrite ^/vex-trading/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8817;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # The front door: vaco-shell, the real app launcher + session host.
+    location / {
+        proxy_pass http://127.0.0.1:8789;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}

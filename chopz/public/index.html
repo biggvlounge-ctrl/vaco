@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CHOPZ</title>
+<link rel="stylesheet" href="/vaco-design.css" />
+<style>
+  .reel {
+    aspect-ratio: 9 / 16;
+    border-radius: var(--vaco-radius);
+    border: 1px solid var(--vaco-border-subtle);
+    background: linear-gradient(180deg, transparent 40%, var(--vaco-accent-soft)), var(--vaco-bg-raised);
+    display: flex; flex-direction: column; justify-content: flex-end;
+    padding: var(--vaco-space-3); gap: var(--vaco-space-2);
+  }
+  .feed-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: var(--vaco-space-4); }
+</style>
+</head>
+<body class="vaco">
+<script src="/vaco-ui.js"></script>
+<script>
+// CHOPZ — the short-form video feed.
+//
+// **No video plays.** There is no media infrastructure in this
+// ecosystem, so a "video" is a real record with a real linked product
+// and a real verification state. Pretending otherwise with a play
+// button that does nothing would be the dishonest version.
+//
+// What IS real, and is the thing worth showing: a video that claims to
+// link a product is verified against CHOPZ SHOP's actual catalogue, so
+// a creator cannot tag something that does not exist.
+
+var el = VACO.el;
+
+function renderFeed(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    '<strong>Video is not hosted or played here.</strong> Each card is a real record. '
+    + 'The linked-product check below is real: it verifies against CHOPZ SHOP’s catalogue, '
+    + 'so a tagged product either exists or the tag is refused.', 'warn'));
+
+  return VACO.api('/chopz/videos').then(function (data) {
+    var videos = data.videos || data || [];
+    if (!videos.length) {
+      out.appendChild(el('div', 'vaco-empty', 'No videos yet.'));
+      return VACO.mount(body, out);
+    }
+
+    var grid = el('div', 'feed-grid');
+    videos.forEach(function (v) {
+      var cell = el('div', 'vaco-stack-sm');
+      var reel = el('div', 'reel');
+      reel.appendChild(el('strong', null, v.creatorId || ''));
+      reel.appendChild(el('span', 'vaco-small', v.caption || ''));
+      cell.appendChild(reel);
+
+      var meta = el('div', 'vaco-row-tight');
+      if (v.linkedProductId) {
+        var badge = VACO.badge('product ' + v.linkedProductId, 'warn');
+        meta.appendChild(badge);
+        // Verify against CHOPZ SHOP's real catalogue rather than
+        // trusting the tag on the video.
+        VACO.post('/chopz/videos/' + v.id + '/verify-linked-product', {})
+          .then(function (r) {
+            var ok = r.verified !== undefined ? r.verified : r.valid;
+            badge.className = 'vaco-badge ' + (ok ? 'vaco-badge-money' : 'vaco-badge-danger');
+            badge.textContent = ok ? 'product verified' : 'product not found';
+          })
+          .catch(function () { badge.textContent = 'verification unavailable'; });
+      } else {
+        meta.appendChild(VACO.badge('no product'));
+      }
+      cell.appendChild(meta);
+      grid.appendChild(cell);
+    });
+    out.appendChild(grid);
+    VACO.mount(body, out);
+  });
+}
+
+function renderPost(body) {
+  return VACO.card('Post a video record', [
+    el('p', 'vaco-small vaco-dim',
+      'Tagging a product is checked against CHOPZ SHOP. An id that does not exist there is refused rather than stored.'),
+    VACO.form([
+      { name: 'creatorId', label: 'Creator', value: VACO.userId() || '', width: '130px' },
+      { name: 'caption', label: 'Caption', placeholder: 'what it is', width: '240px' },
+      { name: 'linkedProductId', label: 'Product id', placeholder: 'optional', width: '110px' },
+    ], function (values) {
+      if (!values.linkedProductId) delete values.linkedProductId;
+      return VACO.post('/chopz/videos', values)
+        .then(function (v) { VACO.toast('Video ' + v.id + ' posted.'); VACO.render(); });
+    }, 'Post'),
+  ]);
+}
+
+VACO.app({
+  id: 'chopz',
+  name: 'CHOPZ',
+  tagline: 'Short-form video',
+  //: CHOPZ's identity: a vivid spring green. Fast and young, and far
+  //: enough from VXLLAGE's calmer green-teal to read as its own thing.
+  accent: '#5fd44f',
+  accentDim: '#43ae35',
+  accentInk: '#04140b',
+  tabs: [
+    { id: 'feed', label: 'Feed', heading: 'The feed', render: renderFeed },
+    { id: 'post', label: 'Post', heading: 'Add a video', render: renderPost },
+  ],
+});
+</script>
+</body>
+</html>

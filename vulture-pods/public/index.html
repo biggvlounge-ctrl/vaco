@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Vvltvre Pods</title>
+<link rel="stylesheet" href="/vaco-design.css" />
+<style>
+  .cover {
+    aspect-ratio: 1;
+    border-radius: var(--vaco-radius);
+    border: 1px solid var(--vaco-border-subtle);
+    background:
+      radial-gradient(circle at 30% 30%, var(--vaco-accent-soft), transparent 70%),
+      var(--vaco-bg-raised);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--vaco-text-faint); font-size: var(--vaco-text-xs);
+    letter-spacing: 0.1em; text-transform: uppercase;
+  }
+  .ep-row { display: flex; align-items: center; gap: var(--vaco-space-3); padding: var(--vaco-space-2) 0;
+            border-top: 1px solid var(--vaco-border-subtle); }
+  .ep-row:first-child { border-top: 0; }
+</style>
+</head>
+<body class="vaco">
+<script src="/vaco-ui.js"></script>
+<script>
+// Vvltvre Pods — shows, episodes, and subscriptions.
+//
+// Real client of its own 17 routes. Listen counts and subscription
+// state are server-owned.
+//
+// **No audio plays.** There is no media infrastructure here, so an
+// episode is a real record with a real listen count, and pressing play
+// increments that count rather than starting a stream. Said on the
+// surface rather than implied by a play button that does nothing.
+
+var el = VACO.el;
+var state = { category: null, categories: ['comedy', 'news', 'true-crime', 'sports', 'music', 'business'] };
+
+function fmtDuration(seconds) {
+  if (!seconds) return '—';
+  var m = Math.round(seconds / 60);
+  return m >= 60 ? Math.floor(m / 60) + 'h ' + (m % 60) + 'm' : m + 'm';
+}
+
+function renderShows(body) {
+  var out = el('div', 'vaco-stack');
+
+  var rail = el('div', 'vaco-row-tight');
+  state.categories.forEach(function (cat) {
+    var btn = el('button', 'vaco-btn vaco-btn-sm' + (cat === state.category ? ' vaco-btn-primary' : ''), cat);
+    btn.addEventListener('click', function () { state.category = cat; VACO.render(); });
+    rail.appendChild(btn);
+  });
+  out.appendChild(rail);
+
+  if (!state.category) {
+    out.appendChild(el('div', 'vaco-empty', 'Pick a category to browse.'));
+    return VACO.mount(body, out);
+  }
+
+  return VACO.api('/api/shows/category/' + encodeURIComponent(state.category)).then(function (data) {
+    var shows = data.shows || [];
+    if (!shows.length) {
+      out.appendChild(el('div', 'vaco-empty', 'No shows in "' + state.category + '" yet.'));
+      return VACO.mount(body, out);
+    }
+    out.appendChild(VACO.grid(shows.map(function (s) {
+      var lines = el('div', 'vaco-stack-sm');
+      var cover = el('div', 'cover');
+      cover.textContent = state.category;
+      lines.appendChild(cover);
+      lines.appendChild(el('p', 'vaco-small vaco-dim', s.description || ''));
+
+      var episodes = el('div', null);
+      episodes.textContent = 'Loading episodes…';
+      lines.appendChild(episodes);
+      VACO.api('/api/shows/' + s.id + '/episodes').then(function (r) {
+        var eps = r.episodes || [];
+        if (!eps.length) { episodes.textContent = 'No episodes yet.'; return; }
+        VACO.clear(episodes);
+        eps.slice(0, 5).forEach(function (ep) {
+          var row = el('div', 'ep-row');
+          var text = el('div', 'vaco-stack-sm');
+          text.appendChild(el('strong', 'vaco-small', ep.title));
+          text.appendChild(el('span', 'vaco-small vaco-faint',
+            fmtDuration(ep.durationSeconds) + ' · ' + (ep.listenCount || 0) + ' listens'));
+          row.appendChild(text);
+          row.appendChild(el('span', 'vaco-spacer'));
+          row.appendChild(VACO.button('Count a listen', function () {
+            return VACO.post('/api/episodes/' + ep.id + '/listen', { userId: VACO.userId() })
+              .then(function () { VACO.toast('Listen recorded — no audio is streamed.'); VACO.render(); });
+          }, 'sm'));
+          episodes.appendChild(row);
+        });
+      }).catch(function () { episodes.textContent = 'Episodes unavailable.'; });
+
+      lines.appendChild(VACO.button('Subscribe', function () {
+        if (!VACO.userId()) throw new Error('Sign in to subscribe.');
+        return VACO.post('/api/shows/' + s.id + '/subscribe', { userId: VACO.userId() })
+          .then(function () { VACO.toast('Subscribed to ' + s.title); });
+      }));
+
+      return VACO.card(s.title || ('Show ' + s.id), [lines]);
+    }), true));
+    VACO.mount(body, out);
+  });
+}
+
+function renderLibrary(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Vvltvre Pods holds real listen history and subscriptions. <strong>Audio is not hosted or streamed</strong> — '
+    + 'that needs media infrastructure this ecosystem does not yet have.', 'warn'));
+
+  var id = VACO.userId();
+  if (!id) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to see your library.'));
+    return VACO.mount(body, out);
+  }
+
+  return Promise.all([
+    VACO.api('/api/users/' + encodeURIComponent(id) + '/subscriptions').catch(function () { return null; }),
+    VACO.api('/api/users/' + encodeURIComponent(id) + '/listen-history').catch(function () { return null; }),
+  ]).then(function (r) {
+    var subs = (r[0] && (r[0].subscriptions || r[0])) || [];
+    var history = (r[1] && (r[1].history || r[1].listenHistory || r[1])) || [];
+    out.appendChild(VACO.card('Subscriptions', [
+      VACO.table([{ key: 'showId', label: 'Show' }, { key: 'subscribedAt', label: 'Since',
+        render: function (s) { return s.subscribedAt ? new Date(s.subscribedAt).toLocaleDateString() : '—'; } }],
+        subs, { empty: 'No subscriptions yet.' }),
+    ]));
+    out.appendChild(VACO.card('Listen history', [
+      VACO.table([{ key: 'episodeId', label: 'Episode' }, { key: 'listenedAt', label: 'When',
+        render: function (h) { return h.listenedAt ? new Date(h.listenedAt).toLocaleString() : '—'; } }],
+        history, { empty: 'Nothing listened to yet.' }),
+    ]));
+    VACO.mount(body, out);
+  });
+}
+
+VACO.app({
+  id: 'vulture-pods',
+  name: 'Vvltvre Pods',
+  tagline: 'Shows & episodes',
+  //: Vvltvre Pods' identity: a warm rust. Radio-studio warmth, and the
+  //: register's only occupant of the orange band next to VAGO's brass.
+  accent: '#e08a4f',
+  accentDim: '#bc6c34',
+  accentInk: '#1a0d03',
+  tabs: [
+    { id: 'shows', label: 'Shows', heading: 'Browse', render: renderShows },
+    { id: 'library', label: 'Library', heading: 'Your subscriptions', render: renderLibrary },
+  ],
+});
+</script>
+</body>
+</html>

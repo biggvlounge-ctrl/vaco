@@ -1,0 +1,87 @@
+# VACO -- shared Dockerfile for the two real Vite frontends (`vdp`,
+# `venvs`). Multi-stage: build the real production bundle, then serve
+# it as static files from a second, much smaller image -- the Node
+# build toolchain never ships in the final image.
+#
+# Build context is the individual app directory (`./vdp` or
+# `./venvs`), same convention as Dockerfile.node.
+#
+# Every `VITE_*_API_URL` build ARG below is the full, real, union set
+# used across both frontends' own client files (grep-verified against
+# every `import.meta.env.VITE_*` reference in `vdp/src/lib/*Client.js`
+# and `venvs/src/**`) -- Vite only actually reads the ones a given
+# app's code references; an app that doesn't use a given var simply
+# never touches its ARG. Real, deliberate default: every one defaults
+# to the matching backend's Docker Compose service name + real port
+# (e.g. `/vulture-music`, nginx's own path-prefixed route -- see
+# `deploy/generate-nginx-conf.js --docker`), not a bare `localhost`
+# port, since the browser talks to nginx's one exposed origin, not
+# directly to any backend container.
+
+FROM node:22-alpine AS build
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+RUN npm install
+
+COPY . .
+
+# ARG alone is only a Dockerfile-instruction substitution value -- it
+# is not reliably exposed as a real process environment variable to
+# the `RUN npm run build` shell below across Docker versions. Every
+# ARG is re-declared as ENV so `vite build`'s own `process.env` (what
+# `import.meta.env.VITE_*` actually reads at build time) sees it for
+# real, not just Dockerfile-level string substitution.
+ARG VITE_V3_API_URL=/v3
+ARG VITE_SHIELD_API_URL=/shield
+ARG VITE_VENVS_URL=/venvs
+ARG VITE_CHOPZ_API_URL=/chopz
+ARG VITE_CHOPZ_SHOP_API_URL=/chopz-shop
+ARG VITE_CVNVO_API_URL=/cvnvo
+ARG VITE_HVNTZ_API_URL=/hvntz
+ARG VITE_VACAY_API_URL=/vacay
+ARG VITE_VACO_ANALYTICS_API_URL=/vaco-analytics
+ARG VITE_VAGO_API_URL=/vago
+ARG VITE_VAVLT_STVDIOS_API_URL=/vavlt-stvdios
+ARG VITE_VENVM_API_URL=/venvm
+ARG VITE_VOID_API_URL=/void
+ARG VITE_VOKEN_API_URL=/voken
+ARG VITE_VULTURE_FLIX_API_URL=/vulture-flix
+ARG VITE_VULTURE_MUSIC_API_URL=/vulture-music
+ARG VITE_VULTURE_PODS_API_URL=/vulture-pods
+ARG VITE_VULTURE_STUDIOS_API_URL=/vulture-studios
+ARG VITE_VXLLAGE_API_URL=/vxllage
+
+ENV VITE_V3_API_URL=$VITE_V3_API_URL \
+    VITE_SHIELD_API_URL=$VITE_SHIELD_API_URL \
+    VITE_VENVS_URL=$VITE_VENVS_URL \
+    VITE_CHOPZ_API_URL=$VITE_CHOPZ_API_URL \
+    VITE_CHOPZ_SHOP_API_URL=$VITE_CHOPZ_SHOP_API_URL \
+    VITE_CVNVO_API_URL=$VITE_CVNVO_API_URL \
+    VITE_HVNTZ_API_URL=$VITE_HVNTZ_API_URL \
+    VITE_VACAY_API_URL=$VITE_VACAY_API_URL \
+    VITE_VACO_ANALYTICS_API_URL=$VITE_VACO_ANALYTICS_API_URL \
+    VITE_VAGO_API_URL=$VITE_VAGO_API_URL \
+    VITE_VAVLT_STVDIOS_API_URL=$VITE_VAVLT_STVDIOS_API_URL \
+    VITE_VENVM_API_URL=$VITE_VENVM_API_URL \
+    VITE_VOID_API_URL=$VITE_VOID_API_URL \
+    VITE_VOKEN_API_URL=$VITE_VOKEN_API_URL \
+    VITE_VULTURE_FLIX_API_URL=$VITE_VULTURE_FLIX_API_URL \
+    VITE_VULTURE_MUSIC_API_URL=$VITE_VULTURE_MUSIC_API_URL \
+    VITE_VULTURE_PODS_API_URL=$VITE_VULTURE_PODS_API_URL \
+    VITE_VULTURE_STUDIOS_API_URL=$VITE_VULTURE_STUDIOS_API_URL \
+    VITE_VXLLAGE_API_URL=$VITE_VXLLAGE_API_URL
+
+RUN npm run build
+
+FROM node:22-alpine
+WORKDIR /app
+RUN npm install -g serve@14
+
+COPY --from=build /app/dist ./dist
+
+ARG PORT=5173
+ENV PORT=$PORT
+EXPOSE $PORT
+
+CMD ["sh", "-c", "serve -s dist -l ${PORT}"]

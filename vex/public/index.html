@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VEX</title>
+<link rel="stylesheet" href="/vaco-design.css" />
+<style>
+  .gate { display: flex; align-items: center; gap: var(--vaco-space-3); padding: var(--vaco-space-3) 0;
+          border-top: 1px solid var(--vaco-border-subtle); }
+  .gate:first-child { border-top: 0; }
+  .gate-name { font-weight: var(--vaco-weight-medium); }
+</style>
+</head>
+<body class="vaco">
+<script src="/vaco-ui.js"></script>
+<script>
+// VEX — the Cvltvre Card brokerage.
+//
+// Extracted out of VOKEN into its own app: VOKEN is the collectibles
+// marketplace, VEX is the brokerage that trades positions in them.
+//
+// **Compliance gates are the first tab, deliberately.** A brokerage
+// that trades before its gates pass is the failure mode that ends a
+// business, and these are real server-side gates that refuse orders
+// rather than warn about them.
+
+var el = VACO.el;
+
+function renderGates(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'These gates are enforced by the server: an order placed while a required gate is closed is refused, '
+    + 'not flagged. <strong>Nothing here connects to a real regulator or broker-dealer</strong> — the gate '
+    + 'model is real, the regulatory relationship is not.', 'warn'));
+
+  out.appendChild(VACO.card('Check a gate', [
+    VACO.form([{ name: 'gateName', label: 'Gate', placeholder: 'gate name', width: '200px' }],
+      function (values) {
+        return VACO.api('/api/compliance-gate/' + encodeURIComponent(values.gateName)).then(function (gate) {
+          while (out.childNodes.length > 2) out.removeChild(out.lastChild);
+          var row = el('div', 'gate');
+          row.appendChild(el('span', 'gate-name', values.gateName));
+          row.appendChild(el('span', 'vaco-spacer'));
+          row.appendChild(gate.open || gate.passed
+            ? VACO.badge('open', 'money')
+            : VACO.badge('closed', 'danger'));
+          out.appendChild(VACO.card('Gate status', [row,
+            el('p', 'vaco-small vaco-dim', gate.reason || gate.description || '')]));
+          VACO.mount(body, out);
+        });
+      }, 'Check'),
+  ]));
+
+  return VACO.mount(body, out);
+}
+
+function renderAccount(body) {
+  var out = el('div', 'vaco-stack');
+
+  out.appendChild(VACO.card('Open an account', [
+    VACO.form([{ name: 'userId', label: 'User', value: VACO.userId() || '', width: '160px' }],
+      function (values) {
+        return VACO.post('/api/account', values)
+          .then(function (a) { VACO.toast('Account ' + a.id + ' opened.'); });
+      }, 'Open'),
+  ]));
+
+  out.appendChild(VACO.card('Look up an account', [
+    VACO.form([{ name: 'id', label: 'Account id', width: '140px' }],
+      function (values) {
+        return VACO.api('/api/account/' + encodeURIComponent(values.id)).then(function (a) {
+          while (out.childNodes.length > 2) out.removeChild(out.lastChild);
+          var rows = Object.keys(a)
+            .filter(function (k) { return typeof a[k] !== 'object'; })
+            .map(function (k) { return { field: k.replace(/([A-Z])/g, ' $1'), value: String(a[k]) }; });
+          out.appendChild(VACO.card('Account ' + values.id, [
+            VACO.table([{ key: 'field', label: 'Field' }, { key: 'value', label: 'Value' }], rows),
+          ]));
+          VACO.mount(body, out);
+        });
+      }, 'Load'),
+  ]));
+
+  return VACO.mount(body, out);
+}
+
+function renderTrade(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'An order moves real VCoin through V3 on fill. Compliance gates are checked first — if one is closed, '
+    + 'the order is refused before any money moves.'));
+
+  out.appendChild(VACO.card('Place an order', [
+    VACO.form([
+      { name: 'accountId', label: 'Account', width: '130px' },
+      { name: 'side', label: 'Side', options: ['buy', 'sell'] },
+      { name: 'cardId', label: 'Card', width: '110px' },
+      { name: 'quantity', label: 'Qty', type: 'number', min: 1, value: 1, width: '80px' },
+      { name: 'limitPrice', label: 'Limit', type: 'number', min: 1, value: 100, width: '100px' },
+    ], function (values) {
+      return VACO.post('/api/order', values).then(function (order) {
+        VACO.toast('Order ' + order.id + ' — ' + order.status, 'money');
+        VACO.refreshBalances().then(VACO.renderIdentity);
+        out.appendChild(VACO.card('Order ' + order.id, [
+          el('pre', 'vaco-mono vaco-small', JSON.stringify(order, null, 2)),
+        ]));
+        VACO.mount(body, out);
+      });
+    }, 'Place order'),
+  ]));
+
+  return VACO.mount(body, out);
+}
+
+VACO.app({
+  id: 'vex',
+  name: 'VEX',
+  tagline: 'Cvltvre Card brokerage',
+  //: VEX's identity: a cool graphite-blue. Trading-terminal restraint —
+  //: markets should look sober, and it must not read as VOKEN, whose
+  //: cards it trades.
+  accent: '#6b8299',
+  accentDim: '#4f6479',
+  accentInk: '#050a0f',
+  tabs: [
+    { id: 'gates', label: 'Compliance', heading: 'Gates', render: renderGates },
+    { id: 'account', label: 'Accounts', heading: 'Brokerage accounts', render: renderAccount },
+    { id: 'trade', label: 'Trade', heading: 'Place an order', render: renderTrade },
+  ],
+});
+</script>
+</body>
+</html>

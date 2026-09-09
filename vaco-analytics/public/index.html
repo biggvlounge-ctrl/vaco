@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VACO Analytics</title>
+<link rel="stylesheet" href="/vaco-design.css" />
+<style>
+  .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--vaco-space-3); }
+  .metric { display: flex; flex-direction: column; gap: 2px; }
+  .metric-value { font-size: var(--vaco-text-2xl); font-weight: var(--vaco-weight-bold); font-variant-numeric: tabular-nums; }
+  /* A sparkline needs the same care as the numbers beside it. */
+  .spark { display: block; width: 100%; height: 34px; }
+  .alert-row { display: flex; align-items: center; gap: var(--vaco-space-3); padding: var(--vaco-space-3) 0;
+               border-top: 1px solid var(--vaco-border-subtle); }
+  .alert-row:first-child { border-top: 0; }
+</style>
+</head>
+<body class="vaco">
+<script src="/vaco-ui.js"></script>
+<script>
+// VACO Analytics — the ecosystem's unified dashboard.
+//
+// **It had a `wallboard.html` and no index**, so opening the app at its
+// root returned nothing. This is the front door.
+//
+// Everything shown is a metric a real app actually pushed in. Nothing is
+// modelled, projected, or filled in — an empty dashboard means nothing
+// has been ingested, which is a true and useful answer rather than a
+// broken-looking one.
+
+var el = VACO.el;
+
+// Renders a real series as an area sparkline. Drawn rather than
+// described, because a column of numbers hides the shape that makes a
+// metric worth watching.
+function sparkline(values) {
+  var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('class', 'spark');
+  svg.setAttribute('viewBox', '0 0 100 34');
+  svg.setAttribute('preserveAspectRatio', 'none');
+  if (!values || values.length < 2) return svg;
+
+  var max = Math.max.apply(null, values);
+  var min = Math.min.apply(null, values);
+  var span = (max - min) || 1;
+  var pts = values.map(function (v, i) {
+    var x = (i / (values.length - 1)) * 100;
+    var y = 32 - ((v - min) / span) * 30;
+    return x + ',' + y;
+  });
+
+  var area = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+  area.setAttribute('points', '0,34 ' + pts.join(' ') + ' 100,34');
+  area.setAttribute('fill', 'var(--vaco-accent-soft)');
+  svg.appendChild(area);
+
+  var line = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+  line.setAttribute('points', pts.join(' '));
+  line.setAttribute('fill', 'none');
+  line.setAttribute('stroke', 'var(--vaco-accent)');
+  line.setAttribute('stroke-width', '1.5');
+  line.setAttribute('vector-effect', 'non-scaling-stroke');
+  svg.appendChild(line);
+
+  // The endpoint is what the reader is actually looking for.
+  var last = pts[pts.length - 1].split(',');
+  var dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  dot.setAttribute('cx', last[0]);
+  dot.setAttribute('cy', last[1]);
+  dot.setAttribute('r', '2');
+  dot.setAttribute('fill', 'var(--vaco-accent)');
+  svg.appendChild(dot);
+
+  return svg;
+}
+
+function renderDashboard(body) {
+  return VACO.api('/api/dashboard').then(function (data) {
+    var apps = data.apps || [];
+    if (!apps.length) {
+      return el('div', 'vaco-empty',
+        'Nothing ingested yet. An empty dashboard means no app has pushed a real event — not that anything is broken.');
+    }
+
+    var out = el('div', 'vaco-stack');
+    apps.forEach(function (app) {
+      var grid = el('div', 'metric-grid');
+      (app.metrics || []).forEach(function (m) {
+        var cell = el('div', 'metric');
+        cell.appendChild(el('span', 'vaco-label', m.metric));
+        cell.appendChild(el('span', 'metric-value', VACO.round(m.sum !== undefined ? m.sum : m.latest)));
+        cell.appendChild(el('span', 'vaco-small vaco-faint',
+          m.count + ' event(s) · latest ' + VACO.round(m.latest)));
+        if (m.series && m.series.length > 1) cell.appendChild(sparkline(m.series));
+        grid.appendChild(cell);
+      });
+      out.appendChild(VACO.card(app.app, [grid]));
+    });
+    return out;
+  });
+}
+
+function renderAlerts(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Alerts come from real evaluation rules against real ingested metrics. '
+    + 'There is <strong>no notification channel connected</strong> — an alert is raised and recorded here, '
+    + 'and nobody is paged.', 'warn'));
+
+  return VACO.api('/api/intelligence/alerts').then(function (data) {
+    var alerts = data.alerts || data || [];
+    out.appendChild(VACO.card('Open alerts', [
+      VACO.table([
+        { key: 'app', label: 'App' },
+        { key: 'metric', label: 'Metric' },
+        { label: 'Severity', render: function (a) { return VACO.badge(a.severity || 'info'); } },
+        { key: 'message', label: 'What happened' },
+      ], alerts, { empty: 'No alerts. Either everything is fine, or nothing has been evaluated.' }),
+    ]));
+    VACO.mount(body, out);
+  });
+}
+
+function renderIngest(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.card('Push a metric', [
+    el('p', 'vaco-small vaco-dim',
+      'The same endpoint the real apps call. Every number on the dashboard arrived this way.'),
+    VACO.form([
+      { name: 'app', label: 'App', placeholder: 'void', width: '140px' },
+      { name: 'metric', label: 'Metric', placeholder: 'jobs_completed', width: '170px' },
+      { name: 'value', label: 'Value', type: 'number', step: 'any', value: 1, width: '100px' },
+    ], function (values) {
+      return VACO.post('/api/metrics/ingest', values)
+        .then(function () { VACO.toast('Ingested.'); VACO.render(); });
+    }, 'Ingest'),
+  ]));
+
+  out.appendChild(VACO.card('Look up one app', [
+    VACO.form([{ name: 'app', label: 'App', placeholder: 'void', width: '140px' }],
+      function (values) {
+        return VACO.api('/api/metrics/' + encodeURIComponent(values.app) + '/summary').then(function (s) {
+          while (out.childNodes.length > 2) out.removeChild(out.lastChild);
+          var rows = (s.metrics || []).map(function (m) { return m; });
+          out.appendChild(VACO.card(values.app, [
+            VACO.table([
+              { key: 'metric', label: 'Metric' },
+              { key: 'count', label: 'Events', num: true },
+              { key: 'sum', label: 'Sum', num: true },
+              { key: 'latest', label: 'Latest', num: true },
+            ], rows, { empty: 'Nothing ingested for that app.' }),
+          ]));
+          VACO.mount(body, out);
+        });
+      }, 'Load'),
+  ]));
+
+  return VACO.mount(body, out);
+}
+
+VACO.app({
+  id: 'vaco-analytics',
+  name: 'VACO Analytics',
+  tagline: 'Ecosystem metrics',
+  //: VACO Analytics' identity: a desaturated blue-grey. A dashboard
+  //: should let its data carry the colour, so the chrome stays quiet.
+  accent: '#6f8fa8',
+  accentDim: '#547288',
+  accentInk: '#040a0f',
+  tabs: [
+    { id: 'dashboard', label: 'Dashboard', heading: 'What the ecosystem is doing',
+      blurb: 'Real metrics that real apps pushed in. Nothing here is modelled or projected.',
+      render: renderDashboard },
+    { id: 'alerts', label: 'Alerts', heading: 'Raised alerts', render: renderAlerts },
+    { id: 'ingest', label: 'Ingest', heading: 'Push & inspect', render: renderIngest },
+  ],
+});
+</script>
+</body>
+</html>

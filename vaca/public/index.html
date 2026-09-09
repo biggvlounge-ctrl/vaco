@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VACA</title>
+<link rel="stylesheet" href="/vaco-design.css" />
+<style>
+  .grade { font-size: var(--vaco-text-3xl); font-weight: var(--vaco-weight-bold); line-height: 1; }
+  .grade-row { display: flex; align-items: center; gap: var(--vaco-space-4); }
+  .queue-note { display: flex; gap: var(--vaco-space-2); align-items: center; }
+</style>
+</head>
+<body class="vaco">
+<script src="/vaco-ui.js"></script>
+<script>
+// VACA — identity and authenticity verification.
+//
+// The third component of V3, and the service six other apps read before
+// they trust a claim. Real client of its own 8 routes.
+//
+// **Approval is a human act here, not an algorithm.** VACA records a
+// verification request, and someone approves or rejects it. Nothing on
+// this page or behind it inspects a document — there is no document
+// verification vendor connected, and pretending there is would be the
+// most damaging possible thing for a service whose entire product is
+// trustworthiness.
+
+var el = VACO.el;
+
+function gradeColour(grade) {
+  var g = String(grade || '').toUpperCase();
+  if (g.charAt(0) === 'A') return 'var(--vaco-money)';
+  if (g.charAt(0) === 'B') return 'var(--vaco-accent)';
+  if (g.charAt(0) === 'C') return 'var(--vaco-warn)';
+  return 'var(--vaco-danger)';
+}
+
+function renderLookup(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    '<strong>No document verification vendor is connected.</strong> A verification is approved or rejected by a '
+    + 'person, and this records that decision. Every consuming app reads the result, so the honesty of this '
+    + 'screen matters more than most.', 'warn'));
+
+  out.appendChild(VACO.card('Check a subject', [
+    VACO.form([
+      { name: 'subjectType', label: 'Type', options: ['user', 'business', 'creator', 'listing'] },
+      { name: 'subjectId', label: 'Id', value: VACO.userId() || '', width: '160px' },
+    ], function (values) {
+      return Promise.all([
+        VACO.api('/api/identity-status/' + encodeURIComponent(values.subjectType) + '/' + encodeURIComponent(values.subjectId)),
+        VACO.api('/api/authenticity-grade/' + encodeURIComponent(values.subjectType) + '/' + encodeURIComponent(values.subjectId))
+          .catch(function () { return null; }),
+        VACO.api('/api/verifications/subject/' + encodeURIComponent(values.subjectType) + '/' + encodeURIComponent(values.subjectId))
+          .catch(function () { return { verifications: [] }; }),
+      ]).then(function (r) {
+        var status = r[0], grade = r[1], list = r[2].verifications || r[2] || [];
+        while (out.childNodes.length > 2) out.removeChild(out.lastChild);
+
+        var lines = el('div', 'vaco-stack-sm');
+        var row = el('div', 'grade-row');
+        if (grade) {
+          var g = el('span', 'grade', grade.grade || grade.authenticityGrade || '—');
+          g.style.color = gradeColour(grade.grade || grade.authenticityGrade);
+          row.appendChild(g);
+        }
+        var text = el('div', 'vaco-stack-sm');
+        text.appendChild(status.verified
+          ? VACO.badge('identity verified', 'money')
+          : VACO.badge('not verified', 'warn'));
+        text.appendChild(el('p', 'vaco-small vaco-dim',
+          status.verified
+            ? 'Consuming apps will accept identity-gated actions for this subject.'
+            : 'Identity-gated actions elsewhere in the ecosystem will be refused.'));
+        row.appendChild(text);
+        lines.appendChild(row);
+        out.appendChild(VACO.card(values.subjectType + ' · ' + values.subjectId, [lines]));
+
+        out.appendChild(VACO.card('Verification history', [
+          VACO.table([
+            { key: 'id', label: 'Id' },
+            { key: 'verificationType', label: 'Type' },
+            { label: 'Status', render: function (v) { return VACO.badge(v.status); } },
+            { key: 'createdAt', label: 'Requested', render: function (v) {
+              return v.createdAt ? new Date(v.createdAt).toLocaleString() : '—'; } },
+          ], list, { empty: 'No verification requests for this subject.' }),
+        ]));
+        VACO.mount(body, out);
+      });
+    }, 'Check'),
+  ]));
+
+  return VACO.mount(body, out);
+}
+
+function renderQueue(body) {
+  var out = el('div', 'vaco-stack');
+
+  out.appendChild(VACO.card('Submit a verification request', [
+    VACO.form([
+      { name: 'subjectType', label: 'Type', options: ['user', 'business', 'creator', 'listing'] },
+      { name: 'subjectId', label: 'Subject', value: VACO.userId() || '', width: '140px' },
+      { name: 'verificationType', label: 'Verification', placeholder: 'identity', width: '140px' },
+    ], function (values) {
+      return VACO.post('/api/verifications', values)
+        .then(function (v) { VACO.toast('Verification ' + v.id + ' submitted for review.'); });
+    }, 'Submit'),
+  ]));
+
+  out.appendChild(VACO.card('Review a request', [
+    el('p', 'vaco-small vaco-dim',
+      'A reviewer decides. Approving marks the subject verified across every app that reads VACA.'),
+    VACO.form([{ name: 'id', label: 'Verification id', type: 'number', min: 1, value: 1, width: '120px' }],
+      function (values) {
+        return VACO.api('/api/verifications/' + values.id).then(function (v) {
+          while (out.childNodes.length > 2) out.removeChild(out.lastChild);
+          var lines = el('div', 'vaco-stack-sm');
+          lines.appendChild(VACO.badge(v.status));
+          lines.appendChild(el('p', 'vaco-small vaco-dim',
+            v.subjectType + ' ' + v.subjectId + ' · ' + (v.verificationType || '')));
+          var actions = el('div', 'vaco-row-tight');
+          actions.appendChild(VACO.button('Approve', function () {
+            return VACO.post('/api/verifications/' + values.id + '/approve', {})
+              .then(function () { VACO.toast('Approved.', 'money'); });
+          }, 'primary'));
+          actions.appendChild(VACO.button('Reject', function () {
+            return VACO.post('/api/verifications/' + values.id + '/reject', {})
+              .then(function () { VACO.toast('Rejected.', 'danger'); });
+          }, 'danger'));
+          lines.appendChild(actions);
+          out.appendChild(VACO.card('Verification ' + values.id, [lines]));
+          VACO.mount(body, out);
+        });
+      }, 'Load'),
+  ]));
+
+  return VACO.mount(body, out);
+}
+
+VACO.app({
+  id: 'vaca',
+  name: 'VACA',
+  tagline: 'Identity & authenticity',
+  //: VACA's identity: a deep teal-blue. Trust infrastructure — related
+  //: to VSAFE's signal blue since both are safety services, pushed
+  //: greener so the two consoles are never confused.
+  accent: '#2f9fb8',
+  accentDim: '#1f7d93',
+  accentInk: '#031318',
+  tabs: [
+    { id: 'lookup', label: 'Lookup', heading: 'Check a subject', render: renderLookup },
+    { id: 'queue', label: 'Review', heading: 'Verification requests', render: renderQueue },
+  ],
+});
+</script>
+</body>
+</html>

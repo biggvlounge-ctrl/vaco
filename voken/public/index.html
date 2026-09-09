@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CVLTVRE</title>
+<link rel="stylesheet" href="/vaco-design.css" />
+<style>
+  .card-art {
+    height: 130px;
+    border-radius: var(--vaco-radius-sm);
+    border: 1px solid var(--vaco-border-subtle);
+    background:
+      radial-gradient(circle at 70% 20%, var(--vaco-accent-soft), transparent 62%),
+      var(--vaco-bg-raised);
+    display: flex; align-items: flex-end; justify-content: space-between;
+    padding: var(--vaco-space-2) var(--vaco-space-3);
+  }
+  .cat-rail { display: flex; gap: var(--vaco-space-2); flex-wrap: wrap; }
+  .bid-row { display: flex; gap: var(--vaco-space-2); align-items: flex-end; flex-wrap: wrap; }
+</style>
+</head>
+<body class="vaco">
+<script src="/vaco-ui.js"></script>
+<script>
+// VOKEN — the CVLTVRE collectibles marketplace.
+//
+// The brand name shown to a person is CVLTVRE; VOKEN is the standard
+// underneath it (the VDAS tokenization layer). That split is real and
+// comes from the app's own `/api/brand`, so this page reads it rather
+// than hardcoding either name.
+//
+// Real client of VOKEN's own 64 routes. No pricing, rarity, or auction
+// logic here — bidding, Dutch price decay, and value scoring are all
+// decided server-side.
+
+var el = VACO.el;
+var state = { category: 'vehicles', categories: [], brand: null };
+
+// -- Auctions ---------------------------------------------------------
+
+function renderAuctions(body) {
+  return VACO.api('/api/auctions/open').then(function (data) {
+    var auctions = data.auctions || [];
+    var cards = auctions.map(function (a) {
+      var art = el('div', 'card-art');
+      art.appendChild(VACO.badge(a.auctionType));
+      art.appendChild(VACO.badge('#' + a.editionNumber + ' · ' + a.format));
+
+      var lines = el('div', 'vaco-stack-sm');
+      var priceRow = el('div', 'vaco-row-tight');
+      priceRow.appendChild(el('span', 'vaco-label', a.currentBid ? 'Top bid' : 'Starting'));
+      priceRow.appendChild(VACO.price(a.currentBid || a.startingPrice, { freeLabel: false }));
+      if (a.reservePrice) {
+        priceRow.appendChild(el('span', 'vaco-spacer'));
+        priceRow.appendChild(VACO.badge('reserve ' + a.reservePrice, 'warn'));
+      }
+      lines.appendChild(priceRow);
+      if (a.highestBidderId) {
+        lines.appendChild(el('p', 'vaco-small vaco-dim', 'Held by ' + a.highestBidderId));
+      }
+
+      // A Dutch auction's price falls over time, so the number on the
+      // card is only true at this instant. Fetched live rather than
+      // computed here — the decay curve is the server's business.
+      if (a.auctionType === 'dutch') {
+        var dutch = el('p', 'vaco-small vaco-dim', 'Fetching current Dutch price…');
+        lines.appendChild(dutch);
+        VACO.api('/api/auction/' + a.id + '/dutch-price')
+          .then(function (d) { dutch.textContent = 'Right now: ' + VACO.round(d.price) + ' VC — falling'; })
+          .catch(function () { dutch.textContent = 'Dutch price unavailable.'; });
+      }
+
+      var bid = el('div', 'bid-row');
+      var amount = el('input', 'vaco-input vaco-num');
+      amount.type = 'number';
+      amount.min = 1;
+      amount.value = (a.currentBid || a.startingPrice) + 10;
+      amount.style.width = '96px';
+      amount.setAttribute('aria-label', 'Bid amount');
+      bid.appendChild(amount);
+      bid.appendChild(VACO.button('Bid', function () {
+        if (!VACO.userId()) throw new Error('Sign in to bid.');
+        return VACO.post('/api/auction/' + a.id + '/bid', {
+          bidderId: VACO.userId(), amount: Number(amount.value),
+        }).then(function () {
+          VACO.toast('Bid placed on lot ' + a.id, 'money');
+          VACO.refreshBalances().then(VACO.renderIdentity);
+          VACO.render();
+        });
+      }, 'primary'));
+      lines.appendChild(bid);
+
+      return VACO.card('Lot ' + a.id + ' · card ' + a.cardId, [art, lines],
+        { trailing: VACO.badge(a.status) });
+    });
+
+    if (!cards.length) return el('div', 'vaco-empty', 'No open auctions right now.');
+    return VACO.grid(cards, true);
+  });
+}
+
+// -- Cards by category ------------------------------------------------
+
+function renderCards(body) {
+  var out = el('div', 'vaco-stack');
+
+  var rail = el('div', 'cat-rail');
+  state.categories.forEach(function (cat) {
+    var btn = el('button', 'vaco-btn vaco-btn-sm' + (cat === state.category ? ' vaco-btn-primary' : ''), cat);
+    btn.addEventListener('click', function () { state.category = cat; VACO.render(); });
+    rail.appendChild(btn);
+  });
+  out.appendChild(rail);
+
+  return VACO.api('/api/cards/category/' + encodeURIComponent(state.category)).then(function (data) {
+    var cards = data.cards || [];
+    if (!cards.length) {
+      out.appendChild(el('div', 'vaco-empty', 'No cards in "' + state.category + '" yet.'));
+      return VACO.mount(body, out);
+    }
+    out.appendChild(VACO.grid(cards.map(function (c) {
+      var art = el('div', 'card-art');
+      art.appendChild(VACO.badge(c.rarityTier || 'standard'));
+      if (c.tokenizationType) art.appendChild(VACO.badge(c.tokenizationType));
+
+      var lines = el('div', 'vaco-stack-sm');
+      if (c.creatorId) lines.appendChild(el('p', 'vaco-small vaco-dim', 'by ' + c.creatorId));
+
+      // The value score is VOKEN's own algorithm, fetched rather than
+      // guessed — it is the number the whole marketplace is built on.
+      var score = el('p', 'vaco-small vaco-faint', 'scoring…');
+      lines.appendChild(score);
+      VACO.api('/api/card/' + c.id + '/value-score')
+        .then(function (v) { score.textContent = 'Value score ' + VACO.round(v.score !== undefined ? v.score : v.valueScore); })
+        .catch(function () { score.textContent = 'No value score yet.'; });
+
+      return VACO.card(c.name || ('Card ' + c.id), [art, lines]);
+    }), true));
+    VACO.mount(body, out);
+  });
+}
+
+// -- Explore ----------------------------------------------------------
+
+function renderExplore(body) {
+  return VACO.api('/api/explore').then(function (data) {
+    var out = el('div', 'vaco-stack');
+    Object.keys(data).forEach(function (key) {
+      var value = data[key];
+      if (!Array.isArray(value) || !value.length) return;
+      out.appendChild(VACO.card(key.replace(/([A-Z])/g, ' $1'), [
+        VACO.table([
+          { key: 'id', label: 'Id' },
+          { label: 'Name', render: function (r) { return r.name || r.title || r.cardId || '—'; } },
+          { label: 'Status', render: function (r) { return r.status ? VACO.badge(r.status) : '—'; } },
+        ], value.slice(0, 12)),
+      ]));
+    });
+    if (!out.childNodes.length) out.appendChild(el('div', 'vaco-empty', 'Nothing to explore yet.'));
+    return out;
+  });
+}
+
+// -- Fractional -------------------------------------------------------
+
+function renderFractional(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Fractional ownership splits one high-value card into shares. The <strong>secondary market</strong> '
+    + 'is where those shares change hands after the initial offering — a real resale market, not a resale claim.'));
+
+  var id = VACO.userId();
+  if (!id) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to see your holdings.'));
+    return VACO.mount(body, out);
+  }
+  return VACO.api('/api/fractional/holdings/' + encodeURIComponent(id)).then(function (data) {
+    var holdings = data.holdings || data;
+    out.appendChild(VACO.card('Your shares', [
+      VACO.table([
+        { key: 'listingId', label: 'Listing' },
+        { key: 'cardId', label: 'Card' },
+        { key: 'shares', label: 'Shares', num: true },
+        { label: 'Paid', num: true, render: function (r) { return VACO.price(r.totalPaid, { freeLabel: false }); } },
+      ], holdings, { empty: 'You hold no fractional shares.' }),
+    ]));
+    VACO.mount(body, out);
+  });
+}
+
+// Boot needs the brand and category list before the first render, since
+// both are real server-owned values rather than constants in this file.
+VACO.api('/api/health').then(function (health) {
+  state.categories = health.categories || [];
+  state.category = state.categories[0] || 'vehicles';
+
+  VACO.app({
+    id: 'voken',
+    name: (health.brand && health.brand.name) || 'VOKEN',
+    tagline: 'Collect · trade · auction',
+    //: CVLTVRE's identity: a deep magenta-rose. Cvltvre and collecting
+    //: rather than the gold every collectibles site reaches for — and
+    //: VAGO already owns brass in the register.
+    accent: '#e0559b',
+    accentDim: '#b83b7b',
+    accentInk: '#1a0611',
+    tabs: [
+      { id: 'auctions', label: 'Auctions', heading: 'Open lots',
+        blurb: (health.brand && health.brand.tagline) || 'Live auctions across every category.',
+        render: renderAuctions },
+      { id: 'cards', label: 'Cards', heading: 'Browse by category', render: renderCards },
+      { id: 'explore', label: 'Explore', heading: 'What is moving', render: renderExplore },
+      { id: 'fractional', label: 'Fractional', heading: 'Shares & resale', render: renderFractional },
+    ],
+  });
+});
+</script>
+</body>
+</html>

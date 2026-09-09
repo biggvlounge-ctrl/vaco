@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Vvltvre Flix</title>
+<link rel="stylesheet" href="/vaco-design.css" />
+<style>
+  .poster {
+    aspect-ratio: 2 / 3;
+    border-radius: var(--vaco-radius-sm);
+    border: 1px solid var(--vaco-border-subtle);
+    background:
+      linear-gradient(160deg, var(--vaco-accent-soft), transparent 65%),
+      var(--vaco-bg-raised);
+    display: flex; align-items: flex-end; padding: var(--vaco-space-3);
+  }
+  .row { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--vaco-space-3); }
+  .stream-slots { display: flex; gap: var(--vaco-space-2); }
+  .slot { width: 34px; height: 22px; border-radius: 3px; border: 1px solid var(--vaco-border); }
+  .slot-used { background: var(--vaco-accent); border-color: var(--vaco-accent); }
+</style>
+</head>
+<body class="vaco">
+<script src="/vaco-ui.js"></script>
+<script>
+// Vvltvre Flix — the Netflix-Originals model.
+//
+// Real client of its own 17 routes. Tier limits, concurrent-stream
+// enforcement, and licence windows are all server-decided.
+//
+// **No video plays here.** There is no media infrastructure in this
+// ecosystem, so a title is a catalogue record and a "watch" is a real
+// stream-slot claim against a real concurrency limit — which is the
+// part that was actually built.
+
+var el = VACO.el;
+
+function renderCatalog(body) {
+  return VACO.api('/api/catalog').then(function (data) {
+    var titles = data.catalog || [];
+    if (!titles.length) return el('div', 'vaco-empty', 'The catalogue is empty.');
+
+    var grid = el('div', 'row');
+    titles.forEach(function (t) {
+      var card = el('div', 'vaco-stack-sm');
+      var poster = el('div', 'poster');
+      poster.appendChild(el('strong', null, t.title || ('Title ' + t.id)));
+      card.appendChild(poster);
+
+      var meta = el('div', 'vaco-row-tight');
+      // Exclusive originals and licensed titles are genuinely different
+      // products with different economics, so the badge is not cosmetic.
+      meta.appendChild(t.isExclusive || t.exclusivity === 'exclusive'
+        ? VACO.badge('Original', 'accent')
+        : VACO.badge('Licensed'));
+      if (t.requiredTier) meta.appendChild(VACO.badge(t.requiredTier + ' tier'));
+      card.appendChild(meta);
+      grid.appendChild(card);
+    });
+    return grid;
+  });
+}
+
+function renderAccount(body) {
+  var out = el('div', 'vaco-stack');
+  var id = VACO.userId();
+  if (!id) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to see your subscription.'));
+    return VACO.mount(body, out);
+  }
+
+  return Promise.all([
+    VACO.api('/api/subscriptions/' + encodeURIComponent(id)).catch(function () { return null; }),
+    VACO.api('/api/users/' + encodeURIComponent(id) + '/active-streams').catch(function () { return null; }),
+    VACO.api('/api/users/' + encodeURIComponent(id) + '/watch-history').catch(function () { return null; }),
+  ]).then(function (r) {
+    var sub = r[0], streams = r[1], history = r[2];
+
+    if (sub) {
+      var lines = el('div', 'vaco-stack-sm');
+      lines.appendChild(VACO.badge(sub.tier || 'unknown tier', 'accent'));
+      lines.appendChild(el('p', 'vaco-small vaco-dim',
+        'A tier is a real limit, not a label: it caps how many streams can run at once.'));
+
+      if (streams) {
+        var used = (streams.activeStreams || streams.streams || []).length;
+        var max = streams.maxConcurrent || sub.maxConcurrentStreams || 1;
+        var slots = el('div', 'stream-slots');
+        for (var i = 0; i < max; i++) {
+          slots.appendChild(el('div', 'slot' + (i < used ? ' slot-used' : '')));
+        }
+        lines.appendChild(slots);
+        lines.appendChild(el('p', 'vaco-small', used + ' of ' + max + ' streams in use'));
+      }
+      out.appendChild(VACO.card('Subscription', [lines]));
+    } else {
+      out.appendChild(VACO.card('No subscription', [
+        el('p', 'vaco-small vaco-dim', 'Subscribe to watch. Payment moves real VCoin through V3.'),
+        VACO.form([{ name: 'tier', label: 'Tier', options: ['basic', 'standard', 'premium'] }],
+          function (values) {
+            return VACO.post('/api/subscriptions', { userId: id, tier: values.tier })
+              .then(function () {
+                VACO.toast('Subscribed to ' + values.tier + '.', 'money');
+                VACO.refreshBalances().then(VACO.renderIdentity);
+                VACO.render();
+              });
+          }, 'Subscribe'),
+      ]));
+    }
+
+    if (history) {
+      var items = history.history || history.watchHistory || history || [];
+      out.appendChild(VACO.card('Watch history', [
+        VACO.table([
+          { key: 'titleId', label: 'Title' },
+          { key: 'watchedAt', label: 'When', render: function (h) {
+            return h.watchedAt ? new Date(h.watchedAt).toLocaleString() : '—'; } },
+        ], items, { empty: 'Nothing watched yet.' }),
+      ]));
+    }
+    VACO.mount(body, out);
+  });
+}
+
+VACO.app({
+  id: 'vulture-flix',
+  name: 'Vvltvre Flix',
+  tagline: 'Originals & licensed',
+  //: Vvltvre Flix's identity: a deep wine red. Cinema-house dark rather
+  //: than the streaming-red every competitor uses.
+  accent: '#b03a52',
+  accentDim: '#8d2b40',
+  accentInk: '#ffffff',
+  tabs: [
+    { id: 'catalog', label: 'Catalogue', heading: 'What is on',
+      blurb: 'Exclusive originals sit alongside licensed titles. The distinction is real — they carry different rights and different economics.',
+      render: renderCatalog },
+    { id: 'account', label: 'Account', heading: 'Subscription & streams', render: renderAccount },
+  ],
+});
+</script>
+</body>
+</html>

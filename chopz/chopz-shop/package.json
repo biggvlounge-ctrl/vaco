@@ -1,0 +1,20 @@
+{
+  "name": "chopz-shop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CHOPZ SHOP -- TikTok Shop model commerce layer for CHOPZ: native in-app checkout, creator-set performance-only affiliate commission, real VOID fulfillment. A separate, standalone app from CHOPZ itself (the video/social feed), per explicit instruction -- same relationship as TikTok to TikTok Shop.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VXLLAGE</title>
+<link rel="stylesheet" href="/vaco-design.css" />
+<style>
+  .post { display: flex; flex-direction: column; gap: var(--vaco-space-2); }
+  .post-head { display: flex; align-items: baseline; gap: var(--vaco-space-2); }
+  .post-author { font-weight: var(--vaco-weight-bold); }
+  .post-body { white-space: pre-wrap; }
+  .feed { max-width: 640px; display: flex; flex-direction: column; gap: var(--vaco-space-3); }
+  .cosmetic-swatch {
+    height: 72px; border-radius: var(--vaco-radius-sm);
+    background: radial-gradient(circle at 40% 35%, var(--vaco-accent-soft), transparent 65%), var(--vaco-bg-raised);
+    border: 1px solid var(--vaco-border-subtle);
+  }
+</style>
+</head>
+<body class="vaco">
+<script src="/vaco-ui.js"></script>
+<script>
+// VXLLAGE — home feed, threads, villages, and the avatar cosmetic shop.
+//
+// Real client of VXLLAGE's own 64 routes. Feed ranking, boost levels,
+// and cosmetic pricing are all server-decided; this renders them.
+
+var el = VACO.el;
+
+function fmtWhen(ts) {
+  if (!ts) return '';
+  var mins = Math.round((Date.now() - ts) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return mins + 'm ago';
+  if (mins < 1440) return Math.round(mins / 60) + 'h ago';
+  return new Date(ts).toLocaleDateString();
+}
+
+function postCard(post) {
+  var card = el('div', 'vaco-card post');
+  var head = el('div', 'post-head');
+  head.appendChild(el('span', 'post-author', post.authorId || post.userId || 'someone'));
+  head.appendChild(el('span', 'vaco-small vaco-faint', fmtWhen(post.createdAt)));
+  head.appendChild(el('span', 'vaco-spacer'));
+  if (post.villageId) head.appendChild(VACO.badge('village ' + post.villageId));
+  card.appendChild(head);
+  card.appendChild(el('p', 'post-body', post.body || post.text || post.content || ''));
+
+  var actions = el('div', 'vaco-row-tight');
+  if (typeof post.replyCount === 'number') actions.appendChild(el('span', 'vaco-small vaco-dim', post.replyCount + ' replies'));
+  if (typeof post.likeCount === 'number') actions.appendChild(el('span', 'vaco-small vaco-dim', post.likeCount + ' likes'));
+  if (actions.childNodes.length) card.appendChild(actions);
+  return card;
+}
+
+// -- Feed -------------------------------------------------------------
+
+function renderFeed(body) {
+  var out = el('div', 'vaco-stack');
+
+  out.appendChild(VACO.card('Post', [
+    VACO.form([
+      { name: 'body', label: 'Say something', placeholder: 'what is happening', width: '380px' },
+    ], function (values) {
+      if (!VACO.userId()) throw new Error('Sign in to post.');
+      return VACO.post('/api/posts', { authorId: VACO.userId(), body: values.body })
+        .then(function () { VACO.toast('Posted.'); VACO.render(); });
+    }, 'Post'),
+  ]));
+
+  var id = VACO.userId();
+  if (!id) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to see your feed.'));
+    return VACO.mount(body, out);
+  }
+
+  // "For you" and "Following" are genuinely different rankings on the
+  // server, so both are offered rather than one being relabelled.
+  return Promise.all([
+    VACO.api('/api/feed/for-you/' + encodeURIComponent(id)).catch(function () { return { posts: [] }; }),
+    VACO.api('/api/feed/following/' + encodeURIComponent(id)).catch(function () { return { posts: [] }; }),
+  ]).then(function (results) {
+    var forYou = results[0].posts || results[0] || [];
+    var following = results[1].posts || results[1] || [];
+
+    var feed = el('div', 'feed');
+    (forYou.length ? forYou : following).forEach(function (p) { feed.appendChild(postCard(p)); });
+    if (!feed.childNodes.length) {
+      feed.appendChild(el('div', 'vaco-empty', 'Nothing in the feed yet — post above, or follow someone.'));
+    }
+    out.appendChild(VACO.card('For you — ' + forYou.length + ' · following ' + following.length, [feed]));
+    VACO.mount(body, out);
+  });
+}
+
+// -- Villages ---------------------------------------------------------
+
+function renderVillages(body) {
+  var out = el('div', 'vaco-stack');
+
+  out.appendChild(VACO.card('Start a village', [
+    VACO.form([
+      { name: 'name', label: 'Name', placeholder: 'St. Louis Runners', width: '200px' },
+      { name: 'description', label: 'About', placeholder: 'what it is for', width: '240px' },
+    ], function (values) {
+      if (!VACO.userId()) throw new Error('Sign in to start a village.');
+      return VACO.post('/api/villages', { ownerId: VACO.userId(), name: values.name, description: values.description })
+        .then(function () { VACO.toast('Village created.'); VACO.render(); });
+    }, 'Create'),
+  ]));
+
+  return VACO.api('/api/villages').then(function (data) {
+    var villages = data.villages || [];
+    if (!villages.length) {
+      out.appendChild(el('div', 'vaco-empty', 'No villages yet — start the first one above.'));
+      return VACO.mount(body, out);
+    }
+    out.appendChild(VACO.grid(villages.map(function (v) {
+      var lines = el('div', 'vaco-stack-sm');
+      lines.appendChild(el('p', 'vaco-small vaco-dim', v.description || ''));
+      var meta = el('div', 'vaco-row-tight');
+      if (typeof v.memberCount === 'number') meta.appendChild(VACO.badge(v.memberCount + ' members'));
+
+      // Boost level is bought with VCoin and is a real, server-computed
+      // tier, so it is fetched rather than derived from a member count.
+      var boost = VACO.badge('boost …');
+      meta.appendChild(boost);
+      VACO.api('/api/villages/' + v.id + '/boost')
+        .then(function (b) { boost.textContent = 'boost level ' + (b.level !== undefined ? b.level : 0); })
+        .catch(function () { boost.textContent = 'boost unknown'; });
+
+      lines.appendChild(meta);
+      lines.appendChild(VACO.button('Join', function () {
+        if (!VACO.userId()) throw new Error('Sign in to join.');
+        return VACO.post('/api/villages/' + v.id + '/join', { userId: VACO.userId() })
+          .then(function () { VACO.toast('Joined ' + v.name); VACO.render(); });
+      }));
+      return VACO.card(v.name, [lines]);
+    }), true));
+    VACO.mount(body, out);
+  });
+}
+
+// -- Cosmetics --------------------------------------------------------
+
+function renderCosmetics(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Cosmetics are <strong>personal and cross-village</strong> — bought once, worn everywhere, '
+    + 'rather than re-bought per community. Purchases move real VCoin through V3.'));
+
+  return VACO.api('/api/avatar-cosmetics/catalog').then(function (data) {
+    var catalog = data.catalog || [];
+    var owned = [];
+    var id = VACO.userId();
+
+    function draw() {
+      var cards = catalog.map(function (c) {
+        var isOwned = owned.some(function (o) { return (o.cosmeticId || o.id) === c.id; });
+        var lines = el('div', 'vaco-stack-sm');
+        lines.appendChild(el('div', 'cosmetic-swatch'));
+        var row = el('div', 'vaco-row-tight');
+        row.appendChild(VACO.price(c.priceVCoin, { freeLabel: false }));
+        row.appendChild(el('span', 'vaco-spacer'));
+        if (isOwned) {
+          row.appendChild(VACO.badge('owned', 'money'));
+          row.appendChild(VACO.button('Equip', function () {
+            return VACO.post('/api/avatar-cosmetics/equip', { userId: id, cosmeticId: c.id })
+              .then(function () { VACO.toast(c.name + ' equipped.'); });
+          }));
+        } else {
+          row.appendChild(VACO.button('Buy', function () {
+            if (!id) throw new Error('Sign in to buy cosmetics.');
+            return VACO.post('/api/avatar-cosmetics/purchase', { userId: id, cosmeticId: c.id })
+              .then(function () {
+                VACO.toast(c.name + ' purchased.', 'money');
+                VACO.refreshBalances().then(VACO.renderIdentity);
+                VACO.render();
+              });
+          }, 'primary'));
+        }
+        lines.appendChild(row);
+        return VACO.card(c.name, [lines]);
+      });
+      out.appendChild(VACO.grid(cards));
+      VACO.mount(body, out);
+    }
+
+    if (!id) return draw();
+    return VACO.api('/api/users/' + encodeURIComponent(id) + '/cosmetics')
+      .then(function (mine) { owned = mine.cosmetics || mine || []; draw(); })
+      .catch(draw);
+  });
+}
+
+// -- Articles ---------------------------------------------------------
+
+function renderArticles(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Long-form publishing with real newsletter subscriptions — the Substack half of VXLLAGE, '
+    + 'sharing one identity with the feed rather than living in a separate product.'));
+
+  var id = VACO.userId();
+  if (!id) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to see your articles and subscribers.'));
+    return VACO.mount(body, out);
+  }
+
+  return Promise.all([
+    VACO.api('/api/authors/' + encodeURIComponent(id) + '/articles').catch(function () { return { articles: [] }; }),
+    VACO.api('/api/authors/' + encodeURIComponent(id) + '/subscribers').catch(function () { return { subscribers: [] }; }),
+  ]).then(function (r) {
+    var articles = r[0].articles || r[0] || [];
+    var subs = r[1].subscribers || r[1] || [];
+    out.appendChild(VACO.card('Your articles — ' + subs.length + ' subscriber(s)', [
+      VACO.table([
+        { key: 'id', label: 'Id' },
+        { key: 'title', label: 'Title' },
+        { label: 'Status', render: function (a) { return VACO.badge(a.status || 'draft'); } },
+      ], articles, { empty: 'No articles yet.' }),
+    ]));
+    VACO.mount(body, out);
+  });
+}
+
+VACO.app({
+  id: 'vxllage',
+  name: 'VXLLAGE',
+  tagline: 'Feed · villages · publishing',
+  //: VXLLAGE's identity: a fresh green-teal. Communal and outdoorsy —
+  //: a village square rather than a timeline.
+  accent: '#3fbf8f',
+  accentDim: '#2a9670',
+  accentInk: '#04140e',
+  tabs: [
+    { id: 'feed', label: 'Feed', heading: 'Home', render: renderFeed },
+    { id: 'villages', label: 'Villages', heading: 'Communities',
+      blurb: 'A village is a real community with members, events, rooms, and a boost level bought with VCoin.',
+      render: renderVillages },
+    { id: 'cosmetics', label: 'Cosmetics', heading: 'Avatar shop', render: renderCosmetics },
+    { id: 'articles', label: 'Publishing', heading: 'Articles & newsletters', render: renderArticles },
+  ],
+});
+</script>
+</body>
+</html>

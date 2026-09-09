@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Shield</title>
+<link rel="stylesheet" href="/vaco-design.css" />
+<style>
+  .token { word-break: break-all; }
+  .kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--vaco-space-3); }
+  .kv-cell { display: flex; flex-direction: column; }
+  .kv-value { font-size: var(--vaco-text-lg); font-weight: var(--vaco-weight-bold); font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body class="vaco">
+<script src="/vaco-ui.js"></script>
+<script>
+// Shield — the session console.
+//
+// Every app in the ecosystem trusts Shield's sessions, and Shield had
+// no surface of its own. This is an operator console: issue a session,
+// inspect one, and see the contract every other app is coded against.
+//
+// **Nothing here is a login page for end users.** Each app has its own
+// sign-in that proxies here. This exists to answer "is that token
+// valid, and whose is it" without reaching for curl.
+
+var el = VACO.el;
+
+function renderSessions(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'A session issued here is accepted by every app in the ecosystem. That is the point of one session '
+    + 'authority — and the reason to be careful with what this page hands out.'));
+
+  out.appendChild(VACO.card('Issue a session', [
+    el('p', 'vaco-small vaco-dim',
+      'With a password this is a real credential login. Without one it issues a session for a claimed user id, '
+      + 'which is what the demo flows across the ecosystem use.'),
+    VACO.form([
+      { name: 'userId', label: 'User id', placeholder: 'sam', width: '150px' },
+      { name: 'password', label: 'Password', type: 'password', placeholder: 'optional', width: '150px' },
+    ], function (values) {
+      var path = values.password ? '/api/shield/login' : '/api/shield/session';
+      var payload = values.password
+        ? { userId: values.userId, password: values.password }
+        : { userId: values.userId };
+      return VACO.post(path, payload).then(function (session) {
+        while (out.childNodes.length > 2) out.removeChild(out.lastChild);
+        var lines = el('div', 'vaco-stack-sm');
+        lines.appendChild(el('span', 'vaco-label', 'Session token'));
+        lines.appendChild(el('code', 'vaco-mono vaco-small token', session.sessionToken));
+        lines.appendChild(el('p', 'vaco-small vaco-dim',
+          'Expires ' + new Date(session.expiresAt).toLocaleString()));
+        out.appendChild(VACO.card('Issued for ' + session.userId, [lines]));
+        VACO.mount(body, out);
+      });
+    }, 'Issue'),
+  ]));
+
+  out.appendChild(VACO.card('Register a credential', [
+    VACO.form([
+      { name: 'userId', label: 'User id', placeholder: 'new user', width: '150px' },
+      { name: 'password', label: 'Password', type: 'password', width: '150px' },
+    ], function (values) {
+      return VACO.post('/api/shield/register', values)
+        .then(function (s) { VACO.toast('Registered ' + s.userId + '.'); });
+    }, 'Register'),
+  ]));
+
+  return VACO.mount(body, out);
+}
+
+function renderInspect(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.card('Inspect a token', [
+    el('p', 'vaco-small vaco-dim',
+      'The exact call every app makes before trusting a request: GET /api/shield/session/:token → { valid, userId, expiresAt }.'),
+    VACO.form([{ name: 'token', label: 'Token', placeholder: 'shield_...', width: '340px' }],
+      function (values) {
+        return VACO.api('/api/shield/session/' + encodeURIComponent(values.token)).then(function (result) {
+          while (out.childNodes.length > 1) out.removeChild(out.lastChild);
+          var lines = el('div', 'vaco-stack-sm');
+          lines.appendChild(result.valid
+            ? VACO.badge('valid — ' + result.userId, 'money')
+            : VACO.badge('invalid or expired', 'danger'));
+          if (result.expiresAt) {
+            lines.appendChild(el('p', 'vaco-small vaco-dim',
+              'Expires ' + new Date(result.expiresAt).toLocaleString()));
+          }
+          lines.appendChild(el('pre', 'vaco-mono vaco-small', JSON.stringify(result, null, 2)));
+          out.appendChild(VACO.card('Result', [lines]));
+          VACO.mount(body, out);
+        });
+      }, 'Inspect'),
+  ]));
+  return VACO.mount(body, out);
+}
+
+function renderContract(body) {
+  return VACO.api('/api/health').then(function (health) {
+    var out = el('div', 'vaco-stack');
+
+    var kv = el('div', 'kv');
+    Object.keys(health).forEach(function (k) {
+      if (typeof health[k] === 'object') return;
+      var cell = el('div', 'kv-cell');
+      cell.appendChild(el('span', 'vaco-label', k.replace(/([A-Z])/g, ' $1')));
+      cell.appendChild(el('span', 'kv-value', String(health[k])));
+      kv.appendChild(cell);
+    });
+    out.appendChild(VACO.card('Configuration', [kv]));
+
+    out.appendChild(VACO.card('The contract', [
+      el('p', 'vaco-small vaco-dim',
+        'Four endpoints, and they are what every app in the ecosystem is coded against. Changing any of these '
+        + 'shapes breaks apps that cannot be redeployed at the same moment.'),
+      VACO.table([
+        { key: 'method', label: 'Method' },
+        { key: 'path', label: 'Path' },
+        { key: 'returns', label: 'Returns' },
+      ], [
+        { method: 'POST', path: '/api/shield/session', returns: '{ sessionToken, userId, expiresAt }' },
+        { method: 'POST', path: '/api/shield/register', returns: '{ sessionToken, userId, expiresAt }' },
+        { method: 'POST', path: '/api/shield/login', returns: '{ sessionToken, userId, expiresAt }' },
+        { method: 'GET', path: '/api/shield/session/:token', returns: '{ valid, userId, expiresAt }' },
+      ]),
+    ]));
+
+    out.appendChild(VACO.notice(
+      '<strong>Sessions do not survive a Shield restart in the way tokens elsewhere do</strong> — check this '
+      + 'service’s own README for its persistence posture before relying on long-lived tokens in production.',
+      'warn'));
+
+    return out;
+  });
+}
+
+VACO.app({
+  id: 'shield',
+  name: 'Shield',
+  tagline: 'Session authority',
+  //: Shield's identity: a cool steel-lavender. Infrastructure, quiet,
+  //: and adjacent to VACON's slate since both are plumbing rather than
+  //: product.
+  accent: '#8f8fd6',
+  accentDim: '#6e6eb0',
+  accentInk: '#08081a',
+  tabs: [
+    { id: 'sessions', label: 'Sessions', heading: 'Issue', render: renderSessions },
+    { id: 'inspect', label: 'Inspect', heading: 'Verify a token', render: renderInspect },
+    { id: 'contract', label: 'Contract', heading: 'What apps depend on', render: renderContract },
+  ],
+});
+</script>
+</body>
+</html>

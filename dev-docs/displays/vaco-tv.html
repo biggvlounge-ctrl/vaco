@@ -1,0 +1,651 @@
+<title>VACO Ten-Foot Shell</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+/* ---------------------------------------------------------------
+   A television in a dark room. Every colour painted explicitly so
+   the page holds on any host ground. Tokens are the repo's own
+   vaco-design.css ink ramp, not a new palette.
+
+   Groups are named for what you do in them, not for the parent
+   brand — "VVLTVRE" told a viewer nothing, and the loudest app in a
+   group is not its description. The brand names are already on the
+   edges; the label underneath is the only place left to say what the
+   shape is for.
+
+   The idea this draft is built on: an app is not a tile and it is
+   not its own shape. The apps of a system are the EDGES of one
+   shape — four names that come together and light up as a single
+   square, and the square is the button. Press it and it opens into
+   the four.
+
+   Which means the shape is not decoration and not an icon. It is
+   an assertion about grouping, and it is only true while the
+   grouping is true.
+   --------------------------------------------------------------- */
+:root {
+  --ink-900:#080b0f; --ink-850:#0a0e14; --ink-800:#0d1219; --ink-700:#141b25;
+  --ink-600:#1b2431; --ink-500:#26313f; --ink-400:#33404f; --ink-300:#5b6a7c;
+  --ink-200:#8d9bab; --ink-100:#c6d0da; --ink-000:#eef3f8;
+  --vaco:#46d4c4;                 /* the system's own registered hue, 174° */
+  --warn:#d8b24a;
+  --safe: 4vmin;                  /* overscan margin — TVs crop the edges  */
+  --accent: var(--vaco);
+}
+
+*,*::before,*::after{box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  margin:0; background:var(--ink-900); color:var(--ink-100);
+  font-family:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+  font-size:17px; line-height:1.5; -webkit-font-smoothing:antialiased;
+  overflow:hidden;
+}
+
+.wash{
+  position:fixed; inset:0; pointer-events:none; z-index:0;
+  background:
+    radial-gradient(66vw 52vh at 78% 2%,  color-mix(in oklab, var(--accent) 17%, transparent), transparent 62%),
+    radial-gradient(56vw 44vh at 6% 100%, color-mix(in oklab, var(--accent) 10%, transparent), transparent 60%);
+  transition:background 700ms cubic-bezier(.2,.7,.3,1);
+}
+@media (prefers-reduced-motion:reduce){ .wash{transition:none;} }
+
+.frame{
+  position:relative; z-index:1; height:100%;
+  padding:var(--safe) var(--safe) calc(var(--safe) * .5);
+  display:flex; flex-direction:column; gap:1.4vh;
+}
+
+/* ---------------- masthead ---------------- */
+.masthead{display:flex; align-items:flex-end; justify-content:space-between; gap:24px; flex-wrap:wrap; flex:none;}
+.brand{display:flex; align-items:baseline; gap:14px;}
+.brand-mark{
+  font-family:"Chakra Petch",system-ui,sans-serif; font-weight:700;
+  font-size:clamp(24px,2.8vw,44px); letter-spacing:.14em; color:var(--ink-000); line-height:1;
+}
+.brand-tag{
+  font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:clamp(9px,.76vw,12.5px);
+  letter-spacing:.24em; text-transform:uppercase; color:var(--ink-300);
+}
+.status{display:flex; gap:clamp(14px,1.6vw,30px); flex-wrap:wrap;}
+.stat{display:flex; flex-direction:column; gap:1px;}
+.stat b{
+  font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:clamp(14px,1.25vw,20px);
+  font-weight:500; color:var(--ink-000); font-variant-numeric:tabular-nums;
+}
+.stat span{font-size:clamp(9px,.68vw,11px); letter-spacing:.16em; text-transform:uppercase; color:var(--ink-300);}
+.stat.live b{color:var(--vaco);}
+
+/* ---------------- the figure ----------------
+   One SVG, used at both sizes. The outline is faint; the names are
+   the bright part, because the names are what actually make the
+   shape. */
+.fig{width:100%; aspect-ratio:1; display:block; overflow:visible;}
+.fig .outline{
+  fill:none; stroke:var(--ink-500); stroke-width:1.3; stroke-linejoin:round; stroke-linecap:round;
+  transition:stroke 320ms ease, stroke-width 320ms ease;
+}
+/* **Lit at rest, blazing on focus.** A ring that only glows once you
+   land on it is a diagram; one already glowing across the room is
+   something you want to press. */
+.fig .halo{
+  fill:none; stroke:var(--vaco); stroke-width:2.2; stroke-linejoin:round; stroke-linecap:round;
+  opacity:.34;
+  filter:drop-shadow(0 0 5px color-mix(in oklab, var(--vaco) 60%, transparent));
+  transition:opacity 320ms ease, stroke-width 320ms ease, filter 320ms ease;
+}
+/* The name IS the shape, so it gets the weight a display face is for.
+   `--glow` is set per element from that app's own registered hue —
+   one rule, eighteen names, eighteen colours of light. */
+.fig text{
+  font-family:"Chakra Petch",system-ui,sans-serif; font-weight:700;
+  letter-spacing:.11em; text-anchor:middle; dominant-baseline:middle;
+  text-transform:uppercase;
+  filter:drop-shadow(0 0 3px color-mix(in oklab, var(--glow, var(--vaco)) 65%, transparent));
+  transition:opacity 320ms ease, fill 320ms ease, filter 320ms ease;
+}
+
+/* ---------------- level 1: the four shapes ---------------- */
+.stage{flex:1; min-height:0; display:flex; align-items:center; justify-content:center;}
+
+.systems{
+  display:flex; flex-wrap:wrap; justify-content:center; align-items:flex-start;
+  gap:clamp(14px,2.4vw,52px) clamp(10px,1.8vw,40px);
+  width:100%;
+}
+
+.sysbtn{
+  appearance:none; background:none; border:0; padding:0; margin:0; color:inherit; font:inherit;
+  cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:.6vh;
+  width:clamp(140px,25vh,300px);
+}
+.sysbtn:focus{outline:none;}
+
+.sysbtn .figwrap{
+  position:relative; width:100%;
+  transition:transform 320ms cubic-bezier(.2,.7,.3,1), filter 320ms ease;
+  filter:drop-shadow(0 0 3px rgba(0,0,0,0));
+}
+/* Unfocused figures keep their colour but stand down, so the shelf
+   reads as one lit shape among four rather than four competing. */
+.sysbtn[data-focused="false"] .fig text{opacity:.72;}
+.sysbtn[data-focused="false"] .figwrap{filter:saturate(.78);}
+
+.sysbtn[data-focused="true"] .figwrap{transform:scale(1.09);}
+.sysbtn[data-focused="true"] .fig .outline{stroke:var(--ink-400); stroke-width:1.5;}
+.sysbtn[data-focused="true"] .fig .halo{
+  opacity:.95; stroke-width:2.9;
+  filter:drop-shadow(0 0 10px var(--vaco))
+         drop-shadow(0 0 30px color-mix(in oklab, var(--vaco) 55%, transparent));
+}
+.sysbtn[data-focused="true"] .fig text{
+  opacity:1;
+  filter:drop-shadow(0 0 7px var(--glow, var(--vaco)))
+         drop-shadow(0 0 22px color-mix(in oklab, var(--glow, var(--vaco)) 55%, transparent));
+}
+
+.sysname{
+  font-family:"Chakra Petch",system-ui,sans-serif; font-weight:700;
+  font-size:clamp(13px,1.35vh,22px); letter-spacing:.22em; text-transform:uppercase;
+  color:var(--ink-300); transition:color 320ms ease; line-height:1.1;
+}
+.sysbtn[data-focused="true"] .sysname{color:var(--ink-000);}
+.sysnote{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:clamp(8.5px,.95vh,12px); letter-spacing:.1em; color:var(--ink-400);
+  transition:color 320ms ease;
+}
+.sysbtn[data-focused="true"] .sysnote{color:var(--ink-200);}
+
+@media (prefers-reduced-motion:reduce){
+  .sysbtn .figwrap,.fig text,.fig .outline,.fig .halo,.sysname,.sysnote{transition:none;}
+  .sysbtn[data-focused="true"] .figwrap{transform:none;}
+}
+
+/* ---------------- level 2: opened ---------------- */
+.opened{
+  position:absolute; inset:0; display:none;
+  align-items:center; justify-content:center; gap:clamp(24px,5vw,90px);
+  padding:0 var(--safe);
+}
+.opened[data-open="true"]{display:flex;}
+.opened .figwrap{width:clamp(210px,52vh,520px); flex:none;}
+.opened .fig .outline{stroke:var(--ink-500); stroke-width:1.2;}
+.opened .fig .halo{stroke:var(--accent); opacity:.42;}
+.opened .fig text{opacity:.34;}
+.opened .fig text[data-on="true"]{opacity:1;}
+
+.panel{width:min(560px,42vw); display:flex; flex-direction:column; gap:1.4vh;}
+.panel-eyebrow{
+  font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:clamp(9px,.78vw,12.5px);
+  letter-spacing:.24em; text-transform:uppercase; color:var(--ink-300);
+}
+.panel-title{
+  font-family:"Chakra Petch",system-ui,sans-serif; font-weight:700;
+  font-size:clamp(26px,3.2vw,52px); letter-spacing:.05em; color:var(--ink-000);
+  margin:0; line-height:1.04; text-wrap:balance;
+}
+.panel-role{font-size:clamp(13px,1.05vw,18px); color:var(--ink-100); margin:0; max-width:46ch; min-height:2.6em;}
+.panel-meta{
+  display:flex; gap:clamp(14px,2vw,34px); flex-wrap:wrap;
+  font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:clamp(10px,.8vw,13px);
+  color:var(--ink-300); letter-spacing:.08em; font-variant-numeric:tabular-nums;
+}
+.panel-meta b{color:var(--ink-000); font-weight:500;}
+.unregistered{color:var(--warn);}
+
+.members{display:flex; flex-direction:column; gap:2px; margin-top:.4vh;}
+.member{
+  display:flex; align-items:center; gap:12px; padding:.75vh 12px;
+  border-left:3px solid transparent; background:none;
+  font-family:"Chakra Petch",system-ui,sans-serif; font-weight:600;
+  font-size:clamp(13px,1.15vw,20px); letter-spacing:.08em; text-transform:uppercase;
+  color:var(--ink-300); transition:color 200ms ease, background 200ms ease, border-color 200ms ease;
+}
+.member b{
+  margin-left:auto; font-family:"IBM Plex Mono",ui-monospace,monospace; font-weight:400;
+  font-size:clamp(9px,.72vw,12px); letter-spacing:.1em; color:var(--ink-400);
+  font-variant-numeric:tabular-nums;
+}
+.member[data-on="true"]{
+  color:var(--ink-000); background:color-mix(in oklab, var(--accent) 11%, transparent);
+  border-left-color:var(--accent);
+}
+.member[data-on="true"] b{color:color-mix(in oklab, var(--accent) 70%, var(--ink-100));}
+
+/* ---------------- footer ---------------- */
+.footer{flex:none; display:flex; flex-direction:column; gap:.8vh;}
+.spectrum-bar{
+  position:relative; height:clamp(6px,.75vh,10px); border-radius:2px;
+  display:flex; border:1px solid var(--ink-700);
+}
+.swatch{flex:1; position:relative;}
+.swatch[data-on="true"]::after{
+  content:""; position:absolute; left:50%; top:-6px; bottom:-6px; width:2px;
+  transform:translateX(-50%); background:var(--ink-000);
+}
+.spectrum-label{
+  display:flex; justify-content:space-between; gap:16px;
+  font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:clamp(8.5px,.64vw,11px); color:var(--ink-400); letter-spacing:.1em; text-transform:uppercase;
+}
+.legend{
+  display:flex; gap:clamp(10px,1.4vw,26px); flex-wrap:wrap; align-items:center;
+  font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:clamp(8.5px,.68vw,11px); color:var(--ink-400); letter-spacing:.1em;
+}
+.key{display:inline-flex; align-items:center; gap:5px;}
+.key kbd{
+  font:inherit; background:var(--ink-700); border:1px solid var(--ink-500);
+  border-bottom-width:2px; border-radius:3px; padding:1px 6px; color:var(--ink-100);
+}
+</style>
+
+<div class="wash" id="wash"></div>
+
+<div class="frame">
+
+  <header class="masthead">
+    <div class="brand">
+      <div class="brand-mark">VACO</div>
+      <div class="brand-tag">ten-foot shell &middot; prototype</div>
+    </div>
+    <div class="status">
+      <div class="stat live"><b id="statApps">&mdash;</b><span>public apps</span></div>
+      <div class="stat"><b>490</b><span>routes guarded</span></div>
+      <div class="stat"><b>879</b><span>tests</span></div>
+      <div class="stat"><b id="statSys">&mdash;</b><span>groups</span></div>
+    </div>
+  </header>
+
+  <div class="stage">
+    <div class="systems" id="systems"></div>
+    <div class="opened" id="opened">
+      <div class="figwrap" id="openedFig"></div>
+      <div class="panel">
+        <div class="panel-eyebrow" id="panelEyebrow"></div>
+        <h2 class="panel-title" id="panelTitle"></h2>
+        <p class="panel-role" id="panelRole"></p>
+        <div class="panel-meta" id="panelMeta"></div>
+        <div class="members" id="members"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="spectrum-bar" id="spectrum"></div>
+    <div class="spectrum-label">
+      <span>VACON is ours to run &middot; the Shell is this screen &mdash; neither takes an edge</span>
+      <span id="hueRead">&mdash;</span>
+    </div>
+    <div class="legend" id="legend"></div>
+  </div>
+
+</div>
+
+<script>
+"use strict";
+
+/* Real data. Accents are the registered hues from
+   vaco-shell/VACO_PALETTE_REGISTER.md; ports are the real ones from
+   vaco-shell/lib/registry.js. Four apps have no registered accent and
+   are drawn in the system's own teal and marked, rather than being
+   given an invented hue. */
+const VACO = "#46d4c4";
+
+const SYSTEMS = [
+  {
+    /* The ✕ carries the card economy. Four names, four arms. */
+    shape:"ex", name:"COLLECT & TRADE", note:"cards, art, brokerage",
+    apps:[
+      {n:"VOKEN",   a:"#e0559b", p:8794, r:"Minting, editions, provenance, value scores."},
+      {n:"CVLTVRE", a:"#e0559b", p:8794, r:"The card brand — collect, trade, auction."},
+      {n:"VADO",    a:null,      p:8794, r:"The Art District — auctions, galleries, frames."},
+      {n:"VEX",     a:"#6b8299", p:8816, r:"Cvltvre Card brokerage, extracted from VOKEN."}
+    ]
+  },
+  {
+    /* The ✕ that held eight is now two squares of four. Cramming
+       both constellations onto four arms was never a grouping
+       decision — it was an arithmetic one, and it read as a mess.
+       Split, each is exactly four names on exactly four sides. */
+    shape:"square", name:"WATCH & POST", note:"music, video, villages",
+    apps:[
+      {n:"Vvltvre", a:"#c45ad4", p:8806, r:"Music, Flix, Pods and Studios — one family across four services, entered at :8806."},
+      {n:"Vavlt Stvdios", a:"#9b6ef0", p:8808, r:"Multi-channel streaming, 8-screen interactive sessions."},
+      {n:"VXLLAGE", a:"#3fbf8f", p:8796, r:"Villages, threads, live rooms, cosmetics."},
+      {n:"CHOPZ",   a:"#5fd44f", p:8800, r:"Short-form video, shoppable links."}
+    ]
+  },
+  {
+    shape:"diamond", name:"MEET & MOVE", note:"dating, stays, delivery, local",
+    apps:[
+      {n:"VOID",  a:"#7c85e8", p:8793, r:"Logistics, drones, workforce, stations."},
+      {n:"HVNTZ", a:"#a3c94f", p:8792, r:"Revenue stack, hunts, the Explore page."},
+      {n:"CVNVO", a:"#e2716b", p:8798, r:"Dating — stable matching, safety-first."},
+      {n:"VACAY", a:"#f0845e", p:8803, r:"Stays, Experiences, Auto, Homes, Flights."}
+    ]
+  },
+  {
+    shape:"triangle", name:"PLAY & WAGER", note:"the world, the sim, the casino",
+    apps:[
+      {n:"VDP",     a:null,      p:5174, r:"The walkable world — districts, avatars, the resort."},
+      {n:"VACON-C", a:"#7d9e5c", p:8809, r:"Civilization simulation — state, tick, NPCs."},
+      {n:"VAGO",    a:"#d9a23f", p:8795, r:"Casino, sportsbook, prediction markets."}
+    ]
+  },
+  {
+    /* The three numbered systems. VACON stays off the shelf — it is
+       the agent network we operate, not an app anyone opens — and the
+       Shell is not on it either, because the Shell *is* this screen.
+       A launcher does not need a tile inside its own launcher. */
+    shape:"circle", name:"BUY, PAY & ASK", note:"market, ledger, agents",
+    apps:[
+      {n:"VENVS", a:null,      p:5173, r:"Analog commerce — Shop, Marketplace, Publishing."},
+      {n:"V3",    a:"#3faf6e", p:8811, r:"VCoin, VASH and VACA — currency, cashout, and blockchain identity."},
+      // **V4 sits in the middle, not on the rim.** The circle is the one
+      // shape here with a meaningful interior, and the agent is what the
+      // other two are reached through — putting it on the ring would have
+      // made it a peer of the ledger it answers questions about.
+      {n:"V4",    a:null,      p:8787, r:"Call an agent — ring, live call, text fallback, on any surface.", center:true}
+    ]
+  }
+];
+
+/* The full registered spectrum, hue-ordered, exactly as filed. */
+const SPECTRUM = [
+  ["CVNVO","#e2716b"],["VOID MAGIC","#e86f4f"],["VACAY","#f0845e"],["Vvltvre Pods","#e08a4f"],
+  ["Vex Trading","#a89080"],["VAGO","#d9a23f"],["VACO Notify","#d8b24a"],["HVNTZ","#a3c94f"],
+  ["CHOPZ","#5fd44f"],["VACON-C","#7d9e5c"],["V3","#3faf6e"],["CHOPZ SHOP","#2fb37a"],
+  ["VXLLAGE","#3fbf8f"],["VACO","#46d4c4"],["VACA","#2f9fb8"],["DREAMS","#3fbde0"],
+  ["VEX","#6b8299"],["VSAFE","#4d94e8"],["Vvltvre Studios","#5a8fd6"],["VACON","#8a90b8"],
+  ["VOID","#7c85e8"],["Shield","#8f8fd6"],["Vavlt Stvdios","#9b6ef0"],["VENVM","#a45ce0"],
+  ["Vvltvre Music","#c45ad4"],["VOKEN / CVLTVRE","#e0559b"],["Vvltvre Flix","#b03a52"]
+];
+
+/* ---- geometry, in a 100×100 field ----------------------------------
+   Each shape declares its outline and one text slot per edge. The
+   slot rotations follow the edge they sit on, so a name on the left
+   side of the square runs up the left side — the word is the edge,
+   not a caption next to it.
+
+   The circle is the one shape with no straight edge to run along, so
+   its names sit upright around the ring. Rotating them tangentially
+   would put two of the five upside down, and an unreadable name is a
+   worse failure than a small inconsistency. */
+const SHAPES = {
+  square: {
+    outline:'<rect class="outline" x="15" y="15" width="70" height="70" rx="2"/>'
+           +'<rect class="halo"    x="15" y="15" width="70" height="70" rx="2"/>',
+    size:9.2,
+    // Top, right, bottom, left. The right and left names run *up* their
+    // own edge rather than sitting beside it — the word is the side.
+    slots:() => [{x:50,y:15,r:0},{x:85,y:50,r:90},{x:50,y:85,r:0},{x:15,y:50,r:-90}]
+  },
+
+  ex: {
+    outline:'<path class="outline" d="M15 15 85 85M85 15 15 85"/>'
+           +'<path class="halo"    d="M15 15 85 85M85 15 15 85"/>',
+    size:9.2,
+    // Four arms, four names. Two names to an arm was tried and is in
+    // the screenshot graveyard: at eight the words collide across the
+    // crossing and the figure stops reading as an ✕ at all. Four
+    // shapes means four edges — the shape sets the count, and the
+    // membership that does not fit is reported rather than crammed.
+    slots:() => [{x:26,y:26,r:45},{x:74,y:26,r:-45},{x:74,y:74,r:45},{x:26,y:74,r:-45}]
+  },
+
+  diamond: {
+    outline:'<path class="outline" d="M50 11 89 50 50 89 11 50Z"/>'
+           +'<path class="halo"    d="M50 11 89 50 50 89 11 50Z"/>',
+    // Shorter edges than a square — 55 units against 70 — so the base
+    // size starts lower. The per-group scaler still applies on top.
+    size:8.2,
+    // Clockwise from the top-right edge. Each name is rotated onto the
+    // diagonal it sits on, and both diagonals are signed so no name
+    // ends up upside down.
+    slots:() => [
+      {x:70,y:30,r:45},   // top-right edge
+      {x:70,y:70,r:-45},  // bottom-right
+      {x:30,y:70,r:45},   // bottom-left
+      {x:30,y:30,r:-45},  // top-left
+    ]
+  },
+
+  triangle: {
+    outline:'<path class="outline" d="M50 14 87 83 13 83Z"/>'
+           +'<path class="halo"    d="M50 14 87 83 13 83Z"/>',
+    size:8.8,
+    // Left edge, right edge, base — each name rotated onto its own
+    // edge. Both slopes read ascending so neither ends up upside down.
+    slots:() => [{x:31,y:49,r:-62},{x:69,y:49,r:62},{x:50,y:83,r:0}]
+  },
+
+  circle: {
+    outline:'<circle class="outline" cx="50" cy="50" r="35"/>'
+           +'<circle class="halo"    cx="50" cy="50" r="35"/>',
+    size:8.4,
+    // The one shape with no straight edge to run along, so its names
+    // sit upright around the ring. Rotating them tangentially would
+    // put two of five upside down, and an unreadable name is a worse
+    // failure than a small inconsistency between shapes.
+    // An app marked `center` goes in the middle; the rest space evenly
+    // around the ring starting at the top. With two on the ring that is
+    // exactly top and bottom, which is the intent rather than a
+    // coincidence of the arithmetic.
+    slots: (sys) => {
+      const onRing = sys.apps.filter((a) => !a.center).length;
+      let i = 0;
+      return sys.apps.map((a) => {
+        if (a.center) return { x: 50, y: 50, r: 0 };
+        const t = -Math.PI / 2 + ((i += 1) - 1) * 2 * Math.PI / onRing;
+        return { x: 50 + Math.cos(t) * 34, y: 50 + Math.sin(t) * 34, r: 0 };
+      });
+    }
+  }
+};
+
+// Resolved once per system, so a shape and its member list can never
+// silently disagree about how many edges there are.
+function slotsFor(sys){ return SHAPES[sys.shape].slots(sys); }
+
+/* If a system's app count ever stops matching its shape's edge count,
+   the shape has stopped being true. Say so at boot rather than
+   silently dropping a name off the end — a shelf that quietly hides
+   an app is worse than one that refuses to draw. */
+const legend = document.getElementById("legend");
+
+/* The shelf is the way in, not the census. A shape has as many edges
+   as it has — three for a triangle, four for an ✕ — and the ✕ holds
+   eight parents, so four of them have no edge to be.
+   **That gets said, not hidden.** The figure carries the names that
+   fit, the count under it states plainly how many are inside, and
+   opening the shape lists every one. What is not acceptable is a
+   shelf that silently draws four of eight and lets you believe that
+   is all there is. */
+function edgeCount(sys){ return slotsFor(sys).length; }
+function overflow(sys){ return Math.max(0, sys.apps.length - edgeCount(sys)); }
+
+// **Type has to answer to the longest name in the group, not to the
+// shape.** Naming Vavlt Stvdios and Vvltvre Music in full — which is
+// what they are actually called — put two thirteen-character words on
+// adjacent sides of one square, and they collided at the corner. A
+// fixed per-shape size only worked while every name happened to be
+// short. Scaled off the real longest name, so the next long name is
+// handled before it is typed rather than after it is seen.
+function fontSizeFor(sys){
+  const longest = Math.max(...sys.apps.map((a) => a.n.length));
+  return SHAPES[sys.shape].size * Math.min(1, 8 / longest);
+}
+
+function figureSVG(sys, opts){
+  const geo = SHAPES[sys.shape];
+  const slots = slotsFor(sys);
+  const fontSize = fontSizeFor(sys);
+  const words = sys.apps.map((app, i) => {
+    const slot = slots[i];
+    if (!slot) return "";
+    const hue = app.a || VACO;
+    return '<text data-a="' + i + '" data-on="' + (opts && opts.on === i ? "true" : "false") + '"'
+         + ' x="' + slot.x + '" y="' + slot.y + '"'
+         + ' transform="rotate(' + slot.r + ' ' + slot.x + ' ' + slot.y + ')"'
+         + ' font-size="' + fontSize.toFixed(2) + '" fill="' + hue + '"'
+         // Painted with an ink-coloured outline under the fill so a name
+         // stays legible where it crosses its own stroke — which on the
+         // ✕ is every one of them.
+         + ' style="--glow:' + hue + ';paint-order:stroke;stroke:#080b0f;'
+         + 'stroke-width:2px;stroke-linejoin:round">'
+         + app.n + "</text>";
+  }).join("");
+  return '<svg class="fig" viewBox="0 0 100 100" role="img" aria-label="'
+       + sys.name + ", " + sys.apps.length + ' apps">'
+       + geo.outline + words + "</svg>";
+}
+
+const systemsEl = document.getElementById("systems");
+const openedEl  = document.getElementById("opened");
+const specEl    = document.getElementById("spectrum");
+const hueRead   = document.getElementById("hueRead");
+
+let level = 1;      /* 1 = the shapes, 2 = one shape opened */
+let si = 0;         /* which system  */
+let ai = 0;         /* which app inside it */
+
+document.getElementById("statApps").textContent = SYSTEMS.reduce((n, s) => n + s.apps.length, 0);
+document.getElementById("statSys").textContent  = SYSTEMS.length;
+
+/* -- level 1 -- */
+SYSTEMS.forEach((sys, i) => {
+  const b = document.createElement("button");
+  b.className = "sysbtn";
+  b.type = "button";
+  b.dataset.s = i;
+  b.dataset.focused = i === 0 ? "true" : "false";
+  b.setAttribute("aria-label", sys.name + " — " + sys.apps.map((a) => a.n).join(", "));
+  const extra = overflow(sys);
+  b.innerHTML = '<div class="figwrap">' + figureSVG(sys) + "</div>"
+              + '<div class="sysname">' + sys.name + "</div>"
+              + '<div class="sysnote">' + sys.apps.length + " apps"
+              + (extra ? " &middot; " + extra + " more inside" : "") + "</div>";
+  b.addEventListener("focus", () => { si = i; ai = 0; paint(); });
+  b.addEventListener("click", () => { si = i; ai = 0; openSystem(); });
+  systemsEl.appendChild(b);
+});
+
+/* -- spectrum -- */
+SPECTRUM.forEach(([name, hex]) => {
+  const s = document.createElement("div");
+  s.className = "swatch";
+  s.style.background = hex;
+  s.title = name + " " + hex;
+  s.dataset.hex = hex;
+  specEl.appendChild(s);
+});
+
+function sys(){ return SYSTEMS[si]; }
+function app(){ return sys().apps[ai]; }
+
+function setLegend(){
+  legend.innerHTML = level === 1
+    ? '<span class="key"><kbd>&larr;</kbd><kbd>&rarr;</kbd> between shapes</span>'
+      + '<span class="key"><kbd>Enter</kbd> open the shape</span>'
+      + '<span style="margin-left:auto">each name is one edge &middot; the names make the button</span>'
+    : '<span class="key"><kbd>&larr;</kbd><kbd>&rarr;</kbd> around the shape</span>'
+      + '<span class="key"><kbd>Esc</kbd> back to the shapes</span>'
+      + '<span style="margin-left:auto">' + sys().name + " &middot; " + sys().note + "</span>";
+}
+
+function paint(){
+  const a = level === 2 ? app() : null;
+  document.documentElement.style.setProperty("--accent", (a && a.a) || VACO);
+
+  document.querySelectorAll(".sysbtn").forEach((b, i) => {
+    b.dataset.focused = (level === 1 && i === si) ? "true" : "false";
+  });
+
+  document.querySelectorAll(".swatch").forEach((s) => {
+    s.dataset.on = (a && a.a && s.dataset.hex === a.a) ? "true" : "false";
+  });
+
+  hueRead.innerHTML = a
+    ? (a.a ? a.n + "  " + a.a : a.n + '  <span class="unregistered">no accent filed</span>')
+    : SYSTEMS.map((s) => s.name).join(" · ");
+
+  setLegend();
+}
+
+function openSystem(){
+  level = 2;
+  systemsEl.style.display = "none";
+  openedEl.dataset.open = "true";
+  document.getElementById("openedFig").innerHTML = figureSVG(sys(), { on: ai });
+  document.getElementById("panelEyebrow").textContent = sys().name + " · " + sys().note;
+  document.getElementById("members").innerHTML = sys().apps.map((m, i) =>
+    '<div class="member" data-a="' + i + '" data-on="' + (i === ai ? "true" : "false") + '">'
+    + m.n + "<b>:" + m.p + "</b></div>").join("");
+  paintMember();
+}
+
+function paintMember(){
+  const a = app();
+  document.getElementById("panelTitle").textContent = a.n;
+  document.getElementById("panelRole").textContent = a.r;
+  const edges = edgeCount(sys());
+  document.getElementById("panelMeta").innerHTML =
+    "<span>port <b>:" + a.p + "</b></span>"
+    + "<span>accent <b" + (a.a ? ">" + a.a : ' class="unregistered">not filed') + "</b></span>"
+    + (ai < edges
+        ? "<span>edge <b>" + (ai + 1) + " of " + edges + "</b></span>"
+        : '<span>edge <b class="unregistered">none — inside the shape</b></span>');
+
+  document.querySelectorAll("#members .member").forEach((el, i) => {
+    el.dataset.on = i === ai ? "true" : "false";
+  });
+  // Matched on the app index the element carries, not on document
+  // order — the figure only draws the apps that have an edge, so the
+  // two lists stop lining up the moment a system overflows.
+  document.querySelectorAll("#openedFig text").forEach((t) => {
+    t.dataset.on = Number(t.dataset.a) === ai ? "true" : "false";
+  });
+  paint();
+}
+
+function closeSystem(){
+  level = 1;
+  openedEl.dataset.open = "false";
+  systemsEl.style.display = "";
+  paint();
+  const b = document.querySelector('.sysbtn[data-s="' + si + '"]');
+  if (b) b.focus({ preventScroll:true });
+}
+
+document.getElementById("members").addEventListener("click", (e) => {
+  const row = e.target.closest(".member");
+  if (row) { ai = Number(row.dataset.a); paintMember(); }
+});
+
+addEventListener("keydown", (e) => {
+  const k = e.key;
+  if (level === 2) {
+    if (k === "Escape" || k === "Backspace") { e.preventDefault(); closeSystem(); return; }
+    const n = sys().apps.length;
+    if (k === "ArrowRight" || k === "ArrowDown") { e.preventDefault(); ai = (ai + 1) % n; paintMember(); }
+    else if (k === "ArrowLeft" || k === "ArrowUp") { e.preventDefault(); ai = (ai - 1 + n) % n; paintMember(); }
+    return;
+  }
+  if (k === "ArrowRight" || k === "ArrowDown") { e.preventDefault(); si = (si + 1) % SYSTEMS.length; ai = 0; focusSystem(); }
+  else if (k === "ArrowLeft" || k === "ArrowUp") { e.preventDefault(); si = (si - 1 + SYSTEMS.length) % SYSTEMS.length; ai = 0; focusSystem(); }
+  else if (k === "Enter" || k === " ") { e.preventDefault(); openSystem(); }
+});
+
+function focusSystem(){
+  paint();
+  const b = document.querySelector('.sysbtn[data-s="' + si + '"]');
+  if (b) b.focus({ preventScroll:true });
+}
+
+paint();
+</script>

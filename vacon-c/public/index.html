@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VACON-C</title>
+<link rel="stylesheet" href="/vaco-design.css" />
+<style>
+  .tick-row { display: flex; align-items: baseline; gap: var(--vaco-space-3); }
+  .tick-value { font-size: var(--vaco-text-3xl); font-weight: var(--vaco-weight-bold); font-variant-numeric: tabular-nums; }
+  .npc-card { display: flex; flex-direction: column; gap: var(--vaco-space-2); }
+  .trait { font-family: var(--vaco-font-mono); font-size: var(--vaco-text-xs); }
+  .state-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--vaco-space-3); }
+  .state-cell { display: flex; flex-direction: column; }
+  .state-value { font-size: var(--vaco-text-lg); font-weight: var(--vaco-weight-bold); font-variant-numeric: tabular-nums; }
+
+  /* MoraleBar — named by VACANCY_REACT_FRONTEND_STRUCTURE.md as one of
+     two shared components. A bar rather than a number because morale is
+     read at a glance across a list of factions, not compared precisely. */
+  .morale { display: flex; align-items: center; gap: var(--vaco-space-2); }
+  .morale-track { flex: 1; height: 6px; border-radius: 3px; background: var(--vaco-surface-3); overflow: hidden; min-width: 60px; }
+  .morale-fill { height: 100%; border-radius: 3px; transition: width 200ms ease; }
+  .morale-num { font-family: var(--vaco-font-mono); font-size: var(--vaco-text-xs); font-variant-numeric: tabular-nums; min-width: 2.2em; text-align: right; }
+  .scarce { color: var(--vaco-danger); }
+</style>
+</head>
+<body class="vaco">
+<script src="/vaco-ui.js"></script>
+<script>
+// VACON-C — the civilisation simulation engine.
+//
+// **Five tabs, per VACANCY_REACT_FRONTEND_STRUCTURE.md**: WORLD,
+// FACTIONS, NPCS, MISSIONS, ECON. That document describes extending an
+// existing React app — `src/App.jsx`, a five-tab bottom nav, MoraleBar
+// and Tag — which does not exist in this repository and was never
+// carried over. What DID exist is this page: four tabs on the shared
+// VACO kit. So the instruction "extend, don't replace" is honoured
+// against the frontend that is actually here, and the deviation is
+// stated rather than hidden:
+//
+//   - No React and no build step. VACON-C is an Express service that
+//     serves `public/`; adding Vite would make it the only app in the
+//     repo that is both a backend and a built frontend, and would need
+//     its own Docker context and Compose entry. The shared kit gets the
+//     same five tabs today with none of that.
+//   - Artifacts folded into MISSIONS rather than dropped. Doc 4 names
+//     five tabs and the old page had a sixth for artifacts; artifacts
+//     exist only to be turned into missions, so they belong on that tab
+//     and the count lands on five honestly rather than by deletion.
+//   - Property folded into FACTIONS for the same reason. The Property
+//     Engine (Phase 2) arrived after Doc 4 was written and a sixth tab
+//     would break the count the document fixes; that tab is already
+//     "organizations & territory", and a building standing in a ward is
+//     territory. Nothing was hidden to keep the number: the card is
+//     right under the territory blocks.
+//
+// If the React app is recovered, this file is the working reference for
+// what each tab shows and which endpoint feeds it.
+//
+// **The frontend holds no simulation logic**, per Doc 4's own rule.
+// Every number on screen came from an endpoint; nothing is computed
+// here that the engine could have computed.
+
+var el = VACO.el;
+
+// -- the two shared components Doc 4 names ----------------------------------
+
+// An unknown is not a zero. `Number(null) || 0` silently turns "we have
+// no reading for this" into a full-width red bar labelled 0, which is a
+// claim the engine never made -- the same class of bug as the inverted
+// scarcity bar below. A genuine numeric 0 still draws a bar at 0.
+function unknown() {
+  var row = el('div', 'morale');
+  row.appendChild(el('span', 'vaco-dim', '—'));
+  return row;
+}
+
+function moraleBar(value) {
+  if (value === null || value === undefined || value === '') return unknown();
+  var v = Math.max(0, Math.min(100, Number(value) || 0));
+  var row = el('div', 'morale');
+  var track = el('div', 'morale-track');
+  var fill = el('div', 'morale-fill');
+  fill.style.width = v + '%';
+  // Colour carries the same information as the width, for anyone who
+  // reads position badly but contrast well.
+  fill.style.background = v < 34 ? 'var(--vaco-danger)'
+    : (v < 67 ? 'var(--vaco-warning)' : 'var(--vaco-accent)');
+  track.appendChild(fill);
+  row.appendChild(track);
+  row.appendChild(el('span', 'morale-num', String(Math.round(v))));
+  return row;
+}
+
+// The same bar read the other way: for scarcity, HIGH is bad. Written
+// as its own function rather than passing an inverted value into
+// moraleBar, because that is exactly the bug this replaced -- a water
+// resource at scarcity 81 displayed the number 19 next to a "scarce"
+// tag, since the label showed whatever had been handed in. A bar whose
+// number disagrees with its own label is worse than no bar.
+function scarcityBar(value) {
+  if (value === null || value === undefined || value === '') return unknown();
+  var v = Math.max(0, Math.min(100, Number(value) || 0));
+  var row = el('div', 'morale');
+  var track = el('div', 'morale-track');
+  var fill = el('div', 'morale-fill');
+  fill.style.width = v + '%';
+  fill.style.background = v >= 67 ? 'var(--vaco-danger)'
+    : (v >= 34 ? 'var(--vaco-warning)' : 'var(--vaco-accent)');
+  track.appendChild(fill);
+  row.appendChild(track);
+  row.appendChild(el('span', 'morale-num', String(Math.round(v))));
+  return row;
+}
+
+// Tag — Doc 4's other shared component. The kit already has `badge`,
+// so this is a thin naming alias rather than a second implementation.
+function tag(text, tone) { return VACO.badge(text, tone); }
+
+function labelled(label, node) {
+  var cell = el('div', 'state-cell');
+  cell.appendChild(el('span', 'vaco-label', label));
+  cell.appendChild(node);
+  return cell;
+}
+
+function stat(label, value) {
+  return labelled(label, el('span', 'state-value', String(value)));
+}
+
+// ---------------------------------------------------------------------------
+// WORLD — state, the tick, and the families the world is made of
+// ---------------------------------------------------------------------------
+
+function renderWorld(body) {
+  var out = el('div', 'vaco-stack');
+
+  return Promise.all([VACO.api('/api/state'), VACO.api('/api/families'), VACO.api('/api/flows')])
+    .then(function (results) {
+      var state = results[0];
+      var families = (results[1] && results[1].families) || [];
+      var flows = (results[2] && results[2].flows) || [];
+
+      var head = el('div', 'tick-row');
+      head.appendChild(el('span', 'tick-value', state.tick !== undefined ? state.tick : 0));
+      head.appendChild(el('span', 'vaco-label', 'ticks elapsed'));
+      head.appendChild(el('span', 'vaco-spacer'));
+      head.appendChild(VACO.button('Advance one tick', function () {
+        return VACO.post('/api/tick', {}).then(function (next) {
+          VACO.toast('Advanced to tick ' + (next.tick !== undefined ? next.tick : '?') + '.');
+          VACO.render();
+        });
+      }, 'primary'));
+
+      var grid = el('div', 'state-grid');
+      Object.keys(state).forEach(function (key) {
+        if (key === 'tick') return;
+        var value = state[key];
+        grid.appendChild(stat(key.replace(/([A-Z])/g, ' $1'),
+          Array.isArray(value) ? value.length : (typeof value === 'object' ? '—' : String(value))));
+      });
+
+      out.appendChild(VACO.card(null, [head, grid]));
+
+      // **Flows are data, not code**, which is the one thing worth
+      // showing about them: each row is a declared rule, and the engine
+      // runs whatever rows it is given. `readable: false` is shown as a
+      // dash rather than 0 — a signal this world has nothing to say
+      // about is not a signal reading zero.
+      out.appendChild(VACO.card('Flows', [
+        el('p', 'vaco-small vaco-dim',
+          'Ten named flows, held as data rather than as ten functions — a flow is a row saying '
+          + 'which signal to watch and where its threshold sits. Flows report; they never change '
+          + 'the world. A dash means this world has nothing to read for that signal.'),
+        VACO.table([
+          { key: 'name', label: 'Flow' },
+          { label: 'Watches', render: function (f) { return el('span', 'vaco-small vaco-dim', f.signal); } },
+          {
+            label: 'Now',
+            render: function (f) {
+              return f.readable
+                ? el('span', 'trait', String(f.value))
+                : el('span', 'vaco-dim', '—');
+            },
+          },
+          {
+            label: 'Threshold',
+            render: function (f) {
+              return el('span', 'vaco-small vaco-dim', f.comparator + ' ' + f.threshold);
+            },
+          },
+          {
+            label: 'State',
+            render: function (f) {
+              if (!f.readable) return tag('no reading');
+              if (!f.firing) return el('span', 'vaco-dim', 'quiet');
+              return tag('firing', f.severity === 'high' ? 'danger' : 'warn');
+            },
+          },
+        ], flows, { empty: 'No flows declared.' }),
+      ]));
+
+      // Families are the tier a player inherits, so they belong on the
+      // world view rather than buried behind an NPC.
+      out.appendChild(VACO.card('Families', [
+        el('p', 'vaco-small vaco-dim',
+          'Wealth is summed from each member\'s finances on every read — never stored on the family, '
+          + 'per the standing rule against duplicating computable rollups.'),
+        VACO.table([
+          { key: 'id', label: 'Id', num: true },
+          { key: 'surname', label: 'Surname' },
+          { label: 'Unity', render: function (f) { return moraleBar(f.unity); } },
+          { key: 'reputation', label: 'Reputation', num: true },
+          { key: 'wealth', label: 'Wealth', num: true },
+        ], families, { empty: 'No families yet — create one from the NPCs tab.' }),
+      ]));
+
+      VACO.mount(body, out);
+    });
+}
+
+// ---------------------------------------------------------------------------
+// FACTIONS — organizations, their morale, and the ground they hold
+// ---------------------------------------------------------------------------
+
+function renderFactions(body) {
+  var out = el('div', 'vaco-stack');
+
+  out.appendChild(VACO.card('Found an organization', [
+    el('p', 'vaco-small vaco-dim',
+      'Faction is a subtype of Organization, not a separate root entity — one form makes either.'),
+    VACO.form([
+      { name: 'name', label: 'Name', value: '' },
+      { name: 'type', label: 'Type', value: 'gang', width: '120px' },
+      // A select, not a checkbox: VACO.form sets `input.value` for every
+      // field, which on a checkbox writes the value ATTRIBUTE and never
+      // `.checked` -- so values() would read truthy however it was left.
+      // Caught by reading the kit rather than by trying it.
+      {
+        name: 'kind',
+        label: 'Kind',
+        options: [{ label: 'Faction', value: 'faction' }, { label: 'Organization', value: 'org' }],
+      },
+    ], function (values) {
+      return VACO.post('/api/organizations', {
+        name: values.name, type: values.type, isFaction: values.kind === 'faction',
+      }).then(function (org) {
+        VACO.toast('Founded ' + (org.name || ('organization ' + org.id)) + '.');
+        VACO.render();
+      });
+    }, 'Found'),
+  ]));
+
+  return Promise.all([
+    VACO.api('/api/factions'),
+    VACO.api('/api/organizations'),
+    VACO.api('/api/territory-blocks'),
+    VACO.api('/api/cities'),
+    VACO.api('/api/communities'),
+    VACO.api('/api/properties'),
+    VACO.api('/api/cultures'),
+  ])
+    .then(function (results) {
+      var factions = (results[0] && results[0].factions) || [];
+      var orgs = (results[1] && results[1].organizations) || [];
+      var blocks = (results[2] && results[2].blocks) || [];
+      var cities = (results[3] && results[3].cities) || [];
+      var communities = (results[4] && results[4].communities) || [];
+      var properties = (results[5] && results[5].properties) || [];
+      var cultures = (results[6] && results[6].cultures) || [];
+      var factionName = function (id) {
+        var f = factions.filter(function (x) { return x.id === id; })[0];
+        return f ? f.name : ('faction ' + id);
+      };
+
+      out.appendChild(VACO.card('Factions', [
+        VACO.table([
+          { key: 'id', label: 'Id', num: true },
+          { key: 'name', label: 'Name' },
+          { label: 'Morale', render: function (f) { return moraleBar(f.morale); } },
+          { label: 'Status', render: function (f) { return tag(f.factionStatus || 'unknown'); } },
+        ], factions, { empty: 'No factions yet.' }),
+      ]));
+
+      var others = orgs.filter(function (o) { return !o.isFaction; });
+      out.appendChild(VACO.card('Other organizations', [
+        el('p', 'vaco-small vaco-dim',
+          'Businesses and governments — same table, same trait sheet, no faction row.'),
+        VACO.table([
+          { key: 'id', label: 'Id', num: true },
+          { key: 'name', label: 'Name' },
+          { label: 'Type', render: function (o) { return tag(o.type || '—'); } },
+        ], others, { empty: 'None yet.' }),
+      ]));
+
+      // Territory is where a faction's traits become a fact about the
+      // map. Status transitions here are emitted by the tick's
+      // Organization phase, which had nothing to iterate over until
+      // blocks could be created at all.
+      out.appendChild(VACO.card('Territory', [
+        el('p', 'vaco-small vaco-dim',
+          'Control is resolved every tick from the holding faction\'s live territory and power '
+          + 'traits — contested below 40, controlled to 79, fortified at 80 and above.'),
+        VACO.table([
+          { key: 'id', label: 'Block', num: true },
+          { label: 'Held by', render: function (b) { return factionName(b.faction_id); } },
+          {
+            label: 'Status',
+            render: function (b) {
+              return tag(b.status, b.status === 'contested' ? 'danger'
+                : (b.status === 'fortified' ? 'good' : null));
+            },
+          },
+          { key: 'building_count', label: 'Buildings', num: true },
+          { key: 'crime_rate', label: 'Crime', num: true },
+        ], blocks, { empty: 'No territory held — create a block from a faction.' }),
+      ]));
+
+      // **Two value columns, and the difference is the point.** `value`
+      // is the assessed number on the row; `currentValue` is derived on
+      // every read from condition and lifecycle stage and never written
+      // back (CLAUDE.md standing rule 3). Showing only one of them would
+      // make the rule invisible on screen. Both come from the endpoint —
+      // the frontend holds no simulation logic.
+      out.appendChild(VACO.card('Property', [
+        el('p', 'vaco-small vaco-dim',
+          'Assessed value is what a building went on the books at. Current value is derived every '
+          + 'time it is read — condition and lifecycle stage — and never stored. Buildings age in '
+          + 'the Environment phase of every tick.'),
+        VACO.table([
+          { key: 'id', label: 'ID', num: true },
+          { label: 'Type', render: function (p) { return tag((p.type || '').replace(/_/g, ' ')); } },
+          {
+            label: 'Stage',
+            render: function (p) {
+              var stage = (p.lifecycle_stage || '').replace(/_/g, ' ');
+              return tag(stage, p.lifecycle_stage === 'historical_legacy' ? 'good'
+                : (p.lifecycle_stage === 'planning' ? 'warn' : null));
+            },
+          },
+          { label: 'Condition', render: function (p) { return moraleBar(p.condition); } },
+          { label: 'Assessed', render: function (p) { return el('span', 'vaco-dim', VACO.round(p.value)); } },
+          { label: 'Current', render: function (p) { return el('span', 'trait', VACO.round(p.currentValue)); } },
+          {
+            label: 'Held by',
+            render: function (p) {
+              var owner = p.owner;
+              if (!owner) return el('span', 'vaco-dim', 'unowned');
+              return tag(owner.owner_type.replace(/_/g, ' ') + ' ' + owner.owner_entity_id);
+            },
+          },
+        ], properties, { empty: 'Nothing built yet — POST /api/properties.' }),
+      ]));
+
+      // Reemergence and community health are both computed on read
+      // (standing rule 3), so they arrive from /api/cities/:id rather
+      // than off the city row -- `cities.reemergence_index` sits at the
+      // schema default of 34 forever and is deliberately not shown.
+      // One detail call per city: the Build Prompt's own target is "one
+      // living city", so this is a handful of requests, not a page of
+      // them.
+      return Promise.all(cities.map(function (c) { return VACO.api('/api/cities/' + c.id); }))
+        .then(function (details) {
+          // Culture is tier-level: cities, communities, organizations and
+      // families belong to one. Individuals never do, and the engine
+      // refuses to attach one to an NPC.
+      out.appendChild(VACO.card('Culture', [
+        el('p', 'vaco-small vaco-dim',
+          'Sixteen named dimensions, stored three ways: eight are scored 0-100, three are a '
+          + 'style from a named set, and five are lists. A culture is something a family, '
+          + 'community, organization, city or civilization belongs to — never a person.'),
+        VACO.table([
+          { key: 'name', label: 'Culture' },
+          { label: 'Trust', render: function (c) { return moraleBar(c.traits && c.traits.trustLevel); } },
+          { label: 'Tradition', render: function (c) { return moraleBar(c.traits && c.traits.tradition); } },
+          { label: 'Innovation', render: function (c) { return moraleBar(c.traits && c.traits.innovation); } },
+          { label: 'Education', render: function (c) { return moraleBar(c.traits && c.traits.education); } },
+          {
+            label: 'Leads by',
+            render: function (c) {
+              return c.leadershipStyle ? tag(c.leadershipStyle) : el('span', 'vaco-dim', '—');
+            },
+          },
+          {
+            label: 'Settles by',
+            render: function (c) {
+              return c.conflictResolution ? tag(c.conflictResolution) : el('span', 'vaco-dim', '—');
+            },
+          },
+        ], cultures, { empty: 'No cultures yet — POST /api/cultures.' }),
+      ]));
+
+      out.appendChild(VACO.card('Cities and communities', [
+            el('p', 'vaco-small vaco-dim',
+              'Reemergence is computed every time it is read, from community conditions and '
+              + 'safety, city economy and infrastructure, and the population\'s resilience. '
+              + 'It is never stored.'),
+            VACO.table([
+              { key: 'name', label: 'City' },
+              { key: 'population', label: 'Population', num: true },
+              { label: 'Economy', render: function (c) { return moraleBar(c.economy); } },
+              { label: 'Safety', render: function (c) { return moraleBar(c.safety); } },
+              {
+                label: 'Reemergence',
+                render: function (c) {
+                  return moraleBar(c.reemergence && c.reemergence.composite);
+                },
+              },
+            ], details, { empty: 'No cities yet.' }),
+            el('p', 'vaco-small vaco-dim', communities.length + ' communities at block tier'),
+            VACO.table([
+              { key: 'id', label: 'Block', num: true },
+              { key: 'population', label: 'People', num: true },
+              { label: 'Housing', render: function (c) { return moraleBar(c.housing); } },
+              { label: 'Employment', render: function (c) { return moraleBar(c.employment); } },
+              {
+                label: 'Health',
+                render: function (c) {
+                  var health = null;
+                  details.forEach(function (d) {
+                    (d.communities || []).forEach(function (x) { if (x.id === c.id) health = x.health; });
+                  });
+                  return moraleBar(health);
+                },
+              },
+            ], communities, { empty: 'No communities yet.' }),
+          ]));
+
+          VACO.mount(body, out);
+        });
+    });
+}
+
+// ---------------------------------------------------------------------------
+// NPCS — generation, and a person's inner life
+// ---------------------------------------------------------------------------
+
+function npcDetail(id) {
+  return VACO.api('/api/npcs/' + id).then(function (d) {
+    var npc = d.npc || {};
+    var stack = el('div', 'vaco-stack-sm');
+
+    var head = el('div', 'state-grid');
+    head.appendChild(stat('Role', npc.role || '—'));
+    head.appendChild(stat('Status', npc.status || '—'));
+    head.appendChild(stat('Education', npc.education || '—'));
+    head.appendChild(stat('Generation', npc.generation !== undefined ? npc.generation : '—'));
+    stack.appendChild(head);
+
+    // **What the NPC believes, not what is true.** Knowledge carries its
+    // own confidence, and that is the whole point of the subjective
+    // layer -- two people can hold the same fact and act differently.
+    stack.appendChild(el('h4', 'vaco-label', 'Knows'));
+    stack.appendChild(VACO.table([
+      { key: 'fact_content', label: 'Fact' },
+      { label: 'Type', render: function (k) { return tag(k.fact_type || '—'); } },
+      { label: 'Confidence', render: function (k) { return moraleBar((k.confidence_level || 0) * 100); } },
+      { key: 'acquired_tick', label: 'Learned at', num: true },
+    ], d.knowledge || [], { empty: 'Knows nothing yet — nothing has happened to them.' }));
+
+    stack.appendChild(el('h4', 'vaco-label', 'Remembers'));
+    stack.appendChild(VACO.table([
+      { key: 'tick', label: 'Tick', num: true },
+      { label: 'Kind', render: function (m) { return tag(m.memory_type || '—'); } },
+      { key: 'description', label: 'What happened' },
+    ], d.memories || [], { empty: 'No memories yet.' }));
+
+    stack.appendChild(el('h4', 'vaco-label', 'Relationships'));
+    stack.appendChild(VACO.table([
+      { key: 'relationship_type', label: 'Kind' },
+      { label: 'Trust', render: function (r) { return moraleBar(r.trust); } },
+      { label: 'Respect', render: function (r) { return moraleBar(r.respect); } },
+    ], d.relationships || [], { empty: 'Knows nobody yet.' }));
+
+    return VACO.card('NPC ' + id + (npc.role ? ' — ' + npc.role : ''), [stack]);
+  });
+}
+
+function renderNpcs(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'NPCs are generated by real procedural rules in the engine. <strong>No language model is involved</strong> — '
+    + 'a set of traits comes from deterministic generation, not from a model writing characters.'));
+
+  out.appendChild(VACO.card('Generate an NPC', [
+    VACO.form([{ name: 'count', label: 'How many', type: 'number', min: 1, value: 1, width: '90px' }],
+      function (values) {
+        var runs = [];
+        for (var i = 0; i < values.count; i++) runs.push(VACO.post('/api/npc/generate', {}));
+        return Promise.all(runs).then(function () {
+          VACO.toast('Generated ' + values.count + '.');
+          VACO.render();
+        });
+      }, 'Generate'),
+  ]));
+
+  return VACO.api('/api/npcs').then(function (data) {
+    var npcs = data.npcs || [];
+
+    out.appendChild(VACO.card('Population — ' + npcs.length, [
+      VACO.table([
+        { key: 'id', label: 'Id', num: true },
+        { label: 'Role', render: function (n) { return tag(n.role || '—'); } },
+        { key: 'status', label: 'Status' },
+        { key: 'generation', label: 'Gen', num: true },
+        {
+          label: '',
+          render: function (n) {
+            return VACO.button('Open', function () {
+              return npcDetail(n.id).then(function (card) {
+                out.appendChild(card);
+                VACO.mount(body, out);
+              });
+            });
+          },
+        },
+      ], npcs, { empty: 'No population yet — generate a few.' }),
+    ]));
+
+    VACO.mount(body, out);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// MISSIONS — artifacts and the missions made from them
+// ---------------------------------------------------------------------------
+
+function renderMissions(body) {
+  var out = el('div', 'vaco-stack');
+
+  out.appendChild(VACO.card('Artifacts', [
+    el('p', 'vaco-small vaco-dim',
+      'Objects the simulation has produced. A mission is generated from one, so artifacts come first.'),
+    VACO.button('Create an artifact', function () {
+      return VACO.post('/api/artifacts', {}).then(function () {
+        VACO.toast('Artifact created.');
+        VACO.render();
+      });
+    }),
+  ]));
+
+  return Promise.all([VACO.api('/api/artifacts'), VACO.api('/api/missions')])
+    .then(function (results) {
+      var artifacts = (results[0] && results[0].artifacts) || [];
+      var missions = (results[1] && results[1].missions) || [];
+
+      out.appendChild(VACO.card(null, [
+        VACO.table([
+          { key: 'id', label: 'Id', num: true },
+          { label: 'Name', render: function (a) { return a.name || a.type || '—'; } },
+          { key: 'tick', label: 'Created at tick', num: true },
+          {
+            label: '',
+            render: function (a) {
+              return VACO.button('Make a mission', function () {
+                return VACO.post('/api/mission', { artifactId: a.id }).then(function () {
+                  VACO.toast('Mission generated.');
+                  VACO.render();
+                });
+              });
+            },
+          },
+        ], artifacts, { empty: 'None yet — create one above.' }),
+      ]));
+
+      out.appendChild(VACO.card('Missions', [
+        VACO.table([
+          { key: 'id', label: 'Id', num: true },
+          { label: 'Title', render: function (m) { return m.title || m.type || '—'; } },
+          { label: 'Status', render: function (m) { return tag(m.status || 'open'); } },
+        ], missions, { empty: 'No missions yet.' }),
+      ]));
+
+      VACO.mount(body, out);
+    });
+}
+
+// ---------------------------------------------------------------------------
+// ECON — resources, scarcity, and what things cost
+// ---------------------------------------------------------------------------
+
+function renderEcon(body) {
+  var out = el('div', 'vaco-stack');
+
+  return VACO.api('/api/economy/snapshot').then(function (snap) {
+    var resources = snap.resources || [];
+    var listings = snap.marketListings || [];
+
+    out.appendChild(VACO.card('Resources', [
+      el('p', 'vaco-small vaco-dim',
+        'Scarcity is computed from supply against demand — 50 is balance, above 60 the world starts talking about it.'),
+      VACO.table([
+        { key: 'resource_type', label: 'Resource' },
+        { key: 'quantity', label: 'Stock', num: true },
+        { key: 'supply', label: 'Supply', num: true },
+        { key: 'demand', label: 'Demand', num: true },
+        {
+          label: 'Scarcity',
+          render: function (r) {
+            var wrap = el('div', 'morale');
+            wrap.appendChild(scarcityBar(r.scarcity || 0));
+            if ((r.scarcity || 0) >= 60) wrap.appendChild(tag('scarce', 'danger'));
+            return wrap;
+          },
+        },
+      ], resources, { empty: 'No resources tracked yet.' }),
+    ]));
+
+    out.appendChild(VACO.card('Market', [
+      el('p', 'vaco-small vaco-dim',
+        'A listing made from a raw input carries its scarcity into the price — a drought in water '
+        + 'makes a water ration dearer.'),
+      VACO.table([
+        { key: 'product_name', label: 'Product' },
+        { label: 'Made from', render: function (l) { return l.resource_type ? tag(l.resource_type) : el('span', 'vaco-dim', '—'); } },
+        { label: 'Price', render: function (l) { return el('span', 'trait', VACO.round(l.price)); } },
+        { key: 'supply', label: 'Supply', num: true },
+        { key: 'demand', label: 'Demand', num: true },
+      ], listings, { empty: 'Nothing on the market yet.' }),
+    ]));
+
+    VACO.mount(body, out);
+  });
+}
+
+VACO.app({
+  id: 'vacon-c',
+  name: 'VACON-C',
+  tagline: 'Civilisation simulation',
+  //: VACON-C's identity: a moss green-grey. Terrain and settlement,
+  //: deliberately earthier than any other app in the register.
+  accent: '#7d9e5c',
+  accentDim: '#5f7d42',
+  accentInk: '#0b1105',
+  tabs: [
+    { id: 'world', label: 'World', heading: 'State, tick & families', render: renderWorld },
+    { id: 'factions', label: 'Factions', heading: 'Organizations & territory', render: renderFactions },
+    { id: 'npcs', label: 'NPCs', heading: 'Population', render: renderNpcs },
+    { id: 'missions', label: 'Missions', heading: 'Artifacts & missions', render: renderMissions },
+    { id: 'econ', label: 'Econ', heading: 'Resources & market', render: renderEcon },
+  ],
+});
+</script>
+</body>
+</html>

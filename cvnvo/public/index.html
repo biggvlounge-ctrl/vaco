@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CVNVO</title>
+<link rel="stylesheet" href="/vaco-design.css" />
+<style>
+  .score-ring {
+    width: 56px; height: 56px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: var(--vaco-weight-bold); font-variant-numeric: tabular-nums;
+    background: var(--vaco-accent-soft); color: var(--vaco-accent);
+    flex: 0 0 auto;
+  }
+  .match-row { display: flex; align-items: center; gap: var(--vaco-space-3); }
+  .safety-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--vaco-space-3); }
+</style>
+</head>
+<body class="vaco">
+<script src="/vaco-ui.js"></script>
+<script>
+// CVNVO — dating, with safety as the spine rather than a settings page.
+//
+// Real client of CVNVO's own 59 routes. Compatibility scoring, stable
+// matching, message screening, and every safety gate are server-side.
+//
+// **The safety tab is deliberately not last.** Check-ins, trusted
+// contacts, and escalation run through VSAFE and are the reason this
+// app is shaped the way it is; burying them under a gear icon would
+// misrepresent what was built.
+
+var el = VACO.el;
+
+// -- Discover ---------------------------------------------------------
+
+function renderDiscover(body) {
+  var out = el('div', 'vaco-stack');
+
+  out.appendChild(VACO.card('Check compatibility', [
+    el('p', 'vaco-small vaco-dim',
+      'A real score from CVNVO’s own compatibility engine — the same one the matcher uses, not a preview of it.'),
+    VACO.form([
+      { name: 'a', label: 'You', value: VACO.userId() || '', width: '140px' },
+      { name: 'b', label: 'Them', placeholder: 'their user id', width: '140px' },
+    ], function (values) {
+      return VACO.api('/api/compatibility/' + encodeURIComponent(values.a) + '/' + encodeURIComponent(values.b))
+        .then(function (result) {
+          var score = result.score !== undefined ? result.score : result.compatibilityScore;
+          var row = el('div', 'match-row');
+          row.appendChild(el('div', 'score-ring', Math.round(score)));
+          var text = el('div', 'vaco-stack-sm');
+          text.appendChild(el('strong', null, values.a + ' & ' + values.b));
+          if (result.factors) {
+            text.appendChild(el('p', 'vaco-small vaco-dim',
+              Object.keys(result.factors).map(function (k) {
+                return k + ' ' + VACO.round(result.factors[k]);
+              }).join(' · ')));
+          }
+          row.appendChild(text);
+          out.appendChild(VACO.card('Result', [row]));
+          VACO.mount(body, out);
+        });
+    }, 'Score'),
+  ]));
+
+  var id = VACO.userId();
+  if (!id) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to see your profile and matches.'));
+    return VACO.mount(body, out);
+  }
+
+  return VACO.api('/api/profiles/' + encodeURIComponent(id))
+    .then(function (profile) {
+      var lines = el('div', 'vaco-stack-sm');
+      lines.appendChild(el('p', 'vaco-small vaco-dim', profile.bio || 'No bio yet.'));
+      var meta = el('div', 'vaco-row-tight');
+      // A VACA-verified badge is a real identity claim checked against
+      // another service, which is exactly the thing a dating app should
+      // not fake.
+      meta.appendChild(profile.verifiedBadge
+        ? VACO.badge('VACA verified', 'money')
+        : VACO.badge('not verified', 'warn'));
+      if (profile.age) meta.appendChild(VACO.badge(profile.age));
+      lines.appendChild(meta);
+      out.appendChild(VACO.card('Your profile', [lines]));
+      VACO.mount(body, out);
+    })
+    .catch(function () {
+      out.appendChild(VACO.card('Your profile', [
+        el('p', 'vaco-small vaco-dim', 'No profile yet — create one.'),
+        VACO.form([
+          { name: 'bio', label: 'Bio', placeholder: 'a sentence about you', width: '300px' },
+          { name: 'age', label: 'Age', type: 'number', min: 18, value: 28, width: '80px' },
+        ], function (values) {
+          return VACO.post('/api/profiles', { userId: id, bio: values.bio, age: values.age })
+            .then(function () { VACO.toast('Profile created.'); VACO.render(); });
+        }, 'Create'),
+      ]));
+      VACO.mount(body, out);
+    });
+}
+
+// -- Events -----------------------------------------------------------
+
+function renderEvents(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Date events are real, RSVP-able, and can be linked to a HVNTZ hunt — '
+    + 'a date that is an activity rather than a drink and an interview.'));
+
+  out.appendChild(VACO.card('Create a date event', [
+    VACO.form([
+      { name: 'title', label: 'Title', placeholder: 'Trivia at the Fox', width: '200px' },
+      { name: 'venue', label: 'Venue', placeholder: 'where', width: '160px' },
+    ], function (values) {
+      if (!VACO.userId()) throw new Error('Sign in to create an event.');
+      return VACO.post('/api/date-events', {
+        hostId: VACO.userId(), title: values.title, venue: values.venue,
+      }).then(function (e) { VACO.toast('Event ' + e.id + ' created.'); VACO.render(); });
+    }, 'Create'),
+  ]));
+
+  out.appendChild(VACO.card('Look up an event', [
+    VACO.form([{ name: 'id', label: 'Event id', type: 'number', min: 1, value: 1, width: '90px' }],
+      function (values) {
+        return VACO.api('/api/date-events/' + values.id).then(function (e) {
+          VACO.toast(e.title + ' — ' + (e.venue || 'venue TBC'));
+        });
+      }, 'Fetch'),
+  ]));
+
+  return VACO.mount(body, out);
+}
+
+// -- Safety -----------------------------------------------------------
+
+function renderSafety(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Safety here is a set of <strong>real mechanics</strong>, not promises: timed check-ins that escalate '
+    + 'to a trusted contact, message screening before delivery, anonymous calls that never expose a number, '
+    + 'and a BarBuddy mode that is deliberately invisible to other people at the venue.'));
+
+  var id = VACO.userId();
+  if (!id) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to use safety features.'));
+    return VACO.mount(body, out);
+  }
+
+  var grid = el('div', 'safety-grid');
+
+  grid.appendChild(VACO.card('Reliability', [
+    (function () {
+      var value = el('p', 'vaco-body', 'Loading…');
+      VACO.api('/api/safety/reliability/' + encodeURIComponent(id))
+        .then(function (r) {
+          value.textContent = 'Score ' + VACO.round(r.score !== undefined ? r.score : r.reliabilityScore)
+            + (r.completedCheckIns !== undefined ? ' from ' + r.completedCheckIns + ' check-ins' : '');
+        })
+        .catch(function () { value.textContent = 'No reliability history yet.'; });
+      return value;
+    }()),
+  ]));
+
+  grid.appendChild(VACO.card('BarBuddy', [
+    el('p', 'vaco-small vaco-dim',
+      'Check in at a venue so a trusted contact knows where you are. Other people at the venue cannot see you — that is fixed, not a preference.'),
+    VACO.form([{ name: 'venueId', label: 'Venue', placeholder: 'venue id', width: '130px' }],
+      function (values) {
+        return VACO.post('/api/barbuddy/check-in', { userId: id, venueId: values.venueId })
+          .then(function () { VACO.toast('Checked in — visible only to your trusted contacts.'); });
+      }, 'Check in'),
+  ]));
+
+  grid.appendChild(VACO.card('Flash notes', [
+    el('p', 'vaco-small vaco-dim', 'Short-lived notes that expire on their own.'),
+    (function () {
+      var list = el('div', null);
+      list.textContent = 'Loading…';
+      VACO.api('/api/flash-notes/' + encodeURIComponent(id))
+        .then(function (data) {
+          var notes = data.notes || data || [];
+          VACO.mount(list, notes.length
+            ? VACO.table([{ key: 'body', label: 'Note' }, { key: 'expiresAt', label: 'Expires' }], notes)
+            : el('p', 'vaco-small vaco-faint', 'No active notes.'));
+        })
+        .catch(function () { list.textContent = 'Unavailable.'; });
+      return list;
+    }()),
+  ]));
+
+  out.appendChild(grid);
+  return VACO.mount(body, out);
+}
+
+VACO.app({
+  id: 'cvnvo',
+  name: 'CVNVO',
+  tagline: 'Dating, safety first',
+  //: CVNVO's identity: a muted coral-rose. Warm without being the
+  //: saturated hot-pink every dating app defaults to, and distinct from
+  //: CVLTVRE's magenta in the register.
+  accent: '#e2716b',
+  accentDim: '#bd524d',
+  accentInk: '#1a0806',
+  tabs: [
+    { id: 'discover', label: 'Discover', heading: 'People', render: renderDiscover },
+    { id: 'events', label: 'Events', heading: 'Date events', render: renderEvents },
+    { id: 'safety', label: 'Safety', heading: 'Check-ins & screening', render: renderSafety },
+  ],
+});
+</script>
+</body>
+</html>

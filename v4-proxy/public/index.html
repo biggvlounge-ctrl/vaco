@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>V4</title>
+<link rel="stylesheet" href="/vaco-design.css" />
+<style>
+  /* A real plotted map, drawn from real coordinates. Not a tile layer —
+     there is no tile provider here — but the geometry is genuine. */
+  .map {
+    position: relative;
+    aspect-ratio: 4 / 3;
+    border: 1px solid var(--vaco-border);
+    border-radius: var(--vaco-radius);
+    background:
+      linear-gradient(var(--vaco-border-subtle) 1px, transparent 1px) 0 0 / 100% 12.5%,
+      linear-gradient(90deg, var(--vaco-border-subtle) 1px, transparent 1px) 0 0 / 12.5% 100%,
+      var(--vaco-bg-raised);
+    overflow: hidden;
+  }
+  .pin {
+    position: absolute;
+    width: 10px; height: 10px;
+    margin: -5px 0 0 -5px;
+    border-radius: 50%;
+    background: var(--vaco-accent);
+    box-shadow: 0 0 0 3px var(--vaco-accent-soft);
+  }
+  .pin-sighting { background: var(--vaco-warn); box-shadow: 0 0 0 3px var(--vaco-warn-soft); width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; }
+  .pin-label {
+    position: absolute;
+    transform: translate(8px, -50%);
+    font-size: var(--vaco-text-xs);
+    color: var(--vaco-text-dim);
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--vaco-space-3); }
+  .stat { display: flex; flex-direction: column; }
+  .stat-value { font-size: var(--vaco-text-xl); font-weight: var(--vaco-weight-bold); font-variant-numeric: tabular-nums; }
+  .call-state { display: flex; align-items: center; gap: var(--vaco-space-2); }
+</style>
+</head>
+<body class="vaco">
+<script src="/vaco-ui.js"></script>
+<script>
+// V4 — the shared map layer, agent twins, and the call surface.
+//
+// **Maps is the substantial half and gets the first tab.** Four VACON
+// agent prompts referenced a shared map layer that did not exist until
+// it was built here; this is the first surface onto it. The geometry is
+// real — great-circle distance, verified identical to VOID's own
+// `geo.js` — so the plot below is a true relative rendering of real
+// coordinates.
+//
+// **It is not a tile map.** There is no map-tile provider in this
+// ecosystem, so there are no roads, labels, or satellite imagery. What
+// is drawn is exactly what V4 knows: places, sightings, and the
+// relationships between them. A borrowed basemap would look better and
+// claim more than is true.
+
+var el = VACO.el;
+
+// -- Maps -------------------------------------------------------------
+
+// Projects lat/lng into the box by simple linear scaling of the bounding
+// box. Deliberately not a real projection: at city scale the distortion
+// is invisible, and pretending to Mercator would imply a fidelity the
+// rest of this page does not have.
+function plot(container, points) {
+  if (!points.length) return;
+  var lats = points.map(function (p) { return p.lat; });
+  var lngs = points.map(function (p) { return p.lng; });
+  var minLat = Math.min.apply(null, lats), maxLat = Math.max.apply(null, lats);
+  var minLng = Math.min.apply(null, lngs), maxLng = Math.max.apply(null, lngs);
+  // A single point, or a perfectly straight line, would divide by zero.
+  var latSpan = (maxLat - minLat) || 0.01;
+  var lngSpan = (maxLng - minLng) || 0.01;
+  var pad = 10;
+
+  points.forEach(function (p) {
+    var x = pad + ((p.lng - minLng) / lngSpan) * (100 - 2 * pad);
+    var y = pad + ((maxLat - p.lat) / latSpan) * (100 - 2 * pad);
+    var pin = el('div', 'pin' + (p.kind === 'sighting' ? ' pin-sighting' : ''));
+    pin.style.left = x + '%';
+    pin.style.top = y + '%';
+    pin.title = (p.name || p.id) + ' — ' + VACO.round(p.lat) + ', ' + VACO.round(p.lng);
+    container.appendChild(pin);
+    if (p.name) {
+      var label = el('div', 'pin-label', p.name);
+      label.style.left = x + '%';
+      label.style.top = y + '%';
+      container.appendChild(label);
+    }
+  });
+}
+
+function renderMaps(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Real great-circle geometry, verified identical to VOID’s own <code>geo.js</code>. '
+    + '<strong>Not a tile map</strong> — no basemap provider is connected, so what is drawn is exactly what V4 '
+    + 'knows: places and sightings, and nothing borrowed.'));
+
+  return VACO.api('/api/maps').then(function (described) {
+    var stats = el('div', 'stat-row');
+    Object.keys(described).forEach(function (k) {
+      if (typeof described[k] !== 'number') return;
+      var s = el('div', 'stat');
+      s.appendChild(el('span', 'vaco-label', k.replace(/([A-Z])/g, ' $1')));
+      s.appendChild(el('span', 'stat-value', described[k]));
+      stats.appendChild(s);
+    });
+    out.appendChild(VACO.card(null, [stats]));
+
+    var places = described.places || [];
+    var map = el('div', 'map');
+    var points = places.map(function (p) {
+      return { lat: p.lat, lng: p.lng, name: p.name, id: p.placeId || p.id };
+    });
+    plot(map, points);
+    if (!points.length) {
+      map.appendChild(el('div', 'vaco-empty', 'No places registered yet — add one below.'));
+    }
+    out.appendChild(VACO.card('The map', [map]));
+
+    out.appendChild(VACO.card('Register a place', [
+      el('p', 'vaco-small vaco-dim',
+        'Any app can register a place. Coordinates outside a valid range are refused — '
+        + 'which is what catches a swapped lat/lng before it becomes a route to nowhere.'),
+      VACO.form([
+        { name: 'placeId', label: 'Id', placeholder: 'union-station', width: '150px' },
+        { name: 'name', label: 'Name', placeholder: 'Union Station', width: '160px' },
+        { name: 'lat', label: 'Lat', type: 'number', step: 'any', value: 38.6270, width: '110px' },
+        { name: 'lng', label: 'Lng', type: 'number', step: 'any', value: -90.1994, width: '110px' },
+      ], function (values) {
+        return VACO.post('/api/maps/place', values)
+          .then(function () { VACO.toast('Place registered.'); VACO.render(); });
+      }, 'Register'),
+    ]));
+
+    out.appendChild(VACO.card('Distance between two points', [
+      VACO.form([
+        { name: 'fromLat', label: 'From lat', type: 'number', step: 'any', value: 38.6270, width: '110px' },
+        { name: 'fromLng', label: 'From lng', type: 'number', step: 'any', value: -90.1994, width: '110px' },
+        { name: 'toLat', label: 'To lat', type: 'number', step: 'any', value: 38.6500, width: '110px' },
+        { name: 'toLng', label: 'To lng', type: 'number', step: 'any', value: -90.2400, width: '110px' },
+      ], function (values) {
+        return VACO.post('/api/maps/distance', values).then(function (r) {
+          VACO.toast(VACO.round(r.distanceKm !== undefined ? r.distanceKm : r.km) + ' km apart');
+        });
+      }, 'Measure'),
+    ]));
+
+    VACO.mount(body, out);
+  });
+}
+
+// -- Twins ------------------------------------------------------------
+
+function renderTwins(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'An AI Human Twin is a <strong>presentation model</strong>, not a rendered avatar. V4 holds the state — '
+    + 'which agent, which animation, which surface — and there is no renderer anywhere in this ecosystem to '
+    + 'draw it. The state machine is real; the face is not.', 'warn'));
+
+  return Promise.all([
+    VACO.api('/api/twins'),
+    VACO.api('/api/twins/animation/states').catch(function () { return null; }),
+    VACO.api('/api/surfaces').catch(function () { return null; }),
+  ]).then(function (r) {
+    var twins = r[0].twins || r[0] || [];
+    out.appendChild(VACO.card('Twins', [
+      VACO.table([
+        { key: 'agentId', label: 'Agent' },
+        { key: 'displayName', label: 'Name' },
+        { label: 'Animation', render: function (t) { return VACO.badge(t.animationState || 'idle'); } },
+      ], twins, { empty: 'No twins registered.' }),
+    ]));
+
+    if (r[1]) {
+      var states = r[1].states || r[1] || [];
+      out.appendChild(VACO.card('Animation states', [
+        el('p', 'vaco-small vaco-dim', 'The state machine a renderer would drive, if one existed.'),
+        el('p', 'vaco-mono vaco-small', (Array.isArray(states) ? states : Object.keys(states)).join(' · ')),
+      ]));
+    }
+
+    if (r[2]) {
+      var surfaces = r[2].surfaces || r[2] || [];
+      out.appendChild(VACO.card('Surfaces', [
+        el('p', 'vaco-small vaco-dim', 'Where a twin can appear across the ecosystem.'),
+        VACO.table([
+          { key: 'id', label: 'Surface', render: function (s) { return typeof s === 'string' ? s : (s.id || s.name); } },
+          { key: 'description', label: 'What it is', render: function (s) { return typeof s === 'string' ? '—' : (s.description || '—'); } },
+        ], Array.isArray(surfaces) ? surfaces : []),
+      ]));
+    }
+    VACO.mount(body, out);
+  });
+}
+
+// -- Calls ------------------------------------------------------------
+
+function renderCalls(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Call state is real — ringing, answered, declined, timed out, and the text fallback a missed call produces. '
+    + '<strong>No audio or video is carried</strong>; there is no media transport in this ecosystem.', 'warn'));
+
+  out.appendChild(VACO.card('Place a call', [
+    VACO.form([
+      { name: 'fromUserId', label: 'From', value: VACO.userId() || '', width: '130px' },
+      { name: 'toAgentId', label: 'To agent', placeholder: 'agent id', width: '140px' },
+    ], function (values) {
+      return VACO.post('/api/calls', values).then(function (c) {
+        VACO.toast('Call ' + c.id + ' — ' + c.status);
+        VACO.render();
+      });
+    }, 'Call'),
+  ]));
+
+  return VACO.api('/api/calls').then(function (data) {
+    var calls = data.calls || data || [];
+    out.appendChild(VACO.card('Calls', [
+      VACO.table([
+        { key: 'id', label: 'Id' },
+        { key: 'fromUserId', label: 'From' },
+        { key: 'toAgentId', label: 'To' },
+        { label: 'Status', render: function (c) { return VACO.badge(c.status); } },
+        { label: '', render: function (c) {
+          if (c.status !== 'ringing') return '—';
+          var row = el('div', 'vaco-row-tight');
+          row.appendChild(VACO.button('Answer', function () {
+            return VACO.post('/api/calls/' + c.id + '/answer', {})
+              .then(function () { VACO.toast('Answered.'); VACO.render(); });
+          }, 'primary vaco-btn-sm'));
+          row.appendChild(VACO.button('Decline', function () {
+            return VACO.post('/api/calls/' + c.id + '/decline', {})
+              .then(function () { VACO.toast('Declined — a fallback message is produced.'); VACO.render(); });
+          }, 'danger vaco-btn-sm'));
+          return row;
+        } },
+      ], calls, { empty: 'No calls yet.' }),
+    ]));
+
+    return VACO.api('/api/fallback-messages').then(function (fb) {
+      var messages = fb.messages || fb.fallbackMessages || fb || [];
+      out.appendChild(VACO.card('Fallback messages', [
+        el('p', 'vaco-small vaco-dim',
+          'What a missed call leaves behind. This is the one thing here that genuinely should outlive a restart, '
+          + 'and V4 says so plainly — its store is deliberately in-memory, because a call restored from disk is '
+          + 'ringing at nobody.'),
+        VACO.table([
+          { key: 'callId', label: 'Call' },
+          { key: 'body', label: 'Message' },
+        ], messages, { empty: 'No missed calls.' }),
+      ]));
+      VACO.mount(body, out);
+    }).catch(function () { VACO.mount(body, out); });
+  });
+}
+
+VACO.app({
+  id: 'v4-proxy',
+  name: 'V4',
+  tagline: 'Maps · twins · calls',
+  //: V4's identity: a cool periwinkle — a lighter sibling of VOID's
+  //: indigo, since V4 is the layer VOID and four other apps call into.
+  accent: '#93a4f0',
+  accentDim: '#7183d4',
+  accentInk: '#070a16',
+  tabs: [
+    { id: 'maps', label: 'Maps', heading: 'The shared map layer',
+      blurb: 'Four VACON agent prompts referenced this layer before it existed. This is the first surface onto it.',
+      render: renderMaps },
+    { id: 'twins', label: 'Twins', heading: 'AI Human Twins', render: renderTwins },
+    { id: 'calls', label: 'Calls', heading: 'Call sessions', render: renderCalls },
+  ],
+});
+</script>
+</body>
+</html>

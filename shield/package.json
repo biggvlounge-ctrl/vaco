@@ -1,0 +1,20 @@
+{
+  "name": "shield",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shield -- the ecosystem's real, standalone session layer: one unified login/session, trusted by every app. Split out of venvs-mock-backend's own real, already-tested, drop-in-compatible session contract, the same real extraction discipline as V3.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

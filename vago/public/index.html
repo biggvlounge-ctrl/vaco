@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VAGO</title>
+<link rel="stylesheet" href="/vaco-design.css" />
+<style>
+  /* Layout only — every colour comes from the design system. */
+  .board {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: var(--vaco-space-2);
+    max-width: 360px;
+  }
+  .tile {
+    aspect-ratio: 1;
+    border: 1px solid var(--vaco-border);
+    border-radius: var(--vaco-radius-sm);
+    background: var(--vaco-surface);
+    font-size: var(--vaco-text-lg);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background var(--vaco-duration) var(--vaco-ease),
+                border-color var(--vaco-duration) var(--vaco-ease);
+  }
+  .tile:hover:not(:disabled) { background: var(--vaco-surface-hover); border-color: var(--vaco-accent); }
+  .tile:disabled { cursor: default; }
+  .tile-safe { background: var(--vaco-money-soft); border-color: var(--vaco-money); }
+  .tile-mine { background: var(--vaco-danger-soft); border-color: var(--vaco-danger); }
+  .multiplier { font-size: var(--vaco-text-3xl); font-weight: var(--vaco-weight-bold); font-variant-numeric: tabular-nums; }
+  .seed { word-break: break-all; }
+  .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: var(--vaco-space-3); }
+  .stat { display: flex; flex-direction: column; gap: 2px; }
+  .stat-value { font-size: var(--vaco-text-lg); font-weight: var(--vaco-weight-bold); font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body class="vaco">
+<script src="/vaco-ui.js"></script>
+<script>
+// VAGO — wagering, prediction markets, and the casino.
+//
+// The centrepiece is a real, playable Mines board. VAGO already had
+// genuine provably-fair game logic (commit a server seed, hash it,
+// reveal it at the end so a player can verify the board was fixed
+// before they touched it) and no way for a human to play it. This is
+// that surface.
+//
+// **The provable-fairness panel is not decoration.** It is the whole
+// reason to trust an online casino at all, and it is shown while the
+// round is live — the hash before, the seed after — rather than buried
+// in a settings page nobody opens.
+//
+// All game logic stays server-side. This file never decides where a
+// mine is, what a multiplier should be, or whether a round is lost.
+
+var el = VACO.el;
+var MINES_BOARD_SIZE = 25;
+
+// The live round. A module-level object rather than re-fetched each
+// render, because a Mines round is a conversation: the board a player
+// is looking at must be the board they clicked into.
+var game = { session: null, round: null, currency: 'gold-coin', stake: 10, mines: 3 };
+
+// -- Casino -----------------------------------------------------------
+
+function renderCasino(body) {
+  var out = el('div', 'vaco-stack');
+
+  if (!VACO.userId()) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to play. Gold Coin is free to play with; VCoin is real money.'));
+    return VACO.mount(body, out);
+  }
+
+  out.appendChild(goldCoinCard());
+
+  if (!game.round) {
+    out.appendChild(newRoundCard());
+  } else {
+    out.appendChild(boardCard());
+    out.appendChild(fairnessCard());
+  }
+
+  return VACO.mount(body, out);
+}
+
+function goldCoinCard() {
+  var card = VACO.card('Gold Coin', ['Free-to-play currency. A daily AMOE entry grants more at no cost — the "no purchase necessary" path that makes a sweepstakes model lawful.']);
+  var row = el('div', 'vaco-row');
+  var balance = el('strong', 'vaco-num stat-value', '…');
+  row.appendChild(balance);
+  row.appendChild(el('span', 'vaco-spacer'));
+  row.appendChild(VACO.button('Claim daily AMOE entry', function () {
+    return VACO.post('/api/amoe-entry', { userId: VACO.userId() }).then(function () {
+      VACO.toast('AMOE entry claimed — Gold Coin granted.', 'money');
+      VACO.render();
+    });
+  }));
+  card.appendChild(row);
+
+  VACO.api('/api/gold-coin/balance/' + encodeURIComponent(VACO.userId()))
+    .then(function (b) { balance.textContent = VACO.round(b.balance); })
+    .catch(function () { balance.textContent = '—'; });
+
+  return card;
+}
+
+function newRoundCard() {
+  return VACO.card('Mines', [
+    el('p', 'vaco-small vaco-dim',
+      'Reveal tiles one at a time. Every safe tile raises the multiplier; one mine ends the round. Cash out whenever you like.'),
+    VACO.form([
+      { name: 'currency', label: 'Currency', options: [
+        { value: 'gold-coin', label: 'Gold Coin (free)' },
+        { value: 'vcoin', label: 'VCoin (real)' },
+      ] },
+      { name: 'stakeAmount', label: 'Stake', type: 'number', min: 1, value: game.stake, width: '90px' },
+      { name: 'minesCount', label: 'Mines', type: 'number', min: 1, value: game.mines, width: '80px' },
+      { name: 'clientSeed', label: 'Your seed', value: randomSeed(), width: '160px' },
+    ], startMines, 'Deal'),
+  ]);
+}
+
+function randomSeed() {
+  return Math.random().toString(36).slice(2, 12);
+}
+
+function startMines(values) {
+  if (values.minesCount < 1 || values.minesCount > 24) {
+    throw new Error('Mines must be between 1 and 24 — a board of all mines is not a game.');
+  }
+  game.currency = values.currency;
+  game.stake = values.stakeAmount;
+  game.mines = values.minesCount;
+
+  return VACO.post('/api/casino/sessions', {
+    userId: VACO.userId(),
+    gameType: 'originals',
+    currency: values.currency,
+    stakeAmount: values.stakeAmount,
+    amoeEntryUsed: false,
+  }).then(function (session) {
+    game.session = session;
+    return VACO.post('/api/casino/mines/start', {
+      sessionId: session.id,
+      clientSeed: values.clientSeed,
+      minesCount: values.minesCount,
+    });
+  }).then(function (round) {
+    game.round = round;
+    VACO.refreshBalances().then(VACO.renderIdentity);
+    VACO.render();
+  });
+}
+
+function boardCard() {
+  var round = game.round;
+  var lost = round.status === 'lost';
+  var over = round.status !== 'active';
+
+  var head = el('div', 'vaco-row');
+  var mult = el('span', 'multiplier', '×' + VACO.round(round.currentMultiplier || 1));
+  head.appendChild(mult);
+  head.appendChild(el('span', 'vaco-spacer'));
+  head.appendChild(VACO.badge(round.status));
+
+  var board = el('div', 'board');
+  for (var i = 0; i < MINES_BOARD_SIZE; i++) {
+    board.appendChild(tile(i, round, over));
+  }
+
+  var actions = el('div', 'vaco-row');
+  if (!over && (round.revealedTiles || []).length > 0) {
+    var potential = VACO.round(game.stake * (round.currentMultiplier || 1));
+    actions.appendChild(VACO.button('Cash out ' + potential, function () {
+      return VACO.post('/api/casino/mines/' + round.id + '/cash-out', {}).then(function (result) {
+        game.round = null;
+        game.session = null;
+        VACO.toast('Cashed out ' + VACO.round(result.payout !== undefined ? result.payout : potential), 'money');
+        VACO.refreshBalances().then(VACO.renderIdentity);
+        VACO.render();
+      });
+    }, 'primary'));
+  }
+  if (over) {
+    actions.appendChild(VACO.button('New round', function () {
+      game.round = null;
+      game.session = null;
+      VACO.render();
+    }, 'primary'));
+  }
+
+  var stats = el('div', 'stat-row');
+  [['Stake', game.stake], ['Mines', round.minesCount],
+   ['Revealed', (round.revealedTiles || []).length],
+   ['Currency', game.currency]].forEach(function (pair) {
+    var s = el('div', 'stat');
+    s.appendChild(el('span', 'vaco-label', pair[0]));
+    s.appendChild(el('span', 'stat-value', pair[1]));
+    stats.appendChild(s);
+  });
+
+  var children = [head, board, stats, actions];
+  if (lost) {
+    children.splice(1, 0, VACO.notice(
+      'Mine hit — the round is over. The mine positions were fixed before your first click, and the seed below proves it.', 'danger'));
+  }
+  return VACO.card(null, children);
+}
+
+function tile(index, round, over) {
+  var revealed = (round.revealedTiles || []).indexOf(index) !== -1;
+  var isMine = (round.minePositions || []).indexOf(index) !== -1;
+
+  var btn = el('button', 'tile');
+  // Mine positions only come back from the server once the round is
+  // over, so nothing here can leak the board mid-game.
+  if (revealed && isMine) { btn.className += ' tile-mine'; btn.textContent = '✳'; }
+  else if (revealed) { btn.className += ' tile-safe'; btn.textContent = '◆'; }
+  else if (over && isMine) { btn.className += ' tile-mine'; btn.style.opacity = '0.45'; btn.textContent = '✳'; }
+
+  btn.disabled = revealed || over;
+  btn.setAttribute('aria-label', 'Tile ' + (index + 1));
+  if (!btn.disabled) {
+    btn.addEventListener('click', function () {
+      btn.disabled = true;
+      VACO.post('/api/casino/mines/' + round.id + '/reveal', { tileIndex: index })
+        .then(function (updated) {
+          game.round = updated.round || updated;
+          if (game.round.status === 'lost') VACO.toast('Mine. Round over.', 'danger');
+          VACO.render();
+        })
+        .catch(function (err) { VACO.error(err); btn.disabled = false; });
+    });
+  }
+  return btn;
+}
+
+// The trust surface. Shown during the round, not after.
+function fairnessCard() {
+  var round = game.round;
+  var rows = el('div', 'vaco-stack-sm');
+
+  rows.appendChild(el('p', 'vaco-small vaco-dim',
+    'The server committed to a board before your first click and published its hash. '
+    + 'When the round ends the seed itself is revealed — hash it yourself and it will match, '
+    + 'which proves the board could not have moved while you played.'));
+
+  function line(label, value) {
+    var wrap = el('div', 'vaco-stack-sm');
+    wrap.appendChild(el('span', 'vaco-label', label));
+    wrap.appendChild(el('code', 'vaco-mono vaco-small seed', value || '— revealed when the round ends —'));
+    return wrap;
+  }
+  rows.appendChild(line('Your seed', round.clientSeed));
+  rows.appendChild(line('Server seed hash (committed up front)', round.serverSeedHash));
+  rows.appendChild(line('Server seed', round.serverSeed));
+
+  return VACO.card('Provably fair', [rows]);
+}
+
+// -- Fantasy ----------------------------------------------------------
+
+function renderFantasy(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Pick more/less on player props. Every pick in an entry must hit — the DraftKings Pick6 shape, not a parlay against the house.'));
+
+  out.appendChild(VACO.card('Look up a prop', [
+    VACO.form([{ name: 'id', label: 'Prop id', type: 'number', min: 1, value: 1, width: '100px' }],
+      function (values) {
+        return VACO.api('/api/fantasy/props/' + values.id).then(function (prop) {
+          VACO.toast(prop.playerName + ' — ' + prop.statType + ' ' + prop.line);
+        });
+      }, 'Fetch'),
+  ]));
+
+  var id = VACO.userId();
+  if (!id) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to see your entries.'));
+    return VACO.mount(body, out);
+  }
+
+  return VACO.api('/api/fantasy/users/' + encodeURIComponent(id) + '/entries')
+    .then(function (data) {
+      var entries = data.entries || data;
+      out.appendChild(VACO.card('Your entries', [
+        VACO.table([
+          { key: 'id', label: 'Entry' },
+          { label: 'Picks', render: function (r) { return (r.picks || []).length; }, num: true },
+          { label: 'Stake', num: true, render: function (r) { return VACO.price(r.stakeAmount, { freeLabel: false }); } },
+          { label: 'Status', render: function (r) { return VACO.badge(r.status); } },
+        ], entries, { empty: 'No entries yet.' }),
+      ]));
+      VACO.mount(body, out);
+    });
+}
+
+// -- Markets ----------------------------------------------------------
+
+function renderMarkets(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Prediction markets settle against real-world outcomes and against events inside the ecosystem itself — '
+    + 'VDP and VACON-C both emit resolvable outcomes.'));
+
+  return Promise.all([
+    VACO.api('/api/predictions/vdp').catch(function () { return { markets: [] }; }),
+    VACO.api('/api/predictions/vacancy').catch(function () { return { markets: [] }; }),
+  ]).then(function (results) {
+    [['From VDP', results[0]], ['From VACON-C', results[1]]].forEach(function (pair) {
+      var markets = pair[1].markets || pair[1] || [];
+      out.appendChild(VACO.card(pair[0], [
+        VACO.table([
+          { key: 'id', label: 'Market' },
+          { key: 'question', label: 'Question' },
+          { label: 'Status', render: function (r) { return VACO.badge(r.status); } },
+        ], markets, { empty: 'No markets from this source yet.' }),
+      ]));
+    });
+    VACO.mount(body, out);
+  });
+}
+
+VACO.app({
+  id: 'vago',
+  name: 'VAGO',
+  tagline: 'Wagering & casino',
+  //: VAGO's identity: a warm brass. Casino gold without the garishness,
+  //: and clearly distinct from the money-green semantic token so a
+  //: payout never reads as brand chrome.
+  accent: '#d9a23f',
+  accentDim: '#b07f26',
+  accentInk: '#1a1204',
+  tabs: [
+    { id: 'casino', label: 'Casino', heading: 'Mines',
+      blurb: 'Real provably-fair game logic, playable. The board is committed before your first click and the seed is published after.',
+      render: renderCasino },
+    { id: 'fantasy', label: 'Fantasy', heading: 'Player props', render: renderFantasy },
+    { id: 'markets', label: 'Markets', heading: 'Prediction markets', render: renderMarkets },
+  ],
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Vvltvre Studios</title>
+<link rel="stylesheet" href="/vaco-design.css" />
+<style>
+  .cap-table { display: flex; height: 14px; border-radius: var(--vaco-radius-sm); overflow: hidden; background: var(--vaco-surface-hover); }
+  .cap-seg { height: 100%; }
+  .raise-track { height: 8px; border-radius: var(--vaco-radius-pill); background: var(--vaco-surface-hover); overflow: hidden; }
+  .raise-fill { height: 100%; background: var(--vaco-money); }
+</style>
+</head>
+<body class="vaco">
+<script src="/vaco-ui.js"></script>
+<script>
+// Vvltvre Studios — the fund-and-produce arm.
+//
+// Greenlight a project, raise real financing for real equity, produce,
+// then distribute into Vvltvre Flix or Vvltvre Music. Real client of
+// its own 10 routes; equity maths is server-side.
+//
+// **The cap table is the screen.** Everything else about film
+// financing is negotiation; who owns what percentage after the raise is
+// the fact, and it is what an investor actually needs to see.
+
+var el = VACO.el;
+
+function renderProjects(body) {
+  var out = el('div', 'vaco-stack');
+
+  out.appendChild(VACO.card('Greenlight a project', [
+    el('p', 'vaco-small vaco-dim',
+      'A greenlit project can raise. The target is what it needs; equity is what an investor receives for funding it.'),
+    VACO.form([
+      { name: 'title', label: 'Title', placeholder: 'working title', width: '190px' },
+      { name: 'projectType', label: 'Type', options: ['film', 'series', 'album', 'podcast'] },
+      { name: 'fundingTarget', label: 'Target', type: 'number', min: 1, value: 5000, width: '110px' },
+    ], function (values) {
+      if (!VACO.userId()) throw new Error('Sign in to greenlight a project.');
+      return VACO.post('/api/projects', {
+        creatorId: VACO.userId(), title: values.title,
+        projectType: values.projectType, fundingTarget: values.fundingTarget,
+      }).then(function (p) { VACO.toast('Project ' + p.id + ' greenlit.'); VACO.render(); });
+    }, 'Greenlight'),
+  ]));
+
+  return VACO.api('/api/projects').then(function (data) {
+    var projects = data.projects || [];
+    if (!projects.length) {
+      out.appendChild(el('div', 'vaco-empty', 'No projects yet — greenlight the first one above.'));
+      return VACO.mount(body, out);
+    }
+
+    var pending = projects.map(function (p) {
+      return VACO.api('/api/projects/' + p.id + '/equity')
+        .then(function (e) { return { project: p, equity: e }; })
+        .catch(function () { return { project: p, equity: null }; });
+    });
+
+    return Promise.all(pending).then(function (loaded) {
+      out.appendChild(VACO.grid(loaded.map(function (entry) {
+        var p = entry.project;
+        var lines = el('div', 'vaco-stack-sm');
+        lines.appendChild(el('p', 'vaco-small vaco-dim', p.projectType + ' · by ' + p.creatorId));
+
+        var raised = p.raisedAmount || p.amountRaised || 0;
+        var target = p.fundingTarget || 1;
+        var pct = Math.min(100, Math.round((raised / target) * 100));
+        var track = el('div', 'raise-track');
+        var fill = el('div', 'raise-fill');
+        fill.style.width = pct + '%';
+        track.appendChild(fill);
+        lines.appendChild(track);
+        lines.appendChild(el('p', 'vaco-small', VACO.round(raised) + ' of ' + VACO.round(target) + ' raised · ' + pct + '%'));
+
+        // The cap table, as a shape. Who owns what after the money.
+        if (entry.equity) {
+          var holders = entry.equity.holders || entry.equity.equityHolders || [];
+          if (holders.length) {
+            var hues = ['var(--vaco-accent)', 'var(--vaco-info)', 'var(--vaco-money)', 'var(--vaco-warn)'];
+            var cap = el('div', 'cap-table');
+            holders.forEach(function (h, i) {
+              var seg = el('div', 'cap-seg');
+              seg.style.width = (h.equityPercent || h.percent || 0) + '%';
+              seg.style.background = hues[i % hues.length];
+              seg.title = (h.investorId || h.userId) + ' — ' + (h.equityPercent || h.percent || 0) + '%';
+              cap.appendChild(seg);
+            });
+            lines.appendChild(el('span', 'vaco-label', 'Cap table'));
+            lines.appendChild(cap);
+            lines.appendChild(el('p', 'vaco-small vaco-faint',
+              holders.map(function (h) {
+                return (h.investorId || h.userId) + ' ' + (h.equityPercent || h.percent || 0) + '%';
+              }).join(' · ')));
+          }
+        }
+
+        var invest = el('div', 'vaco-row-tight');
+        var amount = el('input', 'vaco-input vaco-num');
+        amount.type = 'number'; amount.min = 1; amount.value = 500;
+        amount.style.width = '96px';
+        amount.setAttribute('aria-label', 'Investment amount');
+        invest.appendChild(amount);
+        invest.appendChild(VACO.button('Invest', function () {
+          if (!VACO.userId()) throw new Error('Sign in to invest.');
+          return VACO.post('/api/projects/' + p.id + '/invest', {
+            investorId: VACO.userId(), amount: Number(amount.value),
+          }).then(function () {
+            VACO.toast('Invested ' + amount.value + ' in ' + p.title + ' for real equity.', 'money');
+            VACO.refreshBalances().then(VACO.renderIdentity);
+            VACO.render();
+          });
+        }, 'primary'));
+        lines.appendChild(invest);
+
+        return VACO.card(p.title, [lines], { trailing: VACO.badge(p.status) });
+      }), true));
+      VACO.mount(body, out);
+    });
+  });
+}
+
+VACO.app({
+  id: 'vulture-studios',
+  name: 'Vvltvre Studios',
+  tagline: 'Fund & produce',
+  //: Vvltvre Studios' identity: a steel blue. Institutional and
+  //: financial rather than creative-warm — this is the arm that writes
+  //: cheques, and it should not look like the label.
+  accent: '#5a8fd6',
+  accentDim: '#3f6fb0',
+  accentInk: '#04101f',
+  tabs: [
+    { id: 'projects', label: 'Projects', heading: 'Greenlit & raising',
+      blurb: 'Real financing for real equity. Investing moves VCoin and changes the cap table — it is not a pledge.',
+      render: renderProjects },
+  ],
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+# CALL — real .dockerignore. Without this, `COPY . .` in
+# infra/docker/Dockerfile.{api,worker} would copy the host's own
+# .venv/ (wrong architecture inside the container), node_modules/,
+# every cache directory, and .env (real local secrets) straight into
+# the image. Mirrors .gitignore's own real exclusions plus the
+# Docker-specific ones .gitignore has no reason to care about.
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+*.egg-info/
+dist/
+
+# Node / Next.js
+node_modules/
+.next/
+next-env.d.ts
+
+# Env — real local secrets never belong in an image
+.env
+
+# CALL's own real runtime data
+data/output/
+*.tsbuildinfo
+
+# Docker/VCS bookkeeping with no reason to be inside the image itself
+.git/
+.dockerignore
+Dockerfile*
+docker-compose*.yml

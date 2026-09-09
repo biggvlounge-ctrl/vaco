@@ -1,0 +1,617 @@
+/* ==========================================================================
+   VACO Design System v1 — the ecosystem's shared visual foundation.
+
+   `VISUAL_DESIGN_COHESION_DIRECTIVE.md` asked for exactly this file and
+   recorded, honestly, that it did not exist: "Shared design tokens in
+   Vaco Shell: none." This is that file, built to the smallest-real-
+   first-step the directive itself proposed — tokens, then the shell,
+   then one more consumer as proof.
+
+   THE SPLIT, decided explicitly rather than discovered per-app.
+   The directive asks for both a family look and a per-app identity, and
+   those pull against each other. The resolution, which every app must
+   follow:
+
+       the shared layer owns STRUCTURE — type scale, spacing, radii,
+       component shapes, interaction language.
+
+       the per-app layer owns COLOR — and only color, via the four
+       accent tokens below.
+
+   Left unstated, the predictable outcome is fourteen apps each
+   reinterpreting the system differently, which looks exactly like the
+   disconnected family this is meant to prevent.
+
+   HOW AN APP CONSUMES IT
+       <link rel="stylesheet" href="http://localhost:8789/vaco-design.css">
+       <style>
+         :root {
+           --vaco-accent:      #f0883e;     the app's own hue
+           --vaco-accent-soft: #f0883e26;   the accent at ~15% for fills
+           --vaco-accent-ink:  #0b0f14;     text ON the accent
+           --vaco-accent-dim:  #b8642a;     hover/pressed
+         }
+       </style>
+
+   Overriding anything else is how the family look erodes. If a token is
+   missing that an app genuinely needs, it belongs in this file.
+   ========================================================================== */
+
+:root {
+  /* -- Neutrals -----------------------------------------------------------
+     Chosen, not defaulted. Every step carries a slight blue bias (hue
+     ~213°) rather than being a true grey, so surfaces read as a
+     deliberate cool ink rather than as unstyled #888. */
+  --vaco-ink-900: #080b0f;   /* deepest — page ground                     */
+  --vaco-ink-800: #0d1219;   /* raised ground                             */
+  --vaco-ink-700: #141b25;   /* card                                      */
+  --vaco-ink-600: #1b2431;   /* card, one level up / hover                */
+  --vaco-ink-500: #26313f;   /* border, strong                            */
+  --vaco-ink-400: #33404f;   /* border, subtle                            */
+  --vaco-ink-300: #5b6a7c;   /* disabled text                             */
+  --vaco-ink-200: #8b9aab;   /* secondary text                            */
+  --vaco-ink-100: #c3cedb;   /* primary text, softened                    */
+  --vaco-ink-050: #e8eef5;   /* primary text                              */
+
+  --vaco-bg: var(--vaco-ink-900);
+  --vaco-bg-raised: var(--vaco-ink-800);
+  --vaco-surface: var(--vaco-ink-700);
+  --vaco-surface-hover: var(--vaco-ink-600);
+  --vaco-border: var(--vaco-ink-500);
+  --vaco-border-subtle: var(--vaco-ink-400);
+  --vaco-text: var(--vaco-ink-050);
+  --vaco-text-dim: var(--vaco-ink-200);
+  --vaco-text-faint: var(--vaco-ink-300);
+
+  /* -- Accent: the one thing an app overrides ----------------------------
+     VACO's own is a signal aqua, carried forward from the shell's
+     original palette so the front door stays recognisable. */
+  --vaco-accent: #46d4c4;
+  --vaco-accent-soft: #46d4c422;
+  --vaco-accent-ink: #04120f;
+  --vaco-accent-dim: #2a9c90;
+
+  /* -- Semantic: NOT the accent -----------------------------------------
+     Kept separate on purpose. An app that recolours "money" to match its
+     brand makes a green number mean something different in every app,
+     which is the one thing a shared ledger cannot afford. */
+  --vaco-money: #4ade80;      /* VCoin, payouts, positive balance         */
+  --vaco-money-soft: #4ade8018;
+  --vaco-warn: #f0a03e;       /* held, pending, needs attention           */
+  --vaco-warn-soft: #f0a03e18;
+  --vaco-danger: #f2626b;     /* refused, refunded, destructive           */
+  --vaco-danger-soft: #f2626b18;
+  --vaco-info: #6aa6f5;
+  --vaco-info-soft: #6aa6f518;
+
+  /* -- Type -------------------------------------------------------------
+     One scale, 1.2 ratio off a 14px base. The display face is optional
+     and degrades to the UI stack; no app should depend on a webfont
+     loading to be legible. */
+  --vaco-font: ui-sans-serif, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --vaco-font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  --vaco-text-xs: 11.5px;
+  --vaco-text-sm: 13px;
+  --vaco-text-base: 14px;
+  --vaco-text-md: 16px;
+  --vaco-text-lg: 19px;
+  --vaco-text-xl: 23px;
+  --vaco-text-2xl: 28px;
+  --vaco-text-3xl: 34px;
+
+  --vaco-leading-tight: 1.2;
+  --vaco-leading-normal: 1.55;
+
+  --vaco-weight-normal: 400;
+  --vaco-weight-medium: 500;
+  --vaco-weight-bold: 650;
+
+  /* -- Space: a 4px grid, named by step not by pixel --------------------- */
+  --vaco-space-1: 4px;
+  --vaco-space-2: 8px;
+  --vaco-space-3: 12px;
+  --vaco-space-4: 16px;
+  --vaco-space-5: 24px;
+  --vaco-space-6: 32px;
+  --vaco-space-7: 48px;
+  --vaco-space-8: 64px;
+
+  /* -- Shape ------------------------------------------------------------- */
+  --vaco-radius-sm: 5px;
+  --vaco-radius: 9px;
+  --vaco-radius-lg: 14px;
+  --vaco-radius-pill: 999px;
+
+  --vaco-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --vaco-shadow: 0 4px 16px -4px rgb(0 0 0 / 0.5);
+  --vaco-shadow-lg: 0 16px 40px -12px rgb(0 0 0 / 0.6);
+
+  /* -- Motion: one duration and one curve, so the whole family moves
+        the same way. ------------------------------------------------------ */
+  --vaco-ease: cubic-bezier(0.2, 0, 0.15, 1);
+  --vaco-duration: 140ms;
+
+  --vaco-container: 1180px;
+}
+
+/* Light theme. Only tokens are redefined — never a component rule, so a
+   colour can never end up defined in one theme and missing in the other.
+   Guarded so an explicit dark choice beats a light OS setting. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-vaco-theme="dark"]) {
+    --vaco-bg: #f6f8fb;
+    --vaco-bg-raised: #ffffff;
+    --vaco-surface: #ffffff;
+    --vaco-surface-hover: #eef2f7;
+    --vaco-border: #d3dbe5;
+    --vaco-border-subtle: #e4eaf1;
+    --vaco-text: #10161e;
+    --vaco-text-dim: #55637a;
+    --vaco-text-faint: #8593a8;
+
+    --vaco-accent: #12897c;
+    --vaco-accent-soft: #12897c1a;
+    --vaco-accent-ink: #ffffff;
+    --vaco-accent-dim: #0d6a60;
+
+    --vaco-money: #16794a;
+    --vaco-money-soft: #16794a14;
+    --vaco-warn: #a4630b;
+    --vaco-warn-soft: #a4630b14;
+    --vaco-danger: #c4303c;
+    --vaco-danger-soft: #c4303c14;
+    --vaco-info: #2563c9;
+    --vaco-info-soft: #2563c914;
+
+    --vaco-shadow-sm: 0 1px 2px rgb(16 22 30 / 0.06);
+    --vaco-shadow: 0 4px 16px -4px rgb(16 22 30 / 0.1);
+    --vaco-shadow-lg: 0 16px 40px -12px rgb(16 22 30 / 0.14);
+  }
+}
+
+:root[data-vaco-theme="light"] {
+  --vaco-bg: #f6f8fb;
+  --vaco-bg-raised: #ffffff;
+  --vaco-surface: #ffffff;
+  --vaco-surface-hover: #eef2f7;
+  --vaco-border: #d3dbe5;
+  --vaco-border-subtle: #e4eaf1;
+  --vaco-text: #10161e;
+  --vaco-text-dim: #55637a;
+  --vaco-text-faint: #8593a8;
+  --vaco-accent: #12897c;
+  --vaco-accent-soft: #12897c1a;
+  --vaco-accent-ink: #ffffff;
+  --vaco-accent-dim: #0d6a60;
+  --vaco-money: #16794a;
+  --vaco-money-soft: #16794a14;
+  --vaco-warn: #a4630b;
+  --vaco-warn-soft: #a4630b14;
+  --vaco-danger: #c4303c;
+  --vaco-danger-soft: #c4303c14;
+  --vaco-info: #2563c9;
+  --vaco-info-soft: #2563c914;
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body.vaco {
+  margin: 0;
+  /* Explicit, from a token. A transparent body borrows whatever ground
+     the host paints, which is how a page ends up with one theme's text
+     on the other theme's background. */
+  background: var(--vaco-bg);
+  color: var(--vaco-text);
+  font-family: var(--vaco-font);
+  font-size: var(--vaco-text-base);
+  line-height: var(--vaco-leading-normal);
+  -webkit-font-smoothing: antialiased;
+}
+
+.vaco-container {
+  max-width: var(--vaco-container);
+  margin: 0 auto;
+  padding: 0 var(--vaco-space-5);
+}
+
+/* Layout does the spacing — gap between siblings, not margins that
+   collapse or double. */
+.vaco-stack { display: flex; flex-direction: column; gap: var(--vaco-space-4); }
+.vaco-stack-sm { display: flex; flex-direction: column; gap: var(--vaco-space-2); }
+.vaco-row { display: flex; align-items: center; gap: var(--vaco-space-3); flex-wrap: wrap; }
+.vaco-row-tight { display: flex; align-items: center; gap: var(--vaco-space-2); flex-wrap: wrap; }
+.vaco-spacer { flex: 1; }
+
+/* ==========================================================================
+   App chrome — the masthead every app shares.
+
+   This is the family resemblance made literal: the same bar, in the same
+   place, with the app's own name and colour in it. `vaco-ui.js` builds
+   it; these are the shapes it builds with.
+   ========================================================================== */
+
+.vaco-masthead {
+  border-bottom: 1px solid var(--vaco-border-subtle);
+  background: var(--vaco-bg-raised);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+.vaco-masthead-inner {
+  display: flex;
+  align-items: center;
+  gap: var(--vaco-space-4);
+  padding-top: var(--vaco-space-3);
+  padding-bottom: var(--vaco-space-3);
+  flex-wrap: wrap;
+}
+.vaco-masthead .vaco-tabs { border-bottom: 0; }
+
+/* The brand is a link home to the store. Every app in the family
+   offering the same way back is part of feeling like one system. */
+.vaco-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  text-decoration: none;
+  color: inherit;
+}
+.vaco-brand-mark {
+  font-size: var(--vaco-text-md);
+  font-weight: var(--vaco-weight-bold);
+  letter-spacing: 0.1em;
+  color: var(--vaco-accent);
+  line-height: 1.1;
+}
+.vaco-brand-tag {
+  font-size: var(--vaco-text-xs);
+  color: var(--vaco-text-faint);
+  line-height: 1.1;
+}
+
+.vaco-wallet {
+  display: flex;
+  align-items: baseline;
+  gap: var(--vaco-space-2);
+  padding: var(--vaco-space-1) var(--vaco-space-3);
+  background: var(--vaco-money-soft);
+  border-radius: var(--vaco-radius-pill);
+}
+
+#vaco-main { padding-top: var(--vaco-space-6); padding-bottom: var(--vaco-space-8); }
+
+/* ==========================================================================
+   Type
+   ========================================================================== */
+
+.vaco-display {
+  font-size: var(--vaco-text-3xl);
+  font-weight: var(--vaco-weight-bold);
+  line-height: var(--vaco-leading-tight);
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  margin: 0;
+}
+.vaco-h1 {
+  font-size: var(--vaco-text-2xl);
+  font-weight: var(--vaco-weight-bold);
+  line-height: var(--vaco-leading-tight);
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+  margin: 0;
+}
+.vaco-h2 {
+  font-size: var(--vaco-text-lg);
+  font-weight: var(--vaco-weight-bold);
+  line-height: var(--vaco-leading-tight);
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+.vaco-h3 {
+  font-size: var(--vaco-text-md);
+  font-weight: var(--vaco-weight-medium);
+  line-height: var(--vaco-leading-tight);
+  margin: 0;
+}
+.vaco-body { font-size: var(--vaco-text-base); margin: 0; }
+.vaco-small { font-size: var(--vaco-text-sm); margin: 0; }
+.vaco-dim { color: var(--vaco-text-dim); }
+.vaco-faint { color: var(--vaco-text-faint); }
+
+/* The uppercase section label. Letter-spacing is not decoration here —
+   uppercase without it reads as cramped at small sizes. */
+.vaco-label {
+  font-size: var(--vaco-text-xs);
+  font-weight: var(--vaco-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--vaco-text-faint);
+  margin: 0;
+}
+
+.vaco-mono { font-family: var(--vaco-font-mono); font-size: 0.94em; }
+
+/* Any column of figures. Digits that do not line up are the fastest way
+   to make a financial surface look untrustworthy. */
+.vaco-num { font-variant-numeric: tabular-nums; }
+
+/* ==========================================================================
+   Surfaces
+   ========================================================================== */
+
+.vaco-card {
+  background: var(--vaco-surface);
+  border: 1px solid var(--vaco-border);
+  border-radius: var(--vaco-radius);
+  padding: var(--vaco-space-4);
+}
+.vaco-card-lg { padding: var(--vaco-space-5); border-radius: var(--vaco-radius-lg); }
+
+.vaco-panel {
+  background: var(--vaco-bg-raised);
+  border: 1px solid var(--vaco-border-subtle);
+  border-radius: var(--vaco-radius-lg);
+  padding: var(--vaco-space-5);
+}
+
+.vaco-divider { height: 1px; background: var(--vaco-border-subtle); border: 0; margin: 0; }
+
+.vaco-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: var(--vaco-space-4);
+}
+.vaco-grid-wide { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+
+/* ==========================================================================
+   Controls
+   ========================================================================== */
+
+.vaco-btn {
+  font-family: inherit;
+  font-size: var(--vaco-text-sm);
+  font-weight: var(--vaco-weight-medium);
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--vaco-space-2);
+  padding: 9px 14px;
+  border-radius: var(--vaco-radius-sm);
+  border: 1px solid var(--vaco-border);
+  background: var(--vaco-surface);
+  color: var(--vaco-text);
+  cursor: pointer;
+  transition: background var(--vaco-duration) var(--vaco-ease),
+              border-color var(--vaco-duration) var(--vaco-ease),
+              opacity var(--vaco-duration) var(--vaco-ease);
+}
+.vaco-btn:hover:not(:disabled) { background: var(--vaco-surface-hover); border-color: var(--vaco-border-subtle); }
+.vaco-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.vaco-btn-primary {
+  background: var(--vaco-accent);
+  border-color: var(--vaco-accent);
+  color: var(--vaco-accent-ink);
+  font-weight: var(--vaco-weight-bold);
+}
+.vaco-btn-primary:hover:not(:disabled) { background: var(--vaco-accent-dim); border-color: var(--vaco-accent-dim); }
+
+.vaco-btn-danger { color: var(--vaco-danger); border-color: var(--vaco-danger-soft); }
+.vaco-btn-danger:hover:not(:disabled) { background: var(--vaco-danger-soft); }
+
+.vaco-btn-ghost { background: transparent; border-color: transparent; color: var(--vaco-text-dim); }
+.vaco-btn-ghost:hover:not(:disabled) { background: var(--vaco-surface-hover); color: var(--vaco-text); }
+
+.vaco-btn-sm { padding: 6px 10px; font-size: var(--vaco-text-xs); }
+
+.vaco-input, .vaco-select {
+  font-family: inherit;
+  font-size: var(--vaco-text-sm);
+  background: var(--vaco-bg-raised);
+  border: 1px solid var(--vaco-border);
+  color: var(--vaco-text);
+  border-radius: var(--vaco-radius-sm);
+  padding: 9px 11px;
+  min-width: 0;
+  transition: border-color var(--vaco-duration) var(--vaco-ease);
+}
+.vaco-input::placeholder { color: var(--vaco-text-faint); }
+.vaco-input:hover, .vaco-select:hover { border-color: var(--vaco-border-subtle); }
+
+/* Keyboard focus must be visible. One ring, one rule, everywhere. */
+.vaco-btn:focus-visible,
+.vaco-input:focus-visible,
+.vaco-select:focus-visible,
+.vaco-tile:focus-visible,
+.vaco-tab:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--vaco-accent);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Tabs
+   ========================================================================== */
+
+.vaco-tabs {
+  display: flex;
+  gap: var(--vaco-space-1);
+  border-bottom: 1px solid var(--vaco-border-subtle);
+  overflow-x: auto;
+}
+.vaco-tab {
+  font-family: inherit;
+  font-size: var(--vaco-text-sm);
+  font-weight: var(--vaco-weight-medium);
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--vaco-text-dim);
+  padding: var(--vaco-space-3) var(--vaco-space-4);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--vaco-duration) var(--vaco-ease),
+              border-color var(--vaco-duration) var(--vaco-ease);
+}
+.vaco-tab:hover { color: var(--vaco-text); }
+.vaco-tab[aria-selected="true"] { color: var(--vaco-accent); border-bottom-color: var(--vaco-accent); }
+
+/* ==========================================================================
+   Badges — state encoded in form as well as in the word, so what needs
+   attention reads at a glance rather than on a careful read.
+   ========================================================================== */
+
+.vaco-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--vaco-text-xs);
+  font-weight: var(--vaco-weight-medium);
+  line-height: 1;
+  padding: 4px 9px;
+  border-radius: var(--vaco-radius-pill);
+  background: var(--vaco-surface-hover);
+  color: var(--vaco-text-dim);
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.vaco-badge-accent { background: var(--vaco-accent-soft); color: var(--vaco-accent); }
+.vaco-badge-money  { background: var(--vaco-money-soft);  color: var(--vaco-money);  }
+.vaco-badge-warn   { background: var(--vaco-warn-soft);   color: var(--vaco-warn);   }
+.vaco-badge-danger { background: var(--vaco-danger-soft); color: var(--vaco-danger); }
+.vaco-badge-info   { background: var(--vaco-info-soft);   color: var(--vaco-info);   }
+
+/* ==========================================================================
+   Money — one presentation of a VCoin figure across every app.
+   ========================================================================== */
+
+.vaco-price {
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--vaco-weight-bold);
+  color: var(--vaco-money);
+}
+.vaco-price-free { color: var(--vaco-text-dim); font-weight: var(--vaco-weight-medium); }
+.vaco-price::after { content: " VC"; font-size: 0.78em; font-weight: var(--vaco-weight-normal); opacity: 0.7; }
+.vaco-price-bare::after { content: none; }
+
+/* ==========================================================================
+   Tile — the launcher/store unit
+   ========================================================================== */
+
+.vaco-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vaco-space-2);
+  background: var(--vaco-surface);
+  border: 1px solid var(--vaco-border);
+  border-radius: var(--vaco-radius);
+  padding: var(--vaco-space-4);
+  text-decoration: none;
+  color: inherit;
+  transition: background var(--vaco-duration) var(--vaco-ease),
+              border-color var(--vaco-duration) var(--vaco-ease),
+              transform var(--vaco-duration) var(--vaco-ease);
+}
+.vaco-tile:hover {
+  background: var(--vaco-surface-hover);
+  border-color: var(--vaco-accent);
+  transform: translateY(-1px);
+}
+.vaco-tile-disabled { opacity: 0.5; pointer-events: none; }
+
+/* ==========================================================================
+   Table — wide content scrolls inside its own container, never the page.
+   ========================================================================== */
+
+.vaco-table-wrap { overflow-x: auto; border: 1px solid var(--vaco-border); border-radius: var(--vaco-radius); }
+.vaco-table { width: 100%; border-collapse: collapse; font-size: var(--vaco-text-sm); }
+.vaco-table th {
+  text-align: left;
+  font-size: var(--vaco-text-xs);
+  font-weight: var(--vaco-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--vaco-text-faint);
+  padding: var(--vaco-space-3) var(--vaco-space-4);
+  background: var(--vaco-bg-raised);
+  white-space: nowrap;
+}
+.vaco-table td {
+  padding: var(--vaco-space-3) var(--vaco-space-4);
+  border-top: 1px solid var(--vaco-border-subtle);
+  vertical-align: middle;
+}
+.vaco-table td.vaco-num, .vaco-table th.vaco-num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ==========================================================================
+   Empty state and notices
+   ========================================================================== */
+
+.vaco-empty {
+  text-align: center;
+  padding: var(--vaco-space-7) var(--vaco-space-4);
+  color: var(--vaco-text-dim);
+  border: 1px dashed var(--vaco-border);
+  border-radius: var(--vaco-radius);
+}
+
+.vaco-notice {
+  display: flex;
+  gap: var(--vaco-space-3);
+  padding: var(--vaco-space-3) var(--vaco-space-4);
+  border-radius: var(--vaco-radius-sm);
+  font-size: var(--vaco-text-sm);
+  border-left: 3px solid var(--vaco-info);
+  background: var(--vaco-info-soft);
+  color: var(--vaco-text);
+}
+.vaco-notice-warn   { border-left-color: var(--vaco-warn);   background: var(--vaco-warn-soft);   }
+.vaco-notice-danger { border-left-color: var(--vaco-danger); background: var(--vaco-danger-soft); }
+
+/* ==========================================================================
+   Toast
+   ========================================================================== */
+
+.vaco-toast-host {
+  position: fixed;
+  bottom: var(--vaco-space-5);
+  right: var(--vaco-space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--vaco-space-2);
+  z-index: 100;
+  pointer-events: none;
+}
+.vaco-toast {
+  background: var(--vaco-surface);
+  border: 1px solid var(--vaco-border);
+  border-left: 3px solid var(--vaco-accent);
+  border-radius: var(--vaco-radius-sm);
+  box-shadow: var(--vaco-shadow-lg);
+  padding: var(--vaco-space-3) var(--vaco-space-4);
+  font-size: var(--vaco-text-sm);
+  max-width: 380px;
+  animation: vaco-toast-in var(--vaco-duration) var(--vaco-ease);
+}
+.vaco-toast-danger { border-left-color: var(--vaco-danger); }
+.vaco-toast-money  { border-left-color: var(--vaco-money);  }
+
+@keyframes vaco-toast-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .vaco-tile:hover { transform: none; }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "vaco-notify",
+  "version": "1.0.0",
+  "description": "The one notification channel. VSAFE escalations, DREAMS alerts, and VACO Analytics alerts all deliver through here.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": { "node": ">=22" },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  }
+}

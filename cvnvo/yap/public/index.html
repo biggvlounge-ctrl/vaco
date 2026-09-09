@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>YAP</title>
+<link rel="stylesheet" href="/vaco-design.css" />
+<style>
+  .signal { display: flex; align-items: center; gap: var(--vaco-space-4); }
+  .signal-count { font-size: var(--vaco-text-3xl); font-weight: var(--vaco-weight-bold); font-variant-numeric: tabular-nums; }
+  .report { padding: var(--vaco-space-3) 0; border-top: 1px solid var(--vaco-border-subtle); }
+  .report:first-child { border-top: 0; }
+</style>
+</head>
+<body class="vaco">
+<script src="/vaco-ui.js"></script>
+<script>
+// YAP — safety reporting, split out of CVNVO.
+//
+// **Why it is its own app.** A safety report about someone has to
+// outlive the app the encounter happened in, and has to be readable by
+// apps other than the one that took it. Keeping it inside CVNVO would
+// have made it dating-only, which is precisely wrong for a signal that
+// VOID, CVNVO, and VACAY all have reason to check.
+//
+// **This is deliberately not a public review site.** Reports are a
+// signal that consuming apps weigh; they are not published, ranked, or
+// shown to the person being reported. A reporting tool that doubles as
+// a reputation board becomes a harassment tool, and the split above
+// exists to keep those separate.
+
+var el = VACO.el;
+
+function renderLookup(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'A lookup returns a <strong>summary signal</strong>, not the reports themselves. Consuming apps get enough '
+    + 'to make a decision without republishing what someone wrote in confidence.'));
+
+  out.appendChild(VACO.card('Look up a subject', [
+    VACO.form([{ name: 'subjectId', label: 'Subject', placeholder: 'user id', width: '180px' }],
+      function (values) {
+        var id = encodeURIComponent(values.subjectId);
+        return Promise.all([
+          VACO.api('/yap/lookup/' + id).catch(function () { return null; }),
+          VACO.api('/yap/summary/' + id).catch(function () { return null; }),
+        ]).then(function (r) {
+          var lookup = r[0], summary = r[1];
+          while (out.childNodes.length > 2) out.removeChild(out.lastChild);
+
+          var data = summary || lookup || {};
+          var count = data.reportCount !== undefined ? data.reportCount
+            : (data.count !== undefined ? data.count : 0);
+
+          var row = el('div', 'signal');
+          var num = el('span', 'signal-count', count);
+          num.style.color = count > 0 ? 'var(--vaco-warn)' : 'var(--vaco-money)';
+          row.appendChild(num);
+          var text = el('div', 'vaco-stack-sm');
+          text.appendChild(el('strong', null, count === 0
+            ? 'No reports on file'
+            : count + ' report(s) on file'));
+          text.appendChild(el('p', 'vaco-small vaco-dim', count === 0
+            ? 'A clean lookup is not a character reference — it means nobody has reported this subject here.'
+            : 'Consuming apps weigh this alongside their own signals. It is not a verdict.'));
+          row.appendChild(text);
+
+          var extras = Object.keys(data).filter(function (k) {
+            return typeof data[k] !== 'object' && k !== 'reportCount' && k !== 'count';
+          }).map(function (k) { return { field: k.replace(/([A-Z])/g, ' $1'), value: String(data[k]) }; });
+
+          var children = [row];
+          if (extras.length) {
+            children.push(VACO.table(
+              [{ key: 'field', label: 'Field' }, { key: 'value', label: 'Value' }], extras));
+          }
+          out.appendChild(VACO.card(values.subjectId, children));
+          VACO.mount(body, out);
+        });
+      }, 'Look up'),
+  ]));
+
+  return VACO.mount(body, out);
+}
+
+function renderReport(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Filing a report is a serious act with real consequences for the person named. '
+    + 'It is recorded against a reporter, not anonymous — <strong>and there is no moderation queue built</strong>, '
+    + 'so nothing here reviews a report before it counts toward a subject’s signal. That gate is genuinely missing.',
+    'warn'));
+
+  out.appendChild(VACO.card('File a report', [
+    VACO.form([
+      { name: 'reporterId', label: 'Reporter', value: VACO.userId() || '', width: '140px' },
+      { name: 'subjectId', label: 'Subject', placeholder: 'who', width: '140px' },
+      { name: 'category', label: 'Category', options: ['harassment', 'safety', 'fraud', 'no-show', 'other'] },
+      { name: 'detail', label: 'What happened', placeholder: 'briefly', width: '240px' },
+    ], function (values) {
+      return VACO.post('/yap/reports', values)
+        .then(function (r) { VACO.toast('Report ' + (r.id || '') + ' filed.'); });
+    }, 'File'),
+  ]));
+
+  out.appendChild(VACO.card('Reports for a subject', [
+    el('p', 'vaco-small vaco-dim',
+      'Visible to an operator reviewing a case, not to the subject and not to the public.'),
+    VACO.form([{ name: 'subjectId', label: 'Subject', placeholder: 'user id', width: '160px' }],
+      function (values) {
+        return VACO.api('/yap/reports/' + encodeURIComponent(values.subjectId)).then(function (data) {
+          var reports = data.reports || data || [];
+          while (out.childNodes.length > 3) out.removeChild(out.lastChild);
+          var list = el('div', null);
+          if (!reports.length) {
+            list.appendChild(el('div', 'vaco-empty', 'No reports for that subject.'));
+          } else {
+            reports.forEach(function (rep) {
+              var row = el('div', 'report');
+              var head = el('div', 'vaco-row-tight');
+              head.appendChild(VACO.badge(rep.category || 'other', 'warn'));
+              head.appendChild(el('span', 'vaco-small vaco-faint',
+                rep.createdAt ? new Date(rep.createdAt).toLocaleString() : ''));
+              row.appendChild(head);
+              row.appendChild(el('p', 'vaco-small', rep.detail || ''));
+              list.appendChild(row);
+            });
+          }
+          out.appendChild(VACO.card(reports.length + ' report(s)', [list]));
+          VACO.mount(body, out);
+        });
+      }, 'Load'),
+  ]));
+
+  return VACO.mount(body, out);
+}
+
+VACO.app({
+  id: 'yap',
+  name: 'YAP',
+  tagline: 'Safety reporting',
+  //: YAP's identity: a sober amber. It is a warning signal by nature,
+  //: and should not look like the dating app it was split out of.
+  accent: '#d99a3f',
+  accentDim: '#b57a26',
+  accentInk: '#1a1104',
+  tabs: [
+    { id: 'lookup', label: 'Lookup', heading: 'Check a subject', render: renderLookup },
+    { id: 'report', label: 'Report', heading: 'File & review', render: renderReport },
+  ],
+});
+</script>
+</body>
+</html>

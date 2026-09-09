@@ -1,0 +1,16 @@
+[project]
+name = "vexbusiness-ai"
+version = "0.1.0"
+description = "Vex Business — real LLM-based trade rationale (ai/rationale.py): explains an already-finalized opportunity/risk decision in plain English, never makes or overrides one. Statistical/ML models (logistic regression, gradient boosting, calibrated classifiers per Master Directive Section 15) remain explicitly deferred -- Section 12 requires a deterministic regime-engine baseline before any black-box model is introduced."
+requires-python = ">=3.12"
+dependencies = ["vexbusiness-domain", "httpx>=0.27"]
+
+[tool.uv.sources]
+vexbusiness-domain = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["ai"]

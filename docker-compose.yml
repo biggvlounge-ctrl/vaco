@@ -1,0 +1,1006 @@
+# VACO -- generated Docker Compose config. Regenerate with
+# node deploy/generate-docker-compose.js
+# (also regenerate deploy/nginx-docker.conf: node deploy/generate-nginx-conf.js --docker)
+#
+# Run:
+#   cp .env.example .env   # set ANTHROPIC_API_KEY for v4-proxy
+#   docker compose up --build
+# Front door: http://localhost/ (nginx -> vaco-shell)
+# Direct per-app access (bypassing nginx): http://localhost:<port>/api/health
+
+services:
+  vaco-shell:
+    build:
+      context: ./vaco-shell
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8789
+    container_name: vaco-shell
+    environment:
+      PORT: 8789
+      SHIELD_API_URL: "http://shield:8812"
+      V3_API_URL: "http://v3:8811"
+      VACON_API_URL: "http://vacon:8805"
+      VACO_AUDIT_URL: "http://vaco-audit:8819"
+      VACO_OPERATOR_URL: "http://vaco-operator:8820"
+      VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
+      VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
+      VACO_SERVICE_NAME: vaco-shell
+      VACO_SERVICE_TOKEN: "${VACO_TOKEN_VACO_SHELL:?Set a V3 service token for vaco-shell in .env}"
+      VACO_AUDIT_MODE: "${VACO_AUDIT_MODE:-enforce}"
+      VACO_OPERATOR_MODE: "${VACO_OPERATOR_MODE:-enforce}"
+    ports:
+      - "8789:8789"
+    networks:
+      - vaco
+    restart: unless-stopped
+    depends_on:
+      - v3
+      - shield
+      - vaco-audit
+      - vaco-operator
+  v4-proxy:
+    build:
+      context: ./v4-proxy
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8787
+    container_name: v4-proxy
+    environment:
+      PORT: 8787
+      SHIELD_API_URL: "http://shield:8812"
+      VACO_MEDIA_URL: "http://vaco-media:8821"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:?Set ANTHROPIC_API_KEY in a .env file at the repo root}"
+      VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
+      VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
+      VACO_SERVICE_NAME: v4-proxy
+      VACO_SERVICE_TOKEN: "${VACO_TOKEN_V4_PROXY:?Set a V3 service token for v4-proxy in .env}"
+    ports:
+      - "8787:8787"
+    networks:
+      - vaco
+    restart: unless-stopped
+    depends_on:
+      - v3
+      - shield
+  v4-search:
+    build:
+      context: ./v4-search
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8788
+    container_name: v4-search
+    environment:
+      PORT: 8788
+    ports:
+      - "8788:8788"
+    networks:
+      - vaco
+    restart: unless-stopped
+    depends_on:
+      - v3
+      - shield
+  vacon:
+    build:
+      context: ./vacon
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8805
+    container_name: vacon
+    environment:
+      PORT: 8805
+      V4_PROXY_URL: "http://v4-proxy:8787"
+      VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
+      VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
+      VACO_SERVICE_NAME: vacon
+      VACO_SERVICE_TOKEN: "${VACO_TOKEN_VACON:?Set a V3 service token for vacon in .env}"
+    ports:
+      - "8805:8805"
+    networks:
+      - vaco
+    restart: unless-stopped
+    volumes:
+      - "vacon_data:/app/data"
+    depends_on:
+      - v3
+      - shield
+  vacon-c:
+    build:
+      context: ./vacon-c
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8809
+    container_name: vacon-c
+    environment:
+      PORT: 8809
+      SHIELD_API_URL: "http://shield:8812"
+      VACO_OPERATOR_URL: "http://vaco-operator:8820"
+      VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
+      VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
+      VACO_SERVICE_NAME: vacon-c
+      VACO_SERVICE_TOKEN: "${VACO_TOKEN_VACON_C:?Set a V3 service token for vacon-c in .env}"
+      VACO_OPERATOR_MODE: "${VACO_OPERATOR_MODE:-enforce}"
+    ports:
+      - "8809:8809"
+    networks:
+      - vaco
+    restart: unless-stopped
+    depends_on:
+      - v3
+      - shield
+      - vaco-operator
+  hvntz:
+    build:
+      context: ./hvntz
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8792
+    container_name: hvntz
+    environment:
+      PORT: 8792
+      SHIELD_API_URL: "http://shield:8812"
+      V3_API_URL: "http://v3:8811"
+      VACO_AUDIT_URL: "http://vaco-audit:8819"
+      VACO_OPERATOR_URL: "http://vaco-operator:8820"
+      VAVLT_STVDIOS_API_URL: "http://vavlt-stvdios:8808"
+      VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
+      VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
+      VACO_SERVICE_NAME: hvntz
+      VACO_SERVICE_TOKEN: "${VACO_TOKEN_HVNTZ:?Set a V3 service token for hvntz in .env}"
+      VACO_AUDIT_MODE: "${VACO_AUDIT_MODE:-enforce}"
+      VACO_OPERATOR_MODE: "${VACO_OPERATOR_MODE:-enforce}"
+    ports:
+      - "8792:8792"
+    networks:
+      - vaco
+    restart: unless-stopped
+    volumes:
+      - "hvntz_data:/app/data"
+    depends_on:
+      - v3
+      - shield
+      - vaco-audit
+      - vaco-operator
+  void:
+    build:
+      context: ./void
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8793
+    container_name: void
+    environment:
+      PORT: 8793
+      HVNTZ_API_URL: "http://hvntz:8792"
+      SHIELD_API_URL: "http://shield:8812"
+      V3_API_URL: "http://v3:8811"
+      VACA_API_URL: "http://vaca:8804"
+      VACO_ANALYTICS_URL: "http://vaco-analytics:8790"
+      VACO_AUDIT_URL: "http://vaco-audit:8819"
+      VACO_OPERATOR_URL: "http://vaco-operator:8820"
+      VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
+      VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
+      VACO_SERVICE_NAME: void
+      VACO_SERVICE_TOKEN: "${VACO_TOKEN_VOID:?Set a V3 service token for void in .env}"
+      VACO_AUDIT_MODE: "${VACO_AUDIT_MODE:-enforce}"
+      VACO_OPERATOR_MODE: "${VACO_OPERATOR_MODE:-enforce}"
+    ports:
+      - "8793:8793"
+    networks:
+      - vaco
+    restart: unless-stopped
+    volumes:
+      - "void_data:/app/data"
+    depends_on:
+      - v3
+      - shield
+      - vaco-audit
+      - vaco-operator
+  voidmagic:
+    build:
+      context: ./voidmagic
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8797
+    container_name: voidmagic
+    environment:
+      PORT: 8797
+      SHIELD_API_URL: "http://shield:8812"
+      V3_API_URL: "http://v3:8811"
+      VOID_API_URL: "http://void:8793"
+      VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
+      VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
+      VACO_SERVICE_NAME: voidmagic
+      VACO_SERVICE_TOKEN: "${VACO_TOKEN_VOIDMAGIC:?Set a V3 service token for voidmagic in .env}"
+    ports:
+      - "8797:8797"
+    networks:
+      - vaco
+    restart: unless-stopped
+    volumes:
+      - "voidmagic_data:/app/data"
+    depends_on:
+      - v3
+      - shield
+  voken:
+    build:
+      context: ./voken
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8794
+    container_name: voken
+    environment:
+      PORT: 8794
+      SHIELD_API_URL: "http://shield:8812"
+      V3_API_URL: "http://v3:8811"
+      VACA_API_URL: "http://vaca:8804"
+      VACO_ANALYTICS_URL: "http://vaco-analytics:8790"
+      VACO_AUDIT_URL: "http://vaco-audit:8819"
+      VACO_OPERATOR_URL: "http://vaco-operator:8820"
+      VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
+      VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
+      VACO_SERVICE_NAME: voken
+      VACO_SERVICE_TOKEN: "${VACO_TOKEN_VOKEN:?Set a V3 service token for voken in .env}"
+      VACO_AUDIT_MODE: "${VACO_AUDIT_MODE:-enforce}"
+      VACO_OPERATOR_MODE: "${VACO_OPERATOR_MODE:-enforce}"
+    ports:
+      - "8794:8794"
+    networks:
+      - vaco
+    restart: unless-stopped
+    volumes:
+      - "voken_data:/app/data"
+    depends_on:
+      - v3
+      - shield
+      - vaco-audit
+      - vaco-operator
+  vago:
+    build:
+      context: ./vago
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8795
+    container_name: vago
+    environment:
+      PORT: 8795
+      SHIELD_API_URL: "http://shield:8812"
+      V3_API_URL: "http://v3:8811"
+      VACO_ANALYTICS_URL: "http://vaco-analytics:8790"
+      VACO_AUDIT_URL: "http://vaco-audit:8819"
+      VACO_OPERATOR_URL: "http://vaco-operator:8820"
+      VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
+      VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
+      VACO_SERVICE_NAME: vago
+      VACO_SERVICE_TOKEN: "${VACO_TOKEN_VAGO:?Set a V3 service token for vago in .env}"
+      VACO_AUDIT_MODE: "${VACO_AUDIT_MODE:-enforce}"
+      VACO_OPERATOR_MODE: "${VACO_OPERATOR_MODE:-enforce}"
+    ports:
+      - "8795:8795"
+    networks:
+      - vaco
+    restart: unless-stopped
+    volumes:
+      - "vago_data:/app/data"
+    depends_on:
+      - v3
+      - shield
+      - vaco-audit
+      - vaco-operator
+  vxllage:
+    build:
+      context: ./vxllage
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8796
+    container_name: vxllage
+    environment:
+      PORT: 8796
+      SHIELD_API_URL: "http://shield:8812"
+      V3_API_URL: "http://v3:8811"
+      VACO_MEDIA_URL: "http://vaco-media:8821"
+      VAVLT_STVDIOS_API_URL: "http://vavlt-stvdios:8808"
+      VACO_SERVICE_NAME: vxllage
+      VACO_SERVICE_TOKEN: "${VACO_TOKEN_VXLLAGE:?Set a V3 service token for vxllage in .env}"
+    ports:
+      - "8796:8796"
+    networks:
+      - vaco
+    restart: unless-stopped
+    volumes:
+      - "vxllage_data:/app/data"
+    depends_on:
+      - v3
+      - shield
+  cvnvo:
+    build:
+      context: ./cvnvo
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8798
+    container_name: cvnvo
+    environment:
+      PORT: 8798
+      HVNTZ_API_URL: "http://hvntz:8792"
+      SHIELD_API_URL: "http://shield:8812"
+      V3_API_URL: "http://v3:8811"
+      VACA_API_URL: "http://vaca:8804"
+      VACO_MEDIA_URL: "http://vaco-media:8821"
+      VOID_API_URL: "http://void:8793"
+      VSAFE_API_URL: "http://vsafe:8799"
+      YAP_API_URL: "http://yap:8802"
+      VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
+      VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
+      VACO_SERVICE_NAME: cvnvo
+      VACO_SERVICE_TOKEN: "${VACO_TOKEN_CVNVO:?Set a V3 service token for cvnvo in .env}"
+    ports:
+      - "8798:8798"
+    networks:
+      - vaco
+    restart: unless-stopped
+    volumes:
+      - "cvnvo_data:/app/data"
+    depends_on:
+      - v3
+      - shield
+  yap:
+    build:
+      context: ./cvnvo/yap
+      dockerfile: ../../deploy/Dockerfile.node
+      args:
+        PORT: 8802
+    container_name: yap
+    environment:
+      PORT: 8802
+      CVNVO_API_URL: "http://cvnvo:8798"
+    ports:
+      - "8802:8802"
+    networks:
+      - vaco
+    restart: unless-stopped
+    volumes:
+      - "yap_data:/app/data"
+    depends_on:
+      - v3
+      - shield
+  chopz:
+    build:
+      context: ./chopz
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8800
+    container_name: chopz
+    environment:
+      PORT: 8800
+      CHOPZ_SHOP_API_URL: "http://chopz-shop:8801"
+      SHIELD_API_URL: "http://shield:8812"
+      VACO_MEDIA_URL: "http://vaco-media:8821"
+      VACO_SERVICE_NAME: chopz
+      VACO_SERVICE_TOKEN: "${VACO_TOKEN_CHOPZ:?Set a V3 service token for chopz in .env}"
+    ports:
+      - "8800:8800"
+    networks:
+      - vaco
+    restart: unless-stopped
+    volumes:
+      - "chopz_data:/app/data"
+    depends_on:
+      - v3
+      - shield
+  chopz-shop:
+    build:
+      context: ./chopz/chopz-shop
+      dockerfile: ../../deploy/Dockerfile.node
+      args:
+        PORT: 8801
+    container_name: chopz-shop
+    environment:
+      PORT: 8801
+      SHIELD_API_URL: "http://shield:8812"
+      V3_API_URL: "http://v3:8811"
+      VACO_ANALYTICS_URL: "http://vaco-analytics:8790"
+      VOID_API_URL: "http://void:8793"
+      VACO_SERVICE_NAME: chopz-shop
+      VACO_SERVICE_TOKEN: "${VACO_TOKEN_CHOPZ_SHOP:?Set a V3 service token for chopz-shop in .env}"
+    ports:
+      - "8801:8801"
+    networks:
+      - vaco
+    restart: unless-stopped
+    volumes:
+      - "chopz_shop_data:/app/data"
+    depends_on:
+      - v3
+      - shield
+  vacay:
+    build:
+      context: ./vacay
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8803
+    container_name: vacay
+    environment:
+      PORT: 8803
+      SHIELD_API_URL: "http://shield:8812"
+      V3_API_URL: "http://v3:8811"
+      VOID_API_URL: "http://void:8793"
+      VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
+      VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
+      VACO_SERVICE_NAME: vacay
+      VACO_SERVICE_TOKEN: "${VACO_TOKEN_VACAY:?Set a V3 service token for vacay in .env}"
+    ports:
+      - "8803:8803"
+    networks:
+      - vaco
+    restart: unless-stopped
+    volumes:
+      - "vacay_data:/app/data"
+    depends_on:
+      - v3
+      - shield
+  vavlt-stvdios:
+    build:
+      context: ./vavlt-stvdios
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8808
+    container_name: vavlt-stvdios
+    environment:
+      PORT: 8808
+      SHIELD_API_URL: "http://shield:8812"
+      V3_API_URL: "http://v3:8811"
+      VACO_MEDIA_URL: "http://vaco-media:8821"
+      VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
+      VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
+      VACO_SERVICE_NAME: vavlt-stvdios
+      VACO_SERVICE_TOKEN: "${VACO_TOKEN_VAVLT_STVDIOS:?Set a V3 service token for vavlt-stvdios in .env}"
+    ports:
+      - "8808:8808"
+    networks:
+      - vaco
+    restart: unless-stopped
+    volumes:
+      - "vavlt_stvdios_data:/app/data"
+    depends_on:
+      - v3
+      - shield
+  vsafe:
+    build:
+      context: ./vsafe
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8799
+    container_name: vsafe
+    environment:
+      PORT: 8799
+      SHIELD_API_URL: "http://shield:8812"
+      VACO_NOTIFY_URL: "http://vaco-notify:8818"
+      VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
+      VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
+      VACO_SERVICE_NAME: vsafe
+      VACO_SERVICE_TOKEN: "${VACO_TOKEN_VSAFE:?Set a V3 service token for vsafe in .env}"
+    ports:
+      - "8799:8799"
+    networks:
+      - vaco
+    restart: unless-stopped
+    volumes:
+      - "vsafe_data:/app/data"
+    depends_on:
+      - v3
+      - shield
+  vaca:
+    build:
+      context: ./vaca
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8804
+    container_name: vaca
+    environment:
+      PORT: 8804
+      SHIELD_API_URL: "http://shield:8812"
+      VACO_AUDIT_URL: "http://vaco-audit:8819"
+      VACO_OPERATOR_URL: "http://vaco-operator:8820"
+      VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
+      VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
+      VACO_SERVICE_NAME: vaca
+      VACO_SERVICE_TOKEN: "${VACO_TOKEN_VACA:?Set a V3 service token for vaca in .env}"
+      VACO_AUDIT_MODE: "${VACO_AUDIT_MODE:-enforce}"
+      VACO_OPERATOR_MODE: "${VACO_OPERATOR_MODE:-enforce}"
+    ports:
+      - "8804:8804"
+    networks:
+      - vaco
+    restart: unless-stopped
+    volumes:
+      - "vaca_data:/app/data"
+    depends_on:
+      - v3
+      - shield
+      - vaco-audit
+      - vaco-operator
+  v3:
+    build:
+      context: ./v3
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8811
+    container_name: v3
+    environment:
+      PORT: 8811
+      SHIELD_API_URL: "http://shield:8812"
+      VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
+      VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
+    ports:
+      - "8811:8811"
+    networks:
+      - vaco
+    restart: unless-stopped
+    volumes:
+      - "v3_data:/app/data"
+  shield:
+    build:
+      context: ./shield
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8812
+    container_name: shield
+    environment:
+      PORT: 8812
+    ports:
+      - "8812:8812"
+    networks:
+      - vaco
+    restart: unless-stopped
+    volumes:
+      - "shield_data:/app/data"
+  vaco-analytics:
+    build:
+      context: ./vaco-analytics
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8790
+    container_name: vaco-analytics
+    environment:
+      PORT: 8790
+      VACO_NOTIFY_URL: "http://vaco-notify:8818"
+      VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
+      VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
+      VACO_SERVICE_NAME: vaco-analytics
+      VACO_SERVICE_TOKEN: "${VACO_TOKEN_VACO_ANALYTICS:?Set a V3 service token for vaco-analytics in .env}"
+    ports:
+      - "8790:8790"
+    networks:
+      - vaco
+    restart: unless-stopped
+    volumes:
+      - "vaco_analytics_data:/app/data"
+    depends_on:
+      - v3
+      - shield
+  vulture-music:
+    build:
+      context: ./vulture-music
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8806
+    container_name: vulture-music
+    environment:
+      PORT: 8806
+      SHIELD_API_URL: "http://shield:8812"
+      V3_API_URL: "http://v3:8811"
+      VACO_ANALYTICS_URL: "http://vaco-analytics:8790"
+      VACO_AUDIT_URL: "http://vaco-audit:8819"
+      VACO_OPERATOR_URL: "http://vaco-operator:8820"
+      VAULT_STVDIOS_API_URL: "http://vavlt-stvdios:8808"
+      VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
+      VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
+      VACO_SERVICE_NAME: vulture-music
+      VACO_SERVICE_TOKEN: "${VACO_TOKEN_VULTURE_MUSIC:?Set a V3 service token for vulture-music in .env}"
+      VACO_AUDIT_MODE: "${VACO_AUDIT_MODE:-enforce}"
+      VACO_OPERATOR_MODE: "${VACO_OPERATOR_MODE:-enforce}"
+    ports:
+      - "8806:8806"
+    networks:
+      - vaco
+    restart: unless-stopped
+    volumes:
+      - "vulture_music_data:/app/data"
+    depends_on:
+      - v3
+      - shield
+      - vaco-audit
+      - vaco-operator
+  vulture-flix:
+    build:
+      context: ./vulture-flix
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8807
+    container_name: vulture-flix
+    environment:
+      PORT: 8807
+      SHIELD_API_URL: "http://shield:8812"
+      V3_API_URL: "http://v3:8811"
+      VACO_ANALYTICS_URL: "http://vaco-analytics:8790"
+      VACO_MEDIA_URL: "http://vaco-media:8821"
+      VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
+      VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
+      VACO_SERVICE_NAME: vulture-flix
+      VACO_SERVICE_TOKEN: "${VACO_TOKEN_VULTURE_FLIX:?Set a V3 service token for vulture-flix in .env}"
+    ports:
+      - "8807:8807"
+    networks:
+      - vaco
+    restart: unless-stopped
+    volumes:
+      - "vulture_flix_data:/app/data"
+    depends_on:
+      - v3
+      - shield
+  vulture-pods:
+    build:
+      context: ./vulture-pods
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8810
+    container_name: vulture-pods
+    environment:
+      PORT: 8810
+      SHIELD_API_URL: "http://shield:8812"
+      V3_API_URL: "http://v3:8811"
+      VACO_MEDIA_URL: "http://vaco-media:8821"
+      VAULT_STVDIOS_API_URL: "http://vavlt-stvdios:8808"
+      VULTURE_MUSIC_API_URL: "http://vulture-music:8806"
+      VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
+      VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
+      VACO_SERVICE_NAME: vulture-pods
+      VACO_SERVICE_TOKEN: "${VACO_TOKEN_VULTURE_PODS:?Set a V3 service token for vulture-pods in .env}"
+    ports:
+      - "8810:8810"
+    networks:
+      - vaco
+    restart: unless-stopped
+    volumes:
+      - "vulture_pods_data:/app/data"
+    depends_on:
+      - v3
+      - shield
+  venvm:
+    build:
+      context: ./venvm
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8813
+    container_name: venvm
+    environment:
+      PORT: 8813
+      SHIELD_API_URL: "http://shield:8812"
+      V4_PROXY_URL: "http://v4-proxy:8787"
+      VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
+      VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
+      VACO_SERVICE_NAME: venvm
+      VACO_SERVICE_TOKEN: "${VACO_TOKEN_VENVM:?Set a V3 service token for venvm in .env}"
+    ports:
+      - "8813:8813"
+    networks:
+      - vaco
+    restart: unless-stopped
+    volumes:
+      - "venvm_data:/app/data"
+    depends_on:
+      - v3
+      - shield
+  dreams:
+    build:
+      context: ./dreams
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8814
+    container_name: dreams
+    environment:
+      PORT: 8814
+      SHIELD_API_URL: "http://shield:8812"
+      V3_API_URL: "http://v3:8811"
+      V4_PROXY_URL: "http://v4-proxy:8787"
+      VACO_ANALYTICS_URL: "http://vaco-analytics:8790"
+      VACO_NOTIFY_URL: "http://vaco-notify:8818"
+      VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
+      VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
+      VACO_SERVICE_NAME: dreams
+      VACO_SERVICE_TOKEN: "${VACO_TOKEN_DREAMS:?Set a V3 service token for dreams in .env}"
+    ports:
+      - "8814:8814"
+    networks:
+      - vaco
+    restart: unless-stopped
+    volumes:
+      - "dreams_data:/app/data"
+    depends_on:
+      - v3
+      - shield
+  vulture-studios:
+    build:
+      context: ./vulture-studios
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8815
+    container_name: vulture-studios
+    environment:
+      PORT: 8815
+      SHIELD_API_URL: "http://shield:8812"
+      V3_API_URL: "http://v3:8811"
+      VACO_ANALYTICS_URL: "http://vaco-analytics:8790"
+      VACO_AUDIT_URL: "http://vaco-audit:8819"
+      VACO_OPERATOR_URL: "http://vaco-operator:8820"
+      VULTURE_FLIX_API_URL: "http://vulture-flix:8807"
+      VULTURE_MUSIC_API_URL: "http://vulture-music:8806"
+      VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
+      VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
+      VACO_SERVICE_NAME: vulture-studios
+      VACO_SERVICE_TOKEN: "${VACO_TOKEN_VULTURE_STUDIOS:?Set a V3 service token for vulture-studios in .env}"
+      VACO_AUDIT_MODE: "${VACO_AUDIT_MODE:-enforce}"
+      VACO_OPERATOR_MODE: "${VACO_OPERATOR_MODE:-enforce}"
+    ports:
+      - "8815:8815"
+    networks:
+      - vaco
+    restart: unless-stopped
+    volumes:
+      - "vulture_studios_data:/app/data"
+    depends_on:
+      - v3
+      - shield
+      - vaco-audit
+      - vaco-operator
+  vex:
+    build:
+      context: ./vex
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8816
+    container_name: vex
+    environment:
+      PORT: 8816
+      SHIELD_API_URL: "http://shield:8812"
+      V3_API_URL: "http://v3:8811"
+      VACO_AUDIT_URL: "http://vaco-audit:8819"
+      VACO_OPERATOR_URL: "http://vaco-operator:8820"
+      VOKEN_API_URL: "http://voken:8794"
+      VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
+      VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
+      VACO_SERVICE_NAME: vex
+      VACO_SERVICE_TOKEN: "${VACO_TOKEN_VEX:?Set a V3 service token for vex in .env}"
+      VACO_AUDIT_MODE: "${VACO_AUDIT_MODE:-enforce}"
+      VACO_OPERATOR_MODE: "${VACO_OPERATOR_MODE:-enforce}"
+    ports:
+      - "8816:8816"
+    networks:
+      - vaco
+    restart: unless-stopped
+    volumes:
+      - "vex_data:/app/data"
+    depends_on:
+      - v3
+      - shield
+      - vaco-audit
+      - vaco-operator
+  vex-trading:
+    build:
+      context: ./vex-trading
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8817
+    container_name: vex-trading
+    environment:
+      PORT: 8817
+    ports:
+      - "8817:8817"
+    networks:
+      - vaco
+    restart: unless-stopped
+    depends_on:
+      - v3
+      - shield
+  vaco-notify:
+    build:
+      context: ./vaco-notify
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8818
+    container_name: vaco-notify
+    environment:
+      PORT: 8818
+      SHIELD_API_URL: "http://shield:8812"
+      VACO_OPERATOR_URL: "http://vaco-operator:8820"
+      VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
+      VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
+      VACO_SERVICE_NAME: vaco-notify
+      VACO_SERVICE_TOKEN: "${VACO_TOKEN_VACO_NOTIFY:?Set a V3 service token for vaco-notify in .env}"
+      VACO_OPERATOR_MODE: "${VACO_OPERATOR_MODE:-enforce}"
+    ports:
+      - "8818:8818"
+    networks:
+      - vaco
+    restart: unless-stopped
+    depends_on:
+      - v3
+      - shield
+      - vaco-operator
+  vaco-audit:
+    build:
+      context: ./vaco-audit
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8819
+    container_name: vaco-audit
+    environment:
+      PORT: 8819
+      SHIELD_API_URL: "http://shield:8812"
+      VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
+      VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
+    ports:
+      - "8819:8819"
+    networks:
+      - vaco
+    restart: unless-stopped
+    volumes:
+      - "vaco_audit_data:/app/data"
+    depends_on:
+      - v3
+      - shield
+  vaco-operator:
+    build:
+      context: ./vaco-operator
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8820
+    container_name: vaco-operator
+    environment:
+      PORT: 8820
+      VACO_AUDIT_URL: "http://vaco-audit:8819"
+      VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
+      VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
+      VACO_SERVICE_NAME: vaco-operator
+      VACO_SERVICE_TOKEN: "${VACO_TOKEN_VACO_OPERATOR:?Set a V3 service token for vaco-operator in .env}"
+      VACO_AUDIT_MODE: "${VACO_AUDIT_MODE:-enforce}"
+      VACO_OPERATOR_BOOTSTRAP: "${VACO_OPERATOR_BOOTSTRAP:-}"
+    ports:
+      - "8820:8820"
+    networks:
+      - vaco
+    restart: unless-stopped
+    volumes:
+      - "vaco_operator_data:/app/data"
+    depends_on:
+      - v3
+      - shield
+      - vaco-audit
+  vaco-media:
+    build:
+      context: ./vaco-media
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8821
+    container_name: vaco-media
+    environment:
+      PORT: 8821
+      SHIELD_API_URL: "http://shield:8812"
+      VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
+      VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
+      VACO_MEDIA_TRANSPORT: "${VACO_MEDIA_TRANSPORT:-loopback}"
+      LIVEKIT_URL: "${LIVEKIT_URL:-ws://livekit:7880}"
+      LIVEKIT_API_KEY: "${LIVEKIT_API_KEY:-}"
+      LIVEKIT_API_SECRET: "${LIVEKIT_API_SECRET:-}"
+      VACO_MEDIA_STORAGE: "${VACO_MEDIA_STORAGE:-local}"
+      VACO_MEDIA_S3_ENDPOINT: "${VACO_MEDIA_S3_ENDPOINT:-}"
+      VACO_MEDIA_S3_BUCKET: "${VACO_MEDIA_S3_BUCKET:-}"
+      VACO_MEDIA_S3_REGION: "${VACO_MEDIA_S3_REGION:-us-east-1}"
+      VACO_MEDIA_S3_ACCESS_KEY: "${VACO_MEDIA_S3_ACCESS_KEY:-}"
+      VACO_MEDIA_S3_SECRET_KEY: "${VACO_MEDIA_S3_SECRET_KEY:-}"
+      VACO_MEDIA_CDN_BASE: "${VACO_MEDIA_CDN_BASE:-}"
+    ports:
+      - "8821:8821"
+    networks:
+      - vaco
+    restart: unless-stopped
+    volumes:
+      - "vaco_media_data:/app/data"
+    depends_on:
+      - v3
+      - shield
+      - livekit
+  venvs:
+    build:
+      context: ./venvs
+      dockerfile: ../deploy/Dockerfile.vite
+      args:
+        PORT: 5173
+    container_name: venvs
+    environment:
+      PORT: 5173
+    ports:
+      - "5173:5173"
+    networks:
+      - vaco
+    restart: unless-stopped
+    depends_on:
+      - v3
+      - shield
+  vdp:
+    build:
+      context: ./vdp
+      dockerfile: ../deploy/Dockerfile.vite
+      args:
+        PORT: 5174
+    container_name: vdp
+    environment:
+      PORT: 5174
+    ports:
+      - "5174:5174"
+    networks:
+      - vaco
+    restart: unless-stopped
+    depends_on:
+      - v3
+      - shield
+  nginx:
+    image: "nginx:alpine"
+    container_name: vaco-nginx
+    volumes:
+      - "./deploy/nginx-docker.conf:/etc/nginx/conf.d/default.conf:ro"
+    ports:
+      - "80:80"
+    networks:
+      - vaco
+    depends_on:
+      - vaco-shell
+    restart: unless-stopped
+  livekit:
+    image: "livekit/livekit-server:v1.8"
+    container_name: vaco-livekit
+    command: --config /etc/livekit.yaml
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY:-}: ${LIVEKIT_API_SECRET:-}"
+    volumes:
+      - "./deploy/livekit.yaml:/etc/livekit.yaml:ro"
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+    networks:
+      - vaco
+    restart: unless-stopped
+
+volumes:
+  vacon_data:
+  hvntz_data:
+  void_data:
+  voidmagic_data:
+  voken_data:
+  vago_data:
+  vxllage_data:
+  cvnvo_data:
+  yap_data:
+  chopz_data:
+  chopz_shop_data:
+  vacay_data:
+  vavlt_stvdios_data:
+  vsafe_data:
+  vaca_data:
+  v3_data:
+  shield_data:
+  vaco_analytics_data:
+  vulture_music_data:
+  vulture_flix_data:
+  vulture_pods_data:
+  venvm_data:
+  dreams_data:
+  vulture_studios_data:
+  vex_data:
+  vaco_audit_data:
+  vaco_operator_data:
+  vaco_media_data:
+
+networks:
+  vaco:
+    driver: bridge

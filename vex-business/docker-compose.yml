@@ -1,0 +1,85 @@
+# Vex Business — real, self-contained Docker Compose stack. Deliberately
+# separate from the rest of the VACO ecosystem's own root
+# docker-compose.yml (Python/FastAPI vs. that stack's Node/Express;
+# real financial infrastructure vs. the simulated VCoin/VASH economy)
+# — every port here (9000-9002, 5433, 6380) is chosen outside the
+# main ecosystem's own 8787-8815 range so both can run side by side
+# with zero collision.
+#
+# Run:
+#   cp .env.example .env
+#   docker compose up --build
+# Dashboard: http://localhost:9001/
+# API health: curl http://localhost:9000/api/health
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: vexbusiness
+      POSTGRES_PASSWORD: vexbusiness
+      POSTGRES_DB: vexbusiness
+    ports:
+      - "5433:5432"
+    volumes:
+      - vexbusiness_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vexbusiness"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.api
+    environment:
+      DATABASE_URL: postgresql+psycopg://vexbusiness:vexbusiness@postgres:5432/vexbusiness
+      REDIS_URL: redis://redis:6379/0
+      TRADING_MODE: demo
+      BROKER_ADAPTER_KIND: mock
+      LIVE_TRADING_ENABLED: "false"
+      LIVE_TRADING_CONFIRMATION: ""
+    ports:
+      - "9000:9000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  worker:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.worker
+    environment:
+      DATABASE_URL: postgresql+psycopg://vexbusiness:vexbusiness@postgres:5432/vexbusiness
+      REDIS_URL: redis://redis:6379/0
+      TRADING_MODE: demo
+      BROKER_ADAPTER_KIND: mock
+      LIVE_TRADING_ENABLED: "false"
+      LIVE_TRADING_CONFIRMATION: ""
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  web:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.web
+    environment:
+      VEXBUSINESS_API_URL: http://api:9000
+    ports:
+      - "9001:9001"
+    depends_on:
+      - api
+
+volumes:
+  vexbusiness_postgres_data:

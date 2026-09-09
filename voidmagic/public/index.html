@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VOID MAGIC</title>
+<link rel="stylesheet" href="/vaco-design.css" />
+<style>
+  .exp-art {
+    height: 120px;
+    border-radius: var(--vaco-radius-sm);
+    border: 1px solid var(--vaco-border-subtle);
+    background: linear-gradient(140deg, var(--vaco-accent-soft), transparent 68%), var(--vaco-bg-raised);
+    display: flex; align-items: flex-end; padding: var(--vaco-space-3);
+  }
+  .queue { display: flex; flex-direction: column; gap: var(--vaco-space-2); }
+  .queue-item { display: flex; align-items: center; gap: var(--vaco-space-3);
+                padding: var(--vaco-space-2) var(--vaco-space-3);
+                border: 1px solid var(--vaco-border-subtle); border-radius: var(--vaco-radius-sm); }
+  .queue-pos { font-variant-numeric: tabular-nums; font-weight: var(--vaco-weight-bold); width: 28px; }
+</style>
+</head>
+<body class="vaco">
+<script src="/vaco-ui.js"></script>
+<script>
+// VOID MAGIC — meet & greet bookings.
+//
+// Real client of its own 33 routes. Refund policy, waiting-room
+// admission, and identity verification at the door are server-decided.
+//
+// **The waiting room is the interesting mechanic and gets its own
+// tab.** A meet & greet fails in one specific way: the wrong person
+// walks up. So admission is a real gate with a real identity check
+// rather than a list a host eyeballs.
+
+var el = VACO.el;
+
+function renderExperiences(body) {
+  var out = el('div', 'vaco-stack');
+
+  out.appendChild(VACO.card('List an experience', [
+    VACO.form([
+      { name: 'title', label: 'Title', placeholder: 'Backstage meet & greet', width: '200px' },
+      { name: 'hostId', label: 'Host', value: VACO.userId() || '', width: '130px' },
+      { name: 'pricePerGuest', label: 'Per guest', type: 'number', min: 1, value: 60, width: '100px' },
+      { name: 'capacity', label: 'Capacity', type: 'number', min: 1, value: 20, width: '90px' },
+    ], function (values) {
+      return VACO.post('/api/experiences', values)
+        .then(function (e) { VACO.toast('Experience ' + e.id + ' listed.'); VACO.render(); });
+    }, 'List'),
+  ]));
+
+  return VACO.api('/api/experiences').then(function (data) {
+    var experiences = data.experiences || [];
+    if (!experiences.length) {
+      out.appendChild(el('div', 'vaco-empty', 'No experiences listed yet.'));
+      return VACO.mount(body, out);
+    }
+
+    out.appendChild(VACO.grid(experiences.map(function (e) {
+      var lines = el('div', 'vaco-stack-sm');
+      var art = el('div', 'exp-art');
+      art.appendChild(el('strong', null, e.hostId || ''));
+      lines.appendChild(art);
+
+      var row = el('div', 'vaco-row-tight');
+      row.appendChild(VACO.price(e.pricePerGuest, { freeLabel: false }));
+      if (e.capacity) row.appendChild(VACO.badge(e.capacity + ' spots'));
+      lines.appendChild(row);
+
+      lines.appendChild(VACO.button('Book', function () {
+        if (!VACO.userId()) throw new Error('Sign in to book.');
+        return VACO.post('/api/bookings', { experienceId: e.id, customerId: VACO.userId() })
+          .then(function (b) {
+            VACO.toast('Booking ' + b.id + ' confirmed.', 'money');
+            VACO.refreshBalances().then(VACO.renderIdentity);
+          });
+      }, 'primary'));
+
+      return VACO.card(e.title || ('Experience ' + e.id), [lines],
+        { trailing: VACO.badge(e.status || 'open') });
+    }), true));
+    VACO.mount(body, out);
+  });
+}
+
+function renderBookings(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Cancelling follows a real refund policy — how much comes back depends on when you cancel, '
+    + 'and the refund is a real VCoin movement rather than a status change.'));
+
+  var id = VACO.userId();
+  if (!id) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to see your bookings.'));
+    return VACO.mount(body, out);
+  }
+
+  return VACO.api('/api/customers/' + encodeURIComponent(id) + '/experiences').then(function (data) {
+    var bookings = data.bookings || data.experiences || data || [];
+    out.appendChild(VACO.card('Your bookings', [
+      VACO.table([
+        { key: 'id', label: 'Booking' },
+        { key: 'experienceId', label: 'Experience' },
+        { label: 'Paid', num: true, render: function (b) { return VACO.price(b.amountPaid || b.total, { freeLabel: false }); } },
+        { label: 'Status', render: function (b) { return VACO.badge(b.status); } },
+        { label: '', render: function (b) {
+          if (b.status === 'cancelled') return '—';
+          return VACO.button('Cancel', function () {
+            return VACO.post('/api/bookings/' + b.id + '/cancel', { customerId: id })
+              .then(function (r) {
+                VACO.toast('Cancelled — ' + VACO.round(r.refundAmount !== undefined ? r.refundAmount : 0) + ' refunded.', 'money');
+                VACO.refreshBalances().then(VACO.renderIdentity);
+                VACO.render();
+              });
+          }, 'danger vaco-btn-sm');
+        } },
+      ], bookings, { empty: 'No bookings yet.' }),
+    ]));
+    VACO.mount(body, out);
+  });
+}
+
+function renderWaitingRoom(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'The door. A guest enters the waiting room, their identity is verified, and only then are they admitted. '
+    + '<strong>Verification is a real gate</strong> — admitting an unverified guest is refused, not warned about.'));
+
+  out.appendChild(VACO.card('Enter a waiting room', [
+    VACO.form([{ name: 'bookingId', label: 'Booking id', type: 'number', min: 1, value: 1, width: '110px' }],
+      function (values) {
+        if (!VACO.userId()) throw new Error('Sign in first.');
+        return VACO.post('/api/waiting-room/enter', { bookingId: values.bookingId, userId: VACO.userId() })
+          .then(function (entry) { VACO.toast('In the waiting room as entry ' + entry.id + '.'); });
+      }, 'Enter'),
+  ]));
+
+  out.appendChild(VACO.card('Host controls', [
+    el('p', 'vaco-small vaco-dim', 'Verify a guest, then admit them. The order is enforced by the server.'),
+    VACO.form([{ name: 'id', label: 'Entry id', type: 'number', min: 1, value: 1, width: '100px' }],
+      function (values) {
+        return VACO.api('/api/waiting-room/' + values.id).then(function (entry) {
+          while (out.childNodes.length > 3) out.removeChild(out.lastChild);
+          var lines = el('div', 'vaco-stack-sm');
+          lines.appendChild(VACO.badge(entry.status));
+          lines.appendChild(el('p', 'vaco-small vaco-dim',
+            'Guest ' + (entry.userId || '—')
+            + (entry.identityVerified ? ' · identity verified' : ' · identity NOT verified')));
+
+          var actions = el('div', 'vaco-row-tight');
+          actions.appendChild(VACO.button('Verify identity', function () {
+            return VACO.post('/api/waiting-room/' + values.id + '/verify-identity', {})
+              .then(function () { VACO.toast('Identity verified.'); });
+          }));
+          actions.appendChild(VACO.button('Admit', function () {
+            return VACO.post('/api/waiting-room/' + values.id + '/admit', {})
+              .then(function () { VACO.toast('Admitted.', 'money'); });
+          }, 'primary'));
+          lines.appendChild(actions);
+
+          out.appendChild(VACO.card('Entry ' + values.id, [lines]));
+          VACO.mount(body, out);
+        });
+      }, 'Load'),
+  ]));
+
+  return VACO.mount(body, out);
+}
+
+VACO.app({
+  id: 'voidmagic',
+  name: 'VOID MAGIC',
+  tagline: 'Meet & greet bookings',
+  //: VOID MAGIC's identity: a warm coral-orange. Stage-door excitement,
+  //: sitting between Vvltvre Pods' rust and CVNVO's coral without
+  //: colliding with either.
+  accent: '#e86f4f',
+  accentDim: '#c25236',
+  accentInk: '#1a0704',
+  tabs: [
+    { id: 'experiences', label: 'Experiences', heading: 'What is on offer', render: renderExperiences },
+    { id: 'bookings', label: 'Bookings', heading: 'Your bookings', render: renderBookings },
+    { id: 'door', label: 'The Door', heading: 'Waiting room', render: renderWaitingRoom },
+  ],
+});
+</script>
+</body>
+</html>

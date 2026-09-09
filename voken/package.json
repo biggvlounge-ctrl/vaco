@@ -1,0 +1,20 @@
+{
+  "name": "voken",
+  "version": "0.1.0",
+  "private": true,
+  "description": "VOKEN -- the digital collectibles marketplace (VDAS). Cvltvre Cards, the real value algorithm, VEX brokerage and VADO gallery/auctions on top of one shared card infrastructure.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

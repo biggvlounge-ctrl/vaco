@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HVNTZ</title>
+<link rel="stylesheet" href="/vaco-design.css" />
+<style>
+  .progress-track { height: 8px; border-radius: var(--vaco-radius-pill); background: var(--vaco-surface-hover); overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--vaco-accent); }
+  .map-pin { display: inline-flex; gap: 4px; align-items: baseline; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body class="vaco">
+<script src="/vaco-ui.js"></script>
+<script>
+// HVNTZ — the revenue stack, hunts, and the Explore Page.
+//
+// Real client of HVNTZ's own 40 routes. Hunt progress, break
+// recommendations, and neighbour suggestions are all server-computed —
+// the break recommendation in particular is a real fatigue rule, not a
+// timer this page runs.
+
+var el = VACO.el;
+
+function renderHunts(body) {
+  var out = el('div', 'vaco-stack');
+
+  out.appendChild(VACO.card('Open a hunt', [
+    VACO.form([{ name: 'huntId', label: 'Hunt id', width: '120px', value: '1' }], function (values) {
+      return loadHunt(out, body, values.huntId);
+    }, 'Load'),
+  ]));
+
+  out.appendChild(el('div', 'vaco-empty', 'Enter a hunt id above to see its progress.'));
+  return VACO.mount(body, out);
+}
+
+function loadHunt(out, body, huntId) {
+  var userId = VACO.userId();
+  return Promise.all([
+    VACO.api('/api/hunt/' + encodeURIComponent(huntId)),
+    userId ? VACO.api('/api/hunt/' + encodeURIComponent(huntId) + '/progress/' + encodeURIComponent(userId))
+      .catch(function () { return null; }) : Promise.resolve(null),
+    userId ? VACO.api('/api/hunt/' + encodeURIComponent(huntId) + '/break-recommendation/' + encodeURIComponent(userId))
+      .catch(function () { return null; }) : Promise.resolve(null),
+  ]).then(function (r) {
+    var hunt = r[0], progress = r[1], rec = r[2];
+    var lines = el('div', 'vaco-stack-sm');
+    lines.appendChild(el('p', 'vaco-small vaco-dim', hunt.description || ''));
+
+    if (progress) {
+      var done = progress.completedStops !== undefined ? progress.completedStops : (progress.completed || 0);
+      var total = progress.totalStops !== undefined ? progress.totalStops : (progress.total || 1);
+      var pct = Math.round((done / Math.max(total, 1)) * 100);
+      var track = el('div', 'progress-track');
+      var fill = el('div', 'progress-fill');
+      fill.style.width = pct + '%';
+      track.appendChild(fill);
+      lines.appendChild(track);
+      lines.appendChild(el('p', 'vaco-small', done + ' of ' + total + ' stops · ' + pct + '%'));
+    }
+
+    // A real fatigue rule from the server. Surfaced prominently because
+    // a hunt that pushes someone past their limit is the failure mode.
+    if (rec && rec.shouldBreak) {
+      lines.appendChild(VACO.notice(
+        'HVNTZ suggests a break: <strong>' + VACO.escapeHtml(rec.reason || 'you have been going a while')
+        + '</strong>', 'warn'));
+    }
+
+    var replacement = el('div', 'vaco-stack');
+    replacement.appendChild(VACO.card(hunt.name || ('Hunt ' + huntId), [lines],
+      { trailing: VACO.badge(hunt.status || 'active') }));
+    // Replace only the results area, keeping the lookup form in place.
+    while (out.childNodes.length > 1) out.removeChild(out.lastChild);
+    out.appendChild(replacement);
+    VACO.mount(body, out);
+  }).catch(function (err) {
+    while (out.childNodes.length > 1) out.removeChild(out.lastChild);
+    out.appendChild(VACO.notice('No hunt found: ' + VACO.escapeHtml(err.message), 'danger'));
+    VACO.mount(body, out);
+  });
+}
+
+function renderRevenue(body) {
+  return VACO.api('/api/revenue-events').then(function (data) {
+    var events = data.events || data.revenueEvents || data || [];
+    return VACO.card('Revenue events', [
+      el('p', 'vaco-small vaco-dim',
+        'The revenue stack: every way a business earns through HVNTZ, recorded as a real event rather than a projection.'),
+      VACO.table([
+        { key: 'id', label: 'Id' },
+        { key: 'businessId', label: 'Business' },
+        { key: 'eventType', label: 'Type' },
+        { label: 'Amount', num: true, render: function (r) { return VACO.price(r.amount, { freeLabel: false }); } },
+      ], events, { empty: 'No revenue events recorded yet.' }),
+    ]);
+  });
+}
+
+function renderBusiness(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.card('Look up a business', [
+    VACO.form([{ name: 'id', label: 'Business id', width: '150px', value: '1' }], function (values) {
+      return Promise.all([
+        VACO.api('/api/business/' + encodeURIComponent(values.id)),
+        VACO.api('/api/business/' + encodeURIComponent(values.id) + '/locations').catch(function () { return { locations: [] }; }),
+        VACO.api('/api/neighbor-program/' + encodeURIComponent(values.id) + '/suggestions').catch(function () { return null; }),
+      ]).then(function (r) {
+        var biz = r[0], locs = r[1].locations || [], sugg = r[2];
+        while (out.childNodes.length > 1) out.removeChild(out.lastChild);
+
+        out.appendChild(VACO.card(biz.name || ('Business ' + values.id), [
+          el('p', 'vaco-small vaco-dim', biz.category || ''),
+          VACO.table([
+            { key: 'id', label: 'Location' },
+            { key: 'name', label: 'Name' },
+            { label: 'Coordinates', render: function (l) {
+              var pin = el('span', 'map-pin');
+              pin.textContent = VACO.round(l.lat) + ', ' + VACO.round(l.lng);
+              return pin;
+            } },
+          ], locs, { empty: 'No locations registered.' }),
+        ]));
+
+        // The neighbour program is HVNTZ's own proximity mechanic —
+        // real nearby businesses, computed from real coordinates.
+        if (sugg) {
+          var list = sugg.suggestions || sugg || [];
+          out.appendChild(VACO.card('Neighbour suggestions', [
+            el('p', 'vaco-small vaco-dim', 'Nearby businesses worth partnering with, by real distance.'),
+            VACO.table([
+              { key: 'businessId', label: 'Business' },
+              { key: 'distanceKm', label: 'km', num: true },
+              { key: 'reason', label: 'Why' },
+            ], list, { empty: 'No neighbours suggested.' }),
+          ]));
+        }
+        VACO.mount(body, out);
+      });
+    }, 'Load'),
+  ]));
+  return VACO.mount(body, out);
+}
+
+VACO.app({
+  id: 'hvntz',
+  name: 'HVNTZ',
+  tagline: 'Hunts & the revenue stack',
+  //: HVNTZ's identity: a lime-olive. Outdoors and searching, and the
+  //: only app in the register in the yellow-green band.
+  accent: '#a3c94f',
+  accentDim: '#82a636',
+  accentInk: '#101403',
+  tabs: [
+    { id: 'hunts', label: 'Hunts', heading: 'Hunt progress',
+      blurb: 'Progress, and a real break recommendation when the pace warrants one.', render: renderHunts },
+    { id: 'business', label: 'Business', heading: 'Businesses & neighbours', render: renderBusiness },
+    { id: 'revenue', label: 'Revenue', heading: 'The revenue stack', render: renderRevenue },
+  ],
+});
+</script>
+</body>
+</html>

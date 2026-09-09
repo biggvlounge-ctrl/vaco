@@ -1,0 +1,19 @@
+{
+  "name": "vex-trading",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Vex Trading — the real parent shell over VEX (Cvltvre Card brokerage) and Vex Business (futures-research/trading platform), per direct instruction: one app, two real sub-apps, not a merge of their two codebases.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

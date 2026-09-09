@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Vavlt Stvdios</title>
+<link rel="stylesheet" href="/vaco-design.css" />
+<style>
+  .screen {
+    aspect-ratio: 16 / 9;
+    border-radius: var(--vaco-radius-sm);
+    border: 1px solid var(--vaco-border-subtle);
+    background:
+      linear-gradient(135deg, var(--vaco-accent-soft), transparent 70%),
+      var(--vaco-bg-raised);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--vaco-text-faint);
+    font-size: var(--vaco-text-xs);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    position: relative;
+  }
+  .live-dot {
+    position: absolute; top: 8px; left: 8px;
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--vaco-danger);
+    box-shadow: 0 0 0 3px var(--vaco-danger-soft);
+  }
+  /* The eight-screen wall is the app's signature mechanic, so it gets a
+     real layout rather than a list. */
+  .wall { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--vaco-space-3); }
+</style>
+</head>
+<body class="vaco">
+<script src="/vaco-ui.js"></script>
+<script>
+// Vavlt Stvdios — multi-channel streaming, the IG-style content layer,
+// and the eight-screen interactive session.
+//
+// Real client of its own 57 routes. Grouping rules, tip splits, and
+// session state are server-side.
+
+var el = VACO.el;
+
+function screenTile(channel) {
+  var tile = el('div', 'screen');
+  if (channel.isLive) tile.appendChild(el('span', 'live-dot'));
+  tile.appendChild(el('span', null, channel.isLive ? 'live' : 'offline'));
+  return tile;
+}
+
+// -- Live -------------------------------------------------------------
+
+function renderLive(body) {
+  return VACO.api('/api/channels/live').then(function (data) {
+    var channels = data.channels || [];
+    if (!channels.length) return el('div', 'vaco-empty', 'Nothing live right now.');
+
+    return VACO.grid(channels.map(function (c) {
+      var lines = el('div', 'vaco-stack-sm');
+      lines.appendChild(screenTile(c));
+      lines.appendChild(el('p', 'vaco-small vaco-dim', c.ownerId));
+      var meta = el('div', 'vaco-row-tight');
+      if (c.groupingType) meta.appendChild(VACO.badge(c.groupingType));
+      lines.appendChild(meta);
+
+      // Tipping moves real VCoin through V3, so it is a real control
+      // rather than a heart icon.
+      var tip = el('div', 'vaco-row-tight');
+      var amount = el('input', 'vaco-input vaco-num');
+      amount.type = 'number'; amount.min = 1; amount.value = 5;
+      amount.style.width = '76px';
+      amount.setAttribute('aria-label', 'Tip amount');
+      tip.appendChild(amount);
+      tip.appendChild(VACO.button('Tip', function () {
+        if (!VACO.userId()) throw new Error('Sign in to tip.');
+        return VACO.post('/api/channels/' + c.id + '/tips', {
+          fromUserId: VACO.userId(), amount: Number(amount.value),
+        }).then(function () {
+          VACO.toast('Tipped ' + amount.value + ' to ' + c.name, 'money');
+          VACO.refreshBalances().then(VACO.renderIdentity);
+        });
+      }, 'primary'));
+      lines.appendChild(tip);
+
+      return VACO.card(c.name, [lines], { trailing: c.isLive ? VACO.badge('live', 'danger') : null });
+    }), true);
+  });
+}
+
+// -- The wall ---------------------------------------------------------
+
+function renderWall(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'The eight-screen session: several channels from the same venue, brand, or role watched at once. '
+    + '<strong>Streams are not real video</strong> — no media infrastructure is connected, so a stream URL is a '
+    + 'recorded address rather than a playing feed.', 'warn'));
+
+  return VACO.api('/api/channel-groups').then(function (data) {
+    var groups = data.groups || data.channelGroups || [];
+    if (!groups.length) {
+      out.appendChild(el('div', 'vaco-empty', 'No channel groups yet.'));
+      return VACO.mount(body, out);
+    }
+
+    var pending = groups.map(function (g) {
+      return VACO.api('/api/channel-groups/' + g.id + '/channels')
+        .then(function (r) { return { group: g, channels: r.channels || [] }; })
+        .catch(function () { return { group: g, channels: [] }; });
+    });
+
+    return Promise.all(pending).then(function (loaded) {
+      loaded.forEach(function (entry) {
+        var wall = el('div', 'wall');
+        entry.channels.forEach(function (c) {
+          var cell = el('div', 'vaco-stack-sm');
+          cell.appendChild(screenTile(c));
+          cell.appendChild(el('span', 'vaco-small', c.name));
+          wall.appendChild(cell);
+        });
+        if (!entry.channels.length) wall.appendChild(el('div', 'vaco-empty', 'No channels in this group.'));
+        // A group has no name of its own — it is defined by what binds
+        // its channels together, so the basis IS the title.
+        out.appendChild(VACO.card(
+          'Group ' + entry.group.id + ' · ' + entry.channels.length + ' screens',
+          [wall],
+          { trailing: VACO.badge(entry.group.groupingBasis || 'group') }));
+      });
+      VACO.mount(body, out);
+    });
+  });
+}
+
+// -- Casino events ----------------------------------------------------
+
+function renderEvents(body) {
+  return VACO.api('/api/casino-events').then(function (data) {
+    var events = data.events || data.casinoEvents || [];
+    return VACO.card('Streamed casino events', [
+      el('p', 'vaco-small vaco-dim',
+        'Watch-together events tied to VAGO. Joining is real state — the attendee list is who is actually in the room.'),
+      VACO.table([
+        { key: 'id', label: 'Id' },
+        { key: 'title', label: 'Event' },
+        { key: 'hostId', label: 'Host' },
+        { label: 'Status', render: function (r) { return VACO.badge(r.status); } },
+        { label: '', render: function (r) {
+          return VACO.button('Join', function () {
+            if (!VACO.userId()) throw new Error('Sign in to join.');
+            return VACO.post('/api/casino-events/' + r.id + '/join', { userId: VACO.userId() })
+              .then(function () { VACO.toast('Joined ' + r.title); VACO.render(); });
+          }, 'sm');
+        } },
+      ], events, { empty: 'No casino events scheduled.' }),
+    ]);
+  });
+}
+
+// -- Feed -------------------------------------------------------------
+
+function renderFeed(body) {
+  var id = VACO.userId();
+  if (!id) return el('div', 'vaco-empty', 'Sign in to see the content feed.');
+
+  return VACO.api('/api/feed?viewerId=' + encodeURIComponent(id))
+    .catch(function () { return VACO.api('/api/explore?viewerId=' + encodeURIComponent(id)); })
+    .then(function (data) {
+      var posts = data.posts || data.feed || data.items || [];
+      if (!posts.length) return el('div', 'vaco-empty', 'Nothing in the feed yet.');
+      return VACO.grid(posts.map(function (p) {
+        var lines = el('div', 'vaco-stack-sm');
+        lines.appendChild(el('div', 'screen'));
+        lines.appendChild(el('p', 'vaco-small vaco-dim', p.caption || p.body || ''));
+        var meta = el('div', 'vaco-row-tight');
+        if (p.postType) meta.appendChild(VACO.badge(p.postType));
+        if (p.source) meta.appendChild(VACO.badge(p.source));
+        lines.appendChild(meta);
+        return VACO.card(p.authorId || 'post', [lines]);
+      }), true);
+    });
+}
+
+VACO.app({
+  id: 'vavlt-stvdios',
+  name: 'Vavlt Stvdios',
+  tagline: 'Multi-channel streaming',
+  //: Vavlt Stvdios' identity: an electric violet. Broadcast and stage
+  //: lighting, and the one hue no sibling app in the register uses.
+  accent: '#9b6ef0',
+  accentDim: '#7a4fd0',
+  accentInk: '#0d0618',
+  tabs: [
+    { id: 'live', label: 'Live', heading: 'On air now', render: renderLive },
+    { id: 'wall', label: 'The Wall', heading: 'Eight-screen sessions', render: renderWall },
+    { id: 'events', label: 'Events', heading: 'Casino streams', render: renderEvents },
+    { id: 'feed', label: 'Feed', heading: 'Content', render: renderFeed },
+  ],
+});
+</script>
+</body>
+</html>

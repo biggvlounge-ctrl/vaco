@@ -1,0 +1,20 @@
+{
+  "name": "venvm",
+  "version": "0.1.0",
+  "private": true,
+  "description": "VENVM -- the ecosystem's AI production/marketing tool: real script requests (routed through V4/VACON's own real completion pathway, same as every other agent), real cross-platform video reformatting math, and a real production pipeline. Video rendering itself is a real, honest gap -- no rendering infrastructure exists in this environment.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

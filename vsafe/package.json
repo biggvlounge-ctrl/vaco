@@ -1,0 +1,20 @@
+{
+  "name": "vsafe",
+  "version": "0.1.0",
+  "private": true,
+  "description": "VSAFE -- the Universal Safety Layer. Real-time safety check-ins, trusted-contact sharing, and emergency escalation as shared infrastructure every VACO app calls into, and a real standalone app in its own right.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

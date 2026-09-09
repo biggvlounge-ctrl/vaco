@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VACAY</title>
+<link rel="stylesheet" href="/vaco-design.css" />
+<style>
+  .listing-art {
+    height: 128px;
+    border-radius: var(--vaco-radius-sm);
+    border: 1px solid var(--vaco-border-subtle);
+    background: linear-gradient(150deg, var(--vaco-accent-soft), transparent 66%), var(--vaco-bg-raised);
+    display: flex; align-items: flex-end; padding: var(--vaco-space-3);
+  }
+  .leg { display: flex; align-items: center; gap: var(--vaco-space-3); }
+  .leg-code { font-weight: var(--vaco-weight-bold); font-size: var(--vaco-text-lg); letter-spacing: 0.04em; }
+  .leg-line { flex: 1; height: 1px; background: var(--vaco-border); position: relative; }
+  .leg-line::after { content: '✈'; position: absolute; right: -2px; top: -9px; color: var(--vaco-accent); font-size: 12px; }
+</style>
+</head>
+<body class="vaco">
+<script src="/vaco-ui.js"></script>
+<script>
+// VACAY — four travel products merged into one app.
+//
+// Stays, Experiences, Homes (Zillow-shape), Auto (Turo-shape), and
+// Flights (merchant-of-record). They were separate apps and were merged
+// deliberately: one identity, one wallet, one trip.
+//
+// Each product is a real sub-router with its own store, so this page
+// talks to four APIs rather than one flattened surface.
+
+var el = VACO.el;
+
+function priceRow(label, amount, unit) {
+  var row = el('div', 'vaco-row-tight');
+  row.appendChild(el('span', 'vaco-label', label));
+  row.appendChild(el('span', 'vaco-spacer'));
+  row.appendChild(VACO.price(amount, { freeLabel: false }));
+  if (unit) row.appendChild(el('span', 'vaco-small vaco-faint', unit));
+  return row;
+}
+
+function renderStays(body) {
+  return VACO.api('/api/bookings/listings').then(function (data) {
+    var listings = data.listings || data || [];
+    if (!listings.length) return el('div', 'vaco-empty', 'No stays listed yet.');
+    return VACO.grid(listings.map(function (l) {
+      var lines = el('div', 'vaco-stack-sm');
+      var art = el('div', 'listing-art');
+      art.appendChild(el('strong', null, l.city || l.location || ''));
+      lines.appendChild(art);
+      // hostType is what folded Booking.com-style inventory in beside
+      // Airbnb-style hosts without two separate products.
+      if (l.hostType) lines.appendChild(VACO.badge(l.hostType));
+      lines.appendChild(priceRow('Nightly', l.pricePerNight || l.nightlyRate, '/night'));
+      lines.appendChild(VACO.button('Book', function () {
+        if (!VACO.userId()) throw new Error('Sign in to book.');
+        return VACO.post('/api/bookings/bookings', { listingId: l.id, guestId: VACO.userId() })
+          .then(function () {
+            VACO.toast('Stay booked.', 'money');
+            VACO.refreshBalances().then(VACO.renderIdentity);
+          });
+      }, 'primary'));
+      return VACO.card(l.title || ('Stay ' + l.id), [lines]);
+    }), true);
+  });
+}
+
+function renderExperiences(body) {
+  return VACO.api('/api/bookings/experiences').then(function (data) {
+    var experiences = data.experiences || data || [];
+    if (!experiences.length) return el('div', 'vaco-empty', 'No experiences yet.');
+    return VACO.grid(experiences.map(function (e) {
+      var lines = el('div', 'vaco-stack-sm');
+      lines.appendChild(el('p', 'vaco-small vaco-dim', e.description || ''));
+      lines.appendChild(priceRow('Per guest', e.pricePerGuest || e.price));
+      lines.appendChild(VACO.button('Book', function () {
+        if (!VACO.userId()) throw new Error('Sign in to book.');
+        return VACO.post('/api/bookings/experience-bookings', {
+          experienceId: e.id, guestId: VACO.userId(),
+        }).then(function () {
+          VACO.toast('Experience booked.', 'money');
+          VACO.refreshBalances().then(VACO.renderIdentity);
+        });
+      }, 'primary'));
+      return VACO.card(e.title || ('Experience ' + e.id), [lines]);
+    }), true);
+  });
+}
+
+function renderHomes(body) {
+  return VACO.api('/api/home/listings').then(function (data) {
+    var listings = data.listings || data || [];
+    if (!listings.length) return el('div', 'vaco-empty', 'No homes on the market.');
+    return VACO.grid(listings.map(function (h) {
+      var lines = el('div', 'vaco-stack-sm');
+      var art = el('div', 'listing-art');
+      art.appendChild(el('strong', null, h.address || ''));
+      lines.appendChild(art);
+      var meta = el('div', 'vaco-row-tight');
+      if (h.bedrooms) meta.appendChild(VACO.badge(h.bedrooms + ' bd'));
+      if (h.bathrooms) meta.appendChild(VACO.badge(h.bathrooms + ' ba'));
+      if (h.squareFeet) meta.appendChild(VACO.badge(h.squareFeet + ' sqft'));
+      lines.appendChild(meta);
+      lines.appendChild(priceRow('Asking', h.listPrice || h.price));
+      lines.appendChild(VACO.button('Request info', function () {
+        if (!VACO.userId()) throw new Error('Sign in to enquire.');
+        return VACO.post('/api/home/leads', { listingId: h.id, buyerId: VACO.userId() })
+          .then(function () { VACO.toast('Lead sent to the listing agent.'); });
+      }));
+      return VACO.card(h.address || ('Home ' + h.id), [lines],
+        { trailing: VACO.badge(h.status || 'active') });
+    }), true);
+  });
+}
+
+function renderAuto(body) {
+  return VACO.api('/api/auto/vehicles').then(function (data) {
+    var vehicles = data.vehicles || data || [];
+    if (!vehicles.length) return el('div', 'vaco-empty', 'No vehicles available.');
+    return VACO.grid(vehicles.map(function (v) {
+      var lines = el('div', 'vaco-stack-sm');
+      lines.appendChild(el('p', 'vaco-small vaco-dim',
+        [v.year, v.make, v.model].filter(Boolean).join(' ')));
+      lines.appendChild(priceRow('Daily', v.dailyRate || v.pricePerDay, '/day'));
+      lines.appendChild(VACO.button('Rent', function () {
+        if (!VACO.userId()) throw new Error('Sign in to rent.');
+        return VACO.post('/api/auto/rentals', { vehicleId: v.id, renterId: VACO.userId() })
+          .then(function () {
+            VACO.toast('Rental started.', 'money');
+            VACO.refreshBalances().then(VACO.renderIdentity);
+          });
+      }, 'primary'));
+      return VACO.card([v.year, v.make, v.model].filter(Boolean).join(' ') || ('Vehicle ' + v.id),
+        [lines], { trailing: VACO.badge(v.status || 'available') });
+    }), true);
+  });
+}
+
+function renderFlights(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'VACAY is the <strong>merchant of record</strong> on flights: it takes the payment and owns the customer '
+    + 'relationship, rather than handing a booking off to an airline and disappearing. '
+    + 'No GDS or airline API is connected — inventory here is VACAY’s own.'));
+
+  return VACO.api('/api/flights/flights').then(function (data) {
+    var flights = data.flights || data || [];
+    if (!flights.length) {
+      out.appendChild(el('div', 'vaco-empty', 'No flights loaded.'));
+      return VACO.mount(body, out);
+    }
+    out.appendChild(VACO.grid(flights.map(function (f) {
+      var lines = el('div', 'vaco-stack-sm');
+      var leg = el('div', 'leg');
+      leg.appendChild(el('span', 'leg-code', f.originCode || f.origin || '???'));
+      leg.appendChild(el('span', 'leg-line'));
+      leg.appendChild(el('span', 'leg-code', f.destinationCode || f.destination || '???'));
+      lines.appendChild(leg);
+      if (f.departureTime) {
+        lines.appendChild(el('p', 'vaco-small vaco-dim', new Date(f.departureTime).toLocaleString()));
+      }
+      lines.appendChild(priceRow('Fare', f.price || f.fare));
+      lines.appendChild(VACO.button('Book', function () {
+        if (!VACO.userId()) throw new Error('Sign in to book.');
+        return VACO.post('/api/flights/flight-bookings', { flightId: f.id, passengerId: VACO.userId() })
+          .then(function () {
+            VACO.toast('Flight booked — VACAY is the merchant of record.', 'money');
+            VACO.refreshBalances().then(VACO.renderIdentity);
+          });
+      }, 'primary'));
+      return VACO.card(f.flightNumber || ('Flight ' + f.id), [lines],
+        { trailing: f.airline ? VACO.badge(f.airline) : null });
+    }), true));
+    VACO.mount(body, out);
+  });
+}
+
+VACO.app({
+  id: 'vacay',
+  name: 'VACAY',
+  tagline: 'Stays · homes · auto · flights',
+  //: VACAY's identity: the "dusk navy + sunset coral + brass" direction
+  //: recorded in VISUAL_DESIGN_COHESION_DIRECTIVE.md — which noted the
+  //: palette existed as a decision but appeared in no file. Sunset
+  //: coral is the accent; dusk navy is already the shared ink ramp.
+  accent: '#f0845e',
+  accentDim: '#c96540',
+  accentInk: '#1a0a05',
+  tabs: [
+    { id: 'stays', label: 'Stays', heading: 'Places to stay', render: renderStays },
+    { id: 'experiences', label: 'Experiences', heading: 'Things to do', render: renderExperiences },
+    { id: 'homes', label: 'Homes', heading: 'On the market', render: renderHomes },
+    { id: 'auto', label: 'Auto', heading: 'Cars to rent', render: renderAuto },
+    { id: 'flights', label: 'Flights', heading: 'Getting there', render: renderFlights },
+  ],
+});
+</script>
+</body>
+</html>

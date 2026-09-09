@@ -1,0 +1,12 @@
+{
+  "name": "world-layer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Universal World Layer — shared location/NPC data layer for VACON-C, VENVS, and HVNTZ.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node --test test/"
+  },
+  "license": "UNLICENSED"
+}

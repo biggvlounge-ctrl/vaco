@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>DREAMS</title>
+<link rel="stylesheet" href="/vaco-design.css" />
+<style>
+  .screen-tile {
+    aspect-ratio: 16 / 10;
+    border-radius: var(--vaco-radius-sm);
+    border: 1px solid var(--vaco-border-subtle);
+    background: linear-gradient(150deg, var(--vaco-accent-soft), transparent 70%), var(--vaco-bg-raised);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--vaco-text-faint); font-size: var(--vaco-text-xs);
+    letter-spacing: 0.1em; text-transform: uppercase;
+  }
+  .split-note { display: flex; gap: var(--vaco-space-4); flex-wrap: wrap; }
+  .split-part { display: flex; flex-direction: column; }
+  .split-value { font-size: var(--vaco-text-lg); font-weight: var(--vaco-weight-bold); font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body class="vaco">
+<script src="/vaco-ui.js"></script>
+<script>
+// DREAMS — the ad and screen network.
+//
+// Real client of its own 22 routes. Revenue splits per screen and
+// offline-cache behaviour are server-side.
+//
+// **Two honest limits, stated on the surface.** There is no physical
+// screen hardware anywhere in this ecosystem — a screen here is a
+// registered venue endpoint, not a panel on a wall. And "offline
+// plays" are recorded after the fact by whatever runs the screen;
+// nothing here polls a device, because there is no device.
+
+var el = VACO.el;
+
+function renderScreens(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'A screen is a registered venue endpoint. <strong>No display hardware exists</strong> — '
+    + 'hardware is a separate budget line from software, and this is the software half.', 'warn'));
+
+  out.appendChild(VACO.card('Register a screen', [
+    el('p', 'vaco-small vaco-dim',
+      'The venue keeps a share of everything played on its screen. That split is the reason a venue agrees to host one.'),
+    VACO.form([
+      { name: 'venueName', label: 'Venue', placeholder: 'Magnolia Blues', width: '170px' },
+      { name: 'ownerId', label: 'Owner', value: VACO.userId() || '', width: '130px' },
+      { name: 'revenueSharePercent', label: 'Venue share %', type: 'number', min: 0, value: 30, width: '110px' },
+    ], function (values) {
+      return VACO.post('/api/screens', values)
+        .then(function (s) { VACO.toast('Screen ' + s.id + ' registered.'); VACO.render(); });
+    }, 'Register'),
+  ]));
+
+  return VACO.api('/api/screens').then(function (data) {
+    var screens = data.screens || [];
+    if (!screens.length) {
+      out.appendChild(el('div', 'vaco-empty', 'No screens registered yet.'));
+      return VACO.mount(body, out);
+    }
+
+    var pending = screens.map(function (s) {
+      return VACO.api('/api/screens/' + s.id + '/revenue')
+        .then(function (r) { return { screen: s, revenue: r }; })
+        .catch(function () { return { screen: s, revenue: null }; });
+    });
+
+    return Promise.all(pending).then(function (loaded) {
+      out.appendChild(VACO.grid(loaded.map(function (entry) {
+        var s = entry.screen;
+        var lines = el('div', 'vaco-stack-sm');
+        var tile = el('div', 'screen-tile');
+        tile.textContent = s.status || 'registered';
+        lines.appendChild(tile);
+
+        if (entry.revenue) {
+          var r = entry.revenue;
+          var split = el('div', 'split-note');
+          [['Venue', r.venueShare !== undefined ? r.venueShare : r.ownerRevenue],
+           ['Network', r.networkShare !== undefined ? r.networkShare : r.platformRevenue],
+           ['Plays', r.playCount !== undefined ? r.playCount : r.plays]].forEach(function (pair) {
+            if (pair[1] === undefined) return;
+            var part = el('div', 'split-part');
+            part.appendChild(el('span', 'vaco-label', pair[0]));
+            part.appendChild(el('span', 'split-value', VACO.round(pair[1])));
+            split.appendChild(part);
+          });
+          lines.appendChild(split);
+        }
+
+        return VACO.card(s.venueName || ('Screen ' + s.id), [lines],
+          { trailing: VACO.badge((s.revenueSharePercent || 0) + '% venue') });
+      }), true));
+      VACO.mount(body, out);
+    });
+  });
+}
+
+function renderAdvertisers(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Self-serve: an advertiser signs up, funds a campaign, and it plays across the network — '
+    + 'no sales call, which is the whole reason a small local business would use this at all.'));
+
+  out.appendChild(VACO.card('Create an advertiser', [
+    VACO.form([
+      { name: 'name', label: 'Business', placeholder: 'Cherokee Street Coffee', width: '190px' },
+      { name: 'contactEmail', label: 'Contact', placeholder: 'hello@example.com', width: '180px' },
+    ], function (values) {
+      return VACO.post('/api/advertisers', values)
+        .then(function (a) { VACO.toast('Advertiser ' + a.id + ' created.'); });
+    }, 'Create'),
+  ]));
+
+  out.appendChild(VACO.card('Look up an advertiser', [
+    VACO.form([{ name: 'id', label: 'Advertiser id', type: 'number', min: 1, value: 1, width: '110px' }],
+      function (values) {
+        return VACO.api('/api/advertisers/' + values.id + '/campaigns').then(function (data) {
+          var campaigns = data.campaigns || [];
+          while (out.childNodes.length > 3) out.removeChild(out.lastChild);
+          out.appendChild(VACO.card('Campaigns', [
+            VACO.table([
+              { key: 'id', label: 'Id' },
+              { key: 'name', label: 'Campaign' },
+              { label: 'Budget', num: true, render: function (c) { return VACO.price(c.budget, { freeLabel: false }); } },
+              { label: 'Status', render: function (c) { return VACO.badge(c.status); } },
+            ], campaigns, { empty: 'No campaigns for this advertiser.' }),
+          ]));
+          VACO.mount(body, out);
+        });
+      }, 'Load'),
+  ]));
+
+  return VACO.mount(body, out);
+}
+
+function renderOffline(body) {
+  return VACO.api('/api/offline-plays').then(function (data) {
+    var plays = data.plays || data.offlinePlays || [];
+    return VACO.card('Offline plays', [
+      el('p', 'vaco-small vaco-dim',
+        'A screen that loses its connection keeps playing from cache and reports what it played when it comes back. '
+        + 'Those reports land here. Nothing here polls a device — there is no device.'),
+      VACO.table([
+        { key: 'screenId', label: 'Screen' },
+        { key: 'campaignId', label: 'Campaign' },
+        { key: 'playCount', label: 'Plays', num: true },
+        { key: 'reportedAt', label: 'Reported', render: function (p) {
+          return p.reportedAt ? new Date(p.reportedAt).toLocaleString() : '—'; } },
+      ], plays, { empty: 'No offline plays reported.' }),
+    ]);
+  });
+}
+
+VACO.app({
+  id: 'dreams',
+  name: 'DREAMS',
+  tagline: 'Ad & screen network',
+  //: DREAMS' identity: a bright cyan. Backlit-display glow, and the
+  //: register's only cyan — distinct from VACO's aqua by being
+  //: noticeably bluer.
+  accent: '#3fbde0',
+  accentDim: '#2b98b8',
+  accentInk: '#03141a',
+  tabs: [
+    { id: 'screens', label: 'Screens', heading: 'The network', render: renderScreens },
+    { id: 'advertisers', label: 'Advertisers', heading: 'Self-serve campaigns', render: renderAdvertisers },
+    { id: 'offline', label: 'Offline', heading: 'Cached playback', render: renderOffline },
+  ],
+});
+</script>
+</body>
+</html>
