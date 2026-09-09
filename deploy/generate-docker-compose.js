@@ -75,21 +75,48 @@ const ENV_VAR_TO_SERVICE = {
   YAP_API_URL: "yap",
 };
 
-// Real, grep-verified list (`grep -l createPersistentStore */server.js`).
-// Re-verified when vex/ and vex-trading/ were added as standalone apps:
-// vex persists and had been missing here, so its container ran without
-// a volume and lost its store on every restart. vex-trading is a shell
-// and genuinely holds no store of its own.
 // Apps that actually write to a real `data/store.json` via
 // `lib/persistence.js` -- everyone else stays in-memory-only, same as
 // running them directly with `npm start`, so no volume is invented for
 // an app that wouldn't use one anyway.
-const PERSISTED_APPS = new Set([
-  "chopz", "chopz-shop", "cvnvo", "yap", "dreams", "hvntz", "shield", "v3",
-  "vaca", "vacay", "vaco-analytics", "vaco-audit", "vaco-media", "vaco-operator", "vacon", "vago", "vavlt-stvdios",
-  "venvm", "vex", "void", "voidmagic", "voken", "vsafe", "vulture-flix",
-  "vulture-music", "vulture-pods", "vulture-studios", "vxllage",
-]);
+//
+// **This was a hardcoded list, and the same bug bit it twice.** Its
+// own comment said "Real, grep-verified list (`grep -l
+// createPersistentStore */server.js`)" and recorded the first miss:
+// vex persisted, was absent here, and its container lost its store on
+// every restart. It was added, the comment was updated -- and then
+// `vaco-notify` shipped, persisted, and was absent for exactly the
+// same reason. `scripts/deploy-preflight.mjs` found it: "writes to
+// /app/data but compose mounts no volume there".
+//
+// A list that claims to be the output of a command should be the
+// output of that command. So the grep is now run rather than
+// transcribed, and the third app to persist gets its volume without
+// anybody remembering to add it.
+const PERSISTED_APPS = new Set(
+  apps
+    .filter((app) => {
+      try {
+        return /createPersistentStore/
+          .test(fs.readFileSync(path.join(ROOT, app.appPath, "server.js"), "utf8"));
+      } catch {
+        // A Vite frontend has no server.js and no store.
+        return false;
+      }
+    })
+    .map((app) => app.name),
+);
+
+// A derivation that silently finds nothing would emit a compose file
+// where every app is in-memory -- valid YAML, and every store in the
+// ecosystem lost on `docker compose restart`.
+if (PERSISTED_APPS.size === 0) {
+  throw new Error(
+    "generate-docker-compose: no app appears to call createPersistentStore. "
+    + "That is almost certainly a broken scan rather than an ecosystem with no state; "
+    + "refusing to write a compose file that mounts no volumes.",
+  );
+}
 
 const services = {};
 const volumes = {};

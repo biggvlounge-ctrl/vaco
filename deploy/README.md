@@ -2,7 +2,7 @@
 
 Real production-deployment tooling for the VACO ecosystem's 34 Express
 backends + 2 Vite frontends, plus nginx and the LiveKit SFU — 38
-Compose services and 28 named volumes. (`venvs-mock-backend` is the
+Compose services and 29 named volumes. (`venvs-mock-backend` is the
 one server in the repo that is deliberately *not* deployed: the apps
 were cut over to standalone V3 and Shield, and it stays for local
 development only.) Every file here is *generated* from the
@@ -107,7 +107,7 @@ confirmed cross-app URLs resolve to the correct real service name +
 port per app (spot-checked `vulture-studios` → `shield`/`v3`/
 `vaco-analytics`/`vaco-audit`/`vaco-operator`/`vulture-flix`/
 `vulture-music`, all seven real, all correctly scoped — no unrelated
-var leaked in); confirmed exactly 28 named volumes, each declared once
+var leaked in); confirmed exactly 29 named volumes, each declared once
 and mounted by exactly one service, matching the real persisted-app
 list. `deploy/nginx-docker.conf`'s braces balance (40 open, 40 close)
 and all 36 expected `location` blocks appear exactly once, no

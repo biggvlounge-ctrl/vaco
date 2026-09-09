@@ -823,6 +823,8 @@ services:
     networks:
       - vaco
     restart: unless-stopped
+    volumes:
+      - "vaco_notify_data:/app/data"
     depends_on:
       - v3
       - shield
@@ -998,6 +1000,7 @@ volumes:
   dreams_data:
   vulture_studios_data:
   vex_data:
+  vaco_notify_data:
   vaco_audit_data:
   vaco_operator_data:
   vaco_media_data:

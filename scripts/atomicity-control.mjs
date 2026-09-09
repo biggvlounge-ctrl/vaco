@@ -143,8 +143,17 @@ function suiteFor(app) {
   return null;
 }
 
+// `node --test` sets NODE_TEST_CONTEXT, and a child that inherits it
+// switches to the machine-readable v8 reporter — no `# pass N` line to
+// parse. Here that would be worse than a wrong count: with `fail`
+// parsing as -1 for both the baseline and the mutation, `mutated.fail >
+// base.fail` is false, and every control would report "the mutation
+// broke NOTHING" against suites that catch it perfectly well.
+const CHILD_ENV = { ...process.env };
+delete CHILD_ENV.NODE_TEST_CONTEXT;
+
 function runSuite(files, cwd) {
-  const r = spawnSync(process.execPath, ['--test', ...files], { cwd, encoding: 'utf8' });
+  const r = spawnSync(process.execPath, ['--test', ...files], { cwd, encoding: 'utf8', env: CHILD_ENV });
   const num = (re) => Number((r.stdout.match(re) || [])[1] ?? -1);
   return { pass: num(/^# pass (\d+)/m), fail: num(/^# fail (\d+)/m) };
 }

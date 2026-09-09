@@ -103,6 +103,9 @@ const totals = { tests: 0, pass: 0, fail: 0, skipped: 0 };
 const failed = [];
 const started = Date.now();
 
+const CHILD_ENV = { ...process.env };
+delete CHILD_ENV.NODE_TEST_CONTEXT;
+
 for (const suite of suites) {
   const name = path.relative(REPO_ROOT, suite.dir) || '.';
   // Explicit file paths, not `--test test/`. Node resolves a directory
@@ -113,6 +116,12 @@ for (const suite of suites) {
   const result = spawnSync(process.execPath, ['--test', ...suite.files], {
     cwd: suite.dir,
     encoding: 'utf8',
+    // `node --test` sets NODE_TEST_CONTEXT, and a child that inherits
+    // it switches to the machine-readable v8 reporter — no `# pass N`
+    // line for parseSummary to find, so every suite would count zero.
+    // This script is normally run directly, but it is one `node --test`
+    // wrapper away from silently reporting an all-zero green run.
+    env: CHILD_ENV,
     // A suite that hangs must not hang CI forever. Two minutes is far
     // beyond anything here — the whole ecosystem runs in seconds.
     timeout: 120000,
