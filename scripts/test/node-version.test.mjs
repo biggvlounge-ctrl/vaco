@@ -70,6 +70,51 @@ function engineFloors() {
   return out;
 }
 
+// **A lockfile carries its own copy of `engines`, and nobody was
+// checking it.** The scan above reads `package.json` only, so 33
+// lockfiles sat on `">=18"` while their own `package.json` had moved to
+// `">=22"` — invisible here, and only surfaced when a real
+// `./install-ecosystem.sh` run rewrote every one of them. `npm ci`
+// reads the lockfile's copy, so the two disagreeing is exactly the kind
+// of split that behaves differently in CI than on a workstation.
+function lockfileEngines() {
+  const out = [];
+  const walk = (dir, depth = 0) => {
+    if (depth > 2) return;
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (e.name === 'node_modules' || e.name.startsWith('.')) continue;
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) { walk(full, depth + 1); continue; }
+      if (e.name !== 'package-lock.json') continue;
+      const lock = JSON.parse(fs.readFileSync(full, 'utf8'));
+      const spec = lock.packages?.['']?.engines?.node;
+      if (spec) out.push({ file: path.relative(REPO_ROOT, full), spec });
+    }
+  };
+  walk(REPO_ROOT);
+  return out;
+}
+
+test('every lockfile agrees with its own package.json about the Node floor', () => {
+  const locks = lockfileEngines();
+  assert.ok(locks.length > 20,
+    `found only ${locks.length} lockfile engines declarations — the scan is broken`);
+
+  const mismatched = [];
+  for (const lock of locks) {
+    const pkgPath = path.join(REPO_ROOT, path.dirname(lock.file), 'package.json');
+    if (!fs.existsSync(pkgPath)) continue;
+    const spec = JSON.parse(fs.readFileSync(pkgPath, 'utf8')).engines?.node;
+    if (spec && spec !== lock.spec) {
+      mismatched.push(`${lock.file}: lock says ${lock.spec}, package.json says ${spec}`);
+    }
+  }
+  assert.deepEqual(mismatched, [],
+    'these lockfiles disagree with their package.json about the Node floor. '
+    + '`npm ci` reads the lockfile, so this is a real split between CI and a local install. '
+    + 'Re-run ./install-ecosystem.sh and commit the result.');
+});
+
 test('every Dockerfile builds on the same Node major', () => {
   const all = DOCKERFILES.flatMap(dockerMajors);
   assert.equal(new Set(all).size, 1, `Dockerfiles disagree: ${all.join(', ')}`);

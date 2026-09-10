@@ -43,7 +43,24 @@ mkdir -p "$REPO_ROOT/logs/pids"
 # per-service tokens from the environment — see `.env.example` and
 # `dev-docs/DEPLOYMENT_INVENTORY.md`. If `VACO_SERVICE_TOKENS` is already
 # set, it is respected and nothing is generated.
-VACO_CALLERS="chopz-shop cvnvo dreams hvntz vacay vaco-analytics vaco-shell vago vavlt-stvdios vex void voidmagic voken vsafe vulture-flix vulture-music vulture-pods vulture-studios vxllage"
+# **Derived, not listed.** This was a hardcoded string of 19 names
+# while `scripts/generate-service-tokens.mjs` derived 27 from the same
+# manifest plus each app's real `V3_API_URL` usage. A local boot
+# therefore allowlisted 19 services and the other 8 -- chopz, v4-proxy,
+# vaca, vaco-notify, vaco-operator, vacon, vacon-c, venvm -- got 403
+# from V3 on every service call they made. Confirmed live rather than
+# reasoned: V3's own `/api/health` reported `allowlistedServices` of
+# exactly 19 on a boot from this script.
+#
+# That is the third place this list drifted. `.env.example` did it
+# first (16 hand-kept against 19 derived) and was fixed by deriving;
+# this is the same fix in the last place still keeping its own copy.
+VACO_CALLERS="$(node "$REPO_ROOT/scripts/generate-service-tokens.mjs" --list 2>/dev/null)"
+if [ -z "$VACO_CALLERS" ]; then
+  echo "start-ecosystem: could not derive the V3 caller list." >&2
+  echo "Falling back to a shorter hardcoded list is what caused 8 apps to 403; refusing." >&2
+  exit 1
+fi
 
 if [ -z "${VACO_SERVICE_TOKENS:-}" ]; then
   DEV_TOKEN="dev-$(head -c 18 /dev/urandom | od -An -tx1 | tr -d ' \n')"

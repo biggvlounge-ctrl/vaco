@@ -64,6 +64,23 @@ const shotDir = (args.find((a) => a.startsWith('--shot=')) || '').split('=')[1] 
 // VENVS and VDP are excluded: they are Vite apps that predate this
 // design system and serve a built bundle, so the assertions below
 // (masthead, VACO tokens, tab rendering) do not apply to them.
+//
+// **Headless services are excluded too, and that was a real problem
+// until it was.** `vaco-audit`, `vaco-operator` and `vaco-media` have
+// no `public/` at all — they are infrastructure other services call,
+// never opened by a person. Running the frontend assertions against
+// them produced three permanent, meaningless failures on every `--all`
+// run: 404, no masthead, no tokens, no tabs. A check that cries wolf
+// on three apps by design is a check people learn to skim, and the
+// next real frontend failure hides in that noise.
+//
+// `dev-docs/COMPLETION_BY_APP.md` already treats these three as
+// headless for exactly the same reason. The list is re-earned on every
+// run below rather than trusted: an app here that grows a `public/`
+// fails the run as a stale exemption instead of quietly going
+// untested.
+const HEADLESS = new Set(['vaco-audit', 'vaco-operator', 'vaco-media']);
+
 function targetsFromManifest() {
   const manifest = fs.readFileSync(
     path.join(path.dirname(path.dirname(fileURLToPath(import.meta.url))), 'start-ecosystem.sh'),
@@ -71,10 +88,35 @@ function targetsFromManifest() {
   );
   const block = manifest.match(/^APPS=\(([\s\S]*?)^\)/m);
   if (!block) throw new Error('smoke-frontend: could not find the APPS array in start-ecosystem.sh');
-  return [...block[1].matchAll(/"([^"]+)"/g)]
+  const all = [...block[1].matchAll(/"([^"]+)"/g)]
     .map((match) => match[1].split(':'))
     .filter(([, , command]) => command === 'npm start')
-    .map(([name, , , port]) => ({ name, port: Number(port) }));
+    .map(([name, appPath, , port]) => ({ name, appPath, port: Number(port) }));
+
+  // The headless exemption re-earns itself. An app on the list that now
+  // serves a page is a stale exemption hiding a real, untested
+  // frontend, which is worse than the noise the list removes.
+  const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+  const stale = all.filter((a) => HEADLESS.has(a.name)
+    && fs.existsSync(path.join(repoRoot, a.appPath, 'public', 'index.html')));
+  if (stale.length > 0) {
+    throw new Error(`smoke-frontend: ${stale.map((a) => a.name).join(', ')} `
+      + 'is treated as headless but now serves public/index.html. '
+      + 'Remove it from HEADLESS so its frontend is actually smoke-tested.');
+  }
+
+  const missing = [...HEADLESS].filter((n) => !all.some((a) => a.name === n));
+  if (missing.length > 0) {
+    throw new Error(`smoke-frontend: ${missing.join(', ')} is on the headless list `
+      + 'but is not a backend in start-ecosystem.sh\'s manifest — the app was renamed or removed.');
+  }
+
+  const skipped = all.filter((a) => HEADLESS.has(a.name)).map((a) => a.name);
+  if (skipped.length > 0) {
+    process.stdout.write(`skipping ${skipped.length} headless service(s) with no frontend by design: `
+      + `${skipped.join(', ')}\n\n`);
+  }
+  return all.filter((a) => !HEADLESS.has(a.name));
 }
 
 const targets = args.includes('--all')

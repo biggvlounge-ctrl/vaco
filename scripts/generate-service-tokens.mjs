@@ -81,6 +81,19 @@ if (callers.length === 0) {
   process.exit(1);
 }
 
+// **`--list` prints just the caller names**, so a shell script can
+// derive the same set instead of keeping a fourth copy of it.
+// `start-ecosystem.sh` had a hand-maintained `VACO_CALLERS` holding 19
+// names while this derivation found 27 — the same drift the
+// `.env.example` block below was written to stop, in a third place. A
+// local boot therefore allowlisted 19 services, and the other 8 got 403
+// from V3 on every service call. Confirmed live: V3's own
+// `/api/health` reported `allowlistedServices` of exactly 19.
+if (process.argv.includes('--list')) {
+  process.stdout.write(`${callers.join(' ')}\n`);
+  process.exit(0);
+}
+
 const tokens = new Map(callers.map((name) => [name, crypto.randomBytes(32).toString('hex')]));
 
 const lines = [
