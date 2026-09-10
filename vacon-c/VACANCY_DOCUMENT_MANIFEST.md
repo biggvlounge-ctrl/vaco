@@ -24,14 +24,43 @@ not renamed, not moved, absent. They were produced in earlier threads
 and never brought in.
 
 **This is a real gap and it cannot be closed from inside the
-repository.** They are not in any release archive, not in the
-`vacon-c-game` upload (which turned out to be a strict subset of what
-is already here), and not in any session transcript available to the
-work. Recovering them means locating the original files.
+repository.** Verified rather than assumed: every file under
+`vacon-c/` was listed (tracked and untracked alike), both uploaded
+archives were searched by filename, and the whole repo was searched by
+*content* for each document's distinctive subject matter. None of them
+are here under another name.
 
 Until then, treat the index as a *record of what was written*, not an
 inventory of what is here. Anything below is a document you will not
 find by following it.
+
+### What survived them, which is more than the list suggests
+
+A missing document is not the same as a lost decision, and for the
+technical handoff the difference is large. Three documents in this
+repository absorbed the incoming ones at intake:
+
+- **`VACANCY_MASTER_ARCHITECTURE_DOCUMENT.md`** (558 lines) is the
+  reconciliation underlying the whole handoff package. §2 carries the
+  10-category system map with the implemented/gap split per category;
+  §7 the prototype development plan; §12 the Game DNA mapping table's
+  conclusions; §5 the database design "preserved in detail".
+- **`VACANCY_SEED.md`** logged each document as it arrived *and
+  checked it against the code*: §7 records where Doc 6's status column
+  was stale in seven places, §11 that Doc 4's premise does not hold,
+  §12 verifies Doc 5's Phase 1 checklist item by item.
+- **`VACANCY_INVENTORY.md`** tracks the same intake against the API
+  and route map.
+
+So the *architecture* is not lost. What is lost is the detail those
+summaries point at — §3 says "full detail preserved as sent", and "as
+sent" means in a document that is now gone. The reference tables, the
+per-part world-bible material, and the long enumerations are the real
+casualties, not the decisions taken from them.
+
+The group most worth recovering is therefore **Core Gameplay Systems**
+below: mechanics for work not yet built, where no summary stands in for
+the specification.
 
 Grouped by the part of the index each sat under, with the index's own
 one-line description — so this is a hunting list you can triage, not
