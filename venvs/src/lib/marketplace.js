@@ -22,6 +22,35 @@
 // injected transferFn approach (keeps this module plain-Node
 // testable, decoupled from v3Client.js's Vite-only import.meta.env).
 
+// **Platform-funded legs take a separate function, and the browser
+// never gets one.**
+//
+// This module runs in the browser. Some of the money it moves is the
+// *buyer's own*, and V3 authorises that from their Shield session
+// because `requireActor('fromUserId')` matches the session against the
+// payer. The rest is the **platform paying out** — an author's
+// royalty, a seller's share — which a browser must never instruct. No
+// credential fixes that: a client able to authenticate as the platform
+// is a client able to drain it.
+//
+// So `transferFn` moves the buyer's money and `payoutFn` moves the
+// platform's, and only a backend holding a service credential can
+// supply the second. No component in this app does, and none should.
+//
+// **A flow with any platform leg refuses entirely rather than settling
+// half.** Charging the buyer and not paying the author is exactly the
+// partial-settlement defect the ecosystem-wide sweep removed
+// everywhere else. See `dev-docs/BROWSER_INITIATED_MONEY.md`.
+function requirePayoutFn(payoutFn, operation) {
+  if (typeof payoutFn !== 'function') {
+    throw new Error(
+      `${operation}: this pays out from the platform account, which a browser must not instruct. `
+      + 'It needs a backend holding a service credential to supply payoutFn(fromUserId, toUserId, '
+      + 'amount, reason) -- see dev-docs/BROWSER_INITIATED_MONEY.md.',
+    );
+  }
+}
+
 const PLATFORM_USER_ID = 'venvs-platform';
 
 export function createMarketplace() {
@@ -166,7 +195,7 @@ function cartTotal(marketplace, cart) {
 // span multiple sellers in a unified marketplace) -- same
 // buyer -> platform -> recipient(s) shape as Phase 2's purchaseBook.
 export async function checkout(marketplace, options = {}) {
-  const { cartId, transferFn } = options;
+  const { cartId, transferFn, payoutFn } = options;
   if (typeof transferFn !== 'function') {
     throw new Error('checkout requires a transferFn(fromUserId, toUserId, amount, reason)');
   }
@@ -180,6 +209,12 @@ export async function checkout(marketplace, options = {}) {
   if (cart.items.length === 0) {
     throw new Error('checkout: cart is empty');
   }
+
+  // **Refuse before charging the buyer.** Every cart owes its sellers,
+  // and those legs are the platform's to pay. Charging the buyer and
+  // leaving the sellers unpaid is the partial settlement this
+  // ecosystem spent a sweep removing.
+  requirePayoutFn(payoutFn, 'checkout');
 
   const total = cartTotal(marketplace, cart);
   await transferFn(cart.buyerId, PLATFORM_USER_ID, total, `venvs_marketplace_checkout:${cart.id}`);
@@ -195,7 +230,7 @@ export async function checkout(marketplace, options = {}) {
   for (const [sellerId, amount] of bySeller) {
     const seller = getSeller(marketplace, sellerId);
     const rounded = Math.round(amount * 100) / 100;
-    await transferFn(PLATFORM_USER_ID, seller.ownerId, rounded, `venvs_marketplace_payout:${cart.id}:${sellerId}`);
+    await payoutFn(PLATFORM_USER_ID, seller.ownerId, rounded, `venvs_marketplace_payout:${cart.id}:${sellerId}`);
     payouts.push({ sellerId, amount: rounded });
   }
 

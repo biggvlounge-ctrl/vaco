@@ -306,7 +306,7 @@ test('a shift pays the owner and then locks for the cooldown', () => {
   const id = getAvailableUnits(store)[0].id;
 
   return leaseUnit(store, { unitId: id, ownerId: 'p1', transferFn })
-    .then(() => runShift(store, { unitId: id, transferFn, now: 1000 }))
+    .then(() => runShift(store, { unitId: id, payoutFn: transferFn, now: 1000 }))
     .then((out) => {
       assert.equal(out.payout, SHIFT_PAYOUT);
       const paid = transferFn.moves[1];
@@ -317,16 +317,16 @@ test('a shift pays the owner and then locks for the cooldown', () => {
     })
     // Immediately again: refused.
     .then(() => assert.rejects(
-      () => runShift(store, { unitId: id, transferFn, now: 1000 }),
+      () => runShift(store, { unitId: id, payoutFn: transferFn, now: 1000 }),
       /on cooldown/,
     ))
     // One millisecond before the cooldown ends: still refused.
     .then(() => assert.rejects(
-      () => runShift(store, { unitId: id, transferFn, now: 1000 + SHIFT_COOLDOWN_MS - 1 }),
+      () => runShift(store, { unitId: id, payoutFn: transferFn, now: 1000 + SHIFT_COOLDOWN_MS - 1 }),
       /on cooldown/,
     ))
     // Exactly at the boundary: allowed.
-    .then(() => runShift(store, { unitId: id, transferFn, now: 1000 + SHIFT_COOLDOWN_MS }))
+    .then(() => runShift(store, { unitId: id, payoutFn: transferFn, now: 1000 + SHIFT_COOLDOWN_MS }))
     .then(() => assert.equal(transferFn.moves.length, 3, 'lease + two shifts, nothing else'));
 });
 
@@ -334,8 +334,8 @@ test('a unit nobody leased cannot be worked', () => {
   const store = createChopz();
   const transferFn = ledger();
   const id = getAvailableUnits(store)[0].id;
-  return assert.rejects(() => runShift(store, { unitId: id, transferFn }), /no leased unit/)
-    .then(() => assert.rejects(() => runShift(store, { unitId: 9999, transferFn }), /no leased unit/))
+  return assert.rejects(() => runShift(store, { unitId: id, payoutFn: transferFn }), /no leased unit/)
+    .then(() => assert.rejects(() => runShift(store, { unitId: 9999, payoutFn: transferFn }), /no leased unit/))
     .then(() => assert.equal(transferFn.moves.length, 0));
 });
 
@@ -350,7 +350,7 @@ test('an AI-staffed unit cannot also be worked by its owner', () => {
     .then(() => {
       staffWithAIEmployee(store, id, 'Rosa', 0);
       return assert.rejects(
-        () => runShift(store, { unitId: id, transferFn, now: SHIFT_COOLDOWN_MS * 10 }),
+        () => runShift(store, { unitId: id, payoutFn: transferFn, now: SHIFT_COOLDOWN_MS * 10 }),
         /staffed with an AI employee/,
       );
     })
@@ -368,7 +368,7 @@ test('AI earnings accrue with time and reset when collected', () => {
       staffWithAIEmployee(store, id, 'Rosa', 0);
       assert.equal(getPendingEarnings(store, id, 0), 0, 'nothing accrues in zero time');
       assert.equal(getPendingEarnings(store, id, 2 * HOUR), 2 * AI_EMPLOYEE_RATE_PER_HOUR);
-      return collectEarnings(store, { unitId: id, transferFn, now: 2 * HOUR });
+      return collectEarnings(store, { unitId: id, payoutFn: transferFn, now: 2 * HOUR });
     })
     .then((out) => {
       assert.equal(out.collected, 2 * AI_EMPLOYEE_RATE_PER_HOUR);
@@ -379,7 +379,7 @@ test('AI earnings accrue with time and reset when collected', () => {
     })
     // And collecting again immediately pays nothing rather than double-paying.
     .then(() => assert.rejects(
-      () => collectEarnings(store, { unitId: id, transferFn, now: 2 * HOUR }),
+      () => collectEarnings(store, { unitId: id, payoutFn: transferFn, now: 2 * HOUR }),
       /no pending earnings/,
     ))
     .then(() => assert.equal(transferFn.moves.length, 2));
@@ -393,7 +393,7 @@ test('earnings cannot be collected from a self-run unit', () => {
     .then(() => {
       assert.throws(() => getPendingEarnings(store, id), /not staffed with an AI employee/);
       return assert.rejects(
-        () => collectEarnings(store, { unitId: id, transferFn }),
+        () => collectEarnings(store, { unitId: id, payoutFn: transferFn }),
         /not staffed with an AI employee/,
       );
     });
@@ -442,12 +442,12 @@ test('switching to self-run clears the shift cooldown', () => {
   const id = getAvailableUnits(store)[0].id;
 
   return leaseUnit(store, { unitId: id, ownerId: 'p1', transferFn })
-    .then(() => runShift(store, { unitId: id, transferFn, now: 1000 }))
+    .then(() => runShift(store, { unitId: id, payoutFn: transferFn, now: 1000 }))
     .then(() => {
       switchToSelfRun(store, id, 2000);
       assert.equal(getUnit(store, id).lastShiftAt, null);
       assert.equal(getUnit(store, id).employeeName, null, 'and the employee is gone');
-      return runShift(store, { unitId: id, transferFn, now: 2000 });
+      return runShift(store, { unitId: id, payoutFn: transferFn, now: 2000 });
     })
     .then((out) => assert.equal(out.payout, SHIFT_PAYOUT, 'a shift is available again immediately'));
 });
@@ -463,13 +463,50 @@ test('staffing requires a leased unit and a named employee', () => {
     .then(() => assert.throws(() => staffWithAIEmployee(store, id, ''), /requires an employeeName/));
 });
 
-test('every money-moving CHOPZ operation demands a real transfer function', () => {
-  // Not ceremony: a missing transferFn defaulting to a no-op would make
+test('every money-moving CHOPZ operation demands a real money function', () => {
+  // Not ceremony: a missing function defaulting to a no-op would make
   // leases free and shifts pay nothing, and both would look like they
   // worked.
+  //
+  // **Two different functions, because two different authorities.**
+  // A lease is the tenant paying the platform out of their own account,
+  // which their Shield session authorises — that takes `transferFn`.
+  // A shift payout and AI income are the *platform* paying the
+  // signed-in user, which a browser must never instruct — those take
+  // `payoutFn`, and only a backend holding a service credential can
+  // supply one.
   const store = createChopz();
   const id = getAvailableUnits(store)[0].id;
   return assert.rejects(() => leaseUnit(store, { unitId: id, ownerId: 'p' }), /requires a transferFn/)
-    .then(() => assert.rejects(() => runShift(store, { unitId: id }), /requires a transferFn/))
-    .then(() => assert.rejects(() => collectEarnings(store, { unitId: id }), /requires a transferFn/));
+    .then(() => assert.rejects(() => runShift(store, { unitId: id }), /must not instruct/))
+    .then(() => assert.rejects(() => collectEarnings(store, { unitId: id }), /must not instruct/));
+});
+
+test('a browser cannot pay itself from the platform account', () => {
+  // **The sharpest case in the ecosystem, and the reason payoutFn
+  // exists.** `runShift` moves VCoin from the platform to the signed-in
+  // user. Its only rate limit is a cooldown held in this store — which
+  // in the real app is React state, cleared by a page reload. Had the
+  // browser ever been given a credential that satisfied V3, this would
+  // have been an unbounded money printer: reload, run a shift, repeat.
+  //
+  // The fix is not a better cooldown. It is that a browser cannot
+  // instruct this movement at all, whatever it holds.
+  const store = createChopz();
+  const id = getAvailableUnits(store)[0].id;
+  const transferFn = async () => {};
+
+  return leaseUnit(store, { unitId: id, ownerId: 'p1', transferFn })
+    .then(() => assert.rejects(
+      // Everything a browser could plausibly supply: its own transfer
+      // function, under any name it likes.
+      () => runShift(store, { unitId: id, transferFn, now: 1000 }),
+      /must not instruct/,
+    ))
+    .then(() => {
+      // And the cooldown was not consumed by the refusal, so a real
+      // backend-driven shift later is still the first one.
+      const unit = getUnit(store, id);
+      assert.equal(unit.lastShiftAt, null, 'a refused shift advanced the cooldown');
+    });
 });

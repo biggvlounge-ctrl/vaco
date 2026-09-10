@@ -57,7 +57,13 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..
 // claims the remainder is not growing.
 const CEILING = 0;
 
-const TRANSFER_CALL = /await\s+(?:transferFn|transferVCoin|transfer)\s*\(/g;
+// `payoutFn` is included deliberately. When the browser-initiated
+// modules split their platform-funded legs onto a separate function,
+// this audit's count for them dropped from 8 to 4 — not because
+// anything was fixed, but because the calls had been renamed. A money
+// check that can be quieted by a rename is worse than no check, so it
+// counts both.
+const TRANSFER_CALL = /await\s+(?:transferFn|transferVCoin|payoutFn|transfer)\s*\(/g;
 
 // A code example inside a header comment is not a call site. Neither is
 // a template literal containing the words. Both produced real false
@@ -147,6 +153,19 @@ const IS_THE_LEDGER = 'v3/lib/vcoin.js';
 // backend that holds a service credential — a real decision, not a
 // refactor. Until then they are listed here so the remaining count
 // stays honest about what is unconverted and why.
+//
+// **Partly addressed 2026-09-10; see `dev-docs/BROWSER_INITIATED_MONEY.md`.**
+// VENVS now sends its Shield session (VDP already did — an earlier
+// claim here that neither did was wrong), so buyer-funded legs are
+// authorised rather than anonymous. And the two authorities are now
+// separated in code: `transferFn` moves the user's own money,
+// `payoutFn` moves the platform's, and no component supplies the
+// second. A flow with any platform leg refuses *before* charging
+// anyone rather than settling half.
+//
+// These files stay parked because the platform-funded legs still have
+// nowhere to run: the backend that would own the state, the rule and
+// the settlement does not exist.
 const BROWSER_INITIATED = new Set([
   'vdp/src/lib/chopz.js',
   'venvs/src/lib/catalog.js',

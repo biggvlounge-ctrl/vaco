@@ -28,6 +28,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 
 import {
   calculateEbookRoyalty, calculatePrintRoyalty,
@@ -229,7 +230,7 @@ test('checkout conserves money exactly across several sellers', () => {
   addToCart(m, cart.id, p2.id, 3);   // 37.50
   const transferFn = ledger();
 
-  return checkout(m, { cartId: cart.id, transferFn }).then((order) => {
+  return checkout(m, { cartId: cart.id, transferFn, payoutFn: transferFn }).then((order) => {
     assert.equal(order.total, 117.5);
     assert.equal(transferFn.paidBy('buyer'), 117.5, 'the buyer was charged the cart total, once');
     assert.equal(
@@ -255,7 +256,7 @@ test('two products from one seller are paid as a single payout', () => {
   addToCart(m, cart.id, first.id, 1);
   const transferFn = ledger();
 
-  return checkout(m, { cartId: cart.id, transferFn }).then((order) => {
+  return checkout(m, { cartId: cart.id, transferFn, payoutFn: transferFn }).then((order) => {
     assert.equal(order.payouts.length, 1, 'one seller, one payout');
     assert.equal(order.payouts[0].amount, 50);
     assert.equal(transferFn.paidTo('owner-a'), 50);
@@ -270,9 +271,9 @@ test('a cart cannot be checked out twice', () => {
   addToCart(m, cart.id, p1.id, 1);
   const transferFn = ledger();
 
-  return checkout(m, { cartId: cart.id, transferFn })
+  return checkout(m, { cartId: cart.id, transferFn, payoutFn: transferFn })
     .then(() => assert.rejects(
-      () => checkout(m, { cartId: cart.id, transferFn }),
+      () => checkout(m, { cartId: cart.id, transferFn, payoutFn: transferFn }),
       /is completed, not active/,
     ))
     .then(() => {
@@ -304,7 +305,7 @@ test('an order that cannot be paid for leaves the cart usable', () => {
   const broke = async () => { throw new Error('insufficient funds'); };
 
   return assert.rejects(
-    () => checkout(m, { cartId: cart.id, transferFn: broke }),
+    () => checkout(m, { cartId: cart.id, transferFn: broke, payoutFn: broke }),
     /insufficient funds/,
   ).then(() => {
     assert.equal(getCart(m, cart.id).status, 'active', 'the cart was consumed by a failed payment');
@@ -325,7 +326,7 @@ test('fulfillment requests one shipment per seller and is not repeatable', () =>
   let jobId = 0;
   const voidRequestFn = async () => ({ id: ++jobId });
 
-  return checkout(m, { cartId: cart.id, transferFn })
+  return checkout(m, { cartId: cart.id, transferFn, payoutFn: transferFn })
     .then((order) => requestFulfillment(m, {
       orderId: order.id, shippingCostPerSeller: 5, voidRequestFn,
     }))
@@ -395,7 +396,7 @@ test('buying a book pays the platform and then the author their royalty', () => 
   });
   const transferFn = ledger();
 
-  return purchaseBook(catalog, { bookId: book.id, buyerId: 'reader', transferFn }).then((out) => {
+  return purchaseBook(catalog, { bookId: book.id, buyerId: 'reader', transferFn, payoutFn: transferFn }).then((out) => {
     assert.equal(out.pricePaid, 9.99);
     assert.equal(transferFn.paidBy('reader'), 9.99);
     assert.equal(transferFn.paidTo('author-1'), out.royaltyPaid);
@@ -411,7 +412,7 @@ test('a book purchase is refused before any money moves', () => {
   const catalog = createCatalog();
   const transferFn = ledger();
   return assert.rejects(
-    () => purchaseBook(catalog, { bookId: 9999, buyerId: 'r', transferFn }),
+    () => purchaseBook(catalog, { bookId: 9999, buyerId: 'r', transferFn, payoutFn: transferFn }),
     /no book with id/,
   )
     .then(() => {
@@ -419,7 +420,7 @@ test('a book purchase is refused before any money moves', () => {
         title: 'B', authorId: 'a', format: 'ebook', listPrice: 5,
       });
       return assert.rejects(
-        () => purchaseBook(catalog, { bookId: book.id, transferFn }),
+        () => purchaseBook(catalog, { bookId: book.id, transferFn, payoutFn: transferFn }),
         /requires a buyerId/,
       );
     })
@@ -496,7 +497,7 @@ test('a seeded storefront can actually take an order end to end', () => {
   addToCart(m, cart.id, product.id, 1);
   const transferFn = ledger();
 
-  return checkout(m, { cartId: cart.id, transferFn }).then((order) => {
+  return checkout(m, { cartId: cart.id, transferFn, payoutFn: transferFn }).then((order) => {
     assert.equal(order.total, product.price);
     assert.equal(transferFn.paidTo(seller.ownerId), product.price,
       'the seeded storefront\'s own owner was paid');
@@ -535,7 +536,7 @@ test('a purchase is recorded as an order, not just returned', () => {
   // ship, no id to reference, and nothing for VOID to attach to.
   const catalog = createCatalog();
   const book = printBook(catalog);
-  return purchaseBook(catalog, { bookId: book.id, buyerId: 'reader', transferFn: ledger() })
+  return purchaseBook(catalog, { bookId: book.id, buyerId: 'reader', transferFn: ledger(), payoutFn: ledger() })
     .then(({ order }) => {
       assert.ok(order.id, 'the order has an id somebody can quote');
       assert.equal(order.bookId, book.id);
@@ -562,7 +563,7 @@ test('only a physical book is ever awaiting shipment', () => {
   const transferFn = ledger();
 
   return Promise.all([paper, ebook, audio].map(
-    (b) => purchaseBook(catalog, { bookId: b.id, buyerId: 'reader', transferFn }),
+    (b) => purchaseBook(catalog, { bookId: b.id, buyerId: 'reader', transferFn, payoutFn: transferFn }),
   )).then(([p, e, a]) => {
     assert.equal(p.order.fulfillmentStatus, 'unfulfilled');
     assert.equal(e.order.fulfillmentStatus, 'not-applicable', 'an ebook has nothing to ship');
@@ -579,7 +580,7 @@ test('requesting fulfillment for a physical book creates one real VOID job', () 
   const book = printBook(catalog);
   const voidRequestFn = voidStub();
 
-  return purchaseBook(catalog, { bookId: book.id, buyerId: 'reader', transferFn: ledger() })
+  return purchaseBook(catalog, { bookId: book.id, buyerId: 'reader', transferFn: ledger(), payoutFn: ledger() })
     .then(({ order }) => requestBookFulfillment(catalog, {
       orderId: order.id, shippingCost: 5, voidRequestFn,
     }))
@@ -606,11 +607,11 @@ test('a self-published book ships from its author; an Ingram title ships from VE
   const voidRequestFn = voidStub();
   const transferFn = ledger();
 
-  return purchaseBook(catalog, { bookId: mine.id, buyerId: 'r', transferFn })
+  return purchaseBook(catalog, { bookId: mine.id, buyerId: 'r', transferFn, payoutFn: transferFn })
     .then(({ order }) => requestBookFulfillment(catalog, {
       orderId: order.id, shippingCost: 5, voidRequestFn,
     }))
-    .then(() => purchaseBook(catalog, { bookId: theirs.id, buyerId: 'r', transferFn }))
+    .then(() => purchaseBook(catalog, { bookId: theirs.id, buyerId: 'r', transferFn, payoutFn: transferFn }))
     .then(({ order }) => requestBookFulfillment(catalog, {
       orderId: order.id, shippingCost: 5, voidRequestFn,
     }))
@@ -629,14 +630,14 @@ test('an ebook cannot be shipped, and nothing is shipped twice', () => {
   const voidRequestFn = voidStub();
   const transferFn = ledger();
 
-  return purchaseBook(catalog, { bookId: ebook.id, buyerId: 'r', transferFn })
+  return purchaseBook(catalog, { bookId: ebook.id, buyerId: 'r', transferFn, payoutFn: transferFn })
     .then(({ order }) => assert.rejects(
       () => requestBookFulfillment(catalog, {
         orderId: order.id, shippingCost: 5, voidRequestFn,
       }),
       /nothing to ship/,
     ))
-    .then(() => purchaseBook(catalog, { bookId: paper.id, buyerId: 'r', transferFn }))
+    .then(() => purchaseBook(catalog, { bookId: paper.id, buyerId: 'r', transferFn, payoutFn: transferFn }))
     .then(({ order }) => requestBookFulfillment(catalog, {
       orderId: order.id, shippingCost: 5, voidRequestFn,
     }).then(() => assert.rejects(
@@ -657,7 +658,7 @@ test('fulfillment refuses a missing order, a free shipment, or no VOID client', 
     () => requestBookFulfillment(catalog, { orderId: 9999, shippingCost: 5, voidRequestFn }),
     /no order with id/,
   )
-    .then(() => purchaseBook(catalog, { bookId: book.id, buyerId: 'r', transferFn: ledger() }))
+    .then(() => purchaseBook(catalog, { bookId: book.id, buyerId: 'r', transferFn: ledger(), payoutFn: ledger() }))
     .then(({ order }) => assert.rejects(
       () => requestBookFulfillment(catalog, { orderId: order.id, shippingCost: 0, voidRequestFn }),
       /positive shippingCost/,
@@ -676,10 +677,117 @@ test('a failed payment leaves no order to ship', () => {
   const broke = async () => { throw new Error('insufficient funds'); };
 
   return assert.rejects(
-    () => purchaseBook(catalog, { bookId: book.id, buyerId: 'r', transferFn: broke }),
+    () => purchaseBook(catalog, { bookId: book.id, buyerId: 'r', transferFn: broke, payoutFn: broke }),
     /insufficient funds/,
   ).then(() => {
     assert.equal(catalog.orders.length, 0);
     assert.deepEqual(listUnfulfilledBookOrders(catalog), []);
   });
+});
+
+// -- The browser must not instruct a platform payout ---------------------
+//
+// **These modules run in a browser and move real V3 money.** Some of it
+// is the buyer's own, which their Shield session authorises. The rest
+// is the platform paying out — a seller's share, an author's royalty —
+// which a browser must never instruct. No credential fixes that: a
+// client able to authenticate as the platform is a client able to
+// drain it.
+//
+// The separation is by construction: `transferFn` moves the buyer's
+// money, `payoutFn` moves the platform's, and only a backend holding a
+// service credential can supply the second. The tests below assert the
+// boundary holds, and — the part that matters most — that a flow which
+// cannot pay out refuses *before* charging anyone.
+
+test('checkout refuses without a payoutFn, and charges nobody', () => {
+  const { m, p1 } = shopFixture();
+  const cart = createCart(m, { buyerId: 'buyer' });
+  addToCart(m, cart.id, p1.id, 1);
+  const transferFn = ledger();
+
+  return assert.rejects(
+    () => checkout(m, { cartId: cart.id, transferFn }),
+    /must not instruct/,
+  ).then(() => {
+    assert.equal(transferFn.paidBy('buyer'), 0,
+      'the buyer was charged for a checkout that could never pay its sellers');
+    assert.equal(getCart(m, cart.id).status, 'active', 'the cart was completed anyway');
+  });
+});
+
+test('buying a royalty-bearing book refuses without a payoutFn, and charges nobody', () => {
+  // The author is owed out of this sale. If that leg cannot be paid,
+  // the buyer must not be charged either — taking the money and never
+  // paying the author is worse than the purchase not happening.
+  const catalog = createCatalog();
+  const book = printBook(catalog);  // self-published: owes its author a royalty
+  const transferFn = ledger();
+
+  return assert.rejects(
+    () => purchaseBook(catalog, { bookId: book.id, buyerId: 'reader', transferFn }),
+    /must not instruct/,
+  ).then(() => {
+    assert.equal(transferFn.paidBy('reader'), 0,
+      'the reader was charged for a book whose author could never be paid');
+  });
+});
+
+test('a book that owes no royalty still buys with the buyer session alone', () => {
+  // The mirror case, and the reason the guard is conditional rather
+  // than blanket: an Ingram title has no author-side royalty, so the
+  // whole purchase is the buyer paying the platform — exactly what a
+  // browser may legitimately instruct.
+  const catalog = createCatalog();
+  const book = printBook(catalog, { authorId: 'ingram-listed', source: 'ingram' });
+  const transferFn = ledger();
+
+  return purchaseBook(catalog, { bookId: book.id, buyerId: 'reader', transferFn }).then((out) => {
+    assert.equal(out.royaltyPaid, null, 'an Ingram title pays no author-side royalty');
+    assert.ok(transferFn.paidBy('reader') > 0, 'the buyer-funded leg must still work');
+  });
+});
+
+// -- The session actually reaches V3 -------------------------------------
+
+test('sessionHeaders returns a bearer header when a session is stored', async () => {
+  // A browser module, so localStorage is stubbed. The behaviour that
+  // matters is the one VDP's equivalent documents: silent when there is
+  // no token (let the server answer 401), a real header when there is.
+  const original = globalThis.localStorage;
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, v),
+    removeItem: (k) => store.delete(k),
+  };
+  try {
+    const { sessionHeaders } = await import('../src/lib/shieldAuth.js');
+    assert.deepEqual(sessionHeaders(), {}, 'a client called before login must send no header');
+
+    store.set('venvs.shield.sessionToken', 'tok-123');
+    assert.deepEqual(sessionHeaders(), { Authorization: 'Bearer tok-123' });
+  } finally {
+    globalThis.localStorage = original;
+  }
+});
+
+test('every mutating V3 call in this app sends the session', () => {
+  // **The regression this exists for.** Every call in `v3Client.js`
+  // used to send `Content-Type` and nothing else, so against the real
+  // V3 they 401'd before authorization was considered — the flows only
+  // ever worked against `venvs-mock-backend`, which has no auth.
+  //
+  // Read from source rather than driven, because these are `fetch`
+  // wrappers and driving them would test `fetch`. What must hold is
+  // that no POST to V3 is constructed without the session on it.
+  const src = fs.readFileSync(
+    new URL('../src/lib/v3Client.js', import.meta.url), 'utf8',
+  );
+  const posts = [...src.matchAll(/method:\s*"POST"[\s\S]{0,240}?\}\);/g)].map((m) => m[0]);
+  assert.ok(posts.length > 0, 'no POSTs found in v3Client.js — the scan is broken');
+
+  const unauthenticated = posts.filter((p) => !p.includes('sessionHeaders()'));
+  assert.deepEqual(unauthenticated, [],
+    'a mutating V3 call is built without the Shield session, so it will 401 against the real V3');
 });

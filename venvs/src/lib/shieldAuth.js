@@ -20,7 +20,7 @@
 // a session started inside VENVS itself still doesn't propagate
 // anywhere else.
 
-const SHIELD_API_URL = import.meta.env.VITE_SHIELD_API_URL || "http://localhost:8812";
+const SHIELD_API_URL = import.meta.env?.VITE_SHIELD_API_URL || "http://localhost:8812";
 const SESSION_STORAGE_KEY = "venvs.shield.sessionToken";
 
 export async function login(userId) {
@@ -75,4 +75,27 @@ export async function getCurrentSession() {
 
 export function logout() {
   localStorage.removeItem(SESSION_STORAGE_KEY);
+}
+
+// **The same bug VDP's own `sessionHeaders` was written for, still
+// live here.** VDP's version says it plainly: "a session that is
+// acquired, validated, stored, and then not used." VENVS does exactly
+// that — it logs in through Shield, stores the token, and then every
+// call in `v3Client.js` went to V3 with `Content-Type` and nothing
+// else.
+//
+// `/api/vcoin/transfer` is `actorOrService('fromUserId')`, so against
+// the real V3 every VENVS purchase got 401 before authorization was
+// even considered. The flows only ever appeared to work against
+// `venvs-mock-backend`, which has no auth at all.
+//
+// Deliberately synchronous and deliberately silent about a missing
+// token: a client called before login should send no header and let
+// the server answer 401, rather than throw where the caller cannot
+// handle it.
+//
+//     headers: { "Content-Type": "application/json", ...sessionHeaders() }
+export function sessionHeaders() {
+  const token = localStorage.getItem(SESSION_STORAGE_KEY);
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }

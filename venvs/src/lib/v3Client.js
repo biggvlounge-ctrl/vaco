@@ -12,7 +12,9 @@
 // this module or in VENVS at all — every number comes from the
 // ledger service, which is the entire point of §0.1.
 
-const V3_API_URL = import.meta.env.VITE_V3_API_URL || "http://localhost:8811";
+import { sessionHeaders } from "./shieldAuth.js";
+
+const V3_API_URL = import.meta.env?.VITE_V3_API_URL || "http://localhost:8811";
 
 export async function getVCoinBalance(userId) {
   if (!userId) {
@@ -28,7 +30,7 @@ export async function getVCoinBalance(userId) {
 export async function transferVCoin({ fromUserId, toUserId, amount, reason }) {
   const res = await fetch(`${V3_API_URL}/api/vcoin/transfer`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...sessionHeaders() },
     body: JSON.stringify({ fromUserId, toUserId, amount, reason }),
   });
   const body = await res.json();
@@ -52,7 +54,7 @@ export async function getVCoinTransactions(userId) {
 export async function cashOutToVash({ userId, vcoinAmount }) {
   const res = await fetch(`${V3_API_URL}/api/vash/cashout`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...sessionHeaders() },
     body: JSON.stringify({ userId, vcoinAmount }),
   });
   const body = await res.json();

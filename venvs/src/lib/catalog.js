@@ -108,10 +108,39 @@ export function getCatalog(catalog, options = {}) {
   );
 }
 
+// **Platform-funded legs take a separate function, and the browser
+// never gets one.**
+//
+// This module runs in the browser. Some of the money it moves is the
+// *buyer's own*, and V3 authorises that from their Shield session
+// because `requireActor('fromUserId')` matches the session against the
+// payer. The rest is the **platform paying out** — an author's
+// royalty, a seller's share — which a browser must never instruct. No
+// credential fixes that: a client able to authenticate as the platform
+// is a client able to drain it.
+//
+// So `transferFn` moves the buyer's money and `payoutFn` moves the
+// platform's, and only a backend holding a service credential can
+// supply the second. No component in this app does, and none should.
+//
+// **A flow with any platform leg refuses entirely rather than settling
+// half.** Charging the buyer and not paying the author is exactly the
+// partial-settlement defect the ecosystem-wide sweep removed
+// everywhere else. See `dev-docs/BROWSER_INITIATED_MONEY.md`.
+function requirePayoutFn(payoutFn, operation) {
+  if (typeof payoutFn !== 'function') {
+    throw new Error(
+      `${operation}: this pays out from the platform account, which a browser must not instruct. `
+      + 'It needs a backend holding a service credential to supply payoutFn(fromUserId, toUserId, '
+      + 'amount, reason) -- see dev-docs/BROWSER_INITIATED_MONEY.md.',
+    );
+  }
+}
+
 const PLATFORM_USER_ID = 'venvs-platform';
 
 export async function purchaseBook(catalog, options = {}) {
-  const { bookId, buyerId, transferFn } = options;
+  const { bookId, buyerId, transferFn, payoutFn } = options;
   if (typeof transferFn !== 'function') {
     throw new Error('purchaseBook requires a transferFn(fromUserId, toUserId, amount, reason)');
   }
@@ -123,6 +152,14 @@ export async function purchaseBook(catalog, options = {}) {
     throw new Error('purchaseBook requires a buyerId');
   }
 
+  // **Refuse before charging anyone.** A self-published title owes the
+  // author a royalty out of this sale, and that leg is the platform's
+  // to pay. If it cannot be paid, the buyer must not be charged either
+  // -- a purchase that takes the money and never pays the author is
+  // worse than a purchase that does not happen.
+  const owesRoyalty = Boolean(book.royalty && book.royalty.royaltyAmount > 0);
+  if (owesRoyalty) requirePayoutFn(payoutFn, 'purchaseBook');
+
   // Buyer always pays full list price to the platform.
   await transferFn(buyerId, PLATFORM_USER_ID, book.listPrice, `venvs_publishing_purchase:${book.id}`);
 
@@ -130,8 +167,8 @@ export async function purchaseBook(catalog, options = {}) {
   // sale; Ingram titles don't (wholesale purchase, no author-side
   // royalty split modeled here).
   let royaltyPaid = null;
-  if (book.royalty && book.royalty.royaltyAmount > 0) {
-    await transferFn(
+  if (owesRoyalty) {
+    await payoutFn(
       PLATFORM_USER_ID,
       book.authorId,
       book.royalty.royaltyAmount,

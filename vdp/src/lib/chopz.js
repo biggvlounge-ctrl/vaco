@@ -57,6 +57,44 @@ const SHIFT_COOLDOWN_MS = 4 * 60 * 60 * 1000; // 4 hours
 const AI_EMPLOYEE_RATE_PER_HOUR = 3;
 const PLATFORM_USER_ID = 'venvs-platform';
 
+// **Why platform-funded legs take a separate function, and why the
+// browser never gets one.**
+//
+// This module runs in the browser, and its store lives in React state.
+// Some of the money it moves is the *user's own* — a buyer paying, a
+// tenant paying rent — and V3 authorises that from the user's Shield
+// session, because `requireActor('fromUserId')` matches the session
+// against the payer. A browser may legitimately instruct those.
+//
+// The rest is the **platform paying out**: a seller's share, an
+// author's royalty, a shift payout. A browser must never be able to
+// instruct those, and no credential fixes it — if this client could
+// authenticate as the platform, any user could drain the platform
+// account. VDP's CHOPZ shift payout is the sharp example: it moves 15
+// VCoin from the platform to the signed-in user, rate-limited by a
+// cooldown stored in browser memory that a page reload clears.
+//
+// So the two are separated by construction. `transferFn` moves the
+// user's own money. `payoutFn` moves the platform's, and only a
+// backend holding a service credential can supply one — no component
+// in this app does, and none should.
+//
+// **A flow with any platform leg refuses entirely rather than settling
+// half.** Charging the buyer and not paying the author is precisely
+// the partial-settlement defect the ecosystem-wide sweep removed
+// everywhere else; reintroducing it here to keep a demo working would
+// be the worst of both. See `dev-docs/BROWSER_INITIATED_MONEY.md`.
+function requirePayoutFn(payoutFn, operation) {
+  if (typeof payoutFn !== 'function') {
+    throw new Error(
+      `${operation}: this pays out from the platform account, which a browser must not instruct. `
+      + 'It needs a backend holding a service credential to supply payoutFn(fromUserId, toUserId, '
+      + 'amount, reason) -- see dev-docs/BROWSER_INITIATED_MONEY.md.',
+    );
+  }
+}
+
+
 export function createChopz() {
   return {
     units: UNIT_TEMPLATE.map((u, i) => ({
@@ -106,10 +144,9 @@ export async function leaseUnit(store, options = {}) {
 }
 
 export async function runShift(store, options = {}) {
-  const { unitId, transferFn, now = Date.now() } = options;
-  if (typeof transferFn !== 'function') {
-    throw new Error('runShift requires a transferFn(fromUserId, toUserId, amount, reason)');
-  }
+  const { unitId, payoutFn, now = Date.now() } = options;
+  requirePayoutFn(payoutFn, 'runShift');
+
   const unit = getUnit(store, unitId);
   if (!unit || unit.ownerId === null) {
     throw new Error(`runShift: no leased unit with id ${unitId}`);
@@ -122,7 +159,7 @@ export async function runShift(store, options = {}) {
     throw new Error(`runShift: unit ${unitId} is on cooldown for ${Math.ceil(remainingMs / 60000)} more minute(s)`);
   }
 
-  await transferFn(PLATFORM_USER_ID, unit.ownerId, SHIFT_PAYOUT, `venvs_chopz_shift:${unitId}`);
+  await payoutFn(PLATFORM_USER_ID, unit.ownerId, SHIFT_PAYOUT, `venvs_chopz_shift:${unitId}`);
   unit.lastShiftAt = now;
   return { unitId, payout: SHIFT_PAYOUT, nextAvailableAt: now + SHIFT_COOLDOWN_MS };
 }
@@ -165,10 +202,9 @@ export function getPendingEarnings(store, unitId, now = Date.now()) {
 }
 
 export async function collectEarnings(store, options = {}) {
-  const { unitId, transferFn, now = Date.now() } = options;
-  if (typeof transferFn !== 'function') {
-    throw new Error('collectEarnings requires a transferFn(fromUserId, toUserId, amount, reason)');
-  }
+  const { unitId, payoutFn, now = Date.now() } = options;
+  requirePayoutFn(payoutFn, 'collectAIEmployeeIncome');
+
   const unit = getUnit(store, unitId);
   if (!unit || unit.ownerId === null) {
     throw new Error(`collectEarnings: no leased unit with id ${unitId}`);
@@ -178,7 +214,7 @@ export async function collectEarnings(store, options = {}) {
     throw new Error(`collectEarnings: unit ${unitId} has no pending earnings yet`);
   }
 
-  await transferFn(PLATFORM_USER_ID, unit.ownerId, pending, `venvs_chopz_ai_income:${unitId}`);
+  await payoutFn(PLATFORM_USER_ID, unit.ownerId, pending, `venvs_chopz_ai_income:${unitId}`);
   unit.lastCollectedAt = now;
   return { unitId, collected: pending };
 }
