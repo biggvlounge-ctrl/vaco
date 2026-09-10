@@ -65,7 +65,23 @@ test('every path-shaped .gitignore carve-out names something that exists', () =>
     + 'is exactly how six of them went untracked after CALL became vex-business.');
 });
 
-test('the files a carve-out rescues are actually tracked', () => {
+// **This one needs a git repository, and one place runs the suite
+// without one.** `scripts/package-release.mjs` extracts `git archive`
+// output — tracked files and nothing else, no `.git` — and re-runs
+// everything inside it. There, "is this file tracked?" has no answer
+// rather than a different one: `git ls-files` fails outright.
+//
+// Note this is not the case the report-drift check faced, where the
+// answer merely differed and the fix was to ask a better question.
+// Here the repository the question is about is genuinely absent. The
+// path-exists check above still runs everywhere, and it is the one
+// that catches the rename bug this file was written for.
+const NO_GIT = fs.existsSync(path.join(REPO_ROOT, '.git'))
+  ? false
+  : 'no .git directory — this is a release-archive extract, where every file present '
+    + 'is tracked by construction and there is nothing to ask git about';
+
+test('the files a carve-out rescues are actually tracked', { skip: NO_GIT }, () => {
   // The carve-out working and the files being in the repository are
   // two different facts. Only the second one survives a lost container.
   const dirs = concreteNegations().filter((p) => {
