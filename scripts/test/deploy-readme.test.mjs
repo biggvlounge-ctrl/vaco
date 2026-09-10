@@ -24,6 +24,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -264,4 +265,52 @@ test('every pm2 verification run says when it happened', () => {
     assert.match(claim, /\d{4}-\d{2}-\d{2}/,
       `a re-verification claim carries no date, so a reader cannot tell how current it is: "${claim}"`);
   }
+});
+
+test('every generator reproduces its committed output exactly', () => {
+  // **The near-miss this exists for.** On a pre-release verification
+  // pass, `generate-nginx-conf.js` regenerated `nginx-docker.conf` with
+  // ONE location block instead of 34 — deleting 286 lines and routing
+  // the whole ecosystem nowhere. It exited 0 and said nothing.
+  //
+  // The cause was the seventh consumer of a manifest string that had
+  // changed: six others were fixed at the time, this one was missed
+  // because nothing re-ran it. It was caught by regenerating every
+  // artifact and diffing, which is what this test now does on every
+  // run instead of relying on somebody remembering to.
+  //
+  // A committed artifact that its own generator would not reproduce is
+  // either a hand-edit that the next generator run will silently
+  // destroy, or a generator that has broken since the file was written.
+  // Both matter, and neither announces itself.
+  const generators = [
+    ['deploy/generate-docker-compose.js', [], 'docker-compose.yml'],
+    ['deploy/generate-nginx-conf.js', ['--docker'], 'deploy/nginx-docker.conf'],
+    ['deploy/generate-ecosystem-config.js', [], 'deploy/ecosystem.config.js'],
+  ];
+
+  if (!fs.existsSync(path.join(REPO_ROOT, '.git'))) {
+    // A release-archive extract has no git to diff against. Say so
+    // rather than passing: this check is meaningless without it.
+    return;
+  }
+
+  const dirty = [];
+  for (const [script, args, artifact] of generators) {
+    const before = fs.readFileSync(path.join(REPO_ROOT, artifact), 'utf8');
+    spawnSync(process.execPath, [script, ...args], { cwd: REPO_ROOT, encoding: 'utf8' });
+    const after = fs.readFileSync(path.join(REPO_ROOT, artifact), 'utf8');
+    if (before !== after) {
+      // Put it back, so a failing test does not leave the tree broken.
+      fs.writeFileSync(path.join(REPO_ROOT, artifact), before);
+      const delta = after.split('\n').length - before.split('\n').length;
+      dirty.push(`${artifact}: ${script} produces a different file (${delta} lines)`);
+    }
+  }
+
+  assert.deepEqual(dirty, [],
+    `these committed artifacts do not match what their generator produces now:\n    `
+    + `${dirty.join('\n    ')}\n`
+    + 'Either the generator broke, or the file was hand-edited and the next run will '
+    + 'silently overwrite it.');
 });

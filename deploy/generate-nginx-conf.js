@@ -51,7 +51,8 @@ if (!dockerMode && !domain) {
   process.exit(1);
 }
 
-const src = fs.readFileSync(path.join(__dirname, "..", "start-ecosystem.sh"), "utf8");
+const ROOT = path.join(__dirname, "..");
+const src = fs.readFileSync(path.join(ROOT, "start-ecosystem.sh"), "utf8");
 const match = src.match(/APPS=\(([\s\S]*?)\n\)/);
 const lines = match[1].split("\n").map((l) => l.trim()).filter((l) => l.startsWith('"'));
 const apps = lines
@@ -60,7 +61,31 @@ const apps = lines
     const [name, appPath, cmd, port] = inner.split(":");
     return { name, appPath, cmd, port };
   })
-  .filter((a) => a.name !== "vaco-shell" && a.cmd === "npm start"); // shell is the root, handled separately
+  // **A backend is one with a server.js, not one whose start command is
+  // spelled a particular way.** This read `a.cmd === "npm start"` until
+  // the manifest changed those to `node server.js`, at which point this
+  // generator silently emitted a config with ONE location block instead
+  // of 34 — deleting 286 lines and routing the entire ecosystem
+  // nowhere. It exited 0 and said nothing.
+  //
+  // Caught on a pre-release verification pass by regenerating every
+  // artifact and diffing, not by any test. Six other consumers of that
+  // string were fixed when the manifest changed; this was the seventh
+  // and it was missed because nothing re-ran it.
+  .filter((a) => a.name !== "vaco-shell"
+    && fs.existsSync(path.join(ROOT, a.appPath, "server.js"))); // shell is the root, handled separately
+
+// An nginx config with no routes is a working config that serves
+// nothing, which is why the generator has to refuse rather than write
+// it. The ecosystem has 30+ routable backends; anything close to zero
+// means the filter above is broken again.
+if (apps.length < 20) {
+  throw new Error(
+    `generate-nginx-conf: only ${apps.length} routable backend(s) found in the manifest. `
+    + "A config with no location blocks proxies nothing while looking valid, so this refuses "
+    + "rather than writing it.",
+  );
+}
 
 function upstream(name, port) {
   return dockerMode ? `${name}:${port}` : `127.0.0.1:${port}`;
