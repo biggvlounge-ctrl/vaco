@@ -14,7 +14,7 @@
 // actually work -- a bet's payout never changes even if the posted
 // line moves afterward, unlike `predictionMarkets.js`'s live-price
 // contracts. Settlement pays directly from the house account (the
-// same real, injected `transferFn` pattern as every other module this
+// same real, injected `settleFn` pattern as every other module this
 // session) -- real bookmakers manage risk via balanced odds/vig and
 // capitalization, not a segregated per-bet pool, so no pari-mutuel
 // pooling is used here (unlike predictions/esports staking, which
@@ -71,7 +71,7 @@ function getSportsEvent(store, eventId) {
 }
 
 async function placeSportsBet(store, options = {}) {
-  const { eventId, outcomeId, userId, stakeVCoin, transferFn } = options;
+  const { eventId, outcomeId, userId, stakeVCoin, settleFn } = options;
   const event = getSportsEvent(store, eventId);
   if (!event) throw new Error(`placeSportsBet: no event with id ${eventId}`);
   if (event.status !== 'open') throw new Error(`placeSportsBet: event ${eventId} is not open (status: ${event.status})`);
@@ -79,9 +79,12 @@ async function placeSportsBet(store, options = {}) {
   if (!outcome) throw new Error(`placeSportsBet: no outcome "${outcomeId}" on event ${eventId}`);
   if (!userId) throw new Error('placeSportsBet requires a userId');
   if (!Number.isFinite(stakeVCoin) || stakeVCoin <= 0) throw new Error('placeSportsBet requires a positive stakeVCoin');
-  if (typeof transferFn !== 'function') throw new Error('placeSportsBet requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') throw new Error('placeSportsBet requires a settleFn(legs, meta)');
 
-  await transferFn(userId, VAGO_HOUSE_ACCOUNT, stakeVCoin, `vago_sports_bet:${eventId}`);
+  await settleFn(
+    [{ fromUserId: userId, toUserId: VAGO_HOUSE_ACCOUNT, amount: stakeVCoin, reason: `vago_sports_bet:${eventId}` }],
+    { reason: `vago_sports_bet:${eventId}` },
+  );
 
   // Odds locked in at bet time -- the real, standard sportsbook rule.
   const { totalPayout } = computeAmericanOddsPayout(outcome.odds, stakeVCoin);
@@ -98,20 +101,23 @@ function getSportsBet(store, betId) {
 }
 
 async function settleSportsEvent(store, options = {}) {
-  const { eventId, winningOutcomeId, transferFn } = options;
+  const { eventId, winningOutcomeId, settleFn } = options;
   const event = getSportsEvent(store, eventId);
   if (!event) throw new Error(`settleSportsEvent: no event with id ${eventId}`);
   if (event.status !== 'open') throw new Error(`settleSportsEvent: event ${eventId} is not open (status: ${event.status})`);
   if (!event.outcomes.some((o) => o.outcomeId === winningOutcomeId)) {
     throw new Error(`settleSportsEvent: no outcome "${winningOutcomeId}" on event ${eventId}`);
   }
-  if (typeof transferFn !== 'function') throw new Error('settleSportsEvent requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') throw new Error('settleSportsEvent requires a settleFn(legs, meta)');
 
   const eventBets = store.sportsBets.filter((b) => b.eventId === eventId && b.status === 'pending');
   const settledBets = [];
   for (const bet of eventBets) {
     if (bet.outcomeId === winningOutcomeId) {
-      await transferFn(VAGO_HOUSE_ACCOUNT, bet.userId, bet.potentialPayout, `vago_sports_payout:${eventId}`);
+      await settleFn(
+        [{ fromUserId: VAGO_HOUSE_ACCOUNT, toUserId: bet.userId, amount: bet.potentialPayout, reason: `vago_sports_payout:${eventId}` }],
+        { reason: `vago_sports_payout:${eventId}` },
+      );
       bet.status = 'won';
     } else {
       bet.status = 'lost';

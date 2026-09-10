@@ -3,7 +3,7 @@
 // This is the compliance boundary that makes VAGO a sweepstakes
 // operator rather than a real-money gambling operator. Gold Coin is
 // non-redeemable and lives in its own ledger; VCoin lives in V3 and is
-// only ever reached through the injected `transferFn`. Nothing
+// only ever reached through the injected `settleFn`. Nothing
 // converts between them, in either direction.
 //
 // **The boundary is an absence**, which is what makes it fragile. It
@@ -47,7 +47,7 @@ test('the Gold Coin ledger is a distinct store object from any VCoin balance', (
   const store = createVagoStore();
   assert.ok(store.goldCoinBalances, 'goldCoinBalances must exist');
   // VAGO holds no VCoin ledger at all — VCoin lives in V3 and is
-  // reached only through the injected transferFn. A local vcoin
+  // reached only through the injected settleFn. A local vcoin
   // balance object appearing here would be the first step toward the
   // two becoming interchangeable.
   assert.strictEqual(store.vcoinBalances, undefined);
@@ -83,7 +83,7 @@ test('both currencies are recognised, and only those two', () => {
   assert.deepStrictEqual([...CASINO_CURRENCIES].sort(), ['gold-coin', 'vcoin']);
 });
 
-test('a gold-coin session NEVER calls transferFn', async () => {
+test('a gold-coin session NEVER calls settleFn', async () => {
   // This is the structural claim in casinoSession.js's own header,
   // turned into a test: the sweepstakes currency must not be able to
   // reach V3, because reaching V3 is what "real money" means here.
@@ -96,7 +96,7 @@ test('a gold-coin session NEVER calls transferFn', async () => {
     gameType: 'originals',
     currency: 'gold-coin',
     stakeAmount: 100,
-    transferFn: async () => { transferCalls += 1; },
+    settleFn: async () => { transferCalls += 1; },
   });
 
   assert.strictEqual(transferCalls, 0, 'a gold-coin session must never reach V3');
@@ -115,7 +115,7 @@ test('a vcoin session NEVER touches the Gold Coin ledger', async () => {
     gameType: 'originals',
     currency: 'vcoin',
     stakeAmount: 100,
-    transferFn: async () => { transferCalls += 1; },
+    settleFn: async () => { transferCalls += 1; },
   });
 
   assert.strictEqual(transferCalls, 1, 'a vcoin session settles through V3');
@@ -127,6 +127,6 @@ test('an unrecognised currency is refused rather than defaulting', async () => {
   const store = createVagoStore();
   await assert.rejects(() => startCasinoSession(store, {
     userId: 'alice', gameType: 'originals', currency: 'goldcoin', stakeAmount: 100,
-    transferFn: async () => {},
+    settleFn: async () => {},
   }));
 });

@@ -22,24 +22,44 @@ const {
 } = require('../lib/releases');
 const { createVultureMusicStore } = require('../lib/store');
 
-// Records every transfer instead of moving money, so the test asserts
-// on exactly what would have been paid.
-function recorder() {
+// Records every leg instead of moving money, so the test asserts on
+// exactly what would have been paid.
+//
+// **`calls` stays every leg, flattened**, so every existing assertion
+// in this file about who was paid what is unchanged. `settlements` is
+// the new question: how many times the ledger was asked. It is the only
+// thing that can tell one atomic settlement from the consecutive
+// transfers it replaced — the amounts are identical either way, which
+// is exactly why a report that recouped twice on retry could go
+// unnoticed.
+function recorder({ failFirstCall = false } = {}) {
   const calls = [];
-  const fn = async (from, to, amount, reason) => { calls.push({ from, to, amount, reason }); };
+  const settlements = [];
+  let refuse = failFirstCall;
+  const fn = async (legs, meta = {}) => {
+    if (refuse) {
+      refuse = false;
+      throw new Error('legs[1]: Insufficient VCoin balance. Nothing in this settlement was applied.');
+    }
+    settlements.push({ legs, meta });
+    for (const l of legs) {
+      calls.push({ from: l.fromUserId, to: l.toUserId, amount: l.amount, reason: l.reason });
+    }
+  };
   fn.calls = calls;
+  fn.settlements = settlements;
   fn.payoutsTo = () => calls.filter((c) => c.from === VULTURE_MUSIC_REVENUE_INTAKE_ACCOUNT);
   return fn;
 }
 
-async function liveRelease(store, transferFn, coWriters = null) {
+async function liveRelease(store, settleFn, coWriters = null) {
   const release = await submitRelease(store, {
     artistId: 'artist-1',
     title: 'Test Track',
     format: 'single',
     targetPlatforms: ['Spotify'],
     coWriters,
-    transferFn,
+    settleFn,
   });
   markDistributing(store, release.id);
   markLive(store, release.id);
@@ -110,7 +130,7 @@ test('an even two-way split pays each exactly half', async () => {
   t.calls.length = 0;
 
   await reportStreamingRevenue(store, {
-    releaseId: 1, amount: 100, source: 'spotify', transferFn: t,
+    releaseId: 1, amount: 100, source: 'spotify', settleFn: t,
   });
 
   const payouts = t.payoutsTo();
@@ -132,7 +152,7 @@ test('THREE-WAY split still sums to exactly the reported amount', async () => {
   t.calls.length = 0;
 
   await reportStreamingRevenue(store, {
-    releaseId: 1, amount: 100, source: 'spotify', transferFn: t,
+    releaseId: 1, amount: 100, source: 'spotify', settleFn: t,
   });
 
   const payouts = t.payoutsTo();
@@ -154,7 +174,7 @@ test('an awkward amount across an awkward split still sums exactly', async () =>
   t.calls.length = 0;
 
   await reportStreamingRevenue(store, {
-    releaseId: 1, amount: 1000.07, source: 'spotify', transferFn: t,
+    releaseId: 1, amount: 1000.07, source: 'spotify', settleFn: t,
   });
 
   const total = t.payoutsTo().reduce((s, p) => s + p.amount, 0);
@@ -168,7 +188,7 @@ test('a solo release pays the whole amount to the artist', async () => {
   t.calls.length = 0;
 
   await reportStreamingRevenue(store, {
-    releaseId: 1, amount: 250.5, source: 'spotify', transferFn: t,
+    releaseId: 1, amount: 250.5, source: 'spotify', settleFn: t,
   });
 
   const payouts = t.payoutsTo();
@@ -184,10 +204,10 @@ test('revenue cannot be reported against a release that is not live', async () =
   const t = recorder();
   const release = await submitRelease(store, {
     artistId: 'artist-1', title: 'Not Live', format: 'single',
-    targetPlatforms: ['Spotify'], transferFn: t,
+    targetPlatforms: ['Spotify'], settleFn: t,
   });
   await assert.rejects(() => reportStreamingRevenue(store, {
-    releaseId: release.id, amount: 100, source: 'spotify', transferFn: t,
+    releaseId: release.id, amount: 100, source: 'spotify', settleFn: t,
   }), /must be "live"/);
 });
 
@@ -197,7 +217,7 @@ test('a non-positive revenue amount is refused', async () => {
   await liveRelease(store, t);
   for (const bad of [0, -50]) {
     await assert.rejects(() => reportStreamingRevenue(store, {
-      releaseId: 1, amount: bad, source: 'spotify', transferFn: t,
+      releaseId: 1, amount: bad, source: 'spotify', settleFn: t,
     }), /positive amount/);
   }
 });
@@ -210,7 +230,7 @@ test('collaborator earnings are attributed to the right person', async () => {
     { userId: 'cowriter-1', splitPercent: 0.3 },
   ]);
   await reportStreamingRevenue(store, {
-    releaseId: 1, amount: 1000, source: 'spotify', transferFn: t,
+    releaseId: 1, amount: 1000, source: 'spotify', settleFn: t,
   });
 
   const earnings = getCollaboratorEarnings(store, 'cowriter-1');

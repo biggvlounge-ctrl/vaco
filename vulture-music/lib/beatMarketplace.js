@@ -14,7 +14,7 @@
 // established defining choice for this whole division ("no percentage
 // split anywhere in this codebase," the DistroKid/TuneCore flat-fee
 // posture), v1 here takes the same real, consistent stance: a
-// producer keeps 100% of every sale. `transferFn` moves the real
+// producer keeps 100% of every sale. `settleFn` moves the real
 // price directly from buyer to producer -- no platform account in the
 // path at all. A flat per-listing fee (mirroring `releases.js`'s own
 // `DISTRIBUTION_FEES`) is real, later work if a revenue line is
@@ -84,7 +84,7 @@ function takeDownBeat(store, options = {}) {
   return beat;
 }
 
-// Real purchase: a real transferFn moves the real, full price directly
+// Real purchase: a real settleFn moves the real, full price directly
 // from buyer to producer (no platform account in the path -- see this
 // file's own header for why). The real purchase record IS the license
 // delivery: a real, timestamped, immutable proof of what was bought,
@@ -94,7 +94,7 @@ function takeDownBeat(store, options = {}) {
 // same producer free to sell it again to someone else, matching how a
 // real non-exclusive lease actually works.
 async function purchaseBeat(store, options = {}) {
-  const { beatId, buyerId, transferFn, now = Date.now() } = options;
+  const { beatId, buyerId, settleFn, now = Date.now() } = options;
 
   const beat = getBeat(store, beatId);
   if (!beat) throw new Error(`purchaseBeat: no beat with id ${beatId}`);
@@ -105,11 +105,14 @@ async function purchaseBeat(store, options = {}) {
   if (buyerId === beat.producerId) {
     throw new Error('purchaseBeat: a producer cannot purchase their own beat');
   }
-  if (typeof transferFn !== 'function') {
-    throw new Error('purchaseBeat requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') {
+    throw new Error('purchaseBeat requires a settleFn(legs, meta)');
   }
 
-  await transferFn(buyerId, beat.producerId, beat.price, `vulture_music_beat_purchase:${beatId}`);
+  await settleFn(
+    [{ fromUserId: buyerId, toUserId: beat.producerId, amount: beat.price, reason: `vulture_music_beat_purchase:${beatId}` }],
+    { reason: `vulture_music_beat_purchase:${beatId}` },
+  );
 
   const purchase = {
     id: store.nextBeatPurchaseId++,

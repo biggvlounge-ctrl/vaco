@@ -89,7 +89,7 @@ function findActiveDealForRelease(store, releaseId, artistId) {
 async function signLabelDeal(store, options = {}) {
   const {
     labelId, artistId, dealType, release = null, advanceAmount,
-    labelSharePercent = DEFAULT_LABEL_SHARE_PERCENT, transferFn, now = Date.now(),
+    labelSharePercent = DEFAULT_LABEL_SHARE_PERCENT, settleFn, now = Date.now(),
   } = options;
 
   if (!labelId) throw new Error('signLabelDeal requires a labelId');
@@ -103,8 +103,8 @@ async function signLabelDeal(store, options = {}) {
   if (!Number.isFinite(labelSharePercent) || labelSharePercent <= 0 || labelSharePercent >= 1) {
     throw new Error('signLabelDeal requires a labelSharePercent between 0 and 1 (exclusive)');
   }
-  if (typeof transferFn !== 'function') {
-    throw new Error('signLabelDeal requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') {
+    throw new Error('signLabelDeal requires a settleFn(legs, meta)');
   }
   if (findActiveBlanketDeal(store, artistId)) {
     throw new Error(`signLabelDeal: ${artistId} already has an active blanket label deal`);
@@ -131,7 +131,10 @@ async function signLabelDeal(store, options = {}) {
 
   // The real, defining reversal from a personal-manager relationship:
   // the label pays the artist a real advance immediately, up front.
-  await transferFn(labelId, artistId, advanceAmount, `Label advance: ${dealType} deal`);
+  await settleFn(
+    [{ fromUserId: labelId, toUserId: artistId, amount: advanceAmount, reason: `Label advance: ${dealType} deal` }],
+    { reason: `Label advance: ${dealType} deal` },
+  );
 
   const deal = {
     id: store.nextLabelDealId++,
@@ -187,16 +190,26 @@ function getActiveLabelDealForRelease(store, releaseId, artistId) {
 // `fully-recouped` the moment the balance reaches zero; whatever's
 // left of `grossShare` after that splits by `labelSharePercent`.
 // Returns the real amounts for `releases.js` to actually pay out --
-// this function computes, `releases.js` calls `transferFn`, the same
+// this function computes, `releases.js` calls `settleFn`, the same
 // separation of concerns as every other split helper this session.
-function applyLabelDeal(deal, grossShare, now = Date.now()) {
+// **Split into a computation and a commit, and that is a bug fix.**
+//
+// This used to be one function that reduced `recoupmentBalance` and
+// then returned the split — with the caller paying the label
+// afterwards. So the recoupment was applied *before* the money moved.
+// When a transfer failed, the label's balance had already been reduced
+// for money that never left the intake account, and the caller's retry
+// ran `applyLabelDeal` again and **recouped a second time against the
+// same revenue**. The artist's next report paid out less than it owed,
+// permanently, and nothing anywhere recorded why.
+//
+// `computeLabelDeal` decides the split and touches nothing.
+// `commitLabelDeal` applies it. `reportStreamingRevenue` computes every
+// payee's split, settles the whole report in one call, and only then
+// commits — so a refused settlement leaves every deal exactly where it
+// was and the retry is genuinely a retry.
+function computeLabelDeal(deal, grossShare) {
   const recoupedAmount = round(Math.min(grossShare, deal.recoupmentBalance));
-  deal.recoupmentBalance = round(deal.recoupmentBalance - recoupedAmount);
-  if (deal.recoupmentBalance === 0 && deal.status === 'active') {
-    deal.status = 'fully-recouped';
-    deal.fullyRecoupedAt = now;
-  }
-
   const remaining = round(grossShare - recoupedAmount);
   const labelShareAmount = round(remaining * deal.labelSharePercent);
   const artistPortion = round(remaining - labelShareAmount);
@@ -207,6 +220,24 @@ function applyLabelDeal(deal, grossShare, now = Date.now()) {
   };
 }
 
+function commitLabelDeal(deal, result, now = Date.now()) {
+  deal.recoupmentBalance = round(deal.recoupmentBalance - result.recoupedAmount);
+  if (deal.recoupmentBalance === 0 && deal.status === 'active') {
+    deal.status = 'fully-recouped';
+    deal.fullyRecoupedAt = now;
+  }
+  return deal;
+}
+
+// The original composition, kept for any caller that genuinely has
+// nothing to fail between the two halves. `reportStreamingRevenue` is
+// not such a caller and no longer uses it.
+function applyLabelDeal(deal, grossShare, now = Date.now()) {
+  const result = computeLabelDeal(deal, grossShare);
+  commitLabelDeal(deal, result, now);
+  return result;
+}
+
 module.exports = {
   LABEL_DEAL_TYPES,
   LABEL_DEAL_STATUSES,
@@ -215,5 +246,7 @@ module.exports = {
   getLabelDeal,
   terminateLabelDeal,
   getActiveLabelDealForRelease,
+  computeLabelDeal,
+  commitLabelDeal,
   applyLabelDeal,
 };

@@ -78,7 +78,7 @@
 // every collaborator who ever appears on one of their releases.
 
 const { getArtistManager } = require('./managers');
-const { getActiveLabelDealForRelease, applyLabelDeal } = require('./labelDeals');
+const { getActiveLabelDealForRelease, computeLabelDeal, commitLabelDeal } = require('./labelDeals');
 
 const RELEASE_FORMATS = ['single', 'album', 'video', 'podcast-episode'];
 
@@ -132,7 +132,7 @@ function validateCoWriters(coWriters) {
 
 async function submitRelease(store, options = {}) {
   const {
-    artistId, title, format, targetPlatforms, coWriters = null, transferFn, now = Date.now(),
+    artistId, title, format, targetPlatforms, coWriters = null, settleFn, now = Date.now(),
   } = options;
 
   if (!artistId) throw new Error('submitRelease requires an artistId');
@@ -148,15 +148,18 @@ async function submitRelease(store, options = {}) {
     throw new Error(`submitRelease: unknown target platform(s): ${unknown.join(', ')}`);
   }
   if (coWriters !== null) validateCoWriters(coWriters);
-  if (typeof transferFn !== 'function') {
-    throw new Error('submitRelease requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') {
+    throw new Error('submitRelease requires a settleFn(legs, meta)');
   }
 
   const distributionFee = DISTRIBUTION_FEES[format];
 
   // Charge the artist the real flat fee before recording the release
   // -- a failed charge must never leave a "submitted" release behind.
-  await transferFn(artistId, VULTURE_MUSIC_PLATFORM_ACCOUNT, distributionFee, `Distribution fee: ${format} "${title}"`);
+  await settleFn(
+    [{ fromUserId: artistId, toUserId: VULTURE_MUSIC_PLATFORM_ACCOUNT, amount: distributionFee, reason: `Distribution fee: ${format} "${title}"` }],
+    { reason: `Distribution fee: ${format} "${title}"` },
+  );
 
   const release = {
     id: store.nextReleaseId++,
@@ -253,7 +256,7 @@ function attachMusicVideo(store, options = {}) {
 // artist keeps the full amount.
 async function reportStreamingRevenue(store, options = {}) {
   const {
-    releaseId, amount, source, transferFn, now = Date.now(),
+    releaseId, amount, source, settleFn, now = Date.now(),
   } = options;
 
   const release = getRelease(store, releaseId);
@@ -263,15 +266,38 @@ async function reportStreamingRevenue(store, options = {}) {
   }
   if (!Number.isFinite(amount) || amount <= 0) throw new Error('reportStreamingRevenue requires a positive amount');
   if (!source) throw new Error('reportStreamingRevenue requires a source');
-  if (typeof transferFn !== 'function') {
-    throw new Error('reportStreamingRevenue requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') {
+    throw new Error('reportStreamingRevenue requires a settleFn(legs, meta)');
   }
 
   const deal = getArtistManager(store, release.artistId);
   const coWriters = release.coWriters || [{ userId: release.artistId, splitPercent: 1 }];
 
+  // **The whole report settles once, then commits.**
+  //
+  // This loop used to pay each party with its own `await settleFn`
+  // -- up to three per co-writer (label recoupment, artist net,
+  // manager commission) -- and mutate as it went: `applyLabelDeal`
+  // reduced the deal's recoupment balance, and each manager commission
+  // was pushed to `store.commissionPayouts`, both *before* the money
+  // for later payees had moved.
+  //
+  // A failure part-way through therefore left some co-writers paid,
+  // some not, recoupment already applied for revenue that never moved,
+  // orphan commission records, and no revenue report at all. The retry
+  // ran the whole loop again -- **recouping a second time against the
+  // same revenue** and re-paying everyone the first pass had reached.
+  //
+  // So: compute every payee's split touching nothing, settle the
+  // entire report in one call, and only then apply the mutations. A
+  // refused settlement now leaves every label deal, every commission
+  // record and every balance exactly where it was.
   const payouts = [];
+  const legs = [];
+  const labelCommits = [];
+  const commissionRecords = [];
   let allocated = 0;
+
   for (let i = 0; i < coWriters.length; i += 1) {
     const { userId, splitPercent } = coWriters[i];
     const isLast = i === coWriters.length - 1;
@@ -291,16 +317,17 @@ async function reportStreamingRevenue(store, options = {}) {
     let labelPayout = null;
     const labelDeal = getActiveLabelDealForRelease(store, release.id, userId);
     if (labelDeal) {
-      const result = applyLabelDeal(labelDeal, workingShare, now);
+      const result = computeLabelDeal(labelDeal, workingShare);
       labelPayout = { dealId: labelDeal.id, labelId: labelDeal.labelId, ...result };
       workingShare = result.artistPortion;
+      labelCommits.push({ deal: labelDeal, result });
       if (result.labelTotal > 0) {
-        await transferFn(
-          VULTURE_MUSIC_REVENUE_INTAKE_ACCOUNT,
-          labelDeal.labelId,
-          result.labelTotal,
-          `Label recoupment/share: ${source} for "${release.title}"`,
-        );
+        legs.push({
+          fromUserId: VULTURE_MUSIC_REVENUE_INTAKE_ACCOUNT,
+          toUserId: labelDeal.labelId,
+          amount: result.labelTotal,
+          reason: `Label recoupment/share: ${source} for "${release.title}"`,
+        });
       }
     }
 
@@ -309,30 +336,28 @@ async function reportStreamingRevenue(store, options = {}) {
 
     // A label deal can recoup 100% of the primary artist's own share
     // on a given report, leaving a real, legitimate `netShare` of
-    // exactly 0 -- skip the transfer rather than calling `transferFn`
-    // with a non-positive amount (V3's own real ledger rejects those
-    // outright; this isn't a hypothetical, a live pass against it
-    // caught exactly this case).
+    // exactly 0 -- no leg rather than a leg of zero (V3's own real
+    // ledger rejects non-positive amounts outright; this isn't a
+    // hypothetical, a live pass against it caught exactly this case).
     if (netShare > 0) {
-      await transferFn(
-        VULTURE_MUSIC_REVENUE_INTAKE_ACCOUNT,
-        userId,
-        netShare,
-        managerCommission > 0
+      legs.push({
+        fromUserId: VULTURE_MUSIC_REVENUE_INTAKE_ACCOUNT,
+        toUserId: userId,
+        amount: netShare,
+        reason: managerCommission > 0
           ? `Streaming revenue: ${source} for "${release.title}" (after ${Math.round(deal.commissionPercent * 100)}% management commission)`
           : `Streaming revenue: ${source} for "${release.title}"`,
-      );
+      });
     }
 
     if (managerCommission > 0) {
-      await transferFn(
-        VULTURE_MUSIC_REVENUE_INTAKE_ACCOUNT,
-        deal.managerId,
-        managerCommission,
-        `Management commission: ${source} for "${release.title}"`,
-      );
-      store.commissionPayouts.push({
-        id: store.nextCommissionPayoutId++,
+      legs.push({
+        fromUserId: VULTURE_MUSIC_REVENUE_INTAKE_ACCOUNT,
+        toUserId: deal.managerId,
+        amount: managerCommission,
+        reason: `Management commission: ${source} for "${release.title}"`,
+      });
+      commissionRecords.push({
         dealId: deal.id,
         managerId: deal.managerId,
         artistId: release.artistId,
@@ -344,6 +369,18 @@ async function reportStreamingRevenue(store, options = {}) {
     payouts.push({
       userId, splitPercent, grossShare, labelPayout, managerCommission, netShare,
     });
+  }
+
+  // A report whose every share recouped to zero moves no money, and
+  // that is legitimate -- settling an empty set would be refused.
+  if (legs.length > 0) {
+    await settleFn(legs, { reason: `vulture_music_revenue:${releaseId}:${store.nextRevenueReportId}` });
+  }
+
+  // Past this line the money has moved, so the records can be written.
+  for (const { deal: labelDeal, result } of labelCommits) commitLabelDeal(labelDeal, result, now);
+  for (const record of commissionRecords) {
+    store.commissionPayouts.push({ id: store.nextCommissionPayoutId++, ...record });
   }
 
   // Backward-compatible top-level fields: the primary artist's own

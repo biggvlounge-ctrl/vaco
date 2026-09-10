@@ -62,7 +62,7 @@ function startEsportsMatch(store, options = {}) {
 }
 
 async function placeStake(store, options = {}) {
-  const { matchId, userId, backedPlayerId, amountVCoin, transferFn } = options;
+  const { matchId, userId, backedPlayerId, amountVCoin, settleFn } = options;
   const match = getEsportsMatch(store, matchId);
   if (!match) throw new Error(`placeStake: no match with id ${matchId}`);
   if (match.status === 'resolved') throw new Error(`placeStake: match ${matchId} is already resolved`);
@@ -71,9 +71,12 @@ async function placeStake(store, options = {}) {
     throw new Error(`placeStake: backedPlayerId must be one of the match's two real players`);
   }
   if (!Number.isFinite(amountVCoin) || amountVCoin <= 0) throw new Error('placeStake requires a positive amountVCoin');
-  if (typeof transferFn !== 'function') throw new Error('placeStake requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') throw new Error('placeStake requires a settleFn(legs, meta)');
 
-  await transferFn(userId, VAGO_HOUSE_ACCOUNT, amountVCoin, `vago_esports_stake:${matchId}`);
+  await settleFn(
+    [{ fromUserId: userId, toUserId: VAGO_HOUSE_ACCOUNT, amount: amountVCoin, reason: `vago_esports_stake:${matchId}` }],
+    { reason: `vago_esports_stake:${matchId}` },
+  );
 
   const isFlashStake = match.status === 'live';
   const stake = { userId, backedPlayerId, amountVCoin, isFlashStake, at: Date.now() };
@@ -82,14 +85,14 @@ async function placeStake(store, options = {}) {
 }
 
 async function resolveEsportsMatch(store, options = {}) {
-  const { matchId, winnerId, transferFn } = options;
+  const { matchId, winnerId, settleFn } = options;
   const match = getEsportsMatch(store, matchId);
   if (!match) throw new Error(`resolveEsportsMatch: no match with id ${matchId}`);
   if (match.status === 'resolved') throw new Error(`resolveEsportsMatch: match ${matchId} is already resolved`);
   if (winnerId !== match.player1Id && winnerId !== match.player2Id) {
     throw new Error('resolveEsportsMatch: winnerId must be one of the match\'s two real players');
   }
-  if (typeof transferFn !== 'function') throw new Error('resolveEsportsMatch requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') throw new Error('resolveEsportsMatch requires a settleFn(legs, meta)');
 
   const totalPool = round(match.stakes.reduce((sum, s) => sum + s.amountVCoin, 0));
   const winningStakes = match.stakes.filter((s) => s.backedPlayerId === winnerId);
@@ -101,7 +104,10 @@ async function resolveEsportsMatch(store, options = {}) {
       const share = stake.amountVCoin / totalWinningAmount;
       const payout = round(totalPool * share);
       if (payout > 0) {
-        await transferFn(VAGO_HOUSE_ACCOUNT, stake.userId, payout, `vago_esports_payout:${matchId}`);
+        await settleFn(
+          [{ fromUserId: VAGO_HOUSE_ACCOUNT, toUserId: stake.userId, amount: payout, reason: `vago_esports_payout:${matchId}` }],
+          { reason: `vago_esports_payout:${matchId}` },
+        );
         payouts.push({ userId: stake.userId, payout });
       }
     }

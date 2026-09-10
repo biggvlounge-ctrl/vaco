@@ -32,7 +32,7 @@
 // Pricing is a real, deterministic, demand-driven signal: `yesPool`/
 // `noPool` track real dollars staked on each side. Custody itself is
 // `VAGO_HOUSE_ACCOUNT` (shared with casinoSession.js) in the real
-// VCoin ledger, moved only through the injected `transferFn`, same
+// VCoin ledger, moved only through the injected `settleFn`, same
 // pattern as every other real-money-adjacent module this session. A
 // brand new market with no trades starts at a real, standard 50c
 // bootstrap price. `MIN_PRICE`/`MAX_PRICE` are Kalshi's own real,
@@ -119,24 +119,37 @@ function findContract(market, userId, side) {
 }
 
 async function buyContract(store, options = {}) {
-  const { marketId, userId, side, quantity, transferFn } = options;
+  const { marketId, userId, side, quantity, settleFn } = options;
   const market = getPredictionMarket(store, marketId);
   if (!market) throw new Error(`buyContract: no market with id ${marketId}`);
   if (market.status !== 'open') throw new Error(`buyContract: market ${marketId} is not open (status: ${market.status})`);
   if (!MARKET_SIDES.includes(side)) throw new Error(`buyContract: invalid side "${side}" (expected one of ${MARKET_SIDES.join(', ')})`);
   if (!userId) throw new Error('buyContract requires a userId');
   if (!Number.isInteger(quantity) || quantity < 1) throw new Error('buyContract requires a positive integer quantity');
-  if (typeof transferFn !== 'function') throw new Error('buyContract requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') throw new Error('buyContract requires a settleFn(legs, meta)');
 
   const { yesPrice, noPrice } = getMarketPrice(market);
   const price = side === 'yes' ? yesPrice : noPrice;
   const cost = round(quantity * price);
   const fee = computeTradingFee(price, quantity);
 
-  await transferFn(userId, VAGO_HOUSE_ACCOUNT, cost, `vago_prediction_buy:${marketId}`);
+  // **One settlement, not two.** The cost and the trading fee both
+  // leave the buyer's account, and the market pools and the contract
+  // record below are only written after both. Split, the fee leg could
+  // fail after the cost leg had moved -- the buyer paid and held
+  // nothing, no pool grew, no contract existed -- and the retry charged
+  // the cost a second time.
+  //
+  // They stay two legs rather than one netted movement because the buy
+  // and the fee are separately auditable, which is the same rule every
+  // other settlement in this ecosystem follows.
+  const legs = [
+    { fromUserId: userId, toUserId: VAGO_HOUSE_ACCOUNT, amount: cost, reason: `vago_prediction_buy:${marketId}` },
+  ];
   if (fee > 0) {
-    await transferFn(userId, VAGO_HOUSE_ACCOUNT, fee, `vago_prediction_fee:${marketId}`);
+    legs.push({ fromUserId: userId, toUserId: VAGO_HOUSE_ACCOUNT, amount: fee, reason: `vago_prediction_fee:${marketId}` });
   }
+  await settleFn(legs, { reason: `vago_prediction_purchase:${marketId}:${userId}` });
 
   if (side === 'yes') market.yesPool = round(market.yesPool + cost);
   else market.noPool = round(market.noPool + cost);
@@ -155,13 +168,13 @@ async function buyContract(store, options = {}) {
 }
 
 async function sellContract(store, options = {}) {
-  const { marketId, userId, side, quantity, transferFn } = options;
+  const { marketId, userId, side, quantity, settleFn } = options;
   const market = getPredictionMarket(store, marketId);
   if (!market) throw new Error(`sellContract: no market with id ${marketId}`);
   if (market.status !== 'open') throw new Error(`sellContract: market ${marketId} is not open (status: ${market.status})`);
   if (!MARKET_SIDES.includes(side)) throw new Error(`sellContract: invalid side "${side}" (expected one of ${MARKET_SIDES.join(', ')})`);
   if (!Number.isInteger(quantity) || quantity < 1) throw new Error('sellContract requires a positive integer quantity');
-  if (typeof transferFn !== 'function') throw new Error('sellContract requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') throw new Error('sellContract requires a settleFn(legs, meta)');
 
   const contract = findContract(market, userId, side);
   if (!contract || contract.quantity < quantity) {
@@ -172,7 +185,10 @@ async function sellContract(store, options = {}) {
   const price = side === 'yes' ? yesPrice : noPrice;
   const proceeds = round(quantity * price);
 
-  await transferFn(VAGO_HOUSE_ACCOUNT, userId, proceeds, `vago_prediction_sell:${marketId}`);
+  await settleFn(
+    [{ fromUserId: VAGO_HOUSE_ACCOUNT, toUserId: userId, amount: proceeds, reason: `vago_prediction_sell:${marketId}` }],
+    { reason: `vago_prediction_sell:${marketId}` },
+  );
 
   if (side === 'yes') market.yesPool = round(Math.max(0, market.yesPool - proceeds));
   else market.noPool = round(Math.max(0, market.noPool - proceeds));
@@ -192,12 +208,12 @@ async function sellContract(store, options = {}) {
 // the trading fee was already charged at buy time and never entered
 // the pool, so "no fee on winning trades" holds exactly.
 async function resolveMarket(store, options = {}) {
-  const { marketId, outcome, transferFn } = options;
+  const { marketId, outcome, settleFn } = options;
   const market = getPredictionMarket(store, marketId);
   if (!market) throw new Error(`resolveMarket: no market with id ${marketId}`);
   if (market.status !== 'open') throw new Error(`resolveMarket: market ${marketId} is not open (status: ${market.status})`);
   if (!MARKET_SIDES.includes(outcome)) throw new Error(`resolveMarket: invalid outcome "${outcome}" (expected one of ${MARKET_SIDES.join(', ')})`);
-  if (typeof transferFn !== 'function') throw new Error('resolveMarket requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') throw new Error('resolveMarket requires a settleFn(legs, meta)');
 
   const winningContracts = market.contracts.filter((c) => c.side === outcome && c.quantity > 0);
   const totalWinningQuantity = winningContracts.reduce((sum, c) => sum + c.quantity, 0);
@@ -209,7 +225,10 @@ async function resolveMarket(store, options = {}) {
       const share = contract.quantity / totalWinningQuantity;
       const payout = round(totalPool * share);
       if (payout > 0) {
-        await transferFn(VAGO_HOUSE_ACCOUNT, contract.userId, payout, `vago_prediction_payout:${marketId}`);
+        await settleFn(
+          [{ fromUserId: VAGO_HOUSE_ACCOUNT, toUserId: contract.userId, amount: payout, reason: `vago_prediction_payout:${marketId}` }],
+          { reason: `vago_prediction_payout:${marketId}` },
+        );
         payouts.push({ userId: contract.userId, payout });
       }
     }

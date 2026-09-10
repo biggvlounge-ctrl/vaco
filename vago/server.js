@@ -80,24 +80,42 @@ const VACO_ANALYTICS_URL = process.env.VACO_ANALYTICS_URL || 'http://localhost:8
 const store = createPersistentStore(path.join(__dirname, 'data', 'store.json'), createVagoStore);
 app.use(durable(store));  // commit before responding -- see lib/persistence.js
 
-// `idempotencyKey` is optional and forwarded to V3 as an
-// Idempotency-Key header. When present, V3 replays the first
-// result instead of charging again. It is deliberately a
-// parameter rather than something derived here -- see the note
-// at the call sites.
-async function transferVCoin(fromUserId, toUserId, amount, reason, idempotencyKey) {
-  const res = await fetch(`${V3_API_URL}/api/vcoin/transfer`, {
+// Atomic settlement: every leg moves, or none does.
+//
+// **The one multi-leg path here is a prediction-market purchase**: the
+// contract cost and the trading fee both leave the buyer's account,
+// and the market pools and the contract record are written only after
+// both. Split into consecutive transfers, the fee leg could fail after
+// the cost leg had moved -- the buyer paid and held nothing, no pool
+// grew, no contract existed -- and the retry charged the cost again.
+//
+// Everything else in this app is genuinely one leg (a stake in, a
+// payout out), and each is sent as a single-leg settlement so the app
+// has one money interface rather than two.
+//
+// `POST /api/vcoin/settle` validates every leg against running balances
+// and writes nothing unless all of them pass. `settleVCoin` is
+// removed rather than kept beside it: a working single-transfer helper
+// is what the next money path gets written with, and consecutive calls
+// to it are the defect.
+async function settleVCoin(legs, meta = {}) {
+  const res = await fetch(`${V3_API_URL}/api/vcoin/settle`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...serviceHeaders(),
-      ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
+      // The settlement reason uniquely names what is being
+      // settled, so it doubles as the idempotency key: a retried
+      // settlement replays V3's first answer rather than paying
+      // twice. Atomicity stops a *partial* settlement; this stops
+      // a *duplicate* one.
+      ...(meta.reason ? { 'Idempotency-Key': `settle:${meta.reason}` } : {}),
     },
-    body: JSON.stringify({ fromUserId, toUserId, amount, reason }),
+    body: JSON.stringify({ legs, reason: meta.reason ?? null }),
   });
   const body = await res.json();
   if (!res.ok) {
-    throw new Error(body.error || `transferVCoin failed (${res.status})`);
+    throw new Error(body.error || `settleVCoin failed (${res.status})`);
   }
   return body;
 }
@@ -249,7 +267,7 @@ app.get('/api/amoe-entry/:userId', (req, res) => {
 
 app.post('/api/casino/sessions', requireActor('userId'), async (req, res) => {
   try {
-    res.status(201).json(await startCasinoSession(store, { ...req.body, transferFn: transferVCoin }));
+    res.status(201).json(await startCasinoSession(store, { ...req.body, settleFn: settleVCoin }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -279,7 +297,7 @@ app.post('/api/casino/mines/:id/reveal', requireRoundPlayer(), (req, res) => {
 
 app.post('/api/casino/mines/:id/cash-out', requireRoundPlayer(), async (req, res) => {
   try {
-    const round_ = await cashOutMines(store, { roundId: Number(req.params.id), transferFn: transferVCoin });
+    const round_ = await cashOutMines(store, { roundId: Number(req.params.id), settleFn: settleVCoin });
     await pushMetric('casino_payout', round_.payout);
     res.json(round_);
   } catch (err) {
@@ -297,7 +315,7 @@ app.post('/api/casino/plinko/start', requireCasinoSessionOwner(), (req, res) => 
 
 app.post('/api/casino/plinko/:id/drop', requireRoundPlayer(), async (req, res) => {
   try {
-    const round_ = await dropPlinkoBall(store, { roundId: Number(req.params.id), transferFn: transferVCoin });
+    const round_ = await dropPlinkoBall(store, { roundId: Number(req.params.id), settleFn: settleVCoin });
     await pushMetric('casino_payout', round_.payout);
     res.json(round_);
   } catch (err) {
@@ -323,7 +341,7 @@ app.post('/api/casino/hilo/:id/guess', requireRoundPlayer(), (req, res) => {
 
 app.post('/api/casino/hilo/:id/cash-out', requireRoundPlayer(), async (req, res) => {
   try {
-    const round_ = await cashOutHilo(store, { roundId: Number(req.params.id), transferFn: transferVCoin });
+    const round_ = await cashOutHilo(store, { roundId: Number(req.params.id), settleFn: settleVCoin });
     await pushMetric('casino_payout', round_.payout);
     res.json(round_);
   } catch (err) {
@@ -376,7 +394,7 @@ app.post('/api/fantasy/props/:id/resolve', requireOperator('vago:grade'), async 
 
 app.post('/api/fantasy/entries', requireActor('userId'), async (req, res) => {
   try {
-    res.status(201).json(await createFantasyEntry(store, { ...req.body, transferFn: transferVCoin }));
+    res.status(201).json(await createFantasyEntry(store, { ...req.body, settleFn: settleVCoin }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -405,7 +423,7 @@ app.post('/api/fantasy/entries/:id/grade', requireOperator('vago:grade'), async 
   }
 
   try {
-    res.json(await gradeFantasyEntry(store, { entryId: Number(req.params.id), transferFn: transferVCoin }));
+    res.json(await gradeFantasyEntry(store, { entryId: Number(req.params.id), settleFn: settleVCoin }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -431,7 +449,7 @@ app.get('/api/markets/:id', (req, res) => {
 
 app.post('/api/markets/:id/buy', requireActor('userId'), async (req, res) => {
   try {
-    res.status(201).json(await buyContract(store, { ...req.body, marketId: Number(req.params.id), transferFn: transferVCoin }));
+    res.status(201).json(await buyContract(store, { ...req.body, marketId: Number(req.params.id), settleFn: settleVCoin }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -439,7 +457,7 @@ app.post('/api/markets/:id/buy', requireActor('userId'), async (req, res) => {
 
 app.post('/api/markets/:id/sell', requireActor('userId'), async (req, res) => {
   try {
-    res.json(await sellContract(store, { ...req.body, marketId: Number(req.params.id), transferFn: transferVCoin }));
+    res.json(await sellContract(store, { ...req.body, marketId: Number(req.params.id), settleFn: settleVCoin }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -462,7 +480,7 @@ app.post('/api/markets/:id/resolve', requireOperator('vago:settle'), async (req,
   }
 
   try {
-    res.json(await resolveMarket(store, { ...req.body, marketId: Number(req.params.id), transferFn: transferVCoin }));
+    res.json(await resolveMarket(store, { ...req.body, marketId: Number(req.params.id), settleFn: settleVCoin }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -492,7 +510,7 @@ app.get('/api/sports/events/:eventId', (req, res) => {
 
 app.post('/api/sports/:eventId/bet', requireActor('userId'), async (req, res) => {
   try {
-    res.status(201).json(await placeSportsBet(store, { ...req.body, eventId: req.params.eventId, transferFn: transferVCoin }));
+    res.status(201).json(await placeSportsBet(store, { ...req.body, eventId: req.params.eventId, settleFn: settleVCoin }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -521,7 +539,7 @@ app.post('/api/sports/events/:eventId/settle', requireOperator('vago:settle'), a
   }
 
   try {
-    res.json(await settleSportsEvent(store, { ...req.body, eventId: req.params.eventId, transferFn: transferVCoin }));
+    res.json(await settleSportsEvent(store, { ...req.body, eventId: req.params.eventId, settleFn: settleVCoin }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -566,7 +584,7 @@ app.post('/api/esports/matches/:matchId/start', requireOperator('vago:state'), a
 
 app.post('/api/esports/:matchId/stake', requireActor('userId'), async (req, res) => {
   try {
-    res.status(201).json(await placeStake(store, { ...req.body, matchId: req.params.matchId, transferFn: transferVCoin }));
+    res.status(201).json(await placeStake(store, { ...req.body, matchId: req.params.matchId, settleFn: settleVCoin }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -589,7 +607,7 @@ app.post('/api/esports/matches/:matchId/resolve', requireOperator('vago:settle')
   }
 
   try {
-    res.json(await resolveEsportsMatch(store, { ...req.body, matchId: req.params.matchId, transferFn: transferVCoin }));
+    res.json(await resolveEsportsMatch(store, { ...req.body, matchId: req.params.matchId, settleFn: settleVCoin }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -604,7 +622,7 @@ app.post('/api/esports/matches/:matchId/resolve', requireOperator('vago:settle')
 // `data/store.json` with real data is never clobbered.
 (async () => {
   try {
-    await seedDemoData(store, { transferFn: transferVCoin });
+    await seedDemoData(store, { settleFn: settleVCoin });
   } catch (err) {
     console.error('seedDemoData failed:', err.message);
   }

@@ -12,7 +12,7 @@
 // The enforcement is architectural, not a flag: Gold Coin lives in
 // its own ledger object (`store.goldCoinBalances`), entirely separate
 // from VCoin (which lives in V3/venvs-mock-backend and is only ever
-// moved through the injected `transferFn`, same pattern as VOID and
+// moved through the injected `settleFn`, same pattern as VOID and
 // VOKEN). No function anywhere in this module -- or anywhere in this
 // project -- converts between the two, in either direction. That
 // absence is the compliance boundary.

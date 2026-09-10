@@ -30,7 +30,7 @@
 // this module's own header describes: `submitAmoeEntry` is the real
 // free-entry path that actually credits the separate Gold Coin ledger
 // (never VCoin), then `startCasinoSession(..., currency: 'gold-coin')`
-// spends from that same ledger and never calls `transferFn` -- the
+// spends from that same ledger and never calls `settleFn` -- the
 // real proof this is sweepstakes-model Gold Coin play, not VCoin
 // wagering with a different label.
 
@@ -97,7 +97,7 @@ const DEMO_CASINO_SESSIONS = [
   { userId: 'demo-carlos', gameType: 'game-show', stakeAmount: 25 },
 ];
 
-async function seedPredictionMarkets(store, { transferFn }) {
+async function seedPredictionMarkets(store, { settleFn }) {
   if (store.predictionMarkets.length > 0) return;
 
   for (const spec of [...REAL_WORLD_MARKETS.map((m) => ({ ...m, source: 'real-world' })), ...IN_WORLD_MARKETS]) {
@@ -109,7 +109,7 @@ async function seedPredictionMarkets(store, { transferFn }) {
     });
     for (const trade of spec.trades) {
       try {
-        await buyContract(store, { marketId: market.id, ...trade, transferFn });
+        await buyContract(store, { marketId: market.id, ...trade, settleFn });
       } catch (err) {
         console.warn(`seedDemoData: skipped trade on market ${market.id} (${trade.userId}/${trade.side}) — ${err.message}`);
       }
@@ -117,7 +117,7 @@ async function seedPredictionMarkets(store, { transferFn }) {
   }
 }
 
-async function seedCasinoSessions(store, { transferFn }) {
+async function seedCasinoSessions(store, { settleFn }) {
   if (store.casinoSessions.length > 0) return;
 
   for (const session of DEMO_CASINO_SESSIONS) {
@@ -125,7 +125,7 @@ async function seedCasinoSessions(store, { transferFn }) {
       // Real free Gold Coin entry first (real ledger credit, never
       // VCoin) so the session below has a real balance to stake from.
       await submitAmoeEntry(store, { userId: session.userId });
-      await startCasinoSession(store, { ...session, currency: 'gold-coin', transferFn });
+      await startCasinoSession(store, { ...session, currency: 'gold-coin', settleFn });
     } catch (err) {
       console.warn(`seedDemoData: skipped casino session for ${session.userId} — ${err.message}`);
     }
@@ -136,12 +136,12 @@ async function seedCasinoSessions(store, { transferFn }) {
 // real emptiness check -- a persisted `data/store.json` loaded with
 // real markets/sessions is never touched, and restarting the server
 // twice never double-seeds.
-async function seedDemoData(store, { transferFn }) {
-  if (typeof transferFn !== 'function') {
-    throw new Error('seedDemoData requires a transferFn(fromUserId, toUserId, amount, reason)');
+async function seedDemoData(store, { settleFn }) {
+  if (typeof settleFn !== 'function') {
+    throw new Error('seedDemoData requires a settleFn(legs, meta)');
   }
-  await seedPredictionMarkets(store, { transferFn });
-  await seedCasinoSessions(store, { transferFn });
+  await seedPredictionMarkets(store, { settleFn });
+  await seedCasinoSessions(store, { settleFn });
 }
 
 module.exports = { seedDemoData, DEMO_USERS };

@@ -7,7 +7,7 @@
 // This is the real, structural proof of the Gold Coin/VCoin
 // separation: a `gold-coin` session can only ever debit
 // `lib/goldCoin.js`'s local ledger and never calls the injected
-// `transferFn`; a `vcoin` session can only ever call `transferFn` (the
+// `settleFn`; a `vcoin` session can only ever call `settleFn` (the
 // same real, injected pattern VOID and VOKEN use to reach V3 through
 // venvs-mock-backend) and never touches the Gold Coin ledger. The two
 // branches share no code path -- there is no single function through
@@ -40,7 +40,7 @@ const ORIGINALS_MIN_STAKE = 1;
 const ORIGINALS_MAX_STAKE = 10000;
 
 async function startCasinoSession(store, options = {}) {
-  const { userId, gameType, currency, stakeAmount, amoeEntryUsed = false, transferFn } = options;
+  const { userId, gameType, currency, stakeAmount, amoeEntryUsed = false, settleFn } = options;
 
   if (!userId) throw new Error('startCasinoSession requires a userId');
   if (!CASINO_GAME_TYPES.includes(gameType)) {
@@ -60,14 +60,17 @@ async function startCasinoSession(store, options = {}) {
   }
 
   if (currency === 'gold-coin') {
-    // Real, local-only debit -- never calls transferFn, never reaches V3.
+    // Real, local-only debit -- never calls settleFn, never reaches V3.
     debitGoldCoin(store, { userId, amount: stakeAmount, reason: 'casino-session-stake' });
   } else {
     // Real VCoin movement -- never touches the Gold Coin ledger.
-    if (typeof transferFn !== 'function') {
-      throw new Error('startCasinoSession requires a transferFn(fromUserId, toUserId, amount, reason) for vcoin sessions');
+    if (typeof settleFn !== 'function') {
+      throw new Error('startCasinoSession requires a settleFn(legs, meta) for vcoin sessions');
     }
-    await transferFn(userId, VAGO_HOUSE_ACCOUNT, stakeAmount, 'vago_casino_session_stake');
+    await settleFn(
+      [{ fromUserId: userId, toUserId: VAGO_HOUSE_ACCOUNT, amount: stakeAmount, reason: 'vago_casino_session_stake' }],
+      { reason: 'vago_casino_session_stake' },
+    );
   }
 
   const session = {

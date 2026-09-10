@@ -128,7 +128,7 @@ function gradePick(prop, direction) {
 }
 
 async function createFantasyEntry(store, options = {}) {
-  const { userId, stakeAmount, picks, transferFn, playType = 'perfect' } = options;
+  const { userId, stakeAmount, picks, settleFn, playType = 'perfect' } = options;
 
   if (!userId) throw new Error('createFantasyEntry requires a userId');
   if (!Number.isFinite(stakeAmount) || stakeAmount <= 0) {
@@ -137,8 +137,8 @@ async function createFantasyEntry(store, options = {}) {
   if (!Array.isArray(picks) || picks.length < MIN_PICKS || picks.length > MAX_PICKS) {
     throw new Error(`createFantasyEntry requires between ${MIN_PICKS} and ${MAX_PICKS} picks`);
   }
-  if (typeof transferFn !== 'function') {
-    throw new Error('createFantasyEntry requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') {
+    throw new Error('createFantasyEntry requires a settleFn(legs, meta)');
   }
   if (!PLAY_TYPES.includes(playType)) {
     throw new Error(`createFantasyEntry: invalid playType "${playType}" (expected ${PLAY_TYPES.join(' or ')})`);
@@ -160,7 +160,10 @@ async function createFantasyEntry(store, options = {}) {
     if (prop.status !== 'open') throw new Error(`createFantasyEntry: prop ${propId} is already resolved, can't be picked`);
   }
 
-  await transferFn(userId, VAGO_HOUSE_ACCOUNT, stakeAmount, 'vago_fantasy_entry_stake');
+  await settleFn(
+    [{ fromUserId: userId, toUserId: VAGO_HOUSE_ACCOUNT, amount: stakeAmount, reason: 'vago_fantasy_entry_stake' }],
+    { reason: 'vago_fantasy_entry_stake' },
+  );
 
   const entry = {
     id: store.nextFantasyEntryId++,
@@ -185,12 +188,12 @@ function getFantasyEntry(store, entryId) {
 // mirroring `sportsbook.js`'s own settlement pattern (direct from
 // `VAGO_HOUSE_ACCOUNT`, no pooling, since Pick6 isn't pari-mutuel).
 async function gradeFantasyEntry(store, options = {}) {
-  const { entryId, transferFn } = options;
+  const { entryId, settleFn } = options;
   const entry = getFantasyEntry(store, entryId);
   if (!entry) throw new Error(`gradeFantasyEntry: no entry with id ${entryId}`);
   if (entry.status !== 'pending') throw new Error(`gradeFantasyEntry: entry ${entryId} is already graded (status: ${entry.status})`);
-  if (typeof transferFn !== 'function') {
-    throw new Error('gradeFantasyEntry requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') {
+    throw new Error('gradeFantasyEntry requires a settleFn(legs, meta)');
   }
 
   let pushCount = 0;
@@ -225,7 +228,10 @@ async function gradeFantasyEntry(store, options = {}) {
     // Real DraftKings behavior when pushes drop an entry below the
     // minimum valid pick count: refund the stake rather than force it
     // through a payout table with no real entry for it.
-    await transferFn(VAGO_HOUSE_ACCOUNT, entry.userId, entry.stakeAmount, 'vago_fantasy_entry_refund');
+    await settleFn(
+      [{ fromUserId: VAGO_HOUSE_ACCOUNT, toUserId: entry.userId, amount: entry.stakeAmount, reason: 'vago_fantasy_entry_refund' }],
+      { reason: 'vago_fantasy_entry_refund' },
+    );
     entry.status = 'refunded';
     entry.payout = entry.stakeAmount;
     return entry;
@@ -260,7 +266,10 @@ async function gradeFantasyEntry(store, options = {}) {
   }
 
   const payout = round(entry.stakeAmount * multiplier);
-  await transferFn(VAGO_HOUSE_ACCOUNT, entry.userId, payout, 'vago_fantasy_entry_payout');
+  await settleFn(
+    [{ fromUserId: VAGO_HOUSE_ACCOUNT, toUserId: entry.userId, amount: payout, reason: 'vago_fantasy_entry_payout' }],
+    { reason: 'vago_fantasy_entry_payout' },
+  );
   entry.status = 'won';
   entry.payout = payout;
   return entry;

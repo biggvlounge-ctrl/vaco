@@ -24,12 +24,12 @@
 //
 // A `CasinoSession` (gameType `originals`) is the real stake
 // commitment -- `startCasinoSession` already debits the correct
-// currency (Gold Coin locally, VCoin via `transferFn`) before any
+// currency (Gold Coin locally, VCoin via `settleFn`) before any
 // round exists. `session.roundStarted` is the real guard preventing
 // one staked session from funding more than one round. Payout, when a
 // round resolves in the player's favor, pays back through the exact
 // same currency-correct path (`creditGoldCoin` for gold-coin sessions,
-// `transferFn` from `VAGO_HOUSE_ACCOUNT` for vcoin sessions) -- the
+// `settleFn` from `VAGO_HOUSE_ACCOUNT` for vcoin sessions) -- the
 // same "never cross the Gold Coin/VCoin boundary" rule `casinoSession.js`
 // itself establishes.
 
@@ -229,7 +229,7 @@ function revealMinesTile(store, options = {}) {
 }
 
 async function cashOutMines(store, options = {}) {
-  const { roundId, transferFn } = options;
+  const { roundId, settleFn } = options;
   const round_ = store.originalsRounds.find((r) => r.id === roundId && r.game === 'mines');
   if (!round_) throw new Error(`no mines round with id ${roundId}`);
   if (round_.status !== 'active') throw new Error(`mines round ${roundId} is not active (status: ${round_.status})`);
@@ -241,8 +241,11 @@ async function cashOutMines(store, options = {}) {
   if (session.currency === 'gold-coin') {
     creditGoldCoin(store, { userId: session.userId, amount: payout, reason: 'vago_mines_cashout' });
   } else {
-    if (typeof transferFn !== 'function') throw new Error('cashOutMines requires a transferFn(fromUserId, toUserId, amount, reason) for vcoin sessions');
-    await transferFn(VAGO_HOUSE_ACCOUNT, session.userId, payout, 'vago_mines_cashout');
+    if (typeof settleFn !== 'function') throw new Error('cashOutMines requires a settleFn(legs, meta) for vcoin sessions');
+    await settleFn(
+      [{ fromUserId: VAGO_HOUSE_ACCOUNT, toUserId: session.userId, amount: payout, reason: 'vago_mines_cashout' }],
+      { reason: 'vago_mines_cashout' },
+    );
   }
 
   round_.status = 'cashed-out';
@@ -277,7 +280,7 @@ function startPlinkoRound(store, options = {}) {
 }
 
 async function dropPlinkoBall(store, options = {}) {
-  const { roundId, transferFn } = options;
+  const { roundId, settleFn } = options;
   const round_ = store.originalsRounds.find((r) => r.id === roundId && r.game === 'plinko');
   if (!round_) throw new Error(`no plinko round with id ${roundId}`);
   if (round_.status !== 'pending') throw new Error(`plinko round ${roundId} has already resolved`);
@@ -293,8 +296,11 @@ async function dropPlinkoBall(store, options = {}) {
   if (session.currency === 'gold-coin') {
     creditGoldCoin(store, { userId: session.userId, amount: payout, reason: 'vago_plinko_payout' });
   } else {
-    if (typeof transferFn !== 'function') throw new Error('dropPlinkoBall requires a transferFn(fromUserId, toUserId, amount, reason) for vcoin sessions');
-    await transferFn(VAGO_HOUSE_ACCOUNT, session.userId, payout, 'vago_plinko_payout');
+    if (typeof settleFn !== 'function') throw new Error('dropPlinkoBall requires a settleFn(legs, meta) for vcoin sessions');
+    await settleFn(
+      [{ fromUserId: VAGO_HOUSE_ACCOUNT, toUserId: session.userId, amount: payout, reason: 'vago_plinko_payout' }],
+      { reason: 'vago_plinko_payout' },
+    );
   }
 
   round_.status = 'resolved';
@@ -378,7 +384,7 @@ function guessHilo(store, options = {}) {
 }
 
 async function cashOutHilo(store, options = {}) {
-  const { roundId, transferFn } = options;
+  const { roundId, settleFn } = options;
   const round_ = store.originalsRounds.find((r) => r.id === roundId && r.game === 'hilo');
   if (!round_) throw new Error(`no hilo round with id ${roundId}`);
   if (round_.status !== 'active') throw new Error(`hilo round ${roundId} is not active (status: ${round_.status})`);
@@ -390,8 +396,11 @@ async function cashOutHilo(store, options = {}) {
   if (session.currency === 'gold-coin') {
     creditGoldCoin(store, { userId: session.userId, amount: payout, reason: 'vago_hilo_cashout' });
   } else {
-    if (typeof transferFn !== 'function') throw new Error('cashOutHilo requires a transferFn(fromUserId, toUserId, amount, reason) for vcoin sessions');
-    await transferFn(VAGO_HOUSE_ACCOUNT, session.userId, payout, 'vago_hilo_cashout');
+    if (typeof settleFn !== 'function') throw new Error('cashOutHilo requires a settleFn(legs, meta) for vcoin sessions');
+    await settleFn(
+      [{ fromUserId: VAGO_HOUSE_ACCOUNT, toUserId: session.userId, amount: payout, reason: 'vago_hilo_cashout' }],
+      { reason: 'vago_hilo_cashout' },
+    );
   }
 
   round_.status = 'cashed-out';

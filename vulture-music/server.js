@@ -75,24 +75,41 @@ const VACO_ANALYTICS_URL = process.env.VACO_ANALYTICS_URL || 'http://localhost:8
 const store = createPersistentStore(path.join(__dirname, 'data', 'store.json'), createVultureMusicStore);
 app.use(durable(store));  // commit before responding -- see lib/persistence.js
 
-// Real, live call to V3's own ledger -- same injected-fetch pattern
-// established across every cross-app money movement this session
-// (CHOPZ SHOP, VOID, VACAY, ...), not a local balance system.
-// `idempotencyKey` is optional and forwarded to V3 as an
-// Idempotency-Key header. When present, V3 replays the first
-// result instead of charging again. It is deliberately a
-// parameter rather than something derived here -- see the note
-// at the call sites.
-async function transferVCoin(fromUserId, toUserId, amount, reason, idempotencyKey) {
-  const res = await fetch(`${V3_API_URL}/api/vcoin/transfer`, {
+// Atomic settlement: every leg moves, or none does.
+//
+// **A streaming revenue report pays up to three parties per co-writer**
+// -- label recoupment, artist net share, manager commission -- and used
+// to pay each with its own transfer while mutating as it went. A
+// failure part-way left some co-writers paid and others not, recoupment
+// already applied against revenue that never moved, orphan commission
+// records, and no revenue report at all. The retry then recouped a
+// second time against the same revenue, permanently underpaying the
+// artist. See `lib/labelDeals.js`'s `computeLabelDeal`/`commitLabelDeal`
+// split, which exists for exactly this.
+//
+// The whole report is now one settlement. `POST /api/vcoin/settle`
+// validates every leg against running balances and writes nothing
+// unless all of them pass. `settleVCoin` is removed rather than kept
+// beside it.
+async function settleVCoin(legs, meta = {}) {
+  const res = await fetch(`${V3_API_URL}/api/vcoin/settle`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...serviceHeaders() },
-    body: JSON.stringify({
-      fromUserId, toUserId, amount, reason,
-    }),
+    headers: {
+      'Content-Type': 'application/json',
+      ...serviceHeaders(),
+      // The settlement reason uniquely names what is being
+      // settled, so it doubles as the idempotency key: a retried
+      // settlement replays V3's first answer rather than paying
+      // twice. Atomicity stops a *partial* settlement; this stops
+      // a *duplicate* one.
+      ...(meta.reason ? { 'Idempotency-Key': `settle:${meta.reason}` } : {}),
+    },
+    body: JSON.stringify({ legs, reason: meta.reason ?? null }),
   });
   const body = await res.json();
-  if (!res.ok) throw new Error(body.error || `transferVCoin failed (${res.status})`);
+  if (!res.ok) {
+    throw new Error(body.error || `settleVCoin failed (${res.status})`);
+  }
   return body;
 }
 
@@ -210,7 +227,7 @@ app.get('/api/health', (_req, res) => {
 
 app.post('/api/releases', requireActor('artistId'), async (req, res) => {
   try {
-    res.status(201).json(await submitRelease(store, { ...req.body, transferFn: transferVCoin }));
+    res.status(201).json(await submitRelease(store, { ...req.body, settleFn: settleVCoin }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -316,7 +333,7 @@ app.post('/api/releases/:id/revenue', requireOperator('vulture-music:settle'), a
 
   try {
     const report = await reportStreamingRevenue(store, {
-      ...req.body, releaseId: Number(req.params.id), transferFn: transferVCoin,
+      ...req.body, releaseId: Number(req.params.id), settleFn: settleVCoin,
     });
     await pushMetric('streaming_revenue', req.body.amount);
     res.status(201).json(report);
@@ -361,7 +378,7 @@ app.post('/api/label-deals', requireCallingService(), async (req, res) => {
   try {
     const { releaseId, ...rest } = req.body || {};
     const release = releaseId ? getRelease(store, Number(releaseId)) : null;
-    res.status(201).json(await signLabelDeal(store, { ...rest, release, transferFn: transferVCoin }));
+    res.status(201).json(await signLabelDeal(store, { ...rest, release, settleFn: settleVCoin }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -421,7 +438,7 @@ app.post('/api/beats/:id/take-down', requireActor('producerId'), (req, res) => {
 app.post('/api/beats/:id/purchase', requireActor('buyerId'), async (req, res) => {
   try {
     const purchase = await purchaseBeat(store, {
-      ...req.body, beatId: Number(req.params.id), transferFn: transferVCoin,
+      ...req.body, beatId: Number(req.params.id), settleFn: settleVCoin,
     });
     await pushMetric('beat_sales_revenue', purchase.pricePaid);
     res.status(201).json(purchase);
