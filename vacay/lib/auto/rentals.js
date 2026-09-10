@@ -41,7 +41,7 @@ function findDoubleBooking(store, vehicleId, startDate, endDate) {
 
 async function bookRental(store, options = {}) {
   const {
-    vehicleId, renterId, startDate, endDate, transferFn, now = Date.now(),
+    vehicleId, renterId, startDate, endDate, settleFn, now = Date.now(),
   } = options;
 
   const vehicle = getVehicle(store, vehicleId);
@@ -51,7 +51,7 @@ async function bookRental(store, options = {}) {
   if (!Number.isInteger(startDate) || !Number.isInteger(endDate) || endDate <= startDate) {
     throw new Error('bookRental requires a real startDate before endDate');
   }
-  if (typeof transferFn !== 'function') throw new Error('bookRental requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') throw new Error('bookRental requires a settleFn(fromUserId, toUserId, amount, reason)');
 
   const conflict = findDoubleBooking(store, vehicleId, startDate, endDate);
   if (conflict) {
@@ -62,7 +62,10 @@ async function bookRental(store, options = {}) {
   const totalPrice = round(days * vehicle.dailyRate);
 
   const rentalId = store.nextRentalId++;
-  await transferFn(renterId, VACAY_AUTO_ESCROW_ACCOUNT, totalPrice, `vacay_auto_rental_booking:${rentalId}`);
+  await settleFn(
+    [{ fromUserId: renterId, toUserId: VACAY_AUTO_ESCROW_ACCOUNT, amount: totalPrice, reason: `vacay_auto_rental_booking:${rentalId}` }],
+    { reason: `vacay_auto_rental_booking:${rentalId}` },
+  );
 
   const rental = {
     id: rentalId,
@@ -91,18 +94,24 @@ function getRental(store, rentalId) {
 }
 
 async function completeRental(store, options = {}) {
-  const { rentalId, transferFn, now = Date.now() } = options;
+  const { rentalId, settleFn, now = Date.now() } = options;
   const rental = getRental(store, rentalId);
   if (!rental) throw new Error(`completeRental: no rental with id ${rentalId}`);
   if (rental.status !== 'booked') throw new Error(`completeRental: rental ${rentalId} is not awaiting completion (status: ${rental.status})`);
-  if (typeof transferFn !== 'function') throw new Error('completeRental requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') throw new Error('completeRental requires a settleFn(fromUserId, toUserId, amount, reason)');
 
   const vehicle = getVehicle(store, rental.vehicleId);
   const ownerPayout = round(rental.totalPrice * rental.hostEarnPercent);
   const platformCommission = round(rental.totalPrice - ownerPayout);
 
-  await transferFn(VACAY_AUTO_ESCROW_ACCOUNT, vehicle.ownerId, ownerPayout, `vacay_auto_owner_settlement:${rentalId}`);
-  await transferFn(VACAY_AUTO_ESCROW_ACCOUNT, VACAY_AUTO_PLATFORM_ACCOUNT, platformCommission, `vacay_auto_platform_commission:${rentalId}`);
+  // One settlement: the owner's payout and the platform's commission
+  // both leave the same escrow, and the rental's status is written
+  // afterwards -- so a split that failed between them would pay the
+  // owner and let a retry pay them again.
+  await settleFn([
+    { fromUserId: VACAY_AUTO_ESCROW_ACCOUNT, toUserId: vehicle.ownerId, amount: ownerPayout, reason: `vacay_auto_owner_settlement:${rentalId}` },
+    { fromUserId: VACAY_AUTO_ESCROW_ACCOUNT, toUserId: VACAY_AUTO_PLATFORM_ACCOUNT, amount: platformCommission, reason: `vacay_auto_platform_commission:${rentalId}` },
+  ], { reason: `vacay_auto_rental_settlement:${rentalId}` });
 
   rental.ownerPayout = ownerPayout;
   rental.platformCommission = platformCommission;
@@ -122,24 +131,29 @@ async function completeRental(store, options = {}) {
 const CANCELLATION_CUTOFF_HOURS = 24;
 
 async function cancelRental(store, options = {}) {
-  const { rentalId, transferFn, now = Date.now() } = options;
+  const { rentalId, settleFn, now = Date.now() } = options;
   const rental = getRental(store, rentalId);
   if (!rental) throw new Error(`cancelRental: no rental with id ${rentalId}`);
   if (rental.status === 'cancelled') throw new Error(`cancelRental: rental ${rentalId} is already cancelled`);
   if (rental.status === 'completed') throw new Error(`cancelRental: rental ${rentalId} has already completed and can't be cancelled`);
-  if (typeof transferFn !== 'function') throw new Error('cancelRental requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') throw new Error('cancelRental requires a settleFn(fromUserId, toUserId, amount, reason)');
 
   const vehicle = getVehicle(store, rental.vehicleId);
   const hoursUntilStart = (rental.startDate - now) / 3600000;
   const refundEligible = hoursUntilStart >= CANCELLATION_CUTOFF_HOURS;
 
   if (refundEligible) {
-    await transferFn(VACAY_AUTO_ESCROW_ACCOUNT, rental.renterId, rental.totalPrice, `vacay_auto_cancellation_refund:${rentalId}`);
+    await settleFn(
+      [{ fromUserId: VACAY_AUTO_ESCROW_ACCOUNT, toUserId: rental.renterId, amount: rental.totalPrice, reason: `vacay_auto_cancellation_refund:${rentalId}` }],
+      { reason: `vacay_auto_cancellation_refund:${rentalId}` },
+    );
   } else {
     const ownerPayout = round(rental.totalPrice * rental.hostEarnPercent);
     const platformCommission = round(rental.totalPrice - ownerPayout);
-    await transferFn(VACAY_AUTO_ESCROW_ACCOUNT, vehicle.ownerId, ownerPayout, `vacay_auto_late_cancellation_owner_settlement:${rentalId}`);
-    await transferFn(VACAY_AUTO_ESCROW_ACCOUNT, VACAY_AUTO_PLATFORM_ACCOUNT, platformCommission, `vacay_auto_late_cancellation_platform_commission:${rentalId}`);
+    await settleFn([
+      { fromUserId: VACAY_AUTO_ESCROW_ACCOUNT, toUserId: vehicle.ownerId, amount: ownerPayout, reason: `vacay_auto_late_cancellation_owner_settlement:${rentalId}` },
+      { fromUserId: VACAY_AUTO_ESCROW_ACCOUNT, toUserId: VACAY_AUTO_PLATFORM_ACCOUNT, amount: platformCommission, reason: `vacay_auto_late_cancellation_platform_commission:${rentalId}` },
+    ], { reason: `vacay_auto_late_cancellation:${rentalId}` });
     rental.ownerPayout = ownerPayout;
     rental.platformCommission = platformCommission;
   }

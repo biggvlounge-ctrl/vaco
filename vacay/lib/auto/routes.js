@@ -55,7 +55,7 @@ function requireListingSeller(getListing) {
 }
 
 function createAutoRouter(deps) {
-  const { store, transferVCoin } = deps;
+  const { store, settleVCoin } = deps;
   const router = express.Router();
 
   const requireRentalParty = () => rentalPartyGuard(
@@ -107,7 +107,7 @@ function createAutoRouter(deps) {
 
   router.post('/rentals', requireActor('renterId'), async (req, res) => {
     try {
-      res.status(201).json(await bookRental(store, { ...req.body, transferFn: transferVCoin }));
+      res.status(201).json(await bookRental(store, { ...req.body, settleFn: settleVCoin }));
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
@@ -121,7 +121,7 @@ function createAutoRouter(deps) {
 
   router.post('/rentals/:id/complete', requireRentalParty(), async (req, res) => {
     try {
-      res.json(await completeRental(store, { rentalId: Number(req.params.id), transferFn: transferVCoin }));
+      res.json(await completeRental(store, { rentalId: Number(req.params.id), settleFn: settleVCoin }));
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
@@ -129,7 +129,7 @@ function createAutoRouter(deps) {
 
   router.post('/rentals/:id/cancel', requireRentalParty(), async (req, res) => {
     try {
-      res.json(await cancelRental(store, { rentalId: Number(req.params.id), transferFn: transferVCoin }));
+      res.json(await cancelRental(store, { rentalId: Number(req.params.id), settleFn: settleVCoin }));
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
@@ -138,7 +138,7 @@ function createAutoRouter(deps) {
   // -- CarGurus (buy/sell) --
   router.post('/for-sale-listings', requireActor('sellerId'), async (req, res) => {
     try {
-      res.status(201).json(await createForSaleListing(store, { ...req.body, transferFn: transferVCoin }));
+      res.status(201).json(await createForSaleListing(store, { ...req.body, settleFn: settleVCoin }));
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
@@ -186,7 +186,7 @@ function createAutoRouter(deps) {
 
   router.post('/fleet-rentals', requireActor('renterId'), async (req, res) => {
     try {
-      res.status(201).json(await bookFleetRental(store, { ...req.body, transferFn: transferVCoin }));
+      res.status(201).json(await bookFleetRental(store, { ...req.body, settleFn: settleVCoin }));
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
@@ -200,7 +200,7 @@ function createAutoRouter(deps) {
 
   router.post('/fleet-rentals/:id/complete', requireFleetRentalParty(), async (req, res) => {
     try {
-      res.json(await completeFleetRental(store, { rentalId: Number(req.params.id), transferFn: transferVCoin }));
+      res.json(await completeFleetRental(store, { rentalId: Number(req.params.id), settleFn: settleVCoin }));
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
@@ -208,7 +208,7 @@ function createAutoRouter(deps) {
 
   router.post('/fleet-rentals/:id/cancel', requireFleetRentalParty(), async (req, res) => {
     try {
-      res.json(await cancelFleetRental(store, { rentalId: Number(req.params.id), transferFn: transferVCoin }));
+      res.json(await cancelFleetRental(store, { rentalId: Number(req.params.id), settleFn: settleVCoin }));
     } catch (err) {
       res.status(400).json({ error: err.message });
     }

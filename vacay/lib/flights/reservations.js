@@ -38,7 +38,7 @@ function airlineAccountFor(airline) {
 
 async function bookFlight(store, options = {}) {
   const {
-    flightId, passengerId, transferFn, discountPercent = 0, now = Date.now(),
+    flightId, passengerId, settleFn, discountPercent = 0, now = Date.now(),
   } = options;
 
   const flight = getFlight(store, flightId);
@@ -49,7 +49,7 @@ async function bookFlight(store, options = {}) {
   if (!Number.isFinite(discountPercent) || discountPercent < 0 || discountPercent >= 1) {
     throw new Error('bookFlight requires a discountPercent between 0 (inclusive) and 1 (exclusive)');
   }
-  if (typeof transferFn !== 'function') throw new Error('bookFlight requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') throw new Error('bookFlight requires a settleFn(fromUserId, toUserId, amount, reason)');
 
   const retailPriceCharged = round(flight.retailPrice * (1 - discountPercent));
   // A real, layered guard beyond listFlight's own check -- a bundle
@@ -60,11 +60,24 @@ async function bookFlight(store, options = {}) {
   }
 
   const bookingId = store.nextFlightBookingId++;
-  await transferFn(passengerId, VACAY_FLIGHTS_ESCROW_ACCOUNT, retailPriceCharged, `vacay_flight_booking:${bookingId}`);
-
   const margin = round(retailPriceCharged - flight.netRate);
-  await transferFn(VACAY_FLIGHTS_ESCROW_ACCOUNT, airlineAccountFor(flight.airline), flight.netRate, `vacay_flight_airline_settlement:${bookingId}`);
-  await transferFn(VACAY_FLIGHTS_ESCROW_ACCOUNT, VACAY_FLIGHTS_PLATFORM_ACCOUNT, margin, `vacay_flight_platform_margin:${bookingId}`);
+
+  // **The whole purchase is one settlement, charge included.** These
+  // were three consecutive transfers: the passenger paid escrow, then
+  // escrow paid the airline, then escrow paid the platform. The booking
+  // record is created *after* all three, so a failure on the second or
+  // third left the passenger charged for a flight with no booking, no
+  // seat decremented, and nothing to point at when they asked why.
+  //
+  // Ordering matters and is load-bearing: V3 validates each leg against
+  // *running* balances, so the escrow credit on leg 1 is what makes
+  // legs 2 and 3 affordable. Reordering them would refuse a booking
+  // escrow could genuinely fund.
+  await settleFn([
+    { fromUserId: passengerId, toUserId: VACAY_FLIGHTS_ESCROW_ACCOUNT, amount: retailPriceCharged, reason: `vacay_flight_booking:${bookingId}` },
+    { fromUserId: VACAY_FLIGHTS_ESCROW_ACCOUNT, toUserId: airlineAccountFor(flight.airline), amount: flight.netRate, reason: `vacay_flight_airline_settlement:${bookingId}` },
+    { fromUserId: VACAY_FLIGHTS_ESCROW_ACCOUNT, toUserId: VACAY_FLIGHTS_PLATFORM_ACCOUNT, amount: margin, reason: `vacay_flight_platform_margin:${bookingId}` },
+  ], { reason: `vacay_flight_purchase:${bookingId}` });
 
   flight.seatsAvailable -= 1;
   if (flight.seatsAvailable === 0) flight.status = 'sold-out';
@@ -117,19 +130,25 @@ function listBookingsForPassenger(store, passengerId) {
 const DOT_RISK_FREE_CANCELLATION_HOURS = 24;
 
 async function cancelFlightBooking(store, options = {}) {
-  const { bookingId, transferFn, now = Date.now() } = options;
+  const { bookingId, settleFn, now = Date.now() } = options;
   const booking = getFlightBooking(store, bookingId);
   if (!booking) throw new Error(`cancelFlightBooking: no flight booking with id ${bookingId}`);
   if (booking.status === 'cancelled') throw new Error(`cancelFlightBooking: booking ${bookingId} is already cancelled`);
-  if (typeof transferFn !== 'function') throw new Error('cancelFlightBooking requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') throw new Error('cancelFlightBooking requires a settleFn(fromUserId, toUserId, amount, reason)');
 
   const hoursSinceBooking = (now - booking.createdAt) / 3600000;
   const refundEligible = hoursSinceBooking <= DOT_RISK_FREE_CANCELLATION_HOURS;
 
   if (refundEligible) {
     const flight = getFlight(store, booking.flightId);
-    await transferFn(airlineAccountFor(flight.airline), booking.passengerId, booking.netRate, `vacay_flight_dot_24h_refund_airline_share:${bookingId}`);
-    await transferFn(VACAY_FLIGHTS_PLATFORM_ACCOUNT, booking.passengerId, booking.margin, `vacay_flight_dot_24h_refund_platform_share:${bookingId}`);
+    // Two different payers refunding one passenger, so a split leaves
+    // the airline account out of pocket while the platform keeps its
+    // margin -- and `booking.status` is set afterwards, so the retry
+    // takes the airline's share a second time.
+    await settleFn([
+      { fromUserId: airlineAccountFor(flight.airline), toUserId: booking.passengerId, amount: booking.netRate, reason: `vacay_flight_dot_24h_refund_airline_share:${bookingId}` },
+      { fromUserId: VACAY_FLIGHTS_PLATFORM_ACCOUNT, toUserId: booking.passengerId, amount: booking.margin, reason: `vacay_flight_dot_24h_refund_platform_share:${bookingId}` },
+    ], { reason: `vacay_flight_dot_24h_refund:${bookingId}` });
 
     // The seat is only genuinely released back to inventory on a real
     // refund -- a late, non-refundable cancellation keeps the seat

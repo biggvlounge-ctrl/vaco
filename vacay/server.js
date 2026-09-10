@@ -85,21 +85,44 @@ app.use(durable(store));  // commit before responding -- see lib/persistence.js
 const serviceAuth = createServiceAuth();
 app.use(serviceAuth.middleware);
 
-// `idempotencyKey` is optional and forwarded to V3 as an
-// Idempotency-Key header. When present, V3 replays the first
-// result instead of charging again. It is deliberately a
-// parameter rather than something derived here -- see the note
-// at the call sites.
-async function transferVCoin(fromUserId, toUserId, amount, reason, idempotencyKey) {
-  const res = await fetch(`${V3_API_URL}/api/vcoin/transfer`, {
+// Atomic settlement: every leg moves, or none does.
+//
+// **VACAY settles out of escrow**, which is what made the old shape
+// dangerous. A stay, an experience and a peer-to-peer car rental each
+// paid the host or owner and then the platform in two consecutive
+// transfers *from the same escrow account* -- so the second could fail
+// precisely because the first had just drained it. The booking's status
+// is written afterwards, so the record stayed `booked` and a retry paid
+// the host out of escrow a second time.
+//
+// A flight was worse: three legs, the first of them the passenger's
+// own charge, with the booking record created only after all three. A
+// failure part-way charged a passenger for a flight that had no
+// booking and no seat taken.
+//
+// `POST /api/vcoin/settle` validates every leg against *running*
+// balances, which is also what makes the flight case work at all: the
+// escrow credit on leg 1 is what funds legs 2 and 3.
+//
+// **`settleVCoin` is deliberately gone**, rather than kept beside
+// this. It also carried a real, smaller bug worth recording: it took
+// an `idempotencyKey` parameter, its comment said the value was
+// "forwarded to V3 as an Idempotency-Key header", and the function
+// never referenced it again. Every caller that passed one got no
+// idempotency at all.
+async function settleVCoin(legs, meta = {}) {
+  const res = await fetch(`${V3_API_URL}/api/vcoin/settle`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...serviceHeaders() },
-    body: JSON.stringify({
-      fromUserId, toUserId, amount, reason,
-    }),
+    headers: {
+      'Content-Type': 'application/json',
+      ...serviceHeaders(),
+      // Unlike the helper this replaces, the key is actually sent.
+      ...(meta.reason ? { 'Idempotency-Key': `settle:${meta.reason}` } : {}),
+    },
+    body: JSON.stringify({ legs, reason: meta.reason ?? null }),
   });
   const body = await res.json();
-  if (!res.ok) throw new Error(body.error || `transferVCoin failed (${res.status})`);
+  if (!res.ok) throw new Error(body.error || `settleVCoin failed (${res.status})`);
   return body;
 }
 
@@ -136,12 +159,12 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.use('/api/bookings', createBookingsRouter({
-  store: store.bookings, transferVCoin, requestVoidJob, requestVoidHourlyBooking,
+  store: store.bookings, settleVCoin, requestVoidJob, requestVoidHourlyBooking,
 }));
-app.use('/api/home', createHomeRouter({ store: store.home, transferVCoin }));
-app.use('/api/auto', createAutoRouter({ store: store.auto, transferVCoin }));
+app.use('/api/home', createHomeRouter({ store: store.home, settleVCoin }));
+app.use('/api/auto', createAutoRouter({ store: store.auto, settleVCoin }));
 app.use('/api/flights', createFlightsRouter({
-  store: store.flights, bookingsStore: store.bookings, transferVCoin, createBooking,
+  store: store.flights, bookingsStore: store.bookings, settleVCoin, createBooking,
 }));
 
 app.listen(PORT, () => {

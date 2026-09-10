@@ -60,7 +60,7 @@ function requireFlightPassenger(getBooking) {
 
 function createFlightsRouter(deps) {
   const {
-    store, bookingsStore, transferVCoin, createBooking,
+    store, bookingsStore, settleVCoin, createBooking,
   } = deps;
   const router = express.Router();
 
@@ -93,7 +93,7 @@ function createFlightsRouter(deps) {
 
   router.post('/flight-bookings', requireActor('passengerId'), async (req, res) => {
     try {
-      res.status(201).json(await bookFlight(store, { ...req.body, transferFn: transferVCoin }));
+      res.status(201).json(await bookFlight(store, { ...req.body, settleFn: settleVCoin }));
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
@@ -107,7 +107,7 @@ function createFlightsRouter(deps) {
 
   router.post('/flight-bookings/:id/cancel', requireFlightPassenger((id) => getFlightBooking(store, id)), async (req, res) => {
     try {
-      res.json(await cancelFlightBooking(store, { bookingId: Number(req.params.id), transferFn: transferVCoin }));
+      res.json(await cancelFlightBooking(store, { bookingId: Number(req.params.id), settleFn: settleVCoin }));
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
@@ -130,10 +130,10 @@ function createFlightsRouter(deps) {
 
     try {
       const stayBooking = await createBooking(bookingsStore, {
-        listingId: stay.listingId, guestId: stay.guestId, checkIn: stay.checkIn, checkOut: stay.checkOut, transferFn: transferVCoin,
+        listingId: stay.listingId, guestId: stay.guestId, checkIn: stay.checkIn, checkOut: stay.checkOut, settleFn: settleVCoin,
       });
       const flightBooking = await bookFlight(store, {
-        flightId: flight.flightId, passengerId: flight.passengerId, discountPercent: BUNDLE_DISCOUNT_PERCENT, transferFn: transferVCoin,
+        flightId: flight.flightId, passengerId: flight.passengerId, discountPercent: BUNDLE_DISCOUNT_PERCENT, settleFn: settleVCoin,
       });
       res.status(201).json({
         stayBooking, flightBooking, bundleDiscountApplied: BUNDLE_DISCOUNT_PERCENT,

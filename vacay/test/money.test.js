@@ -48,14 +48,30 @@ function ledger(initial = {}) {
   const balances = { ...initial };
   const moves = [];
 
-  const fn = async (from, to, amount, reason) => {
-    if (typeof amount !== 'number' || Number.isNaN(amount)) {
-      throw new Error(`ledger: refusing a non-numeric transfer of ${amount} (${reason})`);
+  // **Takes a settlement, applies its legs.** Every existing assertion
+  // in this file reads `moves` or `of()`, so legs are flattened into
+  // `moves` exactly as separate transfers used to appear and none of
+  // those assertions changed. `calls` is the new question: how many
+  // times the ledger was asked. It is the only thing that can tell an
+  // atomic settlement from the consecutive transfers it replaced —
+  // every balance, every fee split and the conservation invariant
+  // below are identical either way, which is precisely why that defect
+  // went unnoticed here.
+  const calls = [];
+  const fn = async (legs, meta = {}) => {
+    if (!Array.isArray(legs) || legs.length === 0) {
+      throw new Error(`ledger: refusing a settlement with no legs (${meta.reason})`);
     }
-    if (amount < 0) throw new Error(`ledger: refusing a negative transfer (${reason})`);
-    balances[from] = (balances[from] || 0) - amount;
-    balances[to] = (balances[to] || 0) + amount;
-    moves.push({ from, to, amount, reason });
+    for (const { fromUserId: from, toUserId: to, amount, reason } of legs) {
+      if (typeof amount !== 'number' || Number.isNaN(amount)) {
+        throw new Error(`ledger: refusing a non-numeric transfer of ${amount} (${reason})`);
+      }
+      if (amount < 0) throw new Error(`ledger: refusing a negative transfer (${reason})`);
+      balances[from] = (balances[from] || 0) - amount;
+      balances[to] = (balances[to] || 0) + amount;
+      moves.push({ from, to, amount, reason });
+    }
+    calls.push({ legs, meta });
     return { ok: true };
   };
 
@@ -68,6 +84,7 @@ function ledger(initial = {}) {
 
   fn.balances = balances;
   fn.moves = moves;
+  fn.calls = calls;
   fn.of = (account) => balances[account] || 0;
   fn.drift = () => round2(Object.values(balances).reduce((a, b) => a + b, 0) - openingTotal);
 
@@ -99,12 +116,12 @@ function stayFixture() {
 
 test('a stay charges the guest into ESCROW, not the host directly', async () => {
   const { store, listing } = stayFixture();
-  const transferFn = ledger({ sam: 1000 });
+  const settleFn = ledger({ sam: 1000 });
 
   const booking = await bookings.createBooking(store, {
     listingId: listing.id, guestId: 'sam',
     checkIn: NOW + 10 * DAY, checkOut: NOW + 13 * DAY,
-    transferFn, now: NOW,
+    settleFn, now: NOW,
   });
 
   assert.strictEqual(booking.nights, 3);
@@ -113,22 +130,22 @@ test('a stay charges the guest into ESCROW, not the host directly', async () => 
   // The whole point of escrow: the host has not been paid yet. Paying
   // the host at booking time is the failure this asserts against —
   // it would make every cancellation a clawback.
-  assert.strictEqual(transferFn.of('ines'), 0, 'the host must not be paid at booking time');
-  assert.strictEqual(transferFn.of(bookings.VACAY_ESCROW_ACCOUNT), 360);
-  assert.strictEqual(transferFn.of('sam'), 640);
+  assert.strictEqual(settleFn.of('ines'), 0, 'the host must not be paid at booking time');
+  assert.strictEqual(settleFn.of(bookings.VACAY_ESCROW_ACCOUNT), 360);
+  assert.strictEqual(settleFn.of('sam'), 640);
   assert.strictEqual(booking.hostPayout, null);
 });
 
 test('completing a stay drains escrow exactly — host plus fee equals the charge', async () => {
   const { store, listing } = stayFixture();
-  const transferFn = ledger({ sam: 1000 });
+  const settleFn = ledger({ sam: 1000 });
 
   const booking = await bookings.createBooking(store, {
     listingId: listing.id, guestId: 'sam',
     checkIn: NOW + 10 * DAY, checkOut: NOW + 13 * DAY,
-    transferFn, now: NOW,
+    settleFn, now: NOW,
   });
-  const done = await bookings.completeStay(store, { bookingId: booking.id, transferFn, now: NOW + 14 * DAY });
+  const done = await bookings.completeStay(store, { bookingId: booking.id, settleFn, now: NOW + 14 * DAY });
 
   assert.strictEqual(round2(done.hostPayout + done.platformFee), booking.totalPrice,
     'the two shares must add back up to exactly what the guest paid');
@@ -136,64 +153,74 @@ test('completing a stay drains escrow exactly — host plus fee equals the charg
 
   // Escrow must be empty. Money left behind in escrow is money nobody
   // owns, and it is invisible from every other view.
-  assert.ok(transferFn.isDrained(bookings.VACAY_ESCROW_ACCOUNT),
+  assert.ok(settleFn.isDrained(bookings.VACAY_ESCROW_ACCOUNT),
     'escrow must be fully drained on settlement');
-  assert.ok(Math.abs(transferFn.drift()) < 0.01, 'no value may be created or destroyed');
+  assert.ok(Math.abs(settleFn.drift()) < 0.01, 'no value may be created or destroyed');
+
+  // **The assertion none of the above can make.** Both payout legs must
+  // leave escrow in ONE settlement. Split into consecutive transfers,
+  // every line in this test still passes — the balances, the fee split,
+  // the drained escrow, the conservation invariant — and yet the second
+  // leg can fail because the first just drained escrow, leaving the
+  // booking `booked` and a retry paying the host twice.
+  const settlementCalls = settleFn.calls.filter((c) => c.meta.reason?.startsWith('vacay_stay_settlement'));
+  assert.strictEqual(settlementCalls.length, 1, 'the payout must be a single atomic settlement');
+  assert.strictEqual(settlementCalls[0].legs.length, 2, 'host payout and platform fee stay separately auditable');
 });
 
 test('cancelling before the cutoff refunds the guest in full, and empties escrow', async () => {
   const { store, listing } = stayFixture();
-  const transferFn = ledger({ sam: 1000 });
+  const settleFn = ledger({ sam: 1000 });
 
   const booking = await bookings.createBooking(store, {
     listingId: listing.id, guestId: 'sam',
     checkIn: NOW + 10 * DAY, checkOut: NOW + 13 * DAY,
-    transferFn, now: NOW,
+    settleFn, now: NOW,
   });
   const cancelled = await bookings.cancelBooking(store, {
-    bookingId: booking.id, transferFn, now: NOW + 1 * DAY,
+    bookingId: booking.id, settleFn, now: NOW + 1 * DAY,
   });
 
   assert.strictEqual(cancelled.refunded, true);
-  assert.strictEqual(transferFn.of('sam'), 1000, 'a full refund means whole, not nearly whole');
-  assert.strictEqual(transferFn.of('ines'), 0);
-  assert.ok(transferFn.isDrained(bookings.VACAY_ESCROW_ACCOUNT), 'escrow must be drained to the cent');
+  assert.strictEqual(settleFn.of('sam'), 1000, 'a full refund means whole, not nearly whole');
+  assert.strictEqual(settleFn.of('ines'), 0);
+  assert.ok(settleFn.isDrained(bookings.VACAY_ESCROW_ACCOUNT), 'escrow must be drained to the cent');
 });
 
 test('cancelling inside the cutoff pays the host as if the stay happened', async () => {
   const { store, listing } = stayFixture();
-  const transferFn = ledger({ sam: 1000 });
+  const settleFn = ledger({ sam: 1000 });
 
   const checkIn = NOW + 10 * DAY;
   const booking = await bookings.createBooking(store, {
     listingId: listing.id, guestId: 'sam', checkIn, checkOut: NOW + 13 * DAY,
-    transferFn, now: NOW,
+    settleFn, now: NOW,
   });
 
   // Two hours before check-in — well inside the 24-hour cutoff.
   const cancelled = await bookings.cancelBooking(store, {
-    bookingId: booking.id, transferFn, now: checkIn - 2 * 3600000,
+    bookingId: booking.id, settleFn, now: checkIn - 2 * 3600000,
   });
 
   assert.strictEqual(cancelled.refunded, false);
-  assert.strictEqual(transferFn.of('sam'), 640, 'a late cancellation is not refunded');
+  assert.strictEqual(settleFn.of('sam'), 640, 'a late cancellation is not refunded');
   // The host held the dates and could not resell them, so they are made
   // whole exactly as if the stay completed — not a third, softer split.
   assert.strictEqual(round2(cancelled.hostPayout + cancelled.platformFee), booking.totalPrice);
-  assert.ok(transferFn.isDrained(bookings.VACAY_ESCROW_ACCOUNT), 'escrow must be drained to the cent');
+  assert.ok(settleFn.isDrained(bookings.VACAY_ESCROW_ACCOUNT), 'escrow must be drained to the cent');
 });
 
 test('the cutoff boundary itself refunds — a guest exactly on the line is not penalised', async () => {
   const { store, listing } = stayFixture();
-  const transferFn = ledger({ sam: 1000 });
+  const settleFn = ledger({ sam: 1000 });
   const checkIn = NOW + 10 * DAY;
 
   const booking = await bookings.createBooking(store, {
     listingId: listing.id, guestId: 'sam', checkIn, checkOut: NOW + 13 * DAY,
-    transferFn, now: NOW,
+    settleFn, now: NOW,
   });
   const cancelled = await bookings.cancelBooking(store, {
-    bookingId: booking.id, transferFn,
+    bookingId: booking.id, settleFn,
     now: checkIn - bookings.CANCELLATION_CUTOFF_HOURS * 3600000,
   });
 
@@ -203,54 +230,54 @@ test('the cutoff boundary itself refunds — a guest exactly on the line is not 
 
 test('two guests cannot hold the same listing on overlapping nights', async () => {
   const { store, listing } = stayFixture();
-  const transferFn = ledger({ sam: 1000, ada: 1000 });
+  const settleFn = ledger({ sam: 1000, ada: 1000 });
 
   await bookings.createBooking(store, {
     listingId: listing.id, guestId: 'sam',
-    checkIn: NOW + 10 * DAY, checkOut: NOW + 14 * DAY, transferFn, now: NOW,
+    checkIn: NOW + 10 * DAY, checkOut: NOW + 14 * DAY, settleFn, now: NOW,
   });
 
   // Overlaps by two nights.
   await assert.rejects(() => bookings.createBooking(store, {
     listingId: listing.id, guestId: 'ada',
-    checkIn: NOW + 12 * DAY, checkOut: NOW + 16 * DAY, transferFn, now: NOW,
+    checkIn: NOW + 12 * DAY, checkOut: NOW + 16 * DAY, settleFn, now: NOW,
   }), /already booked/);
 
   // And crucially: the refused guest was not charged on the way to
   // being refused.
-  assert.strictEqual(transferFn.of('ada'), 1000, 'a refused booking must not charge anyone');
+  assert.strictEqual(settleFn.of('ada'), 1000, 'a refused booking must not charge anyone');
 });
 
 test('adjacent bookings are allowed — checkout day is not a booked night', async () => {
   const { store, listing } = stayFixture();
-  const transferFn = ledger({ sam: 1000, ada: 1000 });
+  const settleFn = ledger({ sam: 1000, ada: 1000 });
 
   await bookings.createBooking(store, {
     listingId: listing.id, guestId: 'sam',
-    checkIn: NOW + 10 * DAY, checkOut: NOW + 13 * DAY, transferFn, now: NOW,
+    checkIn: NOW + 10 * DAY, checkOut: NOW + 13 * DAY, settleFn, now: NOW,
   });
   // Starts the day the first guest leaves. Refusing this would cost the
   // host a night on every single turnover.
   const second = await bookings.createBooking(store, {
     listingId: listing.id, guestId: 'ada',
-    checkIn: NOW + 13 * DAY, checkOut: NOW + 15 * DAY, transferFn, now: NOW,
+    checkIn: NOW + 13 * DAY, checkOut: NOW + 15 * DAY, settleFn, now: NOW,
   });
   assert.strictEqual(second.nights, 2);
 });
 
 test('a cancelled booking frees its dates for someone else', async () => {
   const { store, listing } = stayFixture();
-  const transferFn = ledger({ sam: 1000, ada: 1000 });
+  const settleFn = ledger({ sam: 1000, ada: 1000 });
 
   const first = await bookings.createBooking(store, {
     listingId: listing.id, guestId: 'sam',
-    checkIn: NOW + 10 * DAY, checkOut: NOW + 14 * DAY, transferFn, now: NOW,
+    checkIn: NOW + 10 * DAY, checkOut: NOW + 14 * DAY, settleFn, now: NOW,
   });
-  await bookings.cancelBooking(store, { bookingId: first.id, transferFn, now: NOW + DAY });
+  await bookings.cancelBooking(store, { bookingId: first.id, settleFn, now: NOW + DAY });
 
   const second = await bookings.createBooking(store, {
     listingId: listing.id, guestId: 'ada',
-    checkIn: NOW + 10 * DAY, checkOut: NOW + 14 * DAY, transferFn, now: NOW,
+    checkIn: NOW + 10 * DAY, checkOut: NOW + 14 * DAY, settleFn, now: NOW,
   });
   assert.strictEqual(second.status, 'booked');
 });
@@ -262,7 +289,7 @@ test('a failed charge leaves no booking behind', async () => {
   await assert.rejects(() => bookings.createBooking(store, {
     listingId: listing.id, guestId: 'broke',
     checkIn: NOW + 10 * DAY, checkOut: NOW + 13 * DAY,
-    transferFn: declining, now: NOW,
+    settleFn: declining, now: NOW,
   }), /insufficient funds/);
 
   // The dangerous outcome is a 'booked' record for money that never
@@ -272,30 +299,30 @@ test('a failed charge leaves no booking behind', async () => {
 
 test('a stay cannot be settled twice, and a completed stay cannot be cancelled', async () => {
   const { store, listing } = stayFixture();
-  const transferFn = ledger({ sam: 1000 });
+  const settleFn = ledger({ sam: 1000 });
 
   const booking = await bookings.createBooking(store, {
     listingId: listing.id, guestId: 'sam',
-    checkIn: NOW + 10 * DAY, checkOut: NOW + 13 * DAY, transferFn, now: NOW,
+    checkIn: NOW + 10 * DAY, checkOut: NOW + 13 * DAY, settleFn, now: NOW,
   });
-  await bookings.completeStay(store, { bookingId: booking.id, transferFn, now: NOW + 14 * DAY });
+  await bookings.completeStay(store, { bookingId: booking.id, settleFn, now: NOW + 14 * DAY });
 
   // Double settlement would pay the host twice out of an empty escrow.
   await assert.rejects(
-    () => bookings.completeStay(store, { bookingId: booking.id, transferFn }),
+    () => bookings.completeStay(store, { bookingId: booking.id, settleFn }),
     /not awaiting completion/);
   await assert.rejects(
-    () => bookings.cancelBooking(store, { bookingId: booking.id, transferFn }),
+    () => bookings.cancelBooking(store, { bookingId: booking.id, settleFn }),
     /already completed/);
-  assert.ok(transferFn.isDrained(bookings.VACAY_ESCROW_ACCOUNT), 'escrow must be drained to the cent');
+  assert.ok(settleFn.isDrained(bookings.VACAY_ESCROW_ACCOUNT), 'escrow must be drained to the cent');
 });
 
-test('a booking without a transferFn is refused rather than recorded unpaid', async () => {
+test('a booking without a settleFn is refused rather than recorded unpaid', async () => {
   const { store, listing } = stayFixture();
   await assert.rejects(() => bookings.createBooking(store, {
     listingId: listing.id, guestId: 'sam',
     checkIn: NOW + 10 * DAY, checkOut: NOW + 13 * DAY, now: NOW,
-  }), /requires a transferFn/);
+  }), /requires a settleFn/);
   assert.strictEqual(store.bookings.length, 0);
 });
 
@@ -304,7 +331,7 @@ test('a stay in the past is refused', async () => {
   await assert.rejects(() => bookings.createBooking(store, {
     listingId: listing.id, guestId: 'sam',
     checkIn: NOW - 5 * DAY, checkOut: NOW - 2 * DAY,
-    transferFn: ledger({ sam: 1000 }), now: NOW,
+    settleFn: ledger({ sam: 1000 }), now: NOW,
   }), /present-or-future/);
 });
 
@@ -321,38 +348,46 @@ function autoFixture() {
 
 test('a rental escrows the renter’s money and settles it whole to the owner', async () => {
   const { store, vehicle } = autoFixture();
-  const transferFn = ledger({ dana: 1000 });
+  const settleFn = ledger({ dana: 1000 });
 
   const rental = await rentals.bookRental(store, {
     vehicleId: vehicle.id, renterId: 'dana',
     startDate: NOW + 5 * DAY, endDate: NOW + 8 * DAY,
-    transferFn, now: NOW,
+    settleFn, now: NOW,
   });
 
-  assert.strictEqual(transferFn.of('kai'), 0, 'the owner is not paid at booking');
-  assert.strictEqual(transferFn.of(rentals.VACAY_AUTO_ESCROW_ACCOUNT), rental.totalPrice);
+  assert.strictEqual(settleFn.of('kai'), 0, 'the owner is not paid at booking');
+  assert.strictEqual(settleFn.of(rentals.VACAY_AUTO_ESCROW_ACCOUNT), rental.totalPrice);
 
   const done = await rentals.completeRental(store, {
-    rentalId: rental.id, transferFn, now: NOW + 9 * DAY,
+    rentalId: rental.id, settleFn, now: NOW + 9 * DAY,
   });
   assert.strictEqual(round2(done.ownerPayout + done.platformCommission), rental.totalPrice);
-  assert.ok(transferFn.isDrained(rentals.VACAY_AUTO_ESCROW_ACCOUNT), 'escrow must be drained to the cent');
-  assert.ok(Math.abs(transferFn.drift()) < 0.01, 'no value may be created or destroyed');
+
+  // **One settlement, not two transfers.** Both legs leave the same
+  // escrow; split, the second can fail because the first drained it,
+  // and the rental's status is written afterwards — so the retry pays
+  // the owner again. Every other assertion here passes either way.
+  const calls = settleFn.calls.filter((c) => c.meta.reason?.startsWith('vacay_auto_rental_settlement'));
+  assert.strictEqual(calls.length, 1, 'the payout must be a single atomic settlement');
+  assert.strictEqual(calls[0].legs.length, 2, 'owner payout and platform commission stay separately auditable');
+  assert.ok(settleFn.isDrained(rentals.VACAY_AUTO_ESCROW_ACCOUNT), 'escrow must be drained to the cent');
+  assert.ok(Math.abs(settleFn.drift()) < 0.01, 'no value may be created or destroyed');
 });
 
 test('the same vehicle cannot be rented to two people at once', async () => {
   const { store, vehicle } = autoFixture();
-  const transferFn = ledger({ dana: 1000, rio: 1000 });
+  const settleFn = ledger({ dana: 1000, rio: 1000 });
 
   await rentals.bookRental(store, {
     vehicleId: vehicle.id, renterId: 'dana',
-    startDate: NOW + 5 * DAY, endDate: NOW + 8 * DAY, transferFn, now: NOW,
+    startDate: NOW + 5 * DAY, endDate: NOW + 8 * DAY, settleFn, now: NOW,
   });
   await assert.rejects(() => rentals.bookRental(store, {
     vehicleId: vehicle.id, renterId: 'rio',
-    startDate: NOW + 6 * DAY, endDate: NOW + 9 * DAY, transferFn, now: NOW,
+    startDate: NOW + 6 * DAY, endDate: NOW + 9 * DAY, settleFn, now: NOW,
   }), /.*/);
-  assert.strictEqual(transferFn.of('rio'), 1000, 'the refused renter must not be charged');
+  assert.strictEqual(settleFn.of('rio'), 1000, 'the refused renter must not be charged');
 });
 
 // -- Flights ------------------------------------------------------------
@@ -370,31 +405,31 @@ function flightFixture(seats = 2) {
 
 test('VACAY is the merchant of record: it keeps the margin, the airline gets its net rate', async () => {
   const { store, flight } = flightFixture();
-  const transferFn = ledger({ sam: 1000 });
+  const settleFn = ledger({ sam: 1000 });
 
   const booking = await reservations.bookFlight(store, {
-    flightId: flight.id, passengerId: 'sam', transferFn, now: NOW,
+    flightId: flight.id, passengerId: 'sam', settleFn, now: NOW,
   });
 
   // The passenger pays retail; the airline is owed only its net rate;
   // the difference is VACAY's, which is what "merchant of record"
   // actually means in money rather than in marketing.
-  assert.strictEqual(transferFn.of('sam'), 1000 - booking.retailPriceCharged);
+  assert.strictEqual(settleFn.of('sam'), 1000 - booking.retailPriceCharged);
   assert.strictEqual(
-    round2(transferFn.of(reservations.VACAY_FLIGHTS_PLATFORM_ACCOUNT)),
+    round2(settleFn.of(reservations.VACAY_FLIGHTS_PLATFORM_ACCOUNT)),
     round2(booking.retailPriceCharged - flight.netRate),
     'the margin is retail minus the net rate, and it belongs to VACAY');
-  assert.ok(transferFn.isDrained(reservations.VACAY_FLIGHTS_ESCROW_ACCOUNT),
+  assert.ok(settleFn.isDrained(reservations.VACAY_FLIGHTS_ESCROW_ACCOUNT),
     'a flight settles immediately — nothing should be left sitting in escrow');
-  assert.ok(Math.abs(transferFn.drift()) < 0.01, 'no value may be created or destroyed');
+  assert.ok(Math.abs(settleFn.drift()) < 0.01, 'no value may be created or destroyed');
 });
 
 test('seats are real inventory — the last seat sells once and the flight sells out', async () => {
   const { store, flight } = flightFixture(1);
-  const transferFn = ledger({ sam: 1000, ada: 1000 });
+  const settleFn = ledger({ sam: 1000, ada: 1000 });
 
   await reservations.bookFlight(store, {
-    flightId: flight.id, passengerId: 'sam', transferFn, now: NOW,
+    flightId: flight.id, passengerId: 'sam', settleFn, now: NOW,
   });
   assert.strictEqual(flight.seatsAvailable, 0);
   assert.strictEqual(flight.status, 'sold-out');
@@ -404,27 +439,27 @@ test('seats are real inventory — the last seat sells once and the flight sells
   // guard. Both are real; asserting the seat-count message here would
   // be asserting a path the normal flow never reaches.
   await assert.rejects(() => reservations.bookFlight(store, {
-    flightId: flight.id, passengerId: 'ada', transferFn, now: NOW,
+    flightId: flight.id, passengerId: 'ada', settleFn, now: NOW,
   }), /sold-out/);
-  assert.strictEqual(transferFn.of('ada'), 1000,
+  assert.strictEqual(settleFn.of('ada'), 1000,
     'selling a seat that does not exist would charge someone for nothing');
 });
 
 test('cancelling a flight returns the seat to inventory', async () => {
   const { store, flight } = flightFixture(1);
-  const transferFn = ledger({ sam: 1000 });
+  const settleFn = ledger({ sam: 1000 });
 
   const booking = await reservations.bookFlight(store, {
-    flightId: flight.id, passengerId: 'sam', transferFn, now: NOW,
+    flightId: flight.id, passengerId: 'sam', settleFn, now: NOW,
   });
   await reservations.cancelFlightBooking(store, {
-    bookingId: booking.id, transferFn, now: NOW + DAY,
+    bookingId: booking.id, settleFn, now: NOW + DAY,
   });
 
   // A seat that is not returned is inventory quietly destroyed — the
   // flight flies emptier than it was sold.
   assert.strictEqual(flight.seatsAvailable, 1);
-  assert.ok(Math.abs(transferFn.drift()) < 0.01, 'no value may be created or destroyed');
+  assert.ok(Math.abs(settleFn.drift()) < 0.01, 'no value may be created or destroyed');
 });
 
 // -- Homes --------------------------------------------------------------
@@ -435,22 +470,22 @@ test('a lead is charged to the agent once, at the documented flat fee', async ()
     agentId: 'nora', address: '4200 Shaw Blvd', purpose: 'for-sale',
     price: 385000, bedrooms: 3, bathrooms: 2, sqft: 1800,
   });
-  const transferFn = ledger({ nora: 1000 });
+  const settleFn = ledger({ nora: 1000 });
 
   const lead = leads.requestTour(store.home, {
     listingId: listing.id, requesterId: 'sam', contactInfo: 'sam@example.com',
   });
-  await leads.purchaseLead(store.home, { leadId: lead.id, agentId: 'nora', transferFn });
+  await leads.purchaseLead(store.home, { leadId: lead.id, agentId: 'nora', settleFn });
 
-  assert.strictEqual(transferFn.of('nora'), 1000 - leads.LEAD_FEE);
-  assert.strictEqual(transferFn.moves.length, 1);
+  assert.strictEqual(settleFn.of('nora'), 1000 - leads.LEAD_FEE);
+  assert.strictEqual(settleFn.moves.length, 1);
 
   // Buying the same lead twice is the classic double-charge in a
   // pay-per-lead model, and the one an agent notices on their statement.
   await assert.rejects(
-    () => leads.purchaseLead(store.home, { leadId: lead.id, agentId: 'nora', transferFn }),
+    () => leads.purchaseLead(store.home, { leadId: lead.id, agentId: 'nora', settleFn }),
     /.*/);
-  assert.strictEqual(transferFn.of('nora'), 1000 - leads.LEAD_FEE,
+  assert.strictEqual(settleFn.of('nora'), 1000 - leads.LEAD_FEE,
     'a lead must never be billed twice');
 });
 
@@ -470,7 +505,7 @@ test('the four sub-products keep separate escrow accounts', async () => {
 
 test('a full session across three sub-products conserves value exactly', async () => {
   const store = createVacayStore();
-  const transferFn = ledger({ sam: 5000 });
+  const settleFn = ledger({ sam: 5000 });
 
   const stay = listings.createListing(store.bookings, {
     hostId: 'ines', title: 'Loft', city: 'St. Louis', pricePerNight: 120,
@@ -488,25 +523,25 @@ test('a full session across three sub-products conserves value exactly', async (
 
   const b = await bookings.createBooking(store.bookings, {
     listingId: stay.id, guestId: 'sam',
-    checkIn: NOW + 20 * DAY, checkOut: NOW + 23 * DAY, transferFn, now: NOW,
+    checkIn: NOW + 20 * DAY, checkOut: NOW + 23 * DAY, settleFn, now: NOW,
   });
   const r = await rentals.bookRental(store.auto, {
     vehicleId: car.id, renterId: 'sam',
-    startDate: NOW + 20 * DAY, endDate: NOW + 23 * DAY, transferFn, now: NOW,
+    startDate: NOW + 20 * DAY, endDate: NOW + 23 * DAY, settleFn, now: NOW,
   });
   await reservations.bookFlight(store.flights, {
-    flightId: flight.id, passengerId: 'sam', transferFn, now: NOW,
+    flightId: flight.id, passengerId: 'sam', settleFn, now: NOW,
   });
 
-  await bookings.completeStay(store.bookings, { bookingId: b.id, transferFn, now: NOW + 24 * DAY });
-  await rentals.completeRental(store.auto, { rentalId: r.id, transferFn, now: NOW + 24 * DAY });
+  await bookings.completeStay(store.bookings, { bookingId: b.id, settleFn, now: NOW + 24 * DAY });
+  await rentals.completeRental(store.auto, { rentalId: r.id, settleFn, now: NOW + 24 * DAY });
 
   // One trip, three sub-products, and afterwards every escrow account is
   // empty and nothing was created or destroyed.
-  assert.ok(transferFn.isDrained(bookings.VACAY_ESCROW_ACCOUNT), 'escrow must be drained to the cent');
-  assert.ok(transferFn.isDrained(rentals.VACAY_AUTO_ESCROW_ACCOUNT), 'escrow must be drained to the cent');
-  assert.ok(transferFn.isDrained(reservations.VACAY_FLIGHTS_ESCROW_ACCOUNT), 'escrow must be drained to the cent');
-  assert.ok(Math.abs(transferFn.drift()) < 0.01, 'no value may be created or destroyed');
+  assert.ok(settleFn.isDrained(bookings.VACAY_ESCROW_ACCOUNT), 'escrow must be drained to the cent');
+  assert.ok(settleFn.isDrained(rentals.VACAY_AUTO_ESCROW_ACCOUNT), 'escrow must be drained to the cent');
+  assert.ok(settleFn.isDrained(reservations.VACAY_FLIGHTS_ESCROW_ACCOUNT), 'escrow must be drained to the cent');
+  assert.ok(Math.abs(settleFn.drift()) < 0.01, 'no value may be created or destroyed');
 });
 
 // -- Rounding at scale --------------------------------------------------
@@ -522,7 +557,7 @@ test('escrow dust does not accumulate across many settlements', async () => {
   // bias becomes one-directional and this test is what catches it,
   // because the per-booking assertion would still pass.
   const store = createVacayStore();
-  const transferFn = ledger({ sam: 1000000 });
+  const settleFn = ledger({ sam: 1000000 });
 
   // Awkward prices on purpose — round numbers hide rounding bugs.
   const prices = [99.99, 133.33, 87.77, 1.01, 249.95];
@@ -537,26 +572,26 @@ test('escrow dust does not accumulate across many settlements', async () => {
     const booking = await bookings.createBooking(store.bookings, {
       listingId, guestId: 'sam',
       checkIn, checkOut: checkIn + ((i % 3) + 1) * DAY,
-      transferFn, now: NOW,
+      settleFn, now: NOW,
     });
     await bookings.completeStay(store.bookings, {
-      bookingId: booking.id, transferFn, now: checkIn + 5 * DAY,
+      bookingId: booking.id, settleFn, now: checkIn + 5 * DAY,
     });
   }
 
   assert.strictEqual(store.bookings.bookings.length, 100);
-  assert.ok(transferFn.isDrained(bookings.VACAY_ESCROW_ACCOUNT),
-    `escrow held ${transferFn.of(bookings.VACAY_ESCROW_ACCOUNT)} after 100 settlements`);
-  assert.ok(Math.abs(transferFn.drift()) < 0.01,
+  assert.ok(settleFn.isDrained(bookings.VACAY_ESCROW_ACCOUNT),
+    `escrow held ${settleFn.of(bookings.VACAY_ESCROW_ACCOUNT)} after 100 settlements`);
+  assert.ok(Math.abs(settleFn.drift()) < 0.01,
     'a hundred settlements must not create or destroy a cent');
 });
 
 test('the seat-count guard is unreachable through the normal flow, and kept anyway', async () => {
   const { store, flight } = flightFixture(1);
-  const transferFn = ledger({ sam: 1000 });
+  const settleFn = ledger({ sam: 1000 });
 
   await reservations.bookFlight(store, {
-    flightId: flight.id, passengerId: 'sam', transferFn, now: NOW,
+    flightId: flight.id, passengerId: 'sam', settleFn, now: NOW,
   });
 
   // Selling out flips the status, so the status guard always fires
@@ -567,6 +602,6 @@ test('the seat-count guard is unreachable through the normal flow, and kept anyw
   // thing standing between a refactor and selling a seat twice.
   flight.status = 'scheduled';
   await assert.rejects(() => reservations.bookFlight(store, {
-    flightId: flight.id, passengerId: 'ada', transferFn, now: NOW,
+    flightId: flight.id, passengerId: 'ada', settleFn, now: NOW,
   }), /no seats remaining/);
 });

@@ -28,7 +28,7 @@ function requireListingAgent(getListing) {
 }
 
 function createHomeRouter(deps) {
-  const { store, transferVCoin } = deps;
+  const { store, settleVCoin } = deps;
   const router = express.Router();
 
   router.get('/meta', (_req, res) => {
@@ -97,7 +97,7 @@ function createHomeRouter(deps) {
 
   router.post('/leads/:id/purchase', requireActor('agentId'), async (req, res) => {
     try {
-      res.json(await purchaseLead(store, { ...req.body, leadId: Number(req.params.id), transferFn: transferVCoin }));
+      res.json(await purchaseLead(store, { ...req.body, leadId: Number(req.params.id), settleFn: settleVCoin }));
     } catch (err) {
       res.status(400).json({ error: err.message });
     }

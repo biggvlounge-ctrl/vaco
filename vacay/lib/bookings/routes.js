@@ -78,7 +78,7 @@ function requireGuest(getBooking, label) {
 
 function createBookingsRouter(deps) {
   const {
-    store, transferVCoin, requestVoidJob, requestVoidHourlyBooking,
+    store, settleVCoin, requestVoidJob, requestVoidHourlyBooking,
   } = deps;
   const router = express.Router();
 
@@ -141,7 +141,7 @@ function createBookingsRouter(deps) {
 
   router.post('/experience-bookings', requireActor('guestId'), async (req, res) => {
     try {
-      res.status(201).json(await bookExperience(store, { ...req.body, transferFn: transferVCoin }));
+      res.status(201).json(await bookExperience(store, { ...req.body, settleFn: settleVCoin }));
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
@@ -155,7 +155,7 @@ function createBookingsRouter(deps) {
 
   router.post('/experience-bookings/:id/complete', requireExperienceParty(), async (req, res) => {
     try {
-      res.json(await completeExperienceBooking(store, { bookingId: Number(req.params.id), transferFn: transferVCoin }));
+      res.json(await completeExperienceBooking(store, { bookingId: Number(req.params.id), settleFn: settleVCoin }));
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
@@ -163,7 +163,7 @@ function createBookingsRouter(deps) {
 
   router.post('/experience-bookings/:id/cancel', requireExperienceParty(), async (req, res) => {
     try {
-      res.json(await cancelExperienceBooking(store, { bookingId: Number(req.params.id), transferFn: transferVCoin }));
+      res.json(await cancelExperienceBooking(store, { bookingId: Number(req.params.id), settleFn: settleVCoin }));
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
@@ -185,7 +185,7 @@ function createBookingsRouter(deps) {
   // separate nested path, per the explicit "same thing" instruction.
   router.post('/', requireActor('guestId'), async (req, res) => {
     try {
-      res.status(201).json(await createBooking(store, { ...req.body, transferFn: transferVCoin }));
+      res.status(201).json(await createBooking(store, { ...req.body, settleFn: settleVCoin }));
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
@@ -199,7 +199,7 @@ function createBookingsRouter(deps) {
 
   router.post('/:id/complete', requireStayParty(), async (req, res) => {
     try {
-      res.json(await completeStay(store, { bookingId: Number(req.params.id), transferFn: transferVCoin }));
+      res.json(await completeStay(store, { bookingId: Number(req.params.id), settleFn: settleVCoin }));
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
@@ -207,7 +207,7 @@ function createBookingsRouter(deps) {
 
   router.post('/:id/cancel', requireStayParty(), async (req, res) => {
     try {
-      res.json(await cancelBooking(store, { bookingId: Number(req.params.id), transferFn: transferVCoin }));
+      res.json(await cancelBooking(store, { bookingId: Number(req.params.id), settleFn: settleVCoin }));
     } catch (err) {
       res.status(400).json({ error: err.message });
     }

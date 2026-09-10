@@ -71,17 +71,25 @@ function listLeadsForListing(store, listingId, agentId) {
 }
 
 async function purchaseLead(store, options = {}) {
-  const { leadId, agentId, transferFn } = options;
+  const { leadId, agentId, settleFn } = options;
   const lead = getLead(store, leadId);
   if (!lead) throw new Error(`purchaseLead: no lead with id ${leadId}`);
   if (lead.status !== 'new') throw new Error(`purchaseLead: lead ${leadId} is not available for purchase (status: ${lead.status})`);
   if (!agentId) throw new Error('purchaseLead requires an agentId');
-  if (typeof transferFn !== 'function') throw new Error('purchaseLead requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') throw new Error('purchaseLead requires a settleFn(legs, meta)');
 
   // The real, distinctive charge direction of this whole division:
   // the agent pays VACAY Homes directly. No buyer/renter money moves
   // anywhere in this function.
-  await transferFn(agentId, VACAY_HOMES_PLATFORM_ACCOUNT, LEAD_FEE, `vacay_homes_lead_purchase:${leadId}`);
+  // One leg -- the agent pays the platform a flat fee, with nobody to
+  // split with. Sent through `settleFn` anyway so this app has one
+  // money interface, and so a future revenue share is added to an array
+  // that already moves atomically rather than becoming a second
+  // consecutive transfer.
+  await settleFn(
+    [{ fromUserId: agentId, toUserId: VACAY_HOMES_PLATFORM_ACCOUNT, amount: LEAD_FEE, reason: `vacay_homes_lead_purchase:${leadId}` }],
+    { reason: `vacay_homes_lead_purchase:${leadId}` },
+  );
 
   lead.status = 'purchased';
   lead.purchasedBy = agentId;

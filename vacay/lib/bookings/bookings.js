@@ -46,7 +46,7 @@ function findOverlappingBooking(store, listingId, checkIn, checkOut) {
 
 async function createBooking(store, options = {}) {
   const {
-    listingId, guestId, checkIn, checkOut, transferFn, now = Date.now(),
+    listingId, guestId, checkIn, checkOut, settleFn, now = Date.now(),
   } = options;
 
   const listing = getListing(store, listingId);
@@ -55,7 +55,7 @@ async function createBooking(store, options = {}) {
   if (!guestId) throw new Error('createBooking requires a guestId');
   if (!Number.isInteger(checkIn) || checkIn < now) throw new Error('createBooking requires a real, present-or-future checkIn timestamp');
   if (!Number.isInteger(checkOut) || checkOut <= checkIn) throw new Error('createBooking requires a checkOut timestamp after checkIn');
-  if (typeof transferFn !== 'function') throw new Error('createBooking requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') throw new Error('createBooking requires a settleFn(fromUserId, toUserId, amount, reason)');
 
   const conflict = findOverlappingBooking(store, listingId, checkIn, checkOut);
   if (conflict) {
@@ -70,7 +70,10 @@ async function createBooking(store, options = {}) {
   // charge (e.g. insufficient funds) must never leave a "booked"
   // record behind.
   const bookingId = store.nextBookingId++;
-  await transferFn(guestId, VACAY_ESCROW_ACCOUNT, totalPrice, `vacay_booking:${bookingId}`);
+  await settleFn(
+    [{ fromUserId: guestId, toUserId: VACAY_ESCROW_ACCOUNT, amount: totalPrice, reason: `vacay_booking:${bookingId}` }],
+    { reason: `vacay_booking:${bookingId}` },
+  );
 
   const booking = {
     id: bookingId,
@@ -98,17 +101,24 @@ function getBooking(store, bookingId) {
 }
 
 async function completeStay(store, options = {}) {
-  const { bookingId, transferFn, now = Date.now() } = options;
+  const { bookingId, settleFn, now = Date.now() } = options;
   const booking = getBooking(store, bookingId);
   if (!booking) throw new Error(`completeStay: no booking with id ${bookingId}`);
   if (booking.status !== 'booked') throw new Error(`completeStay: booking ${bookingId} is not awaiting completion (status: ${booking.status})`);
-  if (typeof transferFn !== 'function') throw new Error('completeStay requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') throw new Error('completeStay requires a settleFn(fromUserId, toUserId, amount, reason)');
 
   const listing = getListing(store, booking.listingId);
   const platformFee = round(booking.totalPrice * (FEE_PERCENT / 100));
   const hostPayout = round(booking.totalPrice - platformFee);
-  await transferFn(VACAY_ESCROW_ACCOUNT, listing.hostId, hostPayout, `vacay_host_settlement:${bookingId}`);
-  await transferFn(VACAY_ESCROW_ACCOUNT, 'vacay-platform', platformFee, `vacay_platform_fee:${bookingId}`);
+  // **One settlement, not two transfers.** Both legs leave the same
+  // escrow account, so the second can fail because the first just
+  // drained it -- and the status below is only set afterwards, so the
+  // booking stays `booked` and a retry pays the host out of escrow a
+  // second time.
+  await settleFn([
+    { fromUserId: VACAY_ESCROW_ACCOUNT, toUserId: listing.hostId, amount: hostPayout, reason: `vacay_host_settlement:${bookingId}` },
+    { fromUserId: VACAY_ESCROW_ACCOUNT, toUserId: 'vacay-platform', amount: platformFee, reason: `vacay_platform_fee:${bookingId}` },
+  ], { reason: `vacay_stay_settlement:${bookingId}` });
 
   booking.hostPayout = hostPayout;
   booking.platformFee = platformFee;
@@ -132,24 +142,29 @@ async function completeStay(store, options = {}) {
 const CANCELLATION_CUTOFF_HOURS = 24;
 
 async function cancelBooking(store, options = {}) {
-  const { bookingId, transferFn, now = Date.now() } = options;
+  const { bookingId, settleFn, now = Date.now() } = options;
   const booking = getBooking(store, bookingId);
   if (!booking) throw new Error(`cancelBooking: no booking with id ${bookingId}`);
   if (booking.status === 'cancelled') throw new Error(`cancelBooking: booking ${bookingId} is already cancelled`);
   if (booking.status === 'completed') throw new Error(`cancelBooking: booking ${bookingId} has already completed and can't be cancelled`);
-  if (typeof transferFn !== 'function') throw new Error('cancelBooking requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') throw new Error('cancelBooking requires a settleFn(fromUserId, toUserId, amount, reason)');
 
   const listing = getListing(store, booking.listingId);
   const hoursUntilCheckIn = (booking.checkIn - now) / 3600000;
   const refundEligible = hoursUntilCheckIn >= CANCELLATION_CUTOFF_HOURS;
 
   if (refundEligible) {
-    await transferFn(VACAY_ESCROW_ACCOUNT, booking.guestId, booking.totalPrice, `vacay_cancellation_refund:${bookingId}`);
+    await settleFn(
+      [{ fromUserId: VACAY_ESCROW_ACCOUNT, toUserId: booking.guestId, amount: booking.totalPrice, reason: `vacay_cancellation_refund:${bookingId}` }],
+      { reason: `vacay_cancellation_refund:${bookingId}` },
+    );
   } else {
     const platformFee = round(booking.totalPrice * (FEE_PERCENT / 100));
     const hostPayout = round(booking.totalPrice - platformFee);
-    await transferFn(VACAY_ESCROW_ACCOUNT, listing.hostId, hostPayout, `vacay_late_cancellation_host_settlement:${bookingId}`);
-    await transferFn(VACAY_ESCROW_ACCOUNT, 'vacay-platform', platformFee, `vacay_late_cancellation_platform_fee:${bookingId}`);
+    await settleFn([
+      { fromUserId: VACAY_ESCROW_ACCOUNT, toUserId: listing.hostId, amount: hostPayout, reason: `vacay_late_cancellation_host_settlement:${bookingId}` },
+      { fromUserId: VACAY_ESCROW_ACCOUNT, toUserId: 'vacay-platform', amount: platformFee, reason: `vacay_late_cancellation_platform_fee:${bookingId}` },
+    ], { reason: `vacay_late_cancellation:${bookingId}` });
     booking.hostPayout = hostPayout;
     booking.platformFee = platformFee;
   }

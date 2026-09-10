@@ -25,17 +25,20 @@ function round(n) {
 }
 
 async function bookExperience(store, options = {}) {
-  const { experienceId, guestId, transferFn, now = Date.now() } = options;
+  const { experienceId, guestId, settleFn, now = Date.now() } = options;
 
   const experience = getExperience(store, experienceId);
   if (!experience) throw new Error(`bookExperience: no experience with id ${experienceId}`);
   if (experience.status !== 'open') throw new Error(`bookExperience: experience ${experienceId} is not open (status: ${experience.status})`);
   if (!guestId) throw new Error('bookExperience requires a guestId');
   if (experience.remainingCapacity < 1) throw new Error(`bookExperience: experience ${experienceId} has no remaining capacity`);
-  if (typeof transferFn !== 'function') throw new Error('bookExperience requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') throw new Error('bookExperience requires a settleFn(fromUserId, toUserId, amount, reason)');
 
   const bookingId = store.nextExperienceBookingId++;
-  await transferFn(guestId, VACAY_ESCROW_ACCOUNT, experience.price, `vacay_experience_booking:${bookingId}`);
+  await settleFn(
+    [{ fromUserId: guestId, toUserId: VACAY_ESCROW_ACCOUNT, amount: experience.price, reason: `vacay_experience_booking:${bookingId}` }],
+    { reason: `vacay_experience_booking:${bookingId}` },
+  );
 
   experience.remainingCapacity -= 1;
   if (experience.remainingCapacity === 0) experience.status = 'full';
@@ -63,17 +66,22 @@ function getExperienceBooking(store, bookingId) {
 }
 
 async function completeExperienceBooking(store, options = {}) {
-  const { bookingId, transferFn, now = Date.now() } = options;
+  const { bookingId, settleFn, now = Date.now() } = options;
   const booking = getExperienceBooking(store, bookingId);
   if (!booking) throw new Error(`completeExperienceBooking: no experience booking with id ${bookingId}`);
   if (booking.status !== 'booked') throw new Error(`completeExperienceBooking: booking ${bookingId} is not awaiting completion (status: ${booking.status})`);
-  if (typeof transferFn !== 'function') throw new Error('completeExperienceBooking requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') throw new Error('completeExperienceBooking requires a settleFn(fromUserId, toUserId, amount, reason)');
 
   const experience = getExperience(store, booking.experienceId);
   const platformFee = round(booking.price * (FEE_PERCENT / 100));
   const hostPayout = round(booking.price - platformFee);
-  await transferFn(VACAY_ESCROW_ACCOUNT, experience.hostId, hostPayout, `vacay_experience_host_settlement:${bookingId}`);
-  await transferFn(VACAY_ESCROW_ACCOUNT, 'vacay-experiences-platform', platformFee, `vacay_experience_platform_fee:${bookingId}`);
+  // One settlement: both legs leave the same escrow, so a split can
+  // pay the host and fail the fee, leaving the booking uncompleted and
+  // a retry paying the host again.
+  await settleFn([
+    { fromUserId: VACAY_ESCROW_ACCOUNT, toUserId: experience.hostId, amount: hostPayout, reason: `vacay_experience_host_settlement:${bookingId}` },
+    { fromUserId: VACAY_ESCROW_ACCOUNT, toUserId: 'vacay-experiences-platform', amount: platformFee, reason: `vacay_experience_platform_fee:${bookingId}` },
+  ], { reason: `vacay_experience_settlement:${bookingId}` });
 
   booking.hostPayout = hostPayout;
   booking.platformFee = platformFee;
@@ -95,24 +103,29 @@ async function completeExperienceBooking(store, options = {}) {
 const CANCELLATION_CUTOFF_HOURS = 24;
 
 async function cancelExperienceBooking(store, options = {}) {
-  const { bookingId, transferFn, now = Date.now() } = options;
+  const { bookingId, settleFn, now = Date.now() } = options;
   const booking = getExperienceBooking(store, bookingId);
   if (!booking) throw new Error(`cancelExperienceBooking: no experience booking with id ${bookingId}`);
   if (booking.status === 'cancelled') throw new Error(`cancelExperienceBooking: booking ${bookingId} is already cancelled`);
   if (booking.status === 'completed') throw new Error(`cancelExperienceBooking: booking ${bookingId} has already completed and can't be cancelled`);
-  if (typeof transferFn !== 'function') throw new Error('cancelExperienceBooking requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') throw new Error('cancelExperienceBooking requires a settleFn(fromUserId, toUserId, amount, reason)');
 
   const experience = getExperience(store, booking.experienceId);
   const hoursUntilStart = (experience.scheduledAt - now) / 3600000;
   const refundEligible = hoursUntilStart >= CANCELLATION_CUTOFF_HOURS;
 
   if (refundEligible) {
-    await transferFn(VACAY_ESCROW_ACCOUNT, booking.guestId, booking.price, `vacay_experience_cancellation_refund:${bookingId}`);
+    await settleFn(
+      [{ fromUserId: VACAY_ESCROW_ACCOUNT, toUserId: booking.guestId, amount: booking.price, reason: `vacay_experience_cancellation_refund:${bookingId}` }],
+      { reason: `vacay_experience_cancellation_refund:${bookingId}` },
+    );
   } else {
     const platformFee = round(booking.price * (FEE_PERCENT / 100));
     const hostPayout = round(booking.price - platformFee);
-    await transferFn(VACAY_ESCROW_ACCOUNT, experience.hostId, hostPayout, `vacay_experience_late_cancellation_host_settlement:${bookingId}`);
-    await transferFn(VACAY_ESCROW_ACCOUNT, 'vacay-experiences-platform', platformFee, `vacay_experience_late_cancellation_platform_fee:${bookingId}`);
+    await settleFn([
+      { fromUserId: VACAY_ESCROW_ACCOUNT, toUserId: experience.hostId, amount: hostPayout, reason: `vacay_experience_late_cancellation_host_settlement:${bookingId}` },
+      { fromUserId: VACAY_ESCROW_ACCOUNT, toUserId: 'vacay-experiences-platform', amount: platformFee, reason: `vacay_experience_late_cancellation_platform_fee:${bookingId}` },
+    ], { reason: `vacay_experience_late_cancellation:${bookingId}` });
     booking.hostPayout = hostPayout;
     booking.platformFee = platformFee;
   }

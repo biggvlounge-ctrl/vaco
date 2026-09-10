@@ -77,7 +77,7 @@ function searchFleetVehicles(store, options = {}) {
 
 async function bookFleetRental(store, options = {}) {
   const {
-    vehicleId, renterId, startDate, endDate, transferFn, now = Date.now(),
+    vehicleId, renterId, startDate, endDate, settleFn, now = Date.now(),
   } = options;
 
   const vehicle = getFleetVehicle(store, vehicleId);
@@ -87,7 +87,7 @@ async function bookFleetRental(store, options = {}) {
   if (!Number.isInteger(startDate) || !Number.isInteger(endDate) || endDate <= startDate) {
     throw new Error('bookFleetRental requires a real startDate before endDate');
   }
-  if (typeof transferFn !== 'function') throw new Error('bookFleetRental requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') throw new Error('bookFleetRental requires a settleFn(fromUserId, toUserId, amount, reason)');
 
   const conflict = findFleetDoubleBooking(store, vehicleId, startDate, endDate);
   if (conflict) {
@@ -98,7 +98,10 @@ async function bookFleetRental(store, options = {}) {
   const totalPrice = round(days * vehicle.dailyRate);
 
   const rentalId = store.nextFleetRentalId++;
-  await transferFn(renterId, VACAY_AUTO_FLEET_ESCROW_ACCOUNT, totalPrice, `vacay_auto_fleet_booking:${rentalId}`);
+  await settleFn(
+    [{ fromUserId: renterId, toUserId: VACAY_AUTO_FLEET_ESCROW_ACCOUNT, amount: totalPrice, reason: `vacay_auto_fleet_booking:${rentalId}` }],
+    { reason: `vacay_auto_fleet_booking:${rentalId}` },
+  );
 
   const rental = {
     id: rentalId,
@@ -125,16 +128,19 @@ function getFleetRental(store, rentalId) {
 }
 
 async function completeFleetRental(store, options = {}) {
-  const { rentalId, transferFn, now = Date.now() } = options;
+  const { rentalId, settleFn, now = Date.now() } = options;
   const rental = getFleetRental(store, rentalId);
   if (!rental) throw new Error(`completeFleetRental: no fleet rental with id ${rentalId}`);
   if (rental.status !== 'booked') throw new Error(`completeFleetRental: fleet rental ${rentalId} is not awaiting completion (status: ${rental.status})`);
-  if (typeof transferFn !== 'function') throw new Error('completeFleetRental requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') throw new Error('completeFleetRental requires a settleFn(fromUserId, toUserId, amount, reason)');
 
   // The real, defining difference from Turo's own completeRental: one
   // payout, the FULL price, no owner split -- VACAY owns the vehicle
   // outright.
-  await transferFn(VACAY_AUTO_FLEET_ESCROW_ACCOUNT, VACAY_AUTO_FLEET_REVENUE_ACCOUNT, rental.totalPrice, `vacay_auto_fleet_revenue:${rentalId}`);
+  await settleFn(
+    [{ fromUserId: VACAY_AUTO_FLEET_ESCROW_ACCOUNT, toUserId: VACAY_AUTO_FLEET_REVENUE_ACCOUNT, amount: rental.totalPrice, reason: `vacay_auto_fleet_revenue:${rentalId}` }],
+    { reason: `vacay_auto_fleet_revenue:${rentalId}` },
+  );
 
   rental.fleetRevenue = rental.totalPrice;
   rental.status = 'completed';
@@ -150,20 +156,26 @@ async function completeFleetRental(store, options = {}) {
 const CANCELLATION_CUTOFF_HOURS = 24;
 
 async function cancelFleetRental(store, options = {}) {
-  const { rentalId, transferFn, now = Date.now() } = options;
+  const { rentalId, settleFn, now = Date.now() } = options;
   const rental = getFleetRental(store, rentalId);
   if (!rental) throw new Error(`cancelFleetRental: no fleet rental with id ${rentalId}`);
   if (rental.status === 'cancelled') throw new Error(`cancelFleetRental: rental ${rentalId} is already cancelled`);
   if (rental.status === 'completed') throw new Error(`cancelFleetRental: rental ${rentalId} has already completed and can't be cancelled`);
-  if (typeof transferFn !== 'function') throw new Error('cancelFleetRental requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') throw new Error('cancelFleetRental requires a settleFn(fromUserId, toUserId, amount, reason)');
 
   const hoursUntilStart = (rental.startDate - now) / 3600000;
   const refundEligible = hoursUntilStart >= CANCELLATION_CUTOFF_HOURS;
 
   if (refundEligible) {
-    await transferFn(VACAY_AUTO_FLEET_ESCROW_ACCOUNT, rental.renterId, rental.totalPrice, `vacay_auto_fleet_cancellation_refund:${rentalId}`);
+    await settleFn(
+      [{ fromUserId: VACAY_AUTO_FLEET_ESCROW_ACCOUNT, toUserId: rental.renterId, amount: rental.totalPrice, reason: `vacay_auto_fleet_cancellation_refund:${rentalId}` }],
+      { reason: `vacay_auto_fleet_cancellation_refund:${rentalId}` },
+    );
   } else {
-    await transferFn(VACAY_AUTO_FLEET_ESCROW_ACCOUNT, VACAY_AUTO_FLEET_REVENUE_ACCOUNT, rental.totalPrice, `vacay_auto_fleet_late_cancellation_revenue:${rentalId}`);
+    await settleFn(
+      [{ fromUserId: VACAY_AUTO_FLEET_ESCROW_ACCOUNT, toUserId: VACAY_AUTO_FLEET_REVENUE_ACCOUNT, amount: rental.totalPrice, reason: `vacay_auto_fleet_late_cancellation_revenue:${rentalId}` }],
+      { reason: `vacay_auto_fleet_late_cancellation_revenue:${rentalId}` },
+    );
     rental.fleetRevenue = rental.totalPrice;
   }
 
