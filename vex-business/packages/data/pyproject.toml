@@ -1,0 +1,25 @@
+[project]
+name = "vexbusiness-data"
+version = "0.1.0"
+description = "Vex Business — persistence layer (Master Directive Section 6: INFRASTRUCTURE, database half). Real SQLAlchemy 2 ORM models + session/engine wiring, mapping vexbusiness-domain's pure concepts onto real Postgres tables. Depends on vexbusiness-domain; nothing in vexbusiness-domain depends back on this."
+requires-python = ">=3.12"
+dependencies = [
+    "vexbusiness-domain",
+    "sqlalchemy>=2.0.35",
+    "alembic>=1.13",
+    "psycopg[binary]>=3.2",
+    "asyncpg>=0.30",
+]
+
+[tool.uv.sources]
+vexbusiness-domain = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build]
+ignore-vcs = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["data"]

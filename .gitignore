@@ -1,21 +1,35 @@
 logs/
 **/data/
 
-# CALL (call/) has two real, source-tracked directories the generic
-# **/data/ rule above would otherwise silently swallow: a Python
-# package literally named `data/` (packages/data/ -- Master Directive
-# Section 5's own named layout, real ORM models, not runtime state --
-# caught directly via a real empty-wheel build from hatchling's own
-# git-aware packaging, not assumed) and `call/data/sample/` (the
-# Master Directive's own real seed/demo-data directory -- currently
-# just a real README explaining it's honestly empty, not runtime
-# output). Both carved out below; CALL's own `data/output/` (its real
-# runtime-generated directory, see call/.gitignore) stays genuinely
-# gitignored.
-!call/packages/data/
-!call/packages/data/data/
-!call/data/
-!call/data/sample/
+# Vex Business (vex-business/, renamed from CALL) has two real,
+# source-tracked directories the generic **/data/ rule above would
+# otherwise silently swallow: a Python package literally named `data/`
+# (packages/data/ -- Master Directive Section 5's own named layout,
+# real ORM models, not runtime state -- caught directly via a real
+# empty-wheel build from hatchling's own git-aware packaging, not
+# assumed) and `vex-business/data/sample/` (the Master Directive's own
+# real seed/demo-data directory -- currently just a real README
+# explaining it's honestly empty, not runtime output). Both carved out
+# below; Vex Business's own `data/output/` (its real runtime-generated
+# directory, see vex-business/.gitignore) stays genuinely gitignored.
+#
+# **These paths said `call/` for two weeks after the rename, and that
+# is how six real source files sat untracked.** The carve-outs were
+# correct when written; `call/` became `vex-business/`, the negations
+# did not follow, and `**/data/` quietly reclaimed
+# `packages/data/data/orm.py`, `database.py`, `__init__.py`,
+# `py.typed`, `pyproject.toml` and `data/sample/README.md`. Nothing
+# failed. `git status` was clean, because ignored files are not
+# untracked files -- they are invisible. They were absent from every
+# release archive and would have been lost with the container.
+#
+# A negation pattern that names a path is a claim that the path exists.
+# `scripts/test/gitignore-carveouts.test.mjs` now checks that claim on
+# every run, so the next rename fails a test instead of a restore.
+!vex-business/packages/data/
+!vex-business/packages/data/data/
+!vex-business/data/
+!vex-business/data/sample/
 
 # Real secrets, and a real near-miss rather than a precaution.
 #
@@ -48,3 +62,10 @@ vaco-backups/
 # untracked archive sitting in the root would make the *next* run
 # refuse itself. It is a build output -- rebuild it, do not store it.
 vaco-*.tar.gz
+
+# Git bundles (`git bundle create <f> --all`). Same argument, and one
+# more: a bundle of the repository committed *into* the repository is
+# a snapshot of everything up to the moment before it existed, which
+# grows without bound and protects against nothing. Its whole value is
+# being carried off this machine.
+vaco-*.bundle
