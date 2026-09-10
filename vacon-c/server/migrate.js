@@ -227,10 +227,19 @@ async function migrateWorldStateToPostgres(worldState) {
 
       for (const listing of worldState.marketListings) {
         await client.query(
-          `INSERT INTO market_listings (id, city_id, product_name, price, supply, demand, quality, popularity, tick)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-          [listing.id, listing.city_id, listing.product_name, listing.price, listing.supply,
-            listing.demand, listing.quality, listing.popularity, listing.tick]
+          // resource_type was missing here until 10 Sep 2026. It is
+          // not decoration: it names the input resource whose scarcity
+          // drives this listing's price, via resolveMarketPrice()'s
+          // inputScarcity term. economy.js's own comment says a
+          // listing with no resource_type "prices exactly as it did
+          // before this existed" — so dropping it does not fail, it
+          // quietly severs the coupling and the restored market prices
+          // as if the resource economy were not there.
+          `INSERT INTO market_listings (id, city_id, product_name, resource_type, price, supply, demand, quality, popularity, tick)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+          [listing.id, listing.city_id, listing.product_name, listing.resource_type ?? null,
+            listing.price, listing.supply, listing.demand, listing.quality, listing.popularity,
+            listing.tick]
         );
       }
       summary.market_listings = worldState.marketListings.length;
@@ -358,9 +367,27 @@ async function migrateWorldStateToPostgres(worldState) {
 
       for (const m of worldState.missions) {
         await client.query(
-          `INSERT INTO missions (id, artifact_id, objective, reward, controlling_faction_id, status, tick_generated)
-           VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-          [m.id, m.artifact_id, m.objective, m.reward, m.controlling_faction_id, m.status, m.tick_generated]
+          // assigned_entity_id/tick_accepted/tick_resolved/outcome_note
+          // were missing here until 10 Sep 2026, and the loss was
+          // proven against a live database rather than argued: a
+          // mission an NPC accepted and completed migrated with
+          // status 'completed' and NULL in all four. The record said
+          // the mission was done and nothing said who did it, when, or
+          // how it turned out.
+          //
+          // All four are real state — missions.js#acceptMission sets
+          // the first two, #resolveMission the last two — and all four
+          // have had columns in the schema the whole time. This was a
+          // column-level version of the array-level gap
+          // test/migrate.test.js was written for, and it survived
+          // because that test only checks that every column named here
+          // EXISTS. It never asked the other direction.
+          `INSERT INTO missions (id, artifact_id, objective, reward, controlling_faction_id, status,
+                                 tick_generated, assigned_entity_id, tick_accepted, tick_resolved, outcome_note)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+          [m.id, m.artifact_id, m.objective, m.reward, m.controlling_faction_id, m.status,
+            m.tick_generated, m.assigned_entity_id ?? null, m.tick_accepted ?? null,
+            m.tick_resolved ?? null, m.outcome_note ?? null]
         );
       }
       summary.missions = worldState.missions.length;

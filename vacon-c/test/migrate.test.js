@@ -248,3 +248,114 @@ test('culture membership has no individual tier, in the database as well as the 
   assert.match(block, /family\|community\|organization\|city\|civilization/);
   assert.doesNotMatch(block, /individual/);
 });
+
+// ---------------------------------------------------------------------------
+// The direction nothing was checking
+// ---------------------------------------------------------------------------
+//
+// Every test above this point asks "does every column migrate.js NAMES
+// exist in the schema?" — it catches a typo. None of them asked the
+// other direction: "is every schema column the engine actually fills
+// being WRITTEN?" That gap let four real mission columns go unmigrated
+// from the day missions landed.
+//
+// Proven against a live Postgres on 10 Sep 2026, not argued: a mission
+// an NPC accepted and completed migrated with status 'completed' and
+// NULL in assigned_entity_id, tick_accepted, tick_resolved and
+// outcome_note. The database said the mission was done; nothing said
+// who did it, when, or how it turned out. `market_listings.resource_type`
+// went the same way, and that one silently unhooks a listing's price
+// from its input resource's scarcity.
+//
+// This is the array-level failure in the header of this file, one level
+// down. The fix there was to name every array; the fix here is to name
+// every column.
+
+// A schema column that the engine genuinely never fills, with the
+// reason. Same contract as NOT_CARRIED: an unwritten column with no
+// entry here is indistinguishable from one somebody forgot.
+const NOT_WRITTEN = {
+  'entity_state.current_mood': 'derived from stress at read time by behavior.js#getEntityState '
+    + 'rather than stored — test 7 above asserts it stays that way, so writing it here would '
+    + 'persist a value the engine recomputes and never reads back',
+};
+
+test('every schema column the engine fills is actually written', () => {
+  const tables = schemaColumns();
+  const written = {};
+  for (const ins of migrateInserts()) {
+    written[ins.table] = written[ins.table] || new Set();
+    for (const c of ins.columns) written[ins.table].add(c);
+  }
+
+  // Build a world through the engine's own API and see which columns
+  // its objects actually carry values for. Fixtures would only prove
+  // what I typed; this proves what the engine does.
+  const W = engine.WorldState;
+  const npcs = [];
+  for (let i = 0; i < 3; i++) npcs.push(engine.generateNPC());
+  const art = engine.generateArtifact({
+    name: 'The Key', origin: 'pre-collapse', era: 'old', rarity: 'rare',
+  });
+  const mission = engine.generateMission({ artifactId: art.id, objective: 'recover it', reward: 100 });
+  engine.advanceTick();
+  engine.acceptMission(mission.id, npcs[0].id);
+  engine.advanceTick();
+  engine.resolveMission(mission.id, {
+    outcome: 'completed', entityId: npcs[0].id, note: 'found in the flooded wing',
+  });
+
+  const city = engine.generateCity({ name: 'Vacancy City' });
+  engine.generateResource({ resourceType: 'grain', name: 'Grain' });
+  const listing = engine.generateMarketListing({
+    cityId: city.id, productName: 'Bread', price: 5, resourceType: 'grain',
+  });
+
+  // The engine object -> the table it lands in. Only tables whose rows
+  // map one-to-one onto a single engine object; the entity subtypes
+  // (npcs/organizations/families) are split across two tables and are
+  // covered by the array-level tests above.
+  const SUBJECTS = [
+    ['missions', mission],
+    ['market_listings', listing],
+  ];
+
+  const gaps = [];
+  for (const [table, row] of SUBJECTS) {
+    const cols = tables[table];
+    assert.ok(cols, `no CREATE TABLE ${table} in the schema`);
+    for (const col of cols) {
+      if (written[table]?.has(col)) continue;
+      if (NOT_WRITTEN[`${table}.${col}`]) continue;
+      // The engine fills it if the row carries a non-null value under
+      // that column's own name.
+      if (row[col] !== undefined && row[col] !== null) {
+        gaps.push(`${table}.${col} = ${JSON.stringify(row[col])} is never written`);
+      }
+    }
+  }
+
+  assert.deepEqual(gaps, [],
+    `the engine fills these columns and the migration drops them:\n    ${gaps.join('\n    ')}`);
+});
+
+test('every deliberately-unwritten column carries a real reason', () => {
+  // Same self-checking contract NOT_CARRIED has: an entry that no
+  // longer describes a real unwritten column is a stale excuse, and a
+  // stale excuse is how a real gap hides.
+  const tables = schemaColumns();
+  const written = {};
+  for (const ins of migrateInserts()) {
+    written[ins.table] = written[ins.table] || new Set();
+    for (const c of ins.columns) written[ins.table].add(c);
+  }
+
+  for (const [key, reason] of Object.entries(NOT_WRITTEN)) {
+    const [table, column] = key.split('.');
+    assert.ok(tables[table]?.has(column),
+      `NOT_WRITTEN names ${key}, which is not a column in the schema`);
+    assert.equal(written[table]?.has(column) ?? false, false,
+      `NOT_WRITTEN says ${key} is not written, but the migration writes it — stale entry`);
+    assert.ok(reason.length > 40, `${key}'s reason is too short to be one`);
+  }
+});
