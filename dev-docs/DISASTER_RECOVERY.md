@@ -1,8 +1,90 @@
 # Disaster Recovery
 
-**Date:** 2026-08-26 · **Status:** backup and restore are built and
-tested. **Off-host delivery is not yet automated** — see §6, which is
-the one part of this document describing something that does not exist.
+**Date:** 2026-08-26 · **Updated 2026-09-10 after a real total loss —
+see §0.** · **Status:** backup and restore are built and tested.
+**Off-host delivery is not yet automated** — see §6, which is the one
+part of this document describing something that does not exist.
+
+---
+
+## 0. The loss that actually happened
+
+**2026-09-08. The entire repository was lost: 444 commits, gone.**
+
+Not the stores this document was written to protect. The *code*. The
+one thing everybody assumed was safe, because "it's in git."
+
+What happened, plainly:
+
+1. This ecosystem was being built inside an ephemeral container. The
+   container is reclaimed after inactivity, and everything on its disk
+   goes with it. That was documented in the environment and known.
+2. `git push` began failing with a 403 — a GitHub App permission scope
+   problem, not a code problem.
+3. The push was abandoned as a distraction and work continued, with
+   commits landing **locally only**, for over a hundred commits.
+4. The container was reclaimed. `/home/user/vaco` came back empty, with
+   a fresh `.git` holding zero commits, zero refs, zero objects, and an
+   empty reflog. The remote had zero branches.
+
+Everything was recovered from a release archive plus a session
+transcript, which was luck rather than a procedure.
+
+### The three lessons, stated as rules
+
+**A local commit is not a backup.** `git commit` writes to a disk that
+can disappear. Until an object exists somewhere else, it exists once.
+Committing frequently while pushing never is not a cautious workflow;
+it is a single point of failure with extra steps.
+
+**A blocked push is an incident, not an inconvenience.** The moment
+`git push` stops working, durability is gone and the clock is running.
+It does not matter that the cause is administrative. Either fix the
+remote or start producing off-machine artifacts that same session —
+never "keep building and sort it out later."
+
+**When there is no remote, `git bundle` is the answer.** A bundle is
+the whole repository — every commit, branch and tag — in one file that
+can be handed to a person, attached to a message, or copied anywhere.
+It is a real git remote: you clone from it.
+
+```bash
+# Take one. Do this whenever a push is not available.
+git bundle create vaco-full-history-$(git rev-parse --short HEAD).bundle --all
+
+# Prove it before trusting it — `verify` reads the file, `clone` proves
+# the file. Do both.
+git bundle verify vaco-full-history-<sha>.bundle
+git clone --branch <branch> vaco-full-history-<sha>.bundle /tmp/restore-test
+cd /tmp/restore-test && git rev-list --count HEAD && git ls-files | wc -l
+```
+
+Then **get the file off the machine.** A bundle sitting beside the
+repository it backs up is worth precisely nothing — the same argument
+§6 makes about snapshots, and the same one that was ignored about
+commits.
+
+### The second finding, from the same backup
+
+Making that first bundle meant listing what git was ignoring, which
+surfaced something no clean `git status` could ever have shown: six
+real source files had been silently untracked for two weeks.
+
+`.gitignore`'s `**/data/` rule (§1) matches any directory named `data`
+at any depth, so two source directories in the CALL app were carved
+back out by name. CALL was then renamed to `vex-business`. The
+directories moved; the negations did not, and `**/data/` quietly
+reclaimed the ORM layer of the futures-research platform.
+
+**Ignored files are not untracked files — they do not appear.** They
+were absent from git, absent from every release archive, and would have
+been lost with the container alongside everything else.
+`scripts/test/gitignore-carveouts.test.mjs` now holds every carve-out
+to the two claims it makes: the path exists, and the files beneath it
+are really tracked.
+
+When auditing what is actually saved, `git status --short --ignored` is
+the command that tells the truth. `git status` alone will reassure you.
 
 Every claim this repository makes about money being correct assumes the
 data still exists. Until this document, there was no mechanism by which
@@ -33,7 +115,13 @@ did.
 
 **`vex-business` is out of scope here.** It runs its own PostgreSQL with
 Alembic migrations and needs a database backup strategy, not a file
-copy. Its `data/` holds only a sample directory. Flagged, not solved.
+copy. Flagged, not solved.
+
+Its `data/`-named directories hold no runtime state — but two of them
+hold **source**: `packages/data/` is a Python package (the ORM layer)
+and `data/sample/` is the seed-data directory. Both are carved out of
+the `**/data/` rule by name, and both stopped being carved out when the
+app was renamed from CALL. See §0.
 
 ---
 
@@ -178,6 +266,25 @@ node scripts/smoke-frontend.mjs        # all 29 frontends
 
 Code comes from git; **data comes only from the snapshot.** Those are
 two different recovery paths and both must work.
+
+**`<repo>` assumes a reachable remote, and that assumption is what
+failed on 2026-09-08** (§0). If there is no remote — the push is
+403ing, the host is gone, the fork was deleted — the first line becomes
+a clone from the most recent bundle instead:
+
+```bash
+git clone --branch <branch> vaco-full-history-<sha>.bundle vaco && cd vaco
+```
+
+Everything after it is unchanged. This is why a bundle has to be taken
+*and moved off the machine* whenever pushing is not available: it is
+the only thing that makes line one of this runbook work.
+
+A release archive (`scripts/package-release.mjs`) is **not** a
+substitute. It is `git archive HEAD` — the tracked files at one commit,
+with no history, no branches, and nothing to recover an earlier state
+from. It is how the code was rescued in September, and it cost every
+commit message and every intermediate state to do it.
 
 ### One app's store is corrupt
 
