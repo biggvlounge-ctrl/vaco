@@ -1,16 +1,31 @@
 # VACO
 
-A monorepo of ~35 interconnected applications sharing common
-infrastructure: a canonical ledger (V3), session auth (Shield), an
+A monorepo of 36 interconnected applications — 34 Node backends and
+two Vite frontends — sharing common infrastructure: a canonical ledger (V3), session auth (Shield), an
 identity attestation service (VACA), an agent layer (VACON / V4), and
 an analytics spine (VACO Analytics).
 
 ## Running it
 
 ```sh
-./install-ecosystem.sh  # first time only -- installs deps for all 32 apps
+./install-ecosystem.sh  # first time only -- installs deps for every app
 ./start-ecosystem.sh    # boots every app on its assigned port
 ./stop-ecosystem.sh
+```
+
+On a host that gives you one port instead of thirty-six — Replit,
+Render, Fly — put the gateway in front of them:
+
+```sh
+PORT=8080 node gateway.js       # the whole ecosystem, through one port
+node gateway.js --print-routes  # the routing table, starting nothing
+```
+
+And on a machine that cannot hold the full ~2.4 GB stack, boot a
+subset. An unknown app name is refused rather than skipped:
+
+```sh
+VACO_APPS="vaco-shell v3 shield void vacay" ./start-ecosystem.sh
 ```
 
 A fresh clone or unzipped archive contains tracked files only, so no
@@ -50,6 +65,12 @@ follow them:
   never a literal buried in a call site.
 - **`dev-docs/` per app** records what each phase actually did,
   including what it deliberately did not do.
+- **A claim in a document is held by a test.** Counts go stale
+  silently, so the tools that produce them are re-run against the
+  documents that quote them —
+  `scripts/test/system-of-record.test.mjs` and
+  `scripts/test/deploy-readme.test.mjs`. Both exist because the
+  documents they check had drifted while asserting they had not.
 
 ## The other two root documents
 

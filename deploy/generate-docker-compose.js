@@ -519,4 +519,16 @@ networks:
 `;
 
 fs.writeFileSync(path.join(ROOT, "docker-compose.yml"), out);
-console.error(`Wrote docker-compose.yml (${Object.keys(services).length - 2} app services + nginx + livekit, ${Object.keys(volumes).length} persisted volumes).`);
+// Counted by name rather than by subtracting a magic number. The
+// subtraction was `- 2` for nginx and livekit, and adding postgres
+// silently made it report 37 apps when there are still 36 — the
+// infrastructure service was counted as one of them. A named list
+// cannot drift that way: a new infrastructure service has to be added
+// here to be excluded, and forgetting shows up as an app count that is
+// one too high rather than as nothing at all.
+const INFRASTRUCTURE = ["nginx", "livekit", "postgres"];
+const appCount = Object.keys(services).filter((n) => !INFRASTRUCTURE.includes(n)).length;
+console.error(
+  `Wrote docker-compose.yml (${appCount} app services + ${INFRASTRUCTURE.join(", ")}, `
+  + `${Object.keys(volumes).length} persisted volumes).`,
+);

@@ -13,8 +13,25 @@ person who built it can check whether a claim is still true.
 Every number below was produced by running the tool that owns it, not
 recalled. The commands are in §10 so they can be re-run.
 
-*Current as of commit `a6d7214`, 332 commits, branch
-`claude/v4-proxy-server-s6dcp8`.*
+*Current as of commit `856ec00`, 31 commits, branch
+`claude/v4-proxy-server-s6dcp8`, 10 Sep 2026.*
+
+**On "31 commits".** An earlier revision of this line said 332. That
+number was not wrong when written and the history it counted is gone:
+the container holding it was reclaimed with nothing pushed, and the
+repository was rebuilt from an archive. `dev-docs/DISASTER_RECOVERY.md`
+§0 records it. Nothing has been pushed since either — the GitHub App is
+not installed for this org, so `git push` returns 403 — which makes
+`node scripts/snapshot.mjs` the only durable copy and the count here a
+reminder rather than a statistic.
+
+**`scripts/test/system-of-record.test.mjs` now holds every number in
+this file to the tool that produces it.** Before that, this document
+said its numbers "were produced by running the tool that owns it" and
+nothing checked that they still matched — which is the same
+citation-is-not-presence failure it warns about in §8. It was a week
+stale when the test was written: 879 tests against a real 1498, 33
+suites against 39, 28 volumes against 30.
 
 ---
 
@@ -73,6 +90,48 @@ docker compose up --build
 directly is silently undone by the next generator run. The generator
 derives service list, ports, cross-app URLs, `depends_on`, and which
 apps get which credentials from the apps themselves — see §9.
+
+Two required secrets, plus `POSTGRES_PASSWORD` since 10 Sep 2026:
+Compose refuses to start without it rather than shipping a working
+default. It is VACON-C's database and nothing else uses it.
+
+### One port, no nginx
+
+Both paths above assume a host where you can run 36 processes and put
+nginx in front of them. Replit, Render, Fly and most PaaS boxes give
+you one port and expect one process to own it.
+
+```sh
+./start-ecosystem.sh            # the apps, on their own ports
+PORT=8080 node gateway.js       # all of them, through one
+node gateway.js --print-routes  # the table, starting nothing
+```
+
+`gateway.js` is the same routing table as the nginx configs, in Node,
+reading `start-ecosystem.sh`'s APPS array like every other consumer
+rather than keeping a copy. `scripts/test/gateway.test.mjs` holds it
+and `deploy/nginx-docker.conf` to the same table.
+
+**Verified 10 Sep 2026**: against the booted stack, 33 of 34 apps
+answered 200 through the single port; the 34th was `v4-proxy`,
+deliberately down for want of `ANTHROPIC_API_KEY`, and its 502 named
+the app and the port.
+
+`VACO_APPS` boots a subset, for a host that cannot hold the whole
+stack — measured at 68 processes and 2.43 GB, against 6 processes and
+0.35 GB for five apps plus the gateway:
+
+```sh
+VACO_APPS="vaco-shell v3 shield void vacay" ./start-ecosystem.sh
+```
+
+An unknown name is refused with the list of known apps rather than
+skipped, and naming nothing at all is refused too — a subset boot that
+silently starts zero apps reports "0 up, 0 down", which is a clean bill
+of health for an ecosystem that is not running.
+
+`deploy/README.md` has the Replit specifics and what that path is not
+for.
 
 ---
 
@@ -616,14 +675,28 @@ produce the numbers in this document.
 built:** `node scripts/package-release.mjs` — see §11.
 
 ```sh
-node scripts/run-all-tests.mjs           # 879/879 across 33 suites
-node scripts/audit-route-guards.mjs --check   # 490/490 accounted for
-./sync-shared-runtime.sh --check         # 118 copies current, none unmanaged
+node scripts/run-all-tests.mjs           # 1505/1505 across 39 suites
+node scripts/audit-route-guards.mjs --check   # 520/520 accounted for
+./sync-shared-runtime.sh --check         # 119 copies current, none unmanaged
 ./sync-design-system.sh --check          # every serving app is a target
-node deploy/generate-docker-compose.js   # 36 services + nginx + livekit, 28 volumes
+node deploy/generate-docker-compose.js   # 36 apps + nginx, livekit, postgres, 30 volumes
 git diff --exit-code docker-compose.yml  # generator output matches committed
 node scripts/generate-service-tokens.mjs --check   # .env.example matches 27 callers
+node scripts/audit-settlement-atomicity.mjs   # 0 split settlements, ceiling 0
 ```
+
+Eight now, not seven. The last one is the ratchet from the
+settlement-atomicity sweep: it fails if a single money movement is ever
+split into separate calls again, and its ceiling is 0.
+
+**Two of these need something the others do not.**
+`run-all-tests.mjs` runs `vacon-c`'s `restore.test.js` and
+`persistence.test.js`, which need a real Postgres and **skip** without
+one, saying why. A skipped test is not a passing test: the 1498 above
+was produced with Postgres up. Bring one up the way
+`docker-compose.yml` does — the base schema then
+`vacon-c/server/schema-extensions.sql`, in that order — or accept that
+17 checks did not run.
 
 `node --test test/` fails in this Node version regardless of the tests,
 so mutation runs must use explicit file globs. That briefly made a set
@@ -641,15 +714,19 @@ dependencies are installed.
 ### Per-suite
 
 ```
-void            137   v3               56   vaco-media      51
-vdp              50   voken            37   v4-proxy        30
-vaco-shell       30   scripts          28   vacay           22
-cvnvo/yap        20   voidmagic        20   vaco-operator   20
-vaca             17   vsafe            17   vaco-notify     17
-vaco-audit       16   vex              16   venvm           15
-vxllage          13   shield           12   vacon           12
-vulture-flix     12   vulture-music    12   chopz-shop      11
-vulture-studios  11   vago              9
+vacon-c         315   vdp             142   void            142
+scripts         122   v3               80   vaco-media       51
+v4-proxy         42   world-layer      41   venvm            40
+venvs            40   voken            37   vaco-analytics   34
+vaco-shell       33   voidmagic        23   vacay            22
+cvnvo/yap        20   vaco-operator    20   vacon            18
+vaca             17   vaco-notify      17   vsafe            17
+vaco-audit       16   vex              16   vulture-music    16
+v4-search        15   hvntz            14   vaco-mcp         14
+vavlt-stvdios    14   cvnvo            13   vago             13
+vxllage          13   dreams           12   shield           12
+vulture-flix     12   vulture-pods     12   chopz/chopz-shop 11
+vulture-studios  11   vex-trading      10   chopz             8
 ```
 
 ---
@@ -736,11 +813,33 @@ are what stand between this and a real deployment.**
 - **No TLS, no domain.** `deploy/nginx-docker.conf` terminates plain
   HTTP on :80. A real deployment needs certificates and a hostname, and
   Shield's session cookies should be `Secure` once there is one.
-- **The store is a JSON file per app.** Writes are atomic
-  (temp + rename) and `durable(store)` commits before responding, which
-  is genuinely safe for one process per service. It is *not* safe for
-  two replicas of the same service, so **do not scale any app past one
-  container** until that changes. §6 has the full posture.
+- **The store is a JSON file per app — for 33 of the 34.** Writes are
+  atomic (temp + rename) and `durable(store)` commits before
+  responding, which is genuinely safe for one process per service. It
+  is *not* safe for two replicas of the same service, so **do not scale
+  any app past one container** until that changes. §6 has the full
+  posture.
+
+  **VACON-C is the exception, as of 10 Sep 2026.** It is a tick
+  simulation with a locked 63-table schema, and its durable record is
+  Postgres: `server/persistence.js` loads the world before
+  `app.listen` and checkpoints every 10 ticks.
+  `docker-compose.yml` declares the service, mounts the base schema and
+  `server/schema-extensions.sql` as ordered init scripts, and gives it
+  a volume.
+
+  That does **not** make VACON-C safe to scale either, and for a
+  different reason: the working set is still one process's memory, so
+  two replicas would be two divergent worlds both checkpointing over
+  each other. One container, same as the rest.
+
+  It also fails soft. With no reachable database it starts an *empty*
+  world, says so in full on stderr, and never checkpoints — so an unset
+  `DATABASE_URL` is silent data loss rather than a startup failure.
+  A process whose load failed is then permanently barred from
+  checkpointing for its whole life, because otherwise a connection blip
+  at boot followed by a recovery would have the empty world truncate
+  and overwrite a real archive.
 - **Off-host backup restore.** The backup script works and the restore
   works locally. Restoring from a remote copy needs a remote.
 
@@ -772,9 +871,42 @@ are what stand between this and a real deployment.**
 - **Renovate is configured but not installed.** `renovate.json` does
   nothing until the GitHub App is enabled on the repository.
 
-**Not blocking deployment:** commits are local only. Pushes to GitHub
-return 403 (permission scope). 339 commits sit on
-`claude/v4-proxy-server-s6dcp8`.
+**Blocking durability, though not deployment:** commits are local
+only. `git push` returns 403 — the Claude GitHub App is not installed
+for this organization, and the remote says so by name. 31 commits sit
+on `claude/v4-proxy-server-s6dcp8`.
+
+An earlier revision of this line said 339 and called it "not blocking".
+That was wrong twice over. The count was from a history that no longer
+exists — the container was reclaimed with nothing pushed and the repo
+was rebuilt from an archive (`dev-docs/DISASTER_RECOVERY.md` §0) — and
+treating an unpushable branch as merely inconvenient is what made that
+loss total. `node scripts/snapshot.mjs` produces a restore-tested
+bundle and is the only durable copy until somebody installs the app at
+`https://github.com/apps/claude/installations/select_target`.
+
+**Closed since the last revision of this file (10 Sep 2026):**
+
+- **VACON-C persistence.** Order-of-operations step 9's second half.
+  `dev-docs/COMPLETION_BY_APP.md` now reads "Every app meets every
+  criterion that applies to it" — this was the last shortfall.
+- **Single-port deployment.** `gateway.js` puts the whole ecosystem
+  behind one port for hosts without nginx; §2 and §11 have it.
+
+**Known and open, added here rather than discovered again:**
+
+- **`npc.name` needed a column the locked schema does not have.**
+  `server/schema-extensions.sql` adds it in a separate additive file so
+  the base schema stays untouched. Its bar for adding a column is a
+  field the engine *reads*; `properties.community_id` is set by nothing
+  and read by nothing, so it is a self-checking exemption instead and a
+  test fails the day something reads it.
+- **The schema models no property location.** `properties` has no FK to
+  a community or a city. Closing that is a design decision about the
+  Property/Territory relationship, not a column to add quietly.
+- **`.replit` and `replit.nix` have never run on a real Replit
+  container.** They are marked as first drafts in their own headers.
+  `deploy/replit-boot.sh` underneath them has been driven here.
 
 ---
 
