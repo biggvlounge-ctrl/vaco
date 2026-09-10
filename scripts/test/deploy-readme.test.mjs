@@ -228,13 +228,28 @@ test('the README states the real pm2 backend count', () => {
   }
 });
 
-test('the historical pm2 run is still labelled as historical', () => {
-  // **The one prose check, and it earns its place.** That run was real
-  // and is worth keeping, but it happened at 26 apps and the generator
-  // now emits 37. Presented without that framing it reads as a current
-  // all-green for an ecosystem 40% larger than the one actually tested.
+test('every pm2 verification run says when it happened', () => {
+  // **The one prose check, and it earns its place** — but its first
+  // version encoded a fact rather than a property, and the fact
+  // changed. It asserted the literal phrase "has not been repeated at
+  // 34", which was true and worth stating while the only pm2 run was
+  // the 26-app one. Then the run *was* repeated at 34, and the test
+  // was demanding the document keep saying something false.
+  //
+  // The durable property is the one that mattered all along: a reader
+  // must be able to tell which run they are looking at. A verification
+  // paragraph with no date reads as current whenever it is read, which
+  // is exactly how a 26-app all-green came to describe an ecosystem
+  // 40% larger.
   assert.match(readme, /Live-verified when the pm2 path was built/,
-    'the 26-app pm2 verification is being presented as current');
-  assert.match(readme, /has not been repeated at \d+/,
-    'the README no longer says the pm2 run was not repeated at the current count');
+    'the original 26-app pm2 verification is being presented as current');
+
+  // Every claim of a pm2 run carries a date. The 2026-08 one is
+  // identified by its "when the pm2 path was built" framing; any later
+  // one has to say when.
+  const laterRuns = [...readme.matchAll(/[Rr]e-verified[^.\n]*/g)].map((m) => m[0]);
+  for (const claim of laterRuns) {
+    assert.match(claim, /\d{4}-\d{2}-\d{2}/,
+      `a re-verification claim carries no date, so a reader cannot tell how current it is: "${claim}"`);
+  }
 });

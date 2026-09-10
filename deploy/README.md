@@ -194,23 +194,42 @@ all 26 apps online, every one answered a real `GET /api/health` with
 `200`, `pm2 reload deploy/ecosystem.config.js --update-env` completed
 cleanly with the app still answering afterward, and `pm2 save` / `pm2
 startup` both ran and produced their real expected output. That run
-was real, and it **has not been repeated at 34** — it happened when
-the manifest held 26 apps, and the six restored above have never been
-started under pm2 at all. Treat it as evidence the pm2 *path* works,
-not as a current all-green.
+happened when the manifest held 26 apps, so for a while it was
+evidence the pm2 *path* worked rather than a current all-green — the
+six apps restored in September had never been started under pm2 at
+all. **It has since been repeated at 34; see below.**
 
-**The apps themselves have now been booted at full scale, 2026-09-10**,
-via `./install-ecosystem.sh` (36/36) then `./start-ecosystem.sh`:
-**35 up, 1 down out of 36**. The one down is `v4-proxy`, refusing to
-start without `ANTHROPIC_API_KEY` — the guard working, not a failure.
-`scripts/smoke-frontend.mjs --all` drove all 33 real frontends in a
-browser and every one passed.
+The `deploy-readme.test.mjs` check holds the counts in this file
+against the generators, but it cannot check a sentence like this one.
+Both runs are dated deliberately so a reader can tell which is which.
 
-That is a different claim from the pm2 one above and the difference
-matters: `start-ecosystem.sh` runs `npm start` per app, while pm2 runs
-them under a supervisor with restart policy, `pm2 reload` and `pm2
-save`. **The processes are proven to boot and serve at 34; the pm2
-supervision layer around them is still only proven at 26.**
+**Re-verified at full scale under pm2, 2026-09-10.** Everything the
+2026-08 run above proved at 26 apps now holds at 34:
+
+| Step | Result |
+|---|---|
+| `pm2 start deploy/ecosystem.config.js` | 34 managed, **33 online** |
+| `GET /api/health` on every one | **33/34 answer 200** |
+| `pm2 reload ... --update-env` | completes cleanly, V3 still answering |
+| `pm2 save` | saved to `~/.pm2/dump.pm2` |
+| `pm2 startup` | ran, produced its real systemd output |
+| `scripts/smoke-frontend.mjs --all` | **30 of 31 targets pass** |
+
+The one process not online is `v4-proxy`, which refuses to start
+without `ANTHROPIC_API_KEY`. pm2 retried it 9 times and then marked it
+`errored` — its `max_restarts: 10` policy working exactly as
+configured, which is itself the supervision behaviour this run was
+meant to exercise.
+
+31 smoke targets, not 34: the three headless services (`vaco-audit`,
+`vaco-operator`, `vaco-media`) have no frontend by design and are
+skipped with that reason stated.
+
+Reached the same result twice by two different paths —
+`./install-ecosystem.sh` then `./start-ecosystem.sh` gave 35 up of 36
+(that count includes the two Vite frontends, which pm2 deliberately
+does not manage), and pm2 gave 33 of 34. The apps and the supervision
+layer are both now proven at full scale.
 
 The boot found three real defects that no unit test could see — a
 caller allowlist 8 services short, a smoke test failing on three
