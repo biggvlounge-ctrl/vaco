@@ -199,7 +199,7 @@ not be read the same way.
 
 | | Status |
 |---|---|
-| **No Docker image has ever been built.** `docker compose build` has never run — not once, for any service. Docker Hub's blob CDN is blocked by proxy policy here (`production.cloudfront.docker.com` → 403 on CONNECT), so `node:20-alpine` cannot be pulled. The daemon itself starts fine; the base image is unreachable. | **UNTESTED** |
+| **No Docker image has ever been built.** `docker compose build` has never run — not once, for any service. Docker Hub's blob CDN is blocked by proxy policy here (`production.cloudfront.docker.com` → 403 on CONNECT), so `node:22-alpine` cannot be pulled. The daemon itself starts fine; the base image is unreachable. | **UNTESTED** |
 | **Backups are same-host only.** `scripts/backup-stores.mjs` runs and its restore is tested, but the off-host sync in `DISASTER_RECOVERY.md` §6 has never been executed and nothing has ever been restored *from* a remote copy. Snapshots survive a bad deploy; they do not survive losing the machine. | **UNTESTED** |
 
 **What was done instead of claiming the Docker path works:** every

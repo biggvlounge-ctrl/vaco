@@ -112,10 +112,35 @@ and mounted by exactly one service, matching the real persisted-app
 list. `deploy/nginx-docker.conf`'s braces balance (40 open, 40 close)
 and all 36 expected `location` blocks appear exactly once, no
 duplicates. **Not verified**: an actual `docker compose up --build` —
-this sandbox has the Docker CLI but no daemon it can start (no
-permission to raise the ulimits `dockerd` needs in this container), so
-no real image was ever built or run. Run `docker compose up --build`
-yourself as the real first test before trusting this in production.
+no image has ever been built here, for any service. Run
+`docker compose up --build` yourself as the real first test before
+trusting this in production.
+
+**Exactly what blocks it, re-measured 2026-09-10.** An earlier version
+of this paragraph said the daemon could not start. That was wrong, and
+carried forward without testing:
+
+```
+dockerd --iptables=false --bridge=none     # starts, buildkit initialises
+docker info                                # Server Version: 29.3.1
+docker pull node:22-alpine                 # manifest resolves, then:
+  production.cloudfront.docker.com ... Forbidden
+```
+
+The daemon runs. DNS, TLS and registry auth all work through the
+proxy. The single thing denied is Docker Hub's **blob CDN** —
+`production.cloudfront.docker.com:443` answers 403 to CONNECT by proxy
+policy, so no base image can be fetched and `FROM node:22-alpine`
+cannot resolve. Even `docker build --check`, which does not execute the
+build, needs that metadata and fails at the same line.
+
+This matters for whoever picks it up: there is **no container
+capability problem to solve and nothing to configure**. On any machine
+that can reach Docker Hub, `docker compose up --build` is the next
+command, with nothing else standing in front of it. Everything short of
+the image pull — compose validation, the build contexts, the
+`.dockerignore` files, the env and volume wiring — is verified above
+and by `scripts/deploy-preflight.mjs`.
 
 The counts in this file are held against the generated artifacts by
 `scripts/test/deploy-readme.test.mjs`, so a number here that drifts
