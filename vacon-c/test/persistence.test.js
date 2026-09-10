@@ -14,8 +14,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const engine = require('../server/engine.js');
-const db = require('../server/db.js');
-const persistence = require('../server/persistence.js');
+let db;   // required lazily — see the note in test.before
+let persistence;
 
 let available = false;
 let reason = '';
@@ -72,6 +72,20 @@ async function releaseDbLock() {
 
 test.before(async () => {
   try {
+    // **Required here, not at the top of the file.** `server/db.js`
+    // pulls in `pg` at module load, and a release-archive extract is
+    // source only — no node_modules anywhere. A top-level require
+    // therefore threw "Cannot find module 'pg'" before a single test
+    // ran, and the whole file FAILED rather than skipping.
+    //
+    // A missing driver is the same class of thing as a missing
+    // database: this environment cannot run these checks. It should say
+    // so and skip, exactly as it does when Postgres is unreachable.
+    // Found by `scripts/package-release.mjs`, which runs the suite
+    // inside the extracted archive rather than the working tree.
+    db = require('../server/db.js');
+    persistence = require('../server/persistence.js');
+
     await takeDbLock();
     const t = await db.query(
       "SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema='public'");
@@ -81,11 +95,14 @@ test.before(async () => {
     }
     available = true;
   } catch (err) {
-    reason = `no Postgres at ${process.env.DATABASE_URL || 'the default local URL'}: ${err.message}`;
+    reason = /Cannot find module/.test(err.message)
+      ? `the pg driver is not installed here (${err.message}) — run npm install in vacon-c/`
+      : `no Postgres at ${process.env.DATABASE_URL || 'the default local URL'}: ${err.message}`;
   }
 });
 
 test.after(async () => {
+  if (!db) return;   // never got as far as loading the driver
   await releaseDbLock();
   if (available) await db.close();
 });

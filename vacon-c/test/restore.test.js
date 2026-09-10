@@ -31,9 +31,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const engine = require('../server/engine.js');
-const db = require('../server/db.js');
-const { migrateWorldStateToPostgres } = require('../server/migrate.js');
-const { restoreWorldStateFromPostgres } = require('../server/restore.js');
+let db;   // required lazily — see the note in test.before
+let migrateWorldStateToPostgres;
+let restoreWorldStateFromPostgres;
 const worldStore = require('../server/worldStore.js');
 
 // Arrays deliberately not carried by the migration, so deliberately not
@@ -75,6 +75,21 @@ async function releaseDbLock() {
 
 test.before(async () => {
   try {
+    // **Required here, not at the top of the file.** `server/db.js`
+    // pulls in `pg` at module load, and a release-archive extract is
+    // source only — no node_modules anywhere. A top-level require
+    // therefore threw "Cannot find module 'pg'" before a single test
+    // ran, and the whole file FAILED rather than skipping.
+    //
+    // A missing driver is the same class of thing as a missing
+    // database: this environment cannot run these checks. It should say
+    // so and skip, exactly as it does when Postgres is unreachable.
+    // Found by `scripts/package-release.mjs`, which runs the suite
+    // inside the extracted archive rather than the working tree.
+    db = require('../server/db.js');
+    ({ migrateWorldStateToPostgres } = require('../server/migrate.js'));
+    ({ restoreWorldStateFromPostgres } = require('../server/restore.js'));
+
     await takeDbLock();
     await db.query('SELECT 1');
     // Refuse to run against a database that has no schema in it — the
@@ -96,11 +111,14 @@ test.before(async () => {
     }
     available = true;
   } catch (err) {
-    reason = `no Postgres at ${process.env.DATABASE_URL || 'the default local URL'}: ${err.message}`;
+    reason = /Cannot find module/.test(err.message)
+      ? `the pg driver is not installed here (${err.message}) — run npm install in vacon-c/`
+      : `no Postgres at ${process.env.DATABASE_URL || 'the default local URL'}: ${err.message}`;
   }
 });
 
 test.after(async () => {
+  if (!db) return;   // never got as far as loading the driver
   await releaseDbLock();
   if (available) await db.close();
 });

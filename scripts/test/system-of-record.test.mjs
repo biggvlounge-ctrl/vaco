@@ -63,7 +63,22 @@ function run(cmd, args) {
 // before somebody should re-stamp it.
 const STAMP_TOLERANCE = 3;
 
-test('the document names a real, recent commit on this branch', () => {
+// A release-archive extract has no `.git` — `scripts/package-release.mjs`
+// builds it with `git archive`, which writes tracked files and nothing
+// else, then runs this suite inside it. Every git-dependent check below
+// therefore has nothing to ask, and the first version of this file
+// FAILED there rather than skipping: "fatal: not a git repository".
+//
+// A skip is not a pass, so each one says exactly what it could not
+// check. The count checks against the tools are unaffected and still
+// run — which is the half that matters most inside an archive, since
+// that is the artifact somebody deploys.
+const HAS_GIT = fs.existsSync(path.join(REPO_ROOT, '.git'));
+const NO_GIT = 'no .git — this is a release-archive extract, where the commit stamp cannot be '
+  + 'checked against a history that is not present';
+
+test('the document names a real, recent commit on this branch', (t) => {
+  if (!HAS_GIT) return t.skip(NO_GIT);
   const branch = run('git', ['rev-parse', '--abbrev-ref', 'HEAD']).trim();
   assert.match(SOR, new RegExp(`\`${branch}\``),
     `SYSTEM_OF_RECORD.md does not name the current branch ${branch}`);
@@ -87,7 +102,8 @@ test('the document names a real, recent commit on this branch', () => {
     + 'of record describing a state nobody can reach is a story.');
 });
 
-test('every stated commit count matches the commit the document is stamped at', () => {
+test('every stated commit count matches the commit the document is stamped at', (t) => {
+  if (!HAS_GIT) return t.skip(NO_GIT);
   // **Counted at the stamp, not at HEAD**, and that is the precise
   // meaning rather than a loophole. "Current as of commit `X`, N
   // commits" is a claim about the state at X. Requiring N to equal the
@@ -253,11 +269,14 @@ test('the Compose service and volume counts are the real ones', () => {
     `§10 does not state ${volumes} volumes`);
 
   // And the generator must not have changed the committed file — a
-  // count that matches a file nobody committed is not a record.
-  const diff = run('git', ['diff', '--stat', 'docker-compose.yml']).trim();
-  assert.equal(diff, '',
-    'the generator rewrote docker-compose.yml, so the committed file is out of date:\n'
-    + `${diff}`);
+  // count that matches a file nobody committed is not a record. Only
+  // askable where there is a git history to compare against.
+  if (HAS_GIT) {
+    const diff = run('git', ['diff', '--stat', 'docker-compose.yml']).trim();
+    assert.equal(diff, '',
+      'the generator rewrote docker-compose.yml, so the committed file is out of date:\n'
+      + `${diff}`);
+  }
 });
 
 test('the settlement-atomicity ceiling is stated and is still zero', () => {
