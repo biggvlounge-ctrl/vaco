@@ -31,6 +31,12 @@
     # leftover node/vite process(es)".
     pkgs.procps
 
+    # psql, for looking at VACON-C's database by hand. The server does
+    # not need it — `pg` is a pure-JS driver and the app loads its own
+    # schema — but a deployment where you cannot inspect the one
+    # stateful service is a deployment you cannot debug.
+    pkgs.postgresql_16
+
     # git, for `scripts/snapshot.mjs` and because several checks read
     # tracked-file state (`scripts/test/gitignore-carveouts.test.mjs`
     # skips its second claim when .git is absent, which is a weaker

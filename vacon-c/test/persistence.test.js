@@ -286,3 +286,98 @@ test('a tick is not failed by a failed checkpoint', () => {
     'a failed checkpoint is no longer reported — a server that has silently stopped saving '
     + 'looks exactly like one that is saving');
 });
+
+test('an empty database gets the schema loaded into it', async (t) => {
+  if (!available) return t.skip(reason);
+
+  // **The Replit/Neon/RDS case.** The Compose path mounts the schema
+  // as a docker-entrypoint init script, which Postgres runs on first
+  // boot. Nothing equivalent happens on a managed database, so
+  // attaching one and starting the app used to give
+  // `relation "entities" does not exist`, permanent degraded mode, and
+  // a log line that did not say what to do about it.
+  const scratch = `vacanc_schema_test_${Date.now()}`;
+  const admin = new (require('pg').Client)({
+    connectionString: (process.env.DATABASE_URL
+      || 'postgres://vacancy:vacancy_dev@localhost:5432/vacancy')
+      .replace(/\/[^/]*$/, '/postgres'),
+  });
+  await admin.connect();
+  await admin.query(`CREATE DATABASE ${scratch}`);
+  await admin.end();
+
+  const { Pool } = require('pg');
+  const pool = new Pool({
+    connectionString: (process.env.DATABASE_URL
+      || 'postgres://vacancy:vacancy_dev@localhost:5432/vacancy')
+      .replace(/\/[^/]*$/, `/${scratch}`),
+  });
+
+  // Point the persistence layer at the scratch database by swapping
+  // db.js's own accessors — the module reads through them, so this
+  // exercises the real code path rather than a reimplementation.
+  const realQuery = db.query;
+  const realWithClient = db.withClient;
+  db.query = (text, params) => pool.query(text, params);
+  db.withClient = async (fn) => {
+    const client = await pool.connect();
+    try { return await fn(client); } finally { client.release(); }
+  };
+
+  try {
+    const log = capture();
+    const before = await pool.query(
+      "SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema='public'");
+    assert.equal(before.rows[0].n, 0, 'the scratch database was not empty to begin with');
+
+    const W = freshWorld();
+    await persistence.loadAtBoot(W, { log });
+
+    const after = await pool.query(
+      "SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema='public'");
+    assert.ok(after.rows[0].n > 50,
+      `only ${after.rows[0].n} tables after boot — the schema was not loaded`);
+    assert.equal(persistence.state().degraded, null,
+      'the server went degraded against a database it could have set up itself');
+    assert.match(log.lines.join('\n'), /loading the schema/);
+
+    // The extensions ran too, not just the base schema — the ordering
+    // the Compose init scripts enforce with 01-/02- prefixes.
+    const ext = await pool.query(
+      "SELECT count(*)::int AS n FROM information_schema.columns "
+      + "WHERE table_name='npcs' AND column_name='name'");
+    assert.equal(ext.rows[0].n, 1,
+      'server/schema-extensions.sql did not run, so npc names cannot round-trip');
+
+    // Second boot must not try again.
+    const log2 = capture();
+    const loadedAgain = await persistence.ensureSchema({ log: log2 });
+    assert.equal(loadedAgain, false, 'it tried to load the schema over an existing one');
+  } finally {
+    db.query = realQuery;
+    db.withClient = realWithClient;
+    await pool.end();
+    const cleanup = new (require('pg').Client)({
+      connectionString: (process.env.DATABASE_URL
+        || 'postgres://vacancy:vacancy_dev@localhost:5432/vacancy')
+        .replace(/\/[^/]*$/, '/postgres'),
+    });
+    await cleanup.connect();
+    await cleanup.query(`DROP DATABASE IF EXISTS ${scratch}`);
+    await cleanup.end();
+  }
+});
+
+test('a partially-loaded schema is refused, not completed', async (t) => {
+  if (!available) return t.skip(reason);
+
+  // Auto-creating into an EMPTY database is unambiguously right.
+  // Running CREATE TABLE over a database that already has some tables
+  // is not: that is an interrupted migration, a version mismatch, or
+  // somebody else's database, and papering over any of them is worse
+  // than refusing. The real database this suite runs against has its
+  // schema, so ensureSchema must decline to touch it.
+  const loaded = await persistence.ensureSchema({ log: capture() });
+  assert.equal(loaded, false,
+    'ensureSchema ran against a database that already has tables');
+});

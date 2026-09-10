@@ -13,7 +13,7 @@ person who built it can check whether a claim is still true.
 Every number below was produced by running the tool that owns it, not
 recalled. The commands are in §10 so they can be re-run.
 
-*Current as of commit `2022ad5`, 32 commits, branch
+*Current as of commit `dc4d4f8`, 33 commits, branch
 `claude/v4-proxy-server-s6dcp8`, 10 Sep 2026.*
 
 **On the commit count.** An earlier revision of this line said 332. That
@@ -675,7 +675,7 @@ produce the numbers in this document.
 built:** `node scripts/package-release.mjs` — see §11.
 
 ```sh
-node scripts/run-all-tests.mjs           # 1506/1506 across 39 suites
+node scripts/run-all-tests.mjs           # 1508/1508 across 39 suites
 node scripts/audit-route-guards.mjs --check   # 520/520 accounted for
 ./sync-shared-runtime.sh --check         # 119 copies current, none unmanaged
 ./sync-design-system.sh --check          # every serving app is a target
@@ -714,7 +714,7 @@ dependencies are installed.
 ### Per-suite
 
 ```
-vacon-c         315   vdp             142   void            142
+vacon-c         317   vdp             142   void            142
 scripts         123   v3               80   vaco-media       51
 v4-proxy         42   world-layer      41   venvm            40
 venvs            40   voken            37   vaco-analytics   34
@@ -873,7 +873,7 @@ are what stand between this and a real deployment.**
 
 **Blocking durability, though not deployment:** commits are local
 only. `git push` returns 403 — the Claude GitHub App is not installed
-for this organization, and the remote says so by name. 32 commits sit
+for this organization, and the remote says so by name. 33 commits sit
 on `claude/v4-proxy-server-s6dcp8`.
 
 An earlier revision of this line said 339 and called it "not blocking".

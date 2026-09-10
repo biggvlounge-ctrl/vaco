@@ -27,6 +27,15 @@
 # it says so and names the log, rather than starting the gateway and
 # letting a 502 be the first anyone hears of it.
 #
+# VACON-C and its database
+#
+# One app keeps its world in Postgres rather than a JSON file. Attach
+# Replit's built-in PostgreSQL and DATABASE_URL is set for you; the app
+# loads its own schema into an empty database on first boot. Without
+# one it starts an empty world, says so, and never saves — which is a
+# working demo and not a working deployment. Nothing else here depends
+# on it.
+#
 # Set VACO_APPS to run a subset -- a space-separated list of app names.
 # On a small container that is the difference between a working demo of
 # five apps and an OOM of thirty-five.

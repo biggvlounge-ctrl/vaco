@@ -57,9 +57,24 @@ PORT = "8080"
 #
 # VACO_APPS = "vaco-shell v3 shield void vacay"
 
+# -- VACON-C's database -----------------------------------------------
+#
+# One app, `vacon-c`, keeps its world in Postgres rather than a JSON
+# file. Attach Replit's built-in PostgreSQL and it sets DATABASE_URL
+# for you; the app loads its own 63-table schema into an empty database
+# on first boot, so there is nothing to run by hand.
+#
+# Without a database it still boots. It starts an EMPTY world, says so
+# in full on stderr, and never saves — so the simulation runs and
+# nothing persists. Every other app is unaffected: they use JSON stores
+# under their own directories, which Replit's filesystem keeps between
+# runs.
+#
 # Secrets go in Replit's Secrets pane, NOT here -- this file is
-# committed. `node scripts/deploy-preflight.mjs` reports the required
-# set (29 as of this writing). Nothing here invents a default for one:
+# committed. Run `node scripts/deploy-preflight.mjs` for the required
+# set — deliberately not quoted here, because a number written into a
+# comment goes stale silently and this one already had. Nothing here
+# invents a default for any of them:
 # an app that refuses to boot without its credential is an app behaving
 # correctly, and it will show as DOWN with the reason in its log.
 

@@ -42,6 +42,9 @@
 
 'use strict';
 
+const fs = require('node:fs');
+const path = require('node:path');
+
 const db = require('./db.js');
 const { migrateWorldStateToPostgres } = require('./migrate.js');
 const { restoreWorldStateFromPostgres } = require('./restore.js');
@@ -62,8 +65,63 @@ let degraded = null;
 // Load whatever is in the database into `worldState`. Returns a
 // summary, or null when there is nothing to load or nothing to load
 // from.
+// Load the schema into a database that has none.
+//
+// **Why this is here and not left to an operator.** The Compose path
+// mounts the schema as a docker-entrypoint init script, which Postgres
+// runs on first boot. Nothing equivalent happens on a managed database
+// — Replit's, Neon, RDS — so attaching one and starting the app gives
+// `relation "entities" does not exist`, permanent degraded mode, and a
+// log line that does not tell you what to do about it. That is a
+// deployment that looks configured and saves nothing.
+//
+// **Only into a genuinely empty database.** Zero tables in `public`,
+// checked, or this refuses. A partially-loaded schema is a different
+// problem — an interrupted migration, a version mismatch, a database
+// somebody else is using — and running CREATE TABLE over it would
+// either fail halfway or paper over real corruption. Empty is the one
+// case where creating everything is unambiguously right.
+async function ensureSchema({ log = console } = {}) {
+  const counted = await db.query(
+    "SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema='current_schema'"
+    .replace('current_schema', 'public'));
+  if (counted.rows[0].n > 0) return false;
+
+  const root = path.join(__dirname, '..');
+  // Base schema first, then the additive extensions — the same order
+  // the Compose init scripts enforce with their 01-/02- prefixes, for
+  // the same reason: the extensions ALTER tables the base creates.
+  const files = [
+    path.join(root, 'VACANCY_POSTGRESQL_SCHEMA.sql'),
+    path.join(root, 'server', 'schema-extensions.sql'),
+  ];
+  for (const file of files) {
+    if (!fs.existsSync(file)) {
+      throw new Error(`cannot load the schema: ${path.relative(root, file)} is missing`);
+    }
+  }
+
+  log.log('VACON-C: the database has no tables — loading the schema.');
+  await db.withClient(async (client) => {
+    await client.query('BEGIN');
+    try {
+      for (const file of files) await client.query(fs.readFileSync(file, 'utf8'));
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    }
+  });
+
+  const after = await db.query(
+    "SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema='public'");
+  log.log(`VACON-C: loaded ${after.rows[0].n} tables.`);
+  return true;
+}
+
 async function loadAtBoot(worldState, { log = console } = {}) {
   try {
+    await ensureSchema({ log });
     const counted = await db.query('SELECT count(*)::int AS n FROM entities');
     if (counted.rows[0].n === 0) {
       log.log('VACON-C: database reachable and empty — starting a new world.');
@@ -144,6 +202,7 @@ function reset() {
 
 module.exports = {
   CHECKPOINT_EVERY_TICKS,
+  ensureSchema,
   loadAtBoot,
   checkpoint,
   maybeCheckpoint,
