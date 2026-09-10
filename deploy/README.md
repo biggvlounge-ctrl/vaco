@@ -199,6 +199,27 @@ the manifest held 26 apps, and the six restored above have never been
 started under pm2 at all. Treat it as evidence the pm2 *path* works,
 not as a current all-green.
 
+**The apps themselves have now been booted at full scale, 2026-09-10**,
+via `./install-ecosystem.sh` (36/36) then `./start-ecosystem.sh`:
+**35 up, 1 down out of 36**. The one down is `v4-proxy`, refusing to
+start without `ANTHROPIC_API_KEY` — the guard working, not a failure.
+`scripts/smoke-frontend.mjs --all` drove all 33 real frontends in a
+browser and every one passed.
+
+That is a different claim from the pm2 one above and the difference
+matters: `start-ecosystem.sh` runs `npm start` per app, while pm2 runs
+them under a supervisor with restart policy, `pm2 reload` and `pm2
+save`. **The processes are proven to boot and serve at 34; the pm2
+supervision layer around them is still only proven at 26.**
+
+The boot found three real defects that no unit test could see — a
+caller allowlist 8 services short, a smoke test failing on three
+headless apps by design, and 33 lockfiles disagreeing with their own
+package.json about the Node floor. All three are fixed, and the
+settlement endpoint every app now depends on was exercised against the
+running V3: atomicity, idempotency and whole-ledger reconciliation all
+verified over real HTTP.
+
 ## `generate-nginx-conf.js`
 Generates a real nginx reverse-proxy config from the same manifest —
 one domain, path-based routing (`https://yourdomain.com/void/`,
