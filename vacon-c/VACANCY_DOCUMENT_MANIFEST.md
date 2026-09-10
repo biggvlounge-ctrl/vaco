@@ -12,8 +12,8 @@ document to understand what exists and where, rather than opening all
 | | |
 |---|---:|
 | Documents the index names | **90** |
-| Present in this repository | **16** |
-| **Not in this repository** | **74** |
+| Present in this repository | **22** |
+| **Not in this repository** | **68** |
 
 ---
 
@@ -65,21 +65,6 @@ the specification.
 Grouped by the part of the index each sat under, with the index's own
 one-line description — so this is a hunting list you can triage, not
 just a list of things that are gone.
-
-### 3. Core Gameplay Systems (built out this session) — 12 missing
-
-- `COMPLETE_BUSINESS_FOUNDING_PIPELINE.md` — the full skill→ business process
-- `COMPOSITION_REQUIREMENTS_TRIBE_COHESION.md` — real difficulty: role requirements + cohesion
-- `COMPREHENSIVE_RETAIL_KEY_LOCATIONS.md` — full retail location list
-- `EIGHT_SYSTEMS_FULLY_BUILT.md` — repair, spoilage, escalation, capture, corruption, parole, witnesses
-- `GLOBAL_WORLD_FAMOUS_HERO_LANDMARKS.md` — expanded global landmark reference list
-- `KEY_LOCATION_DISCOVERY_WORD_OF_MOUTH_SYSTEM.md` — loot tiers + information spread
-- `PLAYER_DEATH_GENERATIONAL_CONTINUITY.md` — the real death/ succession mechanic
-- `THE_KEY_BUILDING_TYPES.md` — the definitive Hero location category list
-- `TRIBAL_INDEPENDENCE_GOVERNMENT_DISTRUST_EVENTS.md` — independence, distrust, natural events
-- `TRIBE_GROWTH_MISSION_UNLOCK_SYSTEM.md` — recruitment unlocks missions
-- `VACANCY_LOCATION_CONTROL_OPERATIONAL_KEY.md` — Control/ Operational Key system
-- `VACANCY_TRIBES_LEAGUE_LEADERS.md` — Tribes + League Leaders/EA Sports format
 
 ### 2. The World Bible (the full narrative/systems design, Parts 1-50+) — 11 missing
 
@@ -140,6 +125,15 @@ just a list of things that are gone.
 - `MNTN_PRICING_RESEARCH_RECOMMENDATION.md` — honest pricing finding; AdLib recommended first given VACO already has content
 - `V4_SEARCH_LAYER_ARCHITECTURE.md` — the real gap closed: V4's Search component, previously named but never built
 
+### 3. Core Gameplay Systems (built out this session) — 6 missing
+
+- `COMPLETE_BUSINESS_FOUNDING_PIPELINE.md` — the full skill→ business process
+- `EIGHT_SYSTEMS_FULLY_BUILT.md` — repair, spoilage, escalation, capture, corruption, parole, witnesses
+- `GLOBAL_WORLD_FAMOUS_HERO_LANDMARKS.md` — expanded global landmark reference list
+- `TRIBAL_INDEPENDENCE_GOVERNMENT_DISTRUST_EVENTS.md` — independence, distrust, natural events
+- `VACANCY_LOCATION_CONTROL_OPERATIONAL_KEY.md` — Control/ Operational Key system
+- `VACANCY_TRIBES_LEAGUE_LEADERS.md` — Tribes + League Leaders/EA Sports format
+
 ### 9. World Generation Automation & Final Cost (added after initial index) — 4 missing
 
 - `AI_QUALITY_SAMPLING_LOOP.md` — statistical QA replacing full manual review
@@ -182,9 +176,15 @@ just a list of things that are gone.
 
 - `AUTOMATED_HISTORIC_LANDMARK_IMPORT_SYSTEM.md` — `world-layer/AUTOMATED_HISTORIC_LANDMARK_IMPORT_SYSTEM.md`
 - `BUSINESS_AGENT_GIBSON_VOID_DESIGN.md` — `void/BUSINESS_AGENT_GIBSON_VOID_DESIGN.md`
+- `COMPOSITION_REQUIREMENTS_TRIBE_COHESION.md` — `vacon-c/COMPOSITION_REQUIREMENTS_TRIBE_COHESION.md`
+- `COMPREHENSIVE_RETAIL_KEY_LOCATIONS.md` — `vacon-c/COMPREHENSIVE_RETAIL_KEY_LOCATIONS.md`
+- `KEY_LOCATION_DISCOVERY_WORD_OF_MOUTH_SYSTEM.md` — `vacon-c/KEY_LOCATION_DISCOVERY_WORD_OF_MOUTH_SYSTEM.md`
 - `OVERTURE_MAPS_DATASET_UPDATED_COST_SAVINGS.md` — `world-layer/OVERTURE_MAPS_DATASET_UPDATED_COST_SAVINGS.md`
+- `PLAYER_DEATH_GENERATIONAL_CONTINUITY.md` — `vacon-c/PLAYER_DEATH_GENERATIONAL_CONTINUITY.md`
 - `PROACTIVE_ECOSYSTEM_INTELLIGENCE_LAYER.md` — `vaco-analytics/PROACTIVE_ECOSYSTEM_INTELLIGENCE_LAYER.md`
 - `QVAN_LESLIE_DESKINS_TECH_AVATAR.md` — `v4-proxy/QVAN_LESLIE_DESKINS_TECH_AVATAR.md`
+- `THE_KEY_BUILDING_TYPES.md` — `vacon-c/THE_KEY_BUILDING_TYPES.md`
+- `TRIBE_GROWTH_MISSION_UNLOCK_SYSTEM.md` — `vacon-c/TRIBE_GROWTH_MISSION_UNLOCK_SYSTEM.md`
 - `UNIVERSAL_WORLD_LAYER_ARCHITECTURE.md` — `world-layer/UNIVERSAL_WORLD_LAYER_ARCHITECTURE.md`
 - `VACANCY_API_ENDPOINT_MAP.md` — `vacon-c/VACANCY_API_ENDPOINT_MAP.md`
 - `VACANCY_CLAUDE_CODE_BUILD_PROMPT.md` — `vacon-c/VACANCY_CLAUDE_CODE_BUILD_PROMPT.md`

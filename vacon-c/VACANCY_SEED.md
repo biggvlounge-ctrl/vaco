@@ -166,6 +166,72 @@ compliance review. Both stand.
 
 **All seven handoff documents are now accounted for.**
 
+### Recovered 10 Sep 2026 — six Core Gameplay Systems documents
+
+Supplied by the founder as pasted text after
+`VACANCY_DOCUMENT_MANIFEST.md` showed which documents the index names
+but the repository does not hold. Written to `vacon-c/` verbatim; only
+an `# ` title line was added to each, matching the convention every
+other document here follows.
+
+| Recovered | Document | What it settles |
+|---|---|---|
+| 10 Sep 2026 | `PLAYER_DEATH_GENERATIONAL_CONTINUITY.md` | Death is neither permadeath nor respawn: the player continues as an heir, sibling or grown child. Composes four systems already built — Inheritance priority, Legacy Score, Family Bloodline, and Memory/grief. |
+| 10 Sep 2026 | `TRIBE_GROWTH_MISSION_UNLOCK_SYSTEM.md` | Recruiting a specialist whose occupation matches a nearby location's Control Key requirement *is* the mission trigger. The engine behind "the game opens up as the Tribe grows". |
+| 10 Sep 2026 | `THE_KEY_BUILDING_TYPES.md` | The definitive hero-tier category list (23 categories), confirmed as the global standard rather than St. Louis-specific. |
+| 10 Sep 2026 | `COMPOSITION_REQUIREMENTS_TRIBE_COHESION.md` | A Control Key's population requirement is role-based (enforcers/youth/elder), and existing `unity`/`cooperation`/`conflictLevel` traits multiply the success probability. |
+| 10 Sep 2026 | `KEY_LOCATION_DISCOVERY_WORD_OF_MOUTH_SYSTEM.md` | Per-type discovery pools for hero locations, and information spreading person-to-person only during the Chaos Era, widening as the tech tree climbs. |
+| 10 Sep 2026 | `COMPREHENSIVE_RETAIL_KEY_LOCATIONS.md` | Ten retail location types, each with its own discovery pool, and the Control Key → merchandise access flow for the capturing group. |
+
+**None of this is built.** `server/` has no player-death succession,
+no mission unlock triggered by recruitment, no Control Key composition
+check, no discovery pools and no retail location types. Read them as
+the design they are.
+
+#### Their "already built" claims, checked against `server/`
+
+Each of these six argues its mechanic is the right one *because* it
+composes systems that already exist. That is a good argument and it is
+why they read as buildable — but the claim is checkable, so it was
+checked, the same way §7, §11 and §12 checked Documents 6, 4 and 5.
+**Roughly half of what they cite as built is not there.**
+
+Real, cited correctly:
+
+| Cited as built | Where it actually is |
+|---|---|
+| Memory system, traumatic memories resisting decay | `server/worldStore.js` — `memories`, exactly as described |
+| Relationships with trust/loyalty | `worldStore.js`, `traits.js`, `contest.js` |
+| Habits, Crime, NPC Needs | `behavior.js`, `flows.js`, `territory.js`, `tick.js` |
+| Reemergence phases | `engine.js`, `keys.js`, `flows.js`, `tick.js` |
+
+Cited as built and **absent**:
+
+| Cited as built | What is actually there |
+|---|---|
+| Inheritance resolution priority (Will → Family → Organization → Government → Auction → Abandoned → Disputed) | Nothing. `'inherited'` is one value in `property.js`'s acquisition-method enum — how a property was obtained, not who resolves a claim |
+| Legacy Score | Nothing. The word appears twice: a comment about the *legacy* nested trait format, and `historical_legacy` as a property value modifier |
+| Family Bloodline / generational succession | Nothing |
+| Occupation Taxonomy | Nothing — no occupation or profession field exists on an NPC at all |
+| Control Key system, and its specialist/population requirements | Nothing |
+| Family/Tribe `unity`, `conflictLevel` | Nothing. `cooperation` and `conflictResolution` are real but are **culture** dimensions (`culture.js`), not family or tribe traits |
+| Information Spread Key | Nothing |
+| Rural Resource system | Nothing |
+| Bullet scarcity | Nothing |
+| Healthcare system | Nothing |
+
+This does not make the documents wrong — they are design, and design
+is allowed to describe a target. It makes their phrasing wrong, and
+that matters here for one reason: a reader who takes "already built"
+at face value will scope the work as wiring rather than building.
+`TRIBE_GROWTH_MISSION_UNLOCK_SYSTEM.md` in particular describes itself
+as tying together "three systems already built" — two of the three
+(Control Key, Occupation Taxonomy) do not exist, so it is a
+specification for three systems, not an integration of them.
+
+Six of the twelve documents in the index's "Core Gameplay Systems"
+group are still missing; `VACANCY_DOCUMENT_MANIFEST.md` lists them.
+
 ### Standing directives on the wider package (28 Aug 2026)
 
 Given ahead of the remaining documents, and recorded here so they hold
