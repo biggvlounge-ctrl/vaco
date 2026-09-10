@@ -19,14 +19,21 @@
 // every branch, every tag. It is a real git remote — you clone from it.
 // That is the artifact this produces.
 //
-// **And it proves it.** `git bundle verify` reads the file's own
-// headers and reports "complete history" for a bundle nobody has ever
-// restored from. Only a clone proves a clone works, so this clones the
-// bundle into a scratch directory and checks the result has the commits
-// and files it should. Same discipline as `package-release.mjs`, which
-// extracts its own archive and runs the suite inside it: a tool that
-// reports success without checking the thing it claims to have done is
-// the failure class this repository keeps finding.
+// **And it proves it by restoring, because `verify` does not.** That
+// is not a principle here, it was measured: fourteen bytes of garbage
+// were written into the middle of a real bundle's pack, and
+//
+//     git bundle verify  →  "The bundle records a complete history."  exit 0
+//     git clone          →  "pack has bad object ... inflate returned -3"  exit 128
+//
+// `verify` reads the header and the ref list. It will happily bless a
+// file whose objects are shredded. So this clones the bundle into a
+// scratch directory and checks the restored repository has the commit
+// count, HEAD and file count it should. Same discipline as
+// `package-release.mjs`, which extracts its own archive and runs the
+// suite inside it: a tool that reports success without checking the
+// thing it claims to have done is the failure class this repository
+// keeps finding.
 //
 // Usage:
 //   node scripts/snapshot.mjs              # bundle + verify by cloning
