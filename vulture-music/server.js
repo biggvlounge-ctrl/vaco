@@ -106,7 +106,28 @@ async function settleVCoin(legs, meta = {}) {
     },
     body: JSON.stringify({ legs, reason: meta.reason ?? null }),
   });
-  const body = await res.json();
+  // **Read the text, then parse — never parse before checking ok.**
+  // `await res.json()` on a failed response throws on whatever the
+  // peer actually sent, and Express answers an unknown path with an
+  // HTML page. The result was that every failure of this call, whatever
+  // its cause, surfaced as:
+  //
+  //   Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+  //
+  // which names neither the status, nor the URL, nor the real problem.
+  // Found by a seeding run that could not create a release and could
+  // not be told why.
+  const text = await res.text();
+  let body;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    throw new Error(
+      `settleVCoin: ${V3_API_URL}/api/vcoin/settle answered ${res.status} with `
+      + `${res.headers.get('content-type') || 'no content-type'}, not JSON: `
+      + `${text.slice(0, 200).replace(/\s+/g, ' ')}`,
+    );
+  }
   if (!res.ok) {
     throw new Error(body.error || `settleVCoin failed (${res.status})`);
   }

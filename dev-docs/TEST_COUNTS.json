@@ -1,6 +1,6 @@
 {
-  "total": 1510,
-  "passed": 1510,
+  "total": 1513,
+  "passed": 1513,
   "failed": 0,
   "skipped": 0,
   "suites": 39,
@@ -54,8 +54,8 @@
       "skipped": 0
     },
     "v3": {
-      "tests": 80,
-      "pass": 80,
+      "tests": 83,
+      "pass": 83,
       "fail": 0,
       "skipped": 0
     },

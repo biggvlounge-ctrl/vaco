@@ -45,13 +45,78 @@ const path = require('path');
 // without a stray enumerable key showing up in the persisted JSON.
 const FLUSHERS = new WeakMap();
 
-function reactive(value, onChange) {
+// Every proxy this has ever produced. Two bugs need it, and both were
+// found by a crash in V3 -- the canonical ledger -- rather than by
+// reading this code:
+//
+//   RangeError: Maximum call stack size exceeded
+//       at Object.set (lib/persistence.js:55:20)
+//       at Object.set (lib/persistence.js:55:20)     ... and so on
+//
+// **Re-wrapping a live proxy re-enters its own trap.** `reactive`
+// walks children with `value[key] = reactive(value[key])`. When
+// `value` is already a proxy that assignment fires its own `set`
+// trap, which calls `reactive` again, which walks and assigns again.
+// Nothing stops it. The ledger answered a settlement with an HTML 500
+// stack page.
+//
+// **A cyclic object walks forever.** `o.self = o` recurses until the
+// stack ends, for the same reason and by a different route.
+//
+// Both are fixed by remembering: a value that is already reactive is
+// returned as-is, and a value being made reactive registers its proxy
+// BEFORE its children are walked, so a child pointing back at its
+// parent finds the finished proxy instead of starting again.
+const REACTIVE = new WeakSet();
+
+function reactive(value, onChange, seen) {
   if (value === null || typeof value !== 'object') return value;
-  for (const key of Object.keys(value)) {
-    value[key] = reactive(value[key], onChange);
+
+  // Already reactive: hand it back untouched. Wrapping a proxy in a
+  // proxy is what produced the infinite `set` chain above, and it was
+  // never useful even when it terminated -- two layers of trap firing
+  // onChange twice for one mutation.
+  if (REACTIVE.has(value)) return value;
+
+  const visited = seen || { proxies: new WeakMap(), ancestors: new Set() };
+
+  // **Order matters here, and getting it wrong made the check useless.**
+  // The cycle test must come BEFORE the already-seen test. With the
+  // seen-test first, a cycle finds the proxy its own ancestor already
+  // registered, returns it, and is accepted silently -- which is
+  // exactly what happened on the first attempt at this fix.
+  //
+  // A cycle is refused rather than accepted.
+  //
+  // The first version of this fix made cycles stop crashing, which
+  // turned a loud failure into a quiet one: the assignment appeared to
+  // succeed, and then `JSON.stringify` threw "Converting circular
+  // structure to JSON" at flush time and the store silently never
+  // reached disk. On the debounced path that failure is asynchronous
+  // and nobody sees it.
+  //
+  // A store that cannot be serialized cannot be persisted, so the
+  // value is rejected at the line that assigns it, naming what is
+  // wrong. That is the only one of the three behaviours -- crash,
+  // silent data loss, clear refusal -- that a caller can act on.
+  if (visited.ancestors.has(value)) {
+    throw new TypeError(
+      'persistence: refusing to store a value that contains a reference back to itself. '
+      + 'The store is written as JSON, so a cycle cannot be persisted -- it would either '
+      + 'overflow the stack here or fail at flush time and silently lose the write.',
+    );
   }
-  return new Proxy(value, {
+
+  // Seen elsewhere in this walk but not an ancestor: an ordinary shape,
+  // one object referenced from two places. It serializes fine -- JSON
+  // simply repeats it -- so hand back the same proxy.
+  if (visited.proxies.has(value)) return visited.proxies.get(value);
+
+  const proxy = new Proxy(value, {
     set(target, prop, next) {
+      // `target` is the raw object, so this assignment does not
+      // re-enter this trap. `next` may be anything, including
+      // something already reactive, which the guard above now handles.
       target[prop] = reactive(next, onChange);
       onChange();
       return true;
@@ -62,6 +127,25 @@ function reactive(value, onChange) {
       return true;
     },
   });
+
+  // Registered before the walk, not after: a cycle reaching back here
+  // must find this proxy rather than begin a second one.
+  REACTIVE.add(proxy);
+  visited.proxies.set(value, proxy);
+
+  // On the ancestor stack while its children are walked, off it after.
+  // Membership means "this object is an ancestor of the one being
+  // walked right now", which is what makes it a cycle rather than a
+  // shape that merely appears twice.
+  visited.ancestors.add(value);
+  try {
+    for (const key of Object.keys(value)) {
+      value[key] = reactive(value[key], onChange, visited);
+    }
+  } finally {
+    visited.ancestors.delete(value);
+  }
+  return proxy;
 }
 
 function loadOrCreate(filePath, createDefault) {

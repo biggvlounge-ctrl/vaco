@@ -130,6 +130,29 @@ if [ "${DOWN:-0}" -gt 0 ]; then
   echo
 fi
 
+# -- 2b. demo content -------------------------------------------------
+#
+# A launcher full of apps that all open onto blank pages reads as
+# broken rather than as new. `scripts/seed-demo.mjs` creates four demo
+# people and gives them posts, businesses, screens, releases and
+# profiles -- through the real HTTP API, as real signed-in users,
+# against the same guards and validation any other caller meets.
+#
+# Idempotent: it registers a marker account that succeeds exactly once
+# per set of stores, so a second boot adds nothing. Set VACO_NO_SEED=1
+# to skip it entirely.
+#
+# Failure here is reported and does not stop the boot. An unseeded
+# ecosystem is still a running ecosystem, and the gateway coming up
+# matters more than the demo content.
+if [ -z "${VACO_NO_SEED:-}" ]; then
+  echo "Seeding demo content..."
+  node scripts/seed-demo.mjs 2>&1 | sed 's/^/  /' || {
+    echo "  Seeding did not complete. The ecosystem is still up; the apps will just be empty."
+  }
+  echo
+fi
+
 # -- 3. the gateway ---------------------------------------------------
 #
 # `exec`, so the gateway is PID 1's direct child and a stop signal from

@@ -135,3 +135,90 @@ test('durable() commits on every mutating method, not just POST', () => {
     assert.strictEqual(readPersisted(file).n, 1, `${method} should commit`);
   }
 });
+
+// ---------------------------------------------------------------------------
+// The reactive walk, and two ways it used to end the process
+// ---------------------------------------------------------------------------
+//
+// Both were found by a live crash in this app — the canonical ledger —
+// while seeding demo content, not by reading the code:
+//
+//   RangeError: Maximum call stack size exceeded
+//       at Object.set (lib/persistence.js:55:20)
+//       at Object.set (lib/persistence.js:55:20)      ... and so on
+//
+// V3 answered a settlement with an HTML 500 stack page, and the calling
+// app reported it as "Unexpected token '<', \"<!DOCTYPE \"... is not
+// valid JSON" — a parse error standing in for a crashed ledger.
+//
+// `lib/persistence.js` is the shared durability layer: the same file
+// runs in 28 apps. A stack overflow in it takes the process with it.
+
+test('making an already-reactive value reactive again does not recurse', () => {
+  const file = tempStorePath();
+  const store = createPersistentStore(file, () => ({ rows: [], index: {} }));
+  store.rows.push({ id: 1, tags: ['a'] });
+
+  // `reactive` walks children with `value[key] = reactive(value[key])`.
+  // When `value` is itself a proxy that assignment fires its own `set`
+  // trap, which calls `reactive` again, which assigns again. Nothing
+  // stopped it.
+  const row = store.rows[0];
+  assert.doesNotThrow(() => { store.index.byId = row; });
+  assert.doesNotThrow(() => { store.index.again = store.index.byId; });
+
+  let nested = {};
+  for (let i = 0; i < 50; i += 1) nested = { child: nested };
+  assert.doesNotThrow(() => { store.index.deep = nested; });
+  assert.doesNotThrow(() => { store.index.deepAgain = store.index.deep; });
+
+  assert.equal(store.index.byId.id, 1, 'the value did not survive being stored');
+});
+
+test('one object stored in two places is fine, and stays one object', () => {
+  // A shape that appears twice is not a cycle. JSON repeats it, which
+  // serializes correctly, so it must not be refused — the cycle check
+  // below has to be narrower than "have I seen this before".
+  const file = tempStorePath();
+  const store = createPersistentStore(file, () => ({ index: {} }));
+  const shared = { n: 1 };
+
+  assert.doesNotThrow(() => { store.index.a = shared; store.index.b = shared; });
+  commit(store);
+
+  const onDisk = JSON.parse(fs.readFileSync(file, 'utf8'));
+  assert.deepEqual(onDisk.index.a, { n: 1 });
+  assert.deepEqual(onDisk.index.b, { n: 1 });
+});
+
+test('a value that references itself is refused, not accepted and then lost', () => {
+  // **Three possible behaviours, and only one is usable.** Overflow the
+  // stack (what it did); accept the value and fail at flush with
+  // "Converting circular structure to JSON", writing nothing (what the
+  // first version of the fix did — a silent loss on the debounced
+  // path); or refuse at the assignment, naming the problem.
+  const file = tempStorePath();
+  const store = createPersistentStore(file, () => ({ rows: [], index: {} }));
+  store.rows.push({ id: 1 });
+
+  const cyclic = {};
+  cyclic.self = cyclic;
+  assert.throws(
+    () => { store.index.cyc = cyclic; },
+    /reference back to itself/,
+    'a cyclic value was accepted; it cannot be written as JSON, so the store would '
+    + 'either crash or silently stop persisting',
+  );
+
+  const a = {};
+  const b = {};
+  a.b = b;
+  b.a = a;
+  assert.throws(() => { store.index.pair = a; }, /reference back to itself/);
+
+  // And the store is still usable and still writes — a refused value
+  // must not damage what was already there.
+  assert.doesNotThrow(() => commit(store));
+  const onDisk = JSON.parse(fs.readFileSync(file, 'utf8'));
+  assert.equal(onDisk.rows.length, 1);
+});

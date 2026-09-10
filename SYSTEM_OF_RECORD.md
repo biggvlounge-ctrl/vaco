@@ -707,7 +707,7 @@ produce the numbers in this document.
 built:** `node scripts/package-release.mjs` — see §11.
 
 ```sh
-node scripts/run-all-tests.mjs           # 1510/1510 across 39 suites
+node scripts/run-all-tests.mjs           # 1513/1513 across 39 suites
 node scripts/audit-route-guards.mjs --check   # 520/520 accounted for
 ./sync-shared-runtime.sh --check         # 147 copies current, none unmanaged
 ./sync-design-system.sh --check          # every serving app is a target
@@ -747,7 +747,7 @@ dependencies are installed.
 
 ```
 vacon-c         317   vdp             142   void            142
-scripts         125   v3               80   vaco-media       51
+scripts         125   v3               83   vaco-media       51
 v4-proxy         42   world-layer      41   venvm            40
 venvs            40   voken            37   vaco-analytics   34
 vaco-shell       33   voidmagic        23   vacay            22
