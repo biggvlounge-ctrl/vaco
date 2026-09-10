@@ -11,7 +11,7 @@ each app's test suite actually executed. Nothing here is recalled.
 `scripts/test/completion-report.test.mjs` fails if this file drifts
 from what the script emits, which is the failure mode that made
 `COMPLETION_AUDIT.md` read 31 apps and 522 tests when the real numbers
-were 34 and 1124.
+were 34 and 1146.
 
 ---
 
@@ -54,9 +54,9 @@ anything it can:
 | Metric | Value |
 |---|---:|
 | Express backends in the manifest | **34** |
-| Overall criteria met | **99%** (259/260) |
-| Apps at 100% | **33 / 34** |
-| Tests | **1124** |
+| Overall criteria met | **100%** (260/260) |
+| Apps at 100% | **34 / 34** |
+| Tests | **1146** |
 | Apps with no test suite | **0** |
 
 Two notes on that test count, so it is not read as contradicting
@@ -98,6 +98,7 @@ anything else:
 | `vaco-operator` | **100%** | 6/6 | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | 20 |
 | `vaco-shell` | **100%** | 6/6 | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | 33 |
 | `vacon` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 18 |
+| `vacon-c` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 315 |
 | `vago` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 13 |
 | `vavlt-stvdios` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 14 |
 | `venvm` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 40 |
@@ -113,7 +114,6 @@ anything else:
 | `vulture-studios` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 11 |
 | `vxllage` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 13 |
 | `yap` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 20 |
-| `vacon-c` | **87%** | 7/8 | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | 293 |
 
 `—` means the criterion does not apply to that app and is excluded
 from both halves of its fraction — an app is never marked down for
@@ -124,7 +124,7 @@ lacking something it was never meant to have.
 - **Serves HTTP** — a real server.js that answers /api/health
 - **Has a frontend** — public/index.html — its own real client
 - **On the design system** — a sync-design-system.sh target, so it cannot drift
-- **Persists to disk** — createPersistentStore — state survives a restart
+- **Persists to disk** — state is read back at boot, so it survives a restart
 - **Has a test suite** — a test/ directory with at least one running test
 - **Suite passes** — zero failures when its own suite is run
 - **Every mutating route accounted for** — guarded, or declared open with a stated reason — no route neither
@@ -134,6 +134,4 @@ lacking something it was never meant to have.
 
 ## Where the shortfalls are
 
-- **`vacon-c`** (87%) — missing: persists to disk
-
-  known, and half-built rather than untouched. `vacon-c/CLAUDE.md`'s order of operations step 9 is "Stand up Postgres, migrate off in-memory `WorldState`, keep `/api/*` identical". The first half is real and tested — `server/db.js` connects to a live Postgres, the schema loads unmodified, and `server/migrate.js` exports the whole `WorldState` into it. The second half is explicitly flagged as not done in that pass (`dev-docs/phase-9-postgres/`): `engine.js`, `economy.js`, `keys.js` and `tick.js` are synchronous and array-based, and converting them to async Postgres reads is a much larger rewrite. `migrate.js` is a one-way snapshot, not a live sync, so a restart still loses the simulation.
+Every app meets every criterion that applies to it.

@@ -152,7 +152,46 @@ by it. Not done until this specific test passes.
 7. Real resource tracking, real economy
 8. Rebuild `advanceTick()` into the 11-phase pipeline
 9. Stand up Postgres, migrate off in-memory `WorldState`, keep
-   `/api/*` identical
+   `/api/*` identical — **done, 10 Sep 2026, and deliberately not in
+   the literal sense of that wording.** `/api/*` is unchanged.
+
+   Postgres is the durable record; memory stays the working set.
+   `server/persistence.js` loads the world before `app.listen` and
+   checkpoints every 10 ticks; `server/restore.js` is the inverse of
+   `server/migrate.js`. What was NOT done is converting engine.js /
+   economy.js / keys.js / tick.js to async Postgres reads, and that is
+   a design decision rather than a deferral. Three reasons, in
+   restore.js's header at length: a tick sweeps the whole world, so
+   per-row round-trips would be thousands of queries to compute what
+   the process already holds; it buys no durability, since what lost
+   the simulation was that nothing read the database back; and
+   interleaved async reads through the tick pipeline is precisely how
+   a deterministic engine stops being one.
+
+   **Five real defects came out of building the read half**, every one
+   of them invisible until a world went through a real database and
+   back:
+
+   - four `missions` columns and `market_listings.resource_type`
+     silently unwritten — a mission migrated as `completed` with no
+     holder, no acceptance tick and no outcome;
+   - two FK ordering violations (`resources`/`market_listings` before
+     `cities`) that rolled the whole migration back for any world with
+     a city that had a resource in it;
+   - `properties` and `cultures` drawing ids from `nextEntityId` with
+     no `entities` row ever written for them;
+   - a second circular FK, `properties.history_ref` ↔
+     `historical_records.where_location_id`;
+   - two flow signals reading the **denormalised** trait sheet, which
+     is built once at generation and never refreshed — so
+     `population.meanVolatility` and `organization.meanPower` reported
+     birth values forever.
+
+   The migration had never been executed by anything. `migrate.test.js`
+   said so in its own header — its checks were structural "because
+   Postgres is not reachable from this environment" — and that was an
+   honest and correct thing to write. It stopped being true, and the
+   difference showed up immediately.
 
 ## Standing rules (apply to every change, not just Day 1)
 1. Every Key resolver writes back to Memory, Relationships, and World
@@ -165,6 +204,28 @@ by it. Not done until this specific test passes.
    separate root entities.
 5. Ecosystem apps (Vavlt Stvdios, Vvltvre, DREAMS, VENVS, V4, VASH)
    are linked to, never rebuilt.
+
+**A ninth, learned building the restore.** The sixth rule above says a
+signal reading a field that does not exist returns nothing forever.
+Its sibling is worse: **a signal reading a field that is frozen returns
+the same plausible number forever.** `npc.traits` / `org.traits` are a
+sheet built once in `generateNPC()`/`generateOrganization()` and never
+refreshed; the live values are the `entity_traits` rows every tick
+phase and Key modifier writes to. `behavior.js` and `contest.js` knew
+this and went through `getLiveEntity()`. `flows.js` did not — and its
+own header already recorded the *first* version of the same bug, where
+those signals read `organization.power`, got `undefined`, and returned
+null. The fix at the time pointed them at `o.traits.organization.power`,
+which is a real number, so the signal started firing and looked fixed.
+It had moved from "always null" to "always the birth value", which is
+harder to see, because a null is visible and a plausible frozen number
+is not. Read traits through `getLiveEntity()`, always.
+
+**A tenth, from the same pass.** Postgres returns BIGINT and NUMERIC as
+strings. A missed conversion in a restore does not throw — it produces
+a world that looks restored and is wrong. `trait_id` came back as the
+string `"1"`, matched no trait definition, and every entity was
+restored with an empty trait sheet and no error anywhere.
 
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`

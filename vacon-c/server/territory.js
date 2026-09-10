@@ -26,6 +26,8 @@
 
 'use strict';
 
+const { nextAfter } = require('./nextAfter.js');
+
 const { getLiveEntity } = require('./entityTraits.js');
 
 let nextCityId = 1;
@@ -269,7 +271,28 @@ function getCityDetail(worldState, cityId) {
   };
 }
 
+
+// ---------------------------------------------------------------------------
+// reseedIds — see server/idSequences.js
+// ---------------------------------------------------------------------------
+// Called after a world is loaded from Postgres. Without it these
+// counters restart at 1 against restored rows that already use those
+// ids, and two rows end up sharing a primary key with nothing thrown.
+// Derived from the rows themselves rather than stored, so it cannot
+// disagree with them.
+function reseedIds(worldState) {
+  nextCityId = nextAfter(worldState.cities);
+  nextCommunityId = nextAfter(worldState.communities);
+  nextTerritoryBlockId = nextAfter(worldState.territoryBlocks);
+  return {
+    nextCityId: nextCityId,
+    nextCommunityId: nextCommunityId,
+    nextTerritoryBlockId: nextTerritoryBlockId,
+  };
+}
+
 module.exports = {
+  reseedIds,
   generateCity,
   generateCommunity,
   generateTerritoryBlock,

@@ -414,3 +414,47 @@ test('a drought makes Economic Flow fire, which is the whole point of it', () =>
   assert.ok(economic.value > 60, `scarcity should be past the threshold, got ${economic.value}`);
   assert.equal(economic.firing, true);
 });
+
+test('a trait signal follows the live value, not the entity\'s birth value', () => {
+  // `npc.traits` and `org.traits` are a sheet built once in
+  // generateNPC()/generateOrganization() and never refreshed; the live
+  // values are the entity_traits rows that ticks and Key modifiers
+  // write to. Two signals read the sheet until 10 Sep 2026, so two of
+  // the ten named flows reported birth values forever.
+  //
+  // This is the sibling of the failure this file's header already
+  // records: that one read a field that did not exist and returned
+  // null, which is at least visible. This one returns a plausible
+  // number that never moves.
+  const engine = require('../server/engine.js');
+  const W = engine.WorldState;
+  for (const k of Object.keys(W)) if (Array.isArray(W[k])) W[k] = [];
+  W.tick = 0;
+
+  const npc = engine.generateNPC();
+  const org = engine.generateOrganization({ type: 'gang' });
+
+  const volatilityBefore = flows.SIGNALS['population.meanVolatility'](W);
+  const powerBefore = flows.SIGNALS['organization.meanPower'](W);
+  assert.ok(Number.isFinite(volatilityBefore), 'the volatility signal reads nothing at all');
+  assert.ok(Number.isFinite(powerBefore), 'the power signal reads nothing at all');
+
+  // Move the live values without touching the denormalised sheets.
+  engine.applyKeyModifier(npc.id, 'emotional', 'Volatility', 25, 0);
+  engine.applyKeyModifier(org.id, 'organization', 'power', -20, 0);
+
+  // The sheets are deliberately checked to still be stale — that is
+  // what makes this a test of the signal rather than of the engine.
+  assert.equal(npc.traits.emotional.Volatility, volatilityBefore,
+    'the denormalised sheet updated, so this test no longer proves the signal reads live');
+
+  const volatilityAfter = flows.SIGNALS['population.meanVolatility'](W);
+  const powerAfter = flows.SIGNALS['organization.meanPower'](W);
+
+  assert.notEqual(volatilityAfter, volatilityBefore,
+    'population.meanVolatility did not move after a Key modifier changed the live trait — '
+    + 'it is reading npc.traits, which is frozen at generation');
+  assert.notEqual(powerAfter, powerBefore,
+    'organization.meanPower did not move after a Key modifier changed the live trait — '
+    + 'it is reading org.traits, which is frozen at generation');
+});

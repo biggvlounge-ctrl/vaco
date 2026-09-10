@@ -29,6 +29,7 @@ const cors = require('cors');
 require('dotenv/config');
 
 const engine = require('./server/engine.js');
+const persistence = require('./server/persistence.js');
 
 const { requireActor } = require('./lib/shieldAuth.cjs');
 const { createServiceAuth } = require('./lib/serviceAuth.cjs');
@@ -76,11 +77,18 @@ app.get('/api/state', (_req, res) => {
 // advanced the world rather than only that *someone* logged in did.
 // VACON-C has no operator role model yet -- when it grows one, this is
 // the hook it attaches to.
-app.post('/api/tick', requireOperator('vacon-c:tick'), (_req, res) => {
+// The checkpoint runs after the tick and does not gate the response.
+// A failed checkpoint must not fail the tick: the simulation being
+// unsaved is bad, and the simulation being unusable because the archive
+// is unavailable is worse. persistence.maybeCheckpoint() reports every
+// failure rather than swallowing it — see its header.
+app.post('/api/tick', requireOperator('vacon-c:tick'), async (_req, res) => {
   try {
     engine.advanceTick();
     res.json(engine.WorldState);
+    await persistence.maybeCheckpoint(engine.WorldState);
   } catch (err) {
+    if (res.headersSent) return;
     res.status(400).json({ error: err.message });
   }
 });
@@ -1110,7 +1118,39 @@ app.get('/api/health', (_req, res) => {
   res.json({ ok: true, tick: engine.WorldState.tick });
 });
 
-app.listen(PORT, () => {
-  console.log(`VACON-C listening on http://localhost:${PORT}`);
-  console.log(`Health check: curl http://localhost:${PORT}/api/health`);
+// Load before listening, not after.
+//
+// A server that accepts requests while it is still restoring answers
+// them from a half-built world — `/api/state` would return whatever
+// arrays had been filled so far, and a tick would advance a world that
+// is about to be overwritten. Neither fails loudly. So: restore, then
+// open the port.
+//
+// This fails soft. If Postgres is unreachable VACON-C starts with an
+// empty world and says so in full rather than exiting — an app that
+// refuses to boot because its archive is down is one that shows as
+// DOWN in start-ecosystem.sh for a reason nobody can see from the
+// health check.
+persistence.loadAtBoot(engine.WorldState).then(() => {
+  app.listen(PORT, () => {
+    console.log(`VACON-C listening on http://localhost:${PORT}`);
+    console.log(`Health check: curl http://localhost:${PORT}/api/health`);
+  });
 });
+
+// A last checkpoint on the way out, so a clean shutdown does not throw
+// away the ticks since the last one. Best effort and time-boxed: if the
+// archive is unavailable, exiting still has to work.
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  process.on(signal, async () => {
+    try {
+      await Promise.race([
+        persistence.checkpoint(engine.WorldState),
+        new Promise((resolve) => setTimeout(resolve, 5000)),
+      ]);
+    } catch (err) {
+      console.error(`VACON-C: final checkpoint failed — ${err.message}`);
+    }
+    process.exit(0);
+  });
+}

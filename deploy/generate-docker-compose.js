@@ -410,6 +410,67 @@ if (services["vaco-media"]) {
   ];
 }
 
+// ---------------------------------------------------------------------
+// Postgres, for VACON-C
+// ---------------------------------------------------------------------
+//
+// VACON-C is the one app that does not persist through
+// `createPersistentStore`. It is a tick simulation whose durable record
+// is Postgres: `server/persistence.js` loads the world before the
+// server listens and checkpoints it every N ticks.
+//
+// **Without this service the app still boots**, and that is deliberate
+// — it fails soft, starts an empty world, and says so in full. But it
+// then never checkpoints, so everything the simulation does is lost on
+// the next restart, and the only place that is visible is the log.
+// Shipping a compose file that quietly did that would be worse than one
+// that fails, so the database is a declared service and VACON-C waits
+// for it.
+services.postgres = {
+  image: "postgres:16-alpine",
+  container_name: "vaco-postgres",
+  environment: {
+    POSTGRES_USER: "vacancy",
+    // No default. Every other secret in this stack comes from the
+    // environment and this is not the one to make an exception for —
+    // a compose file with a working password in it is a compose file
+    // that reaches production with that password.
+    POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}",
+    POSTGRES_DB: "vacancy",
+  },
+  // The base schema and then the additive extensions, in that order.
+  // postgres:16-alpine runs everything in this directory on FIRST boot
+  // only, in filename order — hence the numeric prefixes, which are
+  // what make "base before extensions" a property of the mount rather
+  // than of luck.
+  volumes: [
+    "vacon-c-pgdata:/var/lib/postgresql/data",
+    "./vacon-c/VACANCY_POSTGRESQL_SCHEMA.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro",
+    "./vacon-c/server/schema-extensions.sql:/docker-entrypoint-initdb.d/02-extensions.sql:ro",
+  ],
+  healthcheck: {
+    test: ["CMD-SHELL", "pg_isready -U vacancy -d vacancy"],
+    interval: "5s",
+    timeout: "5s",
+    retries: 10,
+  },
+  networks: ["vaco"],
+  restart: "unless-stopped",
+};
+volumes["vacon-c-pgdata"] = null;
+
+if (services["vacon-c"]) {
+  services["vacon-c"].depends_on = [
+    ...(services["vacon-c"].depends_on || []),
+    "postgres",
+  ];
+  services["vacon-c"].environment = {
+    ...(services["vacon-c"].environment || {}),
+    DATABASE_URL:
+      "postgres://vacancy:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/vacancy",
+  };
+}
+
 function yamlValue(v, indent) {
   if (v === null) return "";
   if (typeof v === "string") {

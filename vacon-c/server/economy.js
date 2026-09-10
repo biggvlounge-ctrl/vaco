@@ -23,6 +23,8 @@
 
 'use strict';
 
+const { nextAfter } = require('./nextAfter.js');
+
 let nextResourceId = 1;
 let nextMarketListingId = 1;
 
@@ -200,7 +202,26 @@ function getNetWorth(worldState, entityId) {
   return (finances.assets || 0) + (finances.savings || 0) - (finances.debt || 0);
 }
 
+
+// ---------------------------------------------------------------------------
+// reseedIds — see server/idSequences.js
+// ---------------------------------------------------------------------------
+// Called after a world is loaded from Postgres. Without it these
+// counters restart at 1 against restored rows that already use those
+// ids, and two rows end up sharing a primary key with nothing thrown.
+// Derived from the rows themselves rather than stored, so it cannot
+// disagree with them.
+function reseedIds(worldState) {
+  nextResourceId = nextAfter(worldState.resources);
+  nextMarketListingId = nextAfter(worldState.marketListings);
+  return {
+    nextResourceId: nextResourceId,
+    nextMarketListingId: nextMarketListingId,
+  };
+}
+
 module.exports = {
+  reseedIds,
   generateResource,
   advanceResourceTick,
   getScarcity,

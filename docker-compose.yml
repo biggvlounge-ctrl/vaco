@@ -120,6 +120,7 @@ services:
       VACO_SERVICE_NAME: vacon-c
       VACO_SERVICE_TOKEN: "${VACO_TOKEN_VACON_C:?Set a V3 service token for vacon-c in .env}"
       VACO_OPERATOR_MODE: "${VACO_OPERATOR_MODE:-enforce}"
+      DATABASE_URL: "postgres://vacancy:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/vacancy"
     ports:
       - "8809:8809"
     networks:
@@ -129,6 +130,7 @@ services:
       - v3
       - shield
       - vaco-operator
+      - postgres
   hvntz:
     build:
       context: ./hvntz
@@ -973,6 +975,27 @@ services:
     networks:
       - vaco
     restart: unless-stopped
+  postgres:
+    image: "postgres:16-alpine"
+    container_name: vaco-postgres
+    environment:
+      POSTGRES_USER: vacancy
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}"
+      POSTGRES_DB: vacancy
+    volumes:
+      - "vacon-c-pgdata:/var/lib/postgresql/data"
+      - "./vacon-c/VACANCY_POSTGRESQL_SCHEMA.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro"
+      - "./vacon-c/server/schema-extensions.sql:/docker-entrypoint-initdb.d/02-extensions.sql:ro"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U vacancy -d vacancy
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - vaco
+    restart: unless-stopped
 
 volumes:
   vacon_data:
@@ -1004,6 +1027,7 @@ volumes:
   vaco_audit_data:
   vaco_operator_data:
   vaco_media_data:
+  vacon-c-pgdata:
 
 networks:
   vaco:

@@ -61,6 +61,8 @@
 
 'use strict';
 
+const { nextAfter } = require('./nextAfter.js');
+
 let nextOwnershipId = 1;
 
 // Schema comment on properties.type, verbatim.
@@ -321,7 +323,24 @@ function advancePropertyLifecycle(worldState, property, tick) {
   return property;
 }
 
+
+// ---------------------------------------------------------------------------
+// reseedIds — see server/idSequences.js
+// ---------------------------------------------------------------------------
+// Called after a world is loaded from Postgres. Without it these
+// counters restart at 1 against restored rows that already use those
+// ids, and two rows end up sharing a primary key with nothing thrown.
+// Derived from the rows themselves rather than stored, so it cannot
+// disagree with them.
+function reseedIds(worldState) {
+  nextOwnershipId = nextAfter(worldState.ownershipRecords);
+  return {
+    nextOwnershipId: nextOwnershipId,
+  };
+}
+
 module.exports = {
+  reseedIds,
   PROPERTY_TYPES,
   LIFECYCLE,
   OWNER_TYPES,

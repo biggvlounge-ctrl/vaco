@@ -36,6 +36,9 @@ const MIGRATE = fs.readFileSync(path.join(__dirname, '..', 'server', 'migrate.js
 const SCHEMA = fs.readFileSync(
   path.join(__dirname, '..', 'VACANCY_POSTGRESQL_SCHEMA.sql'), 'utf8',
 );
+const EXTENSIONS = fs.readFileSync(
+  path.join(__dirname, '..', 'server', 'schema-extensions.sql'), 'utf8',
+);
 
 // Arrays that are deliberately not migrated, each with the reason.
 // An unmigrated array with no entry here is indistinguishable from one
@@ -49,6 +52,26 @@ const NOT_CARRIED = {
     + 'Event phase turns them into real `events` rows, which ARE carried — migrating both '
     + 'would record every one of them twice',
 };
+
+// The additive DDL in server/schema-extensions.sql is part of the real
+// schema — it is applied right after the base file, and the migration
+// writes columns it adds. Parsing only the base file would report a
+// column that genuinely exists in every deployed database as missing.
+//
+// Read as ALTER TABLE ... ADD COLUMN, deliberately: the extension file
+// may only ADD to tables the base schema already declares. A CREATE
+// TABLE there would be a new table smuggled in outside the source of
+// truth, and this parser gives it nowhere to land.
+function extensionColumns() {
+  const added = {};
+  const re = /ALTER TABLE (\w+)\s+ADD COLUMN(?:\s+IF NOT EXISTS)?\s+(\w+)/gi;
+  for (const m of EXTENSIONS.matchAll(re)) {
+    const table = m[1].toLowerCase();
+    added[table] = added[table] || new Set();
+    added[table].add(m[2].toLowerCase());
+  }
+  return added;
+}
 
 function schemaColumns() {
   const tables = {};
@@ -65,6 +88,18 @@ function schemaColumns() {
       }
     }
     tables[name.toLowerCase()] = cols;
+  }
+  // Fold in the extensions, and refuse one that targets a table the
+  // base schema never declared — that would be a table added outside
+  // the source of truth.
+  for (const [table, cols] of Object.entries(extensionColumns())) {
+    if (!tables[table]) {
+      throw new Error(
+        `schema-extensions.sql alters "${table}", which VACANCY_POSTGRESQL_SCHEMA.sql `
+        + 'does not declare. The extension file may only ADD COLUMN to existing tables.',
+      );
+    }
+    for (const c of cols) tables[table].add(c);
   }
   return tables;
 }
@@ -358,4 +393,112 @@ test('every deliberately-unwritten column carries a real reason', () => {
       `NOT_WRITTEN says ${key} is not written, but the migration writes it — stale entry`);
     assert.ok(reason.length > 40, `${key}'s reason is too short to be one`);
   }
+});
+
+// ---------------------------------------------------------------------------
+// Insert order
+// ---------------------------------------------------------------------------
+//
+// migrate.js's header says "Insert order respects every FK in the
+// schema." It did not. `market_listings.city_id` and
+// `resources.city_id` both point at `cities`, and both were inserted
+// four sections before it — so the moment a world had a city with a
+// resource or a listing in it, the whole migration rolled back on a
+// foreign key violation.
+//
+// It went unnoticed because nothing ran the migration, and it was
+// found the first time a round-trip was attempted against a real
+// database on 10 Sep 2026.
+//
+// It also went unnoticed by MY first scan of the schema, which is the
+// more useful half of the lesson: 18 of this schema's foreign keys are
+// declared as `ALTER TABLE ... ADD CONSTRAINT` after the CREATE TABLE
+// block, not inline, and a scan that only reads inline REFERENCES
+// misses every one of them. This test reads both forms.
+//
+// The check is deliberately narrow: a parent inserted later than its
+// child only matters if the migration actually WRITES the referencing
+// column. `npcs.home_property_id` points at a table inserted much
+// later and has never been a problem because migrate.js does not write
+// it. Flagging that would be noise, and noise is how a real violation
+// gets scrolled past.
+
+function foreignKeys() {
+  const fks = [];
+  // Inline: `city_id INTEGER REFERENCES cities(id)` inside CREATE TABLE.
+  for (const m of SCHEMA.matchAll(/CREATE TABLE (\w+)\s*\(([\s\S]*?)\n\);/g)) {
+    const table = m[1].toLowerCase();
+    for (const line of m[2].split('\n')) {
+      const stripped = line.replace(/--.*$/, '').trim();
+      const inline = stripped.match(/^(\w+)\s+[\w()]+.*?REFERENCES\s+(\w+)/i);
+      if (inline && !/^(PRIMARY|FOREIGN|UNIQUE|CHECK|CONSTRAINT)$/i.test(inline[1])) {
+        fks.push({ table, column: inline[1].toLowerCase(), parent: inline[2].toLowerCase() });
+      }
+      const tableLevel = stripped.match(/FOREIGN KEY\s*\((\w+)\)\s*REFERENCES\s+(\w+)/i);
+      if (tableLevel) {
+        fks.push({ table, column: tableLevel[1].toLowerCase(), parent: tableLevel[2].toLowerCase() });
+      }
+    }
+  }
+  // Deferred: `ALTER TABLE x ADD CONSTRAINT ... FOREIGN KEY (c) REFERENCES y`.
+  // Eighteen of this schema's FKs are declared this way.
+  const alter = /ALTER TABLE (\w+)\s+ADD CONSTRAINT \w+\s+FOREIGN KEY\s*\((\w+)\)\s*REFERENCES\s+(\w+)/gi;
+  for (const m of SCHEMA.matchAll(alter)) {
+    fks.push({ table: m[1].toLowerCase(), column: m[2].toLowerCase(), parent: m[3].toLowerCase() });
+  }
+  return fks;
+}
+
+test('the FK scan reads both ways this schema declares a foreign key', () => {
+  // A guard on the scanner. Without it, a regex that matched nothing
+  // would make the ordering test below pass by finding no FKs at all —
+  // which is exactly how the real violation survived my first attempt.
+  const fks = foreignKeys();
+  const inline = fks.filter((f) => f.table === 'npcs' && f.parent === 'entities');
+  const deferred = fks.filter((f) => f.table === 'market_listings' && f.parent === 'cities');
+
+  assert.ok(fks.length > 40, `found only ${fks.length} foreign keys — the scan is broken`);
+  assert.ok(inline.length > 0, 'no inline REFERENCES found');
+  assert.ok(deferred.length > 0,
+    'no ALTER TABLE ADD CONSTRAINT foreign keys found — 18 of this schema\'s FKs are declared '
+    + 'that way, and a scan that misses them misses the violation this test exists for');
+});
+
+test('a row is never inserted before the row it points at', () => {
+  const order = [];
+  for (const ins of migrateInserts()) if (!order.includes(ins.table)) order.push(ins.table);
+
+  const writes = {};
+  for (const ins of migrateInserts()) {
+    writes[ins.table] = writes[ins.table] || new Set();
+    for (const c of ins.columns) writes[ins.table].add(c);
+  }
+
+  const at = (t) => order.indexOf(t);
+  const violations = new Set();
+
+  for (const fk of foreignKeys()) {
+    if (at(fk.table) < 0 || at(fk.parent) < 0) continue;   // not migrated
+    if (fk.table === fk.parent) continue;                   // self-reference
+    if (!writes[fk.table]?.has(fk.column)) continue;        // column never written
+    if (at(fk.parent) > at(fk.table)) {
+      violations.add(
+        `${fk.table}.${fk.column} -> ${fk.parent}: ${fk.table} is inserted at position `
+        + `${at(fk.table)} and ${fk.parent} at ${at(fk.parent)}`,
+      );
+    }
+  }
+
+  // entities.family_id is the known, documented exception: entities and
+  // families reference each other, so migrate.js inserts entities with
+  // family_id NULL and UPDATEs it after families exist. That column is
+  // therefore not written by the INSERT at all, and the check above
+  // already skips it — asserted here so the exception stays deliberate.
+  assert.equal(writes.entities?.has('family_id') ?? false, false,
+    'entities.family_id is now written by the INSERT, which reintroduces the circular-FK '
+    + 'failure the two-phase pattern in migrate.js exists to avoid');
+
+  assert.deepEqual([...violations], [],
+    'these inserts happen before the rows they reference exist, so the migration rolls back '
+    + `on a real database:\n    ${[...violations].join('\n    ')}`);
 });

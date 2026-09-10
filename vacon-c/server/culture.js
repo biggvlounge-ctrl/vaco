@@ -56,6 +56,8 @@
 
 'use strict';
 
+const { nextAfter } = require('./nextAfter.js');
+
 let nextCultureId = 1;
 
 // Verbatim from the attachment, in its order. Kept whole as the record
@@ -260,7 +262,24 @@ function getCultureMembers(worldState, cultureId) {
   return { cultureId: culture.id, name: culture.name, total: members.length, byTier };
 }
 
+
+// ---------------------------------------------------------------------------
+// reseedIds — see server/idSequences.js
+// ---------------------------------------------------------------------------
+// Called after a world is loaded from Postgres. Without it these
+// counters restart at 1 against restored rows that already use those
+// ids, and two rows end up sharing a primary key with nothing thrown.
+// Derived from the rows themselves rather than stored, so it cannot
+// disagree with them.
+function reseedIds(worldState) {
+  nextCultureId = nextAfter(worldState.cultures);
+  return {
+    nextCultureId: nextCultureId,
+  };
+}
+
 module.exports = {
+  reseedIds,
   CULTURE_TRAIT_FAMILIES,
   CULTURE_SCORED_FAMILIES,
   CULTURE_STYLES,

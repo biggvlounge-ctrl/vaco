@@ -1,8 +1,12 @@
 # deploy/
 
 Real production-deployment tooling for the VACO ecosystem's 34 Express
-backends + 2 Vite frontends, plus nginx and the LiveKit SFU — 38
-Compose services and 29 named volumes. (`venvs-mock-backend` is the
+backends + 2 Vite frontends, plus nginx, the LiveKit SFU and a Postgres
+for VACON-C — 39 Compose services and 30 named volumes. (The Postgres
+is not a general ecosystem database: every other app persists through
+`createPersistentStore` to a JSON store. VACON-C is a tick simulation
+whose durable record is Postgres, and it is the only service that uses
+it — see "VACON-C's Postgres" below.) (`venvs-mock-backend` is the
 one server in the repo that is deliberately *not* deployed: the apps
 were cut over to standalone V3 and Shield, and it stays for local
 development only.) Every file here is *generated* from the
@@ -187,14 +191,22 @@ is which app" needs relearning.
 interpolation, no daemon required) validates the generated
 `docker-compose.yml` cleanly — confirmed the required-secret guard
 rejects a missing `VACO_SERVICE_TOKENS` with the real, intended error
-message, then validates clean once all 29 required vars are set;
+message, then validates clean once all 30 required vars are set;
 confirmed cross-app URLs resolve to the correct real service name +
 port per app (spot-checked `vulture-studios` → `shield`/`v3`/
 `vaco-analytics`/`vaco-audit`/`vaco-operator`/`vulture-flix`/
 `vulture-music`, all seven real, all correctly scoped — no unrelated
-var leaked in); confirmed exactly 29 named volumes, each declared once
+var leaked in); confirmed exactly 30 named volumes, each declared once
 and mounted by exactly one service, matching the real persisted-app
-list. `deploy/nginx-docker.conf`'s braces balance (40 open, 40 close)
+list.
+
+(That pass counted 29 volumes and 29 required vars. Both became 30 on
+2026-09-10, when VACON-C's Postgres was added — one `vacon-c-pgdata`
+volume and `POSTGRES_PASSWORD`. The generator was re-run and
+`scripts/test/deploy-readme.test.mjs` re-checks every count in this
+paragraph against the real files on each run, which is what caught the
+stale numbers here. The rest of the checks above were not re-run for
+the new service.) `deploy/nginx-docker.conf`'s braces balance (40 open, 40 close)
 and all 36 expected `location` blocks appear exactly once, no
 duplicates. **Not verified**: an actual `docker compose up --build` —
 no image has ever been built here, for any service. Run
@@ -368,3 +380,54 @@ way: regenerate, then hold the output against the manifest in a test.
 `node generate-nginx-conf.js example.com` — read it directly to see
 the exact shape before running the generator yourself with your real
 domain.
+
+
+## VACON-C's Postgres
+
+One service in `docker-compose.yml` that is not an app: `postgres`,
+used by `vacon-c` alone.
+
+Every other app in this ecosystem persists with `createPersistentStore`
+— a JSON file under a named volume, loaded when the store is
+constructed. VACON-C does not, because it is not that kind of app: it
+is a civilization simulation with a locked 63-table schema
+(`vacon-c/VACANCY_POSTGRESQL_SCHEMA.sql`) that the whole engine has
+been shaped to mirror since its second phase.
+
+**What runs at boot.** `vacon-c/server/persistence.js#loadAtBoot` reads
+the world back before `app.listen` — deliberately before, because a
+server that opens its port mid-restore answers from a half-built world
+and does it silently. It then checkpoints every
+`VACONC_CHECKPOINT_TICKS` ticks (default 10) and once more on SIGTERM.
+
+**The schema loads itself, in order.** The compose service mounts the
+base schema as `01-schema.sql` and `vacon-c/server/schema-extensions.sql`
+as `02-extensions.sql` into `/docker-entrypoint-initdb.d/`. Postgres
+runs that directory in filename order on first boot only, so the
+numeric prefixes are what make "base before extensions" a property of
+the mount rather than of luck. The extensions file is additive DDL —
+the base schema is a locked source artifact and is never edited; see
+its header for the one column it adds and the one it declines to.
+
+**It fails soft, which is the thing to know.** With no reachable
+database VACON-C starts an *empty* world, says so in full on stderr,
+and never checkpoints. It does not refuse to boot — an app that will
+not start because its archive is down is less useful than one that
+starts and tells you. The consequence is that an unset `DATABASE_URL`
+is silent data loss rather than a startup failure, so `.env.example`
+says so at the variable.
+
+A process whose load failed is then permanently barred from
+checkpointing, for its whole life. Without that bar, a transient
+connection blip at boot followed by a recovery ten ticks later would
+have the empty world truncate and overwrite a real archive — and the
+truncate-and-rewrite that makes checkpoints repeatable is exactly what
+would make that total. `vacon-c/test/persistence.test.js` holds it.
+
+**Running the tests.** `vacon-c/test/restore.test.js` and
+`test/persistence.test.js` need a real Postgres and skip loudly with
+the reason when there is not one. They are integration tests against a
+shared database and take a Postgres advisory lock so they serialise —
+`node --test` runs files concurrently, and without the lock they
+truncate each other's fixtures and restore zero of everything while
+passing individually.

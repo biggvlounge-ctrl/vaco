@@ -61,10 +61,39 @@
 'use strict';
 
 const economy = require('./economy.js');
+const { getLiveEntity } = require('./entityTraits.js');
 
 let nextFlowEventId = 1;
 
 const rows = (worldState, name) => worldState[name] || [];
+
+// **Read traits live, never off the entity object.**
+//
+// `npc.traits` / `org.traits` are a denormalised sheet built once, in
+// generateNPC()/generateOrganization(), and never refreshed. The live
+// values are the `entity_traits` rows, which every tick phase and every
+// Key modifier writes to. Reading the object's own copy therefore
+// returns the entity's BIRTH values for the rest of the simulation.
+//
+// Two signals did exactly that until 10 Sep 2026 —
+// population.meanVolatility and organization.meanPower — so two of the
+// ten named flows could never respond to anything that happened in the
+// world. Measured on a single NPC: object copy 47, live value 72, after
+// one Key modifier and five ticks.
+//
+// This is the sibling of CLAUDE.md's sixth standing rule. That one is
+// "a signal that reads a field which does not exist returns nothing
+// forever"; this one is "a signal that reads a field which is frozen
+// returns the same thing forever", and it is harder to spot because the
+// signal fires, produces a plausible number, and looks alive.
+//
+// behavior.js and contest.js already went through getLiveEntity for
+// this reason, and contest.js's own comment says so. flows.js was the
+// one that did not.
+const liveTrait = (worldState, entityId, family, name) => {
+  const live = getLiveEntity(worldState, entityId);
+  return Number(live?.traits?.[family]?.[name]);
+};
 const mean = (values) => (values.length
   ? values.reduce((sum, n) => sum + n, 0) / values.length : null);
 
@@ -77,11 +106,23 @@ const mean = (values) => (values.length
 // reporting a fact nobody stated. Every reader below returns null on an
 // empty input rather than a default.
 //
-// **Three of these read through a function rather than off the row, and
-// that is not a style choice.** Scarcity and organization power are not
-// columns. Scarcity is computed by economy.getScarcity() on every read
-// (standing rule 3 — a computable rollup is never stored), and an
-// organization's power lives in its entity_traits sheet, not as a field.
+// **Four of these read through a function rather than off the row, and
+// that is not a style choice.** Scarcity, organization power and
+// individual volatility are not columns. Scarcity is computed by
+// economy.getScarcity() on every read (standing rule 3 — a computable
+// rollup is never stored), and traits live in `entity_traits` rows,
+// reachable only through getLiveEntity().
+//
+// **The first fix for this was incomplete and that is the instructive
+// part.** `organization.meanPower` was changed from reading
+// `organization.power` — undefined on every row — to reading
+// `o.traits.organization.power`. That is a real number, so the signal
+// started firing and the bug looked fixed. It was not: `o.traits` is
+// the denormalised sheet built once at generation and never refreshed,
+// so the signal had moved from "always null" to "always the
+// organization's birth value", which is worse, because a null is
+// visible and a plausible-but-frozen number is not. Same for
+// population.meanVolatility. Both go through getLiveEntity() now.
 //
 // The first version of this file read `resource.scarcity` and
 // `organization.power` directly. Both are `undefined` on every real
@@ -107,7 +148,7 @@ const SIGNALS = {
     rows(w, 'marketListings').map((l) => Number(l.price)).filter(Number.isFinite),
   ),
   'population.meanVolatility': (w) => mean(
-    rows(w, 'npcs').map((n) => Number(n.traits?.emotional?.Volatility)).filter(Number.isFinite),
+    rows(w, 'npcs').map((n) => liveTrait(w, n.id, 'emotional', 'Volatility')).filter(Number.isFinite),
   ),
   'population.migrationRiskCount': (w) => rows(w, 'migrationRisk').length,
   'social.meanTrust': (w) => mean(
@@ -123,7 +164,7 @@ const SIGNALS = {
   'business.count': (w) => rows(w, 'organizations').filter((o) => o.type === 'business').length,
   'organization.meanPower': (w) => mean(
     rows(w, 'organizations')
-      .map((o) => Number(o.traits?.organization?.power))
+      .map((o) => liveTrait(w, o.id, 'organization', 'power'))
       .filter(Number.isFinite),
   ),
   'territory.contestedCount': (w) => rows(w, 'territoryBlocks')
@@ -363,7 +404,30 @@ function describeFlows(worldState) {
   });
 }
 
+// ---------------------------------------------------------------------------
+// reseedIds — see server/idSequences.js
+// ---------------------------------------------------------------------------
+// `firing` is the odd one out among the sixteen counters: it is not a
+// table's primary key but a monotonic number inside an event's
+// `global_effects` payload, whose whole stated purpose is that "two
+// firings of the same flow on different ticks are distinguishable in a
+// log". Reset to 1 against a restored log, it stops being that: a new
+// firing reuses a number already sitting in the history.
+//
+// So it is derived from the restored events rather than from an array
+// of its own — the only place those numbers exist.
+function reseedIds(worldState) {
+  let max = 0;
+  for (const event of worldState.events || []) {
+    const firing = Number(event?.global_effects?.firing);
+    if (Number.isFinite(firing) && firing > max) max = firing;
+  }
+  nextFlowEventId = max + 1;
+  return { nextFlowEventId };
+}
+
 module.exports = {
+  reseedIds,
   FLOW_TEMPLATES,
   SIGNALS,
   COMPARATORS,

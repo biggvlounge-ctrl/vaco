@@ -17,6 +17,8 @@
 
 'use strict';
 
+const { nextAfter } = require('./nextAfter.js');
+
 let nextMemoryId = 1;
 let nextRelationshipId = 1;
 let nextKnowledgeId = 1;
@@ -127,7 +129,28 @@ function getKnowledge(worldState, entityId, subjectEntityId) {
   );
 }
 
+
+// ---------------------------------------------------------------------------
+// reseedIds — see server/idSequences.js
+// ---------------------------------------------------------------------------
+// Called after a world is loaded from Postgres. Without it these
+// counters restart at 1 against restored rows that already use those
+// ids, and two rows end up sharing a primary key with nothing thrown.
+// Derived from the rows themselves rather than stored, so it cannot
+// disagree with them.
+function reseedIds(worldState) {
+  nextMemoryId = nextAfter(worldState.memories);
+  nextRelationshipId = nextAfter(worldState.relationships);
+  nextKnowledgeId = nextAfter(worldState.entityKnowledge);
+  return {
+    nextMemoryId: nextMemoryId,
+    nextRelationshipId: nextRelationshipId,
+    nextKnowledgeId: nextKnowledgeId,
+  };
+}
+
 module.exports = {
+  reseedIds,
   addMemory,
   findRelationship,
   getOrCreateRelationship,

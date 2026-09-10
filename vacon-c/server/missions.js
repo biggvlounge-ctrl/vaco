@@ -22,6 +22,8 @@
 
 'use strict';
 
+const { nextAfter } = require('./nextAfter.js');
+
 let nextArtifactId = 1;
 let nextMissionId = 1;
 
@@ -201,7 +203,26 @@ function listMissions(worldState, options = {}) {
   return worldState.missions.filter((m) => !status || m.status === status);
 }
 
+
+// ---------------------------------------------------------------------------
+// reseedIds — see server/idSequences.js
+// ---------------------------------------------------------------------------
+// Called after a world is loaded from Postgres. Without it these
+// counters restart at 1 against restored rows that already use those
+// ids, and two rows end up sharing a primary key with nothing thrown.
+// Derived from the rows themselves rather than stored, so it cannot
+// disagree with them.
+function reseedIds(worldState) {
+  nextArtifactId = nextAfter(worldState.artifacts);
+  nextMissionId = nextAfter(worldState.missions);
+  return {
+    nextArtifactId: nextArtifactId,
+    nextMissionId: nextMissionId,
+  };
+}
+
 module.exports = {
+  reseedIds,
   MISSION_STATUSES,
   TERMINAL_STATUSES,
   acceptMission,

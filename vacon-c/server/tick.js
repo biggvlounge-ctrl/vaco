@@ -43,6 +43,8 @@
 
 'use strict';
 
+const { nextAfter } = require('./nextAfter.js');
+
 const { getEntityTraitsForEntity, applyKeyModifier, getLiveEntity, traitsToSheet } = require('./entityTraits.js');
 const worldStore = require('./worldStore.js');
 const economy = require('./economy.js');
@@ -518,7 +520,26 @@ function advanceTick(worldState) {
   return { tick: worldState.tick, events, historicalRecords, reemergenceIndex };
 }
 
+
+// ---------------------------------------------------------------------------
+// reseedIds — see server/idSequences.js
+// ---------------------------------------------------------------------------
+// Called after a world is loaded from Postgres. Without it these
+// counters restart at 1 against restored rows that already use those
+// ids, and two rows end up sharing a primary key with nothing thrown.
+// Derived from the rows themselves rather than stored, so it cannot
+// disagree with them.
+function reseedIds(worldState) {
+  nextEventId = nextAfter(worldState.events);
+  nextHistoricalRecordId = nextAfter(worldState.historicalRecords);
+  return {
+    nextEventId: nextEventId,
+    nextHistoricalRecordId: nextHistoricalRecordId,
+  };
+}
+
 module.exports = {
+  reseedIds,
   addEnvironmentalCondition,
   advanceTick,
 };

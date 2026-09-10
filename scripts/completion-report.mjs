@@ -194,9 +194,24 @@ const CRITERIA = [
   {
     key: 'persists',
     label: 'Persists to disk',
-    why: 'createPersistentStore — state survives a restart',
-    // A pure proxy or search front-end holds no state of its own.
-    test: (a) => (/createPersistentStore/.test(a.server) ? true
+    why: 'state is read back at boot, so it survives a restart',
+    // **Two mechanisms, deliberately.** Every app but one persists via
+    // `createPersistentStore`, which loads its JSON store when it is
+    // constructed. VACON-C does not and should not: it is a tick
+    // simulation whose durable record is Postgres, and it reads its
+    // world back with an explicit boot-time load
+    // (`server/persistence.js#loadAtBoot`, called before `app.listen`).
+    //
+    // What both have in common is the thing the criterion is actually
+    // about — the server READS persisted state at startup. Writing it
+    // is not enough: `migrate.js` wrote the whole world to Postgres for
+    // months while a restart still lost the simulation, because nothing
+    // read it back. That is why this looks for a load and not a save.
+    //
+    // A third mechanism has to be added here to count. That is the
+    // point: an app that persists some new way should have to say so
+    // rather than quietly matching a loose regex.
+    test: (a) => (/createPersistentStore|loadAtBoot/.test(a.server) ? true
       : (a.holdsState ? false : null)),
   },
   {
@@ -349,15 +364,19 @@ const rows = apps.map((a) => `| \`${a.name}\` | **${a.pct}%** | ${a.met.length}/
 // explains — and an unmet criterion with no note reads as exactly what
 // it is, unexplained.
 const NOTES = {
-  'vacon-c:persists': 'known, and half-built rather than untouched. `vacon-c/CLAUDE.md`\'s '
-    + 'order of operations step 9 is "Stand up Postgres, migrate off in-memory `WorldState`, '
-    + 'keep `/api/*` identical". The first half is real and tested — `server/db.js` connects to '
-    + 'a live Postgres, the schema loads unmodified, and `server/migrate.js` exports the whole '
-    + '`WorldState` into it. The second half is explicitly flagged as not done in that pass '
-    + '(`dev-docs/phase-9-postgres/`): `engine.js`, `economy.js`, `keys.js` and `tick.js` are '
-    + 'synchronous and array-based, and converting them to async Postgres reads is a much larger '
-    + 'rewrite. `migrate.js` is a one-way snapshot, not a live sync, so a restart still loses '
-    + 'the simulation.',
+  // Empty, and that is a result rather than an oversight.
+  //
+  // The one entry here was `vacon-c:persists`, which explained at
+  // length that step 9 was half-built: Postgres stood up and the world
+  // exported to it, but nothing ever read it back, so a restart still
+  // lost the simulation. That gap was closed on 10 Sep 2026 —
+  // server/restore.js and server/persistence.js — so the note went with
+  // it rather than being left to describe a state of affairs that no
+  // longer holds.
+  //
+  // A note left behind after its gap closes is worse than no note: this
+  // map only prints where a criterion is genuinely unmet, so a stale
+  // entry lies in exactly the case where it reappears.
 };
 
 const shortfalls = apps

@@ -77,6 +77,67 @@ async function migrateWorldStateToPostgres(worldState) {
         );
         entityCount++;
       }
+      // properties — an entities row each.
+      //
+      // **Found by the first round-trip that included a property with
+      // an owner (10 Sep 2026).** `ownership_records.entity_id`
+      // REFERENCES entities(id), and the schema's own comment on it
+      // says the referent is "the thing being owned (property,
+      // business, artifact, etc.)". property.js already draws a
+      // property's id from `worldState.nextEntityId`, exactly as
+      // organizations and families do — so properties have always been
+      // entities in the id space — but no entities row was ever
+      // written for one. Any world where somebody owned a property
+      // rolled the whole migration back on a foreign key violation.
+      //
+      // //: INTERPRETIVE — `entities.type` lists fourteen values and
+      // two of them could hold a property: 'building' and 'land'. The
+      // package does not say which, and PROPERTY_TYPES (residential,
+      // commercial, agricultural, farm, digital_property, ...) does not
+      // map onto that split cleanly — a farm is arguably land, a
+      // digital_property is neither. 'building' is chosen because
+      // `properties` carries floors, units, condition, occupants and a
+      // construction_date, which describe a structure rather than a
+      // parcel. Flagged rather than decided quietly; if the package
+      // ever says otherwise, this is the line to change.
+      for (const p of worldState.properties) {
+        await client.query(
+          `INSERT INTO entities (id, type, status, created_tick, updated_tick) VALUES ($1, 'building', 'active', $2, $3)`,
+          [p.id, p.created_tick ?? 0, p.created_tick ?? 0]
+        );
+        entityCount++;
+      }
+
+      // cultures — an entities row each, for the same reason
+      // properties need one directly above.
+      //
+      // culture.js draws `entity_id` from `worldState.nextEntityId`
+      // and its own comment says why: "a culture is a tier-level
+      // entity that other rows will need to reference, and the
+      // property.js lesson was that a local counter collides the
+      // moment something points at it from the entity id space." The
+      // schema agrees — `cultures.entity_id BIGINT REFERENCES
+      // entities(id)`, commented "shared entity id, so other rows can
+      // point at a culture". No entities row was ever written for one,
+      // so any world with a culture in it failed to migrate.
+      //
+      // //: INTERPRETIVE — `entities.type` has no 'culture'. Its
+      // fourteen values are npc|family|organization|city|region|
+      // civilization|vehicle|building|land|artifact|resource|player|
+      // ai|world_object. 'civilization' is the nearest concrete one and
+      // is wrong: a culture attaches at the family, community,
+      // organization, city OR civilization tier, so calling every
+      // culture a civilization would contradict culture.js's own tier
+      // list. 'world_object' is the schema's generic, and that is what
+      // this uses. Flagged, not decided quietly.
+      for (const c of worldState.cultures) {
+        await client.query(
+          `INSERT INTO entities (id, type, status, created_tick, updated_tick) VALUES ($1, 'world_object', 'active', 0, 0)`,
+          [c.entity_id]
+        );
+        entityCount++;
+      }
+
       summary.entities = entityCount;
 
       // ---------------------------------------------------------------
@@ -84,8 +145,20 @@ async function migrateWorldStateToPostgres(worldState) {
       // ---------------------------------------------------------------
       for (const npc of worldState.npcs) {
         await client.query(
-          `INSERT INTO npcs (entity_id, role, education, religion, generation) VALUES ($1,$2,$3,$4,$5)`,
-          [npc.id, npc.role, npc.education, npc.religion, npc.generation]
+          // `name` is not in VACANCY_POSTGRESQL_SCHEMA.sql — this
+          // file's own header has said so since it was written, and
+          // refused to invent a column for it. That refusal was right
+          // for a one-way export and insufficient for a restore:
+          // generateName() uses Math.random(), so a name that is not
+          // stored cannot be regenerated, and engine.js/tick.js/keys.js
+          // all put npc.name into event descriptions.
+          //
+          // The column now exists, added by server/schema-extensions.sql
+          // rather than by editing the locked base schema. See that
+          // file for why it meets the bar and why property location
+          // does not.
+          `INSERT INTO npcs (entity_id, role, education, religion, generation, name) VALUES ($1,$2,$3,$4,$5,$6)`,
+          [npc.id, npc.role, npc.education, npc.religion, npc.generation, npc.name ?? null]
         );
       }
       summary.npcs = worldState.npcs.length;
@@ -177,6 +250,103 @@ async function migrateWorldStateToPostgres(worldState) {
         );
       }
       summary.entity_traits = worldState.entityTraits.length;
+
+      // ---------------------------------------------------------------
+      // Territory and Property come BEFORE the economy and the event
+      // log, not after.
+      // ---------------------------------------------------------------
+      // This block used to sit further down, and the header of this
+      // file claimed "Insert order respects every FK in the schema"
+      // while it did. It did not: resources.city_id and
+      // market_listings.city_id both point at `cities`, and
+      // historical_records.where_location_id points at `properties`.
+      // Any world with a city that had a resource or a listing in it
+      // rolled the whole migration back on a foreign key violation.
+      //
+      // Nothing caught it because nothing ran the migration. It
+      // surfaced the first time a world was round-tripped through a
+      // real database (10 Sep 2026). Three of this schema's FK
+      // declarations that matter here are `ALTER TABLE ... ADD
+      // CONSTRAINT` rather than inline REFERENCES, which is why
+      // reading the CREATE TABLE blocks alone does not show it —
+      // test/migrate.test.js now reads both forms and holds the
+      // ordering.
+      for (const c of worldState.cities) {
+        await client.query(
+          `INSERT INTO cities (id, name, region_id, real_world_geo_ref, population, mayor_npc_id,
+                               economy, infrastructure, safety, growth, reemergence_index)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+          [c.id, c.name, c.region_id, c.real_world_geo_ref, c.population, c.mayor_npc_id,
+            c.economy, c.infrastructure, c.safety, c.growth, c.reemergence_index]
+        );
+      }
+      summary.cities = worldState.cities.length;
+
+      for (const c of worldState.communities) {
+        await client.query(
+          `INSERT INTO communities (id, city_id, population, tier, housing, crime, safety,
+                                    employment, education, culture, reputation, leadership_npc_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+          [c.id, c.city_id, c.population, c.tier, c.housing, c.crime, c.safety,
+            c.employment, c.education, c.culture, c.reputation, c.leadership_npc_id]
+        );
+      }
+      summary.communities = worldState.communities.length;
+
+      for (const b of worldState.territoryBlocks) {
+        await client.query(
+          `INSERT INTO territory_blocks (id, faction_id, city_id, community_id, status,
+                                         contested_since_tick, building_count, crime_rate,
+                                         traffic_level, maintenance_status)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+          [b.id, b.faction_id, b.city_id, b.community_id, b.status, b.contested_since_tick,
+            b.building_count, b.crime_rate, b.traffic_level, b.maintenance_status]
+        );
+      }
+      summary.territory_blocks = worldState.territoryBlocks.length;
+
+      // properties.value is the ASSESSED value and is the only one
+      // stored. currentValue() is derived on read and deliberately not
+      // inserted anywhere — writing it would be the exact drift
+      // standing rule 3 forbids. `community_id`/`city_id` are in-memory
+      // placement fields with no schema column (flagged in
+      // property.js), so they are not inserted either.
+      for (const p of worldState.properties) {
+        await client.query(
+          // history_ref is left out here and backfilled below. It is
+          // the SECOND circular FK in this schema, after
+          // entities.family_id: properties.history_ref ->
+          // historical_records and historical_records.where_location_id
+          // -> properties each need a row in the other to exist first.
+          //
+          // It happens to be null on every property today
+          // (property.js sets it to null and nothing assigns it), so
+          // this is ceremony against a value that is currently always
+          // absent. It is here anyway, because the alternative is to
+          // drop the column from the INSERT on the grounds that it is
+          // "always null" — and a column quietly not written is
+          // precisely the failure that lost four mission fields for
+          // months. The day something sets it, it migrates.
+          `INSERT INTO properties (id, land_size, type, value, condition, occupants, floors, units,
+                                   age, construction_date, utilities, operating_organization_id,
+                                   density_tier, lifecycle_stage)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+          [p.id, p.land_size, p.type, p.value, p.condition, JSON.stringify(p.occupants), p.floors,
+            p.units, p.age, p.construction_date, JSON.stringify(p.utilities),
+            p.operating_organization_id, p.density_tier, p.lifecycle_stage]
+        );
+      }
+      summary.properties = worldState.properties.length;
+
+      for (const o of worldState.ownershipRecords) {
+        await client.query(
+          `INSERT INTO ownership_records (id, entity_id, owner_entity_id, owner_type,
+                                          acquired_method, acquired_tick)
+           VALUES ($1,$2,$3,$4,$5,$6)`,
+          [o.id, o.entity_id, o.owner_entity_id, o.owner_type, o.acquired_method, o.acquired_tick]
+        );
+      }
+      summary.ownership_records = worldState.ownershipRecords.length;
 
       // ---------------------------------------------------------------
       // memories, relationships, entity_knowledge
@@ -273,6 +443,15 @@ async function migrateWorldStateToPostgres(worldState) {
       }
       summary.historical_records = worldState.historicalRecords.length;
 
+      // Second half of the properties.history_ref two-phase insert —
+      // see the note on the properties INSERT above. Now that
+      // historical_records exist, the FK can be satisfied.
+      for (const p of worldState.properties) {
+        if (p.history_ref == null) continue;
+        await client.query('UPDATE properties SET history_ref = $1 WHERE id = $2',
+          [p.history_ref, p.id]);
+      }
+
       // ---------------------------------------------------------------
       // Everything below was NOT carried until 29 Aug 2026.
       // ---------------------------------------------------------------
@@ -293,68 +472,6 @@ async function migrateWorldStateToPostgres(worldState) {
       // above); properties before artifacts (artifacts.location_id ->
       // properties); artifacts before missions.
 
-      for (const c of worldState.cities) {
-        await client.query(
-          `INSERT INTO cities (id, name, region_id, real_world_geo_ref, population, mayor_npc_id,
-                               economy, infrastructure, safety, growth, reemergence_index)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-          [c.id, c.name, c.region_id, c.real_world_geo_ref, c.population, c.mayor_npc_id,
-            c.economy, c.infrastructure, c.safety, c.growth, c.reemergence_index]
-        );
-      }
-      summary.cities = worldState.cities.length;
-
-      for (const c of worldState.communities) {
-        await client.query(
-          `INSERT INTO communities (id, city_id, population, tier, housing, crime, safety,
-                                    employment, education, culture, reputation, leadership_npc_id)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-          [c.id, c.city_id, c.population, c.tier, c.housing, c.crime, c.safety,
-            c.employment, c.education, c.culture, c.reputation, c.leadership_npc_id]
-        );
-      }
-      summary.communities = worldState.communities.length;
-
-      for (const b of worldState.territoryBlocks) {
-        await client.query(
-          `INSERT INTO territory_blocks (id, faction_id, city_id, community_id, status,
-                                         contested_since_tick, building_count, crime_rate,
-                                         traffic_level, maintenance_status)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-          [b.id, b.faction_id, b.city_id, b.community_id, b.status, b.contested_since_tick,
-            b.building_count, b.crime_rate, b.traffic_level, b.maintenance_status]
-        );
-      }
-      summary.territory_blocks = worldState.territoryBlocks.length;
-
-      // properties.value is the ASSESSED value and is the only one
-      // stored. currentValue() is derived on read and deliberately not
-      // inserted anywhere — writing it would be the exact drift
-      // standing rule 3 forbids. `community_id`/`city_id` are in-memory
-      // placement fields with no schema column (flagged in
-      // property.js), so they are not inserted either.
-      for (const p of worldState.properties) {
-        await client.query(
-          `INSERT INTO properties (id, land_size, type, value, condition, occupants, floors, units,
-                                   age, construction_date, utilities, operating_organization_id,
-                                   density_tier, lifecycle_stage, history_ref)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
-          [p.id, p.land_size, p.type, p.value, p.condition, JSON.stringify(p.occupants), p.floors,
-            p.units, p.age, p.construction_date, JSON.stringify(p.utilities),
-            p.operating_organization_id, p.density_tier, p.lifecycle_stage, p.history_ref]
-        );
-      }
-      summary.properties = worldState.properties.length;
-
-      for (const o of worldState.ownershipRecords) {
-        await client.query(
-          `INSERT INTO ownership_records (id, entity_id, owner_entity_id, owner_type,
-                                          acquired_method, acquired_tick)
-           VALUES ($1,$2,$3,$4,$5,$6)`,
-          [o.id, o.entity_id, o.owner_entity_id, o.owner_type, o.acquired_method, o.acquired_tick]
-        );
-      }
-      summary.ownership_records = worldState.ownershipRecords.length;
 
       for (const a of worldState.artifacts) {
         await client.query(

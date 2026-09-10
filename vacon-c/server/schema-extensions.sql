@@ -1,0 +1,72 @@
+-- server/schema-extensions.sql
+--
+-- Additive DDL applied AFTER VACANCY_POSTGRESQL_SCHEMA.sql.
+--
+-- **Why this is a separate file.** The base schema is a source
+-- artifact: CLAUDE.md names it as the source of truth for database
+-- shape, and `server/migrate.js` has refused since it was written to
+-- invent columns in it. That refusal is right and stays. But a schema
+-- that cannot hold a field the engine genuinely uses is a gap
+-- somebody has to close before a restore can work, and closing it by
+-- editing the locked file would erase the distinction between what
+-- the package specified and what this project added.
+--
+-- So: base schema unmodified, additions here, each one with the
+-- engine field it carries and why the base has no home for it.
+--
+-- The bar for adding something here is deliberately high. A field the
+-- engine SETS is not enough; it has to be a field the engine READS,
+-- so that losing it on restore changes behaviour rather than just
+-- dropping a value nothing consumes. Two fields were considered and
+-- only one met it — see the note at the bottom.
+
+-- ---------------------------------------------------------------------
+-- npcs.name
+-- ---------------------------------------------------------------------
+-- Carries: `npc.name`, set by engine.js#generateNPC.
+--
+-- Neither `entities` nor `npcs` has ever had a name column.
+-- migrate.js's header flagged this on the day it was written — "npc.name
+-- has no home in the real schema. Not invented here; `name` stays an
+-- in-memory-only field and is simply not inserted anywhere" — which was
+-- the right call for a one-way export. It stops being sufficient for a
+-- restore.
+--
+-- It cannot be regenerated either: `generateName()` picks from
+-- FIRST_NAMES/LAST_NAMES with Math.random(), so it is not derivable
+-- from the id or from anything else that survives.
+--
+-- And it is load-bearing, not decoration. engine.js, tick.js and
+-- keys.js all put `npc.name` into event descriptions and historical
+-- records. Without it a restored world's entire event log reads
+-- "undefined did X to undefined" — or, worse, every NPC silently
+-- becomes a different person on restart, which in a simulation whose
+-- subject is generational continuity and word-of-mouth reputation is
+-- not a cosmetic loss.
+--
+-- Organizations already have `organizations.name` and families
+-- `families.surname`; npcs are the only tier the base schema left
+-- nameless.
+ALTER TABLE npcs ADD COLUMN IF NOT EXISTS name TEXT;
+
+-- ---------------------------------------------------------------------
+-- Considered and deliberately NOT added
+-- ---------------------------------------------------------------------
+-- `properties.community_id` and `properties.city_id` are set by
+-- property.js#generateProperty and read by nothing — grep says the
+-- only other mention of either name in server/ is territory_blocks'
+-- own columns in migrate.js. The base schema models a property's
+-- location not at all: `properties` has land_size, type, value,
+-- condition, occupants, floors, units, age, construction_date,
+-- utilities, operating_organization_id, density_tier, lifecycle_stage
+-- and history_ref, and no FK to a community or a city.
+--
+-- That is a real gap, but it is a gap in how the package models the
+-- Property/Territory relationship, and closing it is a design decision
+-- about that relationship — not a column this file can quietly add on
+-- its own authority. Losing these on restore changes no behaviour
+-- today because nothing reads them.
+--
+-- `test/restore.test.js` holds this as a named, self-checking
+-- exemption: if anything ever starts reading a property's community,
+-- the exemption stops being true and the test says so.
