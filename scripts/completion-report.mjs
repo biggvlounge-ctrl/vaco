@@ -349,10 +349,15 @@ const rows = apps.map((a) => `| \`${a.name}\` | **${a.pct}%** | ${a.met.length}/
 // explains — and an unmet criterion with no note reads as exactly what
 // it is, unexplained.
 const NOTES = {
-  'vacon-c:persists': 'known and sequenced: `vacon-c/CLAUDE.md`\'s own order of operations, '
-    + 'step 9 — "Stand up Postgres, migrate off in-memory `WorldState`, keep `/api/*` identical". '
-    + 'It is deliberately last, behind the engine work it would otherwise have to be migrated '
-    + 'twice for. Until then a restart loses the simulation state.',
+  'vacon-c:persists': 'known, and half-built rather than untouched. `vacon-c/CLAUDE.md`\'s '
+    + 'order of operations step 9 is "Stand up Postgres, migrate off in-memory `WorldState`, '
+    + 'keep `/api/*` identical". The first half is real and tested — `server/db.js` connects to '
+    + 'a live Postgres, the schema loads unmodified, and `server/migrate.js` exports the whole '
+    + '`WorldState` into it. The second half is explicitly flagged as not done in that pass '
+    + '(`dev-docs/phase-9-postgres/`): `engine.js`, `economy.js`, `keys.js` and `tick.js` are '
+    + 'synchronous and array-based, and converting them to async Postgres reads is a much larger '
+    + 'rewrite. `migrate.js` is a one-way snapshot, not a live sync, so a restart still loses '
+    + 'the simulation.',
 };
 
 const shortfalls = apps

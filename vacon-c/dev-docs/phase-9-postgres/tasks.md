@@ -61,6 +61,34 @@
   flagged since step 1.
 - Resolving the `npc.name` schema gap found while writing this.
 
+> **Both open items below were closed after this pass, and this
+> section was written before that.** It is left as it stood, because
+> what was open *at the time* is the useful part of a build log — but
+> read it as history, not as current state:
+>
+> - **Citizen-mode player binding** — done, see
+>   `dev-docs/citizen-mode-player-binding/tasks.md` (5/5).
+>   `getCitizenDashboard()` exists; the HTTP route it noted as absent
+>   arrived in phase 11.
+> - **Territory/Community** — done, see
+>   `dev-docs/territory-community/tasks.md` (6/6).
+>   `resolveTerritoryControl()` is real. Its own "Next" flags what
+>   remains: nothing writes organization-tier traits from the tick
+>   pipeline, so the drought cascade still needs a manual trait
+>   override to pressure a faction's territory.
+>
+> Two phases also postdate this one entirely: `phase-10-rename-to-vacon-c`
+> and `phase-11-real-http-api` (12/12), the latter closing the "no
+> routes file has existed in any handoff" caveat that appears three
+> times above.
+>
+> The one item in this section that is still true: `engine.js`,
+> `economy.js`, `keys.js` and `tick.js` continue to read and write
+> in-memory `WorldState` arrays, not Postgres. `migrate.js` is a
+> one-way snapshot export, not a live sync — so a restart still loses
+> the simulation. That is why `dev-docs/COMPLETION_BY_APP.md` scores
+> `vacon-c` short on persistence.
+
 ## Status: locked Day 1 numbered order (steps 1-9)
 All 9 steps in `CLAUDE.md`'s "Order of operations" now have real,
 tested work behind them. The two items still genuinely open, both
