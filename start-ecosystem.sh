@@ -23,7 +23,32 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$REPO_ROOT"
 
 WITH_MOCK=0
-if [ "${1:-}" = "--with-mock" ]; then WITH_MOCK=1; fi
+# Anything that is not `--with-mock` used to be ignored, which meant
+# `./start-ecosystem.sh --help` booted all 36 apps. Found by typing
+# exactly that expecting a usage line. An unrecognised flag on a script
+# whose job is to start 36 servers should never mean "start 36 servers".
+case "${1:-}" in
+  "") ;;
+  --with-mock) WITH_MOCK=1 ;;
+  -h|--help)
+    echo "Usage: ./start-ecosystem.sh [--with-mock]"
+    echo
+    echo "  --with-mock   also start venvs-mock-backend (local reference only)"
+    echo
+    echo "Environment:"
+    echo "  VACO_APPS     space-separated app names to start instead of all of"
+    echo "                them, for hosts that cannot hold the full ~2.5 GB stack."
+    echo "                An unknown name is refused rather than skipped."
+    echo
+    echo "Stop what this started: ./stop-ecosystem.sh"
+    exit 0
+    ;;
+  *)
+    echo "start-ecosystem.sh: unknown option '$1'" >&2
+    echo "Try ./start-ecosystem.sh --help" >&2
+    exit 1
+    ;;
+esac
 
 mkdir -p "$REPO_ROOT/logs/pids"
 
@@ -117,6 +142,56 @@ APPS=(
 
 if [ "$WITH_MOCK" = "1" ]; then
   APPS+=("venvs-mock-backend:venvs-mock-backend:npm start:8791:/api/health")
+fi
+
+# -- VACO_APPS: boot a subset -----------------------------------------
+#
+# The full stack measures ~2.5 GB resident across ~68 processes (68
+# rather than 36 because `npm start` stays alive as a parent of each
+# `node`). Plenty of hosts have less than that, and the failure mode
+# there is bad: the OOM killer takes whichever apps it likes and you
+# get a different half of the ecosystem on every boot.
+#
+# VACO_APPS is a space-separated list of app names to start instead of
+# all of them. Everything downstream -- health checks, the up/down
+# count, stop-ecosystem.sh's PID files -- follows from the same
+# filtered array, so a subset boot is a first-class thing rather than a
+# special case.
+#
+#   VACO_APPS="vaco-shell v3 shield void" ./start-ecosystem.sh
+#
+# An unknown name is a hard error. Silently starting fewer apps than
+# asked for is how you spend an afternoon on a 502 from an app you
+# believe is running.
+if [ -n "${VACO_APPS:-}" ]; then
+  SELECTED=()
+  for want in $VACO_APPS; do
+    found=""
+    for entry in "${APPS[@]}"; do
+      IFS=":" read -r name _rest <<< "$entry"
+      if [ "$name" = "$want" ]; then found="$entry"; break; fi
+    done
+    if [ -z "$found" ]; then
+      echo "VACO_APPS names '$want', which is not an app in this manifest." >&2
+      echo "Known apps:" >&2
+      for entry in "${APPS[@]}"; do
+        IFS=":" read -r name _rest <<< "$entry"
+        echo "  $name" >&2
+      done
+      exit 1
+    fi
+    SELECTED+=("$found")
+  done
+  # VACO_APPS=" " reaches here having named nothing. Left alone it
+  # starts zero apps and reports "0 up, 0 down" -- a clean bill of
+  # health for an ecosystem that is not running. Refuse instead.
+  if [ "${#SELECTED[@]}" -eq 0 ]; then
+    echo "VACO_APPS is set but names no apps. Unset it to start everything," >&2
+    echo "or give it a space-separated list of app names." >&2
+    exit 1
+  fi
+  APPS=("${SELECTED[@]}")
+  echo "VACO_APPS is set: starting ${#APPS[@]} of the full manifest, not all of it."
 fi
 
 echo "Starting ${#APPS[@]} apps..."

@@ -9,10 +9,95 @@ development only.) Every file here is *generated* from the
 same authoritative app/path/port manifest `start-ecosystem.sh` already
 uses for local dev — there's exactly one source of truth for "what
 apps exist, at what path, on what port," not four drifting copies.
-Two real deployment paths exist side by side: pm2 + nginx directly on
-a VPS (original, below), and Docker Compose (new — see "Docker
-Compose deployment" below, the one this session's own recommendation
-is built around).
+Three real deployment paths exist side by side: pm2 + nginx directly
+on a VPS (original, below), Docker Compose (see "Docker Compose
+deployment" below, the one this session's own recommendation is built
+around), and the single-port gateway for hosts that give you one port
+and no nginx (see "Single-port deployment" below).
+
+## Single-port deployment (`gateway.js`, Replit and other PaaS)
+
+Both paths above assume you can run nginx. Replit, Render, Fly and
+most PaaS boxes expose exactly one port and expect one process to own
+it. On those, the deploy story used to be "run 36 servers and expose
+one of them", which is not a deploy story.
+
+`gateway.js` at the repo root is the same routing table in Node, in
+front of the same servers: `/<app>/...` strips the prefix and proxies
+to that app's port, `/` goes to `vaco-shell` unprefixed. Like every
+other consumer it reads `start-ecosystem.sh`'s APPS array rather than
+keeping its own copy, and `scripts/test/gateway.test.mjs` holds it and
+`nginx-docker.conf` to the same table so the day they disagree the
+suite says so instead of a deployment.
+
+```bash
+./start-ecosystem.sh          # the apps, on their own ports
+PORT=8080 node gateway.js     # all of them, through one
+node gateway.js --print-routes  # the table, without starting anything
+```
+
+**Verified (2026-09-10):** driven against the booted ecosystem, 33 of
+34 apps answered 200 through the single port; the 34th was `v4-proxy`,
+deliberately down for want of `ANTHROPIC_API_KEY`, and its 502 named
+the app and the port rather than saying "502" against 34 services.
+
+### Replit
+
+`.replit`, `replit.nix` and `deploy/replit-boot.sh` are the entry
+point. The boot script installs on first run, starts the apps, then
+`exec`s the gateway on `$PORT`. Only the gateway binds anything
+public; the backends stay on 127.0.0.1, the same shape as the nginx
+configs.
+
+**`.replit` and `replit.nix` have not been run on a real Replit
+container** — there is no Replit account attached to this work, and
+they are marked as first drafts in their own headers. `replit-boot.sh`
+*has* been driven for real here, and the run found a defect that would
+have failed on Replit every time: `PORT` is set for the gateway, but
+`start-ecosystem.sh` hands its environment to every app it starts and
+every app reads `process.env.PORT`, so all of them tried to bind the
+gateway's port. The boot reported five apps DOWN that had started fine
+a minute earlier, which reads like an out-of-memory problem and is
+not one. `scripts/test/replit-boot.test.mjs` now holds that.
+
+### Memory, and `VACO_APPS`
+
+Measured on the development machine (2026-09-10):
+
+| | processes | resident |
+|---|---|---|
+| full stack, 36 apps | 68 | 2.43 GB |
+| 5-app subset + gateway | 6 | 0.35 GB |
+
+68 rather than 36 because `npm start` stays alive as a parent of each
+`node`. A container with less RAM than the full stack needs will OOM
+partway through the boot, and the OOM killer picks a different half of
+the ecosystem each time.
+
+`VACO_APPS` is the escape hatch — a space-separated list of app names
+to start instead of all of them:
+
+```bash
+VACO_APPS="vaco-shell v3 shield void vacay" ./start-ecosystem.sh
+```
+
+An unknown name is refused with the list of known apps rather than
+skipped, and naming nothing at all is refused too: a subset boot that
+silently starts zero apps reports "0 up, 0 down", which is a clean
+bill of health for an ecosystem that is not running.
+
+### What this path is *not* for
+
+Production, as things stand. Every app keeps its state in JSON files
+on disk. That survives in a persistent workspace or on a Reserved VM;
+it does not survive an autoscaling deployment, where the filesystem is
+ephemeral and a second instance means a second, divergent ledger —
+the exact failure this repo spent the settlement-atomicity sweep
+eliminating everywhere else. The Postgres conversion is the real
+prerequisite, and it is not done.
+
+Use this to *show* the ecosystem at a URL. Use Compose or pm2+nginx to
+run it.
 
 ## Docker Compose deployment (recommended)
 

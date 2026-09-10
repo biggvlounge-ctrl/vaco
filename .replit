@@ -1,0 +1,72 @@
+# VACO on Replit -- single-port entry.
+#
+# **Not verified against a real Replit container.** Every other
+# deployment path in this repo was driven for real before being
+# written down: the pm2 config was booted (33 online, 33/34 health
+# 200), the gateway was proven against the live stack through one
+# port. This file could not be, because there is no Replit account
+# attached to this work. It is written from the documented schema and
+# should be treated as a first draft that someone runs and corrects,
+# not as a tested config.
+#
+# What IS verified is everything underneath it: `deploy/replit-boot.sh`,
+# `start-ecosystem.sh`'s VACO_APPS subset, and `gateway.js` all ran
+# here.
+#
+# ---------------------------------------------------------------------
+# What Replit is good for here, and what it is not
+#
+# Good for: showing the whole ecosystem to somebody at a URL. That is a
+# real gap -- until the gateway existed, seeing this thing run meant
+# cloning the repo and booting 36 servers.
+#
+# Not good for: production. Every app stores state in JSON files on
+# disk (`*/data/*.json`). That survives in a persistent Replit
+# workspace and does NOT survive an Autoscale deployment, which is
+# ephemeral and may run more than one instance -- two instances would
+# keep two divergent ledgers. Use a Reserved VM if this is deployed at
+# all, and treat the Postgres conversion as the real prerequisite.
+#
+# ---------------------------------------------------------------------
+
+run = "bash deploy/replit-boot.sh"
+entrypoint = "gateway.js"
+
+[nix]
+channel = "stable-24_05"
+
+# The gateway is the only public listener. All 34 backends stay on
+# 127.0.0.1 -- same shape as the nginx configs, which is the point.
+[[ports]]
+localPort = 8080
+externalPort = 80
+
+[env]
+# Replit sets PORT itself; this is the fallback the gateway already
+# uses. Listed so the mapping above is legible next to it.
+PORT = "8080"
+
+# Boot a subset instead of all 36 apps. Leave commented out on a
+# container with 4 GB or more; uncomment on anything smaller, or the
+# OOM killer picks which half of the ecosystem you get and picks
+# differently on every boot.
+#
+# Measured on the development machine:
+#   full stack  -- 68 processes, 2.43 GB resident
+#   5-app subset -- 5 processes, 0.32 GB resident
+#
+# VACO_APPS = "vaco-shell v3 shield void vacay"
+
+# Secrets go in Replit's Secrets pane, NOT here -- this file is
+# committed. `node scripts/deploy-preflight.mjs` reports the required
+# set (29 as of this writing). Nothing here invents a default for one:
+# an app that refuses to boot without its credential is an app behaving
+# correctly, and it will show as DOWN with the reason in its log.
+
+[deployment]
+run = ["bash", "deploy/replit-boot.sh"]
+# Reserved VM, deliberately. See the note above about JSON file stores:
+# Autoscale would give this ecosystem an ephemeral, possibly-forked
+# ledger, which is the one failure mode this repo has spent the most
+# effort eliminating everywhere else.
+deploymentTarget = "vm"
