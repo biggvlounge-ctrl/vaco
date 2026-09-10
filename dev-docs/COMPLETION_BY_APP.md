@@ -11,7 +11,7 @@ each app's test suite actually executed. Nothing here is recalled.
 `scripts/test/completion-report.test.mjs` fails if this file drifts
 from what the script emits, which is the failure mode that made
 `COMPLETION_AUDIT.md` read 31 apps and 522 tests when the real numbers
-were 34 and 1106.
+were 34 and 1109.
 
 ---
 
@@ -56,7 +56,7 @@ anything it can:
 | Express backends in the manifest | **34** |
 | Overall criteria met | **99%** (259/260) |
 | Apps at 100% | **33 / 34** |
-| Tests | **1106** |
+| Tests | **1109** |
 | Apps with no test suite | **0** |
 
 Two notes on that test count, so it is not read as contradicting
@@ -96,7 +96,7 @@ anything else:
 | `vaco-media` | **100%** | 6/6 | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | 51 |
 | `vaco-notify` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 17 |
 | `vaco-operator` | **100%** | 6/6 | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | 20 |
-| `vaco-shell` | **100%** | 6/6 | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | 30 |
+| `vaco-shell` | **100%** | 6/6 | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | 33 |
 | `vacon` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 18 |
 | `vago` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 9 |
 | `vavlt-stvdios` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 10 |

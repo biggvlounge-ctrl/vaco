@@ -24,24 +24,45 @@ function serviceHeaders() {
 }
 
 
-// `idempotencyKey` is optional and forwarded to V3 as an
-// Idempotency-Key header. When present, V3 replays the first result
-// instead of charging again.
-export async function transferVCoin(fromUserId, toUserId, amount, reason, idempotencyKey) {
-  const res = await fetch(`${V3_API_URL}/api/vcoin/transfer`, {
+// Atomic settlement: every leg moves, or none does.
+//
+// **Both stores here split money more than two ways**, and both used to
+// pay each party with a separate `await transferVCoin(...)`. A merch
+// order is three legs -- fulfilment, brand, platform -- so there were
+// two windows in which the second or third could fail after the first
+// had already moved money. The order or entitlement record is only
+// written after all of them, so a failure left money moved, no record,
+// and a customer free to buy again. An app refund is worse still: two
+// different payers refund one user, and the retry guard is the
+// unwritten `revokedAt`.
+//
+// `POST /api/vcoin/settle` validates every leg against running balances
+// and writes nothing unless all of them pass.
+export async function settleVCoin(legs, meta = {}) {
+  const res = await fetch(`${V3_API_URL}/api/vcoin/settle`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...serviceHeaders(),
-      ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
+      // The settlement reason uniquely names the order or install, so
+      // it doubles as the idempotency key: a retried settlement replays
+      // V3's first answer rather than charging again. Atomicity stops a
+      // *partial* settlement; this stops a *duplicate* one.
+      ...(meta.reason ? { 'Idempotency-Key': `settle:${meta.reason}` } : {}),
     },
-    body: JSON.stringify({ fromUserId, toUserId, amount, reason }),
+    body: JSON.stringify({ legs, reason: meta.reason ?? null }),
   });
   const body = await res.json();
   if (!res.ok) {
-    throw new Error(body.error || `transferVCoin failed (${res.status})`);
+    throw new Error(body.error || `settleVCoin failed (${res.status})`);
   }
   return body;
 }
+
+// **`transferVCoin` is deliberately gone**, not kept alongside. A
+// working single-transfer helper is what the next money path in this
+// app gets written with, and consecutive calls to it are the shape
+// that pays one party and not the next. `settleVCoin([oneLeg], meta)`
+// covers the single-leg case with the same guarantee.
 
 export { V3_API_URL };

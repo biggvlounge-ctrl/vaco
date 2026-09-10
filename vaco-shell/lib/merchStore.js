@@ -152,7 +152,7 @@ export function discontinueProduct(store, productId) {
 export async function placeOrder(store, options = {}) {
   const {
     customerId, productId, quantity = 1, shippingRef = null,
-    transferFn = null, now = Date.now(),
+    settleFn = null, now = Date.now(),
   } = options;
 
   if (!customerId) throw new MerchError('placeOrder requires a customerId');
@@ -162,8 +162,8 @@ export async function placeOrder(store, options = {}) {
   if (!Number.isInteger(quantity) || quantity < 1) {
     throw new MerchError('placeOrder requires a positive integer quantity');
   }
-  if (typeof transferFn !== 'function') {
-    throw new MerchError('placeOrder requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') {
+    throw new MerchError('placeOrder requires a settleFn(legs, meta) that moves every leg atomically');
   }
 
   const total = round(product.retailPriceVcoin * quantity);
@@ -177,16 +177,37 @@ export async function placeOrder(store, options = {}) {
   // margin, the platform takes its rate of the margin — not of the
   // retail price, which would eat the brand's share on low-margin
   // items.
-  await transferFn(customerId, `merch-fulfilment:${product.fulfillmentProvider}`,
-    fulfilmentCost, `vaco_merch_fulfilment:${productId}`);
+  //
+  // **Three legs is the worst case for splitting them.** Written as
+  // three consecutive awaits there were two windows for a partial
+  // failure, and the order record below is only written after all of
+  // them — so any failure left money moved, no order, and a customer
+  // free to buy again. `POST /api/vcoin/settle` validates all three
+  // against running balances and writes nothing unless every one of
+  // them passes.
+  const legs = [{
+    fromUserId: customerId,
+    toUserId: `merch-fulfilment:${product.fulfillmentProvider}`,
+    amount: fulfilmentCost,
+    reason: `vaco_merch_fulfilment:${productId}`,
+  }];
   if (brandPayout > 0) {
-    await transferFn(customerId, `brand:${product.appBrandId}`, brandPayout,
-      `vaco_merch_brand_payout:${productId}`);
+    legs.push({
+      fromUserId: customerId,
+      toUserId: `brand:${product.appBrandId}`,
+      amount: brandPayout,
+      reason: `vaco_merch_brand_payout:${productId}`,
+    });
   }
   if (platformFee > 0) {
-    await transferFn(customerId, VACO_MERCH_ACCOUNT, platformFee,
-      `vaco_merch_platform_fee:${productId}`);
+    legs.push({
+      fromUserId: customerId,
+      toUserId: VACO_MERCH_ACCOUNT,
+      amount: platformFee,
+      reason: `vaco_merch_platform_fee:${productId}`,
+    });
   }
+  await settleFn(legs, { reason: `vaco_merch_order:${productId}:${customerId}` });
 
   const order = {
     id: store.nextMerchOrderId++,

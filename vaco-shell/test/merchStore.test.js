@@ -19,13 +19,24 @@ import {
   VACO_MERCH_ACCOUNT, MerchError,
 } from '../lib/merchStore.js';
 
+// **`moves` and `calls` answer different questions.** `moves` is every
+// leg, flattened — what an assertion about who was paid what wants.
+// `calls` is how many times the ledger was asked, which is the only
+// thing that distinguishes an atomic settlement from the consecutive
+// transfers it replaced: the amounts are identical either way, which is
+// exactly how that defect survived a green suite.
 function recordingTransfers() {
   const moves = [];
-  const fn = async (from, to, amount, reason) => {
-    moves.push({ from, to, amount, reason });
+  const calls = [];
+  const fn = async (legs, meta = {}) => {
+    calls.push({ legs, meta });
+    for (const l of legs) {
+      moves.push({ from: l.fromUserId, to: l.toUserId, amount: l.amount, reason: l.reason });
+    }
     return { ok: true };
   };
   fn.moves = moves;
+  fn.calls = calls;
   return fn;
 }
 
@@ -104,7 +115,7 @@ test('a discontinued product disappears from the storefront and cannot be ordere
   discontinueProduct(store, 'void-mug');
   assert.equal(listByBrand(store, 'void').length, 1);
   await assert.rejects(() => placeOrder(store, {
-    customerId: 'sam', productId: 'void-mug', transferFn: recordingTransfers(),
+    customerId: 'sam', productId: 'void-mug', settleFn: recordingTransfers(),
   }), /discontinued/);
 });
 
@@ -112,8 +123,8 @@ test('a discontinued product disappears from the storefront and cannot be ordere
 
 test('an order splits three ways, with the platform fee taken on margin not retail', async () => {
   const store = storeWithProducts();
-  const transferFn = recordingTransfers();
-  const order = await placeOrder(store, { customerId: 'sam', productId: 'void-tee', transferFn });
+  const settleFn = recordingTransfers();
+  const order = await placeOrder(store, { customerId: 'sam', productId: 'void-tee', settleFn });
 
   // Retail 30, cost 10 → margin 20. Platform takes 20% of 20 = 4.
   // Taken on retail it would have been 6, leaving the brand 14 instead
@@ -125,18 +136,24 @@ test('an order splits three ways, with the platform fee taken on margin not reta
   assert.equal(order.fulfilmentCost + order.brandPayout + order.platformFee, order.total,
     'the three shares must add back up to what the customer paid');
 
-  assert.equal(transferFn.moves.length, 3);
-  assert.deepEqual(transferFn.moves.map((m) => m.to), [
+  assert.equal(settleFn.moves.length, 3);
+  // **Three legs, one call.** Written as three consecutive transfers
+  // there were two windows for a partial failure, and the order record
+  // is only written after all of them — so a failure moved money,
+  // created no order, and left the customer free to buy again. Every
+  // other assertion in this test passes either way.
+  assert.equal(settleFn.calls.length, 1, 'the settlement must be a single atomic call');
+  assert.deepEqual(settleFn.moves.map((m) => m.to), [
     'merch-fulfilment:printify', 'brand:void', VACO_MERCH_ACCOUNT,
   ]);
-  assert.ok(transferFn.moves.every((m) => m.from === 'sam'));
+  assert.ok(settleFn.moves.every((m) => m.from === 'sam'));
 });
 
 test('quantity multiplies every share', async () => {
   const store = storeWithProducts();
-  const transferFn = recordingTransfers();
+  const settleFn = recordingTransfers();
   const order = await placeOrder(store, {
-    customerId: 'sam', productId: 'void-tee', quantity: 3, transferFn,
+    customerId: 'sam', productId: 'void-tee', quantity: 3, settleFn,
   });
   assert.equal(order.total, 90);
   assert.equal(order.fulfilmentCost, 30);
@@ -144,11 +161,11 @@ test('quantity multiplies every share', async () => {
   assert.equal(order.brandPayout, 48);
 });
 
-test('an order without a transferFn is refused rather than recorded unpaid', async () => {
+test('an order without a settleFn is refused rather than recorded unpaid', async () => {
   const store = storeWithProducts();
   await assert.rejects(
     () => placeOrder(store, { customerId: 'sam', productId: 'void-tee' }),
-    /requires a transferFn/,
+    /requires a settleFn/,
   );
   assert.equal(store.merchOrders.length, 0);
 });
@@ -156,14 +173,14 @@ test('an order without a transferFn is refused rather than recorded unpaid', asy
 test('a fractional quantity is refused', async () => {
   const store = storeWithProducts();
   await assert.rejects(() => placeOrder(store, {
-    customerId: 'sam', productId: 'void-tee', quantity: 1.5, transferFn: recordingTransfers(),
+    customerId: 'sam', productId: 'void-tee', quantity: 1.5, settleFn: recordingTransfers(),
   }), /positive integer quantity/);
 });
 
 test('nothing is manufactured until the order reaches production', async () => {
   const store = storeWithProducts();
-  const transferFn = recordingTransfers();
-  const order = await placeOrder(store, { customerId: 'sam', productId: 'void-tee', transferFn });
+  const settleFn = recordingTransfers();
+  const order = await placeOrder(store, { customerId: 'sam', productId: 'void-tee', settleFn });
   assert.equal(order.status, 'placed');
   assert.equal(order.manufacturedAt, null);
 
@@ -178,16 +195,16 @@ test('nothing is manufactured until the order reaches production', async () => {
 
 test('the fulfilment seam records intent and says so rather than pretending', async () => {
   const store = storeWithProducts();
-  const transferFn = recordingTransfers();
-  const order = await placeOrder(store, { customerId: 'sam', productId: 'void-tee', transferFn });
+  const settleFn = recordingTransfers();
+  const order = await placeOrder(store, { customerId: 'sam', productId: 'void-tee', settleFn });
   const submitted = submitToFulfilment(store, { orderId: order.id });
   assert.match(submitted.integrationNote, /no live fulfilment API/);
 });
 
 test('order status cannot skip or reverse', async () => {
   const store = storeWithProducts();
-  const transferFn = recordingTransfers();
-  const order = await placeOrder(store, { customerId: 'sam', productId: 'void-tee', transferFn });
+  const settleFn = recordingTransfers();
+  const order = await placeOrder(store, { customerId: 'sam', productId: 'void-tee', settleFn });
 
   assert.throws(() => advanceOrder(store, { orderId: order.id, to: 'shipped' }),
     /cannot go placed -> shipped/);
@@ -207,10 +224,10 @@ test('order status cannot skip or reverse', async () => {
 
 test('brand earnings exclude cancelled orders and report each share', async () => {
   const store = storeWithProducts();
-  const transferFn = recordingTransfers();
-  await placeOrder(store, { customerId: 'sam', productId: 'void-tee', transferFn });
-  await placeOrder(store, { customerId: 'ada', productId: 'void-mug', quantity: 2, transferFn });
-  const cancelled = await placeOrder(store, { customerId: 'ada', productId: 'void-tee', transferFn });
+  const settleFn = recordingTransfers();
+  await placeOrder(store, { customerId: 'sam', productId: 'void-tee', settleFn });
+  await placeOrder(store, { customerId: 'ada', productId: 'void-mug', quantity: 2, settleFn });
+  const cancelled = await placeOrder(store, { customerId: 'ada', productId: 'void-tee', settleFn });
   advanceOrder(store, { orderId: cancelled.id, to: 'cancelled' });
 
   const earnings = brandEarnings(store, 'void');
@@ -232,4 +249,22 @@ test('describeMerch states what is not built rather than implying a live integra
   assert.equal(described.zeroInventory, true);
   assert.ok(described.notBuilt.some((n) => /no live Printify/.test(n)));
   assert.ok(described.notBuilt.some((n) => /no AI illustration layer/.test(n)));
+});
+
+test('a refused merch settlement creates no order and moves nothing', async () => {
+  const store = storeWithProducts();
+  const settleFn = async () => {
+    throw new Error('legs[2]: Insufficient VCoin balance. Nothing in this settlement was applied.');
+  };
+  const before = store.merchOrders.length;
+
+  await assert.rejects(
+    () => placeOrder(store, {
+      customerId: 'sam', productId: 'void-tee', quantity: 1, settleFn,
+    }),
+    /Nothing in this settlement was applied/,
+  );
+
+  assert.equal(store.merchOrders.length, before,
+    'a refused settlement recorded an order');
 });

@@ -55,7 +55,7 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..
 // honestly promise while a sweep is unfinished. Same shape as
 // `audit-route-guards.mjs`: it does not claim the remainder is fine, it
 // claims the remainder is not growing.
-const CEILING = 91;
+const CEILING = 84;
 
 const TRANSFER_CALL = /await\s+(?:transferFn|transferVCoin|transfer)\s*\(/g;
 

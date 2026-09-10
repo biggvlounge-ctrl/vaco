@@ -39,7 +39,7 @@ const { traceMiddleware } = tracingModule;
 import { getInsightCard } from './lib/insight.js';
 import { createPersistentShellStore } from './lib/store.js';
 import { durable } from './lib/persistence.js';
-import { transferVCoin, V3_API_URL } from './lib/v3Client.js';
+import { settleVCoin, V3_API_URL } from './lib/v3Client.js';
 import shieldAuth from './lib/shieldAuth.cjs';
 import serviceAuthModule from './lib/serviceAuth.cjs';
 import decisionLogModule from './lib/decisionLog.cjs';
@@ -293,7 +293,7 @@ app.delete('/api/store/listings/:appId', requireCallingService(), (req, res) => 
 // launcher routes would have left three live money paths open.
 app.post('/api/store/install', requireActor('userId'), (req, res) => handle(res, () => appStore.install(store, {
   ...req.body,
-  transferFn: transferVCoin,
+  settleFn: settleVCoin,
 }), 201));
 
 app.post('/api/store/uninstall', requireActor('userId'), (req, res) => handle(res, () => appStore.uninstall(store, req.body || {})));
@@ -317,7 +317,7 @@ app.post('/api/store/refund', requireOperator('vaco-shell:reversal'), async (req
   }
   return handle(res, () => appStore.refund(store, {
     ...req.body,
-    transferFn: transferVCoin,
+    settleFn: settleVCoin,
   }));
 });
 
@@ -367,7 +367,7 @@ app.delete('/api/merch/products/:productId', requireCallingService(), (req, res)
 
 app.post('/api/merch/orders', requireActor('customerId'), (req, res) => handle(res, () => merch.placeOrder(store, {
   ...req.body,
-  transferFn: transferVCoin,
+  settleFn: settleVCoin,
 }), 201));
 
 app.get('/api/merch/orders/:id', (req, res) => {

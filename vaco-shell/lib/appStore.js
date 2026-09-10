@@ -164,7 +164,7 @@ export function hasAccess(store, userId, appId, now = Date.now()) {
 // and making it the caller's job is how a paid app gets given away by
 // a surface that forgot to check.
 export async function install(store, options = {}) {
-  const { userId, appId, transferFn = null, now = Date.now() } = options;
+  const { userId, appId, settleFn = null, now = Date.now() } = options;
 
   if (!userId) throw new AppStoreError('install requires a userId');
   const listing = getListing(store, appId);
@@ -183,25 +183,41 @@ export async function install(store, options = {}) {
   let storeFee = 0;
 
   if (listing.pricingModel !== 'free') {
-    if (typeof transferFn !== 'function') {
+    if (typeof settleFn !== 'function') {
       throw new AppStoreError(
         `install: "${appId}" costs ${listing.priceVcoin} VCoin and requires a `
-        + 'transferFn(fromUserId, toUserId, amount, reason)',
+        + 'settleFn(legs, meta) that moves every leg atomically',
       );
     }
     charged = listing.priceVcoin;
     storeFee = round(charged * listing.takeRate);
     publisherPayout = round(charged - storeFee);
 
-    // Two transfers, same reasoning as V3 settlement everywhere else:
-    // the publisher's earnings and the store's fee stay separately
+    // Two legs, same reasoning as V3 settlement everywhere else: the
+    // publisher's earnings and the store's fee stay separately
     // auditable rather than netting into one movement.
-    await transferFn(userId, listing.publisherId, publisherPayout,
-      `vaco_store_purchase:${appId}`);
+    //
+    // **One call, not two awaits.** Split, the second can fail on its
+    // own -- the first just debited the same buyer -- and the throw
+    // means the entitlement below is never written. The publisher has
+    // been paid for an app the user does not own, and the buyer can
+    // install again and pay again. `POST /api/vcoin/settle` moves every
+    // leg or none.
+    const legs = [{
+      fromUserId: userId,
+      toUserId: listing.publisherId,
+      amount: publisherPayout,
+      reason: `vaco_store_purchase:${appId}`,
+    }];
     if (storeFee > 0) {
-      await transferFn(userId, VACO_STORE_ACCOUNT, storeFee,
-        `vaco_store_fee:${appId}`);
+      legs.push({
+        fromUserId: userId,
+        toUserId: VACO_STORE_ACCOUNT,
+        amount: storeFee,
+        reason: `vaco_store_fee:${appId}`,
+      });
     }
+    await settleFn(legs, { reason: `vaco_store_install:${appId}:${userId}` });
   }
 
   const expiresAt = listing.pricingModel === 'subscription'
@@ -247,25 +263,42 @@ export function uninstall(store, options = {}) {
 // Refunding reverses the money AND the access. Distinct from
 // uninstalling on purpose.
 export async function refund(store, options = {}) {
-  const { userId, appId, transferFn = null, reason = 'unspecified', now = Date.now() } = options;
+  const { userId, appId, settleFn = null, reason = 'unspecified', now = Date.now() } = options;
   const entitlement = getEntitlement(store, userId, appId);
   if (!entitlement) throw new AppStoreError(`refund: "${userId}" has no entitlement for "${appId}"`);
   if (entitlement.revokedAt !== null) throw new AppStoreError(`refund: "${appId}" was already refunded`);
 
   const listing = getListing(store, appId);
   if (entitlement.pricePaid > 0) {
-    if (typeof transferFn !== 'function') {
-      throw new AppStoreError('refund of a paid app requires a transferFn');
+    if (typeof settleFn !== 'function') {
+      throw new AppStoreError('refund of a paid app requires a settleFn(legs, meta)');
     }
     const storeFee = round(entitlement.pricePaid * listing.takeRate);
     const publisherPortion = round(entitlement.pricePaid - storeFee);
     // Both parties give back their share. The store refunding its fee
     // out of the publisher's pocket would be the easy shortcut and the
     // wrong one.
-    await transferFn(listing.publisherId, userId, publisherPortion, `vaco_store_refund:${appId}`);
+    //
+    // **Worse than the purchase if split.** Two different payers refund
+    // one user, so a failure between them leaves the publisher out of
+    // pocket while the store keeps its fee -- and `revokedAt` below is
+    // never set, so the guard at the top of this function still permits
+    // a retry that refunds the publisher a second time.
+    const legs = [{
+      fromUserId: listing.publisherId,
+      toUserId: userId,
+      amount: publisherPortion,
+      reason: `vaco_store_refund:${appId}`,
+    }];
     if (storeFee > 0) {
-      await transferFn(VACO_STORE_ACCOUNT, userId, storeFee, `vaco_store_fee_refund:${appId}`);
+      legs.push({
+        fromUserId: VACO_STORE_ACCOUNT,
+        toUserId: userId,
+        amount: storeFee,
+        reason: `vaco_store_fee_refund:${appId}`,
+      });
     }
+    await settleFn(legs, { reason: `vaco_store_refund:${appId}:${userId}` });
   }
 
   entitlement.revokedAt = now;
