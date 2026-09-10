@@ -14,6 +14,13 @@ function createV3Store() {
     vashBalances: {}, // userId -> number
     transactions: [],
     nextTransactionId: 1,
+    // Groups the legs of one atomic settlement (`vcoin.settle`). Every
+    // leg is still its own transaction row — this only records which
+    // of them happened together. See the header's note about the
+    // shallow-merge default: a store persisted before this field
+    // existed comes back without it, which is why `settle` tolerates
+    // its absence rather than assuming the factory ran.
+    nextSettlementId: 1,
   };
 }
 

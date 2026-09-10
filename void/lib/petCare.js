@@ -261,7 +261,7 @@ function confirmBooking(store, options = {}) {
 // A meet-and-greet settles nothing, because it is an introduction
 // rather than a service and is genuinely free.
 async function completeBooking(store, options = {}) {
-  const { bookingId, completionPhotoRef = null, transferFn = null, now = Date.now() } = options;
+  const { bookingId, completionPhotoRef = null, settleFn = null, now = Date.now() } = options;
   const booking = requireBooking(store, bookingId, 'completeBooking');
   if (booking.status !== 'confirmed') {
     throw new PetCareError(`completeBooking: booking ${bookingId} is ${booking.status}, must be confirmed`);
@@ -274,7 +274,7 @@ async function completeBooking(store, options = {}) {
       total: booking.price,
       label: 'petcare',
       reference: bookingId,
-      transferFn,
+      settleFn,
       now,
     });
   }

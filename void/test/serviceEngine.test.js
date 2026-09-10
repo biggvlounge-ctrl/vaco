@@ -20,17 +20,32 @@ const { registerProvider, addSkill, verifySkill } = require('../lib/providerProf
 const { recordVetting, requiredVettingFor } = require('../lib/serviceCommon');
 const { createVoidStore } = require('../lib/store');
 
-// Records transfers instead of moving money, so a test can assert on
+// Records settlements instead of moving money, so a test can assert on
 // exactly what would have been paid. Settlement now happens inside
 // advanceBooking, so any transition to a completion state needs one.
+//
+// **`calls` and `legs` are different questions, and both matter.**
+// `legs` is every movement, flattened, which is what an assertion about
+// *who was paid what* wants. `calls` is how many times the ledger was
+// asked, which is the only thing that can tell an atomic settlement
+// from the two consecutive transfers it replaced — the amounts are
+// identical either way, which is exactly how that bug survived a green
+// suite.
 function recorder() {
   const calls = [];
-  const fn = async (from, to, amount, reason) => { calls.push({ from, to, amount, reason }); };
+  const legs = [];
+  const fn = async (settlementLegs, meta = {}) => {
+    calls.push({ legs: settlementLegs, meta });
+    for (const l of settlementLegs) {
+      legs.push({ from: l.fromUserId, to: l.toUserId, amount: l.amount, reason: l.reason });
+    }
+  };
   fn.calls = calls;
+  fn.legs = legs;
   return fn;
 }
 
-// Settlement needs a transferFn; most tests do not care what it does.
+// Settlement needs a settleFn; most tests do not care what it does.
 const TEST_TRANSFER = async () => {};
 
 const NOW = Date.UTC(2026, 8, 1);
@@ -196,9 +211,9 @@ test('an intro session is required before a first booking where configured', asy
 test('a completed intro session opens the gate', async () => {
   const store = createVoidStore();
   const intro = bookingFor(store, 'childcare');
-  await engine.advanceBooking(store, { transferFn: TEST_TRANSFER, bookingId: intro.id, to: 'confirmed', now: NOW });
-  await engine.advanceBooking(store, { transferFn: TEST_TRANSFER, bookingId: intro.id, to: 'in-progress', now: NOW });
-  await engine.advanceBooking(store, { transferFn: TEST_TRANSFER, bookingId: intro.id, to: 'completed', now: NOW });
+  await engine.advanceBooking(store, { settleFn: TEST_TRANSFER, bookingId: intro.id, to: 'confirmed', now: NOW });
+  await engine.advanceBooking(store, { settleFn: TEST_TRANSFER, bookingId: intro.id, to: 'in-progress', now: NOW });
+  await engine.advanceBooking(store, { settleFn: TEST_TRANSFER, bookingId: intro.id, to: 'completed', now: NOW });
 
   const real = engine.createServiceBooking(store, {
     verticalId: 'childcare', subjectId: subjectFor(store, 'childcare').id,
@@ -214,26 +229,26 @@ test('every archetype refuses a transition that skips a step', async () => {
   const store = createVoidStore();
   // round-trip: cannot start work before the item is assessed.
   const repair = bookingFor(store, 'autoRepairDetailing');
-  await engine.advanceBooking(store, { transferFn: TEST_TRANSFER, bookingId: repair.id, to: 'collected', now: NOW });
-  await assert.rejects(() => engine.advanceBooking(store, { transferFn: TEST_TRANSFER, bookingId: repair.id, to: 'in-progress', now: NOW }),
+  await engine.advanceBooking(store, { settleFn: TEST_TRANSFER, bookingId: repair.id, to: 'collected', now: NOW });
+  await assert.rejects(() => engine.advanceBooking(store, { settleFn: TEST_TRANSFER, bookingId: repair.id, to: 'in-progress', now: NOW }),
     /cannot go collected -> in-progress/);
 });
 
 test('a terminal state cannot be advanced out of', async () => {
   const store = createVoidStore();
   const b = bookingFor(store, 'beauty');
-  await engine.advanceBooking(store, { transferFn: TEST_TRANSFER, bookingId: b.id, to: 'confirmed', now: NOW });
-  await engine.advanceBooking(store, { transferFn: TEST_TRANSFER, bookingId: b.id, to: 'in-progress', now: NOW });
-  await engine.advanceBooking(store, { transferFn: TEST_TRANSFER, bookingId: b.id, to: 'completed', now: NOW });
-  await assert.rejects(() => engine.advanceBooking(store, { transferFn: TEST_TRANSFER, bookingId: b.id, to: 'in-progress', now: NOW }),
+  await engine.advanceBooking(store, { settleFn: TEST_TRANSFER, bookingId: b.id, to: 'confirmed', now: NOW });
+  await engine.advanceBooking(store, { settleFn: TEST_TRANSFER, bookingId: b.id, to: 'in-progress', now: NOW });
+  await engine.advanceBooking(store, { settleFn: TEST_TRANSFER, bookingId: b.id, to: 'completed', now: NOW });
+  await assert.rejects(() => engine.advanceBooking(store, { settleFn: TEST_TRANSFER, bookingId: b.id, to: 'in-progress', now: NOW }),
     /terminal state/);
 });
 
 test('every booking carries its own audit trail', async () => {
   const store = createVoidStore();
   const b = bookingFor(store, 'beauty');
-  await engine.advanceBooking(store, { transferFn: TEST_TRANSFER, bookingId: b.id, to: 'confirmed', now: NOW });
-  await engine.advanceBooking(store, { transferFn: TEST_TRANSFER, bookingId: b.id, to: 'in-progress', now: NOW + H });
+  await engine.advanceBooking(store, { settleFn: TEST_TRANSFER, bookingId: b.id, to: 'confirmed', now: NOW });
+  await engine.advanceBooking(store, { settleFn: TEST_TRANSFER, bookingId: b.id, to: 'in-progress', now: NOW + H });
   assert.deepStrictEqual(b.history.map((h) => h.status), ['requested', 'confirmed', 'in-progress']);
 });
 
@@ -242,16 +257,16 @@ test('every booking carries its own audit trail', async () => {
 test('a round-trip booking cannot reach "assessed" without a real total', async () => {
   const store = createVoidStore();
   const repair = bookingFor(store, 'autoRepairDetailing');
-  await engine.advanceBooking(store, { transferFn: TEST_TRANSFER, bookingId: repair.id, to: 'collected', now: NOW });
-  await assert.rejects(() => engine.advanceBooking(store, { transferFn: TEST_TRANSFER, bookingId: repair.id, to: 'assessed', now: NOW }),
+  await engine.advanceBooking(store, { settleFn: TEST_TRANSFER, bookingId: repair.id, to: 'collected', now: NOW });
+  await assert.rejects(() => engine.advanceBooking(store, { settleFn: TEST_TRANSFER, bookingId: repair.id, to: 'assessed', now: NOW }),
     /requires a positive actualTotal/);
 });
 
 test('a quote booking cannot reach "quoted" without a real total', async () => {
   const store = createVoidStore();
   const move = bookingFor(store, 'freightMoving');
-  await engine.advanceBooking(store, { transferFn: TEST_TRANSFER, bookingId: move.id, to: 'surveyed', now: NOW });
-  await assert.rejects(() => engine.advanceBooking(store, { transferFn: TEST_TRANSFER, bookingId: move.id, to: 'quoted', now: NOW }),
+  await engine.advanceBooking(store, { settleFn: TEST_TRANSFER, bookingId: move.id, to: 'surveyed', now: NOW });
+  await assert.rejects(() => engine.advanceBooking(store, { settleFn: TEST_TRANSFER, bookingId: move.id, to: 'quoted', now: NOW }),
     /requires a positive actualTotal/);
 });
 
@@ -267,17 +282,17 @@ test('a total over the customer cap HOLDS the work', async () => {
   const store = createVoidStore();
   const repair = bookingFor(store, 'autoRepairDetailing');
   repair.maxAcceptableTotal = 300;
-  await engine.advanceBooking(store, { transferFn: TEST_TRANSFER, bookingId: repair.id, to: 'collected', now: NOW });
-  await engine.advanceBooking(store, { transferFn: TEST_TRANSFER, bookingId: repair.id, to: 'assessed', actualTotal: 520, now: NOW });
+  await engine.advanceBooking(store, { settleFn: TEST_TRANSFER, bookingId: repair.id, to: 'collected', now: NOW });
+  await engine.advanceBooking(store, { settleFn: TEST_TRANSFER, bookingId: repair.id, to: 'assessed', actualTotal: 520, now: NOW });
 
   assert.strictEqual(repair.requiresCustomerApproval, true);
-  await assert.rejects(() => engine.advanceBooking(store, { transferFn: TEST_TRANSFER, bookingId: repair.id, to: 'in-progress', now: NOW }),
+  await assert.rejects(() => engine.advanceBooking(store, { settleFn: TEST_TRANSFER, bookingId: repair.id, to: 'in-progress', now: NOW }),
     /awaiting approval/);
 
   engine.approveOverCap(store, { bookingId: repair.id });
   assert.strictEqual(
     (await engine.advanceBooking(store, {
-      transferFn: TEST_TRANSFER, bookingId: repair.id, to: 'in-progress', now: NOW,
+      settleFn: TEST_TRANSFER, bookingId: repair.id, to: 'in-progress', now: NOW,
     })).status,
     'in-progress',
   );
@@ -287,8 +302,8 @@ test('a total under the cap proceeds without approval', async () => {
   const store = createVoidStore();
   const repair = bookingFor(store, 'autoRepairDetailing');
   repair.maxAcceptableTotal = 600;
-  await engine.advanceBooking(store, { transferFn: TEST_TRANSFER, bookingId: repair.id, to: 'collected', now: NOW });
-  await engine.advanceBooking(store, { transferFn: TEST_TRANSFER, bookingId: repair.id, to: 'assessed', actualTotal: 520, now: NOW });
+  await engine.advanceBooking(store, { settleFn: TEST_TRANSFER, bookingId: repair.id, to: 'collected', now: NOW });
+  await engine.advanceBooking(store, { settleFn: TEST_TRANSFER, bookingId: repair.id, to: 'assessed', actualTotal: 520, now: NOW });
   assert.strictEqual(repair.requiresCustomerApproval, false);
 });
 
@@ -317,9 +332,9 @@ test('a per-vertical cancellation window overrides the default', async () => {
 test('a completed booking can no longer be cancelled', async () => {
   const store = createVoidStore();
   const b = bookingFor(store, 'beauty');
-  await engine.advanceBooking(store, { transferFn: TEST_TRANSFER, bookingId: b.id, to: 'confirmed', now: NOW });
-  await engine.advanceBooking(store, { transferFn: TEST_TRANSFER, bookingId: b.id, to: 'in-progress', now: NOW });
-  await engine.advanceBooking(store, { transferFn: TEST_TRANSFER, bookingId: b.id, to: 'completed', now: NOW });
+  await engine.advanceBooking(store, { settleFn: TEST_TRANSFER, bookingId: b.id, to: 'confirmed', now: NOW });
+  await engine.advanceBooking(store, { settleFn: TEST_TRANSFER, bookingId: b.id, to: 'in-progress', now: NOW });
+  await engine.advanceBooking(store, { settleFn: TEST_TRANSFER, bookingId: b.id, to: 'completed', now: NOW });
   assert.throws(() => engine.cancelServiceBooking(store, { bookingId: b.id, now: NOW }),
     /can no longer be cancelled/);
 });
@@ -356,9 +371,9 @@ test('cancelling a series leaves completed bookings alone', async () => {
     service: 'mow', firstScheduledFor: NOW + 9 * H, intervalDays: 7, occurrences: 3,
     quotedTotal: 60, now: NOW,
   });
-  await engine.advanceBooking(store, { transferFn: TEST_TRANSFER, bookingId: bookings[0].id, to: 'confirmed', now: NOW });
-  await engine.advanceBooking(store, { transferFn: TEST_TRANSFER, bookingId: bookings[0].id, to: 'in-progress', now: NOW });
-  await engine.advanceBooking(store, { transferFn: TEST_TRANSFER, bookingId: bookings[0].id, to: 'completed', now: NOW });
+  await engine.advanceBooking(store, { settleFn: TEST_TRANSFER, bookingId: bookings[0].id, to: 'confirmed', now: NOW });
+  await engine.advanceBooking(store, { settleFn: TEST_TRANSFER, bookingId: bookings[0].id, to: 'in-progress', now: NOW });
+  await engine.advanceBooking(store, { settleFn: TEST_TRANSFER, bookingId: bookings[0].id, to: 'completed', now: NOW });
 
   engine.cancelSeries(store, { recurrenceId, now: NOW });
   assert.strictEqual(engine.getServiceBooking(store, bookings[0].id).status, 'completed');
@@ -371,7 +386,7 @@ test('preferred providers exclude intro sessions from the count', async () => {
   const store = createVoidStore();
   const intro = bookingFor(store, 'childcare');
   for (const to of ['confirmed', 'in-progress', 'completed']) {
-    await engine.advanceBooking(store, { transferFn: TEST_TRANSFER, bookingId: intro.id, to, now: NOW });
+    await engine.advanceBooking(store, { settleFn: TEST_TRANSFER, bookingId: intro.id, to, now: NOW });
   }
   const real = engine.createServiceBooking(store, {
     verticalId: 'childcare', subjectId: subjectFor(store, 'childcare').id,
@@ -379,7 +394,7 @@ test('preferred providers exclude intro sessions from the count', async () => {
     scheduledFor: NOW + 72 * H, quotedTotal: 100, now: NOW,
   });
   for (const to of ['confirmed', 'in-progress', 'completed']) {
-    await engine.advanceBooking(store, { transferFn: TEST_TRANSFER, bookingId: real.id, to, now: NOW + H });
+    await engine.advanceBooking(store, { settleFn: TEST_TRANSFER, bookingId: real.id, to, now: NOW + H });
   }
 
   const preferred = engine.preferredProviders(store, 'sam', 'childcare');
@@ -426,20 +441,26 @@ test('completing a booking pays the provider and takes the platform fee', async 
   const t = recorder();
   const b = bookingFor(store, 'beauty', { quotedTotal: 200 });
 
-  await engine.advanceBooking(store, { bookingId: b.id, to: 'confirmed', transferFn: t, now: NOW });
-  await engine.advanceBooking(store, { bookingId: b.id, to: 'in-progress', transferFn: t, now: NOW });
-  await engine.advanceBooking(store, { bookingId: b.id, to: 'completed', transferFn: t, now: NOW });
+  await engine.advanceBooking(store, { bookingId: b.id, to: 'confirmed', settleFn: t, now: NOW });
+  await engine.advanceBooking(store, { bookingId: b.id, to: 'in-progress', settleFn: t, now: NOW });
+  await engine.advanceBooking(store, { bookingId: b.id, to: 'completed', settleFn: t, now: NOW });
 
   // beauty takes 20%.
   assert.strictEqual(b.providerPayout, 160);
   assert.strictEqual(b.platformFee, 40);
   assert.strictEqual(b.settledTotal, 200);
 
-  assert.strictEqual(t.calls.length, 2, 'payout and fee are separately auditable');
-  assert.strictEqual(t.calls[0].to, 'pro');
-  assert.strictEqual(t.calls[0].amount, 160);
-  assert.strictEqual(t.calls[1].to, engine.VOID_PLATFORM_ACCOUNT);
-  assert.strictEqual(t.calls[1].amount, 40);
+  assert.strictEqual(t.legs.length, 2, 'payout and fee are separately auditable');
+  assert.strictEqual(t.legs[0].to, 'pro');
+  assert.strictEqual(t.legs[0].amount, 160);
+  assert.strictEqual(t.legs[1].to, engine.VOID_PLATFORM_ACCOUNT);
+  assert.strictEqual(t.legs[1].amount, 40);
+
+  // **The assertion arithmetic cannot make.** Both legs must reach the
+  // ledger in ONE call. Split back into two consecutive transfers,
+  // every line above still passes and a mid-settlement failure pays
+  // the provider without the fee -- then the retry pays them twice.
+  assert.strictEqual(t.calls.length, 1, 'the settlement must be a single atomic call');
 });
 
 test('payout and fee always sum to exactly the total', async () => {
@@ -448,7 +469,7 @@ test('payout and fee always sum to exactly the total', async () => {
   const t = recorder();
   const b = bookingFor(store, 'beauty', { quotedTotal: 333.33 });
   for (const to of ['confirmed', 'in-progress', 'completed']) {
-    await engine.advanceBooking(store, { bookingId: b.id, to, transferFn: t, now: NOW });
+    await engine.advanceBooking(store, { bookingId: b.id, to, settleFn: t, now: NOW });
   }
   assert.strictEqual(Math.round((b.providerPayout + b.platformFee) * 100) / 100, 333.33);
 });
@@ -460,14 +481,15 @@ test('a round trip settles at RETURNED, not at ready', async () => {
   const t = recorder();
   const repair = bookingFor(store, 'autoRepairDetailing');
 
-  await engine.advanceBooking(store, { bookingId: repair.id, to: 'collected', transferFn: t, now: NOW });
-  await engine.advanceBooking(store, { bookingId: repair.id, to: 'assessed', actualTotal: 500, transferFn: t, now: NOW });
-  await engine.advanceBooking(store, { bookingId: repair.id, to: 'in-progress', transferFn: t, now: NOW });
-  await engine.advanceBooking(store, { bookingId: repair.id, to: 'ready', transferFn: t, now: NOW });
-  assert.strictEqual(t.calls.length, 0, 'nothing settles before the item is returned');
+  await engine.advanceBooking(store, { bookingId: repair.id, to: 'collected', settleFn: t, now: NOW });
+  await engine.advanceBooking(store, { bookingId: repair.id, to: 'assessed', actualTotal: 500, settleFn: t, now: NOW });
+  await engine.advanceBooking(store, { bookingId: repair.id, to: 'in-progress', settleFn: t, now: NOW });
+  await engine.advanceBooking(store, { bookingId: repair.id, to: 'ready', settleFn: t, now: NOW });
+  assert.strictEqual(t.legs.length, 0, 'nothing settles before the item is returned');
 
-  await engine.advanceBooking(store, { bookingId: repair.id, to: 'returned', transferFn: t, now: NOW });
-  assert.strictEqual(t.calls.length, 2);
+  await engine.advanceBooking(store, { bookingId: repair.id, to: 'returned', settleFn: t, now: NOW });
+  assert.strictEqual(t.legs.length, 2);
+  assert.strictEqual(t.calls.length, 1, 'the settlement must be a single atomic call');
   // The ASSESSED total settles, not the booking estimate.
   assert.strictEqual(repair.settledTotal, 500);
 });
@@ -476,28 +498,28 @@ test('settlement uses the assessed total, never the estimate', async () => {
   const store = createVoidStore();
   const t = recorder();
   const repair = bookingFor(store, 'autoRepairDetailing', { quotedTotal: 100 });
-  await engine.advanceBooking(store, { bookingId: repair.id, to: 'collected', transferFn: t, now: NOW });
-  await engine.advanceBooking(store, { bookingId: repair.id, to: 'assessed', actualTotal: 640, transferFn: t, now: NOW });
-  await engine.advanceBooking(store, { bookingId: repair.id, to: 'in-progress', transferFn: t, now: NOW });
-  await engine.advanceBooking(store, { bookingId: repair.id, to: 'ready', transferFn: t, now: NOW });
-  await engine.advanceBooking(store, { bookingId: repair.id, to: 'returned', transferFn: t, now: NOW });
+  await engine.advanceBooking(store, { bookingId: repair.id, to: 'collected', settleFn: t, now: NOW });
+  await engine.advanceBooking(store, { bookingId: repair.id, to: 'assessed', actualTotal: 640, settleFn: t, now: NOW });
+  await engine.advanceBooking(store, { bookingId: repair.id, to: 'in-progress', settleFn: t, now: NOW });
+  await engine.advanceBooking(store, { bookingId: repair.id, to: 'ready', settleFn: t, now: NOW });
+  await engine.advanceBooking(store, { bookingId: repair.id, to: 'returned', settleFn: t, now: NOW });
 
   assert.strictEqual(repair.settledTotal, 640);
   assert.notStrictEqual(repair.settledTotal, 100);
 });
 
-test('completing without a transferFn is REFUSED, not silently unpaid', async () => {
+test('completing without a settleFn is REFUSED, not silently unpaid', async () => {
   // The failure this prevents: a booking marked complete that paid
   // nobody, which nothing downstream would notice.
   const store = createVoidStore();
   const t = recorder();
   const b = bookingFor(store, 'beauty', { quotedTotal: 200 });
-  await engine.advanceBooking(store, { bookingId: b.id, to: 'confirmed', transferFn: t, now: NOW });
-  await engine.advanceBooking(store, { bookingId: b.id, to: 'in-progress', transferFn: t, now: NOW });
+  await engine.advanceBooking(store, { bookingId: b.id, to: 'confirmed', settleFn: t, now: NOW });
+  await engine.advanceBooking(store, { bookingId: b.id, to: 'in-progress', settleFn: t, now: NOW });
 
   await assert.rejects(
     () => engine.advanceBooking(store, { bookingId: b.id, to: 'completed', now: NOW }),
-    /requires a transferFn/,
+    /requires a settleFn/,
   );
   assert.strictEqual(b.status, 'in-progress', 'the booking must not advance');
 });
@@ -508,11 +530,11 @@ test('a failed transfer leaves the booking UNCOMPLETED', async () => {
   const store = createVoidStore();
   const failing = async () => { throw new Error('V3 unreachable'); };
   const b = bookingFor(store, 'beauty', { quotedTotal: 200 });
-  await engine.advanceBooking(store, { bookingId: b.id, to: 'confirmed', transferFn: TEST_TRANSFER, now: NOW });
-  await engine.advanceBooking(store, { bookingId: b.id, to: 'in-progress', transferFn: TEST_TRANSFER, now: NOW });
+  await engine.advanceBooking(store, { bookingId: b.id, to: 'confirmed', settleFn: TEST_TRANSFER, now: NOW });
+  await engine.advanceBooking(store, { bookingId: b.id, to: 'in-progress', settleFn: TEST_TRANSFER, now: NOW });
 
   await assert.rejects(
-    () => engine.advanceBooking(store, { bookingId: b.id, to: 'completed', transferFn: failing, now: NOW }),
+    () => engine.advanceBooking(store, { bookingId: b.id, to: 'completed', settleFn: failing, now: NOW }),
     /V3 unreachable/,
   );
   assert.strictEqual(b.status, 'in-progress');
@@ -522,10 +544,10 @@ test('a failed transfer leaves the booking UNCOMPLETED', async () => {
 test('a booking with no price cannot complete', async () => {
   const store = createVoidStore();
   const b = bookingFor(store, 'beauty', { quotedTotal: null });
-  await engine.advanceBooking(store, { bookingId: b.id, to: 'confirmed', transferFn: TEST_TRANSFER, now: NOW });
-  await engine.advanceBooking(store, { bookingId: b.id, to: 'in-progress', transferFn: TEST_TRANSFER, now: NOW });
+  await engine.advanceBooking(store, { bookingId: b.id, to: 'confirmed', settleFn: TEST_TRANSFER, now: NOW });
+  await engine.advanceBooking(store, { bookingId: b.id, to: 'in-progress', settleFn: TEST_TRANSFER, now: NOW });
   await assert.rejects(
-    () => engine.advanceBooking(store, { bookingId: b.id, to: 'completed', transferFn: TEST_TRANSFER, now: NOW }),
+    () => engine.advanceBooking(store, { bookingId: b.id, to: 'completed', settleFn: TEST_TRANSFER, now: NOW }),
     /no settleable total/,
   );
 });
@@ -535,7 +557,7 @@ test('a cancelled booking never settles', async () => {
   const t = recorder();
   const b = bookingFor(store, 'beauty', { quotedTotal: 200 });
   engine.cancelServiceBooking(store, { bookingId: b.id, now: NOW });
-  assert.strictEqual(t.calls.length, 0);
+  assert.strictEqual(t.legs.length, 0);
   assert.strictEqual(b.settledAt, undefined);
 });
 
@@ -549,7 +571,7 @@ test('every vertical settles at its own take rate', async () => {
     const settleState = engine.SETTLES_AT[SERVICE_CONFIGS[verticalId].archetype];
     const path = { completed: ['confirmed', 'in-progress', 'completed'] }[settleState];
     for (const to of path) {
-      await engine.advanceBooking(store, { bookingId: b.id, to, transferFn: t, now: NOW });
+      await engine.advanceBooking(store, { bookingId: b.id, to, settleFn: t, now: NOW });
     }
     const expectedFee = Math.round(100 * VERTICALS[verticalId].takeRate * 100) / 100;
     assert.strictEqual(b.platformFee, expectedFee, `${verticalId} fee`);

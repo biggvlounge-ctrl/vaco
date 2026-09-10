@@ -298,24 +298,51 @@ async function fetchRecipientVerification(recipientId) {
   }
 }
 
-// `idempotencyKey` is optional and forwarded to V3 as an
-// Idempotency-Key header. When present, V3 replays the first
-// result instead of charging again. It is deliberately a
-// parameter rather than something derived here -- see the note
-// at the call sites.
-async function transferVCoin(fromUserId, toUserId, amount, reason, idempotencyKey) {
-  const res = await fetch(`${V3_API_URL}/api/vcoin/transfer`, {
+// **`transferVCoin` is deliberately gone.** Every settling path in
+// VOID now goes through `settleVCoin` below, and nothing called this
+// any more. Leaving a working single-transfer helper next to them
+// would be an invitation: the next money path gets written with two
+// consecutive `await transferVCoin(...)` calls, which is exactly the
+// shape that paid a provider without the platform fee and then paid
+// them again on retry. `settleVCoin([oneLeg], meta)` covers the
+// single-leg case with the same atomicity guarantee, so there is no
+// job this removal makes harder.
+//
+// Same reasoning as `shieldAuth.cjs` removing `optionalOwnAccount`
+// rather than deprecating it: a helper that is easy to reach for and
+// wrong in a way nothing detects should not remain reachable.
+
+// Atomic settlement: every leg moves, or none does.
+//
+// **Why the settling modules take this instead of `transferVCoin`.**
+// They used to pay each party with a separate `await transferVCoin(...)`.
+// The second call can fail on its own -- the first just debited the
+// same payer -- and when it did, one party had been paid, the job's
+// status was never advanced, and the retry guard (`'accepted'` for
+// marketplace, `'confirmed'` for pet care) still passed. The retry paid
+// that party a second time.
+//
+// `POST /api/vcoin/settle` validates every leg against running balances
+// and writes nothing unless all of them pass, so the failure is
+// all-or-nothing. Standing rule 5: hard on money.
+async function settleVCoin(legs, meta = {}) {
+  const res = await fetch(`${V3_API_URL}/api/vcoin/settle`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...serviceHeaders(),
-      ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
+      // The settlement's reason is a stable, unique description of the
+      // job being settled, so it doubles as the idempotency key: a
+      // retried settlement replays V3's first answer rather than paying
+      // twice. Belt as well as braces -- atomicity prevents a *partial*
+      // settlement, this prevents a *duplicate* one.
+      ...(meta.reason ? { 'Idempotency-Key': `settle:${meta.reason}` } : {}),
     },
-    body: JSON.stringify({ fromUserId, toUserId, amount, reason }),
+    body: JSON.stringify({ legs, reason: meta.reason ?? null }),
   });
   const body = await res.json();
   if (!res.ok) {
-    throw new Error(body.error || `transferVCoin failed (${res.status})`);
+    throw new Error(body.error || `settleVCoin failed (${res.status})`);
   }
   return body;
 }
@@ -500,7 +527,7 @@ app.post('/api/job/:id/accept', requireJobParty(), (req, res) => {
 
 app.post('/api/job/:id/complete', requireJobParty(), async (req, res) => {
   try {
-    const job = await completeJob(store, { jobId: Number(req.params.id), transferFn: transferVCoin });
+    const job = await completeJob(store, { jobId: Number(req.params.id), settleFn: settleVCoin });
     await pushMetric('job_platform_fee', job.platformFee);
     res.json(job);
   } catch (err) {
@@ -1659,7 +1686,7 @@ app.post('/api/petcare/booking/:id/confirm', requirePetBookingParty(), (req, res
 
 app.post('/api/petcare/booking/:id/complete', requirePetBookingParty(), (req, res) => handle(res,
   () => petCare.completeBooking(store, {
-    ...req.body, bookingId: Number(req.params.id), transferFn: transferVCoin,
+    ...req.body, bookingId: Number(req.params.id), settleFn: settleVCoin,
   })));
 
 app.post('/api/petcare/booking/:id/cancel', requirePetBookingParty(), (req, res) => handle(res,
@@ -1700,7 +1727,7 @@ app.post('/api/laundry/order/:id/ready', requireLaundryOrderParty(), (req, res) 
 
 app.post('/api/laundry/order/:id/deliver', requireLaundryOrderParty(), (req, res) => handle(res,
   () => laundry.markDelivered(store, {
-    ...req.body, orderId: Number(req.params.id), transferFn: transferVCoin,
+    ...req.body, orderId: Number(req.params.id), settleFn: settleVCoin,
   })));
 
 
@@ -1740,7 +1767,7 @@ app.post('/api/service/booking/:id/advance', requireServiceBookingParty(), async
     res.json(await serviceEngine.advanceBooking(store, {
       ...req.body,
       bookingId: Number(req.params.id),
-      transferFn: transferVCoin,
+      settleFn: settleVCoin,
     }));
   } catch (err) {
     res.status(400).json({ error: err.message });

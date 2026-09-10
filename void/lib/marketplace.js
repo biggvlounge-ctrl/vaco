@@ -124,21 +124,47 @@ function acceptJob(store, jobId) {
 
 // The real payout mechanic: platform fee computed first (rounded),
 // provider payout is the exact remainder -- guarantees the two real
-// transfers always sum to totalPrice, not two independently-rounded
-// halves that could drift by a cent.
+// legs always sum to totalPrice, not two independently-rounded halves
+// that could drift by a cent.
+//
+// **Both legs move in one atomic call.** They used to be two
+// consecutive awaits, and the second can fail on its own because the
+// first just debited the same customer. When it did, the provider was
+// paid, the throw meant `job.status` stayed `'accepted'`, and
+// `requireJobInStatus(..., 'accepted', ...)` is exactly what a retry
+// has to satisfy -- so the retry paid the provider a second time. This
+// is the one shared loop every vertical runs through (standing rule 1),
+// so that defect was reachable from all 25 of them.
 async function completeJob(store, options = {}) {
-  const { jobId, transferFn } = options;
+  const { jobId, settleFn } = options;
   const job = requireJobInStatus(store, jobId, 'accepted', 'completeJob');
-  if (typeof transferFn !== 'function') {
-    throw new Error('completeJob requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') {
+    throw new Error('completeJob requires a settleFn(legs, meta) that moves every leg atomically');
   }
 
   const vertical = getVertical(job.verticalId);
   const platformFee = round(job.totalPrice * vertical.takeRate);
   const providerPayout = round(job.totalPrice - platformFee);
 
-  await transferFn(job.customerId, job.providerId, providerPayout, `void_job_payout:${jobId}`);
-  await transferFn(job.customerId, 'void-platform', platformFee, `void_job_platform_fee:${jobId}`);
+  const legs = [{
+    fromUserId: job.customerId,
+    toUserId: job.providerId,
+    amount: providerPayout,
+    reason: `void_job_payout:${jobId}`,
+  }];
+  // A zero fee is no leg rather than a leg of zero -- V3 refuses a
+  // non-positive amount, so sending one would fail the whole
+  // settlement for a vertical that simply takes no cut.
+  if (platformFee > 0) {
+    legs.push({
+      fromUserId: job.customerId,
+      toUserId: 'void-platform',
+      amount: platformFee,
+      reason: `void_job_platform_fee:${jobId}`,
+    });
+  }
+
+  await settleFn(legs, { reason: `void_job:${jobId}` });
 
   job.status = 'completed';
   job.completedAt = Date.now();

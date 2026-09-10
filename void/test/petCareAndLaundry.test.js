@@ -39,16 +39,28 @@ function walker(store, id = 'maria') {
 }
 
 // Records transfers instead of calling V3. Completion now settles, so a
-// transferFn is required — and having the record makes it possible to
+// settleFn is required — and having the record makes it possible to
 // assert that the provider was actually paid rather than that a status
 // changed.
+// **`moves` and `calls` answer different questions, and both matter.**
+// `moves` is every leg, flattened — what an assertion about who was
+// paid what wants. `calls` is how many times the ledger was asked,
+// which is the only thing that distinguishes one atomic settlement
+// from the two consecutive transfers it replaced. The amounts are
+// identical either way, which is exactly why that defect survived a
+// green suite until a test counted the calls.
 function recordingTransfers() {
   const moves = [];
-  const fn = async (from, to, amount, reason) => {
-    moves.push({ from, to, amount, reason });
+  const calls = [];
+  const fn = async (legs, meta = {}) => {
+    calls.push({ legs, meta });
+    for (const l of legs) {
+      moves.push({ from: l.fromUserId, to: l.toUserId, amount: l.amount, reason: l.reason });
+    }
     return { ok: true };
   };
   fn.moves = moves;
+  fn.calls = calls;
   return fn;
 }
 
@@ -66,7 +78,7 @@ async function completedMeetAndGreet(store, petId, providerId, at = DAY) {
   });
   petCare.confirmBooking(store, { bookingId: mg.id });
   // A meet-and-greet is an introduction, not a service, so it is free
-  // and settles nothing — which is why no transferFn is needed here.
+  // and settles nothing — which is why no settleFn is needed here.
   await petCare.completeBooking(store, { bookingId: mg.id, now: at });
   return mg;
 }
@@ -212,7 +224,7 @@ test('cancelling a series leaves already-completed bookings alone', async () => 
   });
 
   petCare.confirmBooking(store, { bookingId: bookings[0].id });
-  await petCare.completeBooking(store, { bookingId: bookings[0].id, now: DAY + 10 * H, transferFn: recordingTransfers() });
+  await petCare.completeBooking(store, { bookingId: bookings[0].id, now: DAY + 10 * H, settleFn: recordingTransfers() });
   petCare.cancelRecurrence(store, { recurrenceId });
 
   assert.strictEqual(petCare.getBooking(store, bookings[0].id).status, 'completed');
@@ -237,7 +249,7 @@ test('preferred providers rank by most recent, excluding meet-and-greets', async
     petId: pet.id, providerId: id, service: 'walk', scheduledFor: DAY + 9 * H, now: DAY, price: 32
   });
   petCare.confirmBooking(store, { bookingId: b.id });
-  await petCare.completeBooking(store, { bookingId: b.id, now: DAY + 10 * H, transferFn: recordingTransfers() });
+  await petCare.completeBooking(store, { bookingId: b.id, now: DAY + 10 * H, settleFn: recordingTransfers() });
 
   const preferred = petCare.preferredProviders(store, 'sam');
   assert.strictEqual(preferred.length, 1);
@@ -365,7 +377,7 @@ test('an order runs the full loop to delivered', async () => {
     deliveryWindowStart: DAY + 48 * H,
     deliveryWindowEnd: DAY + 52 * H,
   });
-  const done = await laundry.markDelivered(store, { orderId: o.id, transferFn: recordingTransfers() });
+  const done = await laundry.markDelivered(store, { orderId: o.id, settleFn: recordingTransfers() });
   assert.strictEqual(done.status, 'delivered');
 });
 
@@ -403,14 +415,14 @@ test('completing a pet care booking pays the walker and takes the platform rate'
   const pet = biscuit(store);
   await completedMeetAndGreet(store, pet.id, id);
 
-  const transferFn = recordingTransfers();
+  const settleFn = recordingTransfers();
   const b = petCare.createBooking(store, {
     petId: pet.id, providerId: id, service: 'walk', price: 40,
     scheduledFor: DAY + 9 * H, now: DAY,
   });
   petCare.confirmBooking(store, { bookingId: b.id });
   const done = await petCare.completeBooking(store, {
-    bookingId: b.id, now: DAY + 10 * H, transferFn,
+    bookingId: b.id, now: DAY + 10 * H, settleFn,
   });
 
   // Pet care takes 20%: the walker gets 32, the platform 8.
@@ -419,18 +431,18 @@ test('completing a pet care booking pays the walker and takes the platform rate'
   assert.strictEqual(done.platformFee, 8);
 
   // Two separate transfers, so each stays individually auditable.
-  assert.strictEqual(transferFn.moves.length, 2);
-  assert.strictEqual(transferFn.moves[0].to, id);
-  assert.strictEqual(transferFn.moves[0].amount, 32);
-  assert.strictEqual(transferFn.moves[1].to, 'void-platform');
-  assert.strictEqual(transferFn.moves[1].amount, 8);
+  assert.strictEqual(settleFn.moves.length, 2);
+  assert.strictEqual(settleFn.moves[0].to, id);
+  assert.strictEqual(settleFn.moves[0].amount, 32);
+  assert.strictEqual(settleFn.moves[1].to, 'void-platform');
+  assert.strictEqual(settleFn.moves[1].amount, 8);
   // Pet care calls the payer `ownerId` where every other vertical says
   // `customerId`; settlement accepts both rather than renaming a field
   // 23 modules already read.
-  assert.ok(transferFn.moves.every((m) => m.from === 'sam'));
+  assert.ok(settleFn.moves.every((m) => m.from === 'sam'));
 });
 
-test('a pet care booking cannot complete without a transferFn, and stays confirmed', async () => {
+test('a pet care booking cannot complete without a settleFn, and stays confirmed', async () => {
   const store = createVoidStore();
   const id = walker(store);
   const pet = biscuit(store);
@@ -443,7 +455,7 @@ test('a pet care booking cannot complete without a transferFn, and stays confirm
   petCare.confirmBooking(store, { bookingId: b.id });
   await assert.rejects(
     () => petCare.completeBooking(store, { bookingId: b.id, now: DAY + 10 * H }),
-    /requires a transferFn/,
+    /requires a settleFn/,
   );
   // Settlement runs before the status changes, so a ledger failure
   // leaves the booking confirmed rather than complete-and-unpaid.
@@ -463,24 +475,24 @@ test('a meet-and-greet is free and settles nothing', async () => {
   const store = createVoidStore();
   const id = walker(store);
   const pet = biscuit(store);
-  const transferFn = recordingTransfers();
+  const settleFn = recordingTransfers();
 
   const mg = petCare.createBooking(store, {
     petId: pet.id, providerId: id, service: 'drop-in',
     scheduledFor: DAY, isMeetAndGreet: true, now: DAY,
   });
   petCare.confirmBooking(store, { bookingId: mg.id });
-  const done = await petCare.completeBooking(store, { bookingId: mg.id, now: DAY, transferFn });
+  const done = await petCare.completeBooking(store, { bookingId: mg.id, now: DAY, settleFn });
 
   assert.strictEqual(done.status, 'completed');
   assert.strictEqual(done.price, 0);
-  assert.strictEqual(transferFn.moves.length, 0, 'an introduction is not a billable service');
+  assert.strictEqual(settleFn.moves.length, 0, 'an introduction is not a billable service');
 });
 
 test('laundry settles the WEIGHED total, never the estimate', async () => {
   const store = createVoidStore();
   laundromat(store);
-  const transferFn = recordingTransfers();
+  const settleFn = recordingTransfers();
 
   // Estimated at 15 lb; the real bag weighs 20.
   const o = order(store, { estimatedPounds: 15 });
@@ -491,7 +503,7 @@ test('laundry settles the WEIGHED total, never the estimate', async () => {
   laundry.markReady(store, {
     orderId: o.id, deliveryWindowStart: DAY + 48 * H, deliveryWindowEnd: DAY + 52 * H,
   });
-  const done = await laundry.markDelivered(store, { orderId: o.id, transferFn });
+  const done = await laundry.markDelivered(store, { orderId: o.id, settleFn });
 
   assert.strictEqual(done.settledTotal, done.actualTotal);
   assert.notStrictEqual(done.settledTotal, estimate,
@@ -504,7 +516,7 @@ test('laundry settles the WEIGHED total, never the estimate', async () => {
     done.settledTotal,
     'the two shares must add back up to what the customer paid',
   );
-  assert.strictEqual(transferFn.moves.length, 2);
+  assert.strictEqual(settleFn.moves.length, 2);
 });
 
 test('an unweighed order can never reach delivery in the first place', async () => {
@@ -528,7 +540,7 @@ test('an unweighed order can never reach delivery in the first place', async () 
   const unweighed = { ...laundry.getOrder(store, o.id), status: 'ready', actualTotal: null };
   store.laundryOrders.push({ ...unweighed, id: 9999 });
   await assert.rejects(
-    () => laundry.markDelivered(store, { orderId: 9999, transferFn: recordingTransfers() }),
+    () => laundry.markDelivered(store, { orderId: 9999, settleFn: recordingTransfers() }),
     /never weighed/,
   );
 });

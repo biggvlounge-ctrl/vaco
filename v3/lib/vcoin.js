@@ -80,6 +80,126 @@ function transfer(store, options = {}) {
   };
 }
 
+// Move several legs, or move none.
+//
+// **The defect this exists for.** Every settling module in this
+// ecosystem pays its parties with consecutive `await transfer(...)`
+// calls — VOID's `settleJob`, which is the single settlement path all
+// 25 verticals share, does exactly this:
+//
+//     await transferFn(payer, provider, payout, ...);
+//     if (platformFee > 0) await transferFn(payer, PLATFORM, fee, ...);
+//     job.settledTotal = total;            // never reached if leg 2 threw
+//
+// If the second leg fails — and it can, because the first leg just
+// debited the same payer — the provider has been paid, the record was
+// never written, and the caller never advances the status. `petCare`'s
+// `completeBooking` then still sees `status === 'confirmed'`, which is
+// the exact condition it retries on. **The retry pays the provider a
+// second time.** No error is logged that says so; the ledger simply
+// contains two payouts and one fee.
+//
+// The caller cannot fix this on its own. Wrapping the two awaits in a
+// try/catch and reversing leg 1 needs a reversal, and V3 deliberately
+// has none — "a correction is another transfer" — which is itself a
+// transfer that can fail. The only place all-or-nothing can be decided
+// is here, where the balances are.
+//
+// **How it is atomic.** Every leg is validated against *running*
+// balances first, and nothing is written until all of them pass. That
+// running part is the whole trick: two legs of 600 from an account
+// holding 1000 are individually affordable and jointly are not, so
+// checking each against the opening balance would admit exactly the
+// overdraft this is meant to refuse. Only after the whole set passes
+// does anything mutate, and mutation cannot fail — it is synchronous
+// arithmetic on an in-process object with no await between the writes.
+//
+// **Still one transaction row per leg.** Netting them into a single
+// movement would lose what `settlement.js` calls out as deliberate:
+// "the provider's earnings and the platform's fee stay separately
+// auditable". They share a `settlementId` so the ledger can also be
+// read the other way — as one event that happened together.
+function settle(store, options = {}) {
+  const { legs, reason = null, now = Date.now() } = options;
+
+  if (!Array.isArray(legs) || legs.length === 0) {
+    throw new Error("'legs' must be a non-empty array of { fromUserId, toUserId, amount }.");
+  }
+
+  // Same guards as `transfer`, applied to every leg before any of them
+  // moves. `Number.isFinite` for the reason its own comment gives: a
+  // NaN amount poisons a balance permanently and there is no reversal.
+  // **Validation must not call `getBalance`.** It auto-grants
+  // `STARTING_VCOIN_BALANCE` on first touch — `store.vcoinBalances[userId] =
+  // ...` — so simply *checking* whether a payee could be paid creates
+  // the payee's account. A refused settlement would then leave new
+  // accounts behind, which is a write, and this function's whole claim
+  // is that a refusal writes nothing. Caught by `settle.test.js`'s
+  // "a refused leg leaves NOTHING applied", which is exactly the sort
+  // of thing a balance-arithmetic assertion never notices.
+  //
+  // Reading with the same default and no assignment keeps the numbers
+  // identical to what `getBalance` would have returned.
+  const running = new Map();
+  const balanceOf = (userId) => {
+    if (running.has(userId)) return running.get(userId);
+    const held = store.vcoinBalances[userId];
+    return held === undefined ? STARTING_VCOIN_BALANCE : held;
+  };
+
+  legs.forEach((leg, i) => {
+    const { fromUserId, toUserId, amount } = leg || {};
+    const at = `legs[${i}]`;
+
+    if (!fromUserId || !toUserId) throw new Error(`${at}: 'fromUserId' and 'toUserId' are required.`);
+    if (!Number.isFinite(amount) || amount <= 0) throw new Error(`${at}: 'amount' must be a positive number.`);
+
+    const from = balanceOf(fromUserId);
+    if (from < amount) {
+      throw new Error(`${at}: Insufficient VCoin balance. Nothing in this settlement was applied.`);
+    }
+    running.set(fromUserId, round(from - amount));
+    running.set(toUserId, round(balanceOf(toUserId) + amount));
+  });
+
+  // Past this line nothing can throw, which is what makes the above a
+  // decision rather than a hope.
+  // A store persisted before `nextSettlementId` existed shallow-merges
+  // back without it (see `store.js`'s header), so this starts the
+  // counter rather than producing `NaN` settlement ids forever.
+  if (!Number.isFinite(store.nextSettlementId)) store.nextSettlementId = 1;
+  const settlementId = store.nextSettlementId;
+  store.nextSettlementId += 1;
+
+  const transactions = legs.map((leg) => {
+    const { fromUserId, toUserId, amount, reason: legReason = null } = leg;
+    store.vcoinBalances[fromUserId] = round(getBalance(store, fromUserId) - amount);
+    store.vcoinBalances[toUserId] = round(getBalance(store, toUserId) + amount);
+
+    const transaction = {
+      id: store.nextTransactionId++,
+      fromUserId,
+      toUserId,
+      amount,
+      reason: legReason,
+      timestamp: now,
+      type: 'transfer',
+      // Reading the ledger as a list of transfers still works
+      // unchanged; this only adds the ability to see which of them
+      // happened together.
+      settlementId,
+      settlementReason: reason,
+    };
+    store.transactions.push(transaction);
+    return transaction;
+  });
+
+  const balances = {};
+  for (const userId of running.keys()) balances[userId] = store.vcoinBalances[userId];
+
+  return { settlementId, reason, transactions, balances };
+}
+
 function getTransactionHistory(store, userId) {
   return store.transactions.filter((t) => t.fromUserId === userId || t.toUserId === userId);
 }
@@ -145,5 +265,6 @@ module.exports = {
   reconcile,
   getBalance,
   transfer,
+  settle,
   getTransactionHistory,
 };

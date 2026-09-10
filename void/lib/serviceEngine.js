@@ -46,6 +46,7 @@ const {
 } = require('./serviceCommon');
 const { canWorkVertical, requireProvider } = require('./providerProfiles');
 const { VERTICALS } = require('./verticals');
+const { settleJob } = require('./settlement');
 
 const ARCHETYPES = ['recurring', 'round-trip', 'appointment', 'quote'];
 
@@ -310,19 +311,21 @@ function requireServiceBooking(store, bookingId, action) {
 // money. That made every domain module a scheduling layer rather than a
 // business -- the single largest gap across all 25 service apps.
 //
-// Money moves at the archetype's own completion state, through the
-// injected `transferFn`, exactly as `marketplace.js::completeJob` does
-// -- same split, same platform account, same reason-string shape. Two
-// transfers rather than one net movement, so the customer's debit and
-// the platform's fee are separately auditable.
+// Money moves at the archetype's own completion state, through
+// `settlement.js`'s `settleJob` and the injected `settleFn` -- same
+// split, same platform account, same reason-string shape as before.
+// Two legs rather than one net movement, so the customer's debit and
+// the platform's fee are separately auditable, but both legs go to V3
+// in one atomic call so a failure cannot pay one party and not the
+// other.
 //
-// `transferFn` is required at settlement and only at settlement. Every
+// `settleFn` is required at settlement and only at settlement. Every
 // other transition stays synchronous and needs no ledger, which keeps
 // the state machine usable in tests and in plain Node with no network.
 async function advanceBooking(store, options = {}) {
   const {
     bookingId, to, actualTotal = null, assessmentNotes = null,
-    transferFn = null, now = Date.now(),
+    settleFn = null, now = Date.now(),
   } = options;
 
   const booking = requireServiceBooking(store, bookingId, 'advanceBooking');
@@ -379,39 +382,33 @@ async function advanceBooking(store, options = {}) {
   // booking in its previous state rather than marked complete and
   // unpaid. Same posture as submitRelease charging before recording.
   if (to === SETTLES_AT[booking.archetype]) {
-    const total = booking.actualTotal ?? booking.estimatedTotal;
-    if (!Number.isFinite(total) || total <= 0) {
-      throw new ServiceEngineError(
-        `advanceBooking: booking ${bookingId} has no settleable total -- `
-        + 'a booking cannot complete without a price',
-      );
-    }
-    if (typeof transferFn !== 'function') {
-      throw new ServiceEngineError(
-        `advanceBooking: settling booking ${bookingId} requires a `
-        + 'transferFn(fromUserId, toUserId, amount, reason)',
-      );
-    }
-
-    const vertical = VERTICALS[booking.verticalId];
-    const platformFee = round(total * vertical.takeRate);
-    const providerPayout = round(total - platformFee);
-
-    await transferFn(
-      booking.customerId, booking.providerId, providerPayout,
-      `void_service_payout:${booking.verticalId}:${bookingId}`,
-    );
-    if (platformFee > 0) {
-      await transferFn(
-        booking.customerId, VOID_PLATFORM_ACCOUNT, platformFee,
-        `void_service_platform_fee:${booking.verticalId}:${bookingId}`,
-      );
-    }
-
-    booking.settledTotal = total;
-    booking.providerPayout = providerPayout;
-    booking.platformFee = platformFee;
-    booking.settledAt = now;
+    // **This used to be a byte-for-byte copy of `settlement.js`'s
+    // block, and `settlement.js`'s own header said it was not.** That
+    // header reads: "The fix is not to copy the engine's settlement
+    // block into two more files. Money logic duplicated three times
+    // drifts, and the drift is invisible until someone is underpaid.
+    // So the block moved here and all three call it."
+    //
+    // Two of the three called it. The engine — which settles 23 of the
+    // 25 verticals, so the overwhelming majority of VOID's money —
+    // kept its own copy and was never converted. The claim was in a
+    // comment; nothing checked it, so it stopped being true without
+    // anyone noticing, and the atomicity fix applied to `settleJob`
+    // would have missed almost every settlement in the app.
+    //
+    // Now it genuinely calls it. `settleJob` mutates the booking with
+    // the same four settlement fields this block set, and refuses a
+    // priceless job with the same rule, so the behaviour is unchanged
+    // apart from the two legs now moving atomically.
+    await settleJob({
+      job: booking,
+      verticalId: booking.verticalId,
+      total: booking.actualTotal ?? booking.estimatedTotal,
+      label: 'service',
+      reference: bookingId,
+      settleFn,
+      now,
+    });
   }
 
   booking.status = to;

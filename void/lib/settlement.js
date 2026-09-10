@@ -21,11 +21,36 @@
 //     becomes a customer who got a service for free.
 //   - **A job with no price is refused, not settled at zero.** Zero is
 //     a real amount and the wrong one.
-//   - **Two transfers, not one netted movement**, so the provider's
+//   - **Two legs, not one netted movement**, so the provider's
 //     earnings and the platform's fee stay separately auditable.
-//   - **`transferFn` is required at settlement and only at
+//   - **`settleFn` is required at settlement and only at
 //     settlement.** Everything else in these modules stays runnable in
-//     plain Node with no network, which is the repo's standing rule.
+//     plain Node with no network, which is the repo's standing rule 4.
+//
+// ---------------------------------------------------------------
+// **One call, not two consecutive awaits — and why that is a bug fix
+// rather than a tidy-up.**
+//
+// This used to be:
+//
+//     await transferFn(payer, provider, providerPayout, ...);
+//     if (platformFee > 0) await transferFn(payer, PLATFORM, fee, ...);
+//     job.settledTotal = total;
+//
+// The second leg can fail on its own — the first one just debited the
+// same payer. When it did, the provider had been paid, the throw meant
+// `job.settledTotal` was never set, and the caller never advanced the
+// status. `petCare.completeBooking` then still saw
+// `status === 'confirmed'`, which is exactly the state it accepts a
+// retry in. **The retry paid the provider again.** Every balance
+// assertion in the suite passed throughout, because the totals of a
+// split settlement are identical to the totals of an atomic one.
+//
+// So both legs now go to V3 in a single `settleFn(legs, meta)` call —
+// `POST /api/vcoin/settle`, which validates every leg against running
+// balances and writes nothing unless all of them pass. Rule 5, "hard
+// on money", means the failure has to be *all* or *nothing*; it was
+// neither.
 
 const { VERTICALS } = require('./verticals');
 
@@ -50,7 +75,7 @@ function round(n) {
 async function settleJob(options = {}) {
   const {
     job, verticalId, total, label, reference,
-    transferFn = null, now = Date.now(),
+    settleFn = null, now = Date.now(),
   } = options;
 
   if (!job) throw new SettlementError('settleJob requires a job');
@@ -63,10 +88,10 @@ async function settleJob(options = {}) {
       + 'a job cannot complete without a price',
     );
   }
-  if (typeof transferFn !== 'function') {
+  if (typeof settleFn !== 'function') {
     throw new SettlementError(
       `settleJob: settling ${label} ${reference} requires a `
-      + 'transferFn(fromUserId, toUserId, amount, reason)',
+      + 'settleFn(legs, meta) that moves every leg atomically',
     );
   }
   if (!job.customerId && !job.ownerId) {
@@ -84,12 +109,25 @@ async function settleJob(options = {}) {
   const platformFee = round(total * vertical.takeRate);
   const providerPayout = round(total - platformFee);
 
-  await transferFn(payerId, job.providerId, providerPayout,
-    `void_${label}_payout:${verticalId}:${reference}`);
+  // A zero platform fee is genuinely no leg, not a leg of zero — V3
+  // refuses a non-positive amount, and rightly: zero is a real amount
+  // and the wrong one.
+  const legs = [{
+    fromUserId: payerId,
+    toUserId: job.providerId,
+    amount: providerPayout,
+    reason: `void_${label}_payout:${verticalId}:${reference}`,
+  }];
   if (platformFee > 0) {
-    await transferFn(payerId, VOID_PLATFORM_ACCOUNT, platformFee,
-      `void_${label}_platform_fee:${verticalId}:${reference}`);
+    legs.push({
+      fromUserId: payerId,
+      toUserId: VOID_PLATFORM_ACCOUNT,
+      amount: platformFee,
+      reason: `void_${label}_platform_fee:${verticalId}:${reference}`,
+    });
   }
+
+  await settleFn(legs, { reason: `void_${label}:${verticalId}:${reference}` });
 
   job.settledTotal = total;
   job.providerPayout = providerPayout;

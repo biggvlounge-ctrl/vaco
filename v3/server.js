@@ -37,9 +37,9 @@ require('dotenv/config');
 const { createV3Store } = require('./lib/store');
 const path = require('path');
 const { createPersistentStore, durable } = require('./lib/persistence');
-const { STARTING_VCOIN_BALANCE, getBalance, transfer, getTransactionHistory, reconcile } = require('./lib/vcoin');
+const { STARTING_VCOIN_BALANCE, getBalance, transfer, settle, getTransactionHistory, reconcile } = require('./lib/vcoin');
 const { VCOIN_TO_VASH_RATE, getVashBalance, cashout } = require('./lib/vash');
-const { requireActor, actorOrService: actorOrServiceWith } = require('./lib/shieldAuth.cjs');
+const { requireActor, actorOrService: actorOrServiceWith, requireCallingService } = require('./lib/shieldAuth.cjs');
 const { idempotent, describeIdempotency } = require('./lib/idempotency');
 const { createServiceAuth } = require('./lib/serviceAuth.cjs');
 const { traceMiddleware } = require('./lib/tracing.cjs');
@@ -124,6 +124,31 @@ app.set('v3Store', store);
 app.post('/api/vcoin/transfer', idempotent('vcoin/transfer'), actorOrService('fromUserId'), (req, res) => {
   try {
     res.status(201).json(transfer(store, req.body || {}));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Atomic multi-leg settlement: every leg moves, or none does.
+//
+// **Why this is `requireCallingService` and not `actorOrService`.** The
+// transfer route matches the session against `fromUserId` in the body,
+// and a settlement has no single such field — the payer sits inside
+// each leg, and a settlement legitimately debits one person to pay two
+// different parties. More to the point, deciding a platform's own fee
+// split is not something an end user does on their own behalf: every
+// real caller is a backend settling a job it just completed. Accepting
+// a browser session here would let a user compose their own fee split
+// and post it.
+//
+// So it requires a service credential specifically, the same shape as
+// the operational routes in vaco-analytics. `serviceAuth.middleware` is
+// mounted app-wide and proves *some* credential exists; this says which
+// kind this route needs, which is the distinction that let an
+// `audit-route-guards: open` marker sit on a route that wrote rows.
+app.post('/api/vcoin/settle', idempotent('vcoin/settle'), requireCallingService(), (req, res) => {
+  try {
+    res.status(201).json(settle(store, req.body || {}));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

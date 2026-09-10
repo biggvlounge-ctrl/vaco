@@ -280,7 +280,7 @@ function markReady(store, options = {}) {
 // Settlement runs before the status changes, so a ledger failure leaves
 // the order ready rather than delivered-and-unpaid.
 async function markDelivered(store, options = {}) {
-  const { orderId, transferFn = null, now = Date.now() } = options;
+  const { orderId, settleFn = null, now = Date.now() } = options;
   const order = requireOrder(store, orderId, 'markDelivered');
   if (order.status !== 'ready') {
     throw new LaundryError(`markDelivered: order ${orderId} is ${order.status}, must be ready`);
@@ -298,7 +298,7 @@ async function markDelivered(store, options = {}) {
     total: order.actualTotal,
     label: 'laundry',
     reference: orderId,
-    transferFn,
+    settleFn,
     now,
   });
 
