@@ -132,6 +132,16 @@ jobs:
       - name: Check no app gained unguarded mutating routes
         run: node scripts/audit-route-guards.mjs --check
 
+      # The same shape of ratchet, on the money question unit tests
+      # structurally cannot see: a settlement split across consecutive
+      # transfers can pay one party, fail, and be retried into paying
+      # them twice -- with every balance assertion passing throughout,
+      # because the totals are identical either way. VOID is converted;
+      # the rest of the ecosystem is the open sweep. This does not claim
+      # the remainder is safe, only that it is not growing.
+      - name: Check no new split settlements
+        run: node scripts/audit-settlement-atomicity.mjs --check
+
   smoke:
     name: Frontend smoke
     runs-on: ubuntu-latest
