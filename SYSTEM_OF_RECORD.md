@@ -13,10 +13,10 @@ person who built it can check whether a claim is still true.
 Every number below was produced by running the tool that owns it, not
 recalled. The commands are in §10 so they can be re-run.
 
-*Current as of commit `856ec00`, 31 commits, branch
+*Current as of commit `2022ad5`, 32 commits, branch
 `claude/v4-proxy-server-s6dcp8`, 10 Sep 2026.*
 
-**On "31 commits".** An earlier revision of this line said 332. That
+**On the commit count.** An earlier revision of this line said 332. That
 number was not wrong when written and the history it counted is gone:
 the container holding it was reclaimed with nothing pushed, and the
 repository was rebuilt from an archive. `dev-docs/DISASTER_RECOVERY.md`
@@ -675,7 +675,7 @@ produce the numbers in this document.
 built:** `node scripts/package-release.mjs` — see §11.
 
 ```sh
-node scripts/run-all-tests.mjs           # 1505/1505 across 39 suites
+node scripts/run-all-tests.mjs           # 1506/1506 across 39 suites
 node scripts/audit-route-guards.mjs --check   # 520/520 accounted for
 ./sync-shared-runtime.sh --check         # 119 copies current, none unmanaged
 ./sync-design-system.sh --check          # every serving app is a target
@@ -715,7 +715,7 @@ dependencies are installed.
 
 ```
 vacon-c         315   vdp             142   void            142
-scripts         122   v3               80   vaco-media       51
+scripts         123   v3               80   vaco-media       51
 v4-proxy         42   world-layer      41   venvm            40
 venvs            40   voken            37   vaco-analytics   34
 vaco-shell       33   voidmagic        23   vacay            22
@@ -873,7 +873,7 @@ are what stand between this and a real deployment.**
 
 **Blocking durability, though not deployment:** commits are local
 only. `git push` returns 403 — the Claude GitHub App is not installed
-for this organization, and the remote says so by name. 31 commits sit
+for this organization, and the remote says so by name. 32 commits sit
 on `claude/v4-proxy-server-s6dcp8`.
 
 An earlier revision of this line said 339 and called it "not blocking".

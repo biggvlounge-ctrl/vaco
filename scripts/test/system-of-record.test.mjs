@@ -49,28 +49,77 @@ function run(cmd, args) {
   return `${r.stdout || ''}${r.stderr || ''}`;
 }
 
-test('the document names the commit and branch it describes', () => {
-  const head = run('git', ['rev-parse', '--short', 'HEAD']).trim();
+// How far behind HEAD the "Current as of" stamp may fall.
+//
+// **It can never be zero.** A file cannot contain the hash of the
+// commit that adds it — stamping HEAD, committing, and re-checking
+// gives a different hash every time. The first version of this test
+// required an exact match and failed on its own commit, which is a
+// neat demonstration of the thing it is testing for.
+//
+// So the property is: the stamp names a real commit on this branch,
+// and the document has not drifted far from it. Three is enough room
+// for the commit that updates the document plus a couple of follow-ups
+// before somebody should re-stamp it.
+const STAMP_TOLERANCE = 3;
+
+test('the document names a real, recent commit on this branch', () => {
   const branch = run('git', ['rev-parse', '--abbrev-ref', 'HEAD']).trim();
-  const commits = run('git', ['rev-list', '--count', 'HEAD']).trim();
+  assert.match(SOR, new RegExp(`\`${branch}\``),
+    `SYSTEM_OF_RECORD.md does not name the current branch ${branch}`);
 
-  assert.match(SOR, new RegExp(`\`${head}\``),
-    `SYSTEM_OF_RECORD.md does not name the current commit ${head}. Update the "Current as of" `
-    + 'line — a system of record that describes a commit nobody can identify is a story.');
-  assert.match(SOR, new RegExp(`\`${branch}\``));
+  const stamp = SOR.match(/Current as of commit \`([0-9a-f]{7,40})\`/);
+  assert.ok(stamp, 'SYSTEM_OF_RECORD.md has no "Current as of commit `...`" stamp');
 
-  // The commit count appears twice: the stamp and §12. Both must be real.
+  // A real commit, and one on this history — not a hash from a branch
+  // nobody has, or from the history that was lost.
+  const merge = run('git', ['merge-base', '--is-ancestor', stamp[1], 'HEAD']);
+  const known = run('git', ['cat-file', '-t', stamp[1]]).trim();
+  assert.equal(known, 'commit',
+    `SYSTEM_OF_RECORD.md is stamped \`${stamp[1]}\`, which is not a commit in this repository`);
+  assert.equal(merge.trim(), '',
+    `SYSTEM_OF_RECORD.md is stamped \`${stamp[1]}\`, which is not an ancestor of HEAD`);
+
+  const behind = Number(run('git', ['rev-list', '--count', `${stamp[1]}..HEAD`]).trim());
+  assert.ok(behind <= STAMP_TOLERANCE,
+    `SYSTEM_OF_RECORD.md is stamped \`${stamp[1]}\`, ${behind} commits behind HEAD `
+    + `(tolerance ${STAMP_TOLERANCE}). Re-run the §10 commands and update the stamp — a system `
+    + 'of record describing a state nobody can reach is a story.');
+});
+
+test('every stated commit count matches the commit the document is stamped at', () => {
+  // **Counted at the stamp, not at HEAD**, and that is the precise
+  // meaning rather than a loophole. "Current as of commit `X`, N
+  // commits" is a claim about the state at X. Requiring N to equal the
+  // count at HEAD is unsatisfiable for the same reason requiring the
+  // stamp to equal HEAD is: committing the document increments the
+  // count, so the number is stale the instant it is written. Counting
+  // at X is exact, checkable, and true.
+  //
+  // How far X may lag HEAD is the stamp tolerance, asserted separately
+  // above — so the two together say "the document describes a real
+  // recent commit, and its numbers are that commit's numbers."
+  //
+  // **No proximity escape hatch.** An earlier version excused a wrong
+  // count if explanatory prose sat within 400 characters, and the
+  // stamp sits directly above its own explanation — so putting the old
+  // 339 back into the stamp passed. This document writes the counts
+  // from the lost history as prose ("an earlier revision of this line
+  // said 332"), never as "332 commits", so every "N commits" is a live
+  // claim and every one must be right.
+  const stamp = SOR.match(/Current as of commit \`([0-9a-f]{7,40})\`/);
+  assert.ok(stamp, 'no "Current as of commit `...`" stamp to count from');
+  const atStamp = run('git', ['rev-list', '--count', stamp[1]]).trim();
+  assert.match(atStamp, /^\d+$/, `could not count commits at ${stamp[1]}: ${atStamp}`);
+
   const claimed = [...SOR.matchAll(/(\d+) commits/g)].map((m) => m[1]);
   assert.ok(claimed.length > 0, 'no commit count in the document at all');
-  for (const n of claimed) {
-    // An explicitly historical figure is allowed if the sentence says
-    // so — §12 keeps the old 339 on purpose, to explain what was lost.
-    if (n === commits) continue;
-    const context = SOR.slice(Math.max(0, SOR.indexOf(`${n} commits`) - 400),
-      SOR.indexOf(`${n} commits`) + 200);
-    assert.match(context, /earlier revision|no longer exists|was lost|history it counted/i,
-      `"${n} commits" appears with no note explaining why it is not the real count (${commits})`);
-  }
+
+  const wrong = [...new Set(claimed.filter((n) => n !== atStamp))];
+  assert.deepEqual(wrong, [],
+    `SYSTEM_OF_RECORD.md states ${wrong.join(', ')} commits; \`${stamp[1]}\`, the commit it is `
+    + `stamped at, has ${atStamp}. If one of those is a deliberate historical figure, write it `
+    + 'as prose rather than as "N commits" — every occurrence of that form is a live claim.');
 });
 
 test('the per-suite table matches what each app really has', () => {

@@ -1,6 +1,6 @@
 {
-  "total": 1505,
-  "passed": 1505,
+  "total": 1506,
+  "passed": 1506,
   "failed": 0,
   "skipped": 0,
   "suites": 39,
@@ -42,8 +42,8 @@
       "skipped": 0
     },
     "scripts": {
-      "tests": 122,
-      "pass": 122,
+      "tests": 123,
+      "pass": 123,
       "fail": 0,
       "skipped": 0
     },
