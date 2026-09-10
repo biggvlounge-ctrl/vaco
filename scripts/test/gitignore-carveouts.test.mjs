@@ -104,3 +104,64 @@ test('the files a carve-out rescues are actually tracked', { skip: NO_GIT }, () 
     + 'carve-out is obsolete, or the files it rescues were never committed — in which case they '
     + 'exist only on this machine.');
 });
+
+// ---------------------------------------------------------------------------
+// Nothing installs itself into the repository
+// ---------------------------------------------------------------------------
+
+test('no node_modules is tracked, and every app ignores its own', () => {
+  // **Found by unzipping the release archive**, not by reading
+  // anything: `vaco-notify/node_modules` was tracked — 636 files,
+  // 4.6MB — so `git archive` shipped it in every release, directly
+  // contradicting `scripts/package-release.mjs`'s own header, which
+  // says node_modules is excluded because "shipping platform-specific
+  // binaries inside a source archive is how a deploy breaks on a
+  // different libc."
+  //
+  // The cause was mundane and worth recording: the root `.gitignore`
+  // has no node_modules rule at all. Each app carries its own, and
+  // `vaco-notify` and `vaco-mcp` were the two that did not have one.
+  // vaco-notify's dependencies were committed before anybody noticed,
+  // and a `.gitignore` added afterwards does nothing about files that
+  // are already tracked.
+  //
+  // That is the more dangerous half. With no rule anywhere, a single
+  // `git add -A` run after `install-ecosystem.sh` would commit every
+  // app's dependencies — 277MB — and nothing would have objected.
+  const listed = spawnSync('git', ['ls-files'], {
+    cwd: REPO_ROOT, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024,
+  });
+  // In a release-archive extract there is no .git to ask. Same posture
+  // as the carve-out check above: say so rather than pass quietly.
+  if (listed.status !== 0) {
+    assert.ok(!fs.existsSync(path.join(REPO_ROOT, '.git')),
+      `git ls-files failed with a .git present: ${listed.stderr}`);
+    return;
+  }
+  const tracked = listed.stdout.split('\n').filter((f) => f.includes('node_modules/'));
+
+  const dirs = [...new Set(tracked.map((f) => f.replace(/\/node_modules\/.*/, '/node_modules')))];
+  assert.deepEqual(dirs, [],
+    `these node_modules directories are tracked and ship in every release archive:\n    `
+    + `${dirs.join('\n    ')}\n`
+    + 'Run `git rm -r --cached <dir>` and make sure that app has a .gitignore.');
+
+  // And the rule that keeps it that way: every app with a package.json
+  // ignores its own. An app without one is not broken today — it is
+  // one `git add -A` away from being the next vaco-notify.
+  const unguarded = [];
+  for (const entry of fs.readdirSync(REPO_ROOT, { withFileTypes: true })) {
+    if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
+    const appDir = path.join(REPO_ROOT, entry.name);
+    if (!fs.existsSync(path.join(appDir, 'package.json'))) continue;
+
+    const ignoreFile = path.join(appDir, '.gitignore');
+    const ignored = fs.existsSync(ignoreFile)
+      && /^\s*node_modules\/?\s*$/m.test(fs.readFileSync(ignoreFile, 'utf8'));
+    if (!ignored) unguarded.push(entry.name);
+  }
+
+  assert.deepEqual(unguarded, [],
+    `these apps have a package.json and nothing ignoring their node_modules:\n    `
+    + `${unguarded.join('\n    ')}`);
+});
