@@ -65,6 +65,46 @@ if (named.length === 0) {
 // files. Counting them as missing documents would invent two.
 const CONTINUATIONS = new Set(['_36_45.md', '_46_50_FINAL.md']);
 
+// **What each document was about, and which part of the index it sat
+// under.** A list of 74 filenames tells somebody that things are
+// missing; it does not help them decide what to spend an afternoon
+// hunting for. The index already carries a one-line description per
+// entry and groups them under `## ` headings that separate the
+// technical handoff from the world bible from the marketing material,
+// which is most of what determines whether a given document still
+// matters. Both are lifted here rather than left for a reader to
+// cross-reference by hand.
+function describeFromIndex() {
+  const described = new Map();
+  let section = '(unsectioned)';
+  const lines = index.split('\n');
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    const heading = line.match(/^##+\s+(.*)$/);
+    if (heading) { section = heading[1].trim(); continue; }
+
+    const entry = line.match(/^\s*-\s+\*\*`([A-Za-z0-9_./-]+\.(?:md|sql|js|mjs|json))`\*\*\s*(?:—|--)?\s*(.*)$/);
+    if (!entry) continue;
+
+    // Descriptions wrap. Keep consuming while the next line is neither
+    // a new entry nor a heading nor blank.
+    let text = entry[2].trim();
+    for (let j = i + 1; j < lines.length; j += 1) {
+      const next = lines[j];
+      if (!next.trim() || /^##+\s/.test(next) || /^\s*-\s+\*\*`/.test(next)) break;
+      text += ` ${next.trim()}`;
+    }
+    described.set(entry[1].split('/').pop(), {
+      section,
+      text: text.replace(/\s+/g, ' ').replace(/^[—-]\s*/, '').trim(),
+    });
+  }
+  return described;
+}
+
+const described = describeFromIndex();
+
 // Where everything actually is, from git rather than the filesystem:
 // an untracked file is not in the repository in any sense that
 // survives this machine, which is the question being asked.
@@ -125,7 +165,24 @@ Until then, treat the index as a *record of what was written*, not an
 inventory of what is here. Anything below is a document you will not
 find by following it.
 
-${missing.map((r) => `- \`${r.name}\``).join('\n')}
+Grouped by the part of the index each sat under, with the index's own
+one-line description — so this is a hunting list you can triage, not
+just a list of things that are gone.
+
+${(() => {
+    const groups = new Map();
+    for (const r of missing) {
+      const d = described.get(r.name);
+      const section = d ? d.section : '(not described by the index)';
+      if (!groups.has(section)) groups.set(section, []);
+      groups.get(section).push({ name: r.name, text: d ? d.text : '' });
+    }
+    return [...groups]
+      .sort((a, b) => b[1].length - a[1].length)
+      .map(([section, items]) => `### ${section} — ${items.length} missing\n\n`
+        + items.map((it) => `- \`${it.name}\`${it.text ? ` — ${it.text}` : ''}`).join('\n'))
+      .join('\n\n');
+  })()}
 
 ---
 
