@@ -415,7 +415,7 @@ function registrations(ctx) {
     {
       file: 'start-ecosystem.sh',
       apply: (s) => s.replace(/(\n)(\s*"venvs:venvs:)/,
-        `\n  "${ctx.name}:${ctx.name}:npm start:${ctx.port}:/api/health"$1$2`),
+        `\n  "${ctx.name}:${ctx.name}:node server.js:${ctx.port}:/api/health"$1$2`),
       why: 'the authoritative manifest — compose, nginx and the smoke harness all read it',
     },
     {

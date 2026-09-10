@@ -174,7 +174,13 @@ test('the README states the real nginx location and brace counts', () => {
 // fails soft on signals by standing rule, so nothing would have said
 // so. The generator now exists; this holds its output to the manifest.
 test('every backend in the manifest is in the pm2 process list', () => {
-  const backends = manifestApps().filter((a) => a.cmd === 'npm start');
+  // Backends identified by entry point, not by how the start command is
+  // spelled — the manifest's `npm start` became `node server.js` and a
+  // literal match would silently yield an empty set here, making both
+  // of these tests pass over nothing.
+  const backends = manifestApps().filter((a) => fs.existsSync(
+    path.join(REPO_ROOT, a.appPath, 'server.js')));
+  assert.ok(backends.length > 20, `only ${backends.length} backends parsed — the filter is broken`);
   const listed = [...ecosystem.matchAll(/name:\s*["']([^"']+)/g)].map((m) => m[1]);
 
   const missing = backends.filter((a) => !listed.includes(a.name)).map((a) => a.name);
@@ -200,7 +206,13 @@ test('every backend in the manifest is in the pm2 process list', () => {
 // have 404'd them at the reverse proxy however healthy the backend.
 // `vaco-shell` is deliberately absent: it IS the `/` root.
 test('every backend in the manifest has an nginx location block', () => {
-  const backends = manifestApps().filter((a) => a.cmd === 'npm start');
+  // Backends identified by entry point, not by how the start command is
+  // spelled — the manifest's `npm start` became `node server.js` and a
+  // literal match would silently yield an empty set here, making both
+  // of these tests pass over nothing.
+  const backends = manifestApps().filter((a) => fs.existsSync(
+    path.join(REPO_ROOT, a.appPath, 'server.js')));
+  assert.ok(backends.length > 20, `only ${backends.length} backends parsed — the filter is broken`);
   for (const file of [{ src: nginx, name: 'nginx-docker.conf' },
     { src: nginxExample, name: 'nginx-vaco.conf.example' }]) {
     const locs = [...file.src.matchAll(/^\s*location\s+(\S+)/gm)].map((m) => m[1]);

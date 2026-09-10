@@ -37,7 +37,7 @@ case "${1:-}" in
     echo
     echo "Environment:"
     echo "  VACO_APPS     space-separated app names to start instead of all of"
-    echo "                them, for hosts that cannot hold the full ~2.5 GB stack."
+    echo "                them, for hosts that cannot hold the full 0.7–0.8 GB stack."
     echo "                An unknown name is refused rather than skipped."
     echo
     echo "Stop what this started: ./stop-ecosystem.sh"
@@ -101,56 +101,88 @@ else
 fi
 
 # name:relative-path:start-command:port:health-path
+# **`node server.js`, not `npm start`, and the reason is memory.**
+#
+# Every one of these apps' `npm start` is literally `node server.js` --
+# checked across all 35, not assumed. Going through npm buys nothing
+# and costs a whole extra process per app, because npm stays alive as
+# the parent of the node it spawned.
+#
+# Measured on five apps, same apps both ways, nothing else running,
+# using PSS rather than summed RSS (see the note below):
+#
+#   npm start        21 processes    190 MB
+#   node server.js   11 processes    125 MB
+#
+# About 13 MB per app, so roughly 450 MB across the 34 backends. Worth
+# doing, and considerably less dramatic than the first measurement of
+# it claimed -- that one summed RSS and reported a 51% saving that does
+# not exist.
+#
+# **Summing RSS double-counts shared pages.** 36 Node processes share
+# most of their address space, so `ps` RSS totals overstated the whole
+# ecosystem at 2.43 GB when the real figure is 0.7–0.8 GB. PSS
+# (`/proc/<pid>/smaps_rollup`) divides shared pages among their users
+# and agrees with the MemAvailable delta from stopping the stack. Two
+# methods, one answer. Do not use RSS sums here.
+#
+# The two Vite apps stay on `npm run dev`: that IS a real npm script
+# with arguments, not a wrapper around a single node call.
 APPS=(
-  "vaco-shell:vaco-shell:npm start:8789:/api/health"
-  "v4-proxy:v4-proxy:npm start:8787:/api/health"
-  "v4-search:v4-search:npm start:8788:/api/health"
-  "vacon:vacon:npm start:8805:/api/health"
-  "vacon-c:vacon-c:npm start:8809:/api/health"
-  "hvntz:hvntz:npm start:8792:/api/health"
-  "void:void:npm start:8793:/api/health"
-  "voidmagic:voidmagic:npm start:8797:/api/health"
-  "voken:voken:npm start:8794:/api/health"
-  "vago:vago:npm start:8795:/api/health"
-  "vxllage:vxllage:npm start:8796:/api/health"
-  "cvnvo:cvnvo:npm start:8798:/api/health"
-  "yap:cvnvo/yap:npm start:8802:/api/health"
-  "chopz:chopz:npm start:8800:/api/health"
-  "chopz-shop:chopz/chopz-shop:npm start:8801:/api/health"
-  "vacay:vacay:npm start:8803:/api/health"
-  "vavlt-stvdios:vavlt-stvdios:npm start:8808:/api/health"
-  "vsafe:vsafe:npm start:8799:/api/health"
-  "vaca:vaca:npm start:8804:/api/health"
-  "v3:v3:npm start:8811:/api/health"
-  "shield:shield:npm start:8812:/api/health"
-  "vaco-analytics:vaco-analytics:npm start:8790:/api/health"
-  "vulture-music:vulture-music:npm start:8806:/api/health"
-  "vulture-flix:vulture-flix:npm start:8807:/api/health"
-  "vulture-pods:vulture-pods:npm start:8810:/api/health"
-  "venvm:venvm:npm start:8813:/api/health"
-  "dreams:dreams:npm start:8814:/api/health"
-  "vulture-studios:vulture-studios:npm start:8815:/api/health"
-  "vex:vex:npm start:8816:/api/health"
-  "vex-trading:vex-trading:npm start:8817:/api/health"
-  "vaco-notify:vaco-notify:npm start:8818:/api/health"
-  "vaco-audit:vaco-audit:npm start:8819:/api/health"
-  "vaco-operator:vaco-operator:npm start:8820:/api/health"
-  "vaco-media:vaco-media:npm start:8821:/api/health"
+  "vaco-shell:vaco-shell:node server.js:8789:/api/health"
+  "v4-proxy:v4-proxy:node server.js:8787:/api/health"
+  "v4-search:v4-search:node server.js:8788:/api/health"
+  "vacon:vacon:node server.js:8805:/api/health"
+  "vacon-c:vacon-c:node server.js:8809:/api/health"
+  "hvntz:hvntz:node server.js:8792:/api/health"
+  "void:void:node server.js:8793:/api/health"
+  "voidmagic:voidmagic:node server.js:8797:/api/health"
+  "voken:voken:node server.js:8794:/api/health"
+  "vago:vago:node server.js:8795:/api/health"
+  "vxllage:vxllage:node server.js:8796:/api/health"
+  "cvnvo:cvnvo:node server.js:8798:/api/health"
+  "yap:cvnvo/yap:node server.js:8802:/api/health"
+  "chopz:chopz:node server.js:8800:/api/health"
+  "chopz-shop:chopz/chopz-shop:node server.js:8801:/api/health"
+  "vacay:vacay:node server.js:8803:/api/health"
+  "vavlt-stvdios:vavlt-stvdios:node server.js:8808:/api/health"
+  "vsafe:vsafe:node server.js:8799:/api/health"
+  "vaca:vaca:node server.js:8804:/api/health"
+  "v3:v3:node server.js:8811:/api/health"
+  "shield:shield:node server.js:8812:/api/health"
+  "vaco-analytics:vaco-analytics:node server.js:8790:/api/health"
+  "vulture-music:vulture-music:node server.js:8806:/api/health"
+  "vulture-flix:vulture-flix:node server.js:8807:/api/health"
+  "vulture-pods:vulture-pods:node server.js:8810:/api/health"
+  "venvm:venvm:node server.js:8813:/api/health"
+  "dreams:dreams:node server.js:8814:/api/health"
+  "vulture-studios:vulture-studios:node server.js:8815:/api/health"
+  "vex:vex:node server.js:8816:/api/health"
+  "vex-trading:vex-trading:node server.js:8817:/api/health"
+  "vaco-notify:vaco-notify:node server.js:8818:/api/health"
+  "vaco-audit:vaco-audit:node server.js:8819:/api/health"
+  "vaco-operator:vaco-operator:node server.js:8820:/api/health"
+  "vaco-media:vaco-media:node server.js:8821:/api/health"
   "venvs:venvs:npm run dev:5173:/"
   "vdp:vdp:npm run dev:5174:/"
 )
 
 if [ "$WITH_MOCK" = "1" ]; then
-  APPS+=("venvs-mock-backend:venvs-mock-backend:npm start:8791:/api/health")
+  APPS+=("venvs-mock-backend:venvs-mock-backend:node server.js:8791:/api/health")
 fi
 
 # -- VACO_APPS: boot a subset -----------------------------------------
 #
-# The full stack measures ~2.5 GB resident across ~68 processes (68
-# rather than 36 because `npm start` stays alive as a parent of each
-# `node`). Plenty of hosts have less than that, and the failure mode
-# there is bad: the OOM killer takes whichever apps it likes and you
-# get a different half of the ecosystem on every boot.
+# The full stack measures **0.7–0.8 GB across 37 processes**, measured by
+# PSS and confirmed by the MemAvailable delta from stopping it. An
+# earlier revision of this comment said 2.5 GB across 68 processes:
+# the process count dropped when these apps stopped going through npm,
+# and the memory figure was simply wrong -- summed RSS, which
+# double-counts the pages 36 Node processes share.
+#
+# So most hosts will hold the whole thing. VACO_APPS is still here for
+# the ones that will not, and because booting four apps is often what
+# you actually want.
 #
 # VACO_APPS is a space-separated list of app names to start instead of
 # all of them. Everything downstream -- health checks, the up/down

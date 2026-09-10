@@ -70,8 +70,18 @@ function reachesV3(app) {
 
 const envVarName = (appName) => `VACO_TOKEN_${appName.toUpperCase().replace(/-/g, '_')}`;
 
+// **A Node backend, identified by its entry point rather than by how
+// its start command is spelled.** This read `command === 'npm start'`
+// until the manifest changed those to `node server.js` to save a
+// process per app, at which point it matched nothing.
+//
+// It failed loudly — "found no callers. That is almost certainly
+// wrong." — and that guard is the reason this was a two-minute fix
+// rather than eight apps silently getting 403 from V3 on every call,
+// which is exactly what happened the last time this list was wrong.
 const callers = appsFromManifest()
-  .filter((app) => app.command === 'npm start' && app.name !== 'v3')
+  .filter((app) => fs.existsSync(path.join(REPO_ROOT, app.appPath, 'server.js')))
+  .filter((app) => app.name !== 'v3')
   .filter(reachesV3)
   .map((app) => app.name)
   .sort();

@@ -16,11 +16,14 @@
 # ---------------------------------------------------------------------
 # What this does NOT pretend
 #
-# The full stack measured **2.43 GB resident across 68 processes** on
-# this machine (68 rather than 34 because `npm start` stays alive as a
-# parent of each `node`). A Replit container with less RAM than that
-# will OOM partway through step 2, and the symptom is undramatic: some
-# apps report DOWN and the gateway 502s exactly those paths.
+# The full stack measures **0.7–0.8 GB across 37 processes** on this
+# machine -- by PSS, confirmed against the memory actually freed when
+# it stops. An earlier revision of this comment said 2.43 GB; that was
+# summed RSS, which double-counts the pages 36 Node processes share.
+#
+# So most containers will hold all of it. One that cannot will OOM
+# partway through step 2, and the symptom is undramatic: some apps
+# report DOWN and the gateway 502s exactly those paths.
 #
 # So this script does not claim success it has not seen. It prints the
 # real up/down count from start-ecosystem.sh, and if anything is down
@@ -122,7 +125,7 @@ if [ "${DOWN:-0}" -gt 0 ]; then
   echo
   echo "  * a missing secret -- the app refused on purpose. Check"
   echo "    logs/<app>.log; it will say which variable."
-  echo "  * not enough memory -- the full stack needs ~2.5 GB. Set"
+  echo "  * not enough memory -- the full stack needs 0.7–0.8 GB. Set"
   echo "    VACO_APPS to a subset and boot fewer."
   echo
 fi

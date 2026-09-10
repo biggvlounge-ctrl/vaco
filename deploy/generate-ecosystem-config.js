@@ -70,14 +70,37 @@ const apps = lines.map((l) => {
 // Dockerfile.node, read from the same field rather than re-listed
 // here -- a third hand-maintained list of frontends is precisely the
 // thing this file exists to stop.
-const backends = apps.filter((a) => a.cmd === "npm start");
-const frontends = apps.filter((a) => a.cmd !== "npm start");
+// **Split on the entry point, not on the command string.** This read
+// `a.cmd === "npm start"` until the manifest changed those to
+// `node server.js` to save a process per app. Both filters would then
+// have matched nothing: zero backends, every app a "frontend", and a
+// pm2 config with no processes in it -- generated successfully, with
+// no error, because an empty filter is not a failure.
+//
+// The real distinction is what the app IS: a Node service with a
+// server.js, or a Vite dev server. Ask that, and a future change to
+// how the command is spelled cannot silently invert the answer.
+const backends = apps.filter((a) => fs.existsSync(path.join(ROOT, a.appPath, "server.js")));
+const frontends = apps.filter((a) => !fs.existsSync(path.join(ROOT, a.appPath, "server.js")));
+
+if (backends.length === 0) {
+  throw new Error(
+    "generate-ecosystem-config: no app in the manifest has a server.js. A pm2 config with no "
+    + "processes generates cleanly and starts nothing, so this refuses rather than writing it.",
+  );
+}
 
 // pm2's `script` is resolved relative to `cwd`. Every backend in the
 // manifest is a plain Express app whose entry point is `server.js`;
 // assert it rather than assume it, because a missing file here is a
 // process pm2 restarts ten times and then gives up on, at 3am, on
 // somebody else's server.
+// Kept, though `backends` is now defined BY having a server.js, so
+// this can no longer fire. That is the point: the assertion moved from
+// runtime into the definition, which is strictly better than checking
+// it afterwards. Left as an explicit statement of the invariant rather
+// than deleted, so the next person to loosen the filter above finds
+// out here.
 const missing = backends.filter((a) => !fs.existsSync(path.join(ROOT, a.appPath, "server.js")));
 if (missing.length > 0) {
   throw new Error(

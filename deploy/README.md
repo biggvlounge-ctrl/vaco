@@ -68,15 +68,30 @@ not one. `scripts/test/replit-boot.test.mjs` now holds that.
 
 Measured on the development machine (2026-09-10):
 
-| | processes | resident |
+| | processes | memory |
 |---|---|---|
-| full stack, 36 apps | 68 | 2.43 GB |
-| 5-app subset + gateway | 6 | 0.35 GB |
+| full stack, 36 apps | 37 | 0.7–0.8 GB |
+| 5-app subset + gateway | 11 | 0.13 GB |
 
-68 rather than 36 because `npm start` stays alive as a parent of each
-`node`. A container with less RAM than the full stack needs will OOM
-partway through the boot, and the OOM killer picks a different half of
-the ecosystem each time.
+**On how these were measured, because the first attempt was wrong by
+3.5x.** Summing RSS across processes double-counts every shared library
+page, and 36 Node processes share a great deal of one. That method
+reported 2.43 GB. PSS (`/proc/<pid>/smaps_rollup`), which divides
+shared pages among the processes using them, reports 0.70 GB — and the
+MemAvailable freed by stopping the stack is 0.7–0.8 GB, the same answer by
+a completely different route. Two independent methods agreeing is why
+these figures are stated. A `ps` RSS total is not a measurement of
+anything.
+
+The range rather than a single number is also deliberate: two full
+boots measured 0.67 GB and 0.81 GB. The simulation app's world size and
+ordinary allocator variance move it, so quoting one figure to two
+decimal places would be precision the measurement does not have.
+
+Two changes account for the difference from the figures this table used
+to carry. The apps launch as `node server.js` rather than `npm start`,
+which removed a process per app and about 13 MB with it; and the memory
+figure was simply wrong.
 
 `VACO_APPS` is the escape hatch — a space-separated list of app names
 to start instead of all of them:

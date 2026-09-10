@@ -21,8 +21,9 @@ PORT=8080 node gateway.js       # the whole ecosystem, through one port
 node gateway.js --print-routes  # the routing table, starting nothing
 ```
 
-And on a machine that cannot hold the full ~2.4 GB stack, boot a
-subset. An unknown app name is refused rather than skipped:
+The whole ecosystem is about 0.7–0.8 GB across 37 processes, so most
+machines hold all of it. To run fewer, boot a subset — an unknown app
+name is refused rather than skipped:
 
 ```sh
 VACO_APPS="vaco-shell v3 shield void vacay" ./start-ecosystem.sh

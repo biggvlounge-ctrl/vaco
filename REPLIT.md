@@ -32,18 +32,30 @@ gateway in front of them.
 
 Measured on the development machine:
 
-| | processes | resident |
+| | processes | memory |
 |---|---|---|
-| all 36 apps | 68 | **2.43 GB** |
-| 5 apps + gateway | 6 | **0.35 GB** |
+| all 36 apps | 37 | **0.7–0.8 GB** |
+| 5 apps + gateway | 11 | **0.13 GB** |
 
-68 processes rather than 36 because `npm start` stays alive as a parent
-of each `node`.
+**On how these were measured, because the first attempt was wrong by
+3.5x.** Summing RSS across processes double-counts every shared library
+page, and 36 Node processes share a great deal of one. That method
+reported 2.43 GB. PSS (`/proc/<pid>/smaps_rollup`), which divides
+shared pages among the processes using them, reports 0.70 GB — and the
+MemAvailable freed by stopping the stack is 0.7–0.8 GB, the same answer by
+a completely different route. Two independent methods agreeing is why
+these figures are stated. A `ps` RSS total is not a measurement of
+anything.
 
-**If your Repl has less RAM than the full stack needs, boot a subset**
-rather than letting the OOM killer choose — it picks a different half
-every time, which looks like random breakage. Uncomment `VACO_APPS` in
-`.replit`:
+The range rather than a single number is also deliberate: two full
+boots measured 0.67 GB and 0.81 GB. The simulation app's world size and
+ordinary allocator variance move it, so quoting one figure to two
+decimal places would be precision the measurement does not have.
+
+**The whole ecosystem is about two thirds of a gigabyte**, so most
+Repls will hold all of it. If yours will not — or if you just want
+fewer things running while you look at one app — uncomment `VACO_APPS`
+in `.replit`:
 
 ```
 VACO_APPS = "vaco-shell v3 shield void vacay"

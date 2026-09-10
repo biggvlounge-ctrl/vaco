@@ -46,14 +46,19 @@ externalPort = 80
 # uses. Listed so the mapping above is legible next to it.
 PORT = "8080"
 
-# Boot a subset instead of all 36 apps. Leave commented out on a
-# container with 4 GB or more; uncomment on anything smaller, or the
-# OOM killer picks which half of the ecosystem you get and picks
-# differently on every boot.
+# Boot a subset instead of all 36 apps. Most containers will hold the
+# whole thing, so leave this commented out unless yours is genuinely
+# small — or unless you simply want fewer apps running while you look
+# at one of them.
 #
-# Measured on the development machine:
-#   full stack  -- 68 processes, 2.43 GB resident
-#   5-app subset -- 5 processes, 0.32 GB resident
+# Measured on the development machine, by PSS and confirmed against
+# the memory actually freed on shutdown:
+#   full stack   -- 37 processes, 0.7–0.8 GB
+#   5-app subset -- 11 processes, 0.13 GB
+#
+# An earlier revision said 2.43 GB. That was summed RSS, which
+# double-counts the pages 36 Node processes share; it overstated the
+# whole ecosystem by about 3.5x.
 #
 # VACO_APPS = "vaco-shell v3 shield void vacay"
 

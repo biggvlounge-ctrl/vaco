@@ -277,7 +277,15 @@ const HEADLESS = new Set(['vaco-audit', 'vaco-operator', 'vaco-media']);
 // this pointing at the wrong app.
 const DESIGN_SOURCE = (designSh.match(/SOURCE_DIR="\$ROOT\/([^/"]+)\//) || [])[1] || null;
 
-const apps = manifest.filter((a) => a.cmd === 'npm start').map((a) => {
+// A backend is an app with a server.js. Filtering on the literal
+// command string broke the moment the manifest switched from
+// `npm start` to `node server.js`: this produced an empty app list,
+// and the first thing to notice was the exemption self-check —
+// "vaco-media is on an exemption list but is not a backend in the
+// manifest" — which is exactly the job that list was given.
+const apps = manifest
+  .filter((a) => fs.existsSync(path.join(REPO_ROOT, a.appPath, 'server.js')))
+  .map((a) => {
   const server = readIf(path.join(REPO_ROOT, a.appPath, 'server.js'));
   const files = suiteFor(a.appPath);
   return {

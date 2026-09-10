@@ -13,7 +13,7 @@ person who built it can check whether a claim is still true.
 Every number below was produced by running the tool that owns it, not
 recalled. The commands are in §10 so they can be re-run.
 
-*Current as of commit `5c12e9c`, 38 commits, branch
+*Current as of commit `cbbbf82`, 39 commits, branch
 `claude/v4-proxy-server-s6dcp8`, 10 Sep 2026.*
 
 **On the commit count.** An earlier revision of this line said 332. That
@@ -123,8 +123,14 @@ deliberately down for want of `ANTHROPIC_API_KEY`, and its 502 named
 the app and the port.
 
 `VACO_APPS` boots a subset, for a host that cannot hold the whole
-stack — measured at 68 processes and 2.43 GB, against 6 processes and
-0.35 GB for five apps plus the gateway:
+stack — though at 37 processes and 0.7–0.8 GB, measured by PSS and
+confirmed against the memory freed on shutdown, most hosts will hold
+all of it. Five apps plus the gateway is 11 processes and 0.13 GB.
+
+An earlier revision of this section said 2.43 GB across 68 processes.
+The process count fell when the apps stopped launching through npm, and
+the memory figure was wrong: summed RSS double-counts the pages 36 Node
+processes share, overstating the total by about 3.5x.
 
 ```sh
 VACO_APPS="vaco-shell v3 shield void vacay" ./start-ecosystem.sh

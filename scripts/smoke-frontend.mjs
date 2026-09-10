@@ -79,6 +79,12 @@ const shotDir = (args.find((a) => a.startsWith('--shot=')) || '').split('=')[1] 
 // run below rather than trusted: an app here that grows a `public/`
 // fails the run as a stale exemption instead of quietly going
 // untested.
+// The repo root, needed by the manifest filter above before the
+// existing `repoRoot` const is reached.
+function repoRootOf(metaUrl) {
+  return path.dirname(path.dirname(fileURLToPath(metaUrl)));
+}
+
 const HEADLESS = new Set(['vaco-audit', 'vaco-operator', 'vaco-media']);
 
 function targetsFromManifest() {
@@ -90,8 +96,21 @@ function targetsFromManifest() {
   if (!block) throw new Error('smoke-frontend: could not find the APPS array in start-ecosystem.sh');
   const all = [...block[1].matchAll(/"([^"]+)"/g)]
     .map((match) => match[1].split(':'))
-    .filter(([, , command]) => command === 'npm start')
-    .map(([name, appPath, , port]) => ({ name, appPath, port: Number(port) }));
+    .map(([name, appPath, , port]) => ({ name, appPath, port: Number(port) }))
+    // **Split on the entry point, not the command string.** This read
+    // `command === 'npm start'` until the manifest changed those to
+    // `node server.js` to save a process per app — at which point this
+    // filter would have matched nothing and the smoke test would have
+    // passed having checked zero pages. A filter that yields an empty
+    // set is not a failure to any test framework; it is a silent one.
+    .filter((a) => fs.existsSync(path.join(repoRootOf(import.meta.url), a.appPath, 'server.js')));
+
+  if (all.length === 0) {
+    throw new Error(
+      'smoke-frontend: no app in the manifest has a server.js. This check would report success '
+      + 'having loaded nothing, so it refuses instead.',
+    );
+  }
 
   // The headless exemption re-earns itself. An app on the list that now
   // serves a page is a stale exemption hiding a real, untested

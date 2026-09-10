@@ -106,10 +106,33 @@ function appsFromManifest() {
   const manifest = fs.readFileSync(path.join(REPO_ROOT, 'start-ecosystem.sh'), 'utf8');
   const block = manifest.match(/^APPS=\(([\s\S]*?)^\)/m);
   if (!block) throw new Error('could not find the APPS array in start-ecosystem.sh');
-  return [...block[1].matchAll(/"([^"]+)"/g)]
+  // **A Node backend is one with a server.js, not one whose command
+  // is spelled a particular way.** This filtered on
+  // `command === 'npm start'` until the manifest changed those to
+  // `node server.js` to save a process per app — and this audit then
+  // reported, in full and in green:
+  //
+  //   audit-route-guards: all 0 mutating routes across 0 apps
+  //   accounted for (0 guarded, 0 declared open with a reason)
+  //
+  // A security audit that examined nothing and passed. It is the check
+  // that holds 520 mutating routes to being guarded or explicitly
+  // declared open, and it would have gone through CI green while
+  // looking at no files at all.
+  const apps = [...block[1].matchAll(/"([^"]+)"/g)]
     .map((m) => m[1].split(':'))
-    .filter(([, , command]) => command === 'npm start')
-    .map(([name, appPath]) => ({ name, appPath }));
+    .map(([name, appPath]) => ({ name, appPath }))
+    .filter((a) => fs.existsSync(path.join(REPO_ROOT, a.appPath, 'server.js')));
+
+  // The guard that was missing. An audit of nothing is not a pass.
+  if (apps.length < 20) {
+    throw new Error(
+      `audit-route-guards: only ${apps.length} app(s) found in the manifest. This audit covers `
+      + 'every Node backend in the ecosystem and there are more than twenty of them, so this '
+      + 'is a broken scan reporting success, not a small ecosystem.',
+    );
+  }
+  return apps;
 }
 
 // Every file that can define a route: the app's own server.js plus any
