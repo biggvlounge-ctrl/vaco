@@ -49,7 +49,7 @@ function generateCredential() {
 // implicit (the experience's own scheduledAt), issue a real
 // credential.
 async function bookExperience(store, options = {}) {
-  const { experienceId, customerId, transferFn, now = Date.now() } = options;
+  const { experienceId, customerId, settleFn, now = Date.now() } = options;
   const experience = getExperience(store, experienceId);
   if (!experience) throw new Error(`bookExperience: no experience with id ${experienceId}`);
   if (experience.status !== 'open') throw new Error(`bookExperience: experience ${experienceId} is not open (status: ${experience.status})`);
@@ -57,8 +57,11 @@ async function bookExperience(store, options = {}) {
   if (experience.remainingCapacity < 1) throw new Error(`bookExperience: experience ${experienceId} has no remaining capacity`);
 
   if (experience.price > 0) {
-    if (typeof transferFn !== 'function') throw new Error('bookExperience requires a transferFn(fromUserId, toUserId, amount, reason) for a priced experience');
-    await transferFn(customerId, VOID_MAGIC_ESCROW_ACCOUNT, experience.price, `voidmagic_booking:${experienceId}`);
+    if (typeof settleFn !== 'function') throw new Error('bookExperience requires a settleFn(fromUserId, toUserId, amount, reason) for a priced experience');
+    await settleFn(
+      [{ fromUserId: customerId, toUserId: VOID_MAGIC_ESCROW_ACCOUNT, amount: experience.price, reason: `voidmagic_booking:${experienceId}` }],
+      { reason: `voidmagic_booking:${experienceId}:${customerId}` },
+    );
   }
 
   experience.remainingCapacity -= 1;
@@ -157,7 +160,7 @@ function checkIn(store, options = {}) {
 // neither way is stranded, and the existing test says why that matters:
 // it is "invisible from every view except this one".
 async function completeExperience(store, options = {}) {
-  const { experienceId, transferFn, now = Date.now() } = options;
+  const { experienceId, settleFn, now = Date.now() } = options;
   const experience = getExperience(store, experienceId);
   if (!experience) throw new Error(`completeExperience: no experience with id ${experienceId}`);
   if (experience.status === 'completed') throw new Error(`completeExperience: experience ${experienceId} is already completed`);
@@ -174,17 +177,24 @@ async function completeExperience(store, options = {}) {
     const attended = booking.status === 'checked-in';
 
     if (booking.pricePaid > 0) {
-      if (typeof transferFn !== 'function') throw new Error('completeExperience requires a transferFn(fromUserId, toUserId, amount, reason) to settle priced bookings');
+      if (typeof settleFn !== 'function') throw new Error('completeExperience requires a settleFn(legs, meta) to settle priced bookings');
 
       if (!anyoneAttended) {
         // The experience did not happen. Full refund, no platform fee
         // -- there is no service to take a cut of.
-        await transferFn(VOID_MAGIC_ESCROW_ACCOUNT, booking.customerId, booking.pricePaid, `voidmagic_unattended_experience_refund:${experienceId}`);
+        await settleFn(
+          [{ fromUserId: VOID_MAGIC_ESCROW_ACCOUNT, toUserId: booking.customerId, amount: booking.pricePaid, reason: `voidmagic_unattended_experience_refund:${experienceId}` }],
+          { reason: `voidmagic_unattended_refund:${experienceId}:${booking.id}` },
+        );
       } else {
         const platformFee = round(booking.pricePaid * PLATFORM_TAKE_RATE);
         const hostPayout = round(booking.pricePaid - platformFee);
-        await transferFn(VOID_MAGIC_ESCROW_ACCOUNT, experience.hostId, hostPayout, `voidmagic_host_settlement:${experienceId}`);
-        await transferFn(VOID_MAGIC_ESCROW_ACCOUNT, 'voidmagic-platform', platformFee, `voidmagic_platform_fee:${experienceId}`);
+        // Both legs leave the same escrow, so split they could pay the
+        // host and then fail the fee because the host's leg drained it.
+        await settleFn([
+          { fromUserId: VOID_MAGIC_ESCROW_ACCOUNT, toUserId: experience.hostId, amount: hostPayout, reason: `voidmagic_host_settlement:${experienceId}` },
+          { fromUserId: VOID_MAGIC_ESCROW_ACCOUNT, toUserId: 'voidmagic-platform', amount: platformFee, reason: `voidmagic_platform_fee:${experienceId}` },
+        ], { reason: `voidmagic_experience_settlement:${experienceId}:${booking.id}` });
       }
     }
 
@@ -237,7 +247,7 @@ async function completeExperience(store, options = {}) {
 const CANCELLATION_CUTOFF_HOURS = 24;
 
 async function cancelBooking(store, options = {}) {
-  const { bookingId, transferFn, now = Date.now() } = options;
+  const { bookingId, settleFn, now = Date.now() } = options;
   const booking = getBooking(store, bookingId);
   if (!booking) throw new Error(`cancelBooking: no booking with id ${bookingId}`);
   if (booking.status === 'cancelled') throw new Error(`cancelBooking: booking ${bookingId} is already cancelled`);
@@ -248,14 +258,19 @@ async function cancelBooking(store, options = {}) {
   const refundEligible = hoursUntilStart >= CANCELLATION_CUTOFF_HOURS;
 
   if (booking.pricePaid > 0) {
-    if (typeof transferFn !== 'function') throw new Error('cancelBooking requires a transferFn(fromUserId, toUserId, amount, reason) for a priced booking');
+    if (typeof settleFn !== 'function') throw new Error('cancelBooking requires a settleFn(legs, meta) for a priced booking');
     if (refundEligible) {
-      await transferFn(VOID_MAGIC_ESCROW_ACCOUNT, booking.customerId, booking.pricePaid, `voidmagic_cancellation_refund:${bookingId}`);
+      await settleFn(
+        [{ fromUserId: VOID_MAGIC_ESCROW_ACCOUNT, toUserId: booking.customerId, amount: booking.pricePaid, reason: `voidmagic_cancellation_refund:${bookingId}` }],
+        { reason: `voidmagic_cancellation_refund:${bookingId}` },
+      );
     } else {
       const platformFee = round(booking.pricePaid * PLATFORM_TAKE_RATE);
       const hostPayout = round(booking.pricePaid - platformFee);
-      await transferFn(VOID_MAGIC_ESCROW_ACCOUNT, experience.hostId, hostPayout, `voidmagic_late_cancellation_host_settlement:${bookingId}`);
-      await transferFn(VOID_MAGIC_ESCROW_ACCOUNT, 'voidmagic-platform', platformFee, `voidmagic_late_cancellation_platform_fee:${bookingId}`);
+      await settleFn([
+        { fromUserId: VOID_MAGIC_ESCROW_ACCOUNT, toUserId: experience.hostId, amount: hostPayout, reason: `voidmagic_late_cancellation_host_settlement:${bookingId}` },
+        { fromUserId: VOID_MAGIC_ESCROW_ACCOUNT, toUserId: 'voidmagic-platform', amount: platformFee, reason: `voidmagic_late_cancellation_platform_fee:${bookingId}` },
+      ], { reason: `voidmagic_late_cancellation:${bookingId}` });
     }
   }
 

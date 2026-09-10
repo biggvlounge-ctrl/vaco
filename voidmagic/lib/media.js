@@ -41,7 +41,7 @@ function round(n) {
 
 async function orderMedia(store, options = {}) {
   const {
-    bookingId, type, price, transferFn, now = Date.now(),
+    bookingId, type, price, settleFn, now = Date.now(),
   } = options;
 
   const booking = getBooking(store, bookingId);
@@ -54,9 +54,12 @@ async function orderMedia(store, options = {}) {
     throw new Error(`orderMedia: "magic-memory" is a post-event package -- booking ${bookingId} has not completed yet (status: ${booking.status})`);
   }
   if (!Number.isFinite(price) || price <= 0) throw new Error('orderMedia requires a positive price');
-  if (typeof transferFn !== 'function') throw new Error('orderMedia requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') throw new Error('orderMedia requires a settleFn(legs, meta)');
 
-  await transferFn(booking.customerId, VOID_MAGIC_ESCROW_ACCOUNT, price, `voidmagic_media_order:${bookingId}:${type}`);
+  await settleFn(
+    [{ fromUserId: booking.customerId, toUserId: VOID_MAGIC_ESCROW_ACCOUNT, amount: price, reason: `voidmagic_media_order:${bookingId}:${type}` }],
+    { reason: `voidmagic_media_order:${bookingId}:${type}` },
+  );
 
   const order = {
     id: store.nextMediaOrderId++,
@@ -85,21 +88,27 @@ function listMediaOrders(store, bookingId) {
 // time -- the same real escrow-then-settle shape as event bookings.
 async function deliverMedia(store, options = {}) {
   const {
-    mediaOrderId, assetUrl, transferFn, now = Date.now(),
+    mediaOrderId, assetUrl, settleFn, now = Date.now(),
   } = options;
 
   const order = getMediaOrder(store, mediaOrderId);
   if (!order) throw new Error(`deliverMedia: no media order with id ${mediaOrderId}`);
   if (order.status !== 'ordered') throw new Error(`deliverMedia: media order ${mediaOrderId} is not awaiting delivery (status: ${order.status})`);
   if (!assetUrl) throw new Error('deliverMedia requires a real assetUrl -- this module never generates media itself');
-  if (typeof transferFn !== 'function') throw new Error('deliverMedia requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') throw new Error('deliverMedia requires a settleFn(legs, meta)');
 
   const booking = getBooking(store, order.bookingId);
   const experience = getExperience(store, booking.experienceId);
   const platformFee = round(order.price * PLATFORM_TAKE_RATE);
   const hostPayout = round(order.price - platformFee);
-  await transferFn(VOID_MAGIC_ESCROW_ACCOUNT, experience.hostId, hostPayout, `voidmagic_media_host_settlement:${mediaOrderId}`);
-  await transferFn(VOID_MAGIC_ESCROW_ACCOUNT, 'voidmagic-platform', platformFee, `voidmagic_media_platform_fee:${mediaOrderId}`);
+  // One settlement: both legs leave the same escrow, and `order.status`
+  // is written afterwards -- so a split that paid the host and failed
+  // the fee would leave the order `ordered` and a retry would pay the
+  // host again for one delivery.
+  await settleFn([
+    { fromUserId: VOID_MAGIC_ESCROW_ACCOUNT, toUserId: experience.hostId, amount: hostPayout, reason: `voidmagic_media_host_settlement:${mediaOrderId}` },
+    { fromUserId: VOID_MAGIC_ESCROW_ACCOUNT, toUserId: 'voidmagic-platform', amount: platformFee, reason: `voidmagic_media_platform_fee:${mediaOrderId}` },
+  ], { reason: `voidmagic_media_settlement:${mediaOrderId}` });
 
   order.status = 'delivered';
   order.assetUrl = assetUrl;

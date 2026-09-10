@@ -76,24 +76,39 @@ const VOID_API_URL = process.env.VOID_API_URL || 'http://localhost:8793';
 const store = createPersistentStore(path.join(__dirname, 'data', 'store.json'), createVoidMagicStore);
 app.use(durable(store));  // commit before responding -- see lib/persistence.js
 
-// `idempotencyKey` is optional and forwarded to V3 as an
-// Idempotency-Key header. When present, V3 replays the first
-// result instead of charging again. It is deliberately a
-// parameter rather than something derived here -- see the note
-// at the call sites.
-async function transferVCoin(fromUserId, toUserId, amount, reason, idempotencyKey) {
-  const res = await fetch(`${V3_API_URL}/api/vcoin/transfer`, {
+// Atomic settlement: every leg moves, or none does.
+//
+// **VOID MAGIC settles out of escrow like VACAY**, and had the same
+// defect. A completed experience, a late cancellation and a delivered
+// media order each paid the host and then the platform in two
+// consecutive transfers from the same escrow account -- so the second
+// could fail because the first had just drained it. Each record's
+// status is written afterwards, so a partial failure left the booking
+// or order in its pre-settlement state and a retry paid the host a
+// second time.
+//
+// `POST /api/vcoin/settle` validates every leg against running balances
+// and writes nothing unless all of them pass.
+//
+// `settleVCoin` is deliberately gone rather than kept beside this: a
+// working single-transfer helper is what the next money path in this
+// app gets written with, and consecutive calls to it are the defect.
+async function settleVCoin(legs, meta = {}) {
+  const res = await fetch(`${V3_API_URL}/api/vcoin/settle`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...serviceHeaders(),
-      ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
+      // The settlement reason uniquely names the booking or order, so
+      // it doubles as the idempotency key: a retried settlement replays
+      // V3's first answer rather than paying twice.
+      ...(meta.reason ? { 'Idempotency-Key': `settle:${meta.reason}` } : {}),
     },
-    body: JSON.stringify({ fromUserId, toUserId, amount, reason }),
+    body: JSON.stringify({ legs, reason: meta.reason ?? null }),
   });
   const body = await res.json();
   if (!res.ok) {
-    throw new Error(body.error || `transferVCoin failed (${res.status})`);
+    throw new Error(body.error || `settleVCoin failed (${res.status})`);
   }
   return body;
 }
@@ -216,7 +231,7 @@ app.get('/api/experiences', (req, res) => {
 
 app.post('/api/bookings', requireActor('customerId'), async (req, res) => {
   try {
-    res.status(201).json(await bookExperience(store, { ...req.body, transferFn: transferVCoin }));
+    res.status(201).json(await bookExperience(store, { ...req.body, settleFn: settleVCoin }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -238,7 +253,7 @@ app.post('/api/bookings/:id/check-in', requireBookingHost(), (req, res) => {
 
 app.post('/api/bookings/:id/cancel', requireBookingParty(), async (req, res) => {
   try {
-    res.json(await cancelBooking(store, { ...req.body, bookingId: Number(req.params.id), transferFn: transferVCoin }));
+    res.json(await cancelBooking(store, { ...req.body, bookingId: Number(req.params.id), settleFn: settleVCoin }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -246,7 +261,7 @@ app.post('/api/bookings/:id/cancel', requireBookingParty(), async (req, res) => 
 
 app.post('/api/experiences/:id/complete', requireExperienceHost(), async (req, res) => {
   try {
-    res.json(await completeExperience(store, { experienceId: Number(req.params.id), transferFn: transferVCoin }));
+    res.json(await completeExperience(store, { experienceId: Number(req.params.id), settleFn: settleVCoin }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -384,7 +399,7 @@ app.get('/api/customers/:customerId/experiences', (req, res) => {
 
 app.post('/api/media-orders', requireActor('customerId'), async (req, res) => {
   try {
-    res.status(201).json(await orderMedia(store, { ...req.body, transferFn: transferVCoin }));
+    res.status(201).json(await orderMedia(store, { ...req.body, settleFn: settleVCoin }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -406,7 +421,7 @@ app.get('/api/bookings/:id/media-orders', (req, res) => {
 
 app.post('/api/media-orders/:id/deliver', requireMediaOrderHost(), async (req, res) => {
   try {
-    res.json(await deliverMedia(store, { ...req.body, mediaOrderId: Number(req.params.id), transferFn: transferVCoin }));
+    res.json(await deliverMedia(store, { ...req.body, mediaOrderId: Number(req.params.id), settleFn: settleVCoin }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
