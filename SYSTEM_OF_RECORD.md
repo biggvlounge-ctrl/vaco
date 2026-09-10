@@ -13,17 +13,22 @@ person who built it can check whether a claim is still true.
 Every number below was produced by running the tool that owns it, not
 recalled. The commands are in §10 so they can be re-run.
 
-*Current as of commit `cccc185`, 36 commits, branch
+*Current as of commit `459819f`, 37 commits, branch
 `claude/v4-proxy-server-s6dcp8`, 10 Sep 2026.*
 
 **On the commit count.** An earlier revision of this line said 332. That
 number was not wrong when written and the history it counted is gone:
 the container holding it was reclaimed with nothing pushed, and the
 repository was rebuilt from an archive. `dev-docs/DISASTER_RECOVERY.md`
-§0 records it. Nothing has been pushed since either — the GitHub App is
-not installed for this org, so `git push` returns 403 — which makes
-`node scripts/snapshot.mjs` the only durable copy and the count here a
-reminder rather than a statistic.
+§0 records it. The count restarted from the rebuild, which is why it is
+small.
+
+**The branch is pushed.** It was not, for most of the work recorded
+here — `git push` returned 403 and this file said so — and it is now.
+Re-linking the GitHub connector from the claude.ai settings page
+restored access; no org-level app install turned out to be needed. The
+whole branch went up on the first attempt afterwards. `git status -sb`
+reports the local branch and `origin/` in step.
 
 **`scripts/test/system-of-record.test.mjs` now holds every number in
 this file to the tool that produces it.** Before that, this document
@@ -675,7 +680,7 @@ produce the numbers in this document.
 built:** `node scripts/package-release.mjs` — see §11.
 
 ```sh
-node scripts/run-all-tests.mjs           # 1509/1509 across 39 suites
+node scripts/run-all-tests.mjs           # 1510/1510 across 39 suites
 node scripts/audit-route-guards.mjs --check   # 520/520 accounted for
 ./sync-shared-runtime.sh --check         # 119 copies current, none unmanaged
 ./sync-design-system.sh --check          # every serving app is a target
@@ -715,7 +720,7 @@ dependencies are installed.
 
 ```
 vacon-c         317   vdp             142   void            142
-scripts         124   v3               80   vaco-media       51
+scripts         125   v3               80   vaco-media       51
 v4-proxy         42   world-layer      41   venvm            40
 venvs            40   voken            37   vaco-analytics   34
 vaco-shell       33   voidmagic        23   vacay            22
@@ -871,19 +876,26 @@ are what stand between this and a real deployment.**
 - **Renovate is configured but not installed.** `renovate.json` does
   nothing until the GitHub App is enabled on the repository.
 
-**Blocking durability, though not deployment:** commits are local
-only. `git push` returns 403 — the Claude GitHub App is not installed
-for this organization, and the remote says so by name. 36 commits sit
-on `claude/v4-proxy-server-s6dcp8`.
+**Durability: resolved.** `claude/v4-proxy-server-s6dcp8` is pushed to
+`biggvlounge-ctrl/vaco`, and local and remote are in step.
 
-An earlier revision of this line said 339 and called it "not blocking".
-That was wrong twice over. The count was from a history that no longer
-exists — the container was reclaimed with nothing pushed and the repo
-was rebuilt from an archive (`dev-docs/DISASTER_RECOVERY.md` §0) — and
-treating an unpushable branch as merely inconvenient is what made that
-loss total. `node scripts/snapshot.mjs` produces a restore-tested
-bundle and is the only durable copy until somebody installs the app at
-`https://github.com/apps/claude/installations/select_target`.
+This section carried a warning for most of this work's life, and the
+warning was earned. `git push` returned 403 — the remote said the
+Claude GitHub App lacked access to the org — so every commit lived only
+in an ephemeral container. Re-linking the GitHub connector from
+claude.ai's settings page fixed it; the org-level app install the error
+message suggested was not required.
+
+Two revisions of this line were wrong before that, and both are worth
+keeping visible. One quoted a commit count from a history that no
+longer exists. The other called an unpushable branch "not blocking" —
+which is exactly the reasoning that made the earlier loss total, when
+the container was reclaimed with nothing pushed and the repository had
+to be rebuilt from an archive (`dev-docs/DISASTER_RECOVERY.md` §0).
+
+`node scripts/snapshot.mjs` still produces a restore-tested bundle and
+is still worth running before anything risky. It is no longer the only
+copy, which is a different and much better position.
 
 **Closed since the last revision of this file (10 Sep 2026):**
 

@@ -43,6 +43,18 @@ It does not matter that the cause is administrative. Either fix the
 remote or start producing off-machine artifacts that same session —
 never "keep building and sort it out later."
 
+> **Resolved 10 Sep 2026.** The push works and the branch is on
+> `biggvlounge-ctrl/vaco`. The fix took under a minute once it was
+> actually attempted: re-linking the GitHub connector from claude.ai's
+> settings page. The org-level app install that the 403 message
+> suggested was never needed.
+>
+> That is the part worth keeping. The block was treated as an
+> administrative nuisance to route around for two days, and routing
+> around it is what turned a permission error into a total loss of
+> history. The remedy was a minute of somebody's attention. The
+> paragraph above is the lesson; this note is the evidence for it.
+
 **When there is no remote, `git bundle` is the answer.** A bundle is
 the whole repository — every commit, branch and tag — in one file that
 can be handed to a person, attached to a message, or copied anywhere.

@@ -333,3 +333,35 @@ test('§10 says a skipped test is not a passing one', () => {
   assert.match(section, /skip|skipped/i,
     '§10 does not warn that those checks skip rather than fail without one');
 });
+
+test('a claim that the branch is pushed is a claim that can be checked', (t) => {
+  // SYSTEM_OF_RECORD.md said `git push` returned 403 for most of this
+  // work's life, and that was true and important. It stopped being
+  // true on 10 Sep 2026, and a system of record that keeps warning
+  // about a resolved problem is wrong in the same way as one that
+  // hides an unresolved one — a reader acts on it either way.
+  //
+  // **Deliberately not "local and remote are identical."** Being a
+  // commit or two ahead of origin is the normal state between a commit
+  // and its push, and a check that failed on it would fail on the very
+  // commit that adds this test. The durable claim is narrower and
+  // stable: the branch exists on the remote at all. Never having
+  // pushed is the condition that cost this repository its history.
+  if (!HAS_GIT) return t.skip(NO_GIT);
+
+  const claimsPushed = /The branch is pushed|Durability: resolved/.test(SOR);
+  const remote = run('git', ['rev-parse', '--verify', '--quiet', '@{upstream}']).trim();
+  const hasUpstream = /^[0-9a-f]{40}$/.test(remote);
+
+  if (claimsPushed) {
+    assert.ok(hasUpstream,
+      'SYSTEM_OF_RECORD.md says the branch is pushed, but this branch has no upstream on '
+      + 'any remote. Either push it or put the warning back — an unpushable branch '
+      + 'described as safe is how the history was lost the first time.');
+  } else {
+    assert.ok(!hasUpstream,
+      'the branch IS pushed, and SYSTEM_OF_RECORD.md still carries the warning that it is '
+      + 'not. Update §12 — a resolved problem left in a system of record misleads exactly '
+      + 'as much as an unresolved one that is hidden.');
+  }
+});
