@@ -74,6 +74,38 @@ DECISION_LOG_TARGETS=(
 # Apps that open live media sessions or register recorded assets in
 # vaco-media. Four live consumers (the ones that each built a session
 # layer and stopped at the same wall) plus three catalogue consumers.
+# -- persistence.js ----------------------------------------------------
+#
+# **The durability layer, and it was the one shared module nothing
+# managed.** 28 byte-identical copies of a 177-line file, maintained by
+# hand. `--check` reported "all 119 copies current" while these sat
+# entirely outside its view — the same blind spot documented below for
+# unmanaged copies, except here it covered the module that decides
+# whether an acknowledged write survives a restart.
+#
+# Copied as `persistence.js`, not `.cjs`, unlike every module above.
+# The `.cjs` convention exists so a `"type": "module"` package cannot
+# misread a CommonJS file; all 28 of these apps are CommonJS packages,
+# and renaming would mean rewriting the require in every one of them
+# for no gain. Checked rather than assumed — the target list is derived
+# from the apps whose package.json has no `"type": "module"`.
+#
+# **Three copies are deliberately NOT here**:
+#   vaco-shell   — a `"type": "module"` package, so its copy is real
+#                  ESM (`export function`) rather than a stale fork. It
+#                  carries the same three exports and uses durable().
+#   vdp, venvs   — Vite frontends. Their persistence is browser storage
+#                  and shares only the name, the same documented split
+#                  as their shieldAuth clients.
+# The unmanaged check below excludes all three on module identity
+# rather than filename, so none of them produces a false positive.
+PERSISTENCE_TARGETS=(
+  chopz chopz/chopz-shop cvnvo cvnvo/yap dreams hvntz shield v3 vaca vacay
+  vaco-audit vaco-media vaco-notify vaco-operator vacon vago vavlt-stvdios
+  venvm vex void voidmagic voken vsafe vulture-flix vulture-music
+  vulture-pods vulture-studios vxllage
+)
+
 MEDIA_TARGETS=(
   vxllage cvnvo vavlt-stvdios v4-proxy vulture-flix vulture-pods chopz
 )
@@ -171,6 +203,7 @@ for app in "${DECISION_LOG_TARGETS[@]}"; do sync_one "shared/decisionLog.js" "$a
 for app in "${OPERATOR_TARGETS[@]}"; do sync_one "shared/operatorAuth.js" "$app" "operatorAuth.cjs"; done
 for app in "${MEDIA_TARGETS[@]}"; do sync_one "shared/mediaClient.js" "$app" "mediaClient.cjs"; done
 for app in "${TRACING_TARGETS[@]}"; do sync_one "shared/tracing.js" "$app" "tracing.cjs"; done
+for app in "${PERSISTENCE_TARGETS[@]}"; do sync_one "shared/persistence.js" "$app" "persistence.js"; done
 
 # -- The mirror of the UNUSED check, and the more dangerous direction --
 #
@@ -199,9 +232,21 @@ UNMANAGED=0
 check_unmanaged() {
   local stem="$1"; shift
   local signature="$1"; shift
-  local -n list="$1"
+  local -n list="$1"; shift
+  # The copied filename. Was hardcoded to "${stem}.cjs", which made
+  # this a no-op the moment a module was synced under any other name:
+  # `persistence.js` copies are `.js`, so the find matched zero files
+  # and the check reported success having examined nothing.
+  #
+  # That is the failure SYSTEM_OF_RECORD.md §8 names in its own words —
+  # "a tool that finds nothing must not report success" — committed
+  # inside the tool that enforces the rest of them. Caught by planting
+  # an unmanaged copy and watching --check stay green.
+  local filename="${1:-${stem}.cjs}"
+  local examined=0
   local app
   while IFS= read -r file; do
+    examined=$((examined + 1))
     grep -q 'module\.exports' "$file" 2>/dev/null || continue
     grep -q "$signature" "$file" 2>/dev/null || continue
     # <app>/lib/<stem>.cjs -> <app>, preserving one level of nesting
@@ -210,10 +255,20 @@ check_unmanaged() {
     app="${app#./}"
     [ -z "$app" ] && continue
     for known in "${list[@]}"; do [ "$known" = "$app" ] && continue 2; done
-    echo "  UNMANAGED $app/lib/${stem}.cjs exists but $app is not in ${!list} --" >&2
+    echo "  UNMANAGED $app/lib/${filename} exists but $app is not in ${!list} --" >&2
     echo "            it will never receive updates to shared/${stem}.js" >&2
     UNMANAGED=$((UNMANAGED + 1))
-  done < <(find . -path ./node_modules -prune -o -name "${stem}.cjs" -path '*/lib/*' -print 2>/dev/null | grep -v node_modules)
+  done < <(find . -path ./node_modules -prune -o -name "${filename}" -path '*/lib/*' -print 2>/dev/null | grep -v node_modules)
+
+  # A scan that examined fewer files than there are managed targets did
+  # not look at the managed copies, let alone any unmanaged ones. It
+  # cannot have checked what it claims to have checked, so it fails
+  # rather than passing quietly.
+  if [ "$examined" -lt "${#list[@]}" ]; then
+    echo "  BROKEN   the ${stem} scan examined $examined file(s) but ${#list[@]} are managed --" >&2
+    echo "           it is looking for the wrong filename and would report success regardless" >&2
+    UNMANAGED=$((UNMANAGED + 1))
+  fi
 }
 check_unmanaged shieldAuth  requireActor       SHIELD_TARGETS
 check_unmanaged serviceAuth createServiceAuth  SERVICE_TARGETS
@@ -221,19 +276,25 @@ check_unmanaged decisionLog createDecisionLog  DECISION_LOG_TARGETS
 check_unmanaged operatorAuth createOperatorAuth  OPERATOR_TARGETS
 check_unmanaged mediaClient  createMediaClient   MEDIA_TARGETS
 check_unmanaged tracing      traceMiddleware     TRACING_TARGETS
+check_unmanaged persistence createPersistentStore PERSISTENCE_TARGETS persistence.js
 
-TOTAL=$(( ${#SHIELD_TARGETS[@]} + ${#SERVICE_TARGETS[@]} + ${#DECISION_LOG_TARGETS[@]} + ${#OPERATOR_TARGETS[@]} + ${#MEDIA_TARGETS[@]} + ${#TRACING_TARGETS[@]} ))
+# Every list, summed. Adding PERSISTENCE_TARGETS to the loops and to
+# the message but not to this line made --check report "all 119 copies
+# current" on the same line that itemised 147 of them — a headline
+# contradicting its own breakdown, which is worse than either number
+# being wrong on its own.
+TOTAL=$(( ${#SHIELD_TARGETS[@]} + ${#SERVICE_TARGETS[@]} + ${#DECISION_LOG_TARGETS[@]} + ${#OPERATOR_TARGETS[@]} + ${#MEDIA_TARGETS[@]} + ${#TRACING_TARGETS[@]} + ${#PERSISTENCE_TARGETS[@]} ))
 
 if [ "$CHECK" = "1" ]; then
   if [ "$DRIFTED" -gt 0 ] || [ "$UNUSED" -gt 0 ] || [ "$UNMANAGED" -gt 0 ]; then
     echo "Shared runtime: $DRIFTED drifted, $UNUSED unused, $UNMANAGED unmanaged. Run ./sync-shared-runtime.sh" >&2
     exit 1
   fi
-  echo "Shared runtime: all $TOTAL copies current and in use (${#SHIELD_TARGETS[@]} shieldAuth, ${#SERVICE_TARGETS[@]} serviceAuth, ${#DECISION_LOG_TARGETS[@]} decisionLog, ${#OPERATOR_TARGETS[@]} operatorAuth, ${#MEDIA_TARGETS[@]} mediaClient, ${#TRACING_TARGETS[@]} tracing), and no unmanaged copies elsewhere."
+  echo "Shared runtime: all $TOTAL copies current and in use (${#SHIELD_TARGETS[@]} shieldAuth, ${#SERVICE_TARGETS[@]} serviceAuth, ${#DECISION_LOG_TARGETS[@]} decisionLog, ${#OPERATOR_TARGETS[@]} operatorAuth, ${#MEDIA_TARGETS[@]} mediaClient, ${#TRACING_TARGETS[@]} tracing, ${#PERSISTENCE_TARGETS[@]} persistence), and no unmanaged copies elsewhere."
 else
   if [ "$UNUSED" -gt 0 ] || [ "$UNMANAGED" -gt 0 ]; then
     echo "Shared runtime: copied $COPIED file(s), but $UNUSED are not required anywhere and $UNMANAGED are outside the target lists." >&2
     exit 1
   fi
-  echo "Shared runtime: copied $COPIED file(s) (${#SHIELD_TARGETS[@]} shieldAuth, ${#SERVICE_TARGETS[@]} serviceAuth, ${#DECISION_LOG_TARGETS[@]} decisionLog, ${#OPERATOR_TARGETS[@]} operatorAuth, ${#MEDIA_TARGETS[@]} mediaClient, ${#TRACING_TARGETS[@]} tracing)."
+  echo "Shared runtime: copied $COPIED file(s) (${#SHIELD_TARGETS[@]} shieldAuth, ${#SERVICE_TARGETS[@]} serviceAuth, ${#DECISION_LOG_TARGETS[@]} decisionLog, ${#OPERATOR_TARGETS[@]} operatorAuth, ${#MEDIA_TARGETS[@]} mediaClient, ${#TRACING_TARGETS[@]} tracing, ${#PERSISTENCE_TARGETS[@]} persistence)."
 fi

@@ -13,7 +13,7 @@ person who built it can check whether a claim is still true.
 Every number below was produced by running the tool that owns it, not
 recalled. The commands are in §10 so they can be re-run.
 
-*Current as of commit `459819f`, 37 commits, branch
+*Current as of commit `5c12e9c`, 38 commits, branch
 `claude/v4-proxy-server-s6dcp8`, 10 Sep 2026.*
 
 **On the commit count.** An earlier revision of this line said 332. That
@@ -307,6 +307,27 @@ That third check matches on **module identity** (CommonJS *and* the
 canonical export), not filename. Matching `*/lib/shieldAuth.cjs` false-
 positived on `vdp/src/lib/shieldAuth.cjs`, a browser-side ESM session
 client that shares the name on purpose.
+
+**A fourth, added 10 Sep 2026: the scan must have looked at
+something.** The unmanaged check hardcoded `*/lib/<stem>.cjs`, which
+made it a no-op for any module synced under a different name — and
+`persistence.js` is one, because all 28 of its apps are CommonJS
+packages and renaming would mean rewriting the require in each. So the
+find matched zero files and the check reported success having examined
+nothing. That is §8's own "a tool that finds nothing must not report
+success", committed inside the tool that enforces the other rules.
+Caught by planting an unmanaged copy and watching `--check` stay green.
+A scan that examines fewer files than there are managed targets now
+fails as BROKEN.
+
+**persistence.js was itself unmanaged until that day**, which is the
+larger half of the same finding. 28 byte-identical copies of the
+durability layer — the module that decides whether an acknowledged
+write survives a restart — maintained by hand, while `--check`
+reported "all 119 copies current" without them in view. Three copies
+stay out deliberately: `vaco-shell`'s is real ESM because that package
+is `"type": "module"`, and `vdp`/`venvs` are browser storage that
+shares only the name.
 
 ---
 
@@ -682,7 +703,7 @@ built:** `node scripts/package-release.mjs` — see §11.
 ```sh
 node scripts/run-all-tests.mjs           # 1510/1510 across 39 suites
 node scripts/audit-route-guards.mjs --check   # 520/520 accounted for
-./sync-shared-runtime.sh --check         # 119 copies current, none unmanaged
+./sync-shared-runtime.sh --check         # 147 copies current, none unmanaged
 ./sync-design-system.sh --check          # every serving app is a target
 node deploy/generate-docker-compose.js   # 36 apps + nginx, livekit, postgres, 30 volumes
 git diff --exit-code docker-compose.yml  # generator output matches committed
