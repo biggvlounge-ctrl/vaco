@@ -1,0 +1,187 @@
+VACON-C — documents named in the index but missing from the repository
+======================================================================
+
+Everything here is a SOURCE DESIGN DOCUMENT, not code. The engine is
+built and passes 315 tests; none of these are needed to run, deploy or
+extend what exists. They matter if you want to build the systems they
+describe.
+
+VACANCY_MASTER_ARCHITECTURE_DOCUMENT.md (558 lines) DID survive and is
+in the repo, so the architecture itself is not lost.
+
+Filenames are as the index names them. If you find a file under a
+different name but matching the description, that is almost certainly
+the right document.
+
+
+2. The World Bible (the full narrative/systems design, Parts 1-50+)  (13)
+----------------------------------------------------------------------
+  VACANCY_CITY_DNA_MASTER_FRAMEWORK.md
+      location categories, Parts 1-2
+  VACANCY_CIVILIZATION_DNA_DATABASE.md
+      population/crime/ government/culture, Parts 1-10
+  VACANCY_CULTURE_FAMILY_DIPLOMACY_SYSTEM.md
+      Parts 81-83
+  VACANCY_GAME_DNA_MASTER_FRAMEWORK.md
+      classic game mechanics integration
+  VACANCY_GOVERNMENT_POWER_STRUCTURE_SYSTEM.md
+      governance evolution
+  VACANCY_HUMAN_CAPITAL_SKILL_SYSTEM.md
+      skills, knowledge, teaching
+  VACANCY_REEMERGENCE_RESOURCE_SYSTEM.md
+      Chaos Era → Currency Era phases
+  VACANCY_SPORTS_LEAGUE_CIVILIZATION_BIBLE.md
+      Parts 51-60
+  VACANCY_UNIVERSAL_VALUE_DISCOVERY_SYSTEM.md
+      Parts 61-70, item/discovery economy
+  VACANCY_WORLD_BIBLE_COMPLETION_MAP.md
+      Parts 18-30
+  VACANCY_WORLD_BIBLE_PARTS_31_35.md
+      _36_45.md, _46_50_FINAL.md — location/player systems through the final AI Autonomous World Simulation Engine
+  VACANCY_WORLD_BIBLE_PARTS_36_45.md
+      part of the same series
+  VACANCY_WORLD_BIBLE_PARTS_46_50_FINAL.md
+      part of the same series
+
+4. Chaos Era & World-State Specifics  (10)
+----------------------------------------------------------------------
+  BOOKS_RECONQUEST_CHAOS_ERA_GAMEPLAY.md
+      books, reconquest, scarcity rules
+  FUEL_CASCADE_BIKER_ADVANTAGE_VALUABLES.md
+      electricity→fuel cascade, generators
+  GRANULAR_CHAOS_START_CITY_COUNTRY_SCALE.md
+      the literal starting-moment scale
+  HIDDEN_MILITARY_INSTALLATIONS_BUNKERS.md
+      secret facility archetypes
+  ORIGIN_STORY_GUN_STORES_MISSION_RECOMMENDATION.md
+      official collapse origin story
+  PACE_OF_LIFE_EXPANDED_GAME_DNA.md
+      rural/urban pace, Fortnite/2K additions
+  PHYSICAL_MEDIA_VEHICLES_ANIMAL_SCALE.md
+      graffiti/signage, animal survival data
+  PRISON_POPULATION_CENTERS_BREAKS_SCHOOLS.md
+      prisons, breaks, schools (corrected version)
+  SCARCITY_ELDER_GUIDANCE_UTILITY_LOCATIONS.md
+      deliberate scarcity + Elder suggestions
+  STORYTELLER_LAYER_ELECTRICITY_NEIGHBORHOOD_RED_DISTRICTS.md
+      RimWorld/Dwarf Fortress research applied
+
+5. Population, Demographics & Occupations  (9)
+----------------------------------------------------------------------
+  CRIME_TAXONOMY_AND_TRAIT_NEUTRALITY.md
+      full crime taxonomy, neutral NPC traits
+  DEMOGRAPHIC_ACCURACY_STRUCTURAL_TENSION.md
+      real demographics, structural (not identity-based) tension
+  DISPLACED_PERSONS_TRANSPORTATION_EXPANSION.md
+      travelers/ students caught away from home
+  ESPIONAGE_BORDER_TENSION_MANUFACTURING.md
+      spies, real border modeling, manufacturing employment
+  EXPANDED_SPIRITUAL_FRATERNAL_OCCUPATIONS.md
+      religious/ spiritual/fraternal roles
+  OCCUPATION_TAXONOMY_ORGANIZED_CRIME_HOMEMADE_CRAFTING.md
+      30-category occupation list
+  REBUILD_OCCUPATION_REQUIREMENTS_BLS_SOURCED.md
+      real BLS labor data methodology
+  REGIONAL_DRUG_PREVALENCE_HABITS_SECRET_SOCIETIES.md
+      real, sourced St. Louis drug data
+  REGIONAL_TRADING_RESOURCE_VISIBILITY_DEMOGRAPHICS.md
+      trading, resource visibility, age demographics
+
+(not described by the index)  (7)
+----------------------------------------------------------------------
+  COMPLETE_FINAL_TOTAL_WITH_GAMBLING_COMPLIANCE.md
+  DNA_FRAMEWORK_REVIEW_IMPROVEMENTS.md
+  FINAL_COMPLIANCE_LICENSING_CHECK_VACANCY.md
+  FINAL_TOTAL_ALL_APPS_MARKETING_COMPLIANCE.md
+  HONEST_GAP_REVIEW_ITEMS_CONFLICT_CRIMINALITY.md
+  MASTER_COMPLIANCE_LICENSING_SCOPE.md
+  REMAINING_GAPS_FILLED.md
+
+12. Marketing, Advertising & Revenue — Final Consolidation  (7)
+----------------------------------------------------------------------
+  COMPLETE_MARKETING_STRATEGY_BUDGET_RECOMMENDATIONS.md
+      real 2026 Facebook/Meta benchmarks, specific test budgets ($15,000–$25,000 Facebook, $5,000–$10,000 AdLib)
+  DREAMS_ADVERTISER_SELF_SERVE_SETUP.md
+      the real, complete flow letting outside businesses sign up and run ads themselves
+  ECOSYSTEM_WIDE_REVENUE_CHECK.md
+      the final, authoritative revenue figure: $3.7 million–$19.9 million Year 1, covering all 14 real apps (VACANCY, VENVS, Vavlt Stvdios, Vvltvre umbrella
+  GOOGLE_MARKETING_ECOSYSTEM_INTEGRATION.md
+      the real gap closed: Trends, Ads (Search+YouTube), Analytics, Search Console
+  MNTN_CONNECTED_TV_ADVERTISING_STRATEGY.md
+      real CTV comparable, and the direct boundary: build VENVM as an original equivalent, never copy MNTN's actual code
+  MNTN_PRICING_RESEARCH_RECOMMENDATION.md
+      honest pricing finding; AdLib recommended first given VACO already has content
+  V4_SEARCH_LAYER_ARCHITECTURE.md
+      the real gap closed: V4's Search component, previously named but never built
+
+3. Core Gameplay Systems (built out this session)  (6)
+----------------------------------------------------------------------
+  COMPLETE_BUSINESS_FOUNDING_PIPELINE.md
+      the full skill→ business process
+  EIGHT_SYSTEMS_FULLY_BUILT.md
+      repair, spoilage, escalation, capture, corruption, parole, witnesses
+  GLOBAL_WORLD_FAMOUS_HERO_LANDMARKS.md
+      expanded global landmark reference list
+  TRIBAL_INDEPENDENCE_GOVERNMENT_DISTRUST_EVENTS.md
+      independence, distrust, natural events
+  VACANCY_LOCATION_CONTROL_OPERATIONAL_KEY.md
+      Control/ Operational Key system
+  VACANCY_TRIBES_LEAGUE_LEADERS.md
+      Tribes + League Leaders/EA Sports format
+
+8. Reconciliation & Quality Control Documents  (4)
+----------------------------------------------------------------------
+  DNA_FRAMEWORK_RECONCILIATION_REPORT.md
+      DNA_FRAMEWORK_REVIEW_IMPROVEMENTS.md — early honest reviews
+  HONEST_GAP_REVIEW.md
+      HONEST_GAP_REVIEW_ITEMS_CONFLICT_CRIMINALITY.md — genuine gap reviews
+  VACANCY_FINAL_ARCHITECTURAL_QUESTIONS_RESOLVED.md
+      the two final open questions, closed
+  WORLD_BIBLE_TECHNICAL_PACKAGE_RECONCILIATION.md
+      connecting World Bible to the technical package
+
+9. World Generation Automation & Final Cost (added after initial index)  (4)
+----------------------------------------------------------------------
+  AI_QUALITY_SAMPLING_LOOP.md
+      statistical QA replacing full manual review
+  CONSOLIDATED_DATASET_BUNDLE_UNDER_1M.md
+      all datasets bundled, the path under $1M for world content
+  REAL_COMPANY_REFERENCE_TEMPLATE_RULE.md
+      the standing rule: real companies are structural references only, never shipped names
+  ST_LOUIS_HISTORIC_ARCHITECTURE_COVERAGE.md
+      Moolah Temple, Kings Highway corridor, institutional building coverage
+
+6. Public Figures, Media & Entertainment  (4)
+----------------------------------------------------------------------
+  COMPREHENSIVE_GENRE_INFLUENCER_TAXONOMY.md
+      51 genre categories
+  GLOBAL_POLITICAL_ARCHETYPE_EXPANSION.md
+      global political archetype coverage
+  PUBLIC_FIGURE_ARCHETYPE_SYSTEM.md
+      fictional archetype system (sports/politics/media/celebrity)
+  TOP_100_FICTIONAL_ARCHETYPE_RANKINGS.md
+      the real-names boundary + Top 100 alternative
+
+1. Core Technical Handoff Package (7 Documents — the ready-to-build foundation)  (3)
+----------------------------------------------------------------------
+  VACANCY_500_SYSTEM_MASTER_INDEX.md
+      Document 6: honest status audit of all 500 systems
+  VACANCY_PROTOTYPE_DEVELOPMENT_ROADMAP.md
+      Document 5: checklist-usable build roadmap
+  VACANCY_REACT_FRONTEND_STRUCTURE.md
+      Document 4: real frontend structure
+
+7. Technology, AI & Development  (2)
+----------------------------------------------------------------------
+  CLAUDE_CODE_DEVELOPMENT_ACCELERATION_GUIDE.md
+      real 2026 Claude Code tooling/workflow guidance
+  NPC_AI_TECH_EVALUATION_GROWTH_SUGGESTIONS.md
+      SLM/tiered NPC intelligence
+
+13. AI Capability — Final Layer  (1)
+----------------------------------------------------------------------
+  V4_EXECUTIVE_AGENT_ARCHITECTURE.md
+      the new, authoritative agent architecture reference (v2): every named agent reframed as a specialized AI executive operating inside VACON (the real op
+
+======================================================================
+70 files.
