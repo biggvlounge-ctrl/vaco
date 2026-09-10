@@ -88,7 +88,7 @@ function getAdSubmissions(store, options = {}) {
 // the review workflow is connected to real revenue, not a separate
 // disconnected moderation queue.
 async function runAdSubmission(store, options = {}) {
-  const { submissionId, amountEarned, payerId, transferFn } = options;
+  const { submissionId, amountEarned, payerId, settleFn } = options;
   const submission = getAdSubmission(store, submissionId);
   if (!submission) {
     throw new Error(`runAdSubmission: no ad submission with id ${submissionId}`);
@@ -102,7 +102,7 @@ async function runAdSubmission(store, options = {}) {
     eventType: 'screen-ad',
     amountEarned,
     payerId,
-    transferFn,
+    settleFn,
   });
   submission.timesRun += 1;
 

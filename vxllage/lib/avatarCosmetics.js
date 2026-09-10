@@ -43,16 +43,19 @@ function findCatalogItem(itemId) {
 }
 
 async function purchaseAvatarCosmetic(store, options = {}) {
-  const { userId, itemId, transferFn } = options;
+  const { userId, itemId, settleFn } = options;
   if (!userId) throw new Error('purchaseAvatarCosmetic requires a userId');
   const item = findCatalogItem(itemId);
   if (!item) throw new Error(`purchaseAvatarCosmetic: no real catalog item with id "${itemId}"`);
-  if (typeof transferFn !== 'function') throw new Error('purchaseAvatarCosmetic requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') throw new Error('purchaseAvatarCosmetic requires a settleFn(legs, meta)');
   if (store.avatarCosmeticOwnership.some((o) => o.userId === userId && o.itemId === itemId)) {
     throw new Error(`purchaseAvatarCosmetic: ${userId} already owns "${itemId}"`);
   }
 
-  await transferFn(userId, VXLLAGE_PLATFORM_ACCOUNT, item.priceVCoin, `vxllage_avatar_cosmetic_purchase:${itemId}`);
+  await settleFn(
+    [{ fromUserId: userId, toUserId: VXLLAGE_PLATFORM_ACCOUNT, amount: item.priceVCoin, reason: `vxllage_avatar_cosmetic_purchase:${itemId}` }],
+    { reason: `vxllage_avatar_cosmetic_purchase:${itemId}` },
+  );
 
   const ownership = {
     id: store.nextAvatarCosmeticOwnershipId++, userId, itemId, purchasedAt: Date.now(),

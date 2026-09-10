@@ -58,22 +58,39 @@ function serviceHeaders() {
 const store = createPersistentStore(path.join(__dirname, 'data', 'store.json'), createChopzShopStore);
 app.use(durable(store));  // commit before responding -- see lib/persistence.js
 
-// `idempotencyKey` is optional and forwarded to V3 as an
-// Idempotency-Key header. When present, V3 replays the first
-// result instead of charging again. It is deliberately a
-// parameter rather than something derived here -- see the note
-// at the call sites.
-async function transferVCoin(fromUserId, toUserId, amount, reason, idempotencyKey) {
-  const res = await fetch(`${V3_API_URL}/api/vcoin/transfer`, {
+// Atomic settlement: every leg moves, or none does.
+//
+// **Every multi-party payment in this app used to be consecutive
+// transfers.** The second leg can fail on its own -- often precisely
+// because the first just drew down the account it pays from -- and the
+// record that would mark the work done is written afterwards. So a
+// partial failure left one party paid, another not, and a retry that
+// paid the first one again.
+//
+// `POST /api/vcoin/settle` validates every leg against running balances
+// and writes nothing unless all of them pass. `settleVCoin` is
+// removed rather than kept beside it: a working single-transfer helper
+// is what the next money path gets written with, and consecutive calls
+// to it are the defect.
+async function settleVCoin(legs, meta = {}) {
+  const res = await fetch(`${V3_API_URL}/api/vcoin/settle`, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json', ...serviceHeaders(),
-      ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
+      'Content-Type': 'application/json',
+      ...serviceHeaders(),
+      // The settlement reason uniquely names what is being
+      // settled, so it doubles as the idempotency key: a retried
+      // settlement replays V3's first answer rather than paying
+      // twice. Atomicity stops a *partial* settlement; this stops
+      // a *duplicate* one.
+      ...(meta.reason ? { 'Idempotency-Key': `settle:${meta.reason}` } : {}),
     },
-    body: JSON.stringify({ fromUserId, toUserId, amount, reason }),
+    body: JSON.stringify({ legs, reason: meta.reason ?? null }),
   });
   const body = await res.json();
-  if (!res.ok) throw new Error(body.error || `transferVCoin failed (${res.status})`);
+  if (!res.ok) {
+    throw new Error(body.error || `settleVCoin failed (${res.status})`);
+  }
   return body;
 }
 
@@ -179,7 +196,7 @@ app.post('/chopz-shop/affiliate/links/:id/click', requireActor('buyerId'), (req,
 
 app.post('/chopz-shop/orders', requireActor('buyerId'), async (req, res) => {
   try {
-    res.status(201).json(await createOrder(store, { ...req.body, transferFn: transferVCoin }));
+    res.status(201).json(await createOrder(store, { ...req.body, settleFn: settleVCoin }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -187,7 +204,7 @@ app.post('/chopz-shop/orders', requireActor('buyerId'), async (req, res) => {
 
 app.post('/chopz-shop/cart-checkout', requireActor('buyerId'), async (req, res) => {
   try {
-    const checkout = await createCartCheckout(store, { ...req.body, transferFn: transferVCoin });
+    const checkout = await createCartCheckout(store, { ...req.body, settleFn: settleVCoin });
     await pushMetric('checkout_revenue', checkout.totalCharged);
     res.status(201).json(checkout);
   } catch (err) {

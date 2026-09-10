@@ -8,7 +8,7 @@
 // **Asserted on the money, never on a status**, per the ecosystem rule.
 // `recordImpression` returns an object with `screenOwnerPayout` and
 // `platformFee` fields on it, and a test that only read those would
-// pass while `transferFn` moved nothing at all, or moved it twice, or
+// pass while `settleFn` moved nothing at all, or moved it twice, or
 // moved it to the wrong account. So every money assertion here reads
 // the recorded transfers, not the return value.
 
@@ -27,10 +27,21 @@ const {
 // what actually moved.
 function recorder() {
   const moves = [];
-  const fn = async (fromUserId, toUserId, amount, reason) => {
-    moves.push({ fromUserId, toUserId, amount, reason });
+  // Takes a settlement and applies each leg, so every existing
+  // assertion below reads exactly as it did when these were
+  // separate transfers. `calls` is the new question: how many
+  // times the ledger was asked. Amounts are identical whether a
+  // settlement is atomic or split, which is why only a call count
+  // can tell them apart.
+  const calls = [];
+  const fn = async (legs, meta = {}) => {
+    calls.push({ legs, meta });
+    for (const { fromUserId: fromUserId, toUserId: toUserId, amount: amount, reason: reason } of legs) {
+      moves.push({ fromUserId, toUserId, amount, reason });
+    }
     return { ok: true };
   };
+  fn.calls = calls;
   fn.moves = moves;
   fn.totalTo = (who) => moves.filter((m) => m.toUserId === who).reduce((n, m) => n + m.amount, 0);
   fn.totalFrom = (who) => moves.filter((m) => m.fromUserId === who).reduce((n, m) => n + m.amount, 0);
@@ -56,16 +67,24 @@ function liveCampaign(store, { budget = 100 } = {}) {
 test('an impression moves money twice: to the screen owner and to the platform', () => {
   const store = createDreamsStore();
   const { campaign, screen } = liveCampaign(store);
-  const transferFn = recorder();
+  const settleFn = recorder();
 
   return recordImpression(store, {
-    campaignId: campaign.id, screenId: screen.id, costPerImpression: 10, transferFn,
+    campaignId: campaign.id, screenId: screen.id, costPerImpression: 10, settleFn,
   }).then(() => {
-    assert.equal(transferFn.moves.length, 2, 'an impression did not move money exactly twice');
-    assert.equal(transferFn.totalTo('owner-1'), 7);
-    assert.equal(transferFn.totalTo(DREAMS_PLATFORM_ACCOUNT), 3);
+    assert.equal(settleFn.moves.length, 2, 'an impression did not move money exactly twice');
+    assert.equal(settleFn.totalTo('owner-1'), 7);
+    assert.equal(settleFn.totalTo(DREAMS_PLATFORM_ACCOUNT), 3);
     // The advertiser pays exactly the cost — no more, no less.
-    assert.equal(transferFn.totalFrom('adv-1'), 10);
+    assert.equal(settleFn.totalFrom('adv-1'), 10);
+
+    // **The assertion arithmetic cannot make.** Both legs must reach
+    // the ledger in ONE call. Split into consecutive transfers every
+    // line above still passes — the amounts, the split, the total
+    // charged — and yet the second leg can fail after the first has
+    // moved, leaving the record unwritten and a retry paying again.
+    assert.equal(settleFn.calls.length, 1, 'the settlement must be a single atomic call');
+    assert.equal(settleFn.calls[0].legs.length, 2, 'the two shares stay separately auditable');
   });
 });
 
@@ -81,12 +100,12 @@ test('the two halves sum to the exact cost, never two rounded halves that drift'
   for (const cost of [0.15, 0.25, 0.45, 0.55, 0.85, 1.05]) {
     const store = createDreamsStore();
     const { campaign, screen } = liveCampaign(store);
-    const transferFn = recorder();
+    const settleFn = recorder();
 
     await recordImpression(store, {
-      campaignId: campaign.id, screenId: screen.id, costPerImpression: cost, transferFn,
+      campaignId: campaign.id, screenId: screen.id, costPerImpression: cost, settleFn,
     });
-    const paid = Math.round(transferFn.totalFrom('adv-1') * 100) / 100;
+    const paid = Math.round(settleFn.totalFrom('adv-1') * 100) / 100;
     assert.equal(
       paid, cost,
       `at cost ${cost} the two transfers summed to ${paid} — the advertiser was charged `
@@ -99,12 +118,12 @@ test('the share is 70/30 and is asserted, not assumed', () => {
   assert.equal(SCREEN_OWNER_SHARE, 0.7);
   const store = createDreamsStore();
   const { campaign, screen } = liveCampaign(store, { budget: 1000 });
-  const transferFn = recorder();
+  const settleFn = recorder();
   return recordImpression(store, {
-    campaignId: campaign.id, screenId: screen.id, costPerImpression: 100, transferFn,
+    campaignId: campaign.id, screenId: screen.id, costPerImpression: 100, settleFn,
   }).then(() => {
-    assert.equal(transferFn.totalTo('owner-1'), 70);
-    assert.equal(transferFn.totalTo(DREAMS_PLATFORM_ACCOUNT), 30);
+    assert.equal(settleFn.totalTo('owner-1'), 70);
+    assert.equal(settleFn.totalTo(DREAMS_PLATFORM_ACCOUNT), 30);
   });
 });
 
@@ -113,9 +132,9 @@ test('the share is 70/30 and is asserted, not assumed', () => {
 test('the budget falls by exactly what was charged', () => {
   const store = createDreamsStore();
   const { campaign, screen } = liveCampaign(store, { budget: 100 });
-  const transferFn = recorder();
+  const settleFn = recorder();
   return recordImpression(store, {
-    campaignId: campaign.id, screenId: screen.id, costPerImpression: 25, transferFn,
+    campaignId: campaign.id, screenId: screen.id, costPerImpression: 25, settleFn,
   }).then(() => {
     assert.equal(campaign.remainingBudget, 75);
   });
@@ -124,14 +143,14 @@ test('the budget falls by exactly what was charged', () => {
 test('an impression that would overspend the budget is refused, and moves nothing', () => {
   const store = createDreamsStore();
   const { campaign, screen } = liveCampaign(store, { budget: 10 });
-  const transferFn = recorder();
+  const settleFn = recorder();
   return assert.rejects(
     () => recordImpression(store, {
-      campaignId: campaign.id, screenId: screen.id, costPerImpression: 11, transferFn,
+      campaignId: campaign.id, screenId: screen.id, costPerImpression: 11, settleFn,
     }),
     /exceeds campaign .* remaining budget/,
   ).then(() => {
-    assert.equal(transferFn.moves.length, 0, 'a refused impression still moved money');
+    assert.equal(settleFn.moves.length, 0, 'a refused impression still moved money');
     assert.equal(campaign.remainingBudget, 10, 'a refused impression still spent budget');
   });
 });
@@ -139,22 +158,22 @@ test('an impression that would overspend the budget is refused, and moves nothin
 test('exhausting the budget completes the campaign, and no further impression runs', async () => {
   const store = createDreamsStore();
   const { campaign, screen } = liveCampaign(store, { budget: 10 });
-  const transferFn = recorder();
+  const settleFn = recorder();
 
   await recordImpression(store, {
-    campaignId: campaign.id, screenId: screen.id, costPerImpression: 10, transferFn,
+    campaignId: campaign.id, screenId: screen.id, costPerImpression: 10, settleFn,
   });
   assert.equal(campaign.remainingBudget, 0);
   assert.equal(campaign.status, 'completed');
 
-  const before = transferFn.moves.length;
+  const before = settleFn.moves.length;
   await assert.rejects(
     () => recordImpression(store, {
-      campaignId: campaign.id, screenId: screen.id, costPerImpression: 1, transferFn,
+      campaignId: campaign.id, screenId: screen.id, costPerImpression: 1, settleFn,
     }),
     /not "live"/,
   );
-  assert.equal(transferFn.moves.length, before, 'a completed campaign still paid out');
+  assert.equal(settleFn.moves.length, before, 'a completed campaign still paid out');
 });
 
 // -- The NaN class --------------------------------------------------------
@@ -165,22 +184,22 @@ test('a non-numeric cost is refused rather than becoming NaN in the split', asyn
   // and writes a corrupt balance without failing a guard.
   const store = createDreamsStore();
   const { campaign, screen } = liveCampaign(store);
-  const transferFn = recorder();
+  const settleFn = recorder();
 
   for (const bad of [NaN, Infinity, -1, 0, '10', null, undefined]) {
     await assert.rejects(
       () => recordImpression(store, {
-        campaignId: campaign.id, screenId: screen.id, costPerImpression: bad, transferFn,
+        campaignId: campaign.id, screenId: screen.id, costPerImpression: bad, settleFn,
       }),
       `costPerImpression ${String(bad)} was accepted`,
     );
   }
-  assert.equal(transferFn.moves.length, 0);
+  assert.equal(settleFn.moves.length, 0);
   assert.equal(campaign.remainingBudget, 100, 'a refused impression still spent budget');
 });
 
-test('an impression with no transferFn is refused rather than silently free', async () => {
-  // A missing transferFn would otherwise mean the advertiser is charged
+test('an impression with no settleFn is refused rather than silently free', async () => {
+  // A missing settleFn would otherwise mean the advertiser is charged
   // nothing and the screen owner earns nothing, while the impression
   // is recorded as having happened.
   const store = createDreamsStore();
@@ -189,7 +208,7 @@ test('an impression with no transferFn is refused rather than silently free', as
     () => recordImpression(store, {
       campaignId: campaign.id, screenId: screen.id, costPerImpression: 5,
     }),
-    /requires a transferFn/,
+    /requires a settleFn/,
   );
   assert.equal(store.impressions.length, 0, 'an impression was recorded with no money moved');
 });
@@ -202,16 +221,16 @@ test('an impression on a screen the campaign never selected is refused', async (
   const other = registerScreen(store, {
     screenOwnerId: 'owner-2', locationName: 'Elsewhere', locationAddress: '2 Other St',
   });
-  const transferFn = recorder();
+  const settleFn = recorder();
   await assert.rejects(
     () => recordImpression(store, {
-      campaignId: campaign.id, screenId: other.id, costPerImpression: 5, transferFn,
+      campaignId: campaign.id, screenId: other.id, costPerImpression: 5, settleFn,
     }),
     /is not selected for campaign/,
   );
   // The one that matters: owner-2 must not have earned from a campaign
   // that never bought their screen.
-  assert.equal(transferFn.totalTo('owner-2'), 0);
+  assert.equal(settleFn.totalTo('owner-2'), 0);
 });
 
 test('a draft campaign pays nobody', async () => {
@@ -223,14 +242,14 @@ test('a draft campaign pays nobody', async () => {
   const campaign = createCampaign(store, { advertiserId: 'adv-1', name: 'Unlaunched' });
   selectScreens(store, { campaignId: campaign.id, screenIds: [screen.id] });
   setBudget(store, { campaignId: campaign.id, budget: 50 });
-  const transferFn = recorder();
+  const settleFn = recorder();
   await assert.rejects(
     () => recordImpression(store, {
-      campaignId: campaign.id, screenId: screen.id, costPerImpression: 5, transferFn,
+      campaignId: campaign.id, screenId: screen.id, costPerImpression: 5, settleFn,
     }),
     /not "live"/,
   );
-  assert.equal(transferFn.moves.length, 0);
+  assert.equal(settleFn.moves.length, 0);
 });
 
 // -- Reporting ------------------------------------------------------------
@@ -238,14 +257,14 @@ test('a draft campaign pays nobody', async () => {
 test('screen revenue reports what the owner was actually paid', async () => {
   const store = createDreamsStore();
   const { campaign, screen } = liveCampaign(store, { budget: 1000 });
-  const transferFn = recorder();
+  const settleFn = recorder();
   for (const cost of [10, 20, 30]) {
     await recordImpression(store, {
-      campaignId: campaign.id, screenId: screen.id, costPerImpression: cost, transferFn,
+      campaignId: campaign.id, screenId: screen.id, costPerImpression: cost, settleFn,
     });
   }
   const revenue = getScreenRevenue(store, screen.id);
-  const paid = transferFn.totalTo('owner-1');
+  const paid = settleFn.totalTo('owner-1');
   assert.equal(paid, 42, 'the owner was not paid 70% of 60');
   // The report and the ledger must agree — a report that drifts from
   // what moved is how an owner disputes a payout.
@@ -256,21 +275,21 @@ test('screen revenue reports what the owner was actually paid', async () => {
 test('a deactivated screen stops earning', async () => {
   const store = createDreamsStore();
   const { campaign, screen } = liveCampaign(store, { budget: 1000 });
-  const transferFn = recorder();
+  const settleFn = recorder();
   await recordImpression(store, {
-    campaignId: campaign.id, screenId: screen.id, costPerImpression: 10, transferFn,
+    campaignId: campaign.id, screenId: screen.id, costPerImpression: 10, settleFn,
   });
-  const earnedBefore = transferFn.totalTo('owner-1');
+  const earnedBefore = settleFn.totalTo('owner-1');
 
   deactivateScreen(store, { screenId: screen.id, screenOwnerId: 'owner-1' });
 
   // Whether the impression is refused or allowed, the invariant that
   // matters is that a dark screen does not keep billing the advertiser.
   await recordImpression(store, {
-    campaignId: campaign.id, screenId: screen.id, costPerImpression: 10, transferFn,
+    campaignId: campaign.id, screenId: screen.id, costPerImpression: 10, settleFn,
   }).catch(() => {});
 
-  const earnedAfter = transferFn.totalTo('owner-1');
+  const earnedAfter = settleFn.totalTo('owner-1');
   assert.ok(
     earnedAfter === earnedBefore || earnedAfter > earnedBefore,
     'earnings went backwards after deactivation',

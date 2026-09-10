@@ -97,21 +97,39 @@ function serviceHeaders() {
 const store = createPersistentStore(path.join(__dirname, 'data', 'store.json'), createVavltStvdiosStore);
 app.use(durable(store));  // commit before responding -- see lib/persistence.js
 
-// `idempotencyKey` is optional and forwarded to V3 as an
-// Idempotency-Key header. When present, V3 replays the first
-// result instead of charging again. It is deliberately a
-// parameter rather than something derived here -- see the note
-// at the call sites.
-async function transferVCoin(fromUserId, toUserId, amount, reason, idempotencyKey) {
-  const res = await fetch(`${V3_API_URL}/api/vcoin/transfer`, {
+// Atomic settlement: every leg moves, or none does.
+//
+// **Every multi-party payment in this app used to be consecutive
+// transfers.** The second leg can fail on its own -- often precisely
+// because the first just drew down the account it pays from -- and the
+// record that would mark the work done is written afterwards. So a
+// partial failure left one party paid, another not, and a retry that
+// paid the first one again.
+//
+// `POST /api/vcoin/settle` validates every leg against running balances
+// and writes nothing unless all of them pass. `settleVCoin` is
+// removed rather than kept beside it: a working single-transfer helper
+// is what the next money path gets written with, and consecutive calls
+// to it are the defect.
+async function settleVCoin(legs, meta = {}) {
+  const res = await fetch(`${V3_API_URL}/api/vcoin/settle`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...serviceHeaders() },
-    body: JSON.stringify({
-      fromUserId, toUserId, amount, reason,
-    }),
+    headers: {
+      'Content-Type': 'application/json',
+      ...serviceHeaders(),
+      // The settlement reason uniquely names what is being
+      // settled, so it doubles as the idempotency key: a retried
+      // settlement replays V3's first answer rather than paying
+      // twice. Atomicity stops a *partial* settlement; this stops
+      // a *duplicate* one.
+      ...(meta.reason ? { 'Idempotency-Key': `settle:${meta.reason}` } : {}),
+    },
+    body: JSON.stringify({ legs, reason: meta.reason ?? null }),
   });
   const body = await res.json();
-  if (!res.ok) throw new Error(body.error || `transferVCoin failed (${res.status})`);
+  if (!res.ok) {
+    throw new Error(body.error || `settleVCoin failed (${res.status})`);
+  }
   return body;
 }
 
@@ -252,7 +270,7 @@ app.get('/api/channels/:id/chat', (req, res) => {
 // balance on a performer of their choosing.
 app.post('/api/channels/:id/tips', requireActor('tipperId'), async (req, res) => {
   try {
-    res.status(201).json(await tipChannel(store, { ...req.body, channelId: Number(req.params.id), transferFn: transferVCoin }));
+    res.status(201).json(await tipChannel(store, { ...req.body, channelId: Number(req.params.id), settleFn: settleVCoin }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -404,7 +422,7 @@ app.get('/api/creators/:creatorId/tiers', (req, res) => {
 
 app.post('/api/tiers/:id/subscribe', requireActor('userId'), async (req, res) => {
   try {
-    res.status(201).json(await subscribeTier(store, { ...req.body, tierId: Number(req.params.id), transferFn: transferVCoin }));
+    res.status(201).json(await subscribeTier(store, { ...req.body, tierId: Number(req.params.id), settleFn: settleVCoin }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -512,7 +530,7 @@ app.get('/api/owners/:ownerId/screen-sessions', (req, res) => {
 
 app.post('/api/referrals', requireActor('referrerId'), async (req, res) => {
   try {
-    res.status(201).json(await recordReferral(store, { ...req.body, transferFn: transferVCoin }));
+    res.status(201).json(await recordReferral(store, { ...req.body, settleFn: settleVCoin }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -526,7 +544,7 @@ app.get('/api/referrals/:userId/progress', (req, res) => {
 // person spinning must be the person credited. Same as VOKEN's.
 app.post('/api/referrals/:userId/spin', requireParamActor('userId'), async (req, res) => {
   try {
-    res.status(201).json(await spinWheel(store, { ...req.body, userId: req.params.userId, transferFn: transferVCoin }));
+    res.status(201).json(await spinWheel(store, { ...req.body, userId: req.params.userId, settleFn: settleVCoin }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

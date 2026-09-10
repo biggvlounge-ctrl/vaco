@@ -18,8 +18,8 @@
 // confirmed no seed call for it existed anywhere in that file before
 // this module. Built for real now.
 //
-// Real transferFn stub: `recordRevenueEvent` requires a real
-// `transferFn(fromUserId, toUserId, amount, reason)` (same injected-
+// Real settleFn stub: `recordRevenueEvent` requires a real
+// `settleFn(legs, meta)` (same injected-
 // client pattern as server.js's own `transferVCoin`, which makes a
 // real, live HTTP call to V3). Seeding runs at process boot, before
 // there's any guarantee V3 is reachable, so this module intentionally
@@ -110,13 +110,13 @@ async function seedDemoData(store) {
   // List isn't empty for any seeded business -- distinct stream per
   // business, not all identical.
   await recordRevenueEvent(store, {
-    locationId: cahokiaLocation.id, eventType: 'hvntz-discovery-placement', amountEarned: 18, payerId, transferFn: demoTransferFn,
+    locationId: cahokiaLocation.id, eventType: 'hvntz-discovery-placement', amountEarned: 18, payerId, settleFn: demoTransferFn,
   });
   await recordRevenueEvent(store, {
-    locationId: archLocation.id, eventType: 'screen-ad', amountEarned: 32.5, payerId, transferFn: demoTransferFn,
+    locationId: archLocation.id, eventType: 'screen-ad', amountEarned: 32.5, payerId, settleFn: demoTransferFn,
   });
   await recordRevenueEvent(store, {
-    locationId: confluenceLocation.id, eventType: 'community-thread', amountEarned: 12, payerId, transferFn: demoTransferFn,
+    locationId: confluenceLocation.id, eventType: 'community-thread', amountEarned: 12, payerId, settleFn: demoTransferFn,
   });
 
   // -- The differentiator: ONE business, several real revenue streams
@@ -140,7 +140,7 @@ async function seedDemoData(store) {
   const differentiatorEvents = [];
   for (const stream of differentiatorStreams) {
     differentiatorEvents.push(await recordRevenueEvent(store, {
-      locationId: mercantileLocation.id, eventType: stream.eventType, amountEarned: stream.amountEarned, payerId, transferFn: demoTransferFn,
+      locationId: mercantileLocation.id, eventType: stream.eventType, amountEarned: stream.amountEarned, payerId, settleFn: demoTransferFn,
     }));
   }
   const differentiatorTotal = Math.round(differentiatorEvents.reduce((sum, e) => sum + e.amountEarned, 0) * 100) / 100;

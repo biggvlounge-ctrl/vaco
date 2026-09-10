@@ -18,7 +18,7 @@
 // lockup." `SECONDARY_LOCKUP_MS` is that real, cited 90-day figure,
 // not an invented one. This project has no registered ATS to route
 // through, so secondary trades settle as direct, real peer-to-peer
-// share transfers (seller to buyer, same `transferFn` pattern as the
+// share transfers (seller to buyer, same `settleFn` pattern as the
 // primary sale) rather than simulating an order book this codebase
 // has no matching engine for -- the same "real code reuse, no
 // invented infrastructure" discipline as this session's other
@@ -146,7 +146,7 @@ function getFractionalListing(store, listingId) {
 // fractionalizing seller directly as shares sell, real remaining-share
 // enforcement against totalShares.
 async function buyShares(store, options = {}) {
-  const { listingId, buyerId, shareCount, transferFn, now = Date.now() } = options;
+  const { listingId, buyerId, shareCount, settleFn, now = Date.now() } = options;
   const listing = getFractionalListing(store, listingId);
   if (!listing) throw new Error(`buyShares: no fractional listing with id ${listingId}`);
   if (!isComplianceCleared(store, 'fractional-ownership')) {
@@ -159,10 +159,13 @@ async function buyShares(store, options = {}) {
   if (shareCount > remaining) {
     throw new Error(`buyShares: only ${remaining} of ${listing.totalShares} shares remain, cannot buy ${shareCount}`);
   }
-  if (typeof transferFn !== 'function') throw new Error('buyShares requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') throw new Error('buyShares requires a settleFn(legs, meta)');
 
   const cost = round(shareCount * listing.pricePerShare);
-  await transferFn(buyerId, listing.sellerId, cost, `voken_fractional_shares:${listing.cardId}`);
+  await settleFn(
+    [{ fromUserId: buyerId, toUserId: listing.sellerId, amount: cost, reason: `voken_fractional_shares:${listing.cardId}` }],
+    { reason: `voken_fractional_shares:${listing.cardId}` },
+  );
 
   listing.soldShares += shareCount;
   const newLot = {
@@ -301,7 +304,7 @@ function cancelSecondaryListing(store, options = {}) {
 // (there's no new custody event here -- the underlying edition never
 // moves, only the investor-level stake does).
 async function buySecondaryShares(store, options = {}) {
-  const { secondaryListingId, buyerId, transferFn } = options;
+  const { secondaryListingId, buyerId, settleFn } = options;
   const secondaryListing = getSecondaryListing(store, secondaryListingId);
   if (!secondaryListing) throw new Error(`buySecondaryShares: no secondary listing with id ${secondaryListingId}`);
   if (!isComplianceCleared(store, 'fractional-ownership')) {
@@ -310,11 +313,14 @@ async function buySecondaryShares(store, options = {}) {
   if (secondaryListing.status !== 'open') throw new Error(`buySecondaryShares: listing ${secondaryListingId} is not open (status: ${secondaryListing.status})`);
   if (!buyerId) throw new Error('buySecondaryShares requires a buyerId');
   if (buyerId === secondaryListing.sellerId) throw new Error('buySecondaryShares: cannot buy your own listing');
-  if (typeof transferFn !== 'function') throw new Error('buySecondaryShares requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') throw new Error('buySecondaryShares requires a settleFn(legs, meta)');
 
   const fractionalListing = getFractionalListing(store, secondaryListing.fractionalListingId);
   const cost = round(secondaryListing.shareCount * secondaryListing.pricePerShare);
-  await transferFn(buyerId, secondaryListing.sellerId, cost, `voken_secondary_shares:${secondaryListing.cardId}`);
+  await settleFn(
+    [{ fromUserId: buyerId, toUserId: secondaryListing.sellerId, amount: cost, reason: `voken_secondary_shares:${secondaryListing.cardId}` }],
+    { reason: `voken_secondary_shares:${secondaryListing.cardId}` },
+  );
 
   // Real per-lot debit: remove exactly the shares from exactly the
   // lots this listing actually drew from, deleting a lot entirely once

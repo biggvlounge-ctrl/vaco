@@ -13,7 +13,7 @@
 // exactly the point the source doc itself makes.
 //
 // recordRevenueEvent reuses this project's established injected-
-// transferFn pattern (matching world-layer/venvs) so this module
+// settleFn pattern (matching world-layer/venvs) so this module
 // stays runnable in plain Node, decoupled from any specific wallet
 // client implementation.
 
@@ -232,7 +232,7 @@ function getLocationsForBusiness(store, businessId) {
 // it.
 async function recordRevenueEvent(store, options = {}) {
   const {
-    locationId, eventType, amountEarned, relatedOrderId = null, payerId, transferFn,
+    locationId, eventType, amountEarned, relatedOrderId = null, payerId, settleFn,
     vacoSharePercent = null,
   } = options;
 
@@ -249,8 +249,8 @@ async function recordRevenueEvent(store, options = {}) {
   if (!payerId) {
     throw new Error('recordRevenueEvent requires a payerId');
   }
-  if (typeof transferFn !== 'function') {
-    throw new Error('recordRevenueEvent requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') {
+    throw new Error('recordRevenueEvent requires a settleFn(legs, meta)');
   }
 
   const business = getBusiness(store, location.businessId);
@@ -268,10 +268,17 @@ async function recordRevenueEvent(store, options = {}) {
   const vacoShare = Math.round(amountEarned * resolvedVacoShare * 100) / 100;
   const businessShare = Math.round((amountEarned - vacoShare) * 100) / 100;
 
-  await transferFn(payerId, business.ownerId, businessShare, `hvntz_revenue:${eventType}:${location.id}`);
+  // One settlement: the business owner's share and VACO's both leave
+  // the payer, and the revenue event is recorded only afterwards -- so
+  // a split that paid the owner and failed the platform leg left a
+  // charge with no record and a retry that paid the owner again.
+  const legs = [
+    { fromUserId: payerId, toUserId: business.ownerId, amount: businessShare, reason: `hvntz_revenue:${eventType}:${location.id}` },
+  ];
   if (vacoShare > 0) {
-    await transferFn(payerId, VACO_PLATFORM_USER_ID, vacoShare, `hvntz_platform_fee:${eventType}:${location.id}`);
+    legs.push({ fromUserId: payerId, toUserId: VACO_PLATFORM_USER_ID, amount: vacoShare, reason: `hvntz_platform_fee:${eventType}:${location.id}` });
   }
+  await settleFn(legs, { reason: `hvntz_revenue_event:${eventType}:${location.id}` });
 
   const event = {
     id: store.nextEventId++,

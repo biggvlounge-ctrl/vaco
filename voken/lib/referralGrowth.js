@@ -91,15 +91,15 @@ function getReferralProgress(store, userId) {
 // real bonus payout (from `VOKEN_PLATFORM_ACCOUNT`) and banks real
 // spins for later use.
 async function recordReferral(store, options = {}) {
-  const { referrerId, refereeId, transferFn, now = Date.now() } = options;
+  const { referrerId, refereeId, settleFn, now = Date.now() } = options;
   if (!referrerId) throw new Error('recordReferral requires a referrerId');
   if (!refereeId) throw new Error('recordReferral requires a refereeId');
   if (referrerId === refereeId) throw new Error('recordReferral: cannot refer yourself');
   if (store.referrals.some((r) => r.refereeId === refereeId)) {
     throw new Error(`recordReferral: ${refereeId} has already been referred by someone`);
   }
-  if (typeof transferFn !== 'function') {
-    throw new Error('recordReferral requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') {
+    throw new Error('recordReferral requires a settleFn(legs, meta)');
   }
 
   const referral = {
@@ -115,7 +115,10 @@ async function recordReferral(store, options = {}) {
   if (justCrossed && !record.tiersReached.includes(justCrossed.threshold)) {
     record.tiersReached.push(justCrossed.threshold);
     record.spinsAvailable += justCrossed.spinsAwarded;
-    await transferFn(VOKEN_PLATFORM_ACCOUNT, referrerId, justCrossed.bonusVCoin, `voken_referral_tier:${justCrossed.threshold}`);
+    await settleFn(
+      [{ fromUserId: VOKEN_PLATFORM_ACCOUNT, toUserId: referrerId, amount: justCrossed.bonusVCoin, reason: `voken_referral_tier:${justCrossed.threshold}` }],
+      { reason: `voken_referral_tier:${justCrossed.threshold}` },
+    );
     tierReached = justCrossed;
   }
 
@@ -135,10 +138,10 @@ function pickPrize(float) {
 // Real spin-to-win, provably fair -- the exact commit-reveal shape
 // VAGO's own Originals games already established.
 async function spinWheel(store, options = {}) {
-  const { userId, clientSeed, transferFn, now = Date.now() } = options;
+  const { userId, clientSeed, settleFn, now = Date.now() } = options;
   if (!clientSeed) throw new Error('spinWheel requires a clientSeed');
-  if (typeof transferFn !== 'function') {
-    throw new Error('spinWheel requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') {
+    throw new Error('spinWheel requires a settleFn(legs, meta)');
   }
 
   const record = referrerRecord(store, userId);
@@ -155,7 +158,10 @@ async function spinWheel(store, options = {}) {
   record.spinsAvailable -= 1;
 
   if (prize.vcoin > 0) {
-    await transferFn(VOKEN_PLATFORM_ACCOUNT, userId, prize.vcoin, `voken_spin_prize:${nonce}`);
+    await settleFn(
+      [{ fromUserId: VOKEN_PLATFORM_ACCOUNT, toUserId: userId, amount: prize.vcoin, reason: `voken_spin_prize:${nonce}` }],
+      { reason: `voken_spin_prize:${nonce}` },
+    );
   }
 
   const spin = {

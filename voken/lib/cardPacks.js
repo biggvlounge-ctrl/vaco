@@ -74,14 +74,14 @@ function shuffle(array, rng) {
 // Real charge, closing a gap this session's own deployment-guide
 // investigation found: openPack minted real cards to a real buyer
 // without ever actually charging them -- packTier.price was a real
-// field nothing collected. Now a real transferFn(buyerId,
+// field nothing collected. Now a real settleFn(buyerId,
 // VOKEN_PLATFORM_ACCOUNT, packTier.price, ...) fires after the pack's
 // real contents are resolved (so a real "no qualifying card" failure
 // below never charges a buyer for a pack that couldn't be filled) but
 // before minting (a buyer who paid always gets real cards back).
 async function openPack(store, options = {}) {
   const {
-    packTierId, buyerId, candidateCardIds, transferFn, rng = Math.random,
+    packTierId, buyerId, candidateCardIds, settleFn, rng = Math.random,
   } = options;
 
   const packTier = getPackTier(store, packTierId);
@@ -90,8 +90,8 @@ async function openPack(store, options = {}) {
   if (!Array.isArray(candidateCardIds) || candidateCardIds.length === 0) {
     throw new Error('openPack requires at least one candidateCardId');
   }
-  if (typeof transferFn !== 'function') {
-    throw new Error('openPack requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') {
+    throw new Error('openPack requires a settleFn(legs, meta)');
   }
 
   const available = candidateCardIds
@@ -119,7 +119,10 @@ async function openPack(store, options = {}) {
     }
   }
 
-  await transferFn(buyerId, VOKEN_PLATFORM_ACCOUNT, packTier.price, `voken_pack_open:${packTierId}`);
+  await settleFn(
+    [{ fromUserId: buyerId, toUserId: VOKEN_PLATFORM_ACCOUNT, amount: packTier.price, reason: `voken_pack_open:${packTierId}` }],
+    { reason: `voken_pack_open:${packTierId}` },
+  );
 
   const cardsReceived = selected.map((card) => ({
     card,

@@ -66,7 +66,7 @@ function round(n) {
 // only sanity-checked to be a real positive number.
 async function acquireExclusiveTitle(store, options = {}) {
   const {
-    creatorId, title, type, acquisitionFee, exclusivityWindowDays, transferFn, now = Date.now(),
+    creatorId, title, type, acquisitionFee, exclusivityWindowDays, settleFn, now = Date.now(),
   } = options;
 
   if (!creatorId) throw new Error('acquireExclusiveTitle requires a creatorId');
@@ -80,15 +80,18 @@ async function acquireExclusiveTitle(store, options = {}) {
   if (!Number.isInteger(exclusivityWindowDays) || exclusivityWindowDays <= 0) {
     throw new Error('acquireExclusiveTitle requires a positive integer exclusivityWindowDays');
   }
-  if (typeof transferFn !== 'function') {
-    throw new Error('acquireExclusiveTitle requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') {
+    throw new Error('acquireExclusiveTitle requires a settleFn(legs, meta)');
   }
 
   // The real, one-time acquisition payment -- in exchange for this,
   // Vvltvre Flix gets exclusive rights; the creator gets no further
   // real payout from this module, ever (no per-view royalty exists
   // anywhere in this codebase).
-  await transferFn(VULTURE_FLIX_ACQUISITION_ACCOUNT, creatorId, acquisitionFee, `Exclusive acquisition: "${title}"`);
+  await settleFn(
+    [{ fromUserId: VULTURE_FLIX_ACQUISITION_ACCOUNT, toUserId: creatorId, amount: acquisitionFee, reason: `Exclusive acquisition: "${title}"` }],
+    { reason: `Exclusive acquisition: "${title}"` },
+  );
 
   const record = {
     id: store.nextTitleId++,
@@ -116,7 +119,7 @@ async function acquireExclusiveTitle(store, options = {}) {
 // holder query keep working unchanged for both title types.
 async function licenseNonExclusiveTitle(store, options = {}) {
   const {
-    licensorId, title, type, licenseFee, licenseTermDays, transferFn, now = Date.now(),
+    licensorId, title, type, licenseFee, licenseTermDays, settleFn, now = Date.now(),
   } = options;
 
   if (!licensorId) throw new Error('licenseNonExclusiveTitle requires a licensorId');
@@ -130,11 +133,14 @@ async function licenseNonExclusiveTitle(store, options = {}) {
   if (!Number.isInteger(licenseTermDays) || licenseTermDays <= 0) {
     throw new Error('licenseNonExclusiveTitle requires a positive integer licenseTermDays');
   }
-  if (typeof transferFn !== 'function') {
-    throw new Error('licenseNonExclusiveTitle requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') {
+    throw new Error('licenseNonExclusiveTitle requires a settleFn(legs, meta)');
   }
 
-  await transferFn(VULTURE_FLIX_ACQUISITION_ACCOUNT, licensorId, licenseFee, `Non-exclusive license: "${title}"`);
+  await settleFn(
+    [{ fromUserId: VULTURE_FLIX_ACQUISITION_ACCOUNT, toUserId: licensorId, amount: licenseFee, reason: `Non-exclusive license: "${title}"` }],
+    { reason: `Non-exclusive license: "${title}"` },
+  );
 
   const record = {
     id: store.nextTitleId++,
@@ -162,7 +168,7 @@ async function licenseNonExclusiveTitle(store, options = {}) {
 // financed into existence -- charging a second, fabricated acquisition
 // fee on top of real production financing would double-count the same
 // real money. `acquisitionFee`/`licenseFee` stay honestly `null`, no
-// `transferFn` is called here at all (the real payment already
+// `settleFn` is called here at all (the real payment already
 // happened as production financing, in Vvltvre Studios' own ledger),
 // and `ownershipRetainedPercent: 0` matches an acquired Original's own
 // value -- Vvltvre Studios/Flix owns this title outright, the same

@@ -129,24 +129,38 @@ const decisionLog = createDecisionLog({ app: 'voken' });
 const operatorAuth = createOperatorAuth();
 const { requireOperator } = operatorAuth;
 
-// `idempotencyKey` is optional and forwarded to V3 as an
-// Idempotency-Key header. When present, V3 replays the first
-// result instead of charging again. It is deliberately a
-// parameter rather than something derived here -- see the note
-// at the call sites.
-async function transferVCoin(fromUserId, toUserId, amount, reason, idempotencyKey) {
-  const res = await fetch(`${V3_API_URL}/api/vcoin/transfer`, {
+// Atomic settlement: every leg moves, or none does.
+//
+// **Every multi-party payment in this app used to be consecutive
+// transfers.** The second leg can fail on its own -- often precisely
+// because the first just drew down the account it pays from -- and the
+// record that would mark the work done is written afterwards. So a
+// partial failure left one party paid, another not, and a retry that
+// paid the first one again.
+//
+// `POST /api/vcoin/settle` validates every leg against running balances
+// and writes nothing unless all of them pass. `settleVCoin` is
+// removed rather than kept beside it: a working single-transfer helper
+// is what the next money path gets written with, and consecutive calls
+// to it are the defect.
+async function settleVCoin(legs, meta = {}) {
+  const res = await fetch(`${V3_API_URL}/api/vcoin/settle`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...serviceHeaders(),
-      ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
+      // The settlement reason uniquely names what is being
+      // settled, so it doubles as the idempotency key: a retried
+      // settlement replays V3's first answer rather than paying
+      // twice. Atomicity stops a *partial* settlement; this stops
+      // a *duplicate* one.
+      ...(meta.reason ? { 'Idempotency-Key': `settle:${meta.reason}` } : {}),
     },
-    body: JSON.stringify({ fromUserId, toUserId, amount, reason }),
+    body: JSON.stringify({ legs, reason: meta.reason ?? null }),
   });
   const body = await res.json();
   if (!res.ok) {
-    throw new Error(body.error || `transferVCoin failed (${res.status})`);
+    throw new Error(body.error || `settleVCoin failed (${res.status})`);
   }
   return body;
 }
@@ -275,7 +289,7 @@ app.get('/api/pack-tier/:id', (req, res) => {
 app.post('/api/pack-tier/:id/open', requireActor('buyerId'), async (req, res) => {
   try {
     res.status(201).json(await openPack(store, {
-      ...req.body, packTierId: Number(req.params.id), transferFn: transferVCoin,
+      ...req.body, packTierId: Number(req.params.id), settleFn: settleVCoin,
     }));
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -554,7 +568,7 @@ app.get('/api/auction/:id/dutch-price', (req, res) => {
 
 app.post('/api/auction/:id/bid', requireActor('bidderId'), async (req, res) => {
   try {
-    res.json(await placeBid(store, { ...req.body, auctionId: Number(req.params.id), transferFn: transferVCoin }));
+    res.json(await placeBid(store, { ...req.body, auctionId: Number(req.params.id), settleFn: settleVCoin }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -581,7 +595,7 @@ app.post('/api/auction/:id/end', requireAuctionSeller(), async (req, res) => {
     const auctionId = Number(req.params.id);
     res.json(await endAuction(store, {
       auctionId,
-      transferFn: (from, to, amount, reason) => transferVCoin(
+      transferFn: (from, to, amount, reason) => settleVCoin(
         from, to, amount, reason, `voken:auction-end:${auctionId}`,
       ),
     }));
@@ -597,7 +611,7 @@ app.post('/api/auction/:id/accept-offer', requireAuctionSeller(), async (req, re
     res.json(await acceptOffer(store, {
       ...req.body,
       auctionId,
-      transferFn: (from, to, amount, reason) => transferVCoin(
+      transferFn: (from, to, amount, reason) => settleVCoin(
         from, to, amount, reason, `voken:auction-accept-offer:${auctionId}`,
       ),
     }));
@@ -678,7 +692,7 @@ app.get('/api/fractional/listing/:id', (req, res) => {
 
 app.post('/api/fractional/listing/:id/buy', requireActor('buyerId'), async (req, res) => {
   try {
-    const purchase = await buyShares(store, { ...req.body, listingId: Number(req.params.id), transferFn: transferVCoin });
+    const purchase = await buyShares(store, { ...req.body, listingId: Number(req.params.id), settleFn: settleVCoin });
     await pushMetric('resale_trade_volume', purchase.amountPaid);
     res.status(201).json(purchase);
   } catch (err) {
@@ -722,7 +736,7 @@ app.post('/api/fractional/secondary-listing/:id/cancel', requireSecondarySeller(
 
 app.post('/api/fractional/secondary-listing/:id/buy', requireActor('buyerId'), async (req, res) => {
   try {
-    res.status(201).json(await buySecondaryShares(store, { ...req.body, secondaryListingId: Number(req.params.id), transferFn: transferVCoin }));
+    res.status(201).json(await buySecondaryShares(store, { ...req.body, secondaryListingId: Number(req.params.id), settleFn: settleVCoin }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -744,7 +758,7 @@ app.get('/api/merch/:id', (req, res) => {
 
 app.post('/api/merch/:id/purchase', requireActor('buyerId'), async (req, res) => {
   try {
-    res.status(201).json(await purchaseMerchItem(store, { ...req.body, listingId: Number(req.params.id), transferFn: transferVCoin }));
+    res.status(201).json(await purchaseMerchItem(store, { ...req.body, listingId: Number(req.params.id), settleFn: settleVCoin }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -774,7 +788,7 @@ app.post('/api/art-frame/:id/load', requireActor('requesterId'), requireFrameOwn
 
 app.post('/api/referrals', requireActor('referrerId'), async (req, res) => {
   try {
-    res.status(201).json(await recordReferral(store, { ...req.body, transferFn: transferVCoin }));
+    res.status(201).json(await recordReferral(store, { ...req.body, settleFn: settleVCoin }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -788,7 +802,7 @@ app.get('/api/referrals/:userId/progress', (req, res) => {
 // client seed -- so the person spinning must be the person credited.
 app.post('/api/referrals/:userId/spin', requireParamActor('userId'), async (req, res) => {
   try {
-    res.status(201).json(await spinWheel(store, { ...req.body, userId: req.params.userId, transferFn: transferVCoin }));
+    res.status(201).json(await spinWheel(store, { ...req.body, userId: req.params.userId, settleFn: settleVCoin }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

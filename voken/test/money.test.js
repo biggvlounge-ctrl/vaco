@@ -20,7 +20,7 @@
 //   8. referral + spin     platform -> user
 //
 // **The one that matters most is #4.** `auctions.js` settle() calls
-// `transferFn` and then `transferEditionOwnership` back to back
+// `settleFn` and then `transferEditionOwnership` back to back
 // against the same in-process store. That pairing is the reason the
 // extraction audit recommends against splitting VADO into its own
 // service — a network hop between those two lines produces a buyer who
@@ -57,14 +57,25 @@ function ledger(initial = {}) {
   const balances = { ...initial };
   const moves = [];
   const opening = Object.values(balances).reduce((a, b) => a + b, 0);
-  const fn = async (from, to, amount, reason) => {
-    if (!Number.isFinite(amount)) throw new Error(`ledger: non-finite transfer of ${amount} (${reason})`);
-    if (amount < 0) throw new Error(`ledger: negative transfer (${reason})`);
-    balances[from] = (balances[from] || 0) - amount;
-    balances[to] = (balances[to] || 0) + amount;
-    moves.push({ from, to, amount, reason });
+  // Takes a settlement and applies each leg, so every existing
+  // assertion below reads exactly as it did when these were
+  // separate transfers. `calls` is the new question: how many
+  // times the ledger was asked. Amounts are identical whether a
+  // settlement is atomic or split, which is why only a call count
+  // can tell them apart.
+  const calls = [];
+  const fn = async (legs, meta = {}) => {
+    calls.push({ legs, meta });
+    for (const { fromUserId: from, toUserId: to, amount: amount, reason: reason } of legs) {
+      if (!Number.isFinite(amount)) throw new Error(`ledger: non-finite transfer of ${amount} (${reason})`);
+      if (amount < 0) throw new Error(`ledger: negative transfer (${reason})`);
+      balances[from] = (balances[from] || 0) - amount;
+      balances[to] = (balances[to] || 0) + amount;
+      moves.push({ from, to, amount, reason });
+    }
     return { ok: true };
   };
+  fn.calls = calls;
   fn.moves = moves;
   fn.of = (a) => balances[a] || 0;
   fn.movedNothing = () => moves.length === 0;
@@ -103,23 +114,23 @@ function cardOwnedBy(store, ownerId, overrides = {}) {
 
 test('opening a pack charges the buyer the tier price and mints them editions', async () => {
   const store = createVokenStore();
-  const transferFn = ledger({ sam: 500 });
+  const settleFn = ledger({ sam: 500 });
   const tier = packs.createPackTier(store, { tierName: 'standard', price: 40, cardsPerPack: 3 });
   const ids = [card(store).id, card(store).id, card(store).id, card(store).id];
 
   const result = await packs.openPack(store, {
-    packTierId: tier.packTierId, buyerId: 'sam', candidateCardIds: ids, transferFn, rng: () => 0.5,
+    packTierId: tier.packTierId, buyerId: 'sam', candidateCardIds: ids, settleFn, rng: () => 0.5,
   });
 
-  assert.strictEqual(transferFn.of('sam'), 460);
-  assert.strictEqual(transferFn.of(VOKEN_PLATFORM_ACCOUNT), 40);
+  assert.strictEqual(settleFn.of('sam'), 460);
+  assert.strictEqual(settleFn.of(VOKEN_PLATFORM_ACCOUNT), 40);
   assert.strictEqual(result.pricePaid, 40);
   assert.strictEqual(result.cardsReceived.length, 3, 'the tier said three cards, so three arrive');
   for (const received of result.cardsReceived) {
     assert.strictEqual(received.edition.ownerId, 'sam',
       'a charged buyer must actually own what they bought');
   }
-  assert.strictEqual(transferFn.drift(), 0);
+  assert.strictEqual(settleFn.drift(), 0);
 });
 
 test('a declined charge mints nothing — no free cards', async () => {
@@ -130,7 +141,7 @@ test('a declined charge mints nothing — no free cards', async () => {
 
   await assert.rejects(() => packs.openPack(store, {
     packTierId: tier.packTierId, buyerId: 'broke', candidateCardIds: [target.id],
-    transferFn: declining, rng: () => 0,
+    settleFn: declining, rng: () => 0,
   }), /insufficient funds/);
 
   // The charge happens before the mint, which is the correct order:
@@ -141,7 +152,7 @@ test('a declined charge mints nothing — no free cards', async () => {
 
 test('a pack cannot mint past a card’s planned supply', async () => {
   const store = createVokenStore();
-  const transferFn = ledger({ sam: 500 });
+  const settleFn = ledger({ sam: 500 });
   const tier = packs.createPackTier(store, { tierName: 'basic', price: 10, cardsPerPack: 5 });
   // plannedDigitalMintCount: 1 is fully consumed by the subject's own
   // edition #1 at creation, so there is genuinely nothing left to draw.
@@ -149,9 +160,9 @@ test('a pack cannot mint past a card’s planned supply', async () => {
 
   // Print-to-order would destroy the scarcity the whole product sells.
   await assert.rejects(() => packs.openPack(store, {
-    packTierId: tier.packTierId, buyerId: 'sam', candidateCardIds: [scarce.id], transferFn, rng: () => 0,
+    packTierId: tier.packTierId, buyerId: 'sam', candidateCardIds: [scarce.id], settleFn, rng: () => 0,
   }), /no candidate cards have any remaining/);
-  assert.ok(transferFn.movedNothing(), 'and a refused pack must not charge');
+  assert.ok(settleFn.movedNothing(), 'and a refused pack must not charge');
 });
 
 // -- 2. Raffles -----------------------------------------------------------
@@ -275,7 +286,7 @@ test('a trade needs items on both sides — a one-way "trade" is a gift with no 
 
 test('an instant auction pays the seller AND hands over the edition', async () => {
   const store = createVokenStore();
-  const transferFn = ledger({ sam: 1000, nova: 0 });
+  const settleFn = ledger({ sam: 1000, nova: 0 });
   const subject = cardOwnedBy(store, 'nova');
   const edition = { editionNumber: 1 };
 
@@ -284,17 +295,17 @@ test('an instant auction pays the seller AND hands over the edition', async () =
     sellerId: 'nova', auctionType: 'instant', startingPrice: 250, reservePrice: 250, now: NOW,
   });
   await auctions.placeBid(store, {
-    auctionId: auction.id, bidderId: 'sam', bidAmount: 250, transferFn, now: NOW,
+    auctionId: auction.id, bidderId: 'sam', bidAmount: 250, settleFn, now: NOW,
   });
 
   // **The pairing.** These two assertions are the reason VADO should
   // not become its own service: money and custody move in one function,
   // in one process, with no I/O between them.
-  assert.strictEqual(transferFn.of('nova'), 250, 'the seller was paid');
+  assert.strictEqual(settleFn.of('nova'), 250, 'the seller was paid');
   assert.strictEqual(getCultureCard(store, subject.id).editions[0].ownerId, 'sam',
     'and the buyer owns what they paid for — a paid buyer who owns nothing is the worst outcome here');
-  assert.strictEqual(transferFn.of('sam'), 750);
-  assert.strictEqual(transferFn.drift(), 0);
+  assert.strictEqual(settleFn.of('sam'), 750);
+  assert.strictEqual(settleFn.drift(), 0);
 });
 
 test('a failed payment leaves the edition with the seller', async () => {
@@ -309,17 +320,17 @@ test('a failed payment leaves the edition with the seller', async () => {
   });
 
   await assert.rejects(() => auctions.placeBid(store, {
-    auctionId: auction.id, bidderId: 'broke', bidAmount: 250, transferFn: declining, now: NOW,
+    auctionId: auction.id, bidderId: 'broke', bidAmount: 250, settleFn: declining, now: NOW,
   }), /insufficient funds/);
 
-  // transferFn runs first in settle(), so a decline must stop the
+  // settleFn runs first in settle(), so a decline must stop the
   // custody change. The reverse order would give away an edition free.
   assert.strictEqual(getCultureCard(store, subject.id).editions[0].ownerId, 'nova');
 });
 
 test('a dutch auction never sells below the seller’s reserve', async () => {
   const store = createVokenStore();
-  const transferFn = ledger({ sam: 1000 });
+  const settleFn = ledger({ sam: 1000 });
   const subject = cardOwnedBy(store, 'nova');
   const edition = { editionNumber: 1 };
 
@@ -336,14 +347,14 @@ test('a dutch auction never sells below the seller’s reserve', async () => {
   assert.strictEqual(price, 400, 'decay floors at the reserve, it does not run to zero');
 
   await auctions.placeBid(store, {
-    auctionId: auction.id, bidderId: 'sam', bidAmount: price, transferFn, now: late,
+    auctionId: auction.id, bidderId: 'sam', bidAmount: price, settleFn, now: late,
   });
-  assert.strictEqual(transferFn.of('nova'), 400);
+  assert.strictEqual(settleFn.of('nova'), 400);
 });
 
 test('an english auction pays only the winning bid, once', async () => {
   const store = createVokenStore();
-  const transferFn = ledger({ sam: 1000, rio: 1000 });
+  const settleFn = ledger({ sam: 1000, rio: 1000 });
   const subject = cardOwnedBy(store, 'nova');
   const edition = { editionNumber: 1 };
 
@@ -352,17 +363,17 @@ test('an english auction pays only the winning bid, once', async () => {
     sellerId: 'nova', auctionType: 'english', startingPrice: 100, reservePrice: 100,
     durationMinutes: 60, now: NOW,
   });
-  await auctions.placeBid(store, { auctionId: auction.id, bidderId: 'sam', bidAmount: 150, transferFn, now: NOW });
-  await auctions.placeBid(store, { auctionId: auction.id, bidderId: 'rio', bidAmount: 200, transferFn, now: NOW + 1 });
+  await auctions.placeBid(store, { auctionId: auction.id, bidderId: 'sam', bidAmount: 150, settleFn, now: NOW });
+  await auctions.placeBid(store, { auctionId: auction.id, bidderId: 'rio', bidAmount: 200, settleFn, now: NOW + 1 });
 
   // Bidding must not charge. Only the close does — otherwise every
   // outbid participant has paid for nothing.
-  assert.ok(transferFn.movedNothing(), 'bids are commitments, not charges');
+  assert.ok(settleFn.movedNothing(), 'bids are commitments, not charges');
 
-  await auctions.endAuction(store, { auctionId: auction.id, transferFn });
-  assert.strictEqual(transferFn.of('rio'), 800, 'the winner paid exactly their bid');
-  assert.strictEqual(transferFn.of('sam'), 1000, 'the loser paid nothing');
-  assert.strictEqual(transferFn.of('nova'), 200);
+  await auctions.endAuction(store, { auctionId: auction.id, settleFn });
+  assert.strictEqual(settleFn.of('rio'), 800, 'the winner paid exactly their bid');
+  assert.strictEqual(settleFn.of('sam'), 1000, 'the loser paid nothing');
+  assert.strictEqual(settleFn.of('nova'), 200);
   assert.strictEqual(getCultureCard(store, subject.id).editions[0].ownerId, 'rio');
 });
 
@@ -380,7 +391,7 @@ test('an auction of an edition the seller does not own is refused', () => {
 
 test('fractional buying is refused while the compliance gate is closed', async () => {
   const store = createVokenStore();
-  const transferFn = ledger({ sam: 1000 });
+  const settleFn = ledger({ sam: 1000 });
   const subject = cardOwnedBy(store, 'nova');
   const edition = { editionNumber: 1 };
 
@@ -391,15 +402,15 @@ test('fractional buying is refused while the compliance gate is closed', async (
 
   // The gate is securities posture, not a feature flag. Default closed.
   await assert.rejects(() => fractional.buyShares(store, {
-    listingId: listing.id, buyerId: 'sam', shareCount: 2, transferFn, now: NOW,
+    listingId: listing.id, buyerId: 'sam', shareCount: 2, settleFn, now: NOW,
   }), /not yet compliance-cleared/);
-  assert.ok(transferFn.movedNothing());
+  assert.ok(settleFn.movedNothing());
 });
 
 test('a cleared fractional purchase pays the seller and cannot oversell', async () => {
   const store = createVokenStore();
   setComplianceStatus(store, 'fractional-ownership', true);
-  const transferFn = ledger({ sam: 1000, rio: 1000 });
+  const settleFn = ledger({ sam: 1000, rio: 1000 });
   const subject = cardOwnedBy(store, 'nova');
   const edition = { editionNumber: 1 };
 
@@ -409,22 +420,22 @@ test('a cleared fractional purchase pays the seller and cannot oversell', async 
   });
 
   await fractional.buyShares(store, {
-    listingId: listing.id, buyerId: 'sam', shareCount: 4, transferFn, now: NOW,
+    listingId: listing.id, buyerId: 'sam', shareCount: 4, settleFn, now: NOW,
   });
-  assert.strictEqual(transferFn.of('sam'), 800);
-  assert.strictEqual(transferFn.of('nova'), 200);
+  assert.strictEqual(settleFn.of('sam'), 800);
+  assert.strictEqual(settleFn.of('nova'), 200);
 
   await fractional.buyShares(store, {
-    listingId: listing.id, buyerId: 'rio', shareCount: 6, transferFn, now: NOW,
+    listingId: listing.id, buyerId: 'rio', shareCount: 6, settleFn, now: NOW,
   });
-  assert.strictEqual(transferFn.of('nova'), 500, 'the seller is paid for every share, not just the first buyer');
+  assert.strictEqual(settleFn.of('nova'), 500, 'the seller is paid for every share, not just the first buyer');
 
   // Selling an eleventh share of ten dilutes everyone who already
   // bought, silently and after the fact.
   await assert.rejects(() => fractional.buyShares(store, {
-    listingId: listing.id, buyerId: 'sam', shareCount: 1, transferFn, now: NOW,
+    listingId: listing.id, buyerId: 'sam', shareCount: 1, settleFn, now: NOW,
   }), /shares remain|not open/);
-  assert.strictEqual(transferFn.drift(), 0);
+  assert.strictEqual(settleFn.drift(), 0);
 });
 
 test('the underlying edition moves into the pool, not to a shareholder', () => {
@@ -446,7 +457,7 @@ test('the underlying edition moves into the pool, not to a shareholder', () => {
 test('secondary shares settle peer to peer, and the gate applies there too', async () => {
   const store = createVokenStore();
   setComplianceStatus(store, 'fractional-ownership', true);
-  const transferFn = ledger({ sam: 1000, rio: 1000 });
+  const settleFn = ledger({ sam: 1000, rio: 1000 });
   const subject = cardOwnedBy(store, 'nova');
   const edition = { editionNumber: 1 };
 
@@ -455,7 +466,7 @@ test('secondary shares settle peer to peer, and the gate applies there too', asy
     sellerId: 'nova', totalShares: 10, pricePerShare: 50,
   });
   await fractional.buyShares(store, {
-    listingId: listing.id, buyerId: 'sam', shareCount: 5, transferFn, now: NOW,
+    listingId: listing.id, buyerId: 'sam', shareCount: 5, settleFn, now: NOW,
   });
 
   // Primary lots carry a lockup; resale is only possible after it.
@@ -464,23 +475,23 @@ test('secondary shares settle peer to peer, and the gate applies there too', asy
     fractionalListingId: listing.id, sellerId: 'sam', shareCount: 2, pricePerShare: 80, now: afterLockup,
   });
 
-  const beforeSam = transferFn.of('sam');
+  const beforeSam = settleFn.of('sam');
   await fractional.buySecondaryShares(store, {
-    secondaryListingId: secondary.id, buyerId: 'rio', transferFn,
+    secondaryListingId: secondary.id, buyerId: 'rio', settleFn,
   });
 
   // Peer to peer: the original seller is not paid twice for the same
   // shares, and the platform takes no second cut here.
-  assert.strictEqual(transferFn.of('sam'), beforeSam + 160);
-  assert.strictEqual(transferFn.of('rio'), 840);
-  assert.strictEqual(transferFn.of('nova'), 250, 'unchanged by the resale');
-  assert.strictEqual(transferFn.drift(), 0);
+  assert.strictEqual(settleFn.of('sam'), beforeSam + 160);
+  assert.strictEqual(settleFn.of('rio'), 840);
+  assert.strictEqual(settleFn.of('nova'), 250, 'unchanged by the resale');
+  assert.strictEqual(settleFn.drift(), 0);
 });
 
 test('you cannot buy your own secondary listing', async () => {
   const store = createVokenStore();
   setComplianceStatus(store, 'fractional-ownership', true);
-  const transferFn = ledger({ sam: 1000 });
+  const settleFn = ledger({ sam: 1000 });
   const subject = cardOwnedBy(store, 'nova');
   const edition = { editionNumber: 1 };
 
@@ -489,7 +500,7 @@ test('you cannot buy your own secondary listing', async () => {
     sellerId: 'nova', totalShares: 10, pricePerShare: 50,
   });
   await fractional.buyShares(store, {
-    listingId: listing.id, buyerId: 'sam', shareCount: 5, transferFn, now: NOW,
+    listingId: listing.id, buyerId: 'sam', shareCount: 5, settleFn, now: NOW,
   });
   const secondary = fractional.createSecondaryListing(store, {
     fractionalListingId: listing.id, sellerId: 'sam', shareCount: 2,
@@ -499,7 +510,7 @@ test('you cannot buy your own secondary listing', async () => {
   // Wash trading — buying your own listing to manufacture a price
   // history — is the classic thin-market abuse.
   await assert.rejects(() => fractional.buySecondaryShares(store, {
-    secondaryListingId: secondary.id, buyerId: 'sam', transferFn,
+    secondaryListingId: secondary.id, buyerId: 'sam', settleFn,
   }), /cannot buy your own listing/);
 });
 
@@ -507,100 +518,100 @@ test('you cannot buy your own secondary listing', async () => {
 
 test('merch pays the creator directly, at the live dynamic price', async () => {
   const store = createVokenStore();
-  const transferFn = ledger({ sam: 1000, rio: 1000 });
+  const settleFn = ledger({ sam: 1000, rio: 1000 });
   const listing = merch.createMerchListing(store, {
     creatorId: 'nova', itemType: 't-shirt', totalSupply: 4, basePrice: 100,
   });
 
   const first = await merch.purchaseMerchItem(store, {
-    listingId: listing.id, buyerId: 'sam', transferFn,
+    listingId: listing.id, buyerId: 'sam', settleFn,
   });
   assert.strictEqual(first.pricePaid, 100, 'the first buyer pays base price');
-  assert.strictEqual(transferFn.of('nova'), 100, 'the creator is paid, not the platform');
+  assert.strictEqual(settleFn.of('nova'), 100, 'the creator is paid, not the platform');
 
   const second = await merch.purchaseMerchItem(store, {
-    listingId: listing.id, buyerId: 'rio', transferFn,
+    listingId: listing.id, buyerId: 'rio', settleFn,
   });
   // Scarcity pricing: 1 of 4 sold => base * (1 + 0.25).
   assert.strictEqual(second.pricePaid, 125);
-  assert.strictEqual(transferFn.of('nova'), 225);
-  assert.strictEqual(transferFn.drift(), 0);
+  assert.strictEqual(settleFn.of('nova'), 225);
+  assert.strictEqual(settleFn.drift(), 0);
 });
 
 test('merch cannot be oversold past its supply', async () => {
   const store = createVokenStore();
-  const transferFn = ledger({ sam: 10000 });
+  const settleFn = ledger({ sam: 10000 });
   const listing = merch.createMerchListing(store, {
     creatorId: 'nova', itemType: 'hat', totalSupply: 2, basePrice: 50,
   });
 
-  await merch.purchaseMerchItem(store, { listingId: listing.id, buyerId: 'sam', transferFn });
-  await merch.purchaseMerchItem(store, { listingId: listing.id, buyerId: 'sam', transferFn });
-  const paidForTwo = transferFn.of('nova');
+  await merch.purchaseMerchItem(store, { listingId: listing.id, buyerId: 'sam', settleFn });
+  await merch.purchaseMerchItem(store, { listingId: listing.id, buyerId: 'sam', settleFn });
+  const paidForTwo = settleFn.of('nova');
 
   // "Limited edition" that is not limited is a lie the buyers paid for.
   await assert.rejects(() => merch.purchaseMerchItem(store, {
-    listingId: listing.id, buyerId: 'sam', transferFn,
+    listingId: listing.id, buyerId: 'sam', settleFn,
   }), /sold out/);
-  assert.strictEqual(transferFn.of('nova'), paidForTwo, 'a refused purchase pays nobody');
+  assert.strictEqual(settleFn.of('nova'), paidForTwo, 'a refused purchase pays nobody');
 });
 
 // -- 8. Referrals and spins ------------------------------------------------
 
 test('a referral tier bonus is paid by the platform, once', async () => {
   const store = createVokenStore();
-  const transferFn = ledger({ [VOKEN_PLATFORM_ACCOUNT]: 10000 });
+  const settleFn = ledger({ [VOKEN_PLATFORM_ACCOUNT]: 10000 });
   const firstTier = referrals.REFERRAL_TIERS[0];
 
   let result;
   for (let i = 0; i < firstTier.threshold; i += 1) {
     // eslint-disable-next-line no-await-in-loop -- sequential by design
     result = await referrals.recordReferral(store, {
-      referrerId: 'ada', refereeId: `friend-${i}`, transferFn, now: NOW,
+      referrerId: 'ada', refereeId: `friend-${i}`, settleFn, now: NOW,
     });
   }
 
   assert.strictEqual(result.tierReached.threshold, firstTier.threshold);
-  assert.strictEqual(transferFn.of('ada'), firstTier.bonusVCoin);
-  assert.strictEqual(transferFn.of(VOKEN_PLATFORM_ACCOUNT), 10000 - firstTier.bonusVCoin,
+  assert.strictEqual(settleFn.of('ada'), firstTier.bonusVCoin);
+  assert.strictEqual(settleFn.of(VOKEN_PLATFORM_ACCOUNT), 10000 - firstTier.bonusVCoin,
     'the bonus comes out of the platform account, not from nowhere');
-  assert.strictEqual(transferFn.drift(), 0);
+  assert.strictEqual(settleFn.drift(), 0);
 });
 
 test('the same person cannot be referred twice, and you cannot refer yourself', async () => {
   const store = createVokenStore();
-  const transferFn = ledger({ [VOKEN_PLATFORM_ACCOUNT]: 10000 });
+  const settleFn = ledger({ [VOKEN_PLATFORM_ACCOUNT]: 10000 });
 
-  await referrals.recordReferral(store, { referrerId: 'ada', refereeId: 'kai', transferFn, now: NOW });
+  await referrals.recordReferral(store, { referrerId: 'ada', refereeId: 'kai', settleFn, now: NOW });
 
   // Both are ways to farm tier bonuses out of the platform account.
   await assert.rejects(() => referrals.recordReferral(store, {
-    referrerId: 'rio', refereeId: 'kai', transferFn, now: NOW,
+    referrerId: 'rio', refereeId: 'kai', settleFn, now: NOW,
   }), /already been referred/);
   await assert.rejects(() => referrals.recordReferral(store, {
-    referrerId: 'ada', refereeId: 'ada', transferFn, now: NOW,
+    referrerId: 'ada', refereeId: 'ada', settleFn, now: NOW,
   }), /cannot refer yourself/);
 });
 
 test('a spin pays only a real prize, and consumes the spin', async () => {
   const store = createVokenStore();
-  const transferFn = ledger({ [VOKEN_PLATFORM_ACCOUNT]: 10000 });
+  const settleFn = ledger({ [VOKEN_PLATFORM_ACCOUNT]: 10000 });
   const firstTier = referrals.REFERRAL_TIERS[0];
   for (let i = 0; i < firstTier.threshold; i += 1) {
     // eslint-disable-next-line no-await-in-loop
     await referrals.recordReferral(store, {
-      referrerId: 'ada', refereeId: `friend-${i}`, transferFn, now: NOW,
+      referrerId: 'ada', refereeId: `friend-${i}`, settleFn, now: NOW,
     });
   }
 
-  const before = transferFn.of('ada');
+  const before = settleFn.of('ada');
   const spin = await referrals.spinWheel(store, {
-    userId: 'ada', clientSeed: 'seed-1', transferFn, now: NOW,
+    userId: 'ada', clientSeed: 'seed-1', settleFn, now: NOW,
   });
 
   const labels = referrals.SPIN_PRIZES.map((p) => p.label);
   assert.ok(labels.includes(spin.prizeLabel), 'the prize must come from the published table');
-  assert.strictEqual(transferFn.of('ada'), before + spin.vcoinWon,
+  assert.strictEqual(settleFn.of('ada'), before + spin.vcoinWon,
     'the payout equals the prize — no more, no less');
   assert.ok(spin.verified, 'provably-fair: the server seed must verify against its published hash');
 
@@ -610,12 +621,12 @@ test('a spin pays only a real prize, and consumes the spin', async () => {
 
 test('spinning with no spins available pays nothing', async () => {
   const store = createVokenStore();
-  const transferFn = ledger({ [VOKEN_PLATFORM_ACCOUNT]: 10000 });
+  const settleFn = ledger({ [VOKEN_PLATFORM_ACCOUNT]: 10000 });
 
   await assert.rejects(() => referrals.spinWheel(store, {
-    userId: 'nobody', clientSeed: 'seed', transferFn, now: NOW,
+    userId: 'nobody', clientSeed: 'seed', settleFn, now: NOW,
   }), /no spins available/);
-  assert.ok(transferFn.movedNothing(),
+  assert.ok(settleFn.movedNothing(),
     'an unearned spin must not reach the platform account at all');
 });
 

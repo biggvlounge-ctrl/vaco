@@ -5,7 +5,7 @@
 // (ascending, settles at close), Dutch (descending, settles the moment
 // a bidder accepts the live price), and offer (buyer-proposed, seller
 // accepts on their own schedule). All four settle through this
-// project's established injected-transferFn pattern and the real
+// project's established injected-settleFn pattern and the real
 // edition-ownership mechanics already built in cultureCards.js -- no
 // parallel ownership system.
 
@@ -108,8 +108,11 @@ function getCurrentDutchPrice(auction, now = Date.now()) {
   return round(Math.max(decayed, auction.reservePrice));
 }
 
-async function settle(store, auction, buyerId, price, transferFn) {
-  await transferFn(buyerId, auction.sellerId, price, `voken_vado_${auction.auctionType}:${auction.cardId}`);
+async function settle(store, auction, buyerId, price, settleFn) {
+  await settleFn(
+    [{ fromUserId: buyerId, toUserId: auction.sellerId, amount: price, reason: `voken_vado_${auction.auctionType}:${auction.cardId}` }],
+    { reason: `voken_vado_${auction.auctionType}:${auction.cardId}` },
+  );
   transferEditionOwnership(store, {
     cardId: auction.cardId, editionNumber: auction.editionNumber, format: auction.format,
     fromOwnerId: auction.sellerId, toOwnerId: buyerId,
@@ -120,7 +123,7 @@ async function settle(store, auction, buyerId, price, transferFn) {
 }
 
 async function placeBid(store, options = {}) {
-  const { auctionId, bidderId, bidAmount, now = Date.now(), transferFn } = options;
+  const { auctionId, bidderId, bidAmount, now = Date.now(), settleFn } = options;
   const auction = getAuction(store, auctionId);
   if (!auction) throw new Error(`placeBid: no auction with id ${auctionId}`);
   if (auction.status !== 'open') throw new Error(`placeBid: auction ${auctionId} is not open (status: ${auction.status})`);
@@ -128,11 +131,11 @@ async function placeBid(store, options = {}) {
   if (!Number.isFinite(bidAmount) || bidAmount <= 0) throw new Error('placeBid requires a positive bidAmount');
 
   if (auction.auctionType === 'instant') {
-    if (typeof transferFn !== 'function') throw new Error('placeBid requires a transferFn(fromUserId, toUserId, amount, reason)');
+    if (typeof settleFn !== 'function') throw new Error('placeBid requires a settleFn(legs, meta)');
     if (bidAmount < auction.startingPrice) {
       throw new Error(`placeBid: instant auctions settle at the full asking price of ${auction.startingPrice}`);
     }
-    await settle(store, auction, bidderId, auction.startingPrice, transferFn);
+    await settle(store, auction, bidderId, auction.startingPrice, settleFn);
     return auction;
   }
 
@@ -152,12 +155,12 @@ async function placeBid(store, options = {}) {
   }
 
   if (auction.auctionType === 'dutch') {
-    if (typeof transferFn !== 'function') throw new Error('placeBid requires a transferFn(fromUserId, toUserId, amount, reason)');
+    if (typeof settleFn !== 'function') throw new Error('placeBid requires a settleFn(legs, meta)');
     const currentPrice = getCurrentDutchPrice(auction, now);
     if (bidAmount < currentPrice) {
       throw new Error(`placeBid: dutch auction's current live price is ${currentPrice}, bid of ${bidAmount} is too low`);
     }
-    await settle(store, auction, bidderId, currentPrice, transferFn);
+    await settle(store, auction, bidderId, currentPrice, settleFn);
     return auction;
   }
 
@@ -168,7 +171,7 @@ async function placeBid(store, options = {}) {
 }
 
 async function endAuction(store, options = {}) {
-  const { auctionId, transferFn } = options;
+  const { auctionId, settleFn } = options;
   const auction = getAuction(store, auctionId);
   if (!auction) throw new Error(`endAuction: no auction with id ${auctionId}`);
   if (auction.auctionType !== 'english') throw new Error('endAuction: only english auctions settle via endAuction');
@@ -179,22 +182,22 @@ async function endAuction(store, options = {}) {
     return auction;
   }
 
-  if (typeof transferFn !== 'function') throw new Error('endAuction requires a transferFn(fromUserId, toUserId, amount, reason)');
-  await settle(store, auction, auction.highestBidderId, auction.currentBid, transferFn);
+  if (typeof settleFn !== 'function') throw new Error('endAuction requires a settleFn(legs, meta)');
+  await settle(store, auction, auction.highestBidderId, auction.currentBid, settleFn);
   return auction;
 }
 
 async function acceptOffer(store, options = {}) {
-  const { auctionId, offerIndex, transferFn } = options;
+  const { auctionId, offerIndex, settleFn } = options;
   const auction = getAuction(store, auctionId);
   if (!auction) throw new Error(`acceptOffer: no auction with id ${auctionId}`);
   if (auction.auctionType !== 'offer') throw new Error('acceptOffer: only offer-type auctions settle via acceptOffer');
   if (auction.status !== 'open') throw new Error(`acceptOffer: auction ${auctionId} is not open (status: ${auction.status})`);
   const offer = auction.offers[offerIndex];
   if (!offer) throw new Error(`acceptOffer: no offer at index ${offerIndex}`);
-  if (typeof transferFn !== 'function') throw new Error('acceptOffer requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') throw new Error('acceptOffer requires a settleFn(legs, meta)');
 
-  await settle(store, auction, offer.bidderId, offer.offerAmount, transferFn);
+  await settle(store, auction, offer.bidderId, offer.offerAmount, settleFn);
   auction.acceptedOfferIndex = offerIndex;
   return auction;
 }

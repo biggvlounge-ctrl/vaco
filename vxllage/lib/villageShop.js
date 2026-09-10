@@ -5,7 +5,7 @@
 // purchase" -- both listed under "Real (local React state)" in the
 // PROTOTYPE, meaning real-looking but never actually backed by VCoin
 // moving anywhere. This module is the real version: every boost and
-// every cosmetic purchase is a real `transferFn` call against V3, paid
+// every cosmetic purchase is a real `settleFn` call against V3, paid
 // to the village's own owner -- the actual "Community Boosting" /
 // "Avatar Economy" revenue streams the doc's own Wallet sheet already
 // named as real monetization concepts, not decoration.
@@ -34,14 +34,17 @@ function computeBoostLevel(totalVCoin) {
 }
 
 async function boostVillage(store, options = {}) {
-  const { villageId, boosterId, amountVCoin, transferFn } = options;
+  const { villageId, boosterId, amountVCoin, settleFn } = options;
   const village = getVillage(store, villageId);
   if (!village) throw new Error(`boostVillage: no village with id ${villageId}`);
   if (!boosterId) throw new Error('boostVillage requires a boosterId');
   if (!Number.isFinite(amountVCoin) || amountVCoin <= 0) throw new Error('boostVillage requires a positive amountVCoin');
-  if (typeof transferFn !== 'function') throw new Error('boostVillage requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') throw new Error('boostVillage requires a settleFn(legs, meta)');
 
-  await transferFn(boosterId, village.ownerId, amountVCoin, `vxllage_village_boost:${villageId}`);
+  await settleFn(
+    [{ fromUserId: boosterId, toUserId: village.ownerId, amount: amountVCoin, reason: `vxllage_village_boost:${villageId}` }],
+    { reason: `vxllage_village_boost:${villageId}` },
+  );
 
   const contribution = {
     id: store.nextBoostContributionId++, villageId, boosterId, amountVCoin, createdAt: Date.now(),
@@ -97,17 +100,20 @@ function listCosmeticsForVillage(store, villageId) {
 }
 
 async function purchaseCosmetic(store, options = {}) {
-  const { itemId, buyerId, transferFn } = options;
+  const { itemId, buyerId, settleFn } = options;
   const item = store.villageCosmeticItems.find((c) => c.id === itemId);
   if (!item) throw new Error(`purchaseCosmetic: no cosmetic item with id ${itemId}`);
   if (!buyerId) throw new Error('purchaseCosmetic requires a buyerId');
-  if (typeof transferFn !== 'function') throw new Error('purchaseCosmetic requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') throw new Error('purchaseCosmetic requires a settleFn(legs, meta)');
   if (store.villageCosmeticOwnership.some((o) => o.itemId === itemId && o.userId === buyerId)) {
     throw new Error(`purchaseCosmetic: ${buyerId} already owns cosmetic ${itemId}`);
   }
 
   const village = getVillage(store, item.villageId);
-  await transferFn(buyerId, village.ownerId, item.priceVCoin, `vxllage_cosmetic_purchase:${itemId}`);
+  await settleFn(
+    [{ fromUserId: buyerId, toUserId: village.ownerId, amount: item.priceVCoin, reason: `vxllage_cosmetic_purchase:${itemId}` }],
+    { reason: `vxllage_cosmetic_purchase:${itemId}` },
+  );
 
   const ownership = { id: store.nextCosmeticOwnershipId++, itemId, userId: buyerId, purchasedAt: Date.now() };
   store.villageCosmeticOwnership.push(ownership);

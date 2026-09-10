@@ -39,7 +39,7 @@ function getBrokerAccount(store, accountId) {
 }
 
 async function placeTradeOrder(store, options = {}) {
-  const { accountId, cardId, orderType, quantity, pricePerUnit, transferFn } = options;
+  const { accountId, cardId, orderType, quantity, pricePerUnit, settleFn } = options;
 
   if (!isComplianceCleared(store, 'vex-brokerage')) {
     throw new Error('placeTradeOrder: VEX brokerage trading is held pending real broker-dealer compliance review -- not cleared to move money yet');
@@ -64,14 +64,17 @@ async function placeTradeOrder(store, options = {}) {
   if (!Number.isFinite(pricePerUnit) || pricePerUnit <= 0) {
     throw new Error('placeTradeOrder requires a positive pricePerUnit');
   }
-  if (typeof transferFn !== 'function') {
-    throw new Error('placeTradeOrder requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') {
+    throw new Error('placeTradeOrder requires a settleFn(legs, meta)');
   }
 
   const totalAmount = round(quantity * pricePerUnit);
 
   if (orderType === 'buy') {
-    await transferFn(account.userId, VEX_PLATFORM_ACCOUNT, totalAmount, `vex_buy:${cardId}`);
+    await settleFn(
+      [{ fromUserId: account.userId, toUserId: VEX_PLATFORM_ACCOUNT, amount: totalAmount, reason: `vex_buy:${cardId}` }],
+      { reason: `vex_buy:${cardId}` },
+    );
     for (let i = 0; i < quantity; i++) {
       await mintAdditionalEdition({ cardId, format: 'digital', ownerId: account.userId });
     }
@@ -86,7 +89,10 @@ async function placeTradeOrder(store, options = {}) {
         fromOwnerId: account.userId, toOwnerId: VEX_PLATFORM_ACCOUNT,
       });
     }
-    await transferFn(VEX_PLATFORM_ACCOUNT, account.userId, totalAmount, `vex_sell:${cardId}`);
+    await settleFn(
+      [{ fromUserId: VEX_PLATFORM_ACCOUNT, toUserId: account.userId, amount: totalAmount, reason: `vex_sell:${cardId}` }],
+      { reason: `vex_sell:${cardId}` },
+    );
   }
 
   const order = {

@@ -107,15 +107,32 @@ function serviceHeaders() {
 const store = createPersistentStore(path.join(__dirname, 'data', 'store.json'), createVexStore);
 app.use(durable(store));  // commit before responding -- see lib/persistence.js
 
-async function transferVCoin(fromUserId, toUserId, amount, reason) {
-  const res = await fetch(`${V3_API_URL}/api/vcoin/transfer`, {
+// Atomic settlement: every leg moves, or none does.
+//
+// A multi-party payment written as consecutive transfers can pay one
+// party, fail on the next -- often because the first just drew down the
+// account it pays from -- and leave the record that marks the work done
+// unwritten, so the retry pays the first party again.
+//
+// `POST /api/vcoin/settle` validates every leg against running balances
+// and writes nothing unless all of them pass. `settleVCoin` is
+// removed rather than kept beside it.
+async function settleVCoin(legs, meta = {}) {
+  const res = await fetch(`${V3_API_URL}/api/vcoin/settle`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...serviceHeaders() },
-    body: JSON.stringify({ fromUserId, toUserId, amount, reason }),
+    headers: {
+      'Content-Type': 'application/json',
+      ...serviceHeaders(),
+      // The settlement reason uniquely names what is being settled, so
+      // it doubles as the idempotency key: a retried settlement replays
+      // V3's first answer rather than paying twice.
+      ...(meta.reason ? { 'Idempotency-Key': `settle:${meta.reason}` } : {}),
+    },
+    body: JSON.stringify({ legs, reason: meta.reason ?? null }),
   });
   const body = await res.json();
   if (!res.ok) {
-    throw new Error(body.error || `transferVCoin failed (${res.status})`);
+    throw new Error(body.error || `settleVCoin failed (${res.status})`);
   }
   return body;
 }
@@ -184,7 +201,7 @@ app.get('/api/account/:id', (req, res) => {
 
 app.post('/api/order', requireAccountOwner('accountId'), async (req, res) => {
   try {
-    res.status(201).json(await placeTradeOrder(store, { ...req.body, transferFn: transferVCoin }));
+    res.status(201).json(await placeTradeOrder(store, { ...req.body, settleFn: settleVCoin }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

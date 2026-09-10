@@ -73,15 +73,26 @@ const brokerage = require('../lib/brokerage');
 function ledger(initial = {}) {
   const balances = { ...initial };
   const moves = [];
-  const fn = async (from, to, amount, reason) => {
-    if (typeof amount !== 'number' || Number.isNaN(amount) || amount < 0) {
-      throw new Error(`ledger: bad transfer of ${amount} (${reason})`);
+  // Takes a settlement and applies each leg, so every existing
+  // assertion below reads exactly as it did when these were
+  // separate transfers. `calls` is the new question: how many
+  // times the ledger was asked. Amounts are identical whether a
+  // settlement is atomic or split, which is why only a call count
+  // can tell them apart.
+  const calls = [];
+  const fn = async (legs, meta = {}) => {
+    calls.push({ legs, meta });
+    for (const { fromUserId: from, toUserId: to, amount: amount, reason: reason } of legs) {
+      if (typeof amount !== 'number' || Number.isNaN(amount) || amount < 0) {
+        throw new Error(`ledger: bad transfer of ${amount} (${reason})`);
+      }
+      balances[from] = (balances[from] || 0) - amount;
+      balances[to] = (balances[to] || 0) + amount;
+      moves.push({ from, to, amount, reason });
     }
-    balances[from] = (balances[from] || 0) - amount;
-    balances[to] = (balances[to] || 0) + amount;
-    moves.push({ from, to, amount, reason });
     return { ok: true };
   };
+  fn.calls = calls;
   fn.moves = moves;
   fn.of = (a) => balances[a] || 0;
   fn.movedNothing = () => moves.length === 0;
@@ -169,17 +180,17 @@ test('setting an unknown gate is refused and does not create one', () => {
 test('a well-formed order is refused while the gate is closed, and no money moves', async () => {
   const store = createVexStore();
   const account = openAccount(store);
-  const transferFn = ledger({ ada: 10000, 'vex-platform': 10000 });
+  const settleFn = ledger({ ada: 10000, 'vex-platform': 10000 });
   const voken = stubVokenClient(cardWith([]));
 
   try {
     await assert.rejects(() => brokerage.placeTradeOrder(store, {
       accountId: account.id, cardId: 'card-1', orderType: 'buy',
-      quantity: 2, pricePerUnit: 100, transferFn,
+      quantity: 2, pricePerUnit: 100, settleFn,
     }), /held pending real broker-dealer compliance review/);
 
-    assert.ok(transferFn.movedNothing(), 'a refused order must not charge anybody');
-    assert.strictEqual(transferFn.of('ada'), 10000);
+    assert.ok(settleFn.movedNothing(), 'a refused order must not charge anybody');
+    assert.strictEqual(settleFn.of('ada'), 10000);
     assert.strictEqual(store.tradeOrders.length, 0, 'and must not leave an order behind');
     assert.strictEqual(store.nextTradeOrderId, 1, 'nor burn an order id');
   } finally {
@@ -195,7 +206,7 @@ test('the gate is checked before the card is even fetched', async () => {
   try {
     await assert.rejects(() => brokerage.placeTradeOrder(store, {
       accountId: account.id, cardId: 'card-1', orderType: 'buy',
-      quantity: 1, pricePerUnit: 100, transferFn: ledger({ ada: 1000 }),
+      quantity: 1, pricePerUnit: 100, settleFn: ledger({ ada: 1000 }),
     }), /held pending/);
 
     // Ordering is the whole point of a gate. Checking it last means
@@ -214,7 +225,7 @@ test('a garbage order is still refused by the gate, not by validation', async ()
   const voken = stubVokenClient(cardWith([]));
 
   try {
-    // No account, negative quantity, no transferFn — every other guard
+    // No account, negative quantity, no settleFn — every other guard
     // would also reject this. The gate must be the one that speaks
     // first, because that is the only ordering that holds when the
     // order is otherwise perfect.
@@ -232,18 +243,18 @@ test('an open gate lets a buy through: money moves and editions are minted', asy
   const store = createVexStore();
   gate.setComplianceStatus(store, 'vex-brokerage', true);
   const account = openAccount(store);
-  const transferFn = ledger({ ada: 1000 });
+  const settleFn = ledger({ ada: 1000 });
   const voken = stubVokenClient(cardWith([]));
 
   try {
     const order = await brokerage.placeTradeOrder(store, {
       accountId: account.id, cardId: 'card-1', orderType: 'buy',
-      quantity: 3, pricePerUnit: 50, transferFn,
+      quantity: 3, pricePerUnit: 50, settleFn,
     });
 
     assert.strictEqual(order.totalAmount, 150);
-    assert.strictEqual(transferFn.of('ada'), 850);
-    assert.strictEqual(transferFn.of(brokerage.VEX_PLATFORM_ACCOUNT), 150);
+    assert.strictEqual(settleFn.of('ada'), 850);
+    assert.strictEqual(settleFn.of(brokerage.VEX_PLATFORM_ACCOUNT), 150);
     assert.strictEqual(voken.calls.mint, 3, 'one edition per unit bought, not one per order');
     assert.strictEqual(order.status, 'filled');
   } finally {
@@ -254,25 +265,25 @@ test('an open gate lets a buy through: money moves and editions are minted', asy
 test('closing the gate again stops trading immediately', async () => {
   const store = createVexStore();
   const account = openAccount(store);
-  const transferFn = ledger({ ada: 1000 });
+  const settleFn = ledger({ ada: 1000 });
   const voken = stubVokenClient(cardWith([]));
 
   try {
     gate.setComplianceStatus(store, 'vex-brokerage', true);
     await brokerage.placeTradeOrder(store, {
       accountId: account.id, cardId: 'card-1', orderType: 'buy',
-      quantity: 1, pricePerUnit: 100, transferFn,
+      quantity: 1, pricePerUnit: 100, settleFn,
     });
-    assert.strictEqual(transferFn.of('ada'), 900);
+    assert.strictEqual(settleFn.of('ada'), 900);
 
     // A gate that only gates at startup is not a gate. Registration can
     // lapse, and the close must bite the very next order.
     gate.setComplianceStatus(store, 'vex-brokerage', false);
     await assert.rejects(() => brokerage.placeTradeOrder(store, {
       accountId: account.id, cardId: 'card-1', orderType: 'buy',
-      quantity: 1, pricePerUnit: 100, transferFn,
+      quantity: 1, pricePerUnit: 100, settleFn,
     }), /held pending/);
-    assert.strictEqual(transferFn.of('ada'), 900, 'balance unchanged after the refusal');
+    assert.strictEqual(settleFn.of('ada'), 900, 'balance unchanged after the refusal');
   } finally {
     voken.restore();
   }
@@ -282,7 +293,7 @@ test('a sell of editions the account does not hold is refused before it is paid'
   const store = createVexStore();
   gate.setComplianceStatus(store, 'vex-brokerage', true);
   const account = openAccount(store, 'ada');
-  const transferFn = ledger({ 'vex-platform': 10000 });
+  const settleFn = ledger({ 'vex-platform': 10000 });
   // The card exists and has editions — they just belong to someone else.
   const voken = stubVokenClient(cardWith([
     { editionNumber: 1, format: 'digital', ownerId: 'rio' },
@@ -292,12 +303,12 @@ test('a sell of editions the account does not hold is refused before it is paid'
   try {
     await assert.rejects(() => brokerage.placeTradeOrder(store, {
       accountId: account.id, cardId: 'card-1', orderType: 'sell',
-      quantity: 1, pricePerUnit: 100, transferFn,
+      quantity: 1, pricePerUnit: 100, settleFn,
     }), /owns only 0 digital editions/);
 
     // The payout happens after the ownership transfer in this flow, so
     // a holdings check that ran late would pay for nothing.
-    assert.ok(transferFn.movedNothing(), 'selling what you do not own must not pay out');
+    assert.ok(settleFn.movedNothing(), 'selling what you do not own must not pay out');
     assert.strictEqual(voken.calls.transfer, 0);
   } finally {
     voken.restore();
@@ -308,7 +319,7 @@ test('a partial holding cannot be oversold', async () => {
   const store = createVexStore();
   gate.setComplianceStatus(store, 'vex-brokerage', true);
   const account = openAccount(store, 'ada');
-  const transferFn = ledger({ 'vex-platform': 10000 });
+  const settleFn = ledger({ 'vex-platform': 10000 });
   const voken = stubVokenClient(cardWith([
     { editionNumber: 1, format: 'digital', ownerId: 'ada' },
     // A physical edition ada owns must not count toward a digital sell.
@@ -318,9 +329,9 @@ test('a partial holding cannot be oversold', async () => {
   try {
     await assert.rejects(() => brokerage.placeTradeOrder(store, {
       accountId: account.id, cardId: 'card-1', orderType: 'sell',
-      quantity: 2, pricePerUnit: 100, transferFn,
+      quantity: 2, pricePerUnit: 100, settleFn,
     }), /owns only 1 digital editions/);
-    assert.ok(transferFn.movedNothing());
+    assert.ok(settleFn.movedNothing());
   } finally {
     voken.restore();
   }
@@ -342,21 +353,21 @@ test('an account requires a user, and only a known net-capital model', () => {
 test('an order against an unknown account is refused once the gate is open', async () => {
   const store = createVexStore();
   gate.setComplianceStatus(store, 'vex-brokerage', true);
-  const transferFn = ledger({ ada: 1000 });
+  const settleFn = ledger({ ada: 1000 });
   const voken = stubVokenClient(cardWith([]));
 
   try {
     await assert.rejects(() => brokerage.placeTradeOrder(store, {
       accountId: 999, cardId: 'card-1', orderType: 'buy',
-      quantity: 1, pricePerUnit: 100, transferFn,
+      quantity: 1, pricePerUnit: 100, settleFn,
     }), /no broker account with id 999/);
-    assert.ok(transferFn.movedNothing());
+    assert.ok(settleFn.movedNothing());
   } finally {
     voken.restore();
   }
 });
 
-test('an order with no transferFn is refused rather than settling silently', async () => {
+test('an order with no settleFn is refused rather than settling silently', async () => {
   const store = createVexStore();
   gate.setComplianceStatus(store, 'vex-brokerage', true);
   const account = openAccount(store);
@@ -368,7 +379,7 @@ test('an order with no transferFn is refused rather than settling silently', asy
     // and records a filled order anyway.
     await assert.rejects(() => brokerage.placeTradeOrder(store, {
       accountId: account.id, cardId: 'card-1', orderType: 'buy', quantity: 1, pricePerUnit: 100,
-    }), /requires a transferFn/);
+    }), /requires a settleFn/);
     assert.strictEqual(store.tradeOrders.length, 0);
     assert.strictEqual(voken.calls.mint, 0);
   } finally {
@@ -380,23 +391,23 @@ test('quantity and price must be real, positive numbers', async () => {
   const store = createVexStore();
   gate.setComplianceStatus(store, 'vex-brokerage', true);
   const account = openAccount(store);
-  const transferFn = ledger({ ada: 1000 });
+  const settleFn = ledger({ ada: 1000 });
   const voken = stubVokenClient(cardWith([]));
 
   try {
     for (const quantity of [0, -1, 1.5, '2', NaN]) {
       await assert.rejects(() => brokerage.placeTradeOrder(store, {
         accountId: account.id, cardId: 'card-1', orderType: 'buy',
-        quantity, pricePerUnit: 100, transferFn,
+        quantity, pricePerUnit: 100, settleFn,
       }), /positive integer quantity/, `quantity ${JSON.stringify(quantity)}`);
     }
     for (const pricePerUnit of [0, -100, '100', NaN]) {
       await assert.rejects(() => brokerage.placeTradeOrder(store, {
         accountId: account.id, cardId: 'card-1', orderType: 'buy',
-        quantity: 1, pricePerUnit, transferFn,
+        quantity: 1, pricePerUnit, settleFn,
       }), /positive pricePerUnit/, `price ${JSON.stringify(pricePerUnit)}`);
     }
-    assert.ok(transferFn.movedNothing(), 'not one of those refusals may have moved money');
+    assert.ok(settleFn.movedNothing(), 'not one of those refusals may have moved money');
   } finally {
     voken.restore();
   }

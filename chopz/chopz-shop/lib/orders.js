@@ -56,7 +56,7 @@ function computeFeePercentForCategory(category) {
 
 async function createOrder(store, options = {}) {
   const {
-    buyerId, productId, affiliateLinkId = null, feePercent, transferFn, now = Date.now(),
+    buyerId, productId, affiliateLinkId = null, feePercent, settleFn, now = Date.now(),
   } = options;
 
   if (!buyerId) throw new Error('createOrder requires a buyerId');
@@ -66,8 +66,8 @@ async function createOrder(store, options = {}) {
   if (!Number.isFinite(resolvedFeePercent) || resolvedFeePercent <= 0 || resolvedFeePercent >= 1) {
     throw new Error('createOrder requires a feePercent between 0 and 1 (exclusive)');
   }
-  if (typeof transferFn !== 'function') {
-    throw new Error('createOrder requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') {
+    throw new Error('createOrder requires a settleFn(legs, meta)');
   }
 
   // Real click-through attribution: an explicit affiliateLinkId always
@@ -97,8 +97,11 @@ async function createOrder(store, options = {}) {
   // (e.g. insufficient funds) must never leave a "placed" order
   // behind, so the id is reserved but the order object isn't built or
   // pushed to the store until the buyer's payment actually clears.
+  //
+  // **The whole order is now one settlement**, and the charge is its
+  // first leg rather than a separate transfer. See the note above the
+  // payout legs below for what splitting them cost.
   const orderId = store.nextOrderId++;
-  await transferFn(buyerId, CHOPZ_ESCROW_ACCOUNT, price, `chopz_order:${orderId}`);
 
   const order = {
     id: orderId,
@@ -118,14 +121,39 @@ async function createOrder(store, options = {}) {
     voidShipmentId: null,
     createdAt: now,
   };
-  store.orders.push(order);
-
-  await transferFn(CHOPZ_ESCROW_ACCOUNT, product.sellerId, sellerPayout, `chopz_seller_payout:${order.id}`);
-  await transferFn(CHOPZ_ESCROW_ACCOUNT, CHOPZ_PLATFORM_ACCOUNT, platformFee, `chopz_platform_fee:${order.id}`);
-  if (affiliateLink && affiliateCommission > 0) {
-    await transferFn(CHOPZ_ESCROW_ACCOUNT, affiliateLink.creatorId, affiliateCommission, `chopz_affiliate_commission:${order.id}`);
-    affiliateLink.conversionsCount += 1;
+  // **Four legs, and the order used to be recorded in the middle of
+  // them.** The buyer paid escrow, the order was pushed to the store,
+  // and then escrow paid the seller, the platform and (when there was
+  // one) the affiliate -- three consecutive transfers out of the same
+  // account, each able to fail because the previous one had just drawn
+  // it down.
+  //
+  // That ordering made this worse than the usual case. A failure after
+  // the seller payout left an order already recorded as `placed`, so
+  // nothing marked it for retry: the platform fee and the affiliate's
+  // commission were simply never paid, and the money sat in escrow
+  // permanently against an order that looked complete.
+  //
+  // One settlement, buyer's charge included. Leg order is load-bearing
+  // -- the escrow credit funds the three payouts, and V3 validates each
+  // leg against running balances.
+  const legs = [
+    { fromUserId: buyerId, toUserId: CHOPZ_ESCROW_ACCOUNT, amount: price, reason: `chopz_order:${orderId}` },
+    { fromUserId: CHOPZ_ESCROW_ACCOUNT, toUserId: product.sellerId, amount: sellerPayout, reason: `chopz_seller_payout:${orderId}` },
+  ];
+  if (platformFee > 0) {
+    legs.push({ fromUserId: CHOPZ_ESCROW_ACCOUNT, toUserId: CHOPZ_PLATFORM_ACCOUNT, amount: platformFee, reason: `chopz_platform_fee:${orderId}` });
   }
+  if (affiliateLink && affiliateCommission > 0) {
+    legs.push({ fromUserId: CHOPZ_ESCROW_ACCOUNT, toUserId: affiliateLink.creatorId, amount: affiliateCommission, reason: `chopz_affiliate_commission:${orderId}` });
+  }
+
+  await settleFn(legs, { reason: `chopz_order:${orderId}` });
+
+  // Past this line the money has moved, so the order and the
+  // affiliate's conversion count can be recorded.
+  store.orders.push(order);
+  if (affiliateLink && affiliateCommission > 0) affiliateLink.conversionsCount += 1;
 
   return order;
 }
@@ -172,7 +200,7 @@ async function requestFulfillment(store, options = {}) {
 // need a real distributed-transaction mechanism this project doesn't
 // have.
 async function createCartCheckout(store, options = {}) {
-  const { buyerId, items, transferFn } = options;
+  const { buyerId, items, settleFn } = options;
   if (!buyerId) throw new Error('createCartCheckout requires a buyerId');
   if (!Array.isArray(items) || items.length === 0) throw new Error('createCartCheckout requires a non-empty items array');
 
@@ -181,7 +209,7 @@ async function createCartCheckout(store, options = {}) {
     // eslint-disable-next-line no-await-in-loop -- real orders settle
     // sequentially, not in parallel, so a later item's failure never
     // races an earlier item's own real payout.
-    const order = await createOrder(store, { ...item, buyerId, transferFn });
+    const order = await createOrder(store, { ...item, buyerId, settleFn });
     orders.push(order);
   }
 

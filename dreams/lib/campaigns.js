@@ -153,7 +153,7 @@ function launchCampaign(store, options = {}) {
 }
 
 // Real per-screen revenue event -- one real ad run on one real
-// selected screen. A real transferFn moves the real, split payment:
+// selected screen. A real settleFn moves the real, split payment:
 // SCREEN_OWNER_SHARE to the screen's own owner, the remainder to
 // DREAMS_PLATFORM_ACCOUNT -- the same two-real-transfers shape VOID's
 // own `completeJob` already established, guaranteeing the two amounts
@@ -162,7 +162,7 @@ function launchCampaign(store, options = {}) {
 // remaining budget auto-completes it -- no more impressions can run
 // against a completed campaign.
 async function recordImpression(store, options = {}) {
-  const { campaignId, screenId, costPerImpression, transferFn, now = Date.now() } = options;
+  const { campaignId, screenId, costPerImpression, settleFn, now = Date.now() } = options;
 
   const campaign = getCampaign(store, campaignId);
   if (!campaign) throw new Error(`recordImpression: no campaign with id ${campaignId}`);
@@ -178,8 +178,8 @@ async function recordImpression(store, options = {}) {
   if (costPerImpression > campaign.remainingBudget) {
     throw new Error(`recordImpression: costPerImpression ${costPerImpression} exceeds campaign ${campaignId}'s remaining budget ${campaign.remainingBudget}`);
   }
-  if (typeof transferFn !== 'function') {
-    throw new Error('recordImpression requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') {
+    throw new Error('recordImpression requires a settleFn(legs, meta)');
   }
 
   const screen = getScreen(store, screenId);
@@ -188,8 +188,15 @@ async function recordImpression(store, options = {}) {
   const screenOwnerPayout = round(costPerImpression * SCREEN_OWNER_SHARE);
   const platformFee = round(costPerImpression - screenOwnerPayout);
 
-  await transferFn(campaign.advertiserId, screen.screenOwnerId, screenOwnerPayout, `dreams_impression:${campaignId}:${screenId}`);
-  await transferFn(campaign.advertiserId, DREAMS_PLATFORM_ACCOUNT, platformFee, `dreams_impression_platform_fee:${campaignId}:${screenId}`);
+  // One settlement per impression. Both legs leave the advertiser, and
+  // the impression record and spend counters below are written only
+  // afterwards -- so a split could pay the screen owner, fail the
+  // platform fee, and leave an impression that was served, paid for in
+  // part, and recorded nowhere.
+  await settleFn([
+    { fromUserId: campaign.advertiserId, toUserId: screen.screenOwnerId, amount: screenOwnerPayout, reason: `dreams_impression:${campaignId}:${screenId}` },
+    { fromUserId: campaign.advertiserId, toUserId: DREAMS_PLATFORM_ACCOUNT, amount: platformFee, reason: `dreams_impression_platform_fee:${campaignId}:${screenId}` },
+  ], { reason: `dreams_impression:${campaignId}:${screenId}` });
 
   campaign.remainingBudget = round(campaign.remainingBudget - costPerImpression);
   if (campaign.remainingBudget <= 0) {

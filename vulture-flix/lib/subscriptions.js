@@ -49,18 +49,21 @@ const RENEWAL_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
 
 async function subscribe(store, options = {}) {
   const {
-    userId, tier = 'standard', transferFn, now = Date.now(),
+    userId, tier = 'standard', settleFn, now = Date.now(),
   } = options;
   if (!userId) throw new Error('subscribe requires a userId');
   if (!SUBSCRIPTION_TIERS.includes(tier)) {
     throw new Error(`subscribe requires a tier of ${SUBSCRIPTION_TIERS.join(', ')}`);
   }
-  if (typeof transferFn !== 'function') {
-    throw new Error('subscribe requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') {
+    throw new Error('subscribe requires a settleFn(legs, meta)');
   }
 
   const fee = TIER_FEES[tier];
-  await transferFn(userId, VULTURE_FLIX_PLATFORM_ACCOUNT, fee, `Vvltvre Flix ${tier} subscription`);
+  await settleFn(
+    [{ fromUserId: userId, toUserId: VULTURE_FLIX_PLATFORM_ACCOUNT, amount: fee, reason: `Vvltvre Flix ${tier} subscription` }],
+    { reason: `Vvltvre Flix ${tier} subscription` },
+  );
 
   let sub = store.subscriptions.find((s) => s.userId === userId);
   if (sub) {

@@ -58,7 +58,7 @@ test('DREAMS: screen-owner and platform shares always sum to the cost', async ()
     const moves = [];
     await campaigns.recordImpression(store, {
       campaignId: c.id, screenId: screen.id, costPerImpression: amount,
-      transferFn: async (from, to, n) => { moves.push({ to, n }); },
+      settleFn: async (legs) => { for (const l of legs) moves.push({ to: l.toUserId, n: l.amount }); },
     });
     return [
       moves.filter((m) => m.to === 'own').reduce((s, m) => s + m.n, 0),
@@ -99,7 +99,7 @@ test('Vvltvre Pods: creator and platform shares always sum to the tier price', a
     const moves = [];
     await subs.subscribeToShow(store, {
       userId: 'ada', showId: show.id, tierId: show.subscriptionTiers[0].id,
-      transferFn: async (from, to, n) => { moves.push({ to, n }); },
+      settleFn: async (legs) => { for (const l of legs) moves.push({ to: l.toUserId, n: l.amount }); },
     });
     const creator = moves.filter((m) => m.to === 'creator').reduce((s, m) => s + m.n, 0);
     const platform = moves
@@ -139,7 +139,7 @@ test('HVNTZ: business and VACO shares sum to the amount, for every event type', 
     const moves = [];
     await rs.recordRevenueEvent(store, {
       locationId: location.id, eventType, amountEarned: amount, payerId: 'payer',
-      transferFn: async (from, to, n) => { moves.push({ to, n }); },
+      settleFn: async (legs) => { for (const l of legs) moves.push({ to: l.toUserId, n: l.amount }); },
     });
     const owner = moves.filter((m) => m.to === 'own').reduce((s, m) => s + m.n, 0);
     const vaco = moves.filter((m) => m.to === rs.VACO_PLATFORM_USER_ID).reduce((s, m) => s + m.n, 0);

@@ -41,7 +41,7 @@ function round(n) {
 
 async function subscribeToShow(store, options = {}) {
   const {
-    userId, showId, tierId, transferFn, now = Date.now(),
+    userId, showId, tierId, settleFn, now = Date.now(),
   } = options;
   if (!userId) throw new Error('subscribeToShow requires a userId');
   const show = getShow(store, showId);
@@ -49,16 +49,22 @@ async function subscribeToShow(store, options = {}) {
   if (show.subscriptionTiers.length === 0) throw new Error(`subscribeToShow: show ${showId} has no subscription tiers`);
   const tier = getSubscriptionTier(show, tierId);
   if (!tier) throw new Error(`subscribeToShow: show ${showId} has no subscription tier with id ${tierId}`);
-  if (typeof transferFn !== 'function') {
-    throw new Error('subscribeToShow requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') {
+    throw new Error('subscribeToShow requires a settleFn(legs, meta)');
   }
 
   const price = tier.priceVCoin;
   const platformCut = round(price * PLATFORM_TAKE_PERCENT);
   const creatorShare = round(price - platformCut);
 
-  await transferFn(userId, show.creatorId, creatorShare, `vulture_pods_show_subscription:${showId}:${tierId}`);
-  await transferFn(userId, VULTURE_PODS_PLATFORM_ACCOUNT, platformCut, `vulture_pods_platform_fee:${showId}:${tierId}`);
+  // One settlement: both legs leave the subscriber and the
+  // subscription record is written afterwards, so a split that paid
+  // the creator and failed the platform cut would leave the subscriber
+  // charged with nothing to show for it and a retry paying again.
+  await settleFn([
+    { fromUserId: userId, toUserId: show.creatorId, amount: creatorShare, reason: `vulture_pods_show_subscription:${showId}:${tierId}` },
+    { fromUserId: userId, toUserId: VULTURE_PODS_PLATFORM_ACCOUNT, amount: platformCut, reason: `vulture_pods_platform_fee:${showId}:${tierId}` },
+  ], { reason: `vulture_pods_subscription:${showId}:${tierId}:${userId}` });
 
   let sub = store.showSubscriptions.find((s) => s.userId === userId && s.showId === showId);
   if (sub) {

@@ -46,7 +46,7 @@ const {
   getAvatarCosmeticCatalog, purchaseAvatarCosmetic, getOwnedAvatarCosmetics,
   equipAvatarCosmetic, unequipAvatarCosmetic, getAvatarProfile,
 } = require('./lib/avatarCosmetics');
-const { transferVCoin } = require('./lib/v3Client');
+const { settleVCoin } = require('./lib/v3Client');
 const {
   publishArticle, getArticle, listArticlesForAuthor, getArticleForViewer, canViewArticle,
 } = require('./lib/articles');
@@ -473,7 +473,7 @@ app.get('/api/channels/:id/unread/:userId', (req, res) => {
 
 app.post('/api/villages/:id/boost', requireActor('boosterId'), async (req, res) => {
   try {
-    res.status(201).json(await boostVillage(store, { ...req.body, villageId: Number(req.params.id), transferFn: transferVCoin }));
+    res.status(201).json(await boostVillage(store, { ...req.body, villageId: Number(req.params.id), settleFn: settleVCoin }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -501,7 +501,7 @@ app.get('/api/villages/:id/cosmetics', (req, res) => {
 
 app.post('/api/cosmetics/:id/purchase', requireActor('buyerId'), async (req, res) => {
   try {
-    res.status(201).json(await purchaseCosmetic(store, { ...req.body, itemId: Number(req.params.id), transferFn: transferVCoin }));
+    res.status(201).json(await purchaseCosmetic(store, { ...req.body, itemId: Number(req.params.id), settleFn: settleVCoin }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -519,7 +519,7 @@ app.get('/api/avatar-cosmetics/catalog', (_req, res) => {
 
 app.post('/api/avatar-cosmetics/purchase', requireActor('userId'), async (req, res) => {
   try {
-    res.status(201).json(await purchaseAvatarCosmetic(store, { ...req.body, transferFn: transferVCoin }));
+    res.status(201).json(await purchaseAvatarCosmetic(store, { ...req.body, settleFn: settleVCoin }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

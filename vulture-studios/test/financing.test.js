@@ -32,16 +32,27 @@ function ledger(initial = {}) {
   const balances = { ...initial };
   const moves = [];
   const opening = Object.values(balances).reduce((a, b) => a + b, 0);
-  const fn = async (from, to, amount, reason) => {
-    if (typeof amount !== 'number' || Number.isNaN(amount)) {
-      throw new Error(`ledger: non-numeric transfer of ${amount} (${reason})`);
+  // Takes a settlement and applies each leg, so every existing
+  // assertion below reads exactly as it did when these were
+  // separate transfers. `calls` is the new question: how many
+  // times the ledger was asked. Amounts are identical whether a
+  // settlement is atomic or split, which is why only a call count
+  // can tell them apart.
+  const calls = [];
+  const fn = async (legs, meta = {}) => {
+    calls.push({ legs, meta });
+    for (const { fromUserId: from, toUserId: to, amount: amount, reason: reason } of legs) {
+      if (typeof amount !== 'number' || Number.isNaN(amount)) {
+        throw new Error(`ledger: non-numeric transfer of ${amount} (${reason})`);
+      }
+      if (amount < 0) throw new Error(`ledger: negative transfer (${reason})`);
+      balances[from] = (balances[from] || 0) - amount;
+      balances[to] = (balances[to] || 0) + amount;
+      moves.push({ from, to, amount, reason });
     }
-    if (amount < 0) throw new Error(`ledger: negative transfer (${reason})`);
-    balances[from] = (balances[from] || 0) - amount;
-    balances[to] = (balances[to] || 0) + amount;
-    moves.push({ from, to, amount, reason });
     return { ok: true };
   };
+  fn.calls = calls;
   fn.moves = moves;
   fn.of = (a) => balances[a] || 0;
   fn.drift = () => Object.values(balances).reduce((a, b) => a + b, 0) - opening;
@@ -55,14 +66,14 @@ function greenlit(store, budgetRequested = 1000) {
   });
 }
 
-async function fundedProject(store, transferFn, contributions, budget) {
+async function fundedProject(store, settleFn, contributions, budget) {
   const total = contributions.reduce((s, c) => s + c.amount, 0);
   const project = greenlit(store, budget !== undefined ? budget : total);
   for (const c of contributions) {
     // eslint-disable-next-line no-await-in-loop -- deliberately sequential
     await projects.investInProject(store, {
       projectId: project.id, investorId: c.investorId, amount: c.amount,
-      transferFn, now: NOW,
+      settleFn, now: NOW,
     });
   }
   return projects.getProject(store, project.id);
@@ -72,41 +83,41 @@ async function fundedProject(store, transferFn, contributions, budget) {
 
 test('investing moves real money to the production account', async () => {
   const store = createVultureStudiosStore();
-  const transferFn = ledger({ ada: 1000 });
+  const settleFn = ledger({ ada: 1000 });
   const project = greenlit(store, 1000);
 
   const { project: updated } = await projects.investInProject(store, {
-    projectId: project.id, investorId: 'ada', amount: 400, transferFn, now: NOW,
+    projectId: project.id, investorId: 'ada', amount: 400, settleFn, now: NOW,
   });
 
-  assert.strictEqual(transferFn.of('ada'), 600);
-  assert.strictEqual(transferFn.of(projects.VULTURE_STUDIOS_PRODUCTION_ACCOUNT), 400);
+  assert.strictEqual(settleFn.of('ada'), 600);
+  assert.strictEqual(settleFn.of(projects.VULTURE_STUDIOS_PRODUCTION_ACCOUNT), 400);
   assert.strictEqual(updated.amountRaised, 400);
   assert.strictEqual(updated.status, 'greenlit', 'a partially funded project is still raising');
 });
 
 test('a project cannot be overfunded, and the refused investor is not charged', async () => {
   const store = createVultureStudiosStore();
-  const transferFn = ledger({ ada: 1000, rio: 1000 });
+  const settleFn = ledger({ ada: 1000, rio: 1000 });
   const project = greenlit(store, 1000);
 
   await projects.investInProject(store, {
-    projectId: project.id, investorId: 'ada', amount: 800, transferFn, now: NOW,
+    projectId: project.id, investorId: 'ada', amount: 800, settleFn, now: NOW,
   });
 
   // Overfunding would dilute everyone who already invested, silently,
   // after the fact.
   await assert.rejects(() => projects.investInProject(store, {
-    projectId: project.id, investorId: 'rio', amount: 300, transferFn, now: NOW,
+    projectId: project.id, investorId: 'rio', amount: 300, settleFn, now: NOW,
   }), /exceeds/);
-  assert.strictEqual(transferFn.of('rio'), 1000, 'a refused investment must not charge anyone');
+  assert.strictEqual(settleFn.of('rio'), 1000, 'a refused investment must not charge anyone');
   assert.strictEqual(projects.getProject(store, project.id).amountRaised, 800);
 });
 
 test('financing closes the moment the budget is met', async () => {
   const store = createVultureStudiosStore();
-  const transferFn = ledger({ ada: 1000, rio: 1000 });
-  const project = await fundedProject(store, transferFn,
+  const settleFn = ledger({ ada: 1000, rio: 1000 });
+  const project = await fundedProject(store, settleFn,
     [{ investorId: 'ada', amount: 600 }, { investorId: 'rio', amount: 400 }], 1000);
 
   assert.strictEqual(project.status, 'funded');
@@ -114,7 +125,7 @@ test('financing closes the moment the budget is met', async () => {
 
   // Taking money into a closed round is money with nothing to buy.
   await assert.rejects(() => projects.investInProject(store, {
-    projectId: project.id, investorId: 'ada', amount: 1, transferFn, now: NOW,
+    projectId: project.id, investorId: 'ada', amount: 1, settleFn, now: NOW,
   }), /financing is only open/);
 });
 
@@ -122,8 +133,8 @@ test('financing closes the moment the budget is met', async () => {
 
 test('equity is proportional to money in, and sums to the whole', async () => {
   const store = createVultureStudiosStore();
-  const transferFn = ledger({ ada: 1000, rio: 1000, kai: 1000 });
-  const project = await fundedProject(store, transferFn, [
+  const settleFn = ledger({ ada: 1000, rio: 1000, kai: 1000 });
+  const project = await fundedProject(store, settleFn, [
     { investorId: 'ada', amount: 500 },
     { investorId: 'rio', amount: 300 },
     { investorId: 'kai', amount: 200 },
@@ -141,8 +152,8 @@ test('equity is proportional to money in, and sums to the whole', async () => {
 
 test('several investments by the same investor are one position, not several', async () => {
   const store = createVultureStudiosStore();
-  const transferFn = ledger({ ada: 1000, rio: 1000 });
-  const project = await fundedProject(store, transferFn, [
+  const settleFn = ledger({ ada: 1000, rio: 1000 });
+  const project = await fundedProject(store, settleFn, [
     { investorId: 'ada', amount: 300 },
     { investorId: 'rio', amount: 400 },
     { investorId: 'ada', amount: 300 },
@@ -156,8 +167,8 @@ test('several investments by the same investor are one position, not several', a
 
 // -- Revenue ------------------------------------------------------------
 
-async function completed(store, transferFn, contributions, budget) {
-  const project = await fundedProject(store, transferFn, contributions, budget);
+async function completed(store, settleFn, contributions, budget) {
+  const project = await fundedProject(store, settleFn, contributions, budget);
   projects.startProduction(store, { projectId: project.id, now: NOW });
   projects.completeProject(store, {
     projectId: project.id, finalAssetUrl: 'https://example.invalid/asset', now: NOW,
@@ -167,14 +178,14 @@ async function completed(store, transferFn, contributions, budget) {
 
 test('revenue is split proportionally and sums to exactly what was reported', async () => {
   const store = createVultureStudiosStore();
-  const transferFn = ledger({ ada: 1000, rio: 1000, 'vulture-studios-revenue': 10000 });
-  const project = await completed(store, transferFn, [
+  const settleFn = ledger({ ada: 1000, rio: 1000, 'vulture-studios-revenue': 10000 });
+  const project = await completed(store, settleFn, [
     { investorId: 'ada', amount: 700 },
     { investorId: 'rio', amount: 300 },
   ], 1000);
 
   const report = await projects.reportProjectRevenue(store, {
-    projectId: project.id, amount: 500, source: 'vulture-flix', transferFn, now: NOW,
+    projectId: project.id, amount: 500, source: 'vulture-flix', settleFn, now: NOW,
   });
 
   const paid = report.payouts.reduce((s, p) => s + p.amount, 0);
@@ -186,18 +197,18 @@ test('revenue is split proportionally and sums to exactly what was reported', as
 
 test('an awkward three-way split still sums exactly — nobody is shortchanged by rounding', async () => {
   const store = createVultureStudiosStore();
-  const transferFn = ledger({ ada: 1000, rio: 1000, kai: 1000, 'vulture-studios-revenue': 10000 });
+  const settleFn = ledger({ ada: 1000, rio: 1000, kai: 1000, 'vulture-studios-revenue': 10000 });
 
   // Thirds of a prime-ish amount: no clean decimal exists, so the code
   // must decide who absorbs the remainder rather than losing it.
-  const project = await completed(store, transferFn, [
+  const project = await completed(store, settleFn, [
     { investorId: 'ada', amount: 100 },
     { investorId: 'rio', amount: 100 },
     { investorId: 'kai', amount: 100 },
   ], 300);
 
   const report = await projects.reportProjectRevenue(store, {
-    projectId: project.id, amount: 100, source: 'vulture-flix', transferFn, now: NOW,
+    projectId: project.id, amount: 100, source: 'vulture-flix', settleFn, now: NOW,
   });
 
   const paid = report.payouts.reduce((s, p) => s + p.amount, 0);
@@ -214,8 +225,8 @@ test('an awkward three-way split still sums exactly — nobody is shortchanged b
 
 test('repeated revenue reports do not drift — the same investors are not shorted every time', async () => {
   const store = createVultureStudiosStore();
-  const transferFn = ledger({ ada: 1000, rio: 1000, kai: 1000, 'vulture-studios-revenue': 100000 });
-  const project = await completed(store, transferFn, [
+  const settleFn = ledger({ ada: 1000, rio: 1000, kai: 1000, 'vulture-studios-revenue': 100000 });
+  const project = await completed(store, settleFn, [
     { investorId: 'ada', amount: 100 },
     { investorId: 'rio', amount: 100 },
     { investorId: 'kai', amount: 100 },
@@ -229,13 +240,13 @@ test('repeated revenue reports do not drift — the same investors are not short
   for (let month = 0; month < 12; month += 1) {
     // eslint-disable-next-line no-await-in-loop
     const report = await projects.reportProjectRevenue(store, {
-      projectId: project.id, amount: 100, source: `month-${month}`, transferFn, now: NOW,
+      projectId: project.id, amount: 100, source: `month-${month}`, settleFn, now: NOW,
     });
     reported += 100;
     assert.strictEqual(report.payouts.reduce((s, p) => s + p.amount, 0), 100);
   }
 
-  const received = ['ada', 'rio', 'kai'].map((id) => transferFn.of(id) - 1000 + 100);
+  const received = ['ada', 'rio', 'kai'].map((id) => settleFn.of(id) - 1000 + 100);
   const total = received.reduce((a, b) => a + b, 0);
   assert.ok(Math.abs(total - reported) < 0.01,
     'a year of reports must pay out exactly what was reported');
@@ -246,18 +257,18 @@ test('repeated revenue reports do not drift — the same investors are not short
 
 test('revenue cannot be reported before a project completes', async () => {
   const store = createVultureStudiosStore();
-  const transferFn = ledger({ ada: 1000, 'vulture-studios-revenue': 10000 });
-  const project = await fundedProject(store, transferFn, [{ investorId: 'ada', amount: 500 }], 500);
+  const settleFn = ledger({ ada: 1000, 'vulture-studios-revenue': 10000 });
+  const project = await fundedProject(store, settleFn, [{ investorId: 'ada', amount: 500 }], 500);
 
   await assert.rejects(() => projects.reportProjectRevenue(store, {
-    projectId: project.id, amount: 100, source: 'vulture-flix', transferFn, now: NOW,
+    projectId: project.id, amount: 100, source: 'vulture-flix', settleFn, now: NOW,
   }), /.*/);
 });
 
 test('a Vvltvre Music project refuses revenue here — one payout path, not two', async () => {
   const store = createVultureStudiosStore();
-  const transferFn = ledger({ ada: 1000, 'vulture-studios-revenue': 10000 });
-  const project = await completed(store, transferFn, [{ investorId: 'ada', amount: 500 }], 500);
+  const settleFn = ledger({ ada: 1000, 'vulture-studios-revenue': 10000 });
+  const project = await completed(store, settleFn, [{ investorId: 'ada', amount: 500 }], 500);
 
   projects.recordDistribution(store, {
     projectId: project.id, distributionApp: 'vulture-music', distributionTitleId: 42, now: NOW,
@@ -267,19 +278,19 @@ test('a Vvltvre Music project refuses revenue here — one payout path, not two'
   // pay every investor twice — and the error message says where to go
   // instead, which is what makes the guard usable rather than annoying.
   await assert.rejects(() => projects.reportProjectRevenue(store, {
-    projectId: project.id, amount: 100, source: 'streams', transferFn, now: NOW,
+    projectId: project.id, amount: 100, source: 'streams', settleFn, now: NOW,
   }), /distributed through Vvltvre Music/);
 });
 
 test('a project with no investors cannot distribute revenue to nobody', async () => {
   const store = createVultureStudiosStore();
-  const transferFn = ledger({ 'vulture-studios-revenue': 10000 });
+  const settleFn = ledger({ 'vulture-studios-revenue': 10000 });
   const project = greenlit(store, 500);
   // Force it to completed without any investment, which the normal flow
   // would not produce but a data import could.
   project.status = 'completed';
 
   await assert.rejects(() => projects.reportProjectRevenue(store, {
-    projectId: project.id, amount: 100, source: 'vulture-flix', transferFn, now: NOW,
+    projectId: project.id, amount: 100, source: 'vulture-flix', settleFn, now: NOW,
   }), /no investors/);
 });

@@ -37,8 +37,8 @@
 // people are here right now" count, seeded below with 18 real
 // attendee-join records on a live tournament.
 //
-// **Seed-time-only transferFn**: `tipChannel` requires an injected
-// `transferFn`, same as every real VCoin movement across this
+// **Seed-time-only settleFn**: `tipChannel` requires an injected
+// `settleFn`, same as every real VCoin movement across this
 // ecosystem -- but a fresh store must be seedable even before the real
 // V3 VCoin ledger service is up (e.g. a first `npm start` on a machine
 // that hasn't started every ecosystem service yet). `seedTransferFn`
@@ -77,7 +77,7 @@ async function seedChannelActivity(store, channel, options) {
       tipperId: tip.tipperId,
       recipientPersonId: tip.recipientPersonId,
       amountVCoin: tip.amountVCoin,
-      transferFn: seedTransferFn,
+      settleFn: seedTransferFn,
       now: now - Math.floor(Math.random() * 600000),
     });
   }

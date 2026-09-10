@@ -21,10 +21,21 @@ const { tipChannel, getTipsForChannel, getTotalTipsForPerson } = require('../lib
 
 function recorder() {
   const moves = [];
-  const fn = async (fromUserId, toUserId, amount, reason) => {
-    moves.push({ fromUserId, toUserId, amount, reason });
+  // Takes a settlement and applies each leg, so every existing
+  // assertion below reads exactly as it did when these were
+  // separate transfers. `calls` is the new question: how many
+  // times the ledger was asked. Amounts are identical whether a
+  // settlement is atomic or split, which is why only a call count
+  // can tell them apart.
+  const calls = [];
+  const fn = async (legs, meta = {}) => {
+    calls.push({ legs, meta });
+    for (const { fromUserId: fromUserId, toUserId: toUserId, amount: amount, reason: reason } of legs) {
+      moves.push({ fromUserId, toUserId, amount, reason });
+    }
     return { ok: true };
   };
+  fn.calls = calls;
   fn.moves = moves;
   fn.totalTo = (who) => moves.filter((m) => m.toUserId === who).reduce((n, m) => n + m.amount, 0);
   fn.totalFrom = (who) => moves.filter((m) => m.fromUserId === who).reduce((n, m) => n + m.amount, 0);
@@ -46,20 +57,20 @@ function clubChannel(store) {
 test('a tip lands on the person, never on the channel owner', async () => {
   const store = createVavltStvdiosStore();
   const channel = clubChannel(store);
-  const transferFn = recorder();
+  const settleFn = recorder();
 
   await tipChannel(store, {
     channelId: channel.id, tipperId: 'viewer-1', recipientPersonId: 'doorman-1',
-    amountVCoin: 25, transferFn,
+    amountVCoin: 25, settleFn,
   });
 
-  assert.equal(transferFn.totalTo('doorman-1'), 25);
+  assert.equal(settleFn.totalTo('doorman-1'), 25);
   assert.equal(
-    transferFn.totalTo('club-owner'), 0,
+    settleFn.totalTo('club-owner'), 0,
     'the tip was routed through the channel owner — the whole point of this module is that it is not',
   );
-  assert.equal(transferFn.totalFrom('viewer-1'), 25);
-  assert.equal(transferFn.moves.length, 1, 'a tip moved money more than once');
+  assert.equal(settleFn.totalFrom('viewer-1'), 25);
+  assert.equal(settleFn.moves.length, 1, 'a tip moved money more than once');
 });
 
 test('no platform cut is taken from a tip', async () => {
@@ -69,15 +80,15 @@ test('no platform cut is taken from a tip', async () => {
   // a fee cannot appear later without this failing.
   const store = createVavltStvdiosStore();
   const channel = clubChannel(store);
-  const transferFn = recorder();
+  const settleFn = recorder();
 
   await tipChannel(store, {
     channelId: channel.id, tipperId: 'viewer-1', recipientPersonId: 'doorman-1',
-    amountVCoin: 100, transferFn,
+    amountVCoin: 100, settleFn,
   });
 
-  assert.equal(transferFn.totalFrom('viewer-1'), 100);
-  assert.equal(transferFn.totalTo('doorman-1'), 100, 'a cut was taken from a tip');
+  assert.equal(settleFn.totalFrom('viewer-1'), 100);
+  assert.equal(settleFn.totalTo('doorman-1'), 100, 'a cut was taken from a tip');
 });
 
 test('two people on the same channel earn separately', async () => {
@@ -85,17 +96,17 @@ test('two people on the same channel earn separately', async () => {
   // on one channel keep their own totals.
   const store = createVavltStvdiosStore();
   const channel = clubChannel(store);
-  const transferFn = recorder();
+  const settleFn = recorder();
 
   await tipChannel(store, {
-    channelId: channel.id, tipperId: 'v1', recipientPersonId: 'doorman-1', amountVCoin: 10, transferFn,
+    channelId: channel.id, tipperId: 'v1', recipientPersonId: 'doorman-1', amountVCoin: 10, settleFn,
   });
   await tipChannel(store, {
-    channelId: channel.id, tipperId: 'v2', recipientPersonId: 'barber-1', amountVCoin: 40, transferFn,
+    channelId: channel.id, tipperId: 'v2', recipientPersonId: 'barber-1', amountVCoin: 40, settleFn,
   });
 
-  assert.equal(transferFn.totalTo('doorman-1'), 10);
-  assert.equal(transferFn.totalTo('barber-1'), 40);
+  assert.equal(settleFn.totalTo('doorman-1'), 10);
+  assert.equal(settleFn.totalTo('barber-1'), 40);
   assert.equal(getTotalTipsForPerson(store, 'doorman-1'), 10);
   assert.equal(getTotalTipsForPerson(store, 'barber-1'), 40);
 });
@@ -107,13 +118,13 @@ test('a person earns across channels, and the total matches what moved', async (
     ownerId: 'other-owner', groupingType: 'same-role-multi-location',
     name: 'Second Venue', streamUrl: 'https://example.test/b.m3u8',
   });
-  const transferFn = recorder();
+  const settleFn = recorder();
 
-  await tipChannel(store, { channelId: a.id, tipperId: 'v1', recipientPersonId: 'doorman-1', amountVCoin: 15, transferFn });
-  await tipChannel(store, { channelId: b.id, tipperId: 'v2', recipientPersonId: 'doorman-1', amountVCoin: 35, transferFn });
+  await tipChannel(store, { channelId: a.id, tipperId: 'v1', recipientPersonId: 'doorman-1', amountVCoin: 15, settleFn });
+  await tipChannel(store, { channelId: b.id, tipperId: 'v2', recipientPersonId: 'doorman-1', amountVCoin: 35, settleFn });
 
   assert.equal(getTotalTipsForPerson(store, 'doorman-1'), 50);
-  assert.equal(transferFn.totalTo('doorman-1'), 50, 'the reported total disagrees with the ledger');
+  assert.equal(settleFn.totalTo('doorman-1'), 50, 'the reported total disagrees with the ledger');
 });
 
 test('tips are attributed to the channel they were given on', async () => {
@@ -123,8 +134,8 @@ test('tips are attributed to the channel they were given on', async () => {
     ownerId: 'other-owner', groupingType: 'same-role-multi-location',
     name: 'Second Venue', streamUrl: 'https://example.test/b.m3u8',
   });
-  const transferFn = recorder();
-  await tipChannel(store, { channelId: a.id, tipperId: 'v1', recipientPersonId: 'p1', amountVCoin: 5, transferFn });
+  const settleFn = recorder();
+  await tipChannel(store, { channelId: a.id, tipperId: 'v1', recipientPersonId: 'p1', amountVCoin: 5, settleFn });
 
   assert.equal(getTipsForChannel(store, a.id).length, 1);
   assert.equal(getTipsForChannel(store, b.id).length, 0);
@@ -135,27 +146,27 @@ test('tips are attributed to the channel they were given on', async () => {
 test('a non-numeric amount is refused rather than becoming NaN', async () => {
   const store = createVavltStvdiosStore();
   const channel = clubChannel(store);
-  const transferFn = recorder();
+  const settleFn = recorder();
   for (const bad of [NaN, Infinity, -1, 0, '25', null, undefined]) {
     await assert.rejects(
       () => tipChannel(store, {
-        channelId: channel.id, tipperId: 'v1', recipientPersonId: 'p1', amountVCoin: bad, transferFn,
+        channelId: channel.id, tipperId: 'v1', recipientPersonId: 'p1', amountVCoin: bad, settleFn,
       }),
       `amountVCoin ${String(bad)} was accepted`,
     );
   }
-  assert.equal(transferFn.moves.length, 0);
+  assert.equal(settleFn.moves.length, 0);
   assert.equal(store.channelTips.length, 0, 'a refused tip was still recorded');
 });
 
-test('a tip with no transferFn is refused rather than silently free', async () => {
+test('a tip with no settleFn is refused rather than silently free', async () => {
   const store = createVavltStvdiosStore();
   const channel = clubChannel(store);
   await assert.rejects(
     () => tipChannel(store, {
       channelId: channel.id, tipperId: 'v1', recipientPersonId: 'p1', amountVCoin: 10,
     }),
-    /requires a transferFn/,
+    /requires a settleFn/,
   );
   assert.equal(store.channelTips.length, 0, 'a tip was recorded with no money moved');
 });
@@ -163,26 +174,26 @@ test('a tip with no transferFn is refused rather than silently free', async () =
 test('a tip with no named recipient is refused — money needs somewhere to land', async () => {
   const store = createVavltStvdiosStore();
   const channel = clubChannel(store);
-  const transferFn = recorder();
+  const settleFn = recorder();
   await assert.rejects(
     () => tipChannel(store, {
-      channelId: channel.id, tipperId: 'v1', amountVCoin: 10, transferFn,
+      channelId: channel.id, tipperId: 'v1', amountVCoin: 10, settleFn,
     }),
     /requires a recipientPersonId/,
   );
-  assert.equal(transferFn.moves.length, 0);
+  assert.equal(settleFn.moves.length, 0);
 });
 
 test('a tip on a channel that does not exist moves nothing', async () => {
   const store = createVavltStvdiosStore();
-  const transferFn = recorder();
+  const settleFn = recorder();
   await assert.rejects(
     () => tipChannel(store, {
-      channelId: 9999, tipperId: 'v1', recipientPersonId: 'p1', amountVCoin: 10, transferFn,
+      channelId: 9999, tipperId: 'v1', recipientPersonId: 'p1', amountVCoin: 10, settleFn,
     }),
     /no channel with id/,
   );
-  assert.equal(transferFn.moves.length, 0);
+  assert.equal(settleFn.moves.length, 0);
 });
 
 test('a person with no tips has a total of zero, not undefined', () => {

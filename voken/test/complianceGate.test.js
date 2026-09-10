@@ -86,7 +86,7 @@ test('buying a REAL open listing is refused while the gate is closed', async () 
   const { store, listing } = storeWithListing();
   await assert.rejects(
     () => buyShares(store, {
-      listingId: listing.id, buyerId: 'alice', shareCount: 1, transferFn: async () => {},
+      listingId: listing.id, buyerId: 'alice', shareCount: 1, settleFn: async () => {},
     }),
     // Asserting the message matters: an earlier validation failing
     // would also reject, and would look like the gate working while
@@ -96,13 +96,13 @@ test('buying a REAL open listing is refused while the gate is closed', async () 
 });
 
 test('no money moves while the gate is closed', async () => {
-  // The sharpest form of the check: prove the injected transferFn is
+  // The sharpest form of the check: prove the injected settleFn is
   // never reached, so a closed gate cannot charge anyone.
   const { store, listing } = storeWithListing();
   let transferCalls = 0;
   await assert.rejects(() => buyShares(store, {
     listingId: listing.id, buyerId: 'alice', shareCount: 1,
-    transferFn: async () => { transferCalls += 1; },
+    settleFn: async () => { transferCalls += 1; },
   }));
   assert.strictEqual(transferCalls, 0);
 });
@@ -115,7 +115,7 @@ test('the gate is checked before listing status, not after', async () => {
   const { store, listing } = storeWithListing();
   store.fractionalListings.find((l) => l.id === listing.id).status = 'closed';
   await assert.rejects(() => buyShares(store, {
-    listingId: listing.id, buyerId: 'alice', shareCount: 1, transferFn: async () => {},
+    listingId: listing.id, buyerId: 'alice', shareCount: 1, settleFn: async () => {},
   }), /compliance/i);
 });
 

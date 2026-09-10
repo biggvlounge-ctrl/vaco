@@ -125,7 +125,7 @@ function hasCheckedIn(hunt, checkpointId, userId) {
 // curated permanent post -- the doc doesn't specify either way.
 async function checkInAtCheckpoint(store, options = {}) {
   const {
-    huntId, checkpointId, userId, transferFn, photoUrl = null, postToVavltStvdios = null,
+    huntId, checkpointId, userId, settleFn, photoUrl = null, postToVavltStvdios = null,
   } = options;
   const hunt = getHunt(store, huntId);
   if (!hunt) {
@@ -145,20 +145,23 @@ async function checkInAtCheckpoint(store, options = {}) {
   if (totalCost > hunt.remainingBudget) {
     throw new Error(`checkInAtCheckpoint: hunt ${huntId} does not have enough remaining budget (needs ${totalCost}, has ${hunt.remainingBudget})`);
   }
-  if (typeof transferFn !== 'function') {
-    throw new Error('checkInAtCheckpoint requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') {
+    throw new Error('checkInAtCheckpoint requires a settleFn(legs, meta)');
   }
   if (photoUrl && typeof postToVavltStvdios !== 'function') {
     throw new Error('checkInAtCheckpoint: photoUrl was supplied but no postToVavltStvdios function was injected');
   }
 
-  await transferFn(hunt.sponsorId, userId, checkpoint.bountyAmount, `hvntz_hunt_bounty:${huntId}:${checkpointId}`);
+  await settleFn(
+    [{ fromUserId: hunt.sponsorId, toUserId: userId, amount: checkpoint.bountyAmount, reason: `hvntz_hunt_bounty:${huntId}:${checkpointId}` }],
+    { reason: `hvntz_hunt_bounty:${huntId}:${checkpointId}` },
+  );
   const revenueEvent = await recordRevenueEvent(store, {
     locationId: checkpoint.locationId,
     eventType: 'hunt-participation',
     amountEarned: checkpoint.hostFee,
     payerId: hunt.sponsorId,
-    transferFn,
+    settleFn,
   });
 
   hunt.remainingBudget = Math.round((hunt.remainingBudget - totalCost) * 100) / 100;

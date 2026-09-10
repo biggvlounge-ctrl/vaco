@@ -63,15 +63,18 @@ function getMerchListing(store, listingId) {
 // not the original basePrice -- then recomputes the price for the next
 // buyer against the new, smaller remaining supply.
 async function purchaseMerchItem(store, options = {}) {
-  const { listingId, buyerId, transferFn } = options;
+  const { listingId, buyerId, settleFn } = options;
   const listing = getMerchListing(store, listingId);
   if (!listing) throw new Error(`purchaseMerchItem: no merch listing with id ${listingId}`);
   if (listing.remainingSupply <= 0) throw new Error(`purchaseMerchItem: listing ${listingId} is sold out`);
   if (!buyerId) throw new Error('purchaseMerchItem requires a buyerId');
-  if (typeof transferFn !== 'function') throw new Error('purchaseMerchItem requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') throw new Error('purchaseMerchItem requires a settleFn(legs, meta)');
 
   const price = listing.currentDynamicPrice;
-  await transferFn(buyerId, listing.creatorId, price, `voken_merch:${listing.id}`);
+  await settleFn(
+    [{ fromUserId: buyerId, toUserId: listing.creatorId, amount: price, reason: `voken_merch:${listing.id}` }],
+    { reason: `voken_merch:${listing.id}` },
+  );
 
   listing.remainingSupply -= 1;
   listing.soldCount += 1;

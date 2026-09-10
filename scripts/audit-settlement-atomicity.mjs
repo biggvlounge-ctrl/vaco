@@ -55,7 +55,7 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..
 // honestly promise while a sweep is unfinished. Same shape as
 // `audit-route-guards.mjs`: it does not claim the remainder is fine, it
 // claims the remainder is not growing.
-const CEILING = 29;
+const CEILING = 0;
 
 const TRANSFER_CALL = /await\s+(?:transferFn|transferVCoin|transfer)\s*\(/g;
 
@@ -69,6 +69,30 @@ function stripNonCode(src) {
     .replace(/`(?:[^`\\]|\\.)*`/g, (m) => m.replace(/[^\n]/g, ' '));
 }
 
+// **Apps come from the manifest, not from listing the repo root, and
+// that was a real blind spot.** The first version walked top-level
+// directories, so `chopz/chopz-shop` and `cvnvo/yap` -- both real apps,
+// both with their own `lib/` -- were invisible to it. `chopz-shop`
+// alone held a four-leg escrow settlement (buyer in; seller, platform
+// and affiliate out) that this audit reported as nonexistent while
+// reporting a clean number for everything else.
+//
+// `start-ecosystem.sh`'s APPS array is the authoritative list every
+// deploy generator reads, and its entries carry the real path. Reading
+// it here means a nested app cannot hide from this check the way one
+// just did.
+function appPaths() {
+  const src = fs.readFileSync(path.join(REPO_ROOT, 'start-ecosystem.sh'), 'utf8');
+  const m = src.match(/APPS=\(([\s\S]*?)\n\)/);
+  if (!m) {
+    process.stderr.write('audit-settlement-atomicity: start-ecosystem.sh has no APPS manifest.\n'
+      + 'Falling back to a directory listing would silently skip nested apps; refusing.\n');
+    process.exit(2);
+  }
+  return m[1].split('\n').map((l) => l.trim()).filter((l) => l.startsWith('"'))
+    .map((l) => l.slice(1, -1).split(':')[1]);
+}
+
 function libFiles() {
   const found = [];
   const walk = (dir) => {
@@ -80,14 +104,13 @@ function libFiles() {
       found.push(abs);
     }
   };
-  for (const app of fs.readdirSync(REPO_ROOT, { withFileTypes: true })) {
-    if (!app.isDirectory() || app.name === 'node_modules' || app.name.startsWith('.')) continue;
+  for (const appPath of appPaths()) {
     for (const root of ['lib', path.join('src', 'lib')]) {
-      const dir = path.join(REPO_ROOT, app.name, root);
+      const dir = path.join(REPO_ROOT, appPath, root);
       if (fs.existsSync(dir)) walk(dir);
     }
   }
-  return found.sort();
+  return [...new Set(found)].sort();
 }
 
 // V3 is the ledger itself: `vcoin.transfer` and `vcoin.settle` are the
@@ -101,6 +124,35 @@ function libFiles() {
 // guess about code I had not read. The real sanity check is below, and
 // it does not depend on any single file staying the way it is.)
 const IS_THE_LEDGER = 'v3/lib/vcoin.js';
+
+// **Parked, not fixed, and the difference matters.**
+//
+// VDP and VENVS are Vite frontends. Their `src/lib/` money modules are
+// called straight from React components, and the `transferFn` those
+// components pass posts to V3 *from the browser*. So the sweep's fix
+// does not apply to them: `POST /api/vcoin/settle` is guarded by
+// `requireCallingService()`, which a browser must not be able to
+// satisfy. Converting them would swap one call the browser cannot make
+// for another and look like progress.
+//
+// It is worse than that, and worth writing down rather than quietly
+// counting these as done. Their client sends **no credential at all** —
+// no service headers and no `Authorization` — while
+// `/api/vcoin/transfer` is `actorOrService('fromUserId')`. Against the
+// real V3 these flows get 401 before authorization is even considered.
+// And VENVS's marketplace checkout pays each seller *from the platform
+// account*, which no end-user session could ever be authorised to do.
+//
+// The fix is not a settlement shape. It is moving these flows behind a
+// backend that holds a service credential — a real decision, not a
+// refactor. Until then they are listed here so the remaining count
+// stays honest about what is unconverted and why.
+const BROWSER_INITIATED = new Set([
+  'vdp/src/lib/chopz.js',
+  'venvs/src/lib/catalog.js',
+  'venvs/src/lib/marketplace.js',
+  'venvs/src/lib/shop.js',
+]);
 
 const rows = [];
 for (const abs of libFiles()) {
@@ -129,8 +181,22 @@ if (rows.length === 0) {
   process.exit(2);
 }
 
-const worklist = rows.filter((r) => r.rel !== IS_THE_LEDGER && r.lines.length >= 2);
+const worklist = rows.filter((r) => r.rel !== IS_THE_LEDGER
+  && !BROWSER_INITIATED.has(r.rel)
+  && r.lines.length >= 2);
 const total = worklist.reduce((n, r) => n + r.lines.length, 0);
+
+// The parked list re-earns itself: a file that stops having transfer
+// calls, or that never had them, is a stale exemption rather than a
+// quiet win. Same discipline as every other exemption in this repo.
+const parked = rows.filter((r) => BROWSER_INITIATED.has(r.rel));
+const staleParks = [...BROWSER_INITIATED].filter((f) => !rows.some((r) => r.rel === f));
+if (staleParks.length > 0) {
+  process.stderr.write('audit-settlement-atomicity: these files are on the browser-initiated '
+    + `parked list but have no transfer calls:\n  ${staleParks.join('\n  ')}\n`
+    + 'Either they were converted -- remove them from the list -- or the path moved.\n');
+  process.exit(2);
+}
 
 const byApp = new Map();
 for (const r of worklist) {
@@ -153,6 +219,12 @@ if (!process.argv.includes('--check')) {
 
 process.stdout.write(`audit-settlement-atomicity: ${total} site(s) across ${worklist.length} file(s) `
   + `in ${byApp.size} app(s); ceiling ${CEILING}.\n`);
+
+if (parked.length > 0) {
+  const parkedSites = parked.reduce((n, r) => n + r.lines.length, 0);
+  process.stdout.write(`Parked (browser-initiated, needs a backend first): ${parkedSites} site(s) `
+    + `across ${parked.length} file(s) -- see BROWSER_INITIATED in this file.\n`);
+}
 
 if (total > CEILING) {
   process.stderr.write(`\nThis is ${total - CEILING} more than when the sweep started.\n`

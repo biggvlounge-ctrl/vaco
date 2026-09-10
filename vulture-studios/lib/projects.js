@@ -84,7 +84,7 @@ function listProjects(store, options = {}) {
 // how a real film's financing round closes before principal
 // photography begins.
 async function investInProject(store, options = {}) {
-  const { projectId, investorId, amount, transferFn, now = Date.now() } = options;
+  const { projectId, investorId, amount, settleFn, now = Date.now() } = options;
 
   const project = getProject(store, projectId);
   if (!project) throw new Error(`investInProject: no project with id ${projectId}`);
@@ -97,11 +97,14 @@ async function investInProject(store, options = {}) {
   if (amount > remaining) {
     throw new Error(`investInProject: amount ${amount} exceeds project ${projectId}'s remaining budget ${remaining}`);
   }
-  if (typeof transferFn !== 'function') {
-    throw new Error('investInProject requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') {
+    throw new Error('investInProject requires a settleFn(legs, meta)');
   }
 
-  await transferFn(investorId, VULTURE_STUDIOS_PRODUCTION_ACCOUNT, amount, `vulture_studios_investment:${projectId}`);
+  await settleFn(
+    [{ fromUserId: investorId, toUserId: VULTURE_STUDIOS_PRODUCTION_ACCOUNT, amount: amount, reason: `vulture_studios_investment:${projectId}` }],
+    { reason: `vulture_studios_investment:${projectId}` },
+  );
 
   const investment = {
     id: store.nextInvestmentId++, projectId, investorId, amount: round(amount), investedAt: now,
@@ -235,7 +238,7 @@ function recordDistribution(store, options = {}) {
 // exactly `amount`) rather than reinventing that math.
 async function reportProjectRevenue(store, options = {}) {
   const {
-    projectId, amount, source, transferFn, now = Date.now(),
+    projectId, amount, source, settleFn, now = Date.now(),
   } = options;
 
   const project = requireStatus(store, projectId, 'completed', 'reportProjectRevenue');
@@ -252,8 +255,8 @@ async function reportProjectRevenue(store, options = {}) {
   }
   if (!Number.isFinite(amount) || amount <= 0) throw new Error('reportProjectRevenue requires a positive amount');
   if (!source) throw new Error('reportProjectRevenue requires a source');
-  if (typeof transferFn !== 'function') {
-    throw new Error('reportProjectRevenue requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') {
+    throw new Error('reportProjectRevenue requires a settleFn(legs, meta)');
   }
 
   const byInvestor = getInvestorContributions(store, projectId);
@@ -262,6 +265,14 @@ async function reportProjectRevenue(store, options = {}) {
     throw new Error(`reportProjectRevenue: project ${projectId} has no investors to pay out`);
   }
 
+  // **Every investor is paid in one settlement.**
+  //
+  // This loop used to pay each investor with its own transfer and push
+  // the revenue report only at the end. A failure part-way paid some
+  // investors and not others, recorded no report -- and, unlike most
+  // paths in this ecosystem, there is no status guard here at all, so
+  // the retry paid everyone the first pass had reached a second time.
+  const legs = [];
   const payouts = [];
   let allocated = 0;
   for (let i = 0; i < investorIds.length; i += 1) {
@@ -277,9 +288,20 @@ async function reportProjectRevenue(store, options = {}) {
     allocated = round(allocated + share);
 
     if (share > 0) {
-      await transferFn(VULTURE_STUDIOS_REVENUE_ACCOUNT, investorId, share, `vulture_studios_project_revenue:${projectId}:${source}`);
+      legs.push({
+        fromUserId: VULTURE_STUDIOS_REVENUE_ACCOUNT,
+        toUserId: investorId,
+        amount: share,
+        reason: `vulture_studios_project_revenue:${projectId}:${source}`,
+      });
     }
     payouts.push({ investorId, equityPercent: round(rawFraction), amount: share });
+  }
+
+  // Every share can legitimately round to zero on a tiny report, and
+  // an empty leg set would be refused by V3 -- skip rather than fail.
+  if (legs.length > 0) {
+    await settleFn(legs, { reason: `vulture_studios_revenue:${projectId}:${source}:${store.nextRevenueReportId}` });
   }
 
   const report = {

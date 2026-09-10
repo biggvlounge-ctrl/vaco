@@ -84,7 +84,7 @@ function listEpisodesForShow(store, showId) {
 
 // The real, one-time transition into `vulture-music`'s own real
 // distribution economics -- `distributeFn` is injected the same way
-// `transferFn` is injected everywhere else this session, except this
+// `settleFn` is injected everywhere else this session, except this
 // one calls into another app's real HTTP API, not V3 directly
 // (`server.js` owns that real cross-app client, same separation this
 // session already established for CHOPZ SHOP/VOID's own cross-app

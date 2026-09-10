@@ -29,13 +29,24 @@ const NOW = Date.UTC(2026, 5, 1);
 function ledger(initial = {}) {
   const balances = { ...initial };
   const moves = [];
-  const fn = async (from, to, amount, reason) => {
-    if (typeof amount !== 'number' || amount < 0) throw new Error(`ledger: bad transfer (${reason})`);
-    balances[from] = (balances[from] || 0) - amount;
-    balances[to] = (balances[to] || 0) + amount;
-    moves.push({ from, to, amount, reason });
+  // Takes a settlement and applies each leg, so every existing
+  // assertion below reads exactly as it did when these were
+  // separate transfers. `calls` is the new question: how many
+  // times the ledger was asked. Amounts are identical whether a
+  // settlement is atomic or split, which is why only a call count
+  // can tell them apart.
+  const calls = [];
+  const fn = async (legs, meta = {}) => {
+    calls.push({ legs, meta });
+    for (const { fromUserId: from, toUserId: to, amount: amount, reason: reason } of legs) {
+      if (typeof amount !== 'number' || amount < 0) throw new Error(`ledger: bad transfer (${reason})`);
+      balances[from] = (balances[from] || 0) - amount;
+      balances[to] = (balances[to] || 0) + amount;
+      moves.push({ from, to, amount, reason });
+    }
     return { ok: true };
   };
+  fn.calls = calls;
   fn.moves = moves;
   fn.of = (a) => balances[a] || 0;
   return fn;
@@ -44,10 +55,10 @@ function ledger(initial = {}) {
 // A title is acquired first and only becomes watchable when it is
 // marked streaming — acquiring is a deal, streaming is a release date.
 // The fixture does both, since every test below is about watching.
-async function withTitle(store, transferFn) {
+async function withTitle(store, settleFn) {
   const record = await titles.acquireExclusiveTitle(store, {
     creatorId: 'nova', title: 'The Long Dark', type: 'film',
-    acquisitionFee: 500, exclusivityWindowDays: 365, transferFn, now: NOW,
+    acquisitionFee: 500, exclusivityWindowDays: 365, settleFn, now: NOW,
   });
   titles.markStreaming(store, record.id);
   return record;
@@ -58,11 +69,11 @@ async function withTitle(store, transferFn) {
 test('each tier charges its own fee — the tiers are not one price with three names', async () => {
   for (const tier of subs.SUBSCRIPTION_TIERS) {
     const store = createVultureFlixStore();
-    const transferFn = ledger({ sam: 1000 });
-    await subs.subscribe(store, { userId: 'sam', tier, transferFn, now: NOW });
-    assert.strictEqual(transferFn.of('sam'), 1000 - subs.TIER_FEES[tier],
+    const settleFn = ledger({ sam: 1000 });
+    await subs.subscribe(store, { userId: 'sam', tier, settleFn, now: NOW });
+    assert.strictEqual(settleFn.of('sam'), 1000 - subs.TIER_FEES[tier],
       `the ${tier} tier must charge its own fee`);
-    assert.strictEqual(transferFn.of(subs.VULTURE_FLIX_PLATFORM_ACCOUNT), subs.TIER_FEES[tier]);
+    assert.strictEqual(settleFn.of(subs.VULTURE_FLIX_PLATFORM_ACCOUNT), subs.TIER_FEES[tier]);
   }
 });
 
@@ -80,34 +91,34 @@ test('tier fees are strictly ordered — paying more must not buy less', async (
 
 test('a renewal extends from now rather than stacking on the old date', async () => {
   const store = createVultureFlixStore();
-  const transferFn = ledger({ sam: 1000 });
+  const settleFn = ledger({ sam: 1000 });
 
-  const first = await subs.subscribe(store, { userId: 'sam', tier: 'standard', transferFn, now: NOW });
+  const first = await subs.subscribe(store, { userId: 'sam', tier: 'standard', settleFn, now: NOW });
   const firstRenewsAt = first.renewsAt;
 
   // Renewing ten days later. Stacking would push renewsAt out by a full
   // period from the OLD date, so the subscriber pays for coverage they
   // already had — a real overcharge that looks like generosity.
   const renewed = await subs.subscribe(store, {
-    userId: 'sam', tier: 'standard', transferFn, now: NOW + 10 * DAY,
+    userId: 'sam', tier: 'standard', settleFn, now: NOW + 10 * DAY,
   });
 
   assert.strictEqual(store.subscriptions.length, 1, 'renewal must not create a second subscription');
   assert.ok(renewed.renewsAt > firstRenewsAt);
   assert.ok(renewed.renewsAt - (NOW + 10 * DAY) <= renewed.renewsAt - renewed.lastRenewedAt + 1,
     'the new period runs from the renewal, not from the old expiry');
-  assert.strictEqual(transferFn.of('sam'), 1000 - 2 * subs.TIER_FEES.standard);
+  assert.strictEqual(settleFn.of('sam'), 1000 - 2 * subs.TIER_FEES.standard);
 });
 
 test('switching tier at renewal charges the new tier and takes effect immediately', async () => {
   const store = createVultureFlixStore();
-  const transferFn = ledger({ sam: 1000 });
+  const settleFn = ledger({ sam: 1000 });
 
-  await subs.subscribe(store, { userId: 'sam', tier: 'ad-supported', transferFn, now: NOW });
-  const upgraded = await subs.subscribe(store, { userId: 'sam', tier: 'premium', transferFn, now: NOW + DAY });
+  await subs.subscribe(store, { userId: 'sam', tier: 'ad-supported', settleFn, now: NOW });
+  const upgraded = await subs.subscribe(store, { userId: 'sam', tier: 'premium', settleFn, now: NOW + DAY });
 
   assert.strictEqual(upgraded.tier, 'premium');
-  assert.strictEqual(transferFn.of('sam'),
+  assert.strictEqual(settleFn.of('sam'),
     1000 - subs.TIER_FEES['ad-supported'] - subs.TIER_FEES.premium);
 });
 
@@ -115,10 +126,10 @@ test('switching tier at renewal charges the new tier and takes effect immediatel
 
 test('a cancelled subscriber cannot watch', async () => {
   const store = createVultureFlixStore();
-  const transferFn = ledger({ sam: 1000, 'vulture-flix': 5000 });
-  const title = await withTitle(store, transferFn);
+  const settleFn = ledger({ sam: 1000, 'vulture-flix': 5000 });
+  const title = await withTitle(store, settleFn);
 
-  await subs.subscribe(store, { userId: 'sam', tier: 'standard', transferFn, now: NOW });
+  await subs.subscribe(store, { userId: 'sam', tier: 'standard', settleFn, now: NOW });
   assert.ok(subs.isSubscriber(store, 'sam', NOW));
 
   subs.cancelSubscription(store, { userId: 'sam', now: NOW + DAY });
@@ -130,10 +141,10 @@ test('a cancelled subscriber cannot watch', async () => {
 
 test('a lapsed subscription stops working on its own, without anyone cancelling it', async () => {
   const store = createVultureFlixStore();
-  const transferFn = ledger({ sam: 1000, 'vulture-flix': 5000 });
-  await withTitle(store, transferFn);
+  const settleFn = ledger({ sam: 1000, 'vulture-flix': 5000 });
+  await withTitle(store, settleFn);
 
-  const sub = await subs.subscribe(store, { userId: 'sam', tier: 'standard', transferFn, now: NOW });
+  const sub = await subs.subscribe(store, { userId: 'sam', tier: 'standard', settleFn, now: NOW });
 
   // Still 'active' as a status — but past its renewal date. A check that
   // only reads status would let this person watch forever without ever
@@ -145,8 +156,8 @@ test('a lapsed subscription stops working on its own, without anyone cancelling 
 
 test('a non-subscriber cannot watch at all', async () => {
   const store = createVultureFlixStore();
-  const transferFn = ledger({ 'vulture-flix': 5000 });
-  const title = await withTitle(store, transferFn);
+  const settleFn = ledger({ 'vulture-flix': 5000 });
+  const title = await withTitle(store, settleFn);
 
   assert.throws(() => titles.startStream(store, {
     userId: 'nobody', titleId: title.id, now: NOW,
@@ -157,12 +168,12 @@ test('a non-subscriber cannot watch at all', async () => {
 
 test('the concurrency limit is enforced at exactly the tier’s number', async () => {
   const store = createVultureFlixStore();
-  const transferFn = ledger({ sam: 1000, 'vulture-flix': 5000 });
-  const title = await withTitle(store, transferFn);
+  const settleFn = ledger({ sam: 1000, 'vulture-flix': 5000 });
+  const title = await withTitle(store, settleFn);
 
   const tier = 'standard';
   const limit = subs.TIER_MAX_SIMULTANEOUS_STREAMS[tier];
-  await subs.subscribe(store, { userId: 'sam', tier, transferFn, now: NOW });
+  await subs.subscribe(store, { userId: 'sam', tier, settleFn, now: NOW });
 
   for (let i = 0; i < limit; i += 1) {
     titles.startStream(store, { userId: 'sam', titleId: title.id, now: NOW + i });
@@ -178,12 +189,12 @@ test('the concurrency limit is enforced at exactly the tier’s number', async (
 
 test('ending a stream frees the slot — otherwise a paying subscriber locks themselves out', async () => {
   const store = createVultureFlixStore();
-  const transferFn = ledger({ sam: 1000, 'vulture-flix': 5000 });
-  const title = await withTitle(store, transferFn);
+  const settleFn = ledger({ sam: 1000, 'vulture-flix': 5000 });
+  const title = await withTitle(store, settleFn);
 
   const tier = 'ad-supported';
   const limit = subs.TIER_MAX_SIMULTANEOUS_STREAMS[tier];
-  await subs.subscribe(store, { userId: 'sam', tier, transferFn, now: NOW });
+  await subs.subscribe(store, { userId: 'sam', tier, settleFn, now: NOW });
 
   const sessions = [];
   for (let i = 0; i < limit; i += 1) {
@@ -202,9 +213,9 @@ test('ending a stream frees the slot — otherwise a paying subscriber locks the
 
 test('a stream cannot be ended twice — that would free a slot nobody was holding', async () => {
   const store = createVultureFlixStore();
-  const transferFn = ledger({ sam: 1000, 'vulture-flix': 5000 });
-  const title = await withTitle(store, transferFn);
-  await subs.subscribe(store, { userId: 'sam', tier: 'standard', transferFn, now: NOW });
+  const settleFn = ledger({ sam: 1000, 'vulture-flix': 5000 });
+  const title = await withTitle(store, settleFn);
+  await subs.subscribe(store, { userId: 'sam', tier: 'standard', settleFn, now: NOW });
 
   const session = titles.startStream(store, { userId: 'sam', titleId: title.id, now: NOW });
   titles.endStream(store, { sessionId: session.id, now: NOW + 100 });
@@ -214,13 +225,13 @@ test('a stream cannot be ended twice — that would free a slot nobody was holdi
 
 test('one subscriber’s streams do not consume another’s slots', async () => {
   const store = createVultureFlixStore();
-  const transferFn = ledger({ sam: 1000, ada: 1000, 'vulture-flix': 5000 });
-  const title = await withTitle(store, transferFn);
+  const settleFn = ledger({ sam: 1000, ada: 1000, 'vulture-flix': 5000 });
+  const title = await withTitle(store, settleFn);
 
   const tier = 'ad-supported';
   const limit = subs.TIER_MAX_SIMULTANEOUS_STREAMS[tier];
-  await subs.subscribe(store, { userId: 'sam', tier, transferFn, now: NOW });
-  await subs.subscribe(store, { userId: 'ada', tier, transferFn, now: NOW });
+  await subs.subscribe(store, { userId: 'sam', tier, settleFn, now: NOW });
+  await subs.subscribe(store, { userId: 'ada', tier, settleFn, now: NOW });
 
   for (let i = 0; i < limit; i += 1) {
     titles.startStream(store, { userId: 'sam', titleId: title.id, now: NOW + i });
@@ -236,10 +247,10 @@ test('one subscriber’s streams do not consume another’s slots', async () => 
 
 test('acquiring an exclusive title pays the creator real money', async () => {
   const store = createVultureFlixStore();
-  const transferFn = ledger({ 'vulture-flix': 5000 });
+  const settleFn = ledger({ 'vulture-flix': 5000 });
 
-  const title = await withTitle(store, transferFn);
-  assert.strictEqual(transferFn.of('nova'), 500);
-  assert.ok(transferFn.moves.length >= 1);
+  const title = await withTitle(store, settleFn);
+  assert.strictEqual(settleFn.of('nova'), 500);
+  assert.ok(settleFn.moves.length >= 1);
   assert.strictEqual(title.creatorId, 'nova');
 });

@@ -62,18 +62,25 @@ function canAccessLockedContent(store, requiredTierId, userId) {
 }
 
 async function subscribeTier(store, options = {}) {
-  const { tierId, userId, transferFn } = options;
+  const { tierId, userId, settleFn } = options;
   const tier = getTier(store, tierId);
   if (!tier) throw new Error(`subscribeTier: no tier with id ${tierId}`);
   if (!userId) throw new Error('subscribeTier requires a userId');
-  if (typeof transferFn !== 'function') throw new Error('subscribeTier requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') throw new Error('subscribeTier requires a settleFn(legs, meta)');
   if (tier.subscribers.includes(userId)) throw new Error(`subscribeTier: ${userId} is already subscribed to tier ${tierId}`);
 
   const creatorShare = round(tier.priceVCoin * CREATOR_SPLIT_PERCENT);
   const platformShare = round(tier.priceVCoin - creatorShare);
 
-  await transferFn(userId, tier.creatorId, creatorShare, `vavlt_stvdios_tier_subscription:${tierId}`);
-  await transferFn(userId, VAVLT_STVDIOS_PLATFORM_ACCOUNT, platformShare, `vavlt_stvdios_tier_platform_share:${tierId}`);
+  // One settlement: the creator's share and the platform's both leave
+  // the subscriber, and the subscription record below is written only
+  // afterwards -- so a split that paid the creator and failed the
+  // platform leg would leave no subscription and let a retry pay the
+  // creator twice.
+  await settleFn([
+    { fromUserId: userId, toUserId: tier.creatorId, amount: creatorShare, reason: `vavlt_stvdios_tier_subscription:${tierId}` },
+    { fromUserId: userId, toUserId: VAVLT_STVDIOS_PLATFORM_ACCOUNT, amount: platformShare, reason: `vavlt_stvdios_tier_platform_share:${tierId}` },
+  ], { reason: `vavlt_stvdios_tier:${tierId}:${userId}` });
 
   tier.subscribers.push(userId);
   return {
