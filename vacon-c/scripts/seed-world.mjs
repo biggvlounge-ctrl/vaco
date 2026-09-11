@@ -7,7 +7,11 @@
 //
 // Run:
 //   node server.js                      # in one terminal
-//   node scripts/seed-world.mjs         # in another
+//   VACON_C_TOKEN=<a Shield session> node scripts/seed-world.mjs
+//
+// `scripts/seed-demo.mjs` at the repo root does this for you as part of
+// seeding the whole ecosystem, signing in as a demo user first. Run
+// that instead unless you want VACON-C on its own.
 //
 // **Over HTTP, deliberately.** The obvious shortcut is to require
 // `server/engine.js` and call the generators directly, and it does not
@@ -32,10 +36,36 @@ const TICKS = Number(process.env.SEED_TICKS || 4);
 
 let created = 0;
 
+// **Credentials, so this works against a normally-guarded server.**
+//
+// This script used to send none, which meant it only ran against a
+// server started with `VACO_SERVICE_AUTH_MODE=off` -- a configuration
+// nobody boots by accident and nobody should boot for a demo. Against
+// the real ecosystem every write refused on the first call:
+//
+//   serviceAuth: this route requires either a user session
+//   (Authorization: Bearer) or a trusted-service credential.
+//
+// So the seeder could not seed the running ecosystem, which is the only
+// place anyone would want it. It takes a credential from the
+// environment now and sends it. Either kind the guard accepts works;
+// `scripts/seed-demo.mjs` passes a real signed-in user's session, so
+// the world is built by the same route a person uses, through the same
+// guard, with nothing relaxed.
+const TOKEN = process.env.VACON_C_TOKEN || '';
+const SERVICE_NAME = process.env.VACO_SERVICE_NAME || 'vaco-shell';
+const SERVICE_TOKEN = process.env.VACO_SERVICE_TOKEN || '';
+
+function authHeaders() {
+  if (TOKEN) return { Authorization: `Bearer ${TOKEN}` };
+  if (SERVICE_TOKEN) return { 'X-Service-Name': SERVICE_NAME, 'X-Service-Token': SERVICE_TOKEN };
+  return {};
+}
+
 async function call(method, path, body) {
   const res = await fetch(`${BASE}${path}`, {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const text = await res.text();

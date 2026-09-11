@@ -96,6 +96,27 @@ if [ -z "${VACO_SERVICE_TOKENS:-}" ]; then
   export VACO_SERVICE_TOKENS="$TOKENS"
   export VACO_SERVICE_TOKEN="$DEV_TOKEN"
   echo "Generated a per-boot dev service token for $(echo "$VACO_CALLERS" | wc -w) callers."
+
+  # **Leave the token where a sibling process can find it.**
+  #
+  # `export` reaches the apps this script starts, because they are its
+  # children. It does NOT reach anything started *after* this script
+  # exits -- and `deploy/replit-boot.sh` runs this as a child and then
+  # runs `scripts/seed-demo.mjs` as a separate one. So the seeder read
+  # `process.env.VACO_SERVICE_TOKEN` and got an empty string on every
+  # Replit boot.
+  #
+  # That was invisible while nothing seeded a service-guarded route.
+  # Two apps (vulture-flix, vulture-studios) expose creation only to
+  # internal schedulers, so seeding them needs this credential and
+  # would have failed with a 403 that looked like a permissions bug
+  # rather than a plumbing one.
+  #
+  # `logs/` is gitignored, so this is a dev-only artefact that never
+  # ships. A deployment sets VACO_SERVICE_TOKENS itself and takes the
+  # branch above instead, writing nothing.
+  mkdir -p "$REPO_ROOT/logs"
+  ( umask 077; printf '%s' "$DEV_TOKEN" > "$REPO_ROOT/logs/service-token" )
 else
   echo "Using VACO_SERVICE_TOKENS from the environment."
 fi
