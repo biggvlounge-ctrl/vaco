@@ -286,17 +286,30 @@ async function seedCvnvo() {
           as: person.userId,
           body: {
             userId: person.userId,
-            // **No `bio` here on purpose.** CVNVO's profile card renders
-            // `profile.bio || 'No bio yet.'`, but `createUserProfile`
-            // accepts only userId, prompts, verifiedBadge and
-            // compatibilityInputs -- there is no bio on the model, so a
-            // bio sent here is dropped silently and the card still says
-            // "No bio yet." Seeding one would be a line of code that
-            // looks like it works and does nothing. `chopz-shop` has
-            // the same shape of gap: its UI reads `p.name` and
-            // `createProduct` has no name field, so every product
-            // renders as "Product <id>". Both are app-side gaps, noted
-            // rather than papered over from here.
+            // **No `bio` here on purpose, and it is not an oversight.**
+            //
+            // CVNVO's profile card renders `profile.bio || 'No bio
+            // yet.'`, but `createUserProfile` accepts only userId,
+            // prompts, verifiedBadge and compatibilityInputs. There is
+            // no bio on the model, so one sent here is dropped in
+            // silence and the card still reads "No bio yet." Seeding it
+            // would be a line that looks like it works and does nothing.
+            //
+            // Four display fields across the ecosystem are like this --
+            // rendered by a UI, absent from the model, so the fallback
+            // is the only branch any data can reach:
+            //
+            //   cvnvo      profile.bio          -> "No bio yet."
+            //   chopz-shop product.name         -> "Product <id>"
+            //   vacay      listing.title        -> "Stay <id>"
+            //   hvntz      hunt.name            -> "Hunt <id>"
+            //
+            // Checked rather than assumed: a scan found 13 fallbacks of
+            // this shape and nine of them are fine -- hvntz businesses,
+            // voidmagic experiences, vulture-flix, vulture-music and
+            // vulture-pods all store the field their UI reads. Only
+            // these four are unreachable. Each is a model change with
+            // its own tests, so they are named here and left alone.
             compatibilityInputs: {
               age: 31,
               interests: ['photography', 'cycling', 'record shops'],
