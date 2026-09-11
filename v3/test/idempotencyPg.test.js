@@ -12,8 +12,21 @@ const assert = require('node:assert');
 const path = require('node:path');
 const http = require('node:http');
 
-const express = require('express');
 const idem = require('../lib/idempotencyPg');
+
+// **`express` is resolved lazily, and that is not fastidiousness.**
+// `scripts/package-release.mjs` extracts the release archive and runs
+// the suite inside it — tracked files only, no node_modules, because
+// shipping platform-specific binaries in a source archive is how a
+// deploy breaks on a different libc. A top-level `require('express')`
+// there throws before any test registers, so this file did not skip, it
+// disappeared: its seven tests vanished from the count and the
+// completion report stopped matching what the script emits.
+//
+// A suite that cannot run must say so and be counted as skipped. One
+// that evaporates takes its own absence with it.
+let express = null;
+try { express = require('express'); } catch { express = null; }
 
 const URL_ = process.env.DATABASE_URL
   || 'postgres://vacancy:vacancy_dev@localhost:5432/vacancy';
@@ -31,7 +44,8 @@ let pool = null;
 let SKIP = false;
 
 test.before(async () => {
-  if (!Pool) { SKIP = 'the pg package is not installed'; return; }
+  if (!express) { SKIP = 'express is not installed — run ./install-ecosystem.sh'; return; }
+  if (!Pool) { SKIP = 'the pg package is not installed — run ./install-ecosystem.sh'; return; }
   pool = new Pool({ connectionString: URL_, max: 8 });
   try {
     await pool.query('SELECT 1');
