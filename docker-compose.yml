@@ -153,6 +153,7 @@ services:
       VACO_SERVICE_TOKEN: "${VACO_TOKEN_HVNTZ:?Set a V3 service token for hvntz in .env}"
       VACO_AUDIT_MODE: "${VACO_AUDIT_MODE:-enforce}"
       VACO_OPERATOR_MODE: "${VACO_OPERATOR_MODE:-enforce}"
+      DATABASE_URL: "postgres://vacancy:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/vacancy"
     ports:
       - "8792:8792"
     networks:
@@ -165,6 +166,7 @@ services:
       - shield
       - vaco-audit
       - vaco-operator
+      - postgres
   void:
     build:
       context: ./void
@@ -187,6 +189,7 @@ services:
       VACO_SERVICE_TOKEN: "${VACO_TOKEN_VOID:?Set a V3 service token for void in .env}"
       VACO_AUDIT_MODE: "${VACO_AUDIT_MODE:-enforce}"
       VACO_OPERATOR_MODE: "${VACO_OPERATOR_MODE:-enforce}"
+      DATABASE_URL: "postgres://vacancy:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/vacancy"
     ports:
       - "8793:8793"
     networks:
@@ -199,6 +202,7 @@ services:
       - shield
       - vaco-audit
       - vaco-operator
+      - postgres
   voidmagic:
     build:
       context: ./voidmagic
@@ -344,6 +348,7 @@ services:
       VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
       VACO_SERVICE_NAME: cvnvo
       VACO_SERVICE_TOKEN: "${VACO_TOKEN_CVNVO:?Set a V3 service token for cvnvo in .env}"
+      DATABASE_URL: "postgres://vacancy:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/vacancy"
     ports:
       - "8798:8798"
     networks:
@@ -354,6 +359,7 @@ services:
     depends_on:
       - v3
       - shield
+      - postgres
   yap:
     build:
       context: ./cvnvo/yap
@@ -445,6 +451,7 @@ services:
       VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
       VACO_SERVICE_NAME: vacay
       VACO_SERVICE_TOKEN: "${VACO_TOKEN_VACAY:?Set a V3 service token for vacay in .env}"
+      DATABASE_URL: "postgres://vacancy:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/vacancy"
     ports:
       - "8803:8803"
     networks:
@@ -455,6 +462,7 @@ services:
     depends_on:
       - v3
       - shield
+      - postgres
   vavlt-stvdios:
     build:
       context: ./vavlt-stvdios
@@ -862,6 +870,7 @@ services:
       VACO_SERVICE_NAME: vaco-notify
       VACO_SERVICE_TOKEN: "${VACO_TOKEN_VACO_NOTIFY:?Set a V3 service token for vaco-notify in .env}"
       VACO_OPERATOR_MODE: "${VACO_OPERATOR_MODE:-enforce}"
+      DATABASE_URL: "postgres://vacancy:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/vacancy"
     ports:
       - "8818:8818"
     networks:
@@ -873,6 +882,7 @@ services:
       - v3
       - shield
       - vaco-operator
+      - postgres
   vaco-audit:
     build:
       context: ./vaco-audit
@@ -913,6 +923,7 @@ services:
       VACO_SERVICE_TOKEN: "${VACO_TOKEN_VACO_OPERATOR:?Set a V3 service token for vaco-operator in .env}"
       VACO_AUDIT_MODE: "${VACO_AUDIT_MODE:-enforce}"
       VACO_OPERATOR_BOOTSTRAP: "${VACO_OPERATOR_BOOTSTRAP:-}"
+      DATABASE_URL: "postgres://vacancy:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/vacancy"
     ports:
       - "8820:8820"
     networks:
@@ -924,6 +935,7 @@ services:
       - v3
       - shield
       - vaco-audit
+      - postgres
   vaco-media:
     build:
       context: ./vaco-media

@@ -124,15 +124,15 @@ DOWN in the boot output with the reason in `logs/<app>.log`. `v4-proxy`
 without `ANTHROPIC_API_KEY` is the worked example, and it is the "1
 down" in the expected `35 up, 1 down` line above.
 
-## The database is optional, and 23 apps will use it if it is there
+## The database is optional, and 29 apps will use it if it is there
 
 **Attach Replit's built-in PostgreSQL.** It sets `DATABASE_URL`, and
 that one variable is the whole configuration — nothing else to set, and
 nothing to run by hand.
 
-With it, 23 of the 34 backends keep their state in Postgres instead of
-a file: `vacon-c` loads its own 63-table world schema, and 22 others
-keep a document each in a `vaco.stores` table. The remaining 11 still
+With it, 29 of the 34 backends keep their state in Postgres instead of
+a file: `vacon-c` loads its own 63-table world schema, and 28 others
+keep a document each in a `vaco.stores` table. The remaining 5 still
 use a JSON file under their own directory.
 
 Without it, everything still boots and every app falls back to its
@@ -142,7 +142,7 @@ demo and is what you get if you skip this section entirely.
 Two things behave differently when the database is attached but
 unreachable, and the difference is deliberate:
 
-- The 22 converted apps **refuse to start** and say why. An app serving
+- The 28 converted apps **refuse to start** and say why. An app serving
   reads from a store that never loaded would report empty collections
   as though they were real — and for V3, the ledger, that means
   everyone's balance reads as zero and transfers are accepted against
@@ -177,7 +177,7 @@ What *has* been driven for real, on Linux:
 existed, seeing this run meant cloning the repo and starting 36
 servers.
 
-**Not good for production, as it stands.** 11 of the 34 apps keep state
+**Not good for production, as it stands.** 6 of the 34 apps keep state
 in JSON files on disk. That survives a persistent workspace or a
 Reserved VM. It does *not* survive an autoscaling deployment, where the
 filesystem is ephemeral and a second instance means a second, divergent

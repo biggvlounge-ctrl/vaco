@@ -16,7 +16,7 @@ require('dotenv/config');
 
 const { createVoidStore } = require('./lib/store');
 const path = require('path');
-const { createPersistentStore, durable } = require('./lib/persistence');
+const { attachStore } = require('./lib/storeBackend');
 const { STATION_TYPES, registerStation, getStation, getStationsByRegion } = require('./lib/stations');
 const { computeNetworkDensity } = require('./lib/networkDensity');
 const { registerNoFlyZone, getNoFlyZones } = require('./lib/noFlyZones');
@@ -117,7 +117,6 @@ const { traceMiddleware } = require('./lib/tracing.cjs');
 // exactly the one you want to correlate.
 app.use(traceMiddleware());
 
-
 app.use(express.static(path.join(__dirname, 'public')));
 const PORT = process.env.PORT || 8793;
 const V3_API_URL = process.env.V3_API_URL || 'http://localhost:8811';
@@ -138,8 +137,38 @@ function serviceHeaders() {
 const HVNTZ_API_URL = process.env.HVNTZ_API_URL || 'http://localhost:8792';
 const VACA_API_URL = process.env.VACA_API_URL || 'http://localhost:8804';
 const VACO_ANALYTICS_URL = process.env.VACO_ANALYTICS_URL || 'http://localhost:8790';
-const store = createPersistentStore(path.join(__dirname, 'data', 'store.json'), createVoidStore);
-app.use(durable(store));  // commit before responding -- see lib/persistence.js
+// -- The store, and which backend holds it ----------------------------
+//
+// `let`, not `const`: with DATABASE_URL set this app's store lives in
+// Postgres, which cannot be built synchronously. `attachStore` mounts a
+// gate ahead of the routes so no request runs before the store has
+// loaded, and installs the commit-before-responding hook that
+// `app.use(durable(store))` used to provide.
+//
+// **The first-boot seed moved in here, and it had to.** It ran at module
+// level, which now means it would run against the empty placeholder --
+// seeding a store nothing ever reads, and leaving the real one unseeded
+// forever. Route handlers are safe because they read the `store` binding
+// when a request arrives; anything running at module level is not.
+let store = createVoidStore();
+attachStore(app, {
+  appKey: 'void',
+  createDefault: createVoidStore,
+  filePath: path.join(__dirname, 'data', 'store.json'),
+  onReady: (loaded) => {
+    store = loaded;
+    // Required here rather than relying on the module-level require
+    // further down the file: with the file backend `onReady` runs
+    // synchronously inside `attachStore`, which sits *above* that line,
+    // so the const was still in its temporal dead zone. It failed only
+    // on a fresh store -- an existing one skips the branch entirely --
+    // so a boot with data would have passed and shipped.
+    const { seedDemoData: seed } = require('./lib/seedDemoData');
+    if (store.stations.length === 0) {
+      seed(store);
+    }
+  },
+});
 
 // **Mounted here, above every route, and that placement is the point.**
 // This block first sat next to the guard helpers two thirds of the way
@@ -229,15 +258,11 @@ const requireDedicatedLaneShipper = () => requireRecordParty(
   'dedicated lane', (req) => getDedicatedLane(store, Number(req.params.id)), (l) => [l.shipperId, l.carrierId],
 );
 
-
 // Real presentation/demo data -- only when the store is genuinely
 // empty (a fresh boot, not a persisted store loaded from disk with
 // real stations/jobs already in it), so restarting the server never
 // double-seeds and real data is never clobbered.
 const { seedDemoData } = require('./lib/seedDemoData');
-if (store.stations.length === 0) {
-  seedDemoData(store);
-}
 
 // Real, live cross-app call to HVNTZ's own real business lookup --
 // the Affiliate Network's own real HVNTZ-onboarded verification (see
@@ -1730,7 +1755,6 @@ app.post('/api/laundry/order/:id/deliver', requireLaundryOrderParty(), (req, res
     ...req.body, orderId: Number(req.params.id), settleFn: settleVCoin,
   })));
 
-
 // -- The service engine: every vertical, one interface ----------------
 // Each of the 25 verticals is a service app. petCare and laundry also
 // have dedicated modules with extra domain depth; these routes work
@@ -1788,7 +1812,6 @@ app.get('/api/service/customer/:customerId/bookings', (req, res) => handle(res,
 
 app.get('/api/service/:verticalId/customer/:customerId/preferred', (req, res) => handle(res,
   () => serviceEngine.preferredProviders(store, req.params.customerId, req.params.verticalId)));
-
 
 app.listen(PORT, () => {
   console.log(`VOID listening on http://localhost:${PORT}`);

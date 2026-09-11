@@ -20,7 +20,7 @@ const cors = require('cors');
 const path = require('path');
 require('dotenv/config');
 
-const { createPersistentStore, durable } = require('./lib/persistence');
+const { attachStore } = require('./lib/storeBackend');
 
 const {
   REVENUE_EVENT_TYPES, LOCATION_TYPES, createHvntzStore,
@@ -44,7 +44,6 @@ const {
 } = require('./lib/adReview');
 const { getScreenAnalytics } = require('./lib/screenAnalytics');
 
-
 const { createServiceAuth } = require('./lib/serviceAuth.cjs');
 const { createDecisionLog } = require('./lib/decisionLog.cjs');
 const { createOperatorAuth } = require('./lib/operatorAuth.cjs');
@@ -58,7 +57,6 @@ const { traceMiddleware } = require('./lib/tracing.cjs');
 // *refused* still carries a trace id, and a 401 you cannot correlate is
 // exactly the one you want to correlate.
 app.use(traceMiddleware());
-
 
 app.use(express.static(path.join(__dirname, 'public')));
 const PORT = process.env.PORT || 8792;
@@ -78,8 +76,25 @@ function serviceHeaders() {
 }
 
 const VAVLT_STVDIOS_API_URL = process.env.VAVLT_STVDIOS_API_URL || 'http://localhost:8808';
-const store = createPersistentStore(path.join(__dirname, 'data', 'store.json'), createHvntzStore);
-app.use(durable(store));  // commit before responding -- see lib/persistence.js
+// -- The store, and which backend holds it ----------------------------
+//
+// `let`, not `const`: with DATABASE_URL set this app's store lives in
+// Postgres, which cannot be built synchronously. `attachStore` mounts a
+// gate ahead of the routes so no request runs before the store has
+// loaded, and installs the commit-before-responding hook that
+// `app.use(durable(store))` used to provide. The route handlers close
+// over this binding rather than a value, so they see the real store the
+// moment it is installed.
+//
+// Without DATABASE_URL nothing changes: the same JSON file, in the same
+// place, with the same guarantees.
+let store = createHvntzStore();
+attachStore(app, {
+  appKey: 'hvntz',
+  createDefault: createHvntzStore,
+  filePath: path.join(__dirname, 'data', 'store.json'),
+  onReady: (loaded) => { store = loaded; },
+});
 
 // `requireCallingService()` on this app's operator and telemetry routes
 // is only meaningful with serviceAuth establishing who the caller is.

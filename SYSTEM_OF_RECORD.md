@@ -13,7 +13,7 @@ person who built it can check whether a claim is still true.
 Every number below was produced by running the tool that owns it, not
 recalled. The commands are in §10 so they can be re-run.
 
-*Current as of commit `9549092`, 50 commits, branch
+*Current as of commit `be1a0c0`, 54 commits, branch
 `claude/v4-proxy-server-s6dcp8`, 11 Sep 2026.*
 
 **On the commit count.** An earlier revision of this line said 332. That
@@ -63,7 +63,7 @@ authorization work in §5 had to be done per app rather than once.
 | Mutating HTTP routes | 520, all accounted for (469 guarded, 51 declared open with a reason) |
 | Automated tests | 1546 across 39 suites |
 | Persisted volumes | 30 |
-| Shared-module copies kept in sync | 191 |
+| Shared-module copies kept in sync | 203 |
 | Service credentials in `.env.example` | 27 callers |
 | Servers carrying trace context | 36 |
 
@@ -709,7 +709,7 @@ built:** `node scripts/package-release.mjs` — see §11.
 ```sh
 node scripts/run-all-tests.mjs           # 1546/1546 across 39 suites
 node scripts/audit-route-guards.mjs --check   # 520/520 accounted for
-./sync-shared-runtime.sh --check         # 191 copies current, none unmanaged
+./sync-shared-runtime.sh --check         # 203 copies current, none unmanaged
 ./sync-design-system.sh --check          # every serving app is a target
 node deploy/generate-docker-compose.js   # 36 apps + nginx, livekit, postgres, 30 volumes
 git diff --exit-code docker-compose.yml  # generator output matches committed
@@ -845,14 +845,14 @@ are what stand between this and a real deployment.**
 - **No TLS, no domain.** `deploy/nginx-docker.conf` terminates plain
   HTTP on :80. A real deployment needs certificates and a hostname, and
   Shield's session cookies should be `Secure` once there is one.
-- **The store is a JSON file per app — for 11 of the 34.** Writes are
+- **The store is a JSON file per app — for 6 of the 34.** Writes are
   atomic (temp + rename) and `durable(store)` commits before
   responding, which is genuinely safe for one process per service. It
   is *not* safe for two replicas of the same service, so **do not scale
   any app past one container** until that changes. §6 has the full
   posture.
 
-  **22 apps moved to the shared Postgres store backend on 11 Sep 2026 — 23 of the 34 on Postgres once VACON-C is counted.** `shared/persistencePg.js` is the same three-function
+  **All 28 file-backed apps moved to the shared Postgres store backend on 11 Sep 2026 — 29 of the 34 on Postgres once VACON-C is counted.** `shared/persistencePg.js` is the same three-function
   interface the other apps already use, over a `vaco_stores` table
   holding one JSONB document per app. An app converts by changing how
   its store is built; its libs, routes and guards do not move.

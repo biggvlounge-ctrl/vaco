@@ -118,9 +118,10 @@ PERSISTENCE_TARGETS=(
 # before it listens and its `durable()` must delay the response. See
 # shared/persistencePg.js for what that costs.
 PERSISTENCE_PG_TARGETS=(
-  chopz chopz/chopz-shop cvnvo/yap dreams shield v3 vaca vaco-audit
-  vaco-media vacon vago vavlt-stvdios venvm vex voidmagic voken vsafe
-  vulture-flix vulture-music vulture-pods vulture-studios vxllage
+  chopz chopz/chopz-shop cvnvo cvnvo/yap dreams hvntz shield v3 vaca
+  vacay vaco-audit vaco-media vaco-notify vaco-operator vacon vago
+  vavlt-stvdios venvm vex void voidmagic voken vsafe vulture-flix
+  vulture-music vulture-pods vulture-studios vxllage
 )
 
 # -- storeBackend.js ---------------------------------------------------

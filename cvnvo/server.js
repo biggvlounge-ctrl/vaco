@@ -16,7 +16,7 @@ require('dotenv/config');
 
 const { createCvnvoStore } = require('./lib/store');
 const path = require('path');
-const { createPersistentStore, durable } = require('./lib/persistence');
+const { attachStore } = require('./lib/storeBackend');
 const { createMediaClient } = require('./lib/mediaClient.cjs');
 const { createMessageSocketServer } = require('./lib/messageSocket');
 const { createUserProfile, getUserProfile } = require('./lib/profiles');
@@ -77,7 +77,6 @@ const { traceMiddleware } = require('./lib/tracing.cjs');
 // exactly the one you want to correlate.
 app.use(traceMiddleware());
 
-
 app.use(express.static(path.join(__dirname, 'public')));
 const PORT = process.env.PORT || 8798;
 const VOID_API_URL = process.env.VOID_API_URL || 'http://localhost:8793';
@@ -107,8 +106,38 @@ function serviceHeaders() {
 }
 
 const YAP_API_URL = process.env.YAP_API_URL || 'http://localhost:8802';
-const store = createPersistentStore(path.join(__dirname, 'data', 'store.json'), createCvnvoStore);
-app.use(durable(store));  // commit before responding -- see lib/persistence.js
+// -- The store, and which backend holds it ----------------------------
+//
+// `let`, not `const`: with DATABASE_URL set this app's store lives in
+// Postgres, which cannot be built synchronously. `attachStore` mounts a
+// gate ahead of the routes so no request runs before the store has
+// loaded, and installs the commit-before-responding hook that
+// `app.use(durable(store))` used to provide.
+//
+// **The first-boot seed moved in here, and it had to.** It ran at module
+// level, which now means it would run against the empty placeholder --
+// seeding a store nothing ever reads, and leaving the real one unseeded
+// forever. Route handlers are safe because they read the `store` binding
+// when a request arrives; anything running at module level is not.
+let store = createCvnvoStore();
+attachStore(app, {
+  appKey: 'cvnvo',
+  createDefault: createCvnvoStore,
+  filePath: path.join(__dirname, 'data', 'store.json'),
+  onReady: (loaded) => {
+    store = loaded;
+    // Required here rather than relying on the module-level require
+    // further down the file: with the file backend `onReady` runs
+    // synchronously inside `attachStore`, which sits *above* that line,
+    // so the const was still in its temporal dead zone. It failed only
+    // on a fresh store -- an existing one skips the branch entirely --
+    // so a boot with data would have passed and shipped.
+    const { seedDemoData: seed } = require('./lib/seedDemoData');
+    if (store.profiles.length === 0) {
+      seed(store);
+    }
+  },
+});
 
 // Establishes that the caller is *someone* — a Shield session or a
 // named internal service — before any per-route guard runs. It is what
@@ -123,9 +152,6 @@ app.use(serviceAuth.middleware);
 // real profiles already in it), so restarting the server never
 // double-seeds and real data is never clobbered.
 const { seedDemoData } = require('./lib/seedDemoData');
-if (store.profiles.length === 0) {
-  seedDemoData(store);
-}
 
 // `idempotencyKey` is optional and forwarded to V3 as an
 // Idempotency-Key header. When present, V3 replays the first

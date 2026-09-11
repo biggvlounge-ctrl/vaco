@@ -32,7 +32,7 @@ require('dotenv/config');
 
 const { createVacayStore } = require('./lib/store');
 const path = require('path');
-const { createPersistentStore, durable } = require('./lib/persistence');
+const { attachStore } = require('./lib/storeBackend');
 const { createBookingsRouter } = require('./lib/bookings/routes');
 const { createHomeRouter } = require('./lib/home/routes');
 const { createAutoRouter } = require('./lib/auto/routes');
@@ -49,7 +49,6 @@ app.use(express.json({ limit: '1mb' }));
 // *refused* still carries a trace id, and a 401 you cannot correlate is
 // exactly the one you want to correlate.
 app.use(traceMiddleware());
-
 
 app.use(express.static(path.join(__dirname, 'public')));
 const PORT = process.env.PORT || 8803;
@@ -69,8 +68,23 @@ function serviceHeaders() {
 }
 
 const VOID_API_URL = process.env.VOID_API_URL || 'http://localhost:8793';
-const store = createPersistentStore(path.join(__dirname, 'data', 'store.json'), createVacayStore);
-app.use(durable(store));  // commit before responding -- see lib/persistence.js
+// -- The store, and which backend holds it ----------------------------
+//
+// `let`, not `const`: with DATABASE_URL set VACAY's store lives in
+// Postgres, which cannot be built synchronously. `attachStore` mounts a
+// gate ahead of the routes so no request runs before the store has
+// loaded, and installs the commit-before-responding hook that
+// `app.use(durable(store))` used to provide.
+//
+// See the section routers below for the one thing this app needed
+// beyond the usual conversion.
+let store = createVacayStore();
+attachStore(app, {
+  appKey: 'vacay',
+  createDefault: createVacayStore,
+  filePath: path.join(__dirname, 'data', 'store.json'),
+  onReady: (loaded) => { store = loaded; },
+});
 
 // **VACAY receives writes as well as sending them.** Its two inventory
 // surfaces -- the fleet vehicles VACAY itself owns and the airline
@@ -158,14 +172,43 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
-app.use('/api/bookings', createBookingsRouter({
+// -- The four section routers -----------------------------------------
+//
+// **Built on first request, not at mount time.** Each of these takes a
+// *sub-store* -- `store.bookings`, `store.home` -- and keeps the object
+// it was handed. Built here at module level they would capture the
+// empty placeholder and hold it for the life of the process: every
+// booking written to an object nothing persists, and the real store
+// staying empty.
+//
+// Moving the mounts into `onReady` would fix the capture and break
+// something else. `onReady` runs synchronously on the file backend and
+// asynchronously on Postgres, so the routers would mount before the
+// routes above on one backend and after them on the other -- route
+// order differing by backend is a far worse bug than the one being
+// fixed, and it would only show up in whichever configuration nobody
+// tested.
+//
+// So the mount stays exactly where it was and only construction is
+// deferred. `attachStore`'s gate guarantees no request arrives before
+// the store has loaded, so the first call through any of these sees the
+// real sub-store. Built once and reused thereafter.
+function lazyRouter(build) {
+  let router = null;
+  return (req, res, next) => {
+    if (!router) router = build();
+    return router(req, res, next);
+  };
+}
+
+app.use('/api/bookings', lazyRouter(() => createBookingsRouter({
   store: store.bookings, settleVCoin, requestVoidJob, requestVoidHourlyBooking,
-}));
-app.use('/api/home', createHomeRouter({ store: store.home, settleVCoin }));
-app.use('/api/auto', createAutoRouter({ store: store.auto, settleVCoin }));
-app.use('/api/flights', createFlightsRouter({
+})));
+app.use('/api/home', lazyRouter(() => createHomeRouter({ store: store.home, settleVCoin })));
+app.use('/api/auto', lazyRouter(() => createAutoRouter({ store: store.auto, settleVCoin })));
+app.use('/api/flights', lazyRouter(() => createFlightsRouter({
   store: store.flights, bookingsStore: store.bookings, settleVCoin, createBooking,
-}));
+})));
 
 app.listen(PORT, () => {
   console.log(`VACAY listening on http://localhost:${PORT}`);

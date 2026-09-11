@@ -19,7 +19,7 @@ const cors = require('cors');
 const path = require('path');
 require('dotenv/config');
 
-const { createPersistentStore, durable } = require('./lib/persistence');
+const { attachStore } = require('./lib/storeBackend');
 const {
   CHANNELS, UNIMPLEMENTED_CHANNELS, SEVERITIES, ATTEMPTS_BY_SEVERITY,
   createNotifyStore, subscribe, unsubscribe, listSubscriptions,
@@ -39,7 +39,6 @@ app.use(express.json({ limit: '1mb' }));
 // *refused* still carries a trace id, and a 401 you cannot correlate is
 // exactly the one you want to correlate.
 app.use(traceMiddleware());
-
 
 // -- Trusted-service allowlist ------------------------------------------
 //
@@ -62,8 +61,35 @@ const { requireOperator } = operatorAuth;
 app.use(express.static(path.join(__dirname, 'public')));
 
 const PORT = process.env.PORT || 8818;
-const store = createPersistentStore(path.join(__dirname, 'data', 'store.json'), createNotifyStore);
-app.use(durable(store));
+// -- The store, and which backend holds it ----------------------------
+//
+// `let`, not `const`: with DATABASE_URL set this app's store lives in
+// Postgres, which cannot be built synchronously. `attachStore` mounts a
+// gate ahead of the routes so no request runs before the store has
+// loaded, and installs the commit-before-responding hook that
+// `app.use(durable(store))` used to provide.
+//
+// **The first-boot seed moved in here, and it had to.** It ran at module
+// level, which now means it would run against the empty placeholder --
+// seeding a store nothing ever reads, and leaving the real one unseeded
+// forever. Route handlers are safe because they read the `store` binding
+// when a request arrives; anything running at module level is not.
+let store = createNotifyStore();
+attachStore(app, {
+  appKey: 'vaco-notify',
+  createDefault: createNotifyStore,
+  filePath: path.join(__dirname, 'data', 'store.json'),
+  onReady: (loaded) => {
+    store = loaded;
+    if (store.subscriptions.length === 0) {
+      subscribe(store, {
+        name: 'default-console',
+        channel: 'console',
+        minSeverity: 'alert',
+      });
+    }
+  },
+});
 
 // Seed a console subscription on first boot, deliberately.
 //
@@ -73,13 +99,6 @@ app.use(durable(store));
 // console subscriber at `alert` means the default install genuinely
 // delivers somewhere a person can see, and it is the honest floor:
 // stdout is a real destination in a container with log collection.
-if (store.subscriptions.length === 0) {
-  subscribe(store, {
-    name: 'default-console',
-    channel: 'console',
-    minSeverity: 'alert',
-  });
-}
 
 app.get('/api/health', (_req, res) => {
   const undelivered = listUndelivered(store, { minSeverity: 'alert' });

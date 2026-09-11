@@ -22,7 +22,7 @@ const path = require('path');
 require('dotenv/config');
 
 const { createOperatorStore } = require('./lib/store');
-const { createPersistentStore, durable } = require('./lib/persistence');
+const { attachStore } = require('./lib/storeBackend');
 const {
   SCOPES, BOOTSTRAP_SCOPE, createOperator, getOperator, disableOperator,
   grantScope, revokeScope, scopesFor, verify, bootstrap, describeCoverage,
@@ -43,8 +43,36 @@ app.use(traceMiddleware());
 app.use(express.static(path.join(__dirname, 'public')));
 
 const PORT = process.env.PORT || 8820;
-const store = createPersistentStore(path.join(__dirname, 'data', 'store.json'), createOperatorStore);
-app.use(durable(store));
+// -- The store, and which backend holds it ----------------------------
+//
+// `let`, not `const`: with DATABASE_URL set this service's store lives
+// in Postgres, which cannot be built synchronously. `attachStore` mounts
+// a gate ahead of the routes so no request runs before the store has
+// loaded, and installs the commit-before-responding hook that
+// `app.use(durable(store))` used to provide.
+//
+// **The bootstrap moved in here, and for this service it matters more
+// than most.** It ran at module level, which would now seed an operator
+// into the empty placeholder -- the real store would come up with no
+// operators at all, and every `operator:grant` route would refuse
+// forever with no way to grant the first credential. An authority
+// service that cannot be bootstrapped is bricked, quietly.
+let store = createOperatorStore();
+attachStore(app, {
+  appKey: 'vaco-operator',
+  createDefault: createOperatorStore,
+  filePath: path.join(__dirname, 'data', 'store.json'),
+  onReady: (loaded) => {
+    store = loaded;
+    // Runs once, from the environment, and grants `operator:grant` and
+    // nothing else. Unset means no operators, which is the correct
+    // starting state for an authority service.
+    const seeded = bootstrap(store, process.env.VACO_OPERATOR_BOOTSTRAP || '');
+    if (seeded) {
+      console.log(`VACO OPERATOR: bootstrap operator "${seeded.name}" seeded with ${BOOTSTRAP_SCOPE} only`);
+    }
+  },
+});
 
 // Mounted above every route, per the rule VOID learned the hard way --
 // a route added above this line would be unauthenticated.
@@ -56,10 +84,6 @@ const decisionLog = createDecisionLog({ app: 'vaco-operator' });
 // The seed. Runs once, from the environment, and grants `operator:grant`
 // and nothing else. Unset means no operators, which is the correct
 // starting state for an authority service.
-const seeded = bootstrap(store, process.env.VACO_OPERATOR_BOOTSTRAP || '');
-if (seeded) {
-  console.log(`VACO OPERATOR: bootstrap operator "${seeded.name}" seeded with ${BOOTSTRAP_SCOPE} only`);
-}
 
 // -- The guard this service applies to itself ---------------------------
 //

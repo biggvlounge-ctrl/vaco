@@ -54,8 +54,8 @@ anything it can:
 | Metric | Value |
 |---|---:|
 | Express backends in the manifest | **34** |
-| Overall criteria met | **91%** (238/260) |
-| Apps at 100% | **12 / 34** |
+| Overall criteria met | **89%** (232/260) |
+| Apps at 100% | **6 / 34** |
 | Tests | **1158** |
 | Apps with no test suite | **0** |
 
@@ -80,29 +80,28 @@ anything else:
 
 | App | Complete | Met | Serves HTTP | Has a frontend | On the design system | Persists to disk | Has a test suite | Suite passes | Every mutating route accounted for | In all three deploy paths | Tests |
 |---|---:|---:|---|---|---|---|---|---|---|---|---:|
-| `cvnvo` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 13 |
-| `hvntz` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 14 |
 | `v4-proxy` | **100%** | 7/7 | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | 42 |
 | `v4-search` | **100%** | 7/7 | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | 15 |
-| `vacay` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 24 |
 | `vaco-analytics` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 34 |
-| `vaco-notify` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 17 |
-| `vaco-operator` | **100%** | 6/6 | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | 20 |
 | `vaco-shell` | **100%** | 6/6 | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | 33 |
 | `vacon-c` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 317 |
 | `vex-trading` | **100%** | 6/6 | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | 10 |
-| `void` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 142 |
 | `chopz` | **87%** | 7/8 | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | 8 |
 | `chopz-shop` | **87%** | 7/8 | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | 14 |
+| `cvnvo` | **87%** | 7/8 | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | 13 |
 | `dreams` | **87%** | 7/8 | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | 12 |
+| `hvntz` | **87%** | 7/8 | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | 14 |
 | `shield` | **87%** | 7/8 | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | 12 |
 | `v3` | **87%** | 7/8 | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | 85 |
 | `vaca` | **87%** | 7/8 | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | 17 |
+| `vacay` | **87%** | 7/8 | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | 24 |
+| `vaco-notify` | **87%** | 7/8 | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | 17 |
 | `vacon` | **87%** | 7/8 | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | 18 |
 | `vago` | **87%** | 7/8 | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | 13 |
 | `vavlt-stvdios` | **87%** | 7/8 | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | 14 |
 | `venvm` | **87%** | 7/8 | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | 40 |
 | `vex` | **87%** | 7/8 | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | 16 |
+| `void` | **87%** | 7/8 | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | 142 |
 | `voidmagic` | **87%** | 7/8 | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | 23 |
 | `voken` | **87%** | 7/8 | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | 37 |
 | `vsafe` | **87%** | 7/8 | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | 17 |
@@ -114,6 +113,7 @@ anything else:
 | `yap` | **87%** | 7/8 | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | 20 |
 | `vaco-audit` | **83%** | 5/6 | ✅ | — | — | ❌ | ✅ | ✅ | ✅ | ✅ | 16 |
 | `vaco-media` | **83%** | 5/6 | ✅ | — | — | ❌ | ✅ | ✅ | ✅ | ✅ | 51 |
+| `vaco-operator` | **83%** | 5/6 | ✅ | — | — | ❌ | ✅ | ✅ | ✅ | ✅ | 20 |
 
 `—` means the criterion does not apply to that app and is excluded
 from both halves of its fraction — an app is never marked down for
@@ -136,15 +136,20 @@ lacking something it was never meant to have.
 
 - **`chopz`** (87%) — missing: persists to disk
 - **`chopz-shop`** (87%) — missing: persists to disk
+- **`cvnvo`** (87%) — missing: persists to disk
 - **`dreams`** (87%) — missing: persists to disk
+- **`hvntz`** (87%) — missing: persists to disk
 - **`shield`** (87%) — missing: persists to disk
 - **`v3`** (87%) — missing: persists to disk
 - **`vaca`** (87%) — missing: persists to disk
+- **`vacay`** (87%) — missing: persists to disk
+- **`vaco-notify`** (87%) — missing: persists to disk
 - **`vacon`** (87%) — missing: persists to disk
 - **`vago`** (87%) — missing: persists to disk
 - **`vavlt-stvdios`** (87%) — missing: persists to disk
 - **`venvm`** (87%) — missing: persists to disk
 - **`vex`** (87%) — missing: persists to disk
+- **`void`** (87%) — missing: persists to disk
 - **`voidmagic`** (87%) — missing: persists to disk
 - **`voken`** (87%) — missing: persists to disk
 - **`vsafe`** (87%) — missing: persists to disk
@@ -156,3 +161,4 @@ lacking something it was never meant to have.
 - **`yap`** (87%) — missing: persists to disk
 - **`vaco-audit`** (83%) — missing: persists to disk
 - **`vaco-media`** (83%) — missing: persists to disk
+- **`vaco-operator`** (83%) — missing: persists to disk
