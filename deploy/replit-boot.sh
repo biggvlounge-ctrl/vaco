@@ -48,7 +48,9 @@
 # ---------------------------------------------------------------------
 # Secrets
 #
-# `scripts/deploy-preflight.mjs` reports 29 required env vars. Replit
+# `scripts/deploy-preflight.mjs` reports 30 required env vars -- but 27
+# are inter-service tokens this script's launcher generates per boot, so
+# a demo needs none of them set by hand. Replit
 # Secrets is where those go; this script does not invent defaults for
 # them, because a made-up secret that lets the app boot is worse than a
 # refusal that names what is missing. Apps that require one refuse on

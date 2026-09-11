@@ -14,17 +14,53 @@ Replit gives you **one port**. `gateway.js` is what reconciles those
 two facts: it runs the apps on 127.0.0.1 and proxies all of them
 through the single port Replit exposes.
 
-## The short version
+## Importing it
 
-1. Import the archive as a Repl (Node.js).
-2. Press **Run**. First boot installs dependencies for every app and
-   takes a while; later boots skip it.
+**Import from GitHub rather than from a zip.** Two facts make that the
+short path:
+
+- **The repository is public.** No account, no invitation, nothing
+  anyone has to grant you. Replit pulls it straight from the URL.
+- **The branch you want is already the default.** The code is on
+  `claude/v4-proxy-server-s6dcp8`, and that is the repository's default
+  branch, so a plain import lands on it. There is no branch to switch
+  to afterwards.
+
+The URL:
+
+```
+https://github.com/biggvlounge-ctrl/vaco
+```
+
+Then:
+
+1. In Replit, create a new Repl and choose **Import from GitHub**
+   rather than a blank template. Paste the URL. Replit detects Node.js
+   on its own. (If it offers to connect a GitHub account, you can skip
+   that — it is only needed for private repositories.)
+2. Press **Run**. Nothing needs configuring first: `.replit` is
+   committed and points Run at `deploy/replit-boot.sh`, which installs
+   dependencies, starts every app on its own local port, seeds demo
+   content, and puts the gateway in front of them. **The first boot is
+   slow** — it installs dependencies for 36 separate applications.
+   Later boots skip that entirely.
 3. Open the web view. You land on `vaco-shell`, the launcher. Every
    other app is at `/<app-name>/` — `/void/`, `/vacay/`, `/voken/`.
 
-That is the whole procedure. `.replit` already points Run at
-`deploy/replit-boot.sh`, which installs, starts the apps, and puts the
-gateway in front of them.
+That is the whole procedure.
+
+### How you know it worked
+
+| Where | What you should see |
+|---|---|
+| Console | `35 up, 1 down, out of 36 total.` — see "Secrets" below about the one. |
+| Launcher | **23 products across 7 sections**, not a flat wall of tiles. Vvltvre is one card containing 5 apps; VACON-C is one containing 4. |
+| Any app path | A real page with content in it, not an empty state — demo content is seeded at boot. |
+| Sign in | `demo-elena`, `demo-marcus`, `demo-priya`, `demo-kai`, password `demo-pass-1234` for all four. |
+
+Those four are local throwaway logins on a per-boot development
+ecosystem, which is why the password is written down here. Do not seed
+a deployment that has real users on it.
 
 ## Two things to decide before it is more than a demo
 
@@ -66,17 +102,27 @@ silently skipped.
 
 ### Secrets
 
-Run `node scripts/deploy-preflight.mjs` for the current list. They go
-in Replit's **Secrets** pane, never in `.replit` — that file is
-committed.
+**A demo needs none.** `scripts/deploy-preflight.mjs` reports 30
+required environment variables, which reads like a lot of setup, but 27
+of them are the inter-service `VACO_TOKEN_*` credentials and
+`start-ecosystem.sh` generates those fresh on every boot when they are
+not already set. `VACO_OPERATOR_BOOTSTRAP` defaults to empty and the
+operator app boots without it. That leaves two a person ever types by
+hand, both optional:
+
+| Variable | What it is for | Needed? |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | Brings `v4-proxy` up. | Optional — without it that one app stays DOWN. |
+| `DATABASE_URL` | Lets VACON-C keep its world between restarts. | Set for you automatically when you attach Replit's PostgreSQL. |
+
+They go in Replit's **Secrets** pane, never in `.replit` — that file is
+committed to a public repository.
 
 Nothing here invents a default for a secret. An app that refuses to
 start without its credential is behaving correctly; it will show as
 DOWN in the boot output with the reason in `logs/<app>.log`. `v4-proxy`
-without `ANTHROPIC_API_KEY` is the worked example.
-
-Service tokens are generated per boot for local development, so you do
-not need to set those by hand to try it.
+without `ANTHROPIC_API_KEY` is the worked example, and it is the "1
+down" in the expected `35 up, 1 down` line above.
 
 ## VACON-C needs a database; nothing else does
 
@@ -113,7 +159,7 @@ What *has* been driven for real, on Linux:
   to bind the gateway's port. Fixed, and held by a test.
 - `gateway.js` against the booted ecosystem — 33 of 34 apps answered
   200 through one port, the 34th being the one deliberately down.
-- The full test suite: 1508 tests across 39 suites.
+- The full test suite: 1514 tests across 39 suites.
 
 ## What Replit is good for here, and what it is not
 
