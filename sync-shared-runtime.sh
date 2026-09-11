@@ -118,8 +118,17 @@ PERSISTENCE_TARGETS=(
 # before it listens and its `durable()` must delay the response. See
 # shared/persistencePg.js for what that costs.
 PERSISTENCE_PG_TARGETS=(
-  v3
+  chopz chopz/chopz-shop cvnvo/yap dreams shield v3 vaca vaco-audit
+  vaco-media vacon vago vavlt-stvdios venvm vex voidmagic voken vsafe
+  vulture-flix vulture-music vulture-pods vulture-studios vxllage
 )
+
+# -- storeBackend.js ---------------------------------------------------
+#
+# The one call an app makes to get a store, whichever backend holds it.
+# Every app converted off a file-only store carries it; the apps still
+# on `createPersistentStore` directly do not need it yet.
+STORE_BACKEND_TARGETS=("${PERSISTENCE_PG_TARGETS[@]}")
 
 MEDIA_TARGETS=(
   vxllage cvnvo vavlt-stvdios v4-proxy vulture-flix vulture-pods chopz
@@ -203,7 +212,13 @@ sync_one() {
   # narrower search would have reported the copy unused and blocked the
   # sync for the app with the most money-moving routes.
   local stem="${basename%.*}"
-  if ! grep -rqE "(require\(|from ) *['\"](\.\./)*\./?lib/${stem}(\.(js|cjs))?['\"]|(require\(|from ) *['\"]\.\./${stem}(\.(js|cjs))?['\"]" \
+  # The third alternative is a sibling require inside `lib/` itself --
+  # `require('./persistence')` from `lib/storeBackend.js`. Without it a
+  # shared module used only by another shared module reads as UNUSED,
+  # which is how `persistence.js` looked the moment `storeBackend.js`
+  # became the thing that requires it. A managed file whose only caller
+  # is another managed file is still in use.
+  if ! grep -rqE "(require\(|from ) *['\"](\.\./)*\./?lib/${stem}(\.(js|cjs))?['\"]|(require\(|from ) *['\"]\.\./${stem}(\.(js|cjs))?['\"]|(require\(|from ) *['\"]\./${stem}(\.(js|cjs))?['\"]" \
       --include='*.js' --include='*.cjs' --include='*.mjs' \
       --exclude-dir=node_modules --exclude-dir=public --exclude-dir=test \
       "$app" 2>/dev/null; then
@@ -220,6 +235,7 @@ for app in "${MEDIA_TARGETS[@]}"; do sync_one "shared/mediaClient.js" "$app" "me
 for app in "${TRACING_TARGETS[@]}"; do sync_one "shared/tracing.js" "$app" "tracing.cjs"; done
 for app in "${PERSISTENCE_TARGETS[@]}"; do sync_one "shared/persistence.js" "$app" "persistence.js"; done
 for app in "${PERSISTENCE_PG_TARGETS[@]}"; do sync_one "shared/persistencePg.js" "$app" "persistencePg.js"; done
+for app in "${STORE_BACKEND_TARGETS[@]}"; do sync_one "shared/storeBackend.js" "$app" "storeBackend.js"; done
 
 # -- The mirror of the UNUSED check, and the more dangerous direction --
 #
@@ -300,18 +316,18 @@ check_unmanaged persistencePg createPersistentStorePg PERSISTENCE_PG_TARGETS per
 # current" on the same line that itemised 147 of them — a headline
 # contradicting its own breakdown, which is worse than either number
 # being wrong on its own.
-TOTAL=$(( ${#SHIELD_TARGETS[@]} + ${#SERVICE_TARGETS[@]} + ${#DECISION_LOG_TARGETS[@]} + ${#OPERATOR_TARGETS[@]} + ${#MEDIA_TARGETS[@]} + ${#TRACING_TARGETS[@]} + ${#PERSISTENCE_TARGETS[@]} + ${#PERSISTENCE_PG_TARGETS[@]} ))
+TOTAL=$(( ${#SHIELD_TARGETS[@]} + ${#SERVICE_TARGETS[@]} + ${#DECISION_LOG_TARGETS[@]} + ${#OPERATOR_TARGETS[@]} + ${#MEDIA_TARGETS[@]} + ${#TRACING_TARGETS[@]} + ${#PERSISTENCE_TARGETS[@]} + ${#PERSISTENCE_PG_TARGETS[@]} + ${#STORE_BACKEND_TARGETS[@]} ))
 
 if [ "$CHECK" = "1" ]; then
   if [ "$DRIFTED" -gt 0 ] || [ "$UNUSED" -gt 0 ] || [ "$UNMANAGED" -gt 0 ]; then
     echo "Shared runtime: $DRIFTED drifted, $UNUSED unused, $UNMANAGED unmanaged. Run ./sync-shared-runtime.sh" >&2
     exit 1
   fi
-  echo "Shared runtime: all $TOTAL copies current and in use (${#SHIELD_TARGETS[@]} shieldAuth, ${#SERVICE_TARGETS[@]} serviceAuth, ${#DECISION_LOG_TARGETS[@]} decisionLog, ${#OPERATOR_TARGETS[@]} operatorAuth, ${#MEDIA_TARGETS[@]} mediaClient, ${#TRACING_TARGETS[@]} tracing, ${#PERSISTENCE_TARGETS[@]} persistence, ${#PERSISTENCE_PG_TARGETS[@]} persistencePg), and no unmanaged copies elsewhere."
+  echo "Shared runtime: all $TOTAL copies current and in use (${#SHIELD_TARGETS[@]} shieldAuth, ${#SERVICE_TARGETS[@]} serviceAuth, ${#DECISION_LOG_TARGETS[@]} decisionLog, ${#OPERATOR_TARGETS[@]} operatorAuth, ${#MEDIA_TARGETS[@]} mediaClient, ${#TRACING_TARGETS[@]} tracing, ${#PERSISTENCE_TARGETS[@]} persistence, ${#PERSISTENCE_PG_TARGETS[@]} persistencePg, ${#STORE_BACKEND_TARGETS[@]} storeBackend), and no unmanaged copies elsewhere."
 else
   if [ "$UNUSED" -gt 0 ] || [ "$UNMANAGED" -gt 0 ]; then
     echo "Shared runtime: copied $COPIED file(s), but $UNUSED are not required anywhere and $UNMANAGED are outside the target lists." >&2
     exit 1
   fi
-  echo "Shared runtime: copied $COPIED file(s) (${#SHIELD_TARGETS[@]} shieldAuth, ${#SERVICE_TARGETS[@]} serviceAuth, ${#DECISION_LOG_TARGETS[@]} decisionLog, ${#OPERATOR_TARGETS[@]} operatorAuth, ${#MEDIA_TARGETS[@]} mediaClient, ${#TRACING_TARGETS[@]} tracing, ${#PERSISTENCE_TARGETS[@]} persistence, ${#PERSISTENCE_PG_TARGETS[@]} persistencePg)."
+  echo "Shared runtime: copied $COPIED file(s) (${#SHIELD_TARGETS[@]} shieldAuth, ${#SERVICE_TARGETS[@]} serviceAuth, ${#DECISION_LOG_TARGETS[@]} decisionLog, ${#OPERATOR_TARGETS[@]} operatorAuth, ${#MEDIA_TARGETS[@]} mediaClient, ${#TRACING_TARGETS[@]} tracing, ${#PERSISTENCE_TARGETS[@]} persistence, ${#PERSISTENCE_PG_TARGETS[@]} persistencePg, ${#STORE_BACKEND_TARGETS[@]} storeBackend)."
 fi

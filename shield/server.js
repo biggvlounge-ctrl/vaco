@@ -35,7 +35,7 @@ require('dotenv/config');
 
 const { createShieldStore } = require('./lib/store');
 const path = require('path');
-const { createPersistentStore, durable } = require('./lib/persistence');
+const { attachStore } = require('./lib/storeBackend');
 const { SESSION_LIFETIME_MS, createSession, getSession } = require('./lib/sessions');
 const { MIN_PASSWORD_LENGTH, registerCredentials, verifyCredentials } = require('./lib/credentials');
 const { traceMiddleware } = require('./lib/tracing.cjs');
@@ -49,11 +49,27 @@ app.use(express.json({ limit: '1mb' }));
 // exactly the one you want to correlate.
 app.use(traceMiddleware());
 
-
 app.use(express.static(path.join(__dirname, 'public')));
 const PORT = process.env.PORT || 8812;
-const store = createPersistentStore(path.join(__dirname, 'data', 'store.json'), createShieldStore);
-app.use(durable(store));  // commit before responding -- see lib/persistence.js
+// -- The store, and which backend holds it ----------------------------
+//
+// `let`, not `const`: with DATABASE_URL set this app's store lives in
+// Postgres, which cannot be built synchronously. `attachStore` mounts a
+// gate ahead of the routes so no request runs before the store has
+// loaded, and installs the commit-before-responding hook that
+// `app.use(durable(store))` used to provide. The route handlers close
+// over this binding rather than a value, so they see the real store the
+// moment it is installed.
+//
+// Without DATABASE_URL nothing changes: the same JSON file, in the same
+// place, with the same guarantees.
+let store = createShieldStore();
+attachStore(app, {
+  appKey: 'shield',
+  createDefault: createShieldStore,
+  filePath: path.join(__dirname, 'data', 'store.json'),
+  onReady: (loaded) => { store = loaded; },
+});
 
 app.get('/api/health', (_req, res) => {
   res.json({

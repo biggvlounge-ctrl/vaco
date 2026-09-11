@@ -20,7 +20,7 @@ require('dotenv/config');
 
 const { createVacaStore } = require('./lib/store');
 const path = require('path');
-const { createPersistentStore, durable } = require('./lib/persistence');
+const { attachStore } = require('./lib/storeBackend');
 const {
   VERIFICATION_STATUSES, AUTHENTICITY_GRADES, submitVerification, getVerification,
   listVerificationsForSubject, approveVerification, rejectVerification, getAuthenticityGrade,
@@ -43,7 +43,6 @@ app.use(express.json({ limit: '1mb' }));
 // exactly the one you want to correlate.
 app.use(traceMiddleware());
 
-
 // -- Trusted-service allowlist ------------------------------------------
 //
 // VACA is the gate other apps trust. VOKEN's value algorithm consumes
@@ -65,11 +64,27 @@ const decisionLog = createDecisionLog({ app: 'vaca' });
 const operatorAuth = createOperatorAuth();
 const { requireOperator } = operatorAuth;
 
-
 app.use(express.static(path.join(__dirname, 'public')));
 const PORT = process.env.PORT || 8804;
-const store = createPersistentStore(path.join(__dirname, 'data', 'store.json'), createVacaStore);
-app.use(durable(store));  // commit before responding -- see lib/persistence.js
+// -- The store, and which backend holds it ----------------------------
+//
+// `let`, not `const`: with DATABASE_URL set this app's store lives in
+// Postgres, which cannot be built synchronously. `attachStore` mounts a
+// gate ahead of the routes so no request runs before the store has
+// loaded, and installs the commit-before-responding hook that
+// `app.use(durable(store))` used to provide. The route handlers close
+// over this binding rather than a value, so they see the real store the
+// moment it is installed.
+//
+// Without DATABASE_URL nothing changes: the same JSON file, in the same
+// place, with the same guarantees.
+let store = createVacaStore();
+attachStore(app, {
+  appKey: 'vaca',
+  createDefault: createVacaStore,
+  filePath: path.join(__dirname, 'data', 'store.json'),
+  onReady: (loaded) => { store = loaded; },
+});
 
 app.get('/api/health', (_req, res) => {
   res.json({

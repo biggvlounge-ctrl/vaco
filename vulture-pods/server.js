@@ -23,7 +23,7 @@ require('dotenv/config');
 
 const { createVulturePodsStore } = require('./lib/store');
 const path = require('path');
-const { createPersistentStore, durable } = require('./lib/persistence');
+const { attachStore } = require('./lib/storeBackend');
 const { createMediaClient } = require('./lib/mediaClient.cjs');
 const {
   SHOW_CATEGORIES, createShow, getShow, listShowsForCreator, listShowsByCategory,
@@ -57,7 +57,6 @@ app.use(express.json({ limit: '1mb' }));
 // exactly the one you want to correlate.
 app.use(traceMiddleware());
 
-
 app.use(express.static(path.join(__dirname, 'public')));
 const PORT = process.env.PORT || 8810;
 const V3_API_URL = process.env.V3_API_URL || 'http://localhost:8811';
@@ -77,8 +76,25 @@ function serviceHeaders() {
 
 const VULTURE_MUSIC_API_URL = process.env.VULTURE_MUSIC_API_URL || 'http://localhost:8806';
 const VAULT_STVDIOS_API_URL = process.env.VAULT_STVDIOS_API_URL || 'http://localhost:8808';
-const store = createPersistentStore(path.join(__dirname, 'data', 'store.json'), createVulturePodsStore);
-app.use(durable(store));  // commit before responding -- see lib/persistence.js
+// -- The store, and which backend holds it ----------------------------
+//
+// `let`, not `const`: with DATABASE_URL set this app's store lives in
+// Postgres, which cannot be built synchronously. `attachStore` mounts a
+// gate ahead of the routes so no request runs before the store has
+// loaded, and installs the commit-before-responding hook that
+// `app.use(durable(store))` used to provide. The route handlers close
+// over this binding rather than a value, so they see the real store the
+// moment it is installed.
+//
+// Without DATABASE_URL nothing changes: the same JSON file, in the same
+// place, with the same guarantees.
+let store = createVulturePodsStore();
+attachStore(app, {
+  appKey: 'vulture-pods',
+  createDefault: createVulturePodsStore,
+  filePath: path.join(__dirname, 'data', 'store.json'),
+  onReady: (loaded) => { store = loaded; },
+});
 
 // Atomic settlement: every leg moves, or none does.
 //

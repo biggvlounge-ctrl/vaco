@@ -32,7 +32,7 @@ const path = require('path');
 require('dotenv/config');
 
 const { createMediaStore } = require('./lib/store');
-const { createPersistentStore, durable } = require('./lib/persistence');
+const { attachStore } = require('./lib/storeBackend');
 const {
   SESSION_KINDS, ROLES, EVENT_KINDS, DEFAULT_GRANT_TTL_MS,
   createSession, getSession, findSession, issueGrant, revokeGrant, verifyGrant,
@@ -62,8 +62,25 @@ app.use(traceMiddleware());
 app.use(express.static(path.join(__dirname, 'public')));
 
 const PORT = process.env.PORT || 8821;
-const store = createPersistentStore(path.join(__dirname, 'data', 'store.json'), createMediaStore);
-app.use(durable(store));
+// -- The store, and which backend holds it ----------------------------
+//
+// `let`, not `const`: with DATABASE_URL set this app's store lives in
+// Postgres, which cannot be built synchronously. `attachStore` mounts a
+// gate ahead of the routes so no request runs before the store has
+// loaded, and installs the commit-before-responding hook that
+// `app.use(durable(store))` used to provide. The route handlers close
+// over this binding rather than a value, so they see the real store the
+// moment it is installed.
+//
+// Without DATABASE_URL nothing changes: the same JSON file, in the same
+// place, with the same guarantees.
+let store = createMediaStore();
+attachStore(app, {
+  appKey: 'vaco-media',
+  createDefault: createMediaStore,
+  filePath: path.join(__dirname, 'data', 'store.json'),
+  onReady: (loaded) => { store = loaded; },
+});
 
 const transport = createTransport();
 

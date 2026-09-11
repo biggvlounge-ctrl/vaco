@@ -19,7 +19,7 @@ require('dotenv/config');
 
 const { createChopzShopStore } = require('./lib/store');
 const path = require('path');
-const { createPersistentStore, durable } = require('./lib/persistence');
+const { attachStore } = require('./lib/storeBackend');
 const { createProduct, getProduct } = require('./lib/products');
 const { createAffiliateLink, getAffiliateLink, recordClick } = require('./lib/affiliateLinks');
 const {
@@ -35,7 +35,6 @@ const { traceMiddleware } = require('./lib/tracing.cjs');
 // *refused* still carries a trace id, and a 401 you cannot correlate is
 // exactly the one you want to correlate.
 app.use(traceMiddleware());
-
 
 app.use(express.static(path.join(__dirname, 'public')));
 const PORT = process.env.PORT || 8801;
@@ -55,8 +54,25 @@ function serviceHeaders() {
     : {};
 }
 
-const store = createPersistentStore(path.join(__dirname, 'data', 'store.json'), createChopzShopStore);
-app.use(durable(store));  // commit before responding -- see lib/persistence.js
+// -- The store, and which backend holds it ----------------------------
+//
+// `let`, not `const`: with DATABASE_URL set this app's store lives in
+// Postgres, which cannot be built synchronously. `attachStore` mounts a
+// gate ahead of the routes so no request runs before the store has
+// loaded, and installs the commit-before-responding hook that
+// `app.use(durable(store))` used to provide. The route handlers close
+// over this binding rather than a value, so they see the real store the
+// moment it is installed.
+//
+// Without DATABASE_URL nothing changes: the same JSON file, in the same
+// place, with the same guarantees.
+let store = createChopzShopStore();
+attachStore(app, {
+  appKey: 'chopz-shop',
+  createDefault: createChopzShopStore,
+  filePath: path.join(__dirname, 'data', 'store.json'),
+  onReady: (loaded) => { store = loaded; },
+});
 
 // Atomic settlement: every leg moves, or none does.
 //

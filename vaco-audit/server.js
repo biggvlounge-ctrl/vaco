@@ -22,7 +22,7 @@ const path = require('path');
 require('dotenv/config');
 
 const { createAuditStore } = require('./lib/store');
-const { createPersistentStore, durable } = require('./lib/persistence');
+const { attachStore } = require('./lib/storeBackend');
 const {
   OUTCOME_KINDS, MAX_INPUT_BYTES, recordDecision, getDecision,
   queryDecisions, historyFor, describeCoverage,
@@ -40,11 +40,27 @@ app.use(express.json({ limit: '256kb' }));
 // exactly the one you want to correlate.
 app.use(traceMiddleware());
 
-
 app.use(express.static(path.join(__dirname, 'public')));
 const PORT = process.env.PORT || 8819;
-const store = createPersistentStore(path.join(__dirname, 'data', 'store.json'), createAuditStore);
-app.use(durable(store));
+// -- The store, and which backend holds it ----------------------------
+//
+// `let`, not `const`: with DATABASE_URL set this app's store lives in
+// Postgres, which cannot be built synchronously. `attachStore` mounts a
+// gate ahead of the routes so no request runs before the store has
+// loaded, and installs the commit-before-responding hook that
+// `app.use(durable(store))` used to provide. The route handlers close
+// over this binding rather than a value, so they see the real store the
+// moment it is installed.
+//
+// Without DATABASE_URL nothing changes: the same JSON file, in the same
+// place, with the same guarantees.
+let store = createAuditStore();
+attachStore(app, {
+  appKey: 'vaco-audit',
+  createDefault: createAuditStore,
+  filePath: path.join(__dirname, 'data', 'store.json'),
+  onReady: (loaded) => { store = loaded; },
+});
 
 // Every writer is another VACO service; no browser posts here. Mounted
 // above every route, per the rule VOID learned the hard way -- a new

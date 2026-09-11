@@ -15,7 +15,7 @@ require('dotenv/config');
 
 const { createVsafeStore } = require('./lib/store');
 const path = require('path');
-const { createPersistentStore, durable } = require('./lib/persistence');
+const { attachStore } = require('./lib/storeBackend');
 const {
   SOURCE_APPS, CHECKIN_STATUSES, createSafetyCheckIn, getSafetyCheckIn, confirmSafe, triggerEmergency, checkForMissedCheckIns,
 } = require('./lib/safetyCheckIn');
@@ -57,11 +57,27 @@ app.use(express.json({ limit: '1mb' }));
 // exactly the one you want to correlate.
 app.use(traceMiddleware());
 
-
 app.use(express.static(path.join(__dirname, 'public')));
 const PORT = process.env.PORT || 8799;
-const store = createPersistentStore(path.join(__dirname, 'data', 'store.json'), createVsafeStore);
-app.use(durable(store));  // commit before responding -- see lib/persistence.js
+// -- The store, and which backend holds it ----------------------------
+//
+// `let`, not `const`: with DATABASE_URL set this app's store lives in
+// Postgres, which cannot be built synchronously. `attachStore` mounts a
+// gate ahead of the routes so no request runs before the store has
+// loaded, and installs the commit-before-responding hook that
+// `app.use(durable(store))` used to provide. The route handlers close
+// over this binding rather than a value, so they see the real store the
+// moment it is installed.
+//
+// Without DATABASE_URL nothing changes: the same JSON file, in the same
+// place, with the same guarantees.
+let store = createVsafeStore();
+attachStore(app, {
+  appKey: 'vsafe',
+  createDefault: createVsafeStore,
+  filePath: path.join(__dirname, 'data', 'store.json'),
+  onReady: (loaded) => { store = loaded; },
+});
 
 // **VSAFE both calls and is called.** It presents a credential to
 // vaco-notify (below) and receives writes from CVNVO, VACAY and the
@@ -170,7 +186,6 @@ app.post('/api/check-ins/:id/confirm-safe', actorOrService(requireCheckInOwner()
   }
 });
 
-
 // -- Escalation delivery ------------------------------------------------
 //
 // `lib/safetyCheckIn.js` says it plainly in its own header: the missed
@@ -199,7 +214,6 @@ function serviceHeaders() {
     ? { 'X-Service-Name': VACO_SERVICE_NAME, 'X-Service-Token': VACO_SERVICE_TOKEN }
     : {};
 }
-
 
 async function escalate(checkIn) {
   try {

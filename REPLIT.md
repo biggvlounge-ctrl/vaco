@@ -124,23 +124,33 @@ DOWN in the boot output with the reason in `logs/<app>.log`. `v4-proxy`
 without `ANTHROPIC_API_KEY` is the worked example, and it is the "1
 down" in the expected `35 up, 1 down` line above.
 
-## VACON-C needs a database; nothing else does
+## The database is optional, and 23 apps will use it if it is there
 
-One app, `vacon-c`, is a civilization simulation that keeps its world
-in Postgres. Everything else uses a JSON file under its own directory,
-which Replit's filesystem keeps between runs.
+**Attach Replit's built-in PostgreSQL.** It sets `DATABASE_URL`, and
+that one variable is the whole configuration — nothing else to set, and
+nothing to run by hand.
 
-**Attach Replit's built-in PostgreSQL.** It sets `DATABASE_URL` for
-you, and the app loads its own 63-table schema into an empty database
-on first boot — there is nothing to run by hand.
+With it, 23 of the 34 backends keep their state in Postgres instead of
+a file: `vacon-c` loads its own 63-table world schema, and 22 others
+keep a document each in a `vaco.stores` table. The remaining 11 still
+use a JSON file under their own directory.
 
-Without a database it still boots. It starts an **empty world**, says
-so in full on stderr, and never saves — so the simulation runs and
-nothing persists. That is a deliberate choice (an app that refuses to
-start because its archive is down is worse than one that starts and
-tells you), but it means a missing `DATABASE_URL` is silent data loss
-rather than a startup failure. If you want VACON-C to keep its world,
-attach the database.
+Without it, everything still boots and every app falls back to its
+file, which Replit's filesystem keeps between runs. That is fine for a
+demo and is what you get if you skip this section entirely.
+
+Two things behave differently when the database is attached but
+unreachable, and the difference is deliberate:
+
+- The 22 converted apps **refuse to start** and say why. An app serving
+  reads from a store that never loaded would report empty collections
+  as though they were real — and for V3, the ledger, that means
+  everyone's balance reads as zero and transfers are accepted against
+  it.
+- `vacon-c` starts an **empty world**, says so in full on stderr, and
+  never checkpoints. A simulation whose working set is regenerable is
+  still a working demo; it does mean a missing `DATABASE_URL` is silent
+  data loss for that app rather than a startup failure.
 
 ## What is honest about this
 
@@ -167,7 +177,7 @@ What *has* been driven for real, on Linux:
 existed, seeing this run meant cloning the repo and starting 36
 servers.
 
-**Not good for production, as it stands.** 32 of the 34 apps keep state
+**Not good for production, as it stands.** 11 of the 34 apps keep state
 in JSON files on disk. That survives a persistent workspace or a
 Reserved VM. It does *not* survive an autoscaling deployment, where the
 filesystem is ephemeral and a second instance means a second, divergent

@@ -31,7 +31,7 @@ const path = require('path');
 require('dotenv/config');
 
 const { createDreamsStore } = require('./lib/store');
-const { createPersistentStore, durable } = require('./lib/persistence');
+const { attachStore } = require('./lib/storeBackend');
 const {
   SCREEN_STATUSES, registerScreen, getScreen, listActiveScreens, deactivateScreen, getScreenRevenue,
 } = require('./lib/screens');
@@ -40,7 +40,6 @@ const {
   CAMPAIGN_STATUSES, createCampaign, getCampaign, listCampaignsForAdvertiser,
   selectScreens, setCreative, generateCreativeText, setBudget, launchCampaign, recordImpression,
 } = require('./lib/campaigns');
-
 
 const { createServiceAuth } = require('./lib/serviceAuth.cjs');
 const { traceMiddleware, traceHeaders } = require('./lib/tracing.cjs');const app = express();
@@ -51,7 +50,6 @@ app.use(express.json({ limit: '1mb' }));
 // serviceAuth *refuses* still gets a trace id, and a 401 you cannot
 // correlate is exactly the one you want to correlate.
 app.use(traceMiddleware());
-
 
 app.use(express.static(path.join(__dirname, 'public')));
 const PORT = process.env.PORT || 8814;
@@ -72,8 +70,25 @@ function serviceHeaders() {
 
 const V4_PROXY_URL = process.env.V4_PROXY_URL || 'http://localhost:8787';
 const VACO_ANALYTICS_URL = process.env.VACO_ANALYTICS_URL || 'http://localhost:8790';
-const store = createPersistentStore(path.join(__dirname, 'data', 'store.json'), createDreamsStore);
-app.use(durable(store));  // commit before responding -- see lib/persistence.js
+// -- The store, and which backend holds it ----------------------------
+//
+// `let`, not `const`: with DATABASE_URL set this app's store lives in
+// Postgres, which cannot be built synchronously. `attachStore` mounts a
+// gate ahead of the routes so no request runs before the store has
+// loaded, and installs the commit-before-responding hook that
+// `app.use(durable(store))` used to provide. The route handlers close
+// over this binding rather than a value, so they see the real store the
+// moment it is installed.
+//
+// Without DATABASE_URL nothing changes: the same JSON file, in the same
+// place, with the same guarantees.
+let store = createDreamsStore();
+attachStore(app, {
+  appKey: 'dreams',
+  createDefault: createDreamsStore,
+  filePath: path.join(__dirname, 'data', 'store.json'),
+  onReady: (loaded) => { store = loaded; },
+});
 
 // `requireCallingService()` on this app's operator and telemetry routes
 // is only meaningful with serviceAuth establishing who the caller is.
@@ -318,7 +333,6 @@ app.post('/api/campaigns/:id/launch', requireCampaignAdvertiser(), (req, res) =>
     res.status(400).json({ error: err.message });
   }
 });
-
 
 // -- Alert delivery -----------------------------------------------------
 //

@@ -20,7 +20,7 @@ require('dotenv/config');
 
 const { createChopzStore } = require('./lib/store');
 const path = require('path');
-const { createPersistentStore, durable } = require('./lib/persistence');
+const { attachStore } = require('./lib/storeBackend');
 const { createMediaClient } = require('./lib/mediaClient.cjs');
 const { createChopzVideo, getChopzVideo, verifyLinkedProduct } = require('./lib/videos');
 
@@ -41,12 +41,28 @@ const { traceMiddleware } = require('./lib/tracing.cjs');
 // exactly the one you want to correlate.
 app.use(traceMiddleware());
 
-
 app.use(express.static(path.join(__dirname, 'public')));
 const PORT = process.env.PORT || 8800;
 const CHOPZ_SHOP_API_URL = process.env.CHOPZ_SHOP_API_URL || 'http://localhost:8801';
-const store = createPersistentStore(path.join(__dirname, 'data', 'store.json'), createChopzStore);
-app.use(durable(store));  // commit before responding -- see lib/persistence.js
+// -- The store, and which backend holds it ----------------------------
+//
+// `let`, not `const`: with DATABASE_URL set this app's store lives in
+// Postgres, which cannot be built synchronously. `attachStore` mounts a
+// gate ahead of the routes so no request runs before the store has
+// loaded, and installs the commit-before-responding hook that
+// `app.use(durable(store))` used to provide. The route handlers close
+// over this binding rather than a value, so they see the real store the
+// moment it is installed.
+//
+// Without DATABASE_URL nothing changes: the same JSON file, in the same
+// place, with the same guarantees.
+let store = createChopzStore();
+attachStore(app, {
+  appKey: 'chopz',
+  createDefault: createChopzStore,
+  filePath: path.join(__dirname, 'data', 'store.json'),
+  onReady: (loaded) => { store = loaded; },
+});
 
 // Real, live cross-app call into CHOPZ SHOP's own real product lookup
 // -- videos.js's own header explains why this is deferred, opt-in

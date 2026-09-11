@@ -27,7 +27,7 @@ const path = require('path');
 require('dotenv/config');
 
 const { createVenvmStore } = require('./lib/store');
-const { createPersistentStore, durable } = require('./lib/persistence');
+const { attachStore } = require('./lib/storeBackend');
 const {
   SCRIPT_STATUSES, submitScriptRequest, getScriptRequest, generateScript,
 } = require('./lib/scriptEngine');
@@ -39,7 +39,6 @@ const {
   PRODUCTION_STAGES, createProductionJob, getProductionJob, advanceToStoryboard, queueRender, markRendered,
 } = require('./lib/productionPipeline');
 
-
 const { createServiceAuth } = require('./lib/serviceAuth.cjs');
 const { traceMiddleware, traceHeaders } = require('./lib/tracing.cjs');const app = express();
 app.use(cors());
@@ -49,7 +48,6 @@ app.use(express.json({ limit: '1mb' }));
 // serviceAuth *refuses* still gets a trace id, and a 401 you cannot
 // correlate is exactly the one you want to correlate.
 app.use(traceMiddleware());
-
 
 app.use(express.static(path.join(__dirname, 'public')));
 const PORT = process.env.PORT || 8813;
@@ -61,8 +59,25 @@ const V4_PROXY_URL = process.env.V4_PROXY_URL || 'http://localhost:8787';
 // what makes it required, not this line.
 const VACO_SERVICE_NAME = process.env.VACO_SERVICE_NAME || 'venvm';
 const VACO_SERVICE_TOKEN = process.env.VACO_SERVICE_TOKEN || '';
-const store = createPersistentStore(path.join(__dirname, 'data', 'store.json'), createVenvmStore);
-app.use(durable(store));  // commit before responding -- see lib/persistence.js
+// -- The store, and which backend holds it ----------------------------
+//
+// `let`, not `const`: with DATABASE_URL set this app's store lives in
+// Postgres, which cannot be built synchronously. `attachStore` mounts a
+// gate ahead of the routes so no request runs before the store has
+// loaded, and installs the commit-before-responding hook that
+// `app.use(durable(store))` used to provide. The route handlers close
+// over this binding rather than a value, so they see the real store the
+// moment it is installed.
+//
+// Without DATABASE_URL nothing changes: the same JSON file, in the same
+// place, with the same guarantees.
+let store = createVenvmStore();
+attachStore(app, {
+  appKey: 'venvm',
+  createDefault: createVenvmStore,
+  filePath: path.join(__dirname, 'data', 'store.json'),
+  onReady: (loaded) => { store = loaded; },
+});
 
 // `requireCallingService()` on this app's operator and telemetry routes
 // is only meaningful with serviceAuth establishing who the caller is.

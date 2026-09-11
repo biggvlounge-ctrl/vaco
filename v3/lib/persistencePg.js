@@ -62,8 +62,24 @@ const { reactive } = require('./persistence');
 
 // One table for every app's store. The app_key is the app's own name,
 // so the table reads as an inventory of what has been converted.
+//
+// **In its own schema, and that is not tidiness.** This lived in
+// `public.vaco_stores` for exactly one test run, which broke VACON-C.
+// VACON-C loads its 63-table world schema only into a database whose
+// `public` schema has *zero* tables — a deliberate guard so a partial
+// or foreign schema is never completed by accident. Booting the
+// ecosystem with DATABASE_URL set meant whichever app started first
+// created `public.vaco_stores`, VACON-C then found one table where it
+// required none, and started an empty world that could never
+// checkpoint. Silent data loss for the one app that already had a
+// database, caused by converting the others.
+//
+// `vaco.stores` sits outside `public`, so VACON-C's count is unaffected
+// and the two can share a database without either knowing about the
+// other.
 const SCHEMA = `
-CREATE TABLE IF NOT EXISTS vaco_stores (
+CREATE SCHEMA IF NOT EXISTS vaco;
+CREATE TABLE IF NOT EXISTS vaco.stores (
   app_key    TEXT PRIMARY KEY,
   data       JSONB NOT NULL,
   version    BIGINT NOT NULL DEFAULT 1,
@@ -102,7 +118,7 @@ async function loadOrCreate(pool, appKey, createDefault) {
   const fresh = createDefault();
 
   const found = await pool.query(
-    'SELECT data, version FROM vaco_stores WHERE app_key = $1',
+    'SELECT data, version FROM vaco.stores WHERE app_key = $1',
     [appKey],
   );
   if (found.rowCount > 0) {
@@ -112,11 +128,11 @@ async function loadOrCreate(pool, appKey, createDefault) {
   // ON CONFLICT DO NOTHING, then re-read: two processes booting at the
   // same instant must not have one of them fail on a duplicate key.
   await pool.query(
-    'INSERT INTO vaco_stores (app_key, data, version) VALUES ($1, $2, 1) ON CONFLICT (app_key) DO NOTHING',
+    'INSERT INTO vaco.stores (app_key, data, version) VALUES ($1, $2, 1) ON CONFLICT (app_key) DO NOTHING',
     [appKey, JSON.stringify(fresh)],
   );
   const created = await pool.query(
-    'SELECT data, version FROM vaco_stores WHERE app_key = $1',
+    'SELECT data, version FROM vaco.stores WHERE app_key = $1',
     [appKey],
   );
   return {
@@ -130,7 +146,7 @@ async function loadOrCreate(pool, appKey, createDefault) {
 // matches and nothing is overwritten.
 async function writeStore(pool, appKey, store, expectedVersion) {
   const result = await pool.query(
-    `UPDATE vaco_stores
+    `UPDATE vaco.stores
         SET data = $1, version = version + 1, updated_at = now()
       WHERE app_key = $2 AND version = $3
       RETURNING version`,

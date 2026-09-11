@@ -97,7 +97,16 @@ const PERSISTED_APPS = new Set(
   apps
     .filter((app) => {
       try {
-        return /createPersistentStore/
+        // `attachStore` as well as `createPersistentStore`: an app
+        // converted to the Postgres backend calls the former and no
+        // longer mentions the latter. Matching only the old name made
+        // 22 converted apps look stateless, which produced a compose
+        // file that mounted them no volume AND gave them no database —
+        // so they would have fallen back to a file inside a container
+        // with nothing persisted under it and lost their store on every
+        // restart. Caught by deploy-readme.test.mjs's volume count
+        // dropping from 30 to 8.
+        return /createPersistentStore|attachStore/
           .test(fs.readFileSync(path.join(ROOT, app.appPath, "server.js"), "utf8"));
       } catch {
         // A Vite frontend has no server.js and no store.
@@ -458,6 +467,41 @@ services.postgres = {
   restart: "unless-stopped",
 };
 volumes["vacon-c-pgdata"] = null;
+
+// Every app converted to the shared Postgres store backend gets the
+// same database and the same dependency. `attachStore` picks Postgres
+// when DATABASE_URL is set and the file otherwise, so this line is what
+// actually decides which backend the Docker deployment runs on.
+//
+// These apps keep their named volume too. It is not redundant: an
+// operator who removes DATABASE_URL gets the file backend back, and a
+// volume is what makes that fall-back survive a restart rather than
+// silently losing a store.
+const PG_STORE_APPS = apps
+  .filter((app) => {
+    try {
+      return /attachStore/.test(
+        fs.readFileSync(path.join(ROOT, app.appPath, "server.js"), "utf8"));
+    } catch {
+      return false;
+    }
+  })
+  .map((app) => app.name);
+
+const VACO_DATABASE_URL =
+  "postgres://vacancy:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/vacancy";
+
+for (const name of PG_STORE_APPS) {
+  if (!services[name]) continue;
+  services[name].depends_on = [
+    ...(services[name].depends_on || []),
+    "postgres",
+  ];
+  services[name].environment = {
+    ...(services[name].environment || {}),
+    DATABASE_URL: VACO_DATABASE_URL,
+  };
+}
 
 if (services["vacon-c"]) {
   services["vacon-c"].depends_on = [

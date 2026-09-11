@@ -36,7 +36,7 @@ require('dotenv/config');
 
 const { createV3Store } = require('./lib/store');
 const path = require('path');
-const { createPersistentStore, durable } = require('./lib/persistence');
+const { attachStore } = require('./lib/storeBackend');
 const { STARTING_VCOIN_BALANCE, getBalance, transfer, settle, getTransactionHistory, reconcile } = require('./lib/vcoin');
 const { VCOIN_TO_VASH_RATE, getVashBalance, cashout } = require('./lib/vash');
 const { requireActor, actorOrService: actorOrServiceWith, requireCallingService } = require('./lib/shieldAuth.cjs');
@@ -58,28 +58,35 @@ app.use(express.static(path.join(__dirname, 'public')));
 const PORT = process.env.PORT || 8811;
 // -- The store, and which backend holds it ----------------------------
 //
-// **`let`, not `const`, and the server does not listen until it is
-// set.** V3 is the first app moved off a JSON file. With DATABASE_URL
-// set the store lives in Postgres; without one it stays exactly where
-// it was, byte for byte, so nothing about local development or the
-// existing deployment changes until somebody sets the variable.
+// `let`, not `const`: with DATABASE_URL set V3's ledger lives in
+// Postgres, which cannot be built synchronously. `attachStore` mounts a
+// gate ahead of the routes so no request runs against an unloaded
+// store, and installs the commit-before-responding hook that
+// `app.use(durable(store))` used to provide.
 //
-// The Postgres backend cannot be built synchronously -- there is no
-// synchronous Postgres client for Node -- so `start()` below awaits it
-// before `app.listen`. That ordering is the whole safety of it: a
-// ledger that answers requests against an unloaded store would report
-// every balance as zero and accept transfers against them.
+// That gate matters more here than anywhere else: a ledger answering
+// `/api/vcoin/balance` from an empty store reports everyone's money as
+// zero, and would then accept transfers against it.
 //
-// The route handlers close over this binding rather than a value, so
-// they see whichever store `start()` installs. Nothing can reach them
-// first: the server is not listening until it resolves.
-let store = null;
-let commitBeforeResponding = (req, res, next) => next();
-
-// Mounted here, in the position `durable(store)` held, so it still runs
-// ahead of every route. It delegates rather than deciding, because
-// which backend is in play is not known until start() has run.
-app.use((req, res, next) => commitBeforeResponding(req, res, next));
+// Without DATABASE_URL nothing changes: the same JSON file, in the same
+// place, with the same guarantees.
+let store = createV3Store();
+attachStore(app, {
+  appKey: 'v3',
+  createDefault: createV3Store,
+  filePath: path.join(__dirname, 'data', 'store.json'),
+  onReady: (loaded) => {
+    store = loaded;
+    // **Must be set here, not at module level.** `app.set` copies the
+    // value, unlike the route handlers which read the `store` binding
+    // when a request arrives. Setting it beside the declaration would
+    // hand the idempotency middleware the empty placeholder for the
+    // life of the process — every replayed request would miss its
+    // record and execute a second time, which on a transfer route means
+    // moving the money twice.
+    app.set('v3Store', loaded);
+  },
+});
 
 // Trusted-service allowlist. **Now defaults to 'enforce'.**
 //
@@ -138,10 +145,6 @@ app.get('/api/health', (_req, res) => {
 app.get('/api/vcoin/balance/:userId', (req, res) => {
   res.json({ userId: req.params.userId, balance: getBalance(store, req.params.userId) });
 });
-
-// Exposed so the idempotency middleware can reach the same real store
-// the handlers use, without re-importing or duplicating it.
-app.set('v3Store', store);
 
 app.post('/api/vcoin/transfer', idempotent('vcoin/transfer'), actorOrService('fromUserId'), (req, res) => {
   try {
@@ -205,51 +208,8 @@ app.get('/api/vash/balance/:userId', (req, res) => {
   res.json({ userId: req.params.userId, vashBalance: getVashBalance(store, req.params.userId) });
 });
 
-// -- Boot -------------------------------------------------------------
-//
-// Two backends, one store shape. The choice is made by whether
-// DATABASE_URL is set and by nothing else -- no flag, no mode, no
-// default that silently picks the wrong one.
-//
-// **A Postgres backend that cannot reach its database refuses to
-// start.** That is deliberate and it is the opposite of what VACON-C
-// does, for a reason worth stating: VACON-C is a simulation whose
-// working set is regenerable, so an empty world that says so is a
-// working demo. This is the ledger. An empty ledger that answers
-// `/api/vcoin/balance` reports everyone's money as zero, and accepting
-// a transfer against that is worse than being unreachable.
-async function start() {
-  const databaseUrl = process.env.DATABASE_URL;
-
-  if (databaseUrl) {
-    const { Pool } = require('pg');
-    const { createPersistentStorePg, durable: durablePg } = require('./lib/persistencePg');
-
-    const pool = new Pool({ connectionString: databaseUrl });
-    store = await createPersistentStorePg(pool, 'v3', createV3Store);
-    commitBeforeResponding = durablePg(store);
-
-    const closePool = () => pool.end().finally(() => process.exit(0));
-    process.on('SIGTERM', closePool);
-    process.on('SIGINT', closePool);
-
-    console.log('V3 store: Postgres (DATABASE_URL is set)');
-  } else {
-    store = createPersistentStore(path.join(__dirname, 'data', 'store.json'), createV3Store);
-    commitBeforeResponding = durable(store);
-    console.log('V3 store: data/store.json (no DATABASE_URL) — safe for one process only');
-  }
-
-  app.listen(PORT, () => {
-    console.log(`V3 listening on http://localhost:${PORT}`);
-    console.log(`Health check: curl http://localhost:${PORT}/api/health`);
-  });
-}
-
-start().catch((err) => {
-  // Nothing half-started: no store, no listener, and a message naming
-  // the cause rather than a stack against an empty ledger later.
-  console.error(`V3 failed to start: ${err.message}`);
-  console.error(err.stack);
-  process.exit(1);
+app.listen(PORT, () => {
+  console.log(`V3 listening on http://localhost:${PORT}`);
+  console.log(`Health check: curl http://localhost:${PORT}/api/health`);
 });
+

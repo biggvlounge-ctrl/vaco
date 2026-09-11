@@ -49,7 +49,7 @@ const freshKey = () => `test-store-${process.pid}-${Date.now()}-${keySeq += 1}`;
 const emptyStore = () => ({ items: [], counters: {}, nextId: 1 });
 
 async function drop(appKey) {
-  if (pool) await pool.query('DELETE FROM vaco_stores WHERE app_key = $1', [appKey]);
+  if (pool) await pool.query('DELETE FROM vaco.stores WHERE app_key = $1', [appKey]);
 }
 
 test('a first boot creates the row and returns an empty store', { skip: SKIP }, async () => {
@@ -59,7 +59,7 @@ test('a first boot creates the row and returns an empty store', { skip: SKIP }, 
     assert.deepEqual(store.items, []);
     assert.equal(store.nextId, 1);
 
-    const row = await pool.query('SELECT version FROM vaco_stores WHERE app_key = $1', [key]);
+    const row = await pool.query('SELECT version FROM vaco.stores WHERE app_key = $1', [key]);
     assert.equal(row.rowCount, 1, 'first boot did not create a row');
     assert.equal(Number(row.rows[0].version), 1);
   } finally { await drop(key); }
@@ -118,7 +118,7 @@ test('a second writer is refused, not allowed to overwrite', { skip: SKIP }, asy
     );
 
     // A's write is intact, B's is not half-applied.
-    const row = await pool.query('SELECT data FROM vaco_stores WHERE app_key = $1', [key]);
+    const row = await pool.query('SELECT data FROM vaco.stores WHERE app_key = $1', [key]);
     assert.deepEqual(row.rows[0].data.items, [{ id: 1, from: 'process A' }]);
   } finally { await drop(key); }
 });
@@ -138,7 +138,7 @@ test('the winning writer can keep writing afterwards', { skip: SKIP }, async () 
     a.items.push({ id: 3 });
     await pg.commit(a);
 
-    const row = await pool.query('SELECT data, version FROM vaco_stores WHERE app_key = $1', [key]);
+    const row = await pool.query('SELECT data, version FROM vaco.stores WHERE app_key = $1', [key]);
     assert.deepEqual(row.rows[0].data.items.map((i) => i.id), [1, 3]);
     assert.equal(Number(row.rows[0].version), 3, 'version should advance once per successful write');
   } finally { await drop(key); }
@@ -159,7 +159,7 @@ test('overlapping commits do not race each other into a false conflict', { skip:
     await assert.doesNotReject(Promise.all([first, second]),
       'concurrent commits on one store conflicted with themselves');
 
-    const row = await pool.query('SELECT data FROM vaco_stores WHERE app_key = $1', [key]);
+    const row = await pool.query('SELECT data FROM vaco.stores WHERE app_key = $1', [key]);
     assert.deepEqual(row.rows[0].data.items.map((i) => i.id), [1, 2]);
   } finally { await drop(key); }
 });
