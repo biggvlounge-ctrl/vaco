@@ -61,7 +61,7 @@ authorization work in §5 had to be done per app rather than once.
 | Containerised services | 36 + nginx + a LiveKit SFU |
 | Registry rows (incl. brand rows and the dev mock) | 37 |
 | Mutating HTTP routes | 520, all accounted for (469 guarded, 51 declared open with a reason) |
-| Automated tests | 1546 across 39 suites |
+| Automated tests | 1555 across 39 suites |
 | Persisted volumes | 30 |
 | Shared-module copies kept in sync | 203 |
 | Service credentials in `.env.example` | 27 callers |
@@ -707,7 +707,7 @@ produce the numbers in this document.
 built:** `node scripts/package-release.mjs` — see §11.
 
 ```sh
-node scripts/run-all-tests.mjs           # 1546/1546 across 39 suites
+node scripts/run-all-tests.mjs           # 1555/1555 across 39 suites
 node scripts/audit-route-guards.mjs --check   # 520/520 accounted for
 ./sync-shared-runtime.sh --check         # 203 copies current, none unmanaged
 ./sync-design-system.sh --check          # every serving app is a target
@@ -747,7 +747,7 @@ dependencies are installed.
 
 ```
 vacon-c         317   vdp             147   void            142
-scripts         141   v3               85   vaco-media       51
+scripts         141   v3               94   vaco-media       51
 v4-proxy         42   world-layer      41   venvm            40
 venvs            45   voken            37   vaco-analytics   34
 vaco-shell       33   vacay            24   voidmagic        23
