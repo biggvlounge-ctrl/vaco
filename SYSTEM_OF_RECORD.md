@@ -61,7 +61,7 @@ authorization work in §5 had to be done per app rather than once.
 | Containerised services | 36 + nginx + a LiveKit SFU |
 | Registry rows (incl. brand rows and the dev mock) | 37 |
 | Mutating HTTP routes | 520, all accounted for (469 guarded, 51 declared open with a reason) |
-| Automated tests | 1583 across 39 suites |
+| Automated tests | 1586 across 39 suites |
 | Persisted volumes | 30 |
 | Shared-module copies kept in sync | 203 |
 | Service credentials in `.env.example` | 27 callers |
@@ -783,7 +783,7 @@ produce the numbers in this document.
 built:** `node scripts/package-release.mjs` — see §11.
 
 ```sh
-node scripts/run-all-tests.mjs           # 1583/1583 across 39 suites
+node scripts/run-all-tests.mjs           # 1586/1586 across 39 suites (1 skipped without a database)
 node scripts/audit-route-guards.mjs --check   # 520/520 accounted for
 ./sync-shared-runtime.sh --check         # 203 copies current, none unmanaged
 ./sync-design-system.sh --check          # every serving app is a target
@@ -823,7 +823,7 @@ dependencies are installed.
 
 ```
 vacon-c         317   vdp             147   void            142
-scripts         154   v3              109   vaco-media       51
+scripts         157   v3              109   vaco-media       51
 v4-proxy         42   world-layer      41   venvm            40
 venvs            45   voken            37   vaco-analytics   34
 vaco-shell       33   vacay            24   voidmagic        23
@@ -914,6 +914,22 @@ are what stand between this and a real deployment.**
   env var is declared — but the build itself has never run. **This is
   the single largest untested step**, and it is the first thing to do
   on a machine that can reach a registry.
+- **There is still no off-host backup, and the backup tooling was
+  blind to Postgres for a day.** `scripts/backup-stores.mjs` copied
+  `<app>/data/store.json` and nothing else. After the 11 Sep conversion
+  those files stop being written the moment `DATABASE_URL` is set, so on
+  a real Postgres deployment the script captured stale pre-cutover
+  files, verified their checksums, and printed `v3 ledger: 17 accounts,
+  15500 VCoin` — its own second witness on the money — against a live
+  ledger of 2 accounts and 2000 VCoin. `restore-stores.mjs` had the
+  mirror and would have reported the ledger restored while the database
+  was untouched. Both now dump and restore `vaco.stores` and the two v3
+  tables, both refuse rather than report success where the files alone
+  would mislead, and `scripts/test/backup-restore.test.mjs` holds it.
+  **The snapshot still goes to a local directory**, so the disk that
+  holds the database and the disk that holds its backup are the same
+  disk. That is the remaining gap, and it is the same one as before —
+  it just moved.
 - **The LiveKit SFU has never been started.** Its config and Compose
   service exist and the token it will be handed is real, but no audio
   has ever crossed it. Expect the first run to need `use_external_ip`

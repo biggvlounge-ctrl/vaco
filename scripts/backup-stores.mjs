@@ -40,12 +40,68 @@
 // against itself and still be wrong; a ledger total is a second,
 // independent witness.
 
+// ---------------------------------------------------------------------
+// Postgres, and the failure that made this section necessary
+//
+// **This script backed up stale files and reported `ok`.** On 11 Sep
+// 2026, 29 of the 34 backends moved onto Postgres. When `DATABASE_URL`
+// is set, `shared/storeBackend.js` builds the store from `vaco.stores`
+// and never touches `<app>/data/store.json` again — so the file left on
+// disk is whatever was there at cutover, frozen.
+//
+// This script only knew about those files. Driven on a real ecosystem
+// with a real database attached, it copied 30 stale files, verified
+// every checksum, wrote a manifest, and printed:
+//
+//     v3 ledger: 17 accounts, 21 transactions, 15500 VCoin
+//     backup-stores: ok
+//
+// while the live ledger held 2 accounts, 1 transaction and 2000 VCoin
+// in `vaco.v3_balances`. The ledger summary above — this file's own
+// second witness, written precisely because "a corrupt-but-well-formed
+// store would pass a checksum against itself and still be wrong" — was
+// checking the wrong store. Self-consistent, and about a database that
+// had not been read.
+//
+// A backup tool that is quietly incomplete is worse than one that is
+// obviously broken, and this was worse still: it was quietly backing up
+// a *different, older universe* and asserting on its money.
+//
+// So when `DATABASE_URL` is set this dumps the real tables too, and the
+// ledger summary comes from wherever the ledger actually is.
+//
+// **What this still does not cover, stated rather than implied.**
+// VACON-C's 63-table world schema is not in here. It is a different
+// kind of data with a different restore path, and `pg_dump` is the
+// right tool for it — pretending a JSON dump of three tables covers it
+// would be the same class of error this section exists to fix.
+
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+// The tables this knows how to snapshot. `vaco.stores` is the 28
+// document-store apps; the two v3 tables are the row ledger.
+//
+// `v3_idempotency` is deliberately absent. Its rows expire within 24
+// hours and exist to make a retry safe, not to record what happened —
+// restoring them would re-arm claims for requests nobody is retrying
+// any more, and omitting them costs a caller at most one duplicate
+// refusal. Named here so the omission is a decision on the page rather
+// than a table somebody forgot.
+const DB_TABLES = ['vaco.stores', 'vaco.v3_balances', 'vaco.v3_transactions'];
+
+function loadPg() {
+  const require_ = createRequire(import.meta.url);
+  // `pg` is a dependency of the converted apps rather than of the repo
+  // root, so it is resolved the same way the test suites resolve it.
+  try { return require_('pg'); } catch { /* fall through */ }
+  return require_(path.join(REPO_ROOT, 'vacon-c', 'node_modules', 'pg'));
+}
 
 // Kept outside the repository by default. A backup committed alongside
 // the thing it backs up protects against nothing.
@@ -151,6 +207,87 @@ function ledgerSummary(store) {
   };
 }
 
+// The same second witness, read from the rows instead of the document.
+//
+// **The two shapes really are different and must not be merged.** The
+// file store keeps `vcoinBalances` as an object of user -> number; the
+// row ledger keeps one row per user per currency, and Postgres returns
+// NUMERIC as a *string*, so `+` on it concatenates rather than adds.
+// That is why every amount goes through `Number()` here.
+function ledgerSummaryFromRows(balances, transactions) {
+  const of = (currency) => balances.filter((r) => r.currency === currency);
+  const sum = (rows) => Math.round(
+    rows.reduce((total, r) => total + Number(r.amount), 0) * 100) / 100;
+  const vcoin = of('vcoin');
+  const vash = of('vash');
+  return {
+    vcoinAccounts: vcoin.length,
+    vashAccounts: vash.length,
+    totalVcoin: sum(vcoin),
+    totalVash: sum(vash),
+    transactionCount: transactions.length,
+    nextTransactionId: transactions.length
+      ? Math.max(...transactions.map((t) => Number(t.id))) + 1
+      : null,
+  };
+}
+
+// Dump the tables into one file in the snapshot. Returns what the
+// manifest needs, and throws rather than returning a partial result —
+// the caller treats a database failure as a failed backup, not as a
+// backup without a database in it.
+async function backupDatabase(databaseUrl, snapshotDir, log) {
+  const { Pool } = loadPg();
+  const pool = new Pool({ connectionString: databaseUrl });
+  try {
+    const dump = {};
+    for (const table of DB_TABLES) {
+      // A table that does not exist is not an error: an ecosystem that
+      // has never run V3 against this database has no v3_balances yet.
+      // A table that exists and cannot be read IS an error, and the
+      // distinction is the `to_regclass` check rather than swallowing
+      // every failure.
+      const present = await pool.query('SELECT to_regclass($1) AS oid', [table]);
+      if (!present.rows[0].oid) {
+        dump[table] = null;
+        log(`  ${table.padEnd(22)} (absent)`);
+        continue;
+      }
+      const { rows } = await pool.query(`SELECT * FROM ${table}`);
+      dump[table] = rows;
+      log(`  ${table.padEnd(22)} ${String(rows.length).padStart(8)} rows`);
+    }
+
+    const raw = Buffer.from(`${JSON.stringify(dump, null, 2)}\n`, 'utf8');
+    const target = path.join(snapshotDir, 'postgres.json');
+    fs.writeFileSync(target, raw);
+
+    // Read it back, for the same reason the file path does.
+    const digest = sha256(raw);
+    if (sha256(fs.readFileSync(target)) !== digest) {
+      throw new Error('postgres.json does not match what was written');
+    }
+
+    const balances = dump['vaco.v3_balances'];
+    return {
+      file: 'postgres.json',
+      bytes: raw.length,
+      sha256: digest,
+      tables: Object.fromEntries(DB_TABLES.map((t) => [t, dump[t] ? dump[t].length : null])),
+      // Only claim a ledger summary when the ledger rows are actually
+      // there. An absent table means V3 is not on this database, and a
+      // summary of zero would read as an empty ledger rather than as no
+      // ledger.
+      ledger: balances
+        ? ledgerSummaryFromRows(balances, dump['vaco.v3_transactions'] || [])
+        : null,
+      appKeys: (dump['vaco.stores'] || []).map((r) => r.app_key).sort(),
+    };
+  } finally {
+    await pool.end();
+  }
+}
+
 function pruneOldSnapshots(dest, keep, log) {
   const snapshots = fs.readdirSync(dest, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && /^\d{8}T\d{6}Z$/.test(entry.name))
@@ -164,7 +301,7 @@ function pruneOldSnapshots(dest, keep, log) {
   return doomed.length;
 }
 
-function main() {
+async function main() {
   let args;
   try {
     args = parseArgs(process.argv.slice(2));
@@ -178,10 +315,15 @@ function main() {
   }
 
   const log = args.quiet ? () => {} : (line) => process.stdout.write(`${line}\n`);
+  const databaseUrl = process.env.DATABASE_URL;
 
   const stores = discoverStores();
-  if (stores.length === 0) {
-    process.stderr.write('backup-stores: found no */data/store.json to back up.\n');
+  // **Only a hard failure when there is nothing at all to back up.**
+  // With a database attached, no store files is an ordinary state — a
+  // fresh deployment that has only ever run on Postgres has none.
+  if (stores.length === 0 && !databaseUrl) {
+    process.stderr.write('backup-stores: found no */data/store.json to back up, '
+      + 'and DATABASE_URL is not set, so there is no database to read either.\n');
     process.exit(1);
   }
 
@@ -232,6 +374,32 @@ function main() {
     log(`  ${app.padEnd(16)} ${String(raw.length).padStart(8)} bytes  ${digest.slice(0, 12)}`);
   }
 
+  // -- the database ---------------------------------------------------
+  //
+  // After the files, so a database failure still leaves whatever the
+  // file pass captured on disk as evidence.
+  let database = null;
+  if (databaseUrl) {
+    log('  --');
+    try {
+      database = await backupDatabase(databaseUrl, snapshotDir, log);
+    } catch (err) {
+      failures.push(`postgres: ${err.message}`);
+    }
+  }
+
+  // Files belonging to an app whose live store is in the database are
+  // marked rather than dropped. They are still copied — an old copy of
+  // a store is worth having and costs nothing — but a restore must not
+  // mistake one for current, and neither must a person reading the
+  // manifest.
+  if (database) {
+    const live = new Set(database.appKeys);
+    for (const entry of entries) {
+      if (live.has(path.basename(entry.app))) entry.stale = true;
+    }
+  }
+
   if (failures.length > 0) {
     for (const failure of failures) process.stderr.write(`backup-stores: FAILED ${failure}\n`);
     // Leave the partial snapshot in place: it is evidence, and deleting
@@ -246,22 +414,57 @@ function main() {
     snapshot: stamp,
     repoRoot: REPO_ROOT,
     storeCount: entries.length,
+    // Recorded so a restore knows which backend this snapshot was taken
+    // from without having to infer it from which files are present.
+    backend: database ? 'postgres+files' : 'files',
     entries,
+    postgres: database,
   };
   const manifestPath = path.join(snapshotDir, 'manifest.json');
   fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
   const pruned = pruneOldSnapshots(args.dest, args.keep, log);
 
-  const ledger = entries.find((entry) => entry.app === 'v3')?.ledger;
+  // -- the ledger line, from wherever the ledger actually is ----------
+  //
+  // **This is the line that lied.** It read the v3 *file* unconditionally
+  // and printed a confident account count and VCoin total, which stayed
+  // confident and became false the moment V3 moved to Postgres. Now the
+  // database wins when there is one, and the line says which store it
+  // is describing so the number can never again be read as being about
+  // the other one.
+  const fileLedger = entries.find((entry) => entry.app === 'v3')?.ledger;
+  const ledger = (database && database.ledger) || fileLedger;
+  const source = database && database.ledger ? 'Postgres rows'
+    : (fileLedger ? 'v3/data/store.json' : null);
+
   if (ledger) {
-    log(`  v3 ledger: ${ledger.vcoinAccounts} accounts, ${ledger.transactionCount} transactions, ${ledger.totalVcoin} VCoin`);
+    log(`  v3 ledger (${source}): ${ledger.vcoinAccounts} accounts, `
+      + `${ledger.transactionCount} transactions, ${ledger.totalVcoin} VCoin`);
   } else {
     log('  note: no v3 store found — the ledger is NOT in this snapshot');
   }
+
+  // **A backup that did not read the live store must not say `ok`.**
+  // With DATABASE_URL set and the ledger tables absent, every file this
+  // captured is a pre-cutover copy, and printing success over it is the
+  // exact failure this whole section was written for.
+  if (databaseUrl && !(database && database.ledger) && fileLedger) {
+    process.stderr.write(
+      'backup-stores: DATABASE_URL is set, but vaco.v3_balances does not exist in it.\n'
+      + `  The v3 file captured here reports ${fileLedger.totalVcoin} VCoin across `
+      + `${fileLedger.vcoinAccounts} accounts.\n`
+      + '  If V3 is running against this database, that file is a pre-cutover copy and\n'
+      + '  this snapshot does NOT contain the live ledger. Refusing to report success.\n');
+    process.exit(1);
+  }
+
   log(`backup-stores: ok${pruned > 0 ? ` (pruned ${pruned} old snapshot${pruned === 1 ? '' : 's'})` : ''}`);
 
   if (args.quiet) process.stdout.write(`${snapshotDir}\n`);
 }
 
-main();
+main().catch((err) => {
+  process.stderr.write(`backup-stores: ${err.stack || err.message}\n`);
+  process.exit(1);
+});

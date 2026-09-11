@@ -33,12 +33,115 @@
 // first — `./stop-ecosystem.sh` — and the script refuses loudly if it
 // can tell that a server is up.
 
+// ---------------------------------------------------------------------
+// Postgres
+//
+// **This had the mirror of the bug `backup-stores.mjs` had.** It
+// restored files and then printed "v3 ledger verified: 17 accounts,
+// 15500 VCoin" — a summary of the file it had just written, while the
+// live ledger in `vaco.v3_balances` sat untouched. On a Postgres
+// deployment the whole restore would have been a no-op that announced
+// success on the money, which on the worst day of somebody's year is
+// the most expensive sentence in this repository.
+//
+// So: the snapshot says which backend it came from, and this refuses
+// any combination where writing the files alone would leave a person
+// believing the ledger came back when it did not.
+//
+//   snapshot has postgres + DATABASE_URL set    → restore both
+//   snapshot has postgres + no DATABASE_URL     → refuse
+//   snapshot is files-only + DATABASE_URL set   → refuse
+//   snapshot is files-only + no DATABASE_URL    → restore files (as before)
+//
+// `--files-only` overrides the two refusals for the case where that is
+// genuinely what is wanted — recovering one app's documents on a
+// machine with no database in front of you. It is a flag rather than
+// the default because the default has to be the safe reading.
+
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+function loadPg() {
+  const require_ = createRequire(import.meta.url);
+  try { return require_('pg'); } catch { /* fall through */ }
+  return require_(path.join(REPO_ROOT, 'vacon-c', 'node_modules', 'pg'));
+}
+
+// Same shape as backup-stores.mjs's, and for the same reason: Postgres
+// returns NUMERIC as a string, so every amount goes through Number().
+function ledgerSummaryFromRows(balances, transactions) {
+  const of = (currency) => balances.filter((r) => r.currency === currency);
+  const sum = (rows) => Math.round(
+    rows.reduce((total, r) => total + Number(r.amount), 0) * 100) / 100;
+  const vcoin = of('vcoin');
+  const vash = of('vash');
+  return {
+    vcoinAccounts: vcoin.length,
+    vashAccounts: vash.length,
+    totalVcoin: sum(vcoin),
+    totalVash: sum(vash),
+    transactionCount: transactions.length,
+    nextTransactionId: transactions.length
+      ? Math.max(...transactions.map((t) => Number(t.id))) + 1
+      : null,
+  };
+}
+
+// One transaction for the whole restore. A half-restored ledger is
+// worse than a failed one: it is a set of balances that never existed
+// together, and nothing downstream would be able to tell.
+async function restoreDatabase(databaseUrl, dump, log) {
+  const { Pool } = loadPg();
+  const pool = new Pool({ connectionString: databaseUrl });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    for (const [table, rows] of Object.entries(dump)) {
+      if (rows === null) continue;
+      const present = await client.query('SELECT to_regclass($1) AS oid', [table]);
+      if (!present.rows[0].oid) {
+        throw new Error(`${table} is in the snapshot but does not exist in this database. `
+          + 'Start the apps once against it so the schema is created, then restore.');
+      }
+      await client.query(`DELETE FROM ${table}`);
+      for (const row of rows) {
+        const cols = Object.keys(row);
+        const params = cols.map((_, i) => `$${i + 1}`).join(', ');
+        await client.query(
+          `INSERT INTO ${table} (${cols.map((c) => `"${c}"`).join(', ')}) VALUES (${params})`,
+          cols.map((c) => row[c]),
+        );
+      }
+      log(`  restored ${table.padEnd(22)} ${String(rows.length).padStart(8)} rows`);
+    }
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+    await pool.end();
+  }
+}
+
+// Read the money back out of the database, not out of what we just
+// parsed. The point of a second witness is that it is independent.
+async function readLedgerFromDb(databaseUrl) {
+  const { Pool } = loadPg();
+  const pool = new Pool({ connectionString: databaseUrl });
+  try {
+    const balances = await pool.query('SELECT * FROM vaco.v3_balances');
+    const txns = await pool.query('SELECT * FROM vaco.v3_transactions');
+    return ledgerSummaryFromRows(balances.rows, txns.rows);
+  } finally {
+    await pool.end();
+  }
+}
 
 const DEFAULT_DEST = process.env.VACO_BACKUP_DIR
   || path.join(path.dirname(REPO_ROOT), 'vaco-backups');
@@ -54,6 +157,8 @@ const USAGE = `Usage: node scripts/restore-stores.mjs [snapshot] [options]
   --apply        Actually write. Without it this is a dry run.
   --list         List available snapshots and exit.
   --force        Restore even if a server looks like it is running.
+  --files-only   Restore the JSON files only, never the database. Refused
+                 combinations below become warnings.
 
 Verifies checksums and JSON validity before writing anything, and
 re-checks the v3 ledger totals after.`;
@@ -66,6 +171,7 @@ function parseArgs(argv) {
     else if (arg === '--into') { args.into = path.resolve(argv[i + 1]); i += 1; }
     else if (arg === '--only') { args.only = argv[i + 1].split(',').map((s) => s.trim()).filter(Boolean); i += 1; }
     else if (arg === '--apply') args.apply = true;
+    else if (arg === '--files-only') args.filesOnly = true;
     else if (arg === '--list') args.list = true;
     else if (arg === '--force') args.force = true;
     else if (arg === '--help' || arg === '-h') args.help = true;
@@ -170,7 +276,7 @@ function writeAtomic(filePath, buffer) {
   fs.renameSync(tmp, filePath);
 }
 
-function main() {
+async function main() {
   let args;
   try {
     args = parseArgs(process.argv.slice(2));
@@ -252,12 +358,60 @@ function main() {
   }
   process.stdout.write(`  verified ${verified.length} file(s): checksums match, all parse\n`);
 
+  // -- Which backend is this snapshot for, and which is in front of us?
+  //
+  // Decided before the dry-run output, so a dry run shows the same
+  // refusal an apply would hit rather than looking fine and then failing
+  // on the day it matters.
+  const databaseUrl = process.env.DATABASE_URL;
+  const snapshotHasDb = Boolean(manifest.postgres);
+  let dbDump = null;
+
+  if (!args.filesOnly) {
+    if (snapshotHasDb && !databaseUrl) {
+      process.stderr.write(
+        'restore-stores: this snapshot contains a Postgres dump and DATABASE_URL is not set.\n'
+        + `  It holds ${manifest.postgres.tables['vaco.stores'] ?? 0} app document(s) and `
+        + `${manifest.postgres.tables['vaco.v3_balances'] ?? 0} ledger balance row(s).\n`
+        + '  Restoring the files alone would leave every converted app reading a database\n'
+        + '  this never wrote to. Set DATABASE_URL, or pass --files-only if that is really\n'
+        + '  what you want.\n');
+      process.exit(1);
+    }
+    if (!snapshotHasDb && databaseUrl) {
+      process.stderr.write(
+        'restore-stores: DATABASE_URL is set, but this snapshot has no Postgres dump in it.\n'
+        + '  It predates the database (taken with backend "files"), so restoring it writes\n'
+        + '  JSON files that the converted apps no longer read — the ledger would be\n'
+        + '  untouched and this would report success. Take a new backup, or pass\n'
+        + '  --files-only if you are deliberately recovering the pre-cutover files.\n');
+      process.exit(1);
+    }
+  }
+
+  if (snapshotHasDb && databaseUrl && !args.filesOnly) {
+    const dumpPath = path.join(snapshotDir, manifest.postgres.file);
+    const raw = fs.readFileSync(dumpPath);
+    if (sha256(raw) !== manifest.postgres.sha256) {
+      process.stderr.write(`restore-stores: ${manifest.postgres.file} does not match its recorded checksum.\n`);
+      process.exit(1);
+    }
+    dbDump = JSON.parse(raw.toString('utf8'));
+  }
+
   if (!args.apply) {
     for (const { entry } of verified) {
       const target = path.join(args.into, entry.app, 'data', 'store.json');
       const exists = fs.existsSync(target);
       process.stdout.write(`  would write ${entry.app.padEnd(16)} ${String(entry.bytes).padStart(8)} bytes`
-        + `  ${exists ? '(overwrites existing)' : '(new file)'}\n`);
+        + `  ${exists ? '(overwrites existing)' : '(new file)'}`
+        + `${entry.stale ? '  [stale — this app\'s live store is the database]' : ''}\n`);
+    }
+    if (dbDump) {
+      for (const [table, rows] of Object.entries(dbDump)) {
+        if (rows === null) continue;
+        process.stdout.write(`  would replace ${table.padEnd(22)} ${String(rows.length).padStart(8)} rows\n`);
+      }
     }
     process.stdout.write('\nDry run. Nothing was written. Re-run with --apply to restore.\n');
     return;
@@ -277,7 +431,33 @@ function main() {
     process.stdout.write(`  restored ${entry.app}\n`);
   }
 
+  if (dbDump) {
+    await restoreDatabase(databaseUrl, dbDump, (line) => process.stdout.write(`${line}\n`));
+  }
+
   // -- Verify the money came back, not just the bytes ----------------
+  //
+  // **From the database when the database is the ledger.** Re-read out
+  // of Postgres and compare against what the snapshot recorded, exactly
+  // as the file path does — the version of this that only ever read the
+  // file is what made a no-op restore print "v3 ledger verified".
+  if (dbDump && manifest.postgres.ledger) {
+    const after = await readLedgerFromDb(databaseUrl);
+    const expected = manifest.postgres.ledger;
+    const mismatches = Object.keys(expected)
+      .filter((key) => after[key] !== expected[key])
+      .map((key) => `${key}: expected ${expected[key]}, got ${after[key]}`);
+    if (mismatches.length > 0) {
+      process.stderr.write('restore-stores: THE LEDGER DID NOT COME BACK INTACT\n');
+      for (const line of mismatches) process.stderr.write(`  ${line}\n`);
+      process.exit(1);
+    }
+    process.stdout.write(`  v3 ledger verified (Postgres rows): ${after.vcoinAccounts} accounts, `
+      + `${after.transactionCount} transactions, ${after.totalVcoin} VCoin\n`);
+    process.stdout.write('restore-stores: ok\n');
+    return;
+  }
+
   const v3Entry = verified.find(({ entry }) => entry.app === 'v3');
   if (v3Entry?.entry.ledger) {
     const restored = JSON.parse(
@@ -302,4 +482,7 @@ function main() {
   process.stdout.write('restore-stores: ok\n');
 }
 
-main();
+main().catch((err) => {
+  process.stderr.write(`restore-stores: ${err.stack || err.message}\n`);
+  process.exit(1);
+});

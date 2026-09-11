@@ -160,6 +160,36 @@ Acceleration Matrix §12 names `v3` as the first app to migrate for
 exactly this reason. **Until then, the backup interval *is* the RPO for
 the ledger, so choose it deliberately rather than by habit.**
 
+**V3 moved to Postgres on 11 Sep 2026, and that changes less than it
+sounds.** Balances and transactions are real rows in `vaco.v3_balances`
+and `vaco.v3_transactions`, so continuous archiving is now *possible* —
+but nothing here does it. `backup-stores.mjs` dumps those tables on
+each run, which is still a periodic snapshot with the same RPO
+property. **WAL archiving or streaming replication is the step that
+would actually deliver RPO ≈ 0, and it has not been set up.** The
+interval is still the RPO for the ledger.
+
+**A second failure the move introduced, and it was live for a day.**
+When `DATABASE_URL` is set, the converted apps never write
+`<app>/data/store.json` again. `backup-stores.mjs` only knew about
+those files, so on a Postgres deployment it copied stale pre-cutover
+files, verified every checksum, and reported:
+
+```
+v3 ledger: 17 accounts, 21 transactions, 15500 VCoin
+backup-stores: ok
+```
+
+against a live ledger of 2 accounts, 1 transaction and 2000 VCoin. The
+ledger summary — the second witness this document leans on below —
+was summarising the wrong store. `restore-stores.mjs` had the mirror of
+it and would have reported a ledger restored while the database sat
+untouched.
+
+Both now read and write the database when there is one, and both
+**refuse rather than report success** in every combination where the
+files alone would mislead. Held by `scripts/test/backup-restore.test.mjs`.
+
 **RTO — Recovery Time Objective.** How long until service is back.
 
 At 87 KB total, the restore itself takes under a second. **RTO here is
@@ -184,13 +214,24 @@ committed alongside the thing it backs up protects against nothing.
 What it does, in order:
 
 1. Discovers every `<app>/data/store.json`. Discovered, not listed, so a
-   new app is covered without anyone remembering to add it.
+   new app is covered without anyone remembering to add it. **When
+   `DATABASE_URL` is set it also dumps `vaco.stores`,
+   `vaco.v3_balances` and `vaco.v3_transactions` to `postgres.json` in
+   the same snapshot**, and marks any file whose app is live in the
+   database as `stale` so a restore cannot mistake it for current.
+   VACON-C's 63-table world schema is **not** covered — that needs
+   `pg_dump`, and pretending otherwise would be the same error this
+   list is careful about elsewhere.
 2. Parses each file **before** accepting it. A backup of a corrupt store
    is a corrupt backup that looks healthy in a directory listing.
 3. Copies, then reads the copy back and compares digests. The difference
    between "wrote it" and "it is on disk".
-4. Writes `manifest.json`: SHA-256, byte size, and for `v3` a **ledger
-   summary** — account count, transaction count, total VCoin.
+4. Writes `manifest.json`: SHA-256, byte size, a `backend` field saying
+   which store the snapshot came from, and a **ledger summary** —
+   account count, transaction count, total VCoin — taken from **wherever
+   the ledger actually is**. That last clause is load-bearing: the
+   version that always read the file is what printed a confident,
+   entirely wrong total for a day.
 5. Prunes to `--keep` snapshots (default 30).
 
 **Exits non-zero if any store fails.** A scheduled job that ignores that

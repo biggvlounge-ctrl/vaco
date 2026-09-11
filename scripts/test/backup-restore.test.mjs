@@ -75,16 +75,31 @@ function makeRepo() {
 // point them at a fixture we back up FROM a copy of the scripts placed
 // inside it. Cheaper and more honest than adding a --from flag that
 // only tests would ever use.
-function backupFrom(repoRoot, dest, extra = []) {
+//
+// **The environment is controlled, not inherited, and that is not
+// tidiness.** Both scripts changed behaviour when `DATABASE_URL` is
+// set: they read and write the real tables. `execFileSync` inherits
+// `process.env` by default, so on any machine where a developer has
+// exported `DATABASE_URL` -- which is every machine running the
+// converted apps -- these fixture tests would have started talking to a
+// real database instead of the temporary directory they were written
+// for. The fixture tests are about files; they say so here.
+function fileEnv(extra = {}) {
+  const env = { ...process.env, ...extra };
+  if (!('DATABASE_URL' in extra)) delete env.DATABASE_URL;
+  return env;
+}
+
+function backupFrom(repoRoot, dest, extra = [], env = fileEnv()) {
   fs.mkdirSync(path.join(repoRoot, 'scripts'), { recursive: true });
   fs.copyFileSync(BACKUP, path.join(repoRoot, 'scripts', 'backup-stores.mjs'));
   return execFileSync(process.execPath,
     [path.join(repoRoot, 'scripts', 'backup-stores.mjs'), '--dest', dest, ...extra],
-    { encoding: 'utf8' });
+    { encoding: 'utf8', env });
 }
 
-function restore(args) {
-  return execFileSync(process.execPath, [RESTORE, ...args], { encoding: 'utf8' });
+function restore(args, env = fileEnv()) {
+  return execFileSync(process.execPath, [RESTORE, ...args], { encoding: 'utf8', env });
 }
 
 function snapshotsIn(dest) {
@@ -356,3 +371,135 @@ test('a nested app is backed up and restored like any other', () => {
   assert.deepStrictEqual(restored, { products: [{ id: 1, name: 'tee' }], nextProductId: 2 },
     'a nested app must round-trip, not just appear in the listing');
 });
+
+// -- The database, and the day these scripts did not know about it -------
+//
+// **The failure these exist for, in full.** On 11 Sep 2026, 29 of the 34
+// backends moved onto Postgres. `shared/storeBackend.js` then builds
+// every converted app's store from `vaco.stores` and never touches
+// `<app>/data/store.json` again, so the file on disk freezes at whatever
+// it held on cutover day.
+//
+// Neither script knew. Driven on a real ecosystem with a real database
+// attached, `backup-stores.mjs` copied 30 stale files, verified every
+// checksum, wrote a manifest, and printed:
+//
+//     v3 ledger: 17 accounts, 21 transactions, 15500 VCoin
+//     backup-stores: ok
+//
+// against a live ledger of 2 accounts, 1 transaction and 2000 VCoin. The
+// ledger summary — this repo's own "assert on the money, not on the
+// bytes" second witness — was summarising the wrong store, confidently.
+// `restore-stores.mjs` had the mirror: it would have written the files,
+// re-read the file it had just written, and reported the ledger
+// verified while the database sat untouched.
+//
+// The first test below needs no database at all and is the most
+// valuable of the set, because it is the check that would have caught
+// the original bug on any machine.
+
+// One unreachable URL. These tests assert that the scripts REFUSE
+// before connecting, so the port never has to answer — and if a future
+// change moves the refusal after the connection, the test fails with a
+// connection error rather than passing quietly.
+const UNREACHABLE = 'postgres://nobody@127.0.0.1:1/definitely-not-here';
+
+function expectFailure(fn) {
+  try {
+    fn();
+  } catch (err) {
+    return `${err.stdout || ''}${err.stderr || ''}`;
+  }
+  return null;
+}
+
+test('a files-only snapshot is refused when DATABASE_URL is set', () => {
+  // The original bug, from the restore side: the snapshot predates the
+  // database, so writing its files would leave the ledger untouched and
+  // report success.
+  const repo = makeRepo();
+  const dest = path.join(repo, '..', `dest-${path.basename(repo)}`);
+  backupFrom(repo, dest);
+
+  const output = expectFailure(() => restore(
+    ['--dest', dest, '--into', repo, '--apply', '--force'],
+    fileEnv({ DATABASE_URL: UNREACHABLE }),
+  ));
+
+  assert.ok(output, 'restoring a files-only snapshot with DATABASE_URL set must fail');
+  assert.match(output, /no Postgres dump in it/,
+    'the refusal must say why, not just exit non-zero');
+  assert.doesNotMatch(output, /ECONNREFUSED|connect/i,
+    'the refusal must happen before any connection attempt');
+});
+
+test('--files-only is the documented way past that refusal', () => {
+  const repo = makeRepo();
+  const dest = path.join(repo, '..', `dest-${path.basename(repo)}`);
+  backupFrom(repo, dest);
+
+  fs.writeFileSync(path.join(repo, 'void', 'data', 'store.json'), '{"lost": true}');
+  restore(['--dest', dest, '--into', repo, '--apply', '--force', '--files-only'],
+    fileEnv({ DATABASE_URL: UNREACHABLE }));
+
+  const restored = JSON.parse(fs.readFileSync(path.join(repo, 'void', 'data', 'store.json'), 'utf8'));
+  assert.strictEqual(restored.jobs[0].id, 7, '--files-only must still restore the files');
+});
+
+// **This test needs a real Postgres, and the first version of it did
+// not — which is why it was worthless.** It drove the fixture repo,
+// where `pg` is not installed, so `backup-stores.mjs` failed to load the
+// driver and exited non-zero for that reason alone. Deleting the
+// refusal it was meant to guard changed nothing: the test still passed.
+// Caught by removing the refusal and watching the suite stay green.
+//
+// So it drives the REAL script against the REAL repo (read-only; the
+// snapshot goes to a temp directory) pointed at an empty database. Then
+// the only thing that can make it exit non-zero is the refusal.
+const PG_URL = process.env.VACO_TEST_DATABASE_URL || process.env.DATABASE_URL;
+
+// **`false`, not `null`, and that is not a style choice.** Node's test
+// runner treats `skip` as set when it is anything other than
+// `undefined` — so `{ skip: null }` skips the test. This was written
+// with `null`, which meant the test below was silently skipped on
+// exactly the machines that could run it, and reported as passing.
+// Found by giving it a real database and noticing it still said SKIP.
+let pgReason = false;
+if (!PG_URL) {
+  pgReason = 'no DATABASE_URL or VACO_TEST_DATABASE_URL — nothing to check the database path against';
+}
+
+test('the backup refuses to report success when the ledger tables are missing',
+  { skip: pgReason }, () => {
+    // A database with no `vaco` schema in it at all: every file the
+    // script captures is then a pre-cutover copy, and printing `ok` over
+    // that is the original bug.
+    const empty = `${PG_URL.replace(/\/[^/]*$/, '')}/vaco_backup_test_empty`;
+    const dest = fs.mkdtempSync(path.join(os.tmpdir(), 'vaco-backup-empty-'));
+
+    let admin;
+    try {
+      admin = execFileSync('psql', [PG_URL, '-tAc',
+        "SELECT 1 FROM pg_database WHERE datname = 'vaco_backup_test_empty'"],
+      { encoding: 'utf8' }).trim();
+    } catch {
+      return; // psql not available; the skip above could not know that
+    }
+    if (!admin) {
+      execFileSync('psql', [PG_URL, '-c', 'CREATE DATABASE vaco_backup_test_empty'],
+        { encoding: 'utf8' });
+    }
+
+    const output = expectFailure(() => execFileSync(
+      process.execPath, [BACKUP, '--dest', dest],
+      { encoding: 'utf8', env: fileEnv({ DATABASE_URL: empty }) },
+    ));
+
+    assert.ok(output,
+      'DATABASE_URL set, no ledger tables in it, and the script reported success — '
+      + 'every file in that snapshot is a pre-cutover copy');
+    assert.match(output, /does not exist in it/,
+      'the refusal must name what is missing');
+    assert.doesNotMatch(output, /backup-stores: ok/,
+      'it must not report success — that is the bug this whole section is about');
+  });
