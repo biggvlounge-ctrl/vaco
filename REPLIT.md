@@ -159,7 +159,7 @@ What *has* been driven for real, on Linux:
   to bind the gateway's port. Fixed, and held by a test.
 - `gateway.js` against the booted ecosystem — 33 of 34 apps answered
   200 through one port, the 34th being the one deliberately down.
-- The full test suite: 1539 tests across 39 suites.
+- The full test suite: 1546 tests across 39 suites.
 
 ## What Replit is good for here, and what it is not
 
@@ -167,7 +167,7 @@ What *has* been driven for real, on Linux:
 existed, seeing this run meant cloning the repo and starting 36
 servers.
 
-**Not good for production, as it stands.** 33 of the 34 apps keep state
+**Not good for production, as it stands.** 32 of the 34 apps keep state
 in JSON files on disk. That survives a persistent workspace or a
 Reserved VM. It does *not* survive an autoscaling deployment, where the
 filesystem is ephemeral and a second instance means a second, divergent

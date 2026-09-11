@@ -56,8 +56,30 @@ app.use(traceMiddleware());
 
 app.use(express.static(path.join(__dirname, 'public')));
 const PORT = process.env.PORT || 8811;
-const store = createPersistentStore(path.join(__dirname, 'data', 'store.json'), createV3Store);
-app.use(durable(store));  // commit before responding -- see lib/persistence.js
+// -- The store, and which backend holds it ----------------------------
+//
+// **`let`, not `const`, and the server does not listen until it is
+// set.** V3 is the first app moved off a JSON file. With DATABASE_URL
+// set the store lives in Postgres; without one it stays exactly where
+// it was, byte for byte, so nothing about local development or the
+// existing deployment changes until somebody sets the variable.
+//
+// The Postgres backend cannot be built synchronously -- there is no
+// synchronous Postgres client for Node -- so `start()` below awaits it
+// before `app.listen`. That ordering is the whole safety of it: a
+// ledger that answers requests against an unloaded store would report
+// every balance as zero and accept transfers against them.
+//
+// The route handlers close over this binding rather than a value, so
+// they see whichever store `start()` installs. Nothing can reach them
+// first: the server is not listening until it resolves.
+let store = null;
+let commitBeforeResponding = (req, res, next) => next();
+
+// Mounted here, in the position `durable(store)` held, so it still runs
+// ahead of every route. It delegates rather than deciding, because
+// which backend is in play is not known until start() has run.
+app.use((req, res, next) => commitBeforeResponding(req, res, next));
 
 // Trusted-service allowlist. **Now defaults to 'enforce'.**
 //
@@ -183,7 +205,51 @@ app.get('/api/vash/balance/:userId', (req, res) => {
   res.json({ userId: req.params.userId, vashBalance: getVashBalance(store, req.params.userId) });
 });
 
-app.listen(PORT, () => {
-  console.log(`V3 listening on http://localhost:${PORT}`);
-  console.log(`Health check: curl http://localhost:${PORT}/api/health`);
+// -- Boot -------------------------------------------------------------
+//
+// Two backends, one store shape. The choice is made by whether
+// DATABASE_URL is set and by nothing else -- no flag, no mode, no
+// default that silently picks the wrong one.
+//
+// **A Postgres backend that cannot reach its database refuses to
+// start.** That is deliberate and it is the opposite of what VACON-C
+// does, for a reason worth stating: VACON-C is a simulation whose
+// working set is regenerable, so an empty world that says so is a
+// working demo. This is the ledger. An empty ledger that answers
+// `/api/vcoin/balance` reports everyone's money as zero, and accepting
+// a transfer against that is worse than being unreachable.
+async function start() {
+  const databaseUrl = process.env.DATABASE_URL;
+
+  if (databaseUrl) {
+    const { Pool } = require('pg');
+    const { createPersistentStorePg, durable: durablePg } = require('./lib/persistencePg');
+
+    const pool = new Pool({ connectionString: databaseUrl });
+    store = await createPersistentStorePg(pool, 'v3', createV3Store);
+    commitBeforeResponding = durablePg(store);
+
+    const closePool = () => pool.end().finally(() => process.exit(0));
+    process.on('SIGTERM', closePool);
+    process.on('SIGINT', closePool);
+
+    console.log('V3 store: Postgres (DATABASE_URL is set)');
+  } else {
+    store = createPersistentStore(path.join(__dirname, 'data', 'store.json'), createV3Store);
+    commitBeforeResponding = durable(store);
+    console.log('V3 store: data/store.json (no DATABASE_URL) — safe for one process only');
+  }
+
+  app.listen(PORT, () => {
+    console.log(`V3 listening on http://localhost:${PORT}`);
+    console.log(`Health check: curl http://localhost:${PORT}/api/health`);
+  });
+}
+
+start().catch((err) => {
+  // Nothing half-started: no store, no listener, and a message naming
+  // the cause rather than a stack against an empty ledger later.
+  console.error(`V3 failed to start: ${err.message}`);
+  console.error(err.stack);
+  process.exit(1);
 });

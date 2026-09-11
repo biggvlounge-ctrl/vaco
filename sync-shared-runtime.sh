@@ -106,6 +106,21 @@ PERSISTENCE_TARGETS=(
   vulture-pods vulture-studios vxllage
 )
 
+# -- persistencePg.js --------------------------------------------------
+#
+# The same store, in Postgres instead of a JSON file. **One app so far.**
+#
+# This list is short on purpose and is the honest record of how far the
+# conversion has got: every app not named here still keeps its state in
+# a file and still must not be run in more than one container. Adding a
+# name here is the act of converting an app, and it is not free -- the
+# Postgres backend is asynchronous, so the app's store must be awaited
+# before it listens and its `durable()` must delay the response. See
+# shared/persistencePg.js for what that costs.
+PERSISTENCE_PG_TARGETS=(
+  v3
+)
+
 MEDIA_TARGETS=(
   vxllage cvnvo vavlt-stvdios v4-proxy vulture-flix vulture-pods chopz
 )
@@ -204,6 +219,7 @@ for app in "${OPERATOR_TARGETS[@]}"; do sync_one "shared/operatorAuth.js" "$app"
 for app in "${MEDIA_TARGETS[@]}"; do sync_one "shared/mediaClient.js" "$app" "mediaClient.cjs"; done
 for app in "${TRACING_TARGETS[@]}"; do sync_one "shared/tracing.js" "$app" "tracing.cjs"; done
 for app in "${PERSISTENCE_TARGETS[@]}"; do sync_one "shared/persistence.js" "$app" "persistence.js"; done
+for app in "${PERSISTENCE_PG_TARGETS[@]}"; do sync_one "shared/persistencePg.js" "$app" "persistencePg.js"; done
 
 # -- The mirror of the UNUSED check, and the more dangerous direction --
 #
@@ -277,24 +293,25 @@ check_unmanaged operatorAuth createOperatorAuth  OPERATOR_TARGETS
 check_unmanaged mediaClient  createMediaClient   MEDIA_TARGETS
 check_unmanaged tracing      traceMiddleware     TRACING_TARGETS
 check_unmanaged persistence createPersistentStore PERSISTENCE_TARGETS persistence.js
+check_unmanaged persistencePg createPersistentStorePg PERSISTENCE_PG_TARGETS persistencePg.js
 
 # Every list, summed. Adding PERSISTENCE_TARGETS to the loops and to
 # the message but not to this line made --check report "all 119 copies
 # current" on the same line that itemised 147 of them — a headline
 # contradicting its own breakdown, which is worse than either number
 # being wrong on its own.
-TOTAL=$(( ${#SHIELD_TARGETS[@]} + ${#SERVICE_TARGETS[@]} + ${#DECISION_LOG_TARGETS[@]} + ${#OPERATOR_TARGETS[@]} + ${#MEDIA_TARGETS[@]} + ${#TRACING_TARGETS[@]} + ${#PERSISTENCE_TARGETS[@]} ))
+TOTAL=$(( ${#SHIELD_TARGETS[@]} + ${#SERVICE_TARGETS[@]} + ${#DECISION_LOG_TARGETS[@]} + ${#OPERATOR_TARGETS[@]} + ${#MEDIA_TARGETS[@]} + ${#TRACING_TARGETS[@]} + ${#PERSISTENCE_TARGETS[@]} + ${#PERSISTENCE_PG_TARGETS[@]} ))
 
 if [ "$CHECK" = "1" ]; then
   if [ "$DRIFTED" -gt 0 ] || [ "$UNUSED" -gt 0 ] || [ "$UNMANAGED" -gt 0 ]; then
     echo "Shared runtime: $DRIFTED drifted, $UNUSED unused, $UNMANAGED unmanaged. Run ./sync-shared-runtime.sh" >&2
     exit 1
   fi
-  echo "Shared runtime: all $TOTAL copies current and in use (${#SHIELD_TARGETS[@]} shieldAuth, ${#SERVICE_TARGETS[@]} serviceAuth, ${#DECISION_LOG_TARGETS[@]} decisionLog, ${#OPERATOR_TARGETS[@]} operatorAuth, ${#MEDIA_TARGETS[@]} mediaClient, ${#TRACING_TARGETS[@]} tracing, ${#PERSISTENCE_TARGETS[@]} persistence), and no unmanaged copies elsewhere."
+  echo "Shared runtime: all $TOTAL copies current and in use (${#SHIELD_TARGETS[@]} shieldAuth, ${#SERVICE_TARGETS[@]} serviceAuth, ${#DECISION_LOG_TARGETS[@]} decisionLog, ${#OPERATOR_TARGETS[@]} operatorAuth, ${#MEDIA_TARGETS[@]} mediaClient, ${#TRACING_TARGETS[@]} tracing, ${#PERSISTENCE_TARGETS[@]} persistence, ${#PERSISTENCE_PG_TARGETS[@]} persistencePg), and no unmanaged copies elsewhere."
 else
   if [ "$UNUSED" -gt 0 ] || [ "$UNMANAGED" -gt 0 ]; then
     echo "Shared runtime: copied $COPIED file(s), but $UNUSED are not required anywhere and $UNMANAGED are outside the target lists." >&2
     exit 1
   fi
-  echo "Shared runtime: copied $COPIED file(s) (${#SHIELD_TARGETS[@]} shieldAuth, ${#SERVICE_TARGETS[@]} serviceAuth, ${#DECISION_LOG_TARGETS[@]} decisionLog, ${#OPERATOR_TARGETS[@]} operatorAuth, ${#MEDIA_TARGETS[@]} mediaClient, ${#TRACING_TARGETS[@]} tracing, ${#PERSISTENCE_TARGETS[@]} persistence)."
+  echo "Shared runtime: copied $COPIED file(s) (${#SHIELD_TARGETS[@]} shieldAuth, ${#SERVICE_TARGETS[@]} serviceAuth, ${#DECISION_LOG_TARGETS[@]} decisionLog, ${#OPERATOR_TARGETS[@]} operatorAuth, ${#MEDIA_TARGETS[@]} mediaClient, ${#TRACING_TARGETS[@]} tracing, ${#PERSISTENCE_TARGETS[@]} persistence, ${#PERSISTENCE_PG_TARGETS[@]} persistencePg)."
 fi

@@ -258,4 +258,10 @@ function durable(store) {
   };
 }
 
-module.exports = { createPersistentStore, commit, durable };
+// `reactive` is exported for `persistencePg.js`, which keeps the same
+// store in Postgres instead of a file and needs the identical
+// change-tracking. Two copies of a recursive Proxy that has already
+// produced a stack overflow and a silent cycle bug is not a trade worth
+// making; the Postgres backend differs in where bytes go, not in how a
+// mutation is noticed.
+module.exports = { createPersistentStore, commit, durable, reactive };
