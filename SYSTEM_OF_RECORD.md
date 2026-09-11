@@ -13,7 +13,7 @@ person who built it can check whether a claim is still true.
 Every number below was produced by running the tool that owns it, not
 recalled. The commands are in §10 so they can be re-run.
 
-*Current as of commit `da21531`, 56 commits, branch
+*Current as of commit `44f9aec`, 57 commits, branch
 `claude/v4-proxy-server-s6dcp8`, 11 Sep 2026.*
 
 **On the commit count.** An earlier revision of this line said 332. That
@@ -878,6 +878,14 @@ are what stand between this and a real deployment.**
   True multi-writer means decomposing a store into rows and letting
   Postgres arbitrate per balance and per transaction — a second,
   per-app job, and V3 is where it will matter first.
+
+  **V3's own ledger is rows, not a document, as of 11 Sep 2026.**
+  Balances, transfers, settlements, cashouts and idempotency keys are
+  real tables; `v3/lib/ledger.js` picks that or the in-memory store from
+  DATABASE_URL and the routes never branch. Two V3 containers can both
+  write: Postgres arbitrates per balance, and an idempotency key is
+  claimed by an INSERT before the handler runs rather than recorded
+  after it.
 
   V3 without `DATABASE_URL` still uses its file and says so at boot.
   With one set and the database unreachable it **refuses to start**,

@@ -37,10 +37,11 @@ require('dotenv/config');
 const { createV3Store } = require('./lib/store');
 const path = require('path');
 const { attachStore } = require('./lib/storeBackend');
-const { STARTING_VCOIN_BALANCE, getBalance, transfer, settle, getTransactionHistory, reconcile } = require('./lib/vcoin');
-const { VCOIN_TO_VASH_RATE, getVashBalance, cashout } = require('./lib/vash');
+const { STARTING_VCOIN_BALANCE } = require('./lib/vcoin');
+const { VCOIN_TO_VASH_RATE } = require('./lib/vash');
+const { createLedger } = require('./lib/ledger');
 const { requireActor, actorOrService: actorOrServiceWith, requireCallingService } = require('./lib/shieldAuth.cjs');
-const { idempotent, describeIdempotency } = require('./lib/idempotency');
+
 const { createServiceAuth } = require('./lib/serviceAuth.cjs');
 const { traceMiddleware } = require('./lib/tracing.cjs');
 
@@ -71,7 +72,44 @@ const PORT = process.env.PORT || 8811;
 // Without DATABASE_URL nothing changes: the same JSON file, in the same
 // place, with the same guarantees.
 let store = createV3Store();
-attachStore(app, {
+
+// -- The ledger ---------------------------------------------------------
+//
+// Balances, transfers, settlements, cashouts and idempotency keys, from
+// whichever backend this deployment is configured for: rows in Postgres
+// when DATABASE_URL is set, the in-memory store otherwise. The routes
+// below call `ledger.transfer(...)` either way and never branch — eight
+// `if (usingPostgres)` blocks in the money app would be eight places for
+// the two paths to drift, and drift in a ledger is not cosmetic.
+//
+// **`idempotentFor` exists because middleware is mounted at require
+// time and the ledger is not ready until later.** Mounting
+// `ledger.idempotent(name)` directly would read `ledger` while it is
+// still null. This defers the lookup to the request, which
+// `attachStore`'s gate guarantees happens after boot.
+let ledger = null;
+let ledgerReady = null;
+
+// **A second gate, because `attachStore`'s covers the store and the
+// ledger is built after it.** Without this a request arriving in the
+// window between the store loading and the ledger being constructed
+// would find `ledger` null and crash the handler. The window is small
+// and it is exactly the kind that only opens under load, on the first
+// requests after a restart.
+app.use((req, res, next) => {
+  if (ledger) return next();
+  return ledgerReady.then(() => next(), next);
+});
+
+const idempotentFor = (routeName) => {
+  let mounted = null;
+  return (req, res, next) => {
+    if (!mounted) mounted = ledger.idempotent(routeName);
+    return mounted(req, res, next);
+  };
+};
+
+ledgerReady = attachStore(app, {
   appKey: 'v3',
   createDefault: createV3Store,
   filePath: path.join(__dirname, 'data', 'store.json'),
@@ -86,7 +124,23 @@ attachStore(app, {
     // moving the money twice.
     app.set('v3Store', loaded);
   },
-});
+})
+  // The ledger is built from the same DATABASE_URL `attachStore` used,
+  // so the two cannot disagree about which backend this process is on.
+  // Chained onto the store's readiness rather than run beside it: the
+  // document ledger reads `store`, and it must be the loaded one.
+  .then(async () => {
+    ledger = await createLedger({
+      databaseUrl: process.env.DATABASE_URL,
+      getStore: () => store,
+    });
+    console.log(`v3 ledger: ${ledger.kind === 'rows' ? 'Postgres rows' : 'in-memory document'}`);
+  })
+  .catch((err) => {
+    console.error(`V3 could not build its ledger: ${err.message}`);
+    console.error('Refusing to serve money routes against a ledger that never loaded.');
+    process.exit(1);
+  });
 
 // Trusted-service allowlist. **Now defaults to 'enforce'.**
 //
@@ -130,25 +184,30 @@ app.use(serviceAuth.middleware);
 // `actorOrService('fromUserId')` rather than nesting two helpers.
 const actorOrService = (field) => actorOrServiceWith(requireActor(field));
 
-app.get('/api/health', (_req, res) => {
-  res.json({
-    ok: true, service: 'v3', startingVcoinBalance: STARTING_VCOIN_BALANCE, vcoinToVashRate: VCOIN_TO_VASH_RATE,
+app.get('/api/health', async (_req, res, next) => {
+  try {
+    res.json({
+      ok: true, service: 'v3', startingVcoinBalance: STARTING_VCOIN_BALANCE, vcoinToVashRate: VCOIN_TO_VASH_RATE,
     // Real, live crypto-migration posture (QVAN_SECURITY_RESILIENCE_SCOPE.md
     // §2) -- so "are we PQC-ready yet" is answerable against a running
     // deployment, not just by reading code.
-    crypto: describeCryptoPosture(),
-    idempotency: describeIdempotency(store),
-    serviceAuth: serviceAuth.describe(),
-  });
+      crypto: describeCryptoPosture(),
+      idempotency: await ledger.describe(),
+      serviceAuth: serviceAuth.describe(),
+      ledger: ledger.kind,
+    });
+  } catch (err) { next(err); }
 });
 
-app.get('/api/vcoin/balance/:userId', (req, res) => {
-  res.json({ userId: req.params.userId, balance: getBalance(store, req.params.userId) });
-});
-
-app.post('/api/vcoin/transfer', idempotent('vcoin/transfer'), actorOrService('fromUserId'), (req, res) => {
+app.get('/api/vcoin/balance/:userId', async (req, res, next) => {
   try {
-    res.status(201).json(transfer(store, req.body || {}));
+    res.json({ userId: req.params.userId, balance: await ledger.getBalance(req.params.userId) });
+  } catch (err) { next(err); }
+});
+
+app.post('/api/vcoin/transfer', idempotentFor('vcoin/transfer'), actorOrService('fromUserId'), async (req, res) => {
+  try {
+    res.status(201).json(await ledger.transfer(req.body || {}));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -171,16 +230,21 @@ app.post('/api/vcoin/transfer', idempotent('vcoin/transfer'), actorOrService('fr
 // mounted app-wide and proves *some* credential exists; this says which
 // kind this route needs, which is the distinction that let an
 // `audit-route-guards: open` marker sit on a route that wrote rows.
-app.post('/api/vcoin/settle', idempotent('vcoin/settle'), requireCallingService(), (req, res) => {
+app.post('/api/vcoin/settle', idempotentFor('vcoin/settle'), requireCallingService(), async (req, res) => {
   try {
-    res.status(201).json(settle(store, req.body || {}));
+    res.status(201).json(await ledger.settle(req.body || {}));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
-app.get('/api/vcoin/transactions/:userId', (req, res) => {
-  res.json({ userId: req.params.userId, transactions: getTransactionHistory(store, req.params.userId) });
+app.get('/api/vcoin/transactions/:userId', async (req, res, next) => {
+  try {
+    res.json({
+      userId: req.params.userId,
+      transactions: await ledger.getTransactionHistory(req.params.userId),
+    });
+  } catch (err) { next(err); }
 });
 
 // Whole-ledger audit: does the transaction history explain every
@@ -192,20 +256,24 @@ app.get('/api/vcoin/transactions/:userId', (req, res) => {
 // X-Service-Name/X-Service-Token pair. No second per-route guard: it is
 // a read, and adding `serviceAuth` here as if it were middleware is a
 // crash, because it is an object with a `.middleware` property.
-app.get('/api/vcoin/reconciliation', (_req, res) => {
-  res.json(reconcile(store));
+app.get('/api/vcoin/reconciliation', async (_req, res, next) => {
+  try {
+    res.json(await ledger.reconcile());
+  } catch (err) { next(err); }
 });
 
-app.post('/api/vash/cashout', idempotent('vash/cashout'), actorOrService('userId'), (req, res) => {
+app.post('/api/vash/cashout', idempotentFor('vash/cashout'), actorOrService('userId'), async (req, res) => {
   try {
-    res.status(201).json(cashout(store, req.body || {}));
+    res.status(201).json(await ledger.cashout(req.body || {}));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
-app.get('/api/vash/balance/:userId', (req, res) => {
-  res.json({ userId: req.params.userId, vashBalance: getVashBalance(store, req.params.userId) });
+app.get('/api/vash/balance/:userId', async (req, res, next) => {
+  try {
+    res.json({ userId: req.params.userId, vashBalance: await ledger.getVashBalance(req.params.userId) });
+  } catch (err) { next(err); }
 });
 
 app.listen(PORT, () => {
