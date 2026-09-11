@@ -53,7 +53,7 @@ PORT = "8080"
 #
 # Measured on the development machine, by PSS and confirmed against
 # the memory actually freed on shutdown:
-#   full stack   -- 37 processes, 0.7–0.8 GB
+#   full stack   -- 38 processes, 0.82–0.86 GB
 #   5-app subset -- 11 processes, 0.13 GB
 #
 # An earlier revision said 2.43 GB. That was summed RSS, which

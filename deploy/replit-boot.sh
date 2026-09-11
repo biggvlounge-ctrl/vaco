@@ -16,7 +16,7 @@
 # ---------------------------------------------------------------------
 # What this does NOT pretend
 #
-# The full stack measures **0.7–0.8 GB across 37 processes** on this
+# The full stack measures **0.82–0.86 GB across 38 processes** on this
 # machine -- by PSS, confirmed against the memory actually freed when
 # it stops. An earlier revision of this comment said 2.43 GB; that was
 # summed RSS, which double-counts the pages 36 Node processes share.
@@ -32,12 +32,20 @@
 #
 # VACON-C and its database
 #
-# One app keeps its world in Postgres rather than a JSON file. Attach
-# Replit's built-in PostgreSQL and DATABASE_URL is set for you; the app
-# loads its own schema into an empty database on first boot. Without
-# one it starts an empty world, says so, and never saves — which is a
-# working demo and not a working deployment. Nothing else here depends
-# on it.
+# **29 of the 34 backends use Postgres when it is there**, as of 11 Sep
+# 2026 -- this said "one app" until then. Attach Replit's built-in
+# PostgreSQL and DATABASE_URL is set for you; nothing else to configure.
+#
+# vacon-c loads its own 63-table world schema. The other 28 keep a
+# document each in a vaco.stores table, and V3's ledger goes further
+# still: balances and transactions are real rows, so two V3 containers
+# can both write.
+#
+# Without a database everything falls back to a JSON file per app and
+# still boots. With one attached but unreachable, the 28 converted apps
+# refuse to start and say why, while vacon-c starts an empty world and
+# says so -- a simulation that can regenerate its state is a working
+# demo, and a ledger reading every balance as zero is not.
 #
 # Set VACO_APPS to run a subset -- a space-separated list of app names.
 # On a small container that is the difference between a working demo of
@@ -127,7 +135,7 @@ if [ "${DOWN:-0}" -gt 0 ]; then
   echo
   echo "  * a missing secret -- the app refused on purpose. Check"
   echo "    logs/<app>.log; it will say which variable."
-  echo "  * not enough memory -- the full stack needs 0.7–0.8 GB. Set"
+  echo "  * not enough memory -- the full stack needs 0.82–0.86 GB. Set"
   echo "    VACO_APPS to a subset and boot fewer."
   echo
 fi

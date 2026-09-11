@@ -70,25 +70,30 @@ Measured on the development machine:
 
 | | processes | memory |
 |---|---|---|
-| all 36 apps | 37 | **0.7–0.8 GB** |
+| all 36 apps | 38 | **0.82–0.86 GB** |
 | 5 apps + gateway | 11 | **0.13 GB** |
 
-**On how these were measured, because the first attempt was wrong by
+**This grew on 11 Sep 2026 and the reason is worth knowing.** It was
+0.7–0.8 GB until 28 apps gained the Postgres driver. Re-measured rather
+than left alone: 819 MB by PSS, 856 MB by the MemAvailable freed on
+shutdown. Same two methods, same agreement, a bigger number.
+
+**On how these are measured, because the first attempt was wrong by
 3.5x.** Summing RSS across processes double-counts every shared library
 page, and 36 Node processes share a great deal of one. That method
-reported 2.43 GB. PSS (`/proc/<pid>/smaps_rollup`), which divides
-shared pages among the processes using them, reports 0.70 GB — and the
-MemAvailable freed by stopping the stack is 0.7–0.8 GB, the same answer by
-a completely different route. Two independent methods agreeing is why
-these figures are stated. A `ps` RSS total is not a measurement of
-anything.
+reported 2.43 GB. PSS (`/proc/<pid>/smaps_rollup`), which divides shared
+pages among the processes using them, and the MemAvailable actually
+freed when the stack stops, are two completely different routes to the
+same answer — which is why these figures are stated at all. A `ps` RSS
+total is not a measurement of anything.
 
-The range rather than a single number is also deliberate: two full
-boots measured 0.67 GB and 0.81 GB. The simulation app's world size and
-ordinary allocator variance move it, so quoting one figure to two
-decimal places would be precision the measurement does not have.
+The range rather than a single number is also deliberate. The two
+methods do not agree to the megabyte, and the simulation app's world
+size and ordinary allocator variance move it between boots, so quoting
+one figure to two decimal places would be precision the measurement does
+not have.
 
-**The whole ecosystem is about two thirds of a gigabyte**, so most
+**The whole ecosystem is a little over four fifths of a gigabyte**, so most
 Repls will hold all of it. If yours will not — or if you just want
 fewer things running while you look at one app — uncomment `VACO_APPS`
 in `.replit`:
@@ -113,7 +118,7 @@ hand, both optional:
 | Variable | What it is for | Needed? |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | Brings `v4-proxy` up. | Optional — without it that one app stays DOWN. |
-| `DATABASE_URL` | Lets VACON-C keep its world between restarts. | Set for you automatically when you attach Replit's PostgreSQL. |
+| `DATABASE_URL` | Puts 29 of the 34 backends on Postgres instead of files. | Set for you automatically when you attach Replit's PostgreSQL. |
 
 They go in Replit's **Secrets** pane, never in `.replit` — that file is
 committed to a public repository.

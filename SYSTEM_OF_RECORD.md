@@ -123,7 +123,7 @@ deliberately down for want of `ANTHROPIC_API_KEY`, and its 502 named
 the app and the port.
 
 `VACO_APPS` boots a subset, for a host that cannot hold the whole
-stack — though at 37 processes and 0.7–0.8 GB, measured by PSS and
+stack — though at 38 processes and 0.82–0.86 GB, measured by PSS and
 confirmed against the memory freed on shutdown, most hosts will hold
 all of it. Five apps plus the gateway is 11 processes and 0.13 GB.
 
