@@ -53,9 +53,31 @@
 
 const SHIELD_API_URL = process.env.SHIELD_API_URL || 'http://localhost:8812';
 
+// **Shield answering "no" and Shield failing to answer are different,
+// and the status is the only thing that separates them.**
+//
+// This used to parse the body and look at `body.valid` without ever
+// consulting the status. That is correct when Shield refuses the
+// connection -- fetch throws, `resolveSession` catches it and returns
+// 502 -- but not when Shield *answers* with an error. A 503 from a load
+// balancer carrying `{"error": "..."}` parses fine, has no `valid`
+// field, and was therefore indistinguishable here from an expired
+// token. The caller got 401: told their session had expired when it had
+// not, which is precisely what the 502 branch below exists to prevent,
+// and the likely shape of a real outage rather than an exotic one.
+//
+// **404 is not an outage.** Shield answers `404 {"valid": false}` for a
+// token it does not know, which is an answer and must stay a 401. A
+// blanket `if (!res.ok) throw` would turn every expired session in the
+// ecosystem into a 502 -- checked against `shield/server.js` before
+// writing this, because that mistake would break the most-travelled
+// path in the system while looking like a hardening fix.
 async function verifySessionToken(token) {
   if (!token) return null;
   const res = await fetch(`${SHIELD_API_URL}/api/shield/session/${encodeURIComponent(token)}`);
+  if (!res.ok && res.status !== 404) {
+    throw new Error(`Shield answered ${res.status}`);
+  }
   const body = await res.json();
   if (!body.valid) return null;
   return { userId: body.userId, expiresAt: body.expiresAt };

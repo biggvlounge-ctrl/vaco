@@ -69,13 +69,44 @@ export async function adoptToken(token) {
   }
 }
 
+// **Clearing the stored token is a destructive act, so only do it when
+// Shield has actually ruled on the token.**
+//
+// This used to parse the response and treat any falsy `body.valid` as
+// "expired", then delete the token. A Shield answering 503 with a JSON
+// error body has no `valid` field, so a transient outage deleted every
+// browser user's session token — logging them out *permanently* rather
+// than for the length of the outage, because the token is gone and
+// cannot be recovered when Shield comes back.
+//
+// Shield answers `404 {"valid": false}` for a token it does not know;
+// that is a real verdict and the token should go. Anything else non-2xx
+// is Shield failing to answer, and the token must survive it.
 export async function getCurrentSession() {
   const token = localStorage.getItem(SESSION_STORAGE_KEY);
   if (!token) {
     return null;
   }
-  const res = await fetch(`${SHIELD_API_URL}/api/shield/session/${encodeURIComponent(token)}`);
-  const body = await res.json();
+
+  let res;
+  try {
+    res = await fetch(`${SHIELD_API_URL}/api/shield/session/${encodeURIComponent(token)}`);
+  } catch {
+    // Unreachable is not a verdict. Signed out for now, token kept.
+    return null;
+  }
+
+  if (!res.ok && res.status !== 404) return null;
+
+  let body;
+  try {
+    body = await res.json();
+  } catch {
+    // A non-JSON body (an HTML error page from a proxy) is an outage
+    // wearing a 200, not a ruling on the session.
+    return null;
+  }
+
   if (!body.valid) {
     localStorage.removeItem(SESSION_STORAGE_KEY);
     return null;

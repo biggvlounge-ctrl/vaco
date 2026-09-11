@@ -1,6 +1,6 @@
 {
-  "total": 1520,
-  "passed": 1520,
+  "total": 1532,
+  "passed": 1532,
   "failed": 0,
   "skipped": 0,
   "suites": 39,
@@ -54,8 +54,8 @@
       "skipped": 0
     },
     "v3": {
-      "tests": 83,
-      "pass": 83,
+      "tests": 85,
+      "pass": 85,
       "fail": 0,
       "skipped": 0
     },
@@ -150,8 +150,8 @@
       "skipped": 0
     },
     "vdp": {
-      "tests": 142,
-      "pass": 142,
+      "tests": 147,
+      "pass": 147,
       "fail": 0,
       "skipped": 0
     },
@@ -162,8 +162,8 @@
       "skipped": 0
     },
     "venvs": {
-      "tests": 40,
-      "pass": 40,
+      "tests": 45,
+      "pass": 45,
       "fail": 0,
       "skipped": 0
     },

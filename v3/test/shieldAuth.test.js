@@ -33,13 +33,27 @@ const { requireSession, requireActor, optionalOwnAccount } = require('../lib/shi
 // keeps these tests fast and, more importantly, lets them assert what
 // happens when Shield is *down* — which is a distinct answer from
 // "your session is invalid" and easy to get wrong.
+// **This double used to return `{ json }` and nothing else.** A real
+// Response carries `ok` and `status`, and because this one did not,
+// every test here ran against a fetch that could not express the
+// difference between "Shield says no" and "Shield is broken". That is
+// why a 5xx-with-a-JSON-body outage read as an expired session for the
+// whole life of the file and no test noticed.
+//
+// It now answers the way `shield/server.js` actually answers: 200 for a
+// live session, `404 {"valid": false}` for a token it does not know.
 function withShield(sessions, { down = false } = {}) {
   const original = globalThis.fetch;
   globalThis.fetch = async (url) => {
     if (down) throw new Error('ECONNREFUSED');
     const token = decodeURIComponent(String(url).split('/').pop());
     const userId = sessions[token];
-    return { json: async () => (userId ? { valid: true, userId, expiresAt: Date.now() + 3600000 } : { valid: false }) };
+    if (!userId) return { ok: false, status: 404, json: async () => ({ valid: false }) };
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ valid: true, userId, expiresAt: Date.now() + 3600000 }),
+    };
   };
   return () => { globalThis.fetch = original; };
 }
@@ -216,6 +230,72 @@ test('Shield unreachable is 502, never 401 and never a pass', async () => {
     assert.strictEqual(result.status, 502,
       '401 would tell a legitimate user their session expired and train them to re-auth against an outage');
   } finally { restore(); }
+});
+
+// **An outage that answers in JSON is still an outage.**
+//
+// The test above covers Shield refusing the connection: fetch throws,
+// `resolveSession` catches, and the caller gets 502. The case it did
+// not cover is Shield *answering* — 500, 502, 503 — with a JSON body.
+// Then `res.json()` succeeds, `body.valid` is undefined, and
+// `verifySessionToken` returns null exactly as it would for a genuinely
+// expired token. The caller was told 401.
+//
+// That is the failure the 502 branch exists to prevent, stated in its
+// own comment: telling a legitimate user their session expired when it
+// did not, and training callers to re-authenticate against an outage.
+// A Shield behind a load balancer returns JSON error bodies as a matter
+// of course, so this is the *likely* shape of an outage, not an exotic
+// one.
+//
+// The fake Shield now carries `ok` and `status` like a real Response,
+// which it did not before — which is why no test could catch this.
+test('a Shield that answers 5xx with a JSON body is 502, not 401', async () => {
+  const original = globalThis.fetch;
+  globalThis.fetch = async () => ({
+    ok: false,
+    status: 503,
+    json: async () => ({ error: 'shield: database unavailable' }),
+  });
+  try {
+    const result = await run(requireActor('userId'), {
+      headers: AUTH('tok-ada'), body: { userId: 'ada' },
+    });
+    assert.strictEqual(result.passed, false, 'an outage must never fail open');
+    assert.strictEqual(
+      result.status, 502,
+      'Shield answered 503 with a JSON body and the caller was told 401 — '
+      + 'the session is fine, the auth service is not',
+    );
+  } finally { globalThis.fetch = original; }
+});
+
+// The other half of that fix, and the reason it is a status check
+// rather than `if (!res.ok) throw`.
+//
+// Shield answers `404 {"valid": false}` for a token it does not know.
+// That is Shield ANSWERING, not Shield failing, and it must stay a 401.
+// Treating every non-2xx as an outage would turn every expired session
+// in the ecosystem into a 502 — a far worse regression than the bug
+// being fixed, and one that would have looked like hardening.
+test('an unknown token still gets 401, because Shield answers 404 for one', async () => {
+  const original = globalThis.fetch;
+  globalThis.fetch = async () => ({
+    ok: false,
+    status: 404,
+    json: async () => ({ valid: false }),
+  });
+  try {
+    const result = await run(requireActor('userId'), {
+      headers: AUTH('tok-nobody'), body: { userId: 'ada' },
+    });
+    assert.strictEqual(result.passed, false);
+    assert.strictEqual(
+      result.status, 401,
+      'Shield 404 means "no such session" — turning that into 502 would '
+      + 'report an outage every time a session expires',
+    );
+  } finally { globalThis.fetch = original; }
 });
 
 // -- The removed middleware ------------------------------------------------
