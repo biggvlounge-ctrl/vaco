@@ -63,9 +63,21 @@ export const APPS = [
   // change happen back to back with no I/O between them. See
   // dev-docs/CVLTVRE_AND_VADO_EXTRACTION_AUDIT.md.
   // Not a consumer product: the one channel every alerting surface
-  // delivers through. Listed so it is discoverable and health-checked,
-  // and parented to VACON-C with the rest of the internal layer -- see
-  // dev-docs/VACO_CONSTELLATIONS.md.
+  // delivers through. Listed so it is discoverable and health-checked.
+  //
+  // **`parent: 'VACON-C'` puts it on a public store card, and the
+  // constellations document says the opposite.** This comment used to
+  // cite that document as justification — "parented to VACON-C with the
+  // rest of the internal layer, see dev-docs/VACO_CONSTELLATIONS.md" —
+  // which reads as agreement and is not: the recorded decision is that
+  // VACON-C the game is public while VACON, VSAFE and this are not.
+  //
+  // The constellation view places all three in ◇ internal, keyed by id
+  // rather than by parent, so the decision is honoured where it is
+  // visible. The parent stays as it is because changing it moves the
+  // app in the store, in the compose generator's grouping and in
+  // SYSTEM_OF_RECORD §3 at once. Recorded as open in §3a rather than
+  // resolved in passing.
   { id: 'vaco-notify', name: 'VACO Notify', description: 'The one notification channel — VSAFE escalations, DREAMS and Analytics alerts.', url: 'http://localhost:8818', category: 'system', parent: 'VACON-C', bundle: 'Gamified & Simulation' },
   { id: 'voken', name: 'VOKEN', description: 'The card engine — minting, editions, provenance, value scores.', url: 'http://localhost:8794', category: 'consumer', parent: 'VOKEN', bundle: 'Commerce & Marketplace' },
   { id: 'cvltvre', name: 'CVLTVRE', description: 'Collect, trade, and auction anything with real cultural relevance.', url: 'http://localhost:8794/#packs', category: 'consumer', parent: 'CVLTVRE', bundle: 'Commerce & Marketplace' },
@@ -115,6 +127,153 @@ export const BUNDLES = [
   { name: 'Gamified & Simulation', parents: ['VDP', 'VACON-C'] },
   { name: 'Operations & Infrastructure', parents: ['VOID', 'V4'] },
 ];
+
+// -- The constellations ------------------------------------------------
+//
+// **A second grouping of the same 18 parents, and both are correct.**
+// `BUNDLES` above groups by what a customer is shopping for. This
+// groups by lineage and shared roadmap — which apps are one job rather
+// than four. VEX sits with V3 and VAGO in the bundles and with VOKEN
+// here, because it was extracted out of VOKEN; both placements are
+// right for their own purpose.
+//
+// `dev-docs/VACO_CONSTELLATIONS.md` is the prose source. It was drawn
+// 2026-08-26 to direct instruction, with the glyphs revised 2026-08-28,
+// and it records which placements were directed and which were decided
+// when asked rather than guessed.
+//
+// **That document used to say "nothing in the codebase reads these
+// glyphs." As of 11 Sep 2026 this does**, so the shell's store can show
+// the structure instead of one flat wall of bundles.
+// `scripts/test/constellations.test.mjs` parses the document's own map
+// and holds this array to it, in both directions — neither copy can
+// drift without the suite saying so.
+//
+// The glyph vocabulary carries meaning rather than decorating:
+//
+//   ■ / ✕  a group of four   (✕ was chosen because it *is* a four —
+//                             four arms, the count it marks)
+//   ▲      a group of three
+//   ○      a group of three that is shared infrastructure
+//   ◇      not public — nothing a customer opens
+//
+// ■ marks the four that arrived whole by instruction; ✕ the two that
+// were completed by a decision. That rule is cosmetic and the document
+// says so; it is recorded here only so the assignment stays checkable.
+//
+// **The public five are keyed by parent, the internal one by app id.**
+// That is not an inconsistency to tidy: the internal services are not
+// parents and must not become them. VACON and VSAFE are folded under
+// the VACON-C parent for the bundle view, and listing them here by id
+// is what lets this view put them where the founder's decision put
+// them — outside the public structure — without moving them in the
+// other view.
+export const CONSTELLATIONS = [
+  {
+    glyph: '■',
+    name: 'VOKEN',
+    title: 'the card economy',
+    public: true,
+    parents: ['VOKEN', 'Vex', 'VADO', 'CVLTVRE'],
+    note: 'One running process under four brands, plus VEX, which was extracted out of VOKEN.',
+  },
+  {
+    glyph: '✕',
+    name: 'VVLTVRE',
+    title: 'content and presence',
+    public: true,
+    parents: ['Vvltvre', 'Vault', 'VXLLAGE', 'CHOPZ'],
+    note: 'Four content surfaces blocked on one decision: the media vendor.',
+  },
+  {
+    glyph: '○',
+    name: 'SYSTEMS',
+    title: 'shared infrastructure',
+    public: true,
+    parents: ['V3', 'V4', 'VENVS'],
+    note: 'What the other constellations are built on. A bug here is every app\'s bug.',
+  },
+  {
+    glyph: '✕',
+    name: 'VOID',
+    title: 'the real world',
+    public: true,
+    parents: ['VOID', 'HVNTZ', 'CVNVO', 'VACAY'],
+    note: 'Places, people, and getting things done off-screen. All four consume the V4 Maps layer.',
+  },
+  {
+    glyph: '▲',
+    name: 'GAMES',
+    title: 'worlds you walk around in',
+    public: true,
+    parents: ['VDP', 'VACON-C', 'VAGO'],
+    note: 'VACON-C is paused by decision; being in a public constellation is not permission to resume it.',
+  },
+  {
+    // **Eight, not the three the document was drawn with.** Shield,
+    // VACO Audit, VACO Operator, VACO Media and VACO Notify were all
+    // built after 2026-08-26 — the document refers to vaco-notify as
+    // unbuilt "task #123". An internal layer that silently stops
+    // listing the internal services is the failure this repo keeps
+    // finding, so the test below requires every app in no public
+    // constellation to appear here by name.
+    glyph: '◇',
+    name: 'internal',
+    title: 'not public — nothing a customer opens',
+    public: false,
+    parents: [],
+    appIds: ['vacon', 'vsafe', 'vaco-analytics', 'shield', 'vaco-audit',
+      'vaco-operator', 'vaco-media', 'vaco-notify'],
+    note: 'Real, running, and load-bearing. None of them is an app anybody opens.',
+  },
+];
+
+// Apps deliberately in no constellation at all, with the reason. Kept
+// as data rather than as a silent `.filter()` so the test can require
+// every app to be either placed or listed here — an app that is
+// neither is an omission, and omissions here do not announce
+// themselves.
+export const UNPLACED = {
+  'v3-shield': 'the legacy V3/Shield mock — dev-only, no longer any app\'s default',
+};
+
+// `vaco-shell` is deliberately in no constellation. It is the launcher
+// and session host over all eighteen, the way the design system sits
+// under every frontend. It is not in APPS either, so it needs no entry
+// in UNPLACED.
+
+// **An app named by id wins over its parent, and that ordering is the
+// whole decision.** VACON, VSAFE and VACO Notify all carry
+// `parent: 'VACON-C'` so the bundle view folds them into one store
+// card. Matching on parent first put them in ▲ GAMES — a *public*
+// constellation — which is precisely what the founder's recorded
+// decision excluded: "VACON-C the game went to GAMES; VACON the agent
+// network and VSAFE the safety layer stayed internal."
+//
+// Written as one pass over ids before one pass over parents, rather
+// than as a single `find` whose answer depends on array order. The
+// first version was the single `find`, it put three internal services
+// on a public shelf, and nothing about reading it said so.
+export function constellationOf(app) {
+  if (!app) return null;
+  const byId = CONSTELLATIONS.find((c) => (c.appIds || []).includes(app.id));
+  if (byId) return byId;
+  if (!app.parent) return null;
+  return CONSTELLATIONS.find((c) => c.parents.includes(app.parent)) || null;
+}
+
+export function listConstellations() {
+  return CONSTELLATIONS.map((c) => ({
+    ...c,
+    apps: APPS.filter((a) => constellationOf(a) === c),
+  }));
+}
+
+export function getConstellation(name) {
+  const found = CONSTELLATIONS.find((c) => c.name.toLowerCase() === name.toLowerCase());
+  if (!found) return null;
+  return { ...found, apps: APPS.filter((a) => constellationOf(a) === found) };
+}
 
 export function listApps() {
   return APPS;

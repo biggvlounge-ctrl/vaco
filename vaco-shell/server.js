@@ -33,7 +33,10 @@ import cors from 'cors';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import 'dotenv/config';
-import { listApps, getApp, listBundles, getBundle } from './lib/registry.js';
+import {
+  listApps, getApp, listBundles, getBundle,
+  listConstellations, getConstellation, constellationOf,
+} from './lib/registry.js';
 import tracingModule from './lib/tracing.cjs';
 const { traceMiddleware } = tracingModule;
 import { getInsightCard } from './lib/insight.js';
@@ -116,7 +119,19 @@ app.get('/api/apps/:id', (req, res) => {
   res.json(found);
 });
 
-// -- Real bundle grouping (5 bundles of 3 parents each) --
+// -- The two groupings of the same 18 parents --
+//
+// **Bundles group by what a customer is shopping for; constellations
+// group by lineage and shared roadmap.** Both are real, both are
+// served, and they deliberately disagree in places — VEX is with V3
+// and VAGO in the bundles and with VOKEN in the constellations,
+// because it was extracted out of VOKEN.
+//
+// This comment used to read "5 bundles of 3 parents each". There have
+// been six for some time, sized 5, 3, 3, 3, 2, 2, and the declared
+// `BUNDLES` list disagrees with what the store draws for Commerce —
+// see SYSTEM_OF_RECORD.md §3a, which records that as open rather than
+// quietly picking one.
 
 app.get('/api/bundles', (_req, res) => {
   res.json({ bundles: listBundles() });
@@ -125,6 +140,16 @@ app.get('/api/bundles', (_req, res) => {
 app.get('/api/bundles/:name', (req, res) => {
   const found = getBundle(req.params.name);
   if (!found) return res.status(404).json({ error: `no bundle named ${req.params.name}` });
+  res.json(found);
+});
+
+app.get('/api/constellations', (_req, res) => {
+  res.json({ constellations: listConstellations() });
+});
+
+app.get('/api/constellations/:name', (req, res) => {
+  const found = getConstellation(req.params.name);
+  if (!found) return res.status(404).json({ error: `no constellation named ${req.params.name}` });
   res.json(found);
 });
 
@@ -234,6 +259,16 @@ function withApp(listing) {
     // and VENVM), and the UI could not see the folding because this
     // did not send it.
     parent: registryApp ? registryApp.parent || null : null,
+    // The second grouping — lineage rather than shopping. Sent for the
+    // same reason `parent` is: the UI cannot show a structure it was
+    // never handed. See dev-docs/VACO_CONSTELLATIONS.md, and note that
+    // an app is in exactly one constellation and one bundle, and the
+    // two deliberately disagree (VEX is with V3 in the bundles and
+    // with VOKEN here).
+    constellation: (() => {
+      const c = constellationOf(registryApp);
+      return c ? { glyph: c.glyph, name: c.name, title: c.title, public: c.public } : null;
+    })(),
     url: registryApp ? registryApp.url : null,
   };
 }

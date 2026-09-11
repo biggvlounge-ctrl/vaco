@@ -1,6 +1,7 @@
 # The VACO Constellations — a square, two X's, a triangle, a circle, and an internal layer
 
-**Date:** 2026-08-26, shapes revised 2026-08-28 · Supersedes the earlier
+**Date:** 2026-08-26, shapes revised 2026-08-28, internal layer and
+stale roadmap lines corrected 2026-09-11 · Supersedes the earlier
 six-triangle draft, and the three-squares/two-triangles revision below it.
 Depends on `dev-docs/CVLTVRE_AND_VADO_EXTRACTION_AUDIT.md`, which
 establishes CVLTVRE and VADO as parents.
@@ -21,16 +22,35 @@ the founder rather than guessed. This document records which is which.
    CVLTVRE                CHOPZ
 
 ✕ VOID                 ▲ GAMES                 ◇ internal — not public
-   VOID                   VDP                     VACON  (14-agent network)
-   HVNTZ                  VACON-C                 VSAFE  (safety layer)
+   VOID                   VDP                     VACON
+   HVNTZ                  VACON-C                 VSAFE
    CVNVO                  VAGO                    VACO Analytics
-   VACAY
+   VACAY                                          VACO Notify
+                                                  Shield
+                                                  VACO Audit
+                                                  VACO Operator
+                                                  VACO Media
 ```
 
 **18 public parents. One square, two X's, one triangle, one circle.**
-No parent in two places, none left out. VACON, VSAFE, and VACO Analytics
-sit outside the public structure entirely, because none of them is an
-app a customer opens.
+No parent in two places, none left out. The eight in ◇ sit outside the
+public structure entirely, because none of them is an app a customer
+opens.
+
+**The internal layer was drawn with three and now holds eight.** VACO
+Notify, Shield, VACO Audit, VACO Operator and VACO Media were all built
+after 2026-08-26 — this document still refers to `vaco-notify` below as
+unbuilt "task #123", which is how you can tell. The public eighteen have
+not changed at all; only the internal list grew, and it grew silently,
+which is exactly the kind of omission
+`scripts/test/constellations.test.mjs` now prevents: every app the
+registry carries must be placed here by name or listed as deliberately
+unplaced.
+
+**This map is now machine-readable.** `vaco-shell/lib/registry.js`
+exports `CONSTELLATIONS`, and the test parses the block above and holds
+the two to each other in both directions — a name added here and not
+there, or there and not here, fails the suite.
 
 ## The shape vocabulary, and why each is what it is
 
@@ -43,7 +63,13 @@ each shape now says something the reader can rely on:
 | ■ / ✕ | a group of **four** | 4 each |
 | ▲ | a group of **three** | 3 |
 | ○ | a group of three that is **shared infrastructure** | 3 |
-| ◇ | **not public** — nothing a customer opens | 3 |
+| ◇ | **not public** — nothing a customer opens | 8 |
+
+**◇ is the one shape whose count is not part of its meaning**, and that
+is why it can be 8 while ■ and ✕ must stay at 4. The other glyphs encode
+a group size; ◇ encodes a boundary. An internal service added later
+joins it without disturbing anything, which is what happened five times
+between 2026-08-26 and 2026-09-11.
 
 **■ and ✕ both mean four, and the X was chosen because it *is* a
 four** — four arms, the same count it marks. Three groups of four and
@@ -69,8 +95,17 @@ Commerce & Marketplace, Social & Discovery, Leisure & Entertainment,
 Gamified & Simulation, Operations & Infrastructure — but by *what a
 customer is looking for*, not by lineage. VEX sits with V3 and VAGO
 there and with VOKEN here, and both are right for their own purpose.
-Nothing in the codebase reads these glyphs; changing them changes this
-document and nothing else.
+
+**This paragraph used to end "nothing in the codebase reads these
+glyphs; changing them changes this document and nothing else." That is
+no longer true, by decision, on 11 Sep 2026.** The App Store has a
+grouping control offering both views, `/api/constellations` serves this
+map, and changing a name here now changes what a visitor sees. The
+reason for the change was that the store read as one flat wall of
+bundles — the structure existed and nothing showed it.
+
+The two groupings still disagree on purpose and neither is being
+retired. What changed is only that both are now visible.
 
 **The internal layer took ◇ so that ○ means one thing.** It was drawn
 as ○ before, which now collides with SYSTEMS. The public/internal line
@@ -149,10 +184,17 @@ CHOPZ SHOP riding along).
 
 - **Shared roadmap:** this is where every ecosystem-wide fix lands
   first — off-host backups, `requireActor`, OpenTelemetry, the Postgres
-  move for the ledger.
-- **Shared risk:** a bug in V3 or V4 is 29 apps' bug. There is currently
-  **no mechanism by which V3's ledger survives the loss of one disk** —
-  the largest under-weighted risk in the repository.
+  move for the ledger. **The Postgres move is done** (11 Sep 2026):
+  V3's balances and transactions are real rows, and 28 more apps keep a
+  document each in `vaco.stores`. Off-host backups are still open.
+- **Shared risk:** a bug in V3 or V4 is 29 apps' bug. This said "there
+  is currently **no mechanism by which V3's ledger survives the loss of
+  one disk** — the largest under-weighted risk in the repository," and
+  that was true when written. With `DATABASE_URL` set the ledger is in
+  Postgres and two V3 containers can both write it. **The disk risk has
+  moved rather than gone**: it is now the database's disk, and there is
+  still no off-host backup, so the sentence is corrected rather than
+  deleted.
 - **VENVS is the loose member, and it is worth saying so.** It is a
   consumer marketplace sitting with two pieces of infrastructure. The
   one thing it genuinely shares is a frontend problem: **VENVS and VDP
@@ -242,16 +284,23 @@ document: `vaco-shell/lib/registry.js` bundles **both `vdp` and
 
 ## ◇ Internal — not public-facing
 
-**VACON · VSAFE · VACO Analytics**
+**VACON · VSAFE · VACO Analytics · VACO Notify · Shield · VACO Audit ·
+VACO Operator · VACO Media**
 
 *Directed: VACON is not an app the public sees, so it does not belong in
-a public constellation.*
+a public constellation. The five added on 11 Sep 2026 follow the same
+rule — none is an app anybody opens.*
 
 | | What it is | Who consumes it |
 |---|---|---|
 | **VACON** | The operating network — 14 agents | Internal operations |
 | **VSAFE** | The shared safety layer | 6 apps, including CVNVO |
 | **VACO Analytics** | The corporate command center | Internal management |
+| **VACO Notify** | The one notification channel | VSAFE, DREAMS, Analytics |
+| **Shield** | The session layer | Every app that reads `SHIELD_API_URL` |
+| **VACO Audit** | The append-only decision record | Every Group-2 route |
+| **VACO Operator** | Human-operator credentials and scopes | Group-2 routes |
+| **VACO Media** | The media control plane | Vault, Flix, Pods, CHOPZ, VXLLAGE |
 
 These are real, running, and load-bearing — VSAFE especially, since
 check-ins, screening and escalation are live mechanics that CVNVO
@@ -262,10 +311,13 @@ public structure should not pretend otherwise.
 game went to ▲ GAMES; VACON the agent network and VSAFE the safety layer
 stayed internal. One parent, two different kinds of thing.
 
-- **Consequence worth stating:** VSAFE escalations currently **page
-  nobody**. A safety escalation with no notification channel is not a
-  degraded feature — it is a promise the product does not keep. Being
-  internal does not lower its priority; `vaco-notify` is task #123.
+- **Consequence worth stating — and since resolved.** This read: "VSAFE
+  escalations currently **page nobody**. A safety escalation with no
+  notification channel is not a degraded feature — it is a promise the
+  product does not keep. Being internal does not lower its priority;
+  `vaco-notify` is task #123." VACO Notify was built; it is in the table
+  above and running on 8818. The original wording is kept because the
+  argument it makes is the reason the app exists.
 - VACO Analytics has 7 untested routes.
 
 ---
@@ -279,11 +331,11 @@ and which is four.
 | | Next | Why |
 |---|---|---|
 | **✕ VOID** | Tests for CVNVO, HVNTZ, YAP · a moderation queue · the notification channel | 126 untested routes, and the highest-liability product has no review step |
-| **○ SYSTEMS** | Off-host backups · CI · `requireActor` · tests for VACA | A gap here is 29 apps' gap; the ledger survives no disk loss today |
+| **○ SYSTEMS** | Off-host backups · CI · `requireActor` · tests for VACA | A gap here is 29 apps' gap. The Postgres move landed 11 Sep 2026; the backup gap did not |
 | **■ VOKEN** | VOKEN's eight money flows · VEX's compliance gates | Precondition for any restructuring of the VOKEN four |
 | **✕ VVLTVRE** | The media vendor decision — start with Pods on storage + CDN | One decision unblocks six surfaces; blocked on judgment, not effort |
 | **▲ GAMES** | Migrate VDP onto the design system | One of the last two frontends outside it |
-| **◇ internal** | `vaco-notify` | VSAFE escalations page nobody |
+| **◇ internal** | *(done — VACO Notify shipped)* · tests for Analytics' 7 routes | VSAFE escalations had no channel; they now have one |
 
 ---
 

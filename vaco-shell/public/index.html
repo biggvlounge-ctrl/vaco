@@ -88,6 +88,19 @@
      them — they must not compete with products for attention. */
   .store-bundle-quiet { opacity: 0.72; }
   .store-bundle-quiet .store-bundle-head { border-bottom-style: dashed; }
+  /* The constellation glyph. Sized to sit with the heading rather than
+     above it, and given a fixed width so ■ ✕ ▲ ○ ◇ — which have quite
+     different natural widths — leave their headings on one left edge
+     down the page. `aria-hidden` is set on it in the markup: the shape
+     is a second encoding of the group's size, not information a screen
+     reader needs read aloud as a character name. */
+  .store-glyph {
+    display: inline-block;
+    width: 1.25em;
+    font-size: 1.15em;
+    line-height: 1;
+    color: var(--vaco-accent, #0f7b6c);
+  }
 
   .tile-apps { display: flex; flex-direction: column; gap: var(--vaco-space-2); margin-top: auto; }
   .tile-app { display: flex; align-items: center; gap: var(--vaco-space-2); }
@@ -128,6 +141,10 @@
         <h1 class="vaco-h1">App Store</h1>
         <span class="vaco-badge" id="storeCount"></span>
         <span class="vaco-spacer"></span>
+        <select class="vaco-select" id="storeGrouping">
+          <option value="bundle">Group: by category</option>
+          <option value="constellation">Group: by constellation</option>
+        </select>
         <select class="vaco-select" id="storeFilter">
           <option value="">All apps</option>
           <option value="free">Free</option>
@@ -390,9 +407,82 @@
   // Media) carry no bundle on purpose: every app calls them and nobody
   // launches them. They go last, under their own heading, rather than
   // sitting between products a visitor might actually open.
+  // **Two groupings of the same apps, and both are correct.** Bundles
+  // answer "what am I shopping for"; constellations answer "what is one
+  // job rather than four" — lineage and shared roadmap. VEX sits with
+  // V3 and VAGO in one and with VOKEN in the other, because it was
+  // extracted out of VOKEN, and neither placement is a mistake.
+  //
+  // The constellation map is `dev-docs/VACO_CONSTELLATIONS.md`, drawn to
+  // direct instruction. That document used to say "nothing in the
+  // codebase reads these glyphs"; this does, which is why
+  // `scripts/test/constellations.test.mjs` now holds the document and
+  // `registry.js` to each other in both directions.
+
+  const CONSTELLATION_ORDER = ['VOKEN', 'VVLTVRE', 'SYSTEMS', 'VOID', 'GAMES', 'internal'];
+
+  // Apps the registry gives no constellation. Named rather than left as
+  // an empty string so the grouping never keys on falsy — the same rule
+  // SERVICES follows for the bundle view.
+  const UNPLACED = 'Not in a constellation';
+
+  // bundle-or-constellation -> product -> [listing], plus what to put
+  // in the heading. One function for both views: the sections differ in
+  // how a listing is keyed and what the heading says, and in nothing
+  // else, so the rendering below stayed single.
+  function groupListings(listings, grouping) {
+    const byConstellation = grouping === 'constellation';
+    const groups = new Map();
+    for (const listing of listings) {
+      const c = listing.constellation;
+      const key = byConstellation
+        ? (c ? c.name : UNPLACED)
+        : (listing.bundle || SERVICES);
+
+      // **The internal layer is a flat list of services, not products,
+      // and getting this wrong put one parent in two sections.**
+      // VACON, VSAFE and VACO Notify carry `parent: 'VACON-C'` so the
+      // bundle view can fold them into one card. Keying on that parent
+      // here drew a "VACON-C" card inside ◇ internal *and* another
+      // inside ▲ GAMES — breaking the one rule the constellation map
+      // states outright: no parent in two places, none left out.
+      //
+      // The split is the founder's recorded decision: VACON-C the game
+      // is public, VACON the agent network and VSAFE the safety layer
+      // are not. So in this view a non-public app is its own row.
+      const product = (byConstellation && c && c.public === false)
+        ? listing.name
+        : (listing.parent || listing.name);
+
+      // The glyph belongs to the constellation view alone. Reading it
+      // off whichever listing happened to open the group stamped ○ on
+      // "Commerce & Marketplace" and ▲ on "Financial & Trading" —
+      // shapes that mean a group's size, printed against a grouping
+      // that has nothing to do with size.
+      const glyph = byConstellation && c ? c.glyph : null;
+      if (!groups.has(key)) groups.set(key, { key, glyph, products: new Map() });
+      const { products } = groups.get(key);
+      if (!products.has(product)) products.set(product, []);
+      products.get(product).push(listing);
+    }
+
+    // Known groups in their deliberate order, then anything the
+    // registry grows later, then the quiet one last. A group added
+    // after this list was written shows up rather than vanishing.
+    const order = grouping === 'constellation' ? CONSTELLATION_ORDER : BUNDLE_ORDER;
+    const quiet = grouping === 'constellation' ? 'internal' : SERVICES;
+    const keys = [
+      ...order.filter((k) => k !== quiet && groups.has(k)),
+      ...[...groups.keys()].filter((k) => k !== quiet && !order.includes(k)),
+      ...(groups.has(quiet) ? [quiet] : []),
+    ];
+    return keys.map((k) => ({ ...groups.get(k), quiet: k === quiet }));
+  }
+
   function renderStore() {
     const grid = document.getElementById('storeGrid');
     const filter = document.getElementById('storeFilter').value;
+    const grouping = document.getElementById('storeGrouping').value;
     const owned = ownedAppIds();
     grid.innerHTML = '';
 
@@ -404,42 +494,36 @@
       return;
     }
 
-    // bundle -> product -> [listing]
-    const byBundle = new Map();
-    for (const listing of listings) {
-      const bundle = listing.bundle || SERVICES;
-      const product = listing.parent || listing.name;
-      if (!byBundle.has(bundle)) byBundle.set(bundle, new Map());
-      const products = byBundle.get(bundle);
-      if (!products.has(product)) products.set(product, []);
-      products.get(product).push(listing);
-    }
+    const sections = groupListings(listings, grouping);
 
     let productCount = 0;
-    for (const products of byBundle.values()) productCount += products.size;
+    for (const s of sections) productCount += s.products.size;
     document.getElementById('storeCount').textContent =
       `${productCount} products · ${listings.length} apps`;
 
-    // Known bundles in order, then anything new the registry grows,
-    // then services last. A bundle added later shows up rather than
-    // vanishing because this list did not know about it.
-    const ordered = [
-      ...BUNDLE_ORDER.filter((b) => byBundle.has(b)),
-      ...[...byBundle.keys()].filter((b) => b !== SERVICES && !BUNDLE_ORDER.includes(b)),
-      ...(byBundle.has(SERVICES) ? [SERVICES] : []),
-    ];
-
-    for (const bundle of ordered) {
-      const products = byBundle.get(bundle);
-      const section = el('section', 'store-bundle' + (bundle === SERVICES ? ' store-bundle-quiet' : ''));
+    for (const { key, glyph, products, quiet } of sections) {
+      const section = el('section', 'store-bundle' + (quiet ? ' store-bundle-quiet' : ''));
 
       const header = el('div', 'store-bundle-head');
-      header.appendChild(el('h2', 'vaco-h3', bundle));
-      header.appendChild(el('span', 'vaco-badge', `${products.size}`));
-      if (bundle === SERVICES) {
-        header.appendChild(el('span', 'vaco-faint',
-          'Shared services every app calls. Nothing to launch.'));
+      // The glyph is meaning, not decoration: ■ and ✕ both mark a group
+      // of four (✕ was chosen because it *is* a four), ▲ a three, ○ a
+      // three that is shared infrastructure, ◇ not public. So it is
+      // rendered as its own element with a label a screen reader can
+      // read, rather than pasted into the heading string.
+      if (glyph) {
+        const mark = el('span', 'store-glyph', glyph);
+        mark.setAttribute('aria-hidden', 'true');
+        header.appendChild(mark);
       }
+      header.appendChild(el('h2', 'vaco-h3', key));
+      header.appendChild(el('span', 'vaco-badge', `${products.size}`));
+
+      const caption = quiet
+        ? (grouping === 'constellation'
+          ? 'Real, running, and load-bearing — and nothing a customer opens.'
+          : 'Shared services every app calls. Nothing to launch.')
+        : sectionCaption(grouping, key);
+      if (caption) header.appendChild(el('span', 'vaco-faint', caption));
       section.appendChild(header);
 
       const row = el('div', 'vaco-grid vaco-grid-wide');
@@ -448,6 +532,21 @@
 
       grid.appendChild(section);
     }
+  }
+
+  // Why each constellation is a group, in the founder's own terms. Left
+  // empty for the bundle view, whose headings already say what they
+  // mean — "Commerce & Marketplace" needs no gloss, "■ VOKEN" does.
+  const CONSTELLATION_CAPTIONS = {
+    VOKEN: 'One running process under four brands, plus VEX, extracted out of VOKEN.',
+    VVLTVRE: 'Four content surfaces blocked on one decision: the media vendor.',
+    SYSTEMS: 'What the rest is built on. A bug here is every app\'s bug.',
+    VOID: 'Places, people, and getting things done off-screen. All four use V4 Maps.',
+    GAMES: 'Worlds you walk around in. VACON-C is paused by decision.',
+  };
+
+  function sectionCaption(grouping, key) {
+    return grouping === 'constellation' ? (CONSTELLATION_CAPTIONS[key] || '') : '';
   }
 
   // One card per product. A product with several apps lists them inside
@@ -815,6 +914,7 @@
   });
 
   document.getElementById('storeFilter').addEventListener('change', renderStore);
+  document.getElementById('storeGrouping').addEventListener('change', renderStore);
 
   // -- boot ------------------------------------------------------------
 

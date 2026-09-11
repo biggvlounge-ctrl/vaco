@@ -61,7 +61,7 @@ authorization work in §5 had to be done per app rather than once.
 | Containerised services | 36 + nginx + a LiveKit SFU |
 | Registry rows (incl. brand rows and the dev mock) | 37 |
 | Mutating HTTP routes | 520, all accounted for (469 guarded, 51 declared open with a reason) |
-| Automated tests | 1574 across 39 suites |
+| Automated tests | 1583 across 39 suites |
 | Persisted volumes | 30 |
 | Shared-module copies kept in sync | 203 |
 | Service credentials in `.env.example` | 27 callers |
@@ -219,6 +219,82 @@ the suite fails.
 
 `vaco-shell` (the launcher) does not list itself. `vex` (8816) is
 listed only through `vex-trading`, which serves it.
+
+---
+
+## 3a. Two groupings of the same apps, and both are correct
+
+The §3 tables above group by **bundle** — what a customer is shopping
+for. There is a second grouping, by **constellation** — lineage and
+shared roadmap, which apps are one job rather than four. Both are real,
+both are served by the API, and the App Store has a control to switch
+between them.
+
+```
+■ VOKEN                ✕ VVLTVRE               ○ SYSTEMS
+   VOKEN                  Vvltvre                 V3
+   VEX                    Vault                   V4
+   VADO                   VXLLAGE                 VENVS
+   CVLTVRE                CHOPZ
+
+✕ VOID                 ▲ GAMES                 ◇ internal — not public
+   VOID                   VDP                     VACON · VSAFE
+   HVNTZ                  VACON-C                 VACO Analytics · Notify
+   CVNVO                  VAGO                    Shield · Audit
+   VACAY                                          Operator · Media
+```
+
+**18 public parents, no parent in two places, none left out**, plus 8
+internal services nobody opens. The glyph is meaning, not decoration:
+■ and ✕ mark a group of four (✕ because it *is* a four — four arms),
+▲ a three, ○ a three that is shared infrastructure, ◇ the public/
+internal boundary. ◇ is the only one whose count is not part of its
+meaning, which is why it can hold eight.
+
+**Where the two disagree, that is the point.** VEX is with V3 and VAGO
+in the bundles because that is where a trader looks for it, and with
+VOKEN in the constellations because it was extracted out of VOKEN.
+Neither placement is a mistake and neither is being retired.
+
+`dev-docs/VACO_CONSTELLATIONS.md` is the prose source and records which
+placements were directed and which were decided when asked.
+`vaco-shell/lib/registry.js` exports the same map as `CONSTELLATIONS`.
+**`scripts/test/constellations.test.mjs` parses the document's own ASCII
+map and holds the two to each other in both directions** — a name in one
+and not the other fails the suite, whichever side it is on.
+
+### Three things this recorded, because they were nearly lost
+
+**The map spent two weeks drifting in silence.** The document's internal
+layer said three while the registry grew five more services — Shield,
+VACO Audit, VACO Operator, VACO Media and VACO Notify. Nothing broke and
+nothing said anything. That is why the test exists rather than a note
+asking someone to keep them in step.
+
+**The public/internal split was being undone by the bundle view.** The
+recorded decision is explicit: *"VACON-C the game went to ▲ GAMES; VACON
+the agent network and VSAFE the safety layer stayed internal."* But both
+carry `parent: 'VACON-C'`, so the store folded them into one public
+card, and `registry.js`'s own comment cited the constellations document
+while doing the opposite of what it says. In the constellation view they
+now sit in ◇ where the decision put them. **In the bundle view they are
+still folded under the public VACON-C card** — deliberately left alone
+here, because changing an app's `parent` changes the store, the compose
+generator's grouping and the §3 tables at once. Recorded as open rather
+than quietly resolved.
+
+**`BUNDLES` and the store disagree about Commerce & Marketplace.** There
+are two sources of truth for the bundle grouping: the declared
+`BUNDLES` array, and each app's own `bundle` field. `BUNDLES` lists
+Commerce as `[VENVS, VOKEN, CHOPZ]`; CVLTVRE and VADO tag themselves
+Commerce without appearing in it. So `/api/bundles` answers **3** and
+the store page draws **5**, and the store page is the one people see.
+Also open: the fix depends on whether CVLTVRE and VADO were meant to be
+declared there, or to be somewhere else entirely.
+
+Relatedly, the comment above `/api/bundles` in `vaco-shell/server.js`
+read *"5 bundles of 3 parents each"* for some time. There are six,
+sized 5, 3, 3, 3, 2, 2. Corrected 11 Sep 2026.
 
 ---
 
@@ -707,7 +783,7 @@ produce the numbers in this document.
 built:** `node scripts/package-release.mjs` — see §11.
 
 ```sh
-node scripts/run-all-tests.mjs           # 1574/1574 across 39 suites
+node scripts/run-all-tests.mjs           # 1583/1583 across 39 suites
 node scripts/audit-route-guards.mjs --check   # 520/520 accounted for
 ./sync-shared-runtime.sh --check         # 203 copies current, none unmanaged
 ./sync-design-system.sh --check          # every serving app is a target
@@ -747,7 +823,7 @@ dependencies are installed.
 
 ```
 vacon-c         317   vdp             147   void            142
-scripts         145   v3              109   vaco-media       51
+scripts         154   v3              109   vaco-media       51
 v4-proxy         42   world-layer      41   venvm            40
 venvs            45   voken            37   vaco-analytics   34
 vaco-shell       33   vacay            24   voidmagic        23
