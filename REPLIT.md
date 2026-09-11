@@ -137,8 +137,13 @@ nothing to run by hand.
 
 With it, 29 of the 34 backends keep their state in Postgres instead of
 a file: `vacon-c` loads its own 63-table world schema, and 28 others
-keep a document each in a `vaco.stores` table. The remaining 5 still
-use a JSON file under their own directory.
+keep a document each in a `vaco.stores` table.
+
+The other 5 are not all waiting their turn. **2 apps keep state in JSON
+files** — `vaco-shell` and `vaco-analytics`. The remaining 3 keep no
+state across a restart at all and are not meant to: `v4-proxy` holds
+live call sessions in memory on purpose, and `v4-search` and
+`vex-trading` are stateless query layers over other apps' records.
 
 Without it, everything still boots and every app falls back to its
 file, which Replit's filesystem keeps between runs. That is fine for a
@@ -174,7 +179,7 @@ What *has* been driven for real, on Linux:
   to bind the gateway's port. Fixed, and held by a test.
 - `gateway.js` against the booted ecosystem — 33 of 34 apps answered
   200 through one port, the 34th being the one deliberately down.
-- The full test suite: 1570 tests across 39 suites.
+- The full test suite: 1574 tests across 39 suites.
 
 ## What Replit is good for here, and what it is not
 
@@ -182,16 +187,28 @@ What *has* been driven for real, on Linux:
 existed, seeing this run meant cloning the repo and starting 36
 servers.
 
-**Not good for production, as it stands.** 6 of the 34 apps keep state
-in JSON files on disk. That survives a persistent workspace or a
-Reserved VM. It does *not* survive an autoscaling deployment, where the
-filesystem is ephemeral and a second instance means a second, divergent
-copy of the ledger. If you deploy this on Replit, use a **Reserved VM**,
-and treat converting the remaining apps to a real database as the
-prerequisite for anything beyond a demo.
+**Not good for production, as it stands — but the reason is narrower
+than it was.** Three separate limits, and they are not the same limit:
+
+**Without `DATABASE_URL`, nothing here should be scaled.** Every app
+falls back to a JSON file, the filesystem on an autoscaling deployment
+is ephemeral, and a second instance means a second divergent copy of
+everything — including the ledger. Use a **Reserved VM**, or attach the
+database.
+
+**With it, exactly one app is safe to run twice.** V3 keeps balances
+and transactions as real rows and takes its locks in a fixed order, so
+two V3 containers can both write. The other 28 keep a whole document
+per app behind an optimistic version check: a concurrent write is
+*refused* rather than silently lost, which makes divergence loud but
+does not make two writers work. **Do not scale those past one
+container.**
+
+**2 apps keep state in JSON files on disk** — `vaco-shell` and
+`vaco-analytics`. Same rule, for the older reason.
 
 VACON-C is on Postgres and still must not be scaled past one container,
-for a different reason: its working set is one process's memory, so two
+for a third reason: its working set is one process's memory, so two
 replicas would be two divergent worlds checkpointing over each other.
 
 ## If you would rather not use Replit

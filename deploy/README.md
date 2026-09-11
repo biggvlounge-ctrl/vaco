@@ -107,13 +107,21 @@ bill of health for an ecosystem that is not running.
 
 ### What this path is *not* for
 
-Production, as things stand. Every app keeps its state in JSON files
-on disk. That survives in a persistent workspace or on a Reserved VM;
-it does not survive an autoscaling deployment, where the filesystem is
-ephemeral and a second instance means a second, divergent ledger —
-the exact failure this repo spent the settlement-atomicity sweep
-eliminating everywhere else. The Postgres conversion is the real
-prerequisite, and it is not done.
+Production, as things stand — though less so than when this was
+written. Without `DATABASE_URL` every app falls back to a JSON file on
+disk. That survives in a persistent workspace or on a Reserved VM; it
+does not survive an autoscaling deployment, where the filesystem is
+ephemeral and a second instance means a second, divergent ledger — the
+exact failure this repo spent the settlement-atomicity sweep
+eliminating everywhere else.
+
+With `DATABASE_URL` set, 29 of the 34 backends are on Postgres, and
+2 apps keep state in JSON files — `vaco-shell` and `vaco-analytics`.
+The other 3 keep nothing across a restart by design. That is enough for V3,
+whose balances are real rows, to run in two containers. It is not
+enough for the other 28, which hold one document each behind an
+optimistic version check — divergence is refused rather than lost, but
+two writers still do not work.
 
 Use this to *show* the ecosystem at a URL. Use Compose or pm2+nginx to
 run it.
@@ -399,13 +407,22 @@ domain.
 
 ## VACON-C's Postgres
 
-One service in `docker-compose.yml` that is not an app: `postgres`,
-used by `vacon-c` alone.
+One service in `docker-compose.yml` that is not an app: `postgres`.
+**It was used by `vacon-c` alone when this section was written; 28
+other apps joined it on 11 Sep 2026.** That is the whole reason this
+heading now needs the paragraph below rather than just the one after
+it.
 
-Every other app in this ecosystem persists with `createPersistentStore`
-— a JSON file under a named volume, loaded when the store is
-constructed. VACON-C does not, because it is not that kind of app: it
-is a civilization simulation with a locked 63-table schema
+Those 28 share one mechanism: `shared/persistencePg.js` keeps a JSONB
+document per app in a `vaco.stores` table, behind the same
+three-function interface `createPersistentStore` already had. V3 goes
+further — its balances and transactions are real rows, not a document.
+Without `DATABASE_URL` all of them fall back to a JSON file under a
+named volume, which is what every app did before.
+
+VACON-C is on the same server for a completely different reason, and
+the two must not be blurred together: it is not a document store at
+all. It is a civilization simulation with a locked 63-table schema
 (`vacon-c/VACANCY_POSTGRESQL_SCHEMA.sql`) that the whole engine has
 been shaped to mirror since its second phase.
 

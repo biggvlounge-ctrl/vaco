@@ -61,7 +61,7 @@ authorization work in §5 had to be done per app rather than once.
 | Containerised services | 36 + nginx + a LiveKit SFU |
 | Registry rows (incl. brand rows and the dev mock) | 37 |
 | Mutating HTTP routes | 520, all accounted for (469 guarded, 51 declared open with a reason) |
-| Automated tests | 1570 across 39 suites |
+| Automated tests | 1574 across 39 suites |
 | Persisted volumes | 30 |
 | Shared-module copies kept in sync | 203 |
 | Service credentials in `.env.example` | 27 callers |
@@ -707,7 +707,7 @@ produce the numbers in this document.
 built:** `node scripts/package-release.mjs` — see §11.
 
 ```sh
-node scripts/run-all-tests.mjs           # 1570/1570 across 39 suites
+node scripts/run-all-tests.mjs           # 1574/1574 across 39 suites
 node scripts/audit-route-guards.mjs --check   # 520/520 accounted for
 ./sync-shared-runtime.sh --check         # 203 copies current, none unmanaged
 ./sync-design-system.sh --check          # every serving app is a target
@@ -747,7 +747,7 @@ dependencies are installed.
 
 ```
 vacon-c         317   vdp             147   void            142
-scripts         141   v3              109   vaco-media       51
+scripts         145   v3              109   vaco-media       51
 v4-proxy         42   world-layer      41   venvm            40
 venvs            45   voken            37   vaco-analytics   34
 vaco-shell       33   vacay            24   voidmagic        23
@@ -845,19 +845,35 @@ are what stand between this and a real deployment.**
 - **No TLS, no domain.** `deploy/nginx-docker.conf` terminates plain
   HTTP on :80. A real deployment needs certificates and a hostname, and
   Shield's session cookies should be `Secure` once there is one.
-- **The store is a JSON file per app — for 6 of the 34.** Writes are
+- **2 apps keep state in JSON files** — `vaco-shell` and
+  `vaco-analytics`, the two that were never converted. Writes are
   atomic (temp + rename) and `durable(store)` commits before
   responding, which is genuinely safe for one process per service. It
   is *not* safe for two replicas of the same service, so **do not scale
-  any app past one container** until that changes. §6 has the full
-  posture.
+  either of those two past one container** until that changes. §6 has
+  the full posture.
 
-  **All 28 file-backed apps moved to the shared Postgres store backend on 11 Sep 2026 — 29 of the 34 on Postgres once VACON-C is counted.** `shared/persistencePg.js` is the same three-function
-  interface the other apps already use, over a `vaco_stores` table
+  The other 32 backends divide as **29 on Postgres** — 28 through the
+  shared store backend plus VACON-C on its own schema — and **3 that
+  keep no state across a restart at all**: `v4-proxy` (call sessions,
+  deliberately in-memory — a `ringing` call restored from disk is
+  ringing at nobody), `v4-search` and `vex-trading` (both stateless
+  query layers over other apps' records).
+
+  **All 28 file-backed apps moved to the shared Postgres store backend on 11 Sep 2026 — 29 of the 34 backends on Postgres once VACON-C is counted.** `shared/persistencePg.js` is the same three-function
+  interface the other apps already use, over a `vaco.stores` table
   holding one JSONB document per app. An app converts by changing how
   its store is built; its libs, routes and guards do not move.
   `sync-shared-runtime.sh`'s `PERSISTENCE_PG_TARGETS` is the honest
-  record of how far this has got — one name in it today.
+  record of how far this has got — 28 names in it today.
+
+  **These counts are held by `scripts/test/storage-backends.test.mjs`,
+  and that test exists because they drifted.** When the conversion
+  landed, the number that grew was updated everywhere and the number
+  that shrank was not: four documents went on describing a file-backed
+  remainder of 5 or 6 apps when the real figure was 2. The direction of
+  that error matters — a document that overstates the remaining work
+  reads as a warning, and one that understates it reads as permission.
 
   Two things about it that must not be blurred together:
 
