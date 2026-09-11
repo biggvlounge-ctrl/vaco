@@ -16,12 +16,29 @@
 // unvalidated against a fixed enum, since the doc names only two real
 // data points (general, apparel), not a closed category list.
 
+// **Real, flagged schema extension**: `name`. The architecture doc's
+// literal shape is `Product { id, sellerId, price,
+// affiliateCommissionPercent }` and carries no display name, so this
+// module faithfully stored none -- while `public/index.html` rendered
+// `p.name || ('Product ' + p.id)`. The catalogue therefore showed
+// "Product 1", "Product 2" for every item ever created, and the cart
+// did the same.
+//
+// A shop whose products cannot be named is not a shop, and the UI had
+// already assumed the field, so the omission reads as a gap in the
+// spec rather than a decision in it. Added on the same basis as
+// `category` above: required rather than optional, because unlike a
+// category there is no sensible way to render a product without one.
+// The architecture document should gain it too.
 function createProduct(store, options = {}) {
   const {
-    sellerId, price, affiliateCommissionPercent = 0, category = null,
+    sellerId, name, price, affiliateCommissionPercent = 0, category = null,
   } = options;
 
   if (!sellerId) throw new Error('createProduct requires a sellerId');
+  if (typeof name !== 'string' || !name.trim()) {
+    throw new Error('createProduct requires a name');
+  }
   if (!Number.isFinite(price) || price <= 0) throw new Error('createProduct requires a positive price');
   if (!Number.isFinite(affiliateCommissionPercent) || affiliateCommissionPercent < 0 || affiliateCommissionPercent >= 1) {
     throw new Error('createProduct requires an affiliateCommissionPercent between 0 and 1 (exclusive of 1)');
@@ -30,6 +47,7 @@ function createProduct(store, options = {}) {
   const product = {
     id: store.nextProductId++,
     sellerId,
+    name: name.trim(),
     price,
     affiliateCommissionPercent,
     category,

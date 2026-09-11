@@ -34,12 +34,29 @@
 const LISTING_TYPES = ['stay'];
 const HOST_TYPES = ['individual', 'professional'];
 
+// **Real, flagged schema extension**: `title`. The architecture doc's
+// literal shape is `Listing { id, hostId, type, pricePerNight }` and
+// names no title, so this module stored none -- while
+// `public/index.html` renders `l.title || ('Stay ' + l.id)`. The Stays
+// tab, which is the first thing anyone opening VACAY sees, therefore
+// listed "Stay 1", "Stay 2", "Stay 3" at real prices with real Book
+// buttons and no way to tell them apart.
+//
+// A booking surface whose inventory cannot be named is not usable, and
+// the UI had already assumed the field, so this reads as an omission in
+// the spec rather than a decision in it. Required rather than optional:
+// unlike `hostType` there is no defensible default, and a nameless
+// listing is exactly the state being fixed. The architecture document
+// should gain it too.
 function createListing(store, options = {}) {
   const {
-    hostId, pricePerNight, hostType = 'individual', now = Date.now(),
+    hostId, title, pricePerNight, hostType = 'individual', now = Date.now(),
   } = options;
 
   if (!hostId) throw new Error('createListing requires a hostId');
+  if (typeof title !== 'string' || !title.trim()) {
+    throw new Error('createListing requires a title');
+  }
   if (!Number.isFinite(pricePerNight) || pricePerNight <= 0) {
     throw new Error('createListing requires a positive pricePerNight');
   }
@@ -50,6 +67,7 @@ function createListing(store, options = {}) {
   const listing = {
     id: store.nextListingId++,
     hostId,
+    title: title.trim(),
     type: 'stay',
     hostType,
     pricePerNight,

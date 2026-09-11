@@ -67,7 +67,7 @@ function ledger(initial = {}) {
 test('an order splits three ways and adds back up to what the buyer paid', async () => {
   const store = createChopzShopStore();
   const product = products.createProduct(store, {
-    sellerId: 'maker', price: 100, affiliateCommissionPercent: 0.1, category: 'general',
+    sellerId: 'maker', name: 'Screen-printed tee', price: 100, affiliateCommissionPercent: 0.1, category: 'general',
   });
   const settleFn = ledger({ sam: 500 });
 
@@ -88,8 +88,8 @@ test('apparel is charged the apparel fee, not the general one', async () => {
   const store = createChopzShopStore();
   const settleFn = ledger({ sam: 1000 });
 
-  const tee = products.createProduct(store, { sellerId: 'maker', price: 100, category: 'apparel' });
-  const mug = products.createProduct(store, { sellerId: 'maker', price: 100, category: 'general' });
+  const tee = products.createProduct(store, { sellerId: 'maker', name: 'Item 100', price: 100, category: 'apparel' });
+  const mug = products.createProduct(store, { sellerId: 'maker', name: 'Item 100', price: 100, category: 'general' });
 
   const teeOrder = await orders.createOrder(store, {
     buyerId: 'sam', productId: tee.id, settleFn, now: NOW,
@@ -109,7 +109,7 @@ test('apparel is charged the apparel fee, not the general one', async () => {
 
 test('a product with no category falls back to the general fee', async () => {
   const store = createChopzShopStore();
-  const product = products.createProduct(store, { sellerId: 'maker', price: 50 });
+  const product = products.createProduct(store, { sellerId: 'maker', name: 'Item 50', price: 50 });
   const settleFn = ledger({ sam: 500 });
 
   const order = await orders.createOrder(store, {
@@ -120,7 +120,7 @@ test('a product with no category falls back to the general fee', async () => {
 
 test('a failed charge leaves no order behind', async () => {
   const store = createChopzShopStore();
-  const product = products.createProduct(store, { sellerId: 'maker', price: 100, category: 'general' });
+  const product = products.createProduct(store, { sellerId: 'maker', name: 'Item 100', price: 100, category: 'general' });
   const declining = async () => { throw new Error('insufficient funds'); };
 
   await assert.rejects(() => orders.createOrder(store, {
@@ -137,7 +137,7 @@ test('a failed charge leaves no order behind', async () => {
 test('no affiliate link means no commission — the seller keeps that share', async () => {
   const store = createChopzShopStore();
   const product = products.createProduct(store, {
-    sellerId: 'maker', price: 100, affiliateCommissionPercent: 0.1, category: 'general',
+    sellerId: 'maker', name: 'Screen-printed tee', price: 100, affiliateCommissionPercent: 0.1, category: 'general',
   });
   const settleFn = ledger({ sam: 500 });
 
@@ -156,7 +156,7 @@ test('no affiliate link means no commission — the seller keeps that share', as
 test('a real click earns the commission without the buyer naming the link', async () => {
   const store = createChopzShopStore();
   const product = products.createProduct(store, {
-    sellerId: 'maker', price: 100, affiliateCommissionPercent: 0.1, category: 'general',
+    sellerId: 'maker', name: 'Screen-printed tee', price: 100, affiliateCommissionPercent: 0.1, category: 'general',
   });
   const settleFn = ledger({ sam: 500 });
 
@@ -179,7 +179,7 @@ test('a real click earns the commission without the buyer naming the link', asyn
 test('one buyer’s click does not earn commission on another buyer’s order', async () => {
   const store = createChopzShopStore();
   const product = products.createProduct(store, {
-    sellerId: 'maker', price: 100, affiliateCommissionPercent: 0.1, category: 'general',
+    sellerId: 'maker', name: 'Screen-printed tee', price: 100, affiliateCommissionPercent: 0.1, category: 'general',
   });
   const settleFn = ledger({ sam: 500, ada: 500 });
 
@@ -197,8 +197,8 @@ test('one buyer’s click does not earn commission on another buyer’s order', 
 
 test('a link generated for another product cannot be claimed on this one', async () => {
   const store = createChopzShopStore();
-  const tee = products.createProduct(store, { sellerId: 'maker', price: 100, category: 'general' });
-  const mug = products.createProduct(store, { sellerId: 'maker', price: 40, category: 'general' });
+  const tee = products.createProduct(store, { sellerId: 'maker', name: 'Item 100', price: 100, category: 'general' });
+  const mug = products.createProduct(store, { sellerId: 'maker', name: 'Item 40', price: 40, category: 'general' });
   const settleFn = ledger({ sam: 500 });
 
   const link = affiliateLinks.createAffiliateLink(store, { creatorId: 'kaya', productId: mug.id });
@@ -214,8 +214,8 @@ test('a cart checkout charges every item and settles each one', async () => {
   const store = createChopzShopStore();
   const settleFn = ledger({ sam: 1000 });
 
-  const a = products.createProduct(store, { sellerId: 'maker', price: 30, category: 'general' });
-  const b = products.createProduct(store, { sellerId: 'other', price: 70, category: 'apparel' });
+  const a = products.createProduct(store, { sellerId: 'maker', name: 'Item 30', price: 30, category: 'general' });
+  const b = products.createProduct(store, { sellerId: 'other', name: 'Item 70', price: 70, category: 'apparel' });
 
   const result = await orders.createCartCheckout(store, {
     buyerId: 'sam',
@@ -236,7 +236,7 @@ test('a cart checkout charges every item and settles each one', async () => {
 
 test('cart items settle sequentially, so a later failure cannot un-pay an earlier seller', async () => {
   const store = createChopzShopStore();
-  const good = products.createProduct(store, { sellerId: 'maker', price: 30, category: 'general' });
+  const good = products.createProduct(store, { sellerId: 'maker', name: 'Item 30', price: 30, category: 'general' });
 
   // **One call is now a whole order.** This used to count individual
   // transfers and fail on the fourth, which was the second item's
@@ -275,4 +275,44 @@ test('an empty cart is refused rather than charging nothing successfully', async
   await assert.rejects(() => orders.createCartCheckout(store, {
     buyerId: 'sam', items: [], settleFn: ledger(),
   }), /non-empty/);
+});
+
+// -- The product name -------------------------------------------------
+//
+// A late addition to the model, and the reason is worth keeping: the
+// architecture doc's literal shape is
+// `Product { id, sellerId, price, affiliateCommissionPercent }` with no
+// display name, so this module stored none -- while the catalogue and
+// the cart both rendered `p.name || ('Product ' + p.id)`. Every product
+// ever created showed as "Product 1". The data was never there for the
+// UI to find.
+
+test('a product carries the name it was given', () => {
+  const store = createChopzShopStore();
+  const p = products.createProduct(store, {
+    sellerId: 'maker', name: 'Riverside House Blend', price: 18,
+  });
+  assert.strictEqual(p.name, 'Riverside House Blend',
+    'the catalogue renders p.name; without it every product reads "Product <id>"');
+  assert.strictEqual(products.getProduct(store, p.id).name, 'Riverside House Blend',
+    'the name must survive into the store, not just the return value');
+});
+
+test('a product without a usable name is refused', () => {
+  const store = createChopzShopStore();
+  for (const bad of [undefined, '', '   ', 42, null]) {
+    assert.throws(
+      () => products.createProduct(store, { sellerId: 'maker', name: bad, price: 18 }),
+      /requires a name/,
+      `createProduct accepted ${JSON.stringify(bad)} as a name`,
+    );
+  }
+});
+
+test('a name is stored trimmed, so the card never renders padding', () => {
+  const store = createChopzShopStore();
+  const p = products.createProduct(store, {
+    sellerId: 'maker', name: '  Reissue bundle  ', price: 64,
+  });
+  assert.strictEqual(p.name, 'Reissue bundle');
 });

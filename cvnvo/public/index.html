@@ -73,7 +73,29 @@ function renderDiscover(body) {
   return VACO.api('/api/profiles/' + encodeURIComponent(id))
     .then(function (profile) {
       var lines = el('div', 'vaco-stack-sm');
-      lines.appendChild(el('p', 'vaco-small vaco-dim', profile.bio || 'No bio yet.'));
+      // **Prompts, not a bio.** This used to render
+      // `profile.bio || 'No bio yet.'`, and there is no `bio` on a
+      // CVNVO profile -- deliberately. `lib/profiles.js` names its
+      // source of truth as CVNVO_ARCHITECTURE.md's
+      // `UserProfile { id, prompts, verifiedBadge, compatibilityInputs }`,
+      // and CVNVO_CORE_FEATURES.md gives the reason: "prompt-based
+      // profiles are what actually feeds a compatibility algorithm
+      // meaningful signal, not just photos".
+      //
+      // So the card advertised a missing field while ignoring the one
+      // thing the product is built around. Every profile read "No bio
+      // yet." no matter how complete it was.
+      var prompts = Array.isArray(profile.prompts) ? profile.prompts : [];
+      if (prompts.length === 0) {
+        lines.appendChild(el('p', 'vaco-small vaco-dim', 'No prompts answered yet.'));
+      } else {
+        prompts.forEach(function (p) {
+          var block = el('div', 'vaco-stack-sm');
+          block.appendChild(el('p', 'vaco-small vaco-dim', p.question));
+          block.appendChild(el('p', null, p.answer));
+          lines.appendChild(block);
+        });
+      }
       var meta = el('div', 'vaco-row-tight');
       // A VACA-verified badge is a real identity claim checked against
       // another service, which is exactly the thing a dating app should

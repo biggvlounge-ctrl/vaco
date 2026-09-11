@@ -605,3 +605,40 @@ test('the seat-count guard is unreachable through the normal flow, and kept anyw
     flightId: flight.id, passengerId: 'ada', settleFn, now: NOW,
   }), /no seats remaining/);
 });
+
+// -- The listing title -------------------------------------------------
+//
+// Added to the model late. The architecture doc's literal shape is
+// `Listing { id, hostId, type, pricePerNight }` with no title, so
+// `createListing` accepted and stored none -- while the Stays tab
+// rendered `l.title || ('Stay ' + l.id)`. The first screen of the app
+// listed "Stay 1", "Stay 2", "Stay 3" at real prices.
+//
+// Note that `stayFixture()` above was already passing a title before
+// this existed. The tests assumed the field; only the model did not
+// have it.
+
+test('a listing carries the title it was given', () => {
+  const store = createVacayStore();
+  const l = listings.createListing(store.bookings, {
+    hostId: 'ines', title: 'Loft above the roastery', pricePerNight: 120,
+  });
+  assert.strictEqual(l.title, 'Loft above the roastery',
+    'the Stays tab renders l.title; without it every listing reads "Stay <id>"');
+  const stored = store.bookings.listings.find((x) => x.id === l.id);
+  assert.strictEqual(stored.title, 'Loft above the roastery',
+    'the title must survive into the store, not just the return value');
+});
+
+test('a listing without a usable title is refused', () => {
+  const store = createVacayStore();
+  for (const bad of [undefined, '', '   ', 7, null]) {
+    assert.throws(
+      () => listings.createListing(store.bookings, {
+        hostId: 'ines', title: bad, pricePerNight: 120,
+      }),
+      /requires a title/,
+      `createListing accepted ${JSON.stringify(bad)} as a title`,
+    );
+  }
+});

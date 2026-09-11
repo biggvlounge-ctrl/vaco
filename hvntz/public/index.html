@@ -70,7 +70,11 @@ function loadHunt(out, body, huntId) {
     }
 
     var replacement = el('div', 'vaco-stack');
-    replacement.appendChild(VACO.card(hunt.name || ('Hunt ' + huntId), [lines],
+    // `hunt.title`, not `hunt.name`. createHunt requires a title and
+    // stores it under that key; there has never been a `name` on a
+    // hunt, so this read was always undefined and every hunt rendered
+    // as "Hunt <id>" with its real title sitting in the response.
+    replacement.appendChild(VACO.card(hunt.title || ('Hunt ' + huntId), [lines],
       { trailing: VACO.badge(hunt.status || 'active') }));
     // Replace only the results area, keeping the lookup form in place.
     while (out.childNodes.length > 1) out.removeChild(out.lastChild);
