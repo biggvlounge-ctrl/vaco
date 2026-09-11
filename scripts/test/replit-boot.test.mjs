@@ -116,3 +116,79 @@ test('a boot that never health-checked anything is a failure, not a success', ()
   assert.doesNotMatch(run.stdout, /GATEWAY_SAW_PORT/,
     'the gateway started in front of an ecosystem that never came up');
 });
+
+// ---------------------------------------------------------------------
+// The root manifest, and why its absence was a real deployment failure.
+//
+// **Found by a person, not by a tool.** Replit was handed this repo and
+// said it could not understand the format of the apps. The cause was
+// that there was no `package.json` at the repo root: 36 of them, one
+// per app, and none at the top. Every runtime detector -- Replit's,
+// Nixpacks', Render's, Heroku's -- classifies a repo as Node by finding
+// that file at the root, so all of them saw a directory of shell
+// scripts and refused to proceed.
+//
+// Nothing in the test suite noticed, because every other consumer
+// enumerates apps from a manifest or by walking directories, and a
+// root file is invisible to both. The ecosystem was correct, tested
+// and unimportable at the same time.
+//
+// The three deliberate absences below are load-bearing and each would
+// break something if added, so they are asserted rather than trusted
+// to a comment inside a file that cannot carry comments.
+// ---------------------------------------------------------------------
+
+const ROOT_PKG_PATH = path.join(REPO_ROOT, 'package.json');
+
+test('the repo root has a package.json, so a host can identify the project', () => {
+  assert.ok(
+    fs.existsSync(ROOT_PKG_PATH),
+    'no package.json at the repo root. Replit, Nixpacks, Render and Heroku all '
+    + 'decide "this is a Node project" by finding this file here, and without it '
+    + 'they refuse the import without saying why.',
+  );
+
+  const pkg = JSON.parse(fs.readFileSync(ROOT_PKG_PATH, 'utf8'));
+  assert.equal(pkg.private, true, 'the root manifest must be private — this is not a publishable package');
+  assert.ok(pkg.engines?.node, 'no engines.node floor, so a host may pick a runtime nothing is tested on');
+});
+
+test('the root start script is the same entry point .replit runs', () => {
+  // Two hosts, one entry point. A host that runs `npm start` and a host
+  // that reads `.replit` must boot the identical thing, or the tested
+  // path and the deployed path diverge silently.
+  const pkg = JSON.parse(fs.readFileSync(ROOT_PKG_PATH, 'utf8'));
+  const replit = fs.readFileSync(path.join(REPO_ROOT, '.replit'), 'utf8');
+
+  assert.match(pkg.scripts?.start || '', /deploy\/replit-boot\.sh/,
+    '`npm start` no longer runs the boot script, so a host using it boots something else');
+  assert.match(replit, /run\s*=\s*"bash deploy\/replit-boot\.sh"/,
+    '.replit and package.json disagree about the entry point');
+
+  // `main` and `.replit`'s entrypoint name the same file.
+  const entry = replit.match(/entrypoint\s*=\s*"([^"]+)"/)?.[1];
+  assert.equal(pkg.main, entry, `package.json main is ${pkg.main} but .replit entrypoint is ${entry}`);
+  assert.ok(fs.existsSync(path.join(REPO_ROOT, pkg.main)), `${pkg.main} does not exist`);
+});
+
+test('the root manifest declares no dependencies, no workspaces and no postinstall', () => {
+  const pkg = JSON.parse(fs.readFileSync(ROOT_PKG_PATH, 'utf8'));
+
+  // gateway.js requires only node: builtins. A root dependency would
+  // create a root node_modules that install-ecosystem.sh does not manage.
+  assert.equal(
+    Object.keys(pkg.dependencies || {}).length, 0,
+    'the root manifest grew a dependency. gateway.js uses only node: builtins; '
+    + 'a root node_modules is not managed by install-ecosystem.sh.',
+  );
+
+  // Workspaces would hoist and re-resolve all 36 apps, invalidating 36
+  // lockfiles that the Docker build and CI both rely on being exact.
+  assert.ok(!pkg.workspaces,
+    'the root manifest declares workspaces. That re-resolves all 36 apps and '
+    + 'invalidates the per-app lockfiles the Docker path and CI depend on.');
+
+  // Installing 36 apps must be asked for, never a side effect.
+  assert.ok(!pkg.scripts?.postinstall,
+    'a postinstall here makes `npm install` silently install 36 apps');
+});

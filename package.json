@@ -1,0 +1,42 @@
+{
+  "//": [
+    "The root manifest exists so a host can IDENTIFY this repo. Every",
+    "runtime detector -- Replit's, Nixpacks, Render's, Heroku's -- decides",
+    "'this is a Node project' by finding a package.json at the root. This",
+    "repo had 36 of them, one per app, and none here, so importers saw a",
+    "directory of shell scripts and refused to classify it. That was a real",
+    "failure: a correct, tested ecosystem that a PaaS could not recognise.",
+    "",
+    "NO dependencies, deliberately. gateway.js requires only node:http,",
+    "node:fs and node:path. Adding a dependency here would mean a root",
+    "node_modules that shadows nothing and confuses install-ecosystem.sh.",
+    "",
+    "NO workspaces, deliberately. Each of the 36 apps carries its own",
+    "package.json AND its own package-lock.json, and install-ecosystem.sh",
+    "installs them separately on purpose -- npm workspaces would hoist and",
+    "re-resolve all of it, invalidating 36 lockfiles that the Docker path",
+    "and CI both depend on being exact.",
+    "",
+    "NO postinstall, deliberately. Installing 36 apps is a two-minute",
+    "operation and must be something a person asks for, not a side effect",
+    "of `npm install`. deploy/replit-boot.sh calls it when it is needed."
+  ],
+  "name": "vaco",
+  "version": "1.0.0",
+  "private": true,
+  "description": "36 applications -- 34 Node/Express backends and two Vite frontends -- sharing a ledger, a session service, an identity service and an analytics spine, served behind a single-port gateway.",
+  "main": "gateway.js",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "bash deploy/replit-boot.sh",
+    "gateway": "node gateway.js",
+    "routes": "node gateway.js --print-routes",
+    "install:all": "bash install-ecosystem.sh",
+    "stop": "bash stop-ecosystem.sh",
+    "test": "node scripts/run-all-tests.mjs",
+    "preflight": "node scripts/deploy-preflight.mjs"
+  },
+  "license": "UNLICENSED"
+}
