@@ -1,8 +1,8 @@
 {
   "total": 1586,
-  "passed": 1585,
+  "passed": 1586,
   "failed": 0,
-  "skipped": 1,
+  "skipped": 0,
   "suites": 39,
   "perSuite": {
     "chopz": {
@@ -43,9 +43,9 @@
     },
     "scripts": {
       "tests": 157,
-      "pass": 156,
+      "pass": 157,
       "fail": 0,
-      "skipped": 1
+      "skipped": 0
     },
     "shield": {
       "tests": 12,

@@ -122,6 +122,19 @@ answered 200 through the single port; the 34th was `v4-proxy`,
 deliberately down for want of `ANTHROPIC_API_KEY`, and its 502 named
 the app and the port.
 
+**Re-verified 11 Sep 2026, this time against Postgres — the first
+end-to-end run of the whole ecosystem on the database.** 35 up, 1 down
+(the same deliberate `v4-proxy`); 28 apps reported `store: Postgres` in
+their own boot lines and none fell back to a file; V3 reported
+`ledger: Postgres rows`; VACON-C loaded its schema. **35 of 36 apps
+reachable through the single port** — 32 serve a page, and
+`vaco-audit`, `vaco-operator` and `vaco-media` are API-only and answer
+on `/api/health`, which an earlier probe of this miscounted as three
+failures. Seeding then wrote 34 items through the real HTTP API,
+producing 28 documents, 8 balance rows and 14 transactions.
+`dev-docs/DISASTER_RECOVERY.md` §0a has the full drill, including the
+destroy-and-restore that followed.
+
 `VACO_APPS` boots a subset, for a host that cannot hold the whole
 stack — though at 38 processes and 0.82–0.86 GB, measured by PSS and
 confirmed against the memory freed on shutdown, most hosts will hold
@@ -783,7 +796,7 @@ produce the numbers in this document.
 built:** `node scripts/package-release.mjs` — see §11.
 
 ```sh
-node scripts/run-all-tests.mjs           # 1586/1586 across 39 suites (1 skipped without a database)
+node scripts/run-all-tests.mjs           # 1586/1586 across 39 suites (some skip without a database)
 node scripts/audit-route-guards.mjs --check   # 520/520 accounted for
 ./sync-shared-runtime.sh --check         # 203 copies current, none unmanaged
 ./sync-design-system.sh --check          # every serving app is a target

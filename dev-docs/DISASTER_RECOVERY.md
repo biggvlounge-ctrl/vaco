@@ -107,6 +107,52 @@ nothing there.
 
 ---
 
+## 0a. The drill, run end to end on Postgres — 11 Sep 2026
+
+**This is the first time the whole ecosystem has been backed up,
+destroyed and recovered.** Everything before this was per-app, or
+against the file backend, or reasoned about. What follows is what was
+actually driven, in order, on one machine against a real PostgreSQL 16:
+
+| step | result |
+|---|---|
+| Boot all 36 apps with `DATABASE_URL` set | **35 up, 1 down** — the one is `v4-proxy`, refusing without `ANTHROPIC_API_KEY`, which is correct |
+| Confirm the backend each app actually chose | **28 on `vaco.stores`, 0 fell back to a file** — read from their own boot lines, not assumed |
+| V3 | `v3 ledger: Postgres rows` |
+| VACON-C | loaded its own schema, started a new world |
+| Seed demo content through the real HTTP API | **34 created, 0 failed** |
+| State that produced | 28 documents, 8 balance rows, 14 transactions, **8000 VCoin** |
+| Reach every app through the single gateway port | **35/36** — 32 with a page, 3 API-only (`vaco-audit`, `vaco-operator`, `vaco-media`), 1 the deliberate 502 |
+| `backup-stores.mjs` | 30 files + 28 documents + 22 ledger rows, `ok` |
+| `DELETE FROM` every document and every balance | 0 rows left |
+| `restore-stores.mjs --apply` | **8000 VCoin verified back, from the rows** |
+| Restart the ecosystem against the restored database | **35 up, 1 down** |
+| Seeded records inside the restored documents | **23** — cvnvo 9 profiles + 3 matches, vxllage 4 posts, hvntz 3 businesses, vulture-music 2 releases, dreams 2 screens |
+
+**Two things this does not prove, stated because the table above reads
+stronger than the truth.**
+
+It was one machine, one database, one process each. It does not test a
+host dying, a disk failing, or a network partition — it tests that the
+tooling captures the real state and puts it back.
+
+And the snapshot went to a local directory. **The disk holding the
+database and the disk holding its backup were the same disk**, which is
+the one thing a disaster-recovery drill most needs not to be. Closing
+that needs somewhere else to put it, which is a decision about
+infrastructure rather than a gap in this code.
+
+**One correction to how this was measured.** The first pass through the
+gateway reported 32/36 and named `vaco-audit`, `vaco-operator` and
+`vaco-media` as unreachable. They were not: those three are API-only and
+have no `GET /` at all, answering 200 on `/api/health` directly and
+through the gateway both. The probe was wrong, not the routing. A probe
+that only knows how to ask for a home page will report every headless
+service as broken, and reporting a false failure in a DR drill spends
+the same trust as missing a real one.
+
+---
+
 ## 1. What there is to lose
 
 Measured 2026-08-26.
