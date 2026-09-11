@@ -11,7 +11,7 @@ each app's test suite actually executed. Nothing here is recalled.
 `scripts/test/completion-report.test.mjs` fails if this file drifts
 from what the script emits, which is the failure mode that made
 `COMPLETION_AUDIT.md` read 31 apps and 522 tests when the real numbers
-were 34 and 1167.
+were 34 and 1182.
 
 ---
 
@@ -56,7 +56,7 @@ anything it can:
 | Express backends in the manifest | **34** |
 | Overall criteria met | **89%** (232/260) |
 | Apps at 100% | **6 / 34** |
-| Tests | **1167** |
+| Tests | **1182** |
 | Apps with no test suite | **0** |
 
 Two notes on that test count, so it is not read as contradicting
@@ -92,7 +92,7 @@ anything else:
 | `dreams` | **87%** | 7/8 | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | 12 |
 | `hvntz` | **87%** | 7/8 | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | 14 |
 | `shield` | **87%** | 7/8 | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | 12 |
-| `v3` | **87%** | 7/8 | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | 94 |
+| `v3` | **87%** | 7/8 | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | 109 |
 | `vaca` | **87%** | 7/8 | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | 17 |
 | `vacay` | **87%** | 7/8 | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | 24 |
 | `vaco-notify` | **87%** | 7/8 | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | 17 |

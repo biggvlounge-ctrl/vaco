@@ -244,3 +244,146 @@ test('the database itself refuses a negative balance', { skip: skip() }, async (
     'the database accepted a negative balance',
   );
 });
+
+// -- settle ---------------------------------------------------------------
+
+test('a settlement moves every leg together', { skip: skip() }, async (t) => {
+  if (SKIP) return t.skip(SKIP);
+  const [payer, x, y] = [who('payer'), who('x'), who('y')];
+
+  const result = await ledger.settle(pool, {
+    reason: 'job complete',
+    legs: [
+      { fromUserId: payer, toUserId: x, amount: 300, reason: 'worker' },
+      { fromUserId: payer, toUserId: y, amount: 100, reason: 'platform fee' },
+    ],
+  });
+
+  assert.strictEqual(result.transactions.length, 2);
+  assert.strictEqual(result.reason, 'job complete');
+  assert.ok(Number.isFinite(result.settlementId));
+  assert.strictEqual(result.transactions[0].settlementId, result.settlementId,
+    'both legs must carry the same settlementId or they cannot be read as one settlement');
+  assert.strictEqual(result.transactions[1].settlementId, result.settlementId);
+
+  assert.strictEqual(await ledger.getBalance(pool, payer), 600);
+  assert.strictEqual(await ledger.getBalance(pool, x), 1300);
+  assert.strictEqual(await ledger.getBalance(pool, y), 1100);
+});
+
+test('a refused leg leaves NOTHING applied, including new accounts', { skip: skip() }, async (t) => {
+  if (SKIP) return t.skip(SKIP);
+  // The property lib/vcoin.js takes deliberate care to preserve: a
+  // refused settlement must not even auto-grant an account to a payee
+  // it was about to pay. Here ROLLBACK gives it for free — but only if
+  // the account creation is genuinely inside the transaction, which is
+  // what this checks.
+  const payer = who('payer');
+  const [ok, doomed] = [who('ok'), who('doomed')];
+  await ledger.getBalance(pool, payer);
+
+  await assert.rejects(
+    () => ledger.settle(pool, {
+      legs: [
+        { fromUserId: payer, toUserId: ok, amount: 100 },
+        { fromUserId: payer, toUserId: doomed, amount: 5000 },
+      ],
+    }),
+    /legs\[1\]: Insufficient VCoin balance\. Nothing in this settlement was applied\./,
+  );
+
+  assert.strictEqual(await ledger.getBalance(pool, payer), 1000, 'the first leg was applied anyway');
+
+  const rows = await pool.query(
+    'SELECT count(*)::int AS n FROM vaco.v3_balances WHERE user_id = ANY($1::text[])',
+    [[ok, doomed]],
+  );
+  assert.strictEqual(rows.rows[0].n, 0,
+    'a refused settlement created accounts for its payees — a rollback that did not roll back');
+});
+
+test('a later leg can spend what an earlier leg paid in', { skip: skip() }, async (t) => {
+  if (SKIP) return t.skip(SKIP);
+  // Same arithmetic as lib/vcoin.js's running Map: the middle account
+  // starts with 1000, receives 1000, and pays out 1500.
+  const [a, b, c] = [who('a'), who('b'), who('c')];
+  const result = await ledger.settle(pool, {
+    legs: [
+      { fromUserId: a, toUserId: b, amount: 1000 },
+      { fromUserId: b, toUserId: c, amount: 1500 },
+    ],
+  });
+  assert.strictEqual(result.transactions.length, 2);
+  assert.strictEqual(await ledger.getBalance(pool, a), 0);
+  assert.strictEqual(await ledger.getBalance(pool, b), 500);
+  assert.strictEqual(await ledger.getBalance(pool, c), 2500);
+});
+
+test('concurrent settlements out of one account cannot overdraw it', { skip: skip() }, async (t) => {
+  if (SKIP) return t.skip(SKIP);
+  const payer = who('payer');
+  await ledger.getBalance(pool, payer);
+
+  const attempts = Array.from({ length: 6 }, (_, i) => ledger.settle(pool, {
+    legs: [{ fromUserId: payer, toUserId: who(`p${i}`), amount: 400 }],
+  }));
+  const results = await Promise.allSettled(attempts);
+  const ok = results.filter((r) => r.status === 'fulfilled').length;
+
+  assert.strictEqual(ok, 2, `${ok} settlements of 400 succeeded against a balance of 1000`);
+  assert.strictEqual(await ledger.getBalance(pool, payer), 200);
+});
+
+// -- cashout --------------------------------------------------------------
+
+test('an unseen VASH account is 0 and reading it creates nothing', { skip: skip() }, async (t) => {
+  if (SKIP) return t.skip(SKIP);
+  // VCoin opens at 1000 on first touch; VASH opens at 0 and is not
+  // created by a read. Getting that wrong would hand everybody 1000 VASH.
+  const a = who('a');
+  assert.strictEqual(await ledger.getVashBalance(pool, a), 0);
+  const rows = await pool.query(
+    "SELECT count(*)::int AS n FROM vaco.v3_balances WHERE user_id = $1 AND currency = 'vash'",
+    [a],
+  );
+  assert.strictEqual(rows.rows[0].n, 0, 'reading a VASH balance opened an account');
+});
+
+test('a cashout moves value across both currencies at once', { skip: skip() }, async (t) => {
+  if (SKIP) return t.skip(SKIP);
+  const a = who('a');
+  const result = await ledger.cashout(pool, { userId: a, vcoinAmount: 500 });
+
+  assert.strictEqual(result.vcoinDeducted, 500);
+  assert.strictEqual(result.vashCredited, 5);       // 500 * 0.01
+  assert.strictEqual(result.rate, 0.01);
+  assert.strictEqual(result.newVcoinBalance, 500);
+  assert.strictEqual(result.newVashBalance, 5);
+  assert.strictEqual(await ledger.getBalance(pool, a), 500);
+  assert.strictEqual(await ledger.getVashBalance(pool, a), 5);
+});
+
+test('a cashout beyond the balance moves neither currency', { skip: skip() }, async (t) => {
+  if (SKIP) return t.skip(SKIP);
+  const a = who('a');
+  await ledger.getBalance(pool, a);
+  await assert.rejects(
+    () => ledger.cashout(pool, { userId: a, vcoinAmount: 5000 }),
+    /Insufficient VCoin balance for cashout\./,
+  );
+  assert.strictEqual(await ledger.getBalance(pool, a), 1000);
+  assert.strictEqual(await ledger.getVashBalance(pool, a), 0, 'a refused cashout credited VASH');
+});
+
+test('concurrent cashouts cannot mint VASH out of one balance', { skip: skip() }, async (t) => {
+  if (SKIP) return t.skip(SKIP);
+  const a = who('a');
+  await ledger.getBalance(pool, a);
+  const results = await Promise.allSettled(
+    Array.from({ length: 5 }, () => ledger.cashout(pool, { userId: a, vcoinAmount: 400 })),
+  );
+  const ok = results.filter((r) => r.status === 'fulfilled').length;
+  assert.strictEqual(ok, 2, `${ok} cashouts of 400 succeeded against 1000`);
+  assert.strictEqual(await ledger.getBalance(pool, a), 200);
+  assert.strictEqual(await ledger.getVashBalance(pool, a), 8, 'VASH credited does not match VCoin debited');
+});

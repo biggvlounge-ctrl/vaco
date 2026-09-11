@@ -72,11 +72,11 @@
 // ---------------------------------------------------------------------
 // SCOPE, STATED PLAINLY
 //
-// This is VCoin transfer and balance. `settle`, `cashout` and the VASH
-// side are not here yet; they are the same shape of work and they are
-// not done. Nothing in this file is wired into `server.js` — V3 still
-// runs on the document store. This exists to prove the pattern and to
-// be the worked example the remaining decomposition follows.
+// Balance, transfer, settle, cashout and the VASH side are all here.
+// What is NOT here is idempotency: `lib/idempotency.js` replays a stored
+// response for a repeated `Idempotency-Key`, and it reads the store
+// directly. Until that is row-backed too, V3 cannot run on this alone —
+// see `lib/idempotencyPg.js`.
 
 const SCHEMA = `
 CREATE SCHEMA IF NOT EXISTS vaco;
@@ -105,10 +105,33 @@ CREATE TABLE IF NOT EXISTS vaco.v3_transactions (
 
 CREATE INDEX IF NOT EXISTS v3_transactions_from_idx ON vaco.v3_transactions (from_user_id);
 CREATE INDEX IF NOT EXISTS v3_transactions_to_idx   ON vaco.v3_transactions (to_user_id);
+
+-- Additive, and idempotent, so an existing table gains them rather than
+-- needing to be dropped. A cashout has no payee, so to_user_id cannot
+-- stay NOT NULL; settlement_id groups the legs of one atomic settle;
+-- metadata carries the two fields only a cashout has (vashCredited,
+-- rate) rather than two mostly-null columns on every transfer.
+--
+-- No backticks anywhere in this string: it is a JS template literal, and
+-- a backtick in a SQL comment ends it. That is what the first version
+-- did, and the file stopped parsing.
+ALTER TABLE vaco.v3_transactions ALTER COLUMN to_user_id DROP NOT NULL;
+ALTER TABLE vaco.v3_transactions ADD COLUMN IF NOT EXISTS settlement_id BIGINT;
+ALTER TABLE vaco.v3_transactions ADD COLUMN IF NOT EXISTS metadata JSONB;
+CREATE SEQUENCE IF NOT EXISTS vaco.v3_settlement_id_seq;
 `;
 
 const STARTING_VCOIN_BALANCE = 1000;
 const VCOIN = 'vcoin';
+const VASH = 'vash';
+const VCOIN_TO_VASH_RATE = 0.01;
+
+// **Opening balances differ by currency, and getting this wrong would
+// hand everybody 1000 VASH.** `lib/vcoin.js` auto-grants 1000 VCoin on
+// first touch; `lib/vash.js` returns `store.vashBalances[userId] || 0`,
+// which opens at nothing. One table holds both, so the opening balance
+// is a property of the currency rather than of the table.
+const OPENING_BALANCE = { [VCOIN]: STARTING_VCOIN_BALANCE, [VASH]: 0 };
 
 // Postgres returns NUMERIC as a string, deliberately — it will not
 // silently narrow an exact decimal into a float. Every read goes
@@ -134,8 +157,28 @@ async function ensureAccount(client, userId, currency = VCOIN) {
     `INSERT INTO vaco.v3_balances (user_id, currency, amount)
      VALUES ($1, $2, $3)
      ON CONFLICT (user_id, currency) DO NOTHING`,
-    [userId, currency, STARTING_VCOIN_BALANCE],
+    [userId, currency, OPENING_BALANCE[currency] ?? 0],
   );
+}
+
+// Locks every named account in one order, so two operations touching an
+// overlapping set cannot take their locks in opposite orders. Sorting is
+// the entire mechanism; the lock is what makes the order matter.
+//
+// `settle` is why this takes a list rather than a pair: a settlement
+// legitimately touches three or four accounts, and two settlements
+// sharing two of them is exactly the shape that deadlocks.
+async function lockAccounts(client, userIds, currency = VCOIN) {
+  const unique = [...new Set(userIds)].sort();
+  for (const id of unique) await ensureAccount(client, id, currency);
+  await client.query(
+    `SELECT user_id FROM vaco.v3_balances
+      WHERE currency = $1 AND user_id = ANY($2::text[])
+      ORDER BY user_id
+        FOR UPDATE`,
+    [currency, unique],
+  );
+  return unique;
 }
 
 async function getBalance(pool, userId, currency = VCOIN) {
@@ -309,12 +352,197 @@ async function reconcile(pool) {
   };
 }
 
+/**
+ * Atomic multi-leg settlement. Every leg moves or none does.
+ *
+ * **The refusal is the interesting half.** `lib/vcoin.js` goes to
+ * deliberate trouble to validate without writing — its own comment
+ * explains that calling `getBalance` during validation would auto-grant
+ * an account to a payee who is about to be refused, so a rejected
+ * settlement would leave new accounts behind. Here the whole thing runs
+ * inside one SQL transaction, so a `ROLLBACK` undoes the account
+ * creation too and the property holds for free rather than by care.
+ */
+async function settle(pool, options = {}) {
+  const { legs, reason = null } = options;
+
+  if (!Array.isArray(legs) || legs.length === 0) {
+    throw new Error("'legs' must be a non-empty array of { fromUserId, toUserId, amount }.");
+  }
+
+  // Shape validation before a connection is taken, word for word what
+  // lib/vcoin.js reports, including the `legs[i]:` prefix.
+  legs.forEach((leg, i) => {
+    const { fromUserId, toUserId, amount } = leg || {};
+    const at = `legs[${i}]`;
+    if (!fromUserId || !toUserId) throw new Error(`${at}: 'fromUserId' and 'toUserId' are required.`);
+    if (!Number.isFinite(amount) || amount <= 0) throw new Error(`${at}: 'amount' must be a positive number.`);
+  });
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const touched = legs.flatMap((l) => [l.fromUserId, l.toUserId]);
+    await lockAccounts(client, touched);
+
+    // Balances are read once, under the locks, and the legs are checked
+    // against a running total — a payer can legitimately fund a later
+    // leg with what an earlier one paid them, which is the same
+    // arithmetic lib/vcoin.js does with its `running` Map.
+    const held = await client.query(
+      `SELECT user_id, amount FROM vaco.v3_balances
+        WHERE currency = $1 AND user_id = ANY($2::text[])`,
+      [VCOIN, [...new Set(touched)]],
+    );
+    const running = new Map(held.rows.map((r) => [r.user_id, num(r.amount)]));
+
+    legs.forEach((leg, i) => {
+      const from = running.get(leg.fromUserId);
+      if (from < leg.amount) {
+        throw new Error(`legs[${i}]: Insufficient VCoin balance. Nothing in this settlement was applied.`);
+      }
+      running.set(leg.fromUserId, round(from - leg.amount));
+      running.set(leg.toUserId, round(running.get(leg.toUserId) + leg.amount));
+    });
+
+    const settlementId = num(
+      (await client.query("SELECT nextval('vaco.v3_settlement_id_seq') AS id")).rows[0].id,
+    );
+
+    const transactions = [];
+    for (const leg of legs) {
+      await client.query(
+        `UPDATE vaco.v3_balances SET amount = amount - $3
+          WHERE user_id = $1 AND currency = $2`,
+        [leg.fromUserId, VCOIN, leg.amount],
+      );
+      await client.query(
+        `UPDATE vaco.v3_balances SET amount = amount + $3
+          WHERE user_id = $1 AND currency = $2`,
+        [leg.toUserId, VCOIN, leg.amount],
+      );
+      const row = await client.query(
+        `INSERT INTO vaco.v3_transactions
+           (from_user_id, to_user_id, amount, reason, type, settlement_id, metadata)
+         VALUES ($1, $2, $3, $4, 'transfer', $5, $6)
+         RETURNING id, created_at`,
+        [leg.fromUserId, leg.toUserId, leg.amount, leg.reason ?? null, settlementId,
+          JSON.stringify({ settlementReason: reason })],
+      );
+      transactions.push({
+        id: num(row.rows[0].id),
+        fromUserId: leg.fromUserId,
+        toUserId: leg.toUserId,
+        amount: leg.amount,
+        reason: leg.reason ?? null,
+        timestamp: row.rows[0].created_at.getTime(),
+        type: 'transfer',
+        settlementId,
+        settlementReason: reason,
+      });
+    }
+
+    await client.query('COMMIT');
+
+    const balances = {};
+    for (const [userId, amount] of running) balances[userId] = amount;
+    return { settlementId, reason, transactions, balances };
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+async function getVashBalance(pool, userId) {
+  const found = await pool.query(
+    'SELECT amount FROM vaco.v3_balances WHERE user_id = $1 AND currency = $2',
+    [userId, VASH],
+  );
+  // Unlike VCoin, an unseen VASH account is 0 and is NOT created by
+  // reading. `lib/vash.js` returns `store.vashBalances[userId] || 0`
+  // with no assignment, and a read that silently opens an account is a
+  // write nobody asked for.
+  return found.rowCount > 0 ? num(found.rows[0].amount) : 0;
+}
+
+/**
+ * Convert VCoin into VASH at the fixed rate. Debit, credit and ledger
+ * row in one transaction, across two currencies.
+ */
+async function cashout(pool, options = {}) {
+  const { userId, vcoinAmount } = options;
+
+  if (!userId) throw new Error("'userId' is required.");
+  if (!Number.isFinite(vcoinAmount) || vcoinAmount <= 0) {
+    throw new Error("'vcoinAmount' must be a positive number.");
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Both currencies for one user. Locked in a fixed currency order so
+    // a cashout and a transfer touching the same person agree.
+    await lockAccounts(client, [userId], VCOIN);
+    await lockAccounts(client, [userId], VASH);
+
+    const debited = await client.query(
+      `UPDATE vaco.v3_balances SET amount = amount - $3
+        WHERE user_id = $1 AND currency = $2 AND amount >= $3
+        RETURNING amount`,
+      [userId, VCOIN, vcoinAmount],
+    );
+    if (debited.rowCount === 0) {
+      await client.query('ROLLBACK');
+      throw new Error('Insufficient VCoin balance for cashout.');
+    }
+
+    const vashAmount = round(vcoinAmount * VCOIN_TO_VASH_RATE);
+    const credited = await client.query(
+      `UPDATE vaco.v3_balances SET amount = amount + $3
+        WHERE user_id = $1 AND currency = $2
+        RETURNING amount`,
+      [userId, VASH, vashAmount],
+    );
+
+    await client.query(
+      `INSERT INTO vaco.v3_transactions
+         (from_user_id, to_user_id, amount, reason, type, metadata)
+       VALUES ($1, NULL, $2, 'vash cashout', 'cashout', $3)`,
+      [userId, vcoinAmount, JSON.stringify({ vashCredited: vashAmount, rate: VCOIN_TO_VASH_RATE })],
+    );
+
+    await client.query('COMMIT');
+
+    return {
+      userId,
+      vcoinDeducted: vcoinAmount,
+      vashCredited: vashAmount,
+      rate: VCOIN_TO_VASH_RATE,
+      newVcoinBalance: round(num(debited.rows[0].amount)),
+      newVashBalance: round(num(credited.rows[0].amount)),
+    };
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 module.exports = {
   SCHEMA,
   STARTING_VCOIN_BALANCE,
+  VCOIN_TO_VASH_RATE,
   ensureSchema,
   getBalance,
+  getVashBalance,
   transfer,
+  settle,
+  cashout,
   getTransactionHistory,
   reconcile,
 };
