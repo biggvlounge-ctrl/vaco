@@ -20,12 +20,29 @@
 # real gap -- until the gateway existed, seeing this thing run meant
 # cloning the repo and booting 36 servers.
 #
-# Not good for: production. Every app stores state in JSON files on
-# disk (`*/data/*.json`). That survives in a persistent Replit
-# workspace and does NOT survive an Autoscale deployment, which is
-# ephemeral and may run more than one instance -- two instances would
-# keep two divergent ledgers. Use a Reserved VM if this is deployed at
-# all, and treat the Postgres conversion as the real prerequisite.
+# Not good for: production -- though the reason narrowed on 11 Sep
+# 2026, and this comment carried the old, wider claim for a day: it
+# asserted that all of them were file-backed. 29 of the 34 backends are
+# on Postgres when DATABASE_URL is set; 2 keep JSON files (vaco-shell,
+# vaco-analytics) and 3 keep no state at all.
+#
+# The old sentence is described rather than quoted on purpose.
+# `scripts/test/storage-backends.test.mjs` bans that phrasing outright,
+# and a file that reproduces it verbatim -- even to correct it -- either
+# trips the check or survives only by where a line happens to wrap.
+#
+# Without a database every app falls back to its file, and THAT is the
+# case this warning is about: the filesystem does not survive an
+# Autoscale deployment, which is ephemeral and may run more than one
+# instance -- two instances would keep two divergent ledgers.
+#
+# With the database attached, exactly one app is safe to run twice: V3
+# keeps balances as real rows and takes its locks in a fixed order. The
+# other 28 hold one document each behind an optimistic version check,
+# which makes a concurrent write loud rather than lost, and still does
+# not make two writers work.
+#
+# So: use a Reserved VM, and attach the database.
 #
 # ---------------------------------------------------------------------
 
@@ -62,18 +79,29 @@ PORT = "8080"
 #
 # VACO_APPS = "vaco-shell v3 shield void vacay"
 
-# -- VACON-C's database -----------------------------------------------
+# -- The database -----------------------------------------------------
 #
-# One app, `vacon-c`, keeps its world in Postgres rather than a JSON
-# file. Attach Replit's built-in PostgreSQL and it sets DATABASE_URL
-# for you; the app loads its own 63-table schema into an empty database
-# on first boot, so there is nothing to run by hand.
+# **Attach Replit's built-in PostgreSQL.** It sets DATABASE_URL, and
+# that one variable is the whole configuration -- nothing else to set,
+# nothing to run by hand.
 #
-# Without a database it still boots. It starts an EMPTY world, says so
-# in full on stderr, and never saves — so the simulation runs and
-# nothing persists. Every other app is unaffected: they use JSON stores
-# under their own directories, which Replit's filesystem keeps between
-# runs.
+# 29 of the 34 backends use it: `vacon-c` loads its own 63-table world
+# schema into an empty database on first boot, and 28 others keep a
+# document each in a `vaco.stores` table. V3 goes further -- balances
+# and transactions are real rows.
+#
+# This section named only `vacon-c` until 11 Sep 2026, which was true
+# when written and stopped being true the day 28 more apps converted.
+# `scripts/test/storage-backends.test.mjs` now reads this file too, so
+# the next time that number moves, the suite says so.
+#
+# Without a database everything still boots and falls back to a JSON
+# file per app, which Replit's filesystem keeps between runs. Two things
+# behave differently when a database is attached but unreachable, and
+# the difference is deliberate: the 28 converted apps REFUSE to start
+# and say why, while `vacon-c` starts an EMPTY world, says so in full on
+# stderr, and never saves. A simulation that can regenerate its state is
+# still a working demo; a ledger reading every balance as zero is not.
 #
 # Secrets go in Replit's Secrets pane, NOT here -- this file is
 # committed. Run `node scripts/deploy-preflight.mjs` for the required

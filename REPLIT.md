@@ -55,6 +55,7 @@ That is the whole procedure.
 |---|---|
 | Console | `35 up, 1 down, out of 36 total.` — see "Secrets" below about the one. |
 | Launcher | **23 products across 7 sections**, not a flat wall of tiles. Vvltvre is one card containing 5 apps; VACON-C is one containing 4. |
+| Store grouping | A **Group:** control at the top right, with two views. "by category" is the 7 sections above. "by constellation" regroups the same apps by lineage into **■ VOKEN (4), ✕ VVLTVRE (4), ○ SYSTEMS (3), ✕ VOID (4), ▲ GAMES (3), ◇ internal (8)**. Both are correct and they disagree on purpose — VEX sits with V3 in one and with VOKEN in the other. |
 | Any app path | A real page with content in it, not an empty state — demo content is seeded at boot. |
 | Sign in | `demo-elena`, `demo-marcus`, `demo-priya`, `demo-kai`, password `demo-pass-1234` for all four. |
 

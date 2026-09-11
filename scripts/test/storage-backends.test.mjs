@@ -12,6 +12,15 @@
 //   REPLIT.md         "6 of the 34 apps keep state in JSON files on disk"
 //   deploy/README.md  "Every app keeps its state in JSON files on disk"
 //   deploy/README.md  "Every other app ... persists with createPersistentStore"
+//   .replit           "Every app stores state in JSON files on disk"
+//   .replit           "One app, vacon-c, keeps its world in Postgres"
+//
+// **`.replit` was missed on the first pass, and it is the worst one to
+// miss.** It is the file a person deploying to Replit opens first — the
+// run command lives in it — so its comments are read before any of the
+// documents above. It was left out of this list because it is config
+// rather than prose, which is exactly the reasoning that lets a claim
+// go unchecked.
 //
 // The real number was 2. That is not a cosmetic error: the "not good
 // for production" warning in REPLIT.md is calibrated on it, and so is
@@ -103,7 +112,7 @@ test('the classification found a real ecosystem, not an empty set', () => {
 
 test('every document states the real number of apps on Postgres', () => {
   let checked = 0;
-  for (const doc of ['REPLIT.md', 'deploy/replit-boot.sh', 'SYSTEM_OF_RECORD.md']) {
+  for (const doc of ['REPLIT.md', 'deploy/replit-boot.sh', 'SYSTEM_OF_RECORD.md', '.replit']) {
     const src = read(doc);
     for (const m of claims(/(\d+) of the (\d+) backends/, src)) {
       checked += 1;
@@ -119,7 +128,7 @@ test('every document states the real number of apps on Postgres', () => {
 test('every document states the real number of apps still on files', () => {
   const n = BACKENDS.file.length;
   let checked = 0;
-  for (const doc of ['REPLIT.md', 'SYSTEM_OF_RECORD.md', 'deploy/README.md']) {
+  for (const doc of ['REPLIT.md', 'SYSTEM_OF_RECORD.md', 'deploy/README.md', '.replit']) {
     const src = read(doc);
     for (const m of claims(/(\d+) (?:of the \d+ )?(?:apps|backends) keep(?:s)? (?:their |its )?state in JSON files/, src)) {
       checked += 1;
@@ -142,11 +151,13 @@ test('no document claims every app is file-backed', () => {
   // regex cannot catch: prose that names no number is never wrong by
   // arithmetic, only by fact. Both of these sentences were true when
   // written and false the day the conversion landed.
-  for (const doc of ['REPLIT.md', 'deploy/README.md', 'SYSTEM_OF_RECORD.md', 'deploy/replit-boot.sh']) {
+  for (const doc of ['REPLIT.md', 'deploy/README.md', 'SYSTEM_OF_RECORD.md', 'deploy/replit-boot.sh', '.replit', 'replit.nix']) {
     const flat = read(doc).replace(/\s+/g, ' ');
     for (const phrase of [
       /Every app keeps its state in JSON files/i,
       /Every other app in this ecosystem persists with `?createPersistentStore/i,
+      /Every app stores state in JSON files on disk/i,
+      /One app, `?vacon-c`?, keeps its world in Postgres/i,
       // Not banned: "without a database everything falls back to a JSON
       // file per app". That one is still true — it describes the
       // fallback, not the configured state — and banning the phrase
