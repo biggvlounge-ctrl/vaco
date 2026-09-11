@@ -67,6 +67,38 @@
   /* A long brand name must not squeeze the quantity field to nothing. */
   .qty { width: 58px; flex: 0 0 auto; }
   .tile-foot .vaco-badge { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+  /* -- App store: bundles and products -------------------------------
+     The store groups 37 apps into 18 products across 6 bundles. These
+     rules give a bundle a heading a visitor can scan past, and give a
+     multi-app product room to list its parts inside one card. */
+  #storeGrid { display: block; }
+  .store-bundle { margin-bottom: var(--vaco-space-6, 2rem); }
+  .store-bundle-head {
+    display: flex;
+    align-items: baseline;
+    gap: var(--vaco-space-2);
+    margin-bottom: var(--vaco-space-3);
+    padding-bottom: var(--vaco-space-2);
+    border-bottom: 1px solid var(--vaco-border-subtle);
+    flex-wrap: wrap;
+  }
+  .store-bundle-head .vaco-h3 { margin: 0; }
+  /* Shared services are real and worth showing, but nobody launches
+     them — they must not compete with products for attention. */
+  .store-bundle-quiet { opacity: 0.72; }
+  .store-bundle-quiet .store-bundle-head { border-bottom-style: dashed; }
+
+  .tile-apps { display: flex; flex-direction: column; gap: var(--vaco-space-2); margin-top: auto; }
+  .tile-app { display: flex; align-items: center; gap: var(--vaco-space-2); }
+  .tile-app + .tile-app { border-top: 1px solid var(--vaco-border-subtle); padding-top: var(--vaco-space-2); }
+  .tile-app-name { display: flex; flex-direction: column; min-width: 0; }
+  .tile-app-name .vaco-faint {
+    font-size: var(--vaco-text-xs);
+    /* A long summary must not push the install button off the card. */
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .tile-action { display: flex; align-items: center; gap: var(--vaco-space-2); flex: 0 0 auto; }
 </style>
 </head>
 
@@ -336,6 +368,28 @@
 
   // -- App Store -------------------------------------------------------
 
+  // Bundles in a deliberate order: the things a visitor is most likely
+  // to have come for first, infrastructure last.
+  const BUNDLE_ORDER = [
+    'Commerce & Marketplace',
+    'Social & Discovery',
+    'Leisure & Entertainment',
+    'Financial & Trading',
+    'Gamified & Simulation',
+    'Operations & Infrastructure',
+  ];
+
+  // **Why this groups rather than listing.** The registry folds 37 apps
+  // into 18 real products across 6 bundles — Vvltvre is one product
+  // containing Music, Flix, Pods, Studios and VENVM; V3 is the ledger
+  // plus VACA. The store used to render one flat grid of 37 tiles with
+  // the bundle as a small badge, which threw away both levels and made
+  // a structured ecosystem look like an undifferentiated pile.
+  //
+  // Six cross-cutting services (Shield, Analytics, Audit, Operator,
+  // Media) carry no bundle on purpose: every app calls them and nobody
+  // launches them. They go last, under their own heading, rather than
+  // sitting between products a visitor might actually open.
   function renderStore() {
     const grid = document.getElementById('storeGrid');
     const filter = document.getElementById('storeFilter').value;
@@ -343,51 +397,122 @@
     grid.innerHTML = '';
 
     const listings = state.listings.filter((l) => !filter || l.pricingModel === filter);
-    document.getElementById('storeCount').textContent = `${listings.length} apps`;
 
     if (!listings.length) {
+      document.getElementById('storeCount').textContent = '0 apps';
       grid.appendChild(el('div', 'vaco-empty', 'Nothing matches that filter.'));
       return;
     }
 
+    // bundle -> product -> [listing]
+    const byBundle = new Map();
     for (const listing of listings) {
-      const card = el('div', 'vaco-card store-tile');
-
-      const head = el('div', 'tile-head');
-      head.appendChild(el('h3', 'vaco-h3', listing.name));
-      head.appendChild(priceNode(listing));
-      card.appendChild(head);
-
-      card.appendChild(el('p', 'tile-desc', listing.summary || listing.description || ''));
-
-      const foot = el('div', 'tile-foot');
-      if (listing.bundle) foot.appendChild(el('span', 'vaco-badge', listing.bundle));
-
-      const isOwned = owned.has(listing.appId);
-      if (isOwned) {
-        foot.appendChild(el('span', 'vaco-badge vaco-badge-money', 'Installed'));
-        foot.appendChild(el('span', 'vaco-spacer'));
-        if (listing.url) {
-          const open = el('a', 'vaco-btn vaco-btn-sm', 'Open');
-          open.href = state.session
-            ? `${listing.url}/?shieldToken=${encodeURIComponent(state.session.sessionToken)}`
-            : listing.url;
-          open.target = '_blank';
-          open.rel = 'noopener';
-          foot.appendChild(open);
-        }
-      } else {
-        foot.appendChild(el('span', 'vaco-spacer'));
-        const btn = el('button', 'vaco-btn vaco-btn-primary vaco-btn-sm',
-          listing.pricingModel === 'free' ? 'Install' : `Buy · ${listing.priceVcoin}`);
-        btn.disabled = !state.session;
-        btn.title = state.session ? '' : 'Sign in to install';
-        btn.onclick = () => install(listing, btn);
-        foot.appendChild(btn);
-      }
-      card.appendChild(foot);
-      grid.appendChild(card);
+      const bundle = listing.bundle || SERVICES;
+      const product = listing.parent || listing.name;
+      if (!byBundle.has(bundle)) byBundle.set(bundle, new Map());
+      const products = byBundle.get(bundle);
+      if (!products.has(product)) products.set(product, []);
+      products.get(product).push(listing);
     }
+
+    let productCount = 0;
+    for (const products of byBundle.values()) productCount += products.size;
+    document.getElementById('storeCount').textContent =
+      `${productCount} products · ${listings.length} apps`;
+
+    // Known bundles in order, then anything new the registry grows,
+    // then services last. A bundle added later shows up rather than
+    // vanishing because this list did not know about it.
+    const ordered = [
+      ...BUNDLE_ORDER.filter((b) => byBundle.has(b)),
+      ...[...byBundle.keys()].filter((b) => b !== SERVICES && !BUNDLE_ORDER.includes(b)),
+      ...(byBundle.has(SERVICES) ? [SERVICES] : []),
+    ];
+
+    for (const bundle of ordered) {
+      const products = byBundle.get(bundle);
+      const section = el('section', 'store-bundle' + (bundle === SERVICES ? ' store-bundle-quiet' : ''));
+
+      const header = el('div', 'store-bundle-head');
+      header.appendChild(el('h2', 'vaco-h3', bundle));
+      header.appendChild(el('span', 'vaco-badge', `${products.size}`));
+      if (bundle === SERVICES) {
+        header.appendChild(el('span', 'vaco-faint',
+          'Shared services every app calls. Nothing to launch.'));
+      }
+      section.appendChild(header);
+
+      const row = el('div', 'vaco-grid vaco-grid-wide');
+      for (const [product, apps] of products) row.appendChild(productCard(product, apps, owned));
+      section.appendChild(row);
+
+      grid.appendChild(section);
+    }
+  }
+
+  // One card per product. A product with several apps lists them inside
+  // it, each with its own install/open — the folding is presentational,
+  // and every app still runs as its own real process on its own port.
+  function productCard(product, apps, owned) {
+    const card = el('div', 'vaco-card store-tile');
+
+    const head = el('div', 'tile-head');
+    head.appendChild(el('h3', 'vaco-h3', product));
+    if (apps.length > 1) head.appendChild(el('span', 'vaco-badge', `${apps.length} apps`));
+    else head.appendChild(priceNode(apps[0]));
+    card.appendChild(head);
+
+    // A single-app product describes itself. A multi-app one describes
+    // itself through its parts, so the first app's summary would be a
+    // misleading label for the whole.
+    if (apps.length === 1) {
+      card.appendChild(el('p', 'tile-desc', apps[0].summary || apps[0].description || ''));
+    }
+
+    const body = el('div', 'tile-apps');
+    for (const listing of apps) {
+      const line = el('div', 'tile-app');
+
+      if (apps.length > 1) {
+        const label = el('div', 'tile-app-name');
+        label.appendChild(el('span', '', listing.name));
+        label.appendChild(el('span', 'vaco-faint', listing.summary || listing.description || ''));
+        line.appendChild(label);
+      }
+
+      line.appendChild(el('span', 'vaco-spacer'));
+      line.appendChild(actionFor(listing, owned));
+      body.appendChild(line);
+    }
+    card.appendChild(body);
+    return card;
+  }
+
+  // The install/open control for one app, unchanged in behaviour from
+  // the flat version — ownership and pricing are per app, not per
+  // product, because that is what the ledger actually records.
+  function actionFor(listing, owned) {
+    const wrap = el('span', 'tile-action');
+    if (owned.has(listing.appId)) {
+      wrap.appendChild(el('span', 'vaco-badge vaco-badge-money', 'Installed'));
+      if (listing.url) {
+        const open = el('a', 'vaco-btn vaco-btn-sm', 'Open');
+        open.href = state.session
+          ? `${listing.url}/?shieldToken=${encodeURIComponent(state.session.sessionToken)}`
+          : listing.url;
+        open.target = '_blank';
+        open.rel = 'noopener';
+        wrap.appendChild(open);
+      }
+      return wrap;
+    }
+    const btn = el('button', 'vaco-btn vaco-btn-primary vaco-btn-sm',
+      listing.pricingModel === 'free' ? 'Install' : `Buy · ${listing.priceVcoin}`);
+    btn.disabled = !state.session;
+    btn.title = state.session ? '' : 'Sign in to install';
+    btn.onclick = () => install(listing, btn);
+    wrap.appendChild(btn);
+    return wrap;
   }
 
   async function install(listing, btn) {
@@ -417,6 +542,11 @@
 
   // A merch brand is usually a registry app, but not always: VACO itself
   // sells merch and is the shell, not an app in its own registry.
+  // Heading for apps the registry deliberately gives no bundle: the
+  // cross-cutting services. Named rather than an empty string so the
+  // grouping code never keys on falsy.
+  const SERVICES = 'Shared infrastructure';
+
   const NON_APP_BRANDS = { vaco: 'VACO' };
 
   function brandLabel(appBrandId) {

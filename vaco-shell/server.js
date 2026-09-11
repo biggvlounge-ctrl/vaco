@@ -228,6 +228,12 @@ function withApp(listing) {
     description: registryApp ? registryApp.description : null,
     category: registryApp ? registryApp.category : null,
     bundle: registryApp ? registryApp.bundle : null,
+    // `parent` was missing here, which is why the store rendered 37
+    // flat tiles: the registry folds those into 18 real products
+    // (Vvltvre is one product containing Music, Flix, Pods, Studios
+    // and VENVM), and the UI could not see the folding because this
+    // did not send it.
+    parent: registryApp ? registryApp.parent || null : null,
     url: registryApp ? registryApp.url : null,
   };
 }

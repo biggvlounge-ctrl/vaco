@@ -145,6 +145,22 @@ const targets = args.includes('--all')
     return { name, port: Number(port) };
   });
 
+// **No targets is not a pass.** Run with neither `--all` nor an
+// explicit app name and this printed "All 0 app(s) passed." — a green
+// result from a tool that loaded no pages. The vacuity guard that
+// already exists lives inside targetsFromManifest(), which never runs
+// on that path, so it could not catch its own caller.
+//
+// Found by running it wrong. That is the point: a tool has to be
+// honest about doing nothing even when the mistake is the operator's.
+if (targets.length === 0) {
+  process.stderr.write(
+    'smoke-frontend: no targets. Pass --all to check every app in the manifest, or name\n'
+    + 'them explicitly as <name>:<port>. Refusing rather than reporting that zero apps passed.\n',
+  );
+  process.exit(1);
+}
+
 const browser = await chromium.launch();
 let failures = 0;
 
