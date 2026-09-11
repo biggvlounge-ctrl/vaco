@@ -135,12 +135,17 @@ TikTok Shop model: 5-8% referral fee, native checkout, affiliate marketplace.
 
 ```
 ChopzVideo { id, creatorId, mediaUrl, linkedProductId: string | null }
-Product { id, sellerId, price, affiliateCommissionPercent }
+Product { id, sellerId, name, price, affiliateCommissionPercent }
 AffiliateLink { id, creatorId, productId, clicksCount, conversionsCount }
 Order { id, buyerId, productId, feePercent  // 5-8%, native checkout only,
   voidShipmentId: string | null  // routes to VOID fulfillment
 }
 ```
+
+**`name` added 11 Sep 2026.** Not in the original research shape. The
+catalogue and cart both render a product name, so every product created
+before this showed as "Product <id>"; `createProduct` requires one now.
+
 
 ## API map
 - `POST /chopz/orders` — native in-app checkout, never redirects out
@@ -156,10 +161,16 @@ Airbnb 15.5% fee model, Experiences tab already validated.
 ## Data models
 
 ```
-Listing { id, hostId, type: "stay" | "experience", pricePerNight }
+Listing { id, hostId, title, type: "stay" | "experience", pricePerNight }
 Booking { id, listingId, guestId, feePercent: 15.5, checkIn, checkOut }
 Experience { id, hostId, description, durationHours }  // Airbnb Experiences model
 ```
+
+**`title` added 11 Sep 2026.** Not in the original research shape. The
+Stays tab is the first screen of VACAY and renders a listing title, so
+every stay showed as "Stay <id>" at a real price; `createListing`
+requires one now.
+
 
 ## API map
 - `POST /vacay/bookings` — enforces the 15.5% flat fee
