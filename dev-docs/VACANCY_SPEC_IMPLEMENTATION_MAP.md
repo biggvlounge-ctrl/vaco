@@ -187,7 +187,7 @@ one-to-one and the difference is worth seeing:
 | 3 Property | `server/property.js` — generate, value, ownership records, ownership history, holdings, lifecycle | **BUILT** |
 | 4 Organization | `runOrganizationPhase`, `generateOrganization`, `generateFaction`, membership table | **BUILT** |
 | 5 Territory | `server/territory.js` — blocks, `resolveTerritoryControl`, community health | **BUILT** |
-| 6 Crime | `runSecurityPhase` | **PARTIAL** — one phase covers crime and policing together; the spec's crime-density/retaliation/hotspot tracking is not separately modelled. |
+| 6 Crime | `runSecurityPhase`, `server/crime.js` — typed incidents, four generators, per-area counts and rates | **BUILT** — §9's seven categories are countable per area and crime density is derivable (`crime.ratePer1k`). Retaliation and hotspots are not modelled, and both want the heat model §7 Law enforcement is still missing. |
 | 7 Law enforcement | `runSecurityPhase` | **PARTIAL** — same phase. No patrols, investigations, raids, arrests or clearance rates as distinct mechanics. |
 | 8 Social influence | `runSocialPhase`, `server/worldStore.js` relationships | **BUILT** |
 | 9 Resource | `advanceResourceTick`, `getScarcity`, `runResourcePhase` | **BUILT** |
@@ -195,8 +195,11 @@ one-to-one and the difference is worth seeing:
 | 11 Event | `runEventPhase`, `runHistoryPhase`, `events` + `historical_records` | **BUILT** — and cascading events are real: `test/drought-cascade.test.js` covers a chain. |
 | 12 AI decision | `runDecisionPhase`, `server/behavior.js`, `server/keys.js` | **BUILT** — see §§21–23. |
 
-**No phase is missing entirely.** The two PARTIALs are both the
-crime/policing split, which is one phase doing two engines' work.
+**No phase is missing entirely.** Crime and policing still share one
+phase; the crime half of it is now a real engine with a typed record,
+and the policing half is the remaining PARTIAL — no patrols,
+investigations, raids, arrests or clearance rates, which is the same
+gap `GAME_LANGUAGE_AND_REFERENCES.md` calls "heat".
 
 ## §7 · The 40 urban systems
 
@@ -206,12 +209,12 @@ from memory with nothing in the repo to check it against. The forty are
 now data in `vacon-c/server/urbanSystems.js`, every citation verified
 by `vacon-c/test/urban-systems.test.js`, and the real breakdown is:
 
-**13 modelled, 16 partial, 5 slot-only, 6 absent**
+**14 modelled, 15 partial, 5 slot-only, 6 absent**
 
 | Level | Means | Systems |
 |---|---|---|
-| **modelled** (13) | Real mechanics; something advances or decides on it each tick | Population, Housing, Economy, **Employment**, **Health**, Infrastructure, **Political**, Cultural, Community Organizations, Real Estate, Environmental, **Technology**, AI Decision |
-| **partial** (16) | A trait family or a live table with little driving it, or one phase covering two systems | Education, Food Supply, Water, Law Enforcement, Crime, Gang, Organized Crime, **Court**, Communication, **Religion**, Business, Construction, Weather, Disaster, Migration, Reputation |
+| **modelled** (14) | Real mechanics; something advances or decides on it each tick | Population, Housing, Economy, **Employment**, **Health**, Infrastructure, **Political**, **Crime**, Cultural, Community Organizations, Real Estate, Environmental, **Technology**, AI Decision |
+| **partial** (15) | A trait family or a live table with little driving it, or one phase covering two systems | Education, Food Supply, Water, Law Enforcement, Gang, Organized Crime, **Court**, Communication, **Religion**, Business, Construction, Weather, Disaster, Migration, Reputation |
 | **slot** (5) | Storage exists and nothing reads it | Transportation, Energy, Waste, Fire & Emergency, Supply Chain |
 | **absent** (6) | No representation at all | Prison, Government Services, Media, Social Media, Military/National Guard, Tourism |
 

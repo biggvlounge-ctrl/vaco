@@ -29,8 +29,15 @@ const {
 const { TRAIT_FAMILIES } = require('../server/traits.js');
 
 const SERVER_DIR = path.join(__dirname, '..', 'server');
+// Both halves of the real schema. The extension file was ALTER-only
+// when this test was written, so reading the base file alone was the
+// whole truth; it stopped being so when `crime_incidents` landed
+// there, and a citation check that reads half the schema reports a
+// real table as fictional.
 const SCHEMA = fs.readFileSync(
   path.join(__dirname, '..', 'VACANCY_POSTGRESQL_SCHEMA.sql'), 'utf8',
+) + '\n' + fs.readFileSync(
+  path.join(__dirname, '..', 'server', 'schema-extensions.sql'), 'utf8',
 );
 const TICK = fs.readFileSync(path.join(SERVER_DIR, 'tick.js'), 'utf8');
 
@@ -219,7 +226,15 @@ test('Prison stays absent while nothing incarcerates anybody', () => {
   // including it made this test fail on its own documentation — a
   // search that matches the thing describing the absence rather than
   // an implementation of it.
-  const haystack = [SCHEMA, ...fs.readdirSync(SERVER_DIR)
+  // **SQL comments are stripped for the same reason**, and the same
+  // mistake was made twice before it was: `schema-extensions.sql` has
+  // a note reading "`imprisoned` stays absent", explaining why the
+  // `deceased` status was added and that one was not. Counting that as
+  // evidence of a prison is counting a sentence that says there is no
+  // prison. DDL still counts — a real `imprisoned_until` column would
+  // survive the strip and fail this, which is the point.
+  const declarations = SCHEMA.split('\n').map((l) => l.replace(/--.*$/, '')).join('\n');
+  const haystack = [declarations, ...fs.readdirSync(SERVER_DIR)
     .filter((f) => f.endsWith('.js') && f !== 'urbanSystems.js')
     .map((f) => fs.readFileSync(path.join(SERVER_DIR, f), 'utf8'))].join('\n');
   assert.equal(/imprison/i.test(haystack), false,

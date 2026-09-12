@@ -259,8 +259,13 @@ test('every statistic this cannot compute names its missing substrate', () => {
   // by type needs a typed crime record, a dropout rate needs somebody
   // to drop out of.
   const keys = Object.keys(areaStats.UNAVAILABLE);
+  // `crimeByType` was the fifth entry here and is gone, because it
+  // stopped being true: server/crime.js records a typed incident and
+  // `crime.countsByCategory` breaks it down. An UNAVAILABLE entry that
+  // outlives the gap it names is worse than no entry at all — it tells
+  // a caller not to ask for something that now works.
   assert.deepEqual(keys.sort(), [
-    'crimeByType', 'demographics', 'gangMembership', 'schoolDropout', 'teenagePregnancy',
+    'demographics', 'gangMembership', 'schoolDropout', 'teenagePregnancy',
   ]);
   for (const [key, reason] of Object.entries(areaStats.UNAVAILABLE)) {
     assert.ok(reason.length > 60, `${key} has no real explanation`);

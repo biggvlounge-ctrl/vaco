@@ -353,7 +353,7 @@ function recordDeath(worldState, options = {}) {
   // says the world remembers, and `historical_records` is already the
   // place that happens — `who`/`what`/`why` carry a death without a
   // single new column.
-  const record = {
+  const record = worldStore.addHistoricalRecord(worldState, {
     who: [entityId, ...(killerId === null ? [] : [killerId])],
     what: 'death',
     when_tick: tick,
@@ -365,8 +365,7 @@ function recordDeath(worldState, options = {}) {
     // Interpretive: a violent death is more consequential to a
     // community's memory than a peaceful one at 90.
     significance: cause === 'violence' ? 70 : cause === 'disease' ? 55 : 30,
-  };
-  worldState.historicalRecords.push(record);
+  });
 
   return {
     npc,

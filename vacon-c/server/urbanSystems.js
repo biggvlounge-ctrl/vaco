@@ -220,10 +220,14 @@ const SYSTEMS = [
   {
     n: 14,
     name: 'Crime',
-    level: 'partial',
+    level: 'modelled',
     phases: ['runSecurityPhase'],
+    tables: ['crime_incidents'],
     traitFamilies: ['criminal'],
-    note: 'Same phase as Law Enforcement. No crime density, retaliation or hotspots.',
+    note: 'Typed incidents with a category, a perpetrator, a victim and a community — '
+      + '§9\'s seven categories are countable per area and four of them are generated. '
+      + 'Density is derivable (crime.ratePer1k); retaliation and hotspots are not, and '
+      + 'both want the heat model Law Enforcement is still missing.',
   },
   {
     n: 15,

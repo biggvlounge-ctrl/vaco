@@ -319,6 +319,15 @@ async function restoreWorldStateFromPostgres(worldState) {
     nums(h, ['id', 'who', 'when_tick', 'where_location_id', 'significance']));
   summary.historical_records = worldState.historicalRecords.length;
 
+  // Standing rule 10: BIGINT and NUMERIC come back as strings. A
+  // `community_id` restored as the string "7" matches no community, so
+  // every per-area crime count would come back as zero on a world that
+  // demonstrably had crime in it — and nothing would throw.
+  worldState.crimeIncidents = (await q('SELECT * FROM crime_incidents ORDER BY id')).map((c) =>
+    nums(c, ['id', 'perpetrator_entity_id', 'victim_entity_id', 'community_id',
+      'tick', 'severity']));
+  summary.crime_incidents = worldState.crimeIncidents.length;
+
   // -------------------------------------------------------------------
   // Territory / Property
   // -------------------------------------------------------------------

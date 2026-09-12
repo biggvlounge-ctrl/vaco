@@ -613,6 +613,24 @@ async function migrateWorldStateToPostgres(worldState) {
       }
       summary.historical_records = worldState.historicalRecords.length;
 
+      // ---------------------------------------------------------------
+      // crime_incidents
+      // ---------------------------------------------------------------
+      // Here and not earlier: the row references `entities` (twice) and
+      // `communities`, and communities are inserted above at the
+      // cities -> communities step. Writing this beside `events` would
+      // have put it before communities existed — the same FK-ordering
+      // class of bug that rolled the whole migration back twice before.
+      for (const c of worldState.crimeIncidents) {
+        await client.query(
+          `INSERT INTO crime_incidents (id, category, perpetrator_entity_id, victim_entity_id,
+             community_id, tick, severity, detail) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+          [c.id, c.category, c.perpetrator_entity_id, c.victim_entity_id,
+            c.community_id, c.tick, c.severity, c.detail]
+        );
+      }
+      summary.crime_incidents = worldState.crimeIncidents.length;
+
       // Second half of the properties.history_ref two-phase insert —
       // see the note on the properties INSERT above. Now that
       // historical_records exist, the FK can be satisfied.

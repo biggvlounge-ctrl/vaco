@@ -110,3 +110,63 @@ ALTER TABLE npcs ADD COLUMN IF NOT EXISTS name TEXT;
 -- where a death belongs. `mortality.js#deathRecordFor` is the read
 -- path, so the historical record is the durable answer rather than a
 -- write nobody consults.
+
+-- ---------------------------------------------------------------------
+-- crime_incidents — the one new TABLE in this file
+-- ---------------------------------------------------------------------
+-- Carries: `worldState.crimeIncidents`, written by server/crime.js from
+-- inside the Security phase.
+--
+-- **The bar for a new table is higher than the bar for a column, and
+-- this is how it was cleared.** §9's MASTER BLOCK KEY asks for seven
+-- crime categories per area — "violent crime, property crime, drug
+-- crime, theft, gun crime, fraud, domestic incidents". The base schema
+-- answers that with two aggregate NUMERIC columns, `communities.crime`
+-- and `territory_blocks.crime_rate`, both seeded by their generators
+-- and updated by nothing. A single number cannot be broken down by
+-- category, so the statistic §9 specifies was not merely unimplemented,
+-- it was unrepresentable.
+--
+-- **Three existing tables were considered first:**
+--
+--   `events` — no roles. `affected_entity_ids` is a flat JSONB array,
+--   so an offender and a victim are the same field, and the category
+--   would live in a free-text `note`. Counting crimes by type would
+--   mean parsing English.
+--
+--   `historical_records` — this is where a DEATH goes, so it was the
+--   strongest candidate. It fails on attribution: `where_location_id`
+--   references `properties`, and a property has no city, community or
+--   block (see the note above, which this file has carried since it was
+--   written). A crime filed there can never be summed by neighbourhood,
+--   which is the only thing §9 asks of it. `who` is also role-less,
+--   same as `events`.
+--
+--   `keys_log` — records that an aggression key resolved, not what the
+--   resolution was in the world.
+--
+-- So the row carries four things no existing table holds together:
+-- **category, perpetrator, victim, and the community it happened in.**
+--
+-- History is not duplicated. An incident at or above severity 60 also
+-- writes a `historical_records` row exactly as a death does, so §41's
+-- "the world remembers" still has one place to read; the incident row
+-- is the count, the history row is the memory.
+CREATE TABLE IF NOT EXISTS crime_incidents (
+    id                      BIGSERIAL PRIMARY KEY,
+    category                TEXT NOT NULL, -- violent|property|drug|theft|gun|fraud|domestic|sex_offense
+    perpetrator_entity_id   BIGINT REFERENCES entities(id),
+    victim_entity_id        BIGINT REFERENCES entities(id),
+    community_id            BIGINT REFERENCES communities(id),
+    tick                    BIGINT NOT NULL,
+    severity                NUMERIC,
+    detail                  TEXT
+);
+
+-- Both nullable on purpose. A property offence has no victim entity,
+-- and an incident whose parties are both unplaced has no community —
+-- recorded with a null rather than assigned to an arbitrary one, so it
+-- is visibly excluded from per-area counts instead of quietly
+-- corrupting one. Same rule `areaStats.unplaced` follows for residents.
+CREATE INDEX IF NOT EXISTS idx_crime_incidents_community ON crime_incidents (community_id);
+CREATE INDEX IF NOT EXISTS idx_crime_incidents_category ON crime_incidents (category);

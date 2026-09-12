@@ -51,6 +51,7 @@ const economy = require('./economy.js');
 const politics = require('./politics.js');
 const technology = require('./technology.js');
 const mortality = require('./mortality.js');
+const crime = require('./crime.js');
 const keys = require('./keys.js');
 const territory = require('./territory.js');
 const property = require('./property.js');
@@ -58,7 +59,6 @@ const flows = require('./flows.js');
 const behavior = require('./behavior.js');
 
 let nextEventId = 1;
-let nextHistoricalRecordId = 1;
 
 // ---------------------------------------------------------------------------
 // Environmental conditions — the mechanism for triggering a "drought-
@@ -406,14 +406,44 @@ function runSecurityPhase(worldState) {
     });
 
     if (outcome.escalatesToConflict) {
+      // **The escalation is named, not just noted.** Before this, the
+      // only record of a violent act was the English sentence below,
+      // so §9's seven crime categories had nothing to count and no
+      // way to attribute what happened to a place. `recordEscalation`
+      // does not re-decide anything — the aggression key already ran
+      // and already said this escalates; it classifies the result as
+      // `domestic` or `violent` and files it against a community.
+      const incident = crime.recordEscalation(worldState, {
+        perpetratorId: relationship.entity_a_id,
+        victimId: relationship.entity_b_id,
+        tick: worldState.tick,
+        responseLevel: outcome.responseLevel,
+      });
+
       events.push({
         type: 'conflict_escalation', severity: 'high',
         note: `Conflict escalated between entity ${relationship.entity_a_id} and entity ${relationship.entity_b_id}`,
         tick: worldState.tick,
         affected_entity_ids: [relationship.entity_a_id, relationship.entity_b_id],
-        global_effects: {},
+        global_effects: { crimeIncidentId: incident.id, crimeCategory: incident.category },
       });
     }
+  }
+
+  // Deprivation crime — theft and property offences driven by poverty
+  // and shortage, read from the environment exactly as mortality reads
+  // it. Inside this phase rather than beside it: the pipeline is
+  // locked at eleven, and crime is what Security is for.
+  for (const incident of crime.runDeprivationCrime(worldState, worldState.tick)) {
+    events.push({
+      type: 'crime', severity: incident.severity >= 60 ? 'high' : 'medium',
+      note: `${incident.category} offence by entity ${incident.perpetrator_entity_id}`
+        + `${incident.victim_entity_id === null ? '' : ` against entity ${incident.victim_entity_id}`}`,
+      tick: incident.tick,
+      affected_entity_ids: [incident.perpetrator_entity_id, incident.victim_entity_id]
+        .filter((id) => id !== null),
+      global_effects: { crimeIncidentId: incident.id, crimeCategory: incident.category },
+    });
   }
 
   return events;
@@ -452,8 +482,7 @@ function runHistoryPhase(worldState, storedEvents) {
   const records = [];
   for (const event of storedEvents) {
     if (event.severity !== 'high') continue;
-    const record = {
-      id: nextHistoricalRecordId++,
+    const record = worldStore.addHistoricalRecord(worldState, {
       who: event.affected_entity_ids,
       what: event.note,
       when_tick: event.tick,
@@ -463,8 +492,7 @@ function runHistoryPhase(worldState, storedEvents) {
       consequences: null,
       future_effects: null,
       significance: 80,
-    };
-    worldState.historicalRecords.push(record);
+    });
     records.push(record);
   }
   return records;
@@ -580,10 +608,12 @@ function advanceTick(worldState) {
 // disagree with them.
 function reseedIds(worldState) {
   nextEventId = nextAfter(worldState.events);
-  nextHistoricalRecordId = nextAfter(worldState.historicalRecords);
+  // `nextHistoricalRecordId` moved to worldStore.js — see the note
+  // there. It was reseeded from here and allocated from here, and the
+  // moment a second module started writing history records without an
+  // id, a counter only one writer could reach stopped being enough.
   return {
     nextEventId: nextEventId,
-    nextHistoricalRecordId: nextHistoricalRecordId,
   };
 }
 

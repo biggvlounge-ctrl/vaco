@@ -59,9 +59,29 @@ const NOT_CARRIED = {
 // column that genuinely exists in every deployed database as missing.
 //
 // Read as ALTER TABLE ... ADD COLUMN, deliberately: the extension file
-// may only ADD to tables the base schema already declares. A CREATE
-// TABLE there would be a new table smuggled in outside the source of
-// truth, and this parser gives it nowhere to land.
+// may only ADD to tables the base schema already declares.
+//
+// **It may also declare a new table, and only the ones named here.**
+// The original rule was flat — no CREATE TABLE at all — on the grounds
+// that a new table there would be smuggled in outside the source of
+// truth. That was right about the risk and wrong as an absolute: §9's
+// crime categories are unrepresentable in the base schema (see the
+// note in schema-extensions.sql, which names the three existing tables
+// that were considered first and why each fails), so the choice was
+// between a new table and a statistic the spec asks for that can never
+// be computed.
+//
+// So the rule becomes an allowlist rather than a prohibition. A new
+// table in that file that is NOT listed here still fails, which keeps
+// the act deliberate — adding one means editing this list and saying
+// why, in the same commit.
+const EXTENSION_TABLES = {
+  crime_incidents: 'typed crime, per §9\'s seven categories. The base schema carries crime as '
+    + 'two aggregate NUMERIC columns (communities.crime, territory_blocks.crime_rate) that '
+    + 'cannot be broken down by type, and no existing table holds category + perpetrator + '
+    + 'victim + community together.',
+};
+
 function extensionColumns() {
   const added = {};
   const re = /ALTER TABLE (\w+)\s+ADD COLUMN(?:\s+IF NOT EXISTS)?\s+(\w+)/gi;
@@ -71,6 +91,27 @@ function extensionColumns() {
     added[table].add(m[2].toLowerCase());
   }
   return added;
+}
+
+// Tables the extension file CREATES, parsed the same way the base
+// schema is so their columns are checked by exactly the same rules.
+function extensionTables() {
+  const tables = {};
+  const re = /CREATE TABLE (?:IF NOT EXISTS )?(\w+)\s*\(([\s\S]*?)\n\);/g;
+  for (const m of EXTENSIONS.matchAll(re)) {
+    const [, name, body] = m;
+    const cols = new Set();
+    for (const line of body.split('\n')) {
+      const stripped = line.replace(/--.*$/, '').trim();
+      if (!stripped) continue;
+      const col = stripped.match(/^(\w+)\s+/);
+      if (col && !/^(PRIMARY|FOREIGN|UNIQUE|CHECK|CONSTRAINT)$/i.test(col[1])) {
+        cols.add(col[1].toLowerCase());
+      }
+    }
+    tables[name.toLowerCase()] = cols;
+  }
+  return tables;
 }
 
 function schemaColumns() {
@@ -89,9 +130,21 @@ function schemaColumns() {
     }
     tables[name.toLowerCase()] = cols;
   }
-  // Fold in the extensions, and refuse one that targets a table the
-  // base schema never declared — that would be a table added outside
-  // the source of truth.
+  // Tables the extension file declares, each of which must be on the
+  // allowlist above.
+  for (const [table, cols] of Object.entries(extensionTables())) {
+    if (!EXTENSION_TABLES[table]) {
+      throw new Error(
+        `schema-extensions.sql creates "${table}", which is not on EXTENSION_TABLES in `
+        + 'test/migrate.test.js. A new table outside the base schema has to be a deliberate '
+        + 'act with a stated reason — add it there, in the same commit.',
+      );
+    }
+    tables[table] = cols;
+  }
+
+  // Fold in the added columns, and refuse one that targets a table
+  // neither the base schema nor the allowlist above declared.
   for (const [table, cols] of Object.entries(extensionColumns())) {
     if (!tables[table]) {
       throw new Error(
@@ -501,4 +554,20 @@ test('a row is never inserted before the row it points at', () => {
   assert.deepEqual([...violations], [],
     'these inserts happen before the rows they reference exist, so the migration rolls back '
     + `on a real database:\n    ${[...violations].join('\n    ')}`);
+});
+
+test('every table the extension file creates is on the allowlist with a real reason', () => {
+  // The allowlist is what keeps a new table a deliberate act rather
+  // than something that lands because a migration needed somewhere to
+  // put a row. A reason of "needed it" is not one.
+  for (const [table, reason] of Object.entries(EXTENSION_TABLES)) {
+    assert.ok(reason.trim().length > 80, `${table}'s reason is too thin to be one`);
+  }
+  // And the allowlist cannot outlive the file: an entry naming a table
+  // schema-extensions.sql no longer creates is stale permission.
+  const created = new Set(Object.keys(extensionTables()));
+  for (const table of Object.keys(EXTENSION_TABLES)) {
+    assert.ok(created.has(table),
+      `EXTENSION_TABLES names "${table}", which schema-extensions.sql does not create`);
+  }
 });

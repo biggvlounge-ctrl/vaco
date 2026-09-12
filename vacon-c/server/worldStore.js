@@ -22,6 +22,7 @@ const { nextAfter } = require('./nextAfter.js');
 let nextMemoryId = 1;
 let nextRelationshipId = 1;
 let nextKnowledgeId = 1;
+let nextHistoricalRecordId = 1;
 
 // ---------------------------------------------------------------------------
 // Memory
@@ -45,6 +46,33 @@ function addMemory(worldState, {
   };
   worldState.memories.push(memory);
   return memory;
+}
+
+// ---------------------------------------------------------------------------
+// Historical records
+// ---------------------------------------------------------------------------
+// **This counter lived in tick.js and the id it hands out was the only
+// thing keeping `historical_records` insertable.** The History phase
+// allocated `nextHistoricalRecordId++` on every record it wrote, and
+// that was fine for as long as the History phase was the only writer.
+//
+// It stopped being the only writer when `mortality.js` started pushing
+// a death straight onto `worldState.historicalRecords` — a record with
+// no id at all. In memory that is invisible: every read path finds the
+// row by `what`/`who`, never by id, so `deathRecordFor` works and every
+// test passes. In Postgres it is not: `migrate.js` inserts `h.id` into
+// a `BIGSERIAL PRIMARY KEY`, `undefined` arrives as NULL, and the
+// migration fails on the first death — a world that looks correct in
+// memory and cannot be saved.
+//
+// Standing rule 6's shape exactly: a value nothing reads is a value
+// nothing notices is missing. The counter moved here because every
+// writer already imports `worldStore` and `tick.js` cannot be imported
+// by `crime.js` or `mortality.js` without a cycle.
+function addHistoricalRecord(worldState, record) {
+  const row = { id: nextHistoricalRecordId++, ...record };
+  worldState.historicalRecords.push(row);
+  return row;
 }
 
 // ---------------------------------------------------------------------------
@@ -142,16 +170,19 @@ function reseedIds(worldState) {
   nextMemoryId = nextAfter(worldState.memories);
   nextRelationshipId = nextAfter(worldState.relationships);
   nextKnowledgeId = nextAfter(worldState.entityKnowledge);
+  nextHistoricalRecordId = nextAfter(worldState.historicalRecords);
   return {
     nextMemoryId: nextMemoryId,
     nextRelationshipId: nextRelationshipId,
     nextKnowledgeId: nextKnowledgeId,
+    nextHistoricalRecordId: nextHistoricalRecordId,
   };
 }
 
 module.exports = {
   reseedIds,
   addMemory,
+  addHistoricalRecord,
   findRelationship,
   getOrCreateRelationship,
   adjustRelationship,

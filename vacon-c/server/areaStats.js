@@ -49,13 +49,13 @@
 // **Not computable, and the reason is named rather than filled with a
 // plausible number:**
 //
-//   crime BY TYPE      `communities.crime` and
-//   (violent, sex,     `territory_blocks.crime_rate` are single
-//    drug, property,   aggregate numbers. §9 lists seven crime
-//    fraud, theft)     categories and `runSecurityPhase` produces no
-//                      typed crime record at all, so there is nothing
-//                      to break down. This needs a crime event with a
-//                      type on it — see the README note.
+//   crime BY TYPE      **Built since, and no longer here.** It was
+//                      listed as uncomputable because `communities.crime`
+//                      and `territory_blocks.crime_rate` are single
+//                      aggregate numbers and `runSecurityPhase` produced
+//                      no typed record, so there was nothing to break
+//                      down. `server/crime.js` is that record;
+//                      `crime.countsByCategory` is the read.
 //
 //   gang presence      `territory_blocks.faction_id` says which
 //                      faction holds a block, so faction CONTROL is
@@ -158,6 +158,33 @@ function povertyLine(worldState) {
   return mid === null ? null : mid * POVERTY_MEDIAN_FRACTION;
 }
 
+// **The degenerate case a relative line has, and the one this
+// simulation is most about.** Half the median is 0 when half the world
+// owns nothing — so in a fully collapsed world the line sits at zero,
+// every comparison `worth < line` is false, and the poorest world
+// possible reports a poverty rate of 0.
+//
+// Found by a crime generator that produced no crime under total
+// destitution: the pressure it read was gated on the line, and the
+// line was zero.
+//
+// A zero line does not mean nobody is poor. It means everybody is. So
+// the predicate is defined once, here, and every caller uses it rather
+// than writing `worth < line` and inheriting the hole.
+function isBelowPovertyLine(worth, line) {
+  if (!Number.isFinite(worth)) return false;
+  if (line === null || !Number.isFinite(line)) return false;
+  return line > 0 ? worth < line : worth <= 0;
+}
+
+// How far below the line somebody is, 0..1 — 0 at or above it, 1 with
+// nothing. Same collapse handling as the predicate above.
+function povertyDepth(worth, line) {
+  if (!isBelowPovertyLine(worth, line)) return 0;
+  if (line <= 0) return 1;
+  return Math.min(1, (line - worth) / line);
+}
+
 // Every statistic for one area. `null` throughout means unknown rather
 // than zero — an area with no residents has no poverty rate, and
 // reporting 0 would read as an area where nobody is poor.
@@ -187,7 +214,7 @@ function statsFor(worldState, communityId, options = {}) {
     .filter((w) => Number.isFinite(w));
   const poor = line === null
     ? null
-    : worths.filter((w) => w < line).length;
+    : worths.filter((w) => isBelowPovertyLine(w, line)).length;
 
   const employed = worldState.employmentRecords.filter(
     (r) => r.status === 'active' && ids.has(r.entity_id),
@@ -273,9 +300,6 @@ function describeDrift(worldState, communityId, options = {}) {
 // rather than a comment only a developer reads. Every entry names the
 // missing substrate, not just the missing number.
 const UNAVAILABLE = {
-  crimeByType: 'communities.crime and territory_blocks.crime_rate are single aggregate '
-    + 'numbers. §9 lists seven crime categories and runSecurityPhase produces no typed '
-    + 'crime record, so there is nothing to break down.',
   gangMembership: 'territory_blocks.faction_id gives faction CONTROL of a block. Nothing '
     + 'links a resident to a faction by geography, so membership per area is not derivable.',
   teenagePregnancy: 'there is no birth driver — addFamilyMember exists and nothing calls it '
@@ -291,6 +315,8 @@ const UNAVAILABLE = {
 module.exports = {
   POVERTY_MEDIAN_FRACTION,
   UNAVAILABLE,
+  isBelowPovertyLine,
+  povertyDepth,
   residentsOf,
   unplaced,
   placeInCommunity,

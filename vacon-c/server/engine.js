@@ -115,6 +115,14 @@ const WorldState = {
   // a dead person drawing a wage or casting a vote. Moving the row
   // makes that structurally impossible. `server/mortality.js`.
   deceased: [],
+  // Typed crime incidents. §9's MASTER BLOCK KEY asks for seven crime
+  // categories per area and `communities.crime` is one aggregate
+  // NUMERIC that nothing updates — so "crime by type" had nothing to
+  // count and no way to attribute it to a place. An incident carries
+  // category, perpetrator, victim and the community it happened in,
+  // which is four things no existing table holds together.
+  // `server/crime.js`; generated inside the Security phase.
+  crimeIncidents: [],
   beliefs: [],
   // Civilizations and the technology ladder. Four dead tables built
   // together on 12 Sep 2026 because they are one system:
