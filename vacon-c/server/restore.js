@@ -353,7 +353,14 @@ async function restoreWorldStateFromPostgres(worldState) {
 
   worldState.properties = (await q('SELECT * FROM properties ORDER BY id')).map((p) =>
     nums(p, ['id', 'land_size', 'value', 'condition', 'occupants', 'floors', 'units',
-      'age', 'construction_date', 'operating_organization_id']));
+      'age', 'construction_date', 'operating_organization_id',
+      // From schema-extensions.sql. A property's location was
+      // unrestorable until statistics.js made it load-bearing, and
+      // standing rule 10 applies with full force: a community_id back
+      // as the string "7" matches no community, every housing
+      // statistic reads null, and the world looks like one with no
+      // buildings in it rather than one with a lost join.
+      'community_id', 'city_id']));
   summary.properties = worldState.properties.length;
 
   worldState.ownershipRecords = (await q('SELECT * FROM ownership_records ORDER BY id')).map((o) =>

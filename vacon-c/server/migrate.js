@@ -347,13 +347,21 @@ async function migrateWorldStateToPostgres(worldState) {
           // "always null" — and a column quietly not written is
           // precisely the failure that lost four mission fields for
           // months. The day something sets it, it migrates.
+          // community_id/city_id come from server/schema-extensions.sql
+          // and are written INLINE rather than backfilled, unlike
+          // residency above: `cities` and `communities` are both
+          // inserted before this point (positions 9 and 10, properties
+          // at 11), so both FK targets already exist. Checked against
+          // the order rather than assumed — that is the whole reason
+          // the FK-ordering test exists.
           `INSERT INTO properties (id, land_size, type, value, condition, occupants, floors, units,
                                    age, construction_date, utilities, operating_organization_id,
-                                   density_tier, lifecycle_stage)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+                                   density_tier, lifecycle_stage, community_id, city_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
           [p.id, p.land_size, p.type, p.value, p.condition, JSON.stringify(p.occupants), p.floors,
             p.units, p.age, p.construction_date, JSON.stringify(p.utilities),
-            p.operating_organization_id, p.density_tier, p.lifecycle_stage]
+            p.operating_organization_id, p.density_tier, p.lifecycle_stage,
+            p.community_id ?? null, p.city_id ?? null]
         );
       }
       summary.properties = worldState.properties.length;

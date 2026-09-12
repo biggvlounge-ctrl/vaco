@@ -52,15 +52,59 @@ const TICK = fs.readFileSync(path.join(SERVER_DIR, 'tick.js'), 'utf8');
 //   "employment_records, investments, and trade_routes are NOT built
 //   here" — and a first attempt at this check counted that sentence as
 //   evidence that employment_records was in use.
+//
+//   **And a declared absence is documentation even when it is a
+//   string.** `statistics.js` and `crime.js` carry their gaps as data
+//   rather than as prose — `unavailable: '...environment_state is a
+//   schema-only table...'` — precisely so a caller can show a user why
+//   a number is missing. Those reasons name the very tables whose
+//   absence they are explaining, so counting them as usage is the same
+//   mistake as counting the comment above, one indirection along.
+//
+//   They are removed by asking the modules for their own reason
+//   strings and deleting exactly those, which cannot drift the way a
+//   regex over `unavailable:` would. Two earlier attempts were wrong
+//   and are worth recording:
+//
+//     Matching the reason text straight against the source failed —
+//     the source writes these as multi-line `'...' + '...'`
+//     concatenations, so the finished sentence appears nowhere.
+//     Hence the concatenation-collapsing step below.
+//
+//     Stripping ALL string literals also failed, and more
+//     interestingly: `businesses`, `entities` and `factions` are cited
+//     as used and the only place their snake_case names appear in
+//     engine code IS a string — an error message. So "a table name in
+//     a string is not usage" is not true here, and the narrow rule
+//     (remove the declared reasons, keep every other string) is the
+//     only one that holds.
 const ENGINE_CODE = (() => {
   const skip = new Set(['migrate.js', 'restore.js', 'urbanSystems.js']);
   const strip = (src) => src
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/^\s*\/\/.*$/gm, '');
-  return fs.readdirSync(SERVER_DIR)
+
+  const declared = [
+    ...require('../server/statistics.js').unavailable().map((e) => e.reason),
+    ...Object.values(require('../server/crime.js').CATEGORIES)
+      .map((c) => c.substrate)
+      .filter(Boolean),
+    ...Object.values(require('../server/areaStats.js').UNAVAILABLE),
+  ];
+
+  let source = fs.readdirSync(SERVER_DIR)
     .filter((f) => f.endsWith('.js') && !skip.has(f))
     .map((f) => strip(fs.readFileSync(path.join(SERVER_DIR, f), 'utf8')))
     .join('\n');
+
+  // Join adjacent string literals — `'abc' + 'def'` becomes `'abcdef'`
+  // — then flatten whitespace, so a reason stored as one sentence can
+  // be found in a source that wrote it across six lines.
+  source = source.replace(/'\s*\+\s*'/g, '').replace(/\s+/g, ' ');
+  for (const reason of declared) {
+    source = source.split(reason.replace(/'\s*\+\s*'/g, '').replace(/\s+/g, ' ')).join(' ');
+  }
+  return source;
 })();
 
 // The engine names a table either as written or in camelCase on

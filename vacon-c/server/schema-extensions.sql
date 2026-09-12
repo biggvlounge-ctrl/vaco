@@ -50,26 +50,43 @@
 ALTER TABLE npcs ADD COLUMN IF NOT EXISTS name TEXT;
 
 -- ---------------------------------------------------------------------
--- Considered and deliberately NOT added
+-- properties.community_id and properties.city_id
 -- ---------------------------------------------------------------------
--- `properties.community_id` and `properties.city_id` are set by
--- property.js#generateProperty and read by nothing — grep says the
--- only other mention of either name in server/ is territory_blocks'
--- own columns in migrate.js. The base schema models a property's
--- location not at all: `properties` has land_size, type, value,
--- condition, occupants, floors, units, age, construction_date,
+-- Carries: `property.community_id` / `property.city_id`, set by
+-- property.js#generateProperty and now READ by
+-- server/statistics.js#propertiesIn.
+--
+-- **This file carried these two as "considered and deliberately NOT
+-- added" from the day it was written, with the reason stated as a
+-- condition rather than a verdict:** the bar here is a field the engine
+-- READS, nothing read them, and closing the gap properly was a design
+-- decision about the Property/Territory relationship rather than a
+-- column this file could add on its own authority. `test/restore.test.js`
+-- held that as a self-checking exemption — if anything ever started
+-- reading a property's community, the exemption stopped being true and
+-- the test would say so.
+--
+-- That is what happened. Every housing statistic in
+-- `server/statistics.js` — condition, value, vacancy, residential mix,
+-- land size — has to know which properties are in an area, and there is
+-- no other path: the base schema gives a property land_size, type,
+-- value, condition, occupants, floors, units, age, construction_date,
 -- utilities, operating_organization_id, density_tier, lifecycle_stage
--- and history_ref, and no FK to a community or a city.
+-- and history_ref, and no FK to a community, a city or a block.
 --
--- That is a real gap, but it is a gap in how the package models the
--- Property/Territory relationship, and closing it is a design decision
--- about that relationship — not a column this file can quietly add on
--- its own authority. Losing these on restore changes no behaviour
--- today because nothing reads them.
+-- So the design decision is made here and stated: **a property belongs
+-- to a community, and a community belongs to a city.** That is the same
+-- containment the rest of the schema already uses — `communities.city_id`,
+-- `territory_blocks.community_id`, `entities.community_id` — and it
+-- keeps a property's location a single FK rather than a geometry, which
+-- is what the engine actually needs and all it can currently fill in.
 --
--- `test/restore.test.js` holds this as a named, self-checking
--- exemption: if anything ever starts reading a property's community,
--- the exemption stops being true and the test says so.
+-- `city_id` is redundant with `community_id -> communities.city_id` for
+-- any placed property and is added anyway, because a property can exist
+-- in a city before any community is drawn around it — which is how a
+-- world is generated, cities first.
+ALTER TABLE properties ADD COLUMN IF NOT EXISTS community_id BIGINT REFERENCES communities(id);
+ALTER TABLE properties ADD COLUMN IF NOT EXISTS city_id BIGINT REFERENCES cities(id);
 
 -- ---------------------------------------------------------------------
 -- `deceased` as an entity status — a value, not a column

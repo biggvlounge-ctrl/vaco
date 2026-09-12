@@ -421,41 +421,31 @@ test('the simulation keeps running after a restore', async (t) => {
     'two events share an id after ticking a restored world');
 });
 
-test('the fields that deliberately do not survive are named, and still deliberate', async (t) => {
+test('a property\'s location survives the round trip, and the exemption is spent', async (t) => {
   if (!available) return t.skip(reason);
   const { before, after } = await roundTrip();
 
-  // A property's community_id/city_id have no column in the schema —
-  // `properties` models no location at all — and nothing in server/
-  // reads either one. server/schema-extensions.sql records why they
-  // are not added: the bar for extending the schema is a field the
-  // engine READS, and closing this gap properly is a design decision
-  // about the Property/Territory relationship.
+  // **This test used to assert the opposite, and it was right to.**
+  // `properties.community_id`/`city_id` had no column in the schema,
+  // `server/schema-extensions.sql` recorded them as considered and
+  // deliberately NOT added, and the stated reason was a condition
+  // rather than a verdict: the bar for extending the schema is a field
+  // the engine READS, and nothing read them. The test held that as a
+  // self-checking exemption — the moment something started reading a
+  // property's community, "nothing reads it" would stop being true.
   //
-  // This exemption re-earns itself. The moment something starts
-  // reading a property's community, "nothing reads it" stops being
-  // true and this fails.
-  const fs = require('node:fs');
-  const path = require('node:path');
-  const serverDir = path.join(__dirname, '..', 'server');
-  const readers = [];
-  for (const file of fs.readdirSync(serverDir)) {
-    if (!file.endsWith('.js')) continue;
-    // property.js SETS them; migrate.js names territory_blocks' own
-    // columns of the same name. Neither is a read of a property's
-    // location.
-    if (file === 'property.js' || file === 'migrate.js' || file === 'restore.js') continue;
-    const src = fs.readFileSync(path.join(serverDir, file), 'utf8');
-    if (/\bproperty\.community_id\b|\bp\.community_id\b/.test(src)) readers.push(file);
-  }
-
-  assert.deepEqual(readers, [],
-    `${readers.join(', ')} now reads a property's community_id. The exemption in `
-    + 'server/schema-extensions.sql says nothing does, which is why no column was added. '
-    + 'Add the column and migrate it, or the restored world is wrong for a reason that '
-    + 'is no longer written down anywhere.');
-
+  // `server/statistics.js#propertiesIn` is that reader: every housing
+  // statistic has to know which properties are in an area, and the
+  // base schema gives a property no location at all. So the columns
+  // were added, the design decision they were waiting on was made and
+  // written down in schema-extensions.sql, and this now checks the
+  // thing it was previously checking the absence of.
   assert.ok(before.properties[0].community_id != null, 'the fixture property has no community');
-  assert.equal(after.properties[0].community_id, undefined,
-    'community_id came back, which means a column was added without updating this exemption');
+  assert.equal(after.properties[0].community_id, before.properties[0].community_id,
+    'a property came back with no community, so every housing statistic reads null');
+
+  // Standing rule 10, held explicitly: Postgres returns BIGINT as a
+  // string, and a community_id of "7" matches no community while
+  // throwing nothing.
+  assert.equal(typeof after.properties[0].community_id, 'number');
 });
