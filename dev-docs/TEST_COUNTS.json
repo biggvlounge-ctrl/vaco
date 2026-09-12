@@ -1,8 +1,8 @@
 {
-  "total": 1586,
-  "passed": 1586,
+  "total": 1588,
+  "passed": 1539,
   "failed": 0,
-  "skipped": 0,
+  "skipped": 49,
   "suites": 39,
   "perSuite": {
     "chopz": {
@@ -42,10 +42,10 @@
       "skipped": 0
     },
     "scripts": {
-      "tests": 157,
-      "pass": 157,
+      "tests": 159,
+      "pass": 151,
       "fail": 0,
-      "skipped": 0
+      "skipped": 8
     },
     "shield": {
       "tests": 12,
@@ -55,9 +55,9 @@
     },
     "v3": {
       "tests": 109,
-      "pass": 109,
+      "pass": 85,
       "fail": 0,
-      "skipped": 0
+      "skipped": 24
     },
     "v4-proxy": {
       "tests": 42,
@@ -133,9 +133,9 @@
     },
     "vacon-c": {
       "tests": 317,
-      "pass": 317,
+      "pass": 300,
       "fail": 0,
-      "skipped": 0
+      "skipped": 17
     },
     "vago": {
       "tests": 13,
