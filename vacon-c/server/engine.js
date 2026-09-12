@@ -99,6 +99,18 @@ const WorldState = {
   // being a table nothing touched. Payroll runs inside the Economy
   // phase — the pipeline stays at eleven.
   employmentRecords: [],
+  // Politics, same day and the same reason: six tables the schema
+  // defined and no engine module touched. A government is an
+  // organization subtype (standing rule 4, and the schema's own
+  // primary key), so `governments` keys off an organization id rather
+  // than owning one. `server/politics.js`; runs inside the
+  // Organization phase.
+  governments: [],
+  elections: [],
+  votes: [],
+  laws: [],
+  publicOpinion: [],
+  revolutions: [],
   entityTraits: [],
   memories: [],
   relationships: [],

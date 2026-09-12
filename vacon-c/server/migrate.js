@@ -437,6 +437,71 @@ async function migrateWorldStateToPostgres(worldState) {
       summary.employment_records = worldState.employmentRecords.length;
 
       // ---------------------------------------------------------------
+      // Politics: governments, elections, votes, laws, public_opinion,
+      // revolutions
+      // ---------------------------------------------------------------
+      // **Ordering is the whole risk here**, and two earlier
+      // migrations rolled back wholesale on exactly this class of
+      // mistake. `governments.organization_id` and
+      // `elections.organization_id` reference organizations;
+      // `votes.election_id` references elections, so votes must follow
+      // them; `revolutions` references organizations twice. Cities are
+      // already written by this point, which `laws` and
+      // `public_opinion` need for their jurisdiction columns.
+      for (const g of worldState.governments) {
+        await client.query(
+          `INSERT INTO governments (organization_id, system_type) VALUES ($1,$2)`,
+          [g.organization_id, g.system_type]
+        );
+      }
+      summary.governments = worldState.governments.length;
+
+      for (const e of worldState.elections) {
+        await client.query(
+          `INSERT INTO elections (id, organization_id, election_type, start_tick, end_tick, status)
+           VALUES ($1,$2,$3,$4,$5,$6)`,
+          [e.id, e.organization_id, e.election_type, e.start_tick, e.end_tick, e.status]
+        );
+      }
+      summary.elections = worldState.elections.length;
+
+      for (const v of worldState.votes) {
+        await client.query(
+          `INSERT INTO votes (election_id, voter_entity_id, candidate_entity_id, tick)
+           VALUES ($1,$2,$3,$4)`,
+          [v.election_id, v.voter_entity_id, v.candidate_entity_id, v.tick]
+        );
+      }
+      summary.votes = worldState.votes.length;
+
+      for (const l of worldState.laws) {
+        await client.query(
+          `INSERT INTO laws (id, jurisdiction_city_id, category, description, enacted_tick, status)
+           VALUES ($1,$2,$3,$4,$5,$6)`,
+          [l.id, l.jurisdiction_city_id, l.category, l.description, l.enacted_tick, l.status]
+        );
+      }
+      summary.laws = worldState.laws.length;
+
+      for (const o of worldState.publicOpinion) {
+        await client.query(
+          `INSERT INTO public_opinion (city_id, topic, approval_score, tick) VALUES ($1,$2,$3,$4)`,
+          [o.city_id, o.topic, o.approval_score, o.tick]
+        );
+      }
+      summary.public_opinion = worldState.publicOpinion.length;
+
+      for (const r of worldState.revolutions) {
+        await client.query(
+          `INSERT INTO revolutions (id, target_government_organization_id, trigger_tick, outcome, new_government_organization_id)
+           VALUES ($1,$2,$3,$4,$5)`,
+          [r.id, r.target_government_organization_id, r.trigger_tick, r.outcome,
+            r.new_government_organization_id]
+        );
+      }
+      summary.revolutions = worldState.revolutions.length;
+
+      // ---------------------------------------------------------------
       // events, historical_records
       // ---------------------------------------------------------------
       for (const e of worldState.events) {

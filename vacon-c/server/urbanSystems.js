@@ -234,9 +234,12 @@ const SYSTEMS = [
   {
     n: 17,
     name: 'Court',
-    level: 'slot',
-    schemaOnly: ['laws'],
-    note: 'A `laws` table no engine code touches. No courts, cases or judgements.',
+    level: 'partial',
+    tables: ['laws'],
+    functions: ['enactLaw', 'repealLaw', 'listLaws'],
+    note: 'Laws are enacted, repealed and queried by jurisdiction. **No courts, cases or '
+      + 'judgements** — nothing applies a law to anybody, so this is legislation without '
+      + 'adjudication. `runSecurityPhase` does not read `laws`.',
   },
   {
     n: 18,
@@ -248,12 +251,22 @@ const SYSTEMS = [
   {
     n: 19,
     name: 'Political',
-    level: 'slot',
-    schemaOnly: ['governments', 'elections', 'votes', 'laws', 'public_opinion', 'revolutions'],
-    note: '**Six tables and no code.** This was marked `modelled` in the first version of this '
-      + 'file purely because six tables are defined — none is touched by any engine module. '
-      + 'Nothing governs, elects, votes, legislates or revolts. The six-stage progression of '
-      + '§63 is not built, and neither is stage one.',
+    level: 'modelled',
+    tables: ['governments', 'elections', 'votes', 'laws', 'public_opinion', 'revolutions'],
+    phases: ['runOrganizationPhase'],
+    functions: [
+      'foundGovernment', 'enactLaw', 'repealLaw', 'scheduleElection', 'castVote',
+      'closeElection', 'computeApproval', 'assessRevolutions', 'resolveRevolution', 'runPolitics',
+    ],
+    note: '**Built 12 Sep 2026 — it was the largest dead spot in the schema.** Six tables, no '
+      + 'code: marked `modelled` on their definitions alone, corrected to `slot` once the '
+      + 'citations were checked, and now real. `server/politics.js`, running inside the '
+      + 'Organization phase because a government is an organization subtype (standing rule 4, '
+      + 'and the schema\'s own primary key). Approval is a rollup computed from '
+      + '`entity_knowledge` exactly as `public_opinion`\'s schema comment demands, and a '
+      + 'revolution needs low approval AND enough of the population informed — the '
+      + '"Public Opinion + Information Spread + Government" mechanic `revolutions` asks for. '
+      + 'What is still not built is §63\'s six-stage progression from informal rules upward.',
   },
   {
     n: 20,
@@ -409,10 +422,13 @@ const SYSTEMS = [
     n: 39,
     name: 'Reputation',
     level: 'partial',
-    schemaOnly: ['public_opinion'],
+    tables: ['public_opinion'],
     traitFamilies: ['reputation'],
-    note: 'Four traits and public opinion. The influence radius and decay §15 asks for '
-      + 'specifically are absent.',
+    functions: ['computeApproval', 'latestOpinion'],
+    note: '`public_opinion` became live when politics was built — approval is computed per '
+      + 'topic from `entity_knowledge` and snapshotted per tick. Still partial: the four '
+      + 'reputation traits drive nothing, and the influence RADIUS and DECAY §15 asks for '
+      + 'specifically are absent, so reputation does not spread or fade with distance.',
   },
   {
     n: 40,

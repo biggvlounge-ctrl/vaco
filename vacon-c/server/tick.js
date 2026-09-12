@@ -48,6 +48,7 @@ const { nextAfter } = require('./nextAfter.js');
 const { getEntityTraitsForEntity, applyKeyModifier, getLiveEntity, traitsToSheet } = require('./entityTraits.js');
 const worldStore = require('./worldStore.js');
 const economy = require('./economy.js');
+const politics = require('./politics.js');
 const keys = require('./keys.js');
 const territory = require('./territory.js');
 const property = require('./property.js');
@@ -341,6 +342,17 @@ function runMigrationPhase(worldState) {
 // ---------------------------------------------------------------------------
 function runOrganizationPhase(worldState) {
   const events = [];
+
+  // **Politics, inside this phase rather than as a twelfth.** A
+  // government is an organization subtype, so this is where it
+  // belongs; the pipeline is locked at eleven phases.
+  //
+  // Snapshots public opinion, then assesses whether any government has
+  // lost enough support — among enough people who have actually heard
+  // of it — to face a revolution. Both events land in this tick's
+  // candidate list, so the Event phase sees them.
+  const political = politics.runPolitics(worldState, worldState.tick);
+  events.push(...political.events);
 
   for (const block of worldState.territoryBlocks) {
     const priorStatus = block.status;

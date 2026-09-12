@@ -105,14 +105,61 @@ from memory with nothing in the repo to check it against. The forty are
 now data in `vacon-c/server/urbanSystems.js`, every citation verified
 by `vacon-c/test/urban-systems.test.js`, and the real breakdown is:
 
-**10 modelled, 16 partial, 8 slot-only, 6 absent**
+**11 modelled, 17 partial, 6 slot-only, 6 absent**
 
 | Level | Means | Systems |
 |---|---|---|
-| **modelled** (10) | Real mechanics; something advances or decides on it each tick | Population, Housing, Economy, **Employment**, Infrastructure, Cultural, Community Organizations, Real Estate, Environmental, AI Decision |
-| **partial** (16) | A trait family or a live table with little driving it, or one phase covering two systems | Education, Health, Food Supply, Water, Law Enforcement, Crime, Gang, Organized Crime, Communication, Business, Construction, Weather, Disaster, Technology, Migration, Reputation |
-| **slot** (8) | Storage exists and nothing reads it | Transportation, Energy, Waste, Court, Political, Religion, Fire & Emergency, Supply Chain |
+| **modelled** (11) | Real mechanics; something advances or decides on it each tick | Population, Housing, Economy, **Employment**, Infrastructure, **Political**, Cultural, Community Organizations, Real Estate, Environmental, AI Decision |
+| **partial** (17) | A trait family or a live table with little driving it, or one phase covering two systems | Education, Health, Food Supply, Water, Law Enforcement, Crime, Gang, Organized Crime, **Court**, Communication, Business, Construction, Weather, Disaster, Technology, Migration, Reputation |
+| **slot** (6) | Storage exists and nothing reads it | Transportation, Energy, Waste, Religion, Fire & Emergency, Supply Chain |
 | **absent** (6) | No representation at all | Prison, Government Services, Media, Social Media, Military/National Guard, Tourism |
+
+**Political was the largest dead spot in the schema and is now built**
+— 12 Sep 2026, `vacon-c/server/politics.js`, running inside the
+Organization phase because a government is an organization subtype
+(standing rule 4, and the schema's own primary key). Six tables that
+no engine module touched: governments, elections, votes, laws,
+public_opinion, revolutions.
+
+**Two of those tables carry schema comments that are design
+instructions, and both are honoured rather than worked around:**
+
+- `public_opinion` — *"Rollup from beliefs/entity_knowledge on a
+  topic, not new source data."* Approval is computed from
+  `entity_knowledge`: **knowledge decides who has an opinion, live
+  traits decide what it is.** Somebody who has never heard of a
+  government is not counted. Snapshots are written per tick, which is
+  history rather than a second source of truth — the same relationship
+  `individual_finances` has to a balance, and the reason this is not a
+  standing-rule-3 violation.
+- `revolutions` — *"Ties Public Opinion + Information Spread +
+  Government into a real regime-change mechanic, not just a lower
+  stability number."* A revolution needs low approval **and** enough of
+  the population actually informed. Without that second floor, one
+  disapproving citizen out of a hundred reads as 0% approval and the
+  government falls on a sample of one — unrest that is a measurement
+  artefact.
+
+**`knowledgeCharge()` in `keys.js` looks like the right tool for
+approval and is not**, which is worth recording because it is an easy
+mistake to make twice. It scores epistemic status — `verified` and
+`known` count fully positive — so using it for approval means a
+*verified* famine reads as +1, and a population approves of a
+government precisely because it has confirmed how badly things are
+going. Not a bug there; a different question.
+
+The honest cost, stated in the module too: **approval does not depend
+on what a law says.** A harsh law and a generous one move it
+identically, because both are only a reason to have heard of the
+government. Encoding favourability would mean judging whether a
+`criminal` law is good for a given NPC — inventing game design no
+source document specifies, which is the line `actions.js` already
+declined to cross.
+
+Court rises to `partial` on the same work: laws are enacted, repealed
+and queried, but **nothing applies a law to anybody** —
+`runSecurityPhase` does not read `laws`, so this is legislation
+without adjudication.
 
 **Employment is the first `slot` taken off the list** — 12 Sep 2026,
 and it is the worked example of what "deepen what exists" means here.
@@ -285,7 +332,7 @@ behaviour, which §82 forbids.
 | 60 First-world city playability | **PARTIAL** | The reset-era model is what exists; the Chicago modern-city layer is a document, not code. Compatibility is a claim nothing currently tests. |
 | 61 Media & communication | **PARTIAL** | `KEY_LOCATION_DISCOVERY_WORD_OF_MOUTH_SYSTEM.md` plus `entity_knowledge`'s spread and distortion fields are genuinely the word-of-mouth layer. Radio, news and social media are not. |
 | 62 Cultural system | **BUILT** | `server/culture.js` — generate, attach, membership, lookup. |
-| 63 Political / government system | **PARTIAL** | `governments`, `elections`, `votes`, `laws`, `public_opinion`, `revolutions` are all real tables. The six-stage progression from informal rules upward is not implemented. |
+| 63 Political / government system | **BUILT, except the progression** | All six tables are live: `foundGovernment`, `enactLaw`/`repealLaw`, `scheduleElection`/`castVote`/`closeElection` (a tie elects nobody rather than the first candidate found), `computeApproval`, `assessRevolutions`, `resolveRevolution`. **§63's six-stage progression from informal rules upward is still not implemented** — a world either has a government or does not. A law with no government attached is the closest thing to stage one and is supported. |
 | 64 Health system | **PARTIAL** | A `health` trait family (4). No disease, no medical knowledge loss and recovery, no clinics as a system. |
 | 65 Education system | **PARTIAL** | `educational` traits (4). No schools, teachers, literacy or libraries as entities. |
 | 66 Technology recovery | **PARTIAL** | `technology_eras` defines ten eras with a `requirements` column and nothing reads it. `runReemergencePhase` computes a recovery index, which is the part that works. |

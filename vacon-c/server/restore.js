@@ -232,6 +232,39 @@ async function restoreWorldStateFromPostgres(worldState) {
     nums(e, ['id', 'entity_id', 'employer_organization_id', 'wage', 'start_tick']));
   summary.employment_records = worldState.employmentRecords.length;
 
+  // Politics. **Every id and numeric column named in `nums`** —
+  // Postgres returns BIGINT and NUMERIC as strings, and a missed
+  // conversion does not throw, it produces a world that looks restored
+  // and is wrong (standing rule 10). `approval_score` is the one that
+  // would bite hardest: a string approval makes
+  // `approval >= approvalFloor` a lexicographic comparison, so "9"
+  // would read as above a floor of 35 and a collapsing government
+  // would restore as a stable one.
+  worldState.governments = (await q('SELECT * FROM governments')).map((g) =>
+    nums(g, ['organization_id']));
+  summary.governments = worldState.governments.length;
+
+  worldState.elections = (await q('SELECT * FROM elections ORDER BY id')).map((e) =>
+    nums(e, ['id', 'organization_id', 'start_tick', 'end_tick']));
+  summary.elections = worldState.elections.length;
+
+  worldState.votes = (await q('SELECT * FROM votes')).map((v) =>
+    nums(v, ['election_id', 'voter_entity_id', 'candidate_entity_id', 'tick']));
+  summary.votes = worldState.votes.length;
+
+  worldState.laws = (await q('SELECT * FROM laws ORDER BY id')).map((l) =>
+    nums(l, ['id', 'jurisdiction_city_id', 'enacted_tick']));
+  summary.laws = worldState.laws.length;
+
+  worldState.publicOpinion = (await q('SELECT * FROM public_opinion')).map((o) =>
+    nums(o, ['city_id', 'approval_score', 'tick']));
+  summary.public_opinion = worldState.publicOpinion.length;
+
+  worldState.revolutions = (await q('SELECT * FROM revolutions ORDER BY id')).map((r) =>
+    nums(r, ['id', 'target_government_organization_id', 'trigger_tick',
+      'new_government_organization_id']));
+  summary.revolutions = worldState.revolutions.length;
+
   // -------------------------------------------------------------------
   // History
   // -------------------------------------------------------------------
