@@ -88,8 +88,10 @@
 const areaStats = require('./areaStats.js');
 const births = require('./births.js');
 const crime = require('./crime.js');
+const demographics = require('./demographics.js');
 const economy = require('./economy.js');
 const membership = require('./membership.js');
+const infrastructure = require('./infrastructure.js');
 const mortality = require('./mortality.js');
 const property = require('./property.js');
 
@@ -315,13 +317,72 @@ const CATALOGUE = [
   },
 
   // ---- demographic ---------------------------------------------------
+  // **This block said "no demographic fields exist on an NPC at all",
+  // which was true of the fields people usually mean and not true of
+  // three the schema already carried**: `languages` + `entity_languages`
+  // (two tables with zero lines of code), `npcs.religion` and
+  // `npcs.education`. See server/demographics.js — and note what is
+  // deliberately still absent: race and ethnicity have no column, no
+  // document asks for one, and §9's clause makes inventing one a
+  // decision to take explicitly rather than as a side effect of
+  // wanting a composition statistic.
+  //
+  // A distribution cannot be z-scored, so each attribute contributes
+  // two comparable scalars: Simpson diversity and the dominant share.
+  // `demographics.compositionOf` returns the full distribution for
+  // anything that wants to show it.
   {
-    key: 'demographic_composition', category: 'demographic', unit: 'share', scope: 'community',
-    unavailable: 'no demographic fields exist on an NPC at all. §9 permits demographic '
-      + 'modelling and forbids demographics determining an NPC\'s morality, criminality, '
-      + 'intelligence or worth — so composition as an area statistic is legitimate and a '
-      + 'demographic that predicts behaviour is what the spec forbids. Any implementation '
-      + 'has to keep that split, which is why this entry names it rather than just the gap.',
+    key: 'linguistic_diversity', category: 'demographic', unit: 'share', scope: 'community',
+    compute: (ctx) => demographics.compositionOf(ctx.worldState, ctx.residents).language.diversity,
+  },
+  {
+    key: 'dominant_language_share', category: 'demographic', unit: 'share', scope: 'community',
+    compute: (ctx) => demographics.compositionOf(ctx.worldState, ctx.residents).language.dominantShare,
+  },
+  {
+    key: 'religious_diversity', category: 'demographic', unit: 'share', scope: 'community',
+    compute: (ctx) => demographics.compositionOf(ctx.worldState, ctx.residents).religion.diversity,
+  },
+  {
+    key: 'dominant_religion_share', category: 'demographic', unit: 'share', scope: 'community',
+    compute: (ctx) => demographics.compositionOf(ctx.worldState, ctx.residents).religion.dominantShare,
+  },
+  {
+    key: 'educational_attainment', category: 'demographic', unit: 'index', scope: 'community',
+    // The one composition here whose values have a direction, so a
+    // mean is meaningful in a way a mean religion would not be.
+    // Reported on 0..100 rather than as a band index so it shares a
+    // scale with every other `index` statistic.
+    compute: (ctx) => {
+      const mean = demographics.compositionOf(ctx.worldState, ctx.residents).education.meanLevel;
+      if (mean === null) return null;
+      return round((mean / (demographics.EDUCATION_LEVELS.length - 1)) * 100, 2);
+    },
+  },
+  {
+    key: 'demographics_recorded_share', category: 'demographic', unit: 'share', scope: 'community',
+    // **How much of the area the three statistics above speak for.**
+    // A diversity index drawn from four residents out of four hundred
+    // is not wrong, it is thin, and the difference is invisible unless
+    // something reports it — the same reason `observed_share` sits
+    // beside `mean_stress`.
+    compute: (ctx) => {
+      if (ctx.population === 0) return null;
+      const recorded = ctx.residents.filter(
+        (n) => demographics.primaryLanguageOf(ctx.worldState, n.id) !== null
+          || n.religion || n.education,
+      ).length;
+      return share(recorded, ctx.population);
+    },
+  },
+  {
+    key: 'race_and_ethnicity_composition', category: 'demographic', unit: 'share', scope: 'community',
+    unavailable: 'deliberately absent rather than missing. No column exists, no document in '
+      + 'the package asks for one, and §9 permits demographic modelling while forbidding '
+      + 'demographics determining an NPC\'s morality, criminality, intelligence or worth — '
+      + 'which makes adding one a decision to take explicitly, not a side effect of wanting '
+      + 'a composition statistic. Language, religion and education are what the schema '
+      + 'models and are computed above.',
   },
 
   // ---- economics -----------------------------------------------------
@@ -510,57 +571,59 @@ const CATALOGUE = [
   },
 
   // ---- community facilities ------------------------------------------
-  // **These three were written as computations first, and each would
-  // have returned a real-looking 0.** `infrastructure` is a schema-only
-  // table: it has columns for type, capacity, condition, funding and
-  // failure_risk, and NO WorldState array — nothing generates a row,
-  // so `worldState.infrastructure` is `undefined` everywhere. Summing
-  // an empty list gives 0 capacity, `per1k` turns that into 0.0, and
-  // every area in every world reports "no schools" as a measurement.
+  // **These three were declared unavailable and are now computed.**
+  // The reason was the same for each — `infrastructure` is a
+  // schema-only table with no WorldState array, so nothing ever
+  // created a row, summing an empty list gave 0 capacity, and every
+  // area in every world reported "no schools" as a measurement.
+  // `server/infrastructure.js` is the array and the generator.
   //
-  // That is the exact failure this catalogue exists to prevent, made
-  // by the catalogue itself before it was checked. §7 lists Education
-  // and Health facilities as `slot` for precisely this reason.
+  // `capacityOf` returns null rather than 0 both when nothing of a
+  // type exists and when it exists with no stated capacity, which is
+  // the distinction the original defect collapsed.
   {
     key: 'school_capacity_per_1k', category: 'community', unit: 'rate_per_1k', scope: 'city',
-    unavailable: '`infrastructure` is a schema-only table — it has a `schools` type and a '
-      + '`capacity` column, and no WorldState array, so nothing ever creates a school. '
-      + 'Summing an empty list would report 0 capacity as a measurement.',
-  },
-  {
-    key: 'hospital_capacity_per_1k', category: 'community', unit: 'rate_per_1k', scope: 'city',
-    unavailable: 'the same schema-only `infrastructure` table. `hospitals` is one of its ten '
-      + 'types and no row is ever written, so clinic capacity per area is not 0 — it is '
-      + 'unmodelled.',
-  },
-  {
-    key: 'infrastructure_condition', category: 'community', unit: 'index', scope: 'city',
-    unavailable: 'the same. `cities.infrastructure` carries a single rollup NUMERIC whose own '
-      + 'schema comment says it is "a rollup from this" — from the per-type table that has '
-      + 'no rows. Reporting the rollup here would report a generator default.',
-  },
-  {
-    key: 'civic_organizations_per_1k', category: 'community', unit: 'rate_per_1k', scope: 'community',
     compute: (ctx) => {
-      // `organizations.type`'s own enumeration, filtered to the kinds
-      // §9's COMMUNITY block names: schools, churches, clinics,
-      // libraries, museums. Parks and community centres have no type
-      // in that list and are not invented here.
-      const civic = new Set(['school', 'religion', 'hospital', 'library', 'museum']);
-      return per1k(
-        membership.organizationPresence(ctx.worldState, ctx.communityId)
-          .filter((o) => civic.has(o.type)).length,
-        ctx.population,
-      );
+      if (ctx.cityId === null) return null;
+      const capacity = infrastructure.capacityOf(ctx.worldState, ctx.cityId, 'schools');
+      return capacity === null ? null : per1k(capacity, ctx.population);
     },
   },
   {
-    key: 'school_dropout_rate', category: 'community', unit: 'share', scope: 'community',
-    unavailable: '`communities.education` is one number and `infrastructure` can hold a '
-      + 'school building, but there are no students and no enrolment — so there is nothing '
-      + 'to drop out OF. §25\'s knowledge tiers are the natural substrate and are unbuilt.',
+    key: 'hospital_capacity_per_1k', category: 'community', unit: 'rate_per_1k', scope: 'city',
+    compute: (ctx) => {
+      if (ctx.cityId === null) return null;
+      const capacity = infrastructure.capacityOf(ctx.worldState, ctx.cityId, 'hospitals');
+      return capacity === null ? null : per1k(capacity, ctx.population);
+    },
   },
-
+  {
+    key: 'public_safety_capacity_per_1k', category: 'community', unit: 'rate_per_1k', scope: 'city',
+    compute: (ctx) => {
+      if (ctx.cityId === null) return null;
+      const capacity = infrastructure.capacityOf(ctx.worldState, ctx.cityId, 'public_safety');
+      return capacity === null ? null : per1k(capacity, ctx.population);
+    },
+  },
+  {
+    key: 'infrastructure_condition', category: 'community', unit: 'index', scope: 'city',
+    compute: (ctx) => (ctx.cityId === null
+      ? null
+      : infrastructure.cityCondition(ctx.worldState, ctx.cityId)),
+  },
+  {
+    key: 'infrastructure_failure_risk', category: 'community', unit: 'share', scope: 'city',
+    // The worst thing standing, not the average — a city whose water
+    // system is about to fail is not reassured by its roads. Same
+    // reasoning `mortality.survivalScarcity` uses for essentials.
+    compute: (ctx) => {
+      if (ctx.cityId === null) return null;
+      const risks = infrastructure.infrastructureIn(ctx.worldState, ctx.cityId)
+        .map((row) => infrastructure.failureRisk(row))
+        .filter((r) => r !== null);
+      return risks.length === 0 ? null : Math.max(...risks);
+    },
+  },
   // ---- environment ---------------------------------------------------
   {
     key: 'resource_scarcity', category: 'environment', unit: 'index', scope: 'city',

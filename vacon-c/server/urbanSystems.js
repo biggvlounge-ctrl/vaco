@@ -141,10 +141,13 @@ const SYSTEMS = [
     n: 5,
     name: 'Education',
     level: 'partial',
+    tables: ['infrastructure'],
     traitFamilies: ['educational'],
     infrastructureTypes: ['schools'],
-    note: 'Four traits and a slot. No schools, teachers, literacy or libraries as entities — '
-      + 'and the knowledge tiers of §25 are absent entirely.',
+    note: 'Schools now exist as infrastructure with a capacity and a condition that decays, '
+      + 'and educational ATTAINMENT is a real per-area statistic (npcs.education, via '
+      + 'demographics.compositionOf). Still partial: no teachers, no enrolment, nobody to '
+      + 'drop out OF, and the knowledge tiers of §25 are absent entirely.',
   },
   {
     n: 6,

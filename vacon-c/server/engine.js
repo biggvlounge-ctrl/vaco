@@ -131,6 +131,20 @@ const WorldState = {
   // block was always real; nothing connected a resident to a faction)
   // and organization presence. `server/membership.js`.
   entityOrganizationMemberships: [],
+  // The built things a place runs on. `infrastructure` was a real
+  // table with the right ten types and NO array at all, which is how
+  // three statistics in `statistics.js` came to return a real-looking
+  // 0 for school and clinic capacity in every world. `server/infrastructure.js`;
+  // ages inside the Environment phase beside the property lifecycle.
+  infrastructure: [],
+  // Language, and the join table that carries who speaks what.
+  // `languages` and `entity_languages` are both in the schema and
+  // neither had a line of code — `urbanSystems.js` did not even list
+  // them among the dead tables. With `npcs.religion` and
+  // `npcs.education`, they are what §9's demographic block is
+  // measurable FROM. `server/demographics.js`.
+  languages: [],
+  entityLanguages: [],
   beliefs: [],
   // Civilizations and the technology ladder. Four dead tables built
   // together on 12 Sep 2026 because they are one system:

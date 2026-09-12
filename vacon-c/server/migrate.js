@@ -36,6 +36,7 @@
 const db = require('./db.js');
 const engine = require('./engine.js');
 const { TRAIT_DEFINITIONS } = require('./traitDefinitions.js');
+const infrastructure = require('./infrastructure.js');
 
 async function migrateWorldStateToPostgres(worldState) {
   const summary = {};
@@ -324,6 +325,51 @@ async function migrateWorldStateToPostgres(worldState) {
         );
       }
       summary.territory_blocks = worldState.territoryBlocks.length;
+
+      // ---------------------------------------------------------------
+      // infrastructure — after cities, which it references
+      // ---------------------------------------------------------------
+      // `failure_risk` is written even though nothing assigns it: it is
+      // computed on read (standing rule 3) and the column exists, so a
+      // dashboard querying the database directly sees the same number
+      // the engine would. Restore ignores it and recomputes.
+      for (const i of worldState.infrastructure) {
+        await client.query(
+          `INSERT INTO infrastructure (id, city_id, type, age, condition, capacity,
+             maintenance_level, funding, failure_risk) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+          [i.id, i.city_id, i.type, i.age, i.condition, i.capacity,
+            i.maintenance_level, i.funding, infrastructure.failureRisk(i)]
+        );
+      }
+      summary.infrastructure = worldState.infrastructure.length;
+
+      // ---------------------------------------------------------------
+      // languages + entity_languages
+      // ---------------------------------------------------------------
+      // `languages.region_id` is always null: there is no `regions`
+      // array on WorldState at all, so nothing can set it. Written
+      // anyway rather than dropped from the INSERT — a column quietly
+      // not written is how four mission fields went missing for months.
+      //
+      // Parents first, so `languages.parent_language_id` (a self
+      // reference) resolves. `generateLanguage` refuses a parent that
+      // does not already exist, so id order is enough.
+      for (const l of [...worldState.languages].sort((a, b) => a.id - b.id)) {
+        await client.query(
+          `INSERT INTO languages (id, name, parent_language_id, region_id) VALUES ($1,$2,$3,$4)`,
+          [l.id, l.name, l.parent_language_id, l.region_id]
+        );
+      }
+      summary.languages = worldState.languages.length;
+
+      for (const r of worldState.entityLanguages) {
+        await client.query(
+          `INSERT INTO entity_languages (entity_id, language_id, proficiency, is_primary)
+           VALUES ($1,$2,$3,$4)`,
+          [r.entity_id, r.language_id, r.proficiency, r.is_primary]
+        );
+      }
+      summary.entity_languages = worldState.entityLanguages.length;
 
       // properties.value is the ASSESSED value and is the only one
       // stored. currentValue() is derived on read and deliberately not

@@ -351,6 +351,26 @@ async function restoreWorldStateFromPostgres(worldState) {
     nums(b, ['id', 'faction_id', 'city_id', 'community_id', 'contested_since_tick', 'tick']));
   summary.territory_blocks = worldState.territoryBlocks.length;
 
+  // `failure_risk` is deliberately NOT restored into the row: it is
+  // computed from age, condition and maintenance (standing rule 3),
+  // and a restored copy is a second source of truth that can disagree
+  // with the three fields it came from.
+  worldState.infrastructure = (await q('SELECT * FROM infrastructure ORDER BY id')).map((i) => {
+    const row = nums(i, ['id', 'city_id', 'age', 'condition', 'capacity',
+      'maintenance_level', 'funding']);
+    row.failure_risk = null;
+    return row;
+  });
+  summary.infrastructure = worldState.infrastructure.length;
+
+  worldState.languages = (await q('SELECT * FROM languages ORDER BY id')).map((l) =>
+    nums(l, ['id', 'parent_language_id', 'region_id']));
+  summary.languages = worldState.languages.length;
+
+  worldState.entityLanguages = (await q('SELECT * FROM entity_languages')).map((r) =>
+    nums(r, ['entity_id', 'language_id', 'proficiency']));
+  summary.entity_languages = worldState.entityLanguages.length;
+
   worldState.properties = (await q('SELECT * FROM properties ORDER BY id')).map((p) =>
     nums(p, ['id', 'land_size', 'value', 'condition', 'occupants', 'floors', 'units',
       'age', 'construction_date', 'operating_organization_id',

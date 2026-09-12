@@ -23,6 +23,7 @@ const statistics = require('../server/statistics.js');
 const areaStats = require('../server/areaStats.js');
 const crime = require('../server/crime.js');
 const economy = require('../server/economy.js');
+const infrastructure = require('../server/infrastructure.js');
 const membership = require('../server/membership.js');
 const mortality = require('../server/mortality.js');
 const property = require('../server/property.js');
@@ -56,6 +57,9 @@ function world({ tick = 36500 } = {}) {
     ownershipRecords: [],
     resources: [],
     marketListings: [],
+    infrastructure: [],
+    languages: [],
+    entityLanguages: [],
     // Property ids come from the shared entity counter so a property
     // can be an `ownership_records.entity_id` — property.js refuses to
     // generate one without it.
@@ -65,6 +69,7 @@ function world({ tick = 36500 } = {}) {
   economy.reseedIds(worldState);
   crime.reseedIds(worldState);
   property.reseedIds(worldState);
+  infrastructure.reseedIds(worldState);
   return worldState;
 }
 
@@ -158,30 +163,46 @@ test('every unavailable statistic names its missing substrate', () => {
     assert.ok(entry.reason.length > 60, `${entry.key} has no real explanation`);
   }
   // §9's constraint travels with the entry rather than living only in
-  // a header nobody reads at the call site.
-  const demographics = missing.find((e) => e.key === 'demographic_composition');
-  assert.match(demographics.reason, /morality, criminality, intelligence or worth/);
+  // a header nobody reads at the call site. `demographic_composition`
+  // used to carry it and is gone — language, religion and education
+  // are computed now — so the clause moved to the entry that is still
+  // a deliberate absence rather than a gap.
+  const race = missing.find((e) => e.key === 'race_and_ethnicity_composition');
+  assert.match(race.reason, /morality, criminality, intelligence or worth/);
+  assert.match(race.reason, /deliberately absent rather than missing/);
 });
 
-test('the three infrastructure statistics are declared absent, not computed as zero', () => {
-  // **These were written as computations first and each returned a
-  // real-looking 0.** `infrastructure` has the right columns — type,
-  // capacity, condition — and no WorldState array at all, so summing
-  // an empty list gave 0 capacity and every area in every world
-  // reported "no schools" as a measurement.
+test('infrastructure capacity is null when nothing exists, not zero', () => {
+  // **This test used to assert the opposite and the opposite was
+  // right.** `infrastructure` was a schema-only table with no
+  // WorldState array, so these three summed an empty list, got 0
+  // capacity, and every area in every world reported "no schools" as a
+  // measurement. server/infrastructure.js is the array; what survives
+  // is the distinction the original defect collapsed — a city with no
+  // schools and a city whose schools have no stated capacity are both
+  // unknown, and neither is zero.
   const w = world();
   const city = territory.generateCity(w, { name: 'Testbed' });
   const c = territory.generateCommunity(w, { cityId: city.id });
   for (let i = 0; i < 10; i += 1) person(w, { communityId: c.id });
 
-  const profile = statistics.profileFor(w, c.id);
-  for (const key of ['school_capacity_per_1k', 'hospital_capacity_per_1k',
-    'infrastructure_condition']) {
-    assert.equal(profile.statistics[key].value, null);
-    assert.match(profile.statistics[key].reason, /schema-only|the same/);
-  }
-  assert.equal('infrastructure' in w, false,
-    'there is now an infrastructure array; these three can become real computations');
+  let s = statistics.profileFor(w, c.id).statistics;
+  assert.equal(s.school_capacity_per_1k.value, null, 'a city with no schools reported a rate');
+  assert.equal(s.infrastructure_condition.value, null);
+
+  // Exists, no capacity recorded: still unknown.
+  infrastructure.generateInfrastructure(w, { cityId: city.id, type: 'schools', condition: 80 });
+  s = statistics.profileFor(w, c.id).statistics;
+  assert.equal(s.school_capacity_per_1k.value, null, 'a school with no stated capacity reported one');
+  assert.equal(s.infrastructure_condition.value, 80, 'condition is known even when capacity is not');
+
+  // Stated: a real rate.
+  infrastructure.generateInfrastructure(w, {
+    cityId: city.id, type: 'schools', capacity: 400, condition: 60,
+  });
+  s = statistics.profileFor(w, c.id).statistics;
+  assert.equal(s.school_capacity_per_1k.value, 40000, '400 places for 10 residents');
+  assert.equal(s.infrastructure_condition.value, 70);
 });
 
 test('a crime category nothing generates carries a caveat on its zero', () => {

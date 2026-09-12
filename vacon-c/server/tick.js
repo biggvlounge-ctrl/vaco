@@ -53,6 +53,7 @@ const technology = require('./technology.js');
 const mortality = require('./mortality.js');
 const births = require('./births.js');
 const crime = require('./crime.js');
+const infrastructure = require('./infrastructure.js');
 const keys = require('./keys.js');
 const territory = require('./territory.js');
 const property = require('./property.js');
@@ -125,6 +126,12 @@ function runEnvironmentPhase(worldState) {
       });
     }
   }
+
+  // Infrastructure wears out here for the reason this phase's own
+  // comment already gives: it is where the physical world changes on
+  // its own. Beside the property lifecycle, not in a phase of its own
+  // — the pipeline is locked at eleven. See server/infrastructure.js.
+  events.push(...infrastructure.advanceInfrastructure(worldState, worldState.tick));
 
   return events;
 }
