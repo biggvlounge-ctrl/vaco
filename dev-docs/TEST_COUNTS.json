@@ -1,6 +1,6 @@
 {
-  "total": 1641,
-  "passed": 1592,
+  "total": 1644,
+  "passed": 1595,
   "failed": 0,
   "skipped": 49,
   "suites": 39,
@@ -120,8 +120,8 @@
       "skipped": 0
     },
     "vaco-shell": {
-      "tests": 33,
-      "pass": 33,
+      "tests": 36,
+      "pass": 36,
       "fail": 0,
       "skipped": 0
     },

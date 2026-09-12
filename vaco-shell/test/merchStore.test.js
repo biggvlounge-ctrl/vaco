@@ -161,6 +161,115 @@ test('quantity multiplies every share', async () => {
   assert.equal(order.brandPayout, 48);
 });
 
+// **Every price in the two tests above divides evenly.** 30/10 and
+// 90/30 split into thirds with nothing left over, so they cannot
+// distinguish a split that adds up from one that loses a cent to
+// rounding — and the money audit closed with this module described as
+// "probed clean", which it had not earned from round numbers alone.
+//
+// Driven across 8 awkward price points: 0 mismatches. The reason it
+// holds is structural rather than lucky — `brandPayout` is
+// `round(grossMargin - platformFee)`, a residual, so whatever the other
+// two shares round to, the brand absorbs the difference and the three
+// always sum to what the customer paid.
+//
+// **A claim this comment first made and the code disproved.** It said
+// an independent `round(grossMargin * (1 - takeRate))` would not have
+// that property. Mutating the line to exactly that: all 16 tests still
+// passed. At a rate of 0.2 the two formulas are arithmetically
+// identical on cent-quantized margins — `0.2 × cents` can only land on
+// a fraction of .0, .2, .4, .6 or .8, never the .5 that would round
+// both shares up and produce an extra cent. So the residual form is
+// the better one to keep, but this test cannot tell them apart, and
+// saying it could would have been an assertion about coverage the
+// suite does not have.
+//
+// What the mutation did surface is the test below it: chasing a rate
+// where the two formulas *do* diverge is what found that `takeRate`
+// was never validated.
+test('the three shares sum to the total at prices that do not divide evenly', async () => {
+  const cases = [
+    { retail: 0.03, cost: 0.01, quantity: 1 },   // sub-cent margin
+    { retail: 7.77, cost: 3.33, quantity: 3 },
+    { retail: 99.99, cost: 49.99, quantity: 7 },
+    { retail: 18, cost: 7, quantity: 11 },
+    { retail: 0.05, cost: 0.02, quantity: 13 },
+    { retail: 52, cost: 24, quantity: 2 },
+    { retail: 1.01, cost: 0.99, quantity: 1 },   // margin of one cent
+    { retail: 28, cost: 11, quantity: 1 },
+  ];
+
+  for (const [i, c] of cases.entries()) {
+    const store = createShellStore();
+    createProduct(store, {
+      productId: `p${i}`, appBrandId: 'void', name: `P${i}`,
+      productType: 'other', retailPriceVcoin: c.retail, fulfilmentCostVcoin: c.cost,
+    });
+    const settleFn = recordingTransfers();
+    const order = await placeOrder(store, {
+      customerId: 'sam', productId: `p${i}`, quantity: c.quantity, settleFn,
+    });
+
+    const shares = order.fulfilmentCost + order.brandPayout + order.platformFee;
+    assert.equal(Math.round(shares * 100) / 100, order.total,
+      `${c.retail}×${c.quantity} split into ${shares} against a total of ${order.total}`);
+
+    // And the ledger must move exactly that, not the unrounded figure.
+    const moved = Math.round(settleFn.moves.reduce((n, m) => n + m.amount, 0) * 100) / 100;
+    assert.equal(moved, order.total,
+      `the customer paid ${order.total} but ${moved} left their balance`);
+    assert.ok(order.brandPayout >= 0 && order.platformFee >= 0,
+      `a share went negative: brand ${order.brandPayout}, platform ${order.platformFee}`);
+  }
+});
+
+// **The defect: `takeRate` was caller-settable with no validation, and
+// it is the one field in a product that can charge a customer more than
+// the order says.** The platform fee is derived from it and the brand
+// gets the residual, so a rate above 1 makes the brand's share
+// negative — and `placeOrder` drops a non-positive leg rather than
+// refusing it, so the fee is taken and nothing offsets it. Measured
+// before the fix, `takeRate: 3` on the 30 VCoin tee: **70 VCoin left
+// the customer's balance against an order recording `total: 30`.** A
+// negative rate inverts it: the brand is paid more than the entire
+// margin, the platform's negative leg is dropped, and the customer
+// funds the difference.
+test('a take rate that would overcharge the customer is refused at creation', () => {
+  const store = createShellStore();
+  for (const takeRate of [1.5, 3, -0.25, Number.NaN, Number.POSITIVE_INFINITY]) {
+    assert.throws(() => createProduct(store, {
+      productId: `bad-${takeRate}`, appBrandId: 'void', name: 'Bad',
+      productType: 'other', retailPriceVcoin: 30, fulfilmentCostVcoin: 10, takeRate,
+    }), MerchError, `takeRate ${takeRate} was accepted`);
+  }
+
+  // 0 and 1 are both legitimate: the brand keeping the whole margin,
+  // and the platform taking it. Neither makes a share negative.
+  for (const takeRate of [0, 1]) {
+    const p = createProduct(store, {
+      productId: `edge-${takeRate}`, appBrandId: 'void', name: 'Edge',
+      productType: 'other', retailPriceVcoin: 30, fulfilmentCostVcoin: 10, takeRate,
+    });
+    assert.equal(p.takeRate, takeRate);
+  }
+});
+
+test('a product persisted with a bad take rate cannot be ordered', async () => {
+  // Validation at creation does not reach a product that was written
+  // to a file or to Postgres before that check existed — the store is
+  // loaded from persistence, so the order path has to refuse it too.
+  const store = storeWithProducts();
+  getProduct(store, 'void-tee').takeRate = 3;
+
+  const settleFn = recordingTransfers();
+  await assert.rejects(() => placeOrder(store, {
+    customerId: 'sam', productId: 'void-tee', settleFn,
+  }), /takeRate 3/);
+
+  assert.equal(settleFn.moves.length, 0, 'money moved on an order that should not exist');
+  assert.equal(store.merchOrders.length, 0, 'an order was recorded despite the refusal');
+});
+
 test('an order without a settleFn is refused rather than recorded unpaid', async () => {
   const store = storeWithProducts();
   await assert.rejects(

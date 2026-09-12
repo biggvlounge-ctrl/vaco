@@ -91,6 +91,32 @@ export function createProduct(store, options = {}) {
       `createProduct: retail ${retailPriceVcoin} does not cover fulfilment cost ${fulfilmentCostVcoin}`,
     );
   }
+  // **`takeRate` had no validation, and it is the one field here that
+  // can overcharge a customer.** `placeOrder` derives the platform fee
+  // from it and gives the brand the residual, so a rate above 1 makes
+  // the brand's share negative — and a negative leg is dropped rather
+  // than refused, leaving the customer charged the fee anyway.
+  // Measured, at `takeRate: 3` on a 30 VCoin tee: 70 VCoin left the
+  // customer's balance against an order record that says `total: 30`.
+  // A negative rate inverts it — the brand is paid more than the whole
+  // margin and the customer funds that too.
+  //
+  // 1 is allowed: a platform taking the entire margin is a business
+  // decision, and the arithmetic still balances at exactly 1 because
+  // the brand's residual is zero rather than negative.
+  //
+  // `appStore.js` bounds its own take rate at `>= 1`, excluding 1, and
+  // the difference is deliberate rather than drift: a listing whose
+  // publisher receives nothing for every sale is not a pricing choice
+  // anyone makes on purpose, whereas merch has house-brand products
+  // where the brand and the platform are the same party. Scanning for
+  // this shape across every money module found only these two rates,
+  // and the app store's was already checked.
+  if (!Number.isFinite(takeRate) || takeRate < 0 || takeRate > 1) {
+    throw new MerchError(
+      `createProduct: takeRate must be between 0 and 1, got ${takeRate}`,
+    );
+  }
 
   if (store.merchProducts.some((p) => p.productId === productId)) {
     throw new MerchError(`createProduct: "${productId}" already exists`);
@@ -171,6 +197,20 @@ export async function placeOrder(store, options = {}) {
   const grossMargin = round(total - fulfilmentCost);
   const platformFee = round(grossMargin * product.takeRate);
   const brandPayout = round(grossMargin - platformFee);
+
+  // **Checked here as well as at creation, because this store is
+  // loaded from a file or from Postgres.** `createProduct` now refuses
+  // a `takeRate` outside 0..1, but a product written before that check
+  // existed comes back from persistence with whatever it was saved
+  // with, and this is the line where a bad rate actually takes money.
+  // Refusing the order is the right end: the alternative is charging a
+  // customer an amount the order record itself contradicts.
+  if (brandPayout < 0 || platformFee < 0) {
+    throw new MerchError(
+      `placeOrder: "${productId}" has takeRate ${product.takeRate}, which splits a `
+      + `${grossMargin} margin into a ${platformFee} fee and a ${brandPayout} brand payout`,
+    );
+  }
 
   // The customer pays once; the money splits three ways. Fulfilment
   // cost goes to the provider account, the brand keeps most of the
