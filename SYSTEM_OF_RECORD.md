@@ -13,7 +13,7 @@ person who built it can check whether a claim is still true.
 Every number below was produced by running the tool that owns it, not
 recalled. The commands are in §10 so they can be re-run.
 
-*Current as of commit `ff6c719`, 75 commits, branch
+*Current as of commit `fa21011`, 78 commits, branch
 `claude/v4-proxy-server-s6dcp8`, 12 Sep 2026.*
 
 **On the commit count.** An earlier revision of this line said 332. That
