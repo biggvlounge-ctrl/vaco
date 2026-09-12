@@ -1,6 +1,6 @@
 {
-  "total": 1633,
-  "passed": 1584,
+  "total": 1641,
+  "passed": 1592,
   "failed": 0,
   "skipped": 49,
   "suites": 39,
@@ -186,8 +186,8 @@
       "skipped": 0
     },
     "voidmagic": {
-      "tests": 23,
-      "pass": 23,
+      "tests": 28,
+      "pass": 28,
       "fail": 0,
       "skipped": 0
     },
@@ -210,8 +210,8 @@
       "skipped": 0
     },
     "vulture-music": {
-      "tests": 16,
-      "pass": 16,
+      "tests": 19,
+      "pass": 19,
       "fail": 0,
       "skipped": 0
     },

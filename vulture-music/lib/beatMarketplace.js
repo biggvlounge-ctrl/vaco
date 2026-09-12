@@ -20,6 +20,8 @@
 // `DISTRIBUTION_FEES`) is real, later work if a revenue line is
 // wanted here, not something this phase invents on its own.
 
+const { settleOnce } = require('./settleOnce');
+
 const LICENSE_TYPES = ['non-exclusive', 'exclusive'];
 const BEAT_STATUSES = ['listed', 'sold-exclusive', 'taken-down'];
 
@@ -109,10 +111,29 @@ async function purchaseBeat(store, options = {}) {
     throw new Error('purchaseBeat requires a settleFn(legs, meta)');
   }
 
-  await settleFn(
-    [{ fromUserId: buyerId, toUserId: beat.producerId, amount: beat.price, reason: `vulture_music_beat_purchase:${beatId}` }],
-    { reason: `vulture_music_beat_purchase:${beatId}` },
-  );
+  // **An exclusive licence is claimed before the money moves.**
+  //
+  // This settled, recorded the purchase, and only then set
+  // `sold-exclusive`. Five concurrent buyers of one *exclusive* beat
+  // all passed the status check, all paid, and all got a purchase
+  // record: **one exclusive licence sold to 5 buyers for 250 VCoin**.
+  // That is a rights problem before it is a money problem — five people
+  // each hold a contract saying nobody else has it.
+  //
+  // **Non-exclusive beats are deliberately untouched.** Selling one
+  // many times is the whole point of the licence, and a fix that
+  // serialised those would be a worse bug than the one it fixed. That
+  // distinction is held by a test, because it is the easy thing to get
+  // wrong here.
+  const claim = beat.licenseType === 'exclusive' ? { status: 'sold-exclusive' } : null;
+  const pay = async () => {
+    await settleFn(
+      [{ fromUserId: buyerId, toUserId: beat.producerId, amount: beat.price, reason: `vulture_music_beat_purchase:${beatId}` }],
+      { reason: `vulture_music_beat_purchase:${beatId}` },
+    );
+  };
+  if (claim) await settleOnce(beat, claim, pay);
+  else await pay();
 
   const purchase = {
     id: store.nextBeatPurchaseId++,
@@ -125,10 +146,6 @@ async function purchaseBeat(store, options = {}) {
     purchasedAt: now,
   };
   store.beatPurchases.push(purchase);
-
-  if (beat.licenseType === 'exclusive') {
-    beat.status = 'sold-exclusive';
-  }
 
   return purchase;
 }

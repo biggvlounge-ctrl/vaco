@@ -11,7 +11,7 @@ each app's test suite actually executed. Nothing here is recalled.
 `scripts/test/completion-report.test.mjs` fails if this file drifts
 from what the script emits, which is the failure mode that made
 `COMPLETION_AUDIT.md` read 31 apps and 522 tests when the real numbers
-were 34 and 1220.
+were 34 and 1228.
 
 ---
 
@@ -56,7 +56,7 @@ anything it can:
 | Express backends in the manifest | **34** |
 | Overall criteria met | **100%** (260/260) |
 | Apps at 100% | **34 / 34** |
-| Tests | **1220** |
+| Tests | **1228** |
 | Apps with no test suite | **0** |
 
 Two notes on that test count, so it is not read as contradicting
@@ -105,11 +105,11 @@ anything else:
 | `vex` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 16 |
 | `vex-trading` | **100%** | 6/6 | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | 10 |
 | `void` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 142 |
-| `voidmagic` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 23 |
+| `voidmagic` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 28 |
 | `voken` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 37 |
 | `vsafe` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 17 |
 | `vulture-flix` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 12 |
-| `vulture-music` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 16 |
+| `vulture-music` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 19 |
 | `vulture-pods` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 12 |
 | `vulture-studios` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 14 |
 | `vxllage` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 13 |

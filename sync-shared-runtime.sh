@@ -138,7 +138,7 @@ STORE_BACKEND_TARGETS=("${PERSISTENCE_PG_TARGETS[@]}")
 # app that never calls it is exactly the unused copy the check at the
 # bottom of this script exists to catch.
 SETTLE_ONCE_TARGETS=(
-  vago dreams vulture-studios voken
+  vago dreams vulture-studios voken voidmagic vulture-music
 )
 
 MEDIA_TARGETS=(

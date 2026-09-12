@@ -25,6 +25,7 @@
 // a real, single-use, unguessable code, not a sequential id.
 
 const crypto = require('crypto');
+const { settleOnce } = require('./settleOnce');
 const { getExperience } = require('./experiences');
 const { createNotification } = require('./notifications');
 
@@ -56,16 +57,30 @@ async function bookExperience(store, options = {}) {
   if (!customerId) throw new Error('bookExperience requires a customerId');
   if (experience.remainingCapacity < 1) throw new Error(`bookExperience: experience ${experienceId} has no remaining capacity`);
 
-  if (experience.price > 0) {
-    if (typeof settleFn !== 'function') throw new Error('bookExperience requires a settleFn(fromUserId, toUserId, amount, reason) for a priced experience');
-    await settleFn(
-      [{ fromUserId: customerId, toUserId: VOID_MAGIC_ESCROW_ACCOUNT, amount: experience.price, reason: `voidmagic_booking:${experienceId}` }],
-      { reason: `voidmagic_booking:${experienceId}:${customerId}` },
-    );
+  if (experience.price > 0 && typeof settleFn !== 'function') {
+    throw new Error('bookExperience requires a settleFn(fromUserId, toUserId, amount, reason) for a priced experience');
   }
 
-  experience.remainingCapacity -= 1;
-  if (experience.remainingCapacity === 0) experience.status = 'full';
+  // **The seat is taken before the money moves.**
+  //
+  // This checked `remainingCapacity < 1`, awaited the payment, then
+  // decremented. Five concurrent bookings on a **one-seat** experience
+  // all passed the check, all paid, and all got a booking:
+  // **5 bookings for 1 seat, remainingCapacity at -4, 100 VCoin
+  // taken**. Four of those five people turn up to a meet-and-greet
+  // that has no room for them.
+  const remainingAfter = experience.remainingCapacity - 1;
+  const claim = { remainingCapacity: remainingAfter };
+  if (remainingAfter === 0) claim.status = 'full';
+
+  await settleOnce(experience, claim, async () => {
+    if (experience.price > 0) {
+      await settleFn(
+        [{ fromUserId: customerId, toUserId: VOID_MAGIC_ESCROW_ACCOUNT, amount: experience.price, reason: `voidmagic_booking:${experienceId}` }],
+        { reason: `voidmagic_booking:${experienceId}:${customerId}` },
+      );
+    }
+  });
 
   const booking = {
     id: store.nextBookingId++,
@@ -257,31 +272,53 @@ async function cancelBooking(store, options = {}) {
   const hoursUntilStart = (experience.scheduledAt - now) / 3600000;
   const refundEligible = hoursUntilStart >= CANCELLATION_CUTOFF_HOURS;
 
-  if (booking.pricePaid > 0) {
-    if (typeof settleFn !== 'function') throw new Error('cancelBooking requires a settleFn(legs, meta) for a priced booking');
-    if (refundEligible) {
-      await settleFn(
-        [{ fromUserId: VOID_MAGIC_ESCROW_ACCOUNT, toUserId: booking.customerId, amount: booking.pricePaid, reason: `voidmagic_cancellation_refund:${bookingId}` }],
-        { reason: `voidmagic_cancellation_refund:${bookingId}` },
-      );
-    } else {
-      const platformFee = round(booking.pricePaid * PLATFORM_TAKE_RATE);
-      const hostPayout = round(booking.pricePaid - platformFee);
-      await settleFn([
-        { fromUserId: VOID_MAGIC_ESCROW_ACCOUNT, toUserId: experience.hostId, amount: hostPayout, reason: `voidmagic_late_cancellation_host_settlement:${bookingId}` },
-        { fromUserId: VOID_MAGIC_ESCROW_ACCOUNT, toUserId: 'voidmagic-platform', amount: platformFee, reason: `voidmagic_late_cancellation_platform_fee:${bookingId}` },
-      ], { reason: `voidmagic_late_cancellation:${bookingId}` });
+  if (booking.pricePaid > 0 && typeof settleFn !== 'function') {
+    throw new Error('cancelBooking requires a settleFn(legs, meta) for a priced booking');
+  }
+
+  // **The booking is claimed cancelled before any money moves.**
+  //
+  // This settled, restored the seat, and only then wrote
+  // `status: 'cancelled'`. Five concurrent cancellations of one booking
+  // all passed the already-cancelled guard, and both money paths ran
+  // five times:
+  //
+  //   200h out (refundable)  100 VCoin refunded on a 20 booking
+  //     1h out (late)        100 VCoin paid to host and platform
+  //
+  // And the seat came back five times either way: **remainingCapacity
+  // went 4 -> 9 on an experience with a capacity of 5**, so one
+  // cancellation sold the host four seats their venue does not have.
+  //
+  // Claiming the booking is enough to close both, because the capacity
+  // restore now runs inside a block only one caller reaches. The
+  // restore is also bounded by `capacity` rather than incremented
+  // blindly — a counter that can exceed its own maximum is the same
+  // defect one layer down.
+  await settleOnce(booking, {
+    status: 'cancelled', cancelledAt: now, refunded: refundEligible,
+  }, async () => {
+    if (booking.pricePaid > 0) {
+      if (refundEligible) {
+        await settleFn(
+          [{ fromUserId: VOID_MAGIC_ESCROW_ACCOUNT, toUserId: booking.customerId, amount: booking.pricePaid, reason: `voidmagic_cancellation_refund:${bookingId}` }],
+          { reason: `voidmagic_cancellation_refund:${bookingId}` },
+        );
+      } else {
+        const platformFee = round(booking.pricePaid * PLATFORM_TAKE_RATE);
+        const hostPayout = round(booking.pricePaid - platformFee);
+        await settleFn([
+          { fromUserId: VOID_MAGIC_ESCROW_ACCOUNT, toUserId: experience.hostId, amount: hostPayout, reason: `voidmagic_late_cancellation_host_settlement:${bookingId}` },
+          { fromUserId: VOID_MAGIC_ESCROW_ACCOUNT, toUserId: 'voidmagic-platform', amount: platformFee, reason: `voidmagic_late_cancellation_platform_fee:${bookingId}` },
+        ], { reason: `voidmagic_late_cancellation:${bookingId}` });
+      }
     }
-  }
 
-  if (experience.status === 'open' || experience.status === 'full') {
-    experience.remainingCapacity += 1;
-    experience.status = 'open';
-  }
-
-  booking.status = 'cancelled';
-  booking.cancelledAt = now;
-  booking.refunded = refundEligible;
+    if (experience.status === 'open' || experience.status === 'full') {
+      experience.remainingCapacity = Math.min(experience.capacity, experience.remainingCapacity + 1);
+      experience.status = 'open';
+    }
+  });
 
   createNotification(store, {
     recipientId: booking.customerId,
