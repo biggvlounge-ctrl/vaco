@@ -51,6 +51,7 @@ const economy = require('./economy.js');
 const politics = require('./politics.js');
 const technology = require('./technology.js');
 const mortality = require('./mortality.js');
+const births = require('./births.js');
 const crime = require('./crime.js');
 const keys = require('./keys.js');
 const territory = require('./territory.js');
@@ -589,6 +590,17 @@ function advanceTick(worldState) {
   // consequence of every stage, which is exactly what a cross-cutting
   // layer is for. See server/mortality.js.
   candidateEvents.push(...mortality.runMortality(worldState, worldState.tick).events);
+
+  // Births, in the same cross-cutting slot and for the same reason: a
+  // birth and a death are the same kind of event about the same
+  // population, and neither is a stage of a tick.
+  //
+  // **After mortality on purpose.** Run before it and somebody can be
+  // born to a parent who dies earlier in the same tick — the child
+  // would exist, the historical record would name a parent who was
+  // already in `deceased`, and nothing would throw. See
+  // server/births.js.
+  candidateEvents.push(...births.runBirths(worldState, worldState.tick).events);
 
   const events = runEventPhase(worldState, candidateEvents);   // 9
   const historicalRecords = runHistoryPhase(worldState, events); // 10

@@ -66,13 +66,15 @@
 //                      `server/membership.js` now writes it and
 //                      `gangMembershipRate` is the read.
 //
-//   teenage pregnancy  There is no birth driver. `addFamilyMember`
-//                      exists and nothing calls it on its own, so no
-//                      birth happens unless code asks for one. A rate
-//                      needs births to count and an age structure to
-//                      count them against — the age structure now
-//                      exists (`mortality.ageInYears`), the births do
-//                      not.
+//   teenage pregnancy  **Built since, and no longer here.** The gap
+//                      was the birth driver — `addFamilyMember` existed
+//                      and nothing called it on its own, so no birth
+//                      happened unless code asked for one.
+//                      `server/births.js` is that driver, and
+//                      `statistics.js` reports the figure as
+//                      `teenage_birth_rate`/`teenage_birth_share`,
+//                      named for what it measures: this engine records
+//                      births, not pregnancies.
 //
 //   school dropout     `communities.education` is one number and there
 //                      are no schools, no students and no enrolment.
@@ -304,9 +306,6 @@ function describeDrift(worldState, communityId, options = {}) {
 // rather than a comment only a developer reads. Every entry names the
 // missing substrate, not just the missing number.
 const UNAVAILABLE = {
-  teenagePregnancy: 'there is no birth driver — addFamilyMember exists and nothing calls it '
-    + 'on its own. A rate needs births to count; the age structure to count them against '
-    + 'now exists.',
   schoolDropout: 'communities.education is one number. There are no schools, students or '
     + 'enrolment, so there is nothing to drop out of. §25 knowledge tiers are the substrate.',
   demographics: 'no demographic fields exist on an NPC. §9 permits demographic modelling and '

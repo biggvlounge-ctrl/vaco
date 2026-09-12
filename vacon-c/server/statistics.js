@@ -86,6 +86,7 @@
 'use strict';
 
 const areaStats = require('./areaStats.js');
+const births = require('./births.js');
 const crime = require('./crime.js');
 const economy = require('./economy.js');
 const membership = require('./membership.js');
@@ -255,16 +256,56 @@ const CATALOGUE = [
       return round(mean([...sizes.values()]), 2);
     },
   },
+  // **Both of these were declared unavailable and are now computed.**
+  // The reason given was the same for each — "there is no birth
+  // driver" — and `server/births.js` is that driver. Nothing about
+  // the entries changed except that they can answer.
   {
     key: 'birth_rate', category: 'population', unit: 'rate_per_1k', scope: 'community',
-    unavailable: 'there is no birth driver. `addFamilyMember` exists and nothing calls it on '
-      + 'its own, so no birth happens unless code asks for one. The age structure to count '
-      + 'births against now exists (mortality.ageInYears); the births do not.',
+    compute: (ctx) => per1k(births.birthsIn(ctx.worldState, ctx.communityId).length, ctx.population),
   },
   {
-    key: 'teenage_pregnancy_rate', category: 'population', unit: 'rate_per_1k', scope: 'community',
-    unavailable: 'the same missing birth driver, plus nothing linking a birth to the age of '
-      + 'the parent. Both halves are needed: a count of births, and the ages to count them at.',
+    key: 'teenage_birth_rate', category: 'population', unit: 'rate_per_1k', scope: 'community',
+    // Births to a parent under 20, per 1,000 residents. **Named
+    // `teenage_birth_rate` rather than `teenage_pregnancy_rate`**
+    // because that is what it measures: this engine records births,
+    // not pregnancies, and the two differ by every pregnancy that does
+    // not end in one. A name that promised the wider figure would
+    // report the narrower one under it forever.
+    compute: (ctx) => {
+      const born = births.birthsIn(ctx.worldState, ctx.communityId);
+      const teenage = born.filter((n) => {
+        const age = births.bearerAgeAt(ctx.worldState, n.id);
+        return age !== null && age < 20;
+      });
+      return per1k(teenage.length, ctx.population);
+    },
+  },
+  {
+    key: 'teenage_birth_share', category: 'population', unit: 'share', scope: 'community',
+    // The same count against births rather than against population,
+    // which is the figure that actually compares across areas of
+    // different age structure — a block of forty-year-olds has few
+    // births of any kind and would otherwise read as having solved
+    // something.
+    compute: (ctx) => {
+      const born = births.birthsIn(ctx.worldState, ctx.communityId);
+      if (born.length === 0) return null;
+      const teenage = born.filter((n) => {
+        const age = births.bearerAgeAt(ctx.worldState, n.id);
+        return age !== null && age < 20;
+      });
+      return share(teenage.length, born.length);
+    },
+  },
+  {
+    key: 'mean_generation', category: 'population', unit: 'count', scope: 'community',
+    // `npcs.generation` was 1 for every NPC in every world because
+    // nothing could advance it. It moves now, and how far a population
+    // has moved from its founders is the thing §51's legacy is about.
+    compute: (ctx) => round(mean(ctx.residents
+      .map((n) => Number(n.generation))
+      .filter((g) => Number.isFinite(g))), 2),
   },
   {
     key: 'migration_rate', category: 'population', unit: 'rate_per_1k', scope: 'community',

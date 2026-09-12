@@ -34,9 +34,15 @@ const { randomTraitValue } = require('./traits.js');
 // traits, or vice versa). Mirrors what generateTraitSheet() used to do
 // directly for individuals, now going through the definition/instance
 // split and generalized to any tier.
-function generateEntityTraits(entityId, tick, definitions) {
+// `valueFor` is optional and defaults to a fresh random roll, which is
+// what generation has always meant here. It exists so a trait sheet
+// can be built from something other than chance without duplicating
+// this row shape — `server/births.js` passes a function that blends
+// the two parents' LIVE values, because a child who rolled fresh
+// traits would make lineage decorative.
+function generateEntityTraits(entityId, tick, definitions, valueFor = null) {
   return definitions.map((def) => {
-    const value = randomTraitValue();
+    const value = valueFor === null ? randomTraitValue() : valueFor(def);
     return {
       entity_id: entityId,
       trait_id: def.trait_id,

@@ -268,9 +268,9 @@ test('every statistic this cannot compute names its missing substrate', () => {
   // missing — a resident to a faction — was
   // `entity_organization_memberships`, a table the schema had carried
   // since the first version with no code touching it.
-  assert.deepEqual(keys.sort(), [
-    'demographics', 'schoolDropout', 'teenagePregnancy',
-  ]);
+  // And `teenagePregnancy` has gone the same way: the missing piece
+  // was the birth driver, and server/births.js is it.
+  assert.deepEqual(keys.sort(), ['demographics', 'schoolDropout']);
   for (const [key, reason] of Object.entries(areaStats.UNAVAILABLE)) {
     assert.ok(reason.length > 60, `${key} has no real explanation`);
   }

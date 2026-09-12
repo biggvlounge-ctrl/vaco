@@ -91,13 +91,17 @@ const SYSTEMS = [
     functions: [
       'generateNPC', 'generateFamily', 'addFamilyMember',
       'ageInYears', 'runMortality', 'recordDeath', 'killEntity',
+      'bearChild', 'runBirths', 'fertilePartnerships',
     ],
     note: '**Aging and death built 12 Sep 2026.** Before that `property.age` was the only '
       + 'thing in the engine that incremented — buildings decayed and people were immortal. '
       + 'Age is computed from `createdTick` (a tick is a day); death moves the row out of '
       + '`worldState.npcs` rather than setting a flag, so a corpse is structurally incapable '
       + 'of working or voting; and every death is a seeded draw, so §88\'s world seed still '
-      + 'replays. `households` and `migration_events` remain schema-only.',
+      + 'replays. **Births followed on 12 Sep 2026** and closed the other end: a population that '
+      + 'could only shrink now bears children who inherit their parents\' live traits, and '
+      + '`npcs.generation` — 1 for every NPC in every world because nothing could advance it '
+      + '— moves. `households` and `migration_events` remain schema-only.',
   },
   {
     n: 2,
