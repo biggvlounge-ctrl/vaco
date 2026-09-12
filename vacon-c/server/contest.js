@@ -88,6 +88,38 @@ const DISCIPLINES = {
     },
     social: { 'Group Loyalty': 1 },
   },
+
+  // **The house games** — pool, darts, horseshoes, anything where a
+  // steady hand and a good eye decide it. Added because a settlement
+  // that has rebuilt far enough to have a table in a room is a
+  // settlement with a social life, and this engine could already
+  // resolve a knife fight and a footrace but not a game of pool.
+  //
+  // `Vision Acuity` carries the most weight and only appears here:
+  // it is generated on every NPC and was read by nothing, the same
+  // dead-trait pattern `contest.js` was originally written to fix.
+  // Endurance and Strength are deliberately absent — a frail person
+  // with a good eye should win.
+  precision: {
+    physical: { 'Vision Acuity': 3, Reflexes: 1.5, Agility: 1 },
+    sports: { Coordination: 3 },
+    mental: { Focus: 2 },
+  },
+
+  // **Cards, dominoes, board games** — nerve and reading the table.
+  // `Risk Assessment` rather than an inverted Impulsivity, because
+  // `rateEntity` averages by weight sum and a negative weight would
+  // corrupt the divisor rather than penalising the trait.
+  //
+  // Charisma is here at low weight and is not a joke: a card game is
+  // partly a performance, and this is the one discipline where
+  // persuading somebody of something false is a skill.
+  wits: {
+    mental: {
+      'Risk Assessment': 3, Memory: 2.5, Focus: 2, 'Problem Solving': 2,
+    },
+    social: { Charisma: 1 },
+  },
 };
 
 const DISCIPLINE_NAMES = Object.keys(DISCIPLINES);

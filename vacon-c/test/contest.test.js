@@ -365,3 +365,108 @@ test('the engine exposes contests bound to its own WorldState', () => {
   assert.equal(engine.verifyContest(r).reproduced, true);
   assert.ok(engine.rateEntity(a.id, 'sport').rating >= 0);
 });
+
+// ---------------------------------------------------------------------------
+// The house games — precision and wits
+// ---------------------------------------------------------------------------
+// Added because a settlement that has rebuilt far enough to have a table
+// in a room has a social life, and this engine could already resolve a
+// knife fight and a footrace but not a game of pool.
+
+test('pool is won by a good eye, not by a strong back', () => {
+  // **The point of a separate discipline.** Endurance and Strength are
+  // deliberately absent from `precision`, so a frail person with a
+  // steady hand beats a powerful one who cannot see the shot. Rating
+  // them under `combat` would have inverted that.
+  const sharp = fighter({
+    physical: { 'Vision Acuity': 95, Reflexes: 80, Agility: 60, Strength: 10, Endurance: 10 },
+    sports: { Coordination: 90 },
+    mental: { Focus: 85 },
+  });
+  const strong = fighter({
+    physical: { 'Vision Acuity': 15, Reflexes: 30, Agility: 40, Strength: 95, Endurance: 95 },
+    sports: { Coordination: 25 },
+    mental: { Focus: 20 },
+  });
+
+  const precisionRating = contest.rateEntity(engine.WorldState, sharp.id, 'precision');
+  const strongRating = contest.rateEntity(engine.WorldState, strong.id, 'precision');
+  assert.ok(precisionRating.rating > strongRating.rating,
+    `sharp ${precisionRating.rating} should beat strong ${strongRating.rating} at pool`);
+
+  // **Distinctness asserted structurally, not by a second rating.**
+  // The first version compared the same two fighters under `combat`
+  // and expected the strong one to win — and `combat` weights four
+  // combat-family traits at 9 of its ~14 total, which `fighter()`
+  // leaves randomly generated. The comparison was noise wearing an
+  // assertion's clothes, which is CLAUDE.md's eighth standing rule:
+  // a test whose subject is randomly generated is not testing what it
+  // says.
+  //
+  // What actually matters is that the two disciplines read different
+  // traits, and that is deterministic.
+  const combatReads = Object.keys(
+    contest.rateEntity(engine.WorldState, strong.id, 'combat').contributions,
+  );
+  const precisionReads = Object.keys(precisionRating.contributions);
+  assert.ok(combatReads.includes('physical.Strength'), 'combat should read Strength');
+  assert.equal(precisionReads.includes('physical.Strength'), false,
+    'precision reads Strength — a powerful player would win at pool for the wrong reason');
+  assert.equal(precisionReads.includes('physical.Endurance'), false);
+});
+
+test('Vision Acuity was a dead trait and now decides something', () => {
+  // Generated on every NPC and read by nothing, which is the exact
+  // pattern `contest.js` was originally written to fix for `combat`
+  // and `sports`. `precision` is the only discipline that reads it.
+  const contributions = Object.keys(
+    contest.rateEntity(engine.WorldState, fighter().id, 'precision').contributions,
+  );
+  assert.ok(contributions.includes('physical.Vision Acuity'));
+
+  for (const discipline of ['combat', 'sport', 'teamSport', 'wits']) {
+    const other = Object.keys(
+      contest.rateEntity(engine.WorldState, fighter().id, discipline).contributions,
+    );
+    assert.equal(other.includes('physical.Vision Acuity'), false,
+      `${discipline} also reads Vision Acuity — precision is not distinct`);
+  }
+});
+
+test('cards are won by nerve and memory, and read no physical trait at all', () => {
+  const player = fighter({
+    mental: {
+      'Risk Assessment': 90, Memory: 85, Focus: 80, 'Problem Solving': 75,
+    },
+    social: { Charisma: 70 },
+  });
+  const rating = contest.rateEntity(engine.WorldState, player.id, 'wits');
+  assert.ok(rating.rating > 60);
+
+  // A card game is not athletics. If a physical trait ever appears
+  // here, somebody has made `wits` a general-purpose discipline.
+  for (const key of Object.keys(rating.contributions)) {
+    assert.equal(key.startsWith('physical.'), false, `wits reads ${key}`);
+    assert.equal(key.startsWith('sports.'), false, `wits reads ${key}`);
+  }
+});
+
+test('a house game resolves and re-verifies like any other contest', () => {
+  // The whole reason to express pool as a discipline rather than as a
+  // new subsystem: everything `resolveContest` already guarantees —
+  // a seeded, replayable, re-verifiable result — comes free.
+  const a = fighter({ physical: { 'Vision Acuity': 90 }, sports: { Coordination: 85 } });
+  const b = fighter({ physical: { 'Vision Acuity': 30 }, sports: { Coordination: 35 } });
+
+  const result = contest.resolveContest(engine.WorldState, {
+    contestId: 'pool-1', participantIds: [a.id, b.id], discipline: 'precision',
+  });
+  assert.ok([a.id, b.id].includes(result.winnerId));
+  assert.equal(contest.verifyContest(engine.WorldState, result).reproduced, true,
+    'a house game result cannot be re-verified');
+
+  const again = contest.resolveContest(engine.WorldState, {
+    contestId: 'pool-1', participantIds: [a.id, b.id], discipline: 'precision',
+  });
+  assert.equal(again.winnerId, result.winnerId, 'the same game played out differently');
+});
