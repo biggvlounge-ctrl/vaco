@@ -22,7 +22,9 @@
 // is distributed proportionally among winning-side holders by their
 // share of the winning side's total quantity. This is solvent by
 // construction -- total paid out can never exceed the real pool that
-// was actually collected -- unlike a naive "pay $1/contract" promise,
+// was actually collected, **once** (the arithmetic was always solvent;
+// the resolution was not, until `settleOnce` was added on 12 Sep 2026 —
+// five concurrent resolutions each paid the whole pool out) -- unlike a naive "pay $1/contract" promise,
 // which is NOT solvent unless a real matching engine guarantees every
 // contract was funded by a real, equal, opposing stake (verified the
 // hard way: an earlier draft of this module tried the fixed-$1
@@ -47,6 +49,7 @@
 // that it's Kalshi's exact published multiplier.
 
 const { VAGO_HOUSE_ACCOUNT } = require('./casinoSession');
+const { settleOnce } = require('./settleOnce');
 
 const MARKET_SOURCES = ['real-world', 'vdp-in-world', 'vacancy-in-game'];
 const MARKET_SIDES = ['yes', 'no'];
@@ -304,25 +307,28 @@ async function resolveMarket(store, options = {}) {
   const totalWinningQuantity = winningContracts.reduce((sum, c) => sum + c.quantity, 0);
   const totalPool = round(market.yesPool + market.noPool);
 
+  // **Claimed before a single leg moves.** The pool arithmetic is
+  // solvent by construction; the *resolution* was not, because the
+  // status was written after the payout loop. Five concurrent calls
+  // each paid the whole pool: 86.00 out of a 17.20 pool, measured.
   const payouts = [];
-  if (totalWinningQuantity > 0 && totalPool > 0) {
-    for (const contract of winningContracts) {
-      const share = contract.quantity / totalWinningQuantity;
-      const payout = round(totalPool * share);
-      if (payout > 0) {
-        await settleFn(
-          [{ fromUserId: VAGO_HOUSE_ACCOUNT, toUserId: contract.userId, amount: payout, reason: `vago_prediction_payout:${marketId}` }],
-          { reason: `vago_prediction_payout:${marketId}` },
-        );
-        payouts.push({ userId: contract.userId, payout });
+  await settleOnce(market, {
+    status: 'resolved', resolved: true, outcome, finalPool: totalPool,
+  }, async () => {
+    if (totalWinningQuantity > 0 && totalPool > 0) {
+      for (const contract of winningContracts) {
+        const share = contract.quantity / totalWinningQuantity;
+        const payout = round(totalPool * share);
+        if (payout > 0) {
+          await settleFn(
+            [{ fromUserId: VAGO_HOUSE_ACCOUNT, toUserId: contract.userId, amount: payout, reason: `vago_prediction_payout:${marketId}` }],
+            { reason: `vago_prediction_payout:${marketId}` },
+          );
+          payouts.push({ userId: contract.userId, payout });
+        }
       }
     }
-  }
-
-  market.status = 'resolved';
-  market.resolved = true;
-  market.outcome = outcome;
-  market.finalPool = totalPool;
+  });
   return { market, payouts };
 }
 

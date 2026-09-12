@@ -25,6 +25,7 @@
 // not trusted from the request body.
 
 const { VAGO_HOUSE_ACCOUNT } = require('./casinoSession');
+const { settleOnce } = require('./settleOnce');
 
 const MATCH_STATUSES = ['scheduled', 'live', 'resolved'];
 
@@ -98,24 +99,24 @@ async function resolveEsportsMatch(store, options = {}) {
   const winningStakes = match.stakes.filter((s) => s.backedPlayerId === winnerId);
   const totalWinningAmount = round(winningStakes.reduce((sum, s) => sum + s.amountVCoin, 0));
 
+  // Claimed before the payout loop. Five concurrent resolutions each
+  // paid the whole pool: 200.00 out of a 40.00 pool, measured.
   const payouts = [];
-  if (totalWinningAmount > 0 && totalPool > 0) {
-    for (const stake of winningStakes) {
-      const share = stake.amountVCoin / totalWinningAmount;
-      const payout = round(totalPool * share);
-      if (payout > 0) {
-        await settleFn(
-          [{ fromUserId: VAGO_HOUSE_ACCOUNT, toUserId: stake.userId, amount: payout, reason: `vago_esports_payout:${matchId}` }],
-          { reason: `vago_esports_payout:${matchId}` },
-        );
-        payouts.push({ userId: stake.userId, payout });
+  await settleOnce(match, { status: 'resolved', winnerId, finalPool: totalPool }, async () => {
+    if (totalWinningAmount > 0 && totalPool > 0) {
+      for (const stake of winningStakes) {
+        const share = stake.amountVCoin / totalWinningAmount;
+        const payout = round(totalPool * share);
+        if (payout > 0) {
+          await settleFn(
+            [{ fromUserId: VAGO_HOUSE_ACCOUNT, toUserId: stake.userId, amount: payout, reason: `vago_esports_payout:${matchId}` }],
+            { reason: `vago_esports_payout:${matchId}` },
+          );
+          payouts.push({ userId: stake.userId, payout });
+        }
       }
     }
-  }
-
-  match.status = 'resolved';
-  match.winnerId = winnerId;
-  match.finalPool = totalPool;
+  });
   return { match, payouts };
 }
 

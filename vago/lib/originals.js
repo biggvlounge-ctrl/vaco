@@ -38,6 +38,7 @@ const {
 } = require('./provablyFair');
 const { getCasinoSession, VAGO_HOUSE_ACCOUNT } = require('./casinoSession');
 const { creditGoldCoin } = require('./goldCoin');
+const { settleOnce } = require('./settleOnce');
 
 const ORIGINALS_RTP = 0.99; // Stake's own real, advertised Originals RTP (1% house edge)
 
@@ -165,23 +166,11 @@ function claimSession(store, sessionId) {
 // idempotency key with an INSERT before the handler runs rather than
 // recording it afterwards. Record-after is always a race.
 async function settleRoundOnce(round_, { status, payout, extra = {}, pay }) {
-  const previous = { status: round_.status, payout: round_.payout ?? null, resolvedAt: round_.resolvedAt ?? null };
-
-  round_.status = status;
-  round_.payout = payout;
-  round_.resolvedAt = Date.now();
-  Object.assign(round_, extra);
-
-  try {
-    await pay();
-  } catch (err) {
-    round_.status = previous.status;
-    round_.payout = previous.payout;
-    round_.resolvedAt = previous.resolvedAt;
-    for (const key of Object.keys(extra)) delete round_[key];
-    throw err;
-  }
-  return round_;
+  // Delegates to `settleOnce`, which every other settlement in this app
+  // now shares. This was the first place the claim-before-settle fix
+  // landed; the shared version arrived once the same race turned up in
+  // four more functions, and one implementation is the point.
+  return settleOnce(round_, { status, payout, resolvedAt: Date.now(), ...extra }, pay);
 }
 
 function publicRoundView(round_) {

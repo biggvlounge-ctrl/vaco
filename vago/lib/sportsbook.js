@@ -21,6 +21,7 @@
 // genuinely need it).
 
 const { VAGO_HOUSE_ACCOUNT } = require('./casinoSession');
+const { settleOnce } = require('./settleOnce');
 
 const SPORTS_EVENT_STATUSES = ['open', 'settled'];
 const SPORTS_BET_STATUSES = ['pending', 'won', 'lost'];
@@ -167,21 +168,29 @@ async function settleSportsEvent(store, options = {}) {
 
   const eventBets = store.sportsBets.filter((b) => b.eventId === eventId && b.status === 'pending');
   const settledBets = [];
-  for (const bet of eventBets) {
-    if (bet.outcomeId === winningOutcomeId) {
-      await settleFn(
-        [{ fromUserId: VAGO_HOUSE_ACCOUNT, toUserId: bet.userId, amount: bet.potentialPayout, reason: `vago_sports_payout:${eventId}` }],
-        { reason: `vago_sports_payout:${eventId}` },
-      );
-      bet.status = 'won';
-    } else {
-      bet.status = 'lost';
-    }
-    settledBets.push(bet);
-  }
 
-  event.status = 'settled';
-  event.winningOutcomeId = winningOutcomeId;
+  // **The widest window of any settlement here, and the worst to leave
+  // open.** This pays in a loop with an await per winning bet, so the
+  // gap between the status check above and the status write below grew
+  // with the number of bets on the event. Five concurrent settlements
+  // on a three-bet event paid 250.05 instead of 50.01.
+  //
+  // Claiming the event first closes it: the second caller sees
+  // `settled` and throws before reaching the loop.
+  await settleOnce(event, { status: 'settled', winningOutcomeId }, async () => {
+    for (const bet of eventBets) {
+      if (bet.outcomeId === winningOutcomeId) {
+        await settleFn(
+          [{ fromUserId: VAGO_HOUSE_ACCOUNT, toUserId: bet.userId, amount: bet.potentialPayout, reason: `vago_sports_payout:${eventId}` }],
+          { reason: `vago_sports_payout:${eventId}` },
+        );
+        bet.status = 'won';
+      } else {
+        bet.status = 'lost';
+      }
+      settledBets.push(bet);
+    }
+  });
   return { event, settledBets };
 }
 

@@ -43,6 +43,7 @@
 // too -- the same real tradeoff DK's own product makes.
 
 const { VAGO_HOUSE_ACCOUNT } = require('./casinoSession');
+const { settleOnce } = require('./settleOnce');
 
 const PICK_DIRECTIONS = ['more', 'less'];
 const PROP_STATUSES = ['open', 'resolved'];
@@ -266,12 +267,15 @@ async function gradeFantasyEntry(store, options = {}) {
   }
 
   const payout = round(entry.stakeAmount * multiplier);
-  await settleFn(
-    [{ fromUserId: VAGO_HOUSE_ACCOUNT, toUserId: entry.userId, amount: payout, reason: 'vago_fantasy_entry_payout' }],
-    { reason: 'vago_fantasy_entry_payout' },
-  );
-  entry.status = 'won';
-  entry.payout = payout;
+
+  // Claimed before the payout. Five concurrent gradings each paid the
+  // full winning amount: 150.00 on a 10.00 stake, measured.
+  await settleOnce(entry, { status: 'won', payout }, async () => {
+    await settleFn(
+      [{ fromUserId: VAGO_HOUSE_ACCOUNT, toUserId: entry.userId, amount: payout, reason: 'vago_fantasy_entry_payout' }],
+      { reason: 'vago_fantasy_entry_payout' },
+    );
+  });
   return entry;
 }
 
