@@ -70,20 +70,81 @@ function computeTradingFee(price, quantity) {
   return round(TRADING_FEE_RATE * quantity * price * (1 - price));
 }
 
+// **Virtual liquidity, and the risk-free money pump it closes.**
+//
+// The price used to be `yesPool / (yesPool + noPool)`, bootstrapped at
+// 50c when both pools were empty. That is correct at volume and badly
+// wrong at zero, because the *first* trade in a market sets the price
+// to an extreme on its own:
+//
+//   alice buys 10 yes at 0.50        -> pays 5, yesPool = 5, noPool = 0
+//   price is now 5/5 = 1.00          -> clamped to 0.99
+//   alice sells the same 10 at 0.99  -> receives 9.90
+//
+// Net: **+4.72 VCoin risk-free** after the fee, from a market with no
+// other participant, repeatable until the house account is empty.
+// Measured, not reasoned about. The pool clamps to zero, so the loss
+// lands on the house rather than on another trader, which is how it
+// stayed invisible.
+//
+// This is the same insolvency class the header above describes being
+// fixed at resolution. It had simply moved to `sell`.
+//
+// The fix is a virtual stake `k` at the market's opening price, mixed
+// into the *displayed* price only:
+//
+//   yes = (yesPool + k*p0) / (yesPool + noPool + k)
+//
+// A new market prices at p0. Real stake moves it from there, and its
+// influence grows as real volume grows, so the first trade no longer
+// swings the price to a bound. That is a Bayesian prior with `k` as
+// its weight, and it is the standard answer to this cold-start shape.
+//
+// **`k` is virtual and must stay that way.** It never enters `yesPool`
+// or `noPool`, so `resolveMarket` still distributes exactly the real
+// stake collected and remains solvent by construction. Adding `k` to
+// the pools instead would promise money nobody paid in — which is the
+// original bug wearing a new hat.
+const VIRTUAL_LIQUIDITY = 25;
+const DEFAULT_OPENING_PRICE = 0.5;
+
+function openingPriceOf(market) {
+  // Markets created before opening prices existed carry none. 50c is
+  // what they were bootstrapped at, so that is what they keep.
+  const p = market.openingYesPrice;
+  return Number.isFinite(p) ? clamp(p, MIN_PRICE, MAX_PRICE) : DEFAULT_OPENING_PRICE;
+}
+
 function getMarketPrice(market) {
-  const total = market.yesPool + market.noPool;
-  const yesPrice = total === 0 ? 0.5 : clamp(market.yesPool / total, MIN_PRICE, MAX_PRICE);
+  const k = VIRTUAL_LIQUIDITY;
+  const p0 = openingPriceOf(market);
+  const total = market.yesPool + market.noPool + k;
+  const yesPrice = clamp((market.yesPool + k * p0) / total, MIN_PRICE, MAX_PRICE);
   return { yesPrice: round(yesPrice), noPrice: round(1 - yesPrice) };
 }
 
+// `openingYesPrice` is the market's starting probability, and the whole
+// point of it is that somebody can supply one that is better than a
+// coin flip. `sportsbook.js` derives it from the house line on the same
+// event, so a paired market opens at the bookmaker's own number instead
+// of at 50c on a game nobody thinks is even. Omit it and a market opens
+// at 50c exactly as before.
+//
+// It is a *starting* price only. Real stake moves it immediately, and
+// it never enters a pool, so it cannot affect what anybody is paid.
 function createPredictionMarket(store, options = {}) {
-  const { question, category, source, creatorId } = options;
+  const { question, category, source, creatorId, openingYesPrice, linkedEventId } = options;
   if (!question) throw new Error('createPredictionMarket requires a question');
   if (!category) throw new Error('createPredictionMarket requires a category');
   if (!MARKET_SOURCES.includes(source)) {
     throw new Error(`createPredictionMarket: invalid source "${source}" (expected one of ${MARKET_SOURCES.join(', ')})`);
   }
   if (!creatorId) throw new Error('createPredictionMarket requires a creatorId');
+  if (openingYesPrice !== undefined) {
+    if (!Number.isFinite(openingYesPrice) || openingYesPrice < MIN_PRICE || openingYesPrice > MAX_PRICE) {
+      throw new Error(`createPredictionMarket: openingYesPrice must be between ${MIN_PRICE} and ${MAX_PRICE}`);
+    }
+  }
 
   const market = {
     id: store.nextMarketId++,
@@ -91,6 +152,10 @@ function createPredictionMarket(store, options = {}) {
     category,
     source,
     creatorId,
+    openingYesPrice: openingYesPrice === undefined ? DEFAULT_OPENING_PRICE : round(openingYesPrice),
+    // Set when this market was opened alongside a sportsbook event, so
+    // the two can be shown together. Null for a standalone market.
+    linkedEventId: linkedEventId || null,
     yesPool: 0,
     noPool: 0,
     contracts: [], // [{ userId, side, quantity, avgPrice }]
@@ -183,12 +248,32 @@ async function sellContract(store, options = {}) {
 
   const { yesPrice, noPrice } = getMarketPrice(market);
   const price = side === 'yes' ? yesPrice : noPrice;
-  const proceeds = round(quantity * price);
 
-  await settleFn(
-    [{ fromUserId: VAGO_HOUSE_ACCOUNT, toUserId: userId, amount: proceeds, reason: `vago_prediction_sell:${marketId}` }],
-    { reason: `vago_prediction_sell:${marketId}` },
-  );
+  // **A sell can never pay out more than that side's pool holds.**
+  //
+  // Virtual liquidity above stops the price swinging to a bound on the
+  // first trade, which removes the large risk-free round trip. It does
+  // not make the payout *bounded*, and an unbounded payout against a
+  // finite pool is a house loss waiting for someone to find the right
+  // sequence. `Math.max(0, pool - proceeds)` clamped the bookkeeping
+  // while the money had already left — the pool read zero and the house
+  // was simply short.
+  //
+  // So the proceeds are capped at the real stake on that side. Same
+  // principle `resolveMarket` already follows: you can only ever pay
+  // out what was actually collected. A seller asking for more than the
+  // pool holds gets the pool, and the market says so rather than
+  // quietly paying a different number than the price implies.
+  const sidePool = side === 'yes' ? market.yesPool : market.noPool;
+  const requested = round(quantity * price);
+  const proceeds = round(Math.min(requested, sidePool));
+
+  if (proceeds > 0) {
+    await settleFn(
+      [{ fromUserId: VAGO_HOUSE_ACCOUNT, toUserId: userId, amount: proceeds, reason: `vago_prediction_sell:${marketId}` }],
+      { reason: `vago_prediction_sell:${marketId}` },
+    );
+  }
 
   if (side === 'yes') market.yesPool = round(Math.max(0, market.yesPool - proceeds));
   else market.noPool = round(Math.max(0, market.noPool - proceeds));
@@ -198,7 +283,7 @@ async function sellContract(store, options = {}) {
     market.contracts = market.contracts.filter((c) => c !== contract);
   }
 
-  return { market, price, proceeds };
+  return { market, price, proceeds, requested, capped: proceeds < requested };
 }
 
 // Pari-mutuel-style pooled settlement, solvent by construction: the

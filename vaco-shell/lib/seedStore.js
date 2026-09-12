@@ -32,6 +32,60 @@ const PAID_LISTINGS = {
   'vacon-c': { pricingModel: 'one-time', priceVcoin: 30 },
 };
 
+//: **Free was a fallthrough, and now it is a decision.**
+//:
+//: Every app not in `PAID_LISTINGS` above was priced at 0 by the `paid
+//: ? ... : 'free'` default below — 32 of the 36. That produced the
+//: right prices for the wrong reason: an app added tomorrow would also
+//: be free, silently, because nobody had thought about it rather than
+//: because somebody had.
+//:
+//: So every app is now named here with the reason it costs nothing,
+//: under the same rule the paid table uses:
+//:
+//:   transacts       it earns inside itself and the store already takes
+//:                   a cut, so charging admission would charge twice
+//:   infrastructure  a service other apps call, not merchandise — "install
+//:                   the ledger" is not a thing to sell a customer
+//:
+//: `scripts/test/store-pricing.test.mjs` requires the union of this and
+//: `PAID_LISTINGS` to cover the registry exactly, so a new app cannot be
+//: priced by omission.
+const FREE_LISTINGS = {
+  vdp: 'transacts',
+  venvs: 'transacts',
+  hvntz: 'transacts',
+  dreams: 'transacts',
+  void: 'transacts',
+  voidmagic: 'transacts',
+  voken: 'transacts',
+  cvltvre: 'transacts',
+  vado: 'transacts',
+  vago: 'transacts',
+  vxllage: 'transacts',
+  cvnvo: 'transacts',
+  yap: 'transacts',
+  chopz: 'transacts',
+  'chopz-shop': 'transacts',
+  vacay: 'transacts',
+  'vulture-music': 'transacts',
+  'vulture-flix': 'transacts',
+  'vulture-pods': 'transacts',
+  'vulture-studios': 'transacts',
+  'vavlt-stvdios': 'transacts',
+  v3: 'infrastructure',
+  vaca: 'infrastructure',
+  shield: 'infrastructure',
+  vacon: 'infrastructure',
+  vsafe: 'infrastructure',
+  'v4-proxy': 'infrastructure',
+  'v4-search': 'infrastructure',
+  'vaco-audit': 'infrastructure',
+  'vaco-operator': 'infrastructure',
+  'vaco-media': 'infrastructure',
+  'vaco-notify': 'infrastructure',
+};
+
 //: Flagged interpretive: the publisher of every first-party app. In
 //: the corporate structure (`dev-docs/CORPORATE_STRUCTURE.md`) these
 //: apps sit under VEGA, so that is where publisher revenue settles.
@@ -66,6 +120,13 @@ export function seedStore(store) {
     for (const registryApp of APPS) {
       if (NOT_LISTED.has(registryApp.id)) continue;
       const paid = PAID_LISTINGS[registryApp.id];
+      // An app in neither table has no pricing decision behind it.
+      // Refuse rather than default it to free: a price nobody chose is
+      // how every app after this one quietly ends up costing nothing.
+      if (!paid && !FREE_LISTINGS[registryApp.id]) {
+        throw new Error(`seedStore: no pricing decision for "${registryApp.id}" - add it `
+          + 'to PAID_LISTINGS or FREE_LISTINGS in vaco-shell/lib/seedStore.js');
+      }
       publishListing(store, {
         appId: registryApp.id,
         publisherId: FIRST_PARTY_PUBLISHER,
@@ -84,4 +145,4 @@ export function seedStore(store) {
   return store;
 }
 
-export { PAID_LISTINGS, FIRST_PARTY_PUBLISHER, SEED_MERCH };
+export { PAID_LISTINGS, FREE_LISTINGS, FIRST_PARTY_PUBLISHER, SEED_MERCH };

@@ -46,6 +46,61 @@ function computeAmericanOddsPayout(odds, stake) {
   return { profit, totalPayout: round(stake + profit) };
 }
 
+// -- Odds as a percentage -------------------------------------------------
+//
+// **`-150` is opaque and `60%` is not**, and the two are the same
+// statement. Every posted line already implies a probability; showing
+// it is a display change, not a new mechanic, and it is most of what
+// makes a Polymarket or Kalshi board readable at a glance.
+//
+// The standard conversions, not invented:
+//   negative (favorite):  |odds| / (|odds| + 100)
+//   positive (underdog):  100 / (odds + 100)
+function impliedProbability(odds) {
+  if (!isValidAmericanOdds(odds)) {
+    throw new Error(`impliedProbability: invalid American odds "${odds}"`);
+  }
+  const p = odds < 0 ? Math.abs(odds) / (Math.abs(odds) + 100) : 100 / (odds + 100);
+  return Math.round(p * 10000) / 10000;
+}
+
+// **These do not sum to 1, and saying so is the honest part.**
+//
+// A bookmaker's posted odds embed the vig, so the raw implied
+// probabilities across an event's outcomes total *more* than 100% --
+// that excess is the house margin. Showing raw numbers labelled
+// "probability" would tell a user that a two-outcome game is 105%
+// likely to happen, which is not a rounding artefact, it is the price
+// of the book.
+//
+// So both are returned: `implied` as posted, and `fair` with the margin
+// divided out proportionally (the standard multiplicative de-vig). A
+// market seeded from a house line must use `fair`, because seeding with
+// the vig baked in would open every market biased toward the favorite
+// by the house's own margin.
+function eventProbabilities(outcomes) {
+  if (!Array.isArray(outcomes) || outcomes.length < 2) {
+    throw new Error('eventProbabilities requires at least 2 outcomes');
+  }
+  const implied = outcomes.map((o) => impliedProbability(o.odds));
+  const overround = implied.reduce((sum, p) => sum + p, 0);
+  return outcomes.map((o, i) => ({
+    outcomeId: o.outcomeId,
+    label: o.label,
+    odds: o.odds,
+    impliedProbability: implied[i],
+    fairProbability: Math.round((implied[i] / overround) * 10000) / 10000,
+  }));
+}
+
+// The house margin on an event, as a percentage. 0 would be a book with
+// no edge, which no real bookmaker posts.
+function eventOverround(outcomes) {
+  const implied = outcomes.map((o) => impliedProbability(o.odds));
+  const total = implied.reduce((sum, p) => sum + p, 0);
+  return Math.round((total - 1) * 10000) / 10000;
+}
+
 function createSportsEvent(store, options = {}) {
   const { eventId, description, outcomes } = options;
   if (!eventId) throw new Error('createSportsEvent requires an eventId');
@@ -135,6 +190,9 @@ module.exports = {
   SPORTS_BET_STATUSES,
   isValidAmericanOdds,
   computeAmericanOddsPayout,
+  impliedProbability,
+  eventProbabilities,
+  eventOverround,
   createSportsEvent,
   getSportsEvent,
   placeSportsBet,

@@ -32,9 +32,11 @@ const {
 const {
   MARKET_SOURCES, MARKET_SIDES, MIN_PRICE, MAX_PRICE,
   createPredictionMarket, getPredictionMarket, listMarketsBySource, buyContract, sellContract, resolveMarket,
+  getMarketPrice,
 } = require('./lib/predictionMarkets');
 const {
   createSportsEvent, getSportsEvent, placeSportsBet, getSportsBet, settleSportsEvent,
+  eventProbabilities, eventOverround,
 } = require('./lib/sportsbook');
 const {
   MATCH_STATUSES, createEsportsMatch, getEsportsMatch, startEsportsMatch, placeStake, resolveEsportsMatch,
@@ -510,18 +512,65 @@ app.get('/api/predictions/vacancy', (_req, res) => {
   res.json({ markets: listMarketsBySource(store, 'vacancy-in-game') });
 });
 
+// **The house line and the market, on one event.**
+//
+// The two mechanics were built deliberately apart — a bookmaker that
+// takes the other side, and a peer market that prices itself — and they
+// stay apart. What was missing was any connection at all: an event and
+// a market were unrelated records, so the market on a game nobody
+// thinks is even still opened at 50c.
+//
+// `withMarket: true` opens a paired market whose starting price is the
+// **de-vigged** probability of the first outcome. De-vigged matters: the
+// posted odds carry the house margin, and seeding with it baked in
+// would open every market tilted toward the favorite by the book's own
+// edge.
+//
+// The seeding is a starting price and nothing else. It puts no money in
+// the pool, so `resolveMarket` still distributes only real stake and
+// stays solvent by construction. The bookmaker's number is a first
+// opinion; the first real trade is entitled to disagree with it.
+//
+// The wiring lives here rather than inside either module, so neither
+// has to know the other exists.
 app.post('/api/sports/events', requireCallingService(), (req, res) => {
   try {
-    res.status(201).json(createSportsEvent(store, req.body || {}));
+    const { withMarket, ...eventOptions } = req.body || {};
+    const event = createSportsEvent(store, eventOptions);
+
+    let market = null;
+    if (withMarket) {
+      const [first] = eventProbabilities(event.outcomes);
+      market = createPredictionMarket(store, {
+        question: `${event.description} — will ${first.label} win?`,
+        category: 'sports',
+        source: 'real-world',
+        creatorId: 'vago-house',
+        openingYesPrice: first.fairProbability,
+        linkedEventId: event.eventId,
+      });
+    }
+
+    res.status(201).json({ ...event, market });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
+// The event, with its odds expressed as percentages and the house
+// margin stated rather than buried. `probabilities` is derived on read
+// rather than stored, so a line that changes cannot leave a stale
+// percentage behind it.
 app.get('/api/sports/events/:eventId', (req, res) => {
   const event = getSportsEvent(store, req.params.eventId);
   if (!event) return res.status(404).json({ error: `no event with id ${req.params.eventId}` });
-  res.json(event);
+  const market = store.predictionMarkets.find((m) => m.linkedEventId === event.eventId) || null;
+  res.json({
+    ...event,
+    probabilities: eventProbabilities(event.outcomes),
+    houseMargin: eventOverround(event.outcomes),
+    market: market ? { id: market.id, question: market.question, ...getMarketPrice(market) } : null,
+  });
 });
 
 app.post('/api/sports/:eventId/bet', requireActor('userId'), async (req, res) => {
