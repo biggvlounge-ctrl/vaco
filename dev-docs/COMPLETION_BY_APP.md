@@ -11,7 +11,7 @@ each app's test suite actually executed. Nothing here is recalled.
 `scripts/test/completion-report.test.mjs` fails if this file drifts
 from what the script emits, which is the failure mode that made
 `COMPLETION_AUDIT.md` read 31 apps and 522 tests when the real numbers
-were 34 and 1214.
+were 34 and 1220.
 
 ---
 
@@ -56,7 +56,7 @@ anything it can:
 | Express backends in the manifest | **34** |
 | Overall criteria met | **100%** (260/260) |
 | Apps at 100% | **34 / 34** |
-| Tests | **1214** |
+| Tests | **1220** |
 | Apps with no test suite | **0** |
 
 Two notes on that test count, so it is not read as contradicting
@@ -83,7 +83,7 @@ anything else:
 | `chopz` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 8 |
 | `chopz-shop` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 14 |
 | `cvnvo` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 13 |
-| `dreams` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 12 |
+| `dreams` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 15 |
 | `hvntz` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 14 |
 | `shield` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 12 |
 | `v3` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 109 |
@@ -111,7 +111,7 @@ anything else:
 | `vulture-flix` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 12 |
 | `vulture-music` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 16 |
 | `vulture-pods` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 12 |
-| `vulture-studios` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 11 |
+| `vulture-studios` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 14 |
 | `vxllage` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 13 |
 | `yap` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 20 |
 

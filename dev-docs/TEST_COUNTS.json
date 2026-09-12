@@ -1,6 +1,6 @@
 {
-  "total": 1627,
-  "passed": 1578,
+  "total": 1633,
+  "passed": 1584,
   "failed": 0,
   "skipped": 49,
   "suites": 39,
@@ -30,8 +30,8 @@
       "skipped": 0
     },
     "dreams": {
-      "tests": 12,
-      "pass": 12,
+      "tests": 15,
+      "pass": 15,
       "fail": 0,
       "skipped": 0
     },
@@ -222,8 +222,8 @@
       "skipped": 0
     },
     "vulture-studios": {
-      "tests": 11,
-      "pass": 11,
+      "tests": 14,
+      "pass": 14,
       "fail": 0,
       "skipped": 0
     },

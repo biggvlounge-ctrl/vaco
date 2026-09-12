@@ -16,6 +16,7 @@
 // doc in this repo.
 
 const { getScreen } = require('./screens');
+const { settleOnce } = require('./settleOnce');
 const { getAdvertiser } = require('./advertisers');
 
 const CAMPAIGN_STATUSES = ['draft', 'live', 'completed'];
@@ -193,12 +194,24 @@ async function recordImpression(store, options = {}) {
   // afterwards -- so a split could pay the screen owner, fail the
   // platform fee, and leave an impression that was served, paid for in
   // part, and recorded nowhere.
-  await settleFn([
-    { fromUserId: campaign.advertiserId, toUserId: screen.screenOwnerId, amount: screenOwnerPayout, reason: `dreams_impression:${campaignId}:${screenId}` },
-    { fromUserId: campaign.advertiserId, toUserId: DREAMS_PLATFORM_ACCOUNT, amount: platformFee, reason: `dreams_impression_platform_fee:${campaignId}:${screenId}` },
-  ], { reason: `dreams_impression:${campaignId}:${screenId}` });
+  // **The budget is spent before the money moves, not after.**
+  //
+  // This read `remainingBudget`, awaited the settlement, then
+  // decremented. Ten concurrent impressions at 10 VCoin each against a
+  // 10 VCoin budget all passed the check, all settled, and all charged:
+  // **100 VCoin moved on a 10 VCoin cap, leaving remainingBudget at
+  // -90**. An advertiser who set a cap got billed ten times it.
+  //
+  // Claiming the reduced budget first means the second impression sees
+  // 0 remaining and is refused by the ordinary check above.
+  const remainingAfter = round(campaign.remainingBudget - costPerImpression);
+  await settleOnce(campaign, { remainingBudget: remainingAfter }, async () => {
+      await settleFn([
+      { fromUserId: campaign.advertiserId, toUserId: screen.screenOwnerId, amount: screenOwnerPayout, reason: `dreams_impression:${campaignId}:${screenId}` },
+      { fromUserId: campaign.advertiserId, toUserId: DREAMS_PLATFORM_ACCOUNT, amount: platformFee, reason: `dreams_impression_platform_fee:${campaignId}:${screenId}` },
+    ], { reason: `dreams_impression:${campaignId}:${screenId}` });
+  });
 
-  campaign.remainingBudget = round(campaign.remainingBudget - costPerImpression);
   if (campaign.remainingBudget <= 0) {
     campaign.status = 'completed';
   }

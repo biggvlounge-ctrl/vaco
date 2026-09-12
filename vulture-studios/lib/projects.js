@@ -19,6 +19,8 @@
 // co-writer percentage-split payout discipline (reused directly
 // below, not reinvented) than to any flat-fee acquisition model.
 
+const { settleOnce } = require('./settleOnce');
+
 const PROJECT_MEDIUMS = ['film', 'tv', 'music', 'podcast'];
 const PROJECT_STATUSES = ['greenlit', 'funded', 'in-production', 'completed'];
 
@@ -101,21 +103,37 @@ async function investInProject(store, options = {}) {
     throw new Error('investInProject requires a settleFn(legs, meta)');
   }
 
-  await settleFn(
-    [{ fromUserId: investorId, toUserId: VULTURE_STUDIOS_PRODUCTION_ACCOUNT, amount: amount, reason: `vulture_studios_investment:${projectId}` }],
-    { reason: `vulture_studios_investment:${projectId}` },
-  );
-
-  const investment = {
-    id: store.nextInvestmentId++, projectId, investorId, amount: round(amount), investedAt: now,
-  };
-  store.investments.push(investment);
-
-  project.amountRaised = round(project.amountRaised + amount);
-  if (project.amountRaised === project.budgetRequested) {
-    project.status = 'funded';
-    project.fundedAt = now;
+  // **The raise is claimed before the money moves, not after.**
+  //
+  // This checked `budgetRequested - amountRaised`, awaited the
+  // settlement, then added to `amountRaised`. Five investors each
+  // offering the full remaining budget at once all passed the check,
+  // all settled, and all paid: **500.00 raised against a 100.00
+  // budget, and 500.00 of real VCoin moved**. Five people had each
+  // bought the whole raise.
+  //
+  // Claiming the new total first means the second investor sees a full
+  // project and is refused by the check above. `status: 'funded'` is
+  // part of the same claim so a fully-subscribed project closes in the
+  // same indivisible step that fills it.
+  const raisedAfter = round(project.amountRaised + amount);
+  const claim = { amountRaised: raisedAfter };
+  if (raisedAfter === project.budgetRequested) {
+    claim.status = 'funded';
+    claim.fundedAt = now;
   }
+
+  let investment;
+  await settleOnce(project, claim, async () => {
+    await settleFn(
+      [{ fromUserId: investorId, toUserId: VULTURE_STUDIOS_PRODUCTION_ACCOUNT, amount: amount, reason: `vulture_studios_investment:${projectId}` }],
+      { reason: `vulture_studios_investment:${projectId}` },
+    );
+    investment = {
+      id: store.nextInvestmentId++, projectId, investorId, amount: round(amount), investedAt: now,
+    };
+    store.investments.push(investment);
+  });
 
   return { investment, project };
 }

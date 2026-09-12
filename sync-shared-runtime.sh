@@ -131,6 +131,16 @@ PERSISTENCE_PG_TARGETS=(
 # on `createPersistentStore` directly do not need it yet.
 STORE_BACKEND_TARGETS=("${PERSISTENCE_PG_TARGETS[@]}")
 
+# `shared/settleOnce.js` -- claim before you pay. Only the apps that
+# actually settle money need it, which is why this is its own list
+# rather than riding on the persistence one: an app that holds a store
+# does not necessarily move money, and a shared module copied into an
+# app that never calls it is exactly the unused copy the check at the
+# bottom of this script exists to catch.
+SETTLE_ONCE_TARGETS=(
+  vago dreams vulture-studios voken
+)
+
 MEDIA_TARGETS=(
   vxllage cvnvo vavlt-stvdios v4-proxy vulture-flix vulture-pods chopz
 )
@@ -237,6 +247,7 @@ for app in "${TRACING_TARGETS[@]}"; do sync_one "shared/tracing.js" "$app" "trac
 for app in "${PERSISTENCE_TARGETS[@]}"; do sync_one "shared/persistence.js" "$app" "persistence.js"; done
 for app in "${PERSISTENCE_PG_TARGETS[@]}"; do sync_one "shared/persistencePg.js" "$app" "persistencePg.js"; done
 for app in "${STORE_BACKEND_TARGETS[@]}"; do sync_one "shared/storeBackend.js" "$app" "storeBackend.js"; done
+for app in "${SETTLE_ONCE_TARGETS[@]}"; do sync_one "shared/settleOnce.js" "$app" "settleOnce.js"; done
 
 # -- The mirror of the UNUSED check, and the more dangerous direction --
 #
@@ -317,18 +328,18 @@ check_unmanaged persistencePg createPersistentStorePg PERSISTENCE_PG_TARGETS per
 # current" on the same line that itemised 147 of them — a headline
 # contradicting its own breakdown, which is worse than either number
 # being wrong on its own.
-TOTAL=$(( ${#SHIELD_TARGETS[@]} + ${#SERVICE_TARGETS[@]} + ${#DECISION_LOG_TARGETS[@]} + ${#OPERATOR_TARGETS[@]} + ${#MEDIA_TARGETS[@]} + ${#TRACING_TARGETS[@]} + ${#PERSISTENCE_TARGETS[@]} + ${#PERSISTENCE_PG_TARGETS[@]} + ${#STORE_BACKEND_TARGETS[@]} ))
+TOTAL=$(( ${#SHIELD_TARGETS[@]} + ${#SERVICE_TARGETS[@]} + ${#DECISION_LOG_TARGETS[@]} + ${#OPERATOR_TARGETS[@]} + ${#MEDIA_TARGETS[@]} + ${#TRACING_TARGETS[@]} + ${#PERSISTENCE_TARGETS[@]} + ${#PERSISTENCE_PG_TARGETS[@]} + ${#STORE_BACKEND_TARGETS[@]} + ${#SETTLE_ONCE_TARGETS[@]} ))
 
 if [ "$CHECK" = "1" ]; then
   if [ "$DRIFTED" -gt 0 ] || [ "$UNUSED" -gt 0 ] || [ "$UNMANAGED" -gt 0 ]; then
     echo "Shared runtime: $DRIFTED drifted, $UNUSED unused, $UNMANAGED unmanaged. Run ./sync-shared-runtime.sh" >&2
     exit 1
   fi
-  echo "Shared runtime: all $TOTAL copies current and in use (${#SHIELD_TARGETS[@]} shieldAuth, ${#SERVICE_TARGETS[@]} serviceAuth, ${#DECISION_LOG_TARGETS[@]} decisionLog, ${#OPERATOR_TARGETS[@]} operatorAuth, ${#MEDIA_TARGETS[@]} mediaClient, ${#TRACING_TARGETS[@]} tracing, ${#PERSISTENCE_TARGETS[@]} persistence, ${#PERSISTENCE_PG_TARGETS[@]} persistencePg, ${#STORE_BACKEND_TARGETS[@]} storeBackend), and no unmanaged copies elsewhere."
+  echo "Shared runtime: all $TOTAL copies current and in use (${#SHIELD_TARGETS[@]} shieldAuth, ${#SERVICE_TARGETS[@]} serviceAuth, ${#DECISION_LOG_TARGETS[@]} decisionLog, ${#OPERATOR_TARGETS[@]} operatorAuth, ${#MEDIA_TARGETS[@]} mediaClient, ${#TRACING_TARGETS[@]} tracing, ${#PERSISTENCE_TARGETS[@]} persistence, ${#PERSISTENCE_PG_TARGETS[@]} persistencePg, ${#STORE_BACKEND_TARGETS[@]} storeBackend, ${#SETTLE_ONCE_TARGETS[@]} settleOnce), and no unmanaged copies elsewhere."
 else
   if [ "$UNUSED" -gt 0 ] || [ "$UNMANAGED" -gt 0 ]; then
     echo "Shared runtime: copied $COPIED file(s), but $UNUSED are not required anywhere and $UNMANAGED are outside the target lists." >&2
     exit 1
   fi
-  echo "Shared runtime: copied $COPIED file(s) (${#SHIELD_TARGETS[@]} shieldAuth, ${#SERVICE_TARGETS[@]} serviceAuth, ${#DECISION_LOG_TARGETS[@]} decisionLog, ${#OPERATOR_TARGETS[@]} operatorAuth, ${#MEDIA_TARGETS[@]} mediaClient, ${#TRACING_TARGETS[@]} tracing, ${#PERSISTENCE_TARGETS[@]} persistence, ${#PERSISTENCE_PG_TARGETS[@]} persistencePg, ${#STORE_BACKEND_TARGETS[@]} storeBackend)."
+  echo "Shared runtime: copied $COPIED file(s) (${#SHIELD_TARGETS[@]} shieldAuth, ${#SERVICE_TARGETS[@]} serviceAuth, ${#DECISION_LOG_TARGETS[@]} decisionLog, ${#OPERATOR_TARGETS[@]} operatorAuth, ${#MEDIA_TARGETS[@]} mediaClient, ${#TRACING_TARGETS[@]} tracing, ${#PERSISTENCE_TARGETS[@]} persistence, ${#PERSISTENCE_PG_TARGETS[@]} persistencePg, ${#STORE_BACKEND_TARGETS[@]} storeBackend, ${#SETTLE_ONCE_TARGETS[@]} settleOnce)."
 fi

@@ -43,6 +43,7 @@
 // so it was never subject to this lockup at all.
 
 const { getCultureCard, transferEditionOwnership } = require('./cultureCards');
+const { settleOnce } = require('./settleOnce');
 const { isComplianceCleared } = require('./complianceGate');
 
 const VOKEN_FRACTIONAL_POOL = 'voken-fractional-pool';
@@ -162,12 +163,34 @@ async function buyShares(store, options = {}) {
   if (typeof settleFn !== 'function') throw new Error('buyShares requires a settleFn(legs, meta)');
 
   const cost = round(shareCount * listing.pricePerShare);
-  await settleFn(
-    [{ fromUserId: buyerId, toUserId: listing.sellerId, amount: cost, reason: `voken_fractional_shares:${listing.cardId}` }],
-    { reason: `voken_fractional_shares:${listing.cardId}` },
-  );
 
-  listing.soldShares += shareCount;
+  // **The shares are claimed before the money moves, not after.**
+  //
+  // This checked `totalShares - soldShares`, awaited the settlement,
+  // then incremented `soldShares`. Concurrent buyers all saw the old
+  // count, all passed the check, and all paid — overselling the
+  // listing and creating obligations to more owners than there are
+  // shares.
+  //
+  // **Latent rather than live**: this path is behind
+  // `isComplianceCleared(store, 'fractional-ownership')`, and that gate
+  // stays shut. It is fixed now because it will be reachable the day
+  // compliance clears it, and a race found then would be found in
+  // production.
+  //
+  // `status: 'fully-sold'` joins the claim so a listing that this
+  // purchase completes closes in the same indivisible step.
+  const soldAfter = listing.soldShares + shareCount;
+  const claim = { soldShares: soldAfter };
+  if (soldAfter === listing.totalShares) claim.status = 'fully-sold';
+
+  await settleOnce(listing, claim, async () => {
+    await settleFn(
+      [{ fromUserId: buyerId, toUserId: listing.sellerId, amount: cost, reason: `voken_fractional_shares:${listing.cardId}` }],
+      { reason: `voken_fractional_shares:${listing.cardId}` },
+    );
+  });
+
   const newLot = {
     id: store.nextFractionalLotId++, shares: shareCount, listedShares: 0, lockedUntil: now + SECONDARY_LOCKUP_MS, purchasedAt: now,
   };
@@ -179,9 +202,6 @@ async function buyShares(store, options = {}) {
     existing.lots.push(newLot);
   } else {
     listing.shareholders.push({ userId: buyerId, lots: [newLot] });
-  }
-  if (listing.soldShares === listing.totalShares) {
-    listing.status = 'fully-sold';
   }
   return { listing, sharesPurchased: shareCount, amountPaid: cost };
 }

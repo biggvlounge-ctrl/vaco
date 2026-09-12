@@ -50,10 +50,14 @@ const { createVagoStore } = require('../lib/store');
 // Ace..King is 1..13, so 7 is the midpoint.
 const HILO_MID = 7;
 
-// A settlement double with a real `await` inside it. **The delay is
-// load-bearing**: without it the whole cash-out runs to completion
-// synchronously and the race cannot appear at all, which would make the
-// concurrency tests below pass against the broken code.
+// A settlement double with a real `await` inside it. The delay widens
+// the race window and makes every concurrency case below fail against
+// broken code rather than most of them.
+//
+// **It is not what makes the race visible, and this comment used to say
+// it was.** Measured in `settleOnce.test.js`: with the delay removed
+// and the fix reverted, 5 of 8 cases still fail, because `await` yields
+// to the microtask queue even on an already-resolved promise.
 function ledger({ delayMs = 20, failFirstCall = false } = {}) {
   const legs = [];
   let refuse = failFirstCall;
