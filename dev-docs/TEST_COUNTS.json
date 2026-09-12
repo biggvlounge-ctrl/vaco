@@ -1,6 +1,6 @@
 {
-  "total": 1609,
-  "passed": 1560,
+  "total": 1619,
+  "passed": 1570,
   "failed": 0,
   "skipped": 49,
   "suites": 39,
@@ -138,8 +138,8 @@
       "skipped": 17
     },
     "vago": {
-      "tests": 27,
-      "pass": 27,
+      "tests": 37,
+      "pass": 37,
       "fail": 0,
       "skipped": 0
     },

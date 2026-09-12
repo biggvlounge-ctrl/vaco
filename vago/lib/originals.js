@@ -139,6 +139,51 @@ function claimSession(store, sessionId) {
   return session;
 }
 
+// **Claim the round before settling it, not after.**
+//
+// All three payout paths here were written as: check the status, await
+// the settlement, then write the terminal status. Between the check and
+// the write the round is still payable, and JS yields at the `await` —
+// so three concurrent cash-out requests on one round all passed the
+// check, all settled, and all paid.
+//
+// Measured, on a Mines round with a 100 VCoin stake and a 1.125x
+// multiplier: **3 requests, 3 payouts, 337.50 paid out**. Unbounded —
+// N concurrent requests produce N payouts — and it needs no unusual
+// timing, just two clicks or a retrying client, because a real
+// settlement is an HTTP call to V3 and the window is as wide as that
+// call takes.
+//
+// This resolves the round synchronously first. Node runs the whole
+// function body up to the first `await` without interruption, so the
+// second caller sees a terminal status and throws before it can pay.
+// If the settlement then fails, the round is handed back so the player
+// can retry — a claim that swallows a genuine failure would lose
+// somebody a real win.
+//
+// The same shape as `v3/lib/idempotencyPg.js`, which claims an
+// idempotency key with an INSERT before the handler runs rather than
+// recording it afterwards. Record-after is always a race.
+async function settleRoundOnce(round_, { status, payout, extra = {}, pay }) {
+  const previous = { status: round_.status, payout: round_.payout ?? null, resolvedAt: round_.resolvedAt ?? null };
+
+  round_.status = status;
+  round_.payout = payout;
+  round_.resolvedAt = Date.now();
+  Object.assign(round_, extra);
+
+  try {
+    await pay();
+  } catch (err) {
+    round_.status = previous.status;
+    round_.payout = previous.payout;
+    round_.resolvedAt = previous.resolvedAt;
+    for (const key of Object.keys(extra)) delete round_[key];
+    throw err;
+  }
+  return round_;
+}
+
 function publicRoundView(round_) {
   const base = {
     id: round_.id, sessionId: round_.sessionId, game: round_.game, status: round_.status, createdAt: round_.createdAt,
@@ -237,21 +282,25 @@ async function cashOutMines(store, options = {}) {
 
   const session = getCasinoSession(store, round_.sessionId);
   const payout = round(session.stakeAmount * round_.currentMultiplier);
-
-  if (session.currency === 'gold-coin') {
-    creditGoldCoin(store, { userId: session.userId, amount: payout, reason: 'vago_mines_cashout' });
-  } else {
-    if (typeof settleFn !== 'function') throw new Error('cashOutMines requires a settleFn(legs, meta) for vcoin sessions');
-    await settleFn(
-      [{ fromUserId: VAGO_HOUSE_ACCOUNT, toUserId: session.userId, amount: payout, reason: 'vago_mines_cashout' }],
-      { reason: 'vago_mines_cashout' },
-    );
+  if (session.currency !== 'gold-coin' && typeof settleFn !== 'function') {
+    throw new Error('cashOutMines requires a settleFn(legs, meta) for vcoin sessions');
   }
 
-  round_.status = 'cashed-out';
-  round_.multiplier = round_.currentMultiplier;
-  round_.payout = payout;
-  round_.resolvedAt = Date.now();
+  await settleRoundOnce(round_, {
+    status: 'cashed-out',
+    payout,
+    extra: { multiplier: round_.currentMultiplier },
+    pay: async () => {
+      if (session.currency === 'gold-coin') {
+        creditGoldCoin(store, { userId: session.userId, amount: payout, reason: 'vago_mines_cashout' });
+      } else {
+        await settleFn(
+          [{ fromUserId: VAGO_HOUSE_ACCOUNT, toUserId: session.userId, amount: payout, reason: 'vago_mines_cashout' }],
+          { reason: 'vago_mines_cashout' },
+        );
+      }
+    },
+  });
   return publicRoundView(round_);
 }
 
@@ -292,23 +341,25 @@ async function dropPlinkoBall(store, options = {}) {
 
   const session = getCasinoSession(store, round_.sessionId);
   const payout = round(session.stakeAmount * multiplier);
-
-  if (session.currency === 'gold-coin') {
-    creditGoldCoin(store, { userId: session.userId, amount: payout, reason: 'vago_plinko_payout' });
-  } else {
-    if (typeof settleFn !== 'function') throw new Error('dropPlinkoBall requires a settleFn(legs, meta) for vcoin sessions');
-    await settleFn(
-      [{ fromUserId: VAGO_HOUSE_ACCOUNT, toUserId: session.userId, amount: payout, reason: 'vago_plinko_payout' }],
-      { reason: 'vago_plinko_payout' },
-    );
+  if (session.currency !== 'gold-coin' && typeof settleFn !== 'function') {
+    throw new Error('dropPlinkoBall requires a settleFn(legs, meta) for vcoin sessions');
   }
 
-  round_.status = 'resolved';
-  round_.path = path;
-  round_.bucket = bucket;
-  round_.multiplier = multiplier;
-  round_.payout = payout;
-  round_.resolvedAt = Date.now();
+  await settleRoundOnce(round_, {
+    status: 'resolved',
+    payout,
+    extra: { path, bucket, multiplier },
+    pay: async () => {
+      if (session.currency === 'gold-coin') {
+        creditGoldCoin(store, { userId: session.userId, amount: payout, reason: 'vago_plinko_payout' });
+      } else {
+        await settleFn(
+          [{ fromUserId: VAGO_HOUSE_ACCOUNT, toUserId: session.userId, amount: payout, reason: 'vago_plinko_payout' }],
+          { reason: 'vago_plinko_payout' },
+        );
+      }
+    },
+  });
   return publicRoundView(round_);
 }
 
@@ -392,20 +443,24 @@ async function cashOutHilo(store, options = {}) {
 
   const session = getCasinoSession(store, round_.sessionId);
   const payout = round(session.stakeAmount * round_.currentMultiplier);
-
-  if (session.currency === 'gold-coin') {
-    creditGoldCoin(store, { userId: session.userId, amount: payout, reason: 'vago_hilo_cashout' });
-  } else {
-    if (typeof settleFn !== 'function') throw new Error('cashOutHilo requires a settleFn(legs, meta) for vcoin sessions');
-    await settleFn(
-      [{ fromUserId: VAGO_HOUSE_ACCOUNT, toUserId: session.userId, amount: payout, reason: 'vago_hilo_cashout' }],
-      { reason: 'vago_hilo_cashout' },
-    );
+  if (session.currency !== 'gold-coin' && typeof settleFn !== 'function') {
+    throw new Error('cashOutHilo requires a settleFn(legs, meta) for vcoin sessions');
   }
 
-  round_.status = 'cashed-out';
-  round_.payout = payout;
-  round_.resolvedAt = Date.now();
+  await settleRoundOnce(round_, {
+    status: 'cashed-out',
+    payout,
+    pay: async () => {
+      if (session.currency === 'gold-coin') {
+        creditGoldCoin(store, { userId: session.userId, amount: payout, reason: 'vago_hilo_cashout' });
+      } else {
+        await settleFn(
+          [{ fromUserId: VAGO_HOUSE_ACCOUNT, toUserId: session.userId, amount: payout, reason: 'vago_hilo_cashout' }],
+          { reason: 'vago_hilo_cashout' },
+        );
+      }
+    },
+  });
   return publicRoundView(round_);
 }
 

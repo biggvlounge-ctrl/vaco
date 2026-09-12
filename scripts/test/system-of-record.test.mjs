@@ -149,9 +149,29 @@ test('every stated commit count matches the commit the document is stamped at', 
 // was failing is a claim about the repository that is not true and that
 // nothing else contradicts, so it stands. This makes it impossible to
 // commit: the file is only ever allowed to describe a green run.
+//
+// **It reads the COMMITTED file, not the working tree, and the first
+// version did not — which deadlocked the suite.** `run-all-tests.mjs`
+// rewrites TEST_COUNTS on every run including a failing one. So the
+// moment anything went red, the record said `failed: 1`, this check
+// failed on that, and the run it was part of wrote `failed: 1` again.
+// Re-running could never clear it: the guard was the thing keeping
+// itself red. Found within the hour, by hitting it.
+//
+// Reading `git show HEAD:` fixes it at the root, and is what the test
+// was always about anyway: a red record in the *working tree* is just
+// an accurate note about a run that failed, and is none of this
+// check's business. A red record in a *commit* is a false claim about
+// the repository.
 test('the committed test record describes a passing run', () => {
-  const counts = JSON.parse(fs.readFileSync(
-    path.join(REPO_ROOT, 'dev-docs', 'TEST_COUNTS.json'), 'utf8'));
+  const shown = spawnSync('git', ['show', 'HEAD:dev-docs/TEST_COUNTS.json'],
+    { cwd: REPO_ROOT, encoding: 'utf8' });
+  if (shown.status !== 0) {
+    // No git, or the file is not committed yet: a release-archive
+    // extract has neither. Nothing to check rather than a false pass.
+    return;
+  }
+  const counts = JSON.parse(shown.stdout);
 
   assert.equal(counts.failed, 0,
     `dev-docs/TEST_COUNTS.json records ${counts.failed} failing test(s). Re-run `

@@ -61,7 +61,7 @@ authorization work in §5 had to be done per app rather than once.
 | Containerised services | 36 + nginx + a LiveKit SFU |
 | Registry rows (incl. brand rows and the dev mock) | 37 |
 | Mutating HTTP routes | 520, all accounted for (469 guarded, 51 declared open with a reason) |
-| Automated tests | 1609 across 39 suites |
+| Automated tests | 1619 across 39 suites |
 | Persisted volumes | 30 |
 | Shared-module copies kept in sync | 203 |
 | Service credentials in `.env.example` | 27 callers |
@@ -810,7 +810,7 @@ produce the numbers in this document.
 built:** `node scripts/package-release.mjs` — see §11.
 
 ```sh
-node scripts/run-all-tests.mjs           # 1609/1609 across 39 suites (some skip without a database)
+node scripts/run-all-tests.mjs           # 1619/1619 across 39 suites (some skip without a database)
 node scripts/audit-route-guards.mjs --check   # 520/520 accounted for
 ./sync-shared-runtime.sh --check         # 203 copies current, none unmanaged
 ./sync-design-system.sh --check          # every serving app is a target
@@ -858,7 +858,7 @@ cvnvo/yap        20   vaco-operator    20   vacon            18
 vaca             17   vaco-notify      17   vsafe            17
 vaco-audit       16   vex              16   vulture-music    16
 v4-search        15   hvntz            14   vaco-mcp         14
-vavlt-stvdios    14   cvnvo            13   vago             27
+vavlt-stvdios    14   cvnvo            13   vago             37
 vxllage          13   dreams           12   shield           12
 vulture-flix     12   vulture-pods     12   chopz/chopz-shop 14
 vulture-studios  11   vex-trading      10   chopz             8
