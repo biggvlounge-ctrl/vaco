@@ -104,6 +104,35 @@ const BASE_ANNUAL_BIRTH_RATE = 0.14;
 //: way to read one — flagged, and the single number to change.
 const PARTNER_BOND_FLOOR = 60;
 
+//: **These three exist because the first version of this file was
+//: broken and its tests could not tell.** `relationships.love` is
+//: initialised to 0 by `getOrCreateRelationship` and was written by
+//: NOTHING — six of the twelve relationship dimensions are, and love
+//: is not one of them. So `PARTNER_BOND_FLOOR` could never be reached
+//: by any engine mechanism and **no birth could ever occur in a
+//: running simulation**. Every test passed because every fixture set
+//: `love` directly; it was caught by measuring a generated world, not
+//: by the suite. Standing rule 6, and rule 8's fixture trap, in one.
+//:
+//: **And the first fix for it was wrong too, in the same way.** It
+//: gated the bond on `trust` and `shared_history`, and
+//: `shared_history` is written only on SELF-relationships — by the
+//: three introspective keys, Resilience, Adaptability and
+//: ScarcityResponse — so between two different people it is 0 forever.
+//: Reading it fixed nothing and would have looked fixed.
+//:
+//: `interaction_count` is the field that genuinely records repeated
+//: contact: `worldStore.adjustRelationship` increments it on every
+//: write-back, and the Social phase resolves Trust for every
+//: relationship every tick. So a bond is **contact over time, in the
+//: absence of hostility**, with trust as an accelerator rather than a
+//: gate — trust only moves when knowledge flows, and gating on it
+//: would make bonds depend on whether a famine happened to be in the
+//: news.
+const BOND_CONTACT_FLOOR = 30;        // ticks of contact before anything grows
+const BOND_CONFLICT_CEILING = 20;     // hostility blocks a bond outright
+const BOND_GROWTH = 0.25;             // love per tick at neutral trust
+
 //: How much the environment suppresses births. Scarcity is the worst
 //: shortage of food, water and medicine; deprivation is poverty depth.
 //: Both reduce, neither can take the rate below zero.
@@ -145,6 +174,47 @@ function environmentalFertility(worldState, bearer, { scarcity, pressure, line }
   const depth = areaStats.povertyDepth(economy.getNetWorth(worldState, bearer.id), line);
   factor *= Math.max(0, 1 - depth * DEPRIVATION_SUPPRESSION);
   return factor;
+}
+
+// -- bonds ---------------------------------------------------------------
+
+// Grow `love` where there is trust and repeated contact.
+//
+// Called from `runSocialPhase`, which is where relationships already
+// change — not a new phase, and not a new place for social mechanics
+// to live. It runs after `resolveTrust` has written this tick's trust
+// and shared history, so a bond reads the current state rather than
+// last tick's.
+function advanceBonds(worldState, tick = worldState.tick ?? 0) {
+  const formed = [];
+  for (const relationship of worldState.relationships || []) {
+    if (relationship.entity_a_id === relationship.entity_b_id) continue;
+    if ((relationship.interaction_count ?? 0) < BOND_CONTACT_FLOOR) continue;
+    if ((relationship.conflict ?? 0) >= BOND_CONFLICT_CEILING) continue;
+
+    const before = relationship.love ?? 0;
+    if (before >= 100) continue;
+    // Trust accelerates, never gates: a pair at trust 100 bonds twice
+    // as fast as a pair at the neutral 50, and a pair below neutral
+    // still bonds, slowly, on contact alone.
+    const trust = relationship.trust ?? 50;
+    const rate = BOND_GROWTH * (1 + Math.max(-0.5, (trust - 50) / 50));
+    relationship.love = Math.min(100, before + rate);
+    // The crossing, not the condition — standing rule 7. A pair that
+    // sits above the floor forever would otherwise report a new
+    // partnership every tick for the rest of their lives.
+    if (before < PARTNER_BOND_FLOOR && relationship.love >= PARTNER_BOND_FLOOR) {
+      formed.push({
+        type: 'partnership_formed',
+        severity: 'low',
+        note: `Entity ${relationship.entity_a_id} and entity ${relationship.entity_b_id} formed a partnership`,
+        tick,
+        affected_entity_ids: [relationship.entity_a_id, relationship.entity_b_id],
+        global_effects: {},
+      });
+    }
+  }
+  return formed;
 }
 
 // -- who could have a child ---------------------------------------------
@@ -435,6 +505,10 @@ module.exports = {
   FERTILITY_MAX_AGE,
   BASE_ANNUAL_BIRTH_RATE,
   PARTNER_BOND_FLOOR,
+  BOND_CONTACT_FLOOR,
+  BOND_CONFLICT_CEILING,
+  BOND_GROWTH,
+  advanceBonds,
   SCARCITY_SUPPRESSION,
   DISEASE_SUPPRESSION,
   DEPRIVATION_SUPPRESSION,

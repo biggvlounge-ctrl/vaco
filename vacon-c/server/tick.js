@@ -252,7 +252,15 @@ function runSocialPhase(worldState) {
       knowledge,
     });
   }
-  return [];
+
+  // **Bonds form here, and they had to start somewhere.**
+  // `relationships.love` is initialised to 0 and was written by
+  // nothing — six of the twelve dimensions are written and love was
+  // not one — so `births.js`'s partnership threshold could never be
+  // reached and no child could ever be born in a running world. This
+  // runs after `resolveTrust` above, so a bond reads the interaction
+  // count and trust this tick just produced. See server/births.js.
+  return births.advanceBonds(worldState, worldState.tick);
 }
 
 // ---------------------------------------------------------------------------

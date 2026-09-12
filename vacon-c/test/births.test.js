@@ -398,3 +398,60 @@ test('mean generation moves once a world has borne anybody', () => {
   births.bearChild(w, { bearerId: a.id, otherParentId: b.id });
   assert.equal(statistics.profileFor(w, c.id).statistics.mean_generation.value, 1.33);
 });
+
+// -- the test the fixtures could not be -------------------------------
+
+test('a world left running forms bonds and bears children by itself', () => {
+  // **This is the test that was missing, and its absence hid a broken
+  // system.** Every test above builds its couples by writing `love`
+  // into a relationship directly — and `relationships.love` is
+  // initialised to 0 by `getOrCreateRelationship` and was written by
+  // NOTHING, so `PARTNER_BOND_FLOOR` could never be reached and no
+  // child could ever be born in a running world. Eighteen passing
+  // tests said otherwise because all eighteen set the field the engine
+  // could not.
+  //
+  // So this one touches no relationship. It seeds people, runs the
+  // real tick pipeline, and looks at what the world did on its own.
+  const engine = require('../server/engine.js');
+  const areaStats = require('../server/areaStats.js');
+  const territory = require('../server/territory.js');
+  const w = engine.WorldState;
+
+  const city = territory.generateCity(w, { name: `Bondtest ${nextId++}` });
+  const block = territory.generateCommunity(w, { cityId: city.id });
+  const seeded = [];
+  for (let i = 0; i < 20; i += 1) {
+    const npc = engine.generateNPC();
+    // Everybody is of an age to bear, so the only thing being tested
+    // is whether a bond can form at all.
+    npc.createdTick = w.tick - Math.round(26 * mortality.TICKS_PER_YEAR);
+    areaStats.placeInCommunity(w, { entityId: npc.id, communityId: block.id });
+    economy.generateIndividualFinances(w, npc.id, { savings: 400, tick: w.tick });
+    seeded.push(npc);
+  }
+  // Relationships with no love — exactly what the engine creates.
+  for (let i = 0; i < seeded.length - 1; i += 2) {
+    const rel = require('../server/worldStore.js')
+      .getOrCreateRelationship(w, seeded[i].id, seeded[i + 1].id, 'social');
+    assert.equal(rel.love, 0, 'getOrCreateRelationship no longer starts love at 0');
+    // Trust high enough that the Social phase's bond can take hold;
+    // trust IS written by resolveTrust, so this is a head start rather
+    // than the thing under test.
+    // Left at the engine's own default. The first version of this
+    // fixture set trust to 75 as a "head start", which would have
+    // hidden that trust is an accelerator and not a gate.
+    assert.equal(rel.trust, 50);
+  }
+
+  const before = w.npcs.length;
+  for (let t = 0; t < 2000; t += 1) engine.advanceTick();
+
+  const bonded = w.relationships.filter((r) => (r.love ?? 0) >= births.PARTNER_BOND_FLOOR);
+  assert.ok(bonded.length > 0, 'no bond formed in 2000 ticks; love is still written by nothing');
+
+  const born = w.npcs.filter((n) => births.birthRecordFor(w, n.id) !== null);
+  assert.ok(born.length > 0,
+    `bonds formed but nobody was born in 2000 ticks (population ${before} -> ${w.npcs.length})`);
+  assert.ok(born.every((n) => n.generation === 2));
+});
