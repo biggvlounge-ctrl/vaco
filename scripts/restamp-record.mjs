@@ -80,7 +80,6 @@ for (const [name, row] of Object.entries(counts.perSuite || {})) {
 if (!Number.isInteger(counts.total) || counts.total < 100) {
   fail(`TEST_COUNTS.json records only ${counts.total} tests`);
 }
-const suiteCount = Object.keys(counts.perSuite || {}).length;
 
 // -- §10's per-suite table ---------------------------------------------
 
@@ -114,6 +113,28 @@ const newTable = tableMatch[2].replace(
 );
 sor = sor.replace(tableMatch[0], `${tableMatch[1]}${newTable}${tableMatch[3]}`);
 
+// **The headline comes from the table, not from TEST_COUNTS.total**, and
+// the difference is not cosmetic. `system-of-record.test.mjs` checks the
+// headline against the sum of §10's own rows — deliberately, so one
+// assertion covers both without running the suite inside a test.
+//
+// Taking it from `counts.total` instead worked only while the two
+// sources were always refreshed together. They are not any more:
+// `run-all-tests.mjs` now leaves TEST_COUNTS alone on a red run, so
+// after a failing run the table restamps from a fresh
+// COMPLETION_BY_APP.md while the headline would restamp from a stale
+// TEST_COUNTS — and the document would state two numbers that
+// contradict each other. Hit immediately after making that change:
+// table 1677, headline 1666.
+//
+// Summing the rows we just wrote is skew-proof by construction.
+const tableRows = [...newTable.matchAll(/([a-z0-9\-/]+)\s+(\d+)/g)];
+const headlineTotal = tableRows.reduce((n, m) => n + Number(m[2]), 0);
+const headlineSuites = tableRows.length;
+if (headlineTotal < 100 || headlineSuites < 25) {
+  fail(`parsed only ${headlineSuites} rows totalling ${headlineTotal} from §10's table`);
+}
+
 // **A nested app is listed under two names and neither is wrong.** The
 // completion report rows it by app name (`chopz-shop`), TEST_COUNTS
 // rows it by suite path (`chopz/chopz-shop`), and §10's table uses the
@@ -138,16 +159,16 @@ function substitute(text, label, pattern, replacement) {
 
 sor = substitute(sor, 'SYSTEM_OF_RECORD.md §1',
   /\| Automated tests \| \d+ across \d+ suites \|/,
-  `| Automated tests | ${counts.total} across ${suiteCount} suites |`);
+  `| Automated tests | ${headlineTotal} across ${headlineSuites} suites |`);
 
 sor = substitute(sor, 'SYSTEM_OF_RECORD.md §10 command',
   /# \d+\/\d+ across \d+ suites/,
-  `# ${counts.total}/${counts.total} across ${suiteCount} suites`);
+  `# ${headlineTotal}/${headlineTotal} across ${headlineSuites} suites`);
 
 let replit = fs.readFileSync(REPLIT_PATH, 'utf8');
 replit = substitute(replit, 'REPLIT.md',
   /- The full test suite: \d+ tests across \d+ suites\./,
-  `- The full test suite: ${counts.total} tests across ${suiteCount} suites.`);
+  `- The full test suite: ${headlineTotal} tests across ${headlineSuites} suites.`);
 
 // -- the audit totals §1 quotes ----------------------------------------
 

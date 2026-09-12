@@ -17,6 +17,22 @@ Every figure below was read out of the code by a command, not recalled.
 Where a section is partly built, the split is stated rather than
 rounded to "done" or "not started".
 
+**On the two names.** The spec is titled VACANCY; the app is
+**VACON-C**, and `vacon-c/CLAUDE.md` states that VACANCY "is now
+retired in favor of VACON-C going forward", with the `VACANCY_*.md`
+files kept under their original filenames rather than renamed. This map
+uses VACANCY when quoting the spec's sections and VACON-C when
+describing the code, which is the same convention the repo already
+follows. Neither is a different system. (VACON without the `-C` **is** a
+different system — the V4 operating network.)
+
+**Three further deferrals `CLAUDE.md` sets, which this map respects
+rather than re-proposing:** Leader mode, Simulation mode and
+Multiplayer are all explicitly deferred, so §84's Phase 11 and §87's
+leader/simulation dashboards are closed scope rather than missing work.
+Gambling and casino systems stay closed pending compliance review — a
+legal gate, not a scope call.
+
 | Mark | Means |
 |---|---|
 | **BUILT** | Implemented and covered by `vacon-c/test/`. |
@@ -83,13 +99,37 @@ crime/policing split, which is one phase doing two engines' work.
 
 ## §7 · The 40 urban systems
 
-**PARTIAL, and the honest answer is that nothing enumerates them.**
-Roughly 25 of the 40 are represented by a table, a phase or a trait
-family; the rest (Court, Prison, Waste, Fire & Emergency, Social Media,
-Tourism, Military/National Guard) have no representation. There is no
-list of 40 anywhere in the code to check against, which means "how many
-of the 40 are built" cannot be answered by a command — the first real
-task here is writing that list down as data.
+**Measured, and my own first estimate here was too generous.** This
+section used to read "roughly 25 of the 40 are represented" — a guess
+from memory with nothing in the repo to check it against. The forty are
+now data in `vacon-c/server/urbanSystems.js`, every citation verified
+by `vacon-c/test/urban-systems.test.js`, and the real breakdown is:
+
+**12 modelled, 18 partial, 4 slot-only, 6 absent**
+
+| Level | Means | Systems |
+|---|---|---|
+| **modelled** (12) | Real mechanics; something advances or decides on it each tick | Population, Housing, Economy, Infrastructure, Political, Cultural, Community Organizations, Real Estate, Environmental, Technology, Migration, AI Decision |
+| **partial** (18) | A table or trait family with little driving it, or one phase covering two systems | Employment, Education, Health, Food Supply, Water, Law Enforcement, Crime, Gang, Organized Crime, Court, Communication, Religion, Business, Construction, Weather, Disaster, Supply Chain, Reputation |
+| **slot** (4) | A place to put data and nothing that reads it | Transportation, Energy, Waste, Fire & Emergency |
+| **absent** (6) | No representation at all | Prison, Government Services, Media, Social Media, Military/National Guard, Tourism |
+
+**The `slot` level is the part worth understanding**, because it is
+where an inflated count comes from. `infrastructure.type` carries a
+comment enumerating roads, bridges, rail, water_systems, electricity,
+internet, hospitals, schools, public_safety and waste_management. A row
+can hold any of those and **nothing in the engine reads the
+distinction** — it is a TEXT column with a comment, not an enum or a
+CHECK constraint. Counting those ten as built is what takes a truthful
+12 to a comfortable 25.
+
+Two things the test enforces that are worth knowing. A system marked
+`absent` must cite **nothing**, so the label cannot be quietly applied
+to something that does exist — Prison is absent because `imprison`
+appears nowhere in the schema or the engine, despite §17 listing
+`imprisoned` as an NPC status. And a `slot` may not cite a phase or a
+function: the moment one gains mechanics the test fails rather than
+letting the level go stale.
 
 ## §§8–12 · City, block key, property control, territory
 
@@ -140,7 +180,7 @@ behaviour, which §82 forbids.
 | 26 Barter economy | **PARTIAL** | `market_listings` + `resolveMarketPrice` + `getScarcity` are the mechanism, and scarcity moves price. The `economic` trait family includes `Barter Skill`. |
 | 27 Master barter key | **NOT BUILT** | No item catalogue. The spec gives 17 example values against a ~3,750-item target; none of the 17 are in the code. The seven per-item fields (Base_Value, Rarity, Environment_Modifier, Population_Modifier, Final_Barter_Score) have no table. |
 | 28 Resource engine | **BUILT** | Produced, consumed, stored, scarce, priced. |
-| 29 Supply chain | **PARTIAL** | `trade_routes` is a table. No route mechanics, hubs, lanes or transport tiers. |
+| 29 Supply chain | **PARTIAL, and partly deferred** | `trade_routes` is a table. No route mechanics, hubs, lanes or transport tiers — and trade routes fall under the same Transportation deferral as §44. |
 
 ## §§30–35 · Buildings, artifacts, control nodes, missions
 
@@ -165,7 +205,7 @@ behaviour, which §82 forbids.
 | 41 Historical memory | **BUILT** | `historical_records`, `runHistoryPhase`, `memories`, `decision_log`. |
 | 42 Probability system | **BUILT** | `winProbability`, `seededUnit`, `hashSeed` in `contest.js`; probability throughout the tick. |
 | 43 Event engine | **BUILT** | With cascades. |
-| 44 Movement system | **NOT BUILT** | No routes, patrols, commutes or deliveries. |
+| 44 Movement system | **DEFERRED, not merely unbuilt** | No routes, patrols, commutes or deliveries — and `vacon-c/CLAUDE.md` puts **Transportation** on its explicit "do not touch" list, alongside Leader/Simulation/Multiplayer modes. Its Phase 2 note says movement/trade routes "stays deferred under Transportation rather than being an open gap". So this is a scope decision the project already took, not an oversight. |
 | 45 Time system | **PARTIAL** | Ticks, schedules (`schedule_events`, `isDue`) and intervals are real. Day/night, weekday/weekend, season and aging are not. |
 | 46 Weather & environment | **PARTIAL** | `environment_state`, `addEnvironmentalCondition`, `runEnvironmentPhase`, and drought cascades to the economy. Temperature/rain/snow/storm specifics are not modelled. |
 | 47 Neighborhood outcome variables | **PARTIAL** | `getCommunityHealth` computes a composite. The 20 named variables are not individually tracked. |
@@ -265,12 +305,21 @@ order for the build that exists.
 | 1 | **Write the 40 urban systems down as data** | §7 cannot be measured at all today. It is an afternoon, and it makes every later claim checkable. |
 | 2 | **Generate the trait catalogue toward 2,100** | The architecture is done and the content is 5% there. Generated entries must be labelled generated — they are not recovered source. |
 | 3 | **Knowledge tiers 1–10 (§25)** | Clean greenfield, no conflict with the existing spread model, and §40's bottleneck logic already has somewhere to plug in. |
-| 4 | **Movement system (§44)** | The one unmet clause in §94's own definition of playable. |
-| 5 | **Map interface (§73)** | Largest remaining build, and the thing that makes the rest visible. |
-| 6 | **Barter item catalogue (§27)** | The mechanism exists; this is content plus one table. |
-| 7 | **Simulation detail levels (§69)** | The gate on §97's scale. Nothing else unblocks millions of NPCs. |
-| 8 | **City DNA (§49), mentors (§58), sports leagues (§54)** | Self-contained additions. |
-| 9 | **Stress tests (§83)** | Deferred deliberately until after §69 — stress-testing one fidelity level measures the wrong thing. |
+| 4 | **Map interface (§73)** | Largest remaining build, and the thing that makes the rest visible. |
+| 5 | **Barter item catalogue (§27)** | The mechanism exists; this is content plus one table. |
+| 6 | **Simulation detail levels (§69)** | The gate on §97's scale. Nothing else unblocks millions of NPCs. |
+| 7 | **City DNA (§49), mentors (§58), sports leagues (§54)** | Self-contained additions. |
+| 8 | **Stress tests (§83)** | Deferred deliberately until after §69 — stress-testing one fidelity level measures the wrong thing. |
+
+**Movement (§44) was item 4 in the first version of this list and has
+been removed.** §94's own definition of "playable" includes "the player
+can move", so it looked like the highest-value unblock. But
+`vacon-c/CLAUDE.md` defers Transportation explicitly, and recommending
+work a project has closed is worse than leaving a gap open — it invites
+someone to spend a week on something that will be rejected on scope.
+**The tension is real and belongs to the owner**: §94 cannot be
+satisfied while Transportation is deferred. That is a decision to take,
+not a task to schedule.
 
 **Not on this list, and deliberately:** multiplayer (§84 Phase 11) and
 anti-cheat (§77). Both are real requirements and both are premature
