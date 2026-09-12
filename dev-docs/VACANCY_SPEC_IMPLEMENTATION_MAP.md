@@ -303,7 +303,7 @@ order for the build that exists.
 | # | Work | Why here |
 |---|---|---|
 | 1 | **Write the 40 urban systems down as data** | §7 cannot be measured at all today. It is an afternoon, and it makes every later claim checkable. |
-| 2 | **Generate the trait catalogue toward 2,100** | The architecture is done and the content is 5% there. Generated entries must be labelled generated — they are not recovered source. |
+| 2 | **Grow the trait catalogue toward 2,100 — with consumers, never ahead of them** | The architecture is done and the content is 5% there. See the warning below: this is the step most likely to produce 2,000 fields nothing reads. Generated entries must be labelled generated; they are not recovered source. |
 | 3 | **Knowledge tiers 1–10 (§25)** | Clean greenfield, no conflict with the existing spread model, and §40's bottleneck logic already has somewhere to plug in. |
 | 4 | **Map interface (§73)** | Largest remaining build, and the thing that makes the rest visible. |
 | 5 | **Barter item catalogue (§27)** | The mechanism exists; this is content plus one table. |
@@ -323,7 +323,43 @@ not a task to schedule.
 
 **Not on this list, and deliberately:** multiplayer (§84 Phase 11) and
 anti-cheat (§77). Both are real requirements and both are premature
-while §§44, 69 and 73 are open.
+while §§69 and 73 are open, and Multiplayer is deferred outright by
+`vacon-c/CLAUDE.md`.
+
+### A warning on step 2, from this project's own history
+
+**Do not generate 2,000 trait definitions and stop.** VACON-C has
+already found this defect twice, in two different disguises, and both
+are recorded in `vacon-c/CLAUDE.md`:
+
+- `combat` and `sports` traits were generated on every NPC and **read
+  by nothing**, until `server/contest.js` was written specifically to
+  consume them. Two whole trait families were dead weight on every
+  entity in the world.
+- Three of the ten named flow signals read `.scarcity` and `.power` —
+  fields that are computed, never stored — so those flows **could
+  never fire**, and no test built on hand-made fixtures noticed. That
+  became a standing rule in its own right.
+
+A trait nothing reads is indistinguishable from a trait that does not
+exist, except that it costs a row per entity and makes the catalogue
+number look healthy. Going from 128 to 2,100 in one pass would create
+roughly 1,972 of them, and the count would then be the least
+informative figure in this document.
+
+**So grow the catalogue alongside the systems that consume it.** The 18
+`partial` urban systems are the natural pairing: Education (§25 tiers,
+4 traits today), Health (§64 disease, 4 traits), Employment (§4 wage
+dynamics) and Reputation (§15 radius and decay) each need both traits
+and the mechanics to read them. That order also means the trait count
+rising is evidence of something rather than a target being hit.
+
+And a third of the same lesson, worth repeating because it is the
+hardest to see: **read traits through `getLiveEntity()`.** The
+denormalised `npc.traits` sheet is built once at generation and never
+refreshed. A signal reading it does not fail — it returns the birth
+value forever, which is a plausible number, and a plausible frozen
+number is far harder to spot than a null.
 
 ---
 
