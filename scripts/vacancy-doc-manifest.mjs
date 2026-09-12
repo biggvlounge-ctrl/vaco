@@ -162,9 +162,33 @@ archives were searched by filename, and the whole repo was searched by
 *content* for each document's distinctive subject matter. None of them
 are here under another name.
 
-Until then, treat the index as a *record of what was written*, not an
-inventory of what is here. Anything below is a document you will not
-find by following it.
+Treat the index as a *record of what was written*, not an inventory of
+what is here. Anything below is a document you will not find by
+following it.
+
+**Confirmed on 12 Sep 2026: they are not coming.** The owner stated
+there are no further VACANCY documents, which settles a question this
+file had left open-ended. These 68 are gone permanently, not pending.
+
+**Seven of them were superseded the same day rather than recovered.**
+A consolidated handoff now sits at
+\`vacon-c/VACANCY_CONSOLIDATED_MASTER_SPEC.md\` and covers the ground
+held by \`VACANCY_WORLD_BIBLE_COMPLETION_MAP.md\`,
+\`VACANCY_CITY_DNA_MASTER_FRAMEWORK.md\`,
+\`VACANCY_CIVILIZATION_DNA_DATABASE.md\`,
+\`VACANCY_GAME_DNA_MASTER_FRAMEWORK.md\` and world-bible parts
+\`_31_35\`, \`_36_45\`, \`_46_50_FINAL\`. It is the design authority for
+VACANCY and outranks every other VACANCY document here.
+
+**What it does not restore, stated by its sender:** the literal
+2,100-entry trait catalogue and the per-part world-bible entries. It
+carries the *architecture* for both. Those enumerations have to be
+generated during the build, and a generated trait list must be
+labelled as generated rather than cited as recovered source.
+\`dev-docs/VACANCY_SPEC_IMPLEMENTATION_MAP.md\` maps the spec section
+by section against what is actually built — 128 trait definitions
+against the 2,100 asked for, among other things — and is the document
+to read before starting work.
 
 ### What survived them, which is more than the list suggests
 
