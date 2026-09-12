@@ -112,6 +112,42 @@ function reactive(value, onChange, seen) {
   // simply repeats it -- so hand back the same proxy.
   if (visited.proxies.has(value)) return visited.proxies.get(value);
 
+  // **The same argument as the cycle refusal above, for values that
+  // do not survive the JSON round trip as themselves.** This store is
+  // written as JSON and read back with `JSON.parse`, so anything but a
+  // plain object or an array comes back as something else, and every
+  // one of those failures is quiet or distant from its cause:
+  //
+  //   `new Date()`  -- throws at flush, not at the assignment. Reading
+  //                    it through the proxy calls `Date.prototype.toJSON`
+  //                    with `this` set to the proxy, which has no date
+  //                    internal slot: "this is not a Date object". On
+  //                    the debounced path that lands in a `setTimeout`,
+  //                    so it is an unhandled rejection and the write is
+  //                    lost. Even without the proxy it would come back
+  //                    from disk as a string, so `.getTime()` works
+  //                    until the first restart.
+  //   `new Map()`   -- serializes as `{}`. Silent, total data loss with
+  //   `new Set()`      no error anywhere, which is the worst of the
+  //                    three outcomes.
+  //   a class instance -- comes back as a plain object with no methods.
+  //
+  // Latent when this was added: nothing in the repo puts any of them in
+  // a store today, checked. It is here because the natural thing to
+  // write is `store.orders.push({ placedAt: new Date() })`, and the
+  // point of a refusal is to fail at that line rather than at a flush
+  // several requests later.
+  const proto = Object.getPrototypeOf(value);
+  if (proto !== null && proto !== Object.prototype && !Array.isArray(value)) {
+    throw new TypeError(
+      `persistence: refusing to store a ${value.constructor?.name || 'non-plain'} value. `
+      + 'The store is written as JSON and read back with JSON.parse, so only plain objects, '
+      + 'arrays and primitives survive a restart as themselves -- a Date returns as a string, '
+      + 'a Map or Set returns as {}, and a class instance returns without its methods. '
+      + 'Store the serializable form instead (Date.now() rather than new Date()).',
+    );
+  }
+
   const proxy = new Proxy(value, {
     set(target, prop, next) {
       // `target` is the raw object, so this assignment does not
@@ -145,6 +181,45 @@ function reactive(value, onChange, seen) {
   } finally {
     visited.ancestors.delete(value);
   }
+
+  // **A serialization shortcut past the proxy, which is where most of
+  // the flush time was going.** Every mutating request pays a full
+  // `JSON.stringify` of the store (see `durable` below), and a Proxy
+  // is slow to stringify even with no `get` trap defined: each
+  // property read still goes through the proxy machinery, and every
+  // object in the store is individually wrapped. Measured on a 50k-row
+  // / 5.7 MB store, same bytes out both ways:
+  //
+  //   raw object          45 ms
+  //   through the proxy  174 ms
+  //   with this toJSON    66 ms
+  //
+  // `JSON.stringify` consults `toJSON` before reading any properties,
+  // so one proxy read per object replaces one per field. Defined on
+  // the raw target rather than answered from a `get` trap on purpose:
+  // a `get` trap would tax every read in the system to speed up the
+  // writes, and reads are the common case.
+  //
+  // Non-enumerable, so it stays out of `Object.keys`, out of spreads,
+  // and out of the JSON itself — checked byte-for-byte against the
+  // un-shortcut output, and `assert.deepStrictEqual` ignores it too.
+  //
+  // **Two objects must not get one, and both would be silent
+  // corruption rather than an error.** Anything with a `toJSON` of its
+  // own — a `Date` is the one that matters, since `reactive` wraps any
+  // object — would have `Date.prototype.toJSON` shadowed and serialize
+  // as `{}` instead of an ISO string. And a non-extensible object
+  // rejects a new property, so it keeps the slow path instead of
+  // throwing.
+  if (typeof value.toJSON !== 'function' && Object.isExtensible(value)) {
+    Object.defineProperty(value, 'toJSON', {
+      value: () => value,
+      enumerable: false,
+      configurable: true,
+      writable: true,
+    });
+  }
+
   return proxy;
 }
 
@@ -233,14 +308,35 @@ function commit(store) {
 // it is 0.55 ms. That is cheap enough that being exhaustive beats
 // being clever.
 //
+// **Two of the figures that used to be here were wrong, and how they
+// were wrong is the useful part.** They read ~4.9 ms at 10k records
+// and ~30 ms at 50k. Re-measured through an actual persistent store
+// rather than over a raw object of the same shape: **54 ms and
+// 229 ms** — 7x worse at 50k, because a full `JSON.stringify` of the
+// store goes through one Proxy per object and the old numbers never
+// paid that. Serializing the raw object really is ~35 ms at 50k; the
+// store is not a raw object.
+//
+// That gap is now mostly closed by the `toJSON` shortcut in
+// `reactive`, which brings the same flush to **11 ms and 62 ms**. The
+// remaining cost is real work: stringify plus the write.
+//
 //: Flagged interpretive, and the number that matters if this is ever
 //: revisited: cost scales with total store size, not with the size of
-//: the change. Measured on this machine at 10k records / 1.1 MB it is
-//: ~4.9 ms, and at 50k / 6 MB it is ~30 ms. Somewhere past a megabyte
-//: per store, this should become append-only or move to SQLite
-//: (`node:sqlite` is in Node 22's standard library, no package
-//: needed). Below that, whole-file writes are the simpler correct
-//: thing.
+//: the change. Measured on this machine, per mutating request:
+//:
+//:     1k records / 0.1 MB      1 ms
+//:    10k records / 1.1 MB     11 ms
+//:    50k records / 5.7 MB     62 ms
+//:   200k records / 23.0 MB   662 ms
+//:
+//: Somewhere past a few megabytes per store, this should become
+//: append-only or move to SQLite (`node:sqlite` is in Node 22's
+//: standard library, no package needed). Below that, whole-file writes
+//: are the simpler correct thing. The stores that can reach it are the
+//: two that are still file-backed and grow without a bound —
+//: `vaco-shell` and `vaco-analytics`, whose `alerts` array has no
+//: retention policy.
 //
 // Only mutating methods commit -- a GET changed nothing. Only 2xx
 // commits -- a rejected request changed nothing worth forcing to disk.
