@@ -1,7 +1,7 @@
 {
-  "total": 1608,
-  "passed": 1558,
-  "failed": 1,
+  "total": 1609,
+  "passed": 1560,
+  "failed": 0,
   "skipped": 49,
   "suites": 39,
   "perSuite": {
@@ -42,9 +42,9 @@
       "skipped": 0
     },
     "scripts": {
-      "tests": 165,
-      "pass": 156,
-      "fail": 1,
+      "tests": 166,
+      "pass": 158,
+      "fail": 0,
       "skipped": 8
     },
     "shield": {

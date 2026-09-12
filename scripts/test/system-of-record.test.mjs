@@ -138,6 +138,34 @@ test('every stated commit count matches the commit the document is stamped at', 
     + 'as prose rather than as "N commits" — every occurrence of that form is a live claim.');
 });
 
+// **A committed test record must not say the suite was red.**
+//
+// `dev-docs/TEST_COUNTS.json` is rewritten by every `run-all-tests.mjs`
+// run, including a failing one. Three times in one session that file
+// went out in a commit carrying somebody's mid-fix state — once with
+// `failed: 1` recorded, from the run before a stamp was corrected.
+//
+// A stale count is a nuisance. A committed count that says the suite
+// was failing is a claim about the repository that is not true and that
+// nothing else contradicts, so it stands. This makes it impossible to
+// commit: the file is only ever allowed to describe a green run.
+test('the committed test record describes a passing run', () => {
+  const counts = JSON.parse(fs.readFileSync(
+    path.join(REPO_ROOT, 'dev-docs', 'TEST_COUNTS.json'), 'utf8'));
+
+  assert.equal(counts.failed, 0,
+    `dev-docs/TEST_COUNTS.json records ${counts.failed} failing test(s). Re-run `
+    + '`node scripts/run-all-tests.mjs` once the suite is green and commit that, rather '
+    + 'than committing a record of a red run.');
+
+  for (const [suite, row] of Object.entries(counts.perSuite || {})) {
+    assert.equal(row.fail, 0, `TEST_COUNTS.json records ${row.fail} failing test(s) in "${suite}"`);
+  }
+
+  // And it must not be empty, which would satisfy the above vacuously.
+  assert.ok(counts.total > 100, `TEST_COUNTS.json records only ${counts.total} tests`);
+});
+
 test('the per-suite table matches what each app really has', () => {
   // **Not compared against a single headline number.** run-all-tests
   // and the completion report count different things — the former
