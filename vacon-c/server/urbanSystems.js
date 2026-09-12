@@ -407,15 +407,19 @@ const SYSTEMS = [
   {
     n: 37,
     name: 'Technology',
-    level: 'partial',
-    schemaOnly: ['technology_eras', 'civilization_technology_progress'],
+    level: 'modelled',
+    tables: ['technology_eras', 'civilization_technology_progress', 'civilizations'],
     phases: ['runReemergencePhase'],
     traitFamilies: ['technology'],
-    note: '**A correction.** The first version said "ten named eras with a requirements chain '
-      + '— this is §40 bottleneck logic, built". The eras and the requirements column are '
-      + 'defined in the schema and no engine code reads either, so §40 is NOT built: nothing '
-      + 'gates a technology on its prerequisites. What is real is `runReemergencePhase`, which '
-      + 'computes a recovery index, and the `technology` trait family.',
+    functions: ['seedTechnologyEras', 'canUnlock', 'unlockEra', 'nextEraFor', 'runTechnology'],
+    note: '**Built 12 Sep 2026, after two wrong labels.** Said "modelled" first because ten '
+      + 'eras with a `requirements` column are defined; corrected to `partial` when the '
+      + 'citations were checked and neither table turned out to be read by anything — so §40\'s '
+      + 'bottleneck logic was a column where a dependency chain could go. Now real: an era '
+      + 'needs its prerequisite era AND a population whose reemergence index clears the level '
+      + 'it asks for, and `canUnlock` returns WHY it refused rather than a bare boolean. One '
+      + 'era per tick, so a world that crosses a threshold does not jump from stone tools to '
+      + 'computing in a single tick.',
   },
   {
     n: 38,

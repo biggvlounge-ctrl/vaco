@@ -110,6 +110,16 @@ const WorldState = {
   // "beliefs/entity_knowledge" and beliefs was a dead table at the
   // time. `server/beliefs.js`.
   beliefs: [],
+  // Civilizations and the technology ladder. Four dead tables built
+  // together on 12 Sep 2026 because they are one system:
+  // `civilizations`, `technology_eras`, its `requirements` chain, and
+  // `civilization_technology_progress`. This is §40's bottleneck
+  // logic, which an earlier revision of the implementation map claimed
+  // was built on the strength of the requirements COLUMN existing.
+  // `server/technology.js`; runs inside the Reemergence phase.
+  civilizations: [],
+  technologyEras: [],
+  civilizationTechnologyProgress: [],
   governments: [],
   elections: [],
   votes: [],

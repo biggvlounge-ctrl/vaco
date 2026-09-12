@@ -49,6 +49,7 @@ const { getEntityTraitsForEntity, applyKeyModifier, getLiveEntity, traitsToSheet
 const worldStore = require('./worldStore.js');
 const economy = require('./economy.js');
 const politics = require('./politics.js');
+const technology = require('./technology.js');
 const keys = require('./keys.js');
 const territory = require('./territory.js');
 const property = require('./property.js');
@@ -492,6 +493,18 @@ function runReemergencePhase(worldState) {
     total += ((live.traits.emotional?.Resilience ?? 0) + (live.traits.mental?.Adaptability ?? 0)) / 2;
   }
   worldState.reemergenceIndex = Math.round(total / worldState.npcs.length);
+
+  // **Technology, after the index it depends on.** Ordering is the
+  // whole point: `canUnlock` reads `worldState.reemergenceIndex`, so
+  // running this first would test every civilization against last
+  // tick's capability. Same mistake the Economy phase already fixed
+  // when it priced listings before computing scarcity.
+  //
+  // Not a twelfth phase — civilization coming back is this phase's own
+  // subject, and the pipeline is locked at eleven.
+  const advanced = technology.runTechnology(worldState, worldState.tick);
+  worldState.technologyEvents = advanced.events;
+
   return worldState.reemergenceIndex;
 }
 

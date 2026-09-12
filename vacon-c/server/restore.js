@@ -240,6 +240,24 @@ async function restoreWorldStateFromPostgres(worldState) {
   // `approval >= approvalFloor` a lexicographic comparison, so "9"
   // would read as above a floor of 35 and a collapsing government
   // would restore as a stable one.
+  // Civilizations and the technology ladder. `stability_index` and
+  // every id go through `nums` (rule 10); `requirements` comes back
+  // from JSONB already parsed by the driver, so it is left alone —
+  // calling JSON.parse on an object throws, and wrapping that in a
+  // try/catch would hide a real shape change.
+  worldState.civilizations = (await q('SELECT * FROM civilizations ORDER BY id')).map((c) =>
+    nums(c, ['id', 'stability_index']));
+  summary.civilizations = worldState.civilizations.length;
+
+  worldState.technologyEras = (await q('SELECT * FROM technology_eras ORDER BY era_order')).map((e) =>
+    nums(e, ['id', 'era_order']));
+  summary.technology_eras = worldState.technologyEras.length;
+
+  worldState.civilizationTechnologyProgress =
+    (await q('SELECT * FROM civilization_technology_progress')).map((p) =>
+      nums(p, ['civilization_id', 'era_id', 'unlocked_tick']));
+  summary.civilization_technology_progress = worldState.civilizationTechnologyProgress.length;
+
   // **`strength` named in `nums`.** Postgres returns NUMERIC as a
   // string, and a string strength makes `belief.strength + delta`
   // string concatenation — "50" + 10 is "5010", which clamps to 100

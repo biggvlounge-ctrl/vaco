@@ -448,6 +448,36 @@ async function migrateWorldStateToPostgres(worldState) {
       // them; `revolutions` references organizations twice. Cities are
       // already written by this point, which `laws` and
       // `public_opinion` need for their jurisdiction columns.
+      // Civilizations, then the era ladder, then progress — in that
+      // order because `civilization_technology_progress` references
+      // both `civilizations(id)` and `technology_eras(id)`.
+      // `requirements` is JSONB, so it is stringified rather than
+      // passed as an object.
+      for (const c of worldState.civilizations) {
+        await client.query(
+          `INSERT INTO civilizations (id, name, era, stability_index) VALUES ($1,$2,$3,$4)`,
+          [c.id, c.name, c.era, c.stability_index]
+        );
+      }
+      summary.civilizations = worldState.civilizations.length;
+
+      for (const e of worldState.technologyEras) {
+        await client.query(
+          `INSERT INTO technology_eras (id, name, era_order, requirements) VALUES ($1,$2,$3,$4)`,
+          [e.id, e.name, e.era_order, JSON.stringify(e.requirements ?? null)]
+        );
+      }
+      summary.technology_eras = worldState.technologyEras.length;
+
+      for (const p of worldState.civilizationTechnologyProgress) {
+        await client.query(
+          `INSERT INTO civilization_technology_progress (civilization_id, era_id, unlocked_tick)
+           VALUES ($1,$2,$3)`,
+          [p.civilization_id, p.era_id, p.unlocked_tick]
+        );
+      }
+      summary.civilization_technology_progress = worldState.civilizationTechnologyProgress.length;
+
       // beliefs, before the political tables that read them.
       for (const b of worldState.beliefs) {
         await client.query(

@@ -105,12 +105,12 @@ from memory with nothing in the repo to check it against. The forty are
 now data in `vacon-c/server/urbanSystems.js`, every citation verified
 by `vacon-c/test/urban-systems.test.js`, and the real breakdown is:
 
-**11 modelled, 18 partial, 5 slot-only, 6 absent**
+**12 modelled, 17 partial, 5 slot-only, 6 absent**
 
 | Level | Means | Systems |
 |---|---|---|
-| **modelled** (11) | Real mechanics; something advances or decides on it each tick | Population, Housing, Economy, **Employment**, Infrastructure, **Political**, Cultural, Community Organizations, Real Estate, Environmental, AI Decision |
-| **partial** (18) | A trait family or a live table with little driving it, or one phase covering two systems | Education, Health, Food Supply, Water, Law Enforcement, Crime, Gang, Organized Crime, **Court**, Communication, **Religion**, Business, Construction, Weather, Disaster, Technology, Migration, Reputation |
+| **modelled** (12) | Real mechanics; something advances or decides on it each tick | Population, Housing, Economy, **Employment**, Infrastructure, **Political**, Cultural, Community Organizations, Real Estate, Environmental, **Technology**, AI Decision |
+| **partial** (17) | A trait family or a live table with little driving it, or one phase covering two systems | Education, Health, Food Supply, Water, Law Enforcement, Crime, Gang, Organized Crime, **Court**, Communication, **Religion**, Business, Construction, Weather, Disaster, Migration, Reputation |
 | **slot** (5) | Storage exists and nothing reads it | Transportation, Energy, Waste, Fire & Emergency, Supply Chain |
 | **absent** (6) | No representation at all | Prison, Government Services, Media, Social Media, Military/National Guard, Tourism |
 
@@ -331,10 +331,10 @@ behaviour, which §82 forbids.
 | § | State | Detail |
 |---|---|---|
 | 36 Community development ladder | **PARTIAL** | `communities` + `getCommunityHealth`. The six named stages (camp → civilization) are not an explicit progression. |
-| 37 Civilization reemergence engine | **PARTIAL** | `runReemergencePhase` and `getCityReemergence` are real and compute a recovery index per city. The two technology tables are schema-only, so era progression itself is not driven. |
+| 37 Civilization reemergence engine | **BUILT** | `runReemergencePhase` and `getCityReemergence` compute the recovery index, and `runTechnology` now advances each civilization up the era ladder from it — **one era per tick**, so a world that crosses a threshold does not jump from stone tools to computing because the index rose. |
 | 38 Regional states | **PARTIAL** | A reemergence index is computed; the four named bands are not applied as labels. |
 | 39 Reemergence systems | **PARTIAL** | The ladder is by technology era, not by the five named system groups. **The spec's own restraint on weapons infrastructure is respected** — nothing models construction instructions. |
-| 40 Bottleneck logic | **PARTIAL — and this row said BUILT, wrongly** | The claim was that `technology_eras.requirements` is the dependency chain. It is, in the schema, and **no engine code reads either the table or the column** — so nothing gates a technology on its prerequisites. What IS real is the cascade half: `test/drought-cascade.test.js` drives a drought through resources into the economy and out into social and migration effects. Cascades yes, technology prerequisites no. |
+| 40 Bottleneck logic | **BUILT — after this row said BUILT wrongly, then PARTIAL** | The original claim was that `technology_eras.requirements` is the dependency chain. It was, in the schema, with **no engine code reading the table or the column** — a place where a dependency chain could go. `server/technology.js` now makes it one: an era needs its prerequisite era AND a population whose reemergence index clears the level it asks for, and `canUnlock` returns **why** it refused rather than a bare boolean, because a bottleneck nobody can see the reason for is not one anybody can act on. The cascade half was always real: `test/drought-cascade.test.js`. |
 | 41 Historical memory | **BUILT** | `historical_records`, `runHistoryPhase`, `memories`, `decision_log`. |
 | 42 Probability system | **BUILT** | `winProbability`, `seededUnit`, `hashSeed` in `contest.js`; probability throughout the tick. |
 | 43 Event engine | **BUILT** | With cascades. |
@@ -370,7 +370,7 @@ behaviour, which §82 forbids.
 | 63 Political / government system | **BUILT, except the progression** | All six tables are live: `foundGovernment`, `enactLaw`/`repealLaw`, `scheduleElection`/`castVote`/`closeElection` (a tie elects nobody rather than the first candidate found), `computeApproval`, `assessRevolutions`, `resolveRevolution`. **§63's six-stage progression from informal rules upward is still not implemented** — a world either has a government or does not. A law with no government attached is the closest thing to stage one and is supported. |
 | 64 Health system | **PARTIAL** | A `health` trait family (4). No disease, no medical knowledge loss and recovery, no clinics as a system. |
 | 65 Education system | **PARTIAL** | `educational` traits (4). No schools, teachers, literacy or libraries as entities. |
-| 66 Technology recovery | **PARTIAL** | `technology_eras` defines ten eras with a `requirements` column and nothing reads it. `runReemergencePhase` computes a recovery index, which is the part that works. |
+| 66 Technology recovery | **BUILT, on one input** | Ten eras, prerequisites enforced, gated on the population's reemergence index. §66 names six drivers — "discovery, knowledge, resources, specialists, manufacturing, infrastructure" — and this uses **one**: the index derived from live Resilience and Adaptability. The other five are real inputs that nothing feeds in yet. |
 
 ## §§67–71 · Graphs, precision, scalability, tick, persistence
 
