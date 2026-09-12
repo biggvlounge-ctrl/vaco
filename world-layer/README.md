@@ -19,7 +19,10 @@ each generating its own separate copy.
 > tested (28 tests, `npm test`) — it is simply not plugged in.
 
 See `UNIVERSAL_WORLD_LAYER_ARCHITECTURE.md` (project root) for the
-full architecture. All six bundled systems from that doc's "final
+full architecture. For the four things this stack does NOT cover —
+parcels, block-level statistics, high-resolution terrain and
+hydrography, and crime data — plus the licensing traps and how each
+dataset lands on a VACON-C column, see `dev-docs/LAND_AND_MAP_DATA.md`. All six bundled systems from that doc's "final
 architecture consolidation" are implemented.
 
 **Relationship to VACON-C**: linked, not replaced. This package is a

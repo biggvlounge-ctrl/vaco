@@ -551,8 +551,8 @@ const CATALOGUE = [
     key: 'terrain_and_water', category: 'environment', unit: 'share', scope: 'community',
     unavailable: '§9 asks for woods, rivers, lakes and flood zones. `regions.geography_key` '
       + 'and `regions.climate_key` are the only geography in the schema, both TEXT, both '
-      + 'written by nothing. See dev-docs on land and map data for where real terrain '
-      + 'would come from.',
+      + 'written by nothing. dev-docs/LAND_AND_MAP_DATA.md names the real sources — USGS '
+      + '3DEP, the National Hydrography Dataset, NLCD and FEMA flood zones.',
   },
 
   // ---- psychological -------------------------------------------------
