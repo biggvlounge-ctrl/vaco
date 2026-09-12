@@ -124,6 +124,12 @@ async function restoreWorldStateFromPostgres(worldState) {
       education: n.education ?? null,
       religion: n.religion ?? null,
       generation: num(n.generation) ?? 1,
+      // Residency, restored from the two columns that carry it. Losing
+      // these would put everybody back to unplaced and make every
+      // per-area statistic read as zero — which looks like an empty
+      // world rather than a lost join.
+      communityId: num(e.community_id) ?? null,
+      home_property_id: num(n.home_property_id) ?? null,
       traits: sheetFor(Number(n.entity_id)),
       createdTick: e.created_tick ?? 0,
       updatedTick: e.updated_tick ?? 0,

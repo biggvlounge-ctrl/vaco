@@ -278,6 +278,20 @@ function generateNPC(options = {}) {
     education: options.education || null,
     religion: options.religion || null,
     generation: options.generation || 1,
+    // **Where this person lives.** `entities.community_id` and
+    // `npcs.home_property_id` were both in the schema from the start
+    // and set by NOTHING — so no person was associated with any area,
+    // and every per-area statistic was not merely missing but
+    // uncomputable. `home_property_id` was read in exactly one place
+    // (mortality.js, for a death's location) and was therefore always
+    // null.
+    //
+    // Null is still allowed and still means unplaced: a world can
+    // generate people before it has anywhere to put them, and
+    // `areaStats.js` counts the unplaced separately rather than
+    // assigning them to an arbitrary community.
+    communityId: options.communityId ?? null,
+    home_property_id: options.homePropertyId ?? null,
     traits: traitsToSheet(traitRows),
     createdTick: WorldState.tick,
     updatedTick: WorldState.tick,

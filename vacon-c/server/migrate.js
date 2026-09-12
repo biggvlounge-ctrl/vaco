@@ -66,6 +66,17 @@ async function migrateWorldStateToPostgres(worldState) {
       // appeared once somebody had died.
       for (const npc of [...worldState.npcs, ...(worldState.deceased || [])]) {
         await client.query(
+          // **Residency is NOT written here**, and the FK-ordering test
+          // is what said so: `entities.community_id -> communities` and
+          // `npcs.home_property_id -> properties`, and both of those
+          // tables are inserted later (positions 9 and 11). Writing
+          // them inline would roll the whole migration back on a real
+          // database — the same class of failure that already did that
+          // twice.
+          //
+          // Backfilled below once communities and properties exist,
+          // which is the two-phase pattern this file already uses for
+          // the circular `entities.family_id` FK.
           `INSERT INTO entities (id, type, status, created_tick, updated_tick) VALUES ($1, 'npc', $2, $3, $4)`,
           [npc.id, npc.status, npc.createdTick, npc.updatedTick]
         );
@@ -346,6 +357,37 @@ async function migrateWorldStateToPostgres(worldState) {
         );
       }
       summary.properties = worldState.properties.length;
+
+      // ---------------------------------------------------------------
+      // Backfill residency, now that communities and properties exist
+      // ---------------------------------------------------------------
+      // **Deferred for the same reason `entities.family_id` is.**
+      // `entities.community_id -> communities(id)` and
+      // `npcs.home_property_id -> properties(id)` both point at tables
+      // inserted after the entity rows, so writing them inline rolls
+      // the migration back on a real database. `migrate.test.js`'s
+      // FK-ordering check caught exactly that when this was first
+      // written inline — which is the third time that class of bug has
+      // been caught here and the first time it was caught before
+      // reaching a database.
+      //
+      // The living and the dead both, because `deceased` carries
+      // residency too and a dead resident is what per-area death
+      // statistics count.
+      for (const npc of [...worldState.npcs, ...(worldState.deceased || [])]) {
+        if (npc.communityId !== null && npc.communityId !== undefined) {
+          await client.query(
+            `UPDATE entities SET community_id = $1 WHERE id = $2`,
+            [npc.communityId, npc.id]
+          );
+        }
+        if (npc.home_property_id !== null && npc.home_property_id !== undefined) {
+          await client.query(
+            `UPDATE npcs SET home_property_id = $1 WHERE entity_id = $2`,
+            [npc.home_property_id, npc.id]
+          );
+        }
+      }
 
       for (const o of worldState.ownershipRecords) {
         await client.query(
