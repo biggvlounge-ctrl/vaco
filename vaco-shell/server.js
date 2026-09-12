@@ -119,7 +119,7 @@ app.get('/api/apps/:id', (req, res) => {
   res.json(found);
 });
 
-// -- The two groupings of the same 18 parents --
+// -- The two groupings of the same 18 public parents --
 //
 // **Bundles group by what a customer is shopping for; constellations
 // group by lineage and shared roadmap.** Both are real, both are
@@ -127,11 +127,12 @@ app.get('/api/apps/:id', (req, res) => {
 // and VAGO in the bundles and with VOKEN in the constellations,
 // because it was extracted out of VOKEN.
 //
-// This comment used to read "5 bundles of 3 parents each". There have
-// been six for some time, sized 5, 3, 3, 3, 2, 2, and the declared
-// `BUNDLES` list disagrees with what the store draws for Commerce —
-// see SYSTEM_OF_RECORD.md §3a, which records that as open rather than
-// quietly picking one.
+// This comment used to read "5 bundles of 3 parents each". There are
+// six, sized 5, 3, 3, 3, 2, 2. The declared `BUNDLES` list also
+// disagreed with what the store drew for Commerce — CVLTVRE and VADO
+// tagged themselves into it without being declared — which was
+// resolved in favour of the store on 12 Sep 2026 and is now held by
+// `scripts/test/registry.test.mjs`.
 
 app.get('/api/bundles', (_req, res) => {
   res.json({ bundles: listBundles() });
@@ -254,7 +255,7 @@ function withApp(listing) {
     category: registryApp ? registryApp.category : null,
     bundle: registryApp ? registryApp.bundle : null,
     // `parent` was missing here, which is why the store rendered 37
-    // flat tiles: the registry folds those into 18 real products
+    // flat tiles: the registry folds those into 18 bundled products
     // (Vvltvre is one product containing Music, Flix, Pods, Studios
     // and VENVM), and the UI could not see the folding because this
     // did not send it.

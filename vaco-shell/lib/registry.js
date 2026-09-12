@@ -9,28 +9,34 @@
 // real entry here.
 //
 // `parent`/`bundle` (added per direct instruction): every real running
-// app here maps to one of 16 real "parent" products -- some parents
+// app here maps to one of 18 real "parent" products -- some parents
 // are one app (VACAY), some fold several real, independently-running
-// apps together (Vvltvre = Music + Flix + Pods + Studios + VENVM;
-// VACON-C = the civilization-sim engine + VACON + VSAFE; V3 = the
-// ledger + VACA; V4 = the proxy + search layer; CVNVO = itself + YAP;
-// CHOPZ = itself + CHOPZ SHOP). Folding is organizational only -- it
-// does not change what actually runs where; every folded app keeps
+// apps together (Vvltvre = Music + Flix + Pods + Studios + VENVM; V3 =
+// the ledger + VACA; V4 = the proxy + search layer; CVNVO = itself +
+// YAP; CHOPZ = itself + CHOPZ SHOP). Folding is organizational only --
+// it does not change what actually runs where; every folded app keeps
 // its own real process, port, and health check.
 //
-// The 16 parents are grouped into 6 real bundles, by genuine
-// functional similarity, so related parents are easy to find/reason
-// about together -- 5 of 3, and (per direct instruction) a 6th pulling
-// VDP and VACON-C out on their own: both are genuinely gamified
-// (VDP's avatar economy/districts, VACON-C's civilization-sim/NPC/
-// mission engine), a different kind of "product" than the rest, so
-// they get their own category instead of being folded into
-// Operations & Infrastructure just to keep every bundle at 3 --
-// Operations & Infrastructure now correctly stands at 2 (VOID, V4).
-// `vaco-analytics`, `shield`, and `v3-shield` (legacy mock) still
-// aren't products of their own -- no parent/bundle. Neither are
-// `vaco-notify`, `vaco-audit`, `vaco-operator` and `vaco-media`: the
-// four cross-cutting services every app calls and no user launches.
+// **VACON-C used to be listed here as "the sim engine + VACON +
+// VSAFE". It is the engine alone as of 12 Sep 2026** -- see the note on
+// `vaco-notify` below. The count also read 16 parents while there have
+// been 18 since CVLTVRE and VADO were promoted on 2026-08-26.
+//
+// The 18 parents are grouped into 6 real bundles, by genuine functional
+// similarity, so related parents are easy to find/reason about together
+// -- sized 5, 3, 3, 3, 2, 2. Per direct instruction a 6th bundle pulled
+// VDP and VACON-C out on their own: both are genuinely gamified (VDP's
+// avatar economy/districts, VACON-C's civilization-sim/NPC/mission
+// engine), a different kind of "product" than the rest, so they get
+// their own category instead of being folded into Operations &
+// Infrastructure just to keep the sizes tidy -- Operations &
+// Infrastructure correspondingly stands at 2 (VOID, V4).
+//
+// Eight apps are products of no bundle at all, which is what
+// `parent: null, bundle: null` means: `shield`, `vaco-analytics`,
+// `vaco-audit`, `vaco-operator`, `vaco-media`, `vaco-notify`, `vacon`,
+// `vsafe` -- the cross-cutting services every app calls and no user
+// launches -- plus `v3-shield`, the legacy dev mock.
 //
 // **Two absences here are deliberate, and both have bitten before.**
 // `vex` (8816) is not listed because `vex-trading` (8817) is the shell
@@ -65,20 +71,21 @@ export const APPS = [
   // Not a consumer product: the one channel every alerting surface
   // delivers through. Listed so it is discoverable and health-checked.
   //
-  // **`parent: 'VACON-C'` puts it on a public store card, and the
-  // constellations document says the opposite.** This comment used to
-  // cite that document as justification — "parented to VACON-C with the
-  // rest of the internal layer, see dev-docs/VACO_CONSTELLATIONS.md" —
-  // which reads as agreement and is not: the recorded decision is that
-  // VACON-C the game is public while VACON, VSAFE and this are not.
+  // **This, VACON and VSAFE carried `parent: 'VACON-C'` until 12 Sep
+  // 2026, which put three internal services on a public store card.**
+  // The comment here used to cite dev-docs/VACO_CONSTELLATIONS.md as
+  // justification — "parented to VACON-C with the rest of the internal
+  // layer" — which reads as agreement and was the opposite of what that
+  // document says. The recorded decision is explicit: "VACON-C the game
+  // went to GAMES; VACON the agent network and VSAFE the safety layer
+  // stayed internal."
   //
-  // The constellation view places all three in ◇ internal, keyed by id
-  // rather than by parent, so the decision is honoured where it is
-  // visible. The parent stays as it is because changing it moves the
-  // app in the store, in the compose generator's grouping and in
-  // SYSTEM_OF_RECORD §3 at once. Recorded as open in §3a rather than
-  // resolved in passing.
-  { id: 'vaco-notify', name: 'VACO Notify', description: 'The one notification channel — VSAFE escalations, DREAMS and Analytics alerts.', url: 'http://localhost:8818', category: 'system', parent: 'VACON-C', bundle: 'Gamified & Simulation' },
+  // Now `parent: null, bundle: null`, which is how every other
+  // cross-cutting service is spelled, so both store views agree: these
+  // three sit with Shield, Audit, Operator, Media and Analytics on the
+  // shared-infrastructure shelf and nowhere else. The VACON-C card is
+  // the simulation engine alone.
+  { id: 'vaco-notify', name: 'VACO Notify', description: 'The one notification channel — VSAFE escalations, DREAMS and Analytics alerts.', url: 'http://localhost:8818', category: 'system', parent: null, bundle: null },
   { id: 'voken', name: 'VOKEN', description: 'The card engine — minting, editions, provenance, value scores.', url: 'http://localhost:8794', category: 'consumer', parent: 'VOKEN', bundle: 'Commerce & Marketplace' },
   { id: 'cvltvre', name: 'CVLTVRE', description: 'Collect, trade, and auction anything with real cultural relevance.', url: 'http://localhost:8794/#packs', category: 'consumer', parent: 'CVLTVRE', bundle: 'Commerce & Marketplace' },
   { id: 'vado', name: 'VADO', description: 'The Art District — auctions, galleries, art frames.', url: 'http://localhost:8794/#vado', category: 'consumer', parent: 'VADO', bundle: 'Commerce & Marketplace' },
@@ -97,13 +104,13 @@ export const APPS = [
   { id: 'venvm', name: 'VENVM', description: "The ecosystem's AI production/marketing tool -- script requests, cross-platform video reformatting, a real production pipeline. Lives inside Vvltvre; also reachable through this shell for public use.", url: 'http://localhost:8813', category: 'consumer', parent: 'Vvltvre', bundle: 'Leisure & Entertainment' },
   { id: 'dreams', name: 'DREAMS', description: "The ecosystem's ad/screen network -- screen registration, self-serve advertiser flow, real per-screen revenue split. Runs inside HVNTZ, feeding its screens real analytics.", url: 'http://localhost:8814', category: 'consumer', parent: 'HVNTZ', bundle: 'Social & Discovery' },
   { id: 'vavlt-stvdios', name: 'Vavlt Stvdios', description: 'Multi-channel streaming, IG-style content layer, 8-screen sessions.', url: 'http://localhost:8808', category: 'consumer', parent: 'Vault', bundle: 'Leisure & Entertainment' },
-  { id: 'vsafe', name: 'VSAFE', description: 'Universal safety layer -- check-ins, trusted contacts, escalation.', url: 'http://localhost:8799', category: 'consumer', parent: 'VACON-C', bundle: 'Gamified & Simulation' },
+  { id: 'vsafe', name: 'VSAFE', description: 'Universal safety layer -- check-ins, trusted contacts, escalation.', url: 'http://localhost:8799', category: 'consumer', parent: null, bundle: null },
   { id: 'vacon-c', name: 'VACON-C', description: 'Civilization simulation engine -- state/tick/NPC/mission API.', url: 'http://localhost:8809', category: 'consumer', parent: 'VACON-C', bundle: 'Gamified & Simulation' },
   { id: 'vex-trading', name: 'Vex Trading', description: 'Parent shell over two real sub-apps: VEX (Cvltvre Card brokerage, extracted from VOKEN) and Vex Business (futures-research/trading platform, renamed from CALL).', url: 'http://localhost:8817', category: 'consumer', parent: 'Vex', bundle: 'Financial & Trading' },
 
   // -- Foundation / infrastructure --
   { id: 'vaca', name: 'VACA', description: "Identity/authenticity verification -- V3's third component.", url: 'http://localhost:8804', category: 'infra', parent: 'V3', bundle: 'Financial & Trading' },
-  { id: 'vacon', name: 'VACON', description: 'The real operating network -- MIA + the named executive agents.', url: 'http://localhost:8805', category: 'infra', parent: 'VACON-C', bundle: 'Gamified & Simulation' },
+  { id: 'vacon', name: 'VACON', description: 'The real operating network -- MIA + the named executive agents.', url: 'http://localhost:8805', category: 'infra', parent: null, bundle: null },
   { id: 'v4-proxy', name: 'V4 Agent Proxy', description: 'Holds the Anthropic API key server-side for VACON.', url: 'http://localhost:8787', category: 'infra', parent: 'V4', bundle: 'Operations & Infrastructure' },
   { id: 'v4-search', name: 'V4 Search Layer', description: 'Shared cross-app search routing.', url: 'http://localhost:8788', category: 'infra', parent: 'V4', bundle: 'Operations & Infrastructure' },
   { id: 'vaco-analytics', name: 'VACO Analytics', description: "The ecosystem's unified metrics dashboard.", url: 'http://localhost:8790', category: 'infra', parent: null, bundle: null },
@@ -116,12 +123,31 @@ export const APPS = [
 ];
 
 // The 6 real bundles, grouped by genuine functional similarity (not
-// alphabetical, not insertion order) -- 5 of 3 parents, plus Gamified
-// & Simulation (2) pulled out on its own per direct instruction, and
-// Operations & Infrastructure correspondingly down to 2.
+// alphabetical, not insertion order). Sizes today: 5, 3, 3, 3, 2, 2.
+//
+// **This comment said "5 of 3 parents" and was wrong twice over.** It
+// described five bundles when there are six, and a uniform three when
+// Commerce holds five and two bundles hold two. Gamified & Simulation
+// was pulled out on its own per direct instruction, taking Operations &
+// Infrastructure down to 2 with it.
+//
+// **CVLTVRE and VADO were missing from Commerce's list until 12 Sep
+// 2026, and that was a real disagreement rather than an omission in
+// prose.** There are two sources of truth for this grouping: the array
+// below, and each app's own `bundle` field. Both apps carried
+// `bundle: 'Commerce & Marketplace'` from the day they were promoted to
+// parents (2026-08-26, see dev-docs/CVLTVRE_AND_VADO_EXTRACTION_AUDIT.md)
+// and neither was ever added here. So `/api/bundles` answered three
+// products and the store page drew five, for two weeks, and the store
+// page is the one people see.
+//
+// Resolved in favour of what the store draws: they are parents, they
+// are commerce, and the declared list was simply behind.
+// `scripts/test/registry.test.mjs` now holds the two against each
+// other so they cannot disagree again.
 export const BUNDLES = [
   { name: 'Financial & Trading', parents: ['Vex', 'V3', 'VAGO'] },
-  { name: 'Commerce & Marketplace', parents: ['VENVS', 'VOKEN', 'CHOPZ'] },
+  { name: 'Commerce & Marketplace', parents: ['VENVS', 'VOKEN', 'CVLTVRE', 'VADO', 'CHOPZ'] },
   { name: 'Social & Discovery', parents: ['VXLLAGE', 'CVNVO', 'HVNTZ'] },
   { name: 'Leisure & Entertainment', parents: ['VACAY', 'Vvltvre', 'Vault'] },
   { name: 'Gamified & Simulation', parents: ['VDP', 'VACON-C'] },

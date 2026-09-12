@@ -31,7 +31,7 @@ import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-const { APPS } = await import(
+const { APPS, BUNDLES } = await import(
   path.join(REPO_ROOT, 'vaco-shell', 'lib', 'registry.js')
 );
 
@@ -145,4 +145,53 @@ test('registry ports match the PORT each container is given', () => {
     }
   }
   assert.deepEqual(wrong, [], wrong.join('; '));
+});
+
+// -- The two sources of truth for a bundle --------------------------------
+//
+// **They disagreed for two weeks and nothing said so.** `BUNDLES` lists
+// the parents in each bundle; separately, every app carries its own
+// `bundle` field, and that field is what the store page groups by.
+// CVLTVRE and VADO were promoted to parents on 2026-08-26 with
+// `bundle: 'Commerce & Marketplace'` and never added to the declared
+// list, so `/api/bundles` answered three products while the store drew
+// five. Both were self-consistent; neither knew about the other.
+test('the declared bundles and the apps agree about who is in what', () => {
+  const declared = new Map(BUNDLES.map((b) => [b.name, new Set(b.parents)]));
+
+  // Every bundle an app claims must exist, and must claim it back.
+  const wrong = [];
+  for (const app of APPS) {
+    if (!app.bundle) continue;
+    const parents = declared.get(app.bundle);
+    if (!parents) {
+      wrong.push(`${app.id} is in bundle "${app.bundle}", which BUNDLES does not define`);
+    } else if (!parents.has(app.parent)) {
+      wrong.push(`${app.id} carries bundle "${app.bundle}" but its parent `
+        + `"${app.parent}" is not in that bundle's declared list`);
+    }
+  }
+  assert.deepStrictEqual(wrong, [], wrong.join('\n    '));
+
+  // And the other direction: a declared parent nobody claims is a
+  // bundle listing a product that does not exist.
+  const claimed = new Set(APPS.filter((a) => a.parent).map((a) => a.parent));
+  const orphans = [];
+  for (const b of BUNDLES) {
+    for (const p of b.parents) {
+      if (!claimed.has(p)) orphans.push(`${b.name} declares parent "${p}", which no app claims`);
+    }
+  }
+  assert.deepStrictEqual(orphans, [], orphans.join('\n    '));
+});
+
+test('an app with no bundle has no parent either, and vice versa', () => {
+  // The shared-infrastructure spelling is both fields null. A half-set
+  // row groups one way in the store and another in the API — which is
+  // how VACON and VSAFE ended up on a public card while the
+  // constellation map called them internal.
+  const half = APPS
+    .filter((a) => Boolean(a.parent) !== Boolean(a.bundle))
+    .map((a) => `${a.id}: parent=${a.parent}, bundle=${a.bundle}`);
+  assert.deepStrictEqual(half, [], `these rows set one of parent/bundle but not the other:\n    ${half.join('\n    ')}`);
 });

@@ -13,8 +13,8 @@ person who built it can check whether a claim is still true.
 Every number below was produced by running the tool that owns it, not
 recalled. The commands are in §10 so they can be re-run.
 
-*Current as of commit `65b9604`, 66 commits, branch
-`claude/v4-proxy-server-s6dcp8`, 11 Sep 2026.*
+*Current as of commit `ea54adb`, 68 commits, branch
+`claude/v4-proxy-server-s6dcp8`, 12 Sep 2026.*
 
 **On the commit count.** An earlier revision of this line said 332. That
 number was not wrong when written and the history it counted is gone:
@@ -61,7 +61,7 @@ authorization work in §5 had to be done per app rather than once.
 | Containerised services | 36 + nginx + a LiveKit SFU |
 | Registry rows (incl. brand rows and the dev mock) | 37 |
 | Mutating HTTP routes | 520, all accounted for (469 guarded, 51 declared open with a reason) |
-| Automated tests | 1586 across 39 suites |
+| Automated tests | 1588 across 39 suites |
 | Persisted volumes | 30 |
 | Shared-module copies kept in sync | 203 |
 | Service credentials in `.env.example` | 27 callers |
@@ -207,10 +207,15 @@ the suite fails.
 | id | port | parent | name |
 |---|---|---|---|
 | `vdp` | 5174 | VDP | VDP — the walkable digital layer (Vite) |
-| `vacon` | 8805 | VACON-C | VACON — the 14-agent operating network |
 | `vacon-c` | 8809 | VACON-C | VACON-C — civilization simulation |
-| `vsafe` | 8799 | VACON-C | VSAFE — safety layer, check-ins, escalation |
-| `vaco-notify` | 8818 | VACON-C | VACO Notify |
+
+**`vacon`, `vsafe` and `vaco-notify` were in this table until 12 Sep
+2026** and are now below, with the other cross-cutting services. They
+carried `parent: 'VACON-C'`, which put three internal services on a
+public store card — the opposite of the recorded decision in
+`dev-docs/VACO_CONSTELLATIONS.md`: "VACON-C the game went to GAMES;
+VACON the agent network and VSAFE the safety layer stayed internal."
+The VACON-C product is the simulation engine alone.
 
 ### Operations & Infrastructure
 | id | port | parent | name |
@@ -224,6 +229,9 @@ the suite fails.
 | id | port | name |
 |---|---|---|
 | `shield` | 8812 | Sessions and credential auth; SSO |
+| `vacon` | 8805 | The 14-agent operating network |
+| `vsafe` | 8799 | Safety layer — check-ins, trusted contacts, escalation |
+| `vaco-notify` | 8818 | The one notification channel |
 | `vaco-analytics` | 8790 | Metric ingestion, anomaly/alert loop |
 | `vaco-audit` | 8819 | Append-only record of operator decisions |
 | `vaco-operator` | 8820 | Human-operator credentials and scopes |
@@ -276,7 +284,7 @@ placements were directed and which were decided when asked.
 map and holds the two to each other in both directions** — a name in one
 and not the other fails the suite, whichever side it is on.
 
-### Three things this recorded, because they were nearly lost
+### Three things this recorded — two since resolved
 
 **The map spent two weeks drifting in silence.** The document's internal
 layer said three while the registry grew five more services — Shield,
@@ -284,30 +292,36 @@ VACO Audit, VACO Operator, VACO Media and VACO Notify. Nothing broke and
 nothing said anything. That is why the test exists rather than a note
 asking someone to keep them in step.
 
-**The public/internal split was being undone by the bundle view.** The
-recorded decision is explicit: *"VACON-C the game went to ▲ GAMES; VACON
-the agent network and VSAFE the safety layer stayed internal."* But both
-carry `parent: 'VACON-C'`, so the store folded them into one public
-card, and `registry.js`'s own comment cited the constellations document
-while doing the opposite of what it says. In the constellation view they
-now sit in ◇ where the decision put them. **In the bundle view they are
-still folded under the public VACON-C card** — deliberately left alone
-here, because changing an app's `parent` changes the store, the compose
-generator's grouping and the §3 tables at once. Recorded as open rather
-than quietly resolved.
+**The public/internal split was being undone by the bundle view —
+resolved 12 Sep 2026.** The recorded decision is explicit: *"VACON-C the
+game went to ▲ GAMES; VACON the agent network and VSAFE the safety layer
+stayed internal."* But all three carried `parent: 'VACON-C'`, so the
+store folded them into one public card, and `registry.js`'s own comment
+cited the constellations document while doing the opposite of what it
+says. They are now `parent: null, bundle: null` — the spelling every
+other cross-cutting service uses — so both views agree and the VACON-C
+product is the simulation engine alone. The store went from 23 products
+to 26.
 
-**`BUNDLES` and the store disagree about Commerce & Marketplace.** There
-are two sources of truth for the bundle grouping: the declared
-`BUNDLES` array, and each app's own `bundle` field. `BUNDLES` lists
-Commerce as `[VENVS, VOKEN, CHOPZ]`; CVLTVRE and VADO tag themselves
-Commerce without appearing in it. So `/api/bundles` answers **3** and
-the store page draws **5**, and the store page is the one people see.
-Also open: the fix depends on whether CVLTVRE and VADO were meant to be
-declared there, or to be somewhere else entirely.
+**`BUNDLES` and the store disagreed about Commerce & Marketplace —
+resolved 12 Sep 2026.** There were two sources of truth: the declared
+`BUNDLES` array, and each app's own `bundle` field. `BUNDLES` listed
+Commerce as `[VENVS, VOKEN, CHOPZ]`; CVLTVRE and VADO had tagged
+themselves Commerce since being promoted to parents on 2026-08-26
+without ever being added. So `/api/bundles` answered **3** and the store
+page drew **5**, for two weeks, and the store page is the one people
+see. Resolved in favour of the store — they are parents, they are
+commerce, and the declared list was simply behind.
 
-Relatedly, the comment above `/api/bundles` in `vaco-shell/server.js`
-read *"5 bundles of 3 parents each"* for some time. There are six,
-sized 5, 3, 3, 3, 2, 2. Corrected 11 Sep 2026.
+**Neither can happen again.** `scripts/test/registry.test.mjs` now
+requires the two sources to agree in both directions, and requires
+`parent` and `bundle` to be set together or not at all — a half-set row
+is what put VACON and VSAFE on a public shelf. Both checks were watched
+failing against deliberate controls before being trusted.
+
+The comment above `/api/bundles` in `vaco-shell/server.js` also read
+*"5 bundles of 3 parents each"* for some time. There are six, sized
+5, 3, 3, 3, 2, 2. Corrected 11 Sep 2026.
 
 ---
 
@@ -796,7 +810,7 @@ produce the numbers in this document.
 built:** `node scripts/package-release.mjs` — see §11.
 
 ```sh
-node scripts/run-all-tests.mjs           # 1586/1586 across 39 suites (some skip without a database)
+node scripts/run-all-tests.mjs           # 1588/1588 across 39 suites (some skip without a database)
 node scripts/audit-route-guards.mjs --check   # 520/520 accounted for
 ./sync-shared-runtime.sh --check         # 203 copies current, none unmanaged
 ./sync-design-system.sh --check          # every serving app is a target
@@ -836,7 +850,7 @@ dependencies are installed.
 
 ```
 vacon-c         317   vdp             147   void            142
-scripts         157   v3              109   vaco-media       51
+scripts         159   v3              109   vaco-media       51
 v4-proxy         42   world-layer      41   venvm            40
 venvs            45   voken            37   vaco-analytics   34
 vaco-shell       33   vacay            24   voidmagic        23

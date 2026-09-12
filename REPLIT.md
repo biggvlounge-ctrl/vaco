@@ -54,8 +54,8 @@ That is the whole procedure.
 | Where | What you should see |
 |---|---|
 | Console | `35 up, 1 down, out of 36 total.` — see "Secrets" below about the one. |
-| Launcher | **23 products across 7 sections**, not a flat wall of tiles. Vvltvre is one card containing 5 apps; VACON-C is one containing 4. |
-| Store grouping | A **Group:** control at the top right, with two views. "by category" is the 7 sections above. "by constellation" regroups the same apps by lineage into **■ VOKEN (4), ✕ VVLTVRE (4), ○ SYSTEMS (3), ✕ VOID (4), ▲ GAMES (3), ◇ internal (8)**. Both are correct and they disagree on purpose — VEX sits with V3 in one and with VOKEN in the other. |
+| Launcher | **26 products across 7 sections**, not a flat wall of tiles. Vvltvre is one card containing 5 apps; V3 is one containing 2. |
+| Store grouping | A **Group:** control at the top right, with two views. "by category" is the 7 sections above. "by constellation" regroups the same apps by lineage into **■ VOKEN (4), ✕ VVLTVRE (4), ○ SYSTEMS (3), ✕ VOID (4), ▲ GAMES (3), ◇ internal (8)**. Both show 26 products and they disagree on grouping by design — VEX sits with V3 in one and with VOKEN in the other. |
 | Any app path | A real page with content in it, not an empty state — demo content is seeded at boot. |
 | Sign in | `demo-elena`, `demo-marcus`, `demo-priya`, `demo-kai`, password `demo-pass-1234` for all four. |
 
@@ -180,7 +180,7 @@ What *has* been driven for real, on Linux:
   to bind the gateway's port. Fixed, and held by a test.
 - `gateway.js` against the booted ecosystem — 33 of 34 apps answered
   200 through one port, the 34th being the one deliberately down.
-- The full test suite: 1586 tests across 39 suites.
+- The full test suite: 1588 tests across 39 suites.
 
 ## What Replit is good for here, and what it is not
 
