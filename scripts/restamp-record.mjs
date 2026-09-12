@@ -11,13 +11,22 @@
 // generated; the transcription was the only manual step, and it was
 // the only step that went wrong.
 //
-// It reads the same two generated files that
+// It reads the same generated files that
 // `scripts/test/system-of-record.test.mjs` reads, so this cannot
 // disagree with the test that guards it:
 //
 //   dev-docs/COMPLETION_BY_APP.md   per-app counts (completion-report.mjs)
 //   dev-docs/TEST_COUNTS.json       every suite, including the four
 //                                   the report does not list
+//
+// ...and runs the three audits whose totals §1 quotes, because those
+// are the other figures that drifted. **Adding one app to one shared
+// module moved five of them at once** -- route count, guarded count,
+// open count, shared-module copies and service callers -- which is
+// more transcription than anybody gets right by hand twice.
+//
+// The audits are run in `--check` mode and their own output is parsed,
+// so a restamp cannot invent a number the tool would not print.
 //
 // **It changes numbers in place and nothing else.** The per-suite
 // table's column layout and row order are left exactly as they are:
@@ -31,7 +40,7 @@
 // TEST_COUNTS.json. Running it before means restamping to the previous
 // run's numbers.
 
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import url from 'node:url';
@@ -139,6 +148,89 @@ let replit = fs.readFileSync(REPLIT_PATH, 'utf8');
 replit = substitute(replit, 'REPLIT.md',
   /- The full test suite: \d+ tests across \d+ suites\./,
   `- The full test suite: ${counts.total} tests across ${suiteCount} suites.`);
+
+// -- the audit totals §1 quotes ----------------------------------------
+
+// Each of these runs the tool and reads the number out of what it
+// printed. A tool that fails or changes its wording produces no
+// substitution and a reported skip -- never a guess.
+// **`spawnSync`, and both streams.** The first version used
+// `execFileSync`, which returns stdout ONLY -- and
+// `generate-docker-compose.js` reports its counts with `console.error`,
+// so the volume total came back as an empty string and was reported as
+// unreadable. The tempting fix was to adjust the regex; the regex was
+// right and the helper was throwing half the output away.
+//
+// Both streams are also what makes a `--check` tool that fails on
+// drift still usable here: it prints the real numbers and exits
+// non-zero, and a non-zero exit is not a reason to lose them.
+function toolOutput(command, args) {
+  const run = spawnSync(command, args, { cwd: REPO_ROOT, encoding: 'utf8' });
+  return `${run.stdout || ''}${run.stderr || ''}`;
+}
+
+const audits = [];
+
+const routes = toolOutput('node', ['scripts/audit-route-guards.mjs', '--check'])
+  .match(/all (\d+) mutating routes across (\d+) apps accounted for \((\d+) guarded, (\d+) declared open/);
+if (routes) {
+  const [, total, , guarded, open] = routes;
+  audits.push(['§1 mutating routes',
+    /\| Mutating HTTP routes \| \d+, all accounted for \(\d+ guarded, \d+ declared open with a reason\) \|/,
+    `| Mutating HTTP routes | ${total}, all accounted for (${guarded} guarded, ${open} declared open with a reason) |`]);
+  audits.push(['§10 route-audit comment',
+    /# \d+\/\d+ accounted for/, `# ${total}/${total} accounted for`]);
+} else {
+  audits.push(['§1 mutating routes', null, null]);
+}
+
+const copies = toolOutput('./sync-shared-runtime.sh', ['--check'])
+  .match(/all (\d+) copies current and in use/);
+if (copies) {
+  audits.push(['§1 shared-module copies',
+    /\| Shared-module copies kept in sync \| \d+ \|/,
+    `| Shared-module copies kept in sync | ${copies[1]} |`]);
+  audits.push(['§10 sync comment',
+    /# \d+ copies current, none unmanaged/, `# ${copies[1]} copies current, none unmanaged`]);
+} else {
+  audits.push(['§1 shared-module copies', null, null]);
+}
+
+const callers = toolOutput('node', ['scripts/generate-service-tokens.mjs', '--check'])
+  .match(/matches the derived list of (\d+) callers/);
+if (callers) {
+  audits.push(['§1 service callers',
+    /\| Service credentials in `\.env\.example` \| \d+ callers \|/,
+    `| Service credentials in \`.env.example\` | ${callers[1]} callers |`]);
+  audits.push(['§10 token comment',
+    /# \.env\.example matches \d+ callers/, `# .env.example matches ${callers[1]} callers`]);
+} else {
+  audits.push(['§1 service callers', null, null]);
+}
+
+const compose = toolOutput('node', ['deploy/generate-docker-compose.js'])
+  .match(/(\d+) app services \+ nginx, livekit, postgres, (\d+) persisted volumes/);
+if (compose) {
+  audits.push(['§1 persisted volumes',
+    /\| Persisted volumes \| \d+ \|/, `| Persisted volumes | ${compose[2]} |`]);
+  audits.push(['§10 compose comment',
+    /# \d+ apps \+ nginx, livekit, postgres, \d+ volumes/,
+    `# ${compose[1]} apps + nginx, livekit, postgres, ${compose[2]} volumes`]);
+} else {
+  audits.push(['§1 persisted volumes', null, null]);
+}
+
+const unread = [];
+for (const [label, pattern, replacement] of audits) {
+  if (pattern === null) { unread.push(label); continue; }
+  sor = substitute(sor, label, pattern, replacement);
+}
+if (unread.length > 0) {
+  process.stdout.write(
+    `restamp-record: could not read ${unread.length} audit total(s), left alone: `
+    + `${unread.join(', ')}\n`,
+  );
+}
 
 // -- the commit stamp --------------------------------------------------
 

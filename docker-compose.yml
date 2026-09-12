@@ -370,6 +370,10 @@ services:
     environment:
       PORT: 8802
       CVNVO_API_URL: "http://cvnvo:8798"
+      VACO_OPERATOR_URL: "http://vaco-operator:8820"
+      VACO_SERVICE_NAME: yap
+      VACO_SERVICE_TOKEN: "${VACO_TOKEN_YAP:?Set a V3 service token for yap in .env}"
+      VACO_OPERATOR_MODE: "${VACO_OPERATOR_MODE:-enforce}"
       DATABASE_URL: "postgres://vacancy:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/vacancy"
     ports:
       - "8802:8802"
@@ -381,6 +385,7 @@ services:
     depends_on:
       - v3
       - shield
+      - vaco-operator
       - postgres
   chopz:
     build:

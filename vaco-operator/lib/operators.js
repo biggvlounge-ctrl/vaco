@@ -91,6 +91,16 @@ const SCOPES = [
   'vaca:verify',            // approve or reject an identity verification
   'vaco-notify:subscribe',  // who receives alerts
   'vacon-c:tick',           // advance the civ-sim clock
+
+  // **Deciding whether a report about a named person is published.**
+  // `YAP_REVIEW_PLATFORM_COMPARABLES.md` calls Yap "the
+  // highest-liability product in the ecosystem, and it is not close",
+  // and until the moderation queue existed a report went live the
+  // instant it was submitted -- no person in the loop at all. This is
+  // the scope that puts one there. It covers publishing, rejecting and
+  // taking down, because all three are the same act of judgement about
+  // the same content.
+  'yap:moderate',
 ];
 
 // The bootstrap holds this and only this. Stated as a constant so the

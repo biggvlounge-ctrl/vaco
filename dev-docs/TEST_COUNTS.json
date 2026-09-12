@@ -1,7 +1,7 @@
 {
-  "total": 1651,
-  "passed": 1602,
-  "failed": 0,
+  "total": 1666,
+  "passed": 1616,
+  "failed": 1,
   "skipped": 49,
   "suites": 39,
   "perSuite": {
@@ -24,8 +24,8 @@
       "skipped": 0
     },
     "cvnvo/yap": {
-      "tests": 20,
-      "pass": 20,
+      "tests": 35,
+      "pass": 35,
       "fail": 0,
       "skipped": 0
     },
@@ -43,8 +43,8 @@
     },
     "scripts": {
       "tests": 166,
-      "pass": 158,
-      "fail": 0,
+      "pass": 157,
+      "fail": 1,
       "skipped": 8
     },
     "shield": {

@@ -13,7 +13,7 @@ person who built it can check whether a claim is still true.
 Every number below was produced by running the tool that owns it, not
 recalled. The commands are in §10 so they can be re-run.
 
-*Current as of commit `dd1afad`, 88 commits, branch
+*Current as of commit `88f4908`, 89 commits, branch
 `claude/v4-proxy-server-s6dcp8`, 12 Sep 2026.*
 
 **On the commit count.** An earlier revision of this line said 332. That
@@ -71,11 +71,11 @@ authorization work in §5 had to be done per app rather than once.
 |---|---|
 | Containerised services | 36 + nginx + a LiveKit SFU |
 | Registry rows (incl. brand rows and the dev mock) | 37 |
-| Mutating HTTP routes | 520, all accounted for (469 guarded, 51 declared open with a reason) |
-| Automated tests | 1651 across 39 suites |
+| Mutating HTTP routes | 524, all accounted for (472 guarded, 52 declared open with a reason) |
+| Automated tests | 1666 across 39 suites |
 | Persisted volumes | 30 |
-| Shared-module copies kept in sync | 209 |
-| Service credentials in `.env.example` | 27 callers |
+| Shared-module copies kept in sync | 210 |
+| Service credentials in `.env.example` | 28 callers |
 | Servers carrying trace context | 36 |
 
 ---
@@ -822,13 +822,13 @@ run to produce the numbers here.
 built:** `node scripts/package-release.mjs` — see §11.
 
 ```sh
-node scripts/run-all-tests.mjs           # 1651/1651 across 39 suites (some skip without a database)
-node scripts/audit-route-guards.mjs --check   # 520/520 accounted for
-./sync-shared-runtime.sh --check         # 209 copies current, none unmanaged
+node scripts/run-all-tests.mjs           # 1666/1666 across 39 suites (some skip without a database)
+node scripts/audit-route-guards.mjs --check   # 524/524 accounted for
+./sync-shared-runtime.sh --check         # 210 copies current, none unmanaged
 ./sync-design-system.sh --check          # every serving app is a target
 node deploy/generate-docker-compose.js   # 36 apps + nginx, livekit, postgres, 30 volumes
 git diff --exit-code docker-compose.yml  # generator output matches committed
-node scripts/generate-service-tokens.mjs --check   # .env.example matches 27 callers
+node scripts/generate-service-tokens.mjs --check   # .env.example matches 28 callers
 node scripts/audit-settlement-atomicity.mjs   # 0 split settlements, ceiling 0
 node scripts/restamp-record.mjs          # writes this document's own figures back
 ```
@@ -898,7 +898,7 @@ scripts         166   v3              111   vaco-media       51
 v4-proxy         42   world-layer      41   venvm            40
 venvs            45   voken            37   vaco-analytics   39
 vaco-shell       36   vacay            24   voidmagic        28
-cvnvo/yap        20   vaco-operator    20   vacon            18
+cvnvo/yap        35   vaco-operator    20   vacon            18
 vaca             17   vaco-notify      17   vsafe            17
 vaco-audit       16   vex              16   vulture-music    19
 v4-search        15   hvntz            14   vaco-mcp         14

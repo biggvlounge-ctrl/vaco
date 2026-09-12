@@ -20,9 +20,14 @@ const { createYapStore } = require('./lib/store');
 const path = require('path');
 const { attachStore } = require('./lib/storeBackend');
 const { traceMiddleware } = require('./lib/tracing.cjs');
+const { createOperatorAuth } = require('./lib/operatorAuth.cjs');
 const {
-  YAP_FLAGS, submitYapReport, getYapReports, getYapSummary, getSafetyLookup,
+  YAP_FLAGS, YAP_STATUSES, submitYapReport, getYapReports, getYapSummary, getSafetyLookup,
 } = require('./lib/yap');
+const {
+  listModerationQueue, queueDepth, publishReport, rejectReport,
+  disputeYapReport, removeReport, detectBrigading,
+} = require('./lib/moderation');
 
 const app = express();
 app.use(cors());
@@ -68,14 +73,106 @@ async function fetchCvnvoProfile(userId) {
   return body;
 }
 
+// **The guard that decides who may publish a report about a person.**
+// There is deliberately no service-token fallback on these routes:
+// `operatorAuth`'s own header explains why, and it applies with full
+// force here. A compromised service should not be able to publish a
+// defamatory claim about a named individual.
+const operatorAuth = createOperatorAuth();
+const { requireOperator } = operatorAuth;
+
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, service: 'yap', yapFlags: YAP_FLAGS });
+  res.json({
+    ok: true,
+    service: 'yap',
+    yapFlags: YAP_FLAGS,
+    yapStatuses: YAP_STATUSES,
+    operatorAuth: operatorAuth.describe(),
+    // The backlog, on the health endpoint on purpose: an unattended
+    // moderation queue is an operational failure of this app, not a
+    // separate dashboard's problem. A growing `pending` number means
+    // real reports nobody has read.
+    moderationQueue: queueDepth(store),
+  });
 });
 
-// audit-route-guards: open -- anonymous signal submission is the product; attribution would defeat it
+// audit-route-guards: open -- submitting a report is the product, and it no longer publishes anything; a moderator decides that at POST /yap/moderation/:id/publish
 app.post('/yap/reports', async (req, res) => {
   try {
-    res.status(201).json(await submitYapReport(store, { ...req.body, profileFetchFn: fetchCvnvoProfile }));
+    const report = await submitYapReport(store, { ...req.body, profileFetchFn: fetchCvnvoProfile });
+    // 202, not 201. The report was accepted, not published — and the
+    // status code is the cheapest place to say so, because a client
+    // that reads 201 as "it is live now" would be wrong and would tell
+    // the reporter so.
+    res.status(202).json({
+      report,
+      published: false,
+      message: 'Report received and queued for human review. It is not visible to anyone yet.',
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// The subject's side of due process. Guarded as open in the same sense
+// the submission route is — but the module still checks that the named
+// subject is the report's actual subject, so this cannot be used to
+// dispute somebody else's report.
+//
+// audit-route-guards: open -- the subject of a report contesting it; the module verifies the named subject owns the report, and a session check belongs here once CVNVO exposes one
+app.post('/yap/reports/:id/dispute', (req, res) => {
+  try {
+    res.json(disputeYapReport(store, { ...req.body, reportId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// -- moderation, all four behind one scope ----------------------------
+
+app.get('/yap/moderation/queue', requireOperator('yap:moderate'), (req, res) => {
+  try {
+    const { status, subjectId } = req.query;
+    res.json({
+      queue: listModerationQueue(store, {
+        ...(status ? { status: String(status).split(',') } : {}),
+        ...(subjectId ? { subjectId: String(subjectId) } : {}),
+      }),
+      depth: queueDepth(store),
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/yap/moderation/:id/publish', requireOperator('yap:moderate'), (req, res) => {
+  try {
+    res.json(publishReport(store, { ...req.body, reportId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/yap/moderation/:id/reject', requireOperator('yap:moderate'), (req, res) => {
+  try {
+    res.json(rejectReport(store, { ...req.body, reportId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/yap/moderation/:id/remove', requireOperator('yap:moderate'), (req, res) => {
+  try {
+    res.json(removeReport(store, { ...req.body, reportId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Flags only. Nothing acts on this — see `detectBrigading`.
+app.get('/yap/moderation/brigading', requireOperator('yap:moderate'), (_req, res) => {
+  try {
+    res.json({ flagged: detectBrigading(store) });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

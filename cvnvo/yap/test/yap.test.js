@@ -37,6 +37,7 @@ const assert = require('node:assert');
 
 const { createYapStore } = require('../lib/store');
 const yap = require('../lib/yap');
+const moderation = require('../lib/moderation');
 
 // YAP never keeps profile data. It fetches live through an injected
 // `profileFetchFn`, which is what keeps the decoupling real rather than
@@ -64,6 +65,23 @@ function report(store, profileFetchFn, overrides = {}) {
     profileFetchFn,
     ...overrides,
   });
+}
+
+// **Submitting a report no longer publishes it**, which is what the
+// moderation queue changed, so every test about what a *reader* sees
+// has to carry the report through a human decision to get there.
+//
+// Five tests in this file failed the moment that landed, and all five
+// were asserting on `getYapSummary`/`getSafetyLookup` right after a
+// submit. They were not wrong tests — they were correct about the old
+// behaviour, where a report about a named person went live the instant
+// it arrived with nobody in the loop. Routing them through
+// `publishReport` is the change, not a workaround for it.
+//
+// `test/moderation.test.js` covers the queue itself.
+async function published(store, profileFetchFn, overrides = {}) {
+  const r = await report(store, profileFetchFn, overrides);
+  return moderation.publishReport(store, { reportId: r.id, moderatorId: 'mod-dana' });
 }
 
 // -- The verified-reporter requirement -----------------------------------
@@ -173,11 +191,15 @@ test('subjectId and reporterId are both required', async () => {
 
 test('a summary counts green and red separately, and totals them honestly', async () => {
   const store = createYapStore();
-  const profileFetchFn = profiles({ ada: VERIFIED, kai: VERIFIED, rio: VERIFIED });
+  const profileFetchFn = profiles({ ada: VERIFIED, kai: VERIFIED, ira: VERIFIED, rio: VERIFIED });
 
-  await report(store, profileFetchFn, { reporterId: 'ada', flag: 'red' });
-  await report(store, profileFetchFn, { reporterId: 'kai', flag: 'green' });
-  await report(store, profileFetchFn, { reporterId: 'kai', flag: 'green' });
+  // Three DISTINCT reporters. The old version of this test filed two
+  // reports from `kai` on the same subject, which the brigading guard
+  // in `submitYapReport` now refuses outright — one account cannot
+  // make itself look like two people agreeing.
+  await published(store, profileFetchFn, { reporterId: 'ada', flag: 'red' });
+  await published(store, profileFetchFn, { reporterId: 'kai', flag: 'green' });
+  await published(store, profileFetchFn, { reporterId: 'ira', flag: 'green' });
 
   const summary = yap.getYapSummary(store, 'rio');
   assert.strictEqual(summary.totalReports, 3);
@@ -195,7 +217,7 @@ test('a subject with no reports summarises to zeros, not to an error', () => {
   // threw would push callers toward swallowing it.
   const summary = yap.getYapSummary(store, 'nobody');
   assert.deepStrictEqual(summary, {
-    subjectId: 'nobody', totalReports: 0, greenCount: 0, redCount: 0,
+    subjectId: 'nobody', totalReports: 0, greenCount: 0, redCount: 0, disputedCount: 0,
   });
 });
 
@@ -203,8 +225,8 @@ test('one subject’s reports never appear under another’s', async () => {
   const store = createYapStore();
   const profileFetchFn = profiles({ ada: VERIFIED, rio: VERIFIED, kai: VERIFIED });
 
-  await report(store, profileFetchFn, { subjectId: 'rio', flag: 'red' });
-  await report(store, profileFetchFn, { subjectId: 'kai', flag: 'green' });
+  await published(store, profileFetchFn, { subjectId: 'rio', flag: 'red' });
+  await published(store, profileFetchFn, { subjectId: 'kai', flag: 'green' });
 
   assert.strictEqual(yap.getYapSummary(store, 'rio').redCount, 1);
   assert.strictEqual(yap.getYapSummary(store, 'rio').greenCount, 0);
@@ -225,7 +247,7 @@ test('getYapReports requires a subject rather than returning everything', () => 
 test('the safety lookup works with no match in existence — that is its whole point', async () => {
   const store = createYapStore();
   const profileFetchFn = profiles({ ada: VERIFIED, rio: VERIFIED });
-  await report(store, profileFetchFn, { flag: 'red' });
+  await published(store, profileFetchFn, { flag: 'red' });
 
   // Tea's real core use case: checking someone out *before* you engage.
   // Nothing in this call requires a match, a conversation, or any prior
@@ -250,7 +272,7 @@ test('a lookup on an unknown subject fails loudly instead of looking clean', asy
 test('a lookup reports an unverified subject as unverified, and still shows their record', async () => {
   const store = createYapStore();
   const profileFetchFn = profiles({ ada: VERIFIED, rio: UNVERIFIED });
-  await report(store, profileFetchFn, { flag: 'red' });
+  await published(store, profileFetchFn, { flag: 'red' });
 
   // Being unverified bars you from *reporting*, not from *being*
   // reported. Conflating the two would let unverified accounts
