@@ -211,7 +211,32 @@ const CRITERIA = [
     // A third mechanism has to be added here to count. That is the
     // point: an app that persists some new way should have to say so
     // rather than quietly matching a loose regex.
-    test: (a) => (/createPersistentStore|loadAtBoot/.test(a.server) ? true
+    //
+    // **`attachStore` is that third mechanism, and this file was not
+    // told for a day.** On 11 Sep 2026, 28 apps moved to
+    // `shared/storeBackend.js`, which loads the store from Postgres (or
+    // from the same JSON file when there is no DATABASE_URL) and holds
+    // every request behind a gate until it has. It reads state back at
+    // boot — the thing this criterion is actually about — and it does
+    // it more strictly than either older mechanism, because an app
+    // whose store fails to load exits rather than serving empty
+    // collections.
+    //
+    // Not being listed here marked all 28 as FAILING to persist. That
+    // was every failure in the whole report: the headline read 89% with
+    // 28 ❌, and all 28 were the most durably persisted apps in the
+    // repository. A completion report is what somebody reads to decide
+    // what to work on next, and this one was pointing at 28 apps that
+    // needed nothing.
+    //
+    // **The pattern matches a CALL, not a name.** It used to be bare
+    // identifiers, so an app that merely `require`d one of these and
+    // never invoked it counted as persisting. Found while checking that
+    // the criterion could still fail: deleting the `attachStore(...)`
+    // call from an app left the import behind, the regex matched it,
+    // and the app still scored a tick for persistence it no longer had.
+    // A criterion that cannot fail is not measuring anything.
+    test: (a) => (/(?:createPersistentStore|loadAtBoot|attachStore)\s*\(/.test(a.server) ? true
       : (a.holdsState ? false : null)),
   },
   {
