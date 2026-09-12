@@ -34,6 +34,35 @@ const SCHEMA = fs.readFileSync(
 );
 const TICK = fs.readFileSync(path.join(SERVER_DIR, 'tick.js'), 'utf8');
 
+// **The engine's actual code, with two exclusions and comments
+// stripped.** This is what separates a table the engine uses from a
+// table the schema merely defines, and every part of it is load-bearing:
+//
+//   `migrate.js` / `restore.js` handle EVERY table by definition, so
+//   including them would make every table look used.
+//   `urbanSystems.js` only names tables, so it would vouch for itself.
+//   Comments are stripped because `economy.js`'s header says
+//   "employment_records, investments, and trade_routes are NOT built
+//   here" — and a first attempt at this check counted that sentence as
+//   evidence that employment_records was in use.
+const ENGINE_CODE = (() => {
+  const skip = new Set(['migrate.js', 'restore.js', 'urbanSystems.js']);
+  const strip = (src) => src
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '');
+  return fs.readdirSync(SERVER_DIR)
+    .filter((f) => f.endsWith('.js') && !skip.has(f))
+    .map((f) => strip(fs.readFileSync(path.join(SERVER_DIR, f), 'utf8')))
+    .join('\n');
+})();
+
+// The engine names a table either as written or in camelCase on
+// `worldState`, so both spellings count.
+function engineTouches(table) {
+  const camel = table.replace(/_([a-z])/g, (m, c) => c.toUpperCase());
+  return ENGINE_CODE.includes(table) || ENGINE_CODE.includes(camel);
+}
+
 // Every `function name(` defined anywhere under server/, so a cited
 // function is checked against the whole engine rather than one file.
 const ALL_FUNCTIONS = (() => {
@@ -75,12 +104,36 @@ test('the spec order is preserved, spot-checked at both ends and the middle', ()
 // -- no fictional citations --------------------------------------------
 
 test('every table a system cites exists in the schema', () => {
-  const cited = citations().tables;
+  const cited = [...citations().tables, ...citations().schemaOnly];
   assert.ok(cited.length > 20, `only ${cited.length} tables cited; the file looks empty`);
   const missing = cited.filter(
     (t) => !new RegExp(`^CREATE TABLE (IF NOT EXISTS )?${t}\\b`, 'm').test(SCHEMA),
   );
   assert.deepEqual(missing, [], `cited tables that do not exist: ${missing.join(', ')}`);
+});
+
+test('a table cited as evidence is one the engine actually touches', () => {
+  // **The check the first version of this file was missing, and it
+  // cost three wrong levels.** Proving a table exists in the schema
+  // proves the schema defines it, not that anything uses it. Political
+  // was `modelled` on six tables no engine module touches; Technology
+  // was `modelled`, carrying a claim that §40's bottleneck chain was
+  // built, on two more.
+  const dead = citations().tables.filter((t) => !engineTouches(t));
+  assert.deepEqual(dead, [],
+    `cited as used, but no engine code touches: ${dead.join(', ')} — `
+    + 'move them to schemaOnly and re-check the system\'s level');
+});
+
+test('a schemaOnly table is one the engine really does not touch', () => {
+  // The other direction, so the label cannot rot as the engine grows
+  // into a table. If something starts using one of these, this fails
+  // and whoever did it gets to re-level the system rather than leaving
+  // it understated.
+  const alive = citations().schemaOnly.filter((t) => engineTouches(t));
+  assert.deepEqual(alive, [],
+    `marked schemaOnly but engine code touches: ${alive.join(', ')} — `
+    + 'promote them to tables and re-check the level');
 });
 
 test('every tick phase a system cites exists in tick.js', () => {
@@ -123,8 +176,8 @@ test('an absent system cites nothing, and everything else cites something', () =
   // citation on a `modelled` one means the label is unsupported.
   for (const s of SYSTEMS) {
     const evidence = [
-      ...(s.tables || []), ...(s.phases || []), ...(s.traitFamilies || []),
-      ...(s.functions || []), ...(s.infrastructureTypes || []),
+      ...(s.tables || []), ...(s.schemaOnly || []), ...(s.phases || []),
+      ...(s.traitFamilies || []), ...(s.functions || []), ...(s.infrastructureTypes || []),
     ];
     if (s.level === 'absent') {
       assert.deepEqual(evidence, [],
@@ -136,15 +189,21 @@ test('an absent system cites nothing, and everything else cites something', () =
   }
 });
 
-test('a slot-level system cites an infrastructure type and no mechanics', () => {
-  // `slot` means "a place to put data, and nothing reads it". If a
-  // slot system ever gains a phase or a function it is no longer a
-  // slot, and this fails rather than letting the level go stale.
+test('a slot-level system cites storage and no mechanics at all', () => {
+  // `slot` means "storage exists and nothing reads it", in either of
+  // its two shapes: an `infrastructure.type` value, or a schema-only
+  // table. What a slot may NOT have is a phase, a function or even a
+  // trait family — any of those is something that reads, which makes
+  // it at least partial. If a slot ever gains one this fails rather
+  // than letting the level go stale.
   for (const s of byLevel('slot')) {
-    assert.ok((s.infrastructureTypes || []).length > 0,
-      `${s.name} is a slot with no infrastructure type`);
-    assert.deepEqual([...(s.phases || []), ...(s.functions || [])], [],
-      `${s.name} is marked slot but cites mechanics — it has outgrown the level`);
+    const storage = [...(s.infrastructureTypes || []), ...(s.schemaOnly || [])];
+    assert.ok(storage.length > 0, `${s.name} is a slot with nothing to store into`);
+    assert.deepEqual(
+      [...(s.phases || []), ...(s.functions || []), ...(s.traitFamilies || []), ...(s.tables || [])],
+      [],
+      `${s.name} is marked slot but cites mechanics — it has outgrown the level`,
+    );
   }
 });
 

@@ -30,20 +30,53 @@
 //   partial   The mechanism exists but is thin — usually a trait
 //             family or a table with no behaviour driving it, or one
 //             phase covering two systems' work.
-//   slot      **A place to put data, and nothing else.** This level
-//             exists because of `infrastructure.type`, whose comment
-//             enumerates roads, bridges, rail, water_systems,
-//             electricity, internet, hospitals, schools, public_safety
-//             and waste_management. A row CAN carry any of those, and
-//             nothing in the engine reads the distinction. Counting
-//             those ten as built would have taken §7 from ~25 to ~33
-//             on the strength of a comment on a TEXT column.
+//   slot      **Storage exists and nothing reads it.** Two shapes, and
+//             both were found by checking rather than by reading:
+//
+//             `infrastructure.type` carries a comment enumerating
+//             roads, bridges, rail, water_systems, electricity,
+//             internet, hospitals, schools, public_safety and
+//             waste_management. A row CAN carry any of those and
+//             nothing in the engine reads the distinction — it is a
+//             TEXT column with a comment, not an enum or a CHECK.
+//
+//             And **18 of the tables cited in the first version of
+//             this file are not touched by any engine code at all**,
+//             with `migrate.js`/`restore.js` excluded (they handle
+//             every table by definition) and comments stripped (so a
+//             header saying "X is NOT built" does not count as using
+//             X). Those are the `schemaOnly` field below.
 //   absent    No representation. Must cite nothing — the test enforces
 //             that, so "absent" cannot be a lazy label on something
 //             that does exist.
 //
 // A `slot` is closer to absent than to built, and the summary counts
 // it separately rather than folding it either way.
+//
+// ---------------------------------------------------------------------
+// `tables` vs `schemaOnly`, and why the split had to exist
+//
+// **The first version of this file cited table definitions as evidence
+// that a system was built, and the test could not catch it** — checking
+// that a table exists in `VACANCY_POSTGRESQL_SCHEMA.sql` proves the
+// schema defines it, not that anything uses it. Political was marked
+// `modelled` on the strength of six tables (governments, elections,
+// votes, laws, public_opinion, revolutions) and **no engine code
+// touches any of them.** Technology was marked `modelled`, and with it
+// a claim that §40's bottleneck chain was built; `technology_eras` and
+// `civilization_technology_progress` are equally untouched.
+//
+// So: `tables` means the engine reads or writes it, and `schemaOnly`
+// means the schema defines it and nothing does. The test asserts both
+// directions — a `tables` entry no code touches fails, and a
+// `schemaOnly` entry that code DOES touch fails too, so the label
+// cannot rot as the engine grows into a table.
+//
+// `environment_state` is the instructive one. It is `schemaOnly`, yet
+// Environmental is still `modelled`: `runEnvironmentPhase` is real and
+// mutates resources every tick — it just works on
+// `worldState.activeConditions` rather than that table. The mechanics
+// were never in doubt; the citation was simply wrong.
 
 'use strict';
 
@@ -52,16 +85,20 @@ const SYSTEMS = [
     n: 1,
     name: 'Population',
     level: 'modelled',
-    tables: ['npcs', 'entities', 'families', 'households', 'migration_events'],
+    tables: ['npcs', 'entities', 'families'],
+    schemaOnly: ['households', 'migration_events'],
     phases: ['runMigrationPhase'],
     functions: ['generateNPC', 'generateFamily', 'addFamilyMember'],
-    note: 'Births, households and movement all advance. Aging and death are not modelled.',
+    note: 'Generation and the migration phase are real. `households` and `migration_events` '
+      + 'are schema-only, so household formation and a migration audit trail are not stored. '
+      + 'Aging and death are not modelled either — §17 lists `deceased` as an NPC status.',
   },
   {
     n: 2,
     name: 'Housing',
     level: 'modelled',
-    tables: ['properties', 'ownership_records', 'households'],
+    tables: ['properties', 'ownership_records'],
+    schemaOnly: ['households'],
     functions: ['generateProperty', 'advancePropertyLifecycle'],
     note: 'Occupancy and lifecycle are real. Vacancy and abandonment as distinct states are not.',
   },
@@ -69,7 +106,8 @@ const SYSTEMS = [
     n: 3,
     name: 'Economy',
     level: 'modelled',
-    tables: ['economy_snapshots', 'market_listings', 'individual_finances', 'investments'],
+    tables: ['market_listings', 'individual_finances', 'resources'],
+    schemaOnly: ['economy_snapshots', 'investments'],
     phases: ['runEconomyPhase'],
     traitFamilies: ['economic'],
     functions: ['resolveMarketPrice', 'getScarcity', 'getNetWorth'],
@@ -77,9 +115,12 @@ const SYSTEMS = [
   {
     n: 4,
     name: 'Employment',
-    level: 'partial',
-    tables: ['employment_records'],
-    note: 'Records exist. No wage dynamics, no unemployment rate driving anything.',
+    level: 'slot',
+    schemaOnly: ['employment_records'],
+    note: 'A table and nothing else — `economy.js` says so in its own header: '
+      + '"employment_records, investments, and trade_routes are NOT built here... natural '
+      + 'follow-ups, not done in this pass." Marked `partial` in the first version of this '
+      + 'file on the strength of that table definition alone.',
   },
   {
     n: 5,
@@ -171,7 +212,8 @@ const SYSTEMS = [
     n: 15,
     name: 'Gang',
     level: 'partial',
-    tables: ['factions', 'organizations', 'entity_organization_memberships'],
+    tables: ['factions', 'organizations'],
+    schemaOnly: ['entity_organization_memberships'],
     traitFamilies: ['faction'],
     note: 'Factions are real and carry a full trait sheet. The hierarchy of §14 '
       + '(shot callers through juveniles) is not enumerated.',
@@ -187,9 +229,9 @@ const SYSTEMS = [
   {
     n: 17,
     name: 'Court',
-    level: 'partial',
-    tables: ['laws'],
-    note: 'Laws exist. No courts, cases or judgements.',
+    level: 'slot',
+    schemaOnly: ['laws'],
+    note: 'A `laws` table no engine code touches. No courts, cases or judgements.',
   },
   {
     n: 18,
@@ -201,9 +243,12 @@ const SYSTEMS = [
   {
     n: 19,
     name: 'Political',
-    level: 'modelled',
-    tables: ['governments', 'elections', 'votes', 'laws', 'public_opinion', 'revolutions'],
-    note: 'Six tables. The six-stage progression of §63 (informal rules upward) is not built.',
+    level: 'slot',
+    schemaOnly: ['governments', 'elections', 'votes', 'laws', 'public_opinion', 'revolutions'],
+    note: '**Six tables and no code.** This was marked `modelled` in the first version of this '
+      + 'file purely because six tables are defined — none is touched by any engine module. '
+      + 'Nothing governs, elects, votes, legislates or revolts. The six-stage progression of '
+      + '§63 is not built, and neither is stage one.',
   },
   {
     n: 20,
@@ -250,9 +295,9 @@ const SYSTEMS = [
   {
     n: 26,
     name: 'Religion',
-    level: 'partial',
-    tables: ['beliefs', 'values_db'],
-    note: 'Beliefs and values are per-entity. No religious institutions or practice.',
+    level: 'slot',
+    schemaOnly: ['beliefs', 'values_db'],
+    note: 'Two schema-only tables. Nothing writes a belief or a value.',
   },
   {
     n: 27,
@@ -288,16 +333,19 @@ const SYSTEMS = [
     n: 31,
     name: 'Environmental',
     level: 'modelled',
-    tables: ['environment_state'],
+    schemaOnly: ['environment_state'],
     phases: ['runEnvironmentPhase'],
     traitFamilies: ['environmental'],
     functions: ['addEnvironmentalCondition'],
+    note: 'Modelled despite its table being schema-only: the phase is real and mutates '
+      + 'resource supply every tick, working on `worldState.activeConditions` rather than '
+      + '`environment_state`. The mechanics were never in doubt; the citation was wrong.',
   },
   {
     n: 32,
     name: 'Weather',
     level: 'partial',
-    tables: ['environment_state'],
+    schemaOnly: ['environment_state'],
     phases: ['runEnvironmentPhase'],
     note: 'Conditions exist and drive consequences. Temperature, rain, snow and season '
       + 'specifically are not modelled — §45 has no seasons either.',
@@ -313,8 +361,8 @@ const SYSTEMS = [
   {
     n: 34,
     name: 'Supply Chain',
-    level: 'partial',
-    tables: ['trade_routes'],
+    level: 'slot',
+    schemaOnly: ['trade_routes'],
     deferred: true,
     note: 'A table. No routes, hubs, lanes or transport tiers — and trade routes fall under '
       + 'the same Transportation deferral as system 7.',
@@ -332,24 +380,31 @@ const SYSTEMS = [
   {
     n: 37,
     name: 'Technology',
-    level: 'modelled',
-    tables: ['technology_eras', 'civilization_technology_progress'],
+    level: 'partial',
+    schemaOnly: ['technology_eras', 'civilization_technology_progress'],
     phases: ['runReemergencePhase'],
     traitFamilies: ['technology'],
-    note: 'Ten named eras with a requirements chain — this is §40 bottleneck logic, built.',
+    note: '**A correction.** The first version said "ten named eras with a requirements chain '
+      + '— this is §40 bottleneck logic, built". The eras and the requirements column are '
+      + 'defined in the schema and no engine code reads either, so §40 is NOT built: nothing '
+      + 'gates a technology on its prerequisites. What is real is `runReemergencePhase`, which '
+      + 'computes a recovery index, and the `technology` trait family.',
   },
   {
     n: 38,
     name: 'Migration',
-    level: 'modelled',
-    tables: ['migration_events'],
+    level: 'partial',
+    schemaOnly: ['migration_events'],
     phases: ['runMigrationPhase'],
+    note: 'The phase moves people. `migration_events` is schema-only, so nothing records '
+      + 'that it happened — which also means §41 historical memory has no migration to '
+      + 'remember.',
   },
   {
     n: 39,
     name: 'Reputation',
     level: 'partial',
-    tables: ['public_opinion'],
+    schemaOnly: ['public_opinion'],
     traitFamilies: ['reputation'],
     note: 'Four traits and public opinion. The influence radius and decay §15 asks for '
       + 'specifically are absent.',
@@ -397,7 +452,10 @@ function getSystem(n) {
 // Every identifier this file claims, flattened, so the test can check
 // each one against the thing that actually defines it.
 function citations() {
-  const out = { tables: new Set(), phases: new Set(), traitFamilies: new Set(), functions: new Set(), infrastructureTypes: new Set() };
+  const out = {
+    tables: new Set(), schemaOnly: new Set(), phases: new Set(),
+    traitFamilies: new Set(), functions: new Set(), infrastructureTypes: new Set(),
+  };
   for (const s of SYSTEMS) {
     for (const key of Object.keys(out)) {
       for (const value of s[key] || []) out[key].add(value);

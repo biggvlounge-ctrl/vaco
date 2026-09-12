@@ -105,23 +105,55 @@ from memory with nothing in the repo to check it against. The forty are
 now data in `vacon-c/server/urbanSystems.js`, every citation verified
 by `vacon-c/test/urban-systems.test.js`, and the real breakdown is:
 
-**12 modelled, 18 partial, 4 slot-only, 6 absent**
+**9 modelled, 16 partial, 9 slot-only, 6 absent**
 
 | Level | Means | Systems |
 |---|---|---|
-| **modelled** (12) | Real mechanics; something advances or decides on it each tick | Population, Housing, Economy, Infrastructure, Political, Cultural, Community Organizations, Real Estate, Environmental, Technology, Migration, AI Decision |
-| **partial** (18) | A table or trait family with little driving it, or one phase covering two systems | Employment, Education, Health, Food Supply, Water, Law Enforcement, Crime, Gang, Organized Crime, Court, Communication, Religion, Business, Construction, Weather, Disaster, Supply Chain, Reputation |
-| **slot** (4) | A place to put data and nothing that reads it | Transportation, Energy, Waste, Fire & Emergency |
+| **modelled** (9) | Real mechanics; something advances or decides on it each tick | Population, Housing, Economy, Infrastructure, Cultural, Community Organizations, Real Estate, Environmental, AI Decision |
+| **partial** (16) | A trait family or a live table with little driving it, or one phase covering two systems | Education, Health, Food Supply, Water, Law Enforcement, Crime, Gang, Organized Crime, Communication, Business, Construction, Weather, Disaster, Technology, Migration, Reputation |
+| **slot** (9) | Storage exists and nothing reads it | Transportation, Energy, Waste, Employment, Court, Political, Religion, Fire & Emergency, Supply Chain |
 | **absent** (6) | No representation at all | Prison, Government Services, Media, Social Media, Military/National Guard, Tourism |
 
-**The `slot` level is the part worth understanding**, because it is
-where an inflated count comes from. `infrastructure.type` carries a
-comment enumerating roads, bridges, rail, water_systems, electricity,
-internet, hospitals, schools, public_safety and waste_management. A row
-can hold any of those and **nothing in the engine reads the
-distinction** — it is a TEXT column with a comment, not an enum or a
-CHECK constraint. Counting those ten as built is what takes a truthful
-12 to a comfortable 25.
+**This breakdown has been revised down twice, and the second revision
+is the instructive one.** It began as an estimate of "roughly 25 of the
+40 represented". Writing the systems out as data with a test made it
+12 modelled. Then checking whether the engine actually *touches* the
+tables being cited made it **9**.
+
+**`slot` means storage exists and nothing reads it, in two shapes.**
+
+The first is `infrastructure.type`, a TEXT column whose comment
+enumerates roads, bridges, rail, water_systems, electricity, internet,
+hospitals, schools, public_safety and waste_management. A row can hold
+any of those and nothing in the engine reads the distinction — no enum,
+no CHECK constraint. Counting those ten as built is what takes a
+truthful figure to a comfortable one.
+
+The second was worse, because it was my own error rather than an
+inherited ambiguity. **18 of the tables cited here as evidence are not
+touched by any engine code** — with `migrate.js`/`restore.js` excluded
+(they handle every table by definition) and comments stripped (so
+`economy.js`'s "employment_records, investments, and trade_routes are
+NOT built here" does not count as using them). Three levels were wrong
+as a result:
+
+| System | Was | Is | Why |
+|---|---|---|---|
+| **Political** | modelled | **slot** | Six tables — governments, elections, votes, laws, public_opinion, revolutions — and no engine module touches one of them. Nothing governs, elects, votes, legislates or revolts. |
+| **Technology** | modelled | **partial** | `technology_eras` and `civilization_technology_progress` are equally untouched, which also makes the §40 claim below wrong. |
+| **Employment** | partial | **slot** | `economy.js` says in its own header that `employment_records` is not built. |
+
+`environment_state` is the instructive counter-example: it is
+schema-only, and Environmental is still **modelled**, because
+`runEnvironmentPhase` is real and mutates resource supply every tick —
+it works on `worldState.activeConditions` rather than that table. The
+mechanics were never in doubt; the citation was simply wrong.
+
+The data now splits `tables` (the engine touches it) from `schemaOnly`
+(the schema defines it, nothing does), and the test asserts **both**
+directions — a `tables` entry no code touches fails, and a `schemaOnly`
+entry that code does touch fails too, so neither label can rot as the
+engine grows.
 
 Two things the test enforces that are worth knowing. A system marked
 `absent` must cite **nothing**, so the label cannot be quietly applied
@@ -198,10 +230,10 @@ behaviour, which §82 forbids.
 | § | State | Detail |
 |---|---|---|
 | 36 Community development ladder | **PARTIAL** | `communities` + `getCommunityHealth`. The six named stages (camp → civilization) are not an explicit progression. |
-| 37 Civilization reemergence engine | **BUILT** | `runReemergencePhase`, `getCityReemergence`, `technology_eras` (10 named eras with `requirements`), `civilization_technology_progress`. |
+| 37 Civilization reemergence engine | **PARTIAL** | `runReemergencePhase` and `getCityReemergence` are real and compute a recovery index per city. The two technology tables are schema-only, so era progression itself is not driven. |
 | 38 Regional states | **PARTIAL** | A reemergence index is computed; the four named bands are not applied as labels. |
 | 39 Reemergence systems | **PARTIAL** | The ladder is by technology era, not by the five named system groups. **The spec's own restraint on weapons infrastructure is respected** — nothing models construction instructions. |
-| 40 Bottleneck logic | **BUILT** | `technology_eras.requirements` is the dependency chain, and `test/drought-cascade.test.js` proves a real cascade. |
+| 40 Bottleneck logic | **PARTIAL — and this row said BUILT, wrongly** | The claim was that `technology_eras.requirements` is the dependency chain. It is, in the schema, and **no engine code reads either the table or the column** — so nothing gates a technology on its prerequisites. What IS real is the cascade half: `test/drought-cascade.test.js` drives a drought through resources into the economy and out into social and migration effects. Cascades yes, technology prerequisites no. |
 | 41 Historical memory | **BUILT** | `historical_records`, `runHistoryPhase`, `memories`, `decision_log`. |
 | 42 Probability system | **BUILT** | `winProbability`, `seededUnit`, `hashSeed` in `contest.js`; probability throughout the tick. |
 | 43 Event engine | **BUILT** | With cascades. |
@@ -237,7 +269,7 @@ behaviour, which §82 forbids.
 | 63 Political / government system | **PARTIAL** | `governments`, `elections`, `votes`, `laws`, `public_opinion`, `revolutions` are all real tables. The six-stage progression from informal rules upward is not implemented. |
 | 64 Health system | **PARTIAL** | A `health` trait family (4). No disease, no medical knowledge loss and recovery, no clinics as a system. |
 | 65 Education system | **PARTIAL** | `educational` traits (4). No schools, teachers, literacy or libraries as entities. |
-| 66 Technology recovery | **BUILT** | `technology_eras` with prerequisites. |
+| 66 Technology recovery | **PARTIAL** | `technology_eras` defines ten eras with a `requirements` column and nothing reads it. `runReemergencePhase` computes a recovery index, which is the part that works. |
 
 ## §§67–71 · Graphs, precision, scalability, tick, persistence
 
