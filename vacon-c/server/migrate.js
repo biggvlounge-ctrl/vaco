@@ -422,6 +422,20 @@ async function migrateWorldStateToPostgres(worldState) {
       }
       summary.individual_finances = worldState.individualFinances.length;
 
+      // employment_records. **Written before nothing and after
+      // organizations**, which is the FK that matters:
+      // employer_organization_id references organizations(id), and two
+      // earlier migrations rolled back wholesale on exactly this class
+      // of ordering mistake (resources/market_listings before cities).
+      for (const e of worldState.employmentRecords) {
+        await client.query(
+          `INSERT INTO employment_records (id, entity_id, employer_organization_id, wage, position, start_tick, status)
+           VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+          [e.id, e.entity_id, e.employer_organization_id, e.wage, e.position, e.start_tick, e.status]
+        );
+      }
+      summary.employment_records = worldState.employmentRecords.length;
+
       // ---------------------------------------------------------------
       // events, historical_records
       // ---------------------------------------------------------------

@@ -95,6 +95,10 @@ const WorldState = {
   resources: [],
   marketListings: [],
   individualFinances: [],
+  // Employment, added 12 Sep 2026 when `employment_records` stopped
+  // being a table nothing touched. Payroll runs inside the Economy
+  // phase — the pipeline stays at eleven.
+  employmentRecords: [],
   entityTraits: [],
   memories: [],
   relationships: [],

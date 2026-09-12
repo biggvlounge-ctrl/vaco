@@ -10,11 +10,14 @@
 // engine.js#getFamilyWealth() from step 6 has been waiting on since it
 // only had an empty array to sum over).
 //
-// employment_records, investments, and trade_routes are NOT built
-// here — not required by the locked Day 1 definition of done (a
-// drought cascade through resources -> economy -> social -> migration/
-// security), and CLAUDE.md doesn't enumerate them under step 7
-// specifically. Natural follow-ups, not done in this pass.
+// **`employment_records` IS built here now** — the "natural follow-up"
+// this header called it, taken up on 12 Sep 2026. It was one of nine
+// urban systems (§7) sitting at `slot`: a table the schema defines and
+// no engine code touches. See `urbanSystems.js` for the others.
+//
+// `investments` and `trade_routes` are still NOT built. Trade routes
+// fall under the Transportation deferral in CLAUDE.md, so they are
+// closed scope rather than a gap.
 //
 // Every function here takes `worldState` explicitly (unlike engine.js's
 // generate*() functions, which close over the module-level WorldState)
@@ -27,6 +30,7 @@ const { nextAfter } = require('./nextAfter.js');
 
 let nextResourceId = 1;
 let nextMarketListingId = 1;
+let nextEmploymentRecordId = 1;
 
 // ---------------------------------------------------------------------------
 // Resources — real, per-type tracking (`resources` table)
@@ -211,12 +215,177 @@ function getNetWorth(worldState, entityId) {
 // ids, and two rows end up sharing a primary key with nothing thrown.
 // Derived from the rows themselves rather than stored, so it cannot
 // disagree with them.
+
+// ---------------------------------------------------------------------------
+// Employment — wages that actually move (`employment_records`)
+// ---------------------------------------------------------------------------
+// **Payroll moves money rather than creating it**, and that is the whole
+// reason this is worth building at all. A wage is subtracted from the
+// employer organization's `assets` and added to the employee's
+// `individual_finances`; the employer's `expenses` records it. An
+// employer that cannot cover its payroll does not pay, and says so as
+// an event.
+//
+// The alternative — crediting the employee and leaving the employer
+// alone — would have been half a line shorter and would have made
+// every organization an infinite money source. `getNetWorth` and
+// `getFamilyWealth` both read these finances, so that money would have
+// shown up as real household wealth across the whole world.
+//
+// **One active job per entity**, refused loudly rather than silently
+// ignored. Two active records would both draw a wage every tick for
+// the same person, which reads as a plausible salary and is not one.
+// Ending a job and taking another is the supported path.
+
+const EMPLOYMENT_STATUSES = ['active', 'ended'];
+
+function getEmployment(worldState, entityId) {
+  return worldState.employmentRecords.find(
+    (r) => r.entity_id === entityId && r.status === 'active',
+  ) || null;
+}
+
+function listEmployment(worldState, options = {}) {
+  const { employerOrganizationId = null, status = null } = options;
+  return worldState.employmentRecords.filter(
+    (r) => (employerOrganizationId === null || r.employer_organization_id === employerOrganizationId)
+      && (status === null || r.status === status),
+  );
+}
+
+function hireEntity(worldState, options = {}) {
+  const {
+    entityId, employerOrganizationId, wage, position = null, tick = worldState.tick ?? 0,
+  } = options;
+
+  if (!entityId) throw new Error('hireEntity requires an entityId');
+  if (!employerOrganizationId) throw new Error('hireEntity requires an employerOrganizationId');
+  // `Number.isFinite`, not a truthiness check: a wage of 0 is a real
+  // unpaid position, and NaN walks straight through `wage > 0` —
+  // the same guard V3's ledger needed for the same reason.
+  if (!Number.isFinite(wage) || wage < 0) {
+    throw new Error('hireEntity requires a non-negative finite wage');
+  }
+
+  const employer = worldState.organizations.find((o) => o.id === employerOrganizationId);
+  if (!employer) {
+    throw new Error(`hireEntity: no organization ${employerOrganizationId}`);
+  }
+
+  const existing = getEmployment(worldState, entityId);
+  if (existing) {
+    throw new Error(
+      `hireEntity: entity ${entityId} already holds employment ${existing.id} `
+      + `at organization ${existing.employer_organization_id}. End it first.`,
+    );
+  }
+
+  const record = {
+    id: nextEmploymentRecordId++,
+    entity_id: entityId,
+    employer_organization_id: employerOrganizationId,
+    wage,
+    position,
+    start_tick: tick,
+    status: 'active',
+  };
+  worldState.employmentRecords.push(record);
+  return record;
+}
+
+function endEmployment(worldState, options = {}) {
+  const { entityId } = options;
+  const record = getEmployment(worldState, entityId);
+  if (!record) throw new Error(`endEmployment: entity ${entityId} holds no active employment`);
+  record.status = 'ended';
+  // **No `end_tick`, deliberately.** The first version set one, and
+  // `employment_records` has no such column — so it would have been
+  // dropped on migrate and absent on restore, a field the engine sets
+  // and the database cannot hold. CLAUDE.md's bar for adding one to
+  // `schema-extensions.sql` is that the engine must READ it, and
+  // nothing does. `status` is what anything actually checks.
+  return record;
+}
+
+// Pays every active wage once. Returns the events the tick should
+// carry, so an employer missing payroll is visible to the Event phase
+// rather than only to whoever reads the numbers afterwards.
+function runPayroll(worldState, tick) {
+  const events = [];
+  let paid = 0;
+  let missed = 0;
+
+  for (const record of worldState.employmentRecords) {
+    if (record.status !== 'active') continue;
+    const employer = worldState.organizations.find(
+      (o) => o.id === record.employer_organization_id,
+    );
+    // An employer that no longer exists cannot pay. The record is left
+    // active rather than silently ended — somebody deleting an
+    // organization out from under its staff is a different bug, and
+    // hiding it here would make it unfindable.
+    if (!employer) continue;
+
+    const wage = Number(record.wage) || 0;
+    const assets = Number(employer.assets) || 0;
+    if (wage > assets) {
+      missed += 1;
+      events.push({
+        type: 'payroll_missed',
+        organizationId: employer.id,
+        entityId: record.entity_id,
+        wage,
+        assets,
+        tick,
+      });
+      continue;
+    }
+
+    employer.assets = assets - wage;
+    employer.expenses = (Number(employer.expenses) || 0) + wage;
+
+    // A new finances row for this tick, carrying the previous balance
+    // forward. `individual_finances` is keyed (entity_id, tick), so a
+    // tick's pay is its own row rather than a mutation of an older one
+    // — which is what lets `getLatestFinances` mean anything.
+    const previous = getLatestFinances(worldState, record.entity_id);
+    worldState.individualFinances.push({
+      entity_id: record.entity_id,
+      income: wage,
+      savings: (Number(previous?.savings) || 0) + wage,
+      debt: Number(previous?.debt) || 0,
+      assets: Number(previous?.assets) || 0,
+      tick,
+    });
+    paid += 1;
+  }
+
+  return { paid, missed, events };
+}
+
+// **Computed, never stored** — standing rule 3. `communities.employment`
+// is a separate stored field seeded at 50 and is deliberately NOT
+// written from here: two sources of truth for one concept is the
+// mistake that rule exists to prevent.
+//
+// The denominator is working-age NPCs, not every entity, because
+// organizations and properties are entities too and counting them
+// would make the rate meaningless.
+function getEmploymentRate(worldState) {
+  const people = worldState.npcs.length;
+  if (people === 0) return null;
+  const employed = worldState.employmentRecords.filter((r) => r.status === 'active').length;
+  return Math.round((employed / people) * 10000) / 10000;
+}
+
 function reseedIds(worldState) {
   nextResourceId = nextAfter(worldState.resources);
   nextMarketListingId = nextAfter(worldState.marketListings);
+  nextEmploymentRecordId = nextAfter(worldState.employmentRecords);
   return {
     nextResourceId: nextResourceId,
     nextMarketListingId: nextMarketListingId,
+    nextEmploymentRecordId: nextEmploymentRecordId,
   };
 }
 
@@ -230,4 +399,11 @@ module.exports = {
   generateIndividualFinances,
   getLatestFinances,
   getNetWorth,
+  EMPLOYMENT_STATUSES,
+  hireEntity,
+  endEmployment,
+  getEmployment,
+  listEmployment,
+  runPayroll,
+  getEmploymentRate,
 };

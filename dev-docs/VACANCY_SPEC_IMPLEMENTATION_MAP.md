@@ -105,14 +105,33 @@ from memory with nothing in the repo to check it against. The forty are
 now data in `vacon-c/server/urbanSystems.js`, every citation verified
 by `vacon-c/test/urban-systems.test.js`, and the real breakdown is:
 
-**9 modelled, 16 partial, 9 slot-only, 6 absent**
+**10 modelled, 16 partial, 8 slot-only, 6 absent**
 
 | Level | Means | Systems |
 |---|---|---|
-| **modelled** (9) | Real mechanics; something advances or decides on it each tick | Population, Housing, Economy, Infrastructure, Cultural, Community Organizations, Real Estate, Environmental, AI Decision |
+| **modelled** (10) | Real mechanics; something advances or decides on it each tick | Population, Housing, Economy, **Employment**, Infrastructure, Cultural, Community Organizations, Real Estate, Environmental, AI Decision |
 | **partial** (16) | A trait family or a live table with little driving it, or one phase covering two systems | Education, Health, Food Supply, Water, Law Enforcement, Crime, Gang, Organized Crime, Communication, Business, Construction, Weather, Disaster, Technology, Migration, Reputation |
-| **slot** (9) | Storage exists and nothing reads it | Transportation, Energy, Waste, Employment, Court, Political, Religion, Fire & Emergency, Supply Chain |
+| **slot** (8) | Storage exists and nothing reads it | Transportation, Energy, Waste, Court, Political, Religion, Fire & Emergency, Supply Chain |
 | **absent** (6) | No representation at all | Prison, Government Services, Media, Social Media, Military/National Guard, Tourism |
+
+**Employment is the first `slot` taken off the list** — 12 Sep 2026,
+and it is the worked example of what "deepen what exists" means here.
+Payroll runs inside the Economy phase (the pipeline stays at eleven)
+and **moves money rather than making it**: a wage leaves the employer
+organization's `assets`, arrives in the employee's
+`individual_finances`, and is recorded in the employer's `expenses`.
+An employer that cannot cover it does not pay and emits
+`payroll_missed` into the tick's events. `getEmploymentRate` is
+computed, never stored — `communities.employment` stays the separate
+seeded field it was, because two sources of truth for one concept is
+what standing rule 3 exists to prevent.
+
+That conservation is the part worth insisting on. Crediting the
+employee and leaving the employer alone is half a line shorter and
+passes most of the tests — and since `getNetWorth` and
+`getFamilyWealth` both read `individual_finances`, the invented money
+would have surfaced as real household wealth across the whole world.
+Four tests fail against that version, verified by writing it.
 
 **This breakdown has been revised down twice, and the second revision
 is the instructive one.** It began as an estimate of "roughly 25 of the
@@ -141,7 +160,7 @@ as a result:
 |---|---|---|---|
 | **Political** | modelled | **slot** | Six tables — governments, elections, votes, laws, public_opinion, revolutions — and no engine module touches one of them. Nothing governs, elects, votes, legislates or revolts. |
 | **Technology** | modelled | **partial** | `technology_eras` and `civilization_technology_progress` are equally untouched, which also makes the §40 claim below wrong. |
-| **Employment** | partial | **slot** | `economy.js` says in its own header that `employment_records` is not built. |
+| **Employment** | partial | **slot**, then built | `economy.js` said in its own header that `employment_records` was not built. It is now — see above. |
 
 `environment_state` is the instructive counter-example: it is
 schema-only, and Environmental is still **modelled**, because

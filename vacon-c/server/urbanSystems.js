@@ -115,12 +115,17 @@ const SYSTEMS = [
   {
     n: 4,
     name: 'Employment',
-    level: 'slot',
-    schemaOnly: ['employment_records'],
-    note: 'A table and nothing else — `economy.js` says so in its own header: '
-      + '"employment_records, investments, and trade_routes are NOT built here... natural '
-      + 'follow-ups, not done in this pass." Marked `partial` in the first version of this '
-      + 'file on the strength of that table definition alone.',
+    level: 'modelled',
+    tables: ['employment_records'],
+    phases: ['runEconomyPhase'],
+    functions: ['hireEntity', 'endEmployment', 'runPayroll', 'getEmploymentRate'],
+    note: '**Built 12 Sep 2026, and it was the first `slot` taken off this list.** It was '
+      + '`partial` on the strength of a table definition, then `slot` once the citation was '
+      + 'checked — `economy.js` said in its own header that employment_records was "NOT built '
+      + 'here... a natural follow-up". Payroll now runs inside the Economy phase and moves '
+      + 'real money: a wage leaves the employer organization\'s `assets`, lands in the '
+      + 'employee\'s `individual_finances`, and is recorded in the employer\'s `expenses`. An '
+      + 'employer that cannot cover it does not pay and emits `payroll_missed`.',
   },
   {
     n: 5,

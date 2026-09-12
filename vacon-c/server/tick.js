@@ -156,6 +156,18 @@ const SCARCITY_BROADCAST_THRESHOLD = 60;
 function runEconomyPhase(worldState) {
   const events = [];
 
+  // **Payroll first, before prices move.** Wages are what people have
+  // to spend, so paying them after this tick's prices were resolved
+  // would mean everyone shops on last tick's wallet. It also puts the
+  // `payroll_missed` events into the same tick's candidate list, so a
+  // failing employer is visible to the Event phase rather than only to
+  // whoever reads the numbers afterwards.
+  //
+  // Inside the Economy phase deliberately — the pipeline is locked at
+  // eleven phases, and payroll is economy rather than a twelfth thing.
+  const payroll = economy.runPayroll(worldState, worldState.tick);
+  events.push(...payroll.events);
+
   // Scarcity is computed BEFORE listings are priced, because prices now
   // depend on it. The original order priced listings first and computed
   // scarcity afterwards, which was harmless only while the two were

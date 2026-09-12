@@ -219,6 +219,19 @@ async function restoreWorldStateFromPostgres(worldState) {
     nums(f, ['entity_id', 'income', 'savings', 'debt', 'assets', 'tick']));
   summary.individual_finances = worldState.individualFinances.length;
 
+  // **Every numeric column named, including the ids.** Postgres returns
+  // BIGINT and NUMERIC as strings, and a missed conversion here does
+  // not throw — it produces a world that looks restored and is wrong.
+  // That is CLAUDE.md's tenth standing rule, learned when `trait_id`
+  // came back as the string "1", matched no definition, and restored
+  // every entity with an empty trait sheet and no error anywhere.
+  // `wage` is the one that would bite: a string wage makes
+  // `wage > assets` a string comparison, so payroll would silently
+  // start paying or refusing on lexicographic order.
+  worldState.employmentRecords = (await q('SELECT * FROM employment_records ORDER BY id')).map((e) =>
+    nums(e, ['id', 'entity_id', 'employer_organization_id', 'wage', 'start_tick']));
+  summary.employment_records = worldState.employmentRecords.length;
+
   // -------------------------------------------------------------------
   // History
   // -------------------------------------------------------------------
