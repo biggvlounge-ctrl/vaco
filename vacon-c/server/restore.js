@@ -325,7 +325,12 @@ async function restoreWorldStateFromPostgres(worldState) {
   // demonstrably had crime in it — and nothing would throw.
   worldState.crimeIncidents = (await q('SELECT * FROM crime_incidents ORDER BY id')).map((c) =>
     nums(c, ['id', 'perpetrator_entity_id', 'victim_entity_id', 'community_id',
-      'tick', 'severity']));
+      // `investigated_tick` is a BIGINT and comes back as a string;
+      // `cleared` is a real BOOLEAN and must NOT go through `num`,
+      // which would turn `false` into 0 — and 0 is not null, so a case
+      // that was investigated and failed would read as never looked at
+      // once `!== null` checks got hold of it.
+      'tick', 'severity', 'investigated_tick']));
   summary.crime_incidents = worldState.crimeIncidents.length;
 
   worldState.entityOrganizationMemberships =

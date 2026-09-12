@@ -78,13 +78,17 @@ function assertType(beliefType) {
 
 function getBeliefs(worldState, entityId, options = {}) {
   const { beliefType = null } = options;
-  return worldState.beliefs.filter(
+  // `|| []` for the same reason every other reader in this engine has
+  // it: a module that reads an array a caller has not declared throws
+  // on a world that is otherwise perfectly valid, and `statistics.js`
+  // now reaches `beliefs` from every area profile.
+  return (worldState.beliefs || []).filter(
     (b) => b.entity_id === entityId && (beliefType === null || b.belief_type === beliefType),
   );
 }
 
 function findBelief(worldState, entityId, beliefName) {
-  return worldState.beliefs.find(
+  return (worldState.beliefs || []).find(
     (b) => b.entity_id === entityId && b.belief_name === beliefName,
   ) || null;
 }

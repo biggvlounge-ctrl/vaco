@@ -678,9 +678,11 @@ async function migrateWorldStateToPostgres(worldState) {
       for (const c of worldState.crimeIncidents) {
         await client.query(
           `INSERT INTO crime_incidents (id, category, perpetrator_entity_id, victim_entity_id,
-             community_id, tick, severity, detail) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+             community_id, tick, severity, detail, investigated_tick, cleared)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
           [c.id, c.category, c.perpetrator_entity_id, c.victim_entity_id,
-            c.community_id, c.tick, c.severity, c.detail]
+            c.community_id, c.tick, c.severity, c.detail,
+            c.investigated_tick ?? null, c.cleared ?? null]
         );
       }
       summary.crime_incidents = worldState.crimeIncidents.length;

@@ -187,3 +187,24 @@ CREATE TABLE IF NOT EXISTS crime_incidents (
 -- corrupting one. Same rule `areaStats.unplaced` follows for residents.
 CREATE INDEX IF NOT EXISTS idx_crime_incidents_community ON crime_incidents (community_id);
 CREATE INDEX IF NOT EXISTS idx_crime_incidents_category ON crime_incidents (category);
+
+-- ---------------------------------------------------------------------
+-- crime_incidents.investigated_tick / .cleared
+-- ---------------------------------------------------------------------
+-- Carries the outcome server/policing.js writes. Added to this file's
+-- own table rather than to the base schema, same as the table itself.
+--
+-- **Three states, not two, and that is the whole reason `cleared` is
+-- nullable.** A case nobody has looked at yet is neither solved nor
+-- failed; defaulting it to false would make every incident ever
+-- recorded count against the clearance rate from the moment it
+-- happened, so an area's clearance rate would fall every time somebody
+-- committed a crime rather than every time one went unsolved.
+--
+-- Both clear this file's stated bar — the engine READS them:
+-- `policing.clearanceRate` and `policing.caseload` are built entirely
+-- on these two columns, and `runPolicing` skips an incident that
+-- already has an `investigated_tick`, so losing them on restore would
+-- re-investigate the entire history of the world on the next tick.
+ALTER TABLE crime_incidents ADD COLUMN IF NOT EXISTS investigated_tick BIGINT;
+ALTER TABLE crime_incidents ADD COLUMN IF NOT EXISTS cleared BOOLEAN;

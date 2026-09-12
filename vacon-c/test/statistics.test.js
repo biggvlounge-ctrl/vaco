@@ -63,6 +63,7 @@ function world({ tick = 36500 } = {}) {
     // Property ids come from the shared entity counter so a property
     // can be an `ownership_records.entity_id` — property.js refuses to
     // generate one without it.
+    beliefs: [],
     nextEntityId: 1,
   };
   territory.reseedIds(worldState);
@@ -158,7 +159,18 @@ test('no key appears twice', () => {
 
 test('every unavailable statistic names its missing substrate', () => {
   const missing = statistics.unavailable();
-  assert.ok(missing.length > 8, 'suspiciously few declared gaps');
+
+  // **This used to assert `> 8`, an arbitrary floor meant to catch an
+  // emptied list, and it started failing as gaps were closed** — which
+  // is a test punishing the work it exists to support. The real
+  // invariant is consistency: `unavailable()` reports exactly the
+  // entries the catalogue declares, no more and no fewer, so neither
+  // can drift from the other.
+  const declaredInCatalogue = statistics.CATALOGUE
+    .filter((d) => d.unavailable)
+    .map((d) => d.key)
+    .sort();
+  assert.deepEqual(missing.map((e) => e.key).sort(), declaredInCatalogue);
   for (const entry of missing) {
     assert.ok(entry.reason.length > 60, `${entry.key} has no real explanation`);
   }

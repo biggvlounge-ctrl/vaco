@@ -93,6 +93,7 @@ const economy = require('./economy.js');
 const membership = require('./membership.js');
 const infrastructure = require('./infrastructure.js');
 const mortality = require('./mortality.js');
+const policing = require('./policing.js');
 const property = require('./property.js');
 
 // §9's MASTER BLOCK KEY, in its order. Every statistic belongs to one.
@@ -507,6 +508,21 @@ const CATALOGUE = [
       : `nothing in the engine generates this category: ${crime.CATEGORIES[category].substrate}`,
   })),
 
+  {
+    key: 'clearance_rate', category: 'crime', unit: 'share', scope: 'community',
+    // **Over INVESTIGATED cases, not over all of them.** A case
+    // committed yesterday has not been solved and has not been failed;
+    // counting it as unsolved would make an area's clearance rate a
+    // function of how recently somebody looked.
+    compute: (ctx) => policing.clearanceRate(ctx.worldState, ctx.communityId),
+  },
+  {
+    key: 'open_cases_per_1k', category: 'crime', unit: 'rate_per_1k', scope: 'community',
+    compute: (ctx) => per1k(
+      policing.caseload(ctx.worldState, ctx.communityId).open, ctx.population,
+    ),
+  },
+
   // ---- organization --------------------------------------------------
   {
     key: 'organizations_present', category: 'organization', unit: 'count', scope: 'community',
@@ -554,10 +570,12 @@ const CATALOGUE = [
   },
   {
     key: 'patrol_frequency', category: 'surveillance', unit: 'rate_per_1k', scope: 'community',
-    unavailable: 'there are no patrols. `runSecurityPhase` covers crime and law enforcement '
-      + 'together and the policing half of it does nothing — no patrols, investigations, '
-      + 'raids, arrests or clearance rates. This is the same gap the references document '
-      + 'calls "heat".',
+    // **This was the reason the whole SURVEILLANCE block read zero.**
+    // The declared gap said "the policing half of runSecurityPhase does
+    // nothing", and server/policing.js is that half. Read from the
+    // public_safety capacity that actually does the investigating,
+    // rather than from a second number that could disagree with it.
+    compute: (ctx) => policing.patrolsPer1k(ctx.worldState, ctx.communityId),
   },
   {
     key: 'street_lighting', category: 'surveillance', unit: 'index', scope: 'community',
@@ -690,10 +708,14 @@ const CATALOGUE = [
     },
   },
   {
-    key: 'police_trust', category: 'psychological', unit: 'index', scope: 'community',
-    unavailable: 'there is no police force to trust or distrust. `beliefs` could carry the '
-      + 'attitude — its six belief types are in the schema — but the institution the '
-      + 'attitude would be about does not exist.',
+    key: 'public_safety_trust', category: 'psychological', unit: 'index', scope: 'community',
+    // The declared gap said `beliefs` could carry this attitude and
+    // the institution it would be about did not exist. It does now,
+    // and this reads the belief rather than deriving one: a formula
+    // over the clearance rate would be the clearance rate under a name
+    // promising something else. Null where nothing has happened yet —
+    // unknown, not neutral.
+    compute: (ctx) => policing.trustIn(ctx.worldState, ctx.communityId),
   },
 ];
 

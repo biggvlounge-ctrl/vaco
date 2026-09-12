@@ -48,6 +48,7 @@ function world({ tick = 36500 } = {}) {
     ownershipRecords: [],
     resources: [],
     marketListings: [],
+    beliefs: [],
     nextEntityId: 1,
   };
   territory.reseedIds(worldState);

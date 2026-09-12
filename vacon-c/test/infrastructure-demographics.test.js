@@ -53,6 +53,7 @@ function world({ tick = 1000 } = {}) {
     infrastructure: [],
     languages: [],
     entityLanguages: [],
+    beliefs: [],
     nextEntityId: 1,
   };
   territory.reseedIds(worldState);

@@ -220,9 +220,15 @@ const SYSTEMS = [
     name: 'Law Enforcement',
     level: 'partial',
     phases: ['runSecurityPhase'],
+    tables: ['infrastructure', 'beliefs'],
     infrastructureTypes: ['public_safety'],
-    note: 'One phase covers this and Crime together. No patrols, investigations, raids, '
-      + 'arrests or clearance rates.',
+    note: 'Investigations, clearance rates and patrol presence are real — capacity is the '
+      + 'public_safety infrastructure a city has, in the condition it is in, so a city that '
+      + 'lets it decay clears fewer crimes with no second mechanism. Trust is measured from '
+      + 'residents\' beliefs rather than derived from the clearance rate. Still partial, and '
+      + 'the boundary is deliberate: clearance is NOT arrest. §7 Prison is absent and '
+      + '`imprisoned` was not added as an entity status, so raids, arrests and sentencing '
+      + 'would need somewhere to put people first.',
   },
   {
     n: 14,

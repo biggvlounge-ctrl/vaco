@@ -243,6 +243,14 @@ function recordCrime(worldState, options = {}) {
     tick,
     severity,
     detail,
+    // **Set by server/policing.js, and null here on purpose.** Null
+    // means "nobody has looked at this yet", which is a third state
+    // distinct from investigated-and-cleared and
+    // investigated-and-not. Defaulting `cleared` to false would make
+    // every case ever recorded count against the clearance rate from
+    // the moment it happened.
+    investigated_tick: null,
+    cleared: null,
   };
   worldState.crimeIncidents.push(incident);
 

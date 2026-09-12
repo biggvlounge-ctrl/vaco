@@ -277,10 +277,19 @@ test('Prison stays absent while nothing incarcerates anybody', () => {
   // evidence of a prison is counting a sentence that says there is no
   // prison. DDL still counts — a real `imprisoned_until` column would
   // survive the strip and fail this, which is the point.
-  const declarations = SCHEMA.split('\n').map((l) => l.replace(/--.*$/, '')).join('\n');
-  const haystack = [declarations, ...fs.readdirSync(SERVER_DIR)
+  // Comments are stripped from BOTH sides, and the JS side was added
+  // after `policing.js` failed this on its own header — which explains
+  // that clearance deliberately stops short of arrest because
+  // `imprisoned` was NOT added as an entity status. That is the third
+  // time in this file's life that prose about an absence has counted
+  // as evidence of a presence.
+  const stripSql = (src) => src.split('\n').map((l) => l.replace(/--.*$/, '')).join('\n');
+  const stripJs = (src) => src
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/.*$/gm, '');
+  const haystack = [stripSql(SCHEMA), ...fs.readdirSync(SERVER_DIR)
     .filter((f) => f.endsWith('.js') && f !== 'urbanSystems.js')
-    .map((f) => fs.readFileSync(path.join(SERVER_DIR, f), 'utf8'))].join('\n');
+    .map((f) => stripJs(fs.readFileSync(path.join(SERVER_DIR, f), 'utf8')))].join('\n');
   assert.equal(/imprison/i.test(haystack), false,
     'something now models imprisonment; system 18 is no longer absent');
 });

@@ -54,6 +54,7 @@ const mortality = require('./mortality.js');
 const births = require('./births.js');
 const crime = require('./crime.js');
 const infrastructure = require('./infrastructure.js');
+const policing = require('./policing.js');
 const keys = require('./keys.js');
 const territory = require('./territory.js');
 const property = require('./property.js');
@@ -453,6 +454,16 @@ function runSecurityPhase(worldState) {
       global_effects: { crimeIncidentId: incident.id, crimeCategory: incident.category },
     });
   }
+
+  // The policing half of this phase, which did nothing until
+  // `server/policing.js` existed. `urbanSystems.js` said so in system
+  // 13's own note: "One phase covers this and Crime together. No
+  // patrols, investigations, raids, arrests or clearance rates."
+  //
+  // Runs after the crime half so a case opened this tick is in the
+  // list, and clears nothing on the tick it happened — investigation
+  // is delayed, which is what makes a backlog visible.
+  events.push(...policing.runPolicing(worldState, worldState.tick).events);
 
   return events;
 }
