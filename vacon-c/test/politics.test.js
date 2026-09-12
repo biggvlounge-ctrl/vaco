@@ -55,6 +55,7 @@ function world({ npcs = 4, loyalty = 50, paranoia = 50, threshold = 50 } = {}) {
     entityKnowledge: [],
     memories: [],
     relationships: [],
+    beliefs: [],
     governments: [],
     elections: [],
     votes: [],

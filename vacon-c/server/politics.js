@@ -51,21 +51,33 @@
 // badly things were going. It is not a bug there; it is a different
 // question.
 //
-// **The alternative I rejected** was adding a `valence` column to
-// `entity_knowledge` so each fact could carry good/bad separately from
-// true/false. It would work, and `schema-extensions.sql` exists for
-// exactly that. Two reasons against: the engine would then need a
-// favourability judgement for every fact it broadcasts, and deciding
-// whether a `criminal` law is good or bad for a given NPC is inventing
-// game design that no source document specifies — the same line
-// `actions.js` declined to cross. Traits-for-stance needs no such
-// judgement and no new column.
+// **A belief outranks a trait when somebody has one.** The first
+// version of this module read traits only, and its note here said the
+// cost was that **approval did not depend on what a law said** — a
+// harsh law and a generous one moved it identically, because knowledge
+// only establishes that somebody has heard of a government.
 //
-// The cost is stated rather than hidden: **approval does not depend on
-// what a law says.** A harsh law and a generous one move approval
-// identically, because both are only a reason for people to have heard
-// of the government. When a source document specifies law
-// favourability, that is where it goes.
+// That note went on to say a `valence` column on `entity_knowledge`
+// would be the way to fix it, and **that was wrong: the schema already
+// had the field.** `beliefs.strength` is a valenced position on a
+// named subject, and `public_opinion`'s own comment asks for a rollup
+// from "beliefs/entity_knowledge" — beliefs first. It was simply an
+// unbuilt table. `server/beliefs.js` now exists, so:
+//
+//   a political belief about the topic  -> that strength is the stance
+//   no belief, but knowledge of it      -> the trait-derived stance,
+//                                          damped by confidence
+//   neither                             -> not counted at all
+//
+// The trait path stays because it is the right answer for a population
+// that has heard of a government and formed no view of it: their
+// disposition is all there is to go on.
+//
+// **What still is not invented:** whether a law is good.
+// `enactLaw` takes an optional caller-declared `favourability`, and
+// with none it shifts no belief. Deciding that a `criminal` law pleases
+// one NPC and offends another is game design no source document
+// specifies — the line `actions.js` already declined to cross.
 //
 // ---------------------------------------------------------------------
 // Where this runs
@@ -79,6 +91,7 @@
 const { nextAfter } = require('./nextAfter.js');
 const entityTraits = require('./entityTraits.js');
 const worldStore = require('./worldStore.js');
+const beliefs = require('./beliefs.js');
 
 let nextElectionId = 1;
 let nextLawId = 1;
@@ -164,8 +177,11 @@ function enactLaw(worldState, options = {}) {
   const {
     jurisdictionCityId = null, category, description = null,
     governmentOrganizationId = null, tick = worldState.tick ?? 0,
-    factType = 'known', confidence = 0.8,
+    factType = 'known', confidence = 0.8, favourability = null,
   } = options;
+  if (favourability !== null && !Number.isFinite(favourability)) {
+    throw new Error('enactLaw: favourability must be a finite number or null');
+  }
 
   if (!LAW_CATEGORIES.includes(category)) {
     throw new Error(`enactLaw: category must be one of ${LAW_CATEGORIES.join(', ')}`);
@@ -192,6 +208,19 @@ function enactLaw(worldState, options = {}) {
       confidence,
       tick,
     });
+
+    // **Only when the caller says which way.** With no
+    // `favourability`, a law is news and nothing more — which is the
+    // original behaviour, kept rather than replaced, because this
+    // module still has no basis for judging a law.
+    if (favourability !== null) {
+      beliefs.shiftPopulationBelief(worldState, {
+        beliefType: 'political',
+        beliefName: topicForGovernment(governmentOrganizationId),
+        delta: favourability,
+        tick,
+      });
+    }
   }
 
   return law;
@@ -250,7 +279,16 @@ function broadcastGovernmentKnowledge(worldState, options = {}) {
 // plausible birth value forever. That is standing rule 9, and it is
 // the failure mode that is hardest to see because a frozen number
 // looks exactly like a real one.
-function stanceOf(worldState, entityId, confidence) {
+function stanceOf(worldState, entityId, confidence, topic) {
+  // A belief is a position somebody actually holds on this subject, so
+  // it is used as-is: not damped by the confidence of a knowledge row,
+  // because the belief IS the view. Damping it would mean somebody who
+  // firmly distrusts a government on hearsay is recorded as neutral.
+  if (topic) {
+    const held = beliefs.beliefStrength(worldState, entityId, topic);
+    if (held !== null) return Math.max(0, Math.min(100, Number(held)));
+  }
+
   const live = entityTraits.getLiveEntity(worldState, entityId);
   if (!live) return null;
   const trait = (family, name, fallback = 50) => {
@@ -305,7 +343,7 @@ function computeApproval(worldState, options = {}) {
 
   const stances = [];
   for (const [entityId, row] of byEntity) {
-    const stance = stanceOf(worldState, entityId, row.confidence_level ?? 0.5);
+    const stance = stanceOf(worldState, entityId, row.confidence_level ?? 0.5, topic);
     if (stance !== null) stances.push(stance);
   }
 

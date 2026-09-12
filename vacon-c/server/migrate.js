@@ -448,6 +448,16 @@ async function migrateWorldStateToPostgres(worldState) {
       // them; `revolutions` references organizations twice. Cities are
       // already written by this point, which `laws` and
       // `public_opinion` need for their jurisdiction columns.
+      // beliefs, before the political tables that read them.
+      for (const b of worldState.beliefs) {
+        await client.query(
+          `INSERT INTO beliefs (id, entity_id, belief_type, belief_name, strength, tick)
+           VALUES ($1,$2,$3,$4,$5,$6)`,
+          [b.id, b.entity_id, b.belief_type, b.belief_name, b.strength, b.tick]
+        );
+      }
+      summary.beliefs = worldState.beliefs.length;
+
       for (const g of worldState.governments) {
         await client.query(
           `INSERT INTO governments (organization_id, system_type) VALUES ($1,$2)`,

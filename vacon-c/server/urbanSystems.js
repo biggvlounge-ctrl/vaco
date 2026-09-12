@@ -252,7 +252,9 @@ const SYSTEMS = [
     n: 19,
     name: 'Political',
     level: 'modelled',
-    tables: ['governments', 'elections', 'votes', 'laws', 'public_opinion', 'revolutions'],
+    tables: [
+      'governments', 'elections', 'votes', 'laws', 'public_opinion', 'revolutions', 'beliefs',
+    ],
     phases: ['runOrganizationPhase'],
     functions: [
       'foundGovernment', 'enactLaw', 'repealLaw', 'scheduleElection', 'castVote',
@@ -313,9 +315,16 @@ const SYSTEMS = [
   {
     n: 26,
     name: 'Religion',
-    level: 'slot',
-    schemaOnly: ['beliefs', 'values_db'],
-    note: 'Two schema-only tables. Nothing writes a belief or a value.',
+    level: 'partial',
+    tables: ['beliefs'],
+    schemaOnly: ['values_db'],
+    functions: ['adoptBelief', 'shiftBelief', 'getBeliefs', 'summariseBelief'],
+    note: '`beliefs` became live on 12 Sep 2026 — `religious` is one of its six types, so a '
+      + 'religious conviction is now a real thing an entity holds, at a strength that moves. '
+      + '**Still partial**: no religious institutions, no practice, no clergy, and nothing '
+      + 'religious drives a decision. `values_db` stays schema-only on purpose — it has no '
+      + 'column defaults and no source document gives value distributions, so a generator '
+      + 'would be fifteen invented numbers per person.',
   },
   {
     n: 27,

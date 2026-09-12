@@ -105,14 +105,49 @@ from memory with nothing in the repo to check it against. The forty are
 now data in `vacon-c/server/urbanSystems.js`, every citation verified
 by `vacon-c/test/urban-systems.test.js`, and the real breakdown is:
 
-**11 modelled, 17 partial, 6 slot-only, 6 absent**
+**11 modelled, 18 partial, 5 slot-only, 6 absent**
 
 | Level | Means | Systems |
 |---|---|---|
 | **modelled** (11) | Real mechanics; something advances or decides on it each tick | Population, Housing, Economy, **Employment**, Infrastructure, **Political**, Cultural, Community Organizations, Real Estate, Environmental, AI Decision |
-| **partial** (17) | A trait family or a live table with little driving it, or one phase covering two systems | Education, Health, Food Supply, Water, Law Enforcement, Crime, Gang, Organized Crime, **Court**, Communication, Business, Construction, Weather, Disaster, Technology, Migration, Reputation |
-| **slot** (6) | Storage exists and nothing reads it | Transportation, Energy, Waste, Religion, Fire & Emergency, Supply Chain |
+| **partial** (18) | A trait family or a live table with little driving it, or one phase covering two systems | Education, Health, Food Supply, Water, Law Enforcement, Crime, Gang, Organized Crime, **Court**, Communication, **Religion**, Business, Construction, Weather, Disaster, Technology, Migration, Reputation |
+| **slot** (5) | Storage exists and nothing reads it | Transportation, Energy, Waste, Fire & Emergency, Supply Chain |
 | **absent** (6) | No representation at all | Prison, Government Services, Media, Social Media, Military/National Guard, Tourism |
+
+**Beliefs closed a loop Political left open, and corrected a guess I
+had written into the code.** `public_opinion`'s comment asks for a
+rollup from "**beliefs**/entity_knowledge"; `beliefs` was dead, so
+approval came from live traits, and `politics.js` recorded the cost —
+**approval did not depend on what a law said.** That note went on to
+say a `valence` column on `entity_knowledge` would be the fix.
+
+It was wrong. **`beliefs.strength` is already a valenced position on a
+named subject** — the field existed and the table was simply unbuilt.
+No schema extension was needed. Approval now reads:
+
+| | Stance |
+|---|---|
+| holds a political belief about the topic | that strength, undamped — the belief *is* the view |
+| knows of it, holds no belief | the trait-derived stance, damped by confidence |
+| neither | not counted, so the spread floor still means something |
+
+What is still not invented: **whether a law is good.** `enactLaw` takes
+an optional caller-declared `favourability` and shifts no belief
+without one. Deciding that a `criminal` law pleases one NPC and
+offends another is game design no source document specifies.
+
+Religion rises to `partial` on the same table — `religious` is one of
+the six belief types, so a religious conviction is now a real thing an
+entity holds at a strength that moves. No institutions, no practice,
+no clergy, and nothing religious drives a decision yet.
+
+**`values_db` is deliberately still dead**, and that is a decision
+rather than an omission: no column defaults, and no source document
+gives value distributions, priorities or influence weights, so a
+generator would be fifteen invented numbers per person. CRUD nothing
+calls would be worse than the dead table — it would look alive and
+hold nothing. A test asserts the restraint, so whoever builds it has
+to delete that test rather than find a stale claim in a comment.
 
 **Political was the largest dead spot in the schema and is now built**
 — 12 Sep 2026, `vacon-c/server/politics.js`, running inside the

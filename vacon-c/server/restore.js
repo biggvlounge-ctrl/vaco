@@ -240,6 +240,14 @@ async function restoreWorldStateFromPostgres(worldState) {
   // `approval >= approvalFloor` a lexicographic comparison, so "9"
   // would read as above a floor of 35 and a collapsing government
   // would restore as a stable one.
+  // **`strength` named in `nums`.** Postgres returns NUMERIC as a
+  // string, and a string strength makes `belief.strength + delta`
+  // string concatenation — "50" + 10 is "5010", which clamps to 100
+  // and reads as an absolute conviction nobody formed (rule 10).
+  worldState.beliefs = (await q('SELECT * FROM beliefs ORDER BY id')).map((b) =>
+    nums(b, ['id', 'entity_id', 'strength', 'tick']));
+  summary.beliefs = worldState.beliefs.length;
+
   worldState.governments = (await q('SELECT * FROM governments')).map((g) =>
     nums(g, ['organization_id']));
   summary.governments = worldState.governments.length;

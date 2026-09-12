@@ -105,6 +105,11 @@ const WorldState = {
   // primary key), so `governments` keys off an organization id rather
   // than owning one. `server/politics.js`; runs inside the
   // Organization phase.
+  // What people believe, and how strongly. Built after politics,
+  // because `public_opinion`'s schema comment asks for a rollup from
+  // "beliefs/entity_knowledge" and beliefs was a dead table at the
+  // time. `server/beliefs.js`.
+  beliefs: [],
   governments: [],
   elections: [],
   votes: [],
