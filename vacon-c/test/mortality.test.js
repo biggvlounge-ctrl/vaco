@@ -96,7 +96,14 @@ test('an entity with no createdTick has an unknown age, not age zero', () => {
   const w = world();
   assert.equal(mortality.ageInYears(w, { id: 99 }), null);
   assert.equal(mortality.ageInYears(w, null), null);
-  assert.equal(mortality.annualDeathRisk(w, 99, { age: null }), 0);
+
+  // **An unknown age drops the age term and nothing else.** The first
+  // version returned 0 risk outright, which made anybody with no
+  // recorded creation immortal — including in a famine. They still
+  // face their environment; it is only their years that are unknown.
+  assert.ok(mortality.annualDeathRisk(w, 99, { age: null }) > 0);
+  assert.ok(mortality.annualDeathRisk(w, 99, { age: null, scarcity: 1 })
+    > mortality.annualDeathRisk(w, 99, { age: null }));
 });
 
 // -- health drives the risk ---------------------------------------------
@@ -120,15 +127,31 @@ test('the four health traits move mortality, and Chronic Conditions inverts', ()
   assert.ok(mortality.vitalityOf(frail, 1) > 1);
 });
 
-test('risk rises with age, is zero for the young, and is certain at the cap', () => {
-  const w = world({ ages: [20, 45, 70, 95, 110] });
+test('risk is continuous from birth — there is no minimum age of death', () => {
+  // **The correction.** The first version had a floor of 40 below
+  // which risk was exactly zero, so no child could die of anything
+  // but violence. That is a rule about people; the truth in a collapse
+  // setting is a rule about circumstances. The only hard bound left is
+  // the far end.
+  const w = world({ ages: [1] });
   const risk = (age) => mortality.annualDeathRisk(w, 1, { age });
 
-  assert.equal(risk(20), 0, 'a twenty-year-old is not on an actuarial table');
-  assert.equal(risk(mortality.MIN_NATURAL_DEATH_AGE), 0);
-  assert.ok(risk(45) > 0);
-  assert.ok(risk(70) > risk(45));
-  assert.ok(risk(95) > risk(70));
+  assert.ok(risk(1) > 0, 'an infant cannot die of anything at all');
+  assert.ok(risk(10) > 0);
+  assert.ok(risk(20) > 0);
+
+  // Monotonic the whole way up, with no step anywhere.
+  let previous = 0;
+  for (const age of [1, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 109]) {
+    const current = risk(age);
+    assert.ok(current >= previous, `risk fell between ${age} and the age before it`);
+    previous = current;
+  }
+
+  // And a recognisable shape rather than a flat line: childhood is
+  // roughly the accident rate, old age is orders of magnitude worse.
+  assert.ok(risk(10) < 0.002, `a child's annual risk is ${risk(10)}`);
+  assert.ok(risk(70) > risk(10) * 50, 'age barely tells at all');
   assert.equal(risk(mortality.MAX_AGE), 1, 'nobody outlives the cap');
   assert.equal(risk(200), 1);
 });
@@ -252,11 +275,14 @@ test('a violent death names the killer and the killer remembers it', () => {
   assert.deepEqual(w.memories[0].related_entity_ids, [1]);
 });
 
-test('violence kills the young, who are not on the age curve at all', () => {
+test('violence is not a probability and ignores the curve entirely', () => {
+  // A killing HAPPENS; it does not resolve. `killEntity` is the
+  // explicit path for that, separate from `runMortality` on purpose.
   const w = world({ ages: [20] });
-  assert.equal(mortality.annualDeathRisk(w, 1, { age: 20 }), 0);
+  assert.ok(mortality.annualDeathRisk(w, 1, { age: 20 }) < 0.002,
+    'a twenty-year-old should be at almost no passive risk');
   mortality.killEntity(w, { entityId: 1 });
-  assert.equal(w.npcs.length, 0, 'age immunity blocked a killing');
+  assert.equal(w.npcs.length, 0);
 });
 
 // -- disease is an environmental condition -------------------------------
@@ -288,7 +314,14 @@ test('an ordinary condition does not silently start killing people', () => {
   const w = world({ ages: [30] });
   w.activeConditions.push({ conditionType: 'drought', resourceType: 'food', supplyDelta: -50 });
   assert.equal(mortality.diseasePressure(w), 1);
-  assert.equal(mortality.annualDeathRisk(w, 1, { age: 30, pressure: 1 }), 0);
+
+  // The condition itself adds nothing. **A drought kills through
+  // scarcity, not by being a drought** — it drains the food resource,
+  // and `survivalScarcity` reads the shortage that results. So the
+  // risk here is unchanged, and the cascade is what does the harm.
+  const withDrought = mortality.annualDeathRisk(w, 1, { age: 30, pressure: 1 });
+  const without = mortality.annualDeathRisk(world({ ages: [30] }), 1, { age: 30 });
+  assert.equal(withDrought, without);
 });
 
 test('two outbreaks multiply rather than add', () => {
@@ -299,11 +332,44 @@ test('two outbreaks multiply rather than add', () => {
   assert.equal(mortality.diseasePressure(w), 12);
 });
 
-test('disease reaches the young, which is the one exception to the age floor', () => {
+test('an epidemic does not check anybody\'s age', () => {
+  // This used to be "the one exception to the age floor". With the
+  // floor gone it is simply how a disease works: the multiplier
+  // applies to everybody's risk, and the young have a real one now.
   const w = world({ ages: [20] });
-  assert.equal(mortality.annualDeathRisk(w, 1, { age: 20, pressure: 1 }), 0);
-  assert.ok(mortality.annualDeathRisk(w, 1, { age: 20, pressure: 50 }) > 0,
-    'an epidemic that could only kill the over-forties would be a strange disease');
+  const quiet = mortality.annualDeathRisk(w, 1, { age: 20, pressure: 1 });
+  const plague = mortality.annualDeathRisk(w, 1, { age: 20, pressure: 50 });
+  assert.ok(plague > quiet * 40, `a 50x plague moved a young person from ${quiet} to ${plague}`);
+});
+
+test('the environment kills the young, which is what "no minimum age" means', () => {
+  // A famine takes children first. Before the floor was removed this
+  // was impossible — a five-year-old in a settlement with no food at
+  // all was at exactly zero risk.
+  const w = world({ ages: [5] });
+  w.resources.push({ resource_type: 'food', supply: 1, demand: 100 });
+  const scarcity = mortality.survivalScarcity(w);
+  assert.equal(scarcity, 1, 'total famine should read as total scarcity');
+
+  const starving = mortality.annualDeathRisk(w, 1, { age: 5, scarcity });
+  assert.ok(starving > 0.2, `a starving child's annual risk is only ${starving}`);
+  assert.equal(mortality.causeFor({ age: 5, scarcity }), 'deprivation',
+    'a famine death recorded as old age makes a starving world look like an ageing one');
+});
+
+test('scarcity is the worst essential, not the average of them', () => {
+  // Plenty of food and no water at all is a settlement that is dying,
+  // and averaging would report it as coping.
+  const w = world({ ages: [30] });
+  w.resources.push({ resource_type: 'food', supply: 100, demand: 10 });
+  w.resources.push({ resource_type: 'water', supply: 1, demand: 100 });
+  assert.equal(mortality.survivalScarcity(w), 1);
+
+  // And a shortage of something inessential is an economic problem,
+  // not a mortality one.
+  const iron = world({ ages: [30] });
+  iron.resources.push({ resource_type: 'iron', supply: 1, demand: 100 });
+  assert.equal(mortality.survivalScarcity(iron), 0);
 });
 
 // -- reproducibility ----------------------------------------------------

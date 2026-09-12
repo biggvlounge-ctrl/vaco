@@ -72,6 +72,7 @@
 'use strict';
 
 const { seededDraw } = require('./seeded.js');
+const economy = require('./economy.js');
 const entityTraits = require('./entityTraits.js');
 const worldStore = require('./worldStore.js');
 
@@ -80,29 +81,65 @@ const worldStore = require('./worldStore.js');
 // choice expressed as a year, so the two cannot disagree silently.
 const TICKS_PER_YEAR = 365;
 
-//: Flagged interpretive: no document gives a lifespan. These bound the
-//: curve rather than setting a fixed span — nobody dies of age before
-//: `MIN_NATURAL_DEATH_AGE`, and the annual risk reaches certainty at
-//: `MAX_AGE`, so a population has a shape instead of a cliff.
-const MIN_NATURAL_DEATH_AGE = 40;
+// **There is no minimum age of death, and removing it was a
+// correction.** The first version of this file had a
+// `MIN_NATURAL_DEATH_AGE` of 40 below which risk was exactly zero, so
+// no child could die of anything except violence. That is a rule about
+// people, and in a collapse setting the truth is a rule about
+// circumstances: a famine kills the young first, an epidemic does not
+// check anybody's age, and a settlement with no clean water loses
+// infants before it loses elders.
+//
+// So risk is continuous from birth and every term below is either the
+// person's own condition or their environment. The only hard bound
+// left is the far end.
 const MAX_AGE = 110;
 
-//: Also interpretive: the annual risk at `MIN_NATURAL_DEATH_AGE` for
-//: somebody of average health, before it accelerates. 0.004 is roughly
-//: four deaths per thousand forty-year-olds per year — low enough that
-//: a healthy adult population is stable, high enough that a century of
-//: simulation is not a century of nobody dying.
-const BASE_ANNUAL_RISK = 0.004;
+//: Flagged interpretive: the always-present annual risk at any age in a
+//: safe, fed, disease-free environment — accident and misadventure.
+//: 0.0008 is roughly one in twelve hundred a year, which is small
+//: enough that a healthy protected population is stable and large
+//: enough that "nobody ever dies for no reason" is not a promise the
+//: engine makes.
+const BASE_ANNUAL_RISK = 0.0008;
 
-//: How sharply risk accelerates with age. At 2.0 the risk roughly
-//: quadruples every time the distance past 40 doubles, which gives a
-//: recognisable human-shaped curve without pretending to be an actuarial
-//: table.
-const AGE_EXPONENT = 2.0;
+//: How sharply age alone tells. `(age / MAX_AGE) ** 6` is chosen so
+//: that the curve is recognisably human without pretending to be an
+//: actuarial table: negligible in childhood (1 in 30,000 at 20),
+//: noticeable in middle age (1 in 450 at 40), serious in old age (1 in
+//: 15 at 70, 1 in 3 at 90) and certain at 110.
+const AGE_EXPONENT = 6;
+
+//: How hard a scarce environment kills, per unit of survival pressure.
+//: At 0.25 a settlement in total famine (pressure 1.0) carries a 25%
+//: annual death risk on top of everything else — severe, survivable
+//: for a while, and fatal if it does not end.
+const SCARCITY_WEIGHT = 0.25;
+
+//: Which resources are a matter of life and death. Scarcity in
+//: anything else is an economic problem; scarcity in these is a
+//: mortality one. Named rather than "every resource" because a world
+//: short of iron is not a world that is dying.
+const SURVIVAL_RESOURCES = ['food', 'water', 'medicine'];
 
 // The recorded causes. `violence` and `disease` are the two the player
 // will actually see; `age` is the background rate.
-const DEATH_CAUSES = ['age', 'disease', 'violence'];
+const DEATH_CAUSES = ['age', 'disease', 'deprivation', 'violence'];
+
+// Which of the three passive terms was the biggest contributor. Not a
+// draw: the cause should be an explanation of the death, and a
+// randomly attributed one makes the world's own history unreliable.
+function causeFor({ age, pressure = 1, scarcity = 0 }) {
+  const ageRisk = age === null || age === undefined ? 0 : (age / MAX_AGE) ** AGE_EXPONENT;
+  const environmentRisk = Math.max(0, Math.min(1, scarcity)) * SCARCITY_WEIGHT;
+  // Disease is expressed as a multiplier rather than a term, so its
+  // contribution is how much it added to everything else.
+  const diseaseRisk = (pressure - 1) * (BASE_ANNUAL_RISK + ageRisk + environmentRisk);
+
+  if (diseaseRisk >= environmentRisk && diseaseRisk >= ageRisk && pressure > 1) return 'disease';
+  if (environmentRisk > ageRisk) return 'deprivation';
+  return 'age';
+}
 
 // -- age ----------------------------------------------------------------
 
@@ -215,31 +252,55 @@ function diseasePressure(worldState) {
 
 // -- the risk -----------------------------------------------------------
 
-// Annual probability of death, before the seeded draw. Returns 0 below
-// `MIN_NATURAL_DEATH_AGE` when there is no disease pressure — the young
-// are not on an actuarial table in an ordinary year — and 1 at
-// `MAX_AGE`.
+// How short of the essentials a world is, as 0..1. Zero when food,
+// water and medicine are all at or better than balance; 1 when they
+// are all as scarce as `getScarcity` can report.
+//
+// **The worst of the three, not the average.** A settlement with
+// plenty of food and no water at all is dying, and averaging would
+// report it as coping. Scarcity in one essential is not offset by
+// abundance in another.
+function survivalScarcity(worldState) {
+  let worst = 0;
+  for (const resource of worldState.resources || []) {
+    if (!SURVIVAL_RESOURCES.includes(resource.resource_type)) continue;
+    // `getScarcity` is 0..100 with 50 as demand meeting supply, so
+    // only the half above balance is a shortage.
+    const scarcity = economy.getScarcity(resource);
+    const shortage = Math.max(0, (scarcity - 50) / 50);
+    if (shortage > worst) worst = shortage;
+  }
+  return Math.min(1, worst);
+}
+
+// Annual probability of death, before the seeded draw.
+//
+// **Continuous from birth, with no minimum age.** Three additive
+// terms, then two multipliers:
+//
+//   base         accident and misadventure, at any age
+//   + age        `(age / MAX_AGE) ** 6`, negligible young, certain at 110
+//   + scarcity   the environment: no food, no water, no medicine
+//   × disease    an epidemic makes everything more lethal
+//   × vitality   the person's own health traits
+//
+// Every term except the age one is about circumstances rather than
+// years, which is what makes a famine kill children and an epidemic
+// ignore birthdays.
 function annualDeathRisk(worldState, entityId, options = {}) {
-  const { age, pressure = 1 } = options;
-  if (age === null || age === undefined) return 0;
-  if (age >= MAX_AGE) return 1;
+  const { age, pressure = 1, scarcity = 0 } = options;
+  // Unknown age is unknown risk, not zero risk — but an entity with no
+  // recorded creation still faces its environment, so the age term is
+  // the only one dropped.
+  const years = age === null || age === undefined ? null : age;
+  if (years !== null && years >= MAX_AGE) return 1;
 
+  const ageRisk = years === null ? 0 : (years / MAX_AGE) ** AGE_EXPONENT;
+  const environmentRisk = Math.max(0, Math.min(1, scarcity)) * SCARCITY_WEIGHT;
   const vitality = vitalityOf(worldState, entityId);
-  let risk = 0;
-  if (age > MIN_NATURAL_DEATH_AGE) {
-    const past = (age - MIN_NATURAL_DEATH_AGE) / (MAX_AGE - MIN_NATURAL_DEATH_AGE);
-    risk = BASE_ANNUAL_RISK * (1 + (past ** AGE_EXPONENT) * 200);
-  }
 
-  // **Disease reaches everybody, including the young.** An epidemic
-  // that could only kill the over-forties would be a strange disease,
-  // and it is the one case where somebody below the natural floor can
-  // die of something other than violence.
-  if (pressure > 1) {
-    risk = Math.max(risk, BASE_ANNUAL_RISK) * pressure;
-  }
-
-  return Math.max(0, Math.min(1, risk * vitality));
+  const risk = (BASE_ANNUAL_RISK + ageRisk + environmentRisk) * pressure * vitality;
+  return Math.max(0, Math.min(1, risk));
 }
 
 // -- dying --------------------------------------------------------------
@@ -361,6 +422,7 @@ function killEntity(worldState, options = {}) {
 // the next one. The pipeline stays at eleven.
 function runMortality(worldState, tick = worldState.tick ?? 0) {
   const pressure = diseasePressure(worldState);
+  const scarcity = survivalScarcity(worldState);
   const events = [];
   const deaths = [];
 
@@ -369,7 +431,7 @@ function runMortality(worldState, tick = worldState.tick ?? 0) {
   // every removal — half the population would be spared at random.
   for (const npc of [...worldState.npcs]) {
     const age = ageInYears(worldState, npc, tick);
-    const annual = annualDeathRisk(worldState, npc.id, { age, pressure });
+    const annual = annualDeathRisk(worldState, npc.id, { age, pressure, scarcity });
     if (annual <= 0) continue;
 
     // A tick is a day, so the daily hazard is the annual one spread
@@ -380,9 +442,12 @@ function runMortality(worldState, tick = worldState.tick ?? 0) {
     const daily = annual / TICKS_PER_YEAR;
     if (seededDraw([npc.id, tick, 'mortality']) >= daily) continue;
 
-    const cause = pressure > 1 && seededDraw([npc.id, tick, 'cause']) < 0.5
-      ? 'disease'
-      : 'age';
+    // **What killed them, attributed to the largest term.** A death in
+    // a famine recorded as "age" would make a starving settlement look
+    // like an ageing one, and the historical record is what §41 and
+    // §51 read. Disease wins ties because an epidemic is the more
+    // specific explanation when both are present.
+    const cause = causeFor({ age, pressure, scarcity });
     const death = recordDeath(worldState, { entityId: npc.id, cause, tick });
     deaths.push(death);
     events.push(death.event);
@@ -431,10 +496,14 @@ function ageProfile(worldState, tick = worldState.tick ?? 0) {
 
 module.exports = {
   TICKS_PER_YEAR,
-  MIN_NATURAL_DEATH_AGE,
   MAX_AGE,
   BASE_ANNUAL_RISK,
+  AGE_EXPONENT,
+  SCARCITY_WEIGHT,
+  SURVIVAL_RESOURCES,
   DEATH_CAUSES,
+  causeFor,
+  survivalScarcity,
   ageInYears,
   vitalityOf,
   addDiseaseOutbreak,
