@@ -1,6 +1,6 @@
 {
-  "total": 1646,
-  "passed": 1597,
+  "total": 1651,
+  "passed": 1602,
   "failed": 0,
   "skipped": 49,
   "suites": 39,
@@ -84,8 +84,8 @@
       "skipped": 0
     },
     "vaco-analytics": {
-      "tests": 34,
-      "pass": 34,
+      "tests": 39,
+      "pass": 39,
       "fail": 0,
       "skipped": 0
     },

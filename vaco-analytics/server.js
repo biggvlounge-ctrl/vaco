@@ -224,7 +224,15 @@ app.post("/api/intelligence/evaluate", requireCallingService(), async (req, res)
     // Only a real anomaly is delivered. Evaluating a healthy metric is
     // the common case by far, and paging on it is how a channel becomes
     // noise nobody reads.
-    if (result.isAnomaly) await notifyAnomaly(result);
+    //
+    // **And `!result.suppressed`, which this said nothing about and
+    // should have.** The reasoning above was right and was applied to
+    // exactly half the problem: a healthy metric paged nobody, and a
+    // metric that stepped to a new normal and stayed there paged
+    // somebody 125 times for one event — measured. `evaluateMetric`
+    // now keeps an ongoing anomaly as one alert with a count on it;
+    // this is the line that stops it ringing the phone each time.
+    if (result.isAnomaly && !result.suppressed) await notifyAnomaly(result);
     res.json(result);
   } catch (err) {
     res.status(400).json({ error: err.message });

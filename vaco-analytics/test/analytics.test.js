@@ -156,6 +156,78 @@ test('the ecosystem snapshot lists every app and each of its metrics', () => {
   assert.equal(voidApp.metrics.find((m) => m.metric === 'revenue').sum, 30);
 });
 
+// **The snapshot is the dashboard query, and it was rewritten for
+// speed.** It used to call `getApps`, then `getMetricNames` per app,
+// then `getSummary` per pair — `1 + A + A*M` full scans of the event
+// array, 217 of them at 36 apps with 5 metrics each, measured at
+// 1592 ms on a 360k-event store. One grouped pass does it in 53 ms.
+//
+// "Faster and equivalent" is two claims, and only the first one is
+// easy to check. So this asserts the second against the per-series
+// functions the rewrite replaced: for every app and metric, the
+// snapshot must carry exactly what `getSummary` computes for that
+// pair, and the apps and metrics must be the same sorted lists
+// `getApps`/`getMetricNames` return. Those still exist and are still
+// used by the single-series routes, so they are a live oracle rather
+// than a copy of the old code kept around for the test.
+test('the snapshot matches what the per-series functions compute, series by series', () => {
+  const store = createMetricsStore();
+  // Names chosen to make the ordering assertions do work: 'b' before
+  // 'a' on ingest, an app whose name sorts after its metrics, and two
+  // apps sharing a metric name.
+  const rows = [
+    ['b-app', 'zeta', 5, 3], ['b-app', 'alpha', 1, 1], ['a-app', 'zeta', -2, 2],
+    ['a-app', 'zeta', 9.005, 5], ['a-app', 'alpha', 0, 4], ['b-app', 'alpha', 7, 9],
+    ['a-app', 'zeta', 0, 8], ['c-app', 'only', 42, 6],
+  ];
+  for (const [app, metric, value, timestamp] of rows) {
+    ingestMetric(store, { app, metric, value, timestamp });
+  }
+
+  const snapshot = getEcosystemSnapshot(store);
+  assert.deepEqual(snapshot.map((s) => s.app), getApps(store),
+    'the snapshot lists different apps, or in a different order, than getApps');
+
+  for (const entry of snapshot) {
+    assert.deepEqual(entry.metrics.map((m) => m.metric), getMetricNames(store, entry.app),
+      `${entry.app}: the snapshot's metrics differ from getMetricNames`);
+    for (const m of entry.metrics) {
+      assert.deepEqual(m, getSummary(store, entry.app, m.metric),
+        `${entry.app}/${m.metric}: the snapshot and getSummary disagree`);
+    }
+  }
+});
+
+// **A series large enough to crash the old code.** `getSummary` did
+// `Math.min(...values)`, which passes one argument per element, and
+// that is a stack limit: bisected, ~125,375 events worked and ~126,929
+// threw `RangeError: Maximum call stack size exceeded`. Nothing bounds
+// how many events one metric accumulates, so a metric posted every few
+// seconds reaches it in weeks — and it took the dashboard down with
+// it, because the snapshot summarises every series.
+//
+// Pushed directly rather than through `ingestMetric` to keep the test
+// under a second; the arithmetic being checked does not care how the
+// rows arrived.
+test('a series far past the argument limit summarises instead of crashing', () => {
+  const store = createMetricsStore();
+  const n = 200000;
+  for (let i = 0; i < n; i++) {
+    store.events.push({ id: i + 1, app: 'a', metric: 'm', value: i % 17, timestamp: 1000 + i });
+  }
+  store.nextEventId = n + 1;
+
+  const summary = getSummary(store, 'a', 'm');
+  assert.equal(summary.count, n);
+  assert.equal(summary.min, 0);
+  assert.equal(summary.max, 16);
+  assert.equal(summary.latest, (n - 1) % 17);
+
+  // And through the dashboard query, which is where it actually broke.
+  const snapshot = getEcosystemSnapshot(store);
+  assert.deepEqual(snapshot[0].metrics[0], summary);
+});
+
 // ---------------------------------------------------------------------------
 // The baseline — where a wrong number becomes a missed alert
 // ---------------------------------------------------------------------------
@@ -346,4 +418,107 @@ test('alerts are filterable by app and by who they were routed to', () => {
 test('getAlerts refuses a store that is not one', () => {
   assert.throws(() => getAlerts(null), /requires a metricsStore/);
   assert.throws(() => getAlerts({ events: [] }), /requires a metricsStore/);
+});
+
+// ---------------------------------------------------------------------------
+// One alert per episode — the "cries wolf" half of the header's warning
+// ---------------------------------------------------------------------------
+
+// **Measured before the fix: 125 pages to a named human for one
+// event.** A metric that steps to a new normal and stays there was
+// evaluated once per reading, and each reading was flagged, filed into
+// `store.alerts`, and POSTed to vaco-notify. The z-score decays as the
+// new level dilutes the baseline (140 -> 3.5 -> 2.47 -> 2.02 -> 1.74),
+// so it stops eventually — the worst shape for this failure, because it
+// self-heals just slowly enough that nobody treats it as a bug.
+//
+// This file's own preamble names the failure: "an anomaly detector that
+// either cries wolf or — much worse — stays quiet." It stays quiet
+// correctly, and cried wolf 125 times.
+test('an ongoing anomaly is one alert with a count, not one per reading', () => {
+  const store = createMetricsStore();
+  let t = 1000;
+  const ingest = (value) => {
+    ingestMetric(store, { app: 'a', metric: 'm', value, timestamp: t });
+    t += 60 * 1000; // a reading a minute, the cadence the cooldown assumes
+  };
+  const post = (value) => {
+    ingest(value);
+    return evaluateMetric(store, 'a', 'm', { category: 'financial' });
+  };
+
+  // The warm-up is ingested but not evaluated. Evaluating it files a
+  // real alert of its own: five readings cycling 100..104 give a
+  // baseline of three points tight enough that the fourth scores
+  // z = 3.67. That is the detector working, not a defect, but it is a
+  // different episode and it would be counted here.
+  for (let i = 0; i < 60; i++) ingest(100 + (i % 5));
+
+  const first = post(300);
+  assert.equal(first.isAnomaly, true, 'the step to a new normal must still raise an alert');
+  assert.equal(first.suppressed, false, 'the first alert of an episode must page somebody');
+  assert.equal(first.occurrences, 1);
+  assert.equal(store.alerts.length, 1);
+
+  // Ten more readings at the new level, inside the cooldown.
+  let paged = 0;
+  for (let i = 0; i < 10; i++) {
+    const r = post(300 + (i % 5));
+    if (r.isAnomaly && !r.suppressed) paged += 1;
+  }
+  assert.equal(paged, 0, `${paged} further readings paged somebody during one episode`);
+  assert.equal(store.alerts.length, 1, `one episode filed ${store.alerts.length} alerts`);
+
+  // The single row carries the episode, not just its first reading.
+  const alert = store.alerts[0];
+  assert.equal(alert.occurrences, 11);
+  assert.ok(alert.lastSeenAt > alert.firstSeenAt, 'the episode has no duration on it');
+  assert.equal(alert.routedTo, 'Leslie', 'and it is still routed to the named person');
+});
+
+test('a fresh anomaly after the cooldown is a new alert, not a bump', () => {
+  // Suppression must not swallow a genuinely separate incident. The
+  // cooldown is measured against the event timestamp rather than the
+  // wall clock, which is what makes this assertable at all.
+  const store = createMetricsStore();
+  let t = 1000;
+  const post = (value, jumpMs = 60 * 1000) => {
+    ingestMetric(store, { app: 'a', metric: 'm', value, timestamp: t });
+    t += jumpMs;
+    return evaluateMetric(store, 'a', 'm', { category: 'financial' });
+  };
+
+  // Warm-up ingested, not evaluated — same reason as the test above.
+  for (let i = 0; i < 60; i++) {
+    ingestMetric(store, { app: 'a', metric: 'm', value: 100 + (i % 5), timestamp: t });
+    t += 60 * 1000;
+  }
+  const first = post(900, 16 * 60 * 1000); // then jump past the 15-minute cooldown
+  assert.equal(first.suppressed, false);
+
+  const later = post(4000);
+  assert.equal(later.isAnomaly, true);
+  assert.equal(later.suppressed, false, 'a separate incident an hour later was suppressed');
+  assert.equal(store.alerts.length, 2);
+  assert.notEqual(store.alerts[0].id, store.alerts[1].id);
+});
+
+test('the baseline is the recent normal, not every reading ever taken', () => {
+  // **The unbounded baseline did not miss anomalies — checked, the
+  // spike was still caught in every case — it reported a misleading
+  // number on the page.** A metric that sat at ~100 for 5,000 readings
+  // and moved to a new normal of ~300 an hour ago produced
+  // `baseline mean 104.4`, telling whoever was paged that normal is
+  // 104 while the metric had been at 300 all hour.
+  const store = createMetricsStore();
+  let t = 1000;
+  for (let i = 0; i < 5000; i++) ingestMetric(store, { app: 'a', metric: 'm', value: 100 + (i % 5), timestamp: t++ });
+  for (let i = 0; i < 60; i++) ingestMetric(store, { app: 'a', metric: 'm', value: 300 + (i % 5), timestamp: t++ });
+  ingestMetric(store, { app: 'a', metric: 'm', value: 600, timestamp: t++ });
+
+  const out = evaluateMetric(store, 'a', 'm');
+  assert.equal(out.isAnomaly, true);
+  assert.ok(out.baseline.mean > 295 && out.baseline.mean < 305,
+    `the baseline reports ${out.baseline.mean} as normal; the metric has been at ~300 for an hour`);
+  assert.equal(out.baseline.count, 50, 'the window is not the window the constant says it is');
 });

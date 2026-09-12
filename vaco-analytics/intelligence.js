@@ -28,6 +28,36 @@ function round2(n) {
   return Math.round(n * 100) / 100;
 }
 
+//: Flagged interpretive, like the z-score itself: no source doc sets a
+//: baseline window. The baseline used every reading ever recorded,
+//: and that is wrong in a way that shows up as a misleading number on
+//: an alert rather than as a missed one. Measured on a metric that sat
+//: at ~100 for 5,000 readings and then moved to a new normal of ~300
+//: sixty readings ago: the spike to 600 was still caught, but the
+//: alert reported `baseline mean 104.4` — an operator reading that
+//: page is told normal is 104 when the metric has been at 300 all
+//: hour.
+//:
+//: 50 readings is long enough for a stable stddev and short enough
+//: that a genuine level change becomes the new normal within an hour
+//: at a one-minute cadence.
+const BASELINE_WINDOW = 50;
+
+//: Also interpretive. **A metric that steps to a new normal and stays
+//: there paged a named human 125 times for one event** — measured, 200
+//: readings at the new level, 125 of them flagged, each one persisted
+//: into `store.alerts` and each one POSTed to vaco-notify. The z-score
+//: decays as the new level dilutes the baseline (140 -> 3.5 -> 2.47 ->
+//: 2.02 -> 1.74) so it stops eventually, which is the worst shape for
+//: this failure: it self-heals just slowly enough that nobody treats
+//: it as a bug.
+//:
+//: So an ongoing anomaly is one alert with a count on it, not one
+//: alert per reading. 15 minutes is the window, measured against the
+//: event's own timestamp rather than the wall clock so evaluation
+//: stays deterministic and testable.
+const ALERT_COOLDOWN_MS = 15 * 60 * 1000;
+
 export function computeBaseline(values) {
   if (!Array.isArray(values) || values.length === 0) {
     throw new Error('computeBaseline requires a non-empty array of values');
@@ -97,7 +127,11 @@ export function evaluateMetric(store, app, metric, options = {}) {
   }
 
   const latest = events[events.length - 1];
-  const history = events.slice(0, -1).map((e) => e.value);
+  // The most recent `BASELINE_WINDOW` readings before the latest, not
+  // every reading ever taken — see the constant for what the
+  // unbounded version reported on a metric whose normal had moved.
+  const history = events.slice(Math.max(0, events.length - 1 - BASELINE_WINDOW), -1)
+    .map((e) => e.value);
   const baseline = computeBaseline(history);
   const detection = detectAnomaly(latest.value, baseline, { threshold });
 
@@ -120,7 +154,40 @@ export function evaluateMetric(store, app, metric, options = {}) {
   if (category) {
     result.routedTo = routeAlert(category).routedTo;
   }
+
+  // **One alert per episode, with a count — not one per reading.**
+  // The caller reads `suppressed` to decide whether to page: an
+  // ongoing condition is already on somebody's desk, and paging again
+  // every reading is how a channel becomes noise nobody reads (which
+  // `notifyAnomaly` in server.js says in its own comment about
+  // evaluating healthy metrics, and then did anyway for unhealthy
+  // ones).
+  //
+  // The open alert is searched from the end: it is the most recent one
+  // for this series, and alerts are appended in order.
+  let open = null;
+  for (let i = store.alerts.length - 1; i >= 0; i--) {
+    const a = store.alerts[i];
+    if (a.app === app && a.metric === metric) { open = a; break; }
+  }
+
+  if (open && latest.timestamp - open.lastSeenAt <= ALERT_COOLDOWN_MS) {
+    // Update the episode in place rather than filing a second one. The
+    // newest value and score are what an operator wants to see, and
+    // `occurrences` is what tells them it is still happening.
+    open.occurrences += 1;
+    open.lastSeenAt = latest.timestamp;
+    open.value = latest.value;
+    open.zScore = detection.zScore;
+    open.baseline = baseline;
+    return { ...result, id: open.id, suppressed: true, occurrences: open.occurrences };
+  }
+
   result.id = store.nextAlertId++;
+  result.suppressed = false;
+  result.occurrences = 1;
+  result.firstSeenAt = latest.timestamp;
+  result.lastSeenAt = latest.timestamp;
   store.alerts.push(result);
   return result;
 }
