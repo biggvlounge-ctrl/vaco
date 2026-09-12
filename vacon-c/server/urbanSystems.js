@@ -233,11 +233,13 @@ const SYSTEMS = [
     n: 15,
     name: 'Gang',
     level: 'partial',
-    tables: ['factions', 'organizations'],
-    schemaOnly: ['entity_organization_memberships'],
+    tables: ['factions', 'organizations', 'entity_organization_memberships'],
     traitFamilies: ['faction'],
-    note: 'Factions are real and carry a full trait sheet. The hierarchy of §14 '
-      + '(shot callers through juveniles) is not enumerated.',
+    note: 'Factions are real and carry a full trait sheet, and membership is now a live '
+      + 'table rather than a schema-only one — so gang membership PER AREA is derivable '
+      + '(membership.gangMembershipRate), not just faction control of a block. The '
+      + 'hierarchy of §14 (shot callers through juveniles) is still not enumerated: '
+      + 'role_in_org is open TEXT and no document names the tiers.',
   },
   {
     n: 16,

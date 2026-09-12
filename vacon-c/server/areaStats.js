@@ -57,10 +57,14 @@
 //                      down. `server/crime.js` is that record;
 //                      `crime.countsByCategory` is the read.
 //
-//   gang presence      `territory_blocks.faction_id` says which
-//                      faction holds a block, so faction CONTROL is
-//                      real. Gang membership per area is not: nothing
-//                      links a resident to a faction by geography.
+//   gang presence      **Built since, and no longer here.** Faction
+//                      CONTROL of a block was always real
+//                      (`territory_blocks.faction_id`); what was
+//                      missing was any link from a RESIDENT to a
+//                      faction. `entity_organization_memberships` was
+//                      that link, sitting unused in the schema —
+//                      `server/membership.js` now writes it and
+//                      `gangMembershipRate` is the read.
 //
 //   teenage pregnancy  There is no birth driver. `addFamilyMember`
 //                      exists and nothing calls it on its own, so no
@@ -300,8 +304,6 @@ function describeDrift(worldState, communityId, options = {}) {
 // rather than a comment only a developer reads. Every entry names the
 // missing substrate, not just the missing number.
 const UNAVAILABLE = {
-  gangMembership: 'territory_blocks.faction_id gives faction CONTROL of a block. Nothing '
-    + 'links a resident to a faction by geography, so membership per area is not derivable.',
   teenagePregnancy: 'there is no birth driver — addFamilyMember exists and nothing calls it '
     + 'on its own. A rate needs births to count; the age structure to count them against '
     + 'now exists.',

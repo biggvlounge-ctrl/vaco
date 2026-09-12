@@ -123,6 +123,14 @@ const WorldState = {
   // which is four things no existing table holds together.
   // `server/crime.js`; generated inside the Security phase.
   crimeIncidents: [],
+  // Who belongs to which organization. `entity_organization_memberships`
+  // was in the schema from the first version and `urbanSystems.js`
+  // listed it as `schemaOnly` — the label for a table cited as evidence
+  // and touched by nothing. It is the missing link behind two of §9's
+  // statistic blocks: gang MEMBERSHIP per area (faction CONTROL of a
+  // block was always real; nothing connected a resident to a faction)
+  // and organization presence. `server/membership.js`.
+  entityOrganizationMemberships: [],
   beliefs: [],
   // Civilizations and the technology ladder. Four dead tables built
   // together on 12 Sep 2026 because they are one system:

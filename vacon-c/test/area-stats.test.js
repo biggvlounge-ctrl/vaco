@@ -264,8 +264,12 @@ test('every statistic this cannot compute names its missing substrate', () => {
   // `crime.countsByCategory` breaks it down. An UNAVAILABLE entry that
   // outlives the gap it names is worse than no entry at all — it tells
   // a caller not to ask for something that now works.
+  // `gangMembership` has gone the same way: the link it said was
+  // missing — a resident to a faction — was
+  // `entity_organization_memberships`, a table the schema had carried
+  // since the first version with no code touching it.
   assert.deepEqual(keys.sort(), [
-    'demographics', 'gangMembership', 'schoolDropout', 'teenagePregnancy',
+    'demographics', 'schoolDropout', 'teenagePregnancy',
   ]);
   for (const [key, reason] of Object.entries(areaStats.UNAVAILABLE)) {
     assert.ok(reason.length > 60, `${key} has no real explanation`);

@@ -631,6 +631,23 @@ async function migrateWorldStateToPostgres(worldState) {
       }
       summary.crime_incidents = worldState.crimeIncidents.length;
 
+      // ---------------------------------------------------------------
+      // entity_organization_memberships
+      // ---------------------------------------------------------------
+      // References `entities(id)` and `organizations(id)`, both written
+      // well above this point. No id column — the schema's primary key
+      // is the (entity_id, organization_id) pair, which is also why
+      // `joinOrganization` updates a role rather than inserting a
+      // second row.
+      for (const m of worldState.entityOrganizationMemberships) {
+        await client.query(
+          `INSERT INTO entity_organization_memberships (entity_id, organization_id, role_in_org, joined_tick)
+           VALUES ($1,$2,$3,$4)`,
+          [m.entity_id, m.organization_id, m.role_in_org, m.joined_tick]
+        );
+      }
+      summary.entity_organization_memberships = worldState.entityOrganizationMemberships.length;
+
       // Second half of the properties.history_ref two-phase insert —
       // see the note on the properties INSERT above. Now that
       // historical_records exist, the FK can be satisfied.

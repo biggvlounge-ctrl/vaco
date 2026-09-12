@@ -75,6 +75,7 @@ const { seededDraw } = require('./seeded.js');
 const economy = require('./economy.js');
 const entityTraits = require('./entityTraits.js');
 const worldStore = require('./worldStore.js');
+const membership = require('./membership.js');
 
 // A tick is a day — `behavior.js` chooses that and says so, and
 // `worldState.tickIntervals` overrides it wholesale. This is the same
@@ -340,6 +341,15 @@ function recordDeath(worldState, options = {}) {
   // is where a death belongs anyway — see `deathRecordFor`.
   npc.status = 'deceased';
   worldState.deceased.push(npc);
+
+  // **Moving the row does not reach into other tables, and this is the
+  // one that had to be cleaned up by hand.** Leaving an
+  // `entity_organization_memberships` row behind leaves a dead person
+  // counted in every organization headcount and in every per-area gang
+  // membership rate, forever — the same class of thing moving the row
+  // out of `npcs` was chosen to make structurally impossible, except
+  // that a join table has no `npcs` to be absent from.
+  membership.releaseDeceased(worldState, entityId);
 
   // **There is no separate `entities` array to update.** `migrate.js`
   // derives every `entities` row FROM `worldState.npcs` (and the other

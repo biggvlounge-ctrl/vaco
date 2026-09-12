@@ -328,6 +328,11 @@ async function restoreWorldStateFromPostgres(worldState) {
       'tick', 'severity']));
   summary.crime_incidents = worldState.crimeIncidents.length;
 
+  worldState.entityOrganizationMemberships =
+    (await q('SELECT * FROM entity_organization_memberships')).map((m) =>
+      nums(m, ['entity_id', 'organization_id', 'joined_tick']));
+  summary.entity_organization_memberships = worldState.entityOrganizationMemberships.length;
+
   // -------------------------------------------------------------------
   // Territory / Property
   // -------------------------------------------------------------------
