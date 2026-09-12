@@ -13,7 +13,7 @@ person who built it can check whether a claim is still true.
 Every number below was produced by running the tool that owns it, not
 recalled. The commands are in §10 so they can be re-run.
 
-*Current as of commit `6b168b4`, 84 commits, branch
+*Current as of commit `dd1afad`, 88 commits, branch
 `claude/v4-proxy-server-s6dcp8`, 12 Sep 2026.*
 
 **On the commit count.** An earlier revision of this line said 332. That
@@ -37,6 +37,17 @@ nothing checked that they still matched — which is the same
 citation-is-not-presence failure it warns about in §8. It was a week
 stale when the test was written: 879 tests against a real 1498, 33
 suites against 39, 28 volumes against 30.
+
+**What this document does not cost out.** Money — pricing, compliance
+spend, licences, staffing and what it costs to run in production — is
+in `dev-docs/GO_LIVE_DOSSIER.md`, which marks every line **[MEASURED]**
+or **[ESTIMATE]** and says which. Its §7 is the infrastructure bill,
+and its one useful headline is that the measured 0.82–0.86 GB of app
+memory for all 36 apps puts the whole ecosystem on a single modest box:
+**the estimated infrastructure cost is 10–100× smaller than the people
+cost.** Nothing in its estimate sections has been checked against a
+real vendor, a real lawyer, or a real payroll, and it says so at the
+top.
 
 ---
 
@@ -803,8 +814,9 @@ matched the wrong thing before.
 
 ## 10. Verification
 
-Seven commands. All seven must pass before deploying. Each was run to
-produce the numbers in this document.
+Nine commands. The first eight must pass before deploying; the ninth
+writes this document's figures back rather than checking them. Each was
+run to produce the numbers here.
 
 **Or run one command that runs all of them, inside the archive it just
 built:** `node scripts/package-release.mjs` — see §11.
@@ -818,20 +830,52 @@ node deploy/generate-docker-compose.js   # 36 apps + nginx, livekit, postgres, 3
 git diff --exit-code docker-compose.yml  # generator output matches committed
 node scripts/generate-service-tokens.mjs --check   # .env.example matches 27 callers
 node scripts/audit-settlement-atomicity.mjs   # 0 split settlements, ceiling 0
+node scripts/restamp-record.mjs          # writes this document's own figures back
 ```
 
-Eight now, not seven. The last one is the ratchet from the
-settlement-atomicity sweep: it fails if a single money movement is ever
-split into separate calls again, and its ceiling is 0.
+Nine now, not seven, and the count in that sentence has been wrong
+twice — which is the reason the ninth exists.
+
+The eighth is the ratchet from the settlement-atomicity sweep: it fails
+if a single money movement is ever split into separate calls again, and
+its ceiling is 0.
+
+**The ninth is the only one that writes.** `restamp-record.mjs` reads
+`dev-docs/COMPLETION_BY_APP.md` and `dev-docs/TEST_COUNTS.json` — the
+two files the tools above generate — and writes their figures back into
+§1's headline, §10's per-suite table, the command comment above, this
+document's commit stamp, and REPLIT.md's line about the suite. Run it
+**after** `run-all-tests.mjs`, which is what produces TEST_COUNTS.json;
+run it before and it restamps to the previous run's numbers.
+
+It exists because those five places were maintained by hand, and every
+hand edit in one session needed a correction: a column width, a figure
+in the wrong section, a number that appeared twice, a month rendered
+"Sept" where the document says "Sep". It changes numbers and nothing
+else — the per-suite table's hand-arranged layout and row order are
+left alone, and a suite it cannot match is reported rather than
+guessed at.
 
 **Two of these need something the others do not.**
-`run-all-tests.mjs` runs `vacon-c`'s `restore.test.js` and
-`persistence.test.js`, which need a real Postgres and **skip** without
-one, saying why. A skipped test is not a passing test: the 1498 above
-was produced with Postgres up. Bring one up the way
-`docker-compose.yml` does — the base schema then
+`run-all-tests.mjs` runs tests that need a real Postgres and **skip**
+without one, saying why. A skipped test is not a passing test: the
+headline count above was produced with Postgres up. Bring one up the
+way `docker-compose.yml` does — the base schema then
 `vacon-c/server/schema-extensions.sql`, in that order — or accept that
-17 checks did not run.
+**49 checks did not run**, across three suites:
+
+| Suite | Skipped without a database |
+|---|---:|
+| `v3` | 24 |
+| `vacon-c` | 17 |
+| `scripts` | 8 |
+
+**This passage named only `vacon-c`'s 17 and quoted a test count that
+had since moved on four times.** Both are the same mistake: a figure
+transcribed by hand into prose that nothing checks. The suite names
+come from `dev-docs/TEST_COUNTS.json`, which
+`scripts/run-all-tests.mjs` writes on every run, so they can be
+re-read rather than remembered.
 
 `node --test test/` fails in this Node version regardless of the tests,
 so mutation runs must use explicit file globs. That briefly made a set

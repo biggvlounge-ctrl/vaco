@@ -1,6 +1,6 @@
 # Go-live dossier — pricing, compliance, cost, and who builds what
 
-**Date:** 2026-09-12 · Covers all 36 apps.
+**Date:** 2026-09-12 · Covers all 36 apps. **Revised the same day** to add §7 (production running cost) and to close the money-module gap in §8, which the work described there finished.
 
 **Read this first.** This document mixes two kinds of statement and
 they are marked throughout:
@@ -316,7 +316,121 @@ structural advice only.
 
 ---
 
-## 7. The honest gaps, collected
+## 7. Production running cost — what it costs to keep the lights on
+
+**The headline, and it is [MEASURED]: the entire 36-app ecosystem uses
+0.82–0.86 GB of memory.** That is the number that decides this whole
+section. It means production is one modest machine, not a cluster, and
+every hosting estimate below starts from that fact rather than from how
+many services the compose file has.
+
+### 7a. What the system actually needs **[MEASURED]**
+
+Read out of the repo and off the running stack:
+
+| | Figure | Source |
+|---|---|---|
+| App services | 36 | `deploy/generate-docker-compose.js` output |
+| Containers including infrastructure | **39** (36 + nginx + LiveKit + Postgres) | same |
+| Persisted volumes | 30 | same |
+| Memory, all 36 apps, 38 processes | **0.82–0.86 GB** | PSS and MemAvailable-on-shutdown, two independent methods |
+| Memory, 5 apps + gateway, 11 processes | **0.13 GB** | same |
+| Dependencies on disk, all apps | **301 MB** | `du -shc */node_modules` |
+| Backends on Postgres with `DATABASE_URL` | 29 of 34 | `SYSTEM_OF_RECORD.md` §3 |
+| Apps safe to run as two containers | **1** (V3) | §3 — the other 28 use one document behind an optimistic version check |
+| AI model in use | `claude-sonnet-4-6`, `max_tokens: 1000` | `v4-proxy/server.js` |
+
+**Two of those constrain the architecture more than the price does.**
+Only V3 can be horizontally scaled, so "more traffic" means a bigger
+box before it means more boxes. And the 0.86 GB is app memory only —
+Postgres, nginx and the OS are on top.
+
+### 7b. Three tiers, and what each is for **[ESTIMATE — vendor prices are not quoted]**
+
+| | Demo / pilot | Production, single region | Production, redundant |
+|---|---|---|---|
+| Shape | 1 VPS, everything on it | 1 app host + managed Postgres | 2 app hosts + managed Postgres with a replica |
+| Compute | 4 GB / 2 vCPU | 8 GB / 4 vCPU | 2 × 8 GB / 4 vCPU |
+| Compute, USD/mo | $20–40 | $50–90 | $120–200 |
+| Managed Postgres, USD/mo | — (on the box) | $50–120 | $150–350 (HA) |
+| Object storage + CDN (media), USD/mo | $5–15 | $25–100 | $50–250 |
+| Egress, USD/mo | $0–10 | $20–100 | $50–300 |
+| Backups, off-host, USD/mo | $5 | $10–30 | $20–60 |
+| Monitoring / logs, USD/mo | $0 (self-hosted) | $0–50 | $50–150 |
+| TLS + domain, USD/yr | $15–40 | $15–40 | $15–40 |
+| **Monthly subtotal** | **$30–70** | **$155–490** | **$440–1,310** |
+
+**The demo tier is not a compromise.** 0.86 GB of app memory fits a
+4 GB box with room for Postgres beside it, and the whole stack has been
+run that way. Anyone who tells you a 36-service system needs a cluster
+has not measured this one.
+
+### 7c. The two variable costs, which are the ones that surprise people **[ESTIMATE]**
+
+Everything above is fixed. These are not, and both scale with usage
+rather than with the number of apps.
+
+**Real-time media (LiveKit).** This blocks six surfaces and is the
+largest single unknown in the document. Self-hosted, the SFU is
+bandwidth: roughly 1–2 Mbit/s per active video participant, so 50
+concurrent participants is ~50–100 Mbit/s sustained and that is an
+egress bill, not a compute one — order $100–500/mo at that level.
+Hosted LiveKit Cloud prices per participant-minute instead, which is
+cheaper below a few thousand minutes a month and more expensive above
+it. **Nothing here has been benchmarked: the SFU has never been
+started.** See §8.
+
+**The AI layer (`v4-proxy`).** One app, one API key, and the only line
+item that can grow without the user count growing. It calls
+`claude-sonnet-4-6` with `max_tokens: 1000`, so the cost per call is
+bounded on the output side and unbounded on the input side — a long
+conversation re-sends its history. Budget it per call, not per user,
+and put a spend cap on the key. The per-IP rate limiter in
+`v4-proxy/server.js` protects the key from a single hammering client;
+it does not protect a budget from ordinary popularity.
+
+### 7d. Storage growth, and the one place it bites **[MEASURED]**
+
+Most apps store small documents. Two grow without a bound and both are
+still file-backed: `vaco-shell` and `vaco-analytics`. Measured cost of
+a single mutating request against store size, because the whole store
+is written on each one:
+
+| Store size | Per mutating request |
+|---|---:|
+| 0.1 MB | 1 ms |
+| 1.1 MB | 11 ms |
+| 5.7 MB | 62 ms |
+| 23 MB | **662 ms** |
+
+**This is a latency cost, not a storage cost — and it is the cheapest
+one on this page to get wrong.** Disk for 23 MB is free; a 662 ms
+response is not. The fix is named in `shared/persistence.js`: past a
+few megabytes per store, move those two to Postgres like the other 28,
+or to `node:sqlite`, which needs no package. Until one of those
+happens, the analytics `alerts` array has no retention policy.
+
+### 7e. What is NOT in any of these numbers **[MEASURED as absent]**
+
+Said plainly because a cost table invites being read as complete:
+
+- **People.** §2b's compliance staffing and §4c's team are the large
+  numbers in this document, and they are 10–100× the infrastructure.
+  Infrastructure is the cheapest part of running this.
+- **Payment processing.** No processor is integrated. If VCoin ever
+  touches real money, 2.9% + 30¢ per transaction is a revenue line, not
+  a hosting line — and it lands in Scenario B, §2b.
+- **Anything in Scenario B.** Licences, bonds and KYC vendors dwarf
+  everything above.
+- **A real load test.** None of these figures come from concurrent
+  users. They come from a booted stack and measured stores. **The
+  per-request numbers in §7d are single-threaded**, so treat the
+  production tiers as a starting point for a load test rather than its
+  result.
+
+---
+
+## 8. The honest gaps, collected
 
 **[MEASURED]** — every one of these is stated elsewhere in the repo and
 none is hidden:
@@ -328,8 +442,18 @@ none is hidden:
 4. **No TLS, no domain.** nginx terminates plain HTTP on :80.
 5. **The LiveKit SFU has never been started.** No audio has crossed it.
 6. **`.replit` and `replit.nix` have never run on a real container.**
-7. **14 money-moving modules have no test.** One of the tested-by-
-   accident ones contained a risk-free money pump found on 12 Sep.
+7. ~~**14 money-moving modules have no test.**~~ **Closed on 12 Sep,
+   and it found more than expected.** Every money-moving module in the
+   repo has now been either tested or driven directly. **14 real
+   defects**, each measured before it was fixed: 13 were the same
+   check-then-await race (a guard reads a status or a remaining
+   capacity, `await` yields, every concurrent caller passes and every
+   one pays) and the 14th was an unvalidated merch take rate that
+   charged 70 VCoin for a 30 VCoin order. Two modules
+   (`vaco-shell/lib/appStore.js`, `vaco-shell/lib/merchStore.js`) were
+   probed and found sound on the split arithmetic, stated as a result
+   rather than left unexamined. Fix: `shared/settleOnce.js`, one
+   implementation synced to 6 apps.
 8. **YAP has no moderation queue.**
 9. **VCoin has no stated value in any real currency.**
 10. **A guard being present is not a guard being right** — the route
@@ -337,13 +461,13 @@ none is hidden:
 
 ---
 
-## 8. If I had to pick the order
+## 9. If I had to pick the order
 
 **[ESTIMATE]**
 
 | # | Do this | Because |
 |---|---|---|
-| 1 | Test the 14 money modules | A live money bug was found in this class today |
+| ~~1~~ | ~~Test the 14 money modules~~ — **done 12 Sep** | 14 defects found, all measured and fixed; see §8.7 |
 | 2 | Decide the media vendor | Unblocks six products; nothing else unblocks six |
 | 3 | Off-host backups | Cheapest real risk reduction in the list |
 | 4 | YAP moderation queue | Highest liability, and it is a build |

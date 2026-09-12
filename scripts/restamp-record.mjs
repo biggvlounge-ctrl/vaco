@@ -31,6 +31,7 @@
 // TEST_COUNTS.json. Running it before means restamping to the previous
 // run's numbers.
 
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import url from 'node:url';
@@ -138,6 +139,52 @@ let replit = fs.readFileSync(REPLIT_PATH, 'utf8');
 replit = substitute(replit, 'REPLIT.md',
   /- The full test suite: \d+ tests across \d+ suites\./,
   `- The full test suite: ${counts.total} tests across ${suiteCount} suites.`);
+
+// -- the commit stamp --------------------------------------------------
+
+// **Stamped at HEAD, with HEAD's own commit count.** The two are one
+// claim: "current as of commit X, N commits" says N is the count *at
+// X*, which `system-of-record.test.mjs` checks exactly. Writing HEAD's
+// hash beside a count taken anywhere else is the one way to get this
+// pair wrong, so they are read in a single place here.
+//
+// Committing this restamp moves HEAD on, leaving the stamp one commit
+// behind — which is what the test's tolerance of 3 exists for. Chasing
+// it to zero is not possible: the commit that updates the stamp is
+// itself a commit.
+//
+// Skipped without `.git`, which is the case inside a release-archive
+// extract — the same condition `system-of-record.test.mjs` skips the
+// stamp check on. Not silently: the count figures above are still
+// restamped, and the skip is reported.
+function git(args) {
+  try {
+    return execFileSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8' }).trim();
+  } catch {
+    return null;
+  }
+}
+
+const head = fs.existsSync(path.join(REPO_ROOT, '.git')) ? git(['rev-parse', '--short', 'HEAD']) : null;
+if (head === null) {
+  process.stdout.write('restamp-record: no .git, so the commit stamp was left alone.\n');
+} else {
+  const branch = git(['rev-parse', '--abbrev-ref', 'HEAD']);
+  const commits = git(['rev-list', '--count', 'HEAD']);
+  // Built from a fixed month list rather than `toLocaleDateString`,
+  // which renders September as "Sept" under en-GB and would have
+  // changed the document's established "12 Sep 2026" form for one
+  // month of the year only.
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const today = new Date();
+  const date = `${today.getDate()} ${MONTHS[today.getMonth()]} ${today.getFullYear()}`;
+  if (branch === null || commits === null) fail('git is present but would not answer');
+
+  sor = substitute(sor, 'SYSTEM_OF_RECORD.md stamp',
+    /\*Current as of commit `[0-9a-f]{7,40}`, \d+ commits, branch\n`[^`]+`, [^.]+\.\*/,
+    `*Current as of commit \`${head}\`, ${commits} commits, branch\n\`${branch}\`, ${date}.*`);
+}
 
 // -- write -------------------------------------------------------------
 
