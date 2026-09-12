@@ -64,6 +64,56 @@ mistake for a finished system.
 
 ---
 
+## Nobody ages and nobody dies — and the schema has nowhere to put it
+
+**Found while assessing playability, and it is the largest single
+obstacle to this being a game rather than a simulation.** It is listed
+here rather than under a section number because it cuts across §2,
+§17, §51 and §56.
+
+Checked by command: **`property.age` is the only thing in the engine
+that increments.** Buildings decay on a lifecycle; people are
+immortal.
+
+That is not merely unbuilt. The schema has no field for it either:
+
+| | What is there |
+|---|---|
+| `npcs` columns | `role`, `education`, `religion`, `generation`, `home_property_id` — **no age** |
+| `entities.status` enum | `active｜inactive｜destroyed｜archived｜hidden` |
+| §17's NPC status list | `active｜imprisoned｜deceased` |
+
+**So the spec and the schema disagree about what an NPC's status can
+be, and the two values that matter are the two missing.** Neither
+`deceased` nor `imprisoned` exists as a status the schema admits —
+which is also why Prison (§7 system 18) is `absent` with `imprison`
+appearing nowhere in the codebase.
+
+**Why this matters more than it sounds.** §2's headline promise is that
+the world continues without the player, and NPCs "have children" and
+"die". Births are real (`generateFamily`, `addFamilyMember`); deaths
+are not. A persistent world where nobody ever dies has no generational
+history, so:
+
+- §51 player legacy has nothing to outlive the player,
+- §56's family system accumulates members and never loses one,
+- `PLAYER_DEATH_GENERATIONAL_CONTINUITY.md` — a document that exists
+  in `vacon-c/` — describes a mechanic with no substrate,
+- and `npcs.generation`, which the schema put there on purpose,
+  stays 1 forever.
+
+**What it would take, and one piece is already free.** Age is
+derivable: `entities.created_tick` exists and a tick is a day
+(`TICK_INTERVALS` in `behavior.js`), so age is `tick -
+created_tick` — computed, never stored, which is what standing rule 3
+asks for anyway. Mortality needs a status the schema will accept,
+which means the first genuinely justified entry in
+`schema-extensions.sql` for this work: a field the engine would READ
+(every phase would have to skip the dead), which is that file's own
+stated bar.
+
+---
+
 ## §§1–5 · Premise, principle, hierarchy, initial state, geography
 
 | § | State | Detail |
