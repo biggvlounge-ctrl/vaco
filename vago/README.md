@@ -32,6 +32,25 @@ securities-adjacent territory than VAGO's other prediction types and
 are deliberately parked, not blocking current work. Everything actually
 built here settles in VCoin or Gold Coin only.
 
+**On sports prediction markets specifically, added 12 Sep 2026.** The
+sportsbook now shows each line as a percentage, and a sports event can
+open a paired prediction market seeded from the de-vigged house line.
+Neither is a new money path — the market mechanics, the pooled
+settlement and the VCoin-only rule are all unchanged — but the framing
+deserves one sentence so nobody reads the wrong thing into it:
+
+> **"It is a prediction market, not a sportsbook" is not a regulatory
+> shortcut.** Kalshi litigated the CFTC specifically over sports event
+> contracts, and several states are contesting them now. For sports,
+> the peer-to-peer framing is the contested question, not the settled
+> one.
+
+Nothing here is blocked by that today, because everything settles in
+VCoin or Gold Coin and real-money settlement code is still not built.
+It is recorded so that a future decision to take this to real money
+starts from the actual legal position rather than from an assumption
+that prediction markets are the lighter-touch path.
+
 ## Run
 ```
 cd vago && npm install && npm start   # localhost:8795

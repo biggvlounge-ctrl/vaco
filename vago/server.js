@@ -512,6 +512,34 @@ app.get('/api/predictions/vacancy', (_req, res) => {
   res.json({ markets: listMarketsBySource(store, 'vacancy-in-game') });
 });
 
+// **The two lists the UI needed and neither existed.** Markets and
+// events could only be fetched one at a time by id, so a board could
+// not be drawn at all — which is why the Markets tab showed two
+// in-world sources and no prices, and why there was no sportsbook tab.
+//
+// Prices are attached here rather than stored on the market, for the
+// same reason the event route derives its percentages on read: a stored
+// price goes stale the moment somebody trades.
+app.get('/api/predictions/real-world', (_req, res) => {
+  res.json({
+    markets: listMarketsBySource(store, 'real-world').map((m) => ({ ...m, ...getMarketPrice(m) })),
+  });
+});
+
+app.get('/api/sports/events', (_req, res) => {
+  res.json({
+    events: store.sportsEvents.map((e) => ({
+      ...e,
+      probabilities: eventProbabilities(e.outcomes),
+      houseMargin: eventOverround(e.outcomes),
+      market: (() => {
+        const m = store.predictionMarkets.find((pm) => pm.linkedEventId === e.eventId);
+        return m ? { id: m.id, ...getMarketPrice(m) } : null;
+      })(),
+    })),
+  });
+});
+
 // **The house line and the market, on one event.**
 //
 // The two mechanics were built deliberately apart — a bookmaker that

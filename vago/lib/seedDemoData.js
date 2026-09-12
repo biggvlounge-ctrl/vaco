@@ -37,6 +37,7 @@
 const { submitAmoeEntry } = require('./amoe');
 const { startCasinoSession } = require('./casinoSession');
 const { createPredictionMarket, buyContract } = require('./predictionMarkets');
+const { createSportsEvent, eventProbabilities, placeSportsBet } = require('./sportsbook');
 
 const DEMO_USERS = ['demo-user', 'demo-maya', 'demo-carlos', 'demo-priya'];
 const VAGO_EDITORIAL = 'vago-editorial';
@@ -117,6 +118,89 @@ async function seedPredictionMarkets(store, { settleFn }) {
   }
 }
 
+//: Flagged interpretive: demo fixtures. The lines are realistic shapes
+//: (a short favorite, a pick-em, a three-way with a draw) chosen so the
+//: percentage columns show something worth looking at — a lopsided
+//: book, a near-coin-flip, and a market with more than two outcomes.
+//: No real fixture, team or result is being predicted.
+const DEMO_SPORTS_EVENTS = [
+  {
+    eventId: 'demo-bkn-at-bos',
+    description: 'Brooklyn at Boston',
+    outcomes: [
+      { outcomeId: 'bos', label: 'Boston', odds: -240 },
+      { outcomeId: 'bkn', label: 'Brooklyn', odds: 195 },
+    ],
+    bets: [{ userId: 'demo-user', outcomeId: 'bkn', stakeVCoin: 20 }],
+  },
+  {
+    eventId: 'demo-sea-at-sf',
+    description: 'Seattle at San Francisco',
+    outcomes: [
+      { outcomeId: 'sf', label: 'San Francisco', odds: -110 },
+      { outcomeId: 'sea', label: 'Seattle', odds: -110 },
+    ],
+    bets: [{ userId: 'demo-maya', outcomeId: 'sf', stakeVCoin: 35 }],
+  },
+  {
+    eventId: 'demo-arsenal-spurs',
+    description: 'Arsenal vs Spurs',
+    outcomes: [
+      { outcomeId: 'ars', label: 'Arsenal', odds: -135 },
+      { outcomeId: 'draw', label: 'Draw', odds: 260 },
+      { outcomeId: 'tot', label: 'Spurs', odds: 320 },
+    ],
+    bets: [],
+  },
+];
+
+// Every seeded event opens a paired market, because a demo that shows
+// the sportsbook and the market side by side is the only way to see
+// what the pairing is for: the market opens at the book's own fair
+// number, and then real stake is free to disagree with it.
+async function seedSportsEvents(store, { settleFn }) {
+  if (store.sportsEvents.length > 0) return;
+
+  for (const spec of DEMO_SPORTS_EVENTS) {
+    try {
+      const event = createSportsEvent(store, {
+        eventId: spec.eventId, description: spec.description, outcomes: spec.outcomes,
+      });
+      const [first] = eventProbabilities(event.outcomes);
+      createPredictionMarket(store, {
+        question: `${event.description} — will ${first.label} win?`,
+        category: 'sports',
+        source: 'real-world',
+        creatorId: VAGO_EDITORIAL,
+        openingYesPrice: first.fairProbability,
+        linkedEventId: event.eventId,
+      });
+    } catch (err) {
+      console.warn(`seedDemoData: skipped sports event ${spec.eventId} — ${err.message}`);
+      continue;
+    }
+
+    // **The bets are seeded separately, and that is not tidiness.**
+    // `placeSportsBet` settles through V3, so it fails whenever the
+    // ledger is not up. Inside the block above, one unreachable ledger
+    // discarded the whole fixture — except it did not, because the
+    // event and market had already been pushed to the store before the
+    // throw. So the warning said "skipped" about three events that were
+    // sitting right there, which is the worst of both: partial state
+    // and a message that misdescribes it.
+    //
+    // A board with no demo bets on it is still a board. A board that
+    // does not exist because the ledger was down is not.
+    for (const bet of spec.bets) {
+      try {
+        await placeSportsBet(store, { ...bet, eventId: spec.eventId, settleFn });
+      } catch (err) {
+        console.warn(`seedDemoData: skipped demo bet on ${spec.eventId} — ${err.message}`);
+      }
+    }
+  }
+}
+
 async function seedCasinoSessions(store, { settleFn }) {
   if (store.casinoSessions.length > 0) return;
 
@@ -141,6 +225,7 @@ async function seedDemoData(store, { settleFn }) {
     throw new Error('seedDemoData requires a settleFn(legs, meta)');
   }
   await seedPredictionMarkets(store, { settleFn });
+  await seedSportsEvents(store, { settleFn });
   await seedCasinoSessions(store, { settleFn });
 }
 

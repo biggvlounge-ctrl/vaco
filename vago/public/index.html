@@ -300,28 +300,97 @@ function renderFantasy(body) {
 
 // -- Markets ----------------------------------------------------------
 
+// A probability as a percentage, which is the only form most people
+// read fluently. `0.58` renders as `58%`.
+function pct(p) {
+  return (typeof p === 'number') ? Math.round(p * 100) + '%' : '—';
+}
+
+// The margin gets a decimal place. Rounded to whole percent, a 4.49%
+// book and a 5.0% book both read as "4%" and "5%" from numbers that are
+// half a point apart — which hides exactly the quantity this column
+// exists to expose.
+function pct1(p) {
+  return (typeof p === 'number') ? (p * 100).toFixed(1) + '%' : '—';
+}
+
 function renderMarkets(body) {
   var out = el('div', 'vaco-stack');
   out.appendChild(VACO.notice(
-    'Prediction markets settle against real-world outcomes and against events inside the ecosystem itself — '
-    + 'VDP and VACON-C both emit resolvable outcomes.'));
+    'Peer-to-peer contracts priced by the market itself, settling in VCoin. A price IS a '
+    + 'probability: 58c to buy YES is the market saying 58%. Payouts are pooled pari-mutuel, '
+    + 'so the pool can only ever pay out what was actually staked into it.'));
 
   return Promise.all([
+    VACO.api('/api/predictions/real-world').catch(function () { return { markets: [] }; }),
     VACO.api('/api/predictions/vdp').catch(function () { return { markets: [] }; }),
     VACO.api('/api/predictions/vacancy').catch(function () { return { markets: [] }; }),
   ]).then(function (results) {
-    [['From VDP', results[0]], ['From VACON-C', results[1]]].forEach(function (pair) {
-      var markets = pair[1].markets || pair[1] || [];
-      out.appendChild(VACO.card(pair[0], [
-        VACO.table([
-          { key: 'id', label: 'Market' },
-          { key: 'question', label: 'Question' },
-          { label: 'Status', render: function (r) { return VACO.badge(r.status); } },
-        ], markets, { empty: 'No markets from this source yet.' }),
-      ]));
-    });
+    [['Real-world', results[0]], ['From VDP', results[1]], ['From VACON-C', results[2]]]
+      .forEach(function (pair) {
+        var markets = pair[1].markets || pair[1] || [];
+        out.appendChild(VACO.card(pair[0], [
+          VACO.table([
+            { key: 'question', label: 'Question' },
+            { label: 'YES', render: function (r) { return pct(r.yesPrice); } },
+            { label: 'NO', render: function (r) { return pct(r.noPrice); } },
+            { label: 'Pool', render: function (r) {
+              return (Math.round(((r.yesPool || 0) + (r.noPool || 0)) * 100) / 100) + ' VC';
+            } },
+            { label: 'Status', render: function (r) { return VACO.badge(r.status); } },
+          ], markets, { empty: 'No markets from this source yet.' }),
+        ]));
+      });
     VACO.mount(body, out);
   });
+}
+
+// **The sportsbook, with its odds translated.** This is the whole point
+// of the percentage work: -150 and 60% are the same statement, and only
+// one of them is readable without training.
+//
+// The house margin is shown per event rather than hidden. A book with
+// no margin is not a book, and a reader comparing the posted number to
+// the fair one can see exactly what the edge costs them — which is the
+// honest version of putting a percentage on a betting line at all.
+function renderSportsbook(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'House-set odds, settled in VCoin. Posted % is what the line implies and includes the '
+    + 'house margin, so the posted numbers add up to more than 100%. Fair % has that margin '
+    + 'divided out — it is what the book actually thinks, and what a paired market opens at.'));
+
+  return VACO.api('/api/sports/events').catch(function () { return { events: [] }; })
+    .then(function (data) {
+      var events = data.events || [];
+      if (!events.length) {
+        out.appendChild(VACO.card('No events yet', [
+          el('p', 'vaco-dim', 'Seeded events appear here once the demo data is loaded.'),
+        ]));
+        VACO.mount(body, out);
+        return;
+      }
+      events.forEach(function (ev) {
+        var rows = ev.probabilities || [];
+        var children = [
+          VACO.table([
+            { key: 'label', label: 'Outcome' },
+            { label: 'Odds', render: function (r) { return r.odds > 0 ? '+' + r.odds : String(r.odds); } },
+            { label: 'Posted %', render: function (r) { return pct(r.impliedProbability); } },
+            { label: 'Fair %', render: function (r) { return pct(r.fairProbability); } },
+          ], rows, { empty: 'No outcomes.' }),
+          el('p', 'vaco-dim', 'House margin on this event: ' + pct1(ev.houseMargin)),
+        ];
+        if (ev.market) {
+          children.push(el('p', 'vaco-dim',
+            'Paired market #' + ev.market.id + ' — traders say YES ' + pct(ev.market.yesPrice)
+            + ' / NO ' + pct(ev.market.noPrice)
+            + '. It opened at the fair line above; every move since is real stake disagreeing with the book.'));
+        }
+        out.appendChild(VACO.card(ev.description + (ev.status === 'open' ? '' : ' (settled)'), children));
+      });
+      VACO.mount(body, out);
+    });
 }
 
 VACO.app({
@@ -339,7 +408,12 @@ VACO.app({
       blurb: 'Real provably-fair game logic, playable. The board is committed before your first click and the seed is published after.',
       render: renderCasino },
     { id: 'fantasy', label: 'Fantasy', heading: 'Player props', render: renderFantasy },
-    { id: 'markets', label: 'Markets', heading: 'Prediction markets', render: renderMarkets },
+    { id: 'sportsbook', label: 'Sportsbook', heading: 'Events and lines',
+      blurb: 'Every line shown as a percentage as well as American odds, with the house margin stated rather than buried.',
+      render: renderSportsbook },
+    { id: 'markets', label: 'Markets', heading: 'Prediction markets',
+      blurb: 'Peer-to-peer contracts where the price is the probability.',
+      render: renderMarkets },
   ],
 });
 </script>
