@@ -109,6 +109,12 @@ const WorldState = {
   // because `public_opinion`'s schema comment asks for a rollup from
   // "beliefs/entity_knowledge" and beliefs was a dead table at the
   // time. `server/beliefs.js`.
+  // **The dead leave `npcs` for here.** Not a status flag: 17 call
+  // sites across 7 modules iterate `worldState.npcs`, and a flag would
+  // need all 17 to check it forever — the first one anybody forgets is
+  // a dead person drawing a wage or casting a vote. Moving the row
+  // makes that structurally impossible. `server/mortality.js`.
+  deceased: [],
   beliefs: [],
   // Civilizations and the technology ladder. Four dead tables built
   // together on 12 Sep 2026 because they are one system:

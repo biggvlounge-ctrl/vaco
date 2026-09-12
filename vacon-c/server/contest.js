@@ -47,6 +47,8 @@
 
 'use strict';
 
+const { hashSeed, seededUnit } = require('./seeded.js');
+
 const { getLiveEntity } = require('./entityTraits.js');
 
 // ---------------------------------------------------------------------------
@@ -143,26 +145,11 @@ function rateEntity(worldState, entityId, discipline = 'combat') {
 // FNV-1a over a string built from the contest's own facts. Not
 // cryptographic and does not need to be — it needs to be reproducible
 // and evenly spread, and it is both.
-function hashSeed(parts) {
-  let h = 0x811c9dc5;
-  const s = parts.join('|');
-  for (let i = 0; i < s.length; i += 1) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 0x01000193) >>> 0;
-  }
-  return h >>> 0;
-}
-
-// A number in [0, 1) from the seed. Deterministic by construction.
-function seededUnit(seed) {
-  // xorshift32, one round — enough to decorrelate adjacent seeds so
-  // that contest 41 and contest 42 do not draw near-identical values.
-  let x = seed || 1;
-  x ^= x << 13; x >>>= 0;
-  x ^= x >> 17;
-  x ^= x << 5; x >>>= 0;
-  return x / 4294967296;
-}
+// **Moved to `server/seeded.js`, unchanged.** Mortality needs the same
+// primitives — §88's world seed means nothing if deaths are random
+// when contests are not — and duplicating a PRNG is how two systems
+// end up drawing correlated values for reasons nobody can find later.
+// Re-exported below so this module's own API is unchanged.
 
 // Rating gap -> win probability. Logistic, so a small edge is a small
 // edge and a large one is not a certainty: at +10 rating the favourite

@@ -85,13 +85,19 @@ const SYSTEMS = [
     n: 1,
     name: 'Population',
     level: 'modelled',
-    tables: ['npcs', 'entities', 'families'],
+    tables: ['npcs', 'entities', 'families', 'historical_records'],
     schemaOnly: ['households', 'migration_events'],
     phases: ['runMigrationPhase'],
-    functions: ['generateNPC', 'generateFamily', 'addFamilyMember'],
-    note: 'Generation and the migration phase are real. `households` and `migration_events` '
-      + 'are schema-only, so household formation and a migration audit trail are not stored. '
-      + 'Aging and death are not modelled either — §17 lists `deceased` as an NPC status.',
+    functions: [
+      'generateNPC', 'generateFamily', 'addFamilyMember',
+      'ageInYears', 'runMortality', 'recordDeath', 'killEntity',
+    ],
+    note: '**Aging and death built 12 Sep 2026.** Before that `property.age` was the only '
+      + 'thing in the engine that incremented — buildings decayed and people were immortal. '
+      + 'Age is computed from `createdTick` (a tick is a day); death moves the row out of '
+      + '`worldState.npcs` rather than setting a flag, so a corpse is structurally incapable '
+      + 'of working or voting; and every death is a seeded draw, so §88\'s world seed still '
+      + 'replays. `households` and `migration_events` remain schema-only.',
   },
   {
     n: 2,
@@ -139,10 +145,16 @@ const SYSTEMS = [
   {
     n: 6,
     name: 'Health',
-    level: 'partial',
+    level: 'modelled',
     traitFamilies: ['health'],
     infrastructureTypes: ['hospitals'],
-    note: 'Four traits and a slot. No disease, no medical knowledge loss and recovery.',
+    functions: ['vitalityOf', 'addDiseaseOutbreak', 'diseasePressure', 'annualDeathRisk'],
+    note: '**Built 12 Sep 2026 with mortality.** All four health traits — Immune Response, '
+      + 'Nutrition Status, Chronic Conditions, Sleep Quality — now drive something: they were '
+      + 'generated on every NPC and read by nothing, exactly like `combat` and `sports` before '
+      + '`contest.js`. Disease is an epidemic expressed as an environmental condition, so '
+      + '`runEnvironmentPhase` ages and clears it like a drought. Still missing: medical '
+      + 'knowledge loss and recovery, and hospitals as anything but an infrastructure slot.',
   },
   {
     n: 7,
@@ -383,7 +395,9 @@ const SYSTEMS = [
     level: 'partial',
     tables: ['events'],
     phases: ['runEventPhase'],
-    note: 'Drought is real and cascades. Fires, floods and blackouts are not distinct.',
+    functions: ['addDiseaseOutbreak'],
+    note: 'Drought is real and cascades; epidemics are real and kill people. Fires, floods '
+      + 'and blackouts are still not distinct.',
   },
   {
     n: 34,

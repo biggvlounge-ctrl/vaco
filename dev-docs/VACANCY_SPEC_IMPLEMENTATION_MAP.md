@@ -64,12 +64,63 @@ mistake for a finished system.
 
 ---
 
-## Nobody ages and nobody dies — and the schema has nowhere to put it
+## The life scale — built 12 Sep 2026
 
-**Found while assessing playability, and it is the largest single
-obstacle to this being a game rather than a simulation.** It is listed
-here rather than under a section number because it cuts across §2,
-§17, §51 and §56.
+**This section recorded the largest single obstacle to VACON-C being a
+game rather than a simulation, and it is now closed.**
+`server/mortality.js`: people age, sicken, are killed, and die. What
+follows is the finding as it stood, kept because the four design
+decisions are the useful part.
+
+**Four decisions, each chosen for consistency with the engine that
+already existed:**
+
+| | Decision | Why this one |
+|---|---|---|
+| 1 | **Death moves the row, it is not a flag** | Measured first: **17 call sites across 7 modules iterate `worldState.npcs`.** A flag needs all 17 to check it forever, and the first one anybody forgets is a dead person drawing a wage or casting a vote. Moving the row to `worldState.deceased` changes none of the 17 and makes a corpse structurally incapable of participating. |
+| 2 | **Age is computed, never stored** | `entities.created_tick` exists and a tick is a day, so age is `(tick − createdTick) / 365`. Standing rule 3, and `npcs` has no age column — the schema being right rather than incomplete. |
+| 3 | **Disease is an environmental condition** | `runEnvironmentPhase` already ages and clears conditions, and a drought already cascades into resources and the economy. An epidemic is the same mechanism pointed at people. Verified: that phase decrements `ticksRemaining` for every condition regardless of resource match, so an outbreak needed no change to it at all. |
+| 4 | **Every death is a seeded draw** | §88 requires the same seed to give the same world, and `contest.js` already replays bouts. A world whose contests replay and whose deaths do not is not reproducible. `hashSeed`/`seededUnit` moved to `server/seeded.js` unchanged for this. |
+
+**Health stopped being a decoration.** All four `health` traits —
+Immune Response, Nutrition Status, Chronic Conditions, Sleep Quality —
+now drive mortality. They were generated on every NPC and read by
+nothing, exactly like `combat` and `sports` before `contest.js` was
+written. This is the "grow traits with consumers" principle in
+practice rather than in a note, and Health rises from `partial` to
+`modelled` on it.
+
+**Three defects the work surfaced, two of them mine:**
+
+- `ageInYears` first read `created_tick` — the **database** column.
+  `generateNPC` sets `createdTick`. Every age would have been null,
+  every risk 0, **nobody would ever have died**, and a fixture written
+  with the same wrong spelling would have made every test pass. Caught
+  by reading `migrate.js`, not by a test.
+- `getEmploymentRate` counted every active contract against a
+  denominator of the living, so two employed people and one survivor
+  reported **2.0** — a rate above 100%.
+- `runPayroll` walks contracts rather than people, so **a corpse kept
+  drawing wages**. Moving the row protects everything that iterates
+  people; that was the one place iterating agreements about people.
+
+**And a migrate bug that would only have appeared after somebody
+died:** `entities` rows were written from `worldState.npcs`, which no
+longer contains the dead — so a death's `historical_records.who` would
+have referenced an entity that did not exist. Another FK failure of
+exactly the class that rolled two earlier migrations back wholesale.
+
+**What is still not built here:** a death does not end employment,
+transfer property, or advance `npcs.generation`. Each is a decision
+about inheritance and succession rather than a mechanic, and inventing
+one here would put a quiet answer next to whatever gets built for it.
+
+---
+
+## The finding, as it stood before the work
+
+It cut across §2, §17, §51 and §56, which is why it sat outside the
+section numbering.
 
 Checked by command: **`property.age` is the only thing in the engine
 that increments.** Buildings decay on a lifecycle; people are
@@ -102,7 +153,7 @@ history, so:
 - and `npcs.generation`, which the schema put there on purpose,
   stays 1 forever.
 
-**What it would take, and one piece is already free.** Age is
+**What it took, and one piece was already free.** Age is
 derivable: `entities.created_tick` exists and a tick is a day
 (`TICK_INTERVALS` in `behavior.js`), so age is `tick -
 created_tick` — computed, never stored, which is what standing rule 3
@@ -155,12 +206,12 @@ from memory with nothing in the repo to check it against. The forty are
 now data in `vacon-c/server/urbanSystems.js`, every citation verified
 by `vacon-c/test/urban-systems.test.js`, and the real breakdown is:
 
-**12 modelled, 17 partial, 5 slot-only, 6 absent**
+**13 modelled, 16 partial, 5 slot-only, 6 absent**
 
 | Level | Means | Systems |
 |---|---|---|
-| **modelled** (12) | Real mechanics; something advances or decides on it each tick | Population, Housing, Economy, **Employment**, Infrastructure, **Political**, Cultural, Community Organizations, Real Estate, Environmental, **Technology**, AI Decision |
-| **partial** (17) | A trait family or a live table with little driving it, or one phase covering two systems | Education, Health, Food Supply, Water, Law Enforcement, Crime, Gang, Organized Crime, **Court**, Communication, **Religion**, Business, Construction, Weather, Disaster, Migration, Reputation |
+| **modelled** (13) | Real mechanics; something advances or decides on it each tick | Population, Housing, Economy, **Employment**, **Health**, Infrastructure, **Political**, Cultural, Community Organizations, Real Estate, Environmental, **Technology**, AI Decision |
+| **partial** (16) | A trait family or a live table with little driving it, or one phase covering two systems | Education, Food Supply, Water, Law Enforcement, Crime, Gang, Organized Crime, **Court**, Communication, **Religion**, Business, Construction, Weather, Disaster, Migration, Reputation |
 | **slot** (5) | Storage exists and nothing reads it | Transportation, Energy, Waste, Fire & Emergency, Supply Chain |
 | **absent** (6) | No representation at all | Prison, Government Services, Media, Social Media, Military/National Guard, Tourism |
 

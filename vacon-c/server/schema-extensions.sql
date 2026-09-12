@@ -70,3 +70,43 @@ ALTER TABLE npcs ADD COLUMN IF NOT EXISTS name TEXT;
 -- `test/restore.test.js` holds this as a named, self-checking
 -- exemption: if anything ever starts reading a property's community,
 -- the exemption stops being true and the test says so.
+
+-- ---------------------------------------------------------------------
+-- `deceased` as an entity status — a value, not a column
+-- ---------------------------------------------------------------------
+-- Recorded here rather than by editing the locked base schema, and
+-- recorded at all because it is a genuine divergence from what that
+-- file documents.
+--
+-- `entities.status` is TEXT with its permitted values in a comment:
+--
+--     status TEXT NOT NULL DEFAULT 'active',
+--         -- active|inactive|destroyed|archived|hidden
+--
+-- `server/mortality.js` writes a sixth, **`deceased`**, and no DDL is
+-- needed for it: the column is TEXT and there is no CHECK constraint
+-- or enum type, so the database already accepts it. What would
+-- otherwise be wrong is the base schema's comment, which would quietly
+-- stop being a complete list.
+--
+-- **Why none of the five existing values would do.** `destroyed` is
+-- for objects and reads as demolition. `inactive` and `archived` both
+-- imply reversibility — an inactive account comes back. `hidden` is a
+-- visibility state. A dead person is none of those: the status has to
+-- be terminal and has to be distinguishable from every other reason an
+-- entity might stop participating, because inheritance, lineage and
+-- `npcs.generation` all key off it.
+--
+-- The spec's §17 lists an NPC's status as `active|imprisoned|deceased`,
+-- so the base schema and the spec already disagreed here and BOTH of
+-- the values that matter were missing. This adds the one that has an
+-- implementation. `imprisoned` stays absent, which is why §7's Prison
+-- system is still marked `absent` in server/urbanSystems.js.
+--
+-- No `npcs.died_tick` and no `npcs.death_cause`. Both were in the
+-- first draft of mortality.js and both were removed: nothing READS
+-- them, which is this file's stated bar, and the tick and cause are
+-- already in `historical_records` (who/what/when_tick/why), which is
+-- where a death belongs. `mortality.js#deathRecordFor` is the read
+-- path, so the historical record is the durable answer rather than a
+-- write nobody consults.

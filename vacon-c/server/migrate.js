@@ -56,7 +56,15 @@ async function migrateWorldStateToPostgres(worldState) {
       // then UPDATE entities.family_id afterward, once families exist.
       // ---------------------------------------------------------------
       let entityCount = 0;
-      for (const npc of worldState.npcs) {
+      // **The living AND the dead.** `mortality.js` moves a dead NPC
+      // out of `worldState.npcs` into `worldState.deceased`, which
+      // means iterating `npcs` alone would stop writing their `entities`
+      // row — and `historical_records.who` holds their id, so the
+      // death record would reference an entity that does not exist.
+      // Another FK ordering failure of exactly the class that rolled
+      // two earlier migrations back wholesale, and it would only have
+      // appeared once somebody had died.
+      for (const npc of [...worldState.npcs, ...(worldState.deceased || [])]) {
         await client.query(
           `INSERT INTO entities (id, type, status, created_tick, updated_tick) VALUES ($1, 'npc', $2, $3, $4)`,
           [npc.id, npc.status, npc.createdTick, npc.updatedTick]
@@ -143,7 +151,7 @@ async function migrateWorldStateToPostgres(worldState) {
       // ---------------------------------------------------------------
       // npcs
       // ---------------------------------------------------------------
-      for (const npc of worldState.npcs) {
+      for (const npc of [...worldState.npcs, ...(worldState.deceased || [])]) {
         await client.query(
           // `name` is not in VACANCY_POSTGRESQL_SCHEMA.sql — this
           // file's own header has said so since it was written, and
@@ -161,7 +169,8 @@ async function migrateWorldStateToPostgres(worldState) {
           [npc.id, npc.role, npc.education, npc.religion, npc.generation, npc.name ?? null]
         );
       }
-      summary.npcs = worldState.npcs.length;
+      summary.npcs = worldState.npcs.length + (worldState.deceased || []).length;
+      summary.deceased = (worldState.deceased || []).length;
 
       // ---------------------------------------------------------------
       // organizations + factions

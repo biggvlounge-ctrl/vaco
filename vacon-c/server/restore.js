@@ -129,7 +129,18 @@ async function restoreWorldStateFromPostgres(worldState) {
       updatedTick: e.updated_tick ?? 0,
     };
   });
+  // **Partitioned by status, because the working set keeps the dead in
+  // a separate array while the database keeps one table.** That is the
+  // same memory-versus-durable-record split this file already rests
+  // on: Postgres holds the rows, memory holds the shape the engine
+  // needs. Restoring every npc into `npcs` would resurrect the dead —
+  // and they would start drawing wages and casting votes again, which
+  // is precisely what moving the row was meant to make impossible.
+  const allNpcs = worldState.npcs;
+  worldState.npcs = allNpcs.filter((n) => n.status !== 'deceased');
+  worldState.deceased = allNpcs.filter((n) => n.status === 'deceased');
   summary.npcs = worldState.npcs.length;
+  summary.deceased = worldState.deceased.length;
 
   // A factions row is what makes an organization a faction — there is
   // no `isFaction` column and there should not be one, since the row's

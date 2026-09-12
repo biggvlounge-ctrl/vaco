@@ -50,6 +50,7 @@ const worldStore = require('./worldStore.js');
 const economy = require('./economy.js');
 const politics = require('./politics.js');
 const technology = require('./technology.js');
+const mortality = require('./mortality.js');
 const keys = require('./keys.js');
 const territory = require('./territory.js');
 const property = require('./property.js');
@@ -549,6 +550,17 @@ function advanceTick(worldState) {
   // computed from would be a loop whose answer depends on line order.
   // See server/behavior.js.
   candidateEvents.push(...behavior.runBehavior(worldState));   // (behavior)
+
+  // Mortality. The third cross-cutting layer, in the same slot and for
+  // a sharper version of the same reason: it must run AFTER phase 8,
+  // because the Security phase is what can kill somebody violently,
+  // and BEFORE phases 9 and 10, so a death becomes an event and a
+  // historical record on the tick it happened rather than the next one.
+  //
+  // Not a twelfth phase. Death is not a stage of a tick — it is a
+  // consequence of every stage, which is exactly what a cross-cutting
+  // layer is for. See server/mortality.js.
+  candidateEvents.push(...mortality.runMortality(worldState, worldState.tick).events);
 
   const events = runEventPhase(worldState, candidateEvents);   // 9
   const historicalRecords = runHistoryPhase(worldState, events); // 10

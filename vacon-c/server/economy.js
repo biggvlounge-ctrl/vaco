@@ -315,8 +315,23 @@ function runPayroll(worldState, tick) {
   let paid = 0;
   let missed = 0;
 
+  // **The living only.** `runPayroll` walks contracts, not people, so
+  // moving a dead NPC out of `worldState.npcs` does not stop their
+  // wage on its own — a corpse kept drawing 25 a tick from an employer
+  // that could still afford it. Moving the row protects everything
+  // that iterates people; this is the one place that iterates
+  // agreements about people, and it has to ask.
+  //
+  // Membership in `npcs`, so this module still knows nothing about
+  // mortality. The record is left `active` rather than ended: ending
+  // somebody's employment because they died is a decision about
+  // inheritance and succession, and inventing it here would put a
+  // second, quieter answer next to whatever gets built for that.
+  const living = new Set(worldState.npcs.map((n) => n.id));
+
   for (const record of worldState.employmentRecords) {
     if (record.status !== 'active') continue;
+    if (!living.has(record.entity_id)) continue;
     const employer = worldState.organizations.find(
       (o) => o.id === record.employer_organization_id,
     );
@@ -374,7 +389,19 @@ function runPayroll(worldState, tick) {
 function getEmploymentRate(worldState) {
   const people = worldState.npcs.length;
   if (people === 0) return null;
-  const employed = worldState.employmentRecords.filter((r) => r.status === 'active').length;
+  // **Only the employed who are still alive**, and the first version
+  // of this counted every active record against a denominator of the
+  // living — so once `mortality.js` started moving dead NPCs out of
+  // `worldState.npcs`, two employed people and one survivor reported a
+  // rate of 2.0. A rate above 100% is the kind of number that gets
+  // read as a units mistake rather than as a defect.
+  //
+  // This module still knows nothing about mortality: "employed and
+  // alive" is membership in `npcs`, which is all it needs to ask.
+  const living = new Set(worldState.npcs.map((n) => n.id));
+  const employed = worldState.employmentRecords.filter(
+    (r) => r.status === 'active' && living.has(r.entity_id),
+  ).length;
   return Math.round((employed / people) * 10000) / 10000;
 }
 
