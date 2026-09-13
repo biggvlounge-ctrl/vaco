@@ -165,6 +165,12 @@ function runResourcePhase(worldState) {
 // ---------------------------------------------------------------------------
 const SCARCITY_BROADCAST_THRESHOLD = 60;
 
+//: How much worse a known shortage has to get before it is news
+//: again. Flagged interpretive: no document sets it, and the value
+//: only has to be large enough that ordinary tick-to-tick jitter does
+//: not re-announce the same shortage.
+const SCARCITY_NEWS_STEP = 10;
+
 function runEconomyPhase(worldState) {
   const events = [];
 
@@ -177,6 +183,15 @@ function runEconomyPhase(worldState) {
   //
   // Inside the Economy phase deliberately — the pipeline is locked at
   // eleven phases, and payroll is economy rather than a twelfth thing.
+  // **Production before payroll**, because a day's wages come out of
+  // that day's takings. Run the other way round and an employer misses
+  // payroll on money its staff have already earned — which is what was
+  // happening, except that nothing earned anything at all: 1,488
+  // `payroll_missed` events in 300 ticks, because `organizations.income`
+  // was a column nothing ever wrote. See economy.js#runProduction.
+  const production = economy.runProduction(worldState, worldState.tick);
+  events.push(...production.events);
+
   const payroll = economy.runPayroll(worldState, worldState.tick);
   events.push(...payroll.events);
 
@@ -198,9 +213,40 @@ function runEconomyPhase(worldState) {
     economy.resolveMarketPrice(listing, worldState.tick, inputScarcity);
   }
 
+  // **News, not weather** — and the difference was 44,899 knowledge
+  // rows and 28,016 `fear_spike` events in 300 ticks of a 150-person
+  // world, which is 95% of everything the event log contained.
+  //
+  // This broadcast fired on a CONDITION: every tick a resource sat
+  // above the threshold, every NPC in the world received another
+  // "verified" knowledge row saying so. Since `runDecisionPhase`
+  // resolves Fear and ScarcityResponse for anybody with knowledge
+  // acquired THIS tick, every frightened person also re-resolved Fear
+  // and re-emitted `fear_spike` every tick for as long as the shortage
+  // lasted. Standing rule 7, three systems deep, and the events that
+  // mattered — a birth, a death, a crime — were buried under it.
+  //
+  // A shortage becoming news is an event. A shortage continuing is
+  // not: people already know. So the broadcast fires when a resource
+  // CROSSES into scarcity, and again only if it worsens materially.
+  // `worldState.scarcityNews` holds the level last broadcast per
+  // resource type — an in-memory working field with no table, same as
+  // `migrationRisk` and `reemergenceIndex` beside it, and losing it on
+  // a restore costs at most one extra broadcast.
+  worldState.scarcityNews = worldState.scarcityNews || {};
+
   for (const resource of worldState.resources) {
     const scarcity = scarcityByType.get(resource.resource_type);
-    if (scarcity <= SCARCITY_BROADCAST_THRESHOLD) continue;
+    const lastBroadcast = worldState.scarcityNews[resource.resource_type];
+
+    if (scarcity <= SCARCITY_BROADCAST_THRESHOLD) {
+      // It has eased. Clear the mark so a fresh crossing is news again.
+      delete worldState.scarcityNews[resource.resource_type];
+      continue;
+    }
+    // Already news, and no worse than when it was announced.
+    if (lastBroadcast !== undefined && scarcity < lastBroadcast + SCARCITY_NEWS_STEP) continue;
+    worldState.scarcityNews[resource.resource_type] = scarcity;
 
     for (const npc of worldState.npcs) {
       worldStore.addKnowledge(worldState, {
@@ -350,9 +396,28 @@ function runDecisionPhase(worldState) {
 // ---------------------------------------------------------------------------
 const MIGRATION_RISK_THRESHOLD = 65;
 
+//: How much worse a standing migration risk has to get before it is
+//: reported again. Flagged interpretive, same as the scarcity step.
+const MIGRATION_RISK_STEP = 10;
+
 function runMigrationPhase(worldState) {
   const events = [];
   const risks = [];
+
+  // **The same condition-versus-crossing failure as the scarcity
+  // broadcast, and the largest single source of noise left in the
+  // event log: 11,809 events in 300 ticks.** This risk is computed
+  // from Volatility and Resource Hoarding, which barely move — so the
+  // same people crossed the threshold on tick 1 and re-announced it
+  // every tick for the rest of their lives.
+  //
+  // `worldState.migrationRisk` already holds last tick's snapshot,
+  // because this phase overwrites it rather than accumulating. That is
+  // exactly the prior state a crossing needs, so no new field is
+  // required — it only has to be read before it is replaced.
+  const previous = new Map(
+    (worldState.migrationRisk || []).map((r) => [r.entity_id, r.risk]),
+  );
 
   for (const npc of worldState.npcs) {
     const live = getLiveEntity(worldState, npc.id);
@@ -362,6 +427,13 @@ function runMigrationPhase(worldState) {
 
     if (risk > MIGRATION_RISK_THRESHOLD) {
       risks.push({ entity_id: npc.id, risk });
+      const was = previous.get(npc.id);
+      // Newly at risk, or materially worse than when it was last
+      // reported. Somebody who has been at risk since tick 1 is not
+      // news on tick 900.
+      const crossed = was === undefined || was <= MIGRATION_RISK_THRESHOLD
+        || risk >= was + MIGRATION_RISK_STEP;
+      if (!crossed) continue;
       events.push({
         type: 'migration_risk', severity: risk > 80 ? 'high' : 'moderate',
         note: `${npc.name} showing migration risk (${risk}) — no relocation system built yet`,

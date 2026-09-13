@@ -27,6 +27,7 @@
 'use strict';
 
 const { nextAfter } = require('./nextAfter.js');
+const { getLiveEntity } = require('./entityTraits.js');
 
 let nextResourceId = 1;
 let nextMarketListingId = 1;
@@ -310,6 +311,127 @@ function endEmployment(worldState, options = {}) {
 // Pays every active wage once. Returns the events the tick should
 // carry, so an employer missing payroll is visible to the Event phase
 // rather than only to whoever reads the numbers afterwards.
+// ---------------------------------------------------------------------------
+// Production — what an employee is worth to an employer
+// ---------------------------------------------------------------------------
+// **Measured before it was written: 1,488 `payroll_missed` events in
+// 300 ticks of a 150-person world.** `organizations.income` is a real
+// column, `generateOrganization` sets it to 0, and nothing ever
+// produced a penny. Every business in every world paid wages out of a
+// fixed pile of assets until the pile was gone, so the economy ran in
+// one direction and every employer eventually went bankrupt — which
+// also means employment, and every statistic built on it, was on a
+// countdown.
+//
+// **This is also the largest single answer to "what makes an NPC's
+// traits matter".** Of 114 individual traits, 44 were read by any code
+// at all; the `skills` family is 16 of them and exactly one was read
+// anywhere. A person's skills are what they can DO, so they are what
+// their labour is worth, and reading the whole family here takes 15
+// traits from decoration to load-bearing in one edge.
+//
+// //: INTERPRETIVE. No document prices labour. The model is the
+// //: simplest one that uses what exists rather than inventing a
+// //: market: a worker produces `WAGE_TO_OUTPUT` times their wage,
+// //: scaled by their own capability. So a business is viable when it
+// //: employs capable people and not when it does not, which is the
+// //: relationship worth having — and the constant is the single
+// //: number to change if the economy runs hot or cold.
+//
+// **Skills are read through `getLiveEntity`, never `npc.traits`** —
+// standing rule 9. The sheet on the object is frozen at generation,
+// so a worker who had spent forty years getting better at their job
+// would have produced their birth value forever.
+const WAGE_TO_OUTPUT = 1.3;
+
+// A worker's capability, **centred on 1.0 for somebody average**, not
+// on a 0..1 scale — and the difference is the whole model. The first
+// version divided skills by 100 and multiplied two more sub-1
+// modulators, so an entirely average worker scored 0.28 and produced
+// 45% of their own wage. Every business still failed, just more
+// slowly: 470 missed payrolls instead of 1,488.
+//
+// Every trait here runs 0..100 with 50 as average, so each factor is
+// written to give exactly 1.0 at 50. An average worker earns their
+// employer `WAGE_TO_OUTPUT` times their wage; a skilled, healthy,
+// focused one earns several times it; a poor one costs money. That is
+// the relationship worth having, and it only reads correctly if the
+// centre is where the trait scale's centre is.
+function productivityOf(worldState, entityId) {
+  const live = getLiveEntity(worldState, entityId);
+  if (!live) return 0;
+
+  const skills = Object.values(live.traits?.skills || {})
+    .map(Number)
+    .filter((v) => Number.isFinite(v));
+  if (skills.length === 0) return 0;
+  const skill = (skills.reduce((a, b) => a + b, 0) / skills.length) / 50;
+
+  // `?? 50` rather than `|| 50`: a real 0 is somebody with no immune
+  // response at all, and `||` would quietly upgrade them to average.
+  const health = Number(live.traits?.health?.['Immune Response'] ?? 50);
+  const focus = Number(live.traits?.mental?.Focus ?? 50);
+
+  // **Modulators, not gates, and the band matters more than it looks.**
+  // At 0.5..1.5 each the two of them swing output by 9x end to end,
+  // which overturns a 4.5x skill gap — so a barely-skilled person in
+  // perfect health out-produced an ailing expert, in a model whose
+  // whole point is that skill is what labour is worth. A test caught
+  // it by asserting exactly that comparison.
+  //
+  // 0.75..1.25 keeps 1.0 at average, still halves the output of
+  // somebody seriously ill, and leaves skill the dominant term.
+  return Math.max(0, skill * (0.75 + health / 200) * (0.75 + focus / 200));
+}
+
+// One tick of work, for everybody holding an active contract.
+//
+// Runs inside the Economy phase immediately BEFORE payroll, because a
+// day's wages come out of that day's takings — running it after would
+// make an employer miss payroll on money its staff had already earned.
+function runProduction(worldState, tick) {
+  const events = [];
+  const living = new Set(worldState.npcs.map((n) => n.id));
+  const byEmployer = new Map();
+
+  for (const record of worldState.employmentRecords) {
+    if (record.status !== 'active') continue;
+    if (!living.has(record.entity_id)) continue;
+    const wage = Number(record.wage) || 0;
+    const output = wage * WAGE_TO_OUTPUT * productivityOf(worldState, record.entity_id);
+    byEmployer.set(
+      record.employer_organization_id,
+      (byEmployer.get(record.employer_organization_id) || 0) + output,
+    );
+  }
+
+  for (const [organizationId, revenue] of byEmployer) {
+    const employer = worldState.organizations.find((o) => o.id === organizationId);
+    if (!employer) continue;
+    const earned = Math.round(revenue);
+    // **Accumulated, because `expenses` is** — `runPayroll` does
+    // `expenses += wage` and `test/employment.test.js` asserts the
+    // running total. An income that reset each tick beside an expense
+    // total that never did would make the pair unreadable: the obvious
+    // comparison, `income - expenses`, would be nonsense in both
+    // directions. Matching the existing field was the smaller and more
+    // honest change, and a per-tick figure is recoverable by
+    // differencing.
+    employer.income = (Number(employer.income) || 0) + earned;
+    employer.assets = (Number(employer.assets) || 0) + earned;
+  }
+
+  // An employer with staff and no takings at all is worth an event —
+  // it is the shape of a business about to fail, and it was
+  // indistinguishable from a healthy one before production existed.
+  for (const [organizationId, revenue] of byEmployer) {
+    if (revenue > 0) continue;
+    events.push({ type: 'no_output', organizationId, tick });
+  }
+
+  return { events, employers: byEmployer.size };
+}
+
 function runPayroll(worldState, tick) {
   const events = [];
   let paid = 0;
@@ -432,5 +554,8 @@ module.exports = {
   getEmployment,
   listEmployment,
   runPayroll,
+  WAGE_TO_OUTPUT,
+  productivityOf,
+  runProduction,
   getEmploymentRate,
 };
