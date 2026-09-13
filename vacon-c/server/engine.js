@@ -294,15 +294,27 @@ function getLiveEntity(entityId) {
 //   education   - string|null
 //   religion    - string|null
 //   generation  - integer, defaults to 1
+//   traitValueFor - optional (definition) => 0..100, so a caller can
+//                 generate a deterministic person. `randomTraitValue()`
+//                 is `Math.random()`, which means a generated world
+//                 cannot replay from a seed — and §88 requires that the
+//                 same seed and the same rules give the same world.
+//                 `server/worldgen.js` passes a seeded function; every
+//                 existing caller omits it and gets the old behaviour
+//                 unchanged.
 function generateNPC(options = {}) {
   const id = nextId();
-  const traitRows = generateEntityTraits(id, WorldState.tick, INDIVIDUAL_DEFINITIONS);
+  const traitRows = generateEntityTraits(
+    id, WorldState.tick, INDIVIDUAL_DEFINITIONS, options.traitValueFor ?? null,
+  );
   WorldState.entityTraits.push(...traitRows);
 
   const npc = {
     id,
     type: 'npc',
     status: 'active',
+    // `generateName()` is `Math.random()` too, so a caller that wants a
+    // replayable world passes the name in.
     name: options.name || generateName(),
     role: options.role || null,
     education: options.education || null,
@@ -370,7 +382,9 @@ function generateOrganization(options = {}) {
   }
 
   const id = nextId();
-  const traitRows = generateEntityTraits(id, WorldState.tick, ORGANIZATION_DEFINITIONS);
+  const traitRows = generateEntityTraits(
+    id, WorldState.tick, ORGANIZATION_DEFINITIONS, options.traitValueFor ?? null,
+  );
   WorldState.entityTraits.push(...traitRows);
 
   const organization = {
@@ -459,7 +473,9 @@ function generateFamily(options = {}) {
   }
 
   const id = nextId();
-  const traitRows = generateEntityTraits(id, WorldState.tick, FAMILY_DEFINITIONS);
+  const traitRows = generateEntityTraits(
+    id, WorldState.tick, FAMILY_DEFINITIONS, options.traitValueFor ?? null,
+  );
   WorldState.entityTraits.push(...traitRows);
 
   const family = {

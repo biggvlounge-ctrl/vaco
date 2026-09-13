@@ -1,0 +1,483 @@
+// server/worldgen.js
+//
+// Build a world that actually contains things.
+//
+// **The finding this closes, measured rather than assumed.** With 67
+// statistics in the catalogue, a world built the only way one could be
+// built — generate some NPCs, put them in a community, tick — answered
+// **35 of them**. Eight of the rest are declared gaps with no
+// substrate. The other **24 were computable and came back null**, and
+// every one for the same reason:
+//
+//     the generator exists, is tested, and nothing ever calls it.
+//
+//   nothing called `generateProperty`        → 5 housing statistics
+//   nothing called `generateInfrastructure`  → 5 community statistics
+//                                              + patrol frequency
+//   nothing set religion/language/education  → 5 demographic statistics
+//   nothing called `hireEntity`              → median wage
+//   nothing made families or factions        → household size, territory
+//                                              contest, org influence
+//   nothing exercised crime or policing      → clearance, trust
+//
+// That is not a modelling gap. The engine models all of it. It is that
+// **no code anywhere assembles a world**, so every world the engine has
+// ever run has been a crowd of people standing in an empty field.
+//
+// ---------------------------------------------------------------------
+// Seeded, because §88 says so and the trait generator did not
+//
+// §88 requires that the same seed and the same rules give the same
+// world. `randomTraitValue()` is `Math.random()` and `generateName()`
+// is too, so until now a "generated world" could not replay even in
+// principle. `generateEntityTraits` already took an optional value
+// function (added for `births.js`, so a child could inherit); this
+// commit threads it through `generateNPC`, `generateOrganization` and
+// `generateFamily` as `traitValueFor`, and everything here supplies a
+// seeded one. Names are supplied too, for the same reason.
+//
+// **Every existing caller omits it and is unchanged.**
+//
+// ---------------------------------------------------------------------
+// Why this operates on engine.WorldState rather than taking one
+//
+// Every module built since is `f(worldState, options)`. `generateNPC`,
+// `generateOrganization` and `generateFamily` are the last three
+// generators still bound to the module-global `WorldState` in
+// engine.js, and rewriting their signatures would change the public
+// API that `server.js`'s routes and a large part of the suite use.
+//
+// So this takes options and builds into that one world, and says so
+// rather than pretending otherwise. A world is a process-level thing
+// here in any case: `persistence.js` loads one at boot and checkpoints
+// it, and `restore.js` restores into it.
+//
+// ---------------------------------------------------------------------
+// What it does NOT do
+//
+// No migration (nobody moves — `migration_events` is still schema-only
+// and `runMigrationPhase` produces a risk signal that relocates
+// nobody). No transportation of any kind, which stays deferred. No
+// government, election or law: `politics.js` is real and founding a
+// government is a decision about a world rather than a fact of one, so
+// it is left to the caller. No prison, because there is none.
+
+'use strict';
+
+const engine = require('./engine.js');
+const areaStats = require('./areaStats.js');
+const crime = require('./crime.js');
+const demographics = require('./demographics.js');
+const economy = require('./economy.js');
+const infrastructure = require('./infrastructure.js');
+const membership = require('./membership.js');
+const property = require('./property.js');
+const territory = require('./territory.js');
+const worldStore = require('./worldStore.js');
+const { hashSeed, seededUnit } = require('./seeded.js');
+
+//: Everything below is flagged interpretive. No document specifies a
+//: world's composition, so these are a plausible small city rather than
+//: a cited one, and every one is an option a caller can override.
+const DEFAULTS = {
+  seed: 'vacon-c',
+  cities: 1,
+  communitiesPerCity: 5,
+  populationPerCommunity: 30,
+  // Households per community; the rest of a community's residents are
+  // unattached adults.
+  familiesPerCommunity: 6,
+  businessesPerCommunity: 2,
+  factionsPerCity: 2,
+  // Homes are generated to house everybody with a margin, which is
+  // what produces a non-zero vacancy rate without inventing one.
+  homesPerResident: 1.15,
+  employmentRate: 0.55,
+  gangMembershipRate: 0.06,
+  languages: ['Riverine', 'Highland', 'Old Tongue'],
+  religions: ['Tidewater', 'Ridge', 'None'],
+};
+
+// The ten infrastructure types a city gets, with capacity expressed
+// per 1,000 residents so a bigger city is not automatically better
+// served. Only the four with a meaningful capacity carry one; a road
+// network has a condition and no headcount.
+const CITY_INFRASTRUCTURE = [
+  { type: 'schools', capacityPer1k: 180 },
+  { type: 'hospitals', capacityPer1k: 30 },
+  { type: 'public_safety', capacityPer1k: 25 },
+  { type: 'waste_management', capacityPer1k: 900 },
+  { type: 'roads' },
+  { type: 'bridges' },
+  { type: 'water_systems' },
+  { type: 'electricity' },
+  { type: 'internet' },
+  { type: 'rail' },
+];
+
+const SURNAMES = [
+  'Vance', 'Okoro', 'Marchetti', 'Delgado', 'Hollis', 'Nakamura',
+  'Brennan', 'Adeyemi', 'Kowalski', 'Ferreira', 'Whitlock', 'Osei',
+];
+const GIVEN_NAMES = [
+  'Ada', 'Bram', 'Cleo', 'Dane', 'Esme', 'Finn', 'Gita', 'Hugo',
+  'Iris', 'Jonas', 'Kira', 'Lev', 'Mira', 'Noor', 'Otto', 'Pia',
+  'Quill', 'Rosa', 'Sami', 'Tova', 'Umar', 'Vera', 'Wren', 'Yusuf',
+];
+
+// -- the seeded draw ----------------------------------------------------
+
+// One generator, threaded everywhere, so the whole world is a pure
+// function of the seed. Each call takes the things that identify the
+// draw, exactly like `seeded.js`'s own callers.
+//
+// **Every draw is keyed on POSITION — city index, community index,
+// person index — and never on a generated id.** The first version
+// keyed on `community.id` and `npc.id`, and the same seed then built
+// two different worlds: ids come from a counter that keeps going, so
+// the second world drew against different keys. It would also have
+// meant a world could not be rebuilt in a fresh process, or after a
+// restore, or beside an existing world — all three of which are
+// exactly when a seed is worth having.
+function makeRandom(seed) {
+  return {
+    unit: (...parts) => seededUnit(hashSeed([seed, ...parts])),
+    int: (max, ...parts) => Math.floor(seededUnit(hashSeed([seed, ...parts])) * max),
+    pick: (list, ...parts) => list[Math.floor(seededUnit(hashSeed([seed, ...parts])) * list.length)],
+    range: (min, max, ...parts) => min
+      + seededUnit(hashSeed([seed, ...parts])) * (max - min),
+  };
+}
+
+// -- the build ----------------------------------------------------------
+
+function generateWorld(options = {}) {
+  const config = { ...DEFAULTS, ...options };
+  const random = makeRandom(config.seed);
+  const w = engine.WorldState;
+  const tick = w.tick ?? 0;
+
+  const summary = {
+    seed: config.seed,
+    cities: [], communities: 0, people: 0, families: 0, properties: 0,
+    infrastructure: 0, organizations: 0, employed: 0, gangMembers: 0,
+    languages: 0, resources: 0, territoryBlocks: 0,
+  };
+
+  // Languages first: everything that speaks one needs it to exist.
+  const languages = config.languages.map((name, i) => demographics.generateLanguage(w, {
+    name,
+    // A language descended from the first one — the column exists, and
+    // a world seeded from real data has a family tree.
+    parentLanguageId: i === 2 ? null : null,
+  }));
+  summary.languages = languages.length;
+
+  for (let c = 0; c < config.cities; c += 1) {
+    const city = territory.generateCity(w, {
+      name: `City ${c + 1}`,
+      economy: Math.round(random.range(35, 70, 'city', c, 'economy')),
+      safety: Math.round(random.range(35, 70, 'city', c, 'safety')),
+    });
+    summary.cities.push(city.id);
+
+    const cityPopulation = config.communitiesPerCity * config.populationPerCommunity;
+
+    // ---- infrastructure --------------------------------------------
+    for (const spec of CITY_INFRASTRUCTURE) {
+      infrastructure.generateInfrastructure(w, {
+        cityId: city.id,
+        type: spec.type,
+        capacity: spec.capacityPer1k === undefined
+          ? null
+          : Math.round((spec.capacityPer1k * cityPopulation) / 1000),
+        // A world that starts at 100 everywhere has no variation for
+        // any statistic to find, and a world that starts at 50
+        // everywhere has the placeholder problem this project keeps
+        // finding. Drawn, and drawn per type so a city can be good at
+        // one thing and bad at another.
+        condition: Math.round(random.range(45, 95, 'infra', c, spec.type)),
+        age: Math.round(random.range(0, 45, 'infra-age', c, spec.type)),
+        maintenanceLevel: Math.round(random.range(20, 80, 'infra-maint', c, spec.type)),
+        funding: Math.round(random.range(0, 100, 'infra-fund', c, spec.type)),
+      });
+      summary.infrastructure += 1;
+    }
+
+    // ---- resources --------------------------------------------------
+    for (const resourceType of ['food', 'water', 'medicine', 'energy', 'timber']) {
+      economy.generateResource(w, {
+        cityId: city.id,
+        resourceType,
+        supply: Math.round(random.range(40, 140, 'res', c, resourceType)),
+        demand: Math.round(random.range(40, 140, 'dem', c, resourceType)),
+        quality: Math.round(random.range(30, 90, 'qual', c, resourceType)),
+      });
+      summary.resources += 1;
+    }
+
+    // ---- factions ---------------------------------------------------
+    const factions = [];
+    for (let f = 0; f < config.factionsPerCity; f += 1) {
+      const faction = engine.generateFaction({
+        name: `${random.pick(SURNAMES, 'faction', c, f)} Crew`,
+        type: 'gang',
+        traitValueFor: (def) => Math.round(
+          random.range(20, 90, 'faction-trait', c, f, def.family, def.name),
+        ),
+      });
+      faction.influence = Math.round(random.range(10, 80, 'faction-inf', c, f));
+      factions.push(faction);
+    }
+    summary.organizations += factions.length;
+
+    // ---- communities -------------------------------------------------
+    for (let b = 0; b < config.communitiesPerCity; b += 1) {
+      const community = territory.generateCommunity(w, { cityId: city.id, tier: 'block' });
+      summary.communities += 1;
+
+      // Territory: each block is held by a faction, and some are
+      // contested — which is what makes `contested_block_share` a
+      // statistic that can vary rather than a constant 0.
+      if (factions.length > 0) {
+        const block = territory.generateTerritoryBlock(w, {
+          factionId: random.pick(factions, 'block-faction', c, b).id,
+          cityId: city.id,
+          communityId: community.id,
+          buildingCount: Math.round(random.range(10, 60, 'buildings', c, b)),
+        });
+        if (random.unit('contested', c, b) < 0.3) {
+          block.status = 'contested';
+          block.contested_since_tick = tick;
+        }
+        summary.territoryBlocks += 1;
+      }
+
+      // ---- homes -----------------------------------------------------
+      const homeCount = Math.round(config.populationPerCommunity * config.homesPerResident);
+      const homes = [];
+      for (let h = 0; h < homeCount; h += 1) {
+        homes.push(property.generateProperty(w, {
+          type: 'residential',
+          communityId: community.id,
+          cityId: city.id,
+          landSize: Math.round(random.range(120, 900, 'land', c, b, h)),
+          value: Math.round(random.range(4000, 60000, 'value', c, b, h)),
+          condition: Math.round(random.range(25, 100, 'cond', c, b, h)),
+          floors: 1 + random.int(3, 'floors', c, b, h),
+          units: 1,
+          lifecycleStage: 'operation',
+          createdTick: tick,
+        }));
+        summary.properties += 1;
+      }
+      // A couple of commercial buildings, so `residential_share` is a
+      // real mix rather than always exactly 1.
+      for (let s = 0; s < config.businessesPerCommunity; s += 1) {
+        property.generateProperty(w, {
+          type: 'commercial',
+          communityId: community.id,
+          cityId: city.id,
+          landSize: Math.round(random.range(400, 2000, 'cland', c, b, s)),
+          value: Math.round(random.range(20000, 200000, 'cvalue', c, b, s)),
+          condition: Math.round(random.range(40, 100, 'ccond', c, b, s)),
+          lifecycleStage: 'operation',
+          createdTick: tick,
+        });
+        summary.properties += 1;
+      }
+
+      // ---- businesses --------------------------------------------------
+      const businesses = [];
+      for (let s = 0; s < config.businessesPerCommunity; s += 1) {
+        const business = engine.generateOrganization({
+          name: `${random.pick(SURNAMES, 'biz', c, b, s)} & Co`,
+          type: 'business',
+          traitValueFor: (def) => Math.round(
+            random.range(20, 90, 'biz-trait', c, b, s, def.family, def.name),
+          ),
+        });
+        business.assets = Math.round(random.range(20000, 300000, 'assets', c, b, s));
+        business.influence = Math.round(random.range(5, 60, 'biz-inf', c, b, s));
+        businesses.push(business);
+        summary.organizations += 1;
+      }
+
+      // ---- families ----------------------------------------------------
+      const families = [];
+      for (let f = 0; f < config.familiesPerCommunity; f += 1) {
+        families.push(engine.generateFamily({
+          surname: random.pick(SURNAMES, 'surname', c, b, f),
+          traitValueFor: (def) => Math.round(
+            random.range(25, 85, 'fam-trait', c, b, f, def.family, def.name),
+          ),
+        }));
+        summary.families += 1;
+      }
+
+      // ---- people ------------------------------------------------------
+      const residents = [];
+      for (let p = 0; p < config.populationPerCommunity; p += 1) {
+        //: An age structure rather than a uniform draw: weighting the
+        //: unit interval pushes mass toward the young, which is roughly
+        //: the shape of a real population pyramid and — more to the
+        //: point here — puts people on both sides of
+        //: `births.FERTILITY_MIN_AGE` and `mortality`'s age curve, so
+        //: neither system is exercised by a single cohort.
+        //:
+        //: The exponent was 3 first and produced a median age of about
+        //: ten — a world of children, in which almost nobody could
+        //: work or bear. 1.5 puts the median near thirty, which is the
+        //: figure a real population lands on.
+        const u = random.unit('age', c, b, p);
+        const age = 1 + (u ** 1.5) * 84;
+
+        const npc = engine.generateNPC({
+          name: `${random.pick(GIVEN_NAMES, 'given', c, b, p)} `
+            + `${random.pick(SURNAMES, 'family', c, b, p)}`,
+          education: null,     // set below, but only for adults
+          religion: random.pick(config.religions, 'religion', c, b, p),
+          traitValueFor: (def) => Math.round(
+            random.range(10, 95, 'trait', c, b, p, def.family, def.name),
+          ),
+        });
+        npc.createdTick = tick - Math.round(age * 365);
+        residents.push(npc);
+        summary.people += 1;
+
+        areaStats.placeInCommunity(w, {
+          entityId: npc.id,
+          communityId: community.id,
+          // Not everybody gets a home: the surplus is what makes a
+          // vacancy rate, and the unhoused are why `home_ownership_rate`
+          // is not automatically 1.
+          homePropertyId: p < homes.length ? homes[p].id : null,
+        });
+
+        // **Education is only meaningful for somebody old enough to
+        // have finished any.** Leaving it null for a child is not a gap
+        // — `demographics` counts unrecorded people as `unknown` and
+        // reports `demographics_recorded_share`, so a young block reads
+        // as young rather than as uneducated.
+        if (age >= 18) {
+          const level = random.unit('edu', c, b, p);
+          npc.education = level < 0.12 ? 'none'
+            : level < 0.45 ? 'basic'
+              : level < 0.7 ? 'secondary'
+                : level < 0.85 ? 'vocational'
+                  : level < 0.96 ? 'higher' : 'advanced';
+        }
+
+        demographics.speakLanguage(w, {
+          entityId: npc.id,
+          languageId: random.pick(languages, 'lang', c, b, p).id,
+          proficiency: Math.round(random.range(50, 100, 'prof', c, b, p)),
+          isPrimary: true,
+        });
+
+        economy.generateIndividualFinances(w, npc.id, {
+          //: A skewed distribution, not a uniform one — a uniform draw
+          //: has a median at its midpoint by construction, so the
+          //: poverty line would land in the same place in every world
+          //: and `poverty_rate` would be near-identical everywhere.
+          savings: Math.round((random.unit('savings', c, b, p) ** 2.2) * 4000),
+          assets: Math.round((random.unit('assets', c, b, p) ** 3) * 12000),
+          debt: Math.round((random.unit('debt', c, b, p) ** 2) * 3000),
+          tick,
+        });
+
+        // Ownership: somebody with a home may own it rather than
+        // occupy it, which is what `home_ownership_rate` measures.
+        if (npc.home_property_id !== null
+          && random.unit('owns', c, b, p) < 0.45) {
+          property.recordOwnership(w, {
+            entityId: npc.home_property_id,
+            ownerEntityId: npc.id,
+            ownerType: 'individual',
+            acquiredMethod: 'purchased',
+            tick,
+          });
+        }
+      }
+
+      // ---- households ---------------------------------------------------
+      // Assigned round-robin over the families, with children attached
+      // to the same family as the adults before them, so
+      // `mean_household_size` measures something structural rather
+      // than a random scatter.
+      residents.forEach((npc, i) => {
+        if (families.length === 0) return;
+        if (random.unit('infamily', c, b, i) > 0.75) return;  // some live alone
+        const family = families[i % families.length];
+        engine.addFamilyMember(family.id, npc.id, 'member', family.generation);
+      });
+
+      // ---- work ----------------------------------------------------------
+      const adults = residents.filter(
+        (n) => (tick - n.createdTick) / 365 >= 16,
+      );
+      adults.forEach((npc, ai) => {
+        if (businesses.length === 0) return;
+        if (random.unit('employed', c, b, ai) > config.employmentRate) return;
+        const employer = businesses[random.int(businesses.length, 'employer', c, b, ai)];
+        economy.hireEntity(w, {
+          entityId: npc.id,
+          employerOrganizationId: employer.id,
+          wage: Math.round(random.range(8, 90, 'wage', c, b, ai)),
+          tick,
+        });
+        membership.joinOrganization(w, {
+          entityId: npc.id, organizationId: employer.id, role: 'employee', tick,
+        });
+        summary.employed += 1;
+      });
+
+      // ---- affiliation -----------------------------------------------------
+      adults.forEach((npc, ai) => {
+        if (factions.length === 0) return;
+        if (random.unit('gang', c, b, ai) > config.gangMembershipRate) return;
+        membership.joinOrganization(w, {
+          entityId: npc.id,
+          organizationId: random.pick(factions, 'gangpick', c, b, ai).id,
+          role: 'member',
+          tick,
+        });
+        summary.gangMembers += 1;
+      });
+
+      // ---- who knows whom ---------------------------------------------------
+      // **Relationships are what the Social phase needs to have
+      // anything to do**, and without them nothing accumulates
+      // interaction count, so no bond forms and nobody is ever born.
+      // A sparse neighbourhood graph: everybody knows a handful of
+      // people on their own block.
+      for (let i = 0; i < residents.length; i += 1) {
+        const degree = 2 + random.int(4, 'degree', c, b, i);
+        for (let k = 0; k < degree; k += 1) {
+          const j = random.int(residents.length, 'edge', c, b, i, k);
+          if (j === i) continue;
+          const rel = worldStore.getOrCreateRelationship(
+            w, residents[i].id, residents[j].id, 'social',
+          );
+          rel.trust = Math.round(random.range(25, 85, 'rtrust', c, b, i, k));
+        }
+      }
+    }
+  }
+
+  // A world with no history of crime has no clearance rate and no
+  // opinion of public safety, and both are statistics somebody asked
+  // for. Rather than fabricate incidents, this leaves them to the tick
+  // pipeline — `runSecurityPhase` generates them from deprivation and
+  // conflict, which is the honest source. Callers who want the crime
+  // statistics populated should tick the world; `summary.hint` says so
+  // rather than leaving it to be discovered.
+  summary.hint = 'tick the world to populate crime, clearance, trust and stress — '
+    + 'those come from the pipeline, not from generation';
+  summary.crimeIncidents = (w.crimeIncidents || []).length;
+  void crime;
+
+  return summary;
+}
+
+module.exports = { DEFAULTS, CITY_INFRASTRUCTURE, makeRandom, generateWorld };

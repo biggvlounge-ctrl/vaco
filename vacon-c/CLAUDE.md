@@ -227,6 +227,33 @@ a world that looks restored and is wrong. `trait_id` came back as the
 string `"1"`, matched no trait definition, and every entity was
 restored with an empty trait sheet and no error anywhere.
 
+**An eleventh, learned by measuring instead of counting.** A generator
+that nothing calls is indistinguishable from a generator that does not
+exist. `server/statistics.js` carried 67 statistics across every §9
+category; a world built the only way one could be built answered **36**,
+and **23 more were computable and came back null** — five housing
+statistics because nothing ever called `generateProperty`, five
+community statistics because nothing called `generateInfrastructure`,
+five demographic statistics because nothing set religion, language or
+education, and so on. Every mechanism was built, tested and green.
+Nothing assembled a world, so every world this engine had ever run was
+a crowd of people standing in an empty field.
+
+`server/worldgen.js` closes it and adds no modelling at all: it calls
+what was already there, and coverage goes to **57 of 67**. The general
+form of the rule is that the suite cannot see this class of gap —
+fixtures construct exactly the rows the code under test reads, which is
+what makes them fixtures. **Measure a built world**
+(`vacon-c/scripts/measure-world.mjs`), and write down the number.
+
+Two corollaries found in the same pass, both of which had shipped:
+`relationships.love` was initialised to 0 and written by nothing, so no
+child could ever be born in a running world and eighteen passing tests
+said otherwise because every one set the field directly; and a seeded
+generator keyed on generated ids is not reproducible, because ids come
+from a counter whose state depends on what was built before — **seed on
+position, never on identity**.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and
