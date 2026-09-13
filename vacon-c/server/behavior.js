@@ -77,6 +77,28 @@ const TICK_INTERVALS = {
 
 const FREQUENCIES = Object.keys(TICK_INTERVALS);
 
+//: When in a day something happens. `schedule_events.time_slot` is a
+//: bare TEXT column with no comment and no enumeration anywhere in the
+//: package — unlike `frequency`, which the schema enumerates in its own
+//: comment. So this list is chosen here and flagged, the same way
+//: `TICK_INTERVALS` is.
+//:
+//: It was null on all 352 routines in a built world before this: a
+//: column carried through generation, migration and restore with
+//: nothing ever in it.
+const TIME_SLOTS = ['morning', 'midday', 'evening', 'night'];
+
+//: Which slot each routine falls in. Derived from what the routine IS
+//: rather than drawn at random — a person sleeps at night and works in
+//: the morning, and a random assignment would make the column noise
+//: instead of information.
+const SLOT_FOR_EVENT = {
+  rest: 'night',
+  eat: 'midday',
+  work: 'morning',
+  gathering: 'evening',
+};
+
 function intervals(worldState) {
   return worldState.tickIntervals ?? TICK_INTERVALS;
 }
@@ -220,6 +242,43 @@ const HABIT_DECAY_PER_TICK = 0.5;
 // The line above which a harmful habit is worth the world noticing.
 const HABIT_ENTRENCHED = 70;
 
+//: How much of a habit's remaining room a reinforcement closes.
+//:
+//: **This constant is what makes `habits.strength` mean anything.**
+//: Measured on a built world, the first version put every habit in the
+//: world at exactly 100: a daily routine fires every tick, each firing
+//: added a flat 1-3, decay only applied on ticks with no firing, so
+//: every habit ratcheted to the ceiling within about forty ticks and
+//: stayed. 365 rows, min 100, median 100, max 100 — a column that
+//: costs storage and carries no information about anybody.
+//:
+//: With gain scaled by the room left (`1 - strength/MAX`) and decay
+//: applied every tick, a habit settles where reinforcement and decay
+//: balance, and that point is set by the person's own trait:
+//:
+//:   Discipline    0 → ~50      100 → ~83      50 → ~75
+//:
+//: So habit strength becomes a reading of who somebody is rather than
+//: of how long the world has been running, and a habit that stops
+//: being practised decays away instead of standing at 100 forever.
+//: Diminishing returns is also simply what habit formation is — the
+//: first week of a routine changes more than the fiftieth.
+const HABIT_ROOM_FACTOR = 1;
+
+//: The stress above which somebody starts leaning on something to
+//: cope. 60 is the top of the `strained` band and the bottom of
+//: `distressed` in MOOD_BANDS — so this is not a new threshold, it is
+//: the one the mood model already draws, reused rather than invented.
+const HARMFUL_HABIT_STRESS = 60;
+
+//: What that coping is called. **Flagged interpretive, and deliberately
+//: one neutral name rather than a list.** The schema gives no
+//: vocabulary for habit names at all, and inventing a menu of specific
+//: vices would be writing content into an engine — a world that wants
+//: its own can change this one constant or call `reinforceHabit`
+//: directly with any name it likes.
+const HARMFUL_HABIT = 'self-medicating';
+
 function findHabit(worldState, entityId, name) {
   return worldState.habits.find((h) => h.entity_id === entityId && h.habit_name === name) ?? null;
 }
@@ -245,9 +304,13 @@ function reinforceHabit(worldState, entityId, name, options = {}) {
     ? (traitOr(live, 'psychological', 'Compulsiveness', 50)
        + traitOr(live, 'psychological', 'Impulsivity', 50)) / 2
     : traitOr(live, 'behavioral', 'Discipline', 50);
-  const gain = Number(amount) * (0.5 + driver / 100);
+  const existing = findHabit(worldState, entityId, name);
+  // Diminishing returns — see HABIT_ROOM_FACTOR. Read before the row
+  // is created so a brand-new habit gets the full first step.
+  const room = 1 - (Number(existing?.strength ?? 0) / HABIT_MAX) * HABIT_ROOM_FACTOR;
+  const gain = Number(amount) * (0.5 + driver / 100) * Math.max(0, room);
 
-  let habit = findHabit(worldState, entityId, name);
+  let habit = existing;
   if (!habit) {
     habit = {
       id: worldState.nextEntityId++,
@@ -438,6 +501,37 @@ function applyEventStress(worldState, events, tick = worldState.tick ?? 0) {
 // daily; everybody rests and eats. Nothing here decides what a person
 // LIKES — habits form from what they actually keep up, which is
 // `runBehavior`'s job and was already built.
+// Where somebody sleeps. `npcs.home_property_id` is set by `worldgen`
+// for every resident, so this is a real building rather than an
+// invented one — and null for a person assembled some other way, which
+// `addScheduleEvent` accepts.
+function homeOf(worldState, entityId) {
+  const npc = (worldState.npcs || []).find((n) => n.id === entityId);
+  const home = npc?.home_property_id ?? null;
+  if (home === null) return null;
+  return (worldState.properties || []).some((p) => p.id === home) ? home : null;
+}
+
+// Where somebody works: the building their employer operates out of.
+// `properties.operating_organization_id` is the schema's own link and
+// this is the only thing that reads it.
+function workplaceOf(worldState, entityId) {
+  const job = (worldState.employmentRecords || []).find(
+    (r) => r.entity_id === entityId && r.status === 'active',
+  );
+  if (!job) return null;
+  const site = (worldState.properties || []).find(
+    (p) => p.operating_organization_id === job.employer_organization_id,
+  );
+  return site ? site.id : null;
+}
+
+// The routine somebody keeps. **Every field the schema offers is
+// filled where the world can say what it should be**, which before
+// this meant: event type and frequency only, with `time_slot` and
+// `location_property_id` null on all 352 rows in a built world while
+// 185 properties stood in it. Nobody went anywhere, and nothing
+// happened at any particular time of day.
 function seedRoutine(worldState, entityId, options = {}) {
   const { tick = worldState.tick ?? 0 } = options;
   const added = [];
@@ -445,18 +539,37 @@ function seedRoutine(worldState, entityId, options = {}) {
   const has = (type) => worldState.scheduleEvents.some(
     (e) => e.entity_id === entityId && e.event_type === type,
   );
+  const add = (eventType, frequency, locationPropertyId = null) => {
+    if (has(eventType)) return;
+    added.push(addScheduleEvent(worldState, entityId, {
+      eventType,
+      frequency,
+      timeSlot: SLOT_FOR_EVENT[eventType] ?? null,
+      locationPropertyId,
+    }));
+  };
 
-  for (const eventType of ['rest', 'eat']) {
-    if (has(eventType)) continue;
-    added.push(addScheduleEvent(worldState, entityId, { eventType, frequency: 'daily' }));
-  }
+  const home = homeOf(worldState, entityId);
+  add('rest', 'daily', home);
+  add('eat', 'daily', home);
 
   const employed = (worldState.employmentRecords || []).some(
     (r) => r.entity_id === entityId && r.status === 'active',
   );
-  if (employed && !has('work')) {
-    added.push(addScheduleEvent(worldState, entityId, { eventType: 'work', frequency: 'daily' }));
-  }
+  if (employed) add('work', 'daily', workplaceOf(worldState, entityId));
+
+  // **A weekly routine, and the one the world can actually justify.**
+  // `schedule_events.frequency` enumerates daily|weekly|monthly|yearly
+  // and only `daily` was ever used, so three quarters of the column's
+  // own vocabulary was dead. Belonging to an organization is real
+  // substrate — `entity_organization_memberships` has rows in every
+  // built world — and an organization whose members never convene is
+  // a membership list rather than an organization. Nothing else here
+  // has a defensible period, so nothing else gets one.
+  const belongs = (worldState.entityOrganizationMemberships || []).some(
+    (m) => m.entity_id === entityId && m.status !== 'left',
+  );
+  if (belongs) add('gathering', 'weekly', null);
 
   void tick;
   return added;
@@ -524,9 +637,43 @@ function runBehavior(worldState) {
     reinforceHabit(worldState, event.entity_id, event.event_type, { amount: 2 });
   }
 
-  // 3. Habits nobody kept up this tick fade.
+  // 3. Sustained strain becomes a way of coping.
+  //
+  // **The `harmful` half of the habits table, which nothing wrote.**
+  // The schema names it in its own comment — "addiction = harmful
+  // habit, not a separate table" — and `reinforceHabit` has always
+  // read Compulsiveness and Impulsivity for exactly this case, with no
+  // caller anywhere that passed `harmful: true`. A whole modelled
+  // mechanism, tested and green, that no world had ever reached.
+  //
+  // Driven by stress rather than by a draw, because stress is the only
+  // thing in this engine that represents somebody being under
+  // sustained pressure, and it is already shaped by their traits on
+  // the way in. Who then forms the habit, and how fast, is
+  // `reinforceHabit`'s existing psychological read — so nothing new is
+  // invented about who is vulnerable.
+  for (const row of worldState.entityState) {
+    if (Number(row.stress_level) < HARMFUL_HABIT_STRESS) continue;
+    if (!living.has(row.entity_id)) continue;
+    reinforceHabit(worldState, row.entity_id, HARMFUL_HABIT, {
+      harmful: true, amount: 1,
+    });
+  }
+
+  // 4. Every habit fades a little, kept up or not.
+  //
+  // **Not "habits nobody kept up this tick fade", which is what this
+  // was.** A daily routine fires every tick, so under that rule a
+  // daily habit never decayed once, gain was unopposed, and every
+  // habit in every world ratcheted to exactly 100. Decay has to be
+  // unconditional for reinforcement to balance against it — that
+  // balance point, set by the person's own Discipline, is the entire
+  // information content of `habits.strength`. See HABIT_ROOM_FACTOR.
+  //
+  // Applied after the reinforcement pass so a habit kept up today nets
+  // out positive while it still has room, and negative once it does
+  // not — which is what a plateau is.
   for (const habit of worldState.habits) {
-    if (habit.last_reinforced_tick === worldState.tick) continue;
     habit.strength = round1(clamp(habit.strength - HABIT_DECAY_PER_TICK, HABIT_MIN, HABIT_MAX));
   }
 
@@ -586,6 +733,13 @@ function assertBehaviorReadsRealTraits() {
 assertBehaviorReadsRealTraits();
 
 module.exports = {
+  TIME_SLOTS,
+  SLOT_FOR_EVENT,
+  HABIT_ROOM_FACTOR,
+  HARMFUL_HABIT_STRESS,
+  HARMFUL_HABIT,
+  homeOf,
+  workplaceOf,
   TICK_INTERVALS,
   FREQUENCIES,
   MOOD_BANDS,

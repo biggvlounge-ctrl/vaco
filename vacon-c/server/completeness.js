@@ -250,6 +250,31 @@ const TRAIT_COLUMNS = [
   'key_modifier',
 ];
 
+//: Columns it is CORRECT never to write, with the reason. Checked by
+//: `test/completeness.test.js` the same way `BY_DESIGN` is.
+const TRAIT_COLUMN_BY_DESIGN = {
+  base_value: 'base is the value you were born with; change belongs in a modifier',
+};
+
+//: Columns a real mechanism writes that this particular world never
+//: triggers. **Still scored zero** — the point of measuring a built
+//: world is that an unreached mechanism and an unwritten one look the
+//: same from inside it, and the honest thing is to say which this is
+//: rather than to award the point.
+//:
+//: `temporary_modifier` is the live example, and it names a second
+//: finding: stress in a generated world tops out around 55, so the
+//: `distressed` and `crisis` bands of `behavior.MOOD_BANDS` are
+//: unreachable and nobody is ever acutely strained. Lowering the
+//: threshold to make this column move would be turning a real gap into
+//: a green tick.
+const TRAIT_COLUMN_UNREACHED = {
+  temporary_modifier: 'no generated world has yet put anybody under acute strain '
+    + '(stress peaks near 55 against a threshold of 60)',
+  permanent_modifier: 'nothing distinguishes an event somebody walks away from '
+    + 'unchanged from one that marks them — see server/traitDrift.js',
+};
+
 function snapshotTraits(worldState) {
   const snap = new Map();
   for (const row of worldState.entityTraits || []) {
@@ -269,13 +294,33 @@ function measureTraitDepth(worldState, snapshot) {
       if (Number(row[column]) !== Number(before[column])) moved[column] += 1;
     }
   }
-  const items = TRAIT_COLUMNS.map((column) => ({
-    name: `entity_traits.${column}`,
-    credit: moved[column] > 0 ? 1 : 0,
-    state: moved[column] > 0
-      ? `moved on ${moved[column]} of ${compared} rows`
-      : 'never moves — nothing writes it',
-  }));
+  const items = TRAIT_COLUMNS.map((column) => {
+    if (moved[column] > 0) {
+      return {
+        name: `entity_traits.${column}`,
+        credit: 1,
+        state: `moved on ${moved[column]} of ${compared} rows`,
+      };
+    }
+    if (TRAIT_COLUMN_BY_DESIGN[column]) {
+      // Same call as `current_mood` in the habits axis: a column that
+      // is CORRECT to leave alone is not missing work, and scoring it
+      // as a gap would be an accuracy failure in the direction that
+      // looks like rigour.
+      return {
+        name: `entity_traits.${column}`,
+        credit: 1,
+        state: `by design — ${TRAIT_COLUMN_BY_DESIGN[column]}`,
+      };
+    }
+    return {
+      name: `entity_traits.${column}`,
+      credit: 0,
+      state: TRAIT_COLUMN_UNREACHED[column]
+        ? `written, but ${TRAIT_COLUMN_UNREACHED[column]}`
+        : 'never moves — nothing writes it',
+    };
+  });
   return { axis: 'traitDepth', label: 'trait columns a life actually changes', items };
 }
 
@@ -332,9 +377,29 @@ function measureHabits(worldState) {
       state: `${schedule.filter((e) => e.location_property_id != null).length} of ${schedule.length} have a place`,
     },
     {
-      name: 'a mood is recorded, not only computed',
-      credit: states.some((s) => s.current_mood != null) ? 1 : 0,
-      state: `${states.filter((s) => s.current_mood != null).length} of ${states.length} rows carry one`,
+      // **Scored as complete because NULL is the correct value**, and
+      // getting this wrong is the exact mistake this file exists to
+      // avoid. `entity_state.current_mood` is null on purpose: mood is
+      // a band label over stress shifted by Optimism, so storing it
+      // would break standing rule 3, and `behavior.js` says so at
+      // length while `test/migrate.test.js` asserts it. The first
+      // version of this axis counted it as a gap and would have scored
+      // a correct decision as missing work — an accuracy failure in
+      // the direction that looks like rigour.
+      name: 'mood is derived rather than stored',
+      credit: states.length > 0 && states.every((s) => s.current_mood == null) ? 1 : 0,
+      state: states.length === 0
+        ? 'no entity_state rows at all'
+        : 'by design — a computable rollup, standing rule 3',
+    },
+    {
+      name: 'stress spreads people out rather than pinning them',
+      credit: (() => {
+        const levels = states.map((s) => Number(s.stress_level)).filter(Number.isFinite);
+        if (levels.length < 2) return 0;
+        return new Set(levels.map((l) => Math.round(l / 10))).size > 2 ? 1 : 0;
+      })(),
+      state: `${new Set(states.map((s) => Math.round(Number(s.stress_level) / 10))).size} distinct bands`,
     },
   ];
   return { axis: 'habits', label: 'habit and routine depth', items };
@@ -387,6 +452,8 @@ function measure(worldState, snapshot = new Map()) {
 module.exports = {
   LEVEL_CREDIT,
   BY_DESIGN,
+  TRAIT_COLUMN_BY_DESIGN,
+  TRAIT_COLUMN_UNREACHED,
   TRAIT_COLUMNS,
   schemaTables,
   snapshotTraits,

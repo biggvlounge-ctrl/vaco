@@ -13,10 +13,10 @@ three places, a spec section's "roughly 25 of the 40", a catalogue of 67
 statistics that a real world answered 36 of, and seven trait families generated
 on every NPC and read by nothing.
 
-## 78.9% complete
+## 83% complete
 
 ```
-████████████████░░░░  78.9%   236.75 of 300
+█████████████████░░░  83%   249.75 of 301
 ```
 
 | axis | complete | score | what it measures |
@@ -25,8 +25,8 @@ on every NPC and read by nothing.
 | tables | **63.8%** | 41.5/65 | schema tables a built world fills |
 | statistics | **86.6%** | 58/67 | statistics a world can answer |
 | traits | **100%** | 114/114 | traits something reads |
-| traitDepth | **14.3%** | 1/7 | trait columns a life actually changes |
-| habits | **0%** | 0/7 | habit and routine depth |
+| traitDepth | **85.7%** | 6/7 | trait columns a life actually changes |
+| habits | **100%** | 8/8 | habit and routine depth |
 
 The total is weighted by item count — one statistic counts the same as one
 table counts as one trait. Any other weighting is a judgement about which half
@@ -130,32 +130,15 @@ The `server/statistics.js` catalogue, scored on whether a world can produce the 
 
 ### traits — complete
 
-### traitDepth — 6 open
+### traitDepth — 1 open
 
 The seven contributing columns on `entity_traits`, scored on whether a real run ever moves them. A column nothing writes means people cannot change.
 
 | item | state | worth |
 |---|---|---|
-| `entity_traits.base_value` | never moves — nothing writes it | +1 |
-| `entity_traits.temporary_modifier` | never moves — nothing writes it | +1 |
-| `entity_traits.permanent_modifier` | never moves — nothing writes it | +1 |
-| `entity_traits.experience_modifier` | never moves — nothing writes it | +1 |
-| `entity_traits.environmental_modifier` | never moves — nothing writes it | +1 |
-| `entity_traits.relationship_modifier` | never moves — nothing writes it | +1 |
+| `entity_traits.permanent_modifier` | written, but nothing distinguishes an event somebody walks away from unchanged from one that marks them — see server/traitDrift.js | +1 |
 
-### habits — 7 open
-
-Yes/no questions about whether habits and routines carry information rather than being identical for everybody.
-
-| item | state | worth |
-|---|---|---|
-| `more than one habit strength in the world` | every habit at the same strength | +1 |
-| `habits beyond the three a routine seeds` | 3 distinct habit names | +1 |
-| `harmful habits can form` | the addiction half of the table is dead | +1 |
-| `more than one schedule frequency` | 1 of 4 used | +1 |
-| `routines happen at a time` | 0 of 359 have a slot | +1 |
-| `routines happen somewhere` | 0 of 359 have a place | +1 |
-| `a mood is recorded, not only computed` | 0 of 150 rows carry one | +1 |
+### habits — complete
 
 ## How to read a gap
 

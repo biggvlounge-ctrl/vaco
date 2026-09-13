@@ -63,6 +63,7 @@ const flows = require('./flows.js');
 const behavior = require('./behavior.js');
 const areaStats = require('./areaStats.js');
 const perception = require('./perception.js');
+const traitDrift = require('./traitDrift.js');
 
 let nextEventId = 1;
 
@@ -892,6 +893,37 @@ function advanceTick(worldState) {
   // already in `deceased`, and nothing would throw. See
   // server/births.js.
   candidateEvents.push(...births.runBirths(worldState, worldState.tick).events);
+
+  // Trait drift, last of the cross-cutting layers and deliberately at
+  // the end of them.
+  //
+  // **What it fixes.** Measured over 200 ticks across 17,358 trait
+  // rows, six of `entity_traits`' seven contributing columns never
+  // moved at all — only Key resolvers ever wrote anything, to their
+  // own column, on 2.3% of rows. Nobody learned a trade, was hardened
+  // or worn down by where they lived, or was changed by the people
+  // around them, and `trait_definitions.growth_rate`/`decay_rate` were
+  // columns no code applied.
+  //
+  // Last because it reads what the whole tick produced: the habits
+  // `runBehavior` just reinforced, the stress it just decayed, and a
+  // population that mortality and births have already settled. A
+  // person who died this tick does not spend it learning.
+  //
+  // Not a twelfth phase — the same cross-cutting slot as behavior,
+  // mortality and births, for the same reason. Living is not a stage
+  // of a tick.
+  traitDrift.runTraitDrift(worldState, {
+    tick: worldState.tick,
+    scarcity: mortality.survivalScarcity(worldState),
+    crimeByCommunity: crime.dangerByCommunity(worldState),
+    // A community inherits its city's infrastructure condition — the
+    // water systems and roads a block depends on are the city's, not
+    // the block's, and `infrastructure` is city-scoped in the schema.
+    conditionByCommunity: new Map((worldState.communities || []).map(
+      (c) => [c.id, infrastructure.cityCondition(worldState, c.city_id)],
+    )),
+  });
 
   const events = runEventPhase(worldState, candidateEvents);   // 9
   const historicalRecords = runHistoryPhase(worldState, events); // 10

@@ -72,7 +72,7 @@ authorization work in §5 had to be done per app rather than once.
 | Containerised services | 36 + nginx + a LiveKit SFU |
 | Registry rows (incl. brand rows and the dev mock) | 37 |
 | Mutating HTTP routes | 524, all accounted for (472 guarded, 52 declared open with a reason) |
-| Automated tests | 2007 across 39 suites |
+| Automated tests | 2022 across 39 suites |
 | Persisted volumes | 30 |
 | Shared-module copies kept in sync | 210 |
 | Service credentials in `.env.example` | 28 callers |
@@ -824,7 +824,7 @@ run to produce the numbers here.
 built:** `node scripts/package-release.mjs` — see §11.
 
 ```sh
-node scripts/run-all-tests.mjs           # 2007/2007 across 39 suites (some skip without a database)
+node scripts/run-all-tests.mjs           # 2022/2022 across 39 suites (some skip without a database)
 node scripts/audit-route-guards.mjs --check   # 524/524 accounted for
 ./sync-shared-runtime.sh --check         # 210 copies current, none unmanaged
 ./sync-design-system.sh --check          # every serving app is a target
@@ -895,8 +895,8 @@ dependencies are installed.
 ### Per-suite
 
 ```
-vacon-c         658   vdp             147   void            142
-scripts         166   v3              111   vaco-media       51
+vacon-c         671   vdp             147   void            142
+scripts         168   v3              111   vaco-media       51
 v4-proxy         42   world-layer      41   venvm            40
 venvs            45   voken            37   vaco-analytics   39
 vaco-shell       36   vacay            24   voidmagic        28
@@ -980,7 +980,7 @@ trusted:
 
 The simulation engine is the one app in this repo whose "done" is not a
 list of routes, so it carries a measured completeness score rather than
-a criteria tally. **78.9%**, from
+a criteria tally. **83%**, from
 `vacon-c/dev-docs/GAME_COMPLETENESS.md`, which
 `vacon-c/scripts/completeness.mjs` regenerates and
 `vacon-c/test/completeness.test.js` fails on if stale — including a
@@ -992,8 +992,8 @@ check that the percent in THIS file matches the one the code measures.
 | tables | 63.8% | schema tables a built world actually fills |
 | statistics | 86.6% | statistics a world can answer about itself |
 | traits | 100% | traits something under `server/` reads |
-| traitDepth | 14.3% | trait columns a life actually changes |
-| habits | 0% | whether habits and routines carry information |
+| traitDepth | 85.7% | trait columns a life actually changes |
+| habits | 100% | whether habits and routines carry information |
 
 Weighted by item count, deliberately: no document in the package says
 which half of a game matters more, so inventing a weighting would put a

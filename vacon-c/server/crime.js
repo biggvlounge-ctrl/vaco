@@ -465,6 +465,39 @@ function countsByCategory(worldState, communityId, options = {}) {
 // compare** — a block of 40 people and a district of 4,000 cannot be
 // ranked on raw totals, and every cross-area statistic in this project
 // is normalised for that reason.
+//: The window a "current" crime rate is measured over, and the rate at
+//: which a place reads as maximally dangerous.
+//:
+//: A cumulative count is not a rate — every community's total only ever
+//: rises, so a place that was violent a decade ago and is quiet now
+//: would read as dangerous forever. One year of ticks is the shortest
+//: window that is not dominated by whether anything happened last week.
+//:
+//: 40 per 1,000 per year is the reference. Flagged interpretive: no
+//: document sets one, and it is chosen so that a settlement where
+//: roughly one person in twenty-five is involved in a recorded incident
+//: in a year reads as fully dangerous rather than merely bad.
+const DANGER_WINDOW_TICKS = 365;
+const DANGER_REFERENCE_PER_1K = 40;
+
+// How dangerous each community currently is, 0..1, keyed by community
+// id. Built once for a whole pass rather than asked per person —
+// `traitDrift` needs it for every NPC in the world and recomputing it
+// 150 times would walk the incident log 150 times.
+//
+// A community with nobody in it is absent from the map rather than
+// present at 0: an empty block is not a safe one, it is unmeasured.
+function dangerByCommunity(worldState, options = {}) {
+  const { tick = worldState.tick ?? 0, window = DANGER_WINDOW_TICKS } = options;
+  const danger = new Map();
+  for (const community of worldState.communities || []) {
+    const rate = ratePer1k(worldState, community.id, { sinceTick: tick - window });
+    if (rate === null) continue;
+    danger.set(community.id, Math.min(1, rate / DANGER_REFERENCE_PER_1K));
+  }
+  return danger;
+}
+
 function ratePer1k(worldState, communityId, options = {}) {
   const population = areaStats.residentsOf(worldState, communityId).length;
   if (population === 0) return null;
@@ -500,6 +533,9 @@ module.exports = {
   incidentsIn,
   countsByCategory,
   ratePer1k,
+  DANGER_WINDOW_TICKS,
+  DANGER_REFERENCE_PER_1K,
+  dangerByCommunity,
   worldCounts,
   sharesFamily,
 };

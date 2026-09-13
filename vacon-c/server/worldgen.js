@@ -309,9 +309,12 @@ function generateWorld(options = {}) {
         summary.properties += 1;
       }
       // A couple of commercial buildings, so `residential_share` is a
-      // real mix rather than always exactly 1.
+      // real mix rather than always exactly 1. Built BEFORE the
+      // businesses so each one can be handed to the business that
+      // operates out of it — see below.
+      const premises = [];
       for (let s = 0; s < config.businessesPerCommunity; s += 1) {
-        property.generateProperty(w, {
+        premises.push(property.generateProperty(w, {
           type: 'commercial',
           communityId: community.id,
           cityId: city.id,
@@ -320,7 +323,7 @@ function generateWorld(options = {}) {
           condition: Math.round(random.range(40, 100, 'ccond', c, b, s)),
           lifecycleStage: 'operation',
           createdTick: tick,
-        });
+        }));
         summary.properties += 1;
       }
 
@@ -336,6 +339,13 @@ function generateWorld(options = {}) {
         });
         business.assets = Math.round(random.range(20000, 300000, 'assets', c, b, s));
         business.influence = Math.round(random.range(5, 60, 'biz-inf', c, b, s));
+        // **`properties.operating_organization_id` is the schema's own
+        // link from a building to whoever runs it, and it was null on
+        // every property in every world this engine had built.** A
+        // business existed and occupied nowhere, so nobody could be
+        // said to go to work anywhere — `behavior.workplaceOf` reads
+        // exactly this to give a work routine a place.
+        if (premises[s]) premises[s].operating_organization_id = business.id;
         businesses.push(business);
         summary.organizations += 1;
       }
