@@ -72,7 +72,7 @@ authorization work in §5 had to be done per app rather than once.
 | Containerised services | 36 + nginx + a LiveKit SFU |
 | Registry rows (incl. brand rows and the dev mock) | 37 |
 | Mutating HTTP routes | 524, all accounted for (472 guarded, 52 declared open with a reason) |
-| Automated tests | 1997 across 39 suites |
+| Automated tests | 2007 across 39 suites |
 | Persisted volumes | 30 |
 | Shared-module copies kept in sync | 210 |
 | Service credentials in `.env.example` | 28 callers |
@@ -792,7 +792,7 @@ running the system, not by reading it.
 
 ## 9. Generated, not hand-written
 
-Four things in this repo are derived. Editing the output is silently
+Six things in this repo are derived. Editing the output is silently
 undone.
 
 | output | generator | derives |
@@ -802,6 +802,8 @@ undone.
 | shared `lib/*.cjs` | `sync-shared-runtime.sh` | 80 copies from `shared/` |
 | `public/vaco-ui.js` | `sync-design-system.sh` | design system into every serving app |
 | service tokens | `scripts/generate-service-tokens.mjs` | the `.env` allowlist |
+| `dev-docs/COMPLETION_BY_APP.md` | `scripts/completion-report.mjs` | per-app criteria met |
+| `vacon-c/dev-docs/GAME_COMPLETENESS.md` | `vacon-c/scripts/completeness.mjs` | how much of a complete game exists |
 
 The compose generator reads each app's own source to decide what it
 gets: `createServiceAuth(` present means it verifies credentials;
@@ -822,7 +824,7 @@ run to produce the numbers here.
 built:** `node scripts/package-release.mjs` — see §11.
 
 ```sh
-node scripts/run-all-tests.mjs           # 1997/1997 across 39 suites (some skip without a database)
+node scripts/run-all-tests.mjs           # 2007/2007 across 39 suites (some skip without a database)
 node scripts/audit-route-guards.mjs --check   # 524/524 accounted for
 ./sync-shared-runtime.sh --check         # 210 copies current, none unmanaged
 ./sync-design-system.sh --check          # every serving app is a target
@@ -893,7 +895,7 @@ dependencies are installed.
 ### Per-suite
 
 ```
-vacon-c         648   vdp             147   void            142
+vacon-c         658   vdp             147   void            142
 scripts         166   v3              111   vaco-media       51
 v4-proxy         42   world-layer      41   venvm            40
 venvs            45   voken            37   vaco-analytics   39
@@ -971,6 +973,41 @@ trusted:
    volumes to cover once the stack has run.
    `dev-docs/DISASTER_RECOVERY.md` has the restore procedure. Restore
    has been tested locally, never from an off-host copy.
+
+---
+
+## 11a. VACON-C — the running percent
+
+The simulation engine is the one app in this repo whose "done" is not a
+list of routes, so it carries a measured completeness score rather than
+a criteria tally. **78.9%**, from
+`vacon-c/dev-docs/GAME_COMPLETENESS.md`, which
+`vacon-c/scripts/completeness.mjs` regenerates and
+`vacon-c/test/completeness.test.js` fails on if stale — including a
+check that the percent in THIS file matches the one the code measures.
+
+| axis | complete | what it measures |
+|---|---|---|
+| systems | 55.6% | the forty urban systems §7 names, at `urbanSystems.js`'s own four levels |
+| tables | 63.8% | schema tables a built world actually fills |
+| statistics | 86.6% | statistics a world can answer about itself |
+| traits | 100% | traits something under `server/` reads |
+| traitDepth | 14.3% | trait columns a life actually changes |
+| habits | 0% | whether habits and routines carry information |
+
+Weighted by item count, deliberately: no document in the package says
+which half of a game matters more, so inventing a weighting would put a
+made-up number at the top of a report whose whole purpose is that its
+numbers are not made up.
+
+**Why a measured score and not a checklist.** Every status claim this
+project has made has been wrong when checked. `vacon-c/CLAUDE.md`'s
+"foundation already running" list was wrong in three places. A spec
+section put its own coverage at "roughly 25 of the 40" from memory.
+`statistics.js` carried 67 statistics and a real world answered 36.
+Seven trait families were generated on every NPC and read by nothing.
+The pattern is consistent enough to be a rule: **the only trustworthy
+number is one a command produces.**
 
 ---
 
