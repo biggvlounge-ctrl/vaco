@@ -18,8 +18,17 @@ const assert = require('node:assert/strict');
 
 const engine = require('../server/engine.js');
 
-function setup({ reward = 250, savings = 100 } = {}) {
-  const npc = engine.generateNPC();
+// **The subject is pinned, per the eighth standing rule.** Every test
+// below is about the state machine, and none of them is about whether
+// this particular NPC can sense an artifact — but `acceptMission` now
+// refuses somebody below `ARTIFACT_SENSITIVITY_FLOOR`, so a bare
+// `generateNPC()` would make a quarter of these tests a coin toss on
+// the roll. `sensitivity` is a parameter so the gate itself can be
+// tested deliberately rather than encountered by accident.
+function setup({ reward = 250, savings = 100, sensitivity = 60 } = {}) {
+  const npc = engine.generateNPC({
+    traitValueFor: (def) => (def.family === 'special' ? sensitivity : 50),
+  });
   engine.generateIndividualFinances(npc.id, { savings });
   const artifact = engine.generateArtifact({ name: `Relic ${npc.id}` });
   const mission = engine.generateMission({

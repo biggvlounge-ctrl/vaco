@@ -62,6 +62,7 @@ const property = require('./property.js');
 const flows = require('./flows.js');
 const behavior = require('./behavior.js');
 const areaStats = require('./areaStats.js');
+const perception = require('./perception.js');
 
 let nextEventId = 1;
 
@@ -173,6 +174,13 @@ const SCARCITY_BROADCAST_THRESHOLD = 60;
 //: not re-announce the same shortage.
 const SCARCITY_NEWS_STEP = 10;
 
+//: How firmly a scarcity crossing is broadcast. 0.9 rather than 1: a
+//: shortage everybody can see is close to certain, not certain. This
+//: was an inline literal and is named because `perception.js` now
+//: scales it per person — the broadcaster's confidence and the
+//: receiver's are different numbers and want different names.
+const SCARCITY_NEWS_CONFIDENCE = 0.9;
+
 function runEconomyPhase(worldState) {
   const events = [];
 
@@ -256,7 +264,14 @@ function runEconomyPhase(worldState) {
         subjectEntityId: null,
         factType: 'verified',
         factContent: `${resource.resource_type} scarcity`,
-        confidenceLevel: 0.9,
+        // **Not a flat 0.9 any more, and this is where the `special`
+        // family reads.** The broadcast is the same for everybody; what
+        // each person ends up holding it at is not. Signal Perception
+        // is exactly how well a signal is picked up, and
+        // `confidence_level` is read by `knowledgeCharge` in keys.js,
+        // so this reaches ScarcityResponse, Fear and migration rather
+        // than sitting in a column. An ordinary person still gets 0.9.
+        confidenceLevel: perception.receivedConfidence(worldState, npc.id, SCARCITY_NEWS_CONFIDENCE),
         tick: worldState.tick,
       });
     }

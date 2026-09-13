@@ -78,8 +78,13 @@ function traitsToSheet(rows) {
 // entity_traits rows for one entity — mirrors a
 // `SELECT * FROM entity_traits WHERE entity_id = ?` query. Works for
 // any tier since it only filters by id.
+// `|| []` rather than a bare read: a world with no trait rows at all is
+// a real state (a fixture, a world mid-restore), and it means "this
+// entity has no traits", not "crash". A reader that throws on it forces
+// every caller to guard the array itself, which is how one of them ends
+// up not doing it.
 function getEntityTraitsForEntity(worldState, entityId) {
-  return worldState.entityTraits.filter((row) => row.entity_id === entityId);
+  return (worldState.entityTraits || []).filter((row) => row.entity_id === entityId);
 }
 
 function findEntityTraitRow(worldState, entityId, family, name) {
@@ -122,9 +127,9 @@ function applyKeyModifier(worldState, entityId, family, name, delta, tick) {
 // outside the pipeline still need to pass a fresh entity themselves —
 // this helper doesn't retroactively fix every past call site.
 function getLiveEntity(worldState, entityId) {
-  const base = worldState.npcs.find((e) => e.id === entityId)
-    || worldState.organizations.find((e) => e.id === entityId)
-    || worldState.families.find((e) => e.id === entityId);
+  const base = (worldState.npcs || []).find((e) => e.id === entityId)
+    || (worldState.organizations || []).find((e) => e.id === entityId)
+    || (worldState.families || []).find((e) => e.id === entityId);
   if (!base) return null;
   return { ...base, traits: traitsToSheet(getEntityTraitsForEntity(worldState, entityId)) };
 }

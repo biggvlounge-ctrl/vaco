@@ -54,6 +54,7 @@
 'use strict';
 
 const { nextAfter } = require('./nextAfter.js');
+const entityTraits = require('./entityTraits.js');
 
 let nextCivilizationId = 1;
 let nextTechnologyEraId = 1;
@@ -147,6 +148,35 @@ function unlockedEras(worldState, civilizationId) {
 // fails silently is indistinguishable from one nobody attempted, and a
 // bottleneck you cannot see the reason for is not a bottleneck anybody
 // can act on.
+//: How much a population's learning offsets the reemergence a new era
+//: asks for. At 0.3, a civilization of scholars clears a bar 30% lower
+//: than one that has forgotten how to read.
+//:
+//: **This is the `educational` family's home, and §40's own logic
+//: points at it.** Literacy, Technical Knowledge, Historical Knowledge
+//: and Self-Taught Aptitude are what a people know, and what a people
+//: know is exactly what decides whether they can recover a technology.
+//: The requirement is not waived — it is what the population brings to
+//: it.
+const LEARNING_WEIGHT = 0.3;
+
+// Mean educational standing across a civilization's people, 0..100.
+// Neutral 50 when nobody is attached, so an unpeopled civilization
+// neither gains nor loses.
+function learningOf(worldState, civilizationId) {
+  const values = [];
+  for (const npc of worldState.npcs || []) {
+    if (npc.civilizationId !== undefined && npc.civilizationId !== civilizationId) continue;
+    const live = entityTraits.getLiveEntity(worldState, npc.id);
+    const learned = live?.traits?.educational;
+    if (!learned) continue;
+    const scores = Object.values(learned).map(Number).filter((v) => Number.isFinite(v));
+    if (scores.length > 0) values.push(scores.reduce((a, b) => a + b, 0) / scores.length);
+  }
+  if (values.length === 0) return 50;
+  return values.reduce((a, b) => a + b, 0) / values.length;
+}
+
 function canUnlock(worldState, options = {}) {
   const { civilizationId, eraName } = options;
   const era = getEra(worldState, eraName);
@@ -165,7 +195,12 @@ function canUnlock(worldState, options = {}) {
     return { ok: false, reason: `requires ${missing.join(', ')}`, missingEras: missing };
   }
 
-  const needed = requirements.minReemergence;
+  // Lowered by what the population already knows — see LEARNING_WEIGHT.
+  const learning = learningOf(worldState, civilizationId);
+  const rawNeeded = requirements.minReemergence;
+  const needed = Number.isFinite(rawNeeded)
+    ? rawNeeded * (1 - ((learning - 50) / 50) * LEARNING_WEIGHT)
+    : rawNeeded;
   // **`needed > 0`, not just finite.** `stone_tools` asks for 0, and
   // checking a requirement of zero against an uncomputed index refused
   // the FIRST era on a world that had not ticked yet — so a collapsed
@@ -286,6 +321,8 @@ function reseedIds(worldState) {
 }
 
 module.exports = {
+  LEARNING_WEIGHT,
+  learningOf,
   ERA_NAMES,
   minReemergenceFor,
   foundCivilization,

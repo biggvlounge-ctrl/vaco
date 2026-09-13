@@ -92,6 +92,7 @@ const { nextAfter } = require('./nextAfter.js');
 const entityTraits = require('./entityTraits.js');
 const worldStore = require('./worldStore.js');
 const beliefs = require('./beliefs.js');
+const perception = require('./perception.js');
 
 let nextElectionId = 1;
 let nextLawId = 1;
@@ -263,7 +264,11 @@ function broadcastGovernmentKnowledge(worldState, options = {}) {
       subjectEntityId: governmentOrganizationId,
       factType,
       factContent: `${topic} ${factContent}`,
-      confidenceLevel: confidence,
+      // Announced once, received differently — see `perception.js`.
+      // `confidence` is what the government stated; this is what this
+      // person came away holding. An ordinary listener gets exactly the
+      // stated figure.
+      confidenceLevel: perception.receivedConfidence(worldState, npc.id, confidence),
       sourceEntityId: governmentOrganizationId,
       tick,
     }));

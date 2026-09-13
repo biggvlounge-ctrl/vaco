@@ -56,6 +56,7 @@
 'use strict';
 
 const { nextAfter } = require('./nextAfter.js');
+const { getLiveEntity } = require('./entityTraits.js');
 
 // The schema's own enumeration on `infrastructure.type`, verbatim and
 // in its order. Not extended here — a type this list does not have is
@@ -208,6 +209,50 @@ function describeCityDrift(worldState, cityId) {
   };
 }
 
+//: How much a population's own technical skill raises the effective
+//: maintenance of what it has built. At 0.4, a city whose people are
+//: expert across the `technology` family maintains its infrastructure
+//: as if it were 40 points better funded.
+//:
+//: **This is the `technology` family's home.** Machinery Aptitude,
+//: Electronics Repair, Signal/Comms Literacy and Salvage Engineering
+//: are about keeping things working, and keeping things working is
+//: what `maintenance_level` means. A world that has lost its engineers
+//: watches its water systems fail faster, with no separate mechanism
+//: for it.
+const TECHNICAL_SKILL_WEIGHT = 0.4;
+
+// The mean technical skill of a city's residents, 0..100.
+//
+// Null-safe and cheap: a city with nobody in it returns 50, which is
+// the neutral value and leaves maintenance exactly as recorded.
+function technicalSkillIn(worldState, cityId) {
+  const communities = new Set((worldState.communities || [])
+    .filter((c) => c.city_id === cityId)
+    .map((c) => c.id));
+  if (communities.size === 0) return 50;
+
+  const values = [];
+  for (const npc of worldState.npcs || []) {
+    if (!communities.has(npc.communityId)) continue;
+    const live = getLiveEntity(worldState, npc.id);
+    const tech = live?.traits?.technology;
+    if (!tech) continue;
+    const scores = Object.values(tech).map(Number).filter((v) => Number.isFinite(v));
+    if (scores.length > 0) values.push(scores.reduce((a, b) => a + b, 0) / scores.length);
+  }
+  if (values.length === 0) return 50;
+  return values.reduce((a, b) => a + b, 0) / values.length;
+}
+
+// What a piece of infrastructure is effectively maintained at: what is
+// funded for it, plus what the people around it can do.
+function effectiveMaintenance(worldState, row) {
+  const recorded = Number(row.maintenance_level) ?? 50;
+  const skill = technicalSkillIn(worldState, row.city_id);
+  return Math.max(0, Math.min(100, recorded + (skill - 50) * TECHNICAL_SKILL_WEIGHT));
+}
+
 // -- decay --------------------------------------------------------------
 
 // One tick of wear on everything standing.
@@ -226,7 +271,7 @@ function advanceInfrastructure(worldState, tick = worldState.tick ?? 0) {
     // shortfall is what wears the thing out. A fully maintained system
     // does not improve on its own — repair is an action somebody
     // takes, not weather.
-    const shortfall = Math.max(0, MAINTENANCE_OFFSET - (Number(row.maintenance_level) ?? 50))
+    const shortfall = Math.max(0, MAINTENANCE_OFFSET - effectiveMaintenance(worldState, row))
       / MAINTENANCE_OFFSET;
     const decay = (ANNUAL_DECAY / TICKS_PER_YEAR) * (0.25 + shortfall);
     // **Not rounded.** The first version rounded to two decimals on
@@ -263,6 +308,9 @@ module.exports = {
   ANNUAL_DECAY,
   MAINTENANCE_OFFSET,
   AGE_AT_FULL_RISK,
+  TECHNICAL_SKILL_WEIGHT,
+  technicalSkillIn,
+  effectiveMaintenance,
   reseedIds,
   generateInfrastructure,
   infrastructureIn,

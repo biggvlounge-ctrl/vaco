@@ -44,6 +44,7 @@
 
 const worldStore = require('./worldStore.js');
 const decisions = require('./decisions.js');
+const { getLiveEntity } = require('./entityTraits.js');
 
 function traitValue(entity, family, name, fallback = 50) {
   return entity.traits?.[family]?.[name] ?? fallback;
@@ -69,6 +70,32 @@ function knowledgeCharge(knowledge = []) {
     total += sign * confidence;
   }
   return total / knowledge.length;
+}
+
+//: How much somebody's own Confidence moves how firmly they hold a
+//: reading. At 0.3, a person at 100 holds the same judgement about a
+//: third more firmly than one at 0 — centred on 50, so an ordinary
+//: person's decisions are logged at exactly the confidence their
+//: resolver computed and the trait changes the spread rather than the
+//: baseline.
+const CONFIDENCE_SWING = 0.3;
+
+// The confidence a decision is actually recorded at: what the resolver
+// computed, shifted by who is holding it.
+//
+// Null in, null out. A resolver that did not compute a confidence has
+// not produced a diffident decision — it has produced one nobody
+// measured the certainty of, and multiplying that by a trait would
+// invent a number.
+function heldWith(worldState, entityId, computed) {
+  if (computed === undefined || computed === null) return null;
+  // `?? 50` rather than `|| 50`: a real 0 is somebody with no certainty
+  // at all, and `||` would quietly promote them to average. 50 when
+  // there is nothing to read, because unknown is not a zero.
+  const live = getLiveEntity(worldState, entityId);
+  const raw = Number(live?.traits?.personality?.Confidence ?? 50);
+  const confident = Number.isFinite(raw) ? raw : 50;
+  return Math.max(0, Math.min(1, computed * (1 + ((confident - 50) / 50) * CONFIDENCE_SWING)));
 }
 
 // Shared three-way write-back (Section 4.3). `relationship.otherEntityId`
@@ -101,6 +128,23 @@ function writeBack(worldState, applyKeyModifier, {
   // supplies one, because a Key that resolves without saying why
   // would work perfectly and just make the log shorter than it should
   // be.
+  // **`personality.Confidence` reads here, and it is the family's
+  // home.** How sure somebody is of a judgement is not a property of
+  // the judgement — two people can read the same situation the same
+  // way and hold it with different certainty. Each resolver supplies
+  // the confidence its own weighting implies; this shifts it by who is
+  // holding it, which is what `decision_log.confidence` means.
+  //
+  // **`...decision` spreads FIRST, and that ordering is the whole
+  // mechanism.** The first version computed `confidence` above the
+  // spread — and every one of the seven resolvers supplies its own
+  // `confidence`, so the spread overwrote the computed value on every
+  // single call. The trait was read, the arithmetic ran, and the
+  // result was discarded before it reached the row. Nothing failed:
+  // the family had a reader, the log had a number, and the number was
+  // simply the one it would have had if none of this existed. A
+  // computed field placed above a spread of its own source is dead
+  // code that looks live.
   const decisionRow = decision
     ? decisions.record(worldState, {
       entityId,
@@ -109,6 +153,7 @@ function writeBack(worldState, applyKeyModifier, {
       // draw on next time, so it IS the memory this decision used.
       memoryUsed: memoryRow ? [memoryRow.id] : [],
       ...decision,
+      confidence: heldWith(worldState, entityId, decision.confidence),
     })
     : null;
 

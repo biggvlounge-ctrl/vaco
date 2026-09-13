@@ -109,6 +109,10 @@ const POPULATION_REFERENCE = 500;
 //: somebody at 50.
 const BARTER_SKILL_SWING = 0.3;
 
+//: What a seller's standing is worth on a price. Smaller than haggling
+//: skill on purpose — reputation opens a door, skill closes the deal.
+const TRUST_PREMIUM = 0.15;
+
 // -- the modifiers ------------------------------------------------------
 
 // Local scarcity of whatever this item is made of. An item whose
@@ -239,9 +243,23 @@ function agreedPrice(worldState, itemName, options = {}) {
     return Number(live?.traits?.economic?.['Barter Skill'] ?? 50);
   };
 
+  //: **`reputation` reads here, and this is its home.** Trustworthiness
+  //: is what somebody's word is worth, and what a deal costs when
+  //: nobody trusts you is the oldest economic fact there is. A trusted
+  //: seller gets a little more; an untrusted one has to discount to
+  //: move anything.
+  const trustOf = (id) => {
+    if (id === null) return 50;
+    const live = getLiveEntity(worldState, id);
+    return Number(live?.traits?.reputation?.Trustworthiness ?? 50);
+  };
+
   // Positive when the seller is the better barterer.
   const edge = (skillOf(sellerId) - skillOf(buyerId)) / 100;
-  const unit = key.Final_Barter_Score * (1 + edge * BARTER_SKILL_SWING);
+  const standing = (trustOf(sellerId) - 50) / 50;
+  const unit = key.Final_Barter_Score
+    * (1 + edge * BARTER_SKILL_SWING)
+    * (1 + standing * TRUST_PREMIUM);
   return {
     ...key,
     quantity,
@@ -375,6 +393,7 @@ module.exports = {
   POPULATION_SWING,
   POPULATION_REFERENCE,
   BARTER_SKILL_SWING,
+  TRUST_PREMIUM,
   itemsFor,
   findItem,
   valueOfHoldings,

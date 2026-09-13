@@ -254,6 +254,50 @@ generator keyed on generated ids is not reproducible, because ids come
 from a counter whose state depends on what was built before — **seed on
 position, never on identity**.
 
+**A twelfth, from wiring the seven trait families nothing read.**
+`scripts/measure-world.mjs` counted 44 of 114 individual traits with a
+reader anywhere in `server/`, and named seven whole families —
+`criminal`, `environmental`, `technology`, `educational`, `reputation`,
+`special`, `personality` — with zero between them. Generated on every
+NPC, stored, migrated, restored, consulted by nothing. Giving each one a
+reader produced three failures worth writing down, because all three
+leave the code looking wired:
+
+- **A modifier centred on zero recalibrates the world.** `1 - evasion *
+  WEIGHT` reads like "skill reduces clearance" and actually means every
+  ordinary criminal got 25% harder to catch the day the trait started
+  being read — the same for deprivation deaths. A trait spreads a
+  population out; it does not get to move the baseline it reads into.
+  Centre on the average person, so an ordinary one's outcome is
+  bit-identical to what it was before the trait existed, and hold that
+  in a test.
+- **A computed field above a spread of its own source is dead code that
+  looks live.** `keys.js` computed a confidence from
+  `personality.Confidence` and then wrote `...decision` over the top of
+  it. All seven resolvers supply their own `confidence`, so the
+  computed value was discarded on every call, for every Key, always.
+  Nothing threw, the family had a reader, and the logged number was
+  exactly the one it would have had if none of it existed.
+- **A threshold picked from what a number sounds like is a guess.** 40
+  out of 100 sounds like "below average" and excluded a quarter of a
+  measured population. Measure the population a cutoff will be applied
+  to before choosing it — and check what the cutoff actually gates:
+  `generateMission` requires an artifact, so "artifact missions" is
+  every mission, and a sensitivity floor on accepting one was a
+  permanent lock on the engine's only player verb. `special` moved to
+  `server/perception.js`, where it varies the confidence each person
+  ends up holding a broadcast fact at — a field `knowledgeCharge`
+  already reads, so it reaches real decisions and bars nobody from
+  acting.
+
+The general form: the suite cannot see any of these, because every
+fixture in it builds a world with no `entity_traits` rows at all, so a
+trait reader returns its neutral default and never executes. Five of
+the seven readers passed the entire suite without once running on a
+real trait. `test/trait-families.test.js` is the answer — build the
+same world twice, differing in exactly one family, and assert both that
+the outcome moves and that an ordinary person's does not.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

@@ -298,6 +298,54 @@ function survivalScarcity(worldState) {
   return Math.min(1, worst);
 }
 
+//: How much somebody's own hardiness offsets a hostile environment.
+//: At 0.5, a person at 100 across the `environmental` family takes
+//: HALF the deprivation risk an average person does, and one at 0 takes
+//: half again as much.
+//:
+//: **Centred on the average person, not on zero**, which is the
+//: difference between a trait that spreads a population out and one
+//: that quietly recalibrates the world. The first version multiplied by
+//: `1 - hardiness * WEIGHT`, so an ordinary person took 75% of the
+//: environment risk they used to and every world this engine had ever
+//: balanced got 25% safer the moment a trait started being read. A
+//: modifier must leave the mean where it found it; only the spread is
+//: its business. `technology.learningOf`, `barter.agreedPrice` and
+//: `infrastructure.effectiveMaintenance` all centre the same way.
+//:
+//: **This is the `environmental` family's only real home**, and it is
+//: the right one: Weather Tolerance, Wilderness Survival and
+//: Contamination Resistance are literally about surviving conditions,
+//: and deprivation death is the one thing in this engine that
+//: conditions cause. It modulates the ENVIRONMENT term only — being
+//: hardy does not make somebody younger, and the age curve is
+//: untouched.
+const HARDINESS_WEIGHT = 0.5;
+
+// 0..1, where 1 is somebody who copes with anything and 0.5 is
+// ordinary. An entity with no trait rows reads as ordinary rather than
+// as frail — unknown is not a zero.
+function hardinessOf(worldState, entityId) {
+  const live = entityTraits.getLiveEntity(worldState, entityId);
+  if (!live) return 0.5;
+  const trait = (name) => {
+    // `?? 50` rather than `|| 50`: a real 0 is somebody who cannot cope
+    // at all, and `||` would upgrade them to average.
+    const value = Number(live.traits?.environmental?.[name] ?? 50);
+    return Number.isFinite(value) ? value : 50;
+  };
+  return Math.max(0, Math.min(1, (
+    trait('Weather Tolerance') + trait('Wilderness Survival') + trait('Contamination Resistance')
+  ) / 300));
+}
+
+// What the environment term is multiplied by. 1 for an ordinary
+// person, so the world's calibration is untouched by this existing.
+function hardinessFactor(worldState, entityId) {
+  const hardiness = hardinessOf(worldState, entityId);
+  return Math.max(0, 1 - (hardiness - 0.5) * 2 * HARDINESS_WEIGHT);
+}
+
 // Annual probability of death, before the seeded draw.
 //
 // **Continuous from birth, with no minimum age.** Three additive
@@ -321,7 +369,11 @@ function annualDeathRisk(worldState, entityId, options = {}) {
   if (years !== null && years >= MAX_AGE) return 1;
 
   const ageRisk = years === null ? 0 : (years / MAX_AGE) ** AGE_EXPONENT;
-  const environmentRisk = scarcityRisk(scarcity);
+  // **Hardiness offsets the ENVIRONMENT term only.** Being able to
+  // cope with weather, wilderness and contamination is exactly what
+  // reduces the risk that a hostile place poses — and it does not make
+  // anybody younger, so the age curve is untouched by it.
+  const environmentRisk = scarcityRisk(scarcity) * hardinessFactor(worldState, entityId);
   const vitality = vitalityOf(worldState, entityId);
 
   const risk = (BASE_ANNUAL_RISK + ageRisk + environmentRisk) * pressure * vitality;
@@ -550,6 +602,9 @@ module.exports = {
   BASE_ANNUAL_RISK,
   AGE_EXPONENT,
   SCARCITY_WEIGHT,
+  HARDINESS_WEIGHT,
+  hardinessOf,
+  hardinessFactor,
   SCARCITY_EXPONENT,
   scarcityRisk,
   SURVIVAL_RESOURCES,

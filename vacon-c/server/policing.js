@@ -62,6 +62,7 @@ const beliefs = require('./beliefs.js');
 const crime = require('./crime.js');
 const infrastructure = require('./infrastructure.js');
 const { seededDraw } = require('./seeded.js');
+const { getLiveEntity } = require('./entityTraits.js');
 
 // The belief this file moves. `belief_type` must be one of the six the
 // schema enumerates, and `political` is the right one: trust in an
@@ -123,11 +124,61 @@ function policingCapacity(worldState, cityId, residents) {
   return Math.max(0, Math.min(1, perResident / CAPACITY_PER_RESIDENT_AT_FULL));
 }
 
+//: How much an offender's own skill at not being caught moves the
+//: chance of clearance. At 0.5, somebody at 100 across the `criminal`
+//: family HALVES it and somebody at 0 raises it by half.
+//:
+//: **Centred on the average offender, not on zero.** The first version
+//: multiplied by `1 - evasion * WEIGHT`, so an ordinary criminal was
+//: 25% harder to catch than before and the whole world's clearance rate
+//: dropped for no reason anybody had decided on. A trait modifier
+//: spreads a population out; it does not get to recalibrate the system
+//: it reads into. `mortality.hardinessFactor` centres the same way and
+//: for the same reason.
+const EVASION_WEIGHT = 0.5;
+
+// How hard this offender is to catch, 0..1, where 0.5 is ordinary.
+//
+// **This is the one place `criminal` traits belong, and the
+// distinction is deliberate.** `crime.js` reads no trait at all and a
+// test enforces it, because §9 forbids demographics determining an
+// NPC's criminality — a generator keyed to who somebody IS rather than
+// what they are living through writes exactly that model.
+//
+// That constraint is about **what drives somebody to offend**. It says
+// nothing about how well they do it. Stealth, Deception, Black Market
+// Ties and Heat Tolerance are skills at not being caught, and reading
+// them here changes who gets away with it rather than who tries —
+// which is the honest place for them and was the whole `criminal`
+// family's only possible home.
+// An unknown offender — no perpetrator recorded, or one who has left
+// the world — reads as ordinary rather than as hopeless or as easy.
+// Unknown is not a zero, and here a zero would make an anonymous crime
+// the EASIEST kind to clear, which is exactly backwards.
+function evasionOf(worldState, entityId) {
+  if (entityId === null || entityId === undefined) return 0.5;
+  const live = getLiveEntity(worldState, entityId);
+  if (!live) return 0.5;
+  const trait = (name) => {
+    // `?? 50` rather than `|| 50`: a real 0 is somebody with no skill
+    // at all, and `||` would upgrade them to average.
+    const value = Number(live.traits?.criminal?.[name] ?? 50);
+    return Number.isFinite(value) ? value : 50;
+  };
+  const skill = (
+    trait('Stealth') + trait('Deception') + trait('Black Market Ties') + trait('Heat Tolerance')
+  ) / 4;
+  return Math.max(0, Math.min(1, skill / 100));
+}
+
 // The chance one case is cleared, before the seeded draw.
 function clearanceChance(worldState, incident, { capacity }) {
   if (capacity === null) return 0;
   const victimBonus = incident.victim_entity_id === null ? 0 : VICTIM_BONUS;
-  return Math.max(0, Math.min(1, BASE_CLEARANCE * capacity + victimBonus * capacity));
+  const base = BASE_CLEARANCE * capacity + victimBonus * capacity;
+  const evasion = evasionOf(worldState, incident.perpetrator_entity_id);
+  const factor = Math.max(0, 1 - (evasion - 0.5) * 2 * EVASION_WEIGHT);
+  return Math.max(0, Math.min(1, base * factor));
 }
 
 // -- investigating ------------------------------------------------------
@@ -278,6 +329,8 @@ module.exports = {
   BASE_CLEARANCE,
   CAPACITY_PER_RESIDENT_AT_FULL,
   VICTIM_BONUS,
+  EVASION_WEIGHT,
+  evasionOf,
   TRUST_PER_CLEARED,
   TRUST_PER_UNCLEARED,
   INVESTIGATION_DELAY_TICKS,
