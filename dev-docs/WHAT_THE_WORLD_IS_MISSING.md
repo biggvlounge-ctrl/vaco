@@ -76,8 +76,61 @@ schema. That is a data problem, not a modelling one.
 **`teenage_birth_share`** — needs a birth, and a birth needs a
 partnership. Bonds accumulate through repeated contact over a few
 hundred ticks, so a freshly generated world has none. Run it and they
-appear: in an 800-tick run of 50 people, 7 died, 8 were born, and the
-population held at replacement.
+appear.
+
+> **A calibration defect found exactly here, and worth recording as a
+> method rather than a number.** The first 800-tick run of 50 people
+> looked healthy — 7 deaths, 8 births, population flat — and a
+> 2,000-tick run of 150 people did not: the population fell by a sixth
+> and deaths ran at about **11% a year**, roughly seven times a
+> plausible pre-modern rate.
+>
+> Two defects, one in each half. `worldgen` drew resource supply and
+> demand independently from one range, so about half of every world's
+> resources sat in permanent deficit — and `survivalScarcity` takes the
+> *worst* of food, water and medicine, so three independent draws
+> almost always produced a starving world (measured: **0.74**, three
+> quarters of the way to total famine on the day of founding). And
+> `mortality`'s scarcity term was **linear**, so that chronic 0.74
+> added 0.185 to every person's annual risk at every age — a
+> five-year-old and a thirty-year-old both died at ~25% a year and the
+> age curve was completely swamped.
+>
+> Fixed in both places: demand is now drawn relative to supply with
+> essentials held closest to balance, and the scarcity term is cubed.
+> Cubing leaves both ends exactly where they were — `1³` is 1, so total
+> famine is as lethal as it was documented to be — and fixes only the
+> middle, which makes it a calibration fix rather than a redesign of
+> the environment-driven model. Annual death risk now reads 0.1% at
+> five, 0.2% at thirty, 3.7% at sixty, 41% at ninety.
+>
+> **Then it flipped the other way, which is how the third defect was
+> found.** With the environment fixed, a 2,000-tick run *grew* 21% in
+> 2.2 years — a crude birth rate near 9.6%. The cause was structural
+> rather than a constant: the birth draw ran **once per partnership**,
+> and because a bond forms on repeated contact a person can hold
+> several, so a well-connected person drew several times a tick. **A
+> person bears; a partnership does not.** Draws are now grouped by
+> bearer, the most fertile partnership is the one that counts, and a
+> bearer who has borne within `GESTATION_TICKS` is skipped — 280 days,
+> the one constant in that file taken from the real world rather than
+> invented, and expressible only because a tick is a day.
+>
+> Measured after all three fixes, 1,500 ticks on 75 people:
+>
+> | | crude rate / year |
+> |---|---|
+> | deaths | 2.6% |
+> | births | 2.6% |
+> | population | 75 → 75 |
+>
+> A pre-modern demographic regime — births and deaths in balance, both
+> in the right order of magnitude — rather than a die-off or a boom.
+>
+> **None of the three was visible to the suite**, and none was visible
+> in a short run. A simulation has to be run long enough for its rates
+> to show, on a world large enough to average, and the rates have to be
+> compared against something real.
 
 **`mean_stress`** — and this one is a live gap rather than a matter of
 patience. **Nothing in the tick pipeline ever applies stress.**

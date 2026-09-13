@@ -71,6 +71,7 @@ const demographics = require('./demographics.js');
 const economy = require('./economy.js');
 const infrastructure = require('./infrastructure.js');
 const membership = require('./membership.js');
+const mortality = require('./mortality.js');
 const property = require('./property.js');
 const territory = require('./territory.js');
 const worldStore = require('./worldStore.js');
@@ -205,12 +206,34 @@ function generateWorld(options = {}) {
     }
 
     // ---- resources --------------------------------------------------
+    // **Demand is drawn RELATIVE to supply, and the first version was
+    // not.** It drew both independently from the same range, so roughly
+    // half of every world's resources were in permanent deficit — and
+    // `mortality.survivalScarcity` takes the WORST of food, water and
+    // medicine, so three independent draws almost always produced a
+    // starving world. Measured: survival scarcity 0.74 at generation,
+    // which under the old linear scarcity term added 0.185 to every
+    // person's annual death risk at every age, and a 2,000-tick run
+    // lost a sixth of its population.
+    //
+    // A world should START in rough balance and become scarce because
+    // something happened to it. Scarcity is an event the simulation
+    // produces — a drought, a blockade, a failed harvest — not the
+    // ground state.
     for (const resourceType of ['food', 'water', 'medicine', 'energy', 'timber']) {
+      const supply = Math.round(random.range(60, 140, 'res', c, resourceType));
+      const essential = mortality.SURVIVAL_RESOURCES.includes(resourceType);
+      // Essentials sit closer to balance than trade goods: a
+      // settlement that cannot feed itself at all does not reach the
+      // point of being generated.
+      const pressure = essential
+        ? random.range(0.8, 1.15, 'dem', c, resourceType)
+        : random.range(0.6, 1.4, 'dem', c, resourceType);
       economy.generateResource(w, {
         cityId: city.id,
         resourceType,
-        supply: Math.round(random.range(40, 140, 'res', c, resourceType)),
-        demand: Math.round(random.range(40, 140, 'dem', c, resourceType)),
+        supply,
+        demand: Math.round(supply * pressure),
         quality: Math.round(random.range(30, 90, 'qual', c, resourceType)),
       });
       summary.resources += 1;

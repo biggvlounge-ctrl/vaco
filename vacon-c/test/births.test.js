@@ -455,3 +455,54 @@ test('a world left running forms bonds and bears children by itself', () => {
     `bonds formed but nobody was born in 2000 ticks (population ${before} -> ${w.npcs.length})`);
   assert.ok(born.every((n) => n.generation === 2));
 });
+
+test('a person bears, not a partnership', () => {
+  // **Measured, not reasoned.** The first version drew once for every
+  // fertile partnership, and a bond forms on contact alone — so a
+  // well-connected person drew several times a tick and a 2,000-tick
+  // world grew 21% in 2.2 simulated years, a crude birth rate near
+  // 9.6% against a real pre-modern 4%.
+  const w = world();
+  const c = territory.generateCommunity(w, {});
+  const bearer = person(w, { communityId: c.id, age: 27 });
+  const partners = [];
+  for (let i = 0; i < 5; i += 1) {
+    const p = person(w, { communityId: c.id, age: 30 });
+    couple(w, bearer, p);
+    partners.push(p);
+  }
+  assert.equal(births.fertilePartnerships(w).length, 5, 'the fixture has five partnerships');
+
+  // Five partnerships, and the bearer is the same person in all five,
+  // so at most one child can come of a tick.
+  let ticks = 0;
+  let born = 0;
+  while (ticks < 4000 && born < 3) {
+    ticks += 1;
+    w.tick += 1;
+    born += births.runBirths(w, w.tick).births.length;
+  }
+  assert.ok(born > 0, 'five partnerships produced nothing in 4000 ticks');
+
+  const bornHere = births.birthsIn(w, c.id);
+  const spacing = bornHere.map((n) => n.createdTick).sort((a, b) => a - b);
+  for (let i = 1; i < spacing.length; i += 1) {
+    assert.ok(spacing[i] - spacing[i - 1] >= births.GESTATION_TICKS,
+      `two children ${spacing[i] - spacing[i - 1]} ticks apart, inside gestation`);
+  }
+});
+
+test('gestation is read from world history, not from a field on the parent', () => {
+  // Same discipline as `deathRecordFor`: the historical record is the
+  // durable answer, so nothing has to keep a `last_borne_tick` column
+  // correct.
+  const w = world();
+  const a = person(w, { age: 27 });
+  const b = person(w, { age: 29 });
+  assert.equal(births.lastBorneTick(w, a.id), null, 'somebody who has never borne has no date');
+
+  births.bearChild(w, { bearerId: a.id, otherParentId: b.id, tick: 500 });
+  assert.equal(births.lastBorneTick(w, a.id), 500);
+  // The other parent did not bear, and must not be blocked by it.
+  assert.equal(births.lastBorneTick(w, b.id), null);
+});

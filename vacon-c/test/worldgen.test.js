@@ -256,3 +256,35 @@ test('the two statistics a fresh world still cannot answer are named', () => {
     `${callers.join(', ')} now applies stress — mean_stress may populate on its own, `
     + 'and this note should be updated');
 });
+
+test('a generated world starts in rough balance, not starving', () => {
+  // **The other half of the same defect.** Supply and demand were
+  // drawn independently from one range, so about half of every world's
+  // resources sat in permanent deficit — and `survivalScarcity` takes
+  // the WORST of food, water and medicine, so three independent draws
+  // almost always produced a starving world. Measured at 0.74, which
+  // is a settlement three quarters of the way to total famine on the
+  // day it is founded.
+  //
+  // A world should START in balance and become scarce because
+  // something happened to it. Scarcity is an event the simulation
+  // produces, not the ground state.
+  const mortality = require('../server/mortality.js');
+  for (const seed of ['balance-a', 'balance-b', 'balance-c']) {
+    worldgen.generateWorld({ ...SMALL, seed });
+    const scarcity = mortality.survivalScarcity(w);
+    assert.ok(scarcity < 0.25,
+      `a freshly generated world has survival scarcity ${scarcity.toFixed(2)} — `
+      + 'it is starving before anything has happened to it');
+  }
+
+  // And the essentials are the ones held closest to balance: a world
+  // short of timber is an economic problem, a world short of water is
+  // a mortality one.
+  const city = w.cities[w.cities.length - 1];
+  const essentials = w.resources.filter(
+    (r) => r.city_id === city.id && mortality.SURVIVAL_RESOURCES.includes(r.resource_type),
+  );
+  assert.equal(essentials.length, 3);
+  assert.equal(essentials.every((r) => r.demand / r.supply <= 1.2), true);
+});

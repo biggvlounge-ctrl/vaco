@@ -111,11 +111,33 @@ const BASE_ANNUAL_RISK = 0.0008;
 //: 15 at 70, 1 in 3 at 90) and certain at 110.
 const AGE_EXPONENT = 6;
 
-//: How hard a scarce environment kills, per unit of survival pressure.
-//: At 0.25 a settlement in total famine (pressure 1.0) carries a 25%
-//: annual death risk on top of everything else — severe, survivable
-//: for a while, and fatal if it does not end.
+//: How hard a scarce environment kills. At 0.25 a settlement in TOTAL
+//: famine carries a 25% annual death risk on top of everything else —
+//: severe, survivable for a while, fatal if it does not end.
 const SCARCITY_WEIGHT = 0.25;
+
+//: **And the curve between nothing and total famine, which was linear
+//: and should not have been.** Measured on a built world running for
+//: 2,000 ticks: the population fell steadily and deaths ran at about
+//: 11% a year, seven times a plausible pre-modern rate. The cause was
+//: not the model's shape but this term's weight in the middle of its
+//: range — a chronic shortfall of 0.74 added 0.185 to EVERY person's
+//: annual risk, so a five-year-old and a thirty-year-old both died at
+//: ~25% a year and the age curve was completely swamped.
+//:
+//: Cubed, a mild shortage barely registers, a serious one hurts, and
+//: total famine is exactly as lethal as it was — `1 ** 3` is 1, so
+//: the documented figure at the extreme (a 1-in-4 annual risk for a
+//: starving child) is unchanged, which is what makes this a
+//: calibration fix rather than a redesign. The shape the owner asked
+//: for — no limits, everything environment-based — is untouched.
+const SCARCITY_EXPONENT = 3;
+
+// The environment's contribution to annual risk, 0..SCARCITY_WEIGHT.
+function scarcityRisk(scarcity) {
+  const bounded = Math.max(0, Math.min(1, scarcity));
+  return (bounded ** SCARCITY_EXPONENT) * SCARCITY_WEIGHT;
+}
 
 //: Which resources are a matter of life and death. Scarcity in
 //: anything else is an economic problem; scarcity in these is a
@@ -132,7 +154,7 @@ const DEATH_CAUSES = ['age', 'disease', 'deprivation', 'violence'];
 // randomly attributed one makes the world's own history unreliable.
 function causeFor({ age, pressure = 1, scarcity = 0 }) {
   const ageRisk = age === null || age === undefined ? 0 : (age / MAX_AGE) ** AGE_EXPONENT;
-  const environmentRisk = Math.max(0, Math.min(1, scarcity)) * SCARCITY_WEIGHT;
+  const environmentRisk = scarcityRisk(scarcity);
   // Disease is expressed as a multiplier rather than a term, so its
   // contribution is how much it added to everything else.
   const diseaseRisk = (pressure - 1) * (BASE_ANNUAL_RISK + ageRisk + environmentRisk);
@@ -297,7 +319,7 @@ function annualDeathRisk(worldState, entityId, options = {}) {
   if (years !== null && years >= MAX_AGE) return 1;
 
   const ageRisk = years === null ? 0 : (years / MAX_AGE) ** AGE_EXPONENT;
-  const environmentRisk = Math.max(0, Math.min(1, scarcity)) * SCARCITY_WEIGHT;
+  const environmentRisk = scarcityRisk(scarcity);
   const vitality = vitalityOf(worldState, entityId);
 
   const risk = (BASE_ANNUAL_RISK + ageRisk + environmentRisk) * pressure * vitality;
@@ -509,6 +531,8 @@ module.exports = {
   BASE_ANNUAL_RISK,
   AGE_EXPONENT,
   SCARCITY_WEIGHT,
+  SCARCITY_EXPONENT,
+  scarcityRisk,
   SURVIVAL_RESOURCES,
   DEATH_CAUSES,
   causeFor,

@@ -93,9 +93,14 @@ const FERTILITY_MIN_AGE = 15;
 const FERTILITY_PEAK_AGE = 27;
 const FERTILITY_MAX_AGE = 45;
 
-//: Per eligible partnership per year, under good conditions. Tuned so
-//: a stable world roughly replaces itself against `mortality.js`'s
-//: curve rather than to any cited figure.
+//: Per eligible BEARER per year, under good conditions — not per
+//: partnership, and the difference was measured rather than reasoned.
+//: The first version drew once for every fertile partnership, and
+//: because a bond forms on contact a person can hold several: a
+//: 2,000-tick run grew 21% in 2.2 simulated years, a crude birth rate
+//: around 9.6% against a real pre-modern 4%. **A person bears; a
+//: partnership does not.** So the draws are grouped by bearer and the
+//: most fertile partnership is the one that counts.
 const BASE_ANNUAL_BIRTH_RATE = 0.14;
 
 //: A partnership is a relationship carrying this much love. The
@@ -129,6 +134,14 @@ const PARTNER_BOND_FLOOR = 60;
 //: gate — trust only moves when knowledge flows, and gating on it
 //: would make bonds depend on whether a famine happened to be in the
 //: news.
+//: **The one constant in this file taken from the real world rather
+//: than invented**, and it is only expressible because a tick is a day
+//: (`TICK_INTERVALS` in behavior.js): human gestation is about 280
+//: days. A bearer who has borne within this many ticks is skipped,
+//: which caps one person's fertility no matter how many partnerships
+//: they hold — the cap belongs to the body, not to the relationship.
+const GESTATION_TICKS = 280;
+
 const BOND_CONTACT_FLOOR = 30;        // ticks of contact before anything grows
 const BOND_CONFLICT_CEILING = 20;     // hostility blocks a bond outright
 const BOND_GROWTH = 0.25;             // love per tick at neutral trust
@@ -431,9 +444,27 @@ function runBirths(worldState, tick = worldState.tick ?? 0) {
   const births = [];
   const events = [];
 
-  // One child per partnership per tick at most, and the pair list is
-  // built before any birth so a newborn cannot itself appear in it.
+  // **One draw per BEARER, not per partnership.** A person holding
+  // three bonds drew three times before this, and a bond forms on
+  // contact alone — so a well-connected person bore at three times the
+  // intended rate and a measured world grew 21% in two years. The most
+  // fertile partnership is the one that counts.
+  //
+  // The pair list is built before any birth, so a newborn cannot
+  // itself appear in it.
+  const bestByBearer = new Map();
   for (const pair of fertilePartnerships(worldState, tick)) {
+    const existing = bestByBearer.get(pair.bearer.id);
+    if (!existing || pair.fertility > existing.fertility) bestByBearer.set(pair.bearer.id, pair);
+  }
+
+  for (const pair of bestByBearer.values()) {
+    // Gestation. A body cannot bear twice in a season however many
+    // partnerships it holds, and this is what makes the cap belong to
+    // the person rather than to the relationship.
+    const last = lastBorneTick(worldState, pair.bearer.id);
+    if (last !== null && tick - last < GESTATION_TICKS) continue;
+
     const annual = BASE_ANNUAL_BIRTH_RATE
       * pair.fertility
       * environmentalFertility(worldState, pair.bearer, { scarcity, pressure, line });
@@ -451,6 +482,19 @@ function runBirths(worldState, tick = worldState.tick ?? 0) {
   }
 
   return { births, events };
+}
+
+// When this person last bore a child, or null if never. Read from
+// world history — the historical record is the durable answer, the
+// same way `mortality.deathRecordFor` is for a death.
+function lastBorneTick(worldState, entityId) {
+  let latest = null;
+  for (const record of worldState.historicalRecords || []) {
+    if (record.what !== 'birth') continue;
+    if (!Array.isArray(record.who) || record.who[1] !== entityId) continue;
+    if (latest === null || record.when_tick > latest) latest = record.when_tick;
+  }
+  return latest;
 }
 
 // -- reading ------------------------------------------------------------
@@ -505,6 +549,8 @@ module.exports = {
   FERTILITY_MAX_AGE,
   BASE_ANNUAL_BIRTH_RATE,
   PARTNER_BOND_FLOOR,
+  GESTATION_TICKS,
+  lastBorneTick,
   BOND_CONTACT_FLOOR,
   BOND_CONFLICT_CEILING,
   BOND_GROWTH,

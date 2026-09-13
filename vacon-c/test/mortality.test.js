@@ -472,3 +472,34 @@ test('a dead voter cannot be elected or vote', () => {
   assert.equal(result.turnout, 0.5, '1 vote among 2 living NPCs');
   assert.equal(result.winnerId, 2);
 });
+
+test('the scarcity curve is cubic, so chronic shortfall does not swamp age', () => {
+  // **Found by running a built world for 2,000 ticks, not by the
+  // suite.** The term was linear, and a chronic survival shortfall of
+  // 0.74 — which is what an unbalanced world generates — added 0.185 to
+  // EVERY person's annual risk at every age. A five-year-old and a
+  // thirty-year-old both died at about 25% a year, the age curve was
+  // completely swamped, and the population fell by a sixth over five
+  // simulated years at roughly seven times a plausible death rate.
+  //
+  // Cubed fixes the middle of the range and leaves both ends alone.
+  assert.equal(mortality.scarcityRisk(0), 0);
+  assert.equal(mortality.scarcityRisk(1), mortality.SCARCITY_WEIGHT,
+    'total famine must be exactly as lethal as it was — this is a calibration fix, '
+    + 'not a redesign of the model the owner asked for');
+
+  // A mild shortfall barely registers; a severe one still hurts.
+  assert.ok(mortality.scarcityRisk(0.25) < 0.005);
+  assert.ok(mortality.scarcityRisk(0.5) < 0.04);
+  assert.ok(mortality.scarcityRisk(0.9) > 0.15);
+
+  // And the ordering that was broken: at a chronic shortfall, being
+  // old must matter more than being alive.
+  const w = world({ ages: [5, 30, 90] });
+  const chronic = 0.5;
+  const young = mortality.annualDeathRisk(w, 1, { age: 5, scarcity: chronic });
+  const old = mortality.annualDeathRisk(w, 3, { age: 90, scarcity: chronic });
+  assert.ok(old > young * 5,
+    `at a chronic shortfall a 90-year-old (${old}) should still be far likelier to die `
+    + `than a five-year-old (${young})`);
+});
