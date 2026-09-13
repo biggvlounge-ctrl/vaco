@@ -73,6 +73,7 @@ const infrastructure = require('./infrastructure.js');
 const membership = require('./membership.js');
 const mortality = require('./mortality.js');
 const barter = require('./barter.js');
+const behavior = require('./behavior.js');
 const property = require('./property.js');
 const territory = require('./territory.js');
 const worldStore = require('./worldStore.js');
@@ -467,6 +468,16 @@ function generateWorld(options = {}) {
         });
         summary.employed += 1;
       });
+
+      // ---- routine ---------------------------------------------------------
+      // **Without this, `schedule_events` is empty in every world and
+      // the Behavior Engine never engages** — no schedule fires, so no
+      // habit forms, so nothing about a person's routine is ever true.
+      // Derived from their situation rather than invented: everybody
+      // rests and eats, and somebody with a job has somewhere to be.
+      for (const npc of residents) {
+        behavior.seedRoutine(w, npc.id, { tick });
+      }
 
       // ---- affiliation -----------------------------------------------------
       adults.forEach((npc, ai) => {

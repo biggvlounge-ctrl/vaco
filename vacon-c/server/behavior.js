@@ -334,6 +334,134 @@ function isDue(worldState, event) {
 // ---------------------------------------------------------------------------
 // Returns candidate events, exactly like a phase, so the Event phase
 // treats them no differently from anything else.
+// **Death ends a routine.** Moving the row out of `worldState.npcs`
+// makes a corpse structurally incapable of being iterated as a person,
+// and it does not reach into the three tables this module owns — the
+// same gap `membership.releaseDeceased` closes for organization
+// rosters. A schedule left behind fires forever for somebody who is
+// not there, and the first world that ran long enough for a person
+// with a routine to die crashed on exactly that.
+//
+// `|| []` throughout, for the reason every reader in this engine has
+// it: `mortality.recordDeath` calls this on any world that records a
+// death, and plenty of worlds — fixtures, scenarios, a scenario that
+// only cares about employment — never declare the three tables this
+// module owns. Reading an array a caller has not declared throws on a
+// world that is otherwise perfectly valid, which is standing rule 6
+// arriving from the other direction.
+function releaseDeceased(worldState, entityId) {
+  const schedules = worldState.scheduleEvents || [];
+  const habitRows = worldState.habits || [];
+  const stateRows = worldState.entityState || [];
+  const released = {
+    scheduleEvents: schedules.filter((e) => e.entity_id === entityId).length,
+    habits: habitRows.filter((h) => h.entity_id === entityId).length,
+    entityState: stateRows.filter((s) => s.entity_id === entityId).length,
+  };
+  worldState.scheduleEvents = schedules.filter((e) => e.entity_id !== entityId);
+  worldState.habits = habitRows.filter((h) => h.entity_id !== entityId);
+  worldState.entityState = stateRows.filter((s) => s.entity_id !== entityId);
+  return released;
+}
+
+// ---------------------------------------------------------------------------
+// What the world does to people
+// ---------------------------------------------------------------------------
+// **The edge this engine did not have.** `entity_state`, `habits` and
+// `schedule_events` were the three tables §4.5 named as genuinely new,
+// all three were built here, and all three were **empty in every
+// running world** — measured: 0 rows each after 300 ticks of a
+// 150-person world. `applyStress` was reachable only through the API,
+// `runBehavior` decays what is already there and creates nothing, and
+// no schedule was ever added by anything.
+//
+// So the Behavior Engine was complete and never engaged. A person's
+// mood, stress, routine and habits — everything that makes an NPC
+// somebody rather than a trait sheet — sat at null forever unless a
+// human poked the API.
+//
+// This is what feeds it: the events the tick has just produced. Not a
+// new source of truth and not a new phase — a reading of what already
+// happened, applied to the people it happened to.
+//
+// //: INTERPRETIVE. No document gives stress values. These are ordered
+// //: by how much the thing would actually disrupt a life, and the
+// //: ordering is the part worth defending: losing a family member
+// //: outweighs being robbed, which outweighs missing a wage.
+// //:
+// //: `applyStress` already scales a positive load by the person's own
+// //: Volatility and Resilience, so these are the world's side of it
+// //: and the person's side is applied for us.
+const STRESS_BY_EVENT = {
+  death: 30,
+  crime: 12,
+  crime_cleared: -6,
+  payroll_missed: 10,
+  scarcity: 4,
+  infrastructure_at_risk: 3,
+  conflict_escalation: 14,
+  birth: -10,
+  partnership_formed: -8,
+  fear_spike: 6,
+};
+
+// Apply this tick's events to the people they happened to.
+//
+// **Reads `affected_entity_ids`, which every phase already sets.** A
+// second list of "who was involved" would be a second source of truth
+// about the same fact, and the two would drift the first time somebody
+// added an event type.
+function applyEventStress(worldState, events, tick = worldState.tick ?? 0) {
+  const touched = new Set();
+  const living = new Set(worldState.npcs.map((n) => n.id));
+
+  for (const event of events || []) {
+    const delta = STRESS_BY_EVENT[event.type];
+    if (delta === undefined) continue;
+    for (const entityId of event.affected_entity_ids || []) {
+      // The dead are past being stressed, and `applyStress` throws on
+      // an entity it cannot find — a death event names the person who
+      // died, so this is the common case rather than an edge one.
+      if (!living.has(entityId)) continue;
+      applyStress(worldState, entityId, delta);
+      touched.add(entityId);
+    }
+  }
+
+  void tick;
+  return { touched: touched.size };
+}
+
+// Give somebody the routine their situation implies.
+//
+// **Derived, not invented.** A person with a job has somewhere to be
+// daily; everybody rests and eats. Nothing here decides what a person
+// LIKES — habits form from what they actually keep up, which is
+// `runBehavior`'s job and was already built.
+function seedRoutine(worldState, entityId, options = {}) {
+  const { tick = worldState.tick ?? 0 } = options;
+  const added = [];
+
+  const has = (type) => worldState.scheduleEvents.some(
+    (e) => e.entity_id === entityId && e.event_type === type,
+  );
+
+  for (const eventType of ['rest', 'eat']) {
+    if (has(eventType)) continue;
+    added.push(addScheduleEvent(worldState, entityId, { eventType, frequency: 'daily' }));
+  }
+
+  const employed = (worldState.employmentRecords || []).some(
+    (r) => r.entity_id === entityId && r.status === 'active',
+  );
+  if (employed && !has('work')) {
+    added.push(addScheduleEvent(worldState, entityId, { eventType: 'work', frequency: 'daily' }));
+  }
+
+  void tick;
+  return added;
+}
+
 function runBehavior(worldState) {
   // **Observations are queued at the moment they happen, and drained
   // here.** They are not re-derived from a before/after snapshot of
@@ -359,7 +487,21 @@ function runBehavior(worldState) {
     const live = getLiveEntity(worldState, row.entity_id);
     if (!live) continue;
     const before = row.stress_level;
-    row.stress_level = round1(clamp(before - recoveryRate(live), STRESS_MIN, STRESS_MAX));
+    // **Proportional, not a flat subtraction, and the difference is
+    // the whole shape of the model.** Flat decay against a steady load
+    // is a step function: any load above the recovery rate ratchets to
+    // 100 and any load below it falls to 0, with no equilibrium in
+    // between. Measured with ongoing conditions feeding it, that gave
+    // 142 people at exactly 0 and six pinned at 97 — a world with no
+    // middle.
+    //
+    // Shedding a share of what is actually there settles a person
+    // where their circumstances put them: a constant load L comes to
+    // rest at `100 * L / rate`, so being poor and out of work reads as
+    // strained rather than as either fine or ruined.
+    row.stress_level = round1(clamp(
+      before - recoveryRate(live) * (before / STRESS_MAX), STRESS_MIN, STRESS_MAX,
+    ));
     if (row.stress_level !== before) row.tick = worldState.tick;
   }
 
@@ -368,7 +510,15 @@ function runBehavior(worldState) {
   //    Anything it entrenches queues its own observation inside
   //    reinforceHabit, so it is picked up by the NEXT drain — one tick
   //    later, which is when the world could have noticed it anyway.
+  const living = new Set(worldState.npcs.map((n) => n.id));
   for (const event of worldState.scheduleEvents) {
+    // **A schedule can outlive its owner**, and this threw the first
+    // time a world ran long enough for somebody with a routine to die:
+    // `reinforceHabit` goes through `getLiveEntity`, which cannot find
+    // a corpse. `mortality.recordDeath` now releases a dead person's
+    // routine, and this stays as the guard for a world assembled some
+    // other way — a restore, a fixture, a scenario.
+    if (!living.has(event.entity_id)) continue;
     if (!isDue(worldState, event)) continue;
     event.tick_last_occurred = worldState.tick;
     reinforceHabit(worldState, event.entity_id, event.event_type, { amount: 2 });
@@ -444,6 +594,10 @@ module.exports = {
   moodFor,
   getEntityState,
   applyStress,
+  releaseDeceased,
+  STRESS_BY_EVENT,
+  applyEventStress,
+  seedRoutine,
   reinforceHabit,
   listHabits,
   addScheduleEvent,

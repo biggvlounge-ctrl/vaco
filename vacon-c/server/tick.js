@@ -60,6 +60,7 @@ const territory = require('./territory.js');
 const property = require('./property.js');
 const flows = require('./flows.js');
 const behavior = require('./behavior.js');
+const areaStats = require('./areaStats.js');
 
 let nextEventId = 1;
 
@@ -573,6 +574,83 @@ function runSecurityPhase(worldState) {
   return events;
 }
 
+//: **Conditions, not events — and both are needed.** With only events
+//: feeding it, 142 of 149 people in a 200-tick world had no
+//: `entity_state` row at all: in a quiet world most people simply have
+//: nothing happen TO them, so the mood model stayed unengaged for
+//: everybody but the handful caught up in a crime or a death.
+//:
+//: What was missing is the ongoing kind of load. Being poor, being out
+//: of work and having nowhere to live are not events — they are
+//: circumstances that press every day, and `runBehavior` decays stress
+//: every tick, so a small daily load against that recovery settles a
+//: person at an equilibrium rather than ratcheting them to crisis.
+//: Somebody in poverty sits higher than somebody not, permanently,
+//: which is the relationship worth having.
+//:
+//: Calibrated against proportional recovery: a constant load L settles
+//: at `100 * L / rate`, and `recoveryRate` is about 5. So being poor
+//: and out of work (2.0) comes to rest near 40 — steady shading into
+//: strained — and being poor, jobless and unhoused (4.0) near 80,
+//: which is a crisis and should read as one.
+const DAILY_POVERTY_STRESS = 1.5;
+const DAILY_UNEMPLOYMENT_STRESS = 1;
+const DAILY_HOMELESS_STRESS = 1.5;
+const DAILY_SETTLED_RELIEF = -0.5;
+
+// The load somebody's circumstances put on them today.
+//
+// **Reads the same poverty depth `crime.js` reads**, through
+// `areaStats.povertyDepth`, rather than a second definition of what
+// being poor means. One environment, several systems reading it — the
+// rule `mortality` and `births` already follow.
+//
+// **It lives here rather than in behavior.js**, which is where stress
+// otherwise lives, because it needs poverty, employment and age —
+// and `mortality.js` already requires `behavior.js` to release a dead
+// person's routine. Reaching back the other way is the cycle that
+// broke `items.js` out of `barter.js` an hour ago. `behavior` stays
+// close to a leaf; `tick` is the file allowed to know about
+// everything, and already holds the other cross-cutting thresholds.
+function applyConditionStress(worldState, options = {}) {
+  const { line = null, tick = worldState.tick ?? 0 } = options;
+  let loaded = 0;
+
+  const employed = new Set((worldState.employmentRecords || [])
+    .filter((r) => r.status === 'active')
+    .map((r) => r.entity_id));
+
+  for (const npc of worldState.npcs) {
+    let load = 0;
+
+    if (line !== null) {
+      const worth = economy.getNetWorth(worldState, npc.id);
+      load += areaStats.povertyDepth(worth, line) * DAILY_POVERTY_STRESS;
+    }
+
+    // **Only for somebody old enough to work.** A child is not
+    // unemployed, and counting them would make a young population read
+    // as a distressed one.
+    const age = mortality.ageInYears(worldState, npc, tick);
+    if (age !== null && age >= 16 && age < 65 && !employed.has(npc.id)) {
+      load += DAILY_UNEMPLOYMENT_STRESS;
+    }
+
+    if (npc.home_property_id === null || npc.home_property_id === undefined) {
+      load += DAILY_HOMELESS_STRESS;
+    } else {
+      load += DAILY_SETTLED_RELIEF;
+    }
+
+    if (load === 0) continue;
+    behavior.applyStress(worldState, npc.id, load);
+    loaded += 1;
+  }
+
+  return { loaded };
+}
+
+
 // ---------------------------------------------------------------------------
 // Event — events emerge FROM phases 1-8, never rolled independently
 // (Build Prompt, explicit). Every phase function above returns a plain
@@ -701,6 +779,22 @@ function advanceTick(worldState) {
   // never the same tick's: a stress level feeding the phase it was
   // computed from would be a loop whose answer depends on line order.
   // See server/behavior.js.
+  // **What the world just did, done to the people it happened to.**
+  // `entity_state`, `habits` and `schedule_events` were all three
+  // empty in every running world — 0 rows each after 300 ticks of a
+  // 150-person world — because `applyStress` was reachable only
+  // through the API and nothing ever added a schedule. The Behavior
+  // Engine was complete and never engaged.
+  //
+  // Runs BEFORE `runBehavior` so the same tick that produced a death
+  // or a robbery is the tick somebody is shaken by it — and
+  // `runBehavior`'s first act is to decay stress, so applying it after
+  // would mean every load was already a tick stale.
+  behavior.applyEventStress(worldState, candidateEvents, worldState.tick);
+  applyConditionStress(worldState, {
+    line: areaStats.povertyLine(worldState), tick: worldState.tick,
+  });
+
   candidateEvents.push(...behavior.runBehavior(worldState));   // (behavior)
 
   // Mortality. The third cross-cutting layer, in the same slot and for

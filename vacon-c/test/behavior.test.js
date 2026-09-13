@@ -410,12 +410,35 @@ test('entering crisis is reported once, and recovery re-arms it', () => {
 
 test('stress comes down on its own over time', () => {
   // A stress level that only ever rises is a counter, not a state.
+  //
+  // **Through `runBehavior` rather than `advanceTick`, and the reason
+  // is a real finding rather than a test convenience.** A full tick now
+  // also applies what somebody is LIVING THROUGH — poverty, being out
+  // of work, having nowhere to live — and this fixture's person has no
+  // job and no home, so the tick loads them faster than they recover
+  // and their stress goes up. That is correct behaviour and it is not
+  // what this test is about: recovery is the claim, so recovery is
+  // what is exercised.
   const p = person({ emotional: { Resilience: 50, Volatility: 50, Optimism: 50 } });
   behavior.applyStress(engine.WorldState, p.id, 60);
   const before = behavior.getEntityState(engine.WorldState, p.id).stressLevel;
-  engine.advanceTick();
+  behavior.runBehavior(engine.WorldState);
   const after = behavior.getEntityState(engine.WorldState, p.id).stressLevel;
   assert.ok(after < before, `${after} should be below ${before} after a tick of recovery`);
+});
+
+test('somebody with no job and no home does not recover — they accumulate', () => {
+  // The other side of the same finding, held so it cannot be undone by
+  // accident. Recovery is proportional to what is already there, so a
+  // steady load settles a person at `100 * load / rate` instead of
+  // ratcheting them to 100 or letting them fall to 0 — and a person
+  // whose circumstances never improve never comes to rest at ease.
+  const p = person({ emotional: { Resilience: 50, Volatility: 50, Optimism: 50 } });
+  const start = behavior.getEntityState(engine.WorldState, p.id)?.stressLevel ?? 0;
+  for (let t = 0; t < 40; t += 1) engine.advanceTick();
+  const after = behavior.getEntityState(engine.WorldState, p.id).stressLevel;
+  assert.ok(after > start,
+    'a jobless, homeless person came to rest at ease, so conditions reach nobody');
 });
 
 test('a resilient, well-rested person recovers faster than a fragile sleepless one', () => {

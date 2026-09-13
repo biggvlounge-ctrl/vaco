@@ -229,32 +229,45 @@ test('a generated world answers most of the catalogue, where an empty one answer
   assert.equal(structural.size, 8, 'the declared-gap count moved without this test being updated');
 });
 
-test('the two statistics a fresh world still cannot answer are named', () => {
-  // Both need the world to RUN, not to be built — which is the honest
-  // distinction, and the summary says so rather than leaving it to be
-  // discovered.
+test('a fresh world has routines, and running it engages the Behavior Engine', () => {
+  // **This test used to assert the opposite and was right to.** It
+  // held that nothing in the tick pipeline applies stress —
+  // `applyStress` was reachable only through the API, `runBehavior`
+  // decays what is there and creates nothing, and nothing ever added a
+  // schedule. Measured: `entity_state`, `habits` and `schedule_events`
+  // were all three 0 after 300 ticks of a 150-person world. The
+  // Behavior Engine was complete and never engaged.
   //
-  //   teenage_birth_share  needs a birth, and a bond takes a few
-  //                        hundred ticks of contact to form
-  //   mean_stress          needs somebody to have been stressed, and
-  //                        **nothing in the tick pipeline applies
-  //                        stress** — `applyStress` is reachable only
-  //                        through the API. `runBehavior` decays what
-  //                        is there and creates nothing, so a world
-  //                        nobody pokes has no `entity_state` rows at
-  //                        all.
-  const summary = worldgen.generateWorld({ ...SMALL, seed: 'hint' });
-  assert.match(summary.hint, /tick the world/);
+  // Both halves are now fed: `worldgen.seedRoutine` gives people the
+  // routine their situation implies, and the tick applies both what
+  // happened to them (events) and what they are living through
+  // (conditions).
+  const engine = require('../server/engine.js');
+  const behavior = require('../server/behavior.js');
+  const before = {
+    schedules: w.scheduleEvents.length,
+    habits: w.habits.length,
+    state: w.entityState.length,
+  };
+  worldgen.generateWorld({ ...SMALL, seed: 'behaviour' });
 
-  const fs = require('node:fs');
-  const path = require('node:path');
-  const serverDir = path.join(__dirname, '..', 'server');
-  const callers = fs.readdirSync(serverDir)
-    .filter((f) => f.endsWith('.js') && f !== 'behavior.js' && f !== 'engine.js')
-    .filter((f) => /\bapplyStress\(/.test(fs.readFileSync(path.join(serverDir, f), 'utf8')));
-  assert.deepEqual(callers, [],
-    `${callers.join(', ')} now applies stress — mean_stress may populate on its own, `
-    + 'and this note should be updated');
+  assert.ok(w.scheduleEvents.length > before.schedules,
+    'a generated world has no routines, so no habit can ever form');
+
+  for (let t = 0; t < 60; t += 1) engine.advanceTick();
+  assert.ok(w.habits.length > before.habits, 'no habit formed in 60 ticks of kept routine');
+  assert.ok(w.entityState.length > before.state, 'nobody was affected by anything');
+
+  // And the moods that come out are a spread rather than a binary.
+  // Flat stress decay against a steady load is a step function — any
+  // load above the recovery rate ratchets to 100 and any below it
+  // falls to 0 — which measured as 142 people at exactly 0 and six
+  // pinned at 97. Recovery is proportional for that reason.
+  const moods = new Set(w.npcs
+    .map((n) => behavior.getEntityState(w, n.id))
+    .filter(Boolean)
+    .map((s) => s.currentMood));
+  assert.ok(moods.size >= 2, `every observed person is "${[...moods][0]}" — there is no spread`);
 });
 
 test('a generated world starts in rough balance, not starving', () => {

@@ -76,6 +76,7 @@ const economy = require('./economy.js');
 const entityTraits = require('./entityTraits.js');
 const worldStore = require('./worldStore.js');
 const membership = require('./membership.js');
+const behavior = require('./behavior.js');
 
 // A tick is a day — `behavior.js` chooses that and says so, and
 // `worldState.tickIntervals` overrides it wholesale. This is the same
@@ -372,6 +373,10 @@ function recordDeath(worldState, options = {}) {
   // out of `npcs` was chosen to make structurally impossible, except
   // that a join table has no `npcs` to be absent from.
   membership.releaseDeceased(worldState, entityId);
+  // The same for a routine, and for the same reason: a schedule left
+  // behind fires forever for somebody who is not there. See
+  // behavior.releaseDeceased.
+  behavior.releaseDeceased(worldState, entityId);
 
   // **There is no separate `entities` array to update.** `migrate.js`
   // derives every `entities` row FROM `worldState.npcs` (and the other
