@@ -506,3 +506,43 @@ test('gestation is read from world history, not from a field on the parent', () 
   // The other parent did not bear, and must not be blocked by it.
   assert.equal(births.lastBorneTick(w, b.id), null);
 });
+
+test('contact still accumulates when there is nothing to reassess', () => {
+  // **The regression guard for the Social phase's memory fix.** That
+  // phase used to resolve Trust for every relationship every tick and
+  // write a "Trust reassessed: 50 -> 50" memory even when nothing had
+  // changed — 53,401 memories after 120 ticks on a generated world,
+  // growing without bound. It now runs the Key only when there is
+  // knowledge to reassess against.
+  //
+  // The risk in that fix is precisely here: `interaction_count` is
+  // what `advanceBonds` reads, and if it stopped incrementing on a
+  // quiet tick then no bond would ever form and nobody would be born
+  // — the same class of silent break as `love` being written by
+  // nothing. So contact is asserted directly.
+  const engine = require('../server/engine.js');
+  const worldStore = require('../server/worldStore.js');
+  const areaStats = require('../server/areaStats.js');
+  const territory = require('../server/territory.js');
+  const ew = engine.WorldState;
+
+  const city = territory.generateCity(ew, { name: `Contact ${nextId++}` });
+  const block = territory.generateCommunity(ew, { cityId: city.id });
+  const a = engine.generateNPC();
+  const b = engine.generateNPC();
+  for (const npc of [a, b]) {
+    npc.createdTick = ew.tick - Math.round(27 * mortality.TICKS_PER_YEAR);
+    areaStats.placeInCommunity(ew, { entityId: npc.id, communityId: block.id });
+    economy.generateIndividualFinances(ew, npc.id, { savings: 300, tick: ew.tick });
+  }
+  const rel = worldStore.getOrCreateRelationship(ew, a.id, b.id, 'social');
+  const before = rel.interaction_count;
+  const memoriesBefore = ew.memories.length;
+
+  for (let t = 0; t < 60; t += 1) engine.advanceTick();
+
+  assert.ok(rel.interaction_count >= before + 60,
+    'contact stopped accumulating on quiet ticks, so no bond can ever form');
+  assert.ok(ew.memories.length - memoriesBefore < 60,
+    'the Social phase is writing a memory per relationship per tick again');
+});

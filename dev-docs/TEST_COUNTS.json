@@ -1,6 +1,6 @@
 {
-  "total": 1904,
-  "passed": 1855,
+  "total": 1905,
+  "passed": 1856,
   "failed": 0,
   "skipped": 49,
   "suites": 39,
@@ -132,8 +132,8 @@
       "skipped": 0
     },
     "vacon-c": {
-      "tests": 555,
-      "pass": 538,
+      "tests": 556,
+      "pass": 539,
       "fail": 0,
       "skipped": 17
     },

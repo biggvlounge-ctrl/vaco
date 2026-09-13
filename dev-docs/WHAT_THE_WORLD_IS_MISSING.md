@@ -143,6 +143,35 @@ starts applying stress, so this note cannot quietly go stale.
 
 ---
 
+## Nothing ever forgets
+
+`memories.expiration` is a real column, set to `'temporary'` by
+`worldStore.addMemory`, and **read by nothing**. No memory is ever
+pruned, reinforced past its usefulness, or allowed to fade.
+
+This surfaced as a performance problem before it surfaced as a
+modelling one. Profiling a generated world found **53,401 memories
+after 120 ticks** — `runSocialPhase` was resolving Trust for every
+relationship every tick and writing a "Trust reassessed: 50 → 50"
+memory even when nothing had changed. That is fixed: a Key with
+nothing to resolve is no longer run, contact is recorded without a
+reassessment, and the same 120 ticks now produce **1** memory and run
+at 40.8 ms/tick instead of 85.6.
+
+So memory growth is now proportional to things that actually happened,
+which makes this a modelling gap rather than an unbounded one. But it
+is still a gap. §41's "the world remembers" does not mean every
+recollection is permanent and equal, and `memories` carries
+`importance`, `emotion_level`, `reinforcement_count` and `expiration`
+precisely so that some fade and some do not. Nothing reads any of the
+four for that purpose.
+
+Forgetting is also what would make `entity_knowledge`'s distortion
+model mean something over long horizons: a rumour that never decays is
+not a rumour.
+
+---
+
 ## The eight declared gaps, and what each would take
 
 These are not oversights. Each one is declared in

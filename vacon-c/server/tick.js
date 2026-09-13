@@ -241,8 +241,33 @@ function runSocialPhase(worldState) {
     if (relationship.entity_a_id === relationship.entity_b_id) continue; // self-relationships (step 4's introspective-Key fallback) aren't social
     if (!isNpc(worldState, relationship.entity_a_id) || !isNpc(worldState, relationship.entity_b_id)) continue; // Trust reads psychological traits — individual tier only
 
-    const entityA = getLiveEntity(worldState, relationship.entity_a_id);
     const knowledge = worldStore.getKnowledge(worldState, relationship.entity_a_id, relationship.entity_b_id);
+
+    // **Contact is not a reassessment, and conflating them wrote a
+    // memory of nothing happening 445 times a tick.** `resolveTrust`
+    // moves trust by the CHARGE of what this entity knows about the
+    // other; with no new knowledge the charge is 0, trust cannot move,
+    // and the Key still wrote a "Trust reassessed: 50 -> 50" memory
+    // for every relationship in the world on every tick. Measured on a
+    // generated world: 53,401 memories after 120 ticks, growing without
+    // bound, which is what made the long runs this engine needs for its
+    // own calibration take a quarter of an hour.
+    //
+    // Standing rule 1 is untouched — a Key that RUNS still writes back
+    // to all three. What changes is that a Key with nothing to resolve
+    // is not run. The relationship still records that the two met:
+    // `adjustRelationship` with no changes increments
+    // `interaction_count`, which is what `births.advanceBonds` reads,
+    // so bonds keep forming on contact exactly as before.
+    if (knowledge.length === 0) {
+      worldStore.adjustRelationship(
+        worldState, relationship.entity_a_id, relationship.entity_b_id,
+        relationship.relationship_type || 'social', {},
+      );
+      continue;
+    }
+
+    const entityA = getLiveEntity(worldState, relationship.entity_a_id);
     keys.resolveTrust(entityA, {
       tick: worldState.tick,
       worldState,
