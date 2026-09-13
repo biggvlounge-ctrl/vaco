@@ -301,3 +301,23 @@ test('a generated world starts in rough balance, not starving', () => {
   assert.equal(essentials.length, 3);
   assert.equal(essentials.every((r) => r.demand / r.supply <= 1.2), true);
 });
+
+test('every family has a head, or nothing can ever succeed to it', () => {
+  // `generateFamily` leaves `head_npc_id` null unless told, and
+  // `succession.settleEstate` advances a family's generation only when
+  // its HEAD dies. Without this, every family in every generated world
+  // stayed on generation 1 no matter how many members were buried —
+  // measured at 400 ticks: two deaths, thirty families, all still
+  // generation 1.
+  const { before } = delta(() => worldgen.generateWorld({ ...SMALL, seed: 'heads' }));
+  const fresh = w.families.slice(before.families);
+  assert.ok(fresh.length > 0);
+
+  const living = new Set(w.npcs.map((n) => n.id));
+  for (const family of fresh) {
+    const members = w.familyMemberships.filter((m) => m.family_id === family.id);
+    if (members.length === 0) continue;
+    assert.ok(family.head_npc_id, `family ${family.id} has members and no head`);
+    assert.ok(living.has(family.head_npc_id), 'a family is headed by somebody who is not there');
+  }
+});

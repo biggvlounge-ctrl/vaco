@@ -77,6 +77,7 @@ const entityTraits = require('./entityTraits.js');
 const worldStore = require('./worldStore.js');
 const membership = require('./membership.js');
 const behavior = require('./behavior.js');
+const succession = require('./succession.js');
 
 // A tick is a day — `behavior.js` chooses that and says so, and
 // `worldState.tickIntervals` overrides it wholesale. This is the same
@@ -378,6 +379,18 @@ function recordDeath(worldState, options = {}) {
   // behavior.releaseDeceased.
   behavior.releaseDeceased(worldState, entityId);
 
+  // **And the estate is settled**, which is the decision this file
+  // deliberately declined to make. `endEmployment`'s own comment here
+  // said ending a contract because somebody died "is a decision about
+  // inheritance and succession, and inventing it here would put a
+  // second, quieter answer next to whatever gets built for that".
+  // `server/succession.js` is that, and it is called from this one
+  // choke point for the same reason the two releases above are: a
+  // death can arrive through `runMortality`, `killEntity` or a
+  // scenario, and a cleanup wired into the tick would miss two of the
+  // three.
+  const estate = succession.settleEstate(worldState, { entityId, tick });
+
   // **There is no separate `entities` array to update.** `migrate.js`
   // derives every `entities` row FROM `worldState.npcs` (and the other
   // tier arrays), so setting `npc.status` above IS setting the entity's
@@ -408,6 +421,7 @@ function recordDeath(worldState, options = {}) {
     npc,
     age,
     cause,
+    estate,
     event: {
       type: 'death',
       entityId,

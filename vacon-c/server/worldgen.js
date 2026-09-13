@@ -449,6 +449,27 @@ function generateWorld(options = {}) {
         engine.addFamilyMember(family.id, npc.id, 'member', family.generation);
       });
 
+      // **A family needs a head, or nothing can ever succeed to it.**
+      // `generateFamily` leaves `head_npc_id` null unless told, and
+      // `succession.settleEstate` advances a family's generation only
+      // when its HEAD dies — so without this, every family in every
+      // generated world stayed on generation 1 no matter how many of
+      // its members were buried. Measured before the fix: 400 ticks,
+      // two deaths, thirty families, all still generation 1.
+      //
+      // The eldest member, which is the same rule `heirFor` uses to
+      // choose between candidates of equal standing.
+      for (const family of families) {
+        const members = w.familyMemberships
+          .filter((m) => m.family_id === family.id)
+          .map((m) => w.npcs.find((n) => n.id === m.entity_id))
+          .filter(Boolean);
+        if (members.length === 0) continue;
+        family.head_npc_id = members.reduce(
+          (eldest, n) => ((n.createdTick ?? 0) < (eldest.createdTick ?? 0) ? n : eldest),
+        ).id;
+      }
+
       // ---- work ----------------------------------------------------------
       const adults = residents.filter(
         (n) => (tick - n.createdTick) / 365 >= 16,

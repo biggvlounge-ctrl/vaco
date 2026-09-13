@@ -190,8 +190,23 @@ test('the dead cannot be paid or counted in an election', () => {
   // employed people and one survivor reported 2.0 — a rate above
   // 100%. Now it counts the employed who are still alive: one of one.
   assert.equal(economy.getEmploymentRate(w), 1);
-  assert.equal(economy.listEmployment(w, { status: 'active' }).length, 2,
+  // **This assertion has flipped, and the flip is the point.** It used
+  // to require the dead employee's contract to stay `active`, because
+  // `mortality.js` deliberately declined to end it — its own comment
+  // said doing so "is a decision about inheritance and succession, and
+  // inventing it here would put a second, quieter answer next to
+  // whatever gets built for that". `server/succession.js` is that, so
+  // the decision is now made: the post is vacant.
+  //
+  // The record still survives as history, which was the real claim —
+  // it is `ended`, not deleted.
+  assert.equal(economy.listEmployment(w).length, 2,
     'the dead employee\'s record should survive as history');
+  assert.equal(economy.listEmployment(w, { status: 'active' }).length, 1);
+  assert.equal(
+    economy.listEmployment(w).find((r) => r.entity_id === 1).status, 'ended',
+    'a dead person still holds an active post',
+  );
 
   // **And payroll does not pay the dead — a defect this test found
   // and then closed.** It first asserted the broken behaviour: a
