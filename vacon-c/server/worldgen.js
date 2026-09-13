@@ -72,6 +72,7 @@ const economy = require('./economy.js');
 const infrastructure = require('./infrastructure.js');
 const membership = require('./membership.js');
 const mortality = require('./mortality.js');
+const barter = require('./barter.js');
 const property = require('./property.js');
 const territory = require('./territory.js');
 const worldStore = require('./worldStore.js');
@@ -115,6 +116,12 @@ const CITY_INFRASTRUCTURE = [
   { type: 'internet' },
   { type: 'rail' },
 ];
+
+// The resource types a generated city tracks. A subset of §28's
+// thirteen — the ones this engine's other systems actually read —
+// drawn FROM that list rather than written out again, so a typo is a
+// crash rather than a fourth quiet vocabulary.
+const CITY_RESOURCES = ['food', 'water', 'medicine', 'energy', 'wood'];
 
 const SURNAMES = [
   'Vance', 'Okoro', 'Marchetti', 'Delgado', 'Hollis', 'Nakamura',
@@ -220,7 +227,13 @@ function generateWorld(options = {}) {
     // something happened to it. Scarcity is an event the simulation
     // produces — a drought, a blockade, a failed harvest — not the
     // ground state.
-    for (const resourceType of ['food', 'water', 'medicine', 'energy', 'timber']) {
+    // **From §28's canonical list, not a literal.** This was
+    // `['food','water','medicine','energy','timber']` — an ad-hoc set
+    // that matched neither the spec's thirteen nor
+    // `mortality.SURVIVAL_RESOURCES`'s three, and `timber` is not a
+    // §28 resource type at all (the spec says `wood`). Three lists,
+    // no canon. See server/barter.js#RESOURCE_TYPES.
+    for (const resourceType of CITY_RESOURCES) {
       const supply = Math.round(random.range(60, 140, 'res', c, resourceType));
       const essential = mortality.SURVIVAL_RESOURCES.includes(resourceType);
       // Essentials sit closer to balance than trade goods: a

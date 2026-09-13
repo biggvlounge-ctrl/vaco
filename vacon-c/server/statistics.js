@@ -435,9 +435,10 @@ const CATALOGUE = [
   },
   {
     key: 'informal_economy_share', category: 'economics', unit: 'share', scope: 'community',
-    unavailable: 'every transaction in the engine goes through `market_listings` or payroll, '
-      + 'both of which are recorded the same way. Nothing is off the books, because there are '
-      + 'no books to be off — an informal economy needs a formal one to be outside of.',
+    unavailable: 'every movement of value is recorded the same way — payroll, production and '
+      + 'barter.exchange all write individual_finances or organizations. Nothing is off the '
+      + 'books, because there are no books to be off: an informal economy needs a formal one '
+      + 'to be outside of, and a way to transact without being recorded.',
   },
 
   // ---- housing -------------------------------------------------------

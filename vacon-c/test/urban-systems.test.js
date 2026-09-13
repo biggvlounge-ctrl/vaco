@@ -90,7 +90,15 @@ const ENGINE_CODE = (() => {
       .map((c) => c.substrate)
       .filter(Boolean),
     ...Object.values(require('../server/areaStats.js').UNAVAILABLE),
+    ...Object.values(require('../server/barter.js').MODIFIERS_NOT_MODELLED),
   ];
+
+  // **This list has grown four times, always the same way**: a module
+  // adds a machine-readable "here is what I cannot do and why", the
+  // reason names the very table it is explaining the absence of, and
+  // this check counts it as usage. If a fifth arrives, add it here —
+  // the alternative is prose in a comment, which is strictly worse for
+  // every caller who wants to show a user why a number is missing.
 
   let source = fs.readdirSync(SERVER_DIR)
     .filter((f) => f.endsWith('.js') && !skip.has(f))
