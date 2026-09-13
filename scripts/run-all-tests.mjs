@@ -125,13 +125,32 @@ for (const suite of suites) {
     // This script is normally run directly, but it is one `node --test`
     // wrapper away from silently reporting an all-zero green run.
     env: CHILD_ENV,
-    // A suite that hangs must not hang CI forever. Two minutes is far
-    // beyond anything here — the whole ecosystem runs in seconds.
-    timeout: 120000,
+    // A suite that hangs must not hang CI forever.
+    //
+    // **This was two minutes, with a comment saying that was "far
+    // beyond anything here — the whole ecosystem runs in seconds".**
+    // That stopped being true: `vacon-c` is a simulation engine whose
+    // tests generate worlds and run them for hundreds of ticks, and it
+    // passed 120 seconds honestly. The cap then failed the entire suite
+    // — not one assertion, the whole thing — and the only symptom was
+    // "no TAP summary", which says nothing about why. Twice.
+    //
+    // Ten minutes is the new ceiling: still far short of a real hang
+    // being tolerated, and far enough above the heaviest suite (~2
+    // minutes) that legitimate growth does not read as a failure. A
+    // timeout that fires on healthy code teaches people to ignore it.
+    timeout: 600000,
   });
 
   const output = `${result.stdout || ''}${result.stderr || ''}`;
   const summary = parseSummary(output);
+
+  // **Name the timeout.** `spawnSync` kills the child and leaves the
+  // output truncated, so a timed-out suite is indistinguishable from a
+  // crashed one in the report — it just says "no TAP summary". That
+  // cost two debugging passes before anybody thought to time the suite
+  // by hand.
+  const timedOut = result.error?.code === 'ETIMEDOUT' || result.signal === 'SIGTERM';
   totals.tests += summary.tests;
   totals.pass += summary.pass;
   totals.fail += summary.fail;
@@ -150,7 +169,7 @@ for (const suite of suites) {
   const mark = ok ? 'ok  ' : 'FAIL';
   const count = summary.tests > 0
     ? `${String(summary.pass).padStart(3)}/${String(summary.tests).padEnd(3)}`
-    : '(no TAP summary)';
+    : (timedOut ? 'TIMED OUT — raise the cap or split it' : '(no TAP summary)');
   process.stdout.write(`  ${mark} ${name.padEnd(24)} ${count}  ${suite.files.length} file(s)\n`);
 
   if (verbose) process.stdout.write(`${output}\n`);
@@ -204,8 +223,24 @@ if (failed.length > 0) {
 // one run stale — which is exactly the lag the per-suite table check
 // already documents and tolerates, and the live numbers are printed
 // below either way.
+//
+// **And "no failing tests" is not the same as "the run went well",
+// which cost two hand repairs before it was fixed.** A suite that
+// times out or crashes reports NO TAP summary, so it contributes zero
+// failing tests — `totals.fail` stayed 0, the run looked green to this
+// writer, and both `scripts` and `vacon-c` were recorded as
+// `{tests: 0, pass: 0, fail: 0}`. The per-suite guard in
+// `scripts/test/system-of-record.test.mjs` then compared §10's real
+// numbers against those zeros and failed, which made the next run red,
+// which meant this file was never rewritten — a deadlock only a manual
+// edit could break.
+//
+// That is §8's own standing rule ("a tool that finds nothing must not
+// report success") turned on the tool itself. The condition is now
+// `failed.length === 0` as well, so a suite that never reported cannot
+// be recorded as having reported nothing.
 const countsPath = path.join(REPO_ROOT, 'dev-docs', 'TEST_COUNTS.json');
-if (totals.fail === 0) {
+if (totals.fail === 0 && failed.length === 0) {
   fs.writeFileSync(countsPath, `${JSON.stringify({
     total: totals.tests,
     passed: totals.pass,
@@ -215,8 +250,11 @@ if (totals.fail === 0) {
     perSuite,
   }, null, 2)}\n`);
 } else {
+  const why = totals.fail > 0
+    ? `${totals.fail} test(s) failed`
+    : `${failed.length} suite(s) did not report`;
   process.stdout.write(
-    `run-all-tests: ${totals.fail} test(s) failed, so dev-docs/TEST_COUNTS.json was left `
+    `run-all-tests: ${why}, so dev-docs/TEST_COUNTS.json was left `
     + 'at the last green run. Fix the failures and re-run to update it.\n',
   );
 }

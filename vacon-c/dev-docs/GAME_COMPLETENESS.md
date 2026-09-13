@@ -13,16 +13,16 @@ three places, a spec section's "roughly 25 of the 40", a catalogue of 67
 statistics that a real world answered 36 of, and seven trait families generated
 on every NPC and read by nothing.
 
-## 83% complete
+## 85.6% complete
 
 ```
-█████████████████░░░  83%   249.75 of 301
+█████████████████░░░  85.6%   257.75 of 301
 ```
 
 | axis | complete | score | what it measures |
 |---|---|---|---|
 | systems | **55.6%** | 22.25/40 | urban systems with mechanics |
-| tables | **63.8%** | 41.5/65 | schema tables a built world fills |
+| tables | **76.2%** | 49.5/65 | schema tables a built world fills |
 | statistics | **86.6%** | 58/67 | statistics a world can answer |
 | traits | **100%** | 114/114 | traits something reads |
 | traitDepth | **85.7%** | 6/7 | trait columns a life actually changes |
@@ -73,7 +73,7 @@ The forty systems §7 names, at `server/urbanSystems.js`'s own four levels (mode
 | `38. Migration` | partial | +0.5 |
 | `39. Reputation` | partial | +0.5 |
 
-### tables — 32 open
+### tables — 16 open
 
 Every `CREATE TABLE` in the schema and its extensions. A table a built world fills scores 1; one the engine writes but no world has ever used scores 0.5; one with no store at all scores 0.
 
@@ -86,31 +86,15 @@ Every `CREATE TABLE` in the schema and its extensions. A table a built world fil
 | `needs` | no store | +1 |
 | `goals` | no store | +1 |
 | `households` | no store | +1 |
-| `governments` | empty in a built world | +0.5 |
-| `elections` | empty in a built world | +0.5 |
-| `votes` | empty in a built world | +0.5 |
-| `laws` | empty in a built world | +0.5 |
-| `public_opinion` | empty in a built world | +0.5 |
-| `revolutions` | empty in a built world | +0.5 |
+| `revolutions` | written, but unreached — assessRevolutions runs every tick; no generated world has fallen below approval 35 with 25% of the population informed | +0.5 |
 | `investments` | no store | +1 |
-| `market_listings` | empty in a built world | +0.5 |
 | `trade_routes` | no store | +1 |
 | `migration_events` | no store | +1 |
 | `economy_snapshots` | no store | +1 |
 | `regions` | no store | +1 |
-| `civilizations` | empty in a built world | +0.5 |
-| `technology_eras` | empty in a built world | +0.5 |
-| `civilization_technology_progress` | empty in a built world | +0.5 |
 | `environment_state` | no store | +1 |
-| `artifacts` | empty in a built world | +0.5 |
-| `missions` | empty in a built world | +0.5 |
 | `analytics_snapshots` | no store | +1 |
-| `players` | empty in a built world | +0.5 |
-| `cultures` | empty in a built world | +0.5 |
-| `culture_memberships` | empty in a built world | +0.5 |
-| `flow_templates` | empty in a built world | +0.5 |
 | `vault_studios_links` | no store | +1 |
-| `inventory` | empty in a built world | +0.5 |
 
 ### statistics — 9 open
 

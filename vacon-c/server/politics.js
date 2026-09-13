@@ -616,10 +616,177 @@ function resolveRevolution(worldState, options = {}) {
 // assessing before the snapshot would test this tick's opinion against
 // a record that does not yet contain it, so the numbers in the event
 // and the numbers on disk would disagree by one tick.
+//: How long a term runs, and how long the polls stay open.
+//:
+//: **Flagged interpretive: no document sets either.** A tick is a day
+//: (`behavior.TICK_INTERVALS`), so a four-year term is 1460 ticks and a
+//: week of voting is 7. The point is not the exact number — it is that
+//: `elections` and `votes` were empty in every world this engine had
+//: ever built. `scheduleElection`, `openElection`, `castVote` and
+//: `closeElection` were all written, tested and green, and nothing
+//: anywhere called them in sequence, so no election had ever been held.
+const ELECTION_TERM_TICKS = 1460;
+const ELECTION_OPEN_TICKS = 7;
+
+//: How many people stand. Drawn from the government's own membership
+//: where it has one, so a candidate is somebody who is already part of
+//: the institution rather than a name picked out of the population.
+const CANDIDATES = 3;
+
+// Who is standing in this government's election.
+//
+// Members of the government organization first — `entity_organization_
+// memberships` is real substrate and a government's own people are the
+// obvious candidates. Falling back to the strongest `leadership` traits
+// in the world, because a government with no roster still has to be
+// able to hold an election rather than silently skip one.
+function candidatesFor(worldState, organizationId) {
+  const living = new Map(worldState.npcs.map((n) => [n.id, n]));
+  const members = (worldState.entityOrganizationMemberships || [])
+    .filter((m) => m.organization_id === organizationId && m.status !== 'left')
+    .map((m) => living.get(m.entity_id))
+    .filter(Boolean);
+  if (members.length >= 2) return members.slice(0, CANDIDATES).map((n) => n.id);
+
+  const ranked = worldState.npcs
+    .map((npc) => {
+      const live = entityTraits.getLiveEntity(worldState, npc.id);
+      const presence = Number(live?.traits?.leadership?.['Command Presence'] ?? 50);
+      return { id: npc.id, presence: Number.isFinite(presence) ? presence : 50 };
+    })
+    .sort((a, b) => b.presence - a.presence);
+  return ranked.slice(0, CANDIDATES).map((r) => r.id);
+}
+
+// Who this voter picks.
+//
+// The candidate they trust most, and Command Presence only where they
+// know none of them — which is what an election between strangers is.
+// Reading `relationships.trust` rather than drawing at random is what
+// makes a result explicable: a well-connected candidate wins because
+// people know them.
+function voteOf(worldState, voterId, candidateIds) {
+  let best = null;
+  let bestTrust = -Infinity;
+  for (const candidateId of candidateIds) {
+    if (candidateId === voterId) continue;
+    const rel = (worldState.relationships || []).find(
+      (r) => (r.entity_a_id === voterId && r.entity_b_id === candidateId)
+        || (r.entity_b_id === voterId && r.entity_a_id === candidateId),
+    );
+    const trust = rel ? Number(rel.trust) : null;
+    if (trust !== null && trust > bestTrust) {
+      bestTrust = trust;
+      best = candidateId;
+    }
+  }
+  if (best !== null) return best;
+
+  // Knows nobody standing. Falls back to presence, which is the only
+  // thing a stranger can judge somebody on.
+  let fallback = null;
+  let bestPresence = -Infinity;
+  for (const candidateId of candidateIds) {
+    if (candidateId === voterId) continue;
+    const live = entityTraits.getLiveEntity(worldState, candidateId);
+    const presence = Number(live?.traits?.leadership?.['Command Presence'] ?? 50);
+    if (presence > bestPresence) {
+      bestPresence = presence;
+      fallback = candidateId;
+    }
+  }
+  return fallback;
+}
+
+// One tick of the electoral cycle: schedule a term, open the polls,
+// take the votes, close them.
+//
+// **Driven on a crossing, not a condition** — standing rule 7. A term
+// elapsing is an event; "no election is open" is a state that holds
+// most of the time, and scheduling on that would put an election in
+// the log every tick forever.
+function runElections(worldState, tick) {
+  const events = [];
+
+  for (const government of worldState.governments || []) {
+    const organizationId = government.organization_id;
+    const held = (worldState.elections || []).filter(
+      (e) => e.organization_id === organizationId,
+    );
+    const open = held.find((e) => e.status === 'open');
+    const scheduled = held.find((e) => e.status === 'scheduled');
+
+    if (open) {
+      if (tick < (open.start_tick ?? 0) + ELECTION_OPEN_TICKS) continue;
+      const result = closeElection(worldState, { electionId: open.id, tick });
+      events.push({
+        type: 'election_closed',
+        severity: 'medium',
+        note: result.tied
+          ? `election ${open.id} tied and elected nobody`
+          : `entity ${result.winnerId} won election ${open.id}`,
+        tick,
+        affected_entity_ids: result.winnerId === null ? [] : [result.winnerId],
+        global_effects: {
+          electionId: open.id, winnerId: result.winnerId, turnout: result.turnout,
+        },
+      });
+      continue;
+    }
+
+    if (scheduled) {
+      if (tick < (scheduled.start_tick ?? 0)) continue;
+      openElection(worldState, { electionId: scheduled.id });
+      const candidates = candidatesFor(worldState, organizationId);
+      if (candidates.length < 2) {
+        // Nobody to choose between. Closed immediately rather than left
+        // open forever, which would block every later term.
+        closeElection(worldState, { electionId: scheduled.id, tick });
+        continue;
+      }
+      for (const npc of worldState.npcs) {
+        const choice = voteOf(worldState, npc.id, candidates);
+        if (choice === null) continue;
+        castVote(worldState, {
+          electionId: scheduled.id, voterEntityId: npc.id, candidateEntityId: choice, tick,
+        });
+      }
+      events.push({
+        type: 'election_opened',
+        severity: 'low',
+        note: `election ${scheduled.id} opened with ${candidates.length} candidates`,
+        tick,
+        affected_entity_ids: candidates,
+        global_effects: { electionId: scheduled.id, candidates: candidates.length },
+      });
+      continue;
+    }
+
+    // Nothing pending: schedule the next term from when the last one
+    // closed, or immediately for a government that has never held one.
+    const last = held
+      .filter((e) => e.status === 'closed')
+      .reduce((latest, e) => (
+        (e.end_tick ?? 0) > (latest?.end_tick ?? -Infinity) ? e : latest
+      ), null);
+    const nextStart = last === null ? tick : (last.end_tick ?? tick) + ELECTION_TERM_TICKS;
+    scheduleElection(worldState, {
+      organizationId, electionType: 'leadership', startTick: nextStart,
+    });
+  }
+
+  return events;
+}
+
 function runPolitics(worldState, tick) {
   const opinions = snapshotPublicOpinion(worldState, tick);
   const { started, events } = assessRevolutions(worldState, tick);
-  return { opinions: opinions.length, revolutions: started.length, events };
+  const electionEvents = runElections(worldState, tick);
+  return {
+    opinions: opinions.length,
+    revolutions: started.length,
+    events: [...events, ...electionEvents],
+  };
 }
 
 function reseedIds(worldState) {
@@ -653,6 +820,12 @@ module.exports = {
   closeElection,
   assessRevolutions,
   resolveRevolution,
+  ELECTION_TERM_TICKS,
+  ELECTION_OPEN_TICKS,
+  CANDIDATES,
+  candidatesFor,
+  voteOf,
+  runElections,
   runPolitics,
   reseedIds,
 };

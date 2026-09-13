@@ -61,6 +61,7 @@ const path = require('node:path');
 
 const urbanSystems = require('./urbanSystems.js');
 const statistics = require('./statistics.js');
+const politics = require('./politics.js');
 const { TRAIT_FAMILIES } = require('./traits.js');
 
 const SERVER_DIR = __dirname;
@@ -133,6 +134,42 @@ const BY_DESIGN = {
   businesses: 'a subtype of organizations — standing rule 4, stored on the organization',
 };
 
+//: A different claim from `BY_DESIGN`, and **separating them was forced
+//: by the test rather than foreseen**: these tables DO have a WorldState
+//: array, and it is correct for a generated world to leave it empty.
+//: Lumping them in with the not-a-store list made
+//: `test/completeness.test.js` fail, because that check asserts the
+//: array does not exist — which is exactly the check the not-a-store
+//: excuses need and precisely the wrong one here. Two claims, two
+//: checks.
+const CORRECTLY_EMPTY = {
+  // An OVERRIDE list, not a store. `flows.listFlowTemplates` returns the
+  // built-in FLOW_TEMPLATES when this array is empty and merges over
+  // them when it is not — so empty means "the world runs the ten named
+  // flows", which is the normal case, not a missing one.
+  flow_templates: 'an override list — flows.listFlowTemplates falls back to the built-ins',
+  // A player is a human account bound to an entity. Generating one into
+  // every world would fabricate a user who does not exist, and the
+  // binding is what `players.generatePlayer` is for when somebody
+  // actually joins.
+  players: 'a human joining, not a feature of a world — worldgen has nobody to bind',
+};
+
+//: Tables a real mechanism writes that this particular world never
+//: triggers. **Scored the same half-credit as any other empty table** —
+//: the mechanism is built and tested, and no world has used it, which
+//: is exactly what half means here. What this list adds is the reason,
+//: so the gap list says "no world has been unstable enough" rather than
+//: "nothing writes it", which are different pieces of work.
+//:
+//: The floor is read from `politics.js` rather than repeated, so the
+//: note cannot drift from the constant it describes.
+const TABLE_UNREACHED = {
+  revolutions: 'assessRevolutions runs every tick; no generated world has fallen below '
+    + `approval ${politics.REVOLUTION_APPROVAL_FLOOR} with `
+    + `${Math.round(politics.REVOLUTION_SPREAD_FLOOR * 100)}% of the population informed`,
+};
+
 const TABLE_TO_ARRAY = (table) => table.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 
 function measureTables(worldState) {
@@ -149,7 +186,19 @@ function measureTables(worldState) {
       items.push({ name: table, credit: 0, state: 'no store' });
       continue;
     }
+    if (CORRECTLY_EMPTY[table] && array.length === 0) {
+      items.push({
+        name: table, credit: 1, state: 'by design', note: CORRECTLY_EMPTY[table],
+      });
+      continue;
+    }
     if (array.length === 0) {
+      if (TABLE_UNREACHED[table]) {
+        items.push({
+          name: table, credit: 0.5, state: 'written, but unreached', note: TABLE_UNREACHED[table],
+        });
+        continue;
+      }
       // The eleventh standing rule exactly: built, tested, and no world
       // has ever put a row in it.
       items.push({ name: table, credit: 0.5, state: 'empty in a built world' });
@@ -452,6 +501,8 @@ function measure(worldState, snapshot = new Map()) {
 module.exports = {
   LEVEL_CREDIT,
   BY_DESIGN,
+  CORRECTLY_EMPTY,
+  TABLE_UNREACHED,
   TRAIT_COLUMN_BY_DESIGN,
   TRAIT_COLUMN_UNREACHED,
   TRAIT_COLUMNS,

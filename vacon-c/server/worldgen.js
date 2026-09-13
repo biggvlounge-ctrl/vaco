@@ -75,6 +75,12 @@ const mortality = require('./mortality.js');
 const barter = require('./barter.js');
 const behavior = require('./behavior.js');
 const property = require('./property.js');
+const technology = require('./technology.js');
+const politics = require('./politics.js');
+const culture = require('./culture.js');
+const missions = require('./missions.js');
+const inventory = require('./inventory.js');
+const items = require('./items.js');
 const territory = require('./territory.js');
 const worldStore = require('./worldStore.js');
 const { hashSeed, seededUnit } = require('./seeded.js');
@@ -99,6 +105,25 @@ const DEFAULTS = {
   gangMembershipRate: 0.06,
   languages: ['Riverine', 'Highland', 'Old Tongue'],
   religions: ['Tidewater', 'Ridge', 'None'],
+
+  // **Everything below exists because the table was empty.** Each one
+  // names a system that is built, tested and green, and that no world
+  // this engine has ever generated contained a single row of — the
+  // eleventh standing rule, found by measuring rather than by reading.
+  // `dev-docs/GAME_COMPLETENESS.md` lists which.
+  civilizationName: 'The Reach',
+  // How far up the era ladder a world starts. `technology.runTechnology`
+  // climbs from here on its own once a civilization exists to climb.
+  startingEras: 2,
+  cultures: ['Rivermouth', 'Ridgeway'],
+  // A share of each community's residents carry the local culture.
+  cultureShare: 0.6,
+  // Listings per city, drawn from the real trade catalogue in items.js.
+  marketListings: 6,
+  artifacts: 3,
+  // Each artifact gets one mission, which is what generateMission asks
+  // for — a mission is always generated FROM a real artifact.
+  startingInventoryPerAdult: 2,
 };
 
 // The ten infrastructure types a city gets, with capacity expressed
@@ -172,6 +197,16 @@ function generateWorld(options = {}) {
     infrastructure: 0, organizations: 0, employed: 0, gangMembers: 0,
     languages: 0, resources: 0, territoryBlocks: 0,
   };
+
+  // **What THIS run built, as distinct from what is in the world.**
+  // `engine.WorldState` is shared and generating twice in one process
+  // appends rather than replaces — so a second `generateWorld` sees the
+  // first world's people. Reaching for `w.npcs` in a generation step
+  // therefore gives a different answer on the second call, which broke
+  // seeded reproducibility: the same seed produced 100 inventory rows
+  // the first time and 120 the second. Every step below iterates these
+  // instead.
+  const made = { communities: [], people: [] };
 
   // Languages first: everything that speaks one needs it to exist.
   const languages = config.languages.map((name, i) => demographics.generateLanguage(w, {
@@ -271,6 +306,7 @@ function generateWorld(options = {}) {
     // ---- communities -------------------------------------------------
     for (let b = 0; b < config.communitiesPerCity; b += 1) {
       const community = territory.generateCommunity(w, { cityId: city.id, tier: 'block' });
+      made.communities.push(community);
       summary.communities += 1;
 
       // Territory: each block is held by a faction, and some are
@@ -390,6 +426,7 @@ function generateWorld(options = {}) {
         });
         npc.createdTick = tick - Math.round(age * 365);
         residents.push(npc);
+        made.people.push(npc);
         summary.people += 1;
 
         areaStats.placeInCommunity(w, {
@@ -542,6 +579,182 @@ function generateWorld(options = {}) {
       }
     }
   }
+
+  // ---------------------------------------------------------------------
+  // The systems that existed and that no world had ever contained
+  // ---------------------------------------------------------------------
+  //
+  // **Every call below is to a generator that was already built, tested
+  // and green.** Measured against a built world, seventeen tables the
+  // engine writes had zero rows in them — the whole politics stack,
+  // civilizations, technology eras, cultures, markets, missions and
+  // inventory. Nothing was broken; nothing ever called them.
+  //
+  // That is the eleventh standing rule, and it is the same finding that
+  // produced this file: a generator nothing calls is indistinguishable
+  // from a generator that does not exist. `worldgen.js` closed it for
+  // housing, infrastructure and demographics and stopped there.
+  //
+  // Two of the per-tick drivers were already wired and idle for want of
+  // a subject: `runPolitics` snapshots public opinion every tick and
+  // had no government to have an opinion about, and `runTechnology`
+  // climbs the era ladder every tick and had no civilization to climb
+  // it. Founding one of each is the whole fix for five tables.
+
+  // ---- the civilization and its technology ------------------------------
+  technology.seedTechnologyEras(w);
+  const civilization = technology.foundCivilization(w, {
+    name: config.civilizationName,
+    stability: Math.round(random.range(40, 75, 'civ', 'stability')),
+  });
+  summary.civilizationId = civilization.id;
+  summary.technologyEras = (w.technologyEras || []).length;
+
+  // Start partway up the ladder rather than at the first rung. A world
+  // that has cities, schools and a market has plainly already worked
+  // out stone tools, and `canUnlock` gates on prerequisites so the
+  // chain has to be walked in order.
+  summary.erasUnlocked = 0;
+  for (let e = 0; e < config.startingEras; e += 1) {
+    const next = technology.nextEraFor(w, civilization.id);
+    if (!next || !next.eraName) break;
+    const check = technology.canUnlock(w, {
+      civilizationId: civilization.id, eraName: next.eraName,
+    });
+    if (!check.ok) break;
+    technology.unlockEra(w, { civilizationId: civilization.id, eraName: next.eraName, tick });
+    summary.erasUnlocked += 1;
+  }
+
+  // ---- the government ---------------------------------------------------
+  // A government is an organization, per standing rule 4 — not a root
+  // entity of its own. So one is generated and then declared to be a
+  // government, which is what `foundGovernment` validates.
+  const state = engine.generateOrganization({
+    name: `${config.civilizationName} Assembly`,
+    type: 'government',
+    traitValueFor: (def) => Math.round(
+      random.range(30, 85, 'gov-trait', def.family, def.name),
+    ),
+  });
+  summary.organizations += 1;
+  politics.foundGovernment(w, {
+    organizationId: state.id,
+    systemType: random.pick(politics.SYSTEM_TYPES, 'gov', 'system'),
+  });
+  summary.governmentId = state.id;
+
+  // Laws, one per city, drawn from the schema's own category list. A
+  // government with no law on the books has enacted nothing, and
+  // `laws` was one of the six political tables at zero.
+  summary.laws = 0;
+  for (const cityId of summary.cities) {
+    for (let l = 0; l < 2; l += 1) {
+      politics.enactLaw(w, {
+        jurisdictionCityId: cityId,
+        category: random.pick(politics.LAW_CATEGORIES, 'law', cityId, l),
+        description: null,
+        governmentOrganizationId: state.id,
+        tick,
+        favourability: Math.round(random.range(-20, 30, 'law-fav', cityId, l)),
+      });
+      summary.laws += 1;
+    }
+  }
+
+  // ---- culture ----------------------------------------------------------
+  // `cultures` and `culture_memberships` were both empty. Culture DNA
+  // is built (Phase 2) and nothing ever made one.
+  const cultures = config.cultures.map((name, i) => culture.generateCulture(w, {
+    name,
+    traitValueFor: (def) => Math.round(
+      random.range(20, 90, 'culture', i, def.family, def.name),
+    ),
+  }));
+  summary.cultures = cultures.length;
+  summary.cultureMembers = 0;
+
+  made.communities.forEach((community, ci) => {
+    const local = cultures[ci % cultures.length];
+    culture.attachCulture(w, {
+      cultureId: local.id, tier: 'community', entityId: community.id,
+    });
+    summary.cultureMembers += 1;
+
+    // **Seeded on position, never on identity** — §88. `community.id`
+    // and `npc.id` come from counters whose state depends on what was
+    // built before them, so the same seed draws differently on a second
+    // generation in one process. `ci` and `ri` do not.
+    areaStats.residentsOf(w, community.id).forEach((npc, ri) => {
+      if (random.unit('culture-member', ci, ri) > config.cultureShare) return;
+      culture.attachCulture(w, {
+        cultureId: local.id, tier: 'family', entityId: npc.id,
+      });
+      summary.cultureMembers += 1;
+    });
+  });
+
+  // ---- the market -------------------------------------------------------
+  // `market_listings` was empty, so `resolveMarketPrice` had nothing to
+  // resolve and no price in the world came from anybody offering
+  // anything. Products are drawn from `items.SOURCED_ITEMS`, the real
+  // trade catalogue, rather than invented here.
+  summary.marketListings = 0;
+  for (const cityId of summary.cities) {
+    for (let m = 0; m < config.marketListings; m += 1) {
+      const item = random.pick(items.SOURCED_ITEMS, 'listing', cityId, m);
+      economy.generateMarketListing(w, {
+        productName: item.name,
+        resourceType: item.resourceType ?? null,
+        price: Math.round(barter.barterScore(w, item.name).Final_Barter_Score),
+        quantity: 1 + random.int(40, 'listing-qty', cityId, m),
+        sellerEntityId: null,
+        tick,
+      });
+      summary.marketListings += 1;
+    }
+  }
+
+  // ---- artifacts and missions -------------------------------------------
+  // The engine's only player verb had nothing to act on: both tables
+  // were empty in every world, so `listMissions` returned nothing and
+  // `POST /api/players/:id/action` could accept no mission.
+  summary.artifacts = 0;
+  summary.missions = 0;
+  for (let a = 0; a < config.artifacts; a += 1) {
+    const artifact = missions.generateArtifact(w, {
+      name: `${random.pick(SURNAMES, 'relic', a)} Relic`,
+      era: 'pre-collapse',
+      locationId: null,
+    });
+    summary.artifacts += 1;
+    missions.generateMission(w, {
+      artifactId: artifact.id,
+      objective: 'Recover it',
+      reward: Math.round(random.range(80, 600, 'reward', a)),
+    });
+    summary.missions += 1;
+  }
+
+  // ---- what people carry ------------------------------------------------
+  // `inventory` was empty, so `valueOfHoldings` was zero for everybody
+  // and a trade could only ever move nothing. Everybody starts with a
+  // couple of things, drawn from the same catalogue the market uses.
+  summary.inventoryRows = 0;
+  made.people.forEach((npc, pi) => {
+    for (let k = 0; k < config.startingInventoryPerAdult; k += 1) {
+      // Position, not identity — see the culture block above.
+      const item = random.pick(items.SOURCED_ITEMS, 'kit', pi, k);
+      inventory.give(w, {
+        entityId: npc.id,
+        itemName: item.name,
+        quantity: 1 + random.int(3, 'kit-qty', pi, k),
+        condition: Math.round(random.range(40, 100, 'kit-cond', pi, k)),
+        tick,
+      });
+      summary.inventoryRows += 1;
+    }
+  });
 
   // A world with no history of crime has no clearance rate and no
   // opinion of public safety, and both are statistics somebody asked

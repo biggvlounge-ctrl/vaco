@@ -129,6 +129,42 @@ test('every BY_DESIGN excuse is still true of the code it cites', () => {
     'factions is excused as a subtype of organizations and nothing sets isFaction');
 });
 
+test('every CORRECTLY_EMPTY excuse names a store that really exists', () => {
+  // **The opposite claim to BY_DESIGN, and it needs the opposite
+  // check.** These tables DO have an array and it is right for a
+  // generated world to leave it empty. Asserting the array is absent —
+  // which is what the BY_DESIGN check does — is exactly wrong here, and
+  // running both against one list is what failed the suite when they
+  // were one list.
+  const declared = new Set(completeness.schemaTables());
+  for (const [table, reason] of Object.entries(completeness.CORRECTLY_EMPTY)) {
+    assert.ok(declared.has(table), `CORRECTLY_EMPTY excuses "${table}", which is not a table`);
+    const key = table.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+    assert.ok(Array.isArray(engine.WorldState[key]),
+      `${table} is excused as correctly empty and WorldState.${key} is not an array at all — `
+      + 'that is a "no store", which scores zero');
+    assert.ok(reason.length > 20, `${table}'s excuse does not say why`);
+  }
+
+  // And no table may appear in both lists, which would be two
+  // contradictory claims about the same thing.
+  for (const table of Object.keys(completeness.CORRECTLY_EMPTY)) {
+    assert.equal(completeness.BY_DESIGN[table], undefined,
+      `${table} is excused twice, as both "no store" and "correctly empty"`);
+  }
+});
+
+test('a correctly-empty store loses its excuse once a world fills it', () => {
+  // The excuse is about a world leaving it empty, not about the table.
+  // If a world ever does put a row in one, it should be scored like any
+  // other live table rather than keeping free credit.
+  const table = Object.keys(completeness.CORRECTLY_EMPTY)[0];
+  const key = table.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+  const filled = completeness.measureTables({ ...engine.WorldState, [key]: [{ id: 1 }] });
+  const row = filled.items.find((i) => i.name === table);
+  assert.equal(row.state, 'live', `${table} kept its by-design credit while holding a row`);
+});
+
 test('BY_DESIGN names only tables the schema actually declares', () => {
   const declared = new Set(completeness.schemaTables());
   for (const table of Object.keys(completeness.BY_DESIGN)) {
