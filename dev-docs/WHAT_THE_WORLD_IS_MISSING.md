@@ -116,16 +116,31 @@ appear.
 > the one constant in that file taken from the real world rather than
 > invented, and expressible only because a tick is a day.
 >
-> Measured after all three fixes, 1,500 ticks on 75 people:
+> Measured after all three fixes, at the scale the defects appeared —
+> 150 people, 2,000 ticks, 5.5 simulated years:
 >
-> | | crude rate / year |
-> |---|---|
-> | deaths | 2.6% |
-> | births | 2.6% |
-> | population | 75 → 75 |
+> | ticks | living | crude deaths/yr | crude births/yr |
+> |---|---|---|---|
+> | 400 | 153 | 1.2% | 3.0% |
+> | 800 | 157 | 1.5% | 3.5% |
+> | 1200 | 160 | 1.1% | 3.0% |
+> | 1600 | 160 | 1.6% | 3.0% |
+> | 2000 | 162 | 1.6% | 2.9% |
 >
-> A pre-modern demographic regime — births and deaths in balance, both
-> in the right order of magnitude — rather than a die-off or a boom.
+> **The rates are flat, which is the thing that matters.** Before the
+> third fix, births ran 7 → 35 → 50 → 80 → 104 across the same
+> checkpoints — compounding, because every new generation added
+> partnerships. They now run 5 → 12 → 16 → 21 → 26, which is linear
+> and is what a stable per-capita rate looks like.
+>
+> This world grows, at about 1.4% a year net. That is not "balance"
+> and should not be reported as it: births at 2.9% against deaths at
+> 1.6% is a young, well-fed, well-housed population, which is what
+> `worldgen` builds. A separate 1,500-tick run of 75 people came out
+> at 2.6% against 2.6% and held exactly flat. Both are inside a
+> defensible range and the difference is the starting age structure,
+> which is drawn. What would be wrong is a rate that accelerates, and
+> that is what was fixed.
 >
 > **None of the three was visible to the suite**, and none was visible
 > in a short run. A simulation has to be run long enough for its rates
