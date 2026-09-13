@@ -338,6 +338,14 @@ async function restoreWorldStateFromPostgres(worldState) {
       nums(m, ['entity_id', 'organization_id', 'joined_tick']));
   summary.entity_organization_memberships = worldState.entityOrganizationMemberships.length;
 
+  // `equipped` is a real BOOLEAN and must NOT go through `num` —
+  // standing rule 10's sibling: `Number(false)` is 0, and 0 is not
+  // `false` to a `=== true` check, so every equipped item would come
+  // back unequipped and every armed offender unarmed.
+  worldState.inventory = (await q('SELECT * FROM inventory ORDER BY id')).map((h) =>
+    nums(h, ['id', 'holder_entity_id', 'quantity', 'condition', 'acquired_tick']));
+  summary.inventory = worldState.inventory.length;
+
   // -------------------------------------------------------------------
   // Territory / Property
   // -------------------------------------------------------------------

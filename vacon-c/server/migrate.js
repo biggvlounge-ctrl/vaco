@@ -704,6 +704,19 @@ async function migrateWorldStateToPostgres(worldState) {
       }
       summary.entity_organization_memberships = worldState.entityOrganizationMemberships.length;
 
+      // ---------------------------------------------------------------
+      // inventory — after entities, which holder_entity_id references
+      // ---------------------------------------------------------------
+      for (const h of worldState.inventory) {
+        await client.query(
+          `INSERT INTO inventory (id, holder_entity_id, item_name, quantity, condition,
+             equipped, acquired_tick) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+          [h.id, h.holder_entity_id, h.item_name, h.quantity, h.condition,
+            h.equipped, h.acquired_tick]
+        );
+      }
+      summary.inventory = worldState.inventory.length;
+
       // Second half of the properties.history_ref two-phase insert —
       // see the note on the properties INSERT above. Now that
       // historical_records exist, the FK can be satisfied.

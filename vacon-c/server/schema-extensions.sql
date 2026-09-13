@@ -208,3 +208,65 @@ CREATE INDEX IF NOT EXISTS idx_crime_incidents_category ON crime_incidents (cate
 -- re-investigate the entire history of the world on the next tick.
 ALTER TABLE crime_incidents ADD COLUMN IF NOT EXISTS investigated_tick BIGINT;
 ALTER TABLE crime_incidents ADD COLUMN IF NOT EXISTS cleared BOOLEAN;
+
+
+-- ---------------------------------------------------------------------
+-- inventory — the second new TABLE in this file
+-- ---------------------------------------------------------------------
+-- Carries: `worldState.inventory`, written by server/inventory.js.
+--
+-- **Four systems had already run into its absence**, which is what
+-- cleared this file's deliberately high bar:
+--
+--   `crime.js` declares the `gun` category ungeneratable in its own
+--   words — "no weapon exists anywhere in the schema ... so nothing
+--   distinguishes an armed offence from an unarmed one".
+--
+--   `barter.js` could not make a trade conservative: with nothing to
+--   represent goods, the seller's side had to reduce
+--   `individual_finances.assets` as a stand-in, and a seller holding
+--   none minted value out of nothing until a check was added.
+--
+--   A deprivation theft moved no object at all — the victim lost
+--   nothing and the offender gained nothing.
+--
+--   And `GAME_LANGUAGE_AND_REFERENCES.md` names "an item that raises a
+--   trait" as one of four missing edges in the growth loop.
+--
+-- **Three existing tables were considered and each fails differently:**
+--
+--   `individual_finances.assets` is a single NUMERIC. It cannot say
+--   WHICH goods, so it answers none of the four questions above.
+--
+--   `properties.occupants` is JSONB about people in a building.
+--
+--   `ownership_records` is the closest and is genuinely wrong for
+--   this. It is an append-only history keyed to an `entities(id)`, and
+--   an item in a satchel is not an entity — there is no entities row
+--   for the third hammer somebody is carrying, and minting one per
+--   item would put hundreds of thousands of rows into the table every
+--   other system iterates.
+--
+-- No `item_definitions` table alongside it, deliberately: the item
+-- catalogue lives in server/barter.js as data (§27's seventeen sourced
+-- values plus whatever a world adds), following the precedent flows.js
+-- set, and inventory refuses an item that catalogue does not know. One
+-- place to define an item means the two cannot drift.
+CREATE TABLE IF NOT EXISTS inventory (
+    id                  BIGSERIAL PRIMARY KEY,
+    holder_entity_id    BIGINT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+    item_name           TEXT NOT NULL,
+    quantity            NUMERIC NOT NULL,
+    condition           NUMERIC DEFAULT 100,
+    equipped            BOOLEAN DEFAULT false,
+    acquired_tick       BIGINT NOT NULL
+);
+
+-- No `value` column, and that is standing rule 3 rather than an
+-- oversight: what a thing is worth is its base value against local
+-- scarcity and population, all of which move. A stored value would be
+-- the price on the day it was picked up, forever — standing rule 9's
+-- frozen-field failure in a new place. `inventory.valueOf` computes it
+-- through `barter.barterScore`.
+CREATE INDEX IF NOT EXISTS idx_inventory_holder ON inventory (holder_entity_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_item ON inventory (item_name);

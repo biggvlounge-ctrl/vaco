@@ -1,6 +1,10 @@
 // server/barter.js
 //
-// The barter economy — §26, §27 and §28, as data.
+// The barter economy — §26, §27 and §28.
+//
+// **The catalogue itself lives in `server/items.js`** and is
+// re-exported here, because `inventory.js` needs it too and a module
+// that both required created a cycle. See that file's header.
 //
 // **What was actually there before this, measured.** The spec is
 // unusually specific about this system, and almost none of it was
@@ -69,58 +73,10 @@
 
 const economy = require('./economy.js');
 const { getLiveEntity } = require('./entityTraits.js');
-
-// §26, verbatim and in its order.
-const TRADE_CATEGORIES = [
-  'food', 'water', 'medicine', 'clothing', 'tools', 'materials',
-  'livestock', 'fish', 'crops', 'metals', 'gems', 'spices',
-  'textiles', 'luxury goods', 'knowledge', 'services', 'labor',
-  'transport', 'repair', 'protection',
-];
-
-// §28, verbatim and in its order. **This is the canonical list the
-// engine did not have.** `resources.resource_type` stays open TEXT —
-// the schema is the source of truth for shape and this file does not
-// change it — but anything generating a resource can now check against
-// the spec's own enumeration instead of inventing a third list.
-const RESOURCE_TYPES = [
-  'food', 'water', 'medicine', 'fuel', 'wood', 'stone', 'metals',
-  'minerals', 'energy', 'tools', 'clothing', 'knowledge', 'technology',
-];
-
-// §27's seven fields, in its order. Held as data so the test can
-// assert every item carries them rather than trusting a comment.
-const BARTER_KEY_FIELDS = [
-  'Item_Name', 'Section_Category', 'Base_Value', 'Rarity',
-  'Environment_Modifier', 'Population_Modifier', 'Final_Barter_Score',
-];
-
-//: **The seventeen values §27 actually gives, and nothing else.**
-//: `Base_Value` is quoted verbatim. `Section_Category` is assigned
-//: from §26's own twenty categories — that assignment is the one
-//: interpretive act in this table, because the spec gives values
-//: without categories, and it is flagged rather than presented as
-//: sourced. `Rarity` is NOT in the spec for these items and is left
-//: null rather than invented; `barterScore` treats a null rarity as 1.
-const SOURCED_ITEMS = [
-  { name: 'Gold Ingot', category: 'metals', baseValue: 100 },
-  { name: 'Silver Ingot', category: 'metals', baseValue: 50 },
-  { name: 'Platinum Ingot', category: 'metals', baseValue: 120 },
-  { name: 'Copper Ingot', category: 'metals', baseValue: 20 },
-  { name: 'Palladium', category: 'metals', baseValue: 110 },
-  { name: 'Diamond', category: 'gems', baseValue: 200 },
-  { name: 'Sapphire', category: 'gems', baseValue: 150 },
-  { name: 'Ruby', category: 'gems', baseValue: 150 },
-  { name: 'Emerald', category: 'gems', baseValue: 150 },
-  { name: 'Amethyst', category: 'gems', baseValue: 60 },
-  { name: 'Sand', category: 'materials', baseValue: 5 },
-  { name: 'Gravel', category: 'materials', baseValue: 7 },
-  { name: 'Hammer', category: 'tools', baseValue: 8 },
-  { name: 'Saw', category: 'tools', baseValue: 10 },
-  { name: 'Gold Bar', category: 'metals', baseValue: 1800 },
-  { name: 'Silver Coin', category: 'metals', baseValue: 25 },
-  { name: 'Rare Musical Instrument', category: 'luxury goods', baseValue: 2000 },
-];
+const inventory = require('./inventory.js');
+const {
+  TRADE_CATEGORIES, RESOURCE_TYPES, BARTER_KEY_FIELDS, SOURCED_ITEMS, itemsFor, findItem,
+} = require('./items.js');
 
 // §27 lists seven influences on the modifiers. These three have no
 // substrate in this engine, and saying so is better than folding a
@@ -152,25 +108,6 @@ const POPULATION_REFERENCE = 500;
 //: bartered. At 0.3, somebody at 100 trades about 15% better than
 //: somebody at 50.
 const BARTER_SKILL_SWING = 0.3;
-
-// -- the catalogue ------------------------------------------------------
-
-// The items a world trades: the seventeen sourced ones, plus anything
-// the world itself defines. Same shape as `flows.js`'s template
-// resolution — a world's own entries win on name.
-function itemsFor(worldState) {
-  const custom = Array.isArray(worldState?.barterItems) ? worldState.barterItems : [];
-  const byName = new Map(SOURCED_ITEMS.map((i) => [i.name, { ...i, sourced: true }]));
-  for (const item of custom) {
-    if (!item || !item.name) continue;
-    byName.set(item.name, { ...item, sourced: false });
-  }
-  return [...byName.values()];
-}
-
-function findItem(worldState, name) {
-  return itemsFor(worldState).find((i) => i.name === name) || null;
-}
 
 // -- the modifiers ------------------------------------------------------
 
@@ -251,6 +188,30 @@ function barterScore(worldState, itemName, options = {}) {
 function round(value, places = 4) {
   const factor = 10 ** places;
   return Math.round(value * factor) / factor;
+}
+
+// What everything somebody holds is worth here, at this moment.
+//
+// **Priced live, never stored.** Standing rule 3: an item's worth is
+// its base value against local scarcity and population, all of which
+// move — a `value` column on a holding would be the price on the day
+// it was picked up, forever, which is standing rule 9's frozen-field
+// failure in a new place.
+//
+// It lives here rather than in `inventory.js` because pricing is this
+// module's job and putting it there would need inventory to require
+// barter, which requires inventory.
+function valueOfHoldings(worldState, entityId, options = {}) {
+  const { cityId = null } = options;
+  let total = 0;
+  for (const holding of inventory.holdingsOf(worldState, entityId)) {
+    if (!findItem(worldState, holding.item_name)) continue;
+    const score = barterScore(worldState, holding.item_name, { cityId });
+    total += score.Final_Barter_Score
+      * Number(holding.quantity)
+      * inventory.conditionFactor(holding.condition);
+  }
+  return Math.round(total * 100) / 100;
 }
 
 // -- the transaction ----------------------------------------------------
@@ -336,16 +297,38 @@ function exchange(worldState, options = {}) {
   // worth rose by 60, out of nothing. Value has to come from
   // somewhere, and a trade that mints it is worse than one that cannot
   // happen.
-  const seller = economy.getLatestFinances(worldState, sellerId);
-  const goods = Number(seller?.assets ?? 0);
-  if (deal.total > goods) {
-    return {
-      settled: false,
-      reason: 'seller does not hold goods of that value — `individual_finances.assets` stands '
-        + 'in for inventory because no item table exists',
-      deal,
-      goods,
-    };
+  // **And the seller has to actually hold the thing.** This check
+  // started as a value proxy — `individual_finances.assets` standing
+  // in for goods held, because no item table existed — after a test
+  // caught what its absence cost: a seller with no assets sold a
+  // 60-value gem and their net worth rose by 60, out of nothing.
+  //
+  // `server/inventory.js` exists now, so the question can be asked
+  // literally: does this person hold one? The asset check stays as the
+  // fallback for a world that trades without tracking holdings, and
+  // says which of the two it applied.
+  const sellerFinances = economy.getLatestFinances(worldState, sellerId);
+  const held = inventory.quantityOf(worldState, sellerId, itemName);
+  if (held > 0) {
+    if (held < quantity) {
+      return {
+        settled: false,
+        reason: `seller holds ${held} of ${quantity}`,
+        deal,
+        held,
+      };
+    }
+  } else {
+    const goods = Number(sellerFinances?.assets ?? 0);
+    if (deal.total > goods) {
+      return {
+        settled: false,
+        reason: 'seller holds none, and does not have assets of that value either — '
+          + '`individual_finances.assets` is the fallback stand-in for untracked goods',
+        deal,
+        goods,
+      };
+    }
   }
 
   // Both sides get a fresh `individual_finances` row rather than an
@@ -360,14 +343,26 @@ function exchange(worldState, options = {}) {
     tick,
   });
   economy.generateIndividualFinances(worldState, sellerId, {
-    income: seller?.income ?? 0,
-    savings: (seller?.savings ?? 0) + deal.total,
-    debt: seller?.debt ?? 0,
-    assets: Math.max(0, (seller?.assets ?? 0) - deal.total),
+    income: sellerFinances?.income ?? 0,
+    savings: (sellerFinances?.savings ?? 0) + deal.total,
+    debt: sellerFinances?.debt ?? 0,
+    // **The asset side only moves when the goods are untracked.** With
+    // a real holding the object itself moves, so reducing assets too
+    // would take the value off the seller twice.
+    assets: held > 0
+      ? (sellerFinances?.assets ?? 0)
+      : Math.max(0, (sellerFinances?.assets ?? 0) - deal.total),
     tick,
   });
 
-  return { settled: true, deal, tick };
+  // The OBJECT moves, not just the value — the half that could not
+  // happen before there was an inventory. A seller whose holdings are
+  // untracked moves nothing and the asset proxy above stands for it.
+  const moved = held > 0
+    ? inventory.transfer(worldState, { fromId: sellerId, toId: buyerId, itemName, quantity, tick })
+    : { moved: 0, short: 0, untracked: true };
+
+  return { settled: true, deal, tick, moved };
 }
 
 module.exports = {
@@ -382,6 +377,7 @@ module.exports = {
   BARTER_SKILL_SWING,
   itemsFor,
   findItem,
+  valueOfHoldings,
   environmentModifier,
   populationModifier,
   barterScore,

@@ -99,6 +99,17 @@ const areaStats = require('./areaStats.js');
 const economy = require('./economy.js');
 const mortality = require('./mortality.js');
 const worldStore = require('./worldStore.js');
+const inventory = require('./inventory.js');
+const items = require('./items.js');
+
+// An item's base worth, for choosing what a thief takes. Deliberately
+// the BASE value rather than the local barter score: a thief in the
+// moment is not running a market analysis, and calling `barterScore`
+// per item per theft would price the whole world on every incident.
+function barterValue(worldState, itemName) {
+  const item = items.findItem(worldState, itemName);
+  return item ? Number(item.baseValue) || 0 : 0;
+}
 const { seededDraw } = require('./seeded.js');
 const { nextAfter } = require('./nextAfter.js');
 
@@ -124,9 +135,10 @@ const CATEGORIES = {
     note: 'deprivation, against a resident above the poverty line',
   },
   gun: {
-    generated: false,
-    substrate: 'no weapon exists anywhere in the schema — no item, inventory or equipment '
-      + 'table — so nothing distinguishes an armed offence from an unarmed one.',
+    generated: true,
+    note: 'an escalation where the aggressor has something from §26\'s `protection` category '
+      + 'equipped. This was declared ungeneratable — "no weapon exists anywhere in the '
+      + 'schema" — until server/inventory.js gave an offence something to be armed WITH.',
   },
   fraud: {
     generated: false,
@@ -313,7 +325,22 @@ function sharesFamily(worldState, aId, bId) {
 // kind of crime that was.
 function recordEscalation(worldState, options = {}) {
   const { perpetratorId, victimId, tick = worldState.tick ?? 0, responseLevel = null } = options;
-  const category = sharesFamily(worldState, perpetratorId, victimId) ? 'domestic' : 'violent';
+
+  // **Armed or not, asked literally.** §9 lists `gun` as its own
+  // category and this file declared it ungeneratable for exactly one
+  // reason, in its own words: nothing in the schema could distinguish
+  // an armed offence from an unarmed one. `inventory.hasEquippedCategory`
+  // can — §26's `protection` category is what somebody has about them
+  // for that purpose.
+  //
+  // It takes precedence over `domestic` and `violent` because it is
+  // the more specific fact: a §9 crime report that recorded an armed
+  // assault as a plain one would lose the thing the category exists to
+  // count.
+  const armed = inventory.hasEquippedCategory(worldState, perpetratorId, 'protection');
+  const category = armed
+    ? 'gun'
+    : sharesFamily(worldState, perpetratorId, victimId) ? 'domestic' : 'violent';
   return recordCrime(worldState, {
     category,
     perpetratorId,
@@ -375,13 +402,36 @@ function runDeprivationCrime(worldState, tick = worldState.tick ?? 0) {
     // a block would otherwise have them rob themselves.
     const victim = target && target.npc.id !== npc.id ? target.npc : null;
 
-    incidents.push(recordCrime(worldState, {
+    const incident = recordCrime(worldState, {
       category: victim ? 'theft' : 'property',
       perpetratorId: npc.id,
       victimId: victim ? victim.id : null,
       tick,
       detail: `deprivation pressure ${Math.round(pressure * 100)}`,
-    }));
+    });
+
+    // **A theft takes something.** Before `server/inventory.js` there
+    // was nothing to take: the victim lost nothing, the offender
+    // gained nothing, and the only trace was a row saying it happened.
+    // The least valuable thing the victim holds is taken — somebody
+    // stealing out of deprivation takes what they can carry, and
+    // taking the best item would make every theft a heist.
+    if (victim) {
+      const holdings = inventory.holdingsOf(worldState, victim.id)
+        .filter((h) => !h.equipped);
+      if (holdings.length > 0) {
+        const target = holdings.reduce((least, h) => {
+          const value = barterValue(worldState, h.item_name);
+          return value < barterValue(worldState, least.item_name) ? h : least;
+        });
+        inventory.transfer(worldState, {
+          fromId: victim.id, toId: npc.id, itemName: target.item_name, quantity: 1, tick,
+        });
+        incident.detail += `; took a ${target.item_name}`;
+      }
+    }
+
+    incidents.push(incident);
   }
 
   return incidents;

@@ -145,6 +145,13 @@ const WorldState = {
   // measurable FROM. `server/demographics.js`.
   languages: [],
   entityLanguages: [],
+  // Who holds what. There was no item, inventory or equipment table
+  // anywhere in the schema, and four systems had already run into it:
+  // `crime.js` could not tell an armed offence from an unarmed one,
+  // `barter.js` could not make a trade conservative, a theft moved no
+  // object, and the growth loop had no item that could raise a trait.
+  // `server/inventory.js`; items themselves are defined in barter.js.
+  inventory: [],
   beliefs: [],
   // Civilizations and the technology ladder. Four dead tables built
   // together on 12 Sep 2026 because they are one system:

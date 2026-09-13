@@ -291,8 +291,12 @@ test('every category §9 names is countable, and the ungenerated ones say why', 
     }
   }
 
+  // `gun` joined the generated set when server/inventory.js gave an
+  // offence something to be armed WITH. Its declared reason was
+  // precisely "no weapon exists anywhere in the schema", and that
+  // stopped being true.
   assert.deepEqual(crime.GENERATED_CATEGORIES.sort(),
-    ['domestic', 'property', 'theft', 'violent']);
+    ['domestic', 'gun', 'property', 'theft', 'violent']);
 });
 
 test('sex_offense is recordable and nothing in the engine generates one', () => {

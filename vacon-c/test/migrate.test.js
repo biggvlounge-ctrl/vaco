@@ -80,6 +80,12 @@ const EXTENSION_TABLES = {
     + 'two aggregate NUMERIC columns (communities.crime, territory_blocks.crime_rate) that '
     + 'cannot be broken down by type, and no existing table holds category + perpetrator + '
     + 'victim + community together.',
+  inventory: 'who holds what. No item, inventory or equipment table exists anywhere in the '
+    + 'base schema, and four systems had already run into it — crime could not tell an armed '
+    + 'offence from an unarmed one, barter could not make a trade conservative, a theft moved '
+    + 'no object, and the growth loop had no item that could raise a trait. '
+    + 'individual_finances.assets is one NUMERIC and cannot say which goods; ownership_records '
+    + 'is keyed to entities(id) and an item in a satchel is not an entity.',
 };
 
 function extensionColumns() {

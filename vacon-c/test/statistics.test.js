@@ -226,10 +226,16 @@ test('a crime category nothing generates carries a caveat on its zero', () => {
   person(w, { communityId: c.id });
   const profile = statistics.profileFor(w, c.id);
 
-  assert.equal(profile.statistics.gun_crime_per_1k.value, 0);
-  assert.match(profile.statistics.gun_crime_per_1k.caveat, /nothing in the engine generates/);
+  // `gun` used to be the example here and is generated now, so the
+  // caveat moved to a category that is still ungenerated. The point of
+  // the test is unchanged: a zero that means "nobody did it" and a
+  // zero that means "we do not model this" have to be distinguishable.
+  assert.equal(profile.statistics.drug_crime_per_1k.value, 0);
+  assert.match(profile.statistics.drug_crime_per_1k.caveat, /nothing in the engine generates/);
   assert.equal(profile.statistics.violent_crime_per_1k.caveat, undefined,
     'violent crime IS generated and should carry no caveat');
+  assert.equal(profile.statistics.gun_crime_per_1k.caveat, undefined,
+    'gun crime is generated now that inventory exists');
 });
 
 test('the crime entries come from crime.js, so the two cannot disagree', () => {
