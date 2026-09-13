@@ -717,6 +717,23 @@ async function migrateWorldStateToPostgres(worldState) {
       }
       summary.inventory = worldState.inventory.length;
 
+      // ---------------------------------------------------------------
+      // decision_log — after entities, which entity_id references
+      // ---------------------------------------------------------------
+      for (const d of worldState.decisionLog) {
+        await client.query(
+          `INSERT INTO decision_log (id, entity_id, situation, available_options,
+             selected_option, expected_result, confidence, traits_used, keys_used,
+             memory_used, outcome, tick)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+          [d.id, d.entity_id, d.situation, JSON.stringify(d.available_options),
+            d.selected_option, d.expected_result, d.confidence,
+            JSON.stringify(d.traits_used), JSON.stringify(d.keys_used),
+            JSON.stringify(d.memory_used), d.outcome, d.tick]
+        );
+      }
+      summary.decision_log = worldState.decisionLog.length;
+
       // Second half of the properties.history_ref two-phase insert —
       // see the note on the properties INSERT above. Now that
       // historical_records exist, the FK can be satisfied.

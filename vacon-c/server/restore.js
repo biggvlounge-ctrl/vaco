@@ -346,6 +346,10 @@ async function restoreWorldStateFromPostgres(worldState) {
     nums(h, ['id', 'holder_entity_id', 'quantity', 'condition', 'acquired_tick']));
   summary.inventory = worldState.inventory.length;
 
+  worldState.decisionLog = (await q('SELECT * FROM decision_log ORDER BY id')).map((d) =>
+    nums(d, ['id', 'entity_id', 'confidence', 'tick']));
+  summary.decision_log = worldState.decisionLog.length;
+
   // -------------------------------------------------------------------
   // Territory / Property
   // -------------------------------------------------------------------

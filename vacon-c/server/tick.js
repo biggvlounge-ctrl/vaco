@@ -44,6 +44,7 @@
 'use strict';
 
 const { nextAfter } = require('./nextAfter.js');
+const { hashSeed } = require('./seeded.js');
 
 const { getEntityTraitsForEntity, applyKeyModifier, getLiveEntity, traitsToSheet } = require('./entityTraits.js');
 const worldStore = require('./worldStore.js');
@@ -348,8 +349,15 @@ function runSocialPhase(worldState) {
 // choice 1. A real topic system would need a schema addition, not
 // something to invent here.
 // ---------------------------------------------------------------------------
+//: How often somebody stops to consider their own situation, in ticks.
+//: Seven — a tick is a day, so roughly weekly, which spreads the whole
+//: population across the interval rather than resolving everybody at
+//: once. Flagged interpretive: no document sets a cadence.
+const REFLECTION_INTERVAL = 7;
+
 function runDecisionPhase(worldState) {
   const events = [];
+  const decided = new Set();
   const boundApplyKeyModifier = (entityId, family, name, delta, tick) => applyKeyModifier(worldState, entityId, family, name, delta, tick);
 
   for (const npc of worldState.npcs) {
@@ -376,6 +384,57 @@ function runDecisionPhase(worldState) {
         note: `${npc.name}'s fear spiked to ${fearOutcome.fearLevel} over ${resourceType} scarcity`,
         tick: worldState.tick, affected_entity_ids: [npc.id], global_effects: {},
       });
+    }
+    decided.add(npc.id);
+  }
+
+  // **The other thing this phase was missing: people deciding about
+  // their own lives.** Measured, a generated world ran forty ticks and
+  // recorded ZERO decisions — the phase fired only on fresh scarcity
+  // knowledge, the Social phase resolves Trust only when there is
+  // knowledge to reassess, and Security resolves Aggression only for a
+  // relationship already carrying conflict above 30. So in an ordinary
+  // world none of the seven Key resolvers ran at all, and the decision
+  // machinery this engine is built around sat idle.
+  //
+  // Everybody considers their own situation, on their own cadence.
+  // **Not everybody every tick** — that is how the Fear spike came to
+  // fire 28,016 times in 300 ticks — but on a seeded weekly rota, so
+  // roughly a seventh of the population decides something on any given
+  // day and the same world always produces the same decisions.
+  for (const npc of worldState.npcs) {
+    if (decided.has(npc.id)) continue;
+    if (hashSeed([npc.id, 'reflect']) % REFLECTION_INTERVAL
+        !== worldState.tick % REFLECTION_INTERVAL) continue;
+
+    const live = getLiveEntity(worldState, npc.id);
+    if (!live) continue;
+    const bound = {
+      tick: worldState.tick, worldState, applyKeyModifier: boundApplyKeyModifier,
+    };
+
+    // **The Key that fits the situation**, rather than a random one.
+    // Which resolver applies is itself a reading of the world: somebody
+    // under real strain is weathering a setback, somebody in a quarrel
+    // is deciding whether to escalate, and somebody with neither is
+    // adjusting to a world that keeps changing around them.
+    const state = behavior.getEntityState(worldState, npc.id);
+    const stress = state?.stressLevel ?? 0;
+    const quarrel = worldState.relationships.find(
+      (r) => r.entity_a_id === npc.id && (r.conflict ?? 0) > 0,
+    );
+
+    if (stress >= 50) {
+      keys.resolveResilience(live, { ...bound, setbackDescription: 'a hard stretch', setbackSeverity: Math.round(stress) });
+    } else if (quarrel) {
+      keys.resolveAggression(live, {
+        ...bound,
+        otherEntityId: quarrel.entity_b_id,
+        provocationDescription: 'an unsettled quarrel',
+        knowledge: worldStore.getKnowledge(worldState, npc.id, quarrel.entity_b_id),
+      });
+    } else {
+      keys.resolveAdaptability(live, { ...bound, changeDescription: 'the way things are going' });
     }
   }
 

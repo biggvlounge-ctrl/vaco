@@ -43,6 +43,7 @@
 'use strict';
 
 const worldStore = require('./worldStore.js');
+const decisions = require('./decisions.js');
 
 function traitValue(entity, family, name, fallback = 50) {
   return entity.traits?.[family]?.[name] ?? fallback;
@@ -73,7 +74,9 @@ function knowledgeCharge(knowledge = []) {
 // Shared three-way write-back (Section 4.3). `relationship.otherEntityId`
 // omitted means the introspective self-relationship fallback (see file
 // header, interpretive choice 2).
-function writeBack(worldState, applyKeyModifier, { entityId, tick, memory, relationship, worldTrait }) {
+function writeBack(worldState, applyKeyModifier, {
+  entityId, tick, memory, relationship, worldTrait, decision,
+}) {
   const memoryRow = worldStore.addMemory(worldState, { entityId, tick, ...memory });
 
   const otherId = relationship.otherEntityId ?? entityId;
@@ -85,7 +88,31 @@ function writeBack(worldState, applyKeyModifier, { entityId, tick, memory, relat
     ? applyKeyModifier(entityId, worldTrait.family, worldTrait.name, worldTrait.delta, tick)
     : null;
 
-  return { memoryRow, relationshipRow, worldRow };
+  // **The fourth write-back.** `decision_log` is one of the most
+  // specific tables in the schema — situation, available options,
+  // what was chosen, what was expected, confidence, which traits,
+  // which keys, which memories, and what actually followed — and it
+  // had no WorldState array at all. Every resolver already held all of
+  // it and discarded it on every resolution.
+  //
+  // Here rather than in each of the seven resolvers for the same
+  // reason the other three are here: one place that cannot be
+  // forgotten. `test/decisions.test.js` asserts every resolver
+  // supplies one, because a Key that resolves without saying why
+  // would work perfectly and just make the log shorter than it should
+  // be.
+  const decisionRow = decision
+    ? decisions.record(worldState, {
+      entityId,
+      tick,
+      // The memory this resolution just wrote is what the entity will
+      // draw on next time, so it IS the memory this decision used.
+      memoryUsed: memoryRow ? [memoryRow.id] : [],
+      ...decision,
+    })
+    : null;
+
+  return { memoryRow, relationshipRow, worldRow, decisionRow };
 }
 
 // ---------------------------------------------------------------------------
@@ -114,6 +141,18 @@ function resolveResilience(entity, context) {
     },
     relationship: { relationshipType: 'self', changes: { shared_history: 1 } },
     worldTrait: { family: 'emotional', name: 'Resilience', delta: Math.round(severityAbsorbed / 20) },
+    decision: {
+      situation: `${setbackDescription} (severity ${setbackSeverity})`,
+      availableOptions: ['absorb', 'be overwhelmed'],
+      selectedOption: netImpact <= setbackSeverity / 2 ? 'absorb' : 'be overwhelmed',
+      expectedResult: `net impact ${netImpact}`,
+      confidence: resilienceScore / 100,
+      traitsUsed: [
+        { family: 'emotional', name: 'Resilience', value: resilienceTrait },
+        { family: 'physical', name: 'Recovery Rate', value: recoveryRate },
+      ],
+      keysUsed: ['Resilience'],
+    },
   });
 
   return { key: 'Resilience', resilienceScore, severityAbsorbed, netImpact, writes };
@@ -145,6 +184,18 @@ function resolveAdaptability(entity, context) {
     },
     relationship: { relationshipType: 'self', changes: { shared_history: 1 } },
     worldTrait: { family: 'mental', name: 'Adaptability', delta: Math.round(adaptabilityScore / 25) },
+    decision: {
+      situation: `${changeDescription} (magnitude ${changeMagnitude})`,
+      availableOptions: ['adjust', 'resist'],
+      selectedOption: adaptabilityScore >= 50 ? 'adjust' : 'resist',
+      expectedResult: `${adjustmentTicks} ticks to adjust`,
+      confidence: adaptabilityScore / 100,
+      traitsUsed: [
+        { family: 'mental', name: 'Adaptability', value: adaptabilityTrait },
+        { family: 'mental', name: 'Learning Speed', value: learningSpeed },
+      ],
+      keysUsed: ['Adaptability'],
+    },
   });
 
   return { key: 'Adaptability', adaptabilityScore, adjustmentTicks, writes };
@@ -187,6 +238,21 @@ function resolveTrust(entity, context) {
       changes: { trust: trustDelta },
     },
     worldTrait: { family: 'psychological', name: 'Trust Threshold', delta: trustDelta > 0 ? -1 : 1 },
+    decision: {
+      situation: `${interactionDescription} with entity ${otherEntityId}`,
+      availableOptions: ['trust more', 'trust less', 'unchanged'],
+      selectedOption: trustDelta > 0 ? 'trust more' : trustDelta < 0 ? 'trust less' : 'unchanged',
+      expectedResult: `trust ${newTrust}`,
+      // **Confidence is how settled the judgement is, not how high it
+      // is.** Somebody with a high Trust Threshold is slow to move off
+      // a prior, which is exactly what being confident in a reading
+      // means here.
+      confidence: trustThreshold / 100,
+      traitsUsed: [
+        { family: 'psychological', name: 'Trust Threshold', value: trustThreshold },
+      ],
+      keysUsed: ['Trust'],
+    },
   });
 
   return { key: 'Trust', priorTrust, newTrust, trustDelta, writes };
@@ -218,6 +284,18 @@ function resolveScarcityResponse(entity, context) {
     },
     relationship: { relationshipType: 'self', changes: { shared_history: 1 } },
     worldTrait: { family: 'economic', name: 'Resource Hoarding', delta: hoardingResponse > 60 ? 1 : -1 },
+    decision: {
+      situation: `${resourceType} scarcity`,
+      availableOptions: ['hoard', 'share'],
+      selectedOption: hoardingResponse > 60 ? 'hoard' : 'share',
+      expectedResult: `hoarding response ${hoardingResponse}`,
+      confidence: Math.abs(hoardingResponse - 50) / 50,
+      traitsUsed: [
+        { family: 'economic', name: 'Resource Hoarding', value: hoarding },
+        { family: 'economic', name: 'Greed', value: greed },
+      ],
+      keysUsed: ['ScarcityResponse'],
+    },
   });
 
   return { key: 'ScarcityResponse', perceivedScarcity, hoardingResponse, writes };
@@ -258,6 +336,18 @@ function resolveFear(entity, context) {
       changes: { fear: fearLevel > 50 ? Math.round(fearLevel / 10) : 0 },
     },
     worldTrait: { family: 'emotional', name: 'Volatility', delta: fearLevel > 50 ? 1 : 0 },
+    decision: {
+      situation: threatDescription,
+      availableOptions: ['face it', 'take fright'],
+      selectedOption: fearLevel > 50 ? 'take fright' : 'face it',
+      expectedResult: `fear level ${fearLevel}`,
+      confidence: Math.abs(fearLevel - 50) / 50,
+      traitsUsed: [
+        { family: 'emotional', name: 'Volatility', value: volatility },
+        { family: 'psychological', name: 'Paranoia', value: paranoia },
+      ],
+      keysUsed: ['Fear'],
+    },
   });
 
   return { key: 'Fear', fearLevel, sourceEntityId: sourceEntityId ?? null, writes };
@@ -298,6 +388,18 @@ function resolveAggression(entity, context) {
       },
     },
     worldTrait: { family: 'behavioral', name: 'Aggression', delta: escalatesToConflict ? 1 : -1 },
+    decision: {
+      situation: `${provocationDescription} from entity ${otherEntityId}`,
+      availableOptions: ['let it go', 'escalate'],
+      selectedOption: escalatesToConflict ? 'escalate' : 'let it go',
+      expectedResult: `response level ${responseLevel}`,
+      confidence: tacticalAwareness / 100,
+      traitsUsed: [
+        { family: 'behavioral', name: 'Aggression', value: aggression },
+        { family: 'combat', name: 'Tactical Awareness', value: tacticalAwareness },
+      ],
+      keysUsed: ['Aggression'],
+    },
   });
 
   return { key: 'Aggression', responseLevel, escalatesToConflict, writes };
@@ -336,6 +438,18 @@ function resolveTerritory(entity, context) {
       changes: { competition: Math.round(defenseLevel / 10), conflict: contested ? Math.round(defenseLevel / 15) : 0 },
     },
     worldTrait: { family: 'faction', name: 'Territorial Instinct', delta: contested ? 1 : 0 },
+    decision: {
+      situation: `${encroachmentDescription} from entity ${otherEntityId}`,
+      availableOptions: ['concede', 'contest'],
+      selectedOption: contested ? 'contest' : 'concede',
+      expectedResult: `defense level ${defenseLevel}`,
+      confidence: territorialInstinct / 100,
+      traitsUsed: [
+        { family: 'faction', name: 'Territorial Instinct', value: territorialInstinct },
+        { family: 'faction', name: 'Defection Risk', value: defectionRisk },
+      ],
+      keysUsed: ['Territory'],
+    },
   });
 
   return { key: 'Territory', defenseLevel, contested, writes };

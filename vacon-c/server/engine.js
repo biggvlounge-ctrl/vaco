@@ -152,6 +152,14 @@ const WorldState = {
   // object, and the growth loop had no item that could raise a trait.
   // `server/inventory.js`; items themselves are defined in barter.js.
   inventory: [],
+  // Why somebody did what they did. `decision_log` is one of the most
+  // specific tables in the schema — situation, available options, what
+  // was chosen, what was expected, confidence, which traits, which
+  // keys, which memories, and what actually followed — and it had no
+  // array at all: not even listed as schema-only. Every Key resolver
+  // held all of it and discarded it on every resolution.
+  // `server/decisions.js`; written from `keys.js#writeBack`.
+  decisionLog: [],
   beliefs: [],
   // Civilizations and the technology ladder. Four dead tables built
   // together on 12 Sep 2026 because they are one system:

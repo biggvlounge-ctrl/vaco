@@ -537,12 +537,22 @@ test('contact still accumulates when there is nothing to reassess', () => {
   }
   const rel = worldStore.getOrCreateRelationship(ew, a.id, b.id, 'social');
   const before = rel.interaction_count;
-  const memoriesBefore = ew.memories.length;
+  // **Counted for THESE two people, not for the whole world.** The
+  // first version measured `ew.memories.length`, which is the shared
+  // engine WorldState — every NPC any earlier test left in it now
+  // reflects on its own situation weekly, so the total rose for
+  // reasons that have nothing to do with the Social phase. A threshold
+  // over a number somebody else is also moving is not a measurement.
+  const mine = new Set([a.id, b.id]);
+  const memoriesBefore = ew.memories.filter((m) => mine.has(m.entity_id)).length;
 
   for (let t = 0; t < 60; t += 1) engine.advanceTick();
 
   assert.ok(rel.interaction_count >= before + 60,
     'contact stopped accumulating on quiet ticks, so no bond can ever form');
-  assert.ok(ew.memories.length - memoriesBefore < 60,
-    'the Social phase is writing a memory per relationship per tick again');
+  const theirs = ew.memories.filter((m) => mine.has(m.entity_id)).length - memoriesBefore;
+  // Two people over sixty ticks: a weekly reflection each is about
+  // seventeen. A memory per relationship per tick would be sixty.
+  assert.ok(theirs < 60,
+    `the Social phase wrote ${theirs} memories for two people in 60 ticks`);
 });
