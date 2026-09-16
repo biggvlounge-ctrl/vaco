@@ -160,6 +160,18 @@ const WorldState = {
   // held all of it and discarded it on every resolution.
   // `server/decisions.js`; written from `keys.js#writeBack`.
   decisionLog: [],
+  // **What somebody wants.** `needs`, `values_db` and `goals` were all
+  // three defined in the schema with no array and no code — the engine
+  // could say what a person was capable of, what they had done and who
+  // they knew, and nothing at all about what they were trying to get.
+  //
+  // One module rather than three, because §4.5 says so in as many
+  // words: "Motivation Engine = Value System DNA restated (don't
+  // duplicate)". `values_db` IS the Value System DNA of §3.5, and needs
+  // and goals hang off it. `server/motivation.js`.
+  needs: [],
+  valuesDb: [],
+  goals: [],
   beliefs: [],
   // Civilizations and the technology ladder. Four dead tables built
   // together on 12 Sep 2026 because they are one system:

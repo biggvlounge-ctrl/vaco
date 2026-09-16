@@ -64,6 +64,7 @@ const behavior = require('./behavior.js');
 const areaStats = require('./areaStats.js');
 const perception = require('./perception.js');
 const traitDrift = require('./traitDrift.js');
+const motivation = require('./motivation.js');
 
 let nextEventId = 1;
 
@@ -893,6 +894,13 @@ function advanceTick(worldState) {
   // already in `deceased`, and nothing would throw. See
   // server/births.js.
   candidateEvents.push(...births.runBirths(worldState, worldState.tick).events);
+
+  // What everybody wants. Before trait drift and after behavior, which
+  // is the order the data flows in: `runBehavior` reinforces the habits
+  // that satisfy needs, motivation reads those habits, and trait drift
+  // then reads the habits too. Nothing here feeds the phase that
+  // produced it.
+  candidateEvents.push(...motivation.runMotivation(worldState, { tick: worldState.tick }));
 
   // Trait drift, last of the cross-cutting layers and deliberately at
   // the end of them.

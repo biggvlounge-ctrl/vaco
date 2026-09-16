@@ -275,6 +275,27 @@ async function restoreWorldStateFromPostgres(worldState) {
       nums(p, ['civilization_id', 'era_id', 'unlocked_tick']));
   summary.civilization_technology_progress = worldState.civilizationTechnologyProgress.length;
 
+  // What people want. Every NUMERIC column is named in `nums` — rule
+  // 10, and `current_level` is the one that matters most: a string
+  // level makes `level + change` string concatenation and a need that
+  // reads as satisfied forever.
+  worldState.needs = (await q('SELECT * FROM needs')).map((n) =>
+    nums(n, ['entity_id', 'current_level', 'priority', 'last_satisfied_tick']));
+  summary.needs = worldState.needs.length;
+
+  worldState.valuesDb = (await q('SELECT * FROM values_db')).map((v) =>
+    nums(v, ['entity_id', 'priority', 'current_strength', 'change_rate', 'influence_weight']));
+  summary.values_db = worldState.valuesDb.length;
+
+  // `resolved_tick` and `about_need` are not columns — see migrate.js.
+  // Restored as null, which is what an unresolved goal has anyway.
+  worldState.goals = (await q('SELECT * FROM goals ORDER BY id')).map((g) => ({
+    ...nums(g, ['id', 'entity_id', 'created_tick']),
+    resolved_tick: null,
+    about_need: null,
+  }));
+  summary.goals = worldState.goals.length;
+
   // **`strength` named in `nums`.** Postgres returns NUMERIC as a
   // string, and a string strength makes `belief.strength + delta`
   // string concatenation — "50" + 10 is "5010", which clamps to 100

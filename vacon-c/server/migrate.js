@@ -583,6 +583,43 @@ async function migrateWorldStateToPostgres(worldState) {
       }
       summary.civilization_technology_progress = worldState.civilizationTechnologyProgress.length;
 
+      // What people want. All three reference entities(id), so they go
+      // after entities and before nothing in particular — nothing reads
+      // them back except the engine.
+      //
+      // **`goals.resolved_tick` and `about_need` are NOT migrated**,
+      // and that is deliberate rather than an omission: neither is a
+      // column in the schema. They are in-memory bookkeeping that lets
+      // `runMotivation` close a goal, the same way `missions` carries
+      // state the schema does not name. A restored world re-derives
+      // them by opening a fresh goal when the need is still unmet.
+      for (const n of worldState.needs) {
+        await client.query(
+          `INSERT INTO needs (entity_id, need_type, current_level, priority, last_satisfied_tick)
+           VALUES ($1,$2,$3,$4,$5)`,
+          [n.entity_id, n.need_type, n.current_level, n.priority, n.last_satisfied_tick]
+        );
+      }
+      summary.needs = worldState.needs.length;
+
+      for (const v of worldState.valuesDb) {
+        await client.query(
+          `INSERT INTO values_db (entity_id, value_name, priority, current_strength, change_rate, influence_weight)
+           VALUES ($1,$2,$3,$4,$5,$6)`,
+          [v.entity_id, v.value_name, v.priority, v.current_strength, v.change_rate, v.influence_weight]
+        );
+      }
+      summary.values_db = worldState.valuesDb.length;
+
+      for (const g of worldState.goals) {
+        await client.query(
+          `INSERT INTO goals (id, entity_id, goal_description, timeframe, status, created_tick)
+           VALUES ($1,$2,$3,$4,$5,$6)`,
+          [g.id, g.entity_id, g.goal_description, g.timeframe, g.status, g.created_tick]
+        );
+      }
+      summary.goals = worldState.goals.length;
+
       // beliefs, before the political tables that read them.
       for (const b of worldState.beliefs) {
         await client.query(

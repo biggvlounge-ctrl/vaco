@@ -13,16 +13,16 @@ three places, a spec section's "roughly 25 of the 40", a catalogue of 67
 statistics that a real world answered 36 of, and seven trait families generated
 on every NPC and read by nothing.
 
-## 85.6% complete
+## 86.6% complete
 
 ```
-█████████████████░░░  85.6%   257.75 of 301
+█████████████████░░░  86.6%   260.75 of 301
 ```
 
 | axis | complete | score | what it measures |
 |---|---|---|---|
 | systems | **55.6%** | 22.25/40 | urban systems with mechanics |
-| tables | **76.2%** | 49.5/65 | schema tables a built world fills |
+| tables | **80.8%** | 52.5/65 | schema tables a built world fills |
 | statistics | **86.6%** | 58/67 | statistics a world can answer |
 | traits | **100%** | 114/114 | traits something reads |
 | traitDepth | **85.7%** | 6/7 | trait columns a life actually changes |
@@ -73,18 +73,15 @@ The forty systems §7 names, at `server/urbanSystems.js`'s own four levels (mode
 | `38. Migration` | partial | +0.5 |
 | `39. Reputation` | partial | +0.5 |
 
-### tables — 16 open
+### tables — 13 open
 
 Every `CREATE TABLE` in the schema and its extensions. A table a built world fills scores 1; one the engine writes but no world has ever used scores 0.5; one with no store at all scores 0.
 
 | item | state | worth |
 |---|---|---|
 | `keys_log` | no store | +1 |
-| `values_db` | no store | +1 |
 | `preferences` | no store | +1 |
 | `archetypes` | no store | +1 |
-| `needs` | no store | +1 |
-| `goals` | no store | +1 |
 | `households` | no store | +1 |
 | `revolutions` | written, but unreached — assessRevolutions runs every tick; no generated world has fallen below approval 35 with 25% of the population informed | +0.5 |
 | `investments` | no store | +1 |

@@ -347,15 +347,21 @@ const SYSTEMS = [
     n: 26,
     name: 'Religion',
     level: 'partial',
-    tables: ['beliefs'],
-    schemaOnly: ['values_db'],
-    functions: ['adoptBelief', 'shiftBelief', 'getBeliefs', 'summariseBelief'],
+    tables: ['beliefs', 'values_db'],
+    functions: ['adoptBelief', 'shiftBelief', 'getBeliefs', 'summariseBelief',
+      'generateValues', 'rankValues', 'topValue'],
     note: '`beliefs` became live on 12 Sep 2026 — `religious` is one of its six types, so a '
       + 'religious conviction is now a real thing an entity holds, at a strength that moves. '
       + '**Still partial**: no religious institutions, no practice, no clergy, and nothing '
-      + 'religious drives a decision. `values_db` stays schema-only on purpose — it has no '
-      + 'column defaults and no source document gives value distributions, so a generator '
-      + 'would be fifteen invented numbers per person.',
+      + 'religious drives a decision. '
+      + '`values_db` was schema-only here on the stated grounds that "no source document gives '
+      + 'value distributions, so a generator would be fifteen invented numbers per person" — '
+      + 'and that objection was wrong twice over. The fifteen VALUE NAMES are given outright by '
+      + '`VACANCY_TRAIT_DATABASE_ATTACHMENT.md` under "Value System DNA", and a distribution is '
+      + 'invented for every trait in this engine too: `randomTraitValue` draws them from a '
+      + 'flagged range, and values now draw the same way from the seeded generator. Live since '
+      + '`server/motivation.js`. The LEVEL stays partial, because a person having values does '
+      + 'not give this world a religion.',
   },
   {
     n: 27,

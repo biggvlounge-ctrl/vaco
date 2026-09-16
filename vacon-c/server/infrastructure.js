@@ -209,6 +209,44 @@ function describeCityDrift(worldState, cityId) {
   };
 }
 
+//: **What a well-served city of this size actually has**, per 1,000
+//: residents, for the four types that carry a headcount at all.
+//:
+//: This lived in `worldgen.js` as generation input and nothing could
+//: read it back, so `motivation.js` had no way to ask "is this city
+//: normally served?" — its first version divided raw capacity by the
+//: whole population and read a hospital with 30 beds per 1,000 people
+//: as 3% coverage, which collapsed the healthcare need to 0.8 on
+//: everybody alive. Beds per head is not the same question as whether
+//: care is available.
+//:
+//: Declared here because this is where infrastructure types live, and
+//: `worldgen.js` now builds from it rather than from its own copy — two
+//: lists of the same numbers is how they come to disagree.
+//:
+//: Flagged interpretive: no document sets service levels. What matters
+//: is that the generator and the reader use ONE set.
+const DESIGN_CAPACITY_PER_1K = {
+  schools: 180,
+  hospitals: 30,
+  public_safety: 25,
+  waste_management: 900,
+};
+
+// How well a city is served for one type, 0..1, against the design
+// baseline above. Null — not zero — when nothing is built or nothing
+// states a capacity, because unknown is not unserved and a caller
+// should be able to tell the difference.
+function serviceLevel(worldState, cityId, type, residents) {
+  const baseline = DESIGN_CAPACITY_PER_1K[type];
+  if (!baseline) return null;
+  const capacity = capacityOf(worldState, cityId, type);
+  if (capacity === null || capacity === undefined) return null;
+  if (!Number.isFinite(residents) || residents <= 0) return null;
+  const perThousand = (Number(capacity) / residents) * 1000;
+  return Math.max(0, Math.min(1, perThousand / baseline));
+}
+
 //: How much a population's own technical skill raises the effective
 //: maintenance of what it has built. At 0.4, a city whose people are
 //: expert across the `technology` family maintains its infrastructure
@@ -308,6 +346,8 @@ module.exports = {
   ANNUAL_DECAY,
   MAINTENANCE_OFFSET,
   AGE_AT_FULL_RISK,
+  DESIGN_CAPACITY_PER_1K,
+  serviceLevel,
   TECHNICAL_SKILL_WEIGHT,
   technicalSkillIn,
   effectiveMaintenance,

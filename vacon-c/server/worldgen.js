@@ -80,6 +80,7 @@ const politics = require('./politics.js');
 const culture = require('./culture.js');
 const missions = require('./missions.js');
 const inventory = require('./inventory.js');
+const motivation = require('./motivation.js');
 const items = require('./items.js');
 const territory = require('./territory.js');
 const worldStore = require('./worldStore.js');
@@ -130,18 +131,18 @@ const DEFAULTS = {
 // per 1,000 residents so a bigger city is not automatically better
 // served. Only the four with a meaningful capacity carry one; a road
 // network has a condition and no headcount.
+// The capacities come from `infrastructure.DESIGN_CAPACITY_PER_1K` so
+// the generator and anything reading service levels back share ONE set
+// of numbers. They were declared here and unreadable from anywhere
+// else, which is how `motivation.js` ended up inventing its own measure
+// of whether a city was served.
 const CITY_INFRASTRUCTURE = [
-  { type: 'schools', capacityPer1k: 180 },
-  { type: 'hospitals', capacityPer1k: 30 },
-  { type: 'public_safety', capacityPer1k: 25 },
-  { type: 'waste_management', capacityPer1k: 900 },
-  { type: 'roads' },
-  { type: 'bridges' },
-  { type: 'water_systems' },
-  { type: 'electricity' },
-  { type: 'internet' },
-  { type: 'rail' },
-];
+  'schools', 'hospitals', 'public_safety', 'waste_management',
+  'roads', 'bridges', 'water_systems', 'electricity', 'internet', 'rail',
+].map((type) => ({
+  type,
+  capacityPer1k: infrastructure.DESIGN_CAPACITY_PER_1K[type],
+}));
 
 // The resource types a generated city tracks. A subset of §28's
 // thirteen — the ones this engine's other systems actually read —
@@ -195,7 +196,7 @@ function generateWorld(options = {}) {
     seed: config.seed,
     cities: [], communities: 0, people: 0, families: 0, properties: 0,
     infrastructure: 0, organizations: 0, employed: 0, gangMembers: 0,
-    languages: 0, resources: 0, territoryBlocks: 0,
+    languages: 0, resources: 0, territoryBlocks: 0, motivated: 0,
   };
 
   // **What THIS run built, as distinct from what is in the world.**
@@ -546,6 +547,35 @@ function generateWorld(options = {}) {
       for (const npc of residents) {
         behavior.seedRoutine(w, npc.id, { tick });
       }
+
+      // ---- what they want ---------------------------------------------
+      // **`needs`, `values_db` and `goals` were three empty tables**, so
+      // every person in every world was capable, connected, employed and
+      // wanting nothing. `runMotivation` is in the tick and, like
+      // `runPolitics` before it had a government, it had nobody with a
+      // need to act on.
+      //
+      // Seeded on position (`b`, `ri`) rather than on `npc.id` — §88,
+      // and the mistake this file already made once with inventory.
+      residents.forEach((npc, ri) => {
+        motivation.generateValues(w, npc.id, {
+          strengthFor: (valueName, vi) => Math.round(
+            random.range(15, 95, 'value', c, b, ri, vi),
+          ),
+          tick,
+        });
+        motivation.generateNeeds(w, npc.id, {
+          // Started high and varied rather than at a flat number: a
+          // world where everybody begins equally satisfied has no
+          // spread for `mostPressing` to find, and a flat start is the
+          // placeholder problem this project keeps catching.
+          levelFor: (needType) => Math.round(
+            random.range(45, 95, 'need', c, b, ri, needType),
+          ),
+          tick,
+        });
+        summary.motivated += 1;
+      });
 
       // ---- affiliation -----------------------------------------------------
       adults.forEach((npc, ai) => {
