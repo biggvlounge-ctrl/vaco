@@ -81,6 +81,7 @@ const culture = require('./culture.js');
 const missions = require('./missions.js');
 const inventory = require('./inventory.js');
 const motivation = require('./motivation.js');
+const archetypes = require('./archetypes.js');
 const items = require('./items.js');
 const territory = require('./territory.js');
 const worldStore = require('./worldStore.js');
@@ -572,6 +573,13 @@ function generateWorld(options = {}) {
           levelFor: (needType) => Math.round(
             random.range(45, 95, 'need', c, b, ri, needType),
           ),
+          tick,
+        });
+        // Taste. `chooseFor` is required rather than optional, so a
+        // preference cannot be drawn from Math.random — and it is
+        // seeded on position, not on `npc.id` (§88).
+        archetypes.generatePreferences(w, npc.id, {
+          chooseFor: (category, choices) => random.pick(choices, 'taste', c, b, ri, category),
           tick,
         });
         summary.motivated += 1;

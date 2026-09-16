@@ -620,6 +620,26 @@ async function migrateWorldStateToPostgres(worldState) {
       }
       summary.goals = worldState.goals.length;
 
+      // Taste, and what somebody's traits add up to.
+      for (const p of worldState.preferences) {
+        await client.query(
+          `INSERT INTO preferences (entity_id, category, value, tick) VALUES ($1,$2,$3,$4)`,
+          [p.entity_id, p.category, p.value, p.tick]
+        );
+      }
+      summary.preferences = worldState.preferences.length;
+
+      // `derived_from_traits` is JSONB — the trait values AT the moment
+      // the tag appeared, which is the whole reason the column exists.
+      for (const a of worldState.archetypes) {
+        await client.query(
+          `INSERT INTO archetypes (id, entity_id, archetype_name, derived_from_traits, tick)
+           VALUES ($1,$2,$3,$4,$5)`,
+          [a.id, a.entity_id, a.archetype_name, JSON.stringify(a.derived_from_traits ?? []), a.tick]
+        );
+      }
+      summary.archetypes = worldState.archetypes.length;
+
       // beliefs, before the political tables that read them.
       for (const b of worldState.beliefs) {
         await client.query(

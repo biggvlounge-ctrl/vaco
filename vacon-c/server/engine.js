@@ -172,6 +172,13 @@ const WorldState = {
   needs: [],
   valuesDb: [],
   goals: [],
+  // Taste, and the tags a person's traits add up to. Both were empty in
+  // every world. `archetypes` is a HISTORY written on a crossing, never
+  // a stored rollup — the trait document says twice that archetypes are
+  // "derived, not source data" and "a read, not a write".
+  // `server/archetypes.js`.
+  preferences: [],
+  archetypes: [],
   beliefs: [],
   // Civilizations and the technology ladder. Four dead tables built
   // together on 12 Sep 2026 because they are one system:

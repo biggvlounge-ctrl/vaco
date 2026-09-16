@@ -275,6 +275,22 @@ async function restoreWorldStateFromPostgres(worldState) {
       nums(p, ['civilization_id', 'era_id', 'unlocked_tick']));
   summary.civilization_technology_progress = worldState.civilizationTechnologyProgress.length;
 
+  worldState.preferences = (await q('SELECT * FROM preferences')).map((p) =>
+    nums(p, ['entity_id', 'tick']));
+  summary.preferences = worldState.preferences.length;
+
+  // `derived_from_traits` comes back as parsed JSONB from node-postgres,
+  // but a string if the driver ever stops parsing it — guarded rather
+  // than trusted, because a string here reads as an object with no
+  // fields and the provenance silently becomes empty.
+  worldState.archetypes = (await q('SELECT * FROM archetypes ORDER BY id')).map((a) => ({
+    ...nums(a, ['id', 'entity_id', 'tick']),
+    derived_from_traits: typeof a.derived_from_traits === 'string'
+      ? JSON.parse(a.derived_from_traits)
+      : (a.derived_from_traits ?? []),
+  }));
+  summary.archetypes = worldState.archetypes.length;
+
   // What people want. Every NUMERIC column is named in `nums` — rule
   // 10, and `current_level` is the one that matters most: a string
   // level makes `level + change` string concatenation and a need that

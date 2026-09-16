@@ -65,6 +65,7 @@ const areaStats = require('./areaStats.js');
 const perception = require('./perception.js');
 const traitDrift = require('./traitDrift.js');
 const motivation = require('./motivation.js');
+const archetypes = require('./archetypes.js');
 
 let nextEventId = 1;
 
@@ -901,6 +902,13 @@ function advanceTick(worldState) {
   // then reads the habits too. Nothing here feeds the phase that
   // produced it.
   candidateEvents.push(...motivation.runMotivation(worldState, { tick: worldState.tick }));
+
+  // What people have become. AFTER trait drift would be the obvious
+  // place and is the wrong one: drift writes the traits this reads, and
+  // a tag derived from values written earlier in the same tick would be
+  // a loop with no defined order. Before, so an archetype reflects a
+  // finished person rather than a half-updated one.
+  candidateEvents.push(...archetypes.runArchetypes(worldState, { tick: worldState.tick }));
 
   // Trait drift, last of the cross-cutting layers and deliberately at
   // the end of them.
