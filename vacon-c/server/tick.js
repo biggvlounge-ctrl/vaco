@@ -66,6 +66,7 @@ const perception = require('./perception.js');
 const traitDrift = require('./traitDrift.js');
 const motivation = require('./motivation.js');
 const archetypes = require('./archetypes.js');
+const households = require('./households.js');
 
 let nextEventId = 1;
 
@@ -895,6 +896,11 @@ function advanceTick(worldState) {
   // already in `deceased`, and nothing would throw. See
   // server/births.js.
   candidateEvents.push(...births.runBirths(worldState, worldState.tick).events);
+
+  // Who lives where. Before motivation, which reads whether somebody
+  // has a home, and after mortality and births, which are what change
+  // the membership of one.
+  candidateEvents.push(...households.runHouseholds(worldState, { tick: worldState.tick }));
 
   // What everybody wants. Before trait drift and after behavior, which
   // is the order the data flows in: `runBehavior` reinforces the habits

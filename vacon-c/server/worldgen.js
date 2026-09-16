@@ -82,6 +82,7 @@ const missions = require('./missions.js');
 const inventory = require('./inventory.js');
 const motivation = require('./motivation.js');
 const archetypes = require('./archetypes.js');
+const households = require('./households.js');
 const items = require('./items.js');
 const territory = require('./territory.js');
 const worldStore = require('./worldStore.js');
@@ -498,6 +499,36 @@ function generateWorld(options = {}) {
         engine.addFamilyMember(family.id, npc.id, 'member', family.generation);
       });
 
+      // **A family shares a roof, and before this nobody shared
+      // anything.** Homes were handed out one per person by index, so
+      // every dwelling in every world held exactly one occupant:
+      // measured, 40 households of size 1, `mean_household_size` 1.00
+      // and a solo rate of 100%. A world where nobody has ever lived
+      // with anybody is not a demographic edge case, it is a bug.
+      //
+      // Reassigned rather than allocated differently up front, because
+      // the family roster does not exist until the block above runs.
+      // Family members move in with the first of their number to have a
+      // home; anyone unattached keeps their own, which is what makes a
+      // real spread of household sizes rather than one number.
+      //
+      // The surplus dwellings stay empty, which is still what produces
+      // a vacancy rate.
+      const familyHome = new Map();
+      for (const npc of residents) {
+        const membership = (w.familyMemberships || []).find((m) => m.entity_id === npc.id);
+        if (!membership) continue;
+        const shared = familyHome.get(membership.family_id);
+        if (shared === undefined) {
+          if (npc.home_property_id != null) familyHome.set(membership.family_id, npc.home_property_id);
+          continue;
+        }
+        // Only somebody who HAS a home moves; the unhoused stay
+        // unhoused, or `home_ownership_rate` and the vacancy rate both
+        // stop meaning anything.
+        if (npc.home_property_id != null) npc.home_property_id = shared;
+      }
+
       // **A family needs a head, or nothing can ever succeed to it.**
       // `generateFamily` leaves `head_npc_id` null unless told, and
       // `succession.settleEstate` advances a family's generation only
@@ -793,6 +824,19 @@ function generateWorld(options = {}) {
       summary.inventoryRows += 1;
     }
   });
+
+  // ---- who lives with whom ----------------------------------------------
+  // **Synced here, not left to the first tick.** `mean_household_size`
+  // is answerable the moment a world is generated — it was, when it
+  // measured family membership — and leaving households to the tick
+  // pipeline made a freshly generated world unable to answer it at all.
+  // A generator that produces a world one statistic short of the world
+  // the same code produces a tick later is the eleventh standing rule
+  // in miniature.
+  //
+  // Also writes `properties.occupants`, which nothing wrote.
+  const homes = households.syncHouseholds(w, { tick });
+  summary.households = homes.formed.length;
 
   // A world with no history of crime has no clearance rate and no
   // opinion of public safety, and both are statistics somebody asked

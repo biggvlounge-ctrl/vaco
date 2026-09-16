@@ -179,6 +179,12 @@ const WorldState = {
   // `server/archetypes.js`.
   preferences: [],
   archetypes: [],
+  // Who actually lives together, which is not who is related. A family
+  // is a lineage; a household is an address, and `mean_household_size`
+  // measured the first while calling it the second.
+  // `server/households.js`; also the only thing that writes
+  // `properties.occupants`.
+  households: [],
   beliefs: [],
   // Civilizations and the technology ladder. Four dead tables built
   // together on 12 Sep 2026 because they are one system:

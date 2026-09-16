@@ -620,6 +620,18 @@ async function migrateWorldStateToPostgres(worldState) {
       }
       summary.goals = worldState.goals.length;
 
+      // Households, after properties — `households.property_id` points
+      // at one. Only the three columns the schema has: `formed_tick`
+      // and `updated_tick` are in-memory bookkeeping, and a restored
+      // world re-derives them on its first sync.
+      for (const h of worldState.households) {
+        await client.query(
+          `INSERT INTO households (id, property_id, member_entity_ids) VALUES ($1,$2,$3)`,
+          [h.id, h.property_id, JSON.stringify(h.member_entity_ids ?? [])]
+        );
+      }
+      summary.households = worldState.households.length;
+
       // Taste, and what somebody's traits add up to.
       for (const p of worldState.preferences) {
         await client.query(

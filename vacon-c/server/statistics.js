@@ -87,6 +87,7 @@
 
 const areaStats = require('./areaStats.js');
 const births = require('./births.js');
+const households = require('./households.js');
 const crime = require('./crime.js');
 const demographics = require('./demographics.js');
 const economy = require('./economy.js');
@@ -246,18 +247,20 @@ const CATALOGUE = [
   },
   {
     key: 'mean_household_size', category: 'population', unit: 'count', scope: 'community',
-    compute: (ctx) => {
-      // Families with at least one resident here, sized by their
-      // resident members — a family spread across two blocks
-      // contributes its members to each, which is what a household
-      // count of an AREA means.
-      const sizes = new Map();
-      for (const m of ctx.worldState.familyMemberships || []) {
-        if (!ctx.ids.has(m.entity_id)) continue;
-        sizes.set(m.family_id, (sizes.get(m.family_id) || 0) + 1);
-      }
-      return round(mean([...sizes.values()]), 2);
-    },
+    // **This measured FAMILY size and called it household size**, which
+    // is a different quantity rather than an approximation of the same
+    // one. Somebody living alone next door to their brother is one
+    // family and two households; a lodger is a household member and no
+    // relation at all. `households` had no store at the time, so family
+    // membership was the only grouping available and the entry said so.
+    // `server/households.js` made the real thing available.
+    compute: (ctx) => households.meanSizeIn(ctx.worldState, ctx.communityId),
+  },
+  {
+    // What family membership could not produce at all: somebody with a
+    // large family who lives by themselves is a one-person household.
+    key: 'solo_household_share', category: 'population', unit: 'share', scope: 'community',
+    compute: (ctx) => households.soloShareIn(ctx.worldState, ctx.communityId),
   },
   // **Both of these were declared unavailable and are now computed.**
   // The reason given was the same for each — "there is no birth

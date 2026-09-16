@@ -85,8 +85,8 @@ const SYSTEMS = [
     n: 1,
     name: 'Population',
     level: 'modelled',
-    tables: ['npcs', 'entities', 'families', 'historical_records'],
-    schemaOnly: ['households', 'migration_events'],
+    tables: ['npcs', 'entities', 'families', 'historical_records', 'households'],
+    schemaOnly: ['migration_events'],
     phases: ['runMigrationPhase'],
     functions: [
       'generateNPC', 'generateFamily', 'addFamilyMember',
@@ -101,14 +101,16 @@ const SYSTEMS = [
       + 'replays. **Births followed on 12 Sep 2026** and closed the other end: a population that '
       + 'could only shrink now bears children who inherit their parents\' live traits, and '
       + '`npcs.generation` — 1 for every NPC in every world because nothing could advance it '
-      + '— moves. `households` and `migration_events` remain schema-only.',
+      + '— moves. **`households` became live on 16 Sep 2026** — and building it found that '
+      + 'nobody in any generated world had ever lived with anybody, because homes were handed '
+      + 'out one per person by array index: 40 households of size 1, a solo rate of 100%. '
+      + '`migration_events` remains schema-only.',
   },
   {
     n: 2,
     name: 'Housing',
     level: 'modelled',
-    tables: ['properties', 'ownership_records'],
-    schemaOnly: ['households'],
+    tables: ['properties', 'ownership_records', 'households'],
     functions: ['generateProperty', 'advancePropertyLifecycle'],
     note: 'Occupancy and lifecycle are real. Vacancy and abandonment as distinct states are not.',
   },
