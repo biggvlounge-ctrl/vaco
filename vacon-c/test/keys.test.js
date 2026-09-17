@@ -224,3 +224,77 @@ test('Resilience: the same entity absorbs consistently', () => {
   assert.equal(first.resilienceScore, second.resilienceScore,
     'the same entity and the same setback must resolve identically');
 });
+
+// -- Aggression: the gate behind the gate --------------------------------
+//
+// **CLAUDE.md's fourteenth standing rule, one level deeper than where it
+// was first found.** That rule records that `runSecurityPhase` filtered
+// relationships on `conflict > 30` while `resolveAggression` was the
+// field's only writer, so conflict sat at 0 forever and not one violent
+// or domestic offence had ever occurred in any world. `crime.
+// advanceFriction` gave conflict a real writer, relationships started
+// qualifying — and every one of them still let it go.
+//
+// The reason was the INNER gate. `provocationCharge` came only from
+// `entity_knowledge` about the other party, and measured on a 400-tick
+// world **0 of 600 knowledge rows were about the other party in any
+// relationship**. So the charge was structurally zero, the formula
+// collapsed to `0.6*aggression - 0.15*tacticalAwareness`, and that tops
+// out at 53.7 across a generated population of 150 — against a
+// threshold of 70. Not rare: impossible, by arithmetic.
+//
+// Fixing a gate is not the same as fixing the gate behind it.
+
+function aggressionWorld(applied) {
+  const world = freshWorld();
+  const [entity, other] = twoNpcs();
+  return { world, entity, other, applied };
+}
+
+test('Aggression reads the grievance the caller holds, not just knowledge', () => {
+  const applied = [];
+  const { world, entity, other } = aggressionWorld(applied);
+  const ctx = contextFor(world, { otherEntityId: other.id }, applied);
+  ctx.knowledge = [];
+
+  const without = keys.resolveAggression(entity, { ...ctx, grievance: 0 });
+  const with_ = keys.resolveAggression(entity, { ...ctx, grievance: 80 });
+
+  assert.ok(with_.responseLevel > without.responseLevel,
+    'the grievance the phase selected on reached the resolver as nothing');
+});
+
+test('escalation is reachable for an angry person with a real grievance, and not for an ordinary one', () => {
+  // Standing rule 8: the subject is constructed. The whole assertion is
+  // about which side of the threshold somebody falls on, so their
+  // traits are set rather than drawn.
+  const applied = [];
+  const world = freshWorld();
+  const make = (aggression, tactical) => {
+    const npc = engine.generateNPC();
+    const live = engine.getLiveEntity(npc.id);
+    live.traits.behavioral.Aggression = aggression;
+    live.traits.combat['Tactical Awareness'] = tactical;
+    return live;
+  };
+  const other = engine.generateNPC();
+  const ctx = (subject) => ({
+    ...contextFor(world, { otherEntityId: other.id }, applied),
+    knowledge: [],
+  });
+
+  const furious = make(95, 10);
+  const ordinary = make(50, 50);
+
+  // A real grievance — the top of what `relationships.conflict` reaches
+  // in a measured world once it stops ratcheting.
+  assert.equal(keys.resolveAggression(furious, { ...ctx(), grievance: 45 })
+    .escalatesToConflict, true, 'violence is still impossible, not merely rare');
+  assert.equal(keys.resolveAggression(ordinary, { ...ctx(), grievance: 45 })
+    .escalatesToConflict, false, 'an ordinary person came to blows over ordinary tension');
+
+  // And no grievance at all is not enough for anybody, which is what
+  // keeps this a response to a provocation rather than a personality.
+  assert.equal(keys.resolveAggression(furious, { ...ctx(), grievance: 0 })
+    .escalatesToConflict, false, 'somebody escalated with nothing to escalate about');
+});

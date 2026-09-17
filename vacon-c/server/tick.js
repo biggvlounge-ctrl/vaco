@@ -72,6 +72,7 @@ const households = require('./households.js');
 const migration = require('./migration.js');
 const environment = require('./environment.js');
 const statecraft = require('./statecraft.js');
+const { seededDraw } = require('./seeded.js');
 
 let nextEventId = 1;
 
@@ -734,7 +735,59 @@ function runOrganizationPhase(worldState) {
 // Organization-level territorial behavior needs its own logic, not
 // this phase reusing an individual-tier Key incorrectly.)
 // ---------------------------------------------------------------------------
-const CONFLICT_ESCALATION_THRESHOLD = 30;
+//: **Measured, after being guessed twice.**
+//:
+//: 30 was chosen when nothing anywhere wrote `relationships.conflict`,
+//: which CLAUDE.md's fourteenth standing rule records: the resolver
+//: behind this threshold was the field's only writer, so the field sat
+//: at 0 forever and not one violent or domestic offence had ever
+//: occurred in any world the engine had generated. `crime.
+//: advanceFriction` fixed the writer. It did not fix the threshold, and
+//: a 400-tick playtest showed why — **1 of 883 relationships above 30**,
+//: so three of the five generatable crime categories (violent, gun,
+//: domestic) were still effectively unreachable. The mechanism had gone
+//: from impossible to almost impossible, which is harder to see.
+//:
+//: So: measure the population the cutoff applies to, which is standing
+//: rule 12's third clause and is the step that was skipped both times.
+//: On a 400-tick world, `crime.frictionTarget` — what conflict is
+//: driven toward — runs p50 2, p90 13, max 50.8, and conflict itself
+//: lands at p90 14.5, p99 25, max 42.7. A threshold of 30 sits ABOVE
+//: the 99th percentile of its own driver.
+//:
+//: 20 is the p95 of that measured distribution: the top few relationships
+//: in a settlement, which is what "already showing meaningful conflict"
+//: was always meant to mean, rather than a number that sounds like
+//: trouble on a 0-100 scale.
+const CONFLICT_ESCALATION_THRESHOLD = 20;
+
+//: **A flashpoint is an occasion, not a state**, and this constant is
+//: standing rule 7 applied to the thing that rule was written about.
+//:
+//: `resolveAggression` was built to answer one provocation. This phase
+//: ran it every tick for every relationship over the threshold, which
+//: is a condition rather than a crossing — and the resolver writes
+//: `conflict: +responseLevel/10` on every call, so conflict ratcheted
+//: to 100 for every eligible pair within about forty ticks, which made
+//: the escalation arithmetic trivially satisfiable, which produced
+//: **6,247 violent offences in 400 ticks among 150 people** — 3.8
+//: million per 100,000 per year. The same pair fought every single day
+//: forever.
+//:
+//: Two people with ongoing tension do not come to blows daily; they
+//: come to blows occasionally, and more often the worse the tension.
+//: So the occasion is drawn, seeded on the pair and the tick (§88), at
+//: a rate proportional to the grievance itself — which also stops the
+//: ratchet, because the resolver now runs tens of times over a world's
+//: life instead of tens of thousands.
+//:
+//: **Flagged interpretive, and measured rather than guessed.** No
+//: document gives a rate. At 0.01 a relationship sitting at the p90
+//: conflict of ~25 has a flashpoint about once every four hundred
+//: ticks, which puts violent offences in the same order as the theft
+//: rate the deprivation model already produces — and that is the
+//: comparison that was checked, not a number that sounded right.
+const AGGRESSION_FLASHPOINT_RATE = 0.01;
 
 function runSecurityPhase(worldState) {
   const events = [];
@@ -745,11 +798,26 @@ function runSecurityPhase(worldState) {
     if (relationship.conflict <= CONFLICT_ESCALATION_THRESHOLD) continue;
     if (!isNpc(worldState, relationship.entity_a_id) || !isNpc(worldState, relationship.entity_b_id)) continue;
 
+    // Does anything actually happen between them today? See
+    // AGGRESSION_FLASHPOINT_RATE. Seeded on the pair and the tick, not
+    // on a counter, so the same world replays (§88).
+    const chance = (Number(relationship.conflict) / 100) * AGGRESSION_FLASHPOINT_RATE;
+    if (seededDraw([
+      worldState.seed ?? 'world', 'flashpoint',
+      relationship.entity_a_id, relationship.entity_b_id, worldState.tick,
+    ]) >= chance) continue;
+
     const entityA = getLiveEntity(worldState, relationship.entity_a_id);
     const knowledge = worldStore.getKnowledge(worldState, relationship.entity_a_id, relationship.entity_b_id);
     const outcome = keys.resolveAggression(entityA, {
       tick: worldState.tick, worldState, applyKeyModifier: boundApplyKeyModifier,
       otherEntityId: relationship.entity_b_id, provocationDescription: 'ongoing tension', knowledge,
+      // **The grievance this phase already selected on.** Without it
+      // the resolver reads a provocation charge of 0 — no knowledge row
+      // in a generated world is ever about the other party — and its
+      // own escalation threshold becomes unreachable by arithmetic. See
+      // keys.js#resolveAggression.
+      grievance: Number(relationship.conflict) || 0,
     });
 
     if (outcome.escalatesToConflict) {

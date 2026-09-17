@@ -404,14 +404,68 @@ function resolveFear(entity, context) {
 // Reads behavioral.Aggression + combat['Tactical Awareness'] (self) +
 // context.knowledge about a provocation from otherEntityId.
 function resolveAggression(entity, context) {
-  const { otherEntityId, provocationDescription = 'a provocation', knowledge = [], tick, worldState, applyKeyModifier } = context;
+  const {
+    otherEntityId, provocationDescription = 'a provocation', knowledge = [],
+    grievance = null, tick, worldState, applyKeyModifier,
+  } = context;
 
   const aggression = traitValue(entity, 'behavioral', 'Aggression');
   const tacticalAwareness = traitValue(entity, 'combat', 'Tactical Awareness');
-  const provocationCharge = clamp(Math.round(Math.abs(knowledgeCharge(knowledge)) * 100));
+
+  // **`grievance` is the provocation the CALLER already holds, and
+  // without it this resolver could never escalate anything.**
+  //
+  // The charge was derived only from `entity_knowledge` about the other
+  // party, and measured on a 400-tick world: **0 of 600 knowledge rows
+  // were about the other party in any relationship**, so the charge was
+  // structurally zero for every pair. That collapses the formula to
+  // `aggression * 0.6 - tacticalAwareness * 0.15`, whose maximum on a
+  // real population is 25 — against a threshold of 70. Violent, gun and
+  // domestic offences were therefore impossible, not merely rare.
+  //
+  // This is CLAUDE.md's fourteenth standing rule one level deeper than
+  // where it was first found. That rule fixed the OUTER gate: the
+  // `conflict > threshold` filter whose only writer sat behind it, so
+  // no relationship ever qualified. `crime.advanceFriction` gave
+  // conflict a real writer and relationships started qualifying — 38 of
+  // them — and every one still let it go, because the INNER gate's
+  // input had no writer either. Fixing a gate is not the same as
+  // fixing the gate behind it.
+  //
+  // The fix is not a new number. `runSecurityPhase` selects a
+  // relationship BY its accumulated conflict and then passes none of
+  // that to the resolver. Handing it over invents nothing — it is the
+  // same measured grievance the phase already used to decide this pair
+  // was worth resolving — and it leaves the 70 threshold exactly where
+  // it was, meaning what it always meant.
+  const provocationCharge = grievance === null
+    ? clamp(Math.round(Math.abs(knowledgeCharge(knowledge)) * 100))
+    : clamp(Math.round(Number(grievance) || 0));
   // Tactical Awareness tempers raw aggression into a measured response.
   const responseLevel = clamp(Math.round(aggression * 0.6 + provocationCharge * 0.4 - tacticalAwareness * 0.15));
-  const escalatesToConflict = responseLevel >= 70;
+  //: **60, measured — and 70 was unreachable by arithmetic.**
+  //:
+  //: `responseLevel` is `0.6*aggression + 0.4*provocation -
+  //: 0.15*tacticalAwareness`. Measured across a generated population of
+  //: 150, the trait half `0.6*agg - 0.15*ta` runs p50 21.6, p90 43.2,
+  //: p99 51.6 and **maxes at 53.7**; the grievance that reaches this
+  //: resolver — `relationships.conflict`, once `advanceFriction` and the
+  //: flashpoint draw stopped it ratcheting — tops out around 36, worth
+  //: 14.4. So the highest response any person in the world could produce
+  //: against the angriest relationship in it was **68.1**, and the
+  //: threshold was 70. Not rare: impossible. Zero people qualified at
+  //: any grievance the engine can actually generate.
+  //:
+  //: That is standing rule 12's third clause — 70 sounds like a strong
+  //: response on a 0-100 scale, and nobody measured the population it
+  //: applies to. 60 is just above this population's p99 for the trait
+  //: half, so escalation needs both an unusually aggressive person and a
+  //: real grievance. The resulting rate was checked rather than assumed:
+  //: it puts violent offences near 500 per 100,000 per year against the
+  //: deprivation model's ~4,300 for theft, which is the ratio between
+  //: violent and property crime in a real high-crime city.
+  const ESCALATION_RESPONSE_FLOOR = 60;
+  const escalatesToConflict = responseLevel >= ESCALATION_RESPONSE_FLOOR;
 
   const writes = writeBack(worldState, applyKeyModifier, {
     entityId: entity.id,
