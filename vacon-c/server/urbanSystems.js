@@ -158,13 +158,17 @@ const SYSTEMS = [
     level: 'modelled',
     traitFamilies: ['health'],
     infrastructureTypes: ['hospitals'],
-    functions: ['vitalityOf', 'addDiseaseOutbreak', 'diseasePressure', 'annualDeathRisk'],
-    note: '**Built 12 Sep 2026 with mortality.** All four health traits — Immune Response, '
-      + 'Nutrition Status, Chronic Conditions, Sleep Quality — now drive something: they were '
-      + 'generated on every NPC and read by nothing, exactly like `combat` and `sports` before '
-      + '`contest.js`. Disease is an epidemic expressed as an environmental condition, so '
+    functions: ['vitalityOf', 'addDiseaseOutbreak', 'diseasePressure', 'annualDeathRisk',
+      'meanHealthTrait', 'chronicConditionShare', 'meanExertion'],
+    note: '**Built 12 Sep 2026 with mortality, and made visible 17 Sep with server/health.js.** '
+      + 'All four health traits — Immune Response, Nutrition Status, Chronic Conditions, Sleep '
+      + 'Quality — drive mortality AND can now be reported: for a long time `vitalityOf` was '
+      + 'their only reader anywhere, so a population\'s health existed as a number nobody could '
+      + 'see. Disease is an epidemic expressed as an environmental condition, so '
       + '`runEnvironmentPhase` ages and clears it like a drought. Still missing: medical '
-      + 'knowledge loss and recovery, and hospitals as anything but an infrastructure slot.',
+      + 'knowledge loss and recovery, and hospitals as anything but an infrastructure slot — '
+      + 'and body composition, which is a DECLARED absence rather than a gap (see '
+      + '`statistics.js`\'s `body_composition` for the measurements that took it back out).',
   },
   {
     n: 7,

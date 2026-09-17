@@ -47,7 +47,7 @@ the Postgres schema that already exists.
 
 ## 1. Server code — `vacon-c/server/`
 
-All 55 files present on disk, all committed. 925 KB total,
+All 56 files present on disk, all committed. 954 KB total,
 largest first.
 
 **This table was stale in a way worth recording**, because it is the
@@ -60,37 +60,38 @@ read off disk, not recalled.
 
 | File | Size | What it holds | State |
 |---|---|---|---|
-| `migrate.js` | 54,182 | WorldState → PostgreSQL migration. | Built, see §4 |
-| `tick.js` | 52,017 | The eleven-phase tick pipeline, environmental conditions, and the cross-cutting slot. **Conditions now give back what they took** — see CLAUDE.md, thirteenth standing rule. | Built |
-| `statistics.js` | 49,709 | The uniform statistics catalogue — every reading an area can give about itself, in one shape, with declared absences as data. | Built |
-| `engine.js` | 43,768 | The simulation core. Re-exports the whole subsystem surface, and holds `WorldState`. | Built |
+| `migrate.js` | 54,749 | WorldState → PostgreSQL migration. | Built, see §4 |
+| `tick.js` | 52,883 | The eleven-phase tick pipeline, environmental conditions, and the cross-cutting slot. **Conditions now give back what they took** — see CLAUDE.md, thirteenth standing rule. | Built |
+| `statistics.js` | 51,242 | The uniform statistics catalogue — every reading an area can give about itself, in one shape, with declared absences as data. | Built |
+| `engine.js` | 44,309 | The simulation core. Re-exports the whole subsystem surface, and holds `WorldState`. | Built |
 | `worldgen.js` | 41,336 | **Assembles a whole world** by calling the generators that already existed. The eleventh standing rule's answer: before this, every world was a crowd of people standing in an empty field. | Built |
 | `motivation.js` | 35,500 | **Needs, values and goals in one module**, per §4.5 ("Motivation Engine = Value System DNA restated"). Fifteen needs, fifteen values, one satisfier apiece and one declared absence. | Built |
-| `behavior.js` | 33,172 | **The Behavior Engine** — routine, mood and habits: the three tables architecture §4.5 named as genuinely new (`schedule_events`, `entity_state`, `habits`), all of which sat in the schema with zero code. | Built |
+| `behavior.js` | 35,339 | **The Behavior Engine** — routine, mood and habits: the three tables architecture §4.5 named as genuinely new (`schedule_events`, `entity_state`, `habits`), all of which sat in the schema with zero code. | Built |
 | `politics.js` | 32,798 | Government, laws, and an election lifecycle with real candidates and votes. | Built |
 | `restore.js` | 29,132 | The inverse of `migrate.js` — PostgreSQL → WorldState. | Built, see §4 |
 | `mortality.js` | 28,001 | Age, vitality, disease pressure, survival scarcity, and who dies. | Built |
+| `urbanSystems.js` | 25,488 | The forty urban systems §7 names, at four levels of presence — the `systems` axis of the percent. | Built |
 | `births.js` | 25,385 | Conception, gestation and birth, including what a child inherits. | Built |
 | `economy.js` | 25,317 | Resources, scarcity, market listings, price resolution, individual finances, net worth. | Built |
-| `urbanSystems.js` | 25,148 | The forty urban systems §7 names, at four levels of presence — the `systems` axis of the percent. | Built |
+| `traitDrift.js` | 25,026 | **What a life does to a person** — the six `entity_traits` columns nothing ever moved: experience, environment, relationship contagion, temporary strain. | Built |
 | `keys.js` | 23,968 | **All 7 Key resolvers** — Resilience, Adaptability, Trust, Scarcity Response, Fear, Aggression, Territory. | Built |
-| `traitDrift.js` | 23,460 | **What a life does to a person** — the six `entity_traits` columns nothing ever moved: experience, environment, relationship contagion, temporary strain. | Built |
 | `crime.js` | 23,027 | The typed crime record, and community danger over a rolling window. **Reads the environment, never the person.** | Built |
 | `completeness.js` | 21,486 | **The running percent.** Six measured axes behind `dev-docs/GAME_COMPLETENESS.md`. | Built |
 | `migration.js` | 19,855 | People actually move: push from unmet need, pull from a better place, and a settling period so nobody churns. | Built |
+| `competition.js` | 19,123 | **Somebody actually plays** — settlements hold games and `contest.js` decides them. That resolver was complete, tested and called by nothing, so no generated world had ever held a contest. | Built |
 | `flows.js` | 18,346 | **Named Flow Templates (Phase 2)** — one resolver, ten rows, seventeen signals. | Built |
 | `barter.js` | 17,504 | Direct exchange between holders, priced from scarcity. | Built |
 | `archetypes.js` | 15,962 | Preferences, and the individual archetype tags derived from live traits — computed on a crossing, never stored twice. | Built |
 | `policing.js` | 15,800 | Clearance, open cases, and public trust in policing as a belief rather than a derived clearance rate. | Built |
 | `schema-extensions.sql` | 15,734 | Columns this engine added beyond the handoff schema, each with the reason in a comment. | Built |
+| `contest.js` | 15,668 | **Contest resolution** — rates entities from their live `combat`/`sports` traits and resolves a bout deterministically from a seeded draw. Called by `server/competition.js` from the cross-cutting slot — for a long time nothing called it at all. | Built |
 | `infrastructure.js` | 15,639 | City infrastructure: capacity, condition, failure risk, service level. | Built |
 | `property.js` | 14,898 | **Property Engine (Phase 2)** — generation, derived value, append-only ownership, lifecycle. | Built |
 | `areaStats.js` | 14,182 | Residents of an area, and the world poverty line. | Built |
 | `technology.js` | 13,834 | Civilizations, eras, and what an era makes possible. | Built |
-| `contest.js` | 13,644 | **Contest resolution** — rates entities from their live `combat`/`sports` traits and resolves a bout deterministically from a seeded draw. **The tick pipeline never calls it**, so no generated world has held a contest. | Built, unreached |
 | `environment.js` | 13,372 | Weather, climate and where a drought lives — `environment_state`, one row per city, and severe weather through the existing condition channel. | Built |
 | `territory.js` | 13,230 | Cities, communities, territory blocks, control resolution, city reemergence and community health (both computed on read). | Built |
-| `health.js` | 12,256 | **A population's health** — the `health` family's first reader besides `mortality.vitalityOf`, plus physical exertion. Its header records why body composition is a declared absence rather than a statistic. | Built |
+| `health.js` | 12,799 | **A population's health** — the `health` family's first reader besides `mortality.vitalityOf`, plus physical exertion. Its header records why body composition is a declared absence rather than a statistic. | Built |
 | `culture.js` | 12,176 | **Culture DNA (Phase 2)** — sixteen named families stored three ways, tier-level attachment. | Built |
 | `succession.js` | 12,172 | Inheritance — an estate settled by name across holdings, family and property. | Built |
 | `inventory.js` | 11,717 | Who holds what: `give`, `take`, and holdings by item name. | Built |

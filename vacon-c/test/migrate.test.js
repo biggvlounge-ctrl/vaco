@@ -51,6 +51,12 @@ const NOT_CARRIED = {
   pendingObservations: 'behavior observations in flight for at most one tick before the '
     + 'Event phase turns them into real `events` rows, which ARE carried — migrating both '
     + 'would record every one of them twice',
+  contests: 'the contest system was built without a table — server/contest.js predates all '
+    + 'of this and the schema names no such thing — so server/competition.js keeps results '
+    + 'in memory the same way activeConditions does. Everything a game LEFT BEHIND does '
+    + 'survive a checkpoint: the memories, the `compete` habits, the `competition` on a '
+    + 'relationship, and the events. Inventing a table here would be a schema decision '
+    + 'taken inside a migration',
 };
 
 // The additive DDL in server/schema-extensions.sql is part of the real

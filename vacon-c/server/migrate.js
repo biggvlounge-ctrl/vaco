@@ -1023,6 +1023,14 @@ async function migrateWorldStateToPostgres(worldState) {
       //     environment_state is city-scoped and this is not).
       //   migrationRisk    — an explicitly flagged stand-in, overwritten
       //     every tick rather than accumulated as history.
+      //   contests         — the whole contest system was built without a
+      //     table (server/contest.js predates any of this and the schema
+      //     names no such thing), so `server/competition.js` keeps its
+      //     results in memory the same way. What DOES survive a
+      //     checkpoint is everything a game left behind: the memories,
+      //     the `compete` habits, the `competition` on a relationship
+      //     and the events. Inventing a table here to carry the rest
+      //     would be a schema decision taken inside a migration.
       //   pendingObservations — in flight for at most one tick before
       //     the Event phase turns them into real `events` rows, which
       //     ARE carried. Migrating both would double-count every one.

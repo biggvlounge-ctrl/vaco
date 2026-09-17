@@ -206,7 +206,19 @@ function winProbability(ratingA, ratingB) {
 //                    fighters on the same tick in two different bouts
 //                    can produce different results.
 function resolveContest(worldState, options = {}) {
-  const { participantIds, discipline = 'combat', contestId = null } = options;
+  const {
+    participantIds, discipline = 'combat', contestId = null,
+    // **The tick is an input, not a read of `worldState` at the moment
+    // of the call.** It was the latter, and that quietly made
+    // `verifyContest` work only on the tick the bout was fought:
+    // re-running a week-old result seeded it with today's tick, drew a
+    // different number, and reported a settled contest as unreproduced.
+    // For a function whose entire purpose is "anybody can verify a
+    // settlement without trusting whoever reported it", verifying only
+    // in the same instant is close to no verification at all. Defaults
+    // to the world's tick, so every existing caller is unchanged.
+    tick = worldState.tick,
+  } = options;
 
   if (!Array.isArray(participantIds) || participantIds.length < 2) {
     throw new Error('resolveContest requires participantIds with at least two entrants.');
@@ -216,22 +228,44 @@ function resolveContest(worldState, options = {}) {
   }
 
   const rated = participantIds.map((id) => rateEntity(worldState, id, discipline));
+  const seed = seedFor({ contestId, tick, discipline, participantIds });
+  const draw = seededUnit(seed);
+  const { winner, favourite, probability } = pickWinner(rated, draw);
 
-  // Seeded from facts the contest already has. Participants are sorted
-  // so that the same bout entered in either order resolves identically
-  // — otherwise a result would depend on argument order, which is the
-  // kind of thing nobody finds until a market settles twice.
-  const seed = hashSeed([
+  return {
+    contestId,
+    discipline,
+    tick,
+    winnerId: winner.entityId,
+    // Everything a settlement needs to be re-checked by somebody who
+    // does not trust the result.
+    seed,
+    draw: Math.round(draw * 10000) / 10000,
+    favouriteId: favourite.entityId,
+    favouriteProbability: probability,
+    upset: winner.entityId !== favourite.entityId,
+    ratings: rated.map((r) => ({ entityId: r.entityId, rating: r.rating })),
+    contributions: Object.fromEntries(rated.map((r) => [r.entityId, r.contributions])),
+  };
+}
+
+// The seed a contest's own facts produce. Participants are sorted so
+// that the same bout entered in either order resolves identically —
+// otherwise a result would depend on argument order, which is the kind
+// of thing nobody finds until a market settles twice.
+function seedFor({ contestId, tick, discipline, participantIds }) {
+  return hashSeed([
     contestId ?? 'contest',
-    worldState.tick,
+    tick,
     discipline,
     [...participantIds].sort((a, b) => a - b).join(','),
   ]);
-  const draw = seededUnit(seed);
+}
 
-  // Cumulative selection weighted by rating. With two entrants this is
-  // exactly the logistic probability above; with more it generalises
-  // without a special case.
+// Cumulative selection weighted by rating. With two entrants this is
+// exactly the logistic probability above; with more it generalises
+// without a special case.
+function pickWinner(rated, draw) {
   const favourite = rated.reduce((best, r) => (r.rating > best.rating ? r : best));
   const underdog = rated.reduce((worst, r) => (r.rating < worst.rating ? r : worst));
   const probability = winProbability(favourite.rating, underdog.rating);
@@ -250,37 +284,46 @@ function resolveContest(worldState, options = {}) {
       if (cursor <= 0) { winner = rated[i]; break; }
     }
   }
-
-  return {
-    contestId,
-    discipline,
-    tick: worldState.tick,
-    winnerId: winner.entityId,
-    // Everything a settlement needs to be re-checked by somebody who
-    // does not trust the result.
-    seed,
-    draw: Math.round(draw * 10000) / 10000,
-    favouriteId: favourite.entityId,
-    favouriteProbability: probability,
-    upset: winner.entityId !== favourite.entityId,
-    ratings: rated.map((r) => ({ entityId: r.entityId, rating: r.rating })),
-    contributions: Object.fromEntries(rated.map((r) => [r.entityId, r.contributions])),
-  };
+  return { winner, favourite, probability };
 }
 
-// Run the same contest again from its own result. The check a
-// prediction market needs: anybody can verify a settlement without
-// trusting whoever reported it.
+// Re-check a contest from its own result. The check a prediction market
+// needs: anybody can verify a settlement without trusting whoever
+// reported it.
+//
+// **Two claims, checked separately, and neither of them re-rates
+// anybody.** The first version re-ran `resolveContest` against the LIVE
+// world, which meant a result could only be verified in the instant it
+// was produced — a day later the entrants' traits had drifted, the tick
+// had moved, and a perfectly honest settlement failed its own audit.
+//
+// What a verifier actually needs to establish is narrower and stronger:
+//
+//   1. the seed is the one this contest's own identifying facts produce
+//      — its id, its tick, its discipline and its entrants — so nobody
+//      picked a seed that suited them;
+//   2. the reported winner is the one those ratings and that seed
+//      select.
+//
+// The RECORDED ratings are the right input to the second claim. They
+// are part of what was published, so anybody re-checking is checking
+// the arithmetic that was actually claimed rather than re-deriving a
+// different one from a world that has moved on.
 function verifyContest(worldState, result) {
-  const rerun = resolveContest(worldState, {
-    participantIds: result.ratings.map((r) => r.entityId),
-    discipline: result.discipline,
+  const participantIds = result.ratings.map((r) => r.entityId);
+  const seed = seedFor({
     contestId: result.contestId,
+    tick: result.tick,
+    discipline: result.discipline,
+    participantIds,
   });
+  const { winner } = pickWinner(result.ratings, seededUnit(seed));
+
   return {
-    reproduced: rerun.winnerId === result.winnerId && rerun.seed === result.seed,
+    reproduced: winner.entityId === result.winnerId && seed === result.seed,
+    seedMatches: seed === result.seed,
     expected: result.winnerId,
-    actual: rerun.winnerId,
+    actual: winner.entityId,
   };
 }
 
@@ -315,6 +358,8 @@ assertDisciplinesReadRealTraits();
 module.exports = {
   DISCIPLINES,
   DISCIPLINE_NAMES,
+  seedFor,
+  pickWinner,
   RATING_SCALE,
   rateEntity,
   winProbability,

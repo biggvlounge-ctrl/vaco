@@ -324,6 +324,37 @@ second is why the first went unseen for the life of the project.
   *long*. The guard that holds it now asserts on 200 ticks of a real
   world, not on a fixture.
 
+**The same rule in a second place, found the next day.** Habit decay
+was a flat 0.5 a tick against reinforcement that arrives per
+occurrence. Flat decay against periodic reinforcement is the same step
+function — `applyStress` in the same file already argues this for
+stress, and the argument was never carried across. Measured on a
+200-tick world: `rest`/`eat`/`work` (daily) at 75.3, and `gathering`
+(weekly) at **0.3**. Seventeen people held a `gathering` schedule, it
+fired every seventh tick for +2, and 3.5 of decay took it away in
+between — so the weekly frequency was wired, firing, and inert, and
+this file's own notes recorded having made it real. Downstream,
+`traitDrift` weights a habit by `strength / 100`, so two social traits
+had a drift path that moved them by 0.003 of their rate, and
+`motivation.SATISFIERS.friendship` read a habit strength of 0.003.
+Decay is proportional now; the constant is unchanged on purpose, so the
+shape is the only variable. Daily ~80, weekly ~36, fortnightly ~22.
+
+**And a resolver nothing calls is the eleventh rule's sibling.**
+`server/contest.js` — five disciplines, live traits, a seeded
+re-runnable result, its own green test file, named in this document as
+a system the phase map never anticipated. `grep -n contest
+server/tick.js` returned two matches, both the word "contested" about
+territory blocks. No generated world had ever held a contest.
+`server/competition.js` is the occasion. Note what the green test file
+did NOT catch, because it could not: `verifyContest` re-ran the bout
+against the LIVE world, so a result could only be verified in the
+instant it was produced — a day later the tick had moved, the entrants
+had drifted, and an honest settlement failed its own audit. A function
+whose entire stated purpose is "anybody can verify a settlement without
+trusting whoever reported it" verified nothing anybody would actually
+want verified.
+
 And the corollary about what to do when the substrate will not support
 the statistic somebody asked for: **declare it, with the measurement
 that killed it.** A body-composition index was derivable here and was

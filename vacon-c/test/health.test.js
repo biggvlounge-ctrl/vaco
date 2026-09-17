@@ -326,18 +326,23 @@ test('body composition is a declared gap, and the declaration says what would cl
   }
 });
 
-test('the athleticism caveat is true: nothing runs a contest', () => {
-  // The statistic says it measures what a population could do rather
-  // than what it has done, and that claim is only worth making while it
-  // is still true. `contest.js` is required by the API and by the
-  // player action dispatcher; the tick pipeline never calls it.
-  const source = fs.readFileSync(path.join(__dirname, '..', 'server', 'tick.js'), 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/^\s*\/\/.*$/gm, '');
-  assert.equal(/contest\./.test(source), false,
-    'the tick now runs contests, so mean_athleticism measures something real and its '
-    + 'caveat should be removed');
-
+test('the athleticism caveat says what is true now, not what used to be', () => {
+  // **This test used to assert that nothing ever held a contest, and it
+  // was right.** `contest.js` was a complete, tested, deterministic
+  // resolver and `grep -n contest server/tick.js` returned two matches,
+  // both the word "contested" about territory blocks.
+  // `server/competition.js` is the occasion, so the old caveat is false
+  // and the new one has to be the honest replacement rather than no
+  // caveat at all: games happen, competing does grow the traits, and
+  // the drift is a fraction of a point a year.
   const definition = statistics.CATALOGUE.find((s) => s.key === 'mean_athleticism');
-  assert.match(definition.caveat, /never\s+calls/);
+  assert.equal(/never\s+calls/.test(definition.caveat), false,
+    'the caveat still says the tick never runs a contest');
+  assert.match(definition.caveat, /48\.92 to 49\.10/,
+    'the caveat should carry the measurement rather than a claim about it');
+
+  // And the readings of what a settlement DOES, beside the reading of
+  // what it is capable of.
+  assert.ok(statistics.KEYS.includes('contests_per_1k'));
+  assert.ok(statistics.KEYS.includes('competitor_share'));
 });

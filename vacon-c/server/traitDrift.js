@@ -134,6 +134,34 @@ const EXERCISES = {
     ['social', 'Group Loyalty'],
     ['social', 'Charisma'],
   ],
+  // **The habit of turning up to the community game**, formed by
+  // `server/competition.js` on everybody who enters one. This is the
+  // entry that makes athleticism something a person becomes rather than
+  // something they were generated with: `contest.js` rates a bout from
+  // Speed and Coordination, competing reinforces the habit, and the
+  // habit grows the traits the next bout is rated from.
+  //
+  // Narrow on purpose, like the rest of this table. Playing regularly
+  // makes somebody faster and better coordinated and builds stamina. It
+  // does not make them a better person, and Competitive Drive is left
+  // out deliberately — that is appetite rather than ability, and
+  // growing it would make anybody who ever played turn up forever.
+  //
+  // **Measured, and small.** The same world run twice off one seed,
+  // differing only in whether the tick holds games, moved a
+  // population's mean athleticism from 48.92 to 49.10 over 600 ticks.
+  // That is the drift model working as designed rather than a weak
+  // link: `growth_rate` is 0.01 a tick, an individual plays about every
+  // forty-five ticks, and the habit settles near 10, so the product is
+  // a fraction of a point a year and reaches `DRIFT_CEILING` over a
+  // lifetime. The number is stated here rather than tuned upward,
+  // because inflating one of three defensible constants to make a new
+  // system look consequential is how a model stops describing anything.
+  compete: [
+    ['sports', 'Speed'],
+    ['sports', 'Coordination'],
+    ['physical', 'Stamina'],
+  ],
   'self-medicating': [
     // A harmful habit exercises something too — that is what makes it
     // harmful rather than merely sad. It is the only negative entry

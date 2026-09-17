@@ -11,11 +11,12 @@
 // plainest questions anybody asks about one: how well fed are these
 // people, how many are carrying something chronic, do they sleep.
 //
-// The `sports` family is the same story with one reader
-// (`server/contest.js`) that the tick pipeline never calls, so its
-// reading here is of a capability rather than of anything anybody has
-// ever done with it. That is stated at the function rather than left
-// for somebody to discover.
+// The `sports` family was the same story with one reader
+// (`server/contest.js`) that the tick pipeline never called, so its
+// reading here was of a capability rather than of anything anybody had
+// ever done with it. `server/competition.js` closed that: settlements
+// hold games, and competing grows Speed and Coordination. What has not
+// changed is the SIZE of it — see `meanAthleticism` below.
 //
 // ---------------------------------------------------------------------
 // Obesity, and why it is a DECLARED ABSENCE rather than a statistic
@@ -175,10 +176,18 @@ function chronicConditionShare(worldState, residents) {
 
 // Mean athleticism across a population, 0..100, or null.
 //
-// The `sports` family, which `contest.js` rates a bout from. **Worth
-// stating plainly: the tick pipeline never calls `contest.js`**, so no
-// world has ever held a contest — this is a reading of the capability,
-// not of anything anybody has done with it.
+// The `sports` family, which `contest.js` rates a bout from. Games are
+// held now — `server/competition.js` runs in the cross-cutting slot —
+// so this is no longer a reading of a capability that nothing ever
+// exercises.
+//
+// **But it is still mostly a reading of what people were born with, and
+// that is worth stating rather than implying otherwise.** The same world
+// run twice off one seed, differing only in whether games happen, moved
+// this from 48.92 to 49.10 over 600 ticks. Real, reproducible, and a
+// fraction of a point a year. `competition.contestRatePer1k` and
+// `competitorShare` are the readings of what a settlement DOES; this is
+// the reading of what it can do.
 function meanAthleticism(worldState, residents) {
   const values = [];
   for (const npc of residents) {

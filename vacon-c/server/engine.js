@@ -195,6 +195,16 @@ const WorldState = {
   // `environment_state.active_disasters` is the durable, city-scoped
   // view of it. `server/environment.js`.
   environmentState: [],
+  // Games actually held. `server/contest.js` was a complete, tested,
+  // deterministic contest resolver that the tick pipeline never called
+  // once, so the `sports` family had a reader on paper and no world had
+  // ever held a contest. `server/competition.js` is the occasion.
+  //
+  // In-memory with no schema table, like `activeConditions` — the whole
+  // contest system was built without one, and `migrate.js` names this
+  // among what a checkpoint does not carry rather than inventing a
+  // table for it here.
+  contests: [],
   beliefs: [],
   // Civilizations and the technology ladder. Four dead tables built
   // together on 12 Sep 2026 because they are one system:

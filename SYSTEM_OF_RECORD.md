@@ -72,7 +72,7 @@ authorization work in §5 had to be done per app rather than once.
 | Containerised services | 36 + nginx + a LiveKit SFU |
 | Registry rows (incl. brand rows and the dev mock) | 37 |
 | Mutating HTTP routes | 524, all accounted for (472 guarded, 52 declared open with a reason) |
-| Automated tests | 2129 across 39 suites |
+| Automated tests | 2140 across 39 suites |
 | Persisted volumes | 30 |
 | Shared-module copies kept in sync | 210 |
 | Service credentials in `.env.example` | 28 callers |
@@ -824,7 +824,7 @@ run to produce the numbers here.
 built:** `node scripts/package-release.mjs` — see §11.
 
 ```sh
-node scripts/run-all-tests.mjs           # 2129/2129 across 39 suites (some skip without a database)
+node scripts/run-all-tests.mjs           # 2140/2140 across 39 suites (some skip without a database)
 node scripts/audit-route-guards.mjs --check   # 524/524 accounted for
 ./sync-shared-runtime.sh --check         # 210 copies current, none unmanaged
 ./sync-design-system.sh --check          # every serving app is a target
@@ -895,7 +895,7 @@ dependencies are installed.
 ### Per-suite
 
 ```
-vacon-c         778   vdp             147   void            142
+vacon-c         789   vdp             147   void            142
 scripts         168   v3              111   vaco-media       51
 v4-proxy         42   world-layer      41   venvm            40
 venvs            45   voken            37   vaco-analytics   39
@@ -990,7 +990,7 @@ check that the percent in THIS file matches the one the code measures.
 |---|---|---|
 | systems | 56.9% | the forty urban systems §7 names, at `urbanSystems.js`'s own four levels |
 | tables | 90% | schema tables a built world actually fills |
-| statistics | 90% | statistics a world can answer about itself |
+| statistics | 90.2% | statistics a world can answer about itself |
 | traits | 100% | traits something under `server/` reads |
 | traitDepth | 85.7% | trait columns a life actually changes |
 | habits | 100% | whether habits and routines carry information |
@@ -1008,7 +1008,12 @@ section put its own coverage at "roughly 25 of the 40" from memory.
 Seven trait families were generated on every NPC and read by nothing.
 Resources had no mechanism anywhere that could raise a supply, so every
 world the engine had ever run ended in total famine and the suite was
-green throughout. The pattern is consistent enough to be a rule: **the
+green throughout. `server/contest.js` was a complete, tested,
+deterministic contest resolver that the tick pipeline never called, so
+no world had ever held a contest. A weekly routine could not form a
+habit at all — flat decay against periodic reinforcement — so
+`gathering` sat at 0.3 while daily habits sat at 75, and the frequency
+column was wired, firing and inert. The pattern is consistent enough to be a rule: **the
 only trustworthy number is one a command produces.**
 
 **One statistic was built, measured, and taken back out.** The owner

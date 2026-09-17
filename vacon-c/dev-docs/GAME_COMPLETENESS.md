@@ -16,14 +16,14 @@ on every NPC and read by nothing.
 ## 89.6% complete
 
 ```
-██████████████████░░  89.6%   281.25 of 314
+██████████████████░░  89.6%   283.25 of 316
 ```
 
 | axis | complete | score | what it measures |
 |---|---|---|---|
 | systems | **56.9%** | 22.75/40 | urban systems with mechanics |
 | tables | **90%** | 58.5/65 | schema tables a built world fills |
-| statistics | **90%** | 72/80 | statistics a world can answer |
+| statistics | **90.2%** | 74/82 | statistics a world can answer |
 | traits | **100%** | 114/114 | traits something reads |
 | traitDepth | **85.7%** | 6/7 | trait columns a life actually changes |
 | habits | **100%** | 8/8 | habit and routine depth |

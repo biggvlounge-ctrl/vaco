@@ -238,6 +238,42 @@ function applyStress(worldState, entityId, delta) {
 // table") and this follows it rather than inventing an Addiction system.
 const HABIT_MIN = 0;
 const HABIT_MAX = 100;
+//: How fast a habit fades, as a share of what is there, per tick.
+//:
+//: **Proportional, not flat, and the difference is that weekly routines
+//: exist at all.** This was a flat 0.5 a tick, and flat decay against a
+//: periodic reinforcement is the same step function `applyStress`
+//: already argues against fifty lines below: anything practised more
+//: often than the decay rate finds a balance, and anything practised
+//: less often falls to zero and stays there. There is no middle.
+//:
+//: Measured on a 200-tick world, that is exactly what had happened:
+//:
+//:   rest / eat / work   daily     p50 75.3
+//:   gathering           weekly    p50  0.3
+//:
+//: Seventeen people held a `gathering` schedule, it fired every seventh
+//: tick for +2, and 3.5 of decay took it away in between. So the weekly
+//: frequency was wired, firing, and inert — and this file's own header
+//: had recorded making it real, because a schedule that fires looks
+//: exactly like a habit that forms. Downstream, `traitDrift` weights a
+//: habit's effect by `strength / 100`, so `gathering`'s two social
+//: traits drifted by 0.003 of their rate, and
+//: `motivation.SATISFIERS.friendship` read a habit strength of 0.003.
+//:
+//: With decay proportional, a habit settles where reinforcement and
+//: fading balance, and that point now reflects how often it is
+//: practised as well as who is practising it:
+//:
+//:   daily        ~80        weekly       ~36        fortnightly  ~22
+//:
+//: **The number is unchanged on purpose.** 0.5 was the flat amount and
+//: is now the percent; changing the shape and the magnitude in one step
+//: would make it impossible to say which caused what. The one real
+//: consequence is that an abandoned habit now fades exponentially
+//: rather than linearly — a half-life of about 139 ticks instead of a
+//: hard floor at 150 — which is what `HABIT_ENTRENCHED` already implies
+//: a habit is.
 const HABIT_DECAY_PER_TICK = 0.5;
 // The line above which a harmful habit is worth the world noticing.
 const HABIT_ENTRENCHED = 70;
@@ -673,8 +709,12 @@ function runBehavior(worldState) {
   // Applied after the reinforcement pass so a habit kept up today nets
   // out positive while it still has room, and negative once it does
   // not — which is what a plateau is.
+  // A share of what is there, not a flat subtraction — see
+  // HABIT_DECAY_PER_TICK for the measurement that changed this and for
+  // what a flat rate did to every routine practised less than daily.
   for (const habit of worldState.habits) {
-    habit.strength = round1(clamp(habit.strength - HABIT_DECAY_PER_TICK, HABIT_MIN, HABIT_MAX));
+    const fade = (HABIT_DECAY_PER_TICK / 100) * habit.strength;
+    habit.strength = round1(clamp(habit.strength - fade, HABIT_MIN, HABIT_MAX));
   }
 
   return events;

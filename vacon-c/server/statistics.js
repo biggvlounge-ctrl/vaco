@@ -93,6 +93,7 @@ const crime = require('./crime.js');
 const demographics = require('./demographics.js');
 const economy = require('./economy.js');
 const health = require('./health.js');
+const competition = require('./competition.js');
 const motivation = require('./motivation.js');
 const membership = require('./membership.js');
 const infrastructure = require('./infrastructure.js');
@@ -362,9 +363,34 @@ const CATALOGUE = [
   },
   {
     key: 'mean_athleticism', category: 'population', unit: 'index', scope: 'community',
-    caveat: 'the `sports` family is rated by server/contest.js, which the tick pipeline never '
-      + 'calls — so this measures what a population could do, not anything it has done',
+    // **The caveat this carried was that nothing ever held a contest.**
+    // `server/contest.js` was a complete, tested resolver the tick
+    // pipeline never called, so the `sports` family had a reader on
+    // paper and no world had ever used it. `server/competition.js` is
+    // the occasion, and the caveat below is the one that is true now.
+    caveat: 'settlements hold games and competing does grow Speed and Coordination, but the '
+      + 'drift is slow by design — the same world run twice off one seed, differing only in '
+      + 'whether games are held, moved this from 48.92 to 49.10 over 600 ticks. Over runs of '
+      + 'that length this is still mostly a reading of what a population was born with. '
+      + 'contests_per_1k and competitor_share are the readings of what it does',
     compute: (ctx) => health.meanAthleticism(ctx.worldState, ctx.residents),
+  },
+  {
+    key: 'contests_per_1k', category: 'population', unit: 'rate_per_1k', scope: 'community',
+    // Over a rolling year, the same window `crime.dangerByCommunity`
+    // uses and for the same reason: a rate over all time only ever
+    // rises, so a place that held games a decade ago and none since
+    // would read as sporting forever.
+    compute: (ctx) => competition.contestRatePer1k(ctx.worldState, ctx.communityId,
+      { tick: ctx.tick }),
+  },
+  {
+    key: 'competitor_share', category: 'population', unit: 'share', scope: 'community',
+    // The participation half. A hundred games between the same two
+    // people is a different settlement from a hundred games across a
+    // hundred, and the rate above cannot tell them apart.
+    compute: (ctx) => competition.competitorShare(ctx.worldState, ctx.communityId,
+      { tick: ctx.tick }),
   },
   {
     key: 'mean_physical_exertion', category: 'population', unit: 'index', scope: 'community',

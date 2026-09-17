@@ -66,6 +66,7 @@ const perception = require('./perception.js');
 const traitDrift = require('./traitDrift.js');
 const motivation = require('./motivation.js');
 const archetypes = require('./archetypes.js');
+const competition = require('./competition.js');
 const households = require('./households.js');
 const migration = require('./migration.js');
 const environment = require('./environment.js');
@@ -1001,6 +1002,21 @@ function advanceTick(worldState) {
   // a loop with no defined order. Before, so an archetype reflects a
   // finished person rather than a half-updated one.
   candidateEvents.push(...archetypes.runArchetypes(worldState, { tick: worldState.tick }));
+
+  // Somebody actually plays.
+  //
+  // **`server/contest.js` was a complete resolver that nothing called.**
+  // Five disciplines, live traits, a seeded draw, a re-runnable result —
+  // tested, green, and `grep -n contest server/tick.js` returned two
+  // matches, both the word "contested" about territory blocks. No
+  // generated world had ever held a contest, which made the `sports`
+  // family a reader on paper and nothing else.
+  //
+  // Here rather than earlier in the slot because a game reads a settled
+  // population: mortality and births have already run, so nobody enters
+  // a match they did not live to see. Before trait drift, which is what
+  // turns the habit of turning up into being good at it.
+  candidateEvents.push(...competition.runCompetition(worldState, { tick: worldState.tick }));
 
   // Trait drift, last of the cross-cutting layers and deliberately at
   // the end of them.
