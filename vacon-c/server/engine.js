@@ -216,6 +216,13 @@ const WorldState = {
   // restore forgot would leave somebody `imprisoned` forever with no
   // sentence to end.
   courtCases: [],
+  // What answered an offence where the STATE did not. `authority.js`
+  // reads how far government rule reaches in each area; where it does
+  // not, `justice.answerByGroup` records what whoever holds the ground
+  // did about it — restitution, expulsion, a feud — or that nothing
+  // did. In memory like `contests`: no schema table names a sanction
+  // that is not a court case.
+  groupSanctions: [],
   beliefs: [],
   // Civilizations and the technology ladder. Four dead tables built
   // together on 12 Sep 2026 because they are one system:

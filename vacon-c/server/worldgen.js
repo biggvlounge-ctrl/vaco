@@ -339,10 +339,22 @@ function generateWorld(options = {}) {
       made.communities.push(community);
       summary.communities += 1;
 
-      // Territory: each block is held by a faction, and some are
-      // contested — which is what makes `contested_block_share` a
-      // statistic that can vary rather than a constant 0.
-      if (factions.length > 0) {
+      // Territory: a faction holds this ground, or nobody does.
+      //
+      // **Not every community, and that is the change that lets areas
+      // differ.** This claimed a block in EVERY community, so faction
+      // presence was a constant and `authority.gripTerm` — how much of
+      // an area somebody other than the state holds — could not tell
+      // one neighbourhood from the next. A gang on every street is as
+      // uniform a world as a gang on none.
+      //
+      // Roughly three in five, seeded. Flagged interpretive like every
+      // other composition number here: no document says how much of a
+      // city a faction holds, and what this is chosen FOR is that both
+      // answers occur — some areas have somebody else in charge and
+      // some have only the state, which is what `writOf` needs to
+      // produce a range rather than a number.
+      if (factions.length > 0 && random.unit('claimed', c, b) < 0.6) {
         const block = territory.generateTerritoryBlock(w, {
           factionId: random.pick(factions, 'block-faction', c, b).id,
           cityId: city.id,

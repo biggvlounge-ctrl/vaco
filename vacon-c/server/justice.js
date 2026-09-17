@@ -64,6 +64,30 @@
 //               and the record is in `historical_records` forever.
 //
 // ---------------------------------------------------------------------
+// And the state's rule is a scale, not a map
+//
+// **This file shipped with law as a city-wide absolute** — if the city
+// had a property statute, every thief in every block was charged, tried
+// and convicted. That is wrong for this setting, and the owner said so:
+// government and law are a scale of trust, lawlessness occurs in
+// certain areas, groups and small groups keep their own law, and some
+// cities maintain government rule without it being a guarantee after
+// the reset.
+//
+// `server/authority.js` computes how far the state's rule reaches in
+// each area, from four measured readings. This file asks it before
+// bringing a case:
+//
+//   governed    charged, tried, sentenced — as before.
+//   contested   the state answers what it cannot ignore. Violence,
+//               guns, domestic incidents and sex offences are charged;
+//               theft, property and drug offences are let go.
+//   lawless     the state brings no case at all.
+//
+// And where the state does not answer an offence, **whoever holds the
+// ground might**. See `answerByGroup`.
+//
+// ---------------------------------------------------------------------
 // A settlement that never legislated cannot convict anybody
 //
 // This falls out rather than being designed in, and it is the most
@@ -96,6 +120,9 @@ const worldStore = require('./worldStore.js');
 const politics = require('./politics.js');
 const behavior = require('./behavior.js');
 const economy = require('./economy.js');
+const authority = require('./authority.js');
+const membership = require('./membership.js');
+const inventory = require('./inventory.js');
 
 // ---------------------------------------------------------------------
 // Vocabulary
@@ -372,6 +399,92 @@ function release(worldState, entityId, options = {}) {
 }
 
 // ---------------------------------------------------------------------
+// Group law — what answers an offence where the state does not
+// ---------------------------------------------------------------------
+//
+// **Small-group law, and it is deliberately not a second court.** A
+// faction holding a block does not hold trials, keep a statute book or
+// run a prison. What it has are the three levers this engine already
+// gives an organization over a person, and each one is a real write to
+// a real store:
+//
+//   restitution   the offender hands the victim something out of their
+//                 own holdings. `inventory.transfer` — the same verb a
+//                 theft already uses, pointed the other way.
+//   expulsion     if the offender belongs to the faction, they stop
+//                 belonging. `membership.leaveOrganization`.
+//   feud          if they do not, the victim and the offender are now
+//                 enemies, and `crime.advanceFriction` will carry it
+//                 from there.
+//
+// **A faction answers what touches it, and ignores what does not.** An
+// offence with no victim — a property offence against nobody — has
+// nothing to put right, so nothing happens, and that IS the answer in a
+// place with no state: some things simply go unanswered. Reporting that
+// as a null rather than as an event is the point.
+const GROUP_FEUD_GAIN = 12;
+
+function answerByGroup(worldState, options = {}) {
+  const {
+    incident, holderId, communityId, tick = worldState.tick ?? 0,
+  } = options;
+  if (!holderId) return null;
+
+  const offenderId = incident.perpetrator_entity_id;
+  const victimId = incident.victim_entity_id ?? null;
+  const acts = [];
+
+  // Restitution, where there is somebody to make it to and something
+  // to make it with.
+  if (victimId !== null) {
+    const holdings = inventory.holdingsOf(worldState, offenderId).filter((h) => !h.equipped);
+    if (holdings.length > 0) {
+      inventory.transfer(worldState, {
+        fromId: offenderId, toId: victimId, itemName: holdings[0].item_name,
+        quantity: 1, tick,
+      });
+      acts.push('restitution');
+    }
+  }
+
+  // Expulsion, where they were one of the holder's own.
+  const belongs = (worldState.entityOrganizationMemberships || []).some(
+    (m) => m.entity_id === offenderId && m.organization_id === holderId && m.status !== 'left',
+  );
+  if (belongs) {
+    membership.leaveOrganization(worldState, offenderId, holderId);
+    acts.push('expulsion');
+  }
+
+  // Feud, where there is somebody to feud with.
+  if (victimId !== null && victimId !== offenderId) {
+    const existing = worldStore.findRelationship(worldState, victimId, offenderId);
+    const now = Number(existing?.conflict) || 0;
+    worldStore.adjustRelationship(worldState, victimId, offenderId, 'social', {
+      conflict: Math.max(0, Math.min(GROUP_FEUD_GAIN, 100 - now)),
+    });
+    acts.push('feud');
+  }
+
+  if (acts.length === 0) return null;
+
+  worldStore.addMemory(worldState, {
+    entityId: offenderId,
+    memoryType: 'experience',
+    category: 'social',
+    description: `answered to organization ${holderId} for ${incident.category}`,
+    importance: 60,
+    emotionLevel: 20,
+    relatedEntityIds: victimId === null ? [] : [victimId],
+    tick,
+  });
+
+  return {
+    incidentId: incident.id, communityId, holderId, acts, tick,
+  };
+}
+
+// ---------------------------------------------------------------------
 // The pass
 // ---------------------------------------------------------------------
 
@@ -386,15 +499,65 @@ function runJustice(worldState, options = {}) {
   // every tick would re-charge everybody every tick forever, which is
   // the seventh standing rule's failure — and would also be quadratic
   // in the length of the run.
-  const charged = new Set(
-    (worldState.courtCases || []).map((c) => c.incident_id),
-  );
+  const charged = new Set([
+    ...(worldState.courtCases || []).map((c) => c.incident_id),
+    // An offence the state declined, or a group answered, is dealt
+    // with — reconsidering it every tick forever is the seventh
+    // standing rule's failure with a different verb.
+    ...(worldState.groupSanctions || []).map((g) => g.incident_id),
+  ]);
+
+  // One reading per area for the whole pass rather than per incident.
+  const writ = authority.writByCommunity(worldState);
 
   for (const incident of worldState.crimeIncidents || []) {
     if (incident.cleared !== true) continue;
     if (incident.perpetrator_entity_id === null
         || incident.perpetrator_entity_id === undefined) continue;
     if (charged.has(incident.id)) continue;
+
+    // **Does the state's rule reach here at all?** See the header: a
+    // governed area charges everything, a contested one charges what it
+    // cannot ignore, a lawless one charges nothing.
+    const reading = writ.get(incident.community_id) ?? null;
+    const decision = authority.prosecutes(worldState, incident.community_id, incident.category,
+      reading === null ? {} : { reading });
+
+    if (!decision.prosecutes) {
+      charged.add(incident.id);
+      // Whoever holds the ground might answer it instead.
+      const holderId = authority.holderOf(worldState, incident.community_id);
+      const answered = answerByGroup(worldState, {
+        incident, holderId, communityId: incident.community_id, tick,
+      });
+      (worldState.groupSanctions || (worldState.groupSanctions = [])).push({
+        incident_id: incident.id,
+        community_id: incident.community_id,
+        category: incident.category,
+        regime: decision.regime,
+        holder_organization_id: answered ? holderId : null,
+        acts: answered ? answered.acts : [],
+        tick,
+      });
+      events.push({
+        type: answered ? 'group_sanction' : 'unanswered_offence',
+        severity: 'low',
+        note: answered
+          ? `${incident.category} answered by organization ${holderId}: ${answered.acts.join(', ')}`
+          : `${incident.category} went unanswered — ${decision.reason}`,
+        tick,
+        affected_entity_ids: [incident.perpetrator_entity_id],
+        global_effects: {
+          incidentId: incident.id,
+          communityId: incident.community_id,
+          category: incident.category,
+          regime: decision.regime,
+          holderId: answered ? holderId : null,
+          reason: decision.reason,
+        },
+      });
+      continue;
+    }
 
     const caseRow = judge(worldState, { incident, tick });
     if (!caseRow) continue;
@@ -508,6 +671,35 @@ function unlegislatedShare(worldState, communityId, options = {}) {
   return Math.round((unlegislated / cases.length) * 10000) / 10000;
 }
 
+// What answered offences here, and what did not. The regime reading for
+// an area, beside the count of what the state let go.
+function sanctionsIn(worldState, communityId, options = {}) {
+  const { sinceTick = null } = options;
+  return (worldState.groupSanctions || []).filter(
+    (g) => g.community_id === communityId
+      && (sinceTick === null || Number(g.tick) >= sinceTick),
+  );
+}
+
+// Of everything that reached a decision here, the share the state
+// declined to prosecute. Null where nothing has.
+function stateDeclinedShare(worldState, communityId, options = {}) {
+  const cases = casesIn(worldState, communityId, options).length;
+  const declined = sanctionsIn(worldState, communityId, options).length;
+  if (cases + declined === 0) return null;
+  return Math.round((declined / (cases + declined)) * 10000) / 10000;
+}
+
+// Of what the state declined, the share a group answered anyway. Null
+// where it declined nothing — which is a different fact from a place
+// where nobody stepped in.
+function groupAnsweredShare(worldState, communityId, options = {}) {
+  const declined = sanctionsIn(worldState, communityId, options);
+  if (declined.length === 0) return null;
+  const answered = declined.filter((g) => g.holder_organization_id !== null).length;
+  return Math.round((answered / declined.length) * 10000) / 10000;
+}
+
 function describeCase(worldState, caseId) {
   const row = (worldState.courtCases || []).find((c) => c.id === caseId);
   if (!row) return null;
@@ -579,6 +771,11 @@ module.exports = {
   release,
   runJustice,
   casesIn,
+  GROUP_FEUD_GAIN,
+  answerByGroup,
+  sanctionsIn,
+  stateDeclinedShare,
+  groupAnsweredShare,
   incarcerationRate,
   convictionRate,
   unlegislatedShare,

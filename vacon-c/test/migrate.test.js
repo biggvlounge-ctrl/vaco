@@ -51,6 +51,12 @@ const NOT_CARRIED = {
   pendingObservations: 'behavior observations in flight for at most one tick before the '
     + 'Event phase turns them into real `events` rows, which ARE carried — migrating both '
     + 'would record every one of them twice',
+  groupSanctions: 'what answered an offence where the state did not — restitution, expulsion '
+    + 'or a feud, recorded by server/justice.js when server/authority.js says government rule '
+    + 'does not reach that area. No schema table names a sanction that is not a court case, and '
+    + 'inventing one would be a schema decision taken inside a migration. What each sanction '
+    + 'DID does survive a checkpoint: the inventory transfer, the dropped membership row, the '
+    + 'conflict on the relationship and the memory are all carried.',
   contests: 'the contest system was built without a table — server/contest.js predates all '
     + 'of this and the schema names no such thing — so server/competition.js keeps results '
     + 'in memory the same way activeConditions does. Everything a game LEFT BEHIND does '

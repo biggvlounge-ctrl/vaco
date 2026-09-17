@@ -671,6 +671,20 @@ function runOrganizationPhase(worldState) {
     }
   }
 
+  // **What each area is actually like.** `communities.housing`,
+  // `safety`, `employment`, `education` and `reputation` sat at the
+  // schema default of 50 in every community of every world ever
+  // generated, and `crime` at 0 — nothing wrote any of them, so
+  // `getCommunityHealth` returned 50 everywhere and every city's
+  // reemergence was 37 or 38. Six communities across two cities,
+  // identical to the integer.
+  //
+  // Here rather than in a phase of its own because this is the phase
+  // that already asks who holds what ground, and the pipeline is locked
+  // at eleven. The columns are a durable VIEW of a live computation,
+  // the same pattern `environment_state.active_disasters` uses.
+  territory.refreshCommunityConditions(worldState, { tick: worldState.tick });
+
   return events;
 }
 

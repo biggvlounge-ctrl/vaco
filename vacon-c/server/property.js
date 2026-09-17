@@ -299,6 +299,39 @@ function getHoldings(worldState, ownerEntityId) {
 const CONDITION_DECAY_PER_TICK = 0.4;
 const BUILD_TICKS = 3;
 
+// **And upkeep, because decay with no inverse has no equilibrium.**
+//
+// Measured before this existed: 38 properties in a generated world, all
+// `operation`, condition 30..96 at generation and **0 across the board
+// by tick 300** — min 0, median 0, max 0. Every building in every world
+// this engine has ever run collapsed inside a year and stayed
+// collapsed, with the lifecycle stage still reading `operation`. That
+// made `communities.housing` read 0 in every populated area the moment
+// anything started computing it from what is standing.
+//
+// This is the thirteenth standing rule for the third time in one
+// session — resources had it, habits had it, buildings have it — and
+// the shape of the fix is the same: find what the mechanism is missing
+// its other half of, and read it from substrate that already exists.
+//
+// Two things keep a building up, and both are already recorded:
+//
+//   somebody lives there   `properties.occupants`, written by
+//                          server/households.js from who actually
+//                          sleeps in it.
+//   somebody owns it       `ownership_records`, append-only, already
+//                          the source of truth for `getCurrentOwner`.
+//
+// Interpretive, flagged, and chosen so the four cases say something
+// true rather than so a number looks tidy: a lived-in home somebody
+// owns slowly improves, a lived-in home nobody owns slowly declines, an
+// owned empty one declines faster, and a building with neither rots at
+// the full rate and is abandoned in about 250 ticks. That is a housing
+// stock that differs by neighbourhood because the neighbourhoods differ,
+// which is the entire reason the column exists.
+const OCCUPANT_UPKEEP_PER_TICK = 0.3;
+const OWNER_UPKEEP_PER_TICK = 0.15;
+
 function advancePropertyLifecycle(worldState, property, tick) {
   property.age = (property.age ?? 0) + 1;
 
@@ -318,9 +351,19 @@ function advancePropertyLifecycle(worldState, property, tick) {
   // fourteen digits of noise, and every display then has to clean up
   // after the engine.
   property.condition = Math.round(clamp(
-    Number(property.condition ?? 100) - CONDITION_DECAY_PER_TICK, 0, 100,
+    Number(property.condition ?? 100) - CONDITION_DECAY_PER_TICK + upkeepFor(worldState, property),
+    0, 100,
   ) * 10) / 10;
   return property;
+}
+
+// What is keeping this building up, in condition points per tick. See
+// the constants above for why these two and not others.
+function upkeepFor(worldState, property) {
+  const occupants = Array.isArray(property.occupants) ? property.occupants.length : 0;
+  const owner = getCurrentOwner(worldState, property.id);
+  return (occupants > 0 ? OCCUPANT_UPKEEP_PER_TICK : 0)
+    + (owner ? OWNER_UPKEEP_PER_TICK : 0);
 }
 
 
@@ -340,6 +383,10 @@ function reseedIds(worldState) {
 }
 
 module.exports = {
+  CONDITION_DECAY_PER_TICK,
+  OCCUPANT_UPKEEP_PER_TICK,
+  OWNER_UPKEEP_PER_TICK,
+  upkeepFor,
   reseedIds,
   PROPERTY_TYPES,
   LIFECYCLE,

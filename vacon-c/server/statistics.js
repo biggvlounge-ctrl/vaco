@@ -95,6 +95,7 @@ const economy = require('./economy.js');
 const health = require('./health.js');
 const competition = require('./competition.js');
 const justice = require('./justice.js');
+const authority = require('./authority.js');
 const motivation = require('./motivation.js');
 const membership = require('./membership.js');
 const infrastructure = require('./infrastructure.js');
@@ -653,6 +654,36 @@ const CATALOGUE = [
     // category, so a settlement that never legislated against theft
     // lets every thief walk, and this number says so.
     compute: (ctx) => justice.unlegislatedShare(ctx.worldState, ctx.communityId),
+  },
+  {
+    key: 'state_authority', category: 'crime', unit: 'share', scope: 'community',
+    // **How far government rule actually reaches here, 0..1.** Law was
+    // a city-wide absolute in this engine until 17 Sep 2026: a city with
+    // a property statute convicted every thief in every block. The
+    // owner's model is a scale of trust that holds in some places and
+    // fails in others, and `server/authority.js` computes it from four
+    // measured readings — residents' trust in their police, how much
+    // policing reaches them, the grip of whatever faction holds the
+    // ground, and the government's standing.
+    //
+    // Null where none of the four can be measured, because a place the
+    // engine knows nothing about is unobserved rather than ungoverned.
+    compute: (ctx) => authority.writOf(ctx.worldState, ctx.communityId).writ,
+  },
+  {
+    key: 'state_declined_share', category: 'crime', unit: 'share', scope: 'community',
+    // Of everything that reached a decision here, the share the state
+    // declined to prosecute — because it does not reach, or because the
+    // offence was beneath what a contested area answers.
+    compute: (ctx) => justice.stateDeclinedShare(ctx.worldState, ctx.communityId),
+  },
+  {
+    key: 'group_answered_share', category: 'crime', unit: 'share', scope: 'community',
+    // Of what the state declined, the share somebody else answered
+    // anyway — restitution, expulsion or a feud, from whichever faction
+    // holds the ground. Null where the state declined nothing, which is
+    // a different fact from a place where nobody stepped in.
+    compute: (ctx) => justice.groupAnsweredShare(ctx.worldState, ctx.communityId),
   },
   {
     key: 'clearance_rate', category: 'crime', unit: 'share', scope: 'community',
