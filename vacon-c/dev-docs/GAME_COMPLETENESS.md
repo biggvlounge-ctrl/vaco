@@ -13,17 +13,17 @@ three places, a spec section's "roughly 25 of the 40", a catalogue of 67
 statistics that a real world answered 36 of, and seven trait families generated
 on every NPC and read by nothing.
 
-## 90% complete
+## 90.6% complete
 
 ```
-██████████████████░░  90%   293.45 of 326
+██████████████████░░  90.6%   299.95 of 331
 ```
 
 | axis | complete | score | what it measures |
 |---|---|---|---|
-| systems | **63.6%** | 25.45/40 | urban systems with mechanics |
+| systems | **67.4%** | 26.95/40 | urban systems with mechanics |
 | tables | **89.4%** | 59/66 | schema tables a built world fills |
-| statistics | **89%** | 81/91 | statistics a world can answer |
+| statistics | **89.6%** | 86/96 | statistics a world can answer |
 | traits | **100%** | 114/114 | traits something reads |
 | traitDepth | **85.7%** | 6/7 | trait columns a life actually changes |
 | habits | **100%** | 8/8 | habit and routine depth |
@@ -54,7 +54,7 @@ The forty systems §7 names, at `server/urbanSystems.js`'s own four levels (mode
 | `15. Gang` | partial | +0.5 |
 | `16. Organized Crime` | partial | +0.5 |
 | `18. Prison` | partial | +0.5 |
-| `20. Government Services` | absent | +1 |
+| `20. Government Services` | partial | +0.5 |
 | `21. Fire & Emergency` | slot | +0.85 |
 | `22. Communication` | partial | +0.5 |
 | `23. Media` | absent | +1 |
@@ -65,8 +65,8 @@ The forty systems §7 names, at `server/urbanSystems.js`'s own four levels (mode
 | `32. Weather` | partial | +0.5 |
 | `33. Disaster` | partial | +0.5 |
 | `34. Supply Chain` *(deferred by scope)* | slot | +0.85 |
-| `35. Military / National Guard` | absent | +1 |
-| `36. Tourism` | absent | +1 |
+| `35. Military / National Guard` | partial | +0.5 |
+| `36. Tourism` | partial | +0.5 |
 | `39. Reputation` | partial | +0.5 |
 
 ### tables — 8 open

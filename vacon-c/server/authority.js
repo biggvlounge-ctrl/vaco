@@ -249,7 +249,31 @@ function gripTerm(worldState, communityId) {
   }
   if (holds.length === 0) return null;
   const held = Math.max(0, Math.min(1, holds.reduce((a, b) => a + b, 0) / holds.length));
-  return 1 - held;
+
+  // **What the state has put on the ground here.** §7's system 35,
+  // Military / National Guard, and `military` is a CIVILIZATION
+  // dimension in VACANCY_TRAIT_DATABASE_ATTACHMENT.md — see
+  // server/tierTraits.js. A garrison does not make the people trust
+  // the police or put a station on the corner, so it touches neither
+  // `trustTerm` nor `reachTerm`; what it does is contest somebody
+  // else's hold on the ground, which is this term and only this term.
+  //
+  // **Centred at zero, and provably.** `garrisonIn` returns 0 when the
+  // state spends nothing on soldiers, when there is no state, and when
+  // there is no budget to read — and in all three cases `1 - held * 1`
+  // is bit-identical to what this function returned before the
+  // military existed. That is standing rule 12's first clause: the
+  // term spreads worlds apart by what they spend, it does not move the
+  // baseline underneath worlds that spend nothing. Held by a test that
+  // builds the same world twice and zeroes the priority in one.
+  //
+  // Required at call time rather than at module scope: statecraft
+  // reads authority for its writ gate, and authority reads statecraft
+  // for this. A cycle at require time resolves to a half-built module;
+  // a cycle at call time resolves to a finished one.
+  const statecraft = require('./statecraft.js');
+  const garrison = Math.max(0, Math.min(1, statecraft.garrisonIn(worldState, communityId)));
+  return 1 - held * (1 - garrison);
 }
 
 // What the city thinks of its government, 0..1, or null where there is

@@ -65,6 +65,16 @@ function generateCity(worldState, options = {}) {
     safety: options.safety ?? 50,
     growth: options.growth ?? 0,
     reemergence_index: 34, // "the founding mechanic since Volume 1" — schema's own default, not invented
+    // §49 CITY DNA — "each city has a distinct identity". Null for a
+    // city nobody has given one, which is not the same as a city with
+    // no character; `statecraft.dnaOf` returns null for both and the
+    // biases it gates are simply not applied.
+    dna: options.dna ?? null,
+    // The CITY tier-level trait sheet (VACANCY_TRAIT_DATABASE_
+    // ATTACHMENT.md). One stored dimension after the reconciliation in
+    // server/tierTraits.js; the other eleven are columns, rollups, or
+    // deferred.
+    traits: require('./tierTraits.js').cityTraits(options.traits ?? {}),
   };
   worldState.cities.push(city);
   return city;
@@ -235,9 +245,15 @@ function getCommunityDetail(worldState, communityId) {
   if (!community) return null;
   const blocks = (worldState.territoryBlocks || [])
     .filter((b) => b.community_id === community.id);
+  const statecraft = require('./statecraft.js');
+  const stability = statecraft.communityStability(worldState, community.id);
   return {
     ...community,
     health: getCommunityHealth(community),
+    // §48 NEIGHBORHOOD STABILITY, as the number and as the spec's own
+    // word for it.
+    stability,
+    stabilityBand: statecraft.stabilityBand(stability),
     territoryBlocks: blocks,
     city: (worldState.cities || []).find((c) => c.id === community.city_id) ?? null,
   };
@@ -289,10 +305,23 @@ function getCityDetail(worldState, cityId) {
   if (!city) return null;
   const communities = (worldState.communities || [])
     .filter((c) => c.city_id === city.id);
+  const statecraft = require('./statecraft.js');
   return {
     ...city,
     reemergence: getCityReemergence(worldState, city.id),
-    communities: communities.map((c) => ({ ...c, health: getCommunityHealth(c) })),
+    communities: communities.map((c) => ({
+      ...c,
+      health: getCommunityHealth(c),
+      // §48's band, by its own name. Additive to the shape, which is
+      // what `VACANCY_API_ENDPOINT_MAP.md` requires of an existing
+      // endpoint — nothing here was removed or renamed.
+      stability: statecraft.communityStability(worldState, c.id),
+    })),
+    // What the state spends here, what it draws, and what kind of city
+    // this is. Hung off the existing detail rather than given a route
+    // of its own: the API map's Phase list governs new endpoints and
+    // does not name one for this.
+    statecraft: statecraft.describeStatecraft(worldState, city.id),
     territoryBlocks: (worldState.territoryBlocks || []).filter((b) => b.city_id === city.id),
     properties: (worldState.properties || []).filter((p) => p.city_id === city.id).length,
   };
@@ -449,6 +478,150 @@ function conditionsOf(worldState, communityId, options = {}) {
   return { crime: crimeLevel, safety, employment, education, housing };
 }
 
+// ---------------------------------------------------------------------------
+// City conditions — the four dead columns one tier up
+// ---------------------------------------------------------------------------
+//
+// **`cities.economy`, `cities.safety`, `cities.infrastructure` and
+// `cities.growth` were the community columns' exact situation, a tier
+// higher and a fortnight later.** Every one of them is set once in
+// `generateCity` and written by nothing ever again, so a city's economy
+// in a 200-tick world is the number `worldgen` drew on tick 0.
+// `getCityReemergence` reads `city.economy` and `city.infrastructure`
+// for its infrastructure sub-index, so a third of a city's reemergence
+// composite has been a founding constant in every world this engine
+// has run.
+//
+// `cities.infrastructure` is the sharpest of the four, because the
+// schema itself says what it should be: the column's own comment reads
+// "computed rollup from the infrastructure table below", and
+// `infrastructure.cityCondition()` has computed exactly that rollup
+// since the infrastructure module was written. Nothing connected them.
+//
+// Same pattern as the communities above: a durable VIEW of a live
+// computation, not a second source of truth. Standing rule 3 is
+// satisfied because the column is maintained FROM the computation
+// every tick rather than drifting alongside it.
+const CITY_GROWTH_WINDOW_TICKS = 365;
+
+function cityConditionsOf(worldState, cityId, options = {}) {
+  // Required lazily: statecraft reads city conditions and this reads
+  // statecraft's tourism, which is a cycle at module scope and not one
+  // at call time.
+  const infrastructureModule = require('./infrastructure.js');
+  const economyModule = require('./economy.js');
+  const tierTraitsModule = require('./tierTraits.js');
+
+  const city = (worldState.cities || []).find((c) => c.id === cityId);
+  if (!city) return {};
+
+  const communities = (worldState.communities || []).filter((c) => c.city_id === cityId);
+  const residents = (worldState.npcs || [])
+    .filter((n) => communities.some((c) => c.id === n.communityId));
+
+  // infrastructure — the rollup the schema names.
+  const condition = infrastructureModule.cityCondition(worldState, cityId);
+  const infrastructureValue = condition === null ? null : clamp(Math.round(condition), 0, 100);
+
+  // safety — what the areas in it report. Null when none of them has a
+  // reading yet, which is a city nobody has measured rather than a
+  // dangerous one.
+  const safeties = communities.map((c) => Number(c.safety)).filter(Number.isFinite);
+  const safety = safeties.length === 0 ? null : clamp(Math.round(mean(safeties)), 0, 100);
+
+  // economy — work, supply and visitors.
+  //
+  // Deliberately NOT a function of infrastructure condition, although
+  // it plainly is in life. Services are funded from the budget, the
+  // budget is the mean city economy, and a city economy that read
+  // infrastructure back would close that loop into positive feedback
+  // with nothing damping it. Tourism is the one path from
+  // infrastructure into the economy and it runs through a lagged stock
+  // (`statecraft.TOURISM_ADJUST`), which is what keeps the loop slow
+  // enough to be a dynamic rather than a runaway.
+  const economyTerms = [];
+  const employments = communities.map((c) => Number(c.employment)).filter(Number.isFinite);
+  if (employments.length > 0) economyTerms.push(mean(employments));
+
+  const scarcities = (worldState.resources || [])
+    .filter((r) => r.city_id === cityId)
+    .map((r) => economyModule.getScarcity(r))
+    .filter(Number.isFinite);
+  // `getScarcity` is 50 at balance and rises with want, so sufficiency
+  // is its complement on the same scale.
+  if (scarcities.length > 0) economyTerms.push(clamp(100 - mean(scarcities), 0, 100));
+
+  const tourism = tierTraitsModule.traitOf(city, 'tourism');
+  if (tourism !== null) economyTerms.push(tourism);
+
+  const economyValue = economyTerms.length === 0
+    ? null
+    : clamp(Math.round(mean(economyTerms)), 0, 100);
+
+  // growth — arrivals against departures over the window, per hundred
+  // residents, so the column reads as a percentage the way `economy`
+  // and `safety` read as scores.
+  //
+  // Births come from `npc.createdTick`; deaths from the historical
+  // record, because `npcs` has no death tick column on purpose (see
+  // mortality.js) and the record is where a death's tick actually
+  // lives. `undefined` — not null — when there is nobody here, so the
+  // column is cleared rather than left showing a stale rate for a city
+  // that has emptied.
+  const tick = Number(options.tick ?? worldState.tick ?? 0);
+  const since = tick - CITY_GROWTH_WINDOW_TICKS;
+  let growth;
+  if (residents.length === 0) {
+    growth = communities.length === 0 ? null : undefined;
+  } else {
+    const born = residents.filter((n) => Number(n.createdTick ?? 0) > since).length;
+    const here = new Set(communities.map((c) => c.id));
+    const gone = new Set((worldState.deceased || [])
+      .filter((n) => here.has(n.communityId))
+      .map((n) => n.id));
+    const died = (worldState.historicalRecords || []).filter(
+      (r) => r.what === 'death'
+        && Array.isArray(r.who)
+        && gone.has(r.who[0])
+        && Number(r.when_tick) > since,
+    ).length;
+    growth = Math.round(((born - died) / residents.length) * 10000) / 100;
+  }
+
+  return {
+    economy: economyValue,
+    safety,
+    infrastructure: infrastructureValue,
+    growth,
+  };
+}
+
+// Write the city view. Same three-state contract as the communities
+// below: a NUMBER is a reading, `undefined` clears the column, `null`
+// leaves it alone.
+function refreshCityConditions(worldState, options = {}) {
+  const moved = [];
+  for (const city of worldState.cities || []) {
+    const next = cityConditionsOf(worldState, city.id, options);
+    let changed = false;
+    for (const [field, value] of Object.entries(next)) {
+      if (value === undefined) {
+        if (city[field] !== null) { city[field] = null; changed = true; }
+        continue;
+      }
+      if (value === null) continue;
+      if (city[field] === value) continue;
+      city[field] = value;
+      changed = true;
+    }
+    city.population = (worldState.communities || [])
+      .filter((c) => c.city_id === city.id)
+      .reduce((total, c) => total + (Number(c.population) || 0), 0);
+    if (changed) moved.push(city);
+  }
+  return moved;
+}
+
 // Write the view. Returns the communities whose reading actually moved,
 // which is what makes this a crossing rather than a per-tick rewrite of
 // six identical numbers.
@@ -501,8 +674,11 @@ function reseedIds(worldState) {
 
 module.exports = {
   CONDITION_WINDOW_TICKS,
+  CITY_GROWTH_WINDOW_TICKS,
   conditionsOf,
+  cityConditionsOf,
   refreshCommunityConditions,
+  refreshCityConditions,
   reseedIds,
   generateCity,
   generateCommunity,

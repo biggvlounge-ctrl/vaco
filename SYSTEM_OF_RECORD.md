@@ -980,7 +980,7 @@ trusted:
 
 The simulation engine is the one app in this repo whose "done" is not a
 list of routes, so it carries a measured completeness score rather than
-a criteria tally. **90%**, from
+a criteria tally. **90.6%**, from
 `vacon-c/dev-docs/GAME_COMPLETENESS.md`, which
 `vacon-c/scripts/completeness.mjs` regenerates and
 `vacon-c/test/completeness.test.js` fails on if stale — including a
@@ -988,9 +988,9 @@ check that the percent in THIS file matches the one the code measures.
 
 | axis | complete | what it measures |
 |---|---|---|
-| systems | 63.6% | the forty urban systems §7 names, at `urbanSystems.js`'s own four levels |
+| systems | 67.4% | the forty urban systems §7 names, at `urbanSystems.js`'s own four levels |
 | tables | 89.4% | schema tables a built world actually fills |
-| statistics | 89% | statistics a world can answer about itself |
+| statistics | 89.6% | statistics a world can answer about itself |
 | traits | 100% | traits something under `server/` reads |
 | traitDepth | 85.7% | trait columns a life actually changes |
 | habits | 100% | whether habits and routines carry information |
@@ -1039,7 +1039,31 @@ consumed by nothing** — a grid at risk 0.95 behaved exactly like one at
 0.05, `funding` had no reader anywhere in the engine, and four of §7's
 forty systems were stuck on that one missing mechanism.
 
-**The percent can go DOWN, and did.** 90% to 89.6%, because the world
+**And two whole tier-level trait sheets existed only in a document.**
+`VACANCY_TRAIT_DATABASE_ATTACHMENT.md` defines five — FAMILY,
+ORGANIZATION, CITY, CIVILIZATION and CULTURE — and the engine built
+four. `CITY_TRAIT_FAMILIES` and `CIVILIZATION_TRAIT_FAMILIES` name
+thirty-three dimensions between them and nothing under `server/`
+mentioned either, which is where §7's last three `absent` urban systems
+had been sitting the whole time: Government Services, Military /
+National Guard and Tourism are `healthcare`/`education`/`security`,
+`military` and `tourism` in a file this project has had since day one.
+That one is not a citation-is-not-presence failure, it is its paper
+twin — **a specification nobody opens is indistinguishable from one
+that was never written**, and it was found only because the owner
+asked, before any of it was built, whether it was already documented.
+
+**And four `cities` columns were founding constants.** `economy`,
+`safety`, `infrastructure` and `growth` were written once by
+`generateCity` and by nothing ever again — the community columns'
+situation exactly, one tier up. `cities.infrastructure`'s own schema
+comment says it is a "computed rollup from the infrastructure table",
+`infrastructure.cityCondition()` had computed that rollup since the day
+that module was written, and nothing connected them; a third of every
+city's reemergence composite was a number drawn on tick 0.
+
+**The percent can go DOWN, and did.** 90% to 89.6% (and back to 90.6%
+with the tier sheets), because the world
 the report measures is now a contested settlement where thefts go
 unprosecuted, so `court_cases` is genuinely empty in it. A score that
 only ever rose would be measuring the work rather than the world. The pattern is consistent enough to be a rule: **the

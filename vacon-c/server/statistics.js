@@ -103,6 +103,8 @@ const infrastructure = require('./infrastructure.js');
 const mortality = require('./mortality.js');
 const policing = require('./policing.js');
 const property = require('./property.js');
+const statecraft = require('./statecraft.js');
+const tierTraits = require('./tierTraits.js');
 
 // §9's MASTER BLOCK KEY, in its order. Every statistic belongs to one.
 const CATEGORIES = [
@@ -847,6 +849,80 @@ const CATALOGUE = [
     compute: (ctx) => (ctx.cityId === null
       ? null
       : infrastructure.failedIn(ctx.worldState, ctx.cityId).length),
+  },
+  {
+    key: 'tourism', category: 'economics', unit: 'index', scope: 'city',
+    // **§7's system 36, and a CITY tier-level dimension the package
+    // already named.** `VACANCY_TRAIT_DATABASE_ATTACHMENT.md`'s
+    // CITY_TRAIT_FAMILIES lists `tourism` among twelve; the engine
+    // built neither that sheet nor the CIVILIZATION one, so
+    // thirty-three named dimensions existed only in a document.
+    //
+    // A STOCK, not a rollup — `statecraft.tourismAppeal` is what the
+    // city currently deserves and this is what it currently has, and
+    // the gap between them is the whole point. A city that cleans
+    // itself up does not have visitors the same afternoon.
+    compute: (ctx) => (ctx.cityId === null
+      ? null
+      : tierTraits.traitOf(
+        (ctx.worldState.cities || []).find((c) => c.id === ctx.cityId), 'tourism',
+      )),
+  },
+  {
+    key: 'tourism_appeal', category: 'economics', unit: 'index', scope: 'city',
+    // What the city offers a visitor right now — safety, what is
+    // standing, and whether there is a culture here to come for, with
+    // §49's CITY DNA as the bias. Reported beside the stock so the two
+    // can be compared; a city whose appeal is far above its tourism is
+    // one on the way up.
+    compute: (ctx) => (ctx.cityId === null
+      ? null
+      : statecraft.tourismAppeal(ctx.worldState, ctx.cityId)),
+  },
+  {
+    key: 'service_funding', category: 'community', unit: 'index', scope: 'city',
+    // **§7's system 20, Government Services.** What this city's
+    // hospitals, schools and stations were actually given at the last
+    // budget, averaged — which is the state's means times its priority
+    // times **how far its writ reaches here**. That last factor is the
+    // owner's model made arithmetic: "some cities will maintain govt
+    // rule but it is not a guarantee". A lawless city is not
+    // under-served because a rule says so; it is under-served because
+    // the number it is multiplied by is near zero.
+    compute: (ctx) => {
+      if (ctx.cityId === null) return null;
+      const plan = statecraft.fundingFor(ctx.worldState, ctx.cityId);
+      if (plan === null) return null;
+      const values = Object.values(plan.funding);
+      return values.length === 0
+        ? null
+        : Math.round(values.reduce((a, b) => a + b, 0) / values.length);
+    },
+  },
+  {
+    key: 'garrison', category: 'crime', unit: 'share', scope: 'city',
+    // **§7's system 35, Military / National Guard**, as the
+    // CIVILIZATION dimension `military` — 0..1, the share of a
+    // faction's hold on any block here that the state's force
+    // contests. Zero when the state spends nothing on soldiers, which
+    // is what makes it safe to fold into `authority.gripTerm` without
+    // recalibrating every world that has none.
+    compute: (ctx) => (ctx.cityId === null
+      ? null
+      : statecraft.garrisonOf(ctx.worldState, ctx.cityId)),
+  },
+  {
+    key: 'neighborhood_stability', category: 'community', unit: 'index', scope: 'community',
+    // **§48 NEIGHBORHOOD STABILITY**, whose bands the spec gives to the
+    // number — 0-30 COLLAPSING, 30-50 STRUGGLING, 50-70 STABLE, 70-85
+    // THRIVING, 85-100 ELITE — and which nothing in the engine had ever
+    // calculated, although §48 says in its own text that it is
+    // "dynamically calculated".
+    //
+    // Computed, never stored: how well the area is doing and whether
+    // anybody is in charge of it. `statecraft.stabilityBand` turns it
+    // back into the spec's word.
+    compute: (ctx) => statecraft.communityStability(ctx.worldState, ctx.communityId),
   },
   {
     key: 'infrastructure_failure_risk', category: 'community', unit: 'share', scope: 'city',

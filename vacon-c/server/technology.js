@@ -78,7 +78,17 @@ function minReemergenceFor(order) {
 // -- civilizations ------------------------------------------------------
 
 function foundCivilization(worldState, options = {}) {
-  const { name, era = null, stabilityIndex = 50 } = options;
+  // **`stability` as well as `stabilityIndex`, and this is a bug fix,
+  // not an alias for convenience.** `worldgen.js` has always called
+  // this with `{ name, stability: random.range(40, 75, ...) }`. The
+  // destructure below only ever read `stabilityIndex`, so the drawn
+  // value was discarded and every civilization in every world this
+  // engine has generated has had a stability index of exactly 50 — the
+  // default — with a seeded draw sitting unused one line above the
+  // call. Accepting both keeps the older call sites working and makes
+  // the drawn number arrive.
+  const { name, era = null } = options;
+  const stabilityIndex = options.stabilityIndex ?? options.stability ?? 50;
   if (!name) throw new Error('foundCivilization requires a name');
   if (!Number.isFinite(stabilityIndex)) {
     throw new Error('foundCivilization requires a finite stabilityIndex');
@@ -95,6 +105,12 @@ function foundCivilization(worldState, options = {}) {
     name,
     era,
     stability_index: stabilityIndex,
+    // The CIVILIZATION tier-level trait sheet (VACANCY_TRAIT_DATABASE_
+    // ATTACHMENT.md). Four stored dimensions after the reconciliation
+    // in server/tierTraits.js — military, healthcare, education,
+    // security — which are the state's spending priorities on one
+    // budget. `statecraft.js` is what reads them.
+    traits: require('./tierTraits.js').civilizationTraits(options.traits ?? {}),
   };
   worldState.civilizations.push(civilization);
   return civilization;

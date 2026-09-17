@@ -88,6 +88,7 @@ const environment = require('./environment.js');
 const items = require('./items.js');
 const territory = require('./territory.js');
 const geo = require('./geo.js');
+const statecraft = require('./statecraft.js');
 const worldStore = require('./worldStore.js');
 const { hashSeed, seededUnit } = require('./seeded.js');
 
@@ -259,6 +260,16 @@ function generateWorld(options = {}) {
       geoSource: 'synthetic',
       latitude: cityPosition.lat,
       longitude: cityPosition.lon,
+      // §49 CITY DNA — "each city has a distinct identity". Drawn on
+      // the city's POSITION in this loop, never on its id (§88, and
+      // the corollary the infrastructure failure draw learned the hard
+      // way), so the same seed always builds the same kind of city.
+      dna: statecraft.drawDna(config.seed, c),
+      // Tourism starts at the schema's trait default rather than at
+      // its own appeal. It is a stock with momentum — a city does not
+      // have the visitors its appeal deserves on the day it is
+      // founded — and `statecraft.driftTourism` walks it there.
+      traits: {},
     });
     summary.cities.push(city.id);
 
@@ -771,6 +782,25 @@ function generateWorld(options = {}) {
   const civilization = technology.foundCivilization(w, {
     name: config.civilizationName,
     stability: Math.round(random.range(40, 75, 'civ', 'stability')),
+    // The state's spending priorities — §7's Government Services and
+    // Military / National Guard, as the CIVILIZATION tier-level
+    // dimensions VACANCY_TRAIT_DATABASE_ATTACHMENT.md already names.
+    // Drawn rather than set flat, because four identical numbers is
+    // the placeholder problem this project keeps finding: a state that
+    // weights everything equally has made no choices, and
+    // `statecraft.sharesOf` divides by their total so an even split
+    // produces no contrast anywhere downstream.
+    //
+    // The band is deliberately wide on `military` and narrow on the
+    // three services: a post-reset state argues about soldiers, and
+    // broadly agrees that hospitals, schools and police stations all
+    // need something.
+    traits: {
+      healthcare: Math.round(random.range(35, 70, 'civ', 'healthcare')),
+      education: Math.round(random.range(35, 70, 'civ', 'education')),
+      security: Math.round(random.range(35, 70, 'civ', 'security')),
+      military: Math.round(random.range(5, 80, 'civ', 'military')),
+    },
   });
   summary.civilizationId = civilization.id;
   region.civilization_id = civilization.id;

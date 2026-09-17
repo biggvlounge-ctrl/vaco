@@ -202,8 +202,20 @@ test('every tick phase a system cites exists in tick.js', () => {
   assert.deepEqual(missing, [], `cited phases that do not exist: ${missing.join(', ')}`);
 });
 
-test('every trait family a system cites exists in traits.js', () => {
-  const missing = citations().traitFamilies.filter((f) => !(f in TRAIT_FAMILIES));
+test('every trait family a system cites exists in traits.js or a tier sheet', () => {
+  // **Five tiers, not one.** `traits.js` is the INDIVIDUAL tier and it
+  // was the only thing this check knew about, which was right while it
+  // was the only tier a system had ever cited. Government Services,
+  // Military and Tourism are the first systems whose trait data lives
+  // a tier up — `VACANCY_TRAIT_DATABASE_ATTACHMENT.md` defines sheets
+  // for FAMILY, ORGANIZATION, CITY and CIVILIZATION as well, and the
+  // first two had modules before the last two did. Widening the check
+  // rather than dropping the citations, because a made-up tier name
+  // should still fail here.
+  const tiers = new Set(['individual', 'organization', 'family', 'city', 'civilization',
+    'culture']);
+  const missing = citations().traitFamilies
+    .filter((f) => !(f in TRAIT_FAMILIES) && !tiers.has(f));
   assert.deepEqual(missing, [], `cited trait families that do not exist: ${missing.join(', ')}`);
 });
 

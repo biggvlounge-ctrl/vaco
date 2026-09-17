@@ -71,6 +71,7 @@ const justice = require('./justice.js');
 const households = require('./households.js');
 const migration = require('./migration.js');
 const environment = require('./environment.js');
+const statecraft = require('./statecraft.js');
 
 let nextEventId = 1;
 
@@ -684,6 +685,24 @@ function runOrganizationPhase(worldState) {
   // at eleven. The columns are a durable VIEW of a live computation,
   // the same pattern `environment_state.active_disasters` uses.
   territory.refreshCommunityConditions(worldState, { tick: worldState.tick });
+
+  // **And the same four columns one tier up.** `cities.economy`,
+  // `safety`, `infrastructure` and `growth` were written once by
+  // `generateCity` and by nothing ever again — `getCityReemergence`
+  // has been reading a founding constant for its infrastructure
+  // sub-index in every world this engine has run. After the
+  // communities, because the city reading is a rollup of theirs.
+  territory.refreshCityConditions(worldState, { tick: worldState.tick });
+
+  // **What the state spends, and where it reaches.** §7's last three
+  // `absent` urban systems — 20 Government Services, 35 Military /
+  // National Guard, 36 Tourism — as the CITY and CIVILIZATION
+  // tier-level trait sheets the package defines and the engine never
+  // built. Here because a budget is a government act and a government
+  // is an organization (standing rule 4), and after the two condition
+  // refreshes above because the budget is the mean city economy and
+  // tourism reads city infrastructure.
+  events.push(...statecraft.runStatecraft(worldState, worldState.tick));
 
   return events;
 }

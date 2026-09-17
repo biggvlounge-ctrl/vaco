@@ -262,8 +262,14 @@ async function restoreWorldStateFromPostgres(worldState) {
   // from JSONB already parsed by the driver, so it is left alone —
   // calling JSON.parse on an object throws, and wrapping that in a
   // try/catch would hide a real shape change.
-  worldState.civilizations = (await q('SELECT * FROM civilizations ORDER BY id')).map((c) =>
-    nums(c, ['id', 'stability_index']));
+  worldState.civilizations = (await q('SELECT * FROM civilizations ORDER BY id')).map((c) => ({
+    ...nums(c, ['id', 'stability_index']),
+    // The state's four spending priorities. JSONB, guarded like every
+    // other JSONB column here — a string comes back with no
+    // `military` key, `statecraft.sharesOf` returns null for it, and
+    // the whole budget pass silently stops delivering anything.
+    traits: typeof c.traits === 'string' ? JSON.parse(c.traits) : (c.traits ?? null),
+  }));
   summary.civilizations = worldState.civilizations.length;
 
   worldState.technologyEras = (await q('SELECT * FROM technology_eras ORDER BY era_order')).map((e) =>
@@ -437,7 +443,7 @@ async function restoreWorldStateFromPostgres(worldState) {
   // -------------------------------------------------------------------
   // Territory / Property
   // -------------------------------------------------------------------
-  worldState.cities = (await q('SELECT * FROM cities ORDER BY id')).map((c) =>
+  worldState.cities = (await q('SELECT * FROM cities ORDER BY id')).map((c) => ({
     // **`latitude` and `longitude` are NUMERIC and come back as
     // strings** (standing rule 10). A latitude of the string "0.0148"
     // fails `Number.isFinite` inside `geo.isPosition`, so every city
@@ -445,9 +451,20 @@ async function restoreWorldStateFromPostgres(worldState) {
     // `authority.proximity` would fall back to 1 — quietly putting
     // every block back at the station door and making every area
     // governed again. Nothing would throw.
-    nums(c, ['id', 'region_id', 'population', 'mayor_npc_id', 'economy', 'infrastructure',
-      'safety', 'health', 'education', 'culture', 'employment', 'housing', 'pollution',
-      'corruption', 'tick', 'latitude', 'longitude']));
+    //
+    // `growth` is on the list for the same rule and is the one entry
+    // that can go NEGATIVE: a string "-1.35" compares as greater than
+    // "0", so a shrinking city would restore as a growing one.
+    ...nums(c, ['id', 'region_id', 'population', 'mayor_npc_id', 'economy', 'infrastructure',
+      'safety', 'growth', 'health', 'education', 'culture', 'employment', 'housing', 'pollution',
+      'corruption', 'tick', 'latitude', 'longitude']),
+    // `traits` is JSONB, guarded rather than trusted for the same
+    // reason `active_disasters` is: a string here reads as an object
+    // with no `tourism` key, `tierTraits.traitOf` returns null for it,
+    // and every restored city's visitors silently vanish rather than
+    // throwing. `dna` is TEXT and stays a string.
+    traits: typeof c.traits === 'string' ? JSON.parse(c.traits) : (c.traits ?? null),
+  }));
   summary.cities = worldState.cities.length;
 
   worldState.communities = (await q('SELECT * FROM communities ORDER BY id')).map((c) =>

@@ -324,11 +324,14 @@ async function migrateWorldStateToPostgres(worldState) {
         await client.query(
           `INSERT INTO cities (id, name, region_id, real_world_geo_ref, population, mayor_npc_id,
                                economy, infrastructure, safety, growth, reemergence_index,
-                               latitude, longitude, geo_source)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+                               latitude, longitude, geo_source, dna, traits)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
           [c.id, c.name, c.region_id, c.real_world_geo_ref, c.population, c.mayor_npc_id,
             c.economy, c.infrastructure, c.safety, c.growth, c.reemergence_index,
-            c.latitude ?? null, c.longitude ?? null, c.geo_source ?? null]
+            c.latitude ?? null, c.longitude ?? null, c.geo_source ?? null,
+            // §49 CITY DNA and the CITY tier-level trait sheet. JSONB,
+            // so the object goes straight in — same as `cultures.traits`.
+            c.dna ?? null, c.traits ?? null]
         );
       }
       summary.cities = worldState.cities.length;
@@ -596,8 +599,12 @@ async function migrateWorldStateToPostgres(worldState) {
       // passed as an object.
       for (const c of worldState.civilizations) {
         await client.query(
-          `INSERT INTO civilizations (id, name, era, stability_index) VALUES ($1,$2,$3,$4)`,
-          [c.id, c.name, c.era, c.stability_index]
+          `INSERT INTO civilizations (id, name, era, stability_index, traits)
+           VALUES ($1,$2,$3,$4,$5)`,
+          // `traits` is the state's four spending priorities — see
+          // server/tierTraits.js. Dropping them on a restore would put
+          // the state back on an even split it never chose.
+          [c.id, c.name, c.era, c.stability_index, c.traits ?? null]
         );
       }
       summary.civilizations = worldState.civilizations.length;

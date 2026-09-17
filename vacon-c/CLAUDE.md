@@ -84,6 +84,35 @@ defines and finding no code that touches it.
 Neither is a twelfth tick phase. The pipeline is locked at eleven and
 both run in the same cross-cutting slot as `flows.js`.
 
+**A third, found by being asked whether it was already documented.**
+`VACANCY_TRAIT_DATABASE_ATTACHMENT.md` defines FIVE tier-level trait
+sheets — FAMILY, ORGANIZATION, CITY, CIVILIZATION and CULTURE. The
+engine built four. `CITY_TRAIT_FAMILIES` and
+`CIVILIZATION_TRAIT_FAMILIES` name thirty-three dimensions between
+them and `grep -rn "CITY_TRAIT\|CIVILIZATION_TRAIT\|tourism"
+server/*.js` returned nothing at all, which is where §7's last three
+`absent` urban systems had been sitting the whole time: Government
+Services, Military / National Guard and Tourism are `healthcare`/
+`education`/`security`, `military`, and `tourism` in a document this
+project has had since day one. §49 CITY DNA names "tourism city" and
+"military city" among nine identities in the same breath.
+
+`server/tierTraits.js` and `server/statecraft.js` are the answer, and
+the shape of the lesson is worth more than the systems: **before
+building a system that a spec document lists by name, find the
+document that already specifies it.** The eleventh rule is "a generator
+nothing calls is indistinguishable from one that does not exist"; this
+is its paper twin — a specification nobody opens is indistinguishable
+from one that was never written, and the cost is not a gap but a
+reinvention that disagrees with it.
+
+`tierTraits.js` also carries the reconciliation of all thirty-three
+names against the column, rollup or system that already answers
+twenty-eight of them. That list is the deliverable, not a comment:
+"we checked, and this one is answered elsewhere" is exactly the
+knowledge that evaporates, and losing it is how a schema grows two
+disagreeing answers to the same question.
+
 **A tick is a day** — `TICK_INTERVALS` in `behavior.js`. Nothing in the
 package says how many ticks a day is, so that file chooses and says so;
 `worldState.tickIntervals` overrides it wholesale.
@@ -392,6 +421,32 @@ taken back out, because intake turned out to be a fact about a city and
 exertion a fact about employment. `statistics.js`'s `body_composition`
 entry names both, and names what would close it. A gap is visible; a
 plausible wrong number is not.
+
+**A fifteenth, and the first one caught before it shipped.** A pass
+that WRITES a field must not read that same field as its own baseline
+— if it does, it is not a delivery, it is an accumulator, and the only
+question is how many cycles it takes to hit the ceiling. `statecraft.
+deliverTo` writes `maintenance_level` onto a city's infrastructure
+every quarter, and its first version applied §49's CITY DNA upkeep as
+`row.maintenance_level + DNA_UPKEEP`. A port's roads gained fifteen
+points every ninety days and pinned at 100 inside two years. That is
+the fifth one-way ratchet this project has found — resources, habits,
+buildings, conditions, and now delivery — and the first that did not
+have to be found in a measured world first, because the test for it is
+mechanical: **a delivery pass run twice on an unchanged world must
+leave the world unchanged.** Idempotence is checkable without knowing
+anything about what the pass means, which is what makes it worth
+asserting on every pass that writes a durable view.
+
+The same commit carries the thirteenth rule's other half in a place
+worth naming: `infrastructure.js` had been left with decay and no
+inverse on purpose, because when utilities were built, every candidate
+repair gain turned out to be a ratchet the other way. `maintenance_
+level` is the honest inverse and it was in the schema the whole time —
+it does not hand condition back, it stops the bleeding, and only for as
+long as it is paid for. When a mechanism seems to need an inverse the
+schema does not have, check whether the schema already has one nobody
+has written to.
 
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`

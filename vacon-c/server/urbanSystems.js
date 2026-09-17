@@ -147,9 +147,16 @@ const SYSTEMS = [
     tables: ['infrastructure'],
     traitFamilies: ['educational'],
     infrastructureTypes: ['schools'],
-    note: 'Schools now exist as infrastructure with a capacity and a condition that decays, '
-      + 'and educational ATTAINMENT is a real per-area statistic (npcs.education, via '
-      + 'demographics.compositionOf). Still partial: no teachers, no enrolment, nobody to '
+    functions: ['runSchooling'],
+    note: 'Schools exist as infrastructure with a capacity and a condition that decays, '
+      + 'educational ATTAINMENT is a real per-area statistic (npcs.education, via '
+      + 'demographics.compositionOf), and **attainment now moves** — `statecraft.runSchooling` '
+      + 'walks residents of school age up `demographics.EDUCATION_LEVELS` at a rate set by '
+      + 'what the state funded that city\'s schools at, and stops entirely while the schools '
+      + 'are failed. Until 17 Sep 2026 `npcs.education` was decided at generation and never '
+      + 'changed, which is why `infrastructure.js` had to DECLARE that it could give `schools` '
+      + 'no outage effect: there was no per-tick education mechanism for an outage to '
+      + 'interrupt. There is now. Still partial: no teachers, no enrolment roll, nobody to '
       + 'drop out OF, and the knowledge tiers of §25 are absent entirely.',
   },
   {
@@ -359,7 +366,28 @@ const SYSTEMS = [
   {
     n: 20,
     name: 'Government Services',
-    level: 'absent',
+    level: 'partial',
+    tables: ['civilizations', 'infrastructure', 'communities'],
+    phases: ['runOrganizationPhase'],
+    traitFamilies: ['civilization'],
+    infrastructureTypes: ['hospitals', 'schools', 'public_safety'],
+    functions: ['budgetOf', 'sharesOf', 'fundingFor', 'deliverTo', 'runSchooling',
+      'setPriority', 'runStatecraft'],
+    note: '**Built 17 Sep 2026, and it needed no new design.** `VACANCY_TRAIT_DATABASE_'
+      + 'ATTACHMENT.md` defines five tier-level trait sheets and the engine had built four; '
+      + 'CIVILIZATION_TRAIT_FAMILIES names `healthcare`, `education` and `security` among '
+      + 'twenty-one dimensions that existed only in a document. They are the state\'s spending '
+      + 'priorities on one budget (`server/tierTraits.js` reconciles all twenty-one against '
+      + 'the columns and rollups that already answered seventeen of them), and delivery writes '
+      + '`funding` and `maintenance_level` onto each city\'s hospitals, schools and stations '
+      + '— **scaled by the mean writ across that city\'s communities**, so the state delivers '
+      + 'where it governs and a lawless city\'s services are funded at close to nothing. '
+      + 'Partial rather than modelled: `education` reaches an outcome through '
+      + '`runSchooling`, and `healthcare` does not. A per-tick treatment mechanism would have '
+      + 'to move `health.Chronic Conditions` downward, and nothing in the engine moves it '
+      + 'upward, so it would be the sixth one-way ratchet rather than the first health '
+      + 'service — declared instead of guessed. Sanitation, public records, licensing and '
+      + 'welfare have no substrate at all.',
   },
   {
     n: 21,
@@ -507,12 +535,48 @@ const SYSTEMS = [
   {
     n: 35,
     name: 'Military / National Guard',
-    level: 'absent',
+    level: 'partial',
+    tables: ['civilizations', 'territory_blocks'],
+    phases: ['runOrganizationPhase'],
+    traitFamilies: ['civilization'],
+    functions: ['garrisonOf', 'garrisonIn', 'gripTerm'],
+    note: '**Built 17 Sep 2026 as the CIVILIZATION dimension `military`** — one of the '
+      + 'twenty-one in VACANCY_TRAIT_DATABASE_ATTACHMENT.md that had no module. It buys a '
+      + 'garrison, 0..1 per city, out of the same budget as the hospitals and the schools, so '
+      + 'guns and butter compete by arithmetic rather than by a rule saying they do. The '
+      + 'garrison folds into `authority.gripTerm` as `1 - held * (1 - garrison)`: it contests '
+      + 'somebody else\'s hold on the ground and touches neither `trustTerm` nor `reachTerm`, '
+      + 'because a garrison does not make people trust the police. **Centred at zero** — a '
+      + 'state that spends nothing on soldiers leaves the term bit-identical to what it was '
+      + 'before the military existed, which is standing rule 12\'s first clause and is held by '
+      + 'a test. Partial rather than modelled: there are no soldiers. Nobody is enlisted, no '
+      + 'entity has a rank, no unit is deployed to a named block and no war exists to fight — '
+      + 'the garrison is a funded capability, not a body of men, and §7\'s National Guard half '
+      + '(a reserve mobilised for a disaster) has no mechanism at all.',
   },
   {
     n: 36,
     name: 'Tourism',
-    level: 'absent',
+    level: 'partial',
+    tables: ['cities'],
+    phases: ['runOrganizationPhase'],
+    traitFamilies: ['city'],
+    functions: ['tourismAppeal', 'driftTourism', 'drawDna'],
+    note: '**Built 17 Sep 2026 as the CITY dimension `tourism`**, one of twelve in '
+      + 'VACANCY_TRAIT_DATABASE_ATTACHMENT.md and the only one of the twelve that needed '
+      + 'storing — `server/tierTraits.js` reconciles the other eleven against columns, '
+      + 'rollups and the Transportation deferral. A STOCK rather than a rollup: '
+      + '`tourismAppeal` is what a city currently deserves (safety, what is standing, whether '
+      + 'there is a culture here to come for, biased by §49 CITY DNA) and the stored number is '
+      + 'what it currently has, closing at 2% of the gap a tick. That lag is the point — a '
+      + 'city that cleans itself up does not have visitors the same afternoon. It feeds '
+      + '`cities.economy` through `territory.cityConditionsOf`. **§49 CITY DNA arrives with '
+      + 'it**: nine identities, verbatim from the spec, drawn per city on its position in the '
+      + 'generation loop. Partial rather than modelled: §49 says City DNA modifies nine things '
+      + 'and only two are wired — visitor appeal and the upkeep of the one system the identity '
+      + 'cares about. The other seven are left unwired rather than given invented '
+      + 'coefficients. There are also no visitors: nobody travels, spends or goes home, so '
+      + 'tourism is a reputation with an economic consequence and not a population flow.',
   },
   {
     n: 37,

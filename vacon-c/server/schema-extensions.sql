@@ -443,3 +443,42 @@ ALTER TABLE infrastructure ADD COLUMN IF NOT EXISTS longitude NUMERIC;
 -- would never come due.
 ALTER TABLE infrastructure ADD COLUMN IF NOT EXISTS failed_since_tick BIGINT;
 ALTER TABLE infrastructure ADD COLUMN IF NOT EXISTS repair_ticks BIGINT;
+
+
+-- ---------------------------------------------------------------------
+-- cities.dna / cities.traits / civilizations.traits
+-- ---------------------------------------------------------------------
+-- The two tier-level trait sheets `VACANCY_TRAIT_DATABASE_ATTACHMENT.md`
+-- defines and the engine never built, plus §49's CITY DNA.
+--
+-- The attachment lists FIVE tier-level sheets — FAMILY, ORGANIZATION,
+-- CITY, CIVILIZATION and CULTURE. Four had a module. CITY and
+-- CIVILIZATION had none, so thirty-three named dimensions existed only
+-- in a document, which is where §7's last three `absent` urban systems
+-- were sitting: 20 Government Services, 35 Military / National Guard
+-- and 36 Tourism.
+--
+-- **JSONB rather than a column per dimension, and not for brevity.**
+-- `cultures.traits` already established this shape for a tier-level
+-- entity, and the reason is the same: cities and civilizations draw
+-- their ids from their own counters, not from `nextEntityId`, so they
+-- have no `entities` row and an `entity_traits` row for them would
+-- violate that table's own foreign key. That is exactly the defect the
+-- restore pass found in `properties` and `cultures`.
+--
+-- Only the dimensions with no existing answer are stored — one of the
+-- twelve city dimensions and four of the twenty-one civilization ones.
+-- `server/tierTraits.js` reconciles every other name against the column,
+-- rollup or system that already answers it, and refuses a caller who
+-- passes one of them.
+--
+-- All three clear this file's bar. `statecraft.runStatecraft` reads
+-- `civilizations.traits` every quarter to decide what each city's
+-- hospitals, schools and stations are funded at, reads `cities.traits`
+-- every tick to drift tourism, and reads `cities.dna` for §49's appeal
+-- and upkeep biases. A restore that dropped them would put every state
+-- back on an even split it never chose, blank every city's visitors,
+-- and give every city the same characterless identity.
+ALTER TABLE cities ADD COLUMN IF NOT EXISTS dna TEXT;
+ALTER TABLE cities ADD COLUMN IF NOT EXISTS traits JSONB;
+ALTER TABLE civilizations ADD COLUMN IF NOT EXISTS traits JSONB;
