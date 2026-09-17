@@ -206,6 +206,27 @@ function generateWorld(options = {}) {
   const w = engine.WorldState;
   const tick = w.tick ?? 0;
 
+  // **`worldState.seed` was read by two modules and set by none.**
+  // `infrastructure.advanceInfrastructure` seeds its failure draw on
+  // `worldState.seed ?? 'infra'` and `statecraft.runSchooling` seeds a
+  // student's progress on `worldState.seed ?? 'world'` — and because
+  // nothing ever assigned the field, BOTH fell through to their
+  // constant in every world ever generated. The draws were
+  // deterministic, which is what §88 asks for, and identical across
+  // every seed, which is not: two worlds built from different seeds
+  // failed the same water system on the same tick. Standing rule 6 with
+  // the default doing the hiding instead of a null.
+  //
+  // **A restored world has no seed and cannot have one.** There is no
+  // `world` table — `restore.js` derives the tick from the high-water
+  // mark of the rows rather than inventing a table for one integer, and
+  // a seed is implied by no row at all. So a restored world falls back
+  // to the constants above and its failures diverge from the live
+  // world's. Stated rather than papered over: replay from a seed is a
+  // property of GENERATION, and a world that has been through the
+  // database is a world that is being continued, not replayed.
+  w.seed = config.seed;
+
   const summary = {
     seed: config.seed,
     cities: [], communities: 0, people: 0, families: 0, properties: 0,

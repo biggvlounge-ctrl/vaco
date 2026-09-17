@@ -425,6 +425,33 @@ test('attainment moves, and it moves only where a funded school is open', () => 
   assert.equal(run({ funding: 100, failed: 50 }), 0);
 });
 
+test('the world seed reaches the draw — §88, and it did not before', () => {
+  // **`worldState.seed` was read by two modules and set by none.**
+  // `infrastructure.advanceInfrastructure` seeds its failure draw on
+  // `worldState.seed ?? 'infra'` and this file seeds a student on
+  // `worldState.seed ?? 'world'`, and because `worldgen` never assigned
+  // the field both fell through to their constant in every world ever
+  // generated: deterministic, which §88 asks for, and identical across
+  // every seed, which it does not. Standing rule 6 with a default doing
+  // the hiding instead of a null.
+  const run = (seed) => {
+    const { w } = stateWorld({ students: 60 });
+    w.seed = seed;
+    for (const row of w.infrastructure) if (row.type === 'schools') row.funding = 100;
+    const moved = [];
+    for (let t = 0; t < 1500; t += 1) {
+      w.tick = 100 + t;
+      for (const step of statecraft.runSchooling(w, w.tick)) {
+        moved.push(`${step.entityId}@${w.tick}`);
+      }
+    }
+    return moved.join(',');
+  };
+
+  assert.equal(run('alpha'), run('alpha'), 'the same seed did not replay');
+  assert.notEqual(run('alpha'), run('beta'), 'the seed does not reach the draw');
+});
+
 test('schooling never invents a fact about somebody', () => {
   const { w } = stateWorld({ students: 5 });
   for (const row of w.infrastructure) if (row.type === 'schools') row.funding = 100;
