@@ -13,7 +13,7 @@ person who built it can check whether a claim is still true.
 Every number below was produced by running the tool that owns it, not
 recalled. The commands are in §10 so they can be re-run.
 
-*Current as of commit `c1e1bd5`, 148 commits, branch
+*Current as of commit `6973796`, 151 commits, branch
 `claude/v4-proxy-server-s6dcp8`, 17 Sep 2026.*
 
 **On the commit count.** An earlier revision of this line said 332. That
@@ -72,7 +72,7 @@ authorization work in §5 had to be done per app rather than once.
 | Containerised services | 36 + nginx + a LiveKit SFU |
 | Registry rows (incl. brand rows and the dev mock) | 37 |
 | Mutating HTTP routes | 524, all accounted for (472 guarded, 52 declared open with a reason) |
-| Automated tests | 2238 across 39 suites |
+| Automated tests | 2258 across 39 suites |
 | Persisted volumes | 30 |
 | Shared-module copies kept in sync | 210 |
 | Service credentials in `.env.example` | 28 callers |
@@ -824,7 +824,7 @@ run to produce the numbers here.
 built:** `node scripts/package-release.mjs` — see §11.
 
 ```sh
-node scripts/run-all-tests.mjs           # 2238/2238 across 39 suites (some skip without a database)
+node scripts/run-all-tests.mjs           # 2258/2258 across 39 suites (some skip without a database)
 node scripts/audit-route-guards.mjs --check   # 524/524 accounted for
 ./sync-shared-runtime.sh --check         # 210 copies current, none unmanaged
 ./sync-design-system.sh --check          # every serving app is a target
@@ -895,7 +895,7 @@ dependencies are installed.
 ### Per-suite
 
 ```
-vacon-c         887   vdp             147   void            142
+vacon-c         907   vdp             147   void            142
 scripts         168   v3              111   vaco-media       51
 v4-proxy         42   world-layer      41   venvm            40
 venvs            45   voken            37   vaco-analytics   39
@@ -980,7 +980,7 @@ trusted:
 
 The simulation engine is the one app in this repo whose "done" is not a
 list of routes, so it carries a measured completeness score rather than
-a criteria tally. **90.6%**, from
+a criteria tally. **91.1%**, from
 `vacon-c/dev-docs/GAME_COMPLETENESS.md`, which
 `vacon-c/scripts/completeness.mjs` regenerates and
 `vacon-c/test/completeness.test.js` fails on if stale — including a
@@ -988,9 +988,9 @@ check that the percent in THIS file matches the one the code measures.
 
 | axis | complete | what it measures |
 |---|---|---|
-| systems | 67.4% | the forty urban systems §7 names, at `urbanSystems.js`'s own four levels |
+| systems | 71.1% | the forty urban systems §7 names, at `urbanSystems.js`'s own four levels |
 | tables | 89.4% | schema tables a built world actually fills |
-| statistics | 89.6% | statistics a world can answer about itself |
+| statistics | 89.8% | statistics a world can answer about itself |
 | traits | 100% | traits something under `server/` reads |
 | traitDepth | 85.7% | trait columns a life actually changes |
 | habits | 100% | whether habits and routines carry information |
@@ -1062,8 +1062,22 @@ comment says it is a "computed rollup from the infrastructure table",
 that module was written, and nothing connected them; a third of every
 city's reemergence composite was a number drawn on tick 0.
 
-**The percent can go DOWN, and did.** 90% to 89.6% (and back to 90.6%
-with the tier sheets), because the world
+**And two whole urban systems were the reason a variable was a
+constant.** §7 had exactly two entries left at `absent` — 23 Media and
+24 Social Media — and `politics.broadcastGovernmentKnowledge` wrote one
+`entity_knowledge` row per NPC unconditionally, so every announcement
+reached every person in the world instantly and
+`computeApproval`'s `spread` was a constant **1.0** (measured, 153 of
+153). `assessRevolutions` needs approval below 35 AND spread at or
+above 0.25, so one of its two conditions could never fail and §63's
+"Public Opinion + Information Spread + Government" mechanic was a
+public-opinion mechanic with a decorative second term. §61's own
+channel list and the ten eras already on the ladder were the whole
+design: awareness now reads 0.2 at founding and 1.0 once radio comes
+back. **Nothing in §7 is `absent` any more.**
+
+**The percent can go DOWN, and did.** 90% to 89.6% (and back up through
+90.6% with the tier sheets to 91.1% with media), because the world
 the report measures is now a contested settlement where thefts go
 unprosecuted, so `court_cases` is genuinely empty in it. A score that
 only ever rose would be measuring the work rather than the world. The pattern is consistent enough to be a rule: **the
