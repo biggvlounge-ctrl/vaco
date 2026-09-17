@@ -518,7 +518,14 @@ const SYSTEMS = [
     name: 'Business',
     level: 'partial',
     tables: ['businesses', 'market_listings'],
-    note: 'Businesses are entities that trade. Formation, growth and failure are not driven.',
+    functions: ['runLabour'],
+    note: 'Businesses are entities that trade, they hire and lay off through `runLabour`, and '
+      + 'their takings and wage bill move real money. **Still partial, and for the reason this '
+      + 'entry always gave: formation, growth and failure are not driven.** No business is '
+      + 'ever founded or wound up in a running world — `worldgen` makes them all and the set '
+      + 'never changes. Note what did NOT close this: `server/trade.js` reached '
+      + '`barter.exchange` for the first time in any generated world, but that is trade '
+      + 'between PEOPLE. A business is not a party to it.',
   },
   {
     n: 29,

@@ -980,7 +980,7 @@ trusted:
 
 The simulation engine is the one app in this repo whose "done" is not a
 list of routes, so it carries a measured completeness score rather than
-a criteria tally. **91.4%**, from
+a criteria tally. **91.5%**, from
 `vacon-c/dev-docs/GAME_COMPLETENESS.md`, which
 `vacon-c/scripts/completeness.mjs` regenerates and
 `vacon-c/test/completeness.test.js` fails on if stale — including a
@@ -990,7 +990,7 @@ check that the percent in THIS file matches the one the code measures.
 |---|---|---|
 | systems | 71.1% | the forty urban systems §7 names, at `urbanSystems.js`'s own four levels |
 | tables | 90.9% | schema tables a built world actually fills |
-| statistics | 89.8% | statistics a world can answer about itself |
+| statistics | 90% | statistics a world can answer about itself |
 | traits | 100% | traits something under `server/` reads |
 | traitDepth | 85.7% | trait columns a life actually changes |
 | habits | 100% | whether habits and routines carry information |
@@ -1091,8 +1091,24 @@ confidence drawn against the offender's own `criminal` traits, and
 Trust resolves 7,186 times with relationship trust spanning 16 to 87
 instead of sitting at 50.
 
+**And a complete trade had never executed.** `barter.exchange` prices
+an item from §27's own barter key, adjusts for scarcity, population,
+both sides' Barter Skill and the seller's Trustworthiness, checks the
+buyer can cover it out of SAVINGS rather than net worth, checks the
+seller really holds the thing, and moves the object — conservative on
+both sides, with its own green test file and **no caller anywhere
+outside its own module**. The `contest.js` shape exactly.
+`vacon-c/server/trade.js` is the occasion and it invents no motive:
+`crime.js` already turns being below the poverty line into a theft, and
+somebody under that pressure who owns something can sell it instead.
+Measured over 400 ticks: 51 sales against 8 thefts, and the tenth
+percentile of net worth rose from -452 to 1,796 — the first mechanism
+in the engine that moves value from the people who have it to the
+people who do not.
+
 **The percent can go DOWN, and did.** 90% to 89.6% (and back up through
-90.6% with the tier sheets and 91.1% with media to 91.4%), because the world
+90.6% with the tier sheets, 91.1% with media and 91.4% with the Social
+Key to 91.5%), because the world
 the report measures is now a contested settlement where thefts go
 unprosecuted, so `court_cases` is genuinely empty in it. A score that
 only ever rose would be measuring the work rather than the world. The pattern is consistent enough to be a rule: **the

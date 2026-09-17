@@ -73,6 +73,7 @@ const migration = require('./migration.js');
 const environment = require('./environment.js');
 const statecraft = require('./statecraft.js');
 const media = require('./media.js');
+const trade = require('./trade.js');
 const { seededDraw } = require('./seeded.js');
 
 let nextEventId = 1;
@@ -306,6 +307,24 @@ function runEconomyPhase(worldState) {
   // opinion about whether one happened.
   const labour = economy.runLabour(worldState, worldState.tick, payroll.events);
   events.push(...labour.events);
+
+  // **The market, and `barter.exchange` had never executed in a
+  // generated world.** A complete, conservative, tested trade — priced
+  // from §27's barter key, adjusted for scarcity, population, both
+  // sides' Barter Skill and the seller's Trustworthiness — with no
+  // caller anywhere outside its own module. The same shape as
+  // `contest.js` before `competition.js` gave it an occasion.
+  //
+  // The occasion was already in the engine: `crime.js` reads
+  // deprivation pressure and turns it into a theft. Somebody under
+  // that pressure who owns something does not have to steal — they can
+  // sell it, and only those with nothing left to sell are pushed toward
+  // the alternative. See server/trade.js.
+  //
+  // After payroll and hiring, because a wage paid this tick is money
+  // somebody no longer needs to raise.
+  const market = trade.runMarket(worldState, worldState.tick);
+  events.push(...market.events);
 
   // Scarcity is computed BEFORE listings are priced, because prices now
   // depend on it. The original order priced listings first and computed

@@ -106,6 +106,7 @@ const property = require('./property.js');
 const statecraft = require('./statecraft.js');
 const tierTraits = require('./tierTraits.js');
 const media = require('./media.js');
+const trade = require('./trade.js');
 const politics = require('./politics.js');
 
 // §9's MASTER BLOCK KEY, in its order. Every statistic belongs to one.
@@ -851,6 +852,35 @@ const CATALOGUE = [
     compute: (ctx) => (ctx.cityId === null
       ? null
       : infrastructure.failedIn(ctx.worldState, ctx.cityId).length),
+  },
+  {
+    key: 'distress_sales_per_1k', category: 'economics', unit: 'rate_per_1k', scope: 'community',
+    // **`barter.exchange` had never executed in a generated world.** A
+    // complete, conservative, tested trade — §27's barter key, local
+    // scarcity, both sides' Barter Skill, the seller's Trustworthiness,
+    // affordability from savings rather than net worth, the object
+    // itself moving through `inventory.transfer` — with no caller
+    // anywhere outside its own module. The `contest.js` shape exactly.
+    //
+    // `server/trade.js` is the occasion, and it invents no motive:
+    // `crime.deprivationPressure` already turns being below the
+    // poverty line into a theft, and somebody under that pressure who
+    // owns something can sell it instead. This is how often they do.
+    compute: (ctx) => per1k(
+      trade.tradesIn(ctx.worldState, ctx.communityId, { tick: ctx.worldState.tick }).length,
+      ctx.population,
+    ),
+  },
+  {
+    key: 'trade_volume', category: 'economics', unit: 'currency', scope: 'community',
+    // Value traded per resident over the same window. `currency`
+    // rather than a comparable unit, deliberately, for the reason
+    // `UNITS` gives: `individual_finances` has no denomination
+    // anywhere, so a value is meaningful within one world and
+    // meaningless between two.
+    compute: (ctx) => trade.tradeVolumeIn(
+      ctx.worldState, ctx.communityId, ctx.population, { tick: ctx.worldState.tick },
+    ),
   },
   {
     key: 'public_awareness', category: 'psychological', unit: 'share', scope: 'city',
