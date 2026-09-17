@@ -440,6 +440,24 @@ async function restoreWorldStateFromPostgres(worldState) {
     nums(d, ['id', 'entity_id', 'confidence', 'tick']));
   summary.decision_log = worldState.decisionLog.length;
 
+  worldState.keysLog = (await q('SELECT * FROM keys_log ORDER BY id')).map((k) => ({
+    // `resolved_value` is NUMERIC and comes back as a string (standing
+    // rule 10). A string here would make `keysLog.verify`'s comparison
+    // between a recomputed number and a recorded one fail on every row
+    // whose arithmetic is in fact identical — an audit trail that
+    // reports every honest resolution as a discrepancy is worse than
+    // none.
+    ...nums(k, ['id', 'entity_id', 'key_id', 'resolved_value', 'tick']),
+    // `context_json` is JSONB, guarded rather than trusted like every
+    // other JSONB column here. A string would read as an object with no
+    // `traits` key, so `verify` would recompute from nothing and
+    // silently report a mismatch.
+    context_json: typeof k.context_json === 'string'
+      ? JSON.parse(k.context_json)
+      : (k.context_json ?? null),
+  }));
+  summary.keys_log = worldState.keysLog.length;
+
   // -------------------------------------------------------------------
   // Territory / Property
   // -------------------------------------------------------------------

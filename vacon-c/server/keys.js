@@ -44,6 +44,7 @@
 
 const worldStore = require('./worldStore.js');
 const decisions = require('./decisions.js');
+const keysLog = require('./keysLog.js');
 const { getLiveEntity } = require('./entityTraits.js');
 
 function traitValue(entity, family, name, fallback = 50) {
@@ -98,11 +99,105 @@ function heldWith(worldState, entityId, computed) {
   return Math.max(0, Math.min(1, computed * (1 + ((confident - 50) / 50) * CONFIDENCE_SWING)));
 }
 
+// ---------------------------------------------------------------------------
+// key_definitions — the seven, as data
+// ---------------------------------------------------------------------------
+//
+// **`server/completeness.js` declared this table "a module constant
+// (keys.js), not per-world state" and the constant did not exist.** So
+// `keys_log.key_id` had nothing to reference, which is part of why that
+// table had no store: you cannot log which Key resolved without a
+// stable id per Key.
+//
+// Same call `traitDefinitions.js` makes for traits, and for the same
+// reason: a definition is a property of the engine rather than of a
+// world, so it needs no per-world store. The columns are the schema's
+// own — `name`, `category` (its comment enumerates
+// human|social|economic|power|world), `inputs` ("list of trait/
+// relationship/knowledge fields this Key reads"), `outputs` ("list of
+// fields this Key writes back to (memory/relationship/world, per
+// 4.3)"), `priority`, `dependencies`.
+//
+// The categories are not chosen here — they are this file's own section
+// headers, which have said World/World/Social/Economic/Human/Power/
+// Power since it was written. `inputs` is what each resolver actually
+// reads, and `test/keys.test.js` holds the claim against the code
+// rather than trusting this comment.
+//
+// `key_id` is assigned 1-based in the order the resolvers appear below,
+// mirroring BIGSERIAL: a stable sequential integer assigned once, not
+// reshuffled when a resolver moves.
+const KEY_DEFINITIONS = [
+  {
+    key_id: 1, name: 'Resilience', category: 'world',
+    inputs: ['mental.Resilience', 'emotional.Volatility', 'context.setbackSeverity'],
+    outputs: ['memory', 'relationship', 'world', 'decision'],
+    probability_curve: null, priority: 0, dependencies: [],
+  },
+  {
+    key_id: 2, name: 'Adaptability', category: 'world',
+    inputs: ['mental.Adaptability', 'mental.Focus', 'context.changeMagnitude'],
+    outputs: ['memory', 'relationship', 'world', 'decision'],
+    probability_curve: null, priority: 0, dependencies: [],
+  },
+  {
+    key_id: 3, name: 'Trust', category: 'social',
+    inputs: ['social.Trustfulness', 'psychological.Paranoia', 'relationships.trust',
+      'entity_knowledge'],
+    outputs: ['memory', 'relationship', 'world', 'decision'],
+    probability_curve: null, priority: 0, dependencies: [],
+  },
+  {
+    key_id: 4, name: 'ScarcityResponse', category: 'economic',
+    inputs: ['survival.Resourcefulness', 'behavioral.Greed', 'entity_knowledge'],
+    outputs: ['memory', 'relationship', 'world', 'decision'],
+    probability_curve: null, priority: 0, dependencies: [],
+  },
+  {
+    key_id: 5, name: 'Fear', category: 'human',
+    inputs: ['emotional.Volatility', 'psychological.Paranoia', 'entity_knowledge'],
+    outputs: ['memory', 'relationship', 'world', 'decision'],
+    probability_curve: null, priority: 0, dependencies: [],
+  },
+  {
+    key_id: 6, name: 'Aggression', category: 'power',
+    inputs: ['behavioral.Aggression', 'combat.Tactical Awareness', 'entity_knowledge',
+      'relationships.conflict'],
+    outputs: ['memory', 'relationship', 'world', 'decision'],
+    probability_curve: null, priority: 0, dependencies: [],
+  },
+  {
+    key_id: 7, name: 'Territory', category: 'power',
+    inputs: ['faction.Territorial Instinct', 'survival.Threat Detection',
+      'context.claimStrength'],
+    outputs: ['memory', 'relationship', 'world', 'decision'],
+    probability_curve: null, priority: 0, dependencies: [],
+  },
+];
+
+const KEY_NAMES = KEY_DEFINITIONS.map((k) => k.name);
+
+// Throws rather than returning null: a resolver logging under a name
+// that is not a Key is a typo, and a `keys_log` row with a dangling
+// `key_id` is worse than no row.
+function keyIdFor(name) {
+  const definition = KEY_DEFINITIONS.find((k) => k.name === name);
+  if (!definition) {
+    throw new Error(`keys: "${name}" is not a Key (one of: ${KEY_NAMES.join(', ')}).`);
+  }
+  return definition.key_id;
+}
+
 // Shared three-way write-back (Section 4.3). `relationship.otherEntityId`
 // omitted means the introspective self-relationship fallback (see file
 // header, interpretive choice 2).
+//
+// **Four-way, then five.** `decision_log` was the fourth; `keys_log` is
+// the fifth, and it is the one that makes a resolution re-derivable
+// rather than merely explained — see server/keysLog.js.
 function writeBack(worldState, applyKeyModifier, {
   entityId, tick, memory, relationship, worldTrait, decision,
+  resolvedValue = null, context = null,
 }) {
   const memoryRow = worldStore.addMemory(worldState, { entityId, tick, ...memory });
 
@@ -157,7 +252,58 @@ function writeBack(worldState, applyKeyModifier, {
     })
     : null;
 
-  return { memoryRow, relationshipRow, worldRow, decisionRow };
+  // **The fifth write-back, and the one that makes a resolution
+  // re-derivable.** `decision_log` says somebody chose to escalate with
+  // confidence 0.6; it does not say from what, so nobody can recompute
+  // the number — the traits have drifted and the relationship has
+  // moved. `keys_log.context_json`'s own schema comment asks for a
+  // "snapshot of entity_knowledge/relationships read at resolution
+  // time", which is exactly what `contest.verifyContest` had to be
+  // rebuilt to record after it turned out to verify nothing anybody
+  // would want verified.
+  //
+  // Here rather than in the seven resolvers for the same reason the
+  // other four are: one place that cannot be forgotten. The Key's name
+  // comes from `decision.keysUsed`, which every resolver already fills
+  // and which `test/decisions.test.js` already holds them to.
+  // **Skipped when the world has no store for it, and that is not the
+  // optional-audit hazard it looks like.** `culture.js`'s `writable`
+  // throws for a missing array, on the argument that a world not wired
+  // for a system cannot do that system. That argument does not hold
+  // here: a world with no `keysLog` array resolves its Keys perfectly
+  // and just keeps no receipt. Throwing would mean every hand-made
+  // fixture that exercises a resolver has to know about logging, and
+  // `writeBack` is the funnel all seven go through, so that is most of
+  // the suite.
+  //
+  // The risk of an optional audit is that it silently does nothing in a
+  // real world. `engine.js` declares the array on `WorldState`, so
+  // every world the engine actually builds has one — and
+  // `test/keys-log.test.js` asserts on a GENERATED world that every
+  // resolution is logged, which is standing rule 11's answer: hold the
+  // wiring with a measurement of a built world, not with a throw that
+  // fixtures have to satisfy.
+  const keyName = decision?.keysUsed?.[0] ?? null;
+  const keysLogRow = keyName === null || !Array.isArray(worldState.keysLog)
+    ? null
+    : keysLog.record(worldState, {
+    entityId,
+    keyId: keyIdFor(keyName),
+    resolvedValue,
+    // The traits the resolver named, plus whatever of the relationship
+    // and the knowledge it read — captured from what `decision` already
+    // carries so a resolver cannot supply one and forget the other.
+    context: context ?? {
+      traits: decision?.traitsUsed ?? [],
+      relationship: relationship?.otherEntityId === undefined ? null : {
+        otherEntityId: relationship.otherEntityId,
+        changes: relationship.changes ?? null,
+      },
+    },
+    tick,
+  });
+
+  return { memoryRow, relationshipRow, worldRow, decisionRow, keysLogRow };
 }
 
 // ---------------------------------------------------------------------------
@@ -175,6 +321,7 @@ function resolveResilience(entity, context) {
   const netImpact = setbackSeverity - severityAbsorbed;
 
   const writes = writeBack(worldState, applyKeyModifier, {
+    resolvedValue: resilienceScore,
     entityId: entity.id,
     tick,
     memory: {
@@ -218,6 +365,7 @@ function resolveAdaptability(entity, context) {
   const adjustmentTicks = Math.max(1, Math.round(changeMagnitude * (1 - adaptabilityScore / 100) / 5));
 
   const writes = writeBack(worldState, applyKeyModifier, {
+    resolvedValue: adaptabilityScore,
     entityId: entity.id,
     tick,
     memory: {
@@ -267,6 +415,7 @@ function resolveTrust(entity, context) {
   const newTrust = clamp(priorTrust + trustDelta, 0, 100);
 
   const writes = writeBack(worldState, applyKeyModifier, {
+    resolvedValue: newTrust,
     entityId: entity.id,
     tick,
     memory: {
@@ -318,6 +467,7 @@ function resolveScarcityResponse(entity, context) {
   const hoardingResponse = clamp(Math.round((hoarding * 0.5 + greed * 0.3) * (perceivedScarcity / 100) + (perceivedScarcity * 0.2)));
 
   const writes = writeBack(worldState, applyKeyModifier, {
+    resolvedValue: perceivedScarcity,
     entityId: entity.id,
     tick,
     memory: {
@@ -365,6 +515,7 @@ function resolveFear(entity, context) {
     ?? knowledge.find((k) => k.subject_entity_id != null)?.subject_entity_id;
 
   const writes = writeBack(worldState, applyKeyModifier, {
+    resolvedValue: fearLevel,
     entityId: entity.id,
     tick,
     memory: {
@@ -494,6 +645,7 @@ function resolveAggression(entity, context) {
   const escalatesToConflict = responseLevel >= ESCALATION_RESPONSE_FLOOR;
 
   const writes = writeBack(worldState, applyKeyModifier, {
+    resolvedValue: responseLevel,
     entityId: entity.id,
     tick,
     memory: {
@@ -547,6 +699,7 @@ function resolveTerritory(entity, context) {
   const contested = defenseLevel >= 60;
 
   const writes = writeBack(worldState, applyKeyModifier, {
+    resolvedValue: defenseLevel,
     entityId: entity.id,
     tick,
     memory: {
@@ -581,6 +734,9 @@ function resolveTerritory(entity, context) {
 }
 
 module.exports = {
+  KEY_DEFINITIONS,
+  KEY_NAMES,
+  keyIdFor,
   resolveResilience,
   resolveAdaptability,
   resolveTrust,

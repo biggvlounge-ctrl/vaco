@@ -683,10 +683,28 @@ const SYSTEMS = [
     level: 'modelled',
     phases: ['runDecisionPhase'],
     traitFamilies: ['behavioral', 'psychological'],
-    functions: ['dispatchAction', 'listActions', 'getEntityState', 'applyStress', 'runBehavior'],
+    tables: ['decision_log', 'keys_log'],
+    functions: ['dispatchAction', 'listActions', 'getEntityState', 'applyStress', 'runBehavior',
+      'keyIdFor'],
     note: 'Decisions read the live trait sheet, and two in-code assertions '
       + '(assertBehaviorReadsRealTraits, assertDisciplinesReadRealTraits) fail if that stops '
-      + 'being true — which is what keeps §82 honest.',
+      + 'being true — which is what keeps §82 honest. '
+      + '**`keys_log` is now written too, and the first thing it measured is a gap.** That '
+      + 'table had no store at all — partly because `keys_log.key_id` references '
+      + '`key_definitions`, which `completeness.js` declared "a module constant (keys.js)" '
+      + 'while the constant did not exist. `keys.KEY_DEFINITIONS` is that constant now, and '
+      + 'every resolution records its numeric result plus a snapshot of what it read, so it '
+      + 'can be re-derived later — the property `contest.verifyContest` had to be rebuilt for '
+      + 'after it turned out to verify only what was happening in that same instant. '
+      + '**Measured over 300 ticks: Aggression 4555, ScarcityResponse 2398, Fear 2398, '
+      + 'Adaptability 1530, Resilience 2, Trust 0, Territory 0.** Territory is deliberately '
+      + 'unwired and `tick.js` says so; **Trust is not** — one of the seven Keys, the entire '
+      + 'Social category, never resolves in a generated world. `runSocialPhase` only runs it '
+      + 'when the actor holds a knowledge row ABOUT the other party, and nothing in this '
+      + 'engine writes a fact whose `subject_entity_id` is a person: measured, 0 of 600. That '
+      + 'is the same gate that made `resolveAggression` unreachable, and it is recorded here '
+      + 'rather than patched, because the fix is a mechanism (a robbery victim learns '
+      + 'something about whoever robbed them) and not a threshold.',
   },
 ];
 

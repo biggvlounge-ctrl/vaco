@@ -901,6 +901,34 @@ async function migrateWorldStateToPostgres(worldState) {
       }
       summary.decision_log = worldState.decisionLog.length;
 
+      // ---------------------------------------------------------------
+      // keys_log — after entities, same as decision_log above.
+      // ---------------------------------------------------------------
+      // **`key_definitions` is NOT migrated and that is deliberate.**
+      // `keys.KEY_DEFINITIONS` is a module constant, the same call
+      // `traitDefinitions.js` makes for traits: a definition is a
+      // property of the engine rather than of a world.
+      // `keys_log.key_id` references it by a stable 1-based id that
+      // does not depend on any world's history, so a restore into a
+      // different process resolves the same seven Keys.
+      //
+      // `context_json` is JSONB and is stringified like every other
+      // JSONB column here. A null context is a resolution nobody
+      // snapshotted, which `keysLog.verify` reports as unverifiable
+      // rather than as disagreeing — so the null has to survive as a
+      // null rather than becoming "null" the string.
+      for (const k of worldState.keysLog) {
+        await client.query(
+          `INSERT INTO keys_log (id, entity_id, key_id, resolved_value, context_json, tick)
+           VALUES ($1,$2,$3,$4,$5,$6)`,
+          [k.id, k.entity_id, k.key_id, k.resolved_value,
+            k.context_json === null || k.context_json === undefined
+              ? null : JSON.stringify(k.context_json),
+            k.tick]
+        );
+      }
+      summary.keys_log = worldState.keysLog.length;
+
       // Second half of the properties.history_ref two-phase insert —
       // see the note on the properties INSERT above. Now that
       // historical_records exist, the FK can be satisfied.

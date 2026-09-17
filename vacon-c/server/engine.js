@@ -160,6 +160,14 @@ const WorldState = {
   // held all of it and discarded it on every resolution.
   // `server/decisions.js`; written from `keys.js#writeBack`.
   decisionLog: [],
+  // `keys_log` — the NUMERIC half of the audit trail, and the one that
+  // makes a resolution re-derivable rather than merely explained.
+  // `decision_log` above records that somebody chose to escalate with
+  // a given confidence; this records what the Key computed and the
+  // snapshot it computed it from, which is what
+  // `contest.verifyContest` had to be rebuilt to do. See
+  // server/keysLog.js.
+  keysLog: [],
   // **What somebody wants.** `needs`, `values_db` and `goals` were all
   // three defined in the schema with no array and no code — the engine
   // could say what a person was capable of, what they had done and who
