@@ -131,14 +131,24 @@ const SYSTEMS = [
     level: 'modelled',
     tables: ['employment_records'],
     phases: ['runEconomyPhase'],
-    functions: ['hireEntity', 'endEmployment', 'runPayroll', 'getEmploymentRate'],
+    functions: ['hireEntity', 'endEmployment', 'runPayroll', 'runLabour', 'getEmploymentRate'],
     note: '**Built 12 Sep 2026, and it was the first `slot` taken off this list.** It was '
       + '`partial` on the strength of a table definition, then `slot` once the citation was '
       + 'checked — `economy.js` said in its own header that employment_records was "NOT built '
       + 'here... a natural follow-up". Payroll now runs inside the Economy phase and moves '
       + 'real money: a wage leaves the employer organization\'s `assets`, lands in the '
       + 'employee\'s `individual_finances`, and is recorded in the employer\'s `expenses`. An '
-      + 'employer that cannot cover it does not pay and emits `payroll_missed`.',
+      + 'employer that cannot cover it does not pay and emits `payroll_missed`. '
+      + '**And there is a labour market now, added 17 Sep 2026 after a playtest rather than a '
+      + 'test.** `hireEntity` was called exactly once in the whole engine — by `worldgen`, at '
+      + 'generation — while `justice.imprison` and death both took people out of work, so '
+      + 'employment could only ever shrink: a child born into the world could never hold a '
+      + 'job and a released prisoner could never work again. Measured over 400 ticks, 55 jobs '
+      + 'down to 51 with the only direction down. `runLabour` hires whoever can cover their '
+      + 'own wage — `1 / WAGE_TO_OUTPUT`, the reciprocal of a constant this file already had '
+      + 'rather than a threshold chosen for the occasion — and lays somebody off wherever '
+      + 'payroll was missed, so the unemployment rate falls out of the population\'s own trait '
+      + 'distribution. 55 jobs to ~105 and then steady across the same 400 ticks.',
   },
   {
     n: 5,

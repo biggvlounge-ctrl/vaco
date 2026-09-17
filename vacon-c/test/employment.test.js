@@ -251,3 +251,181 @@ test('nothing writes communities.employment from here', () => {
   assert.equal(/\.employment\s*=/.test(source), false,
     'economy.js assigns to an `employment` field — check it is not communities.employment');
 });
+
+// -- the labour market --------------------------------------------------
+//
+// **`hireEntity` was called exactly once in the whole engine**, by
+// `worldgen`, at generation. `justice.imprison` ends a contract and
+// death takes a person out of `npcs`, so employment could only ever
+// shrink: a child born into the world could never hold a job and a
+// released prisoner could never work again. Measured on a 400-tick
+// playtest before this existed — 55 jobs at generation, 51 at the end,
+// and the only direction was down.
+//
+// The tests below are about the two properties that make it a market
+// rather than a second ratchet pointing the other way: **who is hired
+// is decided by whether they can cover their own wage, and nothing
+// else**, and **an employer that cannot pay lets somebody go.**
+
+const { getLiveEntity } = require('../server/entityTraits.js');
+const { INDIVIDUAL_DEFINITIONS } = require('../server/traitDefinitions.js');
+const { generateEntityTraits } = require('../server/entityTraits.js');
+
+// A world where productivity is a CONSTRUCTED fact about each person
+// rather than a drawn one — standing rule 8, because the whole point of
+// every assertion here is which side of break-even somebody sits on.
+function labourWorld({ assets = 10000, traitValue = 90, tick = 36500 } = {}) {
+  const worldState = {
+    tick,
+    npcs: [],
+    organizations: [{ id: 100, assets, expenses: 0, income: 0 }],
+    entityOrganizationMemberships: [],
+    employmentRecords: [],
+    individualFinances: [],
+    entityTraits: [],
+    resources: [],
+    marketListings: [],
+  };
+  const add = (id, value, age = 30) => {
+    worldState.npcs.push({
+      id, status: 'active', createdTick: tick - Math.round(age * 365),
+    });
+    worldState.entityTraits.push(
+      ...generateEntityTraits(id, tick, INDIVIDUAL_DEFINITIONS, () => value),
+    );
+  };
+  // One incumbent, so the employer is a going concern with a wage scale.
+  add(1, traitValue);
+  economy.hireEntity(worldState, {
+    entityId: 1, employerOrganizationId: 100, wage: 20, tick,
+  });
+  return { worldState, add };
+}
+
+test('somebody who can cover their own wage gets hired; somebody who cannot does not', () => {
+  const { worldState: w, add } = labourWorld();
+  add(2, 90);   // well above break-even
+  add(3, 5);    // well below it
+
+  const result = economy.runLabour(w, w.tick, []);
+
+  assert.equal(result.hired.length, 1, 'more or fewer than one vacancy was filled');
+  assert.equal(result.hired[0].entityId, 2);
+  assert.equal(economy.getEmployment(w, 3), null,
+    'somebody who costs their employer money was hired anyway');
+
+  // The new hire is paid what the person at the next desk is paid —
+  // no invented wage constant.
+  assert.equal(result.hired[0].wage, economy.goingWage(w, 100));
+  assert.equal(result.hired[0].wage, 20);
+
+  // A hire is a membership as well as a contract. `worldgen` has always
+  // written both, and writing only one leaves every per-area
+  // organization statistic disagreeing with the labour market.
+  assert.ok(w.entityOrganizationMemberships.some(
+    (m) => m.entity_id === 2 && m.organization_id === 100,
+  ), 'the new hire joined no organization');
+});
+
+test('break-even is WAGE_TO_OUTPUT\'s own reciprocal, not a chosen threshold', () => {
+  // Standing rule 12's third clause says a threshold picked from what a
+  // number sounds like is a guess. This one is not picked at all:
+  // output is `wage * WAGE_TO_OUTPUT * productivity`, so a worker pays
+  // for themselves at exactly 1 / WAGE_TO_OUTPUT and the unemployment
+  // rate falls out of the population's trait distribution.
+  assert.equal(economy.BREAK_EVEN_PRODUCTIVITY, 1 / 1.3);
+
+  const { worldState: w, add } = labourWorld();
+  add(2, 50);   // an exactly average person
+  economy.runLabour(w, w.tick, []);
+  // An average worker produces 1.3x their wage, so they are hired.
+  assert.ok(economy.getEmployment(w, 2), 'an average worker was turned away');
+});
+
+test('nobody is hired or refused for anything but what they can do', () => {
+  // §9 permits demographic modelling and forbids demographics deciding
+  // what a person is worth. A labour market is where that line is
+  // easiest to cross by accident, so it is asserted rather than
+  // assumed: two people identical in capability and different in every
+  // demographic fact get the same answer.
+  const { worldState: w, add } = labourWorld();
+  add(2, 80);
+  add(3, 80);
+  Object.assign(w.npcs.find((n) => n.id === 2),
+    { religion: 'one', ethnicity: 'a', education: 'advanced', name: 'A' });
+  Object.assign(w.npcs.find((n) => n.id === 3),
+    { religion: 'other', ethnicity: 'b', education: 'none', name: 'B' });
+
+  // Two ticks, so both vacancies come up.
+  economy.runLabour(w, w.tick, []);
+  economy.runLabour(w, w.tick + 1, []);
+  assert.ok(economy.getEmployment(w, 2) && economy.getEmployment(w, 3),
+    'two equally capable people got different answers');
+});
+
+test('somebody serving a sentence is not in the labour market', () => {
+  const { worldState: w, add } = labourWorld();
+  add(2, 90);
+  w.npcs.find((n) => n.id === 2).status = 'imprisoned';
+  economy.runLabour(w, w.tick, []);
+  assert.equal(economy.getEmployment(w, 2), null,
+    're-hiring a prisoner undoes what justice.imprison did');
+});
+
+test('a child is not in the labour market', () => {
+  const { worldState: w, add } = labourWorld();
+  add(2, 90, 9);
+  economy.runLabour(w, w.tick, []);
+  assert.equal(economy.getEmployment(w, 2), null);
+  assert.equal(economy.WORKING_AGE, 16, 'worldgen offers work at 16; this has to agree');
+});
+
+test('an employer that cannot cover a wage lets that person go — the inverse', () => {
+  // A mechanism with no inverse has no equilibrium (standing rule 13),
+  // and hiring without firing is the same ratchet pointing the other
+  // way. The signal is the one `runPayroll` already produces, read
+  // rather than re-derived.
+  const { worldState: w } = labourWorld();
+  const missed = [{
+    type: 'payroll_missed', organizationId: 100, entityId: 1, wage: 20, assets: 0, tick: w.tick,
+  }];
+
+  const result = economy.runLabour(w, w.tick, missed);
+  assert.equal(result.laidOff.length, 1);
+  assert.equal(economy.getEmployment(w, 1), null, 'an unpayable job stayed open');
+  assert.equal(result.events[0].type, 'laid_off');
+
+  // And a broke employer does not hire on the same tick it failed to
+  // pay somebody.
+  assert.equal(result.hired.length, 0);
+});
+
+test('the same person is not let go twice', () => {
+  // A `payroll_missed` for a contract something else already ended
+  // would otherwise throw out of `endEmployment` and take the tick
+  // with it — the shape of bug that stopped the world in justice.js.
+  const { worldState: w } = labourWorld();
+  economy.endEmployment(w, { entityId: 1 });
+  const missed = [{
+    type: 'payroll_missed', organizationId: 100, entityId: 1, wage: 20, assets: 0, tick: w.tick,
+  }];
+  assert.doesNotThrow(() => economy.runLabour(w, w.tick, missed));
+});
+
+test('an employer that cannot afford the wage bill does not take anybody on', () => {
+  const { worldState: w, add } = labourWorld({ assets: 25 });
+  add(2, 90);
+  // 20 already committed to the incumbent, 20 more for the new hire,
+  // against 25 in the bank.
+  assert.equal(economy.runLabour(w, w.tick, []).hired.length, 0);
+});
+
+test('an employer with nobody left is not in the market', () => {
+  // It has no wage scale of its own and no evidence it can pay. This is
+  // what keeps a dead business dead rather than resurrecting it the
+  // moment somebody becomes available.
+  const { worldState: w, add } = labourWorld();
+  economy.endEmployment(w, { entityId: 1 });
+  add(2, 90);
+  assert.equal(economy.runLabour(w, w.tick, []).hired.length, 0);
+});

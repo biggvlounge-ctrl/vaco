@@ -438,6 +438,40 @@ leave the world unchanged.** Idempotence is checkable without knowing
 anything about what the pass means, which is what makes it worth
 asserting on every pass that writes a durable view.
 
+**A sixteenth, and it is about how the other fifteen were found too
+late.** **Play the world.** Not a fixture, not a 200-tick measurement —
+build a world, run it four hundred ticks, and print what a PLAYER would
+see: how many jobs there are, whether anyone finished school, whether
+any two neighbourhoods differ, what the event log is actually full of.
+The first time that was done (`/scratchpad/playtest.mjs`, 17 Sep 2026)
+it found, in one run:
+
+- **The tick threw and the world stopped.** `justice.answerByGroup`
+  made restitution to a victim who had died since the offence, and
+  `inventory.transfer` asserts its recipient is among the living. Not a
+  wrong number — `advanceTick` raised, every tick after it was gone.
+  876 passing tests and a green ecosystem sweep over the top, because
+  the gap between an offence and a lawless area's answer has to be long
+  enough for somebody to die in.
+- **Nobody was ever hired.** `hireEntity` had exactly one caller in the
+  whole engine — `worldgen`, at generation — while `justice.imprison`
+  and death both took people out of work. A child born into the world
+  could never hold a job; a released prisoner could never work again.
+  55 jobs down to 51 over 400 ticks, only ever down, with
+  `communities.employment` → `getCommunityHealth` → `cities.economy` →
+  `statecraft.budgetOf` all quietly draining behind it.
+- **No child could ever be educated.** `runSchooling` refuses a null
+  attainment on purpose, and both `births.js` and `worldgen` recorded
+  exactly that for everybody under 18 — so the school window and the
+  null window overlapped almost exactly and the mechanism could never
+  touch the people it was for.
+
+Every one of those is a rule already in this file, and the suite could
+not see any of them: a test asserts a mechanism works, and all three of
+these were mechanisms that worked perfectly and were never reached. The
+eleventh rule says measure a built world; the thirteenth says measure it
+long. **The sixteenth says look at what it is like to be in it.**
+
 The same commit carries the thirteenth rule's other half in a place
 worth naming: `infrastructure.js` had been left with decay and no
 inverse on purpose, because when utilities were built, every candidate

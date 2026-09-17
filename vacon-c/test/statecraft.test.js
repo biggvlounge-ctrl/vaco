@@ -479,6 +479,29 @@ test('schooling never invents a fact about somebody', () => {
 // §48 NEIGHBORHOOD STABILITY
 // ---------------------------------------------------------------------
 
+test('a child is born on the bottom rung, not off the ladder', () => {
+  // **`births.js` set `education: null` and that was right until this
+  // module existed.** Null means "nobody recorded it", `indexOf` is -1
+  // for it, and `runSchooling` refuses -1 so it does not invent a fact
+  // about a generated adult. A baby is the one case where the engine
+  // genuinely knows — it made this person — so null turned an honest
+  // unknown into a permanent sentence: every child born in a running
+  // world was skipped by the only mechanism that can teach anybody.
+  // Measured on a 400-tick playtest: 52 of 146 living people had no
+  // education recorded and none of them could ever acquire any.
+  //
+  // `births.js` cannot import `demographics.js` without the cycle its
+  // own header describes, so it carries the literal and this holds the
+  // two in agreement.
+  assert.equal(demographics.EDUCATION_LEVELS[0], 'none');
+
+  const src = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'server', 'births.js'), 'utf8',
+  );
+  assert.match(src, /education: 'none',/,
+    'births.js no longer places a newborn on the bottom rung');
+});
+
 test('§48\'s bands are the spec\'s, to the number', () => {
   assert.equal(statecraft.stabilityBand(0), 'COLLAPSING');
   assert.equal(statecraft.stabilityBand(29), 'COLLAPSING');

@@ -132,16 +132,35 @@ test('people carry the demographics the schema has columns for', () => {
   assert.equal(fresh.every((n) => n.religion !== null), true);
   assert.equal(fresh.every((n) => demographics.primaryLanguageOf(w, n.id) !== null), true);
 
-  // **Education only for adults, and that is not a gap.** A child has
-  // not finished any, `demographics` counts unrecorded people as
-  // `unknown`, and `demographics_recorded_share` reports the coverage
-  // — so a young block reads as young rather than as uneducated.
+  // **An adult's attainment is drawn; a child starts on the bottom
+  // rung.** This used to assert `education === null` for every child,
+  // on the argument that a young block should read as young rather than
+  // as uneducated — right while nothing anywhere moved
+  // `npcs.education`, and wrong the day `statecraft.runSchooling`
+  // existed.
+  //
+  // Schooling refuses `null` on purpose: `indexOf` is -1 for it and -1
+  // is not rung zero, so starting a person whose attainment nobody
+  // recorded at `none` would invent a fact about them. The school
+  // window is 5 to 30, so the null window and the school window
+  // overlapped almost exactly and **the entire 5-to-17 cohort, the
+  // people school is for, could never be taught.** `none` for a child
+  // is not a guess — it is what the engine knows about somebody who has
+  // not finished any education yet, and it is what `births.js` records
+  // for a newborn.
   const adults = fresh.filter((n) => (w.tick - n.createdTick) / 365 >= 18);
   const children = fresh.filter((n) => (w.tick - n.createdTick) / 365 < 18);
   assert.ok(adults.length > 0 && children.length > 0,
     'the age draw produced only one cohort, so neither births nor mortality is exercised');
   assert.equal(adults.every((n) => n.education !== null), true);
-  assert.equal(children.every((n) => n.education === null), true);
+  assert.equal(children.every((n) => n.education === 'none'), true,
+    'a child was generated off the education ladder, so schooling can never reach them');
+
+  // And every generated person is ON the ladder, which is the property
+  // that actually matters to `runSchooling`.
+  assert.equal(
+    fresh.every((n) => demographics.EDUCATION_LEVELS.includes(n.education)), true,
+  );
 });
 
 test('a gang holds territory and has members who live there', () => {

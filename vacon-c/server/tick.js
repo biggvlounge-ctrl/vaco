@@ -290,6 +290,21 @@ function runEconomyPhase(worldState) {
   const payroll = economy.runPayroll(worldState, worldState.tick);
   events.push(...payroll.events);
 
+  // **The labour market, and it is the half that was missing.**
+  // `hireEntity` was called exactly once in the whole engine — by
+  // `worldgen`, at generation — while `justice.imprison` and death both
+  // took people out of work. So employment could only ever shrink: a
+  // child born into the world could never hold a job and a released
+  // prisoner could never work again. Measured over 400 ticks: 55 jobs
+  // down to 51, and the only direction was down.
+  //
+  // After payroll on purpose. Who an employer can take on depends on
+  // whether it just made its wages, and the layoff side reads this
+  // tick's own `payroll_missed` events rather than forming a second
+  // opinion about whether one happened.
+  const labour = economy.runLabour(worldState, worldState.tick, payroll.events);
+  events.push(...labour.events);
+
   // Scarcity is computed BEFORE listings are priced, because prices now
   // depend on it. The original order priced listings first and computed
   // scarcity afterwards, which was harmless only while the two were

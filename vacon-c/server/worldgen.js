@@ -553,11 +553,38 @@ function generateWorld(options = {}) {
           homePropertyId: p < homes.length ? homes[p].id : null,
         });
 
-        // **Education is only meaningful for somebody old enough to
-        // have finished any.** Leaving it null for a child is not a gap
-        // — `demographics` counts unrecorded people as `unknown` and
-        // reports `demographics_recorded_share`, so a young block reads
-        // as young rather than as uneducated.
+        // **An adult's attainment is drawn; a child starts at `none`.**
+        //
+        // This read "education is only meaningful for somebody old
+        // enough to have finished any", left every under-18 null, and
+        // argued that a young block should read as young rather than as
+        // uneducated. That was right when nothing anywhere moved
+        // `npcs.education`. It stopped being right the day
+        // `statecraft.runSchooling` existed, and it failed in the
+        // sharpest possible way: schooling refuses `null` on purpose —
+        // `indexOf` is -1 for it and -1 is not rung zero, so starting a
+        // person whose attainment nobody recorded at `none` would
+        // invent a fact about them — and the school window is 5 to 30.
+        // The null window and the school window overlapped almost
+        // exactly, so **the entire 5-to-17 cohort, the people school is
+        // actually for, could never be taught.** Standing rule 14's
+        // shape: a ladder whose bottom rung nobody is ever placed on.
+        //
+        // `none` for a child is not a guess. It is what the engine
+        // knows about somebody who has not finished any education yet,
+        // the same fact `births.js` now records for a newborn. The
+        // demographic consequence is real and is the correct one: a
+        // young block's `meanLevel` drops, because a young block DOES
+        // have lower attainment, and `demographics_recorded_share`
+        // rises because more of the population is now genuinely
+        // recorded rather than unknown.
+        //
+        // The teenage distribution is no longer drawn at all — school
+        // produces it. A 6-year-old starts at `none` and
+        // `runSchooling` walks them up through their school years, so
+        // the spread of 16-year-olds is an OUTPUT of how well their
+        // city funded its schools rather than a number this file
+        // invented.
         if (age >= 18) {
           const level = random.unit('edu', c, b, p);
           npc.education = level < 0.12 ? 'none'
@@ -565,6 +592,8 @@ function generateWorld(options = {}) {
               : level < 0.7 ? 'secondary'
                 : level < 0.85 ? 'vocational'
                   : level < 0.96 ? 'higher' : 'advanced';
+        } else {
+          npc.education = 'none';
         }
 
         demographics.speakLanguage(w, {

@@ -28,6 +28,12 @@
 
 const { nextAfter } = require('./nextAfter.js');
 const { getLiveEntity } = require('./entityTraits.js');
+// `membership.js` requires nothing, so this is not a cycle. A hire is
+// a membership as well as a contract — `worldgen` has always written
+// both, and writing only one here would leave the labour market and
+// every per-area organization statistic disagreeing about who works
+// where.
+const membership = require('./membership.js');
 
 let nextResourceId = 1;
 let nextMarketListingId = 1;
@@ -500,6 +506,195 @@ function runPayroll(worldState, tick) {
   return { paid, missed, events };
 }
 
+// ---------------------------------------------------------------------------
+// The labour market — the half of employment that only ever subtracted
+// ---------------------------------------------------------------------------
+//
+// **`hireEntity` was called exactly once in the whole engine, by
+// `worldgen`, at generation.** `endEmployment` is called by
+// `justice.imprison`, and death takes people out of `npcs` so their
+// contract stops producing. So every world this engine has ever run
+// had a labour market that could only shrink: nobody was ever hired
+// after tick 0, a child born into the world could never hold a job,
+// and a released prisoner could never work again. Measured on a
+// 400-tick playtest: 55 jobs at generation, 51 at the end, and the
+// only direction was down.
+//
+// That is the thirteenth standing rule again — a mechanism with no
+// inverse has no equilibrium — and it is the sixth ratchet this
+// project has found. It also sat underneath a lot of other things:
+// `communities.employment` is the share employed, `getCommunityHealth`
+// reads it, `cities.economy` reads that, and `statecraft.budgetOf`
+// reads THAT — so the state's whole budget was quietly draining toward
+// zero on a schedule nobody had noticed.
+//
+// ---------------------------------------------------------------------
+// No new constants, and that is the point
+//
+// The whole pass is written out of numbers this file already has:
+//
+//   break-even     `productivityOf` is centred on 1.0 for an average
+//                  worker and output is `wage * WAGE_TO_OUTPUT *
+//                  productivity`, so a worker pays for themselves at
+//                  exactly `1 / WAGE_TO_OUTPUT`. Below that they cost
+//                  their employer money. That line — not an invented
+//                  threshold — is who gets hired, so the unemployment
+//                  rate falls out of the population's own trait
+//                  distribution rather than out of a number chosen
+//                  here. Standing rule 12's third clause, satisfied by
+//                  not having a threshold to choose.
+//   working age    16, which is `worldgen`'s own cutoff for who it
+//                  offered a job to at generation. Reused rather than
+//                  picked again.
+//   the wage       what this employer already pays, median. A new hire
+//                  is paid what the person at the next desk is paid.
+//
+// And the inverse is what `runPayroll` already reports: an employer
+// that could not cover a wage this tick lets that person go. Stateless
+// — it reads this tick's `payroll_missed` events rather than keeping a
+// strike count — and an exact mirror of the hiring rule, so the two
+// meet at an equilibrium instead of either one running away.
+const BREAK_EVEN_PRODUCTIVITY = 1 / WAGE_TO_OUTPUT;
+const WORKING_AGE = 16;
+
+function medianOf(values) {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)];
+}
+
+// What this employer pays, or what the world pays when it has nobody
+// left to compare against. Null when nobody anywhere holds a job,
+// which is a world with no labour market rather than a world of
+// volunteers.
+function goingWage(worldState, organizationId) {
+  const active = (worldState.employmentRecords || []).filter((r) => r.status === 'active');
+  const here = medianOf(active
+    .filter((r) => r.employer_organization_id === organizationId)
+    .map((r) => Number(r.wage))
+    .filter(Number.isFinite));
+  if (here !== null) return here;
+  return medianOf(active.map((r) => Number(r.wage)).filter(Number.isFinite));
+}
+
+// One tick of the labour market. Runs in the Economy phase after
+// payroll, because who an employer can take on depends on whether it
+// just made its wages.
+//
+// `payrollEvents` is what `runPayroll` returned this tick — passed in
+// rather than re-derived, so the layoff is a consequence of the actual
+// miss rather than a second opinion about whether one happened.
+function runLabour(worldState, tick, payrollEvents = []) {
+  const events = [];
+  const hired = [];
+  const laidOff = [];
+
+  // ---- the inverse, first --------------------------------------------
+  // Before hiring, because an employer that missed a wage this tick is
+  // not an employer with a vacancy.
+  const broke = new Set();
+  for (const event of payrollEvents) {
+    if (event.type !== 'payroll_missed') continue;
+    broke.add(event.organizationId);
+    // `getEmployment` rather than trusting the event: the same person
+    // cannot be let go twice, and an event for a contract something
+    // else already ended would otherwise throw out of the tick.
+    if (!getEmployment(worldState, event.entityId)) continue;
+    endEmployment(worldState, { entityId: event.entityId });
+    laidOff.push({ entityId: event.entityId, organizationId: event.organizationId });
+    events.push({
+      type: 'laid_off',
+      severity: 'moderate',
+      note: `Entity ${event.entityId} lost their job — employer ${event.organizationId} `
+        + 'could not cover the wage',
+      tick,
+      affected_entity_ids: [event.entityId],
+      global_effects: { organizationId: event.organizationId, wage: event.wage },
+    });
+  }
+
+  // ---- who is looking -------------------------------------------------
+  const employed = new Set((worldState.employmentRecords || [])
+    .filter((r) => r.status === 'active')
+    .map((r) => r.entity_id));
+
+  const applicants = [];
+  for (const npc of worldState.npcs || []) {
+    if (employed.has(npc.id)) continue;
+    // Somebody serving a sentence is not in the labour market.
+    // `justice.imprison` ended their contract for exactly this reason
+    // and re-hiring them the next tick would undo it.
+    if (npc.status === 'imprisoned') continue;
+    const age = (tick - (npc.createdTick ?? 0)) / 365;
+    if (!(age >= WORKING_AGE)) continue;
+    const productivity = productivityOf(worldState, npc.id);
+    // **The only test.** Somebody who cannot cover their own wage is
+    // not hired, and nothing else is asked about them — not their
+    // religion, their ethnicity, their family or where they live. §9
+    // permits demographic modelling and forbids demographics deciding
+    // what a person is worth, and a labour market is precisely where
+    // that line is easiest to cross by accident.
+    if (productivity < BREAK_EVEN_PRODUCTIVITY) continue;
+    applicants.push({ id: npc.id, productivity });
+  }
+  // The best applicant gets the job. Deterministic, so no seed is
+  // needed and §88 holds without one.
+  applicants.sort((a, b) => b.productivity - a.productivity || a.id - b.id);
+
+  // ---- who is hiring ---------------------------------------------------
+  // An employer that already has somebody is a going concern; one that
+  // has nobody has no wage scale of its own and no evidence it can pay,
+  // so it is not in this market. That is also what keeps a dead
+  // business dead.
+  const staffed = new Map();
+  for (const record of worldState.employmentRecords || []) {
+    if (record.status !== 'active') continue;
+    staffed.set(record.employer_organization_id,
+      (staffed.get(record.employer_organization_id) || 0) + 1);
+  }
+
+  let next = 0;
+  for (const [organizationId] of staffed) {
+    if (next >= applicants.length) break;
+    if (broke.has(organizationId)) continue;
+    const employer = (worldState.organizations || []).find((o) => o.id === organizationId);
+    if (!employer) continue;
+
+    const wage = goingWage(worldState, organizationId);
+    if (wage === null) continue;
+    // It has to be able to pay them on the day it takes them on. Its
+    // existing wage bill is already committed, so the new one comes out
+    // of what is left.
+    const committed = (worldState.employmentRecords || [])
+      .filter((r) => r.status === 'active' && r.employer_organization_id === organizationId)
+      .reduce((total, r) => total + (Number(r.wage) || 0), 0);
+    if ((Number(employer.assets) || 0) < committed + wage) continue;
+
+    // One vacancy per employer per tick. A business does not staff up
+    // in an afternoon, and it keeps the market clearing at a pace a
+    // reader can follow.
+    const applicant = applicants[next];
+    next += 1;
+    hireEntity(worldState, {
+      entityId: applicant.id, employerOrganizationId: organizationId, wage, tick,
+    });
+    membership.joinOrganization(worldState, {
+      entityId: applicant.id, organizationId, role: 'employee', tick,
+    });
+    hired.push({ entityId: applicant.id, organizationId, wage });
+    events.push({
+      type: 'hired',
+      severity: 'low',
+      note: `Entity ${applicant.id} took a job at organization ${organizationId} for ${wage}`,
+      tick,
+      affected_entity_ids: [applicant.id],
+      global_effects: { organizationId, wage },
+    });
+  }
+
+  return { hired, laidOff, events };
+}
+
 // **Computed, never stored** — standing rule 3. `communities.employment`
 // is a separate stored field seeded at 50 and is deliberately NOT
 // written from here: two sources of truth for one concept is the
@@ -554,6 +749,10 @@ module.exports = {
   getEmployment,
   listEmployment,
   runPayroll,
+  runLabour,
+  goingWage,
+  BREAK_EVEN_PRODUCTIVITY,
+  WORKING_AGE,
   WAGE_TO_OUTPUT,
   productivityOf,
   runProduction,

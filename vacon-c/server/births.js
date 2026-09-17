@@ -346,7 +346,28 @@ function bearChild(worldState, options = {}) {
     // children can do it at the call site.
     name: options.name ?? null,
     role: null,
-    education: null,
+    // **`'none'`, the bottom rung — and it was `null` until schooling
+    // existed, which turned an honest unknown into a permanent
+    // sentence.** `demographics.EDUCATION_LEVELS[0]` is `'none'`, and
+    // `statecraft.runSchooling` walks a person UP that ladder from
+    // wherever they stand. It refuses `null` on purpose: `indexOf`
+    // returns -1 for it, and -1 is not rung zero — starting a generated
+    // adult whose attainment nobody recorded at `none` would invent a
+    // fact about them.
+    //
+    // A baby is the one case where the engine genuinely knows. It made
+    // this person; they have no education yet, which is not an unknown,
+    // it is `none`. Left as `null`, every child ever born in a running
+    // world was skipped by the only mechanism that can teach anybody —
+    // standing rule 14's shape, a ladder whose bottom rung nobody is
+    // ever placed on. Measured on a 400-tick playtest: 52 of 146
+    // living people had no education recorded and not one of them could
+    // ever acquire any.
+    //
+    // The literal rather than an import: this file cannot reach
+    // `demographics.js` without the cycle its header already describes.
+    // `test/statecraft.test.js` holds the two in agreement.
+    education: 'none',
     // Inherited, because `npcs.religion` is a real column and a
     // household's religion is the one demographic fact the schema
     // already carries. Null when neither parent has one.

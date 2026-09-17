@@ -434,9 +434,39 @@ function answerByGroup(worldState, options = {}) {
   const victimId = incident.victim_entity_id ?? null;
   const acts = [];
 
+  // **Everybody here has to still be alive, and the same argument
+  // `judge` already makes applies one function over.** `judge` refuses
+  // a dead defendant because "`mortality` has moved them out of `npcs`
+  // and there is nobody to sentence". Group law had no such check, and
+  // it is worse there than in a court, because the state's answer is a
+  // row in a table and a faction's answer is a `transfer`, a
+  // `leaveOrganization` and a relationship write — three reaches into
+  // the living world.
+  //
+  // **This crashed the tick**, and it took a 400-tick playtest to see:
+  // `inventory.transfer` asserts its RECIPIENT is among the living, so
+  // the first offence whose victim died before a lawless area got round
+  // to answering it threw out of `runJustice`, out of
+  // `runSecurityPhase` and out of `advanceTick`. Not a wrong number —
+  // the world stopped. The suite could not see it because the gap
+  // between an incident and its answer has to be long enough for
+  // somebody to die in, and because it only happens where the state
+  // does NOT prosecute. `succession.js`'s own header records the same
+  // shape of bug found the same way, on a 300-tick run.
+  const living = (id) => id !== null && (worldState.npcs || []).some((n) => n.id === id);
+
+  // A dead offender has nothing to answer with and nobody to expel.
+  if (!living(offenderId)) return null;
+  // A dead victim cannot be made whole and cannot hold a grudge. The
+  // faction still expels its own, so this narrows the answer rather
+  // than cancelling it — and an offence that goes unanswered because
+  // the person it was done to is gone is exactly what this file's
+  // header means by "some things simply go unanswered".
+  const victimLives = living(victimId);
+
   // Restitution, where there is somebody to make it to and something
   // to make it with.
-  if (victimId !== null) {
+  if (victimLives) {
     const holdings = inventory.holdingsOf(worldState, offenderId).filter((h) => !h.equipped);
     if (holdings.length > 0) {
       inventory.transfer(worldState, {
@@ -457,7 +487,7 @@ function answerByGroup(worldState, options = {}) {
   }
 
   // Feud, where there is somebody to feud with.
-  if (victimId !== null && victimId !== offenderId) {
+  if (victimLives && victimId !== offenderId) {
     const existing = worldStore.findRelationship(worldState, victimId, offenderId);
     const now = Number(existing?.conflict) || 0;
     worldStore.adjustRelationship(worldState, victimId, offenderId, 'social', {
