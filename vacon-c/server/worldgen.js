@@ -368,12 +368,27 @@ function generateWorld(options = {}) {
       const pressure = essential
         ? random.range(0.8, 1.15, 'dem', c, resourceType)
         : random.range(0.6, 1.4, 'dem', c, resourceType);
+      const demand = Math.round(supply * pressure);
       economy.generateResource(w, {
         cityId: city.id,
         resourceType,
         supply,
-        demand: Math.round(supply * pressure),
+        demand,
         quality: Math.round(random.range(30, 90, 'qual', c, resourceType)),
+        // **Units per person per tick, and DERIVED from the demand just
+        // drawn rather than chosen.** `economy.refreshDemand` reads this
+        // as the per-capita appetite and drifts `demand` toward
+        // `consumption_rate * residents`, so deriving it here means the
+        // target on tick 0 is exactly the number above and no existing
+        // world shifts by a digit — standing rule 12's first clause.
+        //
+        // This is the column becoming live for what it means. It was 0
+        // on every resource in every world, which is why
+        // `advanceResourceTick` computed `max(0, 0 + 0 - 0)` and the
+        // Resource phase — one of the locked eleven — did nothing at
+        // all, and why `getScarcity` returned the same number for 400
+        // ticks straight.
+        consumptionRate: cityPopulation > 0 ? demand / cityPopulation : 0,
       });
       summary.resources += 1;
     }

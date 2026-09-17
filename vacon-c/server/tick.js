@@ -236,6 +236,23 @@ function runResourcePhase(worldState) {
   for (const resource of worldState.resources) {
     economy.advanceResourceTick(resource);
   }
+
+  // **This phase was a no-op in every world ever generated.**
+  // `advanceResourceTick` moves `quantity` by `production_rate -
+  // consumption_rate`, and `worldgen` set neither, so it computed
+  // `max(0, 0 + 0 - 0)` on every resource on every tick — and
+  // `getScarcity`, which reads `supply`/`demand` instead, returned the
+  // same number for the life of the world: measured over 400 ticks,
+  // food 44, water 45, medicine 46, energy 42, wood 62, never moving by
+  // one. Everything downstream of scarcity — prices, the food
+  // satisfier, survival pressure, the broadcast that feeds two Key
+  // resolvers — was reading a constant drawn on tick 0.
+  //
+  // Demand now tracks the population that wants the thing, which is
+  // the link that was missing. See economy.js#refreshDemand for what is
+  // fixed and what is declared instead.
+  economy.refreshDemand(worldState);
+
   return [];
 }
 

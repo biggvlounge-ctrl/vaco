@@ -206,3 +206,116 @@ test('family wealth stays a number when one member has no finances', () => {
   assert.ok(Number.isFinite(total), `family wealth went non-finite: ${total}`);
   assert.equal(total, economy.getNetWorth(w, 1), 'the memberless member contributes zero');
 });
+
+// -- demand tracks the population that wants the thing -------------------
+//
+// **`getScarcity` returned the same number for the life of every world
+// ever generated.** Measured over 400 ticks: food 44, water 45,
+// medicine 46, energy 42, wood 62, never moving by one. Scarcity is
+// `demand / supply` and the only writer of either column anywhere in
+// the engine was the environmental-condition applier — so outside a
+// drought a settlement's scarcity was a constant drawn on tick 0, and
+// prices, the food satisfier, survival pressure and the broadcast that
+// feeds two Key resolvers were all reading it.
+//
+// The Resource phase was worse: `production_rate` and
+// `consumption_rate` were 0 on every resource in every world, so
+// `advanceResourceTick` computed `max(0, 0 + 0 - 0)` on every tick.
+// **Phase 2 of the locked eleven was a no-op.**
+
+function peopledWorld({ residents = 10, demand = 50, supply = 100 } = {}) {
+  const w = {
+    tick: 10,
+    npcs: [], communities: [{ id: 1, city_id: 1 }], cities: [{ id: 1 }],
+    resources: [], marketListings: [], individualFinances: [],
+    organizations: [], employmentRecords: [], entityTraits: [],
+  };
+  for (let i = 0; i < residents; i += 1) {
+    w.npcs.push({ id: 5000 + i, status: 'active', communityId: 1 });
+  }
+  economy.generateResource(w, {
+    cityId: 1, resourceType: 'food', supply, demand,
+    // Derived from the demand, exactly as `worldgen` does it.
+    consumptionRate: demand / residents,
+  });
+  return w;
+}
+
+test('demand on tick 0 is exactly the number that was drawn', () => {
+  // **Centred, and that is why `consumption_rate` is derived rather
+  // than chosen.** Standing rule 12's first clause: a modifier centred
+  // anywhere but zero recalibrates every world the day it starts being
+  // read.
+  const w = peopledWorld({ residents: 10, demand: 50 });
+  const [food] = w.resources;
+  assert.equal(economy.demandTargetFor(w, food), 50);
+  economy.refreshDemand(w);
+  assert.equal(food.demand, 50, 'a world at its own population shifted anyway');
+});
+
+test('more people want more, and fewer people want less', () => {
+  const grow = peopledWorld({ residents: 10, demand: 50 });
+  for (let i = 0; i < 10; i += 1) {
+    grow.npcs.push({ id: 6000 + i, status: 'active', communityId: 1 });
+  }
+  assert.equal(economy.demandTargetFor(grow, grow.resources[0]), 100);
+  for (let t = 0; t < 400; t += 1) economy.refreshDemand(grow);
+  assert.ok(grow.resources[0].demand > 90,
+    `demand reached ${grow.resources[0].demand} against a target of 100`);
+
+  const shrink = peopledWorld({ residents: 10, demand: 50 });
+  shrink.npcs = shrink.npcs.slice(0, 4);
+  for (let t = 0; t < 400; t += 1) economy.refreshDemand(shrink);
+  assert.ok(shrink.resources[0].demand < 25,
+    `demand reached ${shrink.resources[0].demand} against a target of 20`);
+});
+
+test('scarcity moves when the population does, which it never did before', () => {
+  const w = peopledWorld({ residents: 10, demand: 50, supply: 100 });
+  const before = economy.getScarcity(w.resources[0]);
+  for (let i = 0; i < 20; i += 1) {
+    w.npcs.push({ id: 7000 + i, status: 'active', communityId: 1 });
+  }
+  for (let t = 0; t < 400; t += 1) economy.refreshDemand(w);
+  assert.ok(economy.getScarcity(w.resources[0]) > before,
+    'tripling the population left scarcity where it was');
+});
+
+test('a resource nobody can measure a population for is left alone', () => {
+  // **Null residents is not zero residents.** `resources.city_id` is
+  // nullable and most fixtures — the drought cascade's included —
+  // create a resource with no city at all. Drifting those toward a
+  // target of 0 would empty every hand-made world's demand and break
+  // the cascade that is this project's Definition of Done.
+  const w = peopledWorld();
+  const orphan = economy.generateResource(w, {
+    resourceType: 'water', supply: 100, demand: 100, consumptionRate: 5,
+  });
+  assert.equal(orphan.city_id, null);
+  assert.equal(economy.demandTargetFor(w, orphan), null);
+  economy.refreshDemand(w);
+  assert.equal(orphan.demand, 100);
+
+  // Same for a resource in a city nobody lives in, and for one with no
+  // per-capita rate recorded — a world generated before this existed.
+  const empty = economy.generateResource(w, {
+    cityId: 99, resourceType: 'wood', supply: 100, demand: 100, consumptionRate: 5,
+  });
+  assert.equal(economy.demandTargetFor(w, empty), null);
+  const unrated = economy.generateResource(w, {
+    cityId: 1, resourceType: 'medicine', supply: 100, demand: 100,
+  });
+  assert.equal(economy.demandTargetFor(w, unrated), null);
+  economy.refreshDemand(w);
+  assert.equal(empty.demand, 100);
+  assert.equal(unrated.demand, 100);
+});
+
+test('refreshDemand reports only what moved', () => {
+  // Standing rule 7: a resource sitting at its own target for a decade
+  // is not three thousand events.
+  const w = peopledWorld({ residents: 10, demand: 50 });
+  assert.deepEqual(economy.refreshDemand(w), []);
+  w.npcs.push({ id: 8001, status: 'active', communityId: 1 });
+  assert.equal(economy.refreshDemand(w).length, 1);
+});

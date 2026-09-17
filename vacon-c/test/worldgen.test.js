@@ -253,7 +253,22 @@ test('a generated world answers most of the catalogue, where an empty one answer
   // `server/migration.js` does both. This number is asserted rather
   // than read so that a gap QUIETLY appearing, which is the failure
   // that matters, cannot pass.
-  assert.equal(structural.size, 7, 'the declared-gap count moved without this test being updated');
+  //
+  // **8 again as of 17 Sep 2026, and this time the gap was added
+  // deliberately.** `resource_stock` declares that `resources` carries
+  // two models of the same thing: this engine uses supply/demand
+  // LEVELS, and the schema also offers a STOCK with flows
+  // (`quantity`, `production_rate`, `consumption_rate`). Measured, the
+  // flow columns were 0 on every resource in every world, so
+  // `advanceResourceTick` computed `max(0, 0 + 0 - 0)` and the Resource
+  // phase — one of the locked eleven — did nothing at all.
+  // `consumption_rate` is live now, read as units per person per tick
+  // so demand tracks its population; making the STOCK load-bearing
+  // means supply being drawn from it, which changes what a drought does
+  // and the drought cascade is this project's Definition of Done. A
+  // declared gap is the honest state for a design decision with a test
+  // in front of it.
+  assert.equal(structural.size, 8, 'the declared-gap count moved without this test being updated');
 });
 
 test('a fresh world has routines, and running it engages the Behavior Engine', () => {

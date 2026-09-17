@@ -980,7 +980,7 @@ trusted:
 
 The simulation engine is the one app in this repo whose "done" is not a
 list of routes, so it carries a measured completeness score rather than
-a criteria tally. **91.5%**, from
+a criteria tally. **91.2%**, from
 `vacon-c/dev-docs/GAME_COMPLETENESS.md`, which
 `vacon-c/scripts/completeness.mjs` regenerates and
 `vacon-c/test/completeness.test.js` fails on if stale — including a
@@ -990,7 +990,7 @@ check that the percent in THIS file matches the one the code measures.
 |---|---|---|
 | systems | 71.1% | the forty urban systems §7 names, at `urbanSystems.js`'s own four levels |
 | tables | 90.9% | schema tables a built world actually fills |
-| statistics | 90% | statistics a world can answer about itself |
+| statistics | 89.1% | statistics a world can answer about itself |
 | traits | 100% | traits something under `server/` reads |
 | traitDepth | 85.7% | trait columns a life actually changes |
 | habits | 100% | whether habits and routines carry information |
@@ -1106,9 +1106,26 @@ percentile of net worth rose from -452 to 1,796 — the first mechanism
 in the engine that moves value from the people who have it to the
 people who do not.
 
-**The percent can go DOWN, and did.** 90% to 89.6% (and back up through
-90.6% with the tier sheets, 91.1% with media and 91.4% with the Social
-Key to 91.5%), because the world
+**And phase 2 of the locked eleven was a no-op.**
+`advanceResourceTick` moves `resources.quantity` by `production_rate -
+consumption_rate`, and `worldgen` set neither, so it computed
+`max(0, 0 + 0 - 0)` on every resource on every tick. Meanwhile
+`getScarcity` reads `supply`/`demand`, whose only writer anywhere was
+the drought applier — so **a settlement's scarcity was a constant drawn
+on tick 0**, measured unchanged across 400 ticks (food 44, water 45,
+medicine 46, energy 42, wood 62), with prices, the food satisfier,
+survival pressure and the broadcast feeding two Key resolvers all
+reading it. `consumption_rate` is live now as units per person per
+tick, so demand tracks the population that wants the thing and moves
+with births, deaths and migration. Derived from the drawn demand rather
+than chosen, so tick 0 is unchanged to the digit.
+
+**The percent can go DOWN, and did — twice, for different reasons.**
+90% to 89.6% (and back up through 90.6% with the tier sheets, 91.1%
+with media, 91.4% with the Social Key and 91.5% with the market to
+**91.2%**, because declaring `resource_stock` as a gap grows the
+catalogue by an entry that cannot be answered — a score that only ever
+rose would be measuring the work rather than the world), because the world
 the report measures is now a contested settlement where thefts go
 unprosecuted, so `court_cases` is genuinely empty in it. A score that
 only ever rose would be measuring the work rather than the world. The pattern is consistent enough to be a rule: **the

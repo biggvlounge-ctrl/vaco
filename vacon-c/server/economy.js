@@ -84,6 +84,115 @@ function advanceResourceTick(resource) {
   return resource;
 }
 
+// ---------------------------------------------------------------------------
+// Demand tracks the population that wants the thing
+// ---------------------------------------------------------------------------
+//
+// **`getScarcity` returned the same number for the life of every world
+// ever generated.** Measured over 400 ticks of a generated world, every
+// tick: food 44, water 45, medicine 46, energy 42, wood 62 — never
+// moving by one. Scarcity is `demand / supply`, and the only writer of
+// either column anywhere in the engine was the environmental-condition
+// applier in `tick.js`. So outside a drought, a settlement's scarcity
+// was a constant drawn on tick 0, and everything downstream of it —
+// prices, `motivation`'s food satisfier, `mortality.survivalScarcity`,
+// the scarcity broadcast that feeds two Key resolvers — was reading
+// that constant.
+//
+// The Resource phase was worse: `production_rate` and
+// `consumption_rate` are **0 for every resource in every world**
+// (`worldgen` never set them), so `advanceResourceTick` computes
+// `max(0, 0 + 0 - 0)` on every resource on every tick. **Phase 2 of the
+// locked eleven is a no-op**, and `resources.quantity` — the column it
+// exists to move — is 0 everywhere and read by nothing but the
+// migration.
+//
+// ---------------------------------------------------------------------
+// What is fixed here, and what is declared
+//
+// The single most important missing link is that **more people want
+// more**. `consumption_rate` is the schema's own column for it, read as
+// units per person per tick, so `demand` becomes
+// `consumption_rate * residents` and moves whenever the population does
+// — births, deaths, migration, a block emptying out. One of the two
+// dead rate columns becomes live for what it actually means.
+//
+// **Centred exactly, and that is why `consumption_rate` is derived from
+// the drawn demand rather than chosen.** `worldgen` sets it to
+// `demand / residents` at generation, so on tick 0 the target equals
+// the value that was drawn and no existing world shifts by a digit.
+// Standing rule 12's first clause.
+//
+// **And a resource nobody can measure a population for is left exactly
+// alone.** `resources.city_id` is nullable and most fixtures — the
+// drought cascade's included — create a resource with no city at all.
+// Null residents is not zero residents: it is a resource whose demand
+// this pass cannot speak to, so it does not.
+//
+// `quantity` and `production_rate` stay **declared rather than
+// modelled**, and the reason is a real one rather than an omission.
+// This engine represents a resource as LEVELS — a supply and a demand
+// that scarcity is the ratio of — and the schema also offers a STOCK
+// with flows into and out of it. Those are two models of the same
+// thing, and running both would give every reading two disagreeing
+// answers. Making the stock load-bearing means deciding that supply is
+// drawn from it, which changes what a drought does to a world, and the
+// drought cascade is this project's stated Definition of Done. That is
+// a design decision with a test in front of it, not a defect with one
+// right answer. `statistics.js` carries the declaration.
+
+//: How fast demand moves toward what the population implies. **Flagged
+//: interpretive**, and deliberately slow: a resource's demand is a
+//: standing appetite rather than a headcount read fresh each morning, so
+//: a block emptying out over a season is felt over a season. At 0.02 a
+//: resource covers half the distance in about thirty-five ticks.
+//:
+//: Slow also keeps this composable with the condition applier, which
+//: writes the same column as a delta and restores what it took on
+//: expiry. Both are deltas, so they add rather than overwrite, and the
+//: drift pulls back to the population's level afterwards.
+const DEMAND_DRIFT_RATE = 0.02;
+
+// How many people this resource is for, or null when that cannot be
+// read. City-scoped, because `resources.city_id` is where the schema
+// puts a resource.
+function residentsFor(worldState, resource) {
+  if (resource.city_id === null || resource.city_id === undefined) return null;
+  const here = new Set((worldState.communities || [])
+    .filter((c) => c.city_id === resource.city_id)
+    .map((c) => c.id));
+  if (here.size === 0) return null;
+  return (worldState.npcs || []).filter((n) => here.has(n.communityId)).length;
+}
+
+// What demand should be, given who is actually there. Null when there
+// is no population to read or no per-capita rate recorded.
+function demandTargetFor(worldState, resource) {
+  const perCapita = Number(resource.consumption_rate);
+  if (!Number.isFinite(perCapita) || perCapita <= 0) return null;
+  const residents = residentsFor(worldState, resource);
+  if (residents === null) return null;
+  return Math.max(0, perCapita * residents);
+}
+
+// One tick of demand tracking its population. Returns the resources
+// whose demand actually moved, so this is a crossing rather than a
+// per-tick rewrite of the same number (standing rule 7).
+function refreshDemand(worldState, options = {}) {
+  const rate = options.rate ?? DEMAND_DRIFT_RATE;
+  const moved = [];
+  for (const resource of worldState.resources || []) {
+    const target = demandTargetFor(worldState, resource);
+    if (target === null) continue;
+    const current = Number(resource.demand) || 0;
+    const next = Math.round((current + (target - current) * rate) * 100) / 100;
+    if (next === current) continue;
+    resource.demand = next;
+    moved.push(resource);
+  }
+  return moved;
+}
+
 // 0-100 scarcity score derived from supply vs. demand — not a schema
 // column (resources has none), a read-time computation. Referenced
 // elsewhere in the handoff package as a bare threshold ("Black Market
@@ -751,6 +860,10 @@ module.exports = {
   runPayroll,
   runLabour,
   goingWage,
+  DEMAND_DRIFT_RATE,
+  residentsFor,
+  demandTargetFor,
+  refreshDemand,
   BREAK_EVEN_PRODUCTIVITY,
   WORKING_AGE,
   WAGE_TO_OUTPUT,

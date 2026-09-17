@@ -566,6 +566,40 @@ const CATALOGUE = [
       + 'books, because there are no books to be off: an informal economy needs a formal one '
       + 'to be outside of, and a way to transact without being recorded.',
   },
+  {
+    key: 'resource_stock', category: 'economics', unit: 'count', scope: 'city',
+    // **Declared, with the measurement, and it is a design decision
+    // rather than an omission.**
+    //
+    // `resources` offers two models of the same thing. This engine uses
+    // LEVELS — a `supply` and a `demand` whose ratio `getScarcity`
+    // returns — and the schema also offers a STOCK (`quantity`) with
+    // flows into and out of it (`production_rate`,
+    // `consumption_rate`). Running both would give every reading two
+    // disagreeing answers, which is the mistake standing rule 3 exists
+    // to prevent.
+    //
+    // Measured: `production_rate` and `consumption_rate` were 0 on
+    // every resource in every world, so `advanceResourceTick` computed
+    // `max(0, 0 + 0 - 0)` on every tick and `quantity` was 0 everywhere
+    // — the Resource phase, one of the locked eleven, did nothing at
+    // all. `consumption_rate` is live now, read as units per person per
+    // tick so `demand` tracks the population that wants the thing
+    // (economy.js#refreshDemand), which was the missing link: scarcity
+    // returned the same number for 400 ticks straight.
+    //
+    // What would close THIS: deciding that supply is drawn from the
+    // stock, so production and consumption become the only writers of
+    // both. That changes what a drought does to a world, and the
+    // drought cascade is this project's stated Definition of Done —
+    // a decision with a test in front of it, not a defect with one
+    // right answer.
+    unavailable: 'resources.quantity is 0 in every world and read by nothing but the migration. '
+      + 'The engine models a resource as supply/demand LEVELS; the stock-and-flow columns are '
+      + 'the schema\'s second model of the same thing, and running both would give scarcity '
+      + 'two disagreeing answers. Closing it means supply being drawn from the stock, which '
+      + 'changes the drought cascade that is the Definition of Done.',
+  },
 
   // ---- housing -------------------------------------------------------
   {
