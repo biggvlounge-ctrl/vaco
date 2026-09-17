@@ -209,12 +209,12 @@ from memory with nothing in the repo to check it against. The forty are
 now data in `vacon-c/server/urbanSystems.js`, every citation verified
 by `vacon-c/test/urban-systems.test.js`, and the real breakdown is:
 
-**18 modelled, 17 partial, 3 slot-only, 2 absent**
+**19 modelled, 18 partial, 3 slot-only, 0 absent**
 
 | Level | Means | Systems |
 |---|---|---|
-| **modelled** (18) | Real mechanics; something advances or decides on it each tick | Population, Housing, Economy, **Employment**, **Health**, Infrastructure, **Water**, **Law Enforcement**, **Crime**, **Court**, **Political**, Cultural, Community Organizations, Real Estate, Environmental, **Technology**, **Migration**, AI Decision |
-| **partial** (17) | A trait family or a live table with little driving it, or one phase covering two systems | Education, **Energy**, Food Supply, **Waste**, Gang, Organized Crime, **Prison**, **Government Services**, Communication, **Religion**, Business, Construction, Weather, Disaster, **Military/National Guard**, **Tourism**, Reputation |
+| **modelled** (19) | Real mechanics; something advances or decides on it each tick | Population, Housing, Economy, **Employment**, **Health**, Infrastructure, **Water**, **Law Enforcement**, **Crime**, **Court**, **Political**, **Media**, Cultural, Community Organizations, Real Estate, Environmental, **Technology**, **Migration**, AI Decision |
+| **partial** (18) | A trait family or a live table with little driving it, or one phase covering two systems | Education, **Energy**, Food Supply, **Waste**, Gang, Organized Crime, **Prison**, **Government Services**, Communication, **Social Media**, **Religion**, Business, Construction, Weather, Disaster, **Military/National Guard**, **Tourism**, Reputation |
 | **slot** (3) | Storage exists and nothing reads it | Transportation, Fire & Emergency, Supply Chain |
 
 **Energy, Water and Waste all moved on 17 Sep 2026, and it was one
@@ -228,7 +228,34 @@ long as the city's funding and its residents' technology traits make it
 take. Fire & Emergency stays `slot` because it shares the
 `public_safety` row with policing and the schema's ten infrastructure
 types do not separate them.
-| **absent** (2) | No representation at all | Media, Social Media |
+**Nothing is `absent` any more, as of 17 Sep 2026** — and the last two
+to go were worth more than two entries on a list.
+
+**Media and Social Media** were the only bare `absent` rows left, and
+the cost of their absence was in `politics.js`:
+`broadcastGovernmentKnowledge` wrote one knowledge row per NPC
+unconditionally, so the share of a population who had heard of their
+own government was a constant **1.0** — measured, 153 of 153 — and
+`assessRevolutions`, which needs approval below 35 **and** spread at or
+above 0.25, had one condition that could never fail. §63's "Public
+Opinion + Information Spread + Government" mechanic was a
+public-opinion mechanic with a decorative second term.
+
+`vacon-c/server/media.js` is §61's own channel list — word of mouth,
+bulletins, local news, radio, networks — each gated on the
+`technology.ERA_NAMES` entry that makes it possible, so §61's sentence
+"in the reset era, communication should begin locally and reemerge
+technologically over time" needed no invented technology tree. An
+outlet is an `organizations.type = media` row, a type already in the
+schema's own enumeration, and a government announces from the building
+it operates via `properties.operating_organization_id`. Two columns
+`worldStore.addKnowledge` had always accepted and no caller had ever
+passed — `spread_rate` and `distortion_level` — are what carry a fact
+from one person to the next.
+
+Measured on one world: awareness **0.2** at founding (one community of
+five), still 0.2 fifty ticks later, **1.0** once electricity came back
+and with it radio.
 
 **Government Services, Military/National Guard and Tourism moved on 17
 Sep 2026, and none of the three needed designing.** They were the only

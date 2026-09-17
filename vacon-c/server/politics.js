@@ -258,23 +258,61 @@ function broadcastGovernmentKnowledge(worldState, options = {}) {
   } = options;
 
   const topic = topicForGovernment(governmentOrganizationId);
-  const written = [];
-  for (const npc of worldState.npcs) {
-    written.push(worldStore.addKnowledge(worldState, {
-      entityId: npc.id,
-      subjectEntityId: governmentOrganizationId,
-      factType,
-      factContent: `${topic} ${factContent}`,
-      // Announced once, received differently — see `perception.js`.
-      // `confidence` is what the government stated; this is what this
-      // person came away holding. An ordinary listener gets exactly the
-      // stated figure.
-      confidenceLevel: perception.receivedConfidence(worldState, npc.id, confidence),
-      sourceEntityId: governmentOrganizationId,
-      tick,
-    }));
-  }
-  return written;
+
+  // **Through a channel, and this used to be a loop over every NPC in
+  // the world.** Every announcement reached every person instantly,
+  // wherever they lived and whatever had been built, so
+  // `computeApproval`'s `spread` was a constant 1.0 — measured, 153 of
+  // 153 on a 400-tick world. `assessRevolutions` needs approval below
+  // 35 AND spread at or above 0.25, so one of its two conditions could
+  // never fail and §63's "Public Opinion + Information Spread +
+  // Government" mechanic was a public-opinion mechanic with a
+  // decorative second term.
+  //
+  // `server/media.js` is §7's systems 23 and 24, and §61's own
+  // sentence is the design: "in the reset era, communication should
+  // begin locally and reemerge technologically over time". A collapsed
+  // settlement hears its government by word of mouth, over weeks, if
+  // anybody there knows anybody. One that has recovered writing can
+  // read a bulletin; electricity brings radio.
+  //
+  // **Made in ONE place — where the government sits — and this is the
+  // whole difference.** The first attempt at this announced in every
+  // community of every city, on the reasoning that a community-reach
+  // channel has to be spoken somewhere so it should be spoken
+  // everywhere. That reproduced the old behaviour under a new name:
+  // measured, `spread` came back at 1.0 on tick 0 of a fresh world and
+  // not one fact was ever passed from one person to another, because
+  // there was nobody left who had not already heard it.
+  //
+  // An announcement happens at the seat of government, and then it
+  // travels — by word of mouth along real relationships, over weeks,
+  // or instantly if the world has recovered radio. `media.seatOf`
+  // reads `properties.operating_organization_id`, the schema's own
+  // link from a building to whoever runs it, so the government has a
+  // location without `organizations` needing an address column.
+  const media = require('./media.js');
+  const seat = media.seatOf(worldState, governmentOrganizationId);
+
+  // A government with no building announces wherever there is somebody
+  // to announce to. That is a fixture or a world mid-restore rather
+  // than a real settlement, and falling back to the first community
+  // keeps those working without putting the announce-everywhere
+  // behaviour back.
+  const fallback = (worldState.communities || [])[0] ?? null;
+  const cityId = seat.cityId ?? fallback?.city_id ?? null;
+  const communityId = seat.communityId ?? fallback?.id ?? null;
+
+  return media.broadcast(worldState, {
+    factContent: `${topic} ${factContent}`,
+    factType,
+    subjectEntityId: governmentOrganizationId,
+    sourceEntityId: governmentOrganizationId,
+    confidence,
+    cityId,
+    communityId,
+    tick,
+  });
 }
 
 // -- public opinion -----------------------------------------------------
@@ -334,10 +372,23 @@ function computeApproval(worldState, options = {}) {
   const { topic } = options;
   if (!topic) throw new Error('computeApproval requires a topic');
 
-  const people = worldState.npcs.length;
+  // **`spread` could exceed 1, and did — measured at 1.0272.** The
+  // denominator is the living population and the numerator counted
+  // knowledge rows, which the dead keep: `mortality` moves an NPC out
+  // of `npcs` and deliberately leaves their `entity_knowledge` alone,
+  // because what somebody knew is part of the record. So a world that
+  // had buried anybody reported more people informed about its
+  // government than it had people, and a share above 1 is not a share.
+  //
+  // The living only, on both sides. The same argument `runPayroll`
+  // makes about walking contracts rather than people: this walks facts,
+  // and it has to ask.
+  const living = new Set(worldState.npcs.map((n) => n.id));
+  const people = living.size;
   const byEntity = new Map();
   for (const row of worldState.entityKnowledge) {
     if (typeof row.fact_content !== 'string' || !row.fact_content.startsWith(topic)) continue;
+    if (!living.has(row.entity_id)) continue;
     // The most confident thing a person knows about the topic is what
     // they act on. Two rows for one person are two tellings of the
     // same subject, not two opinions.

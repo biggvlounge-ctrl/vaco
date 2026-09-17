@@ -72,6 +72,7 @@ const households = require('./households.js');
 const migration = require('./migration.js');
 const environment = require('./environment.js');
 const statecraft = require('./statecraft.js');
+const media = require('./media.js');
 const { seededDraw } = require('./seeded.js');
 
 let nextEventId = 1;
@@ -459,6 +460,15 @@ function runSocialPhase(worldState) {
   const feuds = crime.advanceFriction(worldState, {
     tick: worldState.tick, threshold: CONFLICT_ESCALATION_THRESHOLD,
   });
+
+  // **Word of mouth, which is what makes awareness a variable at all.**
+  // Here because it moves along `relationships` and that is what this
+  // phase is about. `entity_knowledge.spread_rate` was a column
+  // `worldStore.addKnowledge` accepted and no caller ever passed, so no
+  // fact in any world had ever been passed from one person to another
+  // — every broadcast arrived everywhere at once and awareness was a
+  // constant 1. See server/media.js.
+  media.runWordOfMouth(worldState, worldState.tick);
 
   // **Bonds form here, and they had to start somewhere.**
   // `relationships.love` is initialised to 0 and was written by

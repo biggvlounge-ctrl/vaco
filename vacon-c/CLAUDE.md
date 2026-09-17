@@ -106,6 +106,38 @@ is its paper twin — a specification nobody opens is indistinguishable
 from one that was never written, and the cost is not a gap but a
 reinvention that disagrees with it.
 
+**A fourth, and it is the paper twin's twin: a channel nobody modelled
+makes a variable a constant.** `politics.broadcastGovernmentKnowledge`
+wrote one `entity_knowledge` row per NPC, unconditionally — so every
+announcement reached every person in the world the instant it was made,
+and `computeApproval`'s `spread`, the share of a population who have
+heard of their own government, was a constant **1.0** (measured, 153 of
+153). `assessRevolutions` needs approval below 35 AND spread at or
+above 0.25, so one of its two conditions could never fail and §63's
+"Public Opinion + Information Spread + Government" mechanic was a
+public-opinion mechanic with a decorative second term.
+
+§7's only two `absent` systems were 23 Media and 24 Social Media, and
+they were the reason. `server/media.js` is §61's own channel list —
+word of mouth, bulletins, local news, radio, networks — each gated on
+the `technology.ERA_NAMES` entry that makes it possible, because §61
+says "in the reset era, communication should begin locally and reemerge
+technologically over time" and the ten eras were already there. An
+outlet is an `organizations.type = media` row, a type the schema
+already enumerated. A government announces from the building it
+operates (`properties.operating_organization_id`) and the news travels:
+awareness 0.2 at founding, still 0.2 fifty ticks later, 1.0 once radio
+came back. `entity_knowledge.spread_rate` and `.distortion_level` — two
+columns `addKnowledge` had always accepted and no caller had ever
+passed — are what carry a fact from one person to the next.
+
+**Nothing in §7 is `absent` any more.** And two mistakes were made
+here first, both of them rules already in this file: the outlet was
+founded behind an era gate that generation could never pass (rule 14,
+one commit after adding a rule about it), and the first routing
+announced in every community of every city, which reproduced
+spread 1.0 under a new name.
+
 `tierTraits.js` also carries the reconciliation of all thirty-three
 names against the column, rollup or system that already answers
 twenty-eight of them. That list is the deliverable, not a comment:

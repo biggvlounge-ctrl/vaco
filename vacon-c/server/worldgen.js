@@ -89,6 +89,7 @@ const items = require('./items.js');
 const territory = require('./territory.js');
 const geo = require('./geo.js');
 const statecraft = require('./statecraft.js');
+const media = require('./media.js');
 const worldStore = require('./worldStore.js');
 const { hashSeed, seededUnit } = require('./seeded.js');
 
@@ -872,6 +873,49 @@ function generateWorld(options = {}) {
     summary.erasUnlocked += 1;
   }
 
+  // ---- the press --------------------------------------------------------
+  // **§7's systems 23 and 24 needed an outlet to exist at all**, and
+  // `organizations.type`'s own schema enumeration already includes
+  // `media`, so one is an organization rather than a new table
+  // (standing rule 4).
+  //
+  // **Not gated on the era, and the first version was — which was a
+  // dead gate.** `startingEras` is 2, so a generated world sits at
+  // `agriculture` and `media.eraReached(w, 'writing')` was false at the
+  // only moment an outlet was ever founded. The outlet would therefore
+  // never have existed in any world, and `local_news`, `radio` and
+  // `social_media` would have been permanently unavailable however far
+  // the world climbed. That is standing rule 14's shape and I had just
+  // written it.
+  //
+  // The separation that fixes it is also the truer one: the OUTLET is
+  // an institution and the ERA is a technology. A settlement has
+  // somebody who carries news from the first day — a crier, a scribe,
+  // whoever keeps the board — and what changes as the world recovers is
+  // which channels that institution can operate. §61's "begin locally
+  // and reemerge technologically over time" is carried entirely by the
+  // era gates in `media.CHANNELS`, so this needs no gate of its own.
+  {
+    const press = engine.generateOrganization({
+      name: `${config.civilizationName} Record`,
+      type: 'media',
+      traitValueFor: (def) => Math.round(
+        random.range(25, 80, 'media-trait', def.family, def.name),
+      ),
+    });
+    // `organizations.influence` is what `media.outletReach` reads to
+    // decide how much of a channel's potential audience the outlet
+    // actually reaches. Drawn rather than set flat: a world where the
+    // press is weak is a different world from one where it is strong,
+    // and four identical numbers is the placeholder problem this
+    // project keeps finding.
+    press.influence = Math.round(random.range(20, 85, 'media', 'influence'));
+    press.assets = Math.round(random.range(2000, 40000, 'media', 'assets'));
+    summary.organizations += 1;
+    summary.mediaOutlets = 1;
+    summary.mediaOutletId = press.id;
+  }
+
   // ---- the government ---------------------------------------------------
   // A government is an organization, per standing rule 4 — not a root
   // entity of its own. So one is generated and then declared to be a
@@ -889,6 +933,26 @@ function generateWorld(options = {}) {
     systemType: random.pick(politics.SYSTEM_TYPES, 'gov', 'system'),
   });
   summary.governmentId = state.id;
+
+  // **A seat, because an announcement has to be made somewhere.**
+  // `properties.operating_organization_id` is the schema's own link
+  // from a building to whoever runs it — `worldgen` already uses it for
+  // businesses, and `behavior.workplaceOf` reads it to give a work
+  // routine a place. `media.seatOf` reads it to decide where a
+  // government speaks from, which is what turns
+  // `computeApproval`'s `spread` from a constant 1.0 into a fact about
+  // how far word has actually travelled.
+  //
+  // The first standing building in the first community: a seat of
+  // government is central, and picking one deterministically keeps the
+  // world replayable without a draw.
+  const seat = (w.properties || []).find(
+    (p) => p.operating_organization_id === null && p.lifecycle_stage === 'operation',
+  ) ?? (w.properties || [])[0] ?? null;
+  if (seat) {
+    seat.operating_organization_id = state.id;
+    summary.governmentSeatPropertyId = seat.id;
+  }
 
   // Laws, one per city, drawn from the schema's own category list. A
   // government with no law on the books has enacted nothing, and

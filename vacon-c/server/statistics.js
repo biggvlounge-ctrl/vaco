@@ -105,6 +105,8 @@ const policing = require('./policing.js');
 const property = require('./property.js');
 const statecraft = require('./statecraft.js');
 const tierTraits = require('./tierTraits.js');
+const media = require('./media.js');
+const politics = require('./politics.js');
 
 // §9's MASTER BLOCK KEY, in its order. Every statistic belongs to one.
 const CATEGORIES = [
@@ -849,6 +851,45 @@ const CATALOGUE = [
     compute: (ctx) => (ctx.cityId === null
       ? null
       : infrastructure.failedIn(ctx.worldState, ctx.cityId).length),
+  },
+  {
+    key: 'public_awareness', category: 'psychological', unit: 'share', scope: 'city',
+    // **§7's systems 23 and 24, and the term §63's revolution mechanic
+    // could never read.** `politics.broadcastGovernmentKnowledge` wrote
+    // one knowledge row per NPC unconditionally, so the share of a
+    // population who had heard of their own government was a constant
+    // 1.0 — measured, 153 of 153 — and `assessRevolutions`, which needs
+    // approval below 35 AND spread at or above 0.25, had one condition
+    // that could never fail.
+    //
+    // `server/media.js` gives information a channel: word of mouth in a
+    // collapsed settlement, a bulletin or a printed sheet once writing
+    // is recovered, radio at electricity, networks at computing. A
+    // government now announces from the building it operates and the
+    // news travels. Measured on the same world: 0.2 at founding, still
+    // 0.2 fifty ticks later, 1.0 once radio came back.
+    compute: (ctx) => {
+      const governments = ctx.worldState.governments || [];
+      if (governments.length === 0) return null;
+      const shares = governments
+        .map((g) => media.awarenessOf(
+          ctx.worldState, politics.topicForGovernment(g.organization_id),
+        ))
+        .filter((v) => v !== null);
+      return shares.length === 0
+        ? null
+        : Math.round((shares.reduce((a, b) => a + b, 0) / shares.length) * 10000) / 10000;
+    },
+  },
+  {
+    key: 'media_channels', category: 'community', unit: 'count', scope: 'city',
+    // How many of §61's channels this city can actually use. A count
+    // rather than a share on purpose: the five are not interchangeable
+    // and a city with radio is not "40% as informed" as one with all
+    // five — `describeMedia` says which, and why the rest are shut.
+    compute: (ctx) => (ctx.cityId === null
+      ? null
+      : media.availableChannels(ctx.worldState, ctx.cityId).length),
   },
   {
     key: 'tourism', category: 'economics', unit: 'index', scope: 'city',

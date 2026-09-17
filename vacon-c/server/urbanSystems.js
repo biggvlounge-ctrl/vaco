@@ -419,22 +419,64 @@ const SYSTEMS = [
     level: 'partial',
     tables: ['entity_knowledge'],
     infrastructureTypes: ['internet'],
-    functions: ['addKnowledge', 'getKnowledge'],
-    note: 'This is the genuine word-of-mouth layer: per-entity facts with confidence_level, '
-      + 'spread_rate, distortion_level and a source. Radio and networks are not modelled.',
+    phases: ['runSocialPhase'],
+    functions: ['addKnowledge', 'getKnowledge', 'runWordOfMouth'],
+    note: 'The genuine word-of-mouth layer: per-entity facts with confidence_level, '
+      + 'spread_rate, distortion_level and a source. **This entry used to end "radio and '
+      + 'networks are not modelled", and two of those four columns had never been written by '
+      + 'anything** — `worldStore.addKnowledge` accepted `spreadRate` and `distortionLevel` '
+      + 'and no caller anywhere passed either, so no fact in any world had ever been passed '
+      + 'from one person to another. `media.runWordOfMouth` moves facts along real '
+      + 'relationships now, seeded per telling, degrading with every hand and re-typed as '
+      + '`rumor` because a thing a neighbour told you is not a thing you verified. Radio and '
+      + 'networks are §7 systems 23 and 24. Still partial: there is no telephone, no post and '
+      + 'no letter, and a fact has no addressee — it spreads to whoever you speak to rather '
+      + 'than to whoever you meant to tell.',
   },
   {
     n: 23,
     name: 'Media',
-    level: 'absent',
-    note: 'No news, no radio, no bulletins. §61 describes it; nothing implements it.',
+    level: 'modelled',
+    tables: ['entity_knowledge', 'organizations'],
+    phases: ['runSocialPhase'],
+    functions: ['availableChannels', 'bestChannel', 'audienceFor', 'broadcast',
+      'runWordOfMouth', 'awarenessOf', 'seatOf'],
+    note: '**Built 17 Sep 2026, and it was worth more than a system.** '
+      + '`politics.broadcastGovernmentKnowledge` wrote one knowledge row per NPC '
+      + 'unconditionally, so the share of a population who had heard of their own government '
+      + 'was a constant 1.0 — measured, 153 of 153 — and `assessRevolutions`, which needs '
+      + 'approval below 35 AND spread at or above 0.25, had one condition that could never '
+      + 'fail. §63\'s "Public Opinion + Information Spread + Government" mechanic was a '
+      + 'public-opinion mechanic with a decorative second term. '
+      + '`server/media.js` is §61\'s own channel list — word of mouth, bulletins, local news, '
+      + 'radio, networks — each gated on the `technology.ERA_NAMES` entry that makes it '
+      + 'possible, which is §61\'s sentence "in the reset era, communication should begin '
+      + 'locally and reemerge technologically over time" needing no invented tech tree. An '
+      + 'outlet is an `organizations.type = media` row (standing rule 4; the type was already '
+      + 'in the schema\'s own enumeration) and its `influence` sets how much of a channel\'s '
+      + 'audience it reaches. A government announces from the building it operates — '
+      + '`properties.operating_organization_id`, the schema\'s own link — and the news '
+      + 'travels. Measured on one world: awareness 0.2 at founding, still 0.2 fifty ticks '
+      + 'later, 1.0 once radio came back.',
   },
   {
     n: 24,
     name: 'Social Media',
-    level: 'absent',
-    note: 'Correctly absent in a collapse setting until §39 reemergence restores networks — '
-      + 'but nothing models that restoration either.',
+    level: 'partial',
+    tables: ['entity_knowledge'],
+    infrastructureTypes: ['internet'],
+    functions: ['availableChannels', 'runWordOfMouth'],
+    note: '**The restoration this entry said nobody modelled is modelled now.** It was '
+      + '"correctly absent in a collapse setting until §39 reemergence restores networks — '
+      + 'but nothing models that restoration either", and the restoration turned out to need '
+      + 'nothing new: `media.CHANNELS.social_media` requires the `computing` era AND a '
+      + 'standing, unfailed `internet` site, so §39 reemergence climbing the era ladder is '
+      + 'what brings it back. World reach, and the only channel besides word of mouth that '
+      + 'carries a `spread_rate` — a network where every recipient is also a repeater is '
+      + 'structurally retelling, which is also why its distortion sits above print\'s. '
+      + 'Partial rather than modelled: there is no platform, no account, no feed and no post. '
+      + 'A fact reaches a population through it; nobody publishes, follows or replies, and '
+      + '§7\'s Media half is where the outlet actually lives.',
   },
   {
     n: 25,
