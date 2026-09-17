@@ -194,10 +194,20 @@ const SYSTEMS = [
   {
     n: 9,
     name: 'Energy',
-    level: 'slot',
+    level: 'partial',
     infrastructureTypes: ['electricity'],
-    note: 'One infrastructure type. §40 names electricity as the head of the whole '
-      + 'bottleneck chain, and technology_eras carries that dependency instead.',
+    tables: ['resources'],
+    functions: ['failInfrastructure', 'repairInfrastructure', 'repairTicks'],
+    note: 'This was `slot` — "storage exists and nothing reads it" — and the reading it lacked '
+      + 'was failure. `failureRisk` was computed, crossed and consumed by nothing: a grid at '
+      + 'risk 0.95 behaved exactly like one at 0.05. Electricity can now fail, the outage runs '
+      + 'through the ordinary condition channel, and repair takes as long as the city\'s '
+      + '`funding` and its residents\' technology traits make it take — that column had no '
+      + 'reader anywhere in the engine before. **Partial and not modelled because nothing '
+      + 'CONSUMES energy**: the outage moves `resources` supply for a type no need, habit or '
+      + 'production step reads, so the grid going down is felt as a number rather than by '
+      + 'anybody. §40 names electricity as the head of the whole bottleneck chain and that '
+      + 'chain still runs through technology_eras instead.',
   },
   {
     n: 10,
@@ -211,16 +221,32 @@ const SYSTEMS = [
   {
     n: 11,
     name: 'Water',
-    level: 'partial',
+    level: 'modelled',
     tables: ['resources'],
     infrastructureTypes: ['water_systems'],
-    functions: ['advanceResourceTick'],
+    functions: ['advanceResourceTick', 'failInfrastructure', 'repairInfrastructure'],
+    note: '**The one utility that is felt end to end.** The resource has supply, demand and '
+      + 'scarcity; `motivation.SATISFIERS.water` reads it, so how much water a settlement has '
+      + 'reaches every person in it; drought moves it through the condition channel; and the '
+      + 'pipes themselves can now fail, which takes the supply off for as long as the city '
+      + 'takes to repair them. Measured: a burst main in an underfunded city ran 40 ticks and '
+      + 'took the supply from 100 to 72 in the first seven. What is still absent is a '
+      + 'distribution network — water is a city-wide quantity, so one neighbourhood cannot go '
+      + 'dry while the next one does not.',
   },
   {
     n: 12,
     name: 'Waste',
-    level: 'slot',
+    level: 'partial',
     infrastructureTypes: ['waste_management'],
+    functions: ['failInfrastructure', 'addDiseaseOutbreak'],
+    note: 'Was `slot`. Sanitation failing is the oldest epidemic there is, and it goes through '
+      + 'the channel that already exists — `mortality.addDiseaseOutbreak`, whose '
+      + '`mortalityMultiplier` `diseasePressure` reads — so a waste system going down actually '
+      + 'kills people rather than emitting an event. Measured: disease pressure 1.0 to 1.4 '
+      + 'while the system is down. Partial rather than modelled because there is no waste '
+      + 'VOLUME: nothing produces refuse, so the system has a condition and a failure and '
+      + 'nothing flowing through it.',
   },
   {
     n: 13,
@@ -340,7 +366,14 @@ const SYSTEMS = [
     name: 'Fire & Emergency',
     level: 'slot',
     infrastructureTypes: ['public_safety'],
-    note: 'Shares the public_safety slot with policing; nothing separates them.',
+    note: '**Still slot, and deliberately so after the utility pass of 17 Sep 2026.** It shares '
+      + 'the `public_safety` row with policing and nothing in the schema separates them — '
+      + '`INFRASTRUCTURE_TYPES` is the schema column\'s own enumerated ten and inventing an '
+      + 'eleventh would put a made-up capacity under every reading of it, which is the same '
+      + 'reason §7 Prison stops at partial for want of a cell count. A public_safety failure '
+      + 'also has no outage effect on purpose: `authority.reachTerm` already reads that row\'s '
+      + 'condition directly, so a station falling apart already thins the state\'s writ, and '
+      + 'an outage condition on top would count it twice.',
   },
   {
     n: 22,

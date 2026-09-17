@@ -368,11 +368,13 @@ async function migrateWorldStateToPostgres(worldState) {
       for (const i of worldState.infrastructure) {
         await client.query(
           `INSERT INTO infrastructure (id, city_id, type, age, condition, capacity,
-             maintenance_level, funding, failure_risk, latitude, longitude)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+             maintenance_level, funding, failure_risk, latitude, longitude,
+             failed_since_tick, repair_ticks)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
           [i.id, i.city_id, i.type, i.age, i.condition, i.capacity,
             i.maintenance_level, i.funding, infrastructure.failureRisk(i),
-            i.latitude ?? null, i.longitude ?? null]
+            i.latitude ?? null, i.longitude ?? null,
+            i.failed_since_tick ?? null, i.repair_ticks ?? null]
         );
       }
       summary.infrastructure = worldState.infrastructure.length;

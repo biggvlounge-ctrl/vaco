@@ -466,8 +466,14 @@ async function restoreWorldStateFromPostgres(worldState) {
   // and a restored copy is a second source of truth that can disagree
   // with the three fields it came from.
   worldState.infrastructure = (await q('SELECT * FROM infrastructure ORDER BY id')).map((i) => {
+    // `failed_since_tick` is a BIGINT and comes back as a string.
+    // `isFailed` tests it against null, so a string would read as
+    // failed forever — and `tick - "42"` is NaN, so the repair would
+    // never come due and the outage would run for the life of the
+    // world. Standing rule 10, in the place it costs most.
     const row = nums(i, ['id', 'city_id', 'age', 'condition', 'capacity',
-      'maintenance_level', 'funding', 'latitude', 'longitude']);
+      'maintenance_level', 'funding', 'latitude', 'longitude',
+      'failed_since_tick', 'repair_ticks']);
     row.failure_risk = null;
     return row;
   });

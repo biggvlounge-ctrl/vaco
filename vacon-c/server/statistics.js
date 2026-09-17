@@ -838,6 +838,17 @@ const CATALOGUE = [
       : infrastructure.cityCondition(ctx.worldState, ctx.cityId)),
   },
   {
+    key: 'utilities_down', category: 'community', unit: 'count', scope: 'city',
+    // **`failureRisk` was computed, crossed and read by nothing.** A
+    // grid at risk 0.95 behaved exactly like one at 0.05 — §7's Energy
+    // and Waste were both `slot`, which that file defines as "storage
+    // exists and nothing reads it". Systems fail now, and what a city
+    // currently has down is the reading that says so.
+    compute: (ctx) => (ctx.cityId === null
+      ? null
+      : infrastructure.failedIn(ctx.worldState, ctx.cityId).length),
+  },
+  {
     key: 'infrastructure_failure_risk', category: 'community', unit: 'share', scope: 'city',
     // The worst thing standing, not the average — a city whose water
     // system is about to fail is not reassured by its roads. Same

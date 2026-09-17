@@ -55,6 +55,8 @@
 
 'use strict';
 
+const { seededDraw } = require('./seeded.js');
+
 const { nextAfter } = require('./nextAfter.js');
 const { getLiveEntity } = require('./entityTraits.js');
 
@@ -131,6 +133,11 @@ function generateInfrastructure(worldState, options = {}) {
     // is from the nearest station. Null until something places it.
     latitude: options.latitude ?? null,
     longitude: options.longitude ?? null,
+    // Down since when, and how long it takes to come back. Null when
+    // the thing is running, which is not the same as "repaired at tick
+    // 0" — see `isFailed`.
+    failed_since_tick: options.failedSinceTick ?? null,
+    repair_ticks: options.repairTicks ?? null,
     funding: options.funding ?? null,
     // Computed on read — see the header. Present on the object only so
     // the row shape matches the table; never assigned.
@@ -340,12 +347,262 @@ function advanceInfrastructure(worldState, tick = worldState.tick ?? 0) {
         global_effects: { infrastructureId: row.id, type: row.type, failureRisk: risk },
       });
     }
+
+    // **And now it can actually fail.** The risk above was computed,
+    // crossed and consumed by nothing — see the header on
+    // OUTAGE_EFFECTS. A failure is a seeded draw against it, so §88's
+    // replay guarantee holds: the same world and the same seed break
+    // the same pipes on the same day.
+    if (isFailed(row)) {
+      if (tick - Number(row.failed_since_tick) >= Number(row.repair_ticks ?? MIN_OUTAGE_TICKS)) {
+        const repaired = repairInfrastructure(worldState, row, { tick });
+        events.push({
+          type: 'infrastructure_repaired',
+          severity: 'low',
+          note: `${row.type} in city ${row.city_id} is back`,
+          tick,
+          affected_entity_ids: [],
+          global_effects: { ...repaired },
+        });
+      }
+      continue;
+    }
+
+    // **Seeded on the city and the type, not on the row id.** The first
+    // version used `row.id` and argued that this module's own counter
+    // was safe because `worldgen` builds in a fixed order. It is not:
+    // the counter is module-level and its state depends on everything
+    // built in the process before it, so the same world generated
+    // second broke different things on different days. §88's corollary
+    // — seed on POSITION, never on identity — and the determinism test
+    // is what found it, which is the whole reason that test asserts
+    // equality rather than just that something broke.
+    //
+    // A city has at most one row per type, so city+type identifies this
+    // system without depending on anything built earlier.
+    const draw = seededDraw([worldState.seed ?? 'infra', 'fail', row.city_id, row.type, tick]);
+    if (draw >= risk * DAILY_FAILURE_RATE) continue;
+    const failure = failInfrastructure(worldState, row, { tick });
+    if (failure) {
+      events.push({
+        type: 'infrastructure_failure',
+        // A failure nothing feels is worth less noise than one that
+        // takes the water off.
+        severity: failure.felt ? 'high' : 'moderate',
+        note: `${row.type} in city ${row.city_id} failed`
+          + `${failure.felt ? '' : ' (nothing in the engine consumes this type yet)'}`,
+        tick,
+        affected_entity_ids: [],
+        global_effects: { ...failure, failureRisk: risk },
+      });
+    }
   }
 
   return events;
 }
 
+// ---------------------------------------------------------------------
+// Failure — and the fact that nothing ever failed
+// ---------------------------------------------------------------------
+//
+// **`failureRisk` was computed, crossed and consumed by nothing.** It
+// had exactly two readers: one statistic, and the `infrastructure_at_risk`
+// event directly above, which fires once when the risk crosses 0.5 and
+// then never again. A system at risk 0.95 behaved identically to one at
+// 0.05 — the water kept running either way. `funding` had no reader
+// anywhere in the engine at all.
+//
+// So §7's Energy was `slot` ("Storage exists and nothing reads it"),
+// Waste was `slot`, Water was `partial` on the strength of the resource
+// rather than the pipes, and Fire & Emergency was `slot` sharing the
+// public_safety row with policing. Four systems, one missing mechanism.
+//
+// ---------------------------------------------------------------------
+// An outage is an ordinary condition, not a second effect channel
+//
+// The same decision `environment.js` made about severe weather, for the
+// same reason: everything that already reads `activeConditions` picks
+// this up for free, the Environment phase ages and expires it, and
+// since 17 Sep it gives back exactly what it took when it does. A
+// parallel mechanism doing the same job is how two systems come to
+// disagree about the state of the world.
+//
+// **What each failure actually does, and the four that do nothing.**
+// Every effect below goes through a mechanism that already exists:
+//
+//   water_systems     the water supply drops. `water` is a real
+//                     resource and `motivation.SATISFIERS.water` reads
+//                     it, so a burst main is felt by every person in
+//                     the city rather than by a statistic.
+//   electricity       the energy supply drops. §40 names electricity as
+//                     the head of the whole bottleneck chain.
+//   waste_management  disease. Sanitation failing is the oldest
+//                     epidemic there is, and `mortality.addDiseaseOutbreak`
+//                     is the channel — `diseasePressure` reads the
+//                     `mortalityMultiplier` it carries.
+//   hospitals         the same channel, because a hospital that is not
+//                     running is felt as the disease it is not treating.
+//
+//   schools           **declared.** Education is `partial` and there is
+//                     no per-tick education mechanism for an outage to
+//                     interrupt — `npcs.education` is set at generation
+//                     and never moves.
+//   roads, bridges,
+//   rail, internet    **declared.** Transportation is on CLAUDE.md's
+//                     do-not-touch list and Communication is `partial`;
+//                     an outage with nothing to interrupt would be an
+//                     event in a log and nothing else.
+//   public_safety     **already felt, and deliberately not doubled.**
+//                     `authority.reachTerm` reads the condition of a
+//                     city's public_safety rows directly, so a station
+//                     falling apart already thins the state's writ. An
+//                     outage condition on top would count it twice.
+//                     That is also why Fire & Emergency stays `slot`:
+//                     it shares the row with policing and nothing in the
+//                     schema separates them.
+const OUTAGE_EFFECTS = {
+  water_systems: { resourceType: 'water', supplyDelta: -4, demandDelta: 0 },
+  electricity: { resourceType: 'energy', supplyDelta: -4, demandDelta: 0 },
+  waste_management: { disease: 'sanitation failure', mortalityMultiplier: 1.4 },
+  hospitals: { disease: 'untreated illness', mortalityMultiplier: 1.3 },
+};
+
+//: How long an outage runs before repair even begins to be possible,
+//: and how much of the risk becomes a failure on any given day.
+//:
+//: **Flagged interpretive, and chosen against a measured risk rather
+//: than from what a number sounds like.** `failureRisk` on a generated
+//: world sits low — maintenance defaults to 50, which arrests most of
+//: the decay — so a daily draw straight against the risk would fail
+//: everything constantly. At 0.002 a system sitting at risk 0.5 fails
+//: about once every three years, and one at 0.9 about once every
+//: twenty months, which is a utility that is unreliable rather than one
+//: that is broken.
+const DAILY_FAILURE_RATE = 0.002;
+
+//: The shortest an outage can last. Repair takes as long as the city's
+//: funding and its people's skill make it take, and this is the floor
+//: under that — nothing is fixed the same afternoon.
+const MIN_OUTAGE_TICKS = 3;
+const MAX_OUTAGE_TICKS = 60;
+
+// How long this city takes to fix this thing, in ticks.
+//
+// **`funding`'s first reader in the engine.** A funded system in a city
+// with people who know how it works comes back quickly; an unfunded one
+// in a city that has lost the knowledge stays down. Both halves already
+// exist — `funding` on the row and `technicalSkillIn` over the city —
+// and neither was read by anything.
+//
+// Null funding is not zero funding: a system nobody recorded a budget
+// for is unknown, and reads as the midpoint rather than as abandoned.
+function repairTicks(worldState, row) {
+  const funded = row.funding === null || row.funding === undefined
+    ? 50
+    : clamp(Number(row.funding));
+  const skill = technicalSkillIn(worldState, row.city_id);
+  const capability = clamp((funded + skill) / 2) / 100;
+  const span = MAX_OUTAGE_TICKS - MIN_OUTAGE_TICKS;
+  return Math.round(MIN_OUTAGE_TICKS + span * (1 - capability));
+}
+
+// Is this row currently down?
+function isFailed(row) {
+  return row?.failed_since_tick !== null && row?.failed_since_tick !== undefined;
+}
+
+function failedIn(worldState, cityId) {
+  return infrastructureIn(worldState, cityId).filter(isFailed);
+}
+
+// Put a system down and hang the consequence off the existing channel.
+// Exported so a scenario can fail something deliberately, which is the
+// same courtesy `mortality.addDiseaseOutbreak` extends.
+function failInfrastructure(worldState, row, options = {}) {
+  const { tick = worldState.tick ?? 0 } = options;
+  if (isFailed(row)) return null;
+
+  const ticks = repairTicks(worldState, row);
+  row.failed_since_tick = tick;
+  row.repair_ticks = ticks;
+
+  const effect = OUTAGE_EFFECTS[row.type] ?? null;
+  if (effect && effect.disease) {
+    // Required lazily: `mortality.js` does not depend on this file, and
+    // keeping the import local keeps the dependency one-way.
+    const mortality = require('./mortality.js');
+    mortality.addDiseaseOutbreak(worldState, {
+      name: effect.disease,
+      mortalityMultiplier: effect.mortalityMultiplier,
+      ticksRemaining: ticks,
+      tick,
+    });
+  } else if (effect) {
+    (worldState.activeConditions || (worldState.activeConditions = [])).push({
+      conditionType: 'outage',
+      name: `${row.type} failure`,
+      resourceType: effect.resourceType,
+      supplyDelta: effect.supplyDelta,
+      demandDelta: effect.demandDelta,
+      ticksRemaining: ticks,
+      cityId: row.city_id,
+      communityId: null,
+      startedTick: tick,
+    });
+  }
+
+  return {
+    infrastructureId: row.id, type: row.type, cityId: row.city_id, repairTicks: ticks,
+    felt: Boolean(effect),
+  };
+}
+
+// Bring it back.
+//
+// **A repair restores SERVICE, not condition, and that took two wrong
+// answers to get to.** The worry was real — a system coming back in
+// exactly the state that broke it breaks again immediately, which would
+// be the fifth one-way ratchet this engine has had after resources,
+// habits, buildings and conditions — and the first two answers to it
+// were both worse than the problem.
+//
+// Restoring 25 points made a neglected bridge climb from condition 55
+// to 100 over 6,000 ticks: it got BETTER the more often it broke, and
+// `infrastructure-demographics.test.js`'s assertion that the at-risk
+// crossing fires exactly once started reporting zero, because the
+// bridge could no longer reach the band at all. Dropping to 5 was the
+// same defect smaller — measured over the same run, 7 failures gained
+// 35 points against 20 points of decay, so it still climbed.
+//
+// The size cannot be fixed by choosing a better number, because any
+// gain is coupled to how often the thing fails: the failure rate
+// depends on the condition, which the gain then changes. **So the gain
+// is zero and the model says why.** Fixing a burst main does not make
+// the pipe new, and the inverse of wear already exists and is not this
+// — `effectiveMaintenance` arrests most of the decay for a system a
+// city actually funds and has people skilled enough to service.
+//
+// A city that never maintains anything ends up with everything broken.
+// That is the correct outcome for this setting and it needs no constant
+// to produce it.
+function repairInfrastructure(worldState, row, options = {}) {
+  const { tick = worldState.tick ?? 0 } = options;
+  if (!isFailed(row)) return null;
+  row.failed_since_tick = null;
+  row.repair_ticks = null;
+  return { infrastructureId: row.id, type: row.type, cityId: row.city_id, tick };
+}
+
 module.exports = {
+  OUTAGE_EFFECTS,
+  DAILY_FAILURE_RATE,
+  MIN_OUTAGE_TICKS,
+  MAX_OUTAGE_TICKS,
+  repairTicks,
+  isFailed,
+  failedIn,
+  failInfrastructure,
+  repairInfrastructure,
   INFRASTRUCTURE_TYPES,
   ANNUAL_DECAY,
   MAINTENANCE_OFFSET,

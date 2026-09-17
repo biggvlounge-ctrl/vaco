@@ -209,13 +209,25 @@ from memory with nothing in the repo to check it against. The forty are
 now data in `vacon-c/server/urbanSystems.js`, every citation verified
 by `vacon-c/test/urban-systems.test.js`, and the real breakdown is:
 
-**17 modelled, 13 partial, 5 slot-only, 5 absent**
+**18 modelled, 14 partial, 3 slot-only, 5 absent**
 
 | Level | Means | Systems |
 |---|---|---|
-| **modelled** (17) | Real mechanics; something advances or decides on it each tick | Population, Housing, Economy, **Employment**, **Health**, Infrastructure, **Law Enforcement**, **Crime**, **Court**, **Political**, Cultural, Community Organizations, Real Estate, Environmental, **Technology**, **Migration**, AI Decision |
-| **partial** (13) | A trait family or a live table with little driving it, or one phase covering two systems | Education, Food Supply, Water, Gang, Organized Crime, **Prison**, Communication, **Religion**, Business, Construction, Weather, Disaster, Reputation |
-| **slot** (5) | Storage exists and nothing reads it | Transportation, Energy, Waste, Fire & Emergency, Supply Chain |
+| **modelled** (18) | Real mechanics; something advances or decides on it each tick | Population, Housing, Economy, **Employment**, **Health**, Infrastructure, **Water**, **Law Enforcement**, **Crime**, **Court**, **Political**, Cultural, Community Organizations, Real Estate, Environmental, **Technology**, **Migration**, AI Decision |
+| **partial** (14) | A trait family or a live table with little driving it, or one phase covering two systems | Education, **Energy**, Food Supply, **Waste**, Gang, Organized Crime, **Prison**, Communication, **Religion**, Business, Construction, Weather, Disaster, Reputation |
+| **slot** (3) | Storage exists and nothing reads it | Transportation, Fire & Emergency, Supply Chain |
+
+**Energy, Water and Waste all moved on 17 Sep 2026, and it was one
+missing mechanism between them.** `infrastructure.failureRisk` was
+computed, crossing-detected and consumed by nothing — a grid at risk
+0.95 behaved exactly like one at 0.05 — and `funding` had no reader
+anywhere in the engine. Utilities can fail now; an outage runs through
+the ordinary `activeConditions` channel (water and energy supply) or
+through `mortality.addDiseaseOutbreak` (sanitation), and repair takes as
+long as the city's funding and its residents' technology traits make it
+take. Fire & Emergency stays `slot` because it shares the
+`public_safety` row with policing and the schema's ten infrastructure
+types do not separate them.
 | **absent** (5) | No representation at all | Government Services, Media, Social Media, Military/National Guard, Tourism |
 
 **Law Enforcement, Court and Prison all moved on 17 Sep 2026**, and the

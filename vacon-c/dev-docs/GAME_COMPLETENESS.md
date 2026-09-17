@@ -13,17 +13,17 @@ three places, a spec section's "roughly 25 of the 40", a catalogue of 67
 statistics that a real world answered 36 of, and seven trait families generated
 on every NPC and read by nothing.
 
-## 89.6% complete
+## 90% complete
 
 ```
-██████████████████░░  89.6%   291.25 of 325
+██████████████████░░  90%   293.45 of 326
 ```
 
 | axis | complete | score | what it measures |
 |---|---|---|---|
-| systems | **60.6%** | 24.25/40 | urban systems with mechanics |
+| systems | **63.6%** | 25.45/40 | urban systems with mechanics |
 | tables | **89.4%** | 59/66 | schema tables a built world fills |
-| statistics | **88.9%** | 80/90 | statistics a world can answer |
+| statistics | **89%** | 81/91 | statistics a world can answer |
 | traits | **100%** | 114/114 | traits something reads |
 | traitDepth | **85.7%** | 6/7 | trait columns a life actually changes |
 | habits | **100%** | 8/8 | habit and routine depth |
@@ -40,7 +40,7 @@ reader can weight them differently and say so.
 Everything below is a measured gap, grouped by axis and named exactly as the
 measurement names it. This is the work list.
 
-### systems — 23 open
+### systems — 22 open
 
 The forty systems §7 names, at `server/urbanSystems.js`'s own four levels (modelled 1, partial 0.5, slot 0.15, absent 0).
 
@@ -48,10 +48,9 @@ The forty systems §7 names, at `server/urbanSystems.js`'s own four levels (mode
 |---|---|---|
 | `5. Education` | partial | +0.5 |
 | `7. Transportation` *(deferred by scope)* | slot | +0.85 |
-| `9. Energy` | slot | +0.85 |
+| `9. Energy` | partial | +0.5 |
 | `10. Food Supply` | partial | +0.5 |
-| `11. Water` | partial | +0.5 |
-| `12. Waste` | slot | +0.85 |
+| `12. Waste` | partial | +0.5 |
 | `15. Gang` | partial | +0.5 |
 | `16. Organized Crime` | partial | +0.5 |
 | `18. Prison` | partial | +0.5 |

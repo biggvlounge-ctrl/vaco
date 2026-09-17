@@ -420,3 +420,26 @@ ALTER TABLE communities ADD COLUMN IF NOT EXISTS longitude NUMERIC;
 
 ALTER TABLE infrastructure ADD COLUMN IF NOT EXISTS latitude NUMERIC;
 ALTER TABLE infrastructure ADD COLUMN IF NOT EXISTS longitude NUMERIC;
+
+
+-- ---------------------------------------------------------------------
+-- infrastructure.failed_since_tick / .repair_ticks
+-- ---------------------------------------------------------------------
+-- Carries what server/infrastructure.js writes when a system actually
+-- fails, and how long this city takes to put it back.
+--
+-- **`failureRisk` was computed, crossed and consumed by nothing.** It
+-- had two readers — one statistic and one event that fires once when
+-- the risk crosses 0.5 — so a grid at risk 0.95 behaved exactly like
+-- one at 0.05, and §7 marked Energy and Waste `slot`: "storage exists
+-- and nothing reads it". These two columns are the reading it lacked.
+--
+-- Both clear this file's bar. `advanceInfrastructure` reads
+-- `failed_since_tick` every tick to decide whether a system is down and
+-- reads `repair_ticks` to decide whether it is due back, so a restore
+-- that dropped them would bring every failed utility back online
+-- silently — and one that restored them as strings would leave every
+-- one of them down forever, because `tick - "42"` is NaN and the repair
+-- would never come due.
+ALTER TABLE infrastructure ADD COLUMN IF NOT EXISTS failed_since_tick BIGINT;
+ALTER TABLE infrastructure ADD COLUMN IF NOT EXISTS repair_ticks BIGINT;
