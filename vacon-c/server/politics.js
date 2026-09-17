@@ -89,6 +89,7 @@
 'use strict';
 
 const { nextAfter } = require('./nextAfter.js');
+const { seededDraw } = require('./seeded.js');
 const entityTraits = require('./entityTraits.js');
 const worldStore = require('./worldStore.js');
 const beliefs = require('./beliefs.js');
@@ -778,14 +779,81 @@ function runElections(worldState, tick) {
   return events;
 }
 
+// -- legislation over time ------------------------------------------------
+
+//: How often a government adds to the statute book. Flagged
+//: interpretive: no document gives a legislative rate.
+//:
+//: A year of ticks, and **the first version was 730 for no better
+//: reason than that two years sounds like a legislative cadence.**
+//: Measured: a 600-tick world legislated exactly nothing, so the
+//: mechanism was present and inert — standing rule 12's third clause,
+//: in the same session that added that rule. A year is what a run of
+//: the length anybody actually does can observe, and it means a
+//: government builds out the nine categories over about a decade.
+const LEGISLATION_INTERVAL_TICKS = 365;
+
+//: A government only enacts what it does not already have. Without
+//: this, the draw would re-enact `family` law for the ninth time while
+//: theft stayed legal — and `justice.lawCovering` takes the first
+//: active match, so duplicates change nothing at all.
+function unlegislatedCategories(worldState, cityId) {
+  const held = new Set(
+    (worldState.laws || [])
+      .filter((law) => law.status === 'active'
+        && (law.jurisdiction_city_id === null || law.jurisdiction_city_id === cityId))
+      .map((law) => law.category),
+  );
+  return LAW_CATEGORIES.filter((c) => !held.has(c));
+}
+
+// One pass of legislating. **A crossing, not a condition** — the
+// seventh standing rule: a government that enacted a law whenever some
+// state held would fill the table every tick forever.
+function runLegislation(worldState, tick) {
+  const events = [];
+  if (tick <= 0 || tick % LEGISLATION_INTERVAL_TICKS !== 0) return events;
+
+  for (const government of worldState.governments || []) {
+    for (const city of worldState.cities || []) {
+      const available = unlegislatedCategories(worldState, city.id);
+      if (available.length === 0) continue;
+      // Seeded on the city and the tick, never on an id — §88, and the
+      // corollary that ids come from a counter whose state depends on
+      // what was built before.
+      const category = available[
+        Math.floor(seededDraw([worldState.seed ?? 'politics', 'legislate', city.id, tick])
+          * available.length)
+      ];
+      const law = enactLaw(worldState, {
+        jurisdictionCityId: city.id,
+        category,
+        description: null,
+        governmentOrganizationId: government.organization_id,
+        tick,
+      });
+      events.push({
+        type: 'law_enacted',
+        severity: 'low',
+        note: `city ${city.id}: ${category} law enacted`,
+        tick,
+        affected_entity_ids: [],
+        global_effects: { lawId: law.id, category, cityId: city.id },
+      });
+    }
+  }
+  return events;
+}
+
 function runPolitics(worldState, tick) {
   const opinions = snapshotPublicOpinion(worldState, tick);
   const { started, events } = assessRevolutions(worldState, tick);
   const electionEvents = runElections(worldState, tick);
+  const lawEvents = runLegislation(worldState, tick);
   return {
     opinions: opinions.length,
     revolutions: started.length,
-    events: [...events, ...electionEvents],
+    events: [...events, ...electionEvents, ...lawEvents],
   };
 }
 
@@ -799,6 +867,9 @@ function reseedIds(worldState) {
 module.exports = {
   SYSTEM_TYPES,
   LAW_CATEGORIES,
+  LEGISLATION_INTERVAL_TICKS,
+  unlegislatedCategories,
+  runLegislation,
   ELECTION_STATUSES,
   LAW_STATUSES,
   REVOLUTION_OUTCOMES,

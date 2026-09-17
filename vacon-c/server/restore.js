@@ -404,6 +404,19 @@ async function restoreWorldStateFromPostgres(worldState) {
       'tick', 'severity', 'investigated_tick']));
   summary.crime_incidents = worldState.crimeIncidents.length;
 
+  // Standing rule 10 again, and this one has teeth. `sentence_ticks`
+  // and `released_tick` are BIGINTs; restored as strings,
+  // `tick - charged_tick < sentence_ticks` compares a number against a
+  // string and `released_tick !== null` is true for the string "null"
+  // it never is — so everybody currently inside would stay inside for
+  // the rest of the run, working nowhere, conceiving nothing, and
+  // nothing would throw. `law_id` stays nullable: null IS the
+  // dismissal, so it must not become 0.
+  worldState.courtCases = (await q('SELECT * FROM court_cases ORDER BY id')).map((c) =>
+    nums(c, ['id', 'incident_id', 'defendant_entity_id', 'community_id', 'city_id',
+      'law_id', 'charged_tick', 'sentence_ticks', 'released_tick']));
+  summary.court_cases = worldState.courtCases.length;
+
   worldState.entityOrganizationMemberships =
     (await q('SELECT * FROM entity_organization_memberships')).map((m) =>
       nums(m, ['entity_id', 'organization_id', 'joined_tick']));

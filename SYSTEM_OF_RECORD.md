@@ -72,7 +72,7 @@ authorization work in §5 had to be done per app rather than once.
 | Containerised services | 36 + nginx + a LiveKit SFU |
 | Registry rows (incl. brand rows and the dev mock) | 37 |
 | Mutating HTTP routes | 524, all accounted for (472 guarded, 52 declared open with a reason) |
-| Automated tests | 2140 across 39 suites |
+| Automated tests | 2167 across 39 suites |
 | Persisted volumes | 30 |
 | Shared-module copies kept in sync | 210 |
 | Service credentials in `.env.example` | 28 callers |
@@ -824,7 +824,7 @@ run to produce the numbers here.
 built:** `node scripts/package-release.mjs` — see §11.
 
 ```sh
-node scripts/run-all-tests.mjs           # 2140/2140 across 39 suites (some skip without a database)
+node scripts/run-all-tests.mjs           # 2167/2167 across 39 suites (some skip without a database)
 node scripts/audit-route-guards.mjs --check   # 524/524 accounted for
 ./sync-shared-runtime.sh --check         # 210 copies current, none unmanaged
 ./sync-design-system.sh --check          # every serving app is a target
@@ -895,7 +895,7 @@ dependencies are installed.
 ### Per-suite
 
 ```
-vacon-c         789   vdp             147   void            142
+vacon-c         816   vdp             147   void            142
 scripts         168   v3              111   vaco-media       51
 v4-proxy         42   world-layer      41   venvm            40
 venvs            45   voken            37   vaco-analytics   39
@@ -980,7 +980,7 @@ trusted:
 
 The simulation engine is the one app in this repo whose "done" is not a
 list of routes, so it carries a measured completeness score rather than
-a criteria tally. **89.6%**, from
+a criteria tally. **90.2%**, from
 `vacon-c/dev-docs/GAME_COMPLETENESS.md`, which
 `vacon-c/scripts/completeness.mjs` regenerates and
 `vacon-c/test/completeness.test.js` fails on if stale — including a
@@ -988,9 +988,9 @@ check that the percent in THIS file matches the one the code measures.
 
 | axis | complete | what it measures |
 |---|---|---|
-| systems | 56.9% | the forty urban systems §7 names, at `urbanSystems.js`'s own four levels |
-| tables | 90% | schema tables a built world actually fills |
-| statistics | 90.2% | statistics a world can answer about itself |
+| systems | 60.6% | the forty urban systems §7 names, at `urbanSystems.js`'s own four levels |
+| tables | 90.2% | schema tables a built world actually fills |
+| statistics | 90.6% | statistics a world can answer about itself |
 | traits | 100% | traits something under `server/` reads |
 | traitDepth | 85.7% | trait columns a life actually changes |
 | habits | 100% | whether habits and routines carry information |
@@ -1013,7 +1013,15 @@ deterministic contest resolver that the tick pipeline never called, so
 no world had ever held a contest. A weekly routine could not form a
 habit at all — flat decay against periodic reinforcement — so
 `gathering` sat at 0.3 while daily habits sat at 75, and the frequency
-column was wired, firing and inert. The pattern is consistent enough to be a rule: **the
+column was wired, firing and inert. And `relationships.conflict` was
+initialised to 0 with its only writer gated behind its own threshold,
+so **not one violent or domestic offence had ever occurred in any world
+the engine had generated** — 0 of 241 relationships above zero after
+200 ticks, with a resolver, a threshold and a category vocabulary all
+in place and a green suite over the top. And `laws` was a table no code
+read when deciding anything, so a government legislated into a void:
+the first 600-tick world to reach a courtroom produced 7 cases and **7
+dismissals**, because neither city had ever outlawed theft. The pattern is consistent enough to be a rule: **the
 only trustworthy number is one a command produces.**
 
 **One statistic was built, measured, and taken back out.** The owner

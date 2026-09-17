@@ -86,6 +86,15 @@ const EXTENSION_TABLES = {
     + 'two aggregate NUMERIC columns (communities.crime, territory_blocks.crime_rate) that '
     + 'cannot be broken down by type, and no existing table holds category + perpetrator + '
     + 'victim + community together.',
+  court_cases: 'what happened after somebody was caught. §7\'s Law Enforcement was partial '
+    + 'because "clearance is NOT arrest", Court was partial because "no courts, cases or '
+    + 'judgements — nothing applies a law to anybody", and Prison was absent. Three existing '
+    + 'tables were considered and named in schema-extensions.sql: crime_incidents records the '
+    + 'offence and cannot also carry a defendant, a law, a judgement, a sentence and a release '
+    + 'tick without conflating what happened with what was done about it; `laws` is the '
+    + 'statute, and a case cites one rather than being one; historical_records gets a row per '
+    + 'conviction and is the permanent record, but finding every still-running sentence in a '
+    + 'free-text event log every tick means parsing prose to decide whether to let somebody out.',
   inventory: 'who holds what. No item, inventory or equipment table exists anywhere in the '
     + 'base schema, and four systems had already run into it — crime could not tell an armed '
     + 'offence from an unarmed one, barter could not make a trade conservative, a theft moved '

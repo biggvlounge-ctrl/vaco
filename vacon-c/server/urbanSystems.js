@@ -225,17 +225,21 @@ const SYSTEMS = [
   {
     n: 13,
     name: 'Law Enforcement',
-    level: 'partial',
+    level: 'modelled',
     phases: ['runSecurityPhase'],
-    tables: ['infrastructure', 'beliefs'],
+    tables: ['infrastructure', 'beliefs', 'court_cases'],
     infrastructureTypes: ['public_safety'],
+    functions: ['investigate', 'clearanceRate', 'trustIn', 'runJustice'],
     note: 'Investigations, clearance rates and patrol presence are real — capacity is the '
       + 'public_safety infrastructure a city has, in the condition it is in, so a city that '
       + 'lets it decay clears fewer crimes with no second mechanism. Trust is measured from '
-      + 'residents\' beliefs rather than derived from the clearance rate. Still partial, and '
-      + 'the boundary is deliberate: clearance is NOT arrest. §7 Prison is absent and '
-      + '`imprisoned` was not added as an entity status, so raids, arrests and sentencing '
-      + 'would need somewhere to put people first.',
+      + 'residents\' beliefs rather than derived from the clearance rate. **The boundary this '
+      + 'entry named as deliberate is crossed**: it said "clearance is NOT arrest ... raids, '
+      + 'arrests and sentencing would need somewhere to put people first", and '
+      + 'server/justice.js is the somewhere — a cleared incident with a named perpetrator is '
+      + 'charged, judged against the city\'s actual laws, and sentenced. What is still not '
+      + 'modelled is patrol TARGETING: capacity is city-wide, so no block is policed harder '
+      + 'than another, and the heat model system 14 asks for is the same absence.',
   },
   {
     n: 14,
@@ -272,19 +276,37 @@ const SYSTEMS = [
   {
     n: 17,
     name: 'Court',
-    level: 'partial',
-    tables: ['laws'],
-    functions: ['enactLaw', 'repealLaw', 'listLaws'],
-    note: 'Laws are enacted, repealed and queried by jurisdiction. **No courts, cases or '
-      + 'judgements** — nothing applies a law to anybody, so this is legislation without '
-      + 'adjudication. `runSecurityPhase` does not read `laws`.',
+    level: 'modelled',
+    tables: ['laws', 'court_cases'],
+    functions: ['enactLaw', 'repealLaw', 'listLaws', 'lawCovering', 'judge', 'describeCase'],
+    note: 'Laws are enacted, repealed and queried by jurisdiction, and since server/justice.js '
+      + 'they are APPLIED: a case cites an active law of the matching category in the '
+      + 'jurisdiction the offence happened in, and is dismissed where the city legislated '
+      + 'none. This entry read "nothing applies a law to anybody, so this is legislation '
+      + 'without adjudication" and `runSecurityPhase` does read `laws` now. **What is '
+      + 'deliberately absent is doubt**: this engine records ground truth — '
+      + '`crime_incidents.perpetrator_entity_id` is who did it — so there is no evidence, '
+      + 'testimony or witness reliability for a verdict to weigh, and a coin dressed as a '
+      + 'trial would produce an acquittal rate somebody would read as meaning something. So '
+      + 'no wrongful conviction, plea, appeal, bail, probation or parole.',
   },
   {
     n: 18,
     name: 'Prison',
-    level: 'absent',
-    note: '§17 lists `imprisoned` as an NPC status. Searched: the string appears nowhere '
-      + 'in the schema or under server/. Nothing incarcerates anybody.',
+    level: 'partial',
+    tables: ['court_cases'],
+    functions: ['imprison', 'release', 'incarcerationRate', 'servingCase'],
+    note: 'This entry read "§17 lists `imprisoned` as an NPC status. Searched: the string '
+      + 'appears nowhere in the schema or under server/. Nothing incarcerates anybody." '
+      + 'server/justice.js incarcerates people: the status is real, a sentence runs its '
+      + 'length and ends, and being inside costs the job, the routine and a place in the '
+      + 'household until release. **Partial rather than modelled because there is no '
+      + 'CAPACITY.** infrastructure.INFRASTRUCTURE_TYPES is a fixed ten and none of them is '
+      + 'a prison, so nothing can overflow, queue or release early for want of a cell — and '
+      + 'PRISON_POPULATION_CENTERS_BREAKS_SCHOOLS.md, which VACANCY_MASTER_SESSION_INDEX.md '
+      + '§4 names, is not in this repository, so the numbers that would make capacity real '
+      + 'are not available to read. An eleventh infrastructure type invented on a guess '
+      + 'would put a made-up capacity under every incarceration statistic.',
   },
   {
     n: 19,

@@ -355,6 +355,36 @@ whose entire stated purpose is "anybody can verify a settlement without
 trusting whoever reported it" verified nothing anybody would actually
 want verified.
 
+**A fourteenth, and it is the sharpest form of all of these.** A
+threshold whose only writer sits behind that same threshold can never
+be crossed. `runSecurityPhase` calls `keys.resolveAggression` for a
+relationship whose `conflict` exceeds 30; `resolveAggression` is the
+only code in the engine that raises `conflict`; `conflict` is
+initialised to 0. So the resolver never ran, conflict never rose, and
+**not one violent or domestic offence has ever occurred in any world
+this engine has generated** — two of §9's four generatable crime
+categories unreachable, with a resolver, a threshold, a category
+vocabulary and a passing test suite all in place. Measured: 0 of 241
+relationships above zero after 200 ticks.
+
+This is `relationships.love` exactly, one field over: "initialised to 0
+and written by nothing", so no child could ever be born, and eighteen
+passing tests said otherwise because every one set the field directly.
+The answer is the same shape both times — `births.advanceBonds` and now
+`crime.advanceFriction`, a pass in the Social phase that moves the field
+from real substrate. **Before adding a threshold, find the writer and
+check what gates it.** If the answer is "the thing the threshold
+guards", there is no mechanism, only a diagram of one.
+
+And its first fix was wrong in the twelfth rule's third way, which is
+worth recording because it looked fixed: `FRICTION_STRAIN_FLOOR` was set
+to 50 because 50 sounds like the middle of a 0-100 scale. Measured
+stress in a settled world runs 0 to 43.8 with a median of 0 — so the
+strain term was dead on every person in the world, and averaging a dead
+term in with two live ones capped conflict at 21.2 against a threshold
+of 30. A mechanism that changed nothing, with a passing test that only
+checked the field could move.
+
 And the corollary about what to do when the substrate will not support
 the statistic somebody asked for: **declare it, with the measurement
 that killed it.** A body-composition index was derivable here and was

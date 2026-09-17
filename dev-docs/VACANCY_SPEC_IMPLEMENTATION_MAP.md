@@ -209,14 +209,26 @@ from memory with nothing in the repo to check it against. The forty are
 now data in `vacon-c/server/urbanSystems.js`, every citation verified
 by `vacon-c/test/urban-systems.test.js`, and the real breakdown is:
 
-**15 modelled, 14 partial, 5 slot-only, 6 absent**
+**17 modelled, 13 partial, 5 slot-only, 5 absent**
 
 | Level | Means | Systems |
 |---|---|---|
-| **modelled** (14) | Real mechanics; something advances or decides on it each tick | Population, Housing, Economy, **Employment**, **Health**, Infrastructure, **Political**, **Crime**, Cultural, Community Organizations, Real Estate, Environmental, **Technology**, AI Decision |
-| **partial** (15) | A trait family or a live table with little driving it, or one phase covering two systems | Education, Food Supply, Water, Law Enforcement, Gang, Organized Crime, **Court**, Communication, **Religion**, Business, Construction, Weather, Disaster, Migration, Reputation |
+| **modelled** (17) | Real mechanics; something advances or decides on it each tick | Population, Housing, Economy, **Employment**, **Health**, Infrastructure, **Law Enforcement**, **Crime**, **Court**, **Political**, Cultural, Community Organizations, Real Estate, Environmental, **Technology**, **Migration**, AI Decision |
+| **partial** (13) | A trait family or a live table with little driving it, or one phase covering two systems | Education, Food Supply, Water, Gang, Organized Crime, **Prison**, Communication, **Religion**, Business, Construction, Weather, Disaster, Reputation |
 | **slot** (5) | Storage exists and nothing reads it | Transportation, Energy, Waste, Fire & Emergency, Supply Chain |
-| **absent** (6) | No representation at all | Prison, Government Services, Media, Social Media, Military/National Guard, Tourism |
+| **absent** (5) | No representation at all | Government Services, Media, Social Media, Military/National Guard, Tourism |
+
+**Law Enforcement, Court and Prison all moved on 17 Sep 2026**, and the
+three of them were one gap. Law Enforcement's own note said the
+boundary was deliberate — "clearance is NOT arrest ... raids, arrests
+and sentencing would need somewhere to put people first" — Court said
+"nothing applies a law to anybody, so this is legislation without
+adjudication", and Prison said the string `imprisoned` appeared nowhere
+in the schema or under `server/`. `server/justice.js` is the link:
+cleared incident → charge against the city's actual laws → judgement →
+sentence → release. Prison stops at `partial` because there is no
+capacity: `infrastructure` has ten types and none of them is a prison,
+so a cell cannot run out.
 
 **Beliefs closed a loop Political left open, and corrected a guess I
 had written into the code.** `public_opinion`'s comment asks for a

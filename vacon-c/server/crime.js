@@ -183,6 +183,78 @@ const SEVERITY = {
 // what a community would still be talking about.
 const HISTORY_SIGNIFICANCE_FLOOR = 60;
 
+// ---------------------------------------------------------------------
+// Friction — and the deadlock that made violent crime impossible
+// ---------------------------------------------------------------------
+//
+// **`relationships.conflict` was initialised to 0 and the only code in
+// the engine that ever raised it was gated behind its own threshold.**
+// `runSecurityPhase` calls `keys.resolveAggression` for a relationship
+// whose `conflict > CONFLICT_ESCALATION_THRESHOLD` (30);
+// `resolveAggression` is the sole writer of `conflict`, at
+// `responseLevel / 10`. Conflict starts at 0, so the resolver never
+// runs, so conflict never rises, so the resolver never runs. Measured
+// on a generated world at 200 ticks: **0 of 241 relationships had a
+// conflict above zero**, and therefore not one violent or domestic
+// offence has ever occurred in any world this engine has generated.
+// Two of §9's four generatable crime categories were unreachable.
+//
+// This is `relationships.love` again, one field over. That one was
+// "initialised to 0 and written by nothing", so no child could ever be
+// born, and eighteen passing tests said otherwise because every one of
+// them set the field directly. The answer there was
+// `births.advanceBonds`, called from the Social phase; this is the same
+// answer for the same shape of hole, and it deliberately mirrors it.
+//
+//: Contact first, exactly as a bond needs it: two people who have never
+//: met are not in conflict. Reusing `births.BOND_CONTACT_FLOOR`'s value
+//: would couple two unrelated models, so this is its own constant at
+//: the same number, and the reason is the same — thirty ticks is long
+//: enough that a relationship is a relationship.
+const FRICTION_CONTACT_FLOOR = 30;
+
+//: What friction is made of. Two terms about the PAIR, multiplied by
+//: one about their circumstances — and the shape is that way because
+//: the first shape was measured and did not work.
+//:
+//:   distrust   `relationships.trust` below the neutral 50, which
+//:              `keys.resolveTrust` moves every time one of them learns
+//:              something about the other.
+//:   rivalry    `relationships.competition`, raised by the territory
+//:              resolver and, since `server/competition.js`, by playing
+//:              each other at the community game.
+//:   strain     `entity_state.stress_level`, averaged over the two, as
+//:              a MULTIPLIER on the other two rather than a third term
+//:              averaged in with them.
+//:
+//: **Why not the mean of three.** That was the first version, and
+//: measured on a 400-tick world it capped conflict at 21.2 against an
+//: escalation threshold of 30 — so violent crime stayed exactly as
+//: impossible as it had been, with a mechanism in place that looked
+//: like it had fixed it. The cause is the third clause of standing rule
+//: 12: `FRICTION_STRAIN_FLOOR` was set to 50 because 50 *sounds* like
+//: the middle of a 0-100 scale, and the measured stress in that world
+//: ran 0 to 43.8 with a median of 0. Strain was therefore 0 for every
+//: person in the world, permanently, and averaging a dead term in with
+//: two live ones costs a third of the achievable range.
+//:
+//: So: the floor is 40, which is the top of `behavior.MOOD_BANDS`'
+//: `steady` band and the top of what a settled population actually
+//: reaches — and strain amplifies rather than dilutes. A pair with real
+//: distrust and an active rivalry is a feud whether or not either of
+//: them is also under pressure; being under pressure makes it worse.
+const FRICTION_STRAIN_FLOOR = 40;
+
+//: How fast conflict moves toward what circumstances justify.
+//:
+//: **A target, approached — never a ratchet.** Conflict moves TOWARD
+//: the figure above, so it falls again when the rivalry cools or the
+//: trust recovers. The alternative is an accumulator, which would put
+//: every long-lived relationship over the escalation threshold
+//: eventually regardless of circumstance — a model in which everybody
+//: who lives long enough tries to kill somebody.
+const FRICTION_RATE = 0.02;
+
 let nextCrimeId = 1;
 
 function reseedIds(worldState) {
@@ -437,6 +509,79 @@ function runDeprivationCrime(worldState, tick = worldState.tick ?? 0) {
   return incidents;
 }
 
+// -- friction -------------------------------------------------------------
+
+// How much strain these two are under, 0..1, from what the Behavior
+// Engine has actually observed about them.
+//
+// **Unknown is not calm.** A person with no `entity_state` row has not
+// been observed, and `behavior.moodFor` already shipped the bug of
+// reading that as "content". Somebody unobserved contributes nothing to
+// the average rather than a zero — and where NEITHER has been observed,
+// there is no strain reading at all and friction is driven by the other
+// two terms alone.
+function strainBetween(worldState, aId, bId) {
+  const levels = [];
+  for (const row of worldState.entityState || []) {
+    if (row.entity_id !== aId && row.entity_id !== bId) continue;
+    const level = Number(row.stress_level);
+    if (Number.isFinite(level)) levels.push(level);
+  }
+  if (levels.length === 0) return 0;
+  const mean = levels.reduce((a, b) => a + b, 0) / levels.length;
+  return Math.max(0, Math.min(1, (mean - FRICTION_STRAIN_FLOOR) / (100 - FRICTION_STRAIN_FLOOR)));
+}
+
+// What this pair's circumstances currently justify, 0..100.
+function frictionTarget(worldState, relationship) {
+  const trust = Number(relationship.trust ?? 50);
+  const distrust = Math.max(0, Math.min(1, (50 - trust) / 50));
+  const rivalry = Math.max(0, Math.min(1, Number(relationship.competition ?? 0) / 100));
+  const strain = strainBetween(worldState, relationship.entity_a_id, relationship.entity_b_id);
+  // The mean of the two terms that are ABOUT these two people, scaled
+  // by the strain they are under. So a rivalry alone is a rivalry — it
+  // takes distrust as well to make a feud — and pressure makes an
+  // existing feud worse rather than manufacturing one out of nothing.
+  return ((distrust + rivalry) / 2) * (1 + strain) * 100;
+}
+
+// Move `relationships.conflict` toward what circumstances justify.
+//
+// Called from `runSocialPhase` beside `births.advanceBonds`, which is
+// the pass this mirrors — see the long note above FRICTION_CONTACT_FLOOR
+// for the deadlock this exists to break. Returns events for crossings
+// only, never for the condition (standing rule 7): a pair sitting above
+// the threshold for a decade is one event, not three thousand.
+function advanceFriction(worldState, options = {}) {
+  const { tick = worldState.tick ?? 0, threshold = null } = options;
+  const events = [];
+
+  for (const relationship of worldState.relationships || []) {
+    if (relationship.entity_a_id === relationship.entity_b_id) continue;
+    if ((relationship.interaction_count ?? 0) < FRICTION_CONTACT_FLOOR) continue;
+
+    const before = Number(relationship.conflict ?? 0);
+    const target = frictionTarget(worldState, relationship);
+    const after = Math.max(0, Math.min(100,
+      Math.round((before + (target - before) * FRICTION_RATE) * 10000) / 10000));
+    relationship.conflict = after;
+
+    if (threshold !== null && before <= threshold && after > threshold) {
+      events.push({
+        type: 'feud_opened',
+        severity: 'medium',
+        note: `entities ${relationship.entity_a_id} and ${relationship.entity_b_id} `
+          + 'fell into open conflict',
+        tick,
+        affected_entity_ids: [relationship.entity_a_id, relationship.entity_b_id],
+        global_effects: { conflict: after },
+      });
+    }
+  }
+
+  return events;
+}
+
 // -- reading ------------------------------------------------------------
 
 function incidentsIn(worldState, communityId, options = {}) {
@@ -522,6 +667,12 @@ module.exports = {
   CRIME_CATEGORIES,
   GENERATED_CATEGORIES,
   BASE_DEPRIVATION_RISK,
+  FRICTION_CONTACT_FLOOR,
+  FRICTION_STRAIN_FLOOR,
+  FRICTION_RATE,
+  strainBetween,
+  frictionTarget,
+  advanceFriction,
   SCARCITY_WEIGHT,
   SEVERITY,
   HISTORY_SIGNIFICANCE_FLOOR,

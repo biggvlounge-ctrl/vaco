@@ -266,31 +266,36 @@ test('a slot-level system cites storage and no mechanics at all', () => {
   }
 });
 
-test('Prison stays absent while nothing incarcerates anybody', () => {
-  // The one absent system with a specific, checkable reason: §17 lists
-  // `imprisoned` as an NPC status, so this is a named gap rather than
-  // an unmentioned one. If the string ever appears, the level is wrong.
+test('Prison is partial because nothing has a CAPACITY, not because nothing exists', () => {
+  // **This test used to assert the opposite, and the opposite was
+  // right.** System 18 read "§17 lists `imprisoned` as an NPC status.
+  // Searched: the string appears nowhere in the schema or under
+  // server/. Nothing incarcerates anybody." `server/justice.js`
+  // incarcerates people, so the level moved and this assertion has to
+  // move with it — a test that pins an absence is only worth keeping
+  // while the absence is real.
   assert.equal(getSystem(18).name, 'Prison');
-  assert.equal(getSystem(18).level, 'absent');
+  assert.equal(getSystem(18).level, 'partial');
 
-  // **`urbanSystems.js` is excluded, and it has to be.** That file
-  // says "nothing incarcerates anybody" in system 18's own note, so
-  // including it made this test fail on its own documentation — a
-  // search that matches the thing describing the absence rather than
-  // an implementation of it.
-  // **SQL comments are stripped for the same reason**, and the same
-  // mistake was made twice before it was: `schema-extensions.sql` has
-  // a note reading "`imprisoned` stays absent", explaining why the
-  // `deceased` status was added and that one was not. Counting that as
-  // evidence of a prison is counting a sentence that says there is no
-  // prison. DDL still counts — a real `imprisoned_until` column would
-  // survive the strip and fail this, which is the point.
-  // Comments are stripped from BOTH sides, and the JS side was added
-  // after `policing.js` failed this on its own header — which explains
-  // that clearance deliberately stops short of arrest because
-  // `imprisoned` was NOT added as an entity status. That is the third
-  // time in this file's life that prose about an absence has counted
-  // as evidence of a presence.
+  // The other direction, which is what the old test was protecting:
+  // the level may not claim more than the code does. `partial` is
+  // because there is no prison CAPACITY — `infrastructure` has ten
+  // types and none of them is a prison — so a cell cannot run out.
+  const infrastructure = require('../server/infrastructure.js');
+  assert.equal(
+    infrastructure.INFRASTRUCTURE_TYPES.some((t) => /prison|jail|correct/i.test(t)),
+    false,
+    'an infrastructure type for prisons exists now, so capacity is modellable and system 18 '
+    + 'should be re-levelled rather than left at partial',
+  );
+  assert.match(getSystem(18).note, /CAPACITY/,
+    'system 18 is partial and does not say what it is missing');
+
+  // And something really does imprison somebody — the search the old
+  // version ran, pointed the other way. `urbanSystems.js` is still
+  // excluded and comments are still stripped from both sides, for the
+  // reason the old test recorded at length: three times running, prose
+  // about an absence was counted as evidence of a presence.
   const stripSql = (src) => src.split('\n').map((l) => l.replace(/--.*$/, '')).join('\n');
   const stripJs = (src) => src
     .replace(/\/\*[\s\S]*?\*\//g, '')
@@ -298,8 +303,8 @@ test('Prison stays absent while nothing incarcerates anybody', () => {
   const haystack = [stripSql(SCHEMA), ...fs.readdirSync(SERVER_DIR)
     .filter((f) => f.endsWith('.js') && f !== 'urbanSystems.js')
     .map((f) => stripJs(fs.readFileSync(path.join(SERVER_DIR, f), 'utf8')))].join('\n');
-  assert.equal(/imprison/i.test(haystack), false,
-    'something now models imprisonment; system 18 is no longer absent');
+  assert.equal(/imprison/i.test(haystack), true,
+    'nothing models imprisonment any more, so system 18 is absent again');
 });
 
 // -- the number the map quotes -----------------------------------------

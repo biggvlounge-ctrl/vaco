@@ -114,6 +114,13 @@ function occupancyNow(worldState) {
   for (const npc of worldState.npcs || []) {
     const propertyId = npc.home_property_id;
     if (propertyId === null || propertyId === undefined) continue;
+    // **Away, not evicted.** `justice.js` leaves `home_property_id`
+    // alone when somebody is sentenced — coming out to nowhere to live
+    // is a different claim from coming out to a job that was filled —
+    // so the household is simply smaller while they are inside, and
+    // whole again when they are released. Occupancy is computed, never
+    // stored (standing rule 3), which is what makes that free.
+    if (npc.status === 'imprisoned') continue;
     const list = byProperty.get(propertyId) ?? [];
     list.push(npc.id);
     byProperty.set(propertyId, list);

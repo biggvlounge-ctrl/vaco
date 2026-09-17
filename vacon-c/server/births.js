@@ -255,6 +255,13 @@ function fertilePartnerships(worldState, tick = worldState.tick ?? 0) {
     const a = living.get(relationship.entity_a_id);
     const b = living.get(relationship.entity_b_id);
     if (!a || !b) continue;
+    // **Somebody serving a sentence is not in the room.** `npcs.status`
+    // gained `imprisoned` with server/justice.js, and a person the
+    // engine has put away is still in `worldState.npcs` — they are
+    // alive and still a resident — so every system that iterates the
+    // living has to say whether being inside changes what it models.
+    // For conception it plainly does.
+    if (a.status === 'imprisoned' || b.status === 'imprisoned') continue;
 
     const ageA = mortality.ageInYears(worldState, a, tick);
     const ageB = mortality.ageInYears(worldState, b, tick);

@@ -818,6 +818,28 @@ async function migrateWorldStateToPostgres(worldState) {
       summary.crime_incidents = worldState.crimeIncidents.length;
 
       // ---------------------------------------------------------------
+      // court_cases
+      // ---------------------------------------------------------------
+      // **Immediately after crime_incidents, and that is an FK
+      // ordering, not a preference.** A case references the incident it
+      // was brought on, the defendant in `entities`, the community, the
+      // city and the law. Incidents are written directly above;
+      // communities, cities and laws are all written earlier. Writing
+      // this any sooner is the same class of bug that rolled the whole
+      // migration back twice before.
+      for (const c of worldState.courtCases || []) {
+        await client.query(
+          `INSERT INTO court_cases (id, incident_id, defendant_entity_id, community_id,
+             city_id, category, law_id, status, charged_tick, sentence_ticks, released_tick)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+          [c.id, c.incident_id, c.defendant_entity_id, c.community_id, c.city_id,
+            c.category, c.law_id ?? null, c.status, c.charged_tick,
+            c.sentence_ticks ?? null, c.released_tick ?? null]
+        );
+      }
+      summary.court_cases = (worldState.courtCases || []).length;
+
+      // ---------------------------------------------------------------
       // entity_organization_memberships
       // ---------------------------------------------------------------
       // References `entities(id)` and `organizations(id)`, both written

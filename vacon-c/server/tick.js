@@ -67,6 +67,7 @@ const traitDrift = require('./traitDrift.js');
 const motivation = require('./motivation.js');
 const archetypes = require('./archetypes.js');
 const competition = require('./competition.js');
+const justice = require('./justice.js');
 const households = require('./households.js');
 const migration = require('./migration.js');
 const environment = require('./environment.js');
@@ -424,6 +425,24 @@ function runSocialPhase(worldState) {
     });
   }
 
+  // **And feuds, which had exactly the same hole.**
+  // `relationships.conflict` was initialised to 0 and the only writer
+  // in the engine was `keys.resolveAggression`, which `runSecurityPhase`
+  // calls only for a relationship ALREADY above
+  // CONFLICT_ESCALATION_THRESHOLD. Conflict starts at 0, so the
+  // resolver never ran, so conflict never rose. Measured at 200 ticks:
+  // 0 of 241 relationships above zero, and therefore not one violent or
+  // domestic offence in any world this engine has ever generated — two
+  // of §9's four generatable categories unreachable.
+  //
+  // Before `advanceBonds` on purpose: `advanceBonds` refuses to grow a
+  // bond above `BOND_CONFLICT_CEILING`, a check that could never have
+  // fired while conflict was always 0, and it should read this tick's
+  // friction rather than last tick's.
+  const feuds = crime.advanceFriction(worldState, {
+    tick: worldState.tick, threshold: CONFLICT_ESCALATION_THRESHOLD,
+  });
+
   // **Bonds form here, and they had to start somewhere.**
   // `relationships.love` is initialised to 0 and was written by
   // nothing — six of the twelve dimensions are written and love was
@@ -431,7 +450,7 @@ function runSocialPhase(worldState) {
   // reached and no child could ever be born in a running world. This
   // runs after `resolveTrust` above, so a bond reads the interaction
   // count and trust this tick just produced. See server/births.js.
-  return births.advanceBonds(worldState, worldState.tick);
+  return [...feuds, ...births.advanceBonds(worldState, worldState.tick)];
 }
 
 // ---------------------------------------------------------------------------
@@ -735,6 +754,21 @@ function runSecurityPhase(worldState) {
   // list, and clears nothing on the tick it happened — investigation
   // is delayed, which is what makes a backlog visible.
   events.push(...policing.runPolicing(worldState, worldState.tick).events);
+
+  // What happens after somebody is caught.
+  //
+  // **Last in the phase, and that ordering is the whole design.**
+  // Clearance is the input: `runPolicing` has just decided which
+  // incidents were solved, and `server/justice.js` turns a cleared
+  // incident with a named perpetrator into a charge, a judgement
+  // against the city's actual laws, and a sentence. Run it before
+  // policing and it would be charging people for crimes nobody had
+  // investigated yet.
+  //
+  // Still inside the Security phase, not a twelfth: arrest, trial and
+  // prison are what security DOES with what it found, and the pipeline
+  // is locked at eleven.
+  events.push(...justice.runJustice(worldState, { tick: worldState.tick }));
 
   return events;
 }

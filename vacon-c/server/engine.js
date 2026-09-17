@@ -205,6 +205,17 @@ const WorldState = {
   // among what a checkpoint does not carry rather than inventing a
   // table for it here.
   contests: [],
+  // What happened after somebody was caught. `server/justice.js` —
+  // arrest, charge, judgement, sentence, release. Before it, a
+  // settlement could name the person who committed a crime, clear the
+  // case, and then nothing at all happened to them; `laws` was a table
+  // no code read when deciding anything.
+  //
+  // A new table in `schema-extensions.sql`, so this one IS carried
+  // across a checkpoint — unlike `contests`, an imprisonment that a
+  // restore forgot would leave somebody `imprisoned` forever with no
+  // sentence to end.
+  courtCases: [],
   beliefs: [],
   // Civilizations and the technology ladder. Four dead tables built
   // together on 12 Sep 2026 because they are one system:

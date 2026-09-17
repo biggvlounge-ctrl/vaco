@@ -295,3 +295,82 @@ CREATE INDEX IF NOT EXISTS idx_inventory_item ON inventory (item_name);
 -- generator of crime, policing, employment, wages, mortality or trait
 -- values. The column exists to be counted, not to decide anything.
 ALTER TABLE npcs ADD COLUMN IF NOT EXISTS ethnicity TEXT;
+
+
+-- ---------------------------------------------------------------------
+-- npcs.status = 'imprisoned'
+-- ---------------------------------------------------------------------
+-- No DDL: `npcs.status` is already TEXT and already carried by
+-- migrate/restore. This note exists because the file said the opposite
+-- a few hundred lines above, and that note is now wrong:
+--
+--   "The spec's §17 lists an NPC's status as `active|imprisoned|
+--    deceased` ... This adds the one that has an implementation.
+--    `imprisoned` stays absent, which is why §7's Prison system is
+--    still marked `absent` in server/urbanSystems.js."
+--
+-- `server/justice.js` is the implementation, so all three of the spec's
+-- values are now real. An imprisoned NPC stays in `worldState.npcs` —
+-- they are alive and still a resident — which is the opposite of the
+-- choice made for the dead, who are MOVED to `worldState.deceased`
+-- precisely so that seventeen call sites cannot forget to check a flag.
+--
+-- That difference is deliberate and is the riskier of the two, so it is
+-- written down: being imprisoned is temporary and partial. A dead
+-- person participates in nothing, ever, and moving the row makes that
+-- structurally impossible to get wrong. A prisoner still ages, still
+-- has traits that drift, still holds property and still belongs to a
+-- family — they do not work, do not conceive, do not compete and do not
+-- count as living in the house. So each system says for itself whether
+-- being inside changes what it models, and `test/justice.test.js` holds
+-- the list of the ones that must.
+
+-- ---------------------------------------------------------------------
+-- court_cases — the third new TABLE in this file
+-- ---------------------------------------------------------------------
+-- Carries: `worldState.courtCases`, written by server/justice.js from
+-- inside the Security phase, after policing.
+--
+-- **Why a new table rather than an existing one.** Three were
+-- considered first, the same way `crime_incidents` and `inventory`
+-- were:
+--
+--   * `crime_incidents` already carries the offence and, since
+--     policing, whether it was cleared. It cannot carry the case: one
+--     incident produces at most one case here, but the case has a
+--     DEFENDANT (who is not always the recorded perpetrator once
+--     anything more than ground truth exists), a LAW it was brought
+--     under, a judgement, a sentence length and a release tick. Adding
+--     six columns about adjudication to the table that records the
+--     offence conflates what happened with what was done about it.
+--   * `laws` is the legislation, one row per statute per jurisdiction.
+--     A case cites a law; it is not a kind of law.
+--   * `historical_records` DOES get a row per conviction and per
+--     release, and that is where the permanent record lives. It cannot
+--     be the case itself: `justice.runJustice` has to find, every tick,
+--     the sentences that are still running, and asking that of a
+--     free-text event log means parsing prose to decide whether to let
+--     somebody out of prison.
+--
+-- Both `sentence_ticks` and `released_tick` clear this file's bar — the
+-- engine READS them every tick. A restore that dropped either would
+-- leave everybody currently inside imprisoned forever with no sentence
+-- to end, which is the worst failure available here: silent, permanent,
+-- and invisible until somebody counts the population that is working.
+CREATE TABLE IF NOT EXISTS court_cases (
+    id                  BIGSERIAL PRIMARY KEY,
+    incident_id         BIGINT NOT NULL REFERENCES crime_incidents(id) ON DELETE CASCADE,
+    defendant_entity_id BIGINT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+    community_id        BIGINT REFERENCES communities(id),
+    city_id             BIGINT REFERENCES cities(id),
+    category            TEXT NOT NULL, -- crime.CATEGORIES: violent|property|drug|theft|gun|fraud|domestic|sex_offense
+    -- Null IS the dismissal: no active law of the matching category in
+    -- this jurisdiction, so there was nothing to charge under.
+    law_id              BIGINT REFERENCES laws(id),
+    status              TEXT NOT NULL, -- charged|convicted|dismissed
+    charged_tick        BIGINT NOT NULL,
+    sentence_ticks      BIGINT,
+    released_tick       BIGINT
+);
+CREATE INDEX IF NOT EXISTS idx_court_cases_defendant ON court_cases (defendant_entity_id);
+CREATE INDEX IF NOT EXISTS idx_court_cases_community ON court_cases (community_id);

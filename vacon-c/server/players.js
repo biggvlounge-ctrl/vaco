@@ -20,6 +20,8 @@
 
 'use strict';
 
+const justice = require('./justice.js');
+
 const { nextAfter } = require('./nextAfter.js');
 
 const { getLiveEntity } = require('./entityTraits.js');
@@ -168,6 +170,25 @@ function getCitizenDashboard(worldState, playerId) {
     // they did with their days. `state` is null for somebody nothing
     // has happened to yet -- an unobserved person is not a calm one.
     behavior: behavior.describeBehavior(worldState, npcId),
+    // **Where they are, when being somewhere is the whole story.** Null
+    // for anybody not serving a sentence, which is almost everybody —
+    // `npcs.status` gained `imprisoned` with server/justice.js, and a
+    // dashboard that showed a citizen's mood, habits and routine while
+    // silently omitting that they are in prison would be the one fact
+    // they most needed. Carries the release tick, because "how long"
+    // is the question.
+    sentence: (() => {
+      const serving = justice.servingCase(worldState, npcId);
+      if (!serving) return null;
+      return {
+        caseId: serving.id,
+        category: serving.category,
+        lawId: serving.law_id,
+        chargedTick: serving.charged_tick,
+        sentenceTicks: serving.sentence_ticks,
+        releaseTick: Number(serving.charged_tick) + Number(serving.sentence_ticks),
+      };
+    })(),
     recentMemories,
     recentEvents,
     migrationRisk,

@@ -761,19 +761,43 @@ function generateWorld(options = {}) {
   // Laws, one per city, drawn from the schema's own category list. A
   // government with no law on the books has enacted nothing, and
   // `laws` was one of the six political tables at zero.
+  // **A founding code, not two dice.** This drew two categories at
+  // random from nine, and that was fine while `laws` was a table
+  // nothing read — the comment said as much: "a government with no law
+  // on the books has enacted nothing". `server/justice.js` made it
+  // load-bearing, and a 600-tick world with 240 people then measured
+  // 26 offences, 7 cleared, and **7 cases and 7 dismissals**, because
+  // neither city had ever legislated against theft. Every thief walked
+  // and nobody was ever imprisoned.
+  //
+  // A government that has not outlawed theft or violence is not
+  // governing. So `criminal` and `property` are the founding code —
+  // crimes against persons and crimes against property, the two
+  // categories a state exists to enforce — plus one drawn from the
+  // rest, which is policy rather than order. `politics.runLegislation`
+  // adds the others over the following years, so a settlement's statute
+  // book is a reading of how long it has been a settlement.
+  //
+  // The third is drawn WITHOUT replacement against the founding two.
+  // Two independent picks gave one measured world
+  // `property@city2, property@city2` — two rows and one law, since
+  // `justice.lawCovering` takes the first active match.
+  const FOUNDING_CODE = ['criminal', 'property'];
   summary.laws = 0;
   for (const cityId of summary.cities) {
-    for (let l = 0; l < 2; l += 1) {
+    const rest = politics.LAW_CATEGORIES.filter((c) => !FOUNDING_CODE.includes(c));
+    const categories = [...FOUNDING_CODE, random.pick(rest, 'law', cityId, 0)];
+    categories.forEach((category, l) => {
       politics.enactLaw(w, {
         jurisdictionCityId: cityId,
-        category: random.pick(politics.LAW_CATEGORIES, 'law', cityId, l),
+        category,
         description: null,
         governmentOrganizationId: state.id,
         tick,
         favourability: Math.round(random.range(-20, 30, 'law-fav', cityId, l)),
       });
       summary.laws += 1;
-    }
+    });
   }
 
   // ---- culture ----------------------------------------------------------

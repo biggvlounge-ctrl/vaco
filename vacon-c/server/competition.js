@@ -164,6 +164,9 @@ function drawEntrants(worldState, residents, options = {}) {
   const { seed = worldState.seed ?? 'competition', communityId, tick } = options;
 
   const pool = residents
+    // Nobody enters the community game from a cell. `npcs.status` gained
+    // `imprisoned` with server/justice.js.
+    .filter((npc) => npc.status !== 'imprisoned')
     .map((npc) => ({ id: npc.id, appetite: appetiteOf(worldState, npc.id) }))
     .filter((entry) => entry.appetite !== null && entry.appetite > 0);
   if (pool.length < MIN_ENTRANTS) return [];

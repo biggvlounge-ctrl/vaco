@@ -94,6 +94,7 @@ const demographics = require('./demographics.js');
 const economy = require('./economy.js');
 const health = require('./health.js');
 const competition = require('./competition.js');
+const justice = require('./justice.js');
 const motivation = require('./motivation.js');
 const membership = require('./membership.js');
 const infrastructure = require('./infrastructure.js');
@@ -627,6 +628,32 @@ const CATALOGUE = [
       : `nothing in the engine generates this category: ${crime.CATEGORIES[category].substrate}`,
   })),
 
+  {
+    key: 'incarceration_rate', category: 'crime', unit: 'share', scope: 'community',
+    // **The share of an area's own residents who are inside.** §7's
+    // Prison system was `absent` and `npcs.status = 'imprisoned'`
+    // appeared nowhere in the schema or under server/ — so a settlement
+    // could name the person who committed a crime, clear the case, and
+    // nothing whatever happened to them. server/justice.js.
+    compute: (ctx) => justice.incarcerationRate(ctx.worldState, ctx.communityId),
+  },
+  {
+    key: 'conviction_rate', category: 'crime', unit: 'share', scope: 'community',
+    // Of the cases an area has brought, the share that ended in one.
+    // Null where it has brought none, which is a different fact from an
+    // area that tried and convicted nobody.
+    compute: (ctx) => justice.convictionRate(ctx.worldState, ctx.communityId),
+  },
+  {
+    key: 'unlegislated_crime_share', category: 'crime', unit: 'share', scope: 'community',
+    // **The reading that makes `laws` load-bearing.** Until
+    // server/justice.js, no code anywhere read that table when deciding
+    // anything — a government could legislate into a void. A case is
+    // dismissed when the city has no active law of the matching
+    // category, so a settlement that never legislated against theft
+    // lets every thief walk, and this number says so.
+    compute: (ctx) => justice.unlegislatedShare(ctx.worldState, ctx.communityId),
+  },
   {
     key: 'clearance_rate', category: 'crime', unit: 'share', scope: 'community',
     // **Over INVESTIGATED cases, not over all of them.** A case

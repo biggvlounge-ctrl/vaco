@@ -57,6 +57,8 @@
 
 'use strict';
 
+const justice = require('./justice.js');
+
 // ---------------------------------------------------------------------------
 // The registry
 // ---------------------------------------------------------------------------
@@ -206,6 +208,28 @@ function dispatchAction(worldState, playerId, body = {}, verbs) {
   const missing = spec.requires.filter((field) => body[field] === undefined || body[field] === null);
   if (missing.length) {
     throw new Error(`"${action}" requires ${missing.join(', ')}`);
+  }
+
+  // **A player serving a sentence cannot act.** `npcs.status` gained
+  // `imprisoned` with server/justice.js, and without this check the one
+  // person in the world with a keyboard would be the only one for whom
+  // being convicted changed nothing: every NPC loses their job, their
+  // routine and their place in the household, while the player accepts
+  // missions and enters contests from a cell.
+  //
+  // Refused with the reason and the release tick rather than a bare
+  // error, because "why can I not do anything" is the question this
+  // will be asked.
+  const actor = (worldState.npcs || []).find((n) => n.id === player.linked_entity_id);
+  if (actor && actor.status === 'imprisoned') {
+    const serving = justice.servingCase(worldState, actor.id);
+    const releaseAt = serving
+      ? Number(serving.charged_tick) + Number(serving.sentence_ticks)
+      : null;
+    throw new Error(
+      `entity ${actor.id} is serving a sentence${serving ? ` for ${serving.category}` : ''} `
+      + `and cannot act${releaseAt === null ? '' : ` until tick ${releaseAt}`}.`,
+    );
   }
 
   const actorId = player.linked_entity_id;
