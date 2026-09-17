@@ -84,6 +84,7 @@ const motivation = require('./motivation.js');
 const archetypes = require('./archetypes.js');
 const households = require('./households.js');
 const migration = require('./migration.js');
+const environment = require('./environment.js');
 const items = require('./items.js');
 const territory = require('./territory.js');
 const worldStore = require('./worldStore.js');
@@ -203,6 +204,14 @@ function generateWorld(options = {}) {
     languages: 0, resources: 0, territoryBlocks: 0, motivated: 0,
   };
 
+  // **A new world is not in the middle of the last one's weather.**
+  // `activeConditions` is a global in-memory list and `generateWorld`
+  // appends to a shared WorldState, so a drought still running when the
+  // previous world was generated kept draining the new one's resources.
+  // Nothing created long-lived conditions at generation until
+  // `environment.js` did, which is why this never showed before.
+  w.activeConditions = [];
+
   // **What THIS run built, as distinct from what is in the world.**
   // `engine.WorldState` is shared and generating twice in one process
   // appends rather than replaces — so a second `generateWorld` sees the
@@ -229,6 +238,15 @@ function generateWorld(options = {}) {
       safety: Math.round(random.range(35, 70, 'city', c, 'safety')),
     });
     summary.cities.push(city.id);
+
+    // Every city gets weather. Seeded on the city's position in the
+    // loop rather than its id (§88), so the same seed always produces
+    // the same climate.
+    environment.generateEnvironmentState(w, {
+      cityId: city.id,
+      climate: random.pick(environment.CLIMATE_NAMES, 'climate', c),
+      tick,
+    });
 
     const cityPopulation = config.communitiesPerCity * config.populationPerCommunity;
 

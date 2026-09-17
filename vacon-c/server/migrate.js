@@ -662,6 +662,23 @@ async function migrateWorldStateToPostgres(worldState) {
       }
       summary.migration_events = worldState.migrationEvents.length;
 
+      // Weather, after cities — `environment_state.city_id` is both the
+      // primary key and a reference to one.
+      //
+      // **This is where a drought becomes durable.** `activeConditions`
+      // is an in-memory list with no table of its own, and a checkpoint
+      // taken mid-drought used to come back with the drought gone and
+      // the resources still depressed. `active_disasters` is the
+      // city-scoped view of that list.
+      for (const e of worldState.environmentState) {
+        await client.query(
+          `INSERT INTO environment_state (city_id, weather, climate, active_disasters, tick)
+           VALUES ($1,$2,$3,$4,$5)`,
+          [e.city_id, e.weather, e.climate, JSON.stringify(e.active_disasters ?? []), e.tick]
+        );
+      }
+      summary.environment_state = worldState.environmentState.length;
+
       // Households, after properties — `households.property_id` points
       // at one. Only the three columns the schema has: `formed_tick`
       // and `updated_tick` are in-memory bookkeeping, and a restored

@@ -400,22 +400,31 @@ const SYSTEMS = [
     n: 31,
     name: 'Environmental',
     level: 'modelled',
-    schemaOnly: ['environment_state'],
     phases: ['runEnvironmentPhase'],
     traitFamilies: ['environmental'],
-    functions: ['addEnvironmentalCondition'],
-    note: 'Modelled despite its table being schema-only: the phase is real and mutates '
-      + 'resource supply every tick, working on `worldState.activeConditions` rather than '
-      + '`environment_state`. The mechanics were never in doubt; the citation was wrong.',
+    tables: ['environment_state'],
+    functions: ['addEnvironmentalCondition', 'runEnvironment'],
+    note: 'Was modelled despite its table being schema-only — the phase was real and mutated '
+      + 'resource supply every tick, working on `worldState.activeConditions`, a global '
+      + 'in-memory list with no table. **The table became real on 17 Sep 2026** and closed a '
+      + 'durability hole rather than a cosmetic one: a world checkpointed mid-drought came '
+      + 'back with the drought gone and the resources still depressed.',
   },
   {
     n: 32,
     name: 'Weather',
     level: 'partial',
-    schemaOnly: ['environment_state'],
+    tables: ['environment_state'],
     phases: ['runEnvironmentPhase'],
-    note: 'Conditions exist and drive consequences. Temperature, rain, snow and season '
-      + 'specifically are not modelled — §45 has no seasons either.',
+    functions: ['runEnvironment', 'drawWeather', 'describeEnvironment'],
+    note: 'Every city now has a climate it keeps and a weather that turns on a weekly spell, '
+      + 'and severe weather produces the SAME condition a drought or an epidemic does rather '
+      + 'than a second effect channel. **Still partial**: there is no temperature, no snow '
+      + 'depth and no season — §45 has no seasons either, which is also why '
+      + '`migration_type: seasonal` is declared unmodelled. Calibration is worth recording: '
+      + 'the first weights made severe weather three spells in five, which produced nine real '
+      + 'scarcity crossings and ninety fear spikes in 120 ticks and tripped the event-noise '
+      + 'guard. Roughly one in five now.',
   },
   {
     n: 33,

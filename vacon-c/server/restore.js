@@ -275,6 +275,19 @@ async function restoreWorldStateFromPostgres(worldState) {
       nums(p, ['civilization_id', 'era_id', 'unlocked_tick']));
   summary.civilization_technology_progress = worldState.civilizationTechnologyProgress.length;
 
+  // `active_disasters` is JSONB — guarded like every other JSONB column
+  // here, because a string reads as an object with no length and every
+  // city silently comes back with no disasters running.
+  worldState.environmentState = (await q('SELECT * FROM environment_state')).map((e) => ({
+    ...nums(e, ['city_id', 'tick']),
+    active_disasters: typeof e.active_disasters === 'string'
+      ? JSON.parse(e.active_disasters)
+      : (e.active_disasters ?? []),
+    // Not a schema column; a restored world starts a fresh spell.
+    spell_started_tick: Number(e.tick) || 0,
+  }));
+  summary.environment_state = worldState.environmentState.length;
+
   worldState.regions = (await q('SELECT * FROM regions ORDER BY id')).map((r) =>
     nums(r, ['id', 'civilization_id']));
   summary.regions = worldState.regions.length;

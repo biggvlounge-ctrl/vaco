@@ -292,8 +292,15 @@ test('a generated world starts in rough balance, not starving', () => {
   // produces, not the ground state.
   const mortality = require('../server/mortality.js');
   for (const seed of ['balance-a', 'balance-b', 'balance-c']) {
-    worldgen.generateWorld({ ...SMALL, seed });
-    const scarcity = mortality.survivalScarcity(w);
+    const summary = worldgen.generateWorld({ ...SMALL, seed });
+    // **Scoped to the city just built.** `generateWorld` appends to a
+    // shared WorldState, so an unscoped reading takes the worst
+    // survival resource in ANY world this process has generated —
+    // including one an earlier test ran into a drought. That was
+    // invisible until weather could drain a resource to nothing, and
+    // the test's own sentence says "a freshly generated world", so
+    // measuring only that world is the assertion matching its claim.
+    const scarcity = mortality.survivalScarcity(w, summary.cities[0]);
     assert.ok(scarcity < 0.25,
       `a freshly generated world has survival scarcity ${scarcity.toFixed(2)} — `
       + 'it is starving before anything has happened to it');

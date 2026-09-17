@@ -190,6 +190,11 @@ const WorldState = {
   // system built yet"; both tables had no store. `server/migration.js`.
   migrationEvents: [],
   regions: [],
+  // The weather, and where a drought lives across a checkpoint.
+  // `activeConditions` below is a global in-memory list with no table;
+  // `environment_state.active_disasters` is the durable, city-scoped
+  // view of it. `server/environment.js`.
+  environmentState: [],
   beliefs: [],
   // Civilizations and the technology ladder. Four dead tables built
   // together on 12 Sep 2026 because they are one system:

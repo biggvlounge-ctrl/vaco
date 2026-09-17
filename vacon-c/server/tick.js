@@ -68,6 +68,7 @@ const motivation = require('./motivation.js');
 const archetypes = require('./archetypes.js');
 const households = require('./households.js');
 const migration = require('./migration.js');
+const environment = require('./environment.js');
 
 let nextEventId = 1;
 
@@ -93,10 +94,20 @@ function runEnvironmentPhase(worldState) {
 
   worldState.activeConditions = worldState.activeConditions.filter((condition) => {
     for (const resource of worldState.resources) {
-      if (resource.resource_type === condition.resourceType) {
-        resource.supply = Math.max(0, resource.supply + (condition.supplyDelta || 0));
-        resource.demand = Math.max(0, resource.demand + (condition.demandDelta || 0));
-      }
+      if (resource.resource_type !== condition.resourceType) continue;
+      // **A condition with a `cityId` applies to THAT city only.** It
+      // did not before, and nothing had a cityId to honour until
+      // `environment.js` started producing weather — at which point one
+      // city's drought drained every city's water, three generated
+      // worlds in a row read as starving, and `fear_spike` fired 90
+      // times in 120 ticks for 36 people off the scarcity it invented.
+      //
+      // A condition with no cityId is still global, which is what a
+      // scenario-wide drought is.
+      if (condition.cityId !== undefined && condition.cityId !== null
+          && resource.city_id !== condition.cityId) continue;
+      resource.supply = Math.max(0, resource.supply + (condition.supplyDelta || 0));
+      resource.demand = Math.max(0, resource.demand + (condition.demandDelta || 0));
     }
     condition.ticksRemaining -= 1;
     return condition.ticksRemaining > 0;
@@ -135,6 +146,14 @@ function runEnvironmentPhase(worldState) {
       });
     }
   }
+
+  // The weather, in the phase named for it. **Runs AFTER conditions are
+  // aged above**, so a condition a storm creates this tick gets its
+  // full length rather than being decremented on the tick it started.
+  // `environment_state` was schema-only, and `activeConditions` had no
+  // table at all — so a world checkpointed mid-drought came back with
+  // the drought gone and the resources still depressed.
+  events.push(...environment.runEnvironment(worldState, { tick: worldState.tick }));
 
   // Infrastructure wears out here for the reason this phase's own
   // comment already gives: it is where the physical world changes on

@@ -285,10 +285,16 @@ function diseasePressure(worldState) {
 // plenty of food and no water at all is dying, and averaging would
 // report it as coping. Scarcity in one essential is not offset by
 // abundance in another.
-function survivalScarcity(worldState) {
+// **`cityId` is optional and narrows the reading to one settlement.**
+// Without it this takes the worst survival resource ANYWHERE, which is
+// the right answer for "is this world in famine" and the wrong one for
+// "is this city". It started mattering when weather became city-scoped:
+// one city's drought made every city read as starving.
+function survivalScarcity(worldState, cityId = null) {
   let worst = 0;
   for (const resource of worldState.resources || []) {
     if (!SURVIVAL_RESOURCES.includes(resource.resource_type)) continue;
+    if (cityId !== null && resource.city_id !== cityId) continue;
     // `getScarcity` is 0..100 with 50 as demand meeting supply, so
     // only the half above balance is a shortage.
     const scarcity = economy.getScarcity(resource);

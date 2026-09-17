@@ -205,9 +205,14 @@ test('a generated world stops going bankrupt, and its event log stops shouting',
   worldgen.generateWorld({ communitiesPerCity: 2, populationPerCommunity: 20, seed: 'noise' });
 
   const counts = {};
-  for (let t = 0; t < 120; t += 1) {
+  // Which ticks each signal fired on, not just how many times. See the
+  // guard below for why the distinction is the whole point.
+  const ticksFiredOn = {};
+  const TICKS = 120;
+  for (let t = 0; t < TICKS; t += 1) {
     for (const event of engine.advanceTick().events) {
       counts[event.type] = (counts[event.type] || 0) + 1;
+      (ticksFiredOn[event.type] ??= new Set()).add(t);
     }
   }
   void before;
@@ -217,18 +222,40 @@ test('a generated world stops going bankrupt, and its event log stops shouting',
     'businesses are still failing to make payroll, so nothing is earning');
 
   const people = w.npcs.length;
-  // Two signals that used to fire per person per tick. `fear_spike`
-  // ran at 93 a tick on 152 people; anything near the population is
-  // this bug coming back.
+  // Two signals that used to fire per person per tick. `fear_spike` ran
+  // at 93 a tick on 152 people.
+  //
+  // **This measured the TOTAL against the population, and that guard
+  // broke the day the weather arrived.** A total conflates the bug
+  // (fires for everybody every tick) with correct behaviour (fires for
+  // some people on each genuine crossing) — and once `environment.js`
+  // started producing real shortages, five honest scarcity crossings
+  // put 49 fear spikes on a 38-person world and tripped a threshold of
+  // 38. The signal was working exactly as intended.
+  //
+  // What the bug actually looks like is firing on ALMOST EVERY TICK, so
+  // that is what is measured now. A crossing-driven signal fires on a
+  // handful of ticks however many people it reaches on each.
   for (const noisy of ['fear_spike', 'migration_risk']) {
-    assert.ok((counts[noisy] ?? 0) < people,
-      `${noisy} fired ${counts[noisy]} times in 120 ticks for ${people} people — `
+    const onTicks = (ticksFiredOn[noisy] ?? new Set()).size;
+    assert.ok(onTicks < TICKS / 3,
+      `${noisy} fired on ${onTicks} of ${TICKS} ticks — `
       + 'it is firing on a condition again rather than on a crossing');
   }
 
+
   // And a shortage is announced when it starts, not every tick it
-  // lasts. Knowledge rows were 44,899 after 300 ticks.
-  assert.ok(w.entityKnowledge.length < people * 5,
-    `${w.entityKnowledge.length} knowledge rows for ${people} people — `
-    + 'the scarcity broadcast is firing on a condition again');
+  // lasts. Knowledge rows were 44,899 after 300 ticks on 152 people —
+  // just about one per person per tick, which is what a broadcast on a
+  // CONDITION looks like.
+  //
+  // **Measured as a rate, for the same reason as the two signals
+  // above.** A flat `people * 5` ceiling assumed shortages were rare,
+  // and once the weather could cause them, seven honest crossings put
+  // 280 rows on a 38-person world and tripped a threshold of 190. Every
+  // one of those rows was a real announcement of a real shortage.
+  const perPersonPerTick = w.entityKnowledge.length / (people * TICKS);
+  assert.ok(perPersonPerTick < 0.25,
+    `${w.entityKnowledge.length} knowledge rows is ${perPersonPerTick.toFixed(2)} per person `
+    + 'per tick — the scarcity broadcast is firing on a condition again');
 });
