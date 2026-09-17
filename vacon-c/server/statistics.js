@@ -88,6 +88,7 @@
 const areaStats = require('./areaStats.js');
 const births = require('./births.js');
 const households = require('./households.js');
+const migration = require('./migration.js');
 const crime = require('./crime.js');
 const demographics = require('./demographics.js');
 const economy = require('./economy.js');
@@ -315,9 +316,17 @@ const CATALOGUE = [
   },
   {
     key: 'migration_rate', category: 'population', unit: 'rate_per_1k', scope: 'community',
-    unavailable: '`migration_events` is a schema-only table. `runMigrationPhase` computes a '
-      + 'migration RISK signal and nobody moves — no destination is chosen and no residency '
-      + 'is rewritten, so there is no arrival or departure to count.',
+    // **Declared unavailable and now computed**, and the declaration
+    // was exactly right about why: "`runMigrationPhase` computes a
+    // migration RISK signal and nobody moves — no destination is chosen
+    // and no residency is rewritten, so there is no arrival or
+    // departure to count." `server/migration.js` chooses destinations
+    // and rewrites residency, so there is.
+    //
+    // NET, and over a rolling year: positive means people are arriving.
+    // A cumulative count is not a rate, which is the same reasoning
+    // `crime.dangerByCommunity` records.
+    compute: (ctx) => migration.netRatePer1k(ctx.worldState, ctx.communityId, { tick: ctx.tick }),
   },
 
   // ---- demographic ---------------------------------------------------

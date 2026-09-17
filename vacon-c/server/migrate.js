@@ -292,6 +292,32 @@ async function migrateWorldStateToPostgres(worldState) {
       // reading the CREATE TABLE blocks alone does not show it —
       // test/migrate.test.js now reads both forms and holds the
       // ordering.
+      // **Regions before cities**, because `cities.region_id` and
+      // `languages.region_id` both point at one. The first version put
+      // regions near the end and `test/migrate.test.js` caught it — the
+      // third FK ordering violation this suite has found, and the reason
+      // that test exists: on a real database the whole migration rolls
+      // back, and nothing in memory would ever have noticed.
+      // **civilization_id NULL here, filled after civilizations exist.**
+      // A third circular FK, after `entities` <-> `families` and
+      // `properties` <-> `historical_records`: cities point at regions,
+      // regions point at civilizations, and civilizations are inserted
+      // with the cities. Same resolution the other two use — insert the
+      // nullable side empty, then update.
+      // `civilization_id` is OMITTED from the column list, not written
+      // as NULL — `test/migrate.test.js` skips a column the INSERT
+      // never writes, and writing NULL still counts as writing it. The
+      // same shape `entities.family_id` uses, which that test asserts
+      // stays deliberate.
+      for (const r of worldState.regions) {
+        await client.query(
+          `INSERT INTO regions (id, name, geography_key, climate_key)
+           VALUES ($1,$2,$3,$4)`,
+          [r.id, r.name, r.geography_key, r.climate_key]
+        );
+      }
+      summary.regions = worldState.regions.length;
+
       for (const c of worldState.cities) {
         await client.query(
           `INSERT INTO cities (id, name, region_id, real_world_geo_ref, population, mayor_npc_id,
@@ -566,6 +592,13 @@ async function migrateWorldStateToPostgres(worldState) {
       }
       summary.civilizations = worldState.civilizations.length;
 
+      // The other half of the circular FK above.
+      for (const r of worldState.regions) {
+        if (r.civilization_id === null || r.civilization_id === undefined) continue;
+        await client.query('UPDATE regions SET civilization_id = $1 WHERE id = $2',
+          [r.civilization_id, r.id]);
+      }
+
       for (const e of worldState.technologyEras) {
         await client.query(
           `INSERT INTO technology_eras (id, name, era_order, requirements) VALUES ($1,$2,$3,$4)`,
@@ -619,6 +652,15 @@ async function migrateWorldStateToPostgres(worldState) {
         );
       }
       summary.goals = worldState.goals.length;
+
+      for (const m of worldState.migrationEvents) {
+        await client.query(
+          `INSERT INTO migration_events (id, entity_id, from_location_id, to_location_id, migration_type, reason, tick)
+           VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+          [m.id, m.entity_id, m.from_location_id, m.to_location_id, m.migration_type, m.reason, m.tick]
+        );
+      }
+      summary.migration_events = worldState.migrationEvents.length;
 
       // Households, after properties — `households.property_id` points
       // at one. Only the three columns the schema has: `formed_tick`

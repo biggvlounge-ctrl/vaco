@@ -85,8 +85,7 @@ const SYSTEMS = [
     n: 1,
     name: 'Population',
     level: 'modelled',
-    tables: ['npcs', 'entities', 'families', 'historical_records', 'households'],
-    schemaOnly: ['migration_events'],
+    tables: ['npcs', 'entities', 'families', 'historical_records', 'households', 'migration_events'],
     phases: ['runMigrationPhase'],
     functions: [
       'generateNPC', 'generateFamily', 'addFamilyMember',
@@ -104,7 +103,9 @@ const SYSTEMS = [
       + '— moves. **`households` became live on 16 Sep 2026** — and building it found that '
       + 'nobody in any generated world had ever lived with anybody, because homes were handed '
       + 'out one per person by array index: 40 households of size 1, a solo rate of 100%. '
-      + '`migration_events` remains schema-only.',
+      + '**`migration_events` became live on 16 Sep 2026** — the phase computed a risk '
+      + 'from two traits and said in its own event text that no relocation system was built. '
+      + 'Now driven by unmet needs rather than disposition.',
   },
   {
     n: 2,
@@ -465,12 +466,20 @@ const SYSTEMS = [
   {
     n: 38,
     name: 'Migration',
-    level: 'partial',
-    schemaOnly: ['migration_events'],
+    level: 'modelled',
+    tables: ['migration_events', 'regions'],
     phases: ['runMigrationPhase'],
-    note: 'The phase moves people. `migration_events` is schema-only, so nothing records '
-      + 'that it happened — which also means §41 historical memory has no migration to '
-      + 'remember.',
+    functions: ['pushFor', 'destinationFor', 'relocate', 'runMigration', 'netRatePer1k'],
+    note: '**Modelled since 16 Sep 2026, and the previous note was wrong in its first three '
+      + 'words.** It said "The phase moves people" — the phase computed a migration RISK from '
+      + 'Volatility and Resource Hoarding and its own event text ended "no relocation system '
+      + 'built yet". Nobody went anywhere, and `migration_events` recorded nothing because '
+      + 'there was nothing to record. Now: unmet housing, safety, income or food pushes; a '
+      + 'destination is scored on danger AND work, so an income move goes somewhere with jobs; '
+      + 'traits decide only WHO goes under equal pressure; and residency is rewritten, which '
+      + '`households` and `areaStats` both follow. Three of the seven `migration_type` values '
+      + 'are declared unmodelled rather than faked — there is no commute, no season and no '
+      + 'return. `migration_rate` was a declared statistics gap and is now computed.',
   },
   {
     n: 39,

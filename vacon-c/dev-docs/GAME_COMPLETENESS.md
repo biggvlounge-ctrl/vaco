@@ -13,17 +13,17 @@ three places, a spec section's "roughly 25 of the 40", a catalogue of 67
 statistics that a real world answered 36 of, and seven trait families generated
 on every NPC and read by nothing.
 
-## 87.7% complete
+## 88.8% complete
 
 ```
-██████████████████░░  87.7%   264.75 of 302
+██████████████████░░  88.8%   268.25 of 302
 ```
 
 | axis | complete | score | what it measures |
 |---|---|---|---|
-| systems | **55.6%** | 22.25/40 | urban systems with mechanics |
-| tables | **85.4%** | 55.5/65 | schema tables a built world fills |
-| statistics | **86.8%** | 59/68 | statistics a world can answer |
+| systems | **56.9%** | 22.75/40 | urban systems with mechanics |
+| tables | **88.5%** | 57.5/65 | schema tables a built world fills |
+| statistics | **88.2%** | 60/68 | statistics a world can answer |
 | traits | **100%** | 114/114 | traits something reads |
 | traitDepth | **85.7%** | 6/7 | trait columns a life actually changes |
 | habits | **100%** | 8/8 | habit and routine depth |
@@ -40,7 +40,7 @@ reader can weight them differently and say so.
 Everything below is a measured gap, grouped by axis and named exactly as the
 measurement names it. This is the work list.
 
-### systems — 26 open
+### systems — 25 open
 
 The forty systems §7 names, at `server/urbanSystems.js`'s own four levels (modelled 1, partial 0.5, slot 0.15, absent 0).
 
@@ -70,10 +70,9 @@ The forty systems §7 names, at `server/urbanSystems.js`'s own four levels (mode
 | `34. Supply Chain` *(deferred by scope)* | slot | +0.85 |
 | `35. Military / National Guard` | absent | +1 |
 | `36. Tourism` | absent | +1 |
-| `38. Migration` | partial | +0.5 |
 | `39. Reputation` | partial | +0.5 |
 
-### tables — 10 open
+### tables — 8 open
 
 Every `CREATE TABLE` in the schema and its extensions. A table a built world fills scores 1; one the engine writes but no world has ever used scores 0.5; one with no store at all scores 0.
 
@@ -83,21 +82,18 @@ Every `CREATE TABLE` in the schema and its extensions. A table a built world fil
 | `revolutions` | written, but unreached — assessRevolutions runs every tick; no generated world has fallen below approval 35 with 25% of the population informed | +0.5 |
 | `investments` | no store | +1 |
 | `trade_routes` | no store | +1 |
-| `migration_events` | no store | +1 |
 | `economy_snapshots` | no store | +1 |
-| `regions` | no store | +1 |
 | `environment_state` | no store | +1 |
 | `analytics_snapshots` | no store | +1 |
 | `vault_studios_links` | no store | +1 |
 
-### statistics — 9 open
+### statistics — 8 open
 
 The `server/statistics.js` catalogue, scored on whether a world can produce the number in any area at all.
 
 | item | state | worth |
 |---|---|---|
 | `teenage_birth_share` | silent | +1 |
-| `migration_rate` | declared gap | +1 |
 | `race_and_ethnicity_composition` | declared gap | +1 |
 | `informal_economy_share` | declared gap | +1 |
 | `camera_coverage` | declared gap | +1 |

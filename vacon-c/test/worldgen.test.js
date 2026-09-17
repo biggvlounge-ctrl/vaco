@@ -223,10 +223,18 @@ test('a generated world answers most of the catalogue, where an empty one answer
     (d) => !structural.has(d.key) && profiles.some((p) => p.statistics[d.key].known),
   );
 
-  assert.ok(answered.length >= 55,
+  assert.ok(answered.length >= 56,
     `only ${answered.length} of ${statistics.KEYS.length} statistics answer; `
     + 'a generated world should populate nearly all of them');
-  assert.equal(structural.size, 8, 'the declared-gap count moved without this test being updated');
+
+  // **8 until 16 Sep 2026, when `migration_rate` stopped being one.**
+  // Its declaration was exactly right about why it could not be
+  // answered — "no destination is chosen and no residency is
+  // rewritten, so there is no arrival or departure to count" — and
+  // `server/migration.js` does both. This number is asserted rather
+  // than read so that a gap QUIETLY appearing, which is the failure
+  // that matters, cannot pass.
+  assert.equal(structural.size, 7, 'the declared-gap count moved without this test being updated');
 });
 
 test('a fresh world has routines, and running it engages the Behavior Engine', () => {

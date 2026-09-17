@@ -67,6 +67,7 @@ const traitDrift = require('./traitDrift.js');
 const motivation = require('./motivation.js');
 const archetypes = require('./archetypes.js');
 const households = require('./households.js');
+const migration = require('./migration.js');
 
 let nextEventId = 1;
 
@@ -522,6 +523,14 @@ function runMigrationPhase(worldState) {
   }
 
   worldState.migrationRisk = risks;
+
+  // **And now they actually go.** Everything above is a disposition
+  // reading and says so; this is the relocation the old event text
+  // promised did not exist. Driven by unmet needs rather than by the
+  // two traits above — an unmet housing, safety or income need is a
+  // reason to leave, where Volatility is a reading of who somebody is.
+  // See server/migration.js.
+  events.push(...migration.runMigration(worldState, { tick: worldState.tick }));
   return events;
 }
 

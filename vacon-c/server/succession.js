@@ -176,18 +176,36 @@ function settleEstate(worldState, options = {}) {
   }
 
   // ---- inventory -----------------------------------------------------
-  for (const holding of [...inventory.holdingsOf(worldState, entityId)]) {
+  // **Aggregated by item NAME, not iterated per holding**, and that
+  // distinction crashed a tick before it was found.
+  //
+  // `inventory.take` works by name and spends across every holding of
+  // it, worst condition first. Iterating the holdings instead — two
+  // ropes in different condition are two rows — meant the first
+  // transfer could take from the SECOND row, and the loop then reached
+  // that row with a quantity already spent. `take` refuses a quantity
+  // of 0, so a death with two conditions of one item threw out of
+  // `runMortality` and took the whole tick with it. It surfaced only on
+  // a 300-tick run of a 100-person world, because it needs somebody to
+  // die holding two grades of the same thing.
+  const byItem = new Map();
+  for (const holding of inventory.holdingsOf(worldState, entityId)) {
     const quantity = Number(holding.quantity);
+    if (!Number.isFinite(quantity) || quantity <= 0) continue;
+    byItem.set(holding.item_name, (byItem.get(holding.item_name) ?? 0) + quantity);
+  }
+
+  for (const [itemName, quantity] of byItem) {
     if (heir) {
       inventory.transfer(worldState, {
-        fromId: entityId, toId: heir.id, itemName: holding.item_name, quantity, tick,
+        fromId: entityId, toId: heir.id, itemName, quantity, tick,
       });
       report.itemsTransferred += quantity;
     } else {
       // Nobody to take it. The goods leave the world rather than
       // sitting in a corpse's hands forever, which would make every
       // `valueOfHoldings` over a population quietly wrong.
-      inventory.take(worldState, { entityId, itemName: holding.item_name, quantity });
+      inventory.take(worldState, { entityId, itemName, quantity });
       report.itemsLost += quantity;
     }
   }

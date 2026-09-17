@@ -83,6 +83,7 @@ const inventory = require('./inventory.js');
 const motivation = require('./motivation.js');
 const archetypes = require('./archetypes.js');
 const households = require('./households.js');
+const migration = require('./migration.js');
 const items = require('./items.js');
 const territory = require('./territory.js');
 const worldStore = require('./worldStore.js');
@@ -115,6 +116,7 @@ const DEFAULTS = {
   // eleventh standing rule, found by measuring rather than by reading.
   // `dev-docs/GAME_COMPLETENESS.md` lists which.
   civilizationName: 'The Reach',
+  regionName: 'The Reach Basin',
   // How far up the era ladder a world starts. `technology.runTechnology`
   // climbs from here on its own once a civilization exists to climb.
   startingEras: 2,
@@ -670,6 +672,22 @@ function generateWorld(options = {}) {
   // climbs the era ladder every tick and had no civilization to climb
   // it. Founding one of each is the whole fix for five tables.
 
+  // ---- the region the cities are in -------------------------------------
+  // `regions` had no store. It is what gives `migration_type:
+  // exploration` a meaning distinct from any other move — going
+  // somewhere genuinely elsewhere — and what `civilization_id` on a
+  // region connects to.
+  //
+  // `geography_key` and `climate_key` stay null: both are free TEXT
+  // that no document enumerates, and inventing a climate vocabulary
+  // here is the mistake `environment_state` is still open for.
+  const region = migration.generateRegion(w, { name: config.regionName });
+  for (const cityId of summary.cities) {
+    const city = w.cities.find((x) => x.id === cityId);
+    if (city) city.region_id = region.id;
+  }
+  summary.regionId = region.id;
+
   // ---- the civilization and its technology ------------------------------
   technology.seedTechnologyEras(w);
   const civilization = technology.foundCivilization(w, {
@@ -677,6 +695,7 @@ function generateWorld(options = {}) {
     stability: Math.round(random.range(40, 75, 'civ', 'stability')),
   });
   summary.civilizationId = civilization.id;
+  region.civilization_id = civilization.id;
   summary.technologyEras = (w.technologyEras || []).length;
 
   // Start partway up the ladder rather than at the first rung. A world

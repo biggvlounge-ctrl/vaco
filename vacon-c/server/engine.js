@@ -185,6 +185,11 @@ const WorldState = {
   // `server/households.js`; also the only thing that writes
   // `properties.occupants`.
   households: [],
+  // People actually moving. `runMigrationPhase` computed a risk from
+  // two traits and emitted an event whose own text said "no relocation
+  // system built yet"; both tables had no store. `server/migration.js`.
+  migrationEvents: [],
+  regions: [],
   beliefs: [],
   // Civilizations and the technology ladder. Four dead tables built
   // together on 12 Sep 2026 because they are one system:

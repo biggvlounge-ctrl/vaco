@@ -275,6 +275,14 @@ async function restoreWorldStateFromPostgres(worldState) {
       nums(p, ['civilization_id', 'era_id', 'unlocked_tick']));
   summary.civilization_technology_progress = worldState.civilizationTechnologyProgress.length;
 
+  worldState.regions = (await q('SELECT * FROM regions ORDER BY id')).map((r) =>
+    nums(r, ['id', 'civilization_id']));
+  summary.regions = worldState.regions.length;
+
+  worldState.migrationEvents = (await q('SELECT * FROM migration_events ORDER BY id')).map((m) =>
+    nums(m, ['id', 'entity_id', 'from_location_id', 'to_location_id', 'tick']));
+  summary.migration_events = worldState.migrationEvents.length;
+
   // `member_entity_ids` is JSONB; guarded rather than trusted for the
   // same reason `derived_from_traits` is — a string here reads as an
   // object with no length and every household silently becomes empty.
