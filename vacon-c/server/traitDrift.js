@@ -117,6 +117,16 @@ const TEMPORARY_RECOVERY = 0.05;
 //: body, gathering with others builds the social traits. Anything
 //: broader would be inventing a theory of character development.
 const EXERCISES = {
+  // **`skills.Management` here is the DEFAULT, not the meaning of
+  // work.** It was the whole of it until `occupations.js` existed, so a
+  // farmer who had worked every tick of a forty-year life got steadily
+  // better at management and no better at agriculture, and the same
+  // three traits grew for every working person in the world. What a job
+  // exercises is now the job: `occupationExercise` below replaces this
+  // first pair with the occupation's own skill when the worker holds a
+  // titled position, and leaves it in place for an untitled one — which
+  // is also the honest reading of a restored world, where every
+  // employment record predates the column being written.
   work: [
     ['skills', 'Management'],
     ['behavioral', 'Discipline'],
@@ -247,6 +257,34 @@ function rowFor(rows, family, name) {
   }) ?? null;
 }
 
+// ---------------------------------------------------------------------
+// occupationExercise
+// ---------------------------------------------------------------------
+// What a habit exercises FOR THIS PERSON. Every habit but `work` is the
+// same for everybody and comes straight out of the table; `work`
+// depends on what their work is.
+//
+// `occupations.js` is required lazily, inside the call, for the reason
+// `authority.gripTerm` requires `statecraft` lazily: both directions of
+// that edge already exist at module scope elsewhere and a top-level
+// require here is a cycle waiting for the next file to join it.
+//
+// Substitution, not addition: a titled worker grows their trade's skill
+// in place of `Management`, so the number of traits a working person
+// exercises is unchanged and an ordinary worker's total drift pressure
+// is exactly what it was before this existed — standing rule 12's first
+// clause, which is about not recalibrating a world by reading it.
+function occupationExercise(worldState, entityId, habitName) {
+  const targets = EXERCISES[habitName];
+  if (!targets || habitName !== 'work') return targets ?? null;
+
+  // eslint-disable-next-line global-require
+  const occupations = require('./occupations.js');
+  const skill = occupations.skillOf(occupations.occupationOf(worldState, entityId));
+  if (!skill || skill === 'Management') return targets;
+  return [['skills', skill], ...targets.slice(1)];
+}
+
 // Move one column toward a target, bounded by DRIFT_CEILING, and
 // recompute. Returns true if anything actually moved — a caller can
 // then stamp the tick, and a no-op stays a no-op.
@@ -280,7 +318,7 @@ function driftExperience(worldState, entityId, tick, index = null) {
   const exercised = new Map();
   for (const habit of worldState.habits || []) {
     if (habit.entity_id !== entityId) continue;
-    const targets = EXERCISES[habit.habit_name];
+    const targets = occupationExercise(worldState, entityId, habit.habit_name);
     if (!targets) continue;
     const share = clamp(Number(habit.strength) / 100, 0, 1);
     for (const [family, name, sign = 1] of targets) {
@@ -599,6 +637,7 @@ module.exports = {
   STRAIN_DEPRESSES,
   indexRows,
   recompute,
+  occupationExercise,
   driftExperience,
   driftEnvironment,
   driftRelationships,

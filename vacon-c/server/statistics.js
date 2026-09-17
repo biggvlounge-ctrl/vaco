@@ -108,6 +108,7 @@ const tierTraits = require('./tierTraits.js');
 const media = require('./media.js');
 const trade = require('./trade.js');
 const politics = require('./politics.js');
+const occupations = require('./occupations.js');
 
 // §9's MASTER BLOCK KEY, in its order. Every statistic belongs to one.
 const CATEGORIES = [
@@ -126,10 +127,17 @@ const CATEGORIES = [
 //   currency     `individual_finances` has no denomination anywhere, so
 //                a value is meaningful within one world and meaningless
 //                between two
+//   tier         a position on §25's seven knowledge tiers, 1..7.
+//                Added rather than folded into `index`, which this file
+//                documents as the schema's 0..100 scale: rescaling a
+//                tier to 0..100 would make 3.44 read as 49 and lose the
+//                one thing the number is for, which is that you can
+//                look it up in §25 and read what it means.
 const UNITS = {
   share: { comparable: true },
   rate_per_1k: { comparable: true },
   index: { comparable: true },
+  tier: { comparable: true },
   years: { comparable: true },
   count: { comparable: false },
   currency: { comparable: false },
@@ -537,6 +545,56 @@ const CATALOGUE = [
       .filter((r) => r.status === 'active' && ctx.ids.has(r.entity_id))
       .map((r) => Number(r.wage))
       .filter((w) => Number.isFinite(w))),
+  },
+  {
+    key: 'titled_employment', category: 'economics', unit: 'share', scope: 'community',
+    // **The measurement that would have caught an empty column.**
+    // `employment_records.position` was accepted by `hireEntity`, named
+    // in its signature, migrated and restored — and written by nothing,
+    // so every job in every world this engine ran was untitled and no
+    // statistic anywhere said so. This is that statistic. It stays in
+    // the catalogue after the fix rather than being retired, because a
+    // restored world from before `occupations.js` answers it honestly
+    // at 0 and a caller can tell the two apart.
+    compute: (ctx) => {
+      const held = (ctx.worldState.employmentRecords || [])
+        .filter((r) => r.status === 'active' && ctx.ids.has(r.entity_id));
+      if (held.length === 0) return null;
+      const titled = held.filter((r) => occupations.definitionOf(r.position ?? '')).length;
+      return round(titled / held.length, 2);
+    },
+  },
+  {
+    key: 'occupation_variety', category: 'economics', unit: 'count', scope: 'community',
+    // How many distinct trades an area contains. A count, not a share:
+    // §25's taxonomy has 34 positions and most of them require an
+    // employer type a recovering settlement does not have, so a share
+    // of the whole taxonomy would read as a failure rather than as a
+    // description. It is also what the takeover key reads — a
+    // composition requirement is met by variety, not by headcount.
+    compute: (ctx) => {
+      const names = new Set();
+      for (const record of ctx.worldState.employmentRecords || []) {
+        if (record.status !== 'active' || !ctx.ids.has(record.entity_id)) continue;
+        if (occupations.definitionOf(record.position ?? '')) names.add(record.position);
+      }
+      return names.size;
+    },
+  },
+  {
+    key: 'mean_knowledge_tier', category: 'demographic', unit: 'tier', scope: 'community',
+    // Where this area's work sits on §25's seven knowledge tiers. Null
+    // rather than zero when nobody holds a titled job, because an area
+    // with no work is not an area doing Tier 0 work — §25 has no Tier 0,
+    // and `Number(null)` is exactly the corollary in CLAUDE.md.
+    compute: (ctx) => {
+      const tiers = (ctx.worldState.employmentRecords || [])
+        .filter((r) => r.status === 'active' && ctx.ids.has(r.entity_id))
+        .map((r) => occupations.tierOf(r.position ?? ''))
+        .filter((t) => t !== null);
+      if (tiers.length === 0) return null;
+      return round(tiers.reduce((sum, t) => sum + t, 0) / tiers.length, 2);
+    },
   },
   {
     key: 'home_ownership_rate', category: 'economics', unit: 'share', scope: 'community',

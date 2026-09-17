@@ -34,6 +34,11 @@ const { getLiveEntity } = require('./entityTraits.js');
 // every per-area organization statistic disagreeing about who works
 // where.
 const membership = require('./membership.js');
+// `occupations.js` requires `seeded` and `demographics`, neither of
+// which reaches back here, so this is not a cycle either. It is what
+// turns `employment_records.position` from a column nobody wrote into
+// the trade a person actually holds.
+const occupations = require('./occupations.js');
 
 let nextResourceId = 1;
 let nextMarketListingId = 1;
@@ -784,20 +789,34 @@ function runLabour(worldState, tick, payrollEvents = []) {
     // reader can follow.
     const applicant = applicants[next];
     next += 1;
+    // **The position, which nothing in this engine used to write.**
+    // Drawn from what the employer does and what the applicant knows —
+    // `occupations.drawOccupation` gates the TIER on attainment and
+    // never gates the hire, so the test above stays the only test.
+    const hired_npc = (worldState.npcs || []).find((n) => n.id === applicant.id) ?? null;
+    const position = occupations.drawOccupation({
+      npc: hired_npc,
+      organizationType: employer.type ?? null,
+      seed: worldState.seed ?? 'world',
+      extra: [organizationId, tick],
+    });
     hireEntity(worldState, {
-      entityId: applicant.id, employerOrganizationId: organizationId, wage, tick,
+      entityId: applicant.id, employerOrganizationId: organizationId, wage, position, tick,
     });
     membership.joinOrganization(worldState, {
       entityId: applicant.id, organizationId, role: 'employee', tick,
     });
-    hired.push({ entityId: applicant.id, organizationId, wage });
+    hired.push({
+      entityId: applicant.id, organizationId, wage, position,
+    });
     events.push({
       type: 'hired',
       severity: 'low',
-      note: `Entity ${applicant.id} took a job at organization ${organizationId} for ${wage}`,
+      note: `Entity ${applicant.id} took ${position ? `work as a ${position}` : 'a job'} `
+        + `at organization ${organizationId} for ${wage}`,
       tick,
       affected_entity_ids: [applicant.id],
-      global_effects: { organizationId, wage },
+      global_effects: { organizationId, wage, position },
     });
   }
 

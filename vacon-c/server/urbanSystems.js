@@ -148,7 +148,17 @@ const SYSTEMS = [
       + 'own wage — `1 / WAGE_TO_OUTPUT`, the reciprocal of a constant this file already had '
       + 'rather than a threshold chosen for the occasion — and lays somebody off wherever '
       + 'payroll was missed, so the unemployment rate falls out of the population\'s own trait '
-      + 'distribution. 55 jobs to ~105 and then steady across the same 400 ticks.',
+      + 'distribution. 55 jobs to ~105 and then steady across the same 400 ticks. '
+      + '**And the jobs have names now, 17 Sep 2026.** `employment_records.position` was '
+      + 'accepted by `hireEntity`, named in its signature, migrated and restored — and '
+      + 'written by no caller anywhere, so every job in every world this engine ever ran was '
+      + 'untitled. `server/occupations.js` is §25\'s own subject lists turned into the people '
+      + 'who practise them, gated on attainment for the TIER and never for the hire, and '
+      + 'drawn against a `1 / tier` pyramid: the first version handed everybody the best post '
+      + 'they qualified for and built a settlement of eight engineers, eight navigators and '
+      + 'no labourers at all (mean tier 3.44), which is standing rule 12\'s third clause. '
+      + 'Measured after: 24/17/9/4 across Tiers 1-4, mean 1.95, 19 of 34 positions held at '
+      + 'generation.',
   },
   {
     n: 5,
@@ -166,8 +176,15 @@ const SYSTEMS = [
       + 'are failed. Until 17 Sep 2026 `npcs.education` was decided at generation and never '
       + 'changed, which is why `infrastructure.js` had to DECLARE that it could give `schools` '
       + 'no outage effect: there was no per-tick education mechanism for an outage to '
-      + 'interrupt. There is now. Still partial: no teachers, no enrolment roll, nobody to '
-      + 'drop out OF, and the knowledge tiers of §25 are absent entirely.',
+      + 'interrupt. There is now. **§25\'s seven knowledge tiers are no longer absent** — '
+      + '`occupations.KNOWLEDGE_TIERS` carries them with the spec\'s own subject lists, every '
+      + 'occupation sits on one, attainment is what makes a tier reachable, and '
+      + '`mean_knowledge_tier` measures where an area\'s work actually sits. A city\'s school '
+      + 'is also an ORGANIZATION now (`CITY_INSTITUTIONS` in worldgen) and it employs a '
+      + 'teacher, which is the first teacher this engine has ever had. Still partial: no '
+      + 'enrolment roll, nobody to drop out OF, and no path from a book to a tier — §24 '
+      + 'KNOWLEDGE RECOVERY names books, manuals, libraries and archives as the sources of a '
+      + 'civilization resource and nothing reads one yet.',
   },
   {
     n: 6,

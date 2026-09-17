@@ -90,6 +90,7 @@ const territory = require('./territory.js');
 const geo = require('./geo.js');
 const statecraft = require('./statecraft.js');
 const media = require('./media.js');
+const occupations = require('./occupations.js');
 const worldStore = require('./worldStore.js');
 const { hashSeed, seededUnit } = require('./seeded.js');
 
@@ -158,6 +159,31 @@ const CITY_INFRASTRUCTURE = [
   type,
   capacityPer1k: infrastructure.DESIGN_CAPACITY_PER_1K[type],
 }));
+
+// The institutions every city gets, as `organizations.type` values the
+// schema already enumerates. `assets` ranges differ because what these
+// places are differs: a hospital runs on a budget, a library does not.
+//
+// Deliberately NOT the whole enumeration. `museum`, `sports`, `club`,
+// `religion` and `research` are real org types with real occupations
+// attached and no world generates one, and that stays declared rather
+// than filled: a museum in a city that has just come through a reset is
+// a design decision about the setting, and this file's job is to call
+// what exists rather than to decide what a recovering civilization
+// chooses to rebuild first. `occupations.describeOccupations` reports
+// the unfilled positions, so the gap is visible in a measurement
+// instead of hiding in a table.
+// `post` is the one job that makes the place what it is, named rather
+// than inferred. The first version took the highest-tier occupation the
+// org type employs, which gave the schoolhouse a manager and the
+// reading room a linguist: "highest tier" is not "defining", and
+// guessing which is which from a number is the twelfth rule's third
+// clause again.
+const CITY_INSTITUTIONS = [
+  { type: 'school', suffix: 'Schoolhouse', post: 'teacher', assets: [3000, 40000] },
+  { type: 'hospital', suffix: 'Infirmary', post: 'physician', assets: [8000, 120000] },
+  { type: 'library', suffix: 'Reading Room', post: 'librarian', assets: [1000, 18000] },
+];
 
 // The resource types a generated city tracks. A subset of §28's
 // thirteen — the ones this engine's other systems actually read —
@@ -719,6 +745,17 @@ function generateWorld(options = {}) {
           entityId: npc.id,
           employerOrganizationId: employer.id,
           wage: Math.round(random.range(8, 90, 'wage', c, b, ai)),
+          // **The trade, which no hire in this engine ever recorded.**
+          // Seeded on the person, which is `occupations.drawOccupation`'s
+          // own §88 exception: the draw is about them. Gated on their
+          // attainment, so the schooling this file already sets decides
+          // what work they can hold — and never on whether they hold any.
+          position: occupations.drawOccupation({
+            npc,
+            organizationType: employer.type,
+            seed: config.seed,
+            extra: [c, b, ai],
+          }),
           tick,
         });
         membership.joinOrganization(w, {
@@ -803,6 +840,101 @@ function generateWorld(options = {}) {
           rel.trust = Math.round(random.range(25, 85, 'rtrust', c, b, i, k));
         }
       }
+    }
+
+    // ---- institutions ------------------------------------------------
+    // **Every city had schools, hospitals and public safety and nobody
+    // who worked at any of them.** `CITY_INFRASTRUCTURE` above builds
+    // all three as `infrastructure` rows, `statecraft.
+    // SERVICE_INFRASTRUCTURE` funds them, and `organizations.type`'s
+    // schema enumeration has carried `school`, `hospital` and `library`
+    // from the first day — with no organization of any of those types
+    // ever generated. So `occupations.OCCUPATIONS`' teacher, orderly,
+    // physician and librarian had no employer anywhere in any world,
+    // which is the eleventh rule pointed at a table instead of a
+    // function: an occupation whose only employer type no world
+    // contains is indistinguishable from one that does not exist.
+    //
+    // Founded per city rather than per community, because that is the
+    // scale the infrastructure sits at, and **not gated on anything** —
+    // the media outlet's dead era gate is the precedent, and a
+    // settlement's clinic and its schoolroom are institutions rather
+    // than technologies.
+    //
+    // They are also what gives the takeover key targets worth taking:
+    // `THE_KEY_BUILDING_TYPES.md` lists hospitals, libraries and
+    // universities as hero-tier, and a hero-tier location with no staff
+    // has no specialist requirement to meet.
+    const institutions = [];
+    for (const spec of CITY_INSTITUTIONS) {
+      const org = engine.generateOrganization({
+        name: `${city.name} ${spec.suffix}`,
+        type: spec.type,
+        traitValueFor: (def) => Math.round(
+          random.range(25, 85, 'inst-trait', c, spec.type, def.family, def.name),
+        ),
+      });
+      org.assets = Math.round(random.range(spec.assets[0], spec.assets[1], 'inst-assets', c, spec.type));
+      org.influence = Math.round(random.range(10, 70, 'inst-inf', c, spec.type));
+      institutions.push({ org, post: spec.post });
+      summary.organizations += 1;
+      summary.institutions = (summary.institutions ?? 0) + 1;
+    }
+
+    // **A faction pays somebody, and that is what an enforcer is.**
+    // Gang MEMBERSHIP already existed (`gangMembershipRate` above,
+    // `role: 'member'`) and is a different fact from employment: a
+    // member is affiliated, an enforcer is on the payroll. Without one
+    // hire each, `occupations.OCCUPATIONS.enforcer` had no employer in
+    // any world for the same reason the institutions did — and the
+    // takeover key's composition requirement is written in enforcers.
+    for (const faction of factions) {
+      institutions.push({ org: faction, post: 'enforcer' });
+    }
+
+    // **Staffed at generation, because `runLabour` will not staff
+    // them.** Its market only considers employers that already have
+    // somebody — "an employer that has nobody has no wage scale of its
+    // own and no evidence it can pay" — so a hospital founded empty
+    // would stay empty for the life of the world however many
+    // physicians grew up in it. Standing rule 14: the writer sits
+    // behind the threshold it would have to cross.
+    {
+      const cityCommunities = (w.communities || []).filter((cm) => cm.city_id === city.id);
+      const cityResidents = (w.npcs || []).filter(
+        (n) => cityCommunities.some((cm) => cm.id === n.communityId),
+      );
+      institutions.forEach((spec, oi) => {
+        const org = spec.org;
+        // Its defining post first, then anything else it employs in
+        // descending tier — a settlement that has nobody who can teach
+        // still opens the schoolhouse, and somebody keeps the door.
+        const wanted = [
+          spec.post,
+          ...occupations.occupationsFor(org.type).filter((p) => p !== spec.post).reverse(),
+        ];
+        for (const position of wanted) {
+          const candidate = cityResidents.find(
+            (n) => !economy.getEmployment(w, n.id)
+              && (tick - n.createdTick) / 365 >= 16
+              && occupations.tierReachable(n, occupations.tierOf(position)),
+          );
+          if (!candidate) continue;
+          economy.hireEntity(w, {
+            entityId: candidate.id,
+            employerOrganizationId: org.id,
+            wage: Math.round(random.range(20, 120, 'inst-wage', c, oi, position)),
+            position,
+            tick,
+          });
+          membership.joinOrganization(w, {
+            entityId: candidate.id, organizationId: org.id, role: 'employee', tick,
+          });
+          summary.employed += 1;
+          summary.institutionStaff = (summary.institutionStaff ?? 0) + 1;
+          break;
+        }
+      });
     }
   }
 
@@ -967,6 +1099,49 @@ function generateWorld(options = {}) {
   if (seat) {
     seat.operating_organization_id = state.id;
     summary.governmentSeatPropertyId = seat.id;
+  }
+
+  // ---- who works for the press and the state -----------------------------
+  // **Two organizations that acted on the world and employed nobody.**
+  // The press broadcasts, the assembly announces, funds services and
+  // holds elections — and `employment_records` had not a single row
+  // against either, so `reporter`, `diplomat` and `officer` had no
+  // employer anywhere however long a world ran. `runLabour` could never
+  // fix it: an employer with no staff has no wage scale, so it is not in
+  // the market, so it never gets staff.
+  //
+  // One founding post each, named rather than drawn, and then the market
+  // fills them out. The government's is a diplomat because §7's
+  // Government Services and `statecraft` are about a state dealing with
+  // its own people — an officer belongs to a military organization,
+  // which no world generates yet and which `CITY_INSTITUTIONS` says why
+  // about.
+  {
+    const founding = [
+      { organizationId: summary.mediaOutletId ?? null, position: 'reporter', wage: [30, 90] },
+      { organizationId: summary.governmentId ?? null, position: 'diplomat', wage: [60, 180] },
+    ];
+    for (const post of founding) {
+      if (!post.organizationId) continue;
+      const candidate = (w.npcs || []).find(
+        (n) => !economy.getEmployment(w, n.id)
+          && (tick - n.createdTick) / 365 >= 16
+          && occupations.tierReachable(n, occupations.tierOf(post.position)),
+      );
+      if (!candidate) continue;
+      economy.hireEntity(w, {
+        entityId: candidate.id,
+        employerOrganizationId: post.organizationId,
+        wage: Math.round(random.range(post.wage[0], post.wage[1], 'found-wage', post.position)),
+        position: post.position,
+        tick,
+      });
+      membership.joinOrganization(w, {
+        entityId: candidate.id, organizationId: post.organizationId, role: 'employee', tick,
+      });
+      summary.employed += 1;
+      summary.institutionStaff = (summary.institutionStaff ?? 0) + 1;
+    }
   }
 
   // Laws, one per city, drawn from the schema's own category list. A
