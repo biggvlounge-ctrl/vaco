@@ -354,10 +354,88 @@ function recordCrime(worldState, options = {}) {
     });
   }
 
+  // **The victim learns something, and how much is the whole point.**
+  //
+  // This block used to say the victim's memory was "left to whatever
+  // mechanism observes the harm — a victim who always knows exactly
+  // what happened to them would make `entity_knowledge`'s distortion
+  // model meaningless", and no such mechanism was ever built. So
+  // **nothing in this engine wrote a knowledge row whose
+  // `subject_entity_id` is a person**: measured, 0 of 600 in a
+  // generated world.
+  //
+  // That was the gate behind two of the seven Keys. `runSocialPhase`
+  // runs `resolveTrust` only for a relationship where the actor holds
+  // a fact ABOUT the other party, so — measured by `keys_log` over 300
+  // ticks — **Trust resolved 0 times**, the entire Social category
+  // dead. It is the same gate that made `resolveAggression`
+  // unreachable, one table over.
+  //
+  // The original reasoning is honoured rather than overridden: the
+  // victim does NOT get perfect knowledge. What they come away with is
+  // drawn against the offender's own `criminal` family —
+  // `policing.evasionOf` reads Stealth, Deception, Black Market Ties
+  // and Heat Tolerance — against the victim's own perception. Somebody
+  // robbed in the dark by a skilled thief holds an assumption they
+  // half believe; somebody who saw a neighbour take it holds a fact.
+  // That IS the distortion model, used rather than reserved.
+  if (perpetratorId !== null && victimId !== null && victimId !== perpetratorId) {
+    const policing = require('./policing.js');
+    const perception = require('./perception.js');
+
+    // 1 when the offender is unskilled, 0 when they are a ghost.
+    const identifiable = 1 - policing.evasionOf(worldState, perpetratorId);
+    // What the victim's own perception makes of it. `receivedConfidence`
+    // is the same function every broadcast goes through, so a
+    // perceptive victim sees more of what happened for the same reason
+    // a perceptive listener hears more of an announcement.
+    const confidence = perception.receivedConfidence(worldState, victimId, identifiable);
+
+    worldStore.addKnowledge(worldState, {
+      entityId: victimId,
+      // **A person, and this is the first time this column has ever
+      // held one.**
+      subjectEntityId: perpetratorId,
+      // `known` when they are sure who it was, `assumption` when they
+      // are guessing — the vocabulary `knowledgeCharge` already reads,
+      // used for what it means rather than for an effect.
+      factType: confidence >= 0.5 ? 'known' : 'assumption',
+      factContent: `entity ${perpetratorId} committed ${category}`,
+      confidenceLevel: confidence,
+      sourceEntityId: perpetratorId,
+      // It travels. `media.runWordOfMouth` carries `subject_entity_id`,
+      // so a neighbourhood learns who is worth avoiding — at the
+      // word-of-mouth rate, because being robbed is not an
+      // announcement.
+      spreadRate: 0.08,
+      distortionLevel: 1 - confidence,
+      tick,
+    });
+
+    // **And the valence, which the knowledge row cannot carry.**
+    // `knowledgeCharge` measures whether something is TRUE, not
+    // whether it is good — so a firmly-known fact alone would RAISE
+    // the victim's trust in whoever robbed them. `memories` is the
+    // table that carries valence (`memory_type`, and a signed
+    // `emotion_level`), and `keys.resolveTrust` reads it for exactly
+    // this. Without this memory the knowledge row would open the gate
+    // and send trust the wrong way through it.
+    worldStore.addMemory(worldState, {
+      entityId: victimId,
+      tick,
+      memoryType: 'negative',
+      category: 'conflict',
+      description: `Suffered a ${category} offence${confidence >= 0.5 ? ` by entity ${perpetratorId}` : ' by somebody unidentified'}.`,
+      importance: severity,
+      // Scaled by how sure they are it was this person: an unfounded
+      // suspicion should not poison a relationship as hard as a
+      // certainty.
+      emotionLevel: -Math.round(severity * confidence),
+      relatedEntityIds: [perpetratorId],
+    });
+  }
+
   // Standing rule 1's write-back: whoever did it remembers doing it.
-  // The victim's memory is left to whatever mechanism observes the
-  // harm — a victim who always knows exactly what happened to them
-  // would make `entity_knowledge`'s distortion model meaningless.
   if (perpetratorId !== null) {
     worldStore.addMemory(worldState, {
       entityId: perpetratorId,

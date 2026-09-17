@@ -73,6 +73,37 @@ function knowledgeCharge(knowledge = []) {
   return total / knowledge.length;
 }
 
+// How somebody FEELS about another entity, -1..1, or null when they
+// have no memory of them at all.
+//
+// The valence half of trust — see `resolveTrust`. Read from
+// `memories.emotion_level`, which is signed and already scoped to
+// `related_entity_ids`, rather than from a new column on
+// `entity_knowledge`: a second source of truth for the same concept is
+// the mistake standing rule 3 exists to prevent.
+//
+// **Null, not 0, for somebody they have never thought about.** Zero
+// would be indifference, which is a feeling; null is the absence of
+// one, and the caller uses the knowledge charge alone in that case so
+// a first meeting behaves exactly as it did before this existed.
+function feelingToward(worldState, entityId, otherEntityId) {
+  if (otherEntityId === null || otherEntityId === undefined) return null;
+  const levels = [];
+  for (const memory of worldState.memories || []) {
+    if (memory.entity_id !== entityId) continue;
+    if (!Array.isArray(memory.related_entity_ids)) continue;
+    if (!memory.related_entity_ids.includes(otherEntityId)) continue;
+    const level = Number(memory.emotion_level);
+    if (Number.isFinite(level)) levels.push(level);
+  }
+  if (levels.length === 0) return null;
+  // `emotion_level` runs -100..100 across the engine's writers, so the
+  // mean is divided by 100 to land on the same -1..1 scale the
+  // knowledge charge uses.
+  const mean = levels.reduce((a, b) => a + b, 0) / levels.length;
+  return Math.max(-1, Math.min(1, mean / 100));
+}
+
 //: How much somebody's own Confidence moves how firmly they hold a
 //: reading. At 0.3, a person at 100 holds the same judgement about a
 //: third more firmly than one at 0 — centred on 50, so an ordinary
@@ -408,10 +439,36 @@ function resolveTrust(entity, context) {
   const priorTrust = priorRelationship ? priorRelationship.trust : 50;
   const charge = knowledgeCharge(knowledge); // [-1, 1]
 
-  // Higher Trust Threshold = slower to move off prior trust; knowledge
-  // charge pulls it up or down.
+  // **`knowledgeCharge` measures whether something is TRUE, not
+  // whether it is GOOD — and using it alone as trust's direction is a
+  // real defect that only becomes visible once facts about people
+  // exist.** Its own comment says so: "verified/known facts count
+  // fully toward positive, false facts invert". That is epistemic
+  // status. It is the right input for `resolveFear` and
+  // `resolveScarcityResponse`, where reliably knowing about a shortage
+  // should raise alarm. It is the wrong thing to steer trust by,
+  // because it makes knowing FOR CERTAIN that somebody robbed you
+  // raise your trust in them by the full amount.
+  //
+  // `entity_knowledge` has no valence column, and inventing one would
+  // put a second source of truth next to the table that already
+  // carries valence: `memories.memory_type` is positive/negative and
+  // `memories.emotion_level` is signed, and `related_entity_ids`
+  // already says who a memory is about. Every Key writes one and so
+  // does `crime.recordCrime`.
+  //
+  // So confidence and direction come from different places, which is
+  // what they are: the charge says how sure this person is, and how
+  // they feel about the other says which way it moves them. Somebody
+  // with no memories of the other party has no feeling to read, and
+  // the charge alone is used — bit-identical to what this resolver did
+  // before, which is standing rule 12's first clause.
+  const feeling = feelingToward(worldState, entity.id, otherEntityId);
+
+  // Higher Trust Threshold = slower to move off prior trust.
   const openness = 1 - trustThreshold / 200; // [0.5, 1] roughly
-  const trustDelta = Math.round(charge * 20 * openness);
+  const direction = feeling === null ? charge : Math.abs(charge) * feeling;
+  const trustDelta = Math.round(direction * 20 * openness);
   const newTrust = clamp(priorTrust + trustDelta, 0, 100);
 
   const writes = writeBack(worldState, applyKeyModifier, {

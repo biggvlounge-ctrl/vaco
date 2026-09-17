@@ -980,7 +980,7 @@ trusted:
 
 The simulation engine is the one app in this repo whose "done" is not a
 list of routes, so it carries a measured completeness score rather than
-a criteria tally. **91.1%**, from
+a criteria tally. **91.4%**, from
 `vacon-c/dev-docs/GAME_COMPLETENESS.md`, which
 `vacon-c/scripts/completeness.mjs` regenerates and
 `vacon-c/test/completeness.test.js` fails on if stale — including a
@@ -989,7 +989,7 @@ check that the percent in THIS file matches the one the code measures.
 | axis | complete | what it measures |
 |---|---|---|
 | systems | 71.1% | the forty urban systems §7 names, at `urbanSystems.js`'s own four levels |
-| tables | 89.4% | schema tables a built world actually fills |
+| tables | 90.9% | schema tables a built world actually fills |
 | statistics | 89.8% | statistics a world can answer about itself |
 | traits | 100% | traits something under `server/` reads |
 | traitDepth | 85.7% | trait columns a life actually changes |
@@ -1076,8 +1076,23 @@ channel list and the ten eras already on the ladder were the whole
 design: awareness now reads 0.2 at founding and 1.0 once radio comes
 back. **Nothing in §7 is `absent` any more.**
 
+**And one of the seven Keys had never resolved once.** `keys_log` was a
+table with no store, partly because `keys_log.key_id` references
+`key_definitions` and the module constant `completeness.js` said it
+was had never been written. With both in place, 300 ticks of a
+generated world measured: Aggression 4555, ScarcityResponse 2398, Fear
+2398, Adaptability 1530, Resilience 2, **Trust 0**, Territory 0.
+Territory is deliberately unwired and says so; Trust was not — the
+entire Social category, dead, because `runSocialPhase` only runs it
+where the actor holds a fact ABOUT the other party and **nothing in the
+engine wrote a knowledge row whose subject is a person** (0 of 600).
+A robbery victim now learns something about whoever robbed them, at a
+confidence drawn against the offender's own `criminal` traits, and
+Trust resolves 7,186 times with relationship trust spanning 16 to 87
+instead of sitting at 50.
+
 **The percent can go DOWN, and did.** 90% to 89.6% (and back up through
-90.6% with the tier sheets to 91.1% with media), because the world
+90.6% with the tier sheets and 91.1% with media to 91.4%), because the world
 the report measures is now a contested settlement where thefts go
 unprosecuted, so `court_cases` is genuinely empty in it. A score that
 only ever rose would be measuring the work rather than the world. The pattern is consistent enough to be a rule: **the

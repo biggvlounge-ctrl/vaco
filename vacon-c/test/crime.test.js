@@ -126,12 +126,26 @@ test('a serious crime becomes world history with an id a database can hold', () 
   assert.ok(Number.isInteger(history[0].id), 'a history record with no id cannot be migrated');
 });
 
-test('the offender remembers it and the victim is not handed the truth', () => {
-  // Standing rule 1's write-back applies to whoever acted. A victim
-  // who automatically knows exactly what happened to them would make
-  // `entity_knowledge`'s distortion and confidence model meaningless —
-  // the whole point of that table is that people know things
-  // imperfectly.
+test('the victim learns something, and how much depends on who robbed them', () => {
+  // **This used to assert the victim learned NOTHING**, on the
+  // argument that "a victim who automatically knows exactly what
+  // happened to them would make `entity_knowledge`'s distortion and
+  // confidence model meaningless". The argument was right; the
+  // conclusion was that the victim got nothing at all, and no
+  // mechanism to observe the harm was ever built.
+  //
+  // So **nothing in this engine wrote a knowledge row whose
+  // `subject_entity_id` is a person** — measured, 0 of 600 — and that
+  // was the gate behind two of the seven Keys. `runSocialPhase` runs
+  // `resolveTrust` only where the actor holds a fact ABOUT the other
+  // party, so `keys_log` measured Trust at **0 resolutions in 300
+  // ticks**: the whole Social category dead.
+  //
+  // The original reasoning is honoured rather than reversed. The
+  // victim does not get the truth; they get what they could make out,
+  // drawn against the offender's own `criminal` family via
+  // `policing.evasionOf` and their own perception. That is the
+  // distortion model being USED rather than reserved.
   const w = world();
   const c = territory.generateCommunity(w, {});
   const a = person(w, { communityId: c.id });
@@ -139,7 +153,75 @@ test('the offender remembers it and the victim is not handed the truth', () => {
   crime.recordCrime(w, { category: 'theft', perpetratorId: a.id, victimId: b.id });
 
   assert.equal(w.memories.filter((m) => m.entity_id === a.id).length, 1);
-  assert.equal(w.memories.filter((m) => m.entity_id === b.id).length, 0);
+
+  // The victim now has a memory, and it is NEGATIVE — which is the
+  // half the knowledge row cannot carry. `knowledgeCharge` measures
+  // whether a fact is true, not whether it is good, so a firmly-known
+  // fact alone would raise the victim's trust in whoever robbed them.
+  const victimMemories = w.memories.filter((m) => m.entity_id === b.id);
+  assert.equal(victimMemories.length, 1);
+  assert.equal(victimMemories[0].memory_type, 'negative');
+  assert.ok(victimMemories[0].emotion_level < 0);
+  assert.deepEqual(victimMemories[0].related_entity_ids, [a.id]);
+
+  // And a fact about a PERSON, which is what opens the gate.
+  const learned = w.entityKnowledge.filter((k) => k.entity_id === b.id);
+  assert.equal(learned.length, 1);
+  assert.equal(learned[0].subject_entity_id, a.id);
+  // Never certainty: the confidence is what they could make out, and
+  // the fact_type follows it rather than being asserted.
+  assert.ok(learned[0].confidence_level > 0 && learned[0].confidence_level < 1,
+    `the victim was handed a confidence of ${learned[0].confidence_level}`);
+  assert.ok(['known', 'assumption'].includes(learned[0].fact_type));
+  // It travels — `media.runWordOfMouth` carries `subject_entity_id`,
+  // so a neighbourhood learns who is worth avoiding.
+  assert.ok(learned[0].spread_rate > 0);
+});
+
+test('a skilled offender leaves the victim guessing, an unskilled one does not', () => {
+  // The distortion model doing the work it exists for. Standing rule 8:
+  // both subjects are constructed, because the whole assertion is
+  // about where their `criminal` traits put them.
+  // **Through `entity_traits`, not the frozen sheet** — standing rule
+  // 9. `policing.evasionOf` reads the LIVE entity, so setting
+  // `npc.traits` would measure nothing; this fixture's `person` helper
+  // creates no trait rows at all, so they are built here.
+  const { generateEntityTraits } = require('../server/entityTraits.js');
+  const { INDIVIDUAL_DEFINITIONS } = require('../server/traitDefinitions.js');
+
+  const learn = (evasionTrait) => {
+    const w = world();
+    const c = territory.generateCommunity(w, {});
+    const offender = person(w, { communityId: c.id });
+    const victim = person(w, { communityId: c.id });
+    w.entityTraits.push(...generateEntityTraits(
+      offender.id, w.tick, INDIVIDUAL_DEFINITIONS,
+      (def) => (def.family === 'criminal' ? evasionTrait : 50),
+    ));
+    crime.recordCrime(w, { category: 'theft', perpetratorId: offender.id, victimId: victim.id });
+    return w.entityKnowledge.find((k) => k.entity_id === victim.id);
+  };
+
+  const ghost = learn(100);
+  const clumsy = learn(0);
+  assert.ok(clumsy.confidence_level > ghost.confidence_level,
+    'a ghost and a clumsy thief were equally identifiable');
+  assert.equal(clumsy.fact_type, 'known');
+  assert.equal(ghost.fact_type, 'assumption');
+  // Distortion is the complement, so a guess arrives garbled and
+  // degrades further with every retelling.
+  assert.ok(ghost.distortion_level > clumsy.distortion_level);
+});
+
+test('a crime with no victim tells nobody about anybody', () => {
+  // A property offence against nobody has no observer. Writing a
+  // knowledge row with a null subject would put a fact about nothing
+  // into the table the Social Key gates on.
+  const w = world();
+  const c = territory.generateCommunity(w, {});
+  const a = person(w, { communityId: c.id });
+  crime.recordCrime(w, { category: 'property', perpetratorId: a.id, victimId: null });
+  assert.equal(w.entityKnowledge.length, 0);
 });
 
 // -- domestic vs violent ------------------------------------------------

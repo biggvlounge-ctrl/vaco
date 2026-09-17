@@ -315,3 +315,87 @@ test('escalation is reachable for an angry person with a real grievance, and not
   // unprovoked path into it. Asserting it would be testing a property
   // nothing relies on.
 });
+
+// -- Trust: confidence and direction are different things ----------------
+//
+// **`knowledgeCharge` measures whether something is TRUE, not whether
+// it is GOOD**, and its own comment says so: "verified/known facts
+// count fully toward positive, false facts invert". That is epistemic
+// status, and it is the right input for `resolveFear` and
+// `resolveScarcityResponse`, where reliably knowing about a shortage
+// should raise alarm.
+//
+// It is the wrong thing to steer trust by, and the defect only became
+// visible once facts about people existed: `crime.recordCrime` now
+// gives a victim a knowledge row about whoever robbed them, and with
+// the charge alone as trust's direction, **knowing for certain who
+// robbed you would raise your trust in them by the full amount.**
+//
+// `entity_knowledge` has no valence column, and adding one would put a
+// second source of truth beside the table that already carries valence
+// — `memories.memory_type` is positive/negative, `emotion_level` is
+// signed, and `related_entity_ids` already says who a memory is about.
+
+test('a firmly-known fact about somebody you resent lowers trust, not raises it', () => {
+  const world = freshWorld();
+  const [entity, other] = twoNpcs();
+  world.npcs.push({ id: entity.id }, { id: other.id });
+  const applied = [];
+
+  // The same knowledge either way: a fact they are sure of.
+  const knowledge = [{ fact_content: `entity ${other.id} committed theft`, confidence_level: 0.9, fact_type: 'known' }];
+
+  const resolve = () => keys.resolveTrust(entity, {
+    ...contextFor(world, { otherEntityId: other.id }, applied),
+    knowledge,
+  });
+
+  // With no memory of them, there is no feeling to read and the charge
+  // alone is used — bit-identical to what this resolver did before the
+  // valence term existed. Standing rule 12's first clause.
+  const stranger = resolve();
+  assert.ok(stranger.trustDelta > 0, 'the no-memory path changed behaviour');
+
+  // Now they remember being robbed by them. `crime.recordCrime` writes
+  // exactly this memory, and it is what makes the direction right.
+  world.memories.push({
+    id: 9001, entity_id: entity.id, memory_type: 'negative', category: 'conflict',
+    description: 'Suffered a theft offence', importance: 30, emotion_level: -30,
+    related_entity_ids: [other.id], tick: world.tick,
+  });
+  const wronged = resolve();
+  assert.ok(wronged.trustDelta < 0,
+    `trust rose by ${wronged.trustDelta} on learning for certain who robbed them`);
+});
+
+test('how sure they are still scales how far trust moves', () => {
+  // Confidence is the magnitude and feeling is the direction — the two
+  // halves have to stay separate, or a half-believed suspicion would
+  // poison a relationship as hard as a certainty.
+  const world = freshWorld();
+  const [entity, other] = twoNpcs();
+  world.npcs.push({ id: entity.id }, { id: other.id });
+  world.memories.push({
+    id: 9002, entity_id: entity.id, memory_type: 'negative', category: 'conflict',
+    description: 'Suffered a theft offence', importance: 30, emotion_level: -40,
+    related_entity_ids: [other.id], tick: world.tick,
+  });
+  const applied = [];
+
+  const move = (confidence, factType) => keys.resolveTrust(entity, {
+    ...contextFor(world, { otherEntityId: other.id }, applied),
+    knowledge: [{ fact_content: 'a thing', confidence_level: confidence, fact_type: factType }],
+  }).trustDelta;
+
+  const certain = move(0.95, 'known');
+  const guessing = move(0.2, 'assumption');
+  assert.ok(certain < 0, `a certainty should move trust down, moved ${certain}`);
+  // **Not strictly negative, and that is right.** `trustDelta` is
+  // rounded, so a barely-believed suspicion against a mild resentment
+  // can land on zero — somebody who half-thinks their neighbour might
+  // have taken something does not think less of them for it. The claim
+  // worth asserting is the ordering, not that every whisper counts.
+  assert.ok(guessing <= 0, `a guess moved trust up by ${guessing}`);
+  assert.ok(certain < guessing,
+    `a guess (${guessing}) moved trust as far as a certainty (${certain})`);
+});

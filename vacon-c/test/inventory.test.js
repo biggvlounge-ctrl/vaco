@@ -38,6 +38,11 @@ function world({ tick = 10 } = {}) {
     entityTraits: [],
     memories: [],
     relationships: [],
+    // **`recordCrime` writes a fact about the offender now.** A
+    // robbery victim learns something about whoever robbed them, which
+    // is what opens `resolveTrust`'s gate — see crime.js. A fixture
+    // that records a crime needs somewhere for that to go.
+    entityKnowledge: [],
     historicalRecords: [],
     individualFinances: [],
     employmentRecords: [],
