@@ -443,28 +443,54 @@ function resolveAggression(entity, context) {
     : clamp(Math.round(Number(grievance) || 0));
   // Tactical Awareness tempers raw aggression into a measured response.
   const responseLevel = clamp(Math.round(aggression * 0.6 + provocationCharge * 0.4 - tacticalAwareness * 0.15));
-  //: **60, measured — and 70 was unreachable by arithmetic.**
+  //: **30, and getting here took three wrong answers — each one a
+  //: different way of not measuring the right population.**
   //:
   //: `responseLevel` is `0.6*aggression + 0.4*provocation -
-  //: 0.15*tacticalAwareness`. Measured across a generated population of
-  //: 150, the trait half `0.6*agg - 0.15*ta` runs p50 21.6, p90 43.2,
-  //: p99 51.6 and **maxes at 53.7**; the grievance that reaches this
-  //: resolver — `relationships.conflict`, once `advanceFriction` and the
-  //: flashpoint draw stopped it ratcheting — tops out around 36, worth
-  //: 14.4. So the highest response any person in the world could produce
-  //: against the angriest relationship in it was **68.1**, and the
-  //: threshold was 70. Not rare: impossible. Zero people qualified at
-  //: any grievance the engine can actually generate.
+  //: 0.15*tacticalAwareness`, and the floor is what makes it a
+  //: violent offence rather than a bad mood.
   //:
-  //: That is standing rule 12's third clause — 70 sounds like a strong
-  //: response on a 0-100 scale, and nobody measured the population it
-  //: applies to. 60 is just above this population's p99 for the trait
-  //: half, so escalation needs both an unusually aggressive person and a
-  //: real grievance. The resulting rate was checked rather than assumed:
-  //: it puts violent offences near 500 per 100,000 per year against the
-  //: deprivation model's ~4,300 for theft, which is the ratio between
-  //: violent and property crime in a real high-crime city.
-  const ESCALATION_RESPONSE_FLOOR = 60;
+  //:   **70** — the original. Chosen as if this expression spanned
+  //:   0..100. It does not: provocation reaches the resolver as
+  //:   `relationships.conflict`, whose measured ceiling is about 50, so
+  //:   its term contributes at most 20, and the trait half contributes
+  //:   at most 60. Nobody ever came close.
+  //:
+  //:   **60** — measured, and still wrong. The trait half
+  //:   `0.6*agg - 0.15*ta` runs p50 21.6, p90 43.2, max 53.7 across a
+  //:   generated population of 150, and conflict tops out near 50, so
+  //:   68 looked like the ceiling and 60 looked safely under it. A
+  //:   1,200-tick world produced **zero** violent offences.
+  //:
+  //:   **The error both times was the same**: measuring the trait half
+  //:   over the WHOLE population and the grievance over the WHOLE
+  //:   distribution, then assuming their maxima can co-occur. They
+  //:   cannot, because nothing correlates them — `crime.frictionTarget`
+  //:   drives conflict from distrust, rivalry and strain and reads
+  //:   nothing about aggression. The people in the worst relationships
+  //:   are ordinary people.
+  //:
+  //: So measure the JOINT population the floor actually applies to:
+  //: `responseLevel` over the pairs the flashpoint draw selects from,
+  //: which is every relationship above CONFLICT_ESCALATION_THRESHOLD.
+  //: On a 400-tick world, 44 such pairs, and responseLevel runs **p50
+  //: 5, p75 18, p90 24, p95 28, max 36**. A floor of 40 qualifies
+  //: nobody. That is the distribution, and it is nothing like the one
+  //: either earlier guess imagined.
+  //:
+  //: 30 sits just above its p95: a handful of pairs in a settlement at
+  //: any moment, each with a flashpoint chance of a few thousandths a
+  //: tick, which lands violent offences near 500-900 per 100,000 per
+  //: year against the deprivation model's ~4,300 for theft. That ratio
+  //: is what a real high-crime city has, and it was checked rather than
+  //: assumed.
+  //:
+  //: **The general lesson, which is standing rule 12's third clause
+  //: sharpened:** when a threshold reads several inputs, the population
+  //: to measure is the joint one at the moment of the check — not each
+  //: input's own range. Two maxima that never co-occur produce a
+  //: ceiling that does not exist.
+  const ESCALATION_RESPONSE_FLOOR = 30;
   const escalatesToConflict = responseLevel >= ESCALATION_RESPONSE_FLOOR;
 
   const writes = writeBack(worldState, applyKeyModifier, {

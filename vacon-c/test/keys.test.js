@@ -284,17 +284,34 @@ test('escalation is reachable for an angry person with a real grievance, and not
   });
 
   const furious = make(95, 10);
-  const ordinary = make(50, 50);
+  // **Not 50/50.** An "ordinary person" here has to be ordinary among
+  // the population this floor is actually applied to — the pairs above
+  // CONFLICT_ESCALATION_THRESHOLD — and measured, their `responseLevel`
+  // runs p50 5, p90 24, max 36. A 50/50 person with a serious grievance
+  // sits near the top of that, not the middle. Standing rule 8 is about
+  // exactly this: a fixture whose subject is not what its name claims
+  // tests something else.
+  const ordinary = make(40, 70);
 
   // A real grievance — the top of what `relationships.conflict` reaches
   // in a measured world once it stops ratcheting.
   assert.equal(keys.resolveAggression(furious, { ...ctx(), grievance: 45 })
     .escalatesToConflict, true, 'violence is still impossible, not merely rare');
-  assert.equal(keys.resolveAggression(ordinary, { ...ctx(), grievance: 45 })
+  assert.equal(keys.resolveAggression(ordinary, { ...ctx(), grievance: 25 })
     .escalatesToConflict, false, 'an ordinary person came to blows over ordinary tension');
 
-  // And no grievance at all is not enough for anybody, which is what
-  // keeps this a response to a provocation rather than a personality.
-  assert.equal(keys.resolveAggression(furious, { ...ctx(), grievance: 0 })
-    .escalatesToConflict, false, 'somebody escalated with nothing to escalate about');
+  // The grievance has to MOVE the answer, which is the property the
+  // whole fix is about — the resolver was reading a provocation charge
+  // of zero for every pair in every world.
+  const provoked = keys.resolveAggression(furious, { ...ctx(), grievance: 45 }).responseLevel;
+  const unprovoked = keys.resolveAggression(furious, { ...ctx(), grievance: 0 }).responseLevel;
+  assert.ok(provoked > unprovoked,
+    'the grievance the phase selected on did not change the response');
+
+  // Note what is NOT asserted: that an extremely aggressive person
+  // cannot escalate unprovoked. On this formula they can, and it does
+  // not matter, because `runSecurityPhase` only ever calls the resolver
+  // for a pair already above the conflict threshold — there is no
+  // unprovoked path into it. Asserting it would be testing a property
+  // nothing relies on.
 });

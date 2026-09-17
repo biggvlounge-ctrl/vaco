@@ -472,6 +472,53 @@ these were mechanisms that worked perfectly and were never reached. The
 eleventh rule says measure a built world; the thirteenth says measure it
 long. **The sixteenth says look at what it is like to be in it.**
 
+**A seventeenth, and it cost four wrong answers in a row to learn.**
+When a threshold reads several inputs, the population to measure is
+the JOINT one, at the moment of the check — and if the check is
+sampled repeatedly over time, a snapshot of that population is still
+the wrong thing to measure.
+
+`keys.resolveAggression`'s escalation floor is the case study, and
+every attempt was measured; each measured the wrong set:
+
+- **70** — set as if `0.6*agg + 0.4*provocation - 0.15*ta` spanned
+  0..100. It spans about -15..+40 on a real population, because
+  provocation arrives as `relationships.conflict`, whose ceiling is
+  near 50, so its term contributes at most 20.
+- **60** — measured the trait half over the whole population (max
+  53.7) and conflict over its whole range (max ~50), and assumed the
+  two maxima could co-occur. They cannot: `crime.frictionTarget`
+  drives conflict from distrust, rivalry and strain and reads nothing
+  about aggression, so **the people in the worst relationships are
+  ordinary people**. A 1,200-tick world produced zero offences.
+- **30 at a flashpoint rate of 0.01** — measured the joint
+  distribution properly this time, `responseLevel` across the pairs
+  the draw selects from: p50 5, p90 24, p95 28, max 36. Set the floor
+  just above p95 so only the top few percent would ever escalate. But
+  a snapshot percentile does not survive repeated sampling: every
+  eligible pair gets a draw every tick while `advanceFriction` walks
+  its conflict upward, so **43 of 44 eligible pairs escalated at least
+  once** — 67 offences and a quarter of the town, spread thin at no
+  more than three per pair.
+- **30 at 0.0006** — the floor decides who CAN escalate, the rate
+  decides how often the question is asked, and conflating them is what
+  produced the warzone. Separated, the rate carries the volume:
+  violent 1,217 and domestic 608 per 100,000 per year against the
+  deprivation model's 4,867 for theft, across three pairs and three
+  perpetrators.
+
+Two further notes worth keeping. **A missing inverse cannot be fixed
+by choosing a constant**: `resolveAggression` writes `conflict +=
+responseLevel/10` on every call, so violence raised the tension that
+causes violence, and no floor could have produced an equilibrium —
+`runSecurityPhase` discharges the grievance when the fight happens and
+`advanceFriction` is the restoring force. And **the right reference is
+usually inside the model**: reaching for a real-world crime rate
+imports a society with a functioning state, while every area in a
+generated world here measures as `contested`. Violence below theft,
+where theft comes from an independent mechanism, is the comparison
+that means something.
+
 The same commit carries the thirteenth rule's other half in a place
 worth naming: `infrastructure.js` had been left with decay and no
 inverse on purpose, because when utilities were built, every candidate

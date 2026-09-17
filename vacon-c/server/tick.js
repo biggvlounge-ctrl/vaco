@@ -781,13 +781,34 @@ const CONFLICT_ESCALATION_THRESHOLD = 20;
 //: ratchet, because the resolver now runs tens of times over a world's
 //: life instead of tens of thousands.
 //:
-//: **Flagged interpretive, and measured rather than guessed.** No
-//: document gives a rate. At 0.01 a relationship sitting at the p90
-//: conflict of ~25 has a flashpoint about once every four hundred
-//: ticks, which puts violent offences in the same order as the theft
-//: rate the deprivation model already produces — and that is the
-//: comparison that was checked, not a number that sounded right.
-const AGGRESSION_FLASHPOINT_RATE = 0.01;
+//: **Flagged interpretive. This is the dial that sets the VOLUME, and
+//: separating it from the floor took one more measurement mistake.**
+//:
+//: `keys.ESCALATION_RESPONSE_FLOOR` decides who CAN ever escalate;
+//: this decides how often the question gets asked. Those are different
+//: jobs and the first attempt conflated them: the floor was set at the
+//: p95 of a SNAPSHOT of `responseLevel` across eligible pairs, on the
+//: reasoning that only the top few percent should ever come to blows.
+//:
+//: A snapshot percentile is the wrong basis for a threshold that is
+//: sampled repeatedly. Each eligible pair gets a draw every tick for
+//: hundreds of ticks, and `advanceFriction` walks its conflict up
+//: toward `frictionTarget` the whole time — so a pair that sits below
+//: the floor today clears it next month, and over 400 ticks **43 of the
+//: 44 eligible pairs escalated at least once**: 67 offences, 40
+//: distinct perpetrators out of 149 people, and no pair fighting more
+//: than three times. Not a feud — a quarter of the town, which is a
+//: warzone rather than a settlement.
+//:
+//: So the floor keeps the meaning it was measured for (a serious
+//: response, on this formula's real range) and the rate carries the
+//: volume. 0.0006 puts violent and domestic offences somewhat below the
+//: theft rate the deprivation model produces independently — the
+//: within-model comparison, which is the right one here, because the
+//: setting is a post-reset settlement whose every area measures as
+//: `contested` and real-world rates come from societies with a
+//: functioning state.
+const AGGRESSION_FLASHPOINT_RATE = 0.0006;
 
 function runSecurityPhase(worldState) {
   const events = [];
@@ -834,6 +855,35 @@ function runSecurityPhase(worldState) {
         tick: worldState.tick,
         responseLevel: outcome.responseLevel,
       });
+
+      // **The confrontation spends the tension, and without this the
+      // whole mechanism is a ratchet that feeds itself.**
+      //
+      // `resolveAggression` writes `conflict: +responseLevel/10` on
+      // every call and `hatred` on top when it escalates — so violence
+      // RAISED the grievance that causes violence, which raised both
+      // the flashpoint rate and the next responseLevel. Measured: at a
+      // correctly-calibrated floor the same pairs escalated over and
+      // over at an accelerating rate, **78 violent offences in 400
+      // ticks among 149 people — 47,768 per 100,000 per year**, about
+      // sixty times a real high-crime city.
+      //
+      // That is standing rule 13 inside a single mechanism: the
+      // escalation had no inverse, so there was no equilibrium, and no
+      // choice of floor could have produced one. Lowering the floor
+      // until the rate looked right would have been fitting a constant
+      // to hide a missing term.
+      //
+      // Discharged to zero rather than damped, because that is the
+      // honest statement: the fight happened, and whatever was
+      // between them today is settled today. `crime.advanceFriction`
+      // is the restoring force — it walks conflict back toward
+      // `frictionTarget` at 2% of the gap a tick, so a pair whose
+      // distrust, rivalry and strain persist becomes dangerous again
+      // over months, and a pair whose quarrel was circumstantial does
+      // not. A feud is then something the world produces, not
+      // something the arithmetic guarantees.
+      relationship.conflict = 0;
 
       events.push({
         type: 'conflict_escalation', severity: 'high',
