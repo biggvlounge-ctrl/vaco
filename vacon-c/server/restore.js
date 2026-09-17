@@ -438,14 +438,23 @@ async function restoreWorldStateFromPostgres(worldState) {
   // Territory / Property
   // -------------------------------------------------------------------
   worldState.cities = (await q('SELECT * FROM cities ORDER BY id')).map((c) =>
+    // **`latitude` and `longitude` are NUMERIC and come back as
+    // strings** (standing rule 10). A latitude of the string "0.0148"
+    // fails `Number.isFinite` inside `geo.isPosition`, so every city
+    // would restore unplaced, every distance would read null, and
+    // `authority.proximity` would fall back to 1 — quietly putting
+    // every block back at the station door and making every area
+    // governed again. Nothing would throw.
     nums(c, ['id', 'region_id', 'population', 'mayor_npc_id', 'economy', 'infrastructure',
       'safety', 'health', 'education', 'culture', 'employment', 'housing', 'pollution',
-      'corruption', 'tick']));
+      'corruption', 'tick', 'latitude', 'longitude']));
   summary.cities = worldState.cities.length;
 
   worldState.communities = (await q('SELECT * FROM communities ORDER BY id')).map((c) =>
+    // `geo_ref` and `geo_source` are TEXT and stay strings; the
+    // coordinates are NUMERIC — see the note on cities above.
     nums(c, ['id', 'city_id', 'population', 'housing', 'crime', 'safety', 'employment',
-      'education', 'health', 'culture', 'cohesion', 'tick']));
+      'education', 'health', 'culture', 'cohesion', 'tick', 'latitude', 'longitude']));
   summary.communities = worldState.communities.length;
 
   worldState.territoryBlocks = (await q('SELECT * FROM territory_blocks ORDER BY id')).map((b) =>
@@ -458,7 +467,7 @@ async function restoreWorldStateFromPostgres(worldState) {
   // with the three fields it came from.
   worldState.infrastructure = (await q('SELECT * FROM infrastructure ORDER BY id')).map((i) => {
     const row = nums(i, ['id', 'city_id', 'age', 'condition', 'capacity',
-      'maintenance_level', 'funding']);
+      'maintenance_level', 'funding', 'latitude', 'longitude']);
     row.failure_risk = null;
     return row;
   });

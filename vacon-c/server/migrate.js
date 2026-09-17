@@ -323,10 +323,12 @@ async function migrateWorldStateToPostgres(worldState) {
       for (const c of worldState.cities) {
         await client.query(
           `INSERT INTO cities (id, name, region_id, real_world_geo_ref, population, mayor_npc_id,
-                               economy, infrastructure, safety, growth, reemergence_index)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+                               economy, infrastructure, safety, growth, reemergence_index,
+                               latitude, longitude, geo_source)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
           [c.id, c.name, c.region_id, c.real_world_geo_ref, c.population, c.mayor_npc_id,
-            c.economy, c.infrastructure, c.safety, c.growth, c.reemergence_index]
+            c.economy, c.infrastructure, c.safety, c.growth, c.reemergence_index,
+            c.latitude ?? null, c.longitude ?? null, c.geo_source ?? null]
         );
       }
       summary.cities = worldState.cities.length;
@@ -334,10 +336,12 @@ async function migrateWorldStateToPostgres(worldState) {
       for (const c of worldState.communities) {
         await client.query(
           `INSERT INTO communities (id, city_id, population, tier, housing, crime, safety,
-                                    employment, education, culture, reputation, leadership_npc_id)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+                                    employment, education, culture, reputation, leadership_npc_id,
+                                    geo_ref, geo_source, latitude, longitude)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
           [c.id, c.city_id, c.population, c.tier, c.housing, c.crime, c.safety,
-            c.employment, c.education, c.culture, c.reputation, c.leadership_npc_id]
+            c.employment, c.education, c.culture, c.reputation, c.leadership_npc_id,
+            c.geo_ref ?? null, c.geo_source ?? null, c.latitude ?? null, c.longitude ?? null]
         );
       }
       summary.communities = worldState.communities.length;
@@ -364,9 +368,11 @@ async function migrateWorldStateToPostgres(worldState) {
       for (const i of worldState.infrastructure) {
         await client.query(
           `INSERT INTO infrastructure (id, city_id, type, age, condition, capacity,
-             maintenance_level, funding, failure_risk) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+             maintenance_level, funding, failure_risk, latitude, longitude)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
           [i.id, i.city_id, i.type, i.age, i.condition, i.capacity,
-            i.maintenance_level, i.funding, infrastructure.failureRisk(i)]
+            i.maintenance_level, i.funding, infrastructure.failureRisk(i),
+            i.latitude ?? null, i.longitude ?? null]
         );
       }
       summary.infrastructure = worldState.infrastructure.length;

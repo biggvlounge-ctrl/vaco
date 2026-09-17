@@ -96,6 +96,7 @@ const health = require('./health.js');
 const competition = require('./competition.js');
 const justice = require('./justice.js');
 const authority = require('./authority.js');
+const geo = require('./geo.js');
 const motivation = require('./motivation.js');
 const membership = require('./membership.js');
 const infrastructure = require('./infrastructure.js');
@@ -654,6 +655,36 @@ const CATALOGUE = [
     // category, so a settlement that never legislated against theft
     // lets every thief walk, and this number says so.
     compute: (ctx) => justice.unlegislatedShare(ctx.worldState, ctx.communityId),
+  },
+  {
+    key: 'police_station_distance_m', category: 'surveillance', unit: 'count', scope: 'community',
+    // **§9's GEOGRAPHIC DATA block asks for this by name** — "police
+    // station distance" — along with hospital distance, highway
+    // distance and water proximity, and the engine answered none of
+    // them because nothing anywhere had a position. `server/geo.js` is
+    // the format, the resolver and haversine metres;
+    // `dev-docs/LAND_AND_MAP_DATA.md` §7 step 1 called writing it "the
+    // single most important thing to fix before importing anything".
+    //
+    // `count` rather than a comparable unit, deliberately: metres
+    // compare fine between two areas, but this reads a SYNTHETIC
+    // position in every generated world and z-scoring a made-up
+    // geography across areas would dress it as a finding.
+    caveat: 'measured from a synthetic position — `geo_source` on every row says so, and a '
+      + 'real import replaces both the reference and the coordinates',
+    compute: (ctx) => {
+      const nearest = geo.nearestInfrastructure(ctx.worldState, ctx.communityId, 'public_safety');
+      return nearest === null ? null : nearest.metres;
+    },
+  },
+  {
+    key: 'hospital_distance_m', category: 'surveillance', unit: 'count', scope: 'community',
+    // The other distance §9 names. Same synthetic caveat.
+    caveat: 'measured from a synthetic position — see police_station_distance_m',
+    compute: (ctx) => {
+      const nearest = geo.nearestInfrastructure(ctx.worldState, ctx.communityId, 'hospitals');
+      return nearest === null ? null : nearest.metres;
+    },
   },
   {
     key: 'state_authority', category: 'crime', unit: 'share', scope: 'community',

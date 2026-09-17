@@ -13,17 +13,17 @@ three places, a spec section's "roughly 25 of the 40", a catalogue of 67
 statistics that a real world answered 36 of, and seven trait families generated
 on every NPC and read by nothing.
 
-## 90% complete
+## 89.6% complete
 
 ```
-██████████████████░░  90%   290.75 of 323
+██████████████████░░  89.6%   291.25 of 325
 ```
 
 | axis | complete | score | what it measures |
 |---|---|---|---|
 | systems | **60.6%** | 24.25/40 | urban systems with mechanics |
-| tables | **90.2%** | 59.5/66 | schema tables a built world fills |
-| statistics | **89.8%** | 79/88 | statistics a world can answer |
+| tables | **89.4%** | 59/66 | schema tables a built world fills |
+| statistics | **88.9%** | 80/90 | statistics a world can answer |
 | traits | **100%** | 114/114 | traits something reads |
 | traitDepth | **85.7%** | 6/7 | trait columns a life actually changes |
 | habits | **100%** | 8/8 | habit and routine depth |
@@ -70,7 +70,7 @@ The forty systems §7 names, at `server/urbanSystems.js`'s own four levels (mode
 | `36. Tourism` | absent | +1 |
 | `39. Reputation` | partial | +0.5 |
 
-### tables — 7 open
+### tables — 8 open
 
 Every `CREATE TABLE` in the schema and its extensions. A table a built world fills scores 1; one the engine writes but no world has ever used scores 0.5; one with no store at all scores 0.
 
@@ -83,8 +83,9 @@ Every `CREATE TABLE` in the schema and its extensions. A table a built world fil
 | `economy_snapshots` | no store | +1 |
 | `analytics_snapshots` | no store | +1 |
 | `vault_studios_links` | no store | +1 |
+| `court_cases` | empty in a built world | +0.5 |
 
-### statistics — 9 open
+### statistics — 10 open
 
 The `server/statistics.js` catalogue, scored on whether a world can produce the number in any area at all.
 
@@ -93,7 +94,8 @@ The `server/statistics.js` catalogue, scored on whether a world can produce the 
 | `teenage_birth_share` | silent | +1 |
 | `body_composition` | declared gap | +1 |
 | `informal_economy_share` | declared gap | +1 |
-| `group_answered_share` | silent | +1 |
+| `conviction_rate` | silent | +1 |
+| `unlegislated_crime_share` | silent | +1 |
 | `camera_coverage` | declared gap | +1 |
 | `street_lighting` | declared gap | +1 |
 | `private_security_presence` | declared gap | +1 |

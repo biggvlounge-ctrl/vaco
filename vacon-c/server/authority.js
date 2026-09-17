@@ -31,8 +31,11 @@
 //                actually happened to them. A state whose own residents
 //                do not believe in it does not govern them.
 //   reach        `infrastructure.serviceLevel(public_safety)` scaled by
-//                the condition that infrastructure is in. Capacity that
-//                has rotted is not capacity.
+//                the condition that infrastructure is in AND by how far
+//                this community is from the nearest station. Capacity
+//                that has rotted is not capacity, and a station on the
+//                other side of the city is not a station on this
+//                street.
 //   grip         The control score of whatever faction holds the blocks
 //                in this area, INVERTED. `territory.resolveTerritoryControl`
 //                already rates a faction's hold from its live
@@ -81,22 +84,24 @@
 // there the state prosecuted violence and let every theft go, which is
 // the model doing exactly what it is for.
 //
-// The reason no default area fails is worth writing down rather than
-// tuning away. **Two of the three local terms are not really local.**
-// `trust` moves on clearances, which are rare, so it sits near its
-// neutral 50 everywhere. `reach` is city-scoped — `serviceLevel` is
-// capacity per resident for a whole CITY and caps at 1, so every block
-// in a city with a working station reads fully policed. That leaves
-// `grip` as the only term that genuinely distinguishes one street from
-// the next.
+// The reason was worth writing down rather than tuning away, and it has
+// since been fixed. **Two of the three local terms were not really
+// local.** `trust` moves on clearances, which are rare, so it sits near
+// its neutral 50 everywhere. And `reach` was city-scoped —
+// `serviceLevel` is capacity per resident for a whole CITY and caps at
+// 1, so every block in a city with a working station read fully
+// policed. That left `grip` as the only term that distinguished one
+// street from the next.
 //
-// The missing term is distance: how far this block is from the station,
-// which is what actually makes one neighbourhood policed and the next
-// one not. There is no geography to compute it from — `statistics.js`
-// declares `terrain_and_water` unavailable for the same reason, and
-// `dev-docs/LAND_AND_MAP_DATA.md` names the real sources. Inventing a
-// distance would put a made-up number under every lawlessness reading,
-// so the limitation is stated here instead.
+// The missing term was distance: how far this block is from the
+// station, which is what actually makes one neighbourhood policed and
+// the next one not. `server/geo.js` is that — the format, the resolver
+// and haversine metres — and `reachTerm` reads it now. A community 700
+// metres from a station and one 9 kilometres away in the same city no
+// longer report the same policing.
+//
+// `trust` is still flat, and that is a fact about how rarely crime
+// happens rather than about this file.
 //
 // ---------------------------------------------------------------------
 // What this is NOT
@@ -111,6 +116,7 @@
 const policing = require('./policing.js');
 const infrastructure = require('./infrastructure.js');
 const politics = require('./politics.js');
+const geo = require('./geo.js');
 const { getLiveEntity } = require('./entityTraits.js');
 
 // ---------------------------------------------------------------------
@@ -183,7 +189,35 @@ function reachTerm(worldState, communityId) {
     ? 1
     : Math.max(0, Math.min(1, conditions.reduce((a, b) => a + b, 0) / conditions.length / 100));
 
-  return Math.max(0, Math.min(1, level * condition));
+  return Math.max(0, Math.min(1, level * condition * proximity(worldState, communityId)));
+}
+
+//: How far a station can be before this street stops being policed by
+//: it. **Flagged interpretive** — no document sets a patrol radius —
+//: and chosen against the scale a generated world actually has:
+//: communities scatter within `geo.COMMUNITY_SPREAD_M` (6 km) of their
+//: city, so measured distances to the nearest station run from a few
+//: hundred metres to about ten kilometres. A 5 km half-distance puts
+//: the near end of that range close to fully policed and the far end at
+//: about a third, which is a difference the writ can act on rather than
+//: a rounding error.
+const PATROL_HALF_DISTANCE_M = 5000;
+
+// How much being HERE rather than at the station is worth, 0..1.
+//
+// **1 when there is no geography to read, not 0.** An unplaced world —
+// every world this engine generated before `server/geo.js` — is one
+// where distance is unknown, and an unknown distance is not an infinite
+// one. Scoring it 0 would have made every area in every unplaced world
+// lawless the day this function was written, which is standing rule
+// 12's first clause: a modifier centred wrong recalibrates the world.
+function proximity(worldState, communityId) {
+  const nearest = geo.nearestInfrastructure(worldState, communityId, 'public_safety');
+  if (nearest === null) return 1;
+  // A hyperbolic falloff rather than a linear one: halving at the half
+  // distance and never reaching zero, because a distant station is
+  // worse than a near one and is not the same as no station.
+  return PATROL_HALF_DISTANCE_M / (PATROL_HALF_DISTANCE_M + nearest.metres);
 }
 
 // How much of this ground somebody else holds, 0..1. Returns the
@@ -383,6 +417,8 @@ module.exports = {
   CONTESTED_FLOOR,
   CONTESTED_SEVERITY_FLOOR,
   REGIMES,
+  PATROL_HALF_DISTANCE_M,
+  proximity,
   trustTerm,
   reachTerm,
   gripTerm,

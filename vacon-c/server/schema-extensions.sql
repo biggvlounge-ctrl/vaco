@@ -374,3 +374,49 @@ CREATE TABLE IF NOT EXISTS court_cases (
 );
 CREATE INDEX IF NOT EXISTS idx_court_cases_defendant ON court_cases (defendant_entity_id);
 CREATE INDEX IF NOT EXISTS idx_court_cases_community ON court_cases (community_id);
+
+
+-- ---------------------------------------------------------------------
+-- Position and geo reference — cities, communities, infrastructure
+-- ---------------------------------------------------------------------
+-- Carries: the coordinates and hierarchical references written by
+-- server/worldgen.js and read by server/geo.js.
+--
+-- **`dev-docs/LAND_AND_MAP_DATA.md` §1 named this as the single most
+-- important thing to fix**, and its reasoning is this file's own bar
+-- stated from the other side:
+--
+--   "Three of those are free-text keys with no format, no parser and no
+--    reader. That is the single most important thing to fix before
+--    importing anything, because a geo reference nothing can parse is a
+--    string, not a location."
+--
+-- `cities.real_world_geo_ref` already exists in the base schema and is
+-- not re-added here. What it lacked was a format, a parser and anything
+-- that read it; `server/geo.js` is all three, and `geo_source` is what
+-- makes a reference answerable about where it came from — §5 of that
+-- document is titled "Provenance, and why it is not optional here".
+--
+-- **Latitude and longitude are EPSG:4326, and nothing in the engine
+-- measures an area from them.** §7 step 2 names computing an area in
+-- degrees as the classic silent error; `geo.distanceMetres` is
+-- haversine and returns metres, so the only measurement taken from
+-- these columns cannot be wrong in that direction.
+--
+-- All three clear this file's bar — the engine READS them.
+-- `authority.reachTerm` reads the distance from a community to the
+-- nearest `public_safety` site, which is what makes how far the state
+-- reaches a fact about a NEIGHBOURHOOD rather than about its city; a
+-- restore that dropped them would put every block back at the station
+-- door and quietly make every area governed again.
+ALTER TABLE cities ADD COLUMN IF NOT EXISTS latitude NUMERIC;
+ALTER TABLE cities ADD COLUMN IF NOT EXISTS longitude NUMERIC;
+ALTER TABLE cities ADD COLUMN IF NOT EXISTS geo_source TEXT;
+
+ALTER TABLE communities ADD COLUMN IF NOT EXISTS geo_ref TEXT;
+ALTER TABLE communities ADD COLUMN IF NOT EXISTS geo_source TEXT;
+ALTER TABLE communities ADD COLUMN IF NOT EXISTS latitude NUMERIC;
+ALTER TABLE communities ADD COLUMN IF NOT EXISTS longitude NUMERIC;
+
+ALTER TABLE infrastructure ADD COLUMN IF NOT EXISTS latitude NUMERIC;
+ALTER TABLE infrastructure ADD COLUMN IF NOT EXISTS longitude NUMERIC;

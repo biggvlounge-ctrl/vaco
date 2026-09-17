@@ -127,6 +127,10 @@ function generateInfrastructure(worldState, options = {}) {
     // different facts, and `per1k` over a 0 reports the second.
     capacity: options.capacity ?? null,
     maintenance_level: options.maintenanceLevel ?? 50,
+    // EPSG:4326, so `authority.reachTerm` can ask how far a community
+    // is from the nearest station. Null until something places it.
+    latitude: options.latitude ?? null,
+    longitude: options.longitude ?? null,
     funding: options.funding ?? null,
     // Computed on read — see the header. Present on the object only so
     // the row shape matches the table; never assigned.

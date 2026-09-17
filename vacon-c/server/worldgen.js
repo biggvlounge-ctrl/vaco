@@ -87,6 +87,7 @@ const migration = require('./migration.js');
 const environment = require('./environment.js');
 const items = require('./items.js');
 const territory = require('./territory.js');
+const geo = require('./geo.js');
 const worldStore = require('./worldStore.js');
 const { hashSeed, seededUnit } = require('./seeded.js');
 
@@ -239,10 +240,25 @@ function generateWorld(options = {}) {
   summary.languages = languages.length;
 
   for (let c = 0; c < config.cities; c += 1) {
+    // **Where the city is.** `dev-docs/LAND_AND_MAP_DATA.md` §7 step 1
+    // is "decide the geo-reference format and write the resolver", and
+    // `server/geo.js` is both — so a generated world now writes a
+    // reference something can PARSE rather than the free-text
+    // `real_world_geo_ref` that was null in every world ever built.
+    //
+    // Synthetic and flagged as such: the tokens are not Census GEOIDs
+    // and the coordinates are not anywhere. `geo.fromCensusBlock` is
+    // the adapter a real import comes through, and it overwrites both.
+    const cityRef = geo.refOf({ region: 'R1', city: `C${c + 1}` });
+    const cityPosition = geo.scatter(geo.SYNTHETIC_ORIGIN, geo.CITY_SPREAD_M, [config.seed, 'city', c]);
     const city = territory.generateCity(w, {
       name: `City ${c + 1}`,
       economy: Math.round(random.range(35, 70, 'city', c, 'economy')),
       safety: Math.round(random.range(35, 70, 'city', c, 'safety')),
+      realWorldGeoRef: cityRef,
+      geoSource: 'synthetic',
+      latitude: cityPosition.lat,
+      longitude: cityPosition.lon,
     });
     summary.cities.push(city.id);
 
@@ -259,9 +275,20 @@ function generateWorld(options = {}) {
 
     // ---- infrastructure --------------------------------------------
     for (const spec of CITY_INFRASTRUCTURE) {
+      // Placed in the city, not at its centre. **This is the whole
+      // reason the reach term can distinguish one block from the
+      // next**: a station somewhere in a city is near some communities
+      // and far from others, and `authority.reachTerm` reads that
+      // distance. A station at the centroid would be equidistant from
+      // a symmetric scatter and would measure nothing.
+      const sitePosition = geo.scatter(
+        cityPosition, geo.COMMUNITY_SPREAD_M, [config.seed, 'site', c, spec.type],
+      );
       infrastructure.generateInfrastructure(w, {
         cityId: city.id,
         type: spec.type,
+        latitude: sitePosition.lat,
+        longitude: sitePosition.lon,
         capacity: spec.capacityPer1k === undefined
           ? null
           : Math.round((spec.capacityPer1k * cityPopulation) / 1000),
@@ -335,7 +362,20 @@ function generateWorld(options = {}) {
 
     // ---- communities -------------------------------------------------
     for (let b = 0; b < config.communitiesPerCity; b += 1) {
-      const community = territory.generateCommunity(w, { cityId: city.id, tier: 'block' });
+      const communityPosition = geo.scatter(
+        cityPosition, geo.COMMUNITY_SPREAD_M, [config.seed, 'community', c, b],
+      );
+      const community = territory.generateCommunity(w, {
+        cityId: city.id,
+        tier: 'block',
+        // A path prefix of the city's reference, so `geo.contains`
+        // answers "is this community in this city" structurally rather
+        // than by an assumption about digit widths.
+        geoRef: geo.refOf({ region: 'R1', city: `C${c + 1}`, community: `B${b + 1}` }),
+        geoSource: 'synthetic',
+        latitude: communityPosition.lat,
+        longitude: communityPosition.lon,
+      });
       made.communities.push(community);
       summary.communities += 1;
 

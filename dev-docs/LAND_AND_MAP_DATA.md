@@ -297,6 +297,27 @@ statistics is visibly thin rather than quietly wrong.
 
 ## 7. A workable order of operations
 
+**Steps 1 and 2 are done as of 17 Sep 2026** — `vacon-c/server/geo.js`,
+held by `vacon-c/test/geo.test.js`. Everything from step 3 on is an
+import and is still untouched, for the network and licensing reasons
+this document already gives.
+
+One thing step 1 got wrong, found by writing the resolver. **The Census
+GEOID recommendation does not survive the tier mapping in §1 of this
+document.** §1 maps `cities` to a Census PLACE; a Place GEOID is
+state(2)+place(5), and places are not built out of tracts — a place
+boundary crosses them freely. So `city` is NOT a prefix of `community`
+in the Census scheme, and the prefix-containment trick §1 describes
+("a property knows its community, its city and its region by string
+prefix") is false at exactly one tier.
+
+The format is therefore a slash-separated PATH of tier segments —
+`region/city/community/block` — where containment is a prefix of the
+path rather than of a digit string. A Census import writes exactly
+those segments and loses nothing; `geo.fromCensusBlock` is the adapter
+and takes the Place GEOID as a separate argument, because nothing in
+the block GEOID knows which municipality it is in.
+
 1. **Decide the geo-reference format and write the resolver.** Census
    GEOID is the recommendation for the US; whatever you choose,
    `real_world_geo_ref` and `geography_key` need a parser before they

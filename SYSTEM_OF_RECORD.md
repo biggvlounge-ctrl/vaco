@@ -72,7 +72,7 @@ authorization work in §5 had to be done per app rather than once.
 | Containerised services | 36 + nginx + a LiveKit SFU |
 | Registry rows (incl. brand rows and the dev mock) | 37 |
 | Mutating HTTP routes | 524, all accounted for (472 guarded, 52 declared open with a reason) |
-| Automated tests | 2179 across 39 suites |
+| Automated tests | 2191 across 39 suites |
 | Persisted volumes | 30 |
 | Shared-module copies kept in sync | 210 |
 | Service credentials in `.env.example` | 28 callers |
@@ -824,7 +824,7 @@ run to produce the numbers here.
 built:** `node scripts/package-release.mjs` — see §11.
 
 ```sh
-node scripts/run-all-tests.mjs           # 2179/2179 across 39 suites (some skip without a database)
+node scripts/run-all-tests.mjs           # 2191/2191 across 39 suites (some skip without a database)
 node scripts/audit-route-guards.mjs --check   # 524/524 accounted for
 ./sync-shared-runtime.sh --check         # 210 copies current, none unmanaged
 ./sync-design-system.sh --check          # every serving app is a target
@@ -895,7 +895,7 @@ dependencies are installed.
 ### Per-suite
 
 ```
-vacon-c         828   vdp             147   void            142
+vacon-c         840   vdp             147   void            142
 scripts         168   v3              111   vaco-media       51
 v4-proxy         42   world-layer      41   venvm            40
 venvs            45   voken            37   vaco-analytics   39
@@ -980,7 +980,7 @@ trusted:
 
 The simulation engine is the one app in this repo whose "done" is not a
 list of routes, so it carries a measured completeness score rather than
-a criteria tally. **90%**, from
+a criteria tally. **89.6%**, from
 `vacon-c/dev-docs/GAME_COMPLETENESS.md`, which
 `vacon-c/scripts/completeness.mjs` regenerates and
 `vacon-c/test/completeness.test.js` fails on if stale — including a
@@ -989,8 +989,8 @@ check that the percent in THIS file matches the one the code measures.
 | axis | complete | what it measures |
 |---|---|---|
 | systems | 60.6% | the forty urban systems §7 names, at `urbanSystems.js`'s own four levels |
-| tables | 90.2% | schema tables a built world actually fills |
-| statistics | 89.8% | statistics a world can answer about itself |
+| tables | 89.4% | schema tables a built world actually fills |
+| statistics | 88.9% | statistics a world can answer about itself |
 | traits | 100% | traits something under `server/` reads |
 | traitDepth | 85.7% | trait columns a life actually changes |
 | habits | 100% | whether habits and routines carry information |
@@ -1026,7 +1026,18 @@ every world was identical — `housing`, `safety`, `employment`,
 `education` and `reputation` all at the schema default of 50 with
 nothing writing any of them, so community health was 50 everywhere and
 city reemergence 37 in every world — while every building decayed to
-condition 0 within 300 ticks with nothing anywhere repairing one. The pattern is consistent enough to be a rule: **the
+condition 0 within 300 ticks with nothing anywhere repairing one. And
+nothing anywhere had a POSITION: §9's MASTER BLOCK KEY opens with
+GEOGRAPHIC DATA and names police station distance and hospital distance
+among eight fields, and three free-text geo keys in the schema had no
+format, no parser and no reader — which is why how far the state
+reached could only ever be a fact about a city rather than about a
+street.
+
+**The percent can go DOWN, and did.** 90% to 89.6%, because the world
+the report measures is now a contested settlement where thefts go
+unprosecuted, so `court_cases` is genuinely empty in it. A score that
+only ever rose would be measuring the work rather than the world. The pattern is consistent enough to be a rule: **the
 only trustworthy number is one a command produces.**
 
 **One statistic was built, measured, and taken back out.** The owner

@@ -53,6 +53,11 @@ function generateCity(worldState, options = {}) {
     name: options.name,
     region_id: options.regionId ?? null,
     real_world_geo_ref: options.realWorldGeoRef ?? null,
+    // EPSG:4326. Null until something places the city — an unplaced
+    // city is not at 0,0, and `geo.positionOf` returns null for it.
+    latitude: options.latitude ?? null,
+    longitude: options.longitude ?? null,
+    geo_source: options.geoSource ?? null,
     population: options.population ?? 0,
     mayor_npc_id: options.mayorNpcId ?? null,
     economy: options.economy ?? 50,
@@ -88,6 +93,13 @@ function generateCommunity(worldState, options = {}) {
     education: options.education ?? 50,
     culture: options.culture ?? null,
     reputation: options.reputation ?? 50,
+    // Where this is, and where the answer came from. See server/geo.js
+    // — the format is a path with one segment per tier, so containment
+    // is a path prefix rather than an assumption about digit widths.
+    geo_ref: options.geoRef ?? null,
+    geo_source: options.geoSource ?? null,
+    latitude: options.latitude ?? null,
+    longitude: options.longitude ?? null,
     leadership_npc_id: options.leadershipNpcId ?? null,
   };
   worldState.communities.push(community);
