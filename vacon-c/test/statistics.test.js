@@ -175,13 +175,29 @@ test('every unavailable statistic names its missing substrate', () => {
     assert.ok(entry.reason.length > 60, `${entry.key} has no real explanation`);
   }
   // §9's constraint travels with the entry rather than living only in
-  // a header nobody reads at the call site. `demographic_composition`
-  // used to carry it and is gone — language, religion and education
-  // are computed now — so the clause moved to the entry that is still
-  // a deliberate absence rather than a gap.
-  const race = missing.find((e) => e.key === 'race_and_ethnicity_composition');
-  assert.match(race.reason, /morality, criminality, intelligence or worth/);
-  assert.match(race.reason, /deliberately absent rather than missing/);
+  // a header nobody reads at the call site. Two entries have carried it
+  // in turn and both are gone: `demographic_composition` first, because
+  // language, religion and education are computed now, and then
+  // `race_and_ethnicity_composition`, whose own declaration said adding
+  // the field was "a decision to take explicitly" — the owner took it
+  // on 17 Sep 2026.
+  //
+  // **So the clause is no longer a reason string at all, and that is
+  // the point.** It is `test/ethnicity.test.js`, which asserts that no
+  // module deciding whether somebody offends, is caught, works, earns,
+  // dies, or is capable of anything reads the field. A declared absence
+  // was the weaker guarantee; this is the stronger one.
+  assert.equal(missing.some((e) => e.key === 'race_and_ethnicity_composition'), false,
+    'the ethnicity gap is declared again — if the field was removed, the §9 firewall in '
+    + 'test/ethnicity.test.js needs to go with it');
+
+  // The clause still has to be written down beside something. It is on
+  // `body_composition` now, which is the live deliberate absence: the
+  // reason it is declared is that the index buildable from this
+  // engine's substrate splits a population at the employment line.
+  const body = missing.find((e) => e.key === 'body_composition');
+  assert.ok(body, 'nothing in the catalogue carries §9\'s demographic clause any more');
+  assert.match(body.reason, /demographic clause/);
 });
 
 test('infrastructure capacity is null when nothing exists, not zero', () => {

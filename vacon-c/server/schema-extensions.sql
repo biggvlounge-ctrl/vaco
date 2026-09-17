@@ -270,3 +270,28 @@ CREATE TABLE IF NOT EXISTS inventory (
 -- through `barter.barterScore`.
 CREATE INDEX IF NOT EXISTS idx_inventory_holder ON inventory (holder_entity_id);
 CREATE INDEX IF NOT EXISTS idx_inventory_item ON inventory (item_name);
+
+-- ---------------------------------------------------------------------
+-- npcs.ethnicity
+-- ---------------------------------------------------------------------
+-- Carries: `npc.ethnicity`, set by engine.js#generateNPC and inherited
+-- by births.js#bearChild.
+--
+-- The base schema models language, religion and education as an NPC's
+-- demographic dimensions and has no fourth. `statistics.js` declared
+-- the missing one "deliberately absent rather than missing" and named
+-- what it was waiting for: §9 permits demographic modelling while
+-- forbidding demographics determining an NPC's morality, criminality,
+-- intelligence or worth, "which makes adding one a decision to take
+-- explicitly, not a side effect of wanting a composition statistic."
+-- The owner took that decision on 17 Sep 2026.
+--
+-- Meets this file's bar — a field the engine READS, not merely sets:
+-- `demographics.compositionOf` reads it and two statistics report it,
+-- so a restore that dropped it would change what a world can say about
+-- itself rather than silently discarding a value nothing consumes.
+--
+-- **What may NOT read it is enforced by `test/ethnicity.test.js`**: no
+-- generator of crime, policing, employment, wages, mortality or trait
+-- values. The column exists to be counted, not to decide anything.
+ALTER TABLE npcs ADD COLUMN IF NOT EXISTS ethnicity TEXT;

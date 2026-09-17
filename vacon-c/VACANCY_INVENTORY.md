@@ -20,11 +20,21 @@ There is a working simulation — traits across four tiers, seven Key
 resolvers, family, economy, territory, tick, players, artifacts and
 missions, plus Property, Culture DNA, Named Flow Templates, contest
 resolution and the Behavior Engine — and its HTTP surface is real:
-**76 routes**, up from 8 before any of this.
+**79 routes**, up from 8 before any of this.
+
+Since then, and not in the phase plan because nothing anticipated them:
+world generation, the uniform statistics catalogue, crime and policing,
+births, mortality and succession, demographics, motivation, archetypes,
+households, migration, weather, trait drift, and a population's health.
+Every one of them started from the same observation — a table the
+schema defined that no code touched, or a generator nothing called.
+**The running percent is in `dev-docs/GAME_COMPLETENESS.md`** and is
+measured by `scripts/completeness.mjs`, never typed by hand.
 
 This paragraph named Property and Culture as "genuinely not built" for
-some time after both shipped. Re-checked directly on 29 Aug 2026, which
-is the only way any line in this file should be trusted.
+some time after both shipped, and said 76 routes when 79 were
+registered. Re-checked directly on 17 Sep 2026, which is the only way
+any line in this file should be trusted.
 
 What actually remains: Phase 3's player experience beyond the citizen
 dashboard, Phase 4's ecosystem link-outs, Phase 5 multiplayer, and the
@@ -37,31 +47,74 @@ the Postgres schema that already exists.
 
 ## 1. Server code — `vacon-c/server/`
 
-All present on disk, all committed. 231 KB total.
+All 55 files present on disk, all committed. 925 KB total,
+largest first.
+
+**This table was stale in a way worth recording**, because it is the
+exact failure this repo keeps finding. It listed 21 of what were by
+then 55 files, 15 of those 21 with the wrong byte count, and a total of
+"231 KB" against a real 925 KB — a document whose whole job is to say
+what exists, wrong about two thirds of what exists. Nine modules built
+in one working session were absent from it entirely. Sizes below were
+read off disk, not recalled.
 
 | File | Size | What it holds | State |
 |---|---|---|---|
-| `engine.js` | 23,482 | The simulation core. Re-exports 33 functions across every subsystem. | Built |
-| `tick.js` | 19,682 | Tick pipeline, environmental conditions. | Built |
-| `keys.js` | 16,492 | **All 7 Key resolvers** — Resilience, Adaptability, Trust, Scarcity Response, Fear, Aggression, Territory. | Built |
-| `migrate.js` | 14,314 | WorldState → PostgreSQL migration. | Built, see §4 |
-| `economy.js` | 8,340 | Resources, scarcity, market listings, price resolution, individual finances, net worth. | Built |
-| `territory.js` | 7,598 | Cities, communities, territory blocks, control resolution, city reemergence and community health (both computed on read). | Built |
-| `culture.js` | 11,476 | **Culture DNA (Phase 2)** — sixteen named families stored three ways, tier-level attachment. | Built |
-| `flows.js` | 15,151 | **Named Flow Templates (Phase 2)** — one resolver, ten rows, seventeen signals. | Built |
-| `property.js` | 14,184 | **Property Engine (Phase 2)** — generation, derived value, append-only ownership, lifecycle. | Built |
-| `behavior.js` | 19,085 | **The Behavior Engine** — routine, mood and habits: the three tables architecture §4.5 named as genuinely new (`schedule_events`, `entity_state`, `habits`), all of which sat in the schema with zero code. | Built |
+| `migrate.js` | 54,182 | WorldState → PostgreSQL migration. | Built, see §4 |
+| `tick.js` | 52,017 | The eleven-phase tick pipeline, environmental conditions, and the cross-cutting slot. **Conditions now give back what they took** — see CLAUDE.md, thirteenth standing rule. | Built |
+| `statistics.js` | 49,709 | The uniform statistics catalogue — every reading an area can give about itself, in one shape, with declared absences as data. | Built |
+| `engine.js` | 43,768 | The simulation core. Re-exports the whole subsystem surface, and holds `WorldState`. | Built |
+| `worldgen.js` | 41,336 | **Assembles a whole world** by calling the generators that already existed. The eleventh standing rule's answer: before this, every world was a crowd of people standing in an empty field. | Built |
+| `motivation.js` | 35,500 | **Needs, values and goals in one module**, per §4.5 ("Motivation Engine = Value System DNA restated"). Fifteen needs, fifteen values, one satisfier apiece and one declared absence. | Built |
+| `behavior.js` | 33,172 | **The Behavior Engine** — routine, mood and habits: the three tables architecture §4.5 named as genuinely new (`schedule_events`, `entity_state`, `habits`), all of which sat in the schema with zero code. | Built |
+| `politics.js` | 32,798 | Government, laws, and an election lifecycle with real candidates and votes. | Built |
+| `restore.js` | 29,132 | The inverse of `migrate.js` — PostgreSQL → WorldState. | Built, see §4 |
+| `mortality.js` | 28,001 | Age, vitality, disease pressure, survival scarcity, and who dies. | Built |
+| `births.js` | 25,385 | Conception, gestation and birth, including what a child inherits. | Built |
+| `economy.js` | 25,317 | Resources, scarcity, market listings, price resolution, individual finances, net worth. | Built |
+| `urbanSystems.js` | 25,148 | The forty urban systems §7 names, at four levels of presence — the `systems` axis of the percent. | Built |
+| `keys.js` | 23,968 | **All 7 Key resolvers** — Resilience, Adaptability, Trust, Scarcity Response, Fear, Aggression, Territory. | Built |
+| `traitDrift.js` | 23,460 | **What a life does to a person** — the six `entity_traits` columns nothing ever moved: experience, environment, relationship contagion, temporary strain. | Built |
+| `crime.js` | 23,027 | The typed crime record, and community danger over a rolling window. **Reads the environment, never the person.** | Built |
+| `completeness.js` | 21,486 | **The running percent.** Six measured axes behind `dev-docs/GAME_COMPLETENESS.md`. | Built |
+| `migration.js` | 19,855 | People actually move: push from unmet need, pull from a better place, and a settling period so nobody churns. | Built |
+| `flows.js` | 18,346 | **Named Flow Templates (Phase 2)** — one resolver, ten rows, seventeen signals. | Built |
+| `barter.js` | 17,504 | Direct exchange between holders, priced from scarcity. | Built |
+| `archetypes.js` | 15,962 | Preferences, and the individual archetype tags derived from live traits — computed on a crossing, never stored twice. | Built |
+| `policing.js` | 15,800 | Clearance, open cases, and public trust in policing as a belief rather than a derived clearance rate. | Built |
+| `schema-extensions.sql` | 15,734 | Columns this engine added beyond the handoff schema, each with the reason in a comment. | Built |
+| `infrastructure.js` | 15,639 | City infrastructure: capacity, condition, failure risk, service level. | Built |
+| `property.js` | 14,898 | **Property Engine (Phase 2)** — generation, derived value, append-only ownership, lifecycle. | Built |
+| `areaStats.js` | 14,182 | Residents of an area, and the world poverty line. | Built |
+| `technology.js` | 13,834 | Civilizations, eras, and what an era makes possible. | Built |
+| `contest.js` | 13,644 | **Contest resolution** — rates entities from their live `combat`/`sports` traits and resolves a bout deterministically from a seeded draw. **The tick pipeline never calls it**, so no generated world has held a contest. | Built, unreached |
+| `environment.js` | 13,372 | Weather, climate and where a drought lives — `environment_state`, one row per city, and severe weather through the existing condition channel. | Built |
+| `territory.js` | 13,230 | Cities, communities, territory blocks, control resolution, city reemergence and community health (both computed on read). | Built |
+| `health.js` | 12,256 | **A population's health** — the `health` family's first reader besides `mortality.vitalityOf`, plus physical exertion. Its header records why body composition is a declared absence rather than a statistic. | Built |
+| `culture.js` | 12,176 | **Culture DNA (Phase 2)** — sixteen named families stored three ways, tier-level attachment. | Built |
+| `succession.js` | 12,172 | Inheritance — an estate settled by name across holdings, family and property. | Built |
+| `inventory.js` | 11,717 | Who holds what: `give`, `take`, and holdings by item name. | Built |
+| `demographics.js` | 11,514 | Languages, religion, education and ethnicity — composition and diversity. **Counts, never decides**; see `test/ethnicity.test.js`. | Built |
+| `membership.js` | 10,165 | Organization membership and gang membership rates. | Built |
+| `households.js` | 9,918 | **Who actually lives together.** Before this, homes were handed out one per person and nobody had ever lived with anybody. | Built |
 | `actions.js` | 9,674 | **The player action dispatcher** — a registry over verbs that already exist. The actor is always the player's own linked entity, never a request field. | Built |
-| `contest.js` | 12,409 | **Contest resolution** — rates entities from their live `combat`/`sports` traits and resolves a bout deterministically from a seeded draw, so a settled result can be re-verified. The first code anywhere to read either trait family. | Built |
-| `players.js` | 7,698 | Player generation, citizen dashboard — now including mood, habits and routine. | Built |
-| `entityTraits.js` | 5,781 | Per-entity trait rows, trait sheets, Key modifiers, live entity resolution. | Built |
+| `missions.js` | 9,545 | Artifacts and missions, with a real available → accepted → completed/failed/abandoned state machine. | Built |
+| `beliefs.js` | 8,674 | What an entity holds to be true, and how confidently. | Built |
+| `persistence.js` | 8,638 | Loads the world before `app.listen` and checkpoints every 10 ticks. | Built, see §4 |
+| `players.js` | 8,394 | Player generation, citizen dashboard — including mood, habits and routine. | Built |
+| `worldStore.js` | 7,035 | Memory, relationships, knowledge — the write-back layer the contract requires. | Built |
+| `entityTraits.js` | 6,562 | Per-entity trait rows, trait sheets, Key modifiers, live entity resolution (`getLiveEntity`, the ninth standing rule's answer). | Built |
+| `decisions.js` | 6,365 | `decision_log` — why an NPC did anything, in its own words. | Built |
 | `traits.js` | 5,346 | Trait families, random trait values, sheet generation. | Built |
+| `items.js` | 5,177 | Item and resource type vocabularies, from §28's canonical list. | Built |
+| `perception.js` | 4,782 | **Where the `special` family lives** — how confidently each person ends up holding a broadcast fact, which `keys.knowledgeCharge` already read. | Built |
 | `traitDefinitions.js` | 4,562 | Individual / organization / family definitions, id and definition lookup. | Built |
-| `worldStore.js` | 4,530 | Memory, relationships, knowledge — the write-back layer the contract requires. | Built |
-| `missions.js` | 8,757 | Artifacts and missions, with a real available -> accepted -> completed/failed/abandoned state machine. | Built |
+| `idSequences.js` | 3,678 | Id sequence state, so a restored world does not reissue ids. | Built |
 | `organizationTraits.js` | 2,395 | Organization trait families. | Built |
 | `familyTraits.js` | 2,082 | Family trait families. | Built |
 | `db.js` | 2,017 | Postgres connection and `query()` helper. | Built, see §4 |
+| `seeded.js` | 2,016 | **§88 determinism** — `hashSeed`, `seededUnit`, `seededDraw`. Seed on position, never on identity. | Built |
+| `nextAfter.js` | 1,004 | The next value after a given one in a sequence. | Built |
 
 ## 2. Handoff documents — `vacon-c/`
 

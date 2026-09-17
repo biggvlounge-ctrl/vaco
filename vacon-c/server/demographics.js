@@ -217,6 +217,7 @@ function compositionOf(worldState, residents) {
     return primary ? primary.name : null;
   });
   const religion = distributionOf(residents, (n) => n.religion ?? null);
+  const ethnicity = distributionOf(residents, (n) => n.ethnicity ?? null);
   const education = distributionOf(residents, (n) => n.education ?? null);
 
   return {
@@ -229,6 +230,27 @@ function compositionOf(worldState, residents) {
       distribution: religion,
       diversity: diversityOf(religion),
       dominantShare: dominantShareOf(religion),
+    },
+    // **`ethnicity` is measured here and read NOWHERE else**, which is
+    // the whole design and is enforced by `test/ethnicity.test.js`.
+    //
+    // `statistics.js` declared this dimension "deliberately absent
+    // rather than missing", on the grounds that §9 "permits demographic
+    // modelling while forbidding demographics determining an NPC's
+    // morality, criminality, intelligence or worth — which makes adding
+    // one a decision to take explicitly, not a side effect of wanting a
+    // composition statistic." The owner took that decision on 17 Sep
+    // 2026.
+    //
+    // So it is built the way language, religion and education already
+    // are — a field on the person, a distribution over an area, and a
+    // diversity number — and the firewall is a test rather than an
+    // intention: no generator of crime, policing, employment, wages,
+    // mortality or trait values may read it.
+    ethnicity: {
+      distribution: ethnicity,
+      diversity: diversityOf(ethnicity),
+      dominantShare: dominantShareOf(ethnicity),
     },
     education: {
       distribution: education,

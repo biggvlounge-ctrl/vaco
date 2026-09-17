@@ -384,6 +384,10 @@ function generateNPC(options = {}) {
     // assigning them to an arbitrary community.
     communityId: options.communityId ?? null,
     home_property_id: options.homePropertyId ?? null,
+    // See `demographics.compositionOf` for why this exists and what is
+    // forbidden to read it. Null unless a caller supplies one, exactly
+    // like `religion` and `education`.
+    ethnicity: options.ethnicity ?? null,
     traits: traitsToSheet(traitRows),
     createdTick: WorldState.tick,
     updatedTick: WorldState.tick,

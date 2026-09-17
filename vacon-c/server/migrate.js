@@ -177,8 +177,10 @@ async function migrateWorldStateToPostgres(worldState) {
           // rather than by editing the locked base schema. See that
           // file for why it meets the bar and why property location
           // does not.
-          `INSERT INTO npcs (entity_id, role, education, religion, generation, name) VALUES ($1,$2,$3,$4,$5,$6)`,
-          [npc.id, npc.role, npc.education, npc.religion, npc.generation, npc.name ?? null]
+          `INSERT INTO npcs (entity_id, role, education, religion, generation, name, ethnicity)
+           VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+          [npc.id, npc.role, npc.education, npc.religion, npc.generation, npc.name ?? null,
+            npc.ethnicity ?? null]
         );
       }
       summary.npcs = worldState.npcs.length + (worldState.deceased || []).length;

@@ -178,6 +178,26 @@ test('system 5 -- the drought is resource-typed, not global', () => {
 test('system 6 -- scarcity crosses the threshold', () => {
   const scarcity = engine.getScarcity(world.water.id);
 
+  // **The height of the drought, recorded while it is running.**
+  // `ticksRemaining: 4` means this condition ends, and since the
+  // Environment phase learned to give back what a temporary condition
+  // took — see the header of `runEnvironmentPhase`, and
+  // `test/health.test.js` for what the one-way ratchet did to two
+  // hundred ticks of world — the water supply is back to its baseline
+  // by the time the summary at the bottom of this file runs.
+  //
+  // That is the drought being over, not the cascade failing. So the
+  // three facts about the resource are captured here, at the moment the
+  // cascade passes through them, and asserted from this snapshot. What
+  // the drought left behind — the price, the knowledge, the memories,
+  // the trait modifiers — is still read live at the end, because none
+  // of that is supposed to revert.
+  world.peak = {
+    supply: world.water.supply,
+    demand: world.water.demand,
+    scarcity,
+  };
+
   assert.ok(scarcity > world.baseline.scarcity,
     `scarcity must rise (was ${world.baseline.scarcity}, now ${scarcity})`);
   assert.ok(scarcity >= BROADCAST_THRESHOLD,
@@ -293,12 +313,13 @@ test('system 10 -- the citizen is affected, not merely informed', () => {
 // -- the cascade, stated as one fact ----------------------------------------
 
 test('the Definition of Done: one drought, five systems, in sequence', () => {
-  const scarcity = engine.getScarcity(world.water.id);
-
   const chain = {
-    'resource supply fell': world.water.supply < world.baseline.supply,
-    'resource demand rose': world.water.demand > world.baseline.demand,
-    'scarcity crossed 60': scarcity >= BROADCAST_THRESHOLD,
+    // From the snapshot taken at the height of the drought. See the
+    // comment where `world.peak` is set: the condition has expired by
+    // now and has correctly handed its deltas back.
+    'resource supply fell': world.peak.supply < world.baseline.supply,
+    'resource demand rose': world.peak.demand > world.baseline.demand,
+    'scarcity crossed 60': world.peak.scarcity >= BROADCAST_THRESHOLD,
     'market price rose': world.listing.price > world.baseline.price,
     'NPCs gained knowledge': W.entityKnowledge.length > world.baseline.knowledge,
     'resolvers wrote memories': W.memories.some((m) => m.entity_id === world.alice.id),

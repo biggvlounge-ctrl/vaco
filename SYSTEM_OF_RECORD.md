@@ -72,7 +72,7 @@ authorization work in §5 had to be done per app rather than once.
 | Containerised services | 36 + nginx + a LiveKit SFU |
 | Registry rows (incl. brand rows and the dev mock) | 37 |
 | Mutating HTTP routes | 524, all accounted for (472 guarded, 52 declared open with a reason) |
-| Automated tests | 2110 across 39 suites |
+| Automated tests | 2129 across 39 suites |
 | Persisted volumes | 30 |
 | Shared-module copies kept in sync | 210 |
 | Service credentials in `.env.example` | 28 callers |
@@ -824,7 +824,7 @@ run to produce the numbers here.
 built:** `node scripts/package-release.mjs` — see §11.
 
 ```sh
-node scripts/run-all-tests.mjs           # 2110/2110 across 39 suites (some skip without a database)
+node scripts/run-all-tests.mjs           # 2129/2129 across 39 suites (some skip without a database)
 node scripts/audit-route-guards.mjs --check   # 524/524 accounted for
 ./sync-shared-runtime.sh --check         # 210 copies current, none unmanaged
 ./sync-design-system.sh --check          # every serving app is a target
@@ -895,7 +895,7 @@ dependencies are installed.
 ### Per-suite
 
 ```
-vacon-c         759   vdp             147   void            142
+vacon-c         778   vdp             147   void            142
 scripts         168   v3              111   vaco-media       51
 v4-proxy         42   world-layer      41   venvm            40
 venvs            45   voken            37   vaco-analytics   39
@@ -980,7 +980,7 @@ trusted:
 
 The simulation engine is the one app in this repo whose "done" is not a
 list of routes, so it carries a measured completeness score rather than
-a criteria tally. **89.2%**, from
+a criteria tally. **89.6%**, from
 `vacon-c/dev-docs/GAME_COMPLETENESS.md`, which
 `vacon-c/scripts/completeness.mjs` regenerates and
 `vacon-c/test/completeness.test.js` fails on if stale — including a
@@ -990,7 +990,7 @@ check that the percent in THIS file matches the one the code measures.
 |---|---|---|
 | systems | 56.9% | the forty urban systems §7 names, at `urbanSystems.js`'s own four levels |
 | tables | 90% | schema tables a built world actually fills |
-| statistics | 88.2% | statistics a world can answer about itself |
+| statistics | 90% | statistics a world can answer about itself |
 | traits | 100% | traits something under `server/` reads |
 | traitDepth | 85.7% | trait columns a life actually changes |
 | habits | 100% | whether habits and routines carry information |
@@ -1006,8 +1006,50 @@ project has made has been wrong when checked. `vacon-c/CLAUDE.md`'s
 section put its own coverage at "roughly 25 of the 40" from memory.
 `statistics.js` carried 67 statistics and a real world answered 36.
 Seven trait families were generated on every NPC and read by nothing.
-The pattern is consistent enough to be a rule: **the only trustworthy
-number is one a command produces.**
+Resources had no mechanism anywhere that could raise a supply, so every
+world the engine had ever run ended in total famine and the suite was
+green throughout. The pattern is consistent enough to be a rule: **the
+only trustworthy number is one a command produces.**
+
+**One statistic was built, measured, and taken back out.** The owner
+asked for obesity in a city. A body-composition index was derivable
+from the substrate that exists — `motivation`'s food need as intake, a
+`work` routine and `sports` traits as exertion — and it ran and produced
+bands. It was removed and declared unavailable instead, for three
+measured reasons: intake is a fact about a CITY's food supply rather
+than about a person; 50 of 127 people hold a work routine, so the
+exertion half splits a population at the same line employment does; and
+the obese band was unreachable in every world measured, making it a
+statistic that could only ever report zero. §9 permits demographic
+modelling and forbids demographics deciding an NPC's worth, and a body
+reading that is really a jobs reading is on the wrong side of that
+before anybody uses it for anything. `body_composition` names what
+would close it: a per-person consumption record, which `inventory.js`
+is one step from. **A declared gap is visible; a plausible wrong number
+is not.**
+
+---
+
+## 11b. On deck — frozen, not started
+
+`dev-docs/on-deck/` holds architecture the owner has frozen and
+deliberately deferred. Nothing in it is built.
+
+| document | status |
+|---|---|
+| VACO Verified Business Network + VCoin + Community Economy | frozen 17 Sep 2026; audit begun and stopped |
+| VAGO Group Wagers / Group Bets | frozen 17 Sep 2026; audit begun and stopped |
+
+Both carry a mandatory audit-before-code step, and the partial audit is
+recorded in that folder's README because it is the expensive part.
+Its one load-bearing finding: **the VAGO Group Wagers freeze requires
+integration with a Wager Contract Engine, Wager Graph, Wager Threads,
+Escrow Adapter and Resolution Engine that return zero files apiece.**
+The engine the group layer sits on has not been built, so that is the
+first task there, not the group layer.
+
+The compliance gates in §12 are unchanged by either document, and both
+documents agree with them in their own text.
 
 ---
 

@@ -13,17 +13,17 @@ three places, a spec section's "roughly 25 of the 40", a catalogue of 67
 statistics that a real world answered 36 of, and seven trait families generated
 on every NPC and read by nothing.
 
-## 89.2% complete
+## 89.6% complete
 
 ```
-██████████████████░░  89.2%   269.25 of 302
+██████████████████░░  89.6%   281.25 of 314
 ```
 
 | axis | complete | score | what it measures |
 |---|---|---|---|
 | systems | **56.9%** | 22.75/40 | urban systems with mechanics |
 | tables | **90%** | 58.5/65 | schema tables a built world fills |
-| statistics | **88.2%** | 60/68 | statistics a world can answer |
+| statistics | **90%** | 72/80 | statistics a world can answer |
 | traits | **100%** | 114/114 | traits something reads |
 | traitDepth | **85.7%** | 6/7 | trait columns a life actually changes |
 | habits | **100%** | 8/8 | habit and routine depth |
@@ -93,7 +93,7 @@ The `server/statistics.js` catalogue, scored on whether a world can produce the 
 | item | state | worth |
 |---|---|---|
 | `teenage_birth_share` | silent | +1 |
-| `race_and_ethnicity_composition` | declared gap | +1 |
+| `body_composition` | declared gap | +1 |
 | `informal_economy_share` | declared gap | +1 |
 | `camera_coverage` | declared gap | +1 |
 | `street_lighting` | declared gap | +1 |

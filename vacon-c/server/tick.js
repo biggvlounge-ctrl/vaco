@@ -89,6 +89,61 @@ function addEnvironmentalCondition(worldState, condition) {
   return entry;
 }
 
+// **A temporary condition has to have a temporary effect.**
+//
+// It did not. Every delta a condition applied was permanent, and every
+// delta in the engine is negative — droughts, freezes, storms, failed
+// harvests — so `resources.supply` was a one-way ratchet and nothing
+// anywhere ever raised it. Measured on a two-city world at the default
+// settings: city 1's food supply went 107 → 0 over 200 ticks and its
+// water 70 → 42, while demand climbed 101 → 141. Scarcity pinned at 100
+// and stayed there. **Every world this engine has ever run ended in
+// total famine**, and the only thing that varied was how long it took.
+//
+// That is not a harsh world; it is a broken one, and it made every
+// downstream reading a lie. `motivation`'s food need converges on
+// supply, so a measurement of 127 people found all 127 sitting at
+// exactly the same level with no spread between them at all — which
+// meant anything derived from how well fed somebody is was reading a
+// world-level constant wearing a person's clothes.
+//
+// The fix is not a production model. It is that `ticksRemaining`
+// already promises the condition ends, and the code did not deliver it:
+// what a condition took while it ran is given back when it expires. A
+// drought becomes an event with a recovery rather than a permanent step
+// down, which is what the word means.
+//
+// **Restore what was actually taken, not what was asked for.** The
+// clamp at 0 means a condition draining a nearly-empty resource takes
+// less than its delta says; handing back the delta would create supply
+// out of a famine. So each pass records the real movement per resource
+// and the expiry replays exactly that.
+function applyConditionDelta(resource, condition, sign) {
+  const key = resource.id ?? `${resource.city_id}:${resource.resource_type}`;
+  const taken = condition.applied || (condition.applied = {});
+  const entry = taken[key] || (taken[key] = { supply: 0, demand: 0 });
+
+  const supplyBefore = resource.supply;
+  const demandBefore = resource.demand;
+  resource.supply = Math.max(0, resource.supply + sign * (condition.supplyDelta || 0));
+  resource.demand = Math.max(0, resource.demand + sign * (condition.demandDelta || 0));
+  entry.supply += resource.supply - supplyBefore;
+  entry.demand += resource.demand - demandBefore;
+}
+
+function releaseCondition(worldState, condition) {
+  const taken = condition.applied;
+  if (!taken) return;
+  for (const resource of worldState.resources) {
+    const key = resource.id ?? `${resource.city_id}:${resource.resource_type}`;
+    const entry = taken[key];
+    if (!entry) continue;
+    resource.supply = Math.max(0, resource.supply - entry.supply);
+    resource.demand = Math.max(0, resource.demand - entry.demand);
+  }
+  condition.applied = null;
+}
+
 function runEnvironmentPhase(worldState) {
   const events = [];
 
@@ -106,11 +161,14 @@ function runEnvironmentPhase(worldState) {
       // scenario-wide drought is.
       if (condition.cityId !== undefined && condition.cityId !== null
           && resource.city_id !== condition.cityId) continue;
-      resource.supply = Math.max(0, resource.supply + (condition.supplyDelta || 0));
-      resource.demand = Math.max(0, resource.demand + (condition.demandDelta || 0));
+      applyConditionDelta(resource, condition, 1);
     }
     condition.ticksRemaining -= 1;
-    return condition.ticksRemaining > 0;
+    if (condition.ticksRemaining > 0) return true;
+
+    // Over. Give back exactly what it took.
+    releaseCondition(worldState, condition);
+    return false;
   });
 
   // Property lifecycle (Phase 2). Buildings age here rather than in a
@@ -1005,5 +1063,11 @@ function reseedIds(worldState) {
 module.exports = {
   reseedIds,
   addEnvironmentalCondition,
+  // Exported so the condition ledger can be tested on a fixture rather
+  // than only through a 200-tick world. What it guards — that a
+  // temporary condition has a temporary effect — is the kind of thing
+  // that only shows over hundreds of ticks otherwise, which is how it
+  // went unnoticed for the life of the project.
+  runEnvironmentPhase,
   advanceTick,
 };

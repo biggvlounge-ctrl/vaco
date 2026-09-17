@@ -344,6 +344,12 @@ function bearChild(worldState, options = {}) {
     // household's religion is the one demographic fact the schema
     // already carries. Null when neither parent has one.
     religion: bearer.religion ?? other?.religion ?? null,
+    // Inherited the same way and for the same reason. A child born to
+    // this household belongs to it demographically; rolling a fresh
+    // one would make `ethnic_diversity` drift toward the generator's
+    // distribution rather than the population's, and a settlement's
+    // composition would stop being a fact about its families.
+    ethnicity: bearer.ethnicity ?? other?.ethnicity ?? null,
     // **This is what makes `npcs.generation` mean something.** It has
     // been 1 for every NPC in every world because nothing could ever
     // advance it.

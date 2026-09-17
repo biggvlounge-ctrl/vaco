@@ -92,6 +92,8 @@ const migration = require('./migration.js');
 const crime = require('./crime.js');
 const demographics = require('./demographics.js');
 const economy = require('./economy.js');
+const health = require('./health.js');
+const motivation = require('./motivation.js');
 const membership = require('./membership.js');
 const infrastructure = require('./infrastructure.js');
 const mortality = require('./mortality.js');
@@ -329,6 +331,72 @@ const CATALOGUE = [
     compute: (ctx) => migration.netRatePer1k(ctx.worldState, ctx.communityId, { tick: ctx.tick }),
   },
 
+  // ---- population: health --------------------------------------------
+  // **The `health` trait family had exactly one reader in the whole
+  // engine** — `mortality.vitalityOf`, which folds all four traits into
+  // a single multiplier on the chance of dying. Generated on every NPC
+  // since traits existed, migrated, restored, and visible nowhere. The
+  // eleventh standing rule's shape: a generator that nothing reads is
+  // indistinguishable from one that does not exist.
+  //
+  // These live in `population` rather than in a category of their own
+  // because §9's block key is fixed at its eleven and these are facts
+  // about the people in an area, siblings of the death rate. See
+  // server/health.js — in particular its header on why obesity is
+  // declared below rather than computed here.
+  {
+    key: 'mean_nutrition_status', category: 'population', unit: 'index', scope: 'community',
+    compute: (ctx) => health.meanHealthTrait(ctx.worldState, ctx.residents, 'Nutrition Status'),
+  },
+  {
+    key: 'mean_sleep_quality', category: 'population', unit: 'index', scope: 'community',
+    compute: (ctx) => health.meanHealthTrait(ctx.worldState, ctx.residents, 'Sleep Quality'),
+  },
+  {
+    key: 'mean_immune_response', category: 'population', unit: 'index', scope: 'community',
+    compute: (ctx) => health.meanHealthTrait(ctx.worldState, ctx.residents, 'Immune Response'),
+  },
+  {
+    key: 'chronic_condition_rate', category: 'population', unit: 'share', scope: 'community',
+    compute: (ctx) => health.chronicConditionShare(ctx.worldState, ctx.residents),
+  },
+  {
+    key: 'mean_athleticism', category: 'population', unit: 'index', scope: 'community',
+    caveat: 'the `sports` family is rated by server/contest.js, which the tick pipeline never '
+      + 'calls — so this measures what a population could do, not anything it has done',
+    compute: (ctx) => health.meanAthleticism(ctx.worldState, ctx.residents),
+  },
+  {
+    key: 'mean_physical_exertion', category: 'population', unit: 'index', scope: 'community',
+    // How much physical work a population's life contains: a kept
+    // `work` routine and what the `sports` traits say about moving.
+    // Reported under its own name and not folded into a body reading —
+    // 50 of 127 people hold a work routine, so this splits a population
+    // at the same line employment does, which is honest when it is
+    // called exertion and misleading when it is called anything else.
+    compute: (ctx) => health.meanExertion(ctx.worldState, ctx.residents),
+  },
+  {
+    key: 'health_measured_share', category: 'population', unit: 'share', scope: 'community',
+    // What the six readings above actually speak for. `observed_share`
+    // does the same job for `mean_stress` and for the same reason.
+    compute: (ctx) => health.measuredShare(ctx.worldState, ctx.residents),
+  },
+  {
+    key: 'body_composition', category: 'population', unit: 'index', scope: 'community',
+    unavailable: 'no weight, height or body-composition column exists anywhere in the schema, '
+      + 'and the two sides of the balance that could stand in for one do not support it. '
+      + 'Intake comes from `motivation`\'s food need, which converges on the CITY\'s food '
+      + 'availability — a real reading of a place, not of a person. Exertion comes from '
+      + 'holding a `work` routine, which 50 of 127 people do, so it splits a population at '
+      + 'the employment line: an index built on it reports "not employed" in medical '
+      + 'language, which §9\'s demographic clause is there to prevent. Measured across '
+      + 'several worlds, the obese band held nobody and could not be reached. What would '
+      + 'close it: a per-person consumption record. `inventory.js` can already hold food and '
+      + 'nothing consumes it — the moment somebody eats from a holding rather than from a '
+      + 'city average, intake becomes a fact about a person.',
+  },
+
   // ---- demographic ---------------------------------------------------
   // **This block said "no demographic fields exist on an NPC at all",
   // which was true of the fields people usually mean and not true of
@@ -389,13 +457,25 @@ const CATALOGUE = [
     },
   },
   {
-    key: 'race_and_ethnicity_composition', category: 'demographic', unit: 'share', scope: 'community',
-    unavailable: 'deliberately absent rather than missing. No column exists, no document in '
-      + 'the package asks for one, and §9 permits demographic modelling while forbidding '
-      + 'demographics determining an NPC\'s morality, criminality, intelligence or worth — '
-      + 'which makes adding one a decision to take explicitly, not a side effect of wanting '
-      + 'a composition statistic. Language, religion and education are what the schema '
-      + 'models and are computed above.',
+    // **Declared deliberately absent, and now built — because the
+    // declaration named exactly what it was waiting for.** It read:
+    // "§9 permits demographic modelling while forbidding demographics
+    // determining an NPC's morality, criminality, intelligence or worth
+    // — which makes adding one a decision to take explicitly, not a
+    // side effect of wanting a composition statistic." The owner took
+    // that decision on 17 Sep 2026.
+    //
+    // Measured exactly like language, religion and education. The
+    // forbidden half is enforced by `test/ethnicity.test.js` rather
+    // than by intention: no generator of crime, policing, employment,
+    // wages, mortality or trait values may read the field.
+    key: 'ethnic_diversity', category: 'demographic', unit: 'share', scope: 'community',
+    compute: (ctx) => demographics.compositionOf(ctx.worldState, ctx.residents).ethnicity.diversity,
+  },
+  {
+    key: 'dominant_ethnicity_share', category: 'demographic', unit: 'share', scope: 'community',
+    compute: (ctx) => demographics.compositionOf(ctx.worldState, ctx.residents)
+      .ethnicity.dominantShare,
   },
 
   // ---- economics -----------------------------------------------------
@@ -729,6 +809,47 @@ const CATALOGUE = [
     // promising something else. Null where nothing has happened yet —
     // unknown, not neutral.
     compute: (ctx) => policing.trustIn(ctx.worldState, ctx.communityId),
+  },
+  {
+    key: 'harmful_habit_share', category: 'psychological', unit: 'share', scope: 'community',
+    // Substance use, as this engine actually models it. `habits.harmful`
+    // is the schema's own flag — the architecture document's "addiction
+    // = harmful habit, not a separate table" — and `behavior.js` forms
+    // one out of sustained stress.
+    //
+    // **Psychological rather than crime**, because that is where it
+    // comes from here: nothing in this engine makes a harmful habit an
+    // offence, and filing it under crime would import a claim the model
+    // does not make. It sits beside `mean_stress`, which is what
+    // produces it.
+    caveat: 'formed from sustained stress in server/behavior.js, which peaks near 55 against a '
+      + 'threshold of 60 — so a settled world produces very few (4.9% measured) and this '
+      + 'reading is bounded by the stress model rather than by anything about substances',
+    compute: (ctx) => health.harmfulHabitShare(ctx.worldState, ctx.residents),
+  },
+  {
+    key: 'mean_need_satisfaction', category: 'psychological', unit: 'index', scope: 'community',
+    // How well this settlement is meeting what its people actually
+    // want, across all fifteen needs. `server/motivation.js` built the
+    // needs, the values and the goals, and nothing measured any of them
+    // — the same shape the health family was in.
+    compute: (ctx) => motivation.meanNeedLevel(ctx.worldState, ctx.residents.map((n) => n.id)),
+  },
+  {
+    key: 'mean_food_security', category: 'psychological', unit: 'index', scope: 'community',
+    // Singled out from the fifteen because it is the one need with a
+    // resource behind it, and because it is the closest this engine can
+    // honestly come to the nutrition question `body_composition`
+    // declines to answer. It moves with both halves: the city's food
+    // supply, and whether this person keeps the routine.
+    compute: (ctx) => {
+      const levels = ctx.residents
+        .map((n) => motivation.needOf(ctx.worldState, n.id, 'food'))
+        .filter((row) => row !== null)
+        .map((row) => Number(row.current_level))
+        .filter(Number.isFinite);
+      return round(mean(levels), 2);
+    },
   },
 ];
 

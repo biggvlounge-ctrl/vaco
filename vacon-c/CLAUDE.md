@@ -298,6 +298,40 @@ real trait. `test/trait-families.test.js` is the answer — build the
 same world twice, differing in exactly one family, and assert both that
 the outcome moves and that an ordinary person's does not.
 
+**A thirteenth, from measuring a world's health.** Two halves, and the
+second is why the first went unseen for the life of the project.
+
+- **A mechanism with no inverse has no equilibrium.** Every
+  environmental condition applied its supply/demand delta to a resource
+  and nothing anywhere in `server/` ever raised a supply or lowered a
+  demand — `grep '\.supply ='` returned exactly one writer, the
+  condition applier itself. Every delta in the engine is negative, so
+  `resources.supply` was a one-way ratchet: a two-city world at default
+  settings took city 1's food from 107 to **zero** over 200 ticks with
+  demand climbing 101 to 141, and water went the same way in the other
+  city. **Every world this engine had ever run ended in total famine**,
+  and the only variable was how long it took. `ticksRemaining` already
+  promised the condition was temporary; the code never delivered it. The
+  fix is a per-resource ledger of what each condition actually took —
+  what was *taken*, not what was *asked for*, because the clamp at zero
+  means a condition draining a nearly-empty resource takes less than its
+  delta says and handing back the delta would create supply out of a
+  famine.
+- **A fixture cannot see a slope.** Every test in the suite was green
+  throughout, because a fixture runs ten ticks and ten ticks of a
+  ratchet looks exactly like ten ticks of a working mechanism. This is
+  the eleventh rule's cousin: measure a built world, and measure it
+  *long*. The guard that holds it now asserts on 200 ticks of a real
+  world, not on a fixture.
+
+And the corollary about what to do when the substrate will not support
+the statistic somebody asked for: **declare it, with the measurement
+that killed it.** A body-composition index was derivable here and was
+taken back out, because intake turned out to be a fact about a city and
+exertion a fact about employment. `statistics.js`'s `body_composition`
+entry names both, and names what would close it. A gap is visible; a
+plausible wrong number is not.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

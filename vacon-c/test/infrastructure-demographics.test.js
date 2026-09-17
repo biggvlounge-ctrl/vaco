@@ -356,14 +356,29 @@ test('the demographic block is computed from real records', () => {
   assert.ok(s.educational_attainment.value > 0);
 });
 
-test('race and ethnicity stay a declared absence with the §9 clause attached', () => {
-  // A decision, not a gap, and held by a test so it cannot be undone
-  // by accident: no column exists, no document asks for one, and §9
-  // makes adding one something to do explicitly.
-  const entry = statistics.unavailable().find((e) => e.key === 'race_and_ethnicity_composition');
-  assert.ok(entry);
-  assert.match(entry.reason, /deliberately absent rather than missing/);
-  assert.match(entry.reason, /morality, criminality, intelligence or worth/);
+test('race and ethnicity are counted, and the §9 clause is held by a firewall instead', () => {
+  // **This test used to assert the opposite, and the opposite was right
+  // at the time.** The declared absence said in its own words that no
+  // column existed, no document asked for one, and §9 made adding one
+  // "a decision to take explicitly, not a side effect of wanting a
+  // composition statistic". The owner took that decision on
+  // 17 Sep 2026, so `npcs.ethnicity` exists, is inherited at birth, and
+  // is measured exactly like language, religion and education.
+  //
+  // The clause it was protecting did not go away — it got stronger.
+  // `test/ethnicity.test.js` asserts that nothing which decides an
+  // outcome reads the field: not crime, policing, economy, mortality,
+  // traits, contest, motivation, archetypes, migration or succession.
+  // A gap guarantees only that nobody can misuse a field that does not
+  // exist; the firewall guarantees nobody misuses one that does.
+  assert.equal(
+    statistics.unavailable().some((e) => e.key === 'race_and_ethnicity_composition'),
+    false,
+    'the gap is declared again, which means the field was removed — check that the §9 '
+    + 'firewall in test/ethnicity.test.js went with it',
+  );
+  assert.ok(statistics.KEYS.includes('ethnic_diversity'));
+  assert.ok(statistics.KEYS.includes('dominant_ethnicity_share'));
 });
 
 test('nothing that decides anything reads a demographic', () => {

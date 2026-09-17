@@ -110,6 +110,13 @@ const DEFAULTS = {
   gangMembershipRate: 0.06,
   languages: ['Riverine', 'Highland', 'Old Tongue'],
   religions: ['Tidewater', 'Ridge', 'None'],
+  //: The ethnic groups a world is drawn from. **Deliberately named for
+  //: this setting rather than for any real-world group** — the engine
+  //: needs a demographic dimension with more than one value in it so
+  //: composition and diversity mean something, and borrowing real
+  //: ethnonyms would attach real-world associations to a simulation
+  //: that models none of them.
+  ethnicities: ['Riverborn', 'Highland', 'Coastwise', 'Outlander'],
 
   // **Everything below exists because the table was empty.** Each one
   // names a system that is built, tested and green, and that no world
@@ -443,6 +450,7 @@ function generateWorld(options = {}) {
             + `${random.pick(SURNAMES, 'family', c, b, p)}`,
           education: null,     // set below, but only for adults
           religion: random.pick(config.religions, 'religion', c, b, p),
+          ethnicity: random.pick(config.ethnicities, 'ethnicity', c, b, p),
           traitValueFor: (def) => Math.round(
             random.range(10, 95, 'trait', c, b, p, def.family, def.name),
           ),

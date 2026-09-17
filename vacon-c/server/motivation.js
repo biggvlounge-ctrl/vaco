@@ -448,15 +448,32 @@ const SATISFIERS = {
     // perfect supply — a world with no food in it reported everybody
     // fed. That is "unknown is not a zero" failing in the direction
     // that looks like abundance.
-    const available = ctx.availabilityOf('food');
+    const available = ctx.availabilityOf('food', npc.communityId);
     if (available === null) return null;
-    return Math.min(ctx.habitStrength(npc.id, 'eat'), available);
+    // **The two halves multiply; they do not take the lower.** `min`
+    // was the first version and it reads sensibly right up until you
+    // measure it: the `eat` habit runs 0.54..0.81 and food availability
+    // in a settled world sits near 0.50, so the minimum was availability
+    // for essentially everybody, essentially always. 144 people, and
+    // their food levels spanned 50 to 53.
+    //
+    // That is the twelfth standing rule's second clause exactly — a
+    // computed field sitting above a spread of its own source is dead
+    // code that looks live. Whether somebody keeps the routine made no
+    // difference to whether they ate, in any world where supply was the
+    // binding side, which is most of them.
+    //
+    // The product keeps both claims the header makes: a kept routine in
+    // a famine still feeds nobody (availability 0 → 0), and somebody
+    // diligent in a well-supplied place eats better than somebody who
+    // is not.
+    return ctx.habitStrength(npc.id, 'eat') * available;
   },
   // No habit for it — `seedRoutine` has no `drink` — so this is purely
   // whether the settlement has water. That is the honest reading, and
   // it is why water was the worst number in the measurement: nothing
   // was looking at the resource at all.
-  water: (ctx) => ctx.availabilityOf('water'),
+  water: (ctx, npc) => ctx.availabilityOf('water', npc.communityId),
   sleep: (ctx, npc) => ctx.habitStrength(npc.id, 'rest'),
   // Somewhere to be, and how dangerous it is there.
   safety: (ctx, npc) => (npc.home_property_id == null ? 0.2 : 1)
@@ -552,15 +569,34 @@ function contextFor(worldState) {
     }
   }
 
-  const scarcity = new Map();
-  for (const resource of worldState.resources || []) {
-    const value = Number(economy.getScarcity(resource));
-    scarcity.set(resource.resource_type, Number.isFinite(value) ? value / 100 : 0);
-  }
-
   const cityOf = new Map(
     (worldState.communities || []).map((community) => [community.id, community.city_id]),
   );
+
+  // **Scarcity is a fact about a place, and this map used to forget
+  // which place.** It was keyed on `resource_type` alone, so the last
+  // city's food row in the array decided how well fed every person in
+  // the world was. Measured: 127 people across two cities, one of them
+  // in total famine and the other comfortable, and all 127 read exactly
+  // the same food level to the decimal.
+  //
+  // The same defect, in the same words, was fixed in `tick.js`'s
+  // condition applier when weather started producing city-scoped
+  // droughts — one city's drought drained every city. It was here too,
+  // one layer up, and nothing caught it because a need with no spread
+  // still looks like a working need.
+  //
+  // A resource with no `city_id` is genuinely world-wide (the column is
+  // nullable and a scenario-level shortage is a real thing), so it is
+  // kept under a separate key and used when the city has no row of its
+  // own.
+  const WORLD = '*';
+  const scarcity = new Map();
+  for (const resource of worldState.resources || []) {
+    const value = Number(economy.getScarcity(resource));
+    const level = Number.isFinite(value) ? value / 100 : 0;
+    scarcity.set(`${resource.city_id ?? WORLD}:${resource.resource_type}`, level);
+  }
   const residentsPerCity = new Map();
   for (const npc of worldState.npcs || []) {
     const cityId = cityOf.get(npc.communityId);
@@ -583,13 +619,20 @@ function contextFor(worldState) {
       const value = habits.get(`${entityId}:${name}`);
       return Number.isFinite(value) ? Math.max(0, Math.min(1, value / 100)) : 0;
     },
-    // **How much of this resource there is, 0..1 — or null when the
-    // world does not track it.** Named for what the caller wants rather
-    // than for scarcity, because the first version returned scarcity
-    // and every call site had to remember to invert it; one that forgot
-    // would read a famine as plenty.
-    availabilityOf: (resourceType) => {
-      const value = scarcity.get(resourceType);
+    // **How much of this resource there is where this person is,
+    // 0..1 — or null when the world does not track it.** Named for what
+    // the caller wants rather than for scarcity, because the first
+    // version returned scarcity and every call site had to remember to
+    // invert it; one that forgot would read a famine as plenty.
+    //
+    // `communityId` is how the person's city is found. Omitting it
+    // falls back to a world-wide row, which is the honest answer for a
+    // caller who has no place to ask about — and null, not 1, when
+    // there is no row at all.
+    availabilityOf: (resourceType, communityId = null) => {
+      const cityId = communityId === null ? undefined : cityOf.get(communityId);
+      const local = cityId === undefined ? undefined : scarcity.get(`${cityId}:${resourceType}`);
+      const value = local !== undefined ? local : scarcity.get(`${WORLD}:${resourceType}`);
       if (value === undefined) return null;
       return Math.max(0, Math.min(1, 1 - value));
     },
