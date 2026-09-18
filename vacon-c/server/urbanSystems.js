@@ -181,10 +181,16 @@ const SYSTEMS = [
       + 'occupation sits on one, attainment is what makes a tier reachable, and '
       + '`mean_knowledge_tier` measures where an area\'s work actually sits. A city\'s school '
       + 'is also an ORGANIZATION now (`CITY_INSTITUTIONS` in worldgen) and it employs a '
-      + 'teacher, which is the first teacher this engine has ever had. Still partial: no '
-      + 'enrolment roll, nobody to drop out OF, and no path from a book to a tier — §24 '
-      + 'KNOWLEDGE RECOVERY names books, manuals, libraries and archives as the sources of a '
-      + 'civilization resource and nothing reads one yet.',
+      + 'teacher, which is the first teacher this engine has ever had. **And §24 KNOWLEDGE '
+      + 'RECOVERY is built, 18 Sep 2026** — `server/knowledge.js` carries its ten named '
+      + 'sources and nine unlockable fields, a generated world contains nine of the ten, and '
+      + 'studying moves three things that already had readers: the field\'s `skills` trait, '
+      + 'the `educational` family that `technology.learningOf` averages to decide whether a '
+      + 'civilization can recover an era, and `npcs.education` for the self-taught. That last '
+      + 'one is the gap that mattered: `runSchooling` refuses anybody outside 5-30 or in a '
+      + 'city whose schools are unfunded, so an adult in a collapsed settlement could never '
+      + 'learn anything again for the rest of their life however many books were lying '
+      + 'around. Still partial: no enrolment roll and nobody to drop out OF.',
   },
   {
     n: 6,
@@ -450,9 +456,17 @@ const SYSTEMS = [
       + 'from one person to another. `media.runWordOfMouth` moves facts along real '
       + 'relationships now, seeded per telling, degrading with every hand and re-typed as '
       + '`rumor` because a thing a neighbour told you is not a thing you verified. Radio and '
-      + 'networks are §7 systems 23 and 24. Still partial: there is no telephone, no post and '
-      + 'no letter, and a fact has no addressee — it spreads to whoever you speak to rather '
-      + 'than to whoever you meant to tell.',
+      + 'networks are §7 systems 23 and 24. **And a fact can now be told on purpose, 18 Sep '
+      + '2026**: `server/meetings.js` is the spec\'s own `negotiate` / `teach` / `recruit` / '
+      + '`form alliance` vocabulary, none of which had a home anywhere in the engine, and a '
+      + 'meeting passes what anybody at the table knows to everybody else at it — the one '
+      + 'place information moves because people CHOSE to move it rather than leaking outward '
+      + 'from a broadcast. Facts about the people in the room are deliberately excluded: a '
+      + 'meeting is not an interrogation, and "everybody now knows everything about everybody '
+      + 'present" is the total-information sweep that made `computeApproval`\'s spread a '
+      + 'constant 1.0. Still partial: there is no telephone, no post and no letter, and a fact '
+      + 'told outside a meeting still has no addressee — it spreads to whoever you speak to '
+      + 'rather than to whoever you meant to tell.',
   },
   {
     n: 23,
@@ -682,7 +696,13 @@ const SYSTEMS = [
       + 'needs its prerequisite era AND a population whose reemergence index clears the level '
       + 'it asks for, and `canUnlock` returns WHY it refused rather than a bare boolean. One '
       + 'era per tick, so a world that crosses a threshold does not jump from stone tools to '
-      + 'computing in a single tick.',
+      + 'computing in a single tick. **And the learning term stopped being frozen on 18 Sep '
+      + '2026.** `learningOf` averages the `educational` family across a civilization and '
+      + 'lowers the reemergence bar by up to 30% for a people who can read — but nothing in '
+      + 'the engine had ever MOVED an educational trait, so that term was the population\'s '
+      + 'birth draw for the life of every world. `server/knowledge.js` is §24 KNOWLEDGE '
+      + 'RECOVERY, and reading raises exactly those four traits: "knowledge is a civilization '
+      + 'resource" is this wire, and it had nothing pushing current through it.',
   },
   {
     n: 38,
@@ -741,7 +761,12 @@ const SYSTEMS = [
       + 'engine writes a fact whose `subject_entity_id` is a person: measured, 0 of 600. That '
       + 'is the same gate that made `resolveAggression` unreachable, and it is recorded here '
       + 'rather than patched, because the fix is a mechanism (a robbery victim learns '
-      + 'something about whoever robbed them) and not a threshold.',
+      + 'something about whoever robbed them) and not a threshold. '
+      + '**Three player verbs were added on 18 Sep 2026** — `call-meeting`, `assess-takeover` '
+      + 'and `attempt-takeover` — taking the dispatcher from five to eight. All three route '
+      + 'to things that exist, which is the rule this registry was built on; and all three '
+      + 'refuse to be told who is acting, because a player acts as themselves and, for a '
+      + 'takeover, for their own family.',
   },
 ];
 

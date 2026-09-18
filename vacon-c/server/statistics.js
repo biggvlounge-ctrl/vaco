@@ -111,6 +111,7 @@ const politics = require('./politics.js');
 const occupations = require('./occupations.js');
 const familyTraits = require('./familyTraits.js');
 const control = require('./control.js');
+const knowledge = require('./knowledge.js');
 
 // §9's MASTER BLOCK KEY, in its order. Every statistic belongs to one.
 const CATEGORIES = [
@@ -628,6 +629,59 @@ const CATALOGUE = [
       }
       return names.size;
     },
+  },
+  {
+    key: 'knowledge_sources', category: 'community', unit: 'count', scope: 'community',
+    // **§24 KNOWLEDGE RECOVERY's own list of ten**, and how many of
+    // them anybody here can actually reach. A count rather than a
+    // share, for `media_channels`' reason: the ten are not
+    // interchangeable and a settlement with a library is not "40% as
+    // learned" as one with all ten.
+    //
+    // Measured across the residents rather than per person, because
+    // "experienced NPCs" and the places are shared and the holdings
+    // are not — what an area can reach is the union.
+    compute: (ctx) => {
+      if (ctx.population === 0) return null;
+      const found = new Set();
+      for (const npc of ctx.residents) {
+        for (const source of knowledge.sourcesFor(ctx.worldState, npc.id, { tick: ctx.tick })) {
+          found.add(source.source);
+        }
+      }
+      return found.size;
+    },
+  },
+  {
+    key: 'self_taught_share', category: 'demographic', unit: 'share', scope: 'community',
+    // Who has taught themselves anything at all. Before
+    // `server/knowledge.js`, `statecraft.runSchooling` was the only
+    // writer of `npcs.education` and it refuses anybody outside 5-30 or
+    // in a city whose schools are unfunded — so an adult in a collapsed
+    // settlement could never learn anything again for the rest of their
+    // life, however many books were lying around.
+    compute: (ctx) => {
+      if (ctx.population === 0) return null;
+      const taught = ctx.residents.filter((n) => knowledge.sessionsOf(n) > 0).length;
+      return round(taught / ctx.population, 4);
+    },
+  },
+  {
+    key: 'knowledge_stock', category: 'economics', unit: 'count', scope: 'city',
+    // **Declared, and the measurement that killed it is in
+    // `knowledge.js`'s header.** §28 lists `knowledge` among thirteen
+    // resource types and `economy.generateResource` would make one
+    // happily — but `advanceResourceTick` computes
+    // `supply + production - consumption`, and knowledge is not
+    // consumed by being used. A `consumption_rate` for it would be a
+    // number with no referent, and `refreshDemand` would then drift
+    // demand toward a population times that number. The countable
+    // thing is `knowledge_sources` above, which is what this entry
+    // points at.
+    unavailable: 'knowledge is a §28 resource type with no consumption: a resource row needs '
+      + 'a consumption_rate and using knowledge does not use it up. knowledge_sources counts '
+      + 'what an area can reach instead. Closing this needs a resource whose stock changes by '
+      + 'discovery and loss rather than by production and consumption.',
   },
   {
     key: 'mean_knowledge_tier', category: 'demographic', unit: 'tier', scope: 'community',

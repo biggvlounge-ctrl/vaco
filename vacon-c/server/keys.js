@@ -794,6 +794,12 @@ module.exports = {
   KEY_DEFINITIONS,
   KEY_NAMES,
   keyIdFor,
+  // Exported for `meetings.js`, which asks the same question a
+  // negotiation asks: what do these two already think of each other?
+  // `resolveTrust` uses it to decide whether a firmly-known fact should
+  // raise or lower trust, and two people who have wronged each other do
+  // not leave a negotiation closer either.
+  feelingToward,
   resolveResilience,
   resolveAdaptability,
   resolveTrust,

@@ -145,6 +145,45 @@ twenty-eight of them. That list is the deliverable, not a comment:
 knowledge that evaporates, and losing it is how a schema grows two
 disagreeing answers to the same question.
 
+**A fifth, and it took four files because two of the three things it
+was built on turned out not to exist.** The takeover key —
+`COMPOSITION_REQUIREMENTS_TRIBE_COHESION.md`'s `ControlKeyComposition`
+and `TakeoverAttemptResolution` — is `server/control.js`, and it needed
+`server/occupations.js` and a writer for `families.unity` first. See
+the nineteenth standing rule; the short version is that
+`employment_records.position` was a column no caller had ever written
+and `families.unity`/`.conflict` were 50 and 0 on every family in every
+world, so "a Hospital needs medical experts" had nothing to ask and the
+cohesion multiplier had two constants in it.
+
+The shape worth keeping: **the composition is the document's own
+5:10:1 used as a RATIO against however many people hold the target
+now**, so its worked example falls out of the model instead of being
+copied into it, and no per-scale constants had to be guessed. A flat
+with one occupant takes one person; a city measures 105.
+
+`server/knowledge.js` (§24 KNOWLEDGE RECOVERY),
+`server/meetings.js` (the spec's `negotiate`/`teach`/`recruit`/`form
+alliance`, which had no home anywhere) and `server/orgArchetypes.js`
+came out of the same pass. Two of them are worth a line each:
+
+- **Knowledge closes a wire that was complete except for the book.**
+  `technology.learningOf` has always averaged the `educational` family
+  to lower the reemergence bar for a literate people — and nothing in
+  the engine had ever moved an educational trait, so that term was the
+  population's birth draw for the life of every world. §24's first line
+  is "Knowledge is a civilization resource" and its third is "Knowledge
+  can unlock..."; both were wired and inert.
+- **Meetings add no modifier at all, on purpose.** The obvious build is
+  a planning bonus on a takeover's probability. It is not needed: a
+  meeting moves trust, `familyTraits.unityTarget` IS the mean trust
+  between a family's members, `advanceCohesion` converges unity on it,
+  and `cohesionOf` is the multiplier. Four systems each built for its
+  own reason, and the only new number is how much one afternoon moves
+  one relationship — set equal to `control.SHARED_UNDERTAKING`, because
+  giving two events of the same size different numbers would be
+  asserting something nobody knows.
+
 **A tick is a day** — `TICK_INTERVALS` in `behavior.js`. Nothing in the
 package says how many ticks a day is, so that file chooses and says so;
 `worldState.tickIntervals` overrides it wholesale.
@@ -189,11 +228,22 @@ and stopped being right once the engine grew concrete verbs: accept a
 mission, resolve one, adopt a routine, practise a habit, enter a
 contest. The dispatcher invents nothing — it routes to what exists.
 
+**Eight verbs now, not five.** `call-meeting`, `assess-takeover` and
+`attempt-takeover` were added on 18 Sep 2026, and the same rule held:
+each routes to a system that already exists, and none of them was added
+until the system was.
+
 **A player acts as themselves.** The actor is always
 `player.linked_entity_id`, taken from the player record. A body naming
 an `entityId` is refused rather than ignored, because the mission state
 machine's "only the holder can resolve" check would otherwise be handed
 its own bypass.
+
+The takeover verbs extend that one level up: a player takes a building
+**for their own family**, read off `family_memberships` by
+`engine.tribeIdFor`, so naming somebody else's tribe is not something
+the API can be asked to do. A meeting works the same way — the actor is
+added to their own attendee list rather than being nameable in it.
 
 Leader-dashboard and simulation-controls remain unbuilt because Leader
 and Simulation modes are deferred above — not because they were missed.

@@ -76,6 +76,7 @@ const media = require('./media.js');
 const trade = require('./trade.js');
 const familyTraits = require('./familyTraits.js');
 const control = require('./control.js');
+const knowledge = require('./knowledge.js');
 const { seededDraw } = require('./seeded.js');
 
 let nextEventId = 1;
@@ -799,6 +800,21 @@ function runOrganizationPhase(worldState) {
   // refreshes above because the budget is the mean city economy and
   // tourism reads city infrastructure.
   events.push(...statecraft.runStatecraft(worldState, worldState.tick));
+
+  // **§24 KNOWLEDGE RECOVERY.** Here, immediately after
+  // `runStatecraft`, because `runSchooling` lives inside it and the two
+  // are the same question asked of different people: schooling is what
+  // the state teaches the young, and this is what everybody else
+  // teaches themselves from whatever survived. Running it second means
+  // somebody schooled this tick is not also self-taught this tick for
+  // the same rung.
+  //
+  // It moves the `educational` family, which `technology.learningOf`
+  // averages to decide whether a civilization can recover an era — so
+  // "knowledge is a civilization resource" is the wire that was always
+  // there and had nothing pushing current through it. See
+  // server/knowledge.js.
+  events.push(...knowledge.runStudy(worldState, worldState.tick));
 
   return events;
 }

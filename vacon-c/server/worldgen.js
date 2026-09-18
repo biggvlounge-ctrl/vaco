@@ -91,6 +91,7 @@ const geo = require('./geo.js');
 const statecraft = require('./statecraft.js');
 const media = require('./media.js');
 const occupations = require('./occupations.js');
+const knowledge = require('./knowledge.js');
 const worldStore = require('./worldStore.js');
 const { hashSeed, seededUnit } = require('./seeded.js');
 
@@ -141,6 +142,14 @@ const DEFAULTS = {
   // Each artifact gets one mission, which is what generateMission asks
   // for — a mission is always generated FROM a real artifact.
   startingInventoryPerAdult: 2,
+  // **What share of people have something to read.** §24 lists ten
+  // knowledge sources and the setting is a civilization-collapse
+  // reset, so the answer is "not many" — a settlement where everybody
+  // owns a manual is not a settlement that has just lost everything.
+  // At 0.12 a world of 153 gives about eighteen surviving books
+  // between them, and the libraries and the people who know a trade
+  // are the other two thirds of §24's list.
+  survivingBookRate: 0.12,
 };
 
 // The ten infrastructure types a city gets, with capacity expressed
@@ -1282,6 +1291,44 @@ function generateWorld(options = {}) {
       });
       summary.inventoryRows += 1;
     }
+  });
+
+  // ---- what survived, to read ------------------------------------------
+  // **§24 KNOWLEDGE RECOVERY names ten sources and a generated world
+  // contained none of them.** `knowledge` is listed in BOTH canonical
+  // vocabularies — `items.TRADE_CATEGORIES` from §26 and
+  // `items.RESOURCE_TYPES` from §28 — and no item, no resource and no
+  // code of any kind stood behind either. §24's first line is
+  // "Knowledge is a civilization resource", and `technology.learningOf`
+  // has always averaged the `educational` family to decide whether a
+  // civilization can recover an era, so the wire from a book to a
+  // technology was complete except for the book.
+  //
+  // Scattered rather than handed out: this is a reset world, and what
+  // is left to read is what happens to have survived. Most people have
+  // nothing. Seeded on position (§88), and the item list is registered
+  // first because `inventory.give` refuses an item `items.findItem`
+  // does not know.
+  knowledge.registerItems(w);
+  summary.knowledgeItems = 0;
+  made.people.forEach((npc, pi) => {
+    if (random.unit('book', pi) > config.survivingBookRate) return;
+    const field = random.pick(knowledge.FIELD_NAMES, 'book-field', pi);
+    const source = random.pick(knowledge.HOLDING_SOURCES, 'book-source', pi);
+    inventory.give(w, {
+      entityId: npc.id,
+      itemName: knowledge.itemNameFor(field, source),
+      quantity: 1,
+      // Condition matters for a book the way it matters for a tool:
+      // `inventory.conditionFactor` is what a distress sale reads, and
+      // a knowledge item is unpriced so it never reaches that — but a
+      // ruined book being indistinguishable from a new one would be
+      // the placeholder problem this project keeps finding.
+      condition: Math.round(random.range(20, 95, 'book-cond', pi)),
+      tick,
+    });
+    summary.knowledgeItems += 1;
+    summary.inventoryRows += 1;
   });
 
   // ---- who lives with whom ----------------------------------------------

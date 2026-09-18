@@ -119,6 +119,31 @@ const ACTIONS = {
     }),
   },
 
+  // **Sitting down with people.** The spec's NPC vocabulary names
+  // `negotiate` three separate times and `teach`, `recruit` and `form
+  // alliance` once each, and none of the four had a home anywhere in
+  // the engine — five verbs about two or more people doing something
+  // together, in a simulation whose entire subject is people.
+  //
+  // `attendeeIds` is a list of OTHER people, and the actor is added to
+  // it by the dispatcher rather than being nameable. It is not in
+  // `ACTOR_FIELDS` because it does not claim to be the actor — but a
+  // player who could omit themselves from their own meeting would be
+  // arranging one between other people and calling it theirs, which is
+  // the same mistake `enter-contest` refuses.
+  'call-meeting': {
+    summary: 'Sit down with people you know — to plan, negotiate, teach or recruit.',
+    modes: ['citizen'],
+    requires: ['attendeeIds'],
+    verbs: ['holdMeeting'],
+    run: (verbs, actorId, body) => verbs.holdMeeting(actorId, {
+      attendeeIds: (Array.isArray(body.attendeeIds) ? body.attendeeIds : [body.attendeeIds])
+        .map(Number),
+      purpose: body.purpose,
+      topic: body.topic ?? null,
+    }),
+  },
+
   // **The takeover key, as two verbs rather than one.**
   // `COMPOSITION_REQUIREMENTS_TRIBE_COHESION.md` splits the shapes the
   // same way: `ControlKeyComposition` is what a target requires and

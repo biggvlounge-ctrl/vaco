@@ -47,7 +47,7 @@ the Postgres schema that already exists.
 
 ## 1. Server code — `vacon-c/server/`
 
-All 65 files present on disk, all committed. 1472 KB total,
+All 68 files present on disk, all committed. 1560 KB total,
 largest first.
 
 **This table was stale in a way worth recording**, because it is the
@@ -96,6 +96,9 @@ read off disk, not recalled.
 | `technology.js` | 14,892 | Civilizations, eras, and what an era makes possible. | Built |
 | `environment.js` | 13,372 | Weather, climate and where a drought lives — `environment_state`, one row per city, and severe weather through the existing condition channel. | Built |
 | `territory.js` | 31,762 | Cities, communities, territory blocks, control resolution, city reemergence and community health (both computed on read). | Built |
+| `knowledge.js` | 29,768 | **§24 KNOWLEDGE RECOVERY** — ten named sources, nine unlockable fields, and the three things reading moves: the field's skill, the `educational` family `technology.learningOf` averages, and attainment for the self-taught. Books are unpriced on purpose. | Built |
+| `orgArchetypes.js` | 16,474 | **Kinds of organization, so a scenario can name its own.** Ten archetypes over the schema's own `organizations.type`, expressed as bands rather than values. Names nothing and refuses to be asked to — see its header on why there is no roster of real agencies or parties. | Built |
+| `meetings.js` | 19,484 | **Sitting down together.** The spec's `negotiate` / `teach` / `recruit` / `form alliance`, none of which had a home. Adds no planning bonus: a meeting moves trust, trust is what family unity converges on, unity is the takeover multiplier. | Built |
 | `occupations.js` | 23,300 | **What a person does for a living** — §25's seven knowledge tiers turned into thirty-four occupations, and the answer to `employment_records.position` being a column no caller ever wrote. Owns `DEFINING_POST`, the one vocabulary `worldgen` and `control` both read. | Built |
 | `familyTraits.js` | 14,808 | Family trait families, and **cohesion** — `families.unity` and `.conflict` were 50 and 0 on every family in every world until `advanceCohesion` gave them a writer in the Social phase. | Built |
 | `health.js` | 12,799 | **A population's health** — the `health` family's first reader besides `mortality.vitalityOf`, plus physical exertion. Its header records why body composition is a declared absence rather than a statistic. | Built |

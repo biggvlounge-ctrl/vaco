@@ -123,6 +123,17 @@ async function restoreWorldStateFromPostgres(worldState) {
       role: n.role ?? null,
       education: n.education ?? null,
       religion: n.religion ?? null,
+      // **`studySessions` is deliberately NOT restored, because there
+      // is nowhere to restore it from.** `knowledge.js` keeps a running
+      // count of how many times somebody has taught themselves
+      // something, on the NPC object, and no `study_sessions` column
+      // exists anywhere in the schema. Inventing a table for one
+      // integer is what this file already refused to do for the
+      // world's own tick, which it derives from the high-water mark of
+      // the rows instead. The consequence, stated rather than
+      // discovered: a restored self-taught learner keeps the ATTAINMENT
+      // they reached — `npcs.education` is a real column — and starts
+      // their next rung from zero sessions.
       generation: num(n.generation) ?? 1,
       // Residency, restored from the two columns that carry it. Losing
       // these would put everybody back to unplaced and make every

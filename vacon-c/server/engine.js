@@ -70,6 +70,7 @@ const culture = require('./culture.js');
 const flows = require('./flows.js');
 const contest = require('./contest.js');
 const control = require('./control.js');
+const meetings = require('./meetings.js');
 const behavior = require('./behavior.js');
 const actions = require('./actions.js');
 
@@ -860,6 +861,7 @@ const ACTION_VERBS = {
   resolveContest: (...args) => resolveContest(...args),
   assessTakeover: (...args) => assessTakeover(...args),
   attemptTakeover: (...args) => attemptTakeover(...args),
+  holdMeeting: (...args) => holdMeeting(...args),
 };
 
 function dispatchAction(playerId, body) {
@@ -933,6 +935,29 @@ function tribeIdFor(entityId) {
     );
   }
   return membershipRow.family_id;
+}
+
+// ---------------------------------------------------------------------------
+// Meetings
+// ---------------------------------------------------------------------------
+// **The caller is always at their own meeting.** `attendeeIds` names
+// the others; this adds the actor, so a player cannot arrange a
+// sit-down between other people and have it count as theirs — the same
+// argument `actions.js` makes about `participantIds` on a contest.
+//
+// Events go through the Event phase for the reason `attemptTakeover`
+// does: a meeting a player called is an `events` row of exactly the
+// same shape and id sequence as one a tick produced.
+function holdMeeting(entityId, options = {}) {
+  const others = (options.attendeeIds || []).filter((id) => id !== entityId);
+  const result = meetings.hold(WorldState, {
+    attendeeIds: [entityId, ...others],
+    purpose: options.purpose ?? 'sit-down',
+    topic: options.topic ?? null,
+    calledBy: entityId,
+    tick: WorldState.tick,
+  });
+  return { ...result, events: tick.recordEvents(WorldState, result.events) };
 }
 
 function assessTakeover(entityId, options = {}) {
@@ -1107,6 +1132,7 @@ module.exports = {
   resolveContest,
   verifyContest,
   assessTakeover,
+  holdMeeting,
   attemptTakeover,
   acceptMission,
   resolveMission,

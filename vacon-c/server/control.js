@@ -393,7 +393,13 @@ const SCALES = {
     // point: you do not take a country with a raiding party. What a
     // player actually does is take its ASSEMBLY, which is the
     // `organization` rung and is reachable.
-    holders: (worldState) => (worldState.npcs || []).filter((n) => n.status !== 'dead'),
+    // Everybody in `npcs`, which IS the living — the dead are moved to
+    // `worldState.deceased` rather than flagged. An earlier version of
+    // this line filtered `status !== 'dead'`, a word that appears
+    // nowhere in the vocabulary (`active | imprisoned | deceased`); it
+    // happened to be harmless because it excluded nobody, which is
+    // exactly why it was worth removing rather than correcting.
+    holders: (worldState) => [...(worldState.npcs || [])],
     specialists: () => [
       { occupation: occupations.postFor('government'), count: SPECIALISTS_REQUIRED },
       { occupation: occupations.postFor('military'), count: SPECIALISTS_REQUIRED },
@@ -737,6 +743,65 @@ function article(word) {
   return 'aeiou'.includes(String(word)[0]) ? 'an' : 'a';
 }
 
+// Every target in this city whose specialist requirement IS this
+// occupation. Reads the two mappings that produce a requirement rather
+// than assessing targets and filtering — see the note in
+// `noteRecruitment`.
+//
+// `city` and `civilization` are included when the position is one they
+// name, and that is deliberate even though a tribe will essentially
+// never meet a city's composition: the point of the unlock notice is
+// that a door opened, and a door the tribe cannot yet walk through is
+// still a door. `assess` decides whether it can.
+function targetsRequiring(worldState, position, cityId) {
+  const out = [];
+
+  for (const organization of worldState.organizations || []) {
+    if (occupations.postFor(organization.type) === position) {
+      out.push({ scale: 'organization', locationId: organization.id });
+    }
+  }
+
+  for (const row of worldState.infrastructure || []) {
+    if (cityId !== null && row.city_id !== cityId) continue;
+    if (occupations.postForInfrastructure(row.type) === position) {
+      out.push({ scale: 'infrastructure', locationId: row.id });
+    }
+  }
+
+  // A property inherits the specialist of whoever operates it, because
+  // what you are taking is the business in the building.
+  const communityIds = new Set(
+    (cityId === null
+      ? (worldState.communities || [])
+      : communitiesOfCity(worldState, cityId)).map((c) => c.id),
+  );
+  for (const p of worldState.properties || []) {
+    if (!p.operating_organization_id) continue;
+    if (cityId !== null && !communityIds.has(p.community_id)) continue;
+    const operator = (worldState.organizations || [])
+      .find((o) => o.id === p.operating_organization_id);
+    if (operator && occupations.postFor(operator.type) === position) {
+      out.push({ scale: 'property', locationId: p.id });
+    }
+  }
+
+  if (occupations.postFor('government') === position) {
+    for (const city of worldState.cities || []) {
+      if (cityId !== null && city.id !== cityId) continue;
+      out.push({ scale: 'city', locationId: city.id });
+    }
+  }
+  if (occupations.postFor('government') === position
+    || occupations.postFor('military') === position) {
+    for (const civilization of worldState.civilizations || []) {
+      out.push({ scale: 'civilization', locationId: civilization.id });
+    }
+  }
+
+  return out;
+}
+
 function noteRecruitment(worldState, hires = [], tick = worldState.tick ?? 0) {
   const events = [];
 
@@ -763,13 +828,28 @@ function noteRecruitment(worldState, hires = [], tick = worldState.tick ?? 0) {
       .find((c) => c.id === npc?.communityId);
     const cityId = community?.city_id ?? null;
 
-    const unlocked = viableTargetsFor(worldState, { tribeId, cityId, tick })
-      .filter((t) => {
-        const composition = compositionFor(worldState, {
-          scale: t.scale, locationId: t.locationId, tick,
-        });
-        return composition?.requiredSpecialists.some((s) => s.occupation === position);
-      });
+    // **Only the targets this trade could possibly unlock**, which is
+    // the difference between a cheap check and a quadratic one. The
+    // first version called `viableTargetsFor` and filtered the result:
+    // that assesses every property, community, organization and piece
+    // of infrastructure in the city against this tribe — roughly two
+    // hundred full resolutions — and then throws away all but the two
+    // or three a new physician could have changed. Measured as a tick
+    // that had become too slow to run four hundred of.
+    //
+    // A specialist requirement comes from exactly two mappings
+    // (`occupations.postFor` and `postForInfrastructure`), so the
+    // targets worth assessing can be found by asking which types name
+    // THIS position — and for most hires the answer is none and the
+    // work is a handful of comparisons.
+    const candidates = targetsRequiring(worldState, position, cityId);
+    if (candidates.length === 0) continue;
+
+    const unlocked = [];
+    for (const candidate of candidates) {
+      const resolution = assess(worldState, { ...candidate, tribeId, tick });
+      if (resolution && resolution.compositionRequirementMet) unlocked.push(candidate);
+    }
     if (unlocked.length === 0) continue;
 
     events.push({

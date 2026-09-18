@@ -114,6 +114,17 @@ function sellableOf(worldState, entityId, options = {}) {
     .map((holding) => {
       const item = barter.findItem(worldState, holding.item_name);
       if (!item) return { holding, value: null };
+      // **An item with no Base_Value is not worthless, it is unpriced,
+      // and `barterScore` THROWS for one rather than guessing.** That
+      // is right — §27 gives values for seventeen items and inventing
+      // an eighteenth is exactly what `items.js` exists to prevent —
+      // but a distress sale sweeping somebody's whole store must not
+      // raise because one thing in it has no price. It is skipped, and
+      // the distinction is real in the world rather than defensive:
+      // `knowledge.js`'s books and manuals are deliberately unpriced,
+      // so a starving person sells their tools and keeps their books,
+      // because there is no market for a book.
+      if (!Number.isFinite(Number(item.baseValue))) return { holding, value: null };
       const score = barter.barterScore(worldState, holding.item_name, { cityId });
       return {
         holding,

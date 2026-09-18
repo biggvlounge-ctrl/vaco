@@ -75,7 +75,7 @@ test('every verb an action names is one the engine actually supplies', () => {
   assert.deepEqual(
     actions.REQUIRED_VERBS,
     ['acceptMission', 'addScheduleEvent', 'assessTakeover', 'attemptTakeover',
-      'reinforceHabit', 'resolveContest', 'resolveMission'],
+      'holdMeeting', 'reinforceHabit', 'resolveContest', 'resolveMission'],
   );
 });
 
