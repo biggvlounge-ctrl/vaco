@@ -766,6 +766,29 @@ Three columns had to exist first and all three were simply missing:
 than per city. Measured: 11 anonymous landmarks and two empty
 neighbourhoods before; 38 named ones across six named areas after.
 
+**A twenty-second, and it is the twentieth rule pointed at version
+control. An ignored file is invisible, not untracked.**
+
+`data/st-louis.landmarks.json` was written, `git add -A`ed, named in a
+commit message and **never committed.** `**/data/` is gitignored, and
+`git status` reports nothing for an ignored file — so the commit
+succeeded, said it had the file, and did not. It would have gone with
+the container.
+
+The repo's own `.gitignore` already records this happening: six real
+source files under `vex-business/packages/data/` sat untracked for two
+weeks after a rename moved the carve-out out from under them, and its
+comment says exactly why nobody noticed — "`git status` was clean,
+because ignored files are not untracked files, they are invisible."
+There is even a test, `scripts/test/gitignore-carveouts.test.mjs`,
+which asserts that every path a negation names actually has tracked
+files under it. It failed the moment the carve-out was added and
+passed once the file was really in, which is the whole point of it.
+
+**Check that a file you meant to commit is in `git ls-files`, not that
+`git status` is clean.** The two are different questions and only one
+of them is about your file.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

@@ -165,6 +165,36 @@ const KEY_BUILDING_TYPES = {
     significance: [60, 85], propertyType: 'government', staff: 'librarian',
     discovery: 'knowledge books across every category',
   },
+  //: **A twenty-fourth, and it comes from a disagreement between two
+  //: documents this repository HAS.**
+  //:
+  //: `THE_KEY_BUILDING_TYPES.md` lists twenty-three categories and no
+  //: school. `KEY_LOCATION_DISCOVERY_WORD_OF_MOUTH_SYSTEM.md` names
+  //: schools as a Key building type twice, in its own words: "the Key
+  //: building types (skyscrapers, churches, **schools**, hospitals,
+  //: caves) should be the primary source of high-tier discoveries",
+  //: and "**Schools**/Libraries → knowledge books across every
+  //: category".
+  //:
+  //: Both are present, both are the owner's, and they cannot both be
+  //: complete. The tie is broken toward including it for two reasons:
+  //: the Key's own last entry is "any other genuinely distinctive
+  //: feature not covered above", so the list is explicitly open; and
+  //: `PRISON_POPULATION_CENTERS_BREAKS_SCHOOLS.md` — a document the
+  //: manifest records as written and lost — is named for schools, so
+  //: the omission reads as a document that went missing rather than a
+  //: decision that schools do not count.
+  //:
+  //: Everything else about it is taken rather than invented: the
+  //: discovery pool is the discovery document's own clause, and
+  //: `occupations.DEFINING_POST.school` has said `teacher` since the
+  //: occupation taxonomy was built. Significance sits below the
+  //: university's band because a neighbourhood school is a local
+  //: landmark and a university is a regional one.
+  school: {
+    significance: [40, 70], propertyType: 'government', staff: 'teacher',
+    discovery: 'knowledge books across every category',
+  },
   'theater-concert-hall': {
     significance: [40, 65], propertyType: 'commercial', staff: 'curator',
     discovery: 'cultural/historical artifacts',

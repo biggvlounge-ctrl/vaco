@@ -51,6 +51,14 @@ const KEY_CATEGORIES = [
   'airport', 'train-station', 'hospital', 'stadium-arena', 'library',
   'theater-concert-hall', 'notable-bridge', 'monument-memorial', 'zoo-aquarium',
   'cave-system', 'natural-formation', 'other-distinctive-feature',
+  // **A twenty-fourth.** THE_KEY_BUILDING_TYPES.md lists twenty-three
+  // and no school; KEY_LOCATION_DISCOVERY_WORD_OF_MOUTH_SYSTEM.md
+  // names schools as a Key building type twice. Both documents are the
+  // owner's and both are present, so the list is the union — see
+  // `vacon-c/server/landmarks.js` for the reasoning, and that repo's
+  // `landmark-packs.test.js` for the assertion that keeps these two
+  // copies identical.
+  'school',
 ];
 
 // UNESCO inscription is treated as maximal historical importance by

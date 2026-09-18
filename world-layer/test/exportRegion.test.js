@@ -100,8 +100,9 @@ test('half a coordinate pair is dropped rather than exported', () => {
   assert.equal(pack.locations[0].lat, undefined);
 });
 
-test('the Key is the documents’ twenty-three, in full', () => {
-  assert.equal(KEY_CATEGORIES.length, 23);
+test('the Key is the documents’ twenty-three, plus the school they disagree about', () => {
+  assert.equal(KEY_CATEGORIES.length, 24);
+  assert.ok(KEY_CATEGORIES.includes('school'));
   assert.ok(KEY_CATEGORIES.includes('masonic-building'));
   assert.ok(KEY_CATEGORIES.includes('other-distinctive-feature'));
 });

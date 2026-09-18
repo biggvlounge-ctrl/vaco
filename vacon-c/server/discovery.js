@@ -93,6 +93,10 @@ const POOLS = {
   hospital: { books: ['medicine'], itemCategories: ['medicine', 'tools'] },
   'stadium-arena': null,
   library: { books: 'all' },
+  // The discovery document's own "Schools/Libraries → knowledge books
+  // across every category" — one clause, two categories, and until
+  // `landmarks.js` gained a `school` there was only one to attach it to.
+  school: { books: 'all' },
   'theater-concert-hall': { artifacts: true },
   'notable-bridge': null,
   'monument-memorial': { artifacts: true },

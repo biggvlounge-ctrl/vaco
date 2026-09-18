@@ -1,0 +1,161 @@
+{
+  "region": "St. Louis, Missouri",
+  "source": "sample",
+  "note": "READ THIS BEFORE TRUSTING THE ROWS. `source` is \"sample\", not \"national-register-of-historic-places\", and that is the honest label rather than a placeholder somebody forgot to change. AUTOMATED_HISTORIC_LANDMARK_IMPORT_SYSTEM.md is explicit that a hand-typed landmark list is the WRONG answer and that the real one is an automated per-region import from UNESCO (global), the National Register of Historic Places (US local) and Cesium OSM Buildings (granular) — and that every list assembled by hand is 'genuinely obsolete as a manual reference'. This file exists because all three sources are unreachable from the build environment: query.wikidata.org, whc.unesco.org and services1.arcgis.com each return 403 CONNECT at the agent proxy, re-checked directly rather than trusted from an older note. So this is the shape an import produces, filled with well-known public St. Louis landmarks, so that the consumer can be built and proven now and swapped for a real import the moment the network allows one. `significance` is an interpretive score on the engine's own 0-100 scale, not a figure any register publishes. Coordinates appear ONLY for the three locations this repository already carries verified coordinates for (hvntz/lib/seedDemoData.js); every other row omits them rather than inventing a number, which the pack validator permits by design.",
+  "areas": [
+    "Downtown",
+    "Forest Park",
+    "Central West End",
+    "Grand Center",
+    "Midtown",
+    "North Riverfront"
+  ],
+  "locations": [
+    {
+      "name": "Gateway Arch",
+      "category": "monument-memorial",
+      "area": "Downtown",
+      "tier": "hero",
+      "significance": 100,
+      "lat": 38.6247,
+      "lng": -90.1848
+    },
+    {
+      "name": "Old Courthouse",
+      "category": "government-building",
+      "area": "Downtown",
+      "tier": "hero",
+      "significance": 92
+    },
+    {
+      "name": "Eads Bridge",
+      "category": "notable-bridge",
+      "area": "Downtown",
+      "tier": "hero",
+      "significance": 88
+    },
+    {
+      "name": "Union Station",
+      "category": "train-station",
+      "area": "Downtown",
+      "tier": "hero",
+      "significance": 84
+    },
+    {
+      "name": "Busch Stadium",
+      "category": "stadium-arena",
+      "area": "Downtown",
+      "tier": "hero",
+      "significance": 70
+    },
+    {
+      "name": "Metropolitan Square",
+      "category": "skyscraper",
+      "area": "Downtown",
+      "tier": "regional",
+      "significance": 62
+    },
+    {
+      "name": "Saint Louis Art Museum",
+      "category": "art-museum",
+      "area": "Forest Park",
+      "tier": "hero",
+      "significance": 86
+    },
+    {
+      "name": "Saint Louis Zoo",
+      "category": "zoo-aquarium",
+      "area": "Forest Park",
+      "tier": "hero",
+      "significance": 78
+    },
+    {
+      "name": "Missouri History Museum",
+      "category": "art-museum",
+      "area": "Forest Park",
+      "tier": "regional",
+      "significance": 72
+    },
+    {
+      "name": "Cathedral Basilica of Saint Louis",
+      "category": "church",
+      "area": "Central West End",
+      "tier": "hero",
+      "significance": 90
+    },
+    {
+      "name": "Barnes-Jewish Hospital",
+      "category": "hospital",
+      "area": "Central West End",
+      "tier": "regional",
+      "significance": 80
+    },
+    {
+      "name": "Washington University in St. Louis",
+      "category": "university",
+      "area": "Central West End",
+      "tier": "hero",
+      "significance": 88
+    },
+    {
+      "name": "Fox Theatre",
+      "category": "theater-concert-hall",
+      "area": "Grand Center",
+      "tier": "hero",
+      "significance": 82
+    },
+    {
+      "name": "Powell Hall",
+      "category": "theater-concert-hall",
+      "area": "Grand Center",
+      "tier": "regional",
+      "significance": 76
+    },
+    {
+      "name": "Moolah Temple",
+      "category": "masonic-building",
+      "area": "Grand Center",
+      "tier": "regional",
+      "significance": 68
+    },
+    {
+      "name": "Saint Louis University",
+      "category": "university",
+      "area": "Midtown",
+      "tier": "regional",
+      "significance": 80
+    },
+    {
+      "name": "St. Louis Public Library, Central Library",
+      "category": "library",
+      "area": "Downtown",
+      "tier": "hero",
+      "significance": 84
+    },
+    {
+      "name": "St. Louis Lambert International Airport",
+      "category": "airport",
+      "area": "North Riverfront",
+      "tier": "regional",
+      "significance": 74
+    },
+    {
+      "name": "Cahokia Mounds",
+      "category": "historic-site",
+      "area": "North Riverfront",
+      "tier": "hero",
+      "significance": 96,
+      "lat": 38.6551,
+      "lng": -90.0611
+    },
+    {
+      "name": "Confluence Point",
+      "category": "natural-formation",
+      "area": "North Riverfront",
+      "tier": "regional",
+      "significance": 64,
+      "lat": 38.8783,
+      "lng": -90.1547
+    }
+  ]
+}

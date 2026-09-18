@@ -31,6 +31,24 @@ logs/
 !vex-business/data/
 !vex-business/data/sample/
 
+# VACON-C's landmark packs — reference DATA, not runtime state, and
+# this rule caught them exactly the way the paragraph above describes.
+#
+# `vacon-c/data/st-louis.landmarks.json` is a region's real named
+# landmarks, read by `vacon-c/server/landmarkPacks.js` and the worked
+# example `AUTOMATED_HISTORIC_LANDMARK_IMPORT_SYSTEM.md` calls for. It
+# was written, `git add -A`ed, reported in a commit message and
+# **never committed** — `git status` was clean, because an ignored file
+# is invisible rather than untracked. It would have gone with the
+# container, which is precisely the loss the VACANCY document manifest
+# records for sixty-eight other documents.
+#
+# Scoped to the packs rather than the whole directory: `vacon-c/data/`
+# is also where a runtime store would land, and that stays ignored.
+!vacon-c/data/
+vacon-c/data/*
+!vacon-c/data/*.landmarks.json
+
 # Real secrets, and a real near-miss rather than a precaution.
 #
 # `deploy/README.md` and `dev-docs/DEPLOYMENT_INVENTORY.md` both tell a

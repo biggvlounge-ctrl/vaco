@@ -260,6 +260,63 @@ specification for three systems, not an integration of them.
 Six of the twelve documents in the index's "Core Gameplay Systems"
 group are still missing; `VACANCY_DOCUMENT_MANIFEST.md` lists them.
 
+### The regional landmark lists, and where they went — 18 Sep 2026
+
+Asked to find the St. Louis / Ozarks / Illinois landmark work — "the
+hospitals, the prisons, the universities, all of it, St. Louis as the
+key we duplicate across the country" — the answer is that it was
+written and is not here. Searched, not assumed:
+
+  * `VACANCY_DOCUMENT_MANIFEST.md` re-generated from its own script and
+    came out byte-identical: **90 documents named by the index, 22
+    present, 68 not in this repository.**
+  * Four of the 68 are exactly this work —
+    `GLOBAL_WORLD_FAMOUS_HERO_LANDMARKS.md` ("expanded global landmark
+    reference list"), `PRISON_POPULATION_CENTERS_BREAKS_SCHOOLS.md`,
+    `REGIONAL_TRADING_RESOURCE_VISIBILITY_DEMOGRAPHICS.md` and
+    `REGIONAL_DRUG_PREVALENCE_HABITS_SECRET_SOCIETIES.md`.
+  * No commit on any branch ever ADDED those filenames, and every
+    deleted `.md` in the whole history is `node_modules`.
+  * Both uploaded archives were extracted and searched by CONTENT, not
+    just filename. Neither holds a landmark list.
+  * The only mention of the Ozarks or Illinois on disk is the scope
+    sentence in `VACANCY_CONSOLIDATED_MASTER_SPEC.md` §5 — the
+    boundary of the prototype region, not an inventory of it.
+
+The manifest already recorded the conclusion: "Confirmed on 12 Sep
+2026: they are not coming."
+
+**What survived is the part that matters most, and it is the part the
+owner meant by "St. Louis was supposed to be the key".**
+`THE_KEY_BUILDING_TYPES.md` IS present, and says so itself: "built once
+here, duplicated as the same category standard globally... proven in
+St. Louis, now the definitive, standard reference for identifying
+hero-tier locations in every subsequent city and region worldwide." The
+Key is the CATEGORY standard, not the named list — and the category
+standard is what duplicates. That is built: 34 categories, each with a
+significance band, a staff post, a discovery pool and a maintain key.
+
+**And searching for the lost lists turned up a real defect in the
+present ones.** `THE_KEY_BUILDING_TYPES.md` enumerates twenty-three
+categories with no school. `KEY_LOCATION_DISCOVERY_WORD_OF_MOUTH_
+SYSTEM.md` — also present — names schools as a Key building type
+twice: "(skyscrapers, churches, **schools**, hospitals, caves)" and
+"**Schools**/Libraries → knowledge books across every category". Two
+of the owner's own documents, both here, disagreeing. `school` is now
+the twenty-fourth hero category, with the discovery document's own
+pool and the `teacher` post `occupations.DEFINING_POST` has carried
+since it was written. The omission reads as the lost
+`PRISON_POPULATION_CENTERS_BREAKS_SCHOOLS.md` rather than a decision.
+
+**A second defect, and this one nearly lost work the same way the 68
+were lost.** `data/st-louis.landmarks.json` was written, `git add -A`ed
+and reported in a commit message — and never committed, because
+`**/data/` is gitignored and an ignored file is invisible rather than
+untracked, so `git status` stayed clean. The repo's own `.gitignore`
+documents this exact failure happening before (six source files, two
+weeks) and carries a test for it. Carve-out added; the test now passes
+against a tracked file.
+
 ### The world-layer integration — 18 Sep 2026
 
 `world-layer/UNIVERSAL_WORLD_LAYER_ARCHITECTURE.md` describes one
