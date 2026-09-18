@@ -253,23 +253,51 @@ founders, influencers, Tribe members all from one creation system
 rather than seven — is exactly the kind of consolidation that is cheap
 to state and expensive to retrofit, and it was taken seriously.
 
-**On the data sources: one of six is integrated.** UNESCO import is
-real. Natural Earth, OpenStreetMap direct, Wikidata, USGS, NOAA, and
-OpenWeather are named for evaluation and none are wired. That matches
-the document's own framing ("additional real free data sources to
-**evaluate**"), so this is accurate rather than behind — but per
-`dev-docs/STANDING_INSTRUCTION_ONGOING_EVALUATION.md`, licence terms
-and access conditions for all six should be re-checked before use
-rather than trusted from research done at design time. Dataset terms
-change quietly.
+**On the data sources: one of six was integrated, and that is now
+sixteen registered and five wired — 18 Sep 2026.** `sources.js` holds
+every dataset this project has identified, each with its licence, its
+access path, the slice of the world model it fills and the tier it
+serves. Importers exist for UNESCO, the National Register of Historic
+Places, Overture Places, Wikidata and Wikimedia Commons.
 
-**The 90%/10% automation target is an aspiration with no measurement
-behind it.** Nothing counts what fraction of generated locations
-needed human refinement, so the target cannot currently be tested. It
-would become measurable the moment tier assignment is tracked against
-actual artist hours — worth knowing, since ~1,200 UNESCO locations at
-"real paid human work" is the one line item here with a genuine
-budget attached.
+Two of the sixteen are not named in any document here. Census ACS and
+BLS were added from this project's OWN lost document titles —
+`REBUILD_OCCUPATION_REQUIREMENTS_BLS_SOURCED.md` was the BLS
+methodology document, recorded as written and gone. Wikimedia Commons
+was added under `dev-docs/STANDING_INSTRUCTION_ONGOING_EVALUATION.md`,
+flagged in `sources.js` rather than slipped in, because it is the image
+store Wikidata already points into and reference art is part of what
+the hero rate pays for.
+
+**The licence point that paragraph made still stands and is now
+counted.** Every entry carries `licenceCheckedAt: null` until somebody
+actually looks, `describeSources` reports how many that is (sixteen of
+sixteen), and it separately names the three whose conditions reach the
+shipped product rather than the build: Cesium OSM Buildings and
+OpenStreetMap are ODbL share-alike, and OpenWeather is commercial.
+
+**The 90%/10% automation target was an aspiration with no measurement
+behind it. It has one now, from the data side.**
+`costModel.automationCoverage()` reports, per tier, which slices of the
+world model have a working importer behind them and which specific
+sources would close the rest. Measured today: **hero 100%** (2 of 2
+slices — UNESCO, NRHP, Wikidata and Commons all aim at exactly this
+tier), **regional 43%**, **filler 25%**.
+
+That is not the same measurement as artist hours, and it is not
+presented as one. It reports SHARES and deliberately never money:
+turning "6 of 7 slices automated" into a percentage off would invent
+the one figure nobody has measured, the labour cost per slice. A test
+asserts the function quotes no currency, on the same principle
+`estimateBuildCost` already holds — a rate nobody supplied is not a
+rate of zero.
+
+The reasoning, the per-source payoff and what free data can never buy
+are in `COST_REDUCTION_THROUGH_DATA.md`. Its headline: the largest
+lever is not a discount but a **reclassification** — a location a free
+dataset can describe completely is a location that moves out of the
+tier that costs money — and the next real saving is eleven importers,
+not a negotiation.
 
 **`world-layer/` is a shared data module, not an app.** It has no HTTP
 layer and does not deploy as a service — the skip is documented in

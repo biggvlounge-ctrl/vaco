@@ -176,6 +176,85 @@ const HERO_RATE_ON_FILE = {
 };
 
 // ---------------------------------------------------------------------------
+// automationCoverage — what free data already does, per tier
+// ---------------------------------------------------------------------------
+// **The missing link between `sources.js` and a budget.**
+//
+// §7's cost hierarchy is per tier: Tier 1 is "real, paid human work",
+// Tier 2 is "AI-assisted refinement only", Tier 3 is "fully automated".
+// `getTierCoverage` counts locations per tier and `estimateBuildCost`
+// prices them — but neither knew anything about DATA, so a world with
+// every free dataset wired and a world with none priced identically.
+// That is the whole 90%/10% automation target the architecture document
+// sets and then says, in its own implementation note, "is an aspiration
+// with no measurement behind it".
+//
+// This is the measurement. For each tier: which slices of the world
+// model that tier needs, how many have a working importer in this
+// repository, how many have a source identified but not yet wired, and
+// which specific sources would close the rest.
+//
+// **It reports shares, never money.** Turning "6 of 7 slices are
+// automated" into "therefore 86% cheaper" would be inventing the one
+// number nobody has measured — the labour cost per slice. That belongs
+// to whoever is paying, and `estimateBuildCost` already establishes the
+// rule: a rate nobody supplied is not a rate of zero.
+function automationCoverage() {
+  // Required lazily: `sources.js` requires `locations.js` and so does
+  // this file, and a top-level cycle is not worth one import.
+  // eslint-disable-next-line global-require
+  const sources = require('./sources');
+
+  const byTier = {};
+  for (const tier of LOCATION_TIERS) {
+    const relevant = sources.SOURCE_NAMES.filter((k) => sources.SOURCES[k].tiers.includes(tier));
+
+    // The slices this tier's sources speak to at all. A tier is not
+    // required to need every slice — hero work is landmarks and
+    // pictures, filler work is footprints — so the denominator is what
+    // this tier actually draws on, not the full nine.
+    const slices = new Set();
+    for (const key of relevant) for (const slice of sources.SOURCES[key].fills) slices.add(slice);
+
+    const wired = [];
+    const identifiedOnly = [];
+    for (const slice of slices) {
+      const behind = relevant.filter((k) => sources.SOURCES[k].fills.includes(slice));
+      if (behind.some((k) => sources.SOURCES[k].wired !== null)) wired.push(slice);
+      else identifiedOnly.push({ slice, wouldClose: behind });
+    }
+
+    byTier[tier] = {
+      slices: [...slices],
+      automated: wired,
+      // **Identified but not wired is the cheapest work available.**
+      // The source exists, is free, and somebody has already checked
+      // its licence terms — all that is missing is an importer, which
+      // is a day's work against a slice of a five-figure art budget.
+      identifiedOnly,
+      wiredShare: slices.size === 0 ? null : round2(wired.length / slices.size),
+    };
+  }
+
+  const all = sources.describeSources();
+  return {
+    byTier,
+    sources: all.sources,
+    wired: all.wired.length,
+    unwired: all.unwired.length,
+    // Every slice of the world model that no dataset covers, minus the
+    // two that are simulation state rather than world data. This is the
+    // list that is genuinely paid human work no matter what.
+    noSourceAnywhere: all.uncoveredSlices,
+    // Licence conditions that reach the shipped product. Not a cost
+    // today and potentially one later, which is why it is reported
+    // beside the savings rather than under them.
+    encumbered: all.encumbered,
+    licencesUnverified: all.licencesUnverified.length,
+  };
+}
+
+// ---------------------------------------------------------------------------
 
 function countBy(items, key) {
   const out = {};
@@ -195,4 +274,5 @@ module.exports = {
   getReuseReport,
   getTierCoverage,
   estimateBuildCost,
+  automationCoverage,
 };

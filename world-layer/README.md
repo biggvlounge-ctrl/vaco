@@ -162,3 +162,23 @@ of silently creating a stray property.
   manually-reconciled things.
 - Postgres wiring (schema exists, no driver code yet — will follow
   `vacon-c/server/db.js` + `migrate.js`'s pattern when that's next).
+
+## Data sources — added 18 Sep 2026
+
+`sources.js` is the registry: sixteen free datasets, each with its
+licence, access path, the slice of the world model it fills and the
+tier it serves. Five have importers — UNESCO, the National Register of
+Historic Places, Overture Places, Wikidata and Wikimedia Commons; the
+other eleven are identified with a named payoff each.
+
+`costModel.automationCoverage()` reports what that covers per tier, and
+`COST_REDUCTION_THROUGH_DATA.md` is the reasoning behind it: how far
+free data can push the $420,000-$960,000 hero-tier figure down, what it
+can never pay for, and why the biggest lever is reclassification rather
+than discount.
+
+**Every source host is blocked from the build environment** (403
+CONNECT at the agent proxy, checked directly). Each importer is a real,
+tested transform plus a `fetch*` that throws naming the block and the
+genuine access path — so on a reachable network each is one function
+away and no transform changes.
