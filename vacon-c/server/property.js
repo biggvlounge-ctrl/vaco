@@ -155,6 +155,11 @@ function generateProperty(worldState, options = {}) {
   const property = {
     // Shared entity counter, not a local one. See the header.
     id: worldState.nextEntityId++,
+    // **Named things.** `properties` had no name column, so a
+    // cathedral and a corner shop were both just an id and a type.
+    // Null for an ordinary building — a house genuinely has no name,
+    // and `landmarks.designate` is what gives one to a landmark.
+    name: options.name ?? null,
     land_size: options.landSize ?? null,
     type: options.type,
     value: Number(options.value),
@@ -187,6 +192,15 @@ function generateProperty(worldState, options = {}) {
     // categories collapse onto `historical_site` alone. See
     // server/landmarks.js.
     landmark_category: options.landmarkCategory ?? null,
+    // How much has been carried out of it. Zero, not null: a building
+    // nobody has searched has genuinely had nothing taken, which is a
+    // known fact rather than an unobserved one — the distinction
+    // `bedrooms` above makes the other way round.
+    discoveries_taken: options.discoveriesTaken ?? 0,
+    // Whether the stockroom has already been emptied by a capture.
+    // False, not null: a shop nobody has taken has genuinely not been
+    // cleared out.
+    merchandise_taken: options.merchandiseTaken ?? false,
     former_type: null,
     repurposed_tick: null,
     // Not schema columns. Kept so a property can be placed in the world

@@ -77,6 +77,7 @@ const trade = require('./trade.js');
 const familyTraits = require('./familyTraits.js');
 const control = require('./control.js');
 const salvage = require('./salvage.js');
+const discovery = require('./discovery.js');
 const knowledge = require('./knowledge.js');
 const { seededDraw } = require('./seeded.js');
 
@@ -346,6 +347,15 @@ function runEconomyPhase(worldState) {
   // about it here would let a person be laid off and go scavenging in
   // the same afternoon, or be hired and go anyway.
   events.push(...salvage.runSalvage(worldState, worldState.tick));
+
+  // **Searching a landmark, which is not salvaging one.** A separate
+  // pass rather than a branch inside `runSalvage` on purpose: salvage
+  // strips an empty building for what it is made of, discovery carries
+  // something out of a library or a cathedral, and folding them
+  // together would make the rate of one depend on the supply of the
+  // other. Both sit here because both are what somebody does with a
+  // day, which is what this phase already decides.
+  events.push(...discovery.runDiscovery(worldState, worldState.tick));
 
   // **The market, and `barter.exchange` had never executed in a
   // generated world.** A complete, conservative, tested trade — priced

@@ -577,7 +577,13 @@ const SYSTEMS = [
       + 'DECLARE that `infrastructure`, `cities` and `civilizations` have no control column '
       + 'anywhere in the schema, and that `territory_blocks.faction_id` references '
       + '`factions(organization_id)` specifically — so a FAMILY taking a block has nowhere '
-      + 'to be written. Real estate is the one rung of the six where the record exists.',
+      + 'to be written. Real estate is the one rung of the six where the record exists. '
+      + '**And taking a place now comes with what is in it, 18 Sep 2026** — '
+      + '`server/merchandise.js` honours COMPREHENSIVE_RETAIL_KEY_LOCATIONS.md\'s '
+      + '`merchandiseAccessGranted: true`, which was stated as confirmed and built '
+      + 'nowhere, so a captured hardware store yielded a hardware store and not one '
+      + 'hammer. Measured: a tribe went from 3 tools to 15 by taking one shop, which '
+      + 'is read straight back by this file\'s own materiel requirement.',
   },
   {
     n: 30,

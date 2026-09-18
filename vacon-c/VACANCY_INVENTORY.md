@@ -47,7 +47,7 @@ the Postgres schema that already exists.
 
 ## 1. Server code — `vacon-c/server/`
 
-All 69 files present on disk, all committed. 1598 KB total,
+All 72 files present on disk, all committed. 1636 KB total,
 largest first.
 
 **This table was stale in a way worth recording**, because it is the
@@ -67,6 +67,9 @@ read off disk, not recalled.
 | `worldgen.js` | 47,288 | **Assembles a whole world** by calling the generators that already existed. The eleventh standing rule's answer: before this, every world was a crowd of people standing in an empty field. | Built |
 | `control.js` | 37,243 | **The takeover key** — `COMPOSITION_REQUIREMENTS_TRIBE_COHESION.md`'s `ControlKeyComposition` and `TakeoverAttemptResolution`, across six scales from a one-bedroom apartment to a country. The 5:10:1 composition is the document's, used as a ratio against however many people hold the target now. | Built |
 | `salvage.js` | 38,308 | **Everything has value, because everything can become something.** Ten materials, eight products, eight recipes with alternatives, and a teardown for every one of §26's twenty categories so any item ever added is salvageable without this file knowing the catalogue. Buildings are the real supply — a house has curtains and windows in it — and `stripProperty` costs condition, so it is finite. Nothing here is priced: what a thing is worth is what it can become. Three player verbs and one pass in the Economy phase. | Built |
+| `discovery.js` | 18,689 | **What is actually inside a landmark.** The thirty-three discovery pools `KEY_LOCATION_DISCOVERY_WORD_OF_MOUTH_SYSTEM.md` and `COMPREHENSIVE_RETAIL_KEY_LOCATIONS.md` specify — hospitals hold medical books, libraries hold knowledge across every field, churches hold relics, caves hold lost technology — turned from prose `landmarks.js` already carried and nothing read into real books, artifacts and items. A place runs out. Woke `artifacts.location_id`, a column no caller had ever passed. | Built |
+| `merchandise.js` | 11,061 | **What is on the shelves, and who gets it when the place is taken.** `COMPREHENSIVE_RETAIL_KEY_LOCATIONS.md`'s `merchandiseAccessGranted: true` — stated as confirmed, and `grep -rn merchandise server/` returned nothing, so taking a hardware store gave you a hardware store and not one hammer. The stockroom IS the discovery pool, so there is no second table. Emptied once per location; goods go to the tribe's members, which is what `control.materielOf` already sums. | Built |
+| `landmarkPacks.js` | 9,673 | **Real named places, imported per region — and the reconciliation with `world-layer/`.** That module's own status said its consumers were unbuilt because VACON-C was paused; VACON-C was not paused, and had written a second, anonymous landmark system without finding it. A pack arrives as DATA, never a cross-directory require (the per-app Docker build context), and `data/st-louis.landmarks.json` is the worked example the import documents point at. | Built |
 | `motivation.js` | 35,500 | **Needs, values and goals in one module**, per §4.5 ("Motivation Engine = Value System DNA restated"). Fifteen needs, fifteen values, one satisfier apiece and one declared absence. | Built |
 | `behavior.js` | 35,339 | **The Behavior Engine** — routine, mood and habits: the three tables architecture §4.5 named as genuinely new (`schedule_events`, `entity_state`, `habits`), all of which sat in the schema with zero code. | Built |
 | `politics.js` | 35,701 | Government, laws, and an election lifecycle with real candidates and votes. | Built |

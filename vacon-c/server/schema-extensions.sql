@@ -521,3 +521,53 @@ ALTER TABLE infrastructure ADD COLUMN IF NOT EXISTS repair_ticks BIGINT;
 ALTER TABLE cities ADD COLUMN IF NOT EXISTS dna TEXT;
 ALTER TABLE cities ADD COLUMN IF NOT EXISTS traits JSONB;
 ALTER TABLE civilizations ADD COLUMN IF NOT EXISTS traits JSONB;
+
+-- ---------------------------------------------------------------------
+-- What has been carried out of a landmark
+-- ---------------------------------------------------------------------
+-- `server/discovery.js` turns `landmarks.KEY_BUILDING_TYPES.discovery`
+-- — thirty-three loot pools quoted verbatim from
+-- KEY_LOCATION_DISCOVERY_WORD_OF_MOUTH_SYSTEM.md and
+-- COMPREHENSIVE_RETAIL_KEY_LOCATIONS.md, and read by nothing — into
+-- real books, artifacts and items.
+--
+-- A landmark has to run out, or it is an infinite supply of books
+-- (standing rule 13: a mechanism with no inverse has no equilibrium).
+-- Capacity is computed from `landmarks.significanceOf`, so the only
+-- thing that needs storing is how much has already gone. Stored rather
+-- than derived because it is a fact about what happened, not a rollup
+-- — standing rule 3 forbids storing what can be computed, and this
+-- cannot be.
+ALTER TABLE properties ADD COLUMN IF NOT EXISTS discoveries_taken INTEGER DEFAULT 0;
+
+-- Whether a captured location's stockroom has already been emptied.
+-- `COMPREHENSIVE_RETAIL_KEY_LOCATIONS.md`'s `KeyLocationCapture` says
+-- "merchandiseAccessGranted: true" on capture, and `server/merchandise.js`
+-- honours it — but a group that takes a shop, loses it and takes it
+-- back must not get a second stockroom, or a takeover loop is an
+-- infinite supply of food. Standing rule 13, same shape as
+-- `discoveries_taken` above.
+ALTER TABLE properties ADD COLUMN IF NOT EXISTS merchandise_taken BOOLEAN DEFAULT FALSE;
+
+-- What a place is called.
+-- **`properties` had no name column at all**, so every landmark in
+-- every world was an id and a category — `813, monument-memorial` —
+-- and a cathedral was indistinguishable from the next cathedral. The
+-- St. Louis demo this project's own documents point at names every
+-- location it uses (Cahokia Mounds, the Gateway Arch, Confluence
+-- Point); nothing in the engine named anything.
+--
+-- NULL for an ordinary building, because a house genuinely has no
+-- name and zero-or-blank would claim it is called nothing.
+-- `landmarks.designate` is the writer, and a caller-supplied name wins
+-- so that an imported real place keeps the name it actually has.
+ALTER TABLE properties ADD COLUMN IF NOT EXISTS name TEXT;
+
+-- What a neighbourhood is called.
+-- `cities.name` is NOT NULL and a city's blocks were `community 3`,
+-- which is fine while every area is interchangeable and stops being
+-- fine the moment a landmark pack says the cathedral is in the Central
+-- West End. `landmarkPacks.byArea` matches a real place to a real
+-- neighbourhood on this column. NULL for a generated block: inventing
+-- neighbourhood names is a different job from placing real ones.
+ALTER TABLE communities ADD COLUMN IF NOT EXISTS name TEXT;

@@ -281,3 +281,44 @@ the per-app Docker build context valid. See
 **Genuinely unbuilt**: the consumers. VACON-C is paused, so the
 world model is generated and read by nothing yet. That is the honest
 ceiling — this is real infrastructure waiting on the game that uses it.
+
+---
+
+## The consumer arrived — 18 Sep 2026
+
+**That paragraph above went stale in the one direction nothing prompts
+you to re-check.** VACON-C is not paused; it is the most built thing in
+this repo. And while it was being built it wrote its own
+`server/landmarks.js` — thirty-three Key categories, its own
+significance model, its own per-city placement, every landmark
+anonymous — **without anybody finding `locations.js`**, which already
+had `landmarkData`, the tier model and an import path for real named
+sites. Two disagreeing answers to the same question, for months, with
+neither side's documentation listing the integration as outstanding.
+
+`exportRegion.js` is the join, and it is deliberately a FILE rather
+than an import: `dev-docs/DEPLOYMENT_FILE_PLACEMENT.md` records that
+ten apps reference this directory in comments and none require it
+across the boundary, which is what keeps each app's Docker build
+context valid. So this produces a pack — plain JSON — and
+`vacon-c/server/landmarkPacks.js` validates and reads it. Neither app
+requires the other, and `vacon-c/test/landmark-packs.test.js` asserts
+the two copies of the Key category list are identical so the
+duplication cannot become drift.
+
+Measured on the first world built this way: **38 landmarks across six
+named St. Louis areas, every one named**, with the Gateway Arch in
+Downtown and the Cathedral Basilica in the Central West End because
+that is where they are. Before it: 11 landmarks, all anonymous, 11 of
+33 categories, and two neighbourhoods out of five with nothing in them.
+
+The data sources are still unreachable and that is still reported
+rather than worked around — `query.wikidata.org`, `whc.unesco.org` and
+`services1.arcgis.com` (the NRHP feature service) each return 403
+CONNECT at the agent proxy, re-checked directly rather than trusted
+from `imports/unescoImport.js`'s older note. So
+`vacon-c/data/st-louis.landmarks.json` declares `source: "sample"`,
+which is the honest label rather than a placeholder: a hand-made pack
+claiming to be an NRHP import is exactly what
+AUTOMATED_HISTORIC_LANDMARK_IMPORT_SYSTEM.md was written to stop. A
+reachable network makes it one fetch and no code change.

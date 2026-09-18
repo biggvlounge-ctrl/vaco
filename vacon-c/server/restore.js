@@ -60,6 +60,7 @@ const { reseedAll } = require('./idSequences.js');
 // `barterItems` note where `inventory` is loaded.
 const knowledge = require('./knowledge.js');
 const salvage = require('./salvage.js');
+const merchandise = require('./merchandise.js');
 
 // Turn `SELECT *` rows into what the engine expects. Postgres returns
 // NUMERIC as a string, which is correct of it and wrong for an engine
@@ -478,6 +479,7 @@ async function restoreWorldStateFromPostgres(worldState) {
   // run on a world that already has them.
   knowledge.registerItems(worldState);
   salvage.registerItems(worldState);
+  merchandise.registerItems(worldState);
   summary.barter_items = (worldState.barterItems || []).length;
 
   worldState.decisionLog = (await q('SELECT * FROM decision_log ORDER BY id')).map((d) =>
@@ -582,7 +584,7 @@ async function restoreWorldStateFromPostgres(worldState) {
       // as "41" matches no historical record, so `significanceOf`
       // returns 0 and every landmark in a restored world reads as an
       // ordinary building — which is exactly the maintain key's input.
-      'bedrooms', 'repurposed_tick', 'history_ref']));
+      'bedrooms', 'repurposed_tick', 'discoveries_taken', 'history_ref']));
   summary.properties = worldState.properties.length;
 
   worldState.ownershipRecords = (await q('SELECT * FROM ownership_records ORDER BY id')).map((o) =>

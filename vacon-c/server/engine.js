@@ -73,6 +73,7 @@ const control = require('./control.js');
 const meetings = require('./meetings.js');
 const landmarks = require('./landmarks.js');
 const salvage = require('./salvage.js');
+const discovery = require('./discovery.js');
 const behavior = require('./behavior.js');
 const actions = require('./actions.js');
 
@@ -869,6 +870,7 @@ const ACTION_VERBS = {
   stripBuilding: (...args) => stripBuilding(...args),
   makeThing: (...args) => makeThing(...args),
   canMakeThing: (...args) => canMakeThing(...args),
+  searchLocation: (...args) => searchLocation(...args),
 };
 
 function dispatchAction(playerId, body) {
@@ -1041,6 +1043,12 @@ function makeThing(entityId, options = {}) {
 
 function canMakeThing(entityId, options = {}) {
   return salvage.canMake(WorldState, entityId, options.product);
+}
+
+function searchLocation(entityId, options = {}) {
+  return discovery.search(WorldState, entityId, Number(options.propertyId), {
+    tick: WorldState.tick,
+  });
 }
 
 function assessTakeover(entityId, options = {}) {

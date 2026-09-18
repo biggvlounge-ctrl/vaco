@@ -94,6 +94,8 @@ const occupations = require('./occupations.js');
 const knowledge = require('./knowledge.js');
 const landmarks = require('./landmarks.js');
 const salvage = require('./salvage.js');
+const landmarkPacks = require('./landmarkPacks.js');
+const merchandise = require('./merchandise.js');
 const worldStore = require('./worldStore.js');
 const { hashSeed, seededUnit } = require('./seeded.js');
 
@@ -160,7 +162,8 @@ const DEFAULTS = {
   // government building and a hardware store, which is what the
   // takeover and maintain keys need to have anything to tell apart.
   landmarksPerCity: 6,
-  shopsPerCity: 5,
+  // Per AREA now, not per city — see the placement block below.
+  shopsPerArea: 3,
 };
 
 // The ten infrastructure types a city gets, with capacity expressed
@@ -256,6 +259,18 @@ function generateWorld(options = {}) {
   const random = makeRandom(config.seed);
   const w = engine.WorldState;
   const tick = w.tick ?? 0;
+
+  // **A landmark pack, if this world is being built from a real
+  // region.** Accepted here as well as read off the world, because
+  // "set a field on WorldState, then call this" is a contract nobody
+  // discovers — and refused outright rather than half-applied, so a
+  // typo in a pack produces an error instead of a world that looks
+  // generated with no sign an import was asked for.
+  if (config.landmarkPack) {
+    w.landmarkPack = landmarkPacks.assertPack(config.landmarkPack);
+  } else if (w.landmarkPack) {
+    landmarkPacks.assertPack(w.landmarkPack);
+  }
 
   // **`worldState.seed` was read by two modules and set by none.**
   // `infrastructure.advanceInfrastructure` seeds its failure draw on
@@ -463,9 +478,14 @@ function generateWorld(options = {}) {
       const communityPosition = geo.scatter(
         cityPosition, geo.COMMUNITY_SPREAD_M, [config.seed, 'community', c, b],
       );
+      // A pack's own area names, in its own order, so
+      // `landmarkPacks.byArea` can match a real place to a real
+      // neighbourhood. A world with no pack keeps null names.
+      const packAreas = landmarkPacks.packFor(w)?.areas ?? [];
       const community = territory.generateCommunity(w, {
         cityId: city.id,
         tier: 'block',
+        name: packAreas[b] ?? null,
         // A path prefix of the city's reference, so `geo.contains`
         // answers "is this community in this city" structurally rather
         // than by an assumption about digit widths.
@@ -895,11 +915,41 @@ function generateWorld(options = {}) {
       const cityCommunityRows = (w.communities || []).filter((cm) => cm.city_id === city.id);
       const anchor = cityCommunityRows[0] ?? null;
 
+      // **A pack replaces the draw, and nothing else.** When a world
+      // was assembled with a real region import
+      // (`server/landmarkPacks.js`), the hero landmarks are that
+      // region's actual places — named, scored and in the
+      // neighbourhood they are really in. Without one, the generated
+      // draw below is unchanged, because a world with no pack must
+      // still build.
+      //
+      // Note what a pack does NOT change: the significance model, the
+      // staffing crew, the discovery pool, the maintain key. A place
+      // imported from the National Register is an ordinary property
+      // with a real name on it, which is the whole point of reading
+      // `world-layer` rather than reimplementing it.
+      const packed = (() => {
+        const pack = landmarkPacks.packFor(w);
+        if (!pack) return null;
+        const hero = pack.locations.filter((l) => landmarks.isHeroTier(l.category));
+        return hero.length > 0 ? hero : null;
+      })();
+
       const heroPool = [...landmarks.KEY_BUILDING_CATEGORIES];
-      for (let k = 0; k < config.landmarksPerCity && heroPool.length > 0; k += 1) {
-        const pick = heroPool.splice(random.int(heroPool.length, 'landmark', c, k), 1)[0];
+      const heroCount = packed ? packed.length : config.landmarksPerCity;
+      for (let k = 0; k < heroCount && (packed || heroPool.length > 0); k += 1) {
+        const entry = packed ? packed[k] : null;
+        const pick = entry
+          ? entry.category
+          : heroPool.splice(random.int(heroPool.length, 'landmark', c, k), 1)[0];
         const definition = landmarks.KEY_BUILDING_TYPES[pick];
-        const home = cityCommunityRows[random.int(
+        // A pack names the area a place is really in; the generated
+        // draw picks one. `named` is matched against the community's
+        // own name so a pack does not have to know internal ids.
+        const named = entry?.area
+          ? cityCommunityRows.find((cm) => cm.name === entry.area)
+          : null;
+        const home = named ?? cityCommunityRows[random.int(
           Math.max(1, cityCommunityRows.length), 'landmark-where', c, k,
         )] ?? anchor;
         const row = property.generateProperty(w, {
@@ -934,23 +984,47 @@ function generateWorld(options = {}) {
         landmarks.designate(w, {
           propertyId: row.id,
           category: pick,
-          significance: Math.round(
+          // A pack's own score wins where it gives one — UNESCO
+          // inscription is 100 and that judgement belongs to the
+          // importer. Where it gives none, the category's band, so an
+          // imported place and a generated one are on one scale.
+          significance: landmarkPacks.significanceFor(entry, Math.round(
             random.range(definition.significance[0], definition.significance[1], 'lsig', c, k),
-          ),
+          )),
           tick,
-          what: `the ${city.name} ${pick.replace(/-/g, ' ')}`,
+          // **The real name, where there is one.** Everything else in
+          // this engine called a landmark "the City 1 mosque".
+          name: entry?.name ?? null,
+          what: entry?.name ?? `the ${city.name} ${pick.replace(/-/g, ' ')}`,
         });
         summary.properties += 1;
         summary.landmarks = (summary.landmarks ?? 0) + 1;
       }
 
-      const retailPool = [...landmarks.RETAIL_CATEGORIES];
-      for (let k = 0; k < config.shopsPerCity && retailPool.length > 0; k += 1) {
-        const pick = retailPool.splice(random.int(retailPool.length, 'shop', c, k), 1)[0];
+      // **Shops are per AREA, and hero landmarks are per city.** The
+      // distinction is real rather than a knob: a city has one
+      // cathedral and one courthouse, and every neighbourhood has a
+      // hardware store and somewhere to buy food. Placing both per city
+      // is why a measured world reached only 11 of the Key's 33
+      // categories — six hero types and five retail, once, for the
+      // whole map, so most of the Key never appeared anywhere and four
+      // neighbourhoods out of five had nothing to search or take.
+      //
+      // Drawn without replacement WITHIN an area, so one neighbourhood
+      // does not get two pharmacies, and re-drawn per area, so the ten
+      // retail types are all reachable across a city.
+      const retailRounds = [];
+      for (const home of (cityCommunityRows.length > 0 ? cityCommunityRows : [anchor])) {
+        const pool = [...landmarks.RETAIL_CATEGORIES];
+        for (let n = 0; n < config.shopsPerArea && pool.length > 0; n += 1) {
+          retailRounds.push({ home, pool });
+        }
+      }
+      for (let k = 0; k < retailRounds.length; k += 1) {
+        const { home: area, pool } = retailRounds[k];
+        const pick = pool.splice(random.int(pool.length, 'shop', c, k), 1)[0];
         const definition = landmarks.RETAIL_TYPES[pick];
-        const home = cityCommunityRows[random.int(
-          Math.max(1, cityCommunityRows.length), 'shop-where', c, k,
-        )] ?? anchor;
+        const home = area ?? anchor;
         const row = property.generateProperty(w, {
           type: 'commercial',
           communityId: home ? home.id : null,
@@ -976,7 +1050,9 @@ function generateWorld(options = {}) {
             random.range(definition.significance[0], definition.significance[1], 'ssig', c, k),
           ),
           tick,
-          what: `a ${pick.replace(/-/g, ' ')} on this corner`,
+          // "a auto parts store" — the article has to follow the word,
+          // and this text is a name a player reads.
+          what: `${/^[aeiou]/.test(pick) ? 'an' : 'a'} ${pick.replace(/-/g, ' ')} on this corner`,
         });
         summary.properties += 1;
         summary.shops = (summary.shops ?? 0) + 1;
@@ -1446,6 +1522,13 @@ function generateWorld(options = {}) {
   // before `inventory.give` will hand anybody a piece of it, and
   // `describeSalvage` measures the catalogue rather than the holdings.
   summary.salvageItems = salvage.registerItems(w);
+  // **The goods the retail Key locations actually sell.** Registered
+  // for the same reason and handed out the same way — not at all:
+  // merchandise reaches a tribe by taking the shop it is in.
+  // `discovery.describeDiscovery` measured four §26 categories that
+  // real pools draw on and no item in any world belonged to, so a
+  // grocery store search found nothing, every time.
+  summary.merchandiseItems = merchandise.registerItems(w);
   summary.knowledgeItems = 0;
   made.people.forEach((npc, pi) => {
     if (random.unit('book', pi) > config.survivingBookRate) return;

@@ -114,6 +114,7 @@ const control = require('./control.js');
 const knowledge = require('./knowledge.js');
 const landmarks = require('./landmarks.js');
 const salvage = require('./salvage.js');
+const discovery = require('./discovery.js');
 const inventory = require('./inventory.js');
 
 // §9's MASTER BLOCK KEY, in its order. Every statistic belongs to one.
@@ -644,6 +645,24 @@ const CATALOGUE = [
         && Number(p.condition ?? 0) > 0
       )).length;
       return round(open / here.length, 4);
+    },
+  },
+  {
+    key: 'unsearched_finds', category: 'territory', unit: 'count', scope: 'community',
+    // **What is still inside this area's landmarks.** The other half of
+    // `salvageable_stock`: that counts buildings worth taking apart,
+    // this counts what is worth carrying out of the ones worth keeping.
+    // A neighbourhood with a library and a hospital in it is richer in
+    // a way no property value expresses, and until `discovery.js` the
+    // 33 pools those two documents specify were prose read by nothing.
+    //
+    // Null where the area has no landmarks, which is different from an
+    // area whose landmarks have been picked clean — the first has no
+    // answer, the second answers zero.
+    compute: (ctx) => {
+      const marks = propertiesIn(ctx).filter((p) => p.landmark_category);
+      if (marks.length === 0) return null;
+      return marks.reduce((total, p) => total + (discovery.remainingAt(ctx.worldState, p.id) ?? 0), 0);
     },
   },
   {

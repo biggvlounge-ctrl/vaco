@@ -936,9 +936,29 @@ function attempt(worldState, options = {}) {
     .filter((n) => roleOf(worldState, n, tick) !== null);
 
   let seized = null;
+  let merchandise = null;
   if (succeeded) {
     const target = SCALES[scale].find(worldState, locationId);
     seized = SCALES[scale].seize(worldState, target, tribeId, tick);
+
+    // **`merchandiseAccessGranted`**, which
+    // COMPREHENSIVE_RETAIL_KEY_LOCATIONS.md states as confirmed and
+    // nothing in this engine honoured: taking a hardware store gave you
+    // a hardware store and not one hammer. That mattered most here of
+    // all places, because this file's own materiel requirement means a
+    // tribe with no tools cannot take the building tools come from —
+    // a lock rather than a difficulty curve.
+    //
+    // Property scale only, because that is the scale a shop is. The
+    // document's `KeyLocationCapture` is about a LOCATION; a city or a
+    // civilization has no merchandise pool and pretending otherwise
+    // would be inventing one.
+    if (scale === 'property') {
+      // eslint-disable-next-line global-require
+      merchandise = require('./merchandise.js').grantOnCapture(
+        worldState, locationId, tribeId, { tick },
+      );
+    }
   }
 
   // Memory. `importance` and `emotionLevel` scale with the attempt: a
@@ -999,11 +1019,19 @@ function attempt(worldState, options = {}) {
       tribeCohesionScore: resolution.tribeCohesionScore,
       finalSuccessProbability: resolution.finalSuccessProbability,
       seized,
+      // What came with the building. Null for a scale or a category
+      // with no merchandise pool, which is most of them.
+      merchandise: merchandise?.granted ?? null,
     },
   };
 
   return {
-    ...resolution, succeeded, draw: Math.round(draw * 10000) / 10000, seized, events: [event],
+    ...resolution,
+    succeeded,
+    draw: Math.round(draw * 10000) / 10000,
+    seized,
+    merchandise,
+    events: [event],
   };
 }
 

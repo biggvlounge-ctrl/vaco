@@ -228,8 +228,8 @@ and stopped being right once the engine grew concrete verbs: accept a
 mission, resolve one, adopt a routine, practise a habit, enter a
 contest. The dispatcher invents nothing — it routes to what exists.
 
-**Eleven verbs now, not five.** `break-down`, `strip-building` and
-`make-thing` joined on 18 Sep 2026 under the same rule as the three
+**Twelve verbs now, not five.** `break-down`, `strip-building`,
+`make-thing` and `search-location` joined on 18 Sep 2026 under the same rule as the three
 below. They are the one part of the engine a player is meant to touch
 constantly rather than at a turning point, and `make-thing` carries a
 `check` flag for the same reason `assess-takeover` is a separate verb
@@ -707,6 +707,64 @@ which mattered more than it looks: the §25 tier gate excludes NOBODY
 from these recipes, because Tiers 1 and 2 need no schooling by design,
 so measured on a world 150 of 150 people qualified for all eight and the
 only real gate was materials.
+
+**A twenty-first, and it is the paper twin's twin's twin. The
+consumers of a shared system are a system nobody builds.**
+
+`world-layer/UNIVERSAL_WORLD_LAYER_ARCHITECTURE.md` is the parent
+document behind `world-layer/` — one shared Earth model every gameplay
+system reads from, seven real modules, a hero/regional/filler tier
+vocabulary, and a runnable UNESCO importer. Its own status section ends:
+
+> **Genuinely unbuilt**: the consumers. VACON-C is paused, so the world
+> model is generated and read by nothing yet.
+
+**VACON-C is not paused.** It is the most built thing in this repo, and
+`server/landmarks.js` was written here — thirty-three categories, its
+own significance scale, its own per-city placement — without anybody
+finding `world-layer/locations.js`, which already had `landmarkData`, a
+tier model and an import path for real named sites. That is the third
+standing rule at the level of whole systems rather than columns: **two
+disagreeing answers to the same question**, one of them anonymous and
+generated per city, the other real and imported per region.
+
+The lesson is not "check harder". It is that a document saying a system
+is waiting on its consumer **goes stale in exactly one direction** —
+the consumer gets built, nobody re-reads the file that was waiting for
+it, and the integration is the one piece of work neither side's
+documentation lists as outstanding. When a module's status says it is
+waiting on something, that sentence needs re-checking every time the
+something changes, and nothing prompts you to.
+
+Two constraints that shape the fix, both real:
+
+- **`world-layer/` may not be imported across the directory
+  boundary.** Ten apps reference it in comments and none require it;
+  that is what keeps the per-app Docker build context valid
+  (`dev-docs/DEPLOYMENT_FILE_PLACEMENT.md`). So the integration is by
+  DATA — a region pack VACON-C reads the way it already reads
+  `worldState.barterItems` and `flows.js`'s templates — not by
+  `require('../world-layer')`.
+- **The real data sources are unreachable from here**, re-checked
+  rather than trusted: `query.wikidata.org`, `whc.unesco.org` and
+  `services1.arcgis.com` all return 403 CONNECT at the agent proxy.
+  Per `/root/.ccr/README.md` that is report-do-not-work-around, so the
+  pipeline is built and a network that can reach them makes it one
+  function call, exactly as `imports/unescoImport.js` already says.
+
+**The world-layer integration landed the same day the rule was
+written.** `server/landmarkPacks.js` reads a region pack as DATA;
+`world-layer/exportRegion.js` produces one; neither app requires the
+other, and `test/landmark-packs.test.js` asserts the two copies of the
+Key category list are identical so the duplication cannot become drift.
+`data/st-louis.landmarks.json` is the worked example the import
+documents point at, and it declares `source: "sample"` rather than
+claiming to be a register import it could not perform.
+
+Three columns had to exist first and all three were simply missing:
+`properties.name`, `communities.name`, and shops placed per AREA rather
+than per city. Measured: 11 anonymous landmarks and two empty
+neighbourhoods before; 38 named ones across six named areas after.
 
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`

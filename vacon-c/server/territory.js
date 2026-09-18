@@ -94,6 +94,14 @@ function generateCommunity(worldState, options = {}) {
   const community = {
     id: nextCommunityId++,
     city_id: options.cityId ?? null,
+    // **Neighbourhoods had no names.** A city has one (`cities.name`
+    // is NOT NULL) and its blocks were `community 3`. That is fine
+    // while every area is interchangeable and stops being fine the
+    // moment a landmark pack says the cathedral is in the Central West
+    // End — `landmarkPacks.byArea` matches on this. NULL for a
+    // generated block, because inventing neighbourhood names is a
+    // different job from placing real ones.
+    name: options.name ?? null,
     population: options.population ?? 0,
     tier: options.tier ?? 'block',
     housing: options.housing ?? 50,

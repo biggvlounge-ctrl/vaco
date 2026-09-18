@@ -260,6 +260,87 @@ specification for three systems, not an integration of them.
 Six of the twelve documents in the index's "Core Gameplay Systems"
 group are still missing; `VACANCY_DOCUMENT_MANIFEST.md` lists them.
 
+### The world-layer integration — 18 Sep 2026
+
+`world-layer/UNIVERSAL_WORLD_LAYER_ARCHITECTURE.md` describes one
+shared Earth model every gameplay system reads from, and its status
+section ended: "**Genuinely unbuilt**: the consumers. VACON-C is
+paused, so the world model is generated and read by nothing yet."
+
+**VACON-C was not paused**, and `server/landmarks.js` was written here
+without anybody finding `world-layer/locations.js` — which already had
+`landmarkData`, a hero/regional/filler tier model and an import path
+for real named sites. Two disagreeing answers to "what landmarks are in
+this area", one anonymous and generated per city, one real and imported
+per region.
+
+`server/landmarkPacks.js` is the reconciliation, and it READS rather
+than replaces: `landmarks.js` keeps the Key categories and the
+significance model, and a pack supplies the names, places and scores
+the generated version has to make up. It arrives as DATA on the world —
+the same extension point `worldState.barterItems` and `flows.js`'s
+templates use — because `dev-docs/DEPLOYMENT_FILE_PLACEMENT.md` records
+that no app imports `world-layer/` across the directory boundary, which
+is what keeps each app's Docker build context valid.
+
+Three columns had to exist first, and all three were missing rather
+than wrong: `properties.name` (every landmark in every world was an id
+and a category), `communities.name` (no pack could say which
+neighbourhood a place is in), and shops placed per AREA rather than per
+city (six hero and five retail placed once for a whole map left two of
+five neighbourhoods empty, and a world reached 11 of the Key's 33
+categories).
+
+Measured: 11 anonymous landmarks before, **38 named ones across six
+named St. Louis areas** after, with the Gateway Arch in Downtown
+because that is where it is.
+
+**The sources are blocked and that is reported, not worked around.**
+`query.wikidata.org`, `whc.unesco.org` and `services1.arcgis.com` each
+return 403 CONNECT at the agent proxy, re-checked directly. So
+`data/st-louis.landmarks.json` declares `source: "sample"` — the honest
+label, because a hand-made pack claiming to be a National Register
+import is precisely what `AUTOMATED_HISTORIC_LANDMARK_IMPORT_SYSTEM.md`
+was written to stop. A reachable network makes it one fetch.
+
+### Built on 18 Sep 2026 against documents that were RIGHT there
+
+Two systems that needed no design at all, because both were specified
+in full and then read by nothing. They are the eleventh standing rule
+at the level of whole documents rather than functions.
+
+**`server/discovery.js`** — `KEY_LOCATION_DISCOVERY_WORD_OF_MOUTH_
+SYSTEM.md` gives a loot pool per Key building type: hospitals hold
+medical books and surgical equipment, libraries hold knowledge books
+across every category, churches hold cultural and historical artifacts,
+caves hold lost pre-collapse technology, government buildings hold laws
+and security equipment. **All thirty-three were already in
+`landmarks.KEY_BUILDING_TYPES.discovery`, quoted verbatim, and `grep`
+for a reader returned nothing** — `landmark_category` had exactly three
+readers and none of them was the loot table. What the world did instead
+was scatter books onto 12% of people with a dice roll, so a library and
+a zoo were equally likely to hold one.
+
+It also woke `artifacts.location_id`: a real column, accepted by
+`generateArtifact` since it was written, **passed by no caller ever**,
+so no artifact in any world had ever come from anywhere.
+
+**`server/merchandise.js`** — `COMPREHENSIVE_RETAIL_KEY_LOCATIONS.md`
+states `merchandiseAccessGranted: true` as confirmed, and
+`grep -rn merchandise server/` returned nothing. Taking a hardware
+store gave you a hardware store and not one hammer, which became a lock
+rather than a difficulty curve the day `control.js` grew a materiel
+requirement: a tribe that cannot take a building for want of tools
+cannot take the building tools come from. Measured after: 3 tools to
+15 by taking one shop, read straight back by `control.materielOf`.
+
+The order mattered. Discovery's guard found the gap merchandise closes
+— four §26 categories (`clothing`, `food`, `repair`, `transport`) that
+real pools draw on and **no item in any generated world belonged to**,
+because §27's seventeen priced items are metals, gems, sand, gravel,
+two tools and a musical instrument. Building the loot tables first is
+what made the missing goods visible.
+
 ### Built on 18 Sep 2026 against a missing document, and said so
 
 `server/salvage.js` — everything has value, because everything can

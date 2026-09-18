@@ -224,6 +224,20 @@ const ACTIONS = {
     }),
   },
 
+  // **Searching a landmark for what is in it.** The other half of
+  // `strip-building`: salvage takes a building apart for what it is
+  // MADE of, this carries out what it HELD. A library is worth
+  // searching and worth nothing to a scrapper.
+  'search-location': {
+    summary: 'Search a landmark for what is still inside it.',
+    modes: ['citizen'],
+    requires: ['propertyId'],
+    verbs: ['searchLocation'],
+    run: (verbs, actorId, body) => verbs.searchLocation(actorId, {
+      propertyId: Number(body.propertyId),
+    }),
+  },
+
   'make-thing': {
     summary: 'Make something from the materials you carry.',
     modes: ['citizen'],

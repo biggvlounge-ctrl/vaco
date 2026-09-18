@@ -442,8 +442,9 @@ async function migrateWorldStateToPostgres(worldState) {
           `INSERT INTO properties (id, land_size, type, value, condition, occupants, floors, units,
                                    age, construction_date, utilities, operating_organization_id,
                                    density_tier, lifecycle_stage, community_id, city_id,
-                                   bedrooms, landmark_category, former_type, repurposed_tick)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
+                                   bedrooms, landmark_category, former_type, repurposed_tick,
+                                   discoveries_taken, merchandise_taken, name)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)`,
           [p.id, p.land_size, p.type, p.value, p.condition, JSON.stringify(p.occupants), p.floors,
             p.units, p.age, p.construction_date, JSON.stringify(p.utilities),
             p.operating_organization_id, p.density_tier, p.lifecycle_stage,
@@ -454,7 +455,10 @@ async function migrateWorldStateToPostgres(worldState) {
             // to be, because `properties.type` is coarser than the two
             // documents that name the things worth taking.
             p.bedrooms ?? null, p.landmark_category ?? null,
-            p.former_type ?? null, p.repurposed_tick ?? null]
+            p.former_type ?? null, p.repurposed_tick ?? null,
+            // How much has been carried out of it. 0, not null — a
+            // landmark nobody has searched has had nothing taken.
+            p.discoveries_taken ?? 0, p.merchandise_taken ?? false, p.name ?? null]
         );
       }
       summary.properties = worldState.properties.length;
@@ -1021,7 +1025,7 @@ async function migrateWorldStateToPostgres(worldState) {
                                  competition, cooperation, education, art, religion,
                                  communication_style, leadership_style, conflict_resolution,
                                  values_held, customs, language, cuisine, fashion)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)`,
           [c.id, c.entity_id, c.name, c.era, c.traits.trustLevel, c.traits.tradition,
             c.traits.innovation, c.traits.competition, c.traits.cooperation, c.traits.education,
             c.traits.art, c.traits.religion, c.communicationStyle, c.leadershipStyle,

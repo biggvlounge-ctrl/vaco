@@ -532,7 +532,7 @@ function categoryOf(worldState, propertyId) {
 function designate(worldState, options = {}) {
   const {
     propertyId, category, significance, tick = worldState.tick ?? 0,
-    what = null, why = null,
+    what = null, why = null, name = null,
   } = options;
 
   const property = (worldState.properties || []).find((p) => p.id === propertyId);
@@ -563,6 +563,20 @@ function designate(worldState, options = {}) {
 
   property.history_ref = record.id;
   property.landmark_category = category;
+  // **A landmark with no name is not a landmark.** `properties` had no
+  // `name` column at all, so every monument in every world was
+  // `id 813, landmark_category 'monument-memorial'` — anonymous, and
+  // indistinguishable from the next one. The St. Louis demo this
+  // project's own documents point at names every checkpoint
+  // (Cahokia Mounds, the Gateway Arch, Confluence Point); nothing here
+  // named anything.
+  //
+  // A caller-supplied name wins, which is how an imported real place
+  // keeps the name it actually has. Otherwise this composes one from
+  // the category — which is honest rather than good, and the whole
+  // point of `landmarkPacks.js` is that a world can do better.
+  if (name !== null) property.name = name;
+  else if (!property.name) property.name = what ?? `the ${category.replace(/-/g, ' ')}`;
   // **`hero_tier` is NOT stored**, and an earlier version of this line
   // stored it. It is `isHeroTier(landmark_category)` and nothing else —
   // standing rule 3, never duplicate a computable rollup. Storing it
