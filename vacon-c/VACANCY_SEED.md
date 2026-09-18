@@ -260,6 +260,26 @@ specification for three systems, not an integration of them.
 Six of the twelve documents in the index's "Core Gameplay Systems"
 group are still missing; `VACANCY_DOCUMENT_MANIFEST.md` lists them.
 
+### Built on 18 Sep 2026 against a missing document, and said so
+
+`server/salvage.js` — everything has value, because everything can
+become something. **Three of the manifest's missing documents are
+this one system**: `VACANCY_UNIVERSAL_VALUE_DISCOVERY_SYSTEM.md`
+("Parts 61-70, item/discovery economy"),
+`OCCUPATION_TAXONOMY_ORGANIZED_CRIME_HOMEMADE_CRAFTING.md` (whose
+title names homemade crafting) and
+`BOOKS_RECONQUEST_CHAOS_ERA_GAMEPLAY.md` ("scarcity rules"). None of
+them is recoverable, so the file's own header says at the top that its
+design is invented rather than sourced — which is the honest form of
+the nineteenth standing rule when the document is not merely
+overstating what exists but is gone.
+
+What IS sourced is every vocabulary it stands on, and that is not
+small: §26's twenty trade categories, §27's seventeen priced items,
+§25's knowledge tiers through `occupations.js`, and `traits.js`'s own
+`skills`. The file adds no fourth list, and nothing in it is priced —
+what a thing is worth is what it can become.
+
 ### Standing directives on the wider package (28 Aug 2026)
 
 Given ahead of the remaining documents, and recorded here so they hold

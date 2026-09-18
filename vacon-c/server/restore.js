@@ -56,6 +56,10 @@
 const db = require('./db.js');
 const { traitsToSheet } = require('./entityTraits.js');
 const { reseedAll } = require('./idSequences.js');
+// Item definitions are derived from code, not stored — see the
+// `barterItems` note where `inventory` is loaded.
+const knowledge = require('./knowledge.js');
+const salvage = require('./salvage.js');
 
 // Turn `SELECT *` rows into what the engine expects. Postgres returns
 // NUMERIC as a string, which is correct of it and wrong for an engine
@@ -446,6 +450,35 @@ async function restoreWorldStateFromPostgres(worldState) {
   worldState.inventory = (await q('SELECT * FROM inventory ORDER BY id')).map((h) =>
     nums(h, ['id', 'holder_entity_id', 'quantity', 'condition', 'acquired_tick']));
   summary.inventory = worldState.inventory.length;
+
+  // **The item DEFINITIONS a restored world's holdings refer to.**
+  //
+  // `inventory` rows carry an `item_name` and nothing else; what that
+  // name MEANS — its §26 category — lives in `items.itemsFor`, which is
+  // `items.SOURCED_ITEMS` plus whatever a world registered into
+  // `worldState.barterItems`. That array is derived from code, so it is
+  // deliberately not a table — and it was also not being rebuilt here,
+  // which made it the tenth rule's shape without the type conversion: a
+  // world came back with every row present and every name meaningless.
+  //
+  // `items.findItem` returns null for an unknown name, and the callers
+  // that matter all skip rather than throw, so nothing anywhere would
+  // have reported it:
+  //
+  //   `control.materielOf` skips a holding with no category — so a
+  //   restored tribe's weapons and tools vanish from the takeover check
+  //   and a tribe that could take a building before the restart cannot
+  //   after it;
+  //   `salvage.breakDown` refuses the item as unknown, so a restored
+  //   world cannot take anything apart;
+  //   `barter` and `trade` drop it from anything sellable.
+  //
+  // Books had this from the day `knowledge.js` was written and salvage
+  // inherited it. Registering is idempotent by name, so this is safe to
+  // run on a world that already has them.
+  knowledge.registerItems(worldState);
+  salvage.registerItems(worldState);
+  summary.barter_items = (worldState.barterItems || []).length;
 
   worldState.decisionLog = (await q('SELECT * FROM decision_log ORDER BY id')).map((d) =>
     nums(d, ['id', 'entity_id', 'confidence', 'tick']));

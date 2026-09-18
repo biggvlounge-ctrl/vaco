@@ -47,7 +47,7 @@ the Postgres schema that already exists.
 
 ## 1. Server code — `vacon-c/server/`
 
-All 68 files present on disk, all committed. 1560 KB total,
+All 69 files present on disk, all committed. 1598 KB total,
 largest first.
 
 **This table was stale in a way worth recording**, because it is the
@@ -66,6 +66,7 @@ read off disk, not recalled.
 | `engine.js` | 45,291 | The simulation core. Re-exports the whole subsystem surface, and holds `WorldState`. | Built |
 | `worldgen.js` | 47,288 | **Assembles a whole world** by calling the generators that already existed. The eleventh standing rule's answer: before this, every world was a crowd of people standing in an empty field. | Built |
 | `control.js` | 37,243 | **The takeover key** — `COMPOSITION_REQUIREMENTS_TRIBE_COHESION.md`'s `ControlKeyComposition` and `TakeoverAttemptResolution`, across six scales from a one-bedroom apartment to a country. The 5:10:1 composition is the document's, used as a ratio against however many people hold the target now. | Built |
+| `salvage.js` | 38,308 | **Everything has value, because everything can become something.** Ten materials, eight products, eight recipes with alternatives, and a teardown for every one of §26's twenty categories so any item ever added is salvageable without this file knowing the catalogue. Buildings are the real supply — a house has curtains and windows in it — and `stripProperty` costs condition, so it is finite. Nothing here is priced: what a thing is worth is what it can become. Three player verbs and one pass in the Economy phase. | Built |
 | `motivation.js` | 35,500 | **Needs, values and goals in one module**, per §4.5 ("Motivation Engine = Value System DNA restated"). Fifteen needs, fifteen values, one satisfier apiece and one declared absence. | Built |
 | `behavior.js` | 35,339 | **The Behavior Engine** — routine, mood and habits: the three tables architecture §4.5 named as genuinely new (`schedule_events`, `entity_state`, `habits`), all of which sat in the schema with zero code. | Built |
 | `politics.js` | 35,701 | Government, laws, and an election lifecycle with real candidates and votes. | Built |

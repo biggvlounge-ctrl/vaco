@@ -93,6 +93,7 @@ const media = require('./media.js');
 const occupations = require('./occupations.js');
 const knowledge = require('./knowledge.js');
 const landmarks = require('./landmarks.js');
+const salvage = require('./salvage.js');
 const worldStore = require('./worldStore.js');
 const { hashSeed, seededUnit } = require('./seeded.js');
 
@@ -1437,6 +1438,14 @@ function generateWorld(options = {}) {
   // first because `inventory.give` refuses an item `items.findItem`
   // does not know.
   knowledge.registerItems(w);
+  // **The materials and products salvage deals in, registered but not
+  // handed out.** Nobody starts with a pile of scrap: materials arrive
+  // by taking something apart or stripping an empty building, which is
+  // the point of the system. What registering does is make the names
+  // MEAN something from tick zero — `items.findItem` has to know `glass`
+  // before `inventory.give` will hand anybody a piece of it, and
+  // `describeSalvage` measures the catalogue rather than the holdings.
+  summary.salvageItems = salvage.registerItems(w);
   summary.knowledgeItems = 0;
   made.people.forEach((npc, pi) => {
     if (random.unit('book', pi) > config.survivingBookRate) return;

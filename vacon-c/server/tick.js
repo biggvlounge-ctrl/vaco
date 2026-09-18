@@ -76,6 +76,7 @@ const media = require('./media.js');
 const trade = require('./trade.js');
 const familyTraits = require('./familyTraits.js');
 const control = require('./control.js');
+const salvage = require('./salvage.js');
 const knowledge = require('./knowledge.js');
 const { seededDraw } = require('./seeded.js');
 
@@ -338,6 +339,13 @@ function runEconomyPhase(worldState) {
   // tribe qualifies for something, so a scan would emit thousands of
   // "newly viable" notices on tick 1 and nothing thereafter.
   events.push(...control.noteRecruitment(worldState, labour.hired, worldState.tick));
+
+  // **Salvage, and it belongs after `runLabour` for the same reason the
+  // unlock chain does**: who has no work today is settled by the hiring
+  // and layoff pass immediately above, and forming a second opinion
+  // about it here would let a person be laid off and go scavenging in
+  // the same afternoon, or be hired and go anyway.
+  events.push(...salvage.runSalvage(worldState, worldState.tick));
 
   // **The market, and `barter.exchange` had never executed in a
   // generated world.** A complete, conservative, tested trade — priced

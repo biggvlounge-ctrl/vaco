@@ -228,7 +228,15 @@ and stopped being right once the engine grew concrete verbs: accept a
 mission, resolve one, adopt a routine, practise a habit, enter a
 contest. The dispatcher invents nothing — it routes to what exists.
 
-**Eight verbs now, not five.** `call-meeting`, `assess-takeover` and
+**Eleven verbs now, not five.** `break-down`, `strip-building` and
+`make-thing` joined on 18 Sep 2026 under the same rule as the three
+below. They are the one part of the engine a player is meant to touch
+constantly rather than at a turning point, and `make-thing` carries a
+`check` flag for the same reason `assess-takeover` is a separate verb
+from `attempt-takeover`: a player has to be able to look before they
+spend what they are carrying.
+
+`call-meeting`, `assess-takeover` and
 `attempt-takeover` were added on 18 Sep 2026, and the same rule held:
 each routes to a system that already exists, and none of them was added
 until the system was.
@@ -650,6 +658,55 @@ takeover key could be: `employment_records.position`, accepted by
 `hireEntity` and written by nobody, and `families.unity`/`.conflict`,
 set to 50 and 0 and moved by nothing. A multiplier over two constants
 and a column of nulls would have passed every test and meant nothing.
+
+**A twentieth, and it is the fourteenth rule pointed at a measurement
+rather than at a mechanism. A guard that includes its own output in its
+evidence can never fail.**
+
+`server/salvage.js` claims that everything in a world has value because
+everything can become something. `describeSalvage` is the guard on that
+claim, and it reported a clean bill of health **twice while the claim
+was false**.
+
+- Round one counted a material as reachable if anything in the item
+  catalogue yielded it. Materials ARE in that catalogue — they are
+  ordinary items, which is what lets `inventory`, `barter` and
+  `control.materielOf` see them without a special case — and
+  `salvageOf` returns a material unchanged. So every material vouched
+  for itself and `unreachableMaterials` was structurally always empty.
+- Round two excluded materials and was still wrong, because the
+  PRODUCTS are in the catalogue too. A `blade` is §26 `protection`,
+  `protection` yields cloth, and a blade is made of cloth. The crafting
+  table vouched for its own inputs.
+
+Each time the guard got quieter the real gap got louder. With materials
+excluded it found rubber and plastic; with products excluded as well it
+found that **cloth, paper and plastic reached a generated world through
+nothing at all** — no item anywhere carries the §26 `textiles`,
+`clothing`, `medicine` or `water` category, so four teardown rows
+described a supply that did not exist. Measured: `blade`, the request's
+own headline example, was makeable by **0 of 150 people**, along with
+`furniture`, `bandage` and `notebook`. Four of eight products, and the
+guard said fine.
+
+The general form is the eleventh rule's inverse. That one says a
+generator nothing calls is indistinguishable from one that does not
+exist; this one says **a check that everything is fine, which counts the
+thing being checked as evidence, is indistinguishable from no check at
+all** — and it is worse, because it is reassuring. When writing a guard,
+ask what would have to be true for it to fail, and if the answer is
+"nothing", it is decoration.
+
+Two smaller ones from the same file, both already rules here in other
+clothes. `runSalvage`'s first version read `npc.community_id`, which
+does not exist — an NPC is an engine object with `communityId`, a
+property is a database row with `community_id` — so the pass would have
+run on schedule forever and done nothing (rule 6). And every recipe
+named a `skill` that `canMake` never read (rule 12's second clause),
+which mattered more than it looks: the §25 tier gate excludes NOBODY
+from these recipes, because Tiers 1 and 2 need no schooling by design,
+so measured on a world 150 of 150 people qualified for all eight and the
+only real gate was materials.
 
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`

@@ -72,6 +72,7 @@ const contest = require('./contest.js');
 const control = require('./control.js');
 const meetings = require('./meetings.js');
 const landmarks = require('./landmarks.js');
+const salvage = require('./salvage.js');
 const behavior = require('./behavior.js');
 const actions = require('./actions.js');
 
@@ -864,6 +865,10 @@ const ACTION_VERBS = {
   attemptTakeover: (...args) => attemptTakeover(...args),
   holdMeeting: (...args) => holdMeeting(...args),
   repurposeProperty: (...args) => repurposeProperty(...args),
+  breakDownItem: (...args) => breakDownItem(...args),
+  stripBuilding: (...args) => stripBuilding(...args),
+  makeThing: (...args) => makeThing(...args),
+  canMakeThing: (...args) => canMakeThing(...args),
 };
 
 function dispatchAction(playerId, body) {
@@ -1006,6 +1011,36 @@ function repurposeProperty(entityId, options = {}) {
     throw new Error(`property ${target.id} is already ${options.toType}`);
   }
   return result;
+}
+
+// ---------------------------------------------------------------------
+// Salvage — taking apart and making
+// ---------------------------------------------------------------------
+// Thin on purpose. `salvage.js` holds every rule; these exist so the
+// action dispatcher calls the ENGINE rather than the module underneath,
+// which is the invariant `actions.assertVerbsPresent` was written to
+// protect after calling a module directly made a completed mission pay
+// nothing.
+
+function breakDownItem(entityId, options = {}) {
+  return salvage.breakDown(WorldState, entityId, options.itemName, {
+    quantity: options.quantity ?? 1,
+    tick: WorldState.tick,
+  });
+}
+
+function stripBuilding(entityId, options = {}) {
+  return salvage.stripProperty(WorldState, entityId, Number(options.propertyId), {
+    tick: WorldState.tick,
+  });
+}
+
+function makeThing(entityId, options = {}) {
+  return salvage.make(WorldState, entityId, options.product, { tick: WorldState.tick });
+}
+
+function canMakeThing(entityId, options = {}) {
+  return salvage.canMake(WorldState, entityId, options.product);
 }
 
 function assessTakeover(entityId, options = {}) {

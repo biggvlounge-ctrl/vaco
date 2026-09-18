@@ -192,6 +192,50 @@ const ACTIONS = {
     }),
   },
 
+  // **Salvage, as three verbs.** `server/salvage.js` is the one system
+  // in the engine a player is meant to touch constantly rather than at
+  // a turning point — you take things apart and make things all day —
+  // so all three are plain and none of them takes an actor.
+  //
+  // Note which way round the refusals go. `make` and `break-down` throw
+  // when they cannot proceed, because the player asked for a specific
+  // thing; `can-make` is the one that answers "no" without throwing,
+  // and it is separate for the same reason `assess-takeover` is
+  // separate from `attempt-takeover` — a player has to be able to look
+  // before they spend what they are carrying.
+  'break-down': {
+    summary: 'Take something you carry apart for what it is made of.',
+    modes: ['citizen'],
+    requires: ['itemName'],
+    verbs: ['breakDownItem'],
+    run: (verbs, actorId, body) => verbs.breakDownItem(actorId, {
+      itemName: body.itemName,
+      quantity: body.quantity === undefined ? 1 : Number(body.quantity),
+    }),
+  },
+
+  'strip-building': {
+    summary: 'Strip an empty building for materials. It will not survive many visits.',
+    modes: ['citizen'],
+    requires: ['propertyId'],
+    verbs: ['stripBuilding'],
+    run: (verbs, actorId, body) => verbs.stripBuilding(actorId, {
+      propertyId: Number(body.propertyId),
+    }),
+  },
+
+  'make-thing': {
+    summary: 'Make something from the materials you carry.',
+    modes: ['citizen'],
+    requires: ['product'],
+    verbs: ['makeThing', 'canMakeThing'],
+    run: (verbs, actorId, body) => (
+      body.check === true
+        ? { check: verbs.canMakeThing(actorId, { product: body.product }) }
+        : verbs.makeThing(actorId, { product: body.product })
+    ),
+  },
+
   'enter-contest': {
     summary: 'Compete against a named opponent.',
     modes: ['citizen'],

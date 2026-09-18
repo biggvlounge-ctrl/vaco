@@ -113,6 +113,8 @@ const familyTraits = require('./familyTraits.js');
 const control = require('./control.js');
 const knowledge = require('./knowledge.js');
 const landmarks = require('./landmarks.js');
+const salvage = require('./salvage.js');
+const inventory = require('./inventory.js');
 
 // §9's MASTER BLOCK KEY, in its order. Every statistic belongs to one.
 const CATEGORIES = [
@@ -616,6 +618,70 @@ const CATALOGUE = [
         .filter((n) => Number.isFinite(n));
       if (counts.length === 0) return null;
       return round(counts.reduce((a, b) => a + b, 0) / counts.length, 2);
+    },
+  },
+  // -- salvage: what an area is made of, and what anybody has made ------
+  //
+  // Three statistics rather than one, because they answer three
+  // different questions a player would actually ask about a
+  // neighbourhood, and because a single "salvage index" would hide
+  // exactly the case that matters: an area rich in materials where
+  // nobody has ever made anything.
+  {
+    key: 'salvageable_stock', category: 'territory', unit: 'share', scope: 'community',
+    // **What share of this area's buildings can be stripped.** Empty, no
+    // organization working out of them, and not already taken down to
+    // nothing — `salvage.stripProperty`'s own three refusals, asked of a
+    // whole neighbourhood. This is a material supply and a warning in
+    // the same number: a street of empty houses is where glass, timber
+    // and cloth come from, and it is also a street nobody lives on.
+    compute: (ctx) => {
+      const here = propertiesIn(ctx);
+      if (here.length === 0) return null;
+      const open = here.filter((p) => (
+        (!Array.isArray(p.occupants) || p.occupants.length === 0)
+        && (p.operating_organization_id === null || p.operating_organization_id === undefined)
+        && Number(p.condition ?? 0) > 0
+      )).length;
+      return round(open / here.length, 4);
+    },
+  },
+  {
+    key: 'materials_held', category: 'economics', unit: 'count', scope: 'community',
+    // Materials in the hands of the people who live here, per person.
+    // **Zero is a real and expected answer**, not a gap: nobody is born
+    // holding scrap, and worldgen deliberately hands out none — every
+    // unit of this had to be taken out of something. So this rises only
+    // where salvage is actually being done, which makes it the honest
+    // reader for whether the system is reached rather than merely built.
+    compute: (ctx) => {
+      if (ctx.residents.length === 0) return null;
+      let total = 0;
+      for (const npc of ctx.residents) {
+        for (const holding of inventory.holdingsOf(ctx.worldState, npc.id)) {
+          if (!salvage.MATERIALS[holding.item_name]) continue;
+          total += Number(holding.quantity) || 0;
+        }
+      }
+      return round(total / ctx.residents.length, 3);
+    },
+  },
+  {
+    key: 'things_made', category: 'economics', unit: 'count', scope: 'community',
+    // How many made things are in this area's hands — blades, tools,
+    // furniture, bandages. A product cannot be generated, inherited or
+    // bought into existence: `salvage.make` is the only writer, so a
+    // non-zero here is proof somebody in this neighbourhood took
+    // something apart and built something out of it.
+    compute: (ctx) => {
+      let total = 0;
+      for (const npc of ctx.residents) {
+        for (const holding of inventory.holdingsOf(ctx.worldState, npc.id)) {
+          if (!salvage.PRODUCTS[holding.item_name]) continue;
+          total += Number(holding.quantity) || 0;
+        }
+      }
+      return total;
     },
   },
   {
