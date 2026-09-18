@@ -119,6 +119,39 @@ const ACTIONS = {
     }),
   },
 
+  // **The takeover key, as two verbs rather than one.**
+  // `COMPOSITION_REQUIREMENTS_TRIBE_COHESION.md` splits the shapes the
+  // same way: `ControlKeyComposition` is what a target requires and
+  // `TakeoverAttemptResolution` is what happened. A player has to be
+  // able to look before they leap — "a Tribe can meet every technical
+  // requirement and still fail" is only a meaningful risk if they can
+  // see the requirement first.
+  'assess-takeover': {
+    summary: 'See what it would take for your tribe to hold a place, and your odds.',
+    modes: ['citizen'],
+    requires: ['scale', 'locationId'],
+    verbs: ['assessTakeover'],
+    run: (verbs, actorId, body) => ({
+      resolution: verbs.assessTakeover(actorId, {
+        scale: body.scale, locationId: Number(body.locationId),
+      }),
+    }),
+  },
+
+  'attempt-takeover': {
+    summary: 'Try to take control of a place, with your tribe behind you.',
+    modes: ['citizen'],
+    requires: ['scale', 'locationId'],
+    verbs: ['attemptTakeover'],
+    // The tribe is NOT a parameter. `engine.tribeIdFor` reads it off
+    // the actor's family membership, for the same reason the actor is
+    // never a parameter: a player acts as themselves, and that means
+    // for their own family.
+    run: (verbs, actorId, body) => verbs.attemptTakeover(actorId, {
+      scale: body.scale, locationId: Number(body.locationId),
+    }),
+  },
+
   'enter-contest': {
     summary: 'Compete against a named opponent.',
     modes: ['citizen'],

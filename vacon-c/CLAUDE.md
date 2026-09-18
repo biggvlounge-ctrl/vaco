@@ -561,6 +561,46 @@ long as it is paid for. When a mechanism seems to need an inverse the
 schema does not have, check whether the schema already has one nobody
 has written to.
 
+**An eighteenth, and it is one line long.** A function's tests can be
+complete and correct and say nothing about whether anybody uses what it
+returns. `advanceTick`'s phase 4 read
+
+    runSocialPhase(worldState);                                  // 4
+
+while every other phase on either side of it read
+`candidateEvents.push(...runPhase(worldState))`. `runSocialPhase`
+returns events — `feud_opened` from `crime.advanceFriction`,
+`partnership_formed` from `births.advanceBonds` — and **not one social
+event in the history of this engine had ever reached the event log.**
+Measured on a 400-tick world once the spread operator was there: 485
+partnerships and 25 feuds, all of which had happened, changed the world,
+and been recorded nowhere. A player reading the log saw a town where
+nobody ever fell in love and nobody ever fell out.
+
+`test/births.test.js` asserts on `advanceBonds`' return value, which is
+correct and complete for that function. The gap is one level up, and it
+is the general form worth keeping: **a fixture checks what a function
+returns; nothing checks what its caller does with it.** The same shape
+as the eleventh rule (a generator nothing calls) and the twelfth's
+second clause (a computed value written over) — a thing that is built,
+correct, tested and then dropped on the floor. It was found by adding a
+THIRD event to the same phase, measuring, and getting zero.
+
+**A nineteenth, from the takeover key, and it is about specifications
+rather than code.** When a document says a mechanic composes "three
+systems already built", check all three before scoping the work as
+wiring. `TRIBE_GROWTH_MISSION_UNLOCK_SYSTEM.md` and
+`COMPOSITION_REQUIREMENTS_TRIBE_COHESION.md` between them cite the
+Occupation Taxonomy, the Control Key and the Family/Tribe cohesion
+fields. `VACANCY_SEED.md` had already audited those claims and found
+"roughly half of what they cite as built is not there" — and even that
+audit was one table off in one place (`position` is on the employment
+record, not the person). Two of the three had to be BUILT before the
+takeover key could be: `employment_records.position`, accepted by
+`hireEntity` and written by nobody, and `families.unity`/`.conflict`,
+set to 50 and 0 and moved by nothing. A multiplier over two constants
+and a column of nulls would have passed every test and meant nothing.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

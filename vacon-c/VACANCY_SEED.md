@@ -188,6 +188,34 @@ no mission unlock triggered by recruitment, no Control Key composition
 check, no discovery pools and no retail location types. Read them as
 the design they are.
 
+**Two of the five are built now (18 Sep 2026), and the paragraph above
+stands as written for the other three.**
+
+- **The Control Key composition check** is `server/control.js`.
+  `ControlKeyComposition` and `TakeoverAttemptResolution` are the
+  document's shapes to the field name, across six scales — property,
+  organization, infrastructure, community, city, civilization, which is
+  "a one bedroom apartment to an entire country" as the ladder the
+  schema already had. The 5:10:1 composition is used as a RATIO scaled
+  by how many people hold the target now, so the document's own worked
+  example is what the model produces for something sixteen people hold
+  rather than a constant copied in. Cohesion is
+  `familyTraits.cohesionOf` and discounts rather than averages, because
+  "a Tribe can meet every technical requirement and still fail" has to
+  be arithmetic to be true.
+- **The mission unlock triggered by recruitment** is
+  `control.noteRecruitment`, called from the Economy phase with
+  `runLabour`'s own hire list — the document's trigger is "the moment a
+  Tribe recruits", and a periodic scan would be a condition rather than
+  a crossing. It emits a `takeover_unlocked` event rather than a
+  `missions` row, and says why: `missions.artifact_id` is NOT NULL and
+  that table is about artifact recovery, so a takeover mission would
+  need a fictional artifact to satisfy a foreign key. Measured: 1
+  unlock from 38 hires over 60 ticks of a generated world.
+
+Player-death succession, discovery pools and retail location types
+remain unbuilt.
+
 #### Their "already built" claims, checked against `server/`
 
 Each of these six argues its mechanic is the right one *because* it
@@ -212,9 +240,9 @@ Cited as built and **absent**:
 | Inheritance resolution priority (Will → Family → Organization → Government → Auction → Abandoned → Disputed) | Nothing. `'inherited'` is one value in `property.js`'s acquisition-method enum — how a property was obtained, not who resolves a claim |
 | Legacy Score | Nothing. The word appears twice: a comment about the *legacy* nested trait format, and `historical_legacy` as a property value modifier |
 | Family Bloodline / generational succession | Nothing |
-| Occupation Taxonomy | Nothing — no occupation or profession field exists on an NPC at all |
-| Control Key system, and its specialist/population requirements | Nothing |
-| Family/Tribe `unity`, `conflictLevel` | Nothing. `cooperation` and `conflictResolution` are real but are **culture** dimensions (`culture.js`), not family or tribe traits |
+| Occupation Taxonomy | ~~Nothing — no occupation or profession field exists on an NPC at all~~ **Built 18 Sep 2026** as `server/occupations.js`, §25's own subject lists turned into the people who practise them. One correction to the original row, because it matters: the field DID exist — `employment_records.position`, which `hireEntity` accepted and named in its signature and which **no caller anywhere ever passed**. Not on the NPC, which is the better place for it, and worse than absent: a column that looks wired |
+| Control Key system, and its specialist/population requirements | ~~Nothing~~ **Built 18 Sep 2026** as `server/control.js` — see above |
+| Family/Tribe `unity`, `conflictLevel` | ~~Nothing. `cooperation` and `conflictResolution` are real but are **culture** dimensions (`culture.js`), not family or tribe traits~~ **Half of this row was wrong when written, and the other half is built.** `families.unity` and `families.conflict` are real columns that `generateFamily` has always set, and `cooperation` is a real FAMILY-tier `entity_traits` row (`familyTraits.FAMILY_TRAIT_FAMILIES`) as well as a culture dimension. What was true is that nothing ever MOVED unity or conflict: 50 and 0 on every family in every world, which is worse than a missing field because a multiplier over them looks live. `familyTraits.advanceCohesion` is the writer, in the Social phase beside `advanceBonds` and `advanceFriction` |
 | Information Spread Key | Nothing |
 | Rural Resource system | Nothing |
 | Bullet scarcity | Nothing |

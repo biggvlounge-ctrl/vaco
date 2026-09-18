@@ -69,6 +69,7 @@ const property = require('./property.js');
 const culture = require('./culture.js');
 const flows = require('./flows.js');
 const contest = require('./contest.js');
+const control = require('./control.js');
 const behavior = require('./behavior.js');
 const actions = require('./actions.js');
 
@@ -857,6 +858,8 @@ const ACTION_VERBS = {
   addScheduleEvent: (...args) => addScheduleEvent(...args),
   reinforceHabit: (...args) => reinforceHabit(...args),
   resolveContest: (...args) => resolveContest(...args),
+  assessTakeover: (...args) => assessTakeover(...args),
+  attemptTakeover: (...args) => attemptTakeover(...args),
 };
 
 function dispatchAction(playerId, body) {
@@ -905,6 +908,59 @@ function resolveContest(options) {
 
 function verifyContest(result) {
   return contest.verifyContest(WorldState, result);
+}
+
+// ---------------------------------------------------------------------------
+// The takeover key
+// ---------------------------------------------------------------------------
+// `COMPOSITION_REQUIREMENTS_TRIBE_COHESION.md`'s two shapes, bound to
+// this file's WorldState. See server/control.js.
+//
+// **The tribe is not a parameter.** A player acts as themselves, which
+// `actions.js` enforces by refusing a body that names an actor — and
+// the same argument applies one level up: a player takes a building
+// FOR THEIR OWN FAMILY, not for whichever tribe they nominate.
+// `tribeIdFor` reads it off `family_memberships`, so naming somebody
+// else's family is not a thing the API can be asked to do.
+function tribeIdFor(entityId) {
+  const membershipRow = (WorldState.familyMemberships || [])
+    .find((m) => m.entity_id === entityId);
+  if (!membershipRow) {
+    throw new Error(
+      `entity ${entityId} belongs to no family, and a takeover is a tribe acting together. `
+      + 'COMPOSITION_REQUIREMENTS_TRIBE_COHESION.md makes internal cohesion half the '
+      + 'resolution, and a tribe of one has none to measure.',
+    );
+  }
+  return membershipRow.family_id;
+}
+
+function assessTakeover(entityId, options = {}) {
+  return control.assess(WorldState, {
+    scale: options.scale,
+    locationId: options.locationId,
+    tribeId: tribeIdFor(entityId),
+    tick: WorldState.tick,
+  });
+}
+
+function attemptTakeover(entityId, options = {}) {
+  const result = control.attempt(WorldState, {
+    scale: options.scale,
+    locationId: options.locationId,
+    tribeId: tribeIdFor(entityId),
+    tick: WorldState.tick,
+  });
+  if (result === null) {
+    throw new Error(
+      `no ${options.scale} with id ${options.locationId} to take`,
+    );
+  }
+  // Recorded through the Event phase rather than pushed here, so a
+  // player's takeover is an `events` row of exactly the same shape and
+  // id sequence as one the tick produced.
+  const recorded = tick.recordEvents(WorldState, result.events);
+  return { ...result, events: recorded };
 }
 
 function resolveMission(missionId, options = {}) {
@@ -1050,6 +1106,8 @@ module.exports = {
   rateEntity,
   resolveContest,
   verifyContest,
+  assessTakeover,
+  attemptTakeover,
   acceptMission,
   resolveMission,
   PROPERTY_TYPES: property.PROPERTY_TYPES,

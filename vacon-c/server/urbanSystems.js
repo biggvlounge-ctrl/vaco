@@ -323,7 +323,11 @@ const SYSTEMS = [
       + 'table rather than a schema-only one — so gang membership PER AREA is derivable '
       + '(membership.gangMembershipRate), not just faction control of a block. The '
       + 'hierarchy of §14 (shot callers through juveniles) is still not enumerated: '
-      + 'role_in_org is open TEXT and no document names the tiers.',
+      + 'role_in_org is open TEXT and no document names the tiers. **A faction now pays '
+      + 'an enforcer**, which is a different fact from membership — `worldgen` gives each '
+      + 'one a founding hire, so `occupations.OCCUPATIONS.enforcer` has an employer and '
+      + 'the takeover key\'s composition requirement, which is written in enforcers, can '
+      + 'actually be met (server/control.js).',
   },
   {
     n: 16,
@@ -549,8 +553,17 @@ const SYSTEMS = [
     name: 'Real Estate',
     level: 'modelled',
     tables: ['properties', 'ownership_records'],
-    functions: ['currentPropertyValue', 'recordOwnership', 'getOwnershipHistory', 'getHoldings'],
-    note: 'Value, transfer and full ownership history. One of the most complete systems here.',
+    functions: ['currentPropertyValue', 'recordOwnership', 'getOwnershipHistory', 'getHoldings',
+      'compositionFor', 'attempt'],
+    note: 'Value, transfer and full ownership history. One of the most complete systems here. '
+      + '**And property now changes hands by force as well as by purchase, 17 Sep 2026** — '
+      + '`server/control.js` is COMPOSITION_REQUIREMENTS_TRIBE_COHESION.md\'s takeover key, '
+      + 'and a successful one writes an `ownership_records` row with the schema\'s own '
+      + '`stolen` acquisition method. Note what this does NOT close: the same file has to '
+      + 'DECLARE that `infrastructure`, `cities` and `civilizations` have no control column '
+      + 'anywhere in the schema, and that `territory_blocks.faction_id` references '
+      + '`factions(organization_id)` specifically — so a FAMILY taking a block has nowhere '
+      + 'to be written. Real estate is the one rung of the six where the record exists.',
   },
   {
     n: 30,

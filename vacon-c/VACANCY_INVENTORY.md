@@ -47,7 +47,7 @@ the Postgres schema that already exists.
 
 ## 1. Server code — `vacon-c/server/`
 
-All 60 files present on disk, all committed. 1132 KB total,
+All 65 files present on disk, all committed. 1472 KB total,
 largest first.
 
 **This table was stale in a way worth recording**, because it is the
@@ -65,6 +65,7 @@ read off disk, not recalled.
 | `statistics.js` | 60,429 | The uniform statistics catalogue — every reading an area can give about itself, in one shape, with declared absences as data. | Built |
 | `engine.js` | 45,291 | The simulation core. Re-exports the whole subsystem surface, and holds `WorldState`. | Built |
 | `worldgen.js` | 47,288 | **Assembles a whole world** by calling the generators that already existed. The eleventh standing rule's answer: before this, every world was a crowd of people standing in an empty field. | Built |
+| `control.js` | 37,243 | **The takeover key** — `COMPOSITION_REQUIREMENTS_TRIBE_COHESION.md`'s `ControlKeyComposition` and `TakeoverAttemptResolution`, across six scales from a one-bedroom apartment to a country. The 5:10:1 composition is the document's, used as a ratio against however many people hold the target now. | Built |
 | `motivation.js` | 35,500 | **Needs, values and goals in one module**, per §4.5 ("Motivation Engine = Value System DNA restated"). Fifteen needs, fifteen values, one satisfier apiece and one declared absence. | Built |
 | `behavior.js` | 35,339 | **The Behavior Engine** — routine, mood and habits: the three tables architecture §4.5 named as genuinely new (`schedule_events`, `entity_state`, `habits`), all of which sat in the schema with zero code. | Built |
 | `politics.js` | 35,701 | Government, laws, and an election lifecycle with real candidates and votes. | Built |
@@ -95,6 +96,8 @@ read off disk, not recalled.
 | `technology.js` | 14,892 | Civilizations, eras, and what an era makes possible. | Built |
 | `environment.js` | 13,372 | Weather, climate and where a drought lives — `environment_state`, one row per city, and severe weather through the existing condition channel. | Built |
 | `territory.js` | 31,762 | Cities, communities, territory blocks, control resolution, city reemergence and community health (both computed on read). | Built |
+| `occupations.js` | 23,300 | **What a person does for a living** — §25's seven knowledge tiers turned into thirty-four occupations, and the answer to `employment_records.position` being a column no caller ever wrote. Owns `DEFINING_POST`, the one vocabulary `worldgen` and `control` both read. | Built |
+| `familyTraits.js` | 14,808 | Family trait families, and **cohesion** — `families.unity` and `.conflict` were 50 and 0 on every family in every world until `advanceCohesion` gave them a writer in the Social phase. | Built |
 | `health.js` | 12,799 | **A population's health** — the `health` family's first reader besides `mortality.vitalityOf`, plus physical exertion. Its header records why body composition is a declared absence rather than a statistic. | Built |
 | `culture.js` | 12,176 | **Culture DNA (Phase 2)** — sixteen named families stored three ways, tier-level attachment. | Built |
 | `succession.js` | 12,172 | Inheritance — an estate settled by name across holdings, family and property. | Built |
@@ -117,7 +120,6 @@ read off disk, not recalled.
 | `traitDefinitions.js` | 4,562 | Individual / organization / family definitions, id and definition lookup. | Built |
 | `idSequences.js` | 3,678 | Id sequence state, so a restored world does not reissue ids. | Built |
 | `organizationTraits.js` | 2,395 | Organization trait families. | Built |
-| `familyTraits.js` | 2,082 | Family trait families. | Built |
 | `db.js` | 2,017 | Postgres connection and `query()` helper. | Built, see §4 |
 | `seeded.js` | 2,016 | **§88 determinism** — `hashSeed`, `seededUnit`, `seededDraw`. Seed on position, never on identity. | Built |
 | `nextAfter.js` | 1,004 | The next value after a given one in a sequence. | Built |

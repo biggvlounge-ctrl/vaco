@@ -291,6 +291,73 @@ const OCCUPATIONS = {
 const OCCUPATION_NAMES = Object.keys(OCCUPATIONS);
 
 // ---------------------------------------------------------------------
+// Which post makes a place what it is
+// ---------------------------------------------------------------------
+// **One vocabulary, in one file.** `TRIBE_GROWTH_MISSION_UNLOCK_SYSTEM.
+// md` turns on exactly this: "A location's Control Key already
+// specifies real specialist requirements (a Hospital needs medical
+// experts)... The moment a Tribe recruits someone whose occupation
+// matches a nearby location's specialist requirement, that match itself
+// becomes the trigger for a new, real, suggested mission." So the
+// mapping is read by `worldgen` (to staff an institution with the
+// person who defines it), by `control.js` (as a takeover's specialist
+// requirement) and by nothing else — and it lives here rather than in
+// either, because this project keeps finding the same list written out
+// three times with three different spellings.
+//
+// Not "the highest tier the type employs", which was the first version
+// and gave a schoolhouse a manager and a reading room a linguist. A
+// tier is not a definition.
+const DEFINING_POST = {
+  school: 'teacher',
+  hospital: 'physician',
+  library: 'librarian',
+  museum: 'curator',
+  research: 'researcher',
+  media: 'reporter',
+  religion: 'preacher',
+  sports: 'athlete',
+  gang: 'enforcer',
+  military: 'officer',
+  government: 'diplomat',
+  // `business`, `corporation` and `club` are deliberately absent. A
+  // business is not defined by one trade — it is whatever it does — and
+  // returning `manager` for all three would assert something about them
+  // that is not true. `postFor` returns null and the caller decides.
+  //: `business`, `corporation`, `club` → null, on purpose.
+};
+
+// The infrastructure the schema defines has no operator column at all,
+// so the link from a water plant to the person who runs it has to be
+// stated somewhere. §25's own subject list is what names them:
+// "plumbing, electrical" at Tier 3 and "engineering" at Tier 4.
+//
+// Six of `infrastructure.INFRASTRUCTURE_TYPES` are missing here and
+// that is the honest answer rather than an omission: roads and bridges
+// are built and then stand, and nobody in this engine's occupation
+// taxonomy is a road. `postForInfrastructure` returns null for them,
+// and `control.js` reads that as "no specialist is required to hold
+// it", which is true — an unmanned road is taken by standing on it.
+const INFRASTRUCTURE_POST = {
+  hospitals: 'physician',
+  schools: 'teacher',
+  water_systems: 'plumber',
+  electricity: 'electrician',
+  internet: 'engineer',
+  public_safety: 'officer',
+  waste_management: 'labourer',
+  rail: 'navigator',
+};
+
+function postFor(organizationType) {
+  return DEFINING_POST[organizationType] ?? null;
+}
+
+function postForInfrastructure(infrastructureType) {
+  return INFRASTRUCTURE_POST[infrastructureType] ?? null;
+}
+
+// ---------------------------------------------------------------------
 // The education gate
 // ---------------------------------------------------------------------
 //: `demographics.EDUCATION_LEVELS` is six rungs — none, basic,
@@ -506,6 +573,10 @@ module.exports = {
   TIER_COUNT,
   OCCUPATIONS,
   OCCUPATION_NAMES,
+  DEFINING_POST,
+  INFRASTRUCTURE_POST,
+  postFor,
+  postForInfrastructure,
   TIER_MINIMUM_LEVEL,
   attainmentOf,
   tierReachable,

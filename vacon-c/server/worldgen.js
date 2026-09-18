@@ -179,11 +179,15 @@ const CITY_INFRASTRUCTURE = [
 // reading room a linguist: "highest tier" is not "defining", and
 // guessing which is which from a number is the twelfth rule's third
 // clause again.
+// `post` comes from `occupations.DEFINING_POST` rather than being
+// written out again — `control.js` reads the same mapping as a
+// takeover's specialist requirement, and this project keeps finding
+// the same list spelled three ways in three files.
 const CITY_INSTITUTIONS = [
-  { type: 'school', suffix: 'Schoolhouse', post: 'teacher', assets: [3000, 40000] },
-  { type: 'hospital', suffix: 'Infirmary', post: 'physician', assets: [8000, 120000] },
-  { type: 'library', suffix: 'Reading Room', post: 'librarian', assets: [1000, 18000] },
-];
+  { type: 'school', suffix: 'Schoolhouse', assets: [3000, 40000] },
+  { type: 'hospital', suffix: 'Infirmary', assets: [8000, 120000] },
+  { type: 'library', suffix: 'Reading Room', assets: [1000, 18000] },
+].map((spec) => ({ ...spec, post: occupations.postFor(spec.type) }));
 
 // The resource types a generated city tracks. A subset of §28's
 // thirteen — the ones this engine's other systems actually read —

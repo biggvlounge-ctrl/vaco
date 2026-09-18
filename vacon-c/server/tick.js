@@ -74,6 +74,8 @@ const environment = require('./environment.js');
 const statecraft = require('./statecraft.js');
 const media = require('./media.js');
 const trade = require('./trade.js');
+const familyTraits = require('./familyTraits.js');
+const control = require('./control.js');
 const { seededDraw } = require('./seeded.js');
 
 let nextEventId = 1;
@@ -325,6 +327,17 @@ function runEconomyPhase(worldState) {
   const labour = economy.runLabour(worldState, worldState.tick, payroll.events);
   events.push(...labour.events);
 
+  // **The unlock chain, and it belongs HERE rather than in the
+  // Organization phase.** `TRIBE_GROWTH_MISSION_UNLOCK_SYSTEM.md`'s
+  // trigger is precise: "The moment a Tribe recruits someone whose
+  // occupation matches a nearby location's specialist requirement, that
+  // match itself becomes the trigger." The moment is a hire, the hires
+  // are in `labour.hired`, and a periodic scan would be a condition
+  // rather than a crossing (standing rule 7) — at generation every
+  // tribe qualifies for something, so a scan would emit thousands of
+  // "newly viable" notices on tick 1 and nothing thereafter.
+  events.push(...control.noteRecruitment(worldState, labour.hired, worldState.tick));
+
   // **The market, and `barter.exchange` had never executed in a
   // generated world.** A complete, conservative, tested trade — priced
   // from §27's barter key, adjusted for scarcity, population, both
@@ -513,7 +526,28 @@ function runSocialPhase(worldState) {
   // reached and no child could ever be born in a running world. This
   // runs after `resolveTrust` above, so a bond reads the interaction
   // count and trust this tick just produced. See server/births.js.
-  return [...feuds, ...births.advanceBonds(worldState, worldState.tick)];
+  const bonds = births.advanceBonds(worldState, worldState.tick);
+
+  // **And families, which had the hole in two fields at once.**
+  // `families.unity` was 50 and `families.conflict` 0 on every family
+  // in every world — `generateFamily` set both and nothing in the
+  // engine ever moved either. `COMPOSITION_REQUIREMENTS_TRIBE_COHESION.
+  // md` specifies the takeover key's second factor as a multiplier on
+  // exactly those fields plus `cooperation`, so two of its three terms
+  // were constants and the document's whole point — that a tribe can
+  // meet every requirement and still fail because the people do not
+  // work together — could not happen.
+  //
+  // Last in the phase on purpose: unity converges on the trust
+  // `resolveTrust` just moved and conflict on the friction
+  // `advanceFriction` just moved, so a family reads this tick's
+  // relationships rather than last tick's. Same ordering argument as
+  // `advanceBonds` above. See server/familyTraits.js.
+  const discord = familyTraits.advanceCohesion(worldState, {
+    tick: worldState.tick, discordThreshold: FAMILY_DISCORD_THRESHOLD,
+  });
+
+  return [...feuds, ...bonds, ...discord];
 }
 
 // ---------------------------------------------------------------------------
@@ -806,6 +840,25 @@ function runOrganizationPhase(worldState) {
 //: was always meant to mean, rather than a number that sounds like
 //: trouble on a 0-100 scale.
 const CONFLICT_ESCALATION_THRESHOLD = 20;
+
+//: **Measured on the population it applies to, which is families and
+//: not relationships.** `familyTraits.conflictTarget` is the MEAN
+//: conflict across a family's internal relationships, so it cannot
+//: reach the tail a single pair reaches — averaging is what makes this
+//: a different distribution from the one above, and reusing 20 here
+//: would have been standing rule 17's second failure exactly: two
+//: numbers on the same 0-100 scale that describe different
+//: populations.
+//:
+//: Measured on a 400-tick generated world, 30 families of which 23 are
+//: measurable at all: stored family conflict runs p50 3.3, p90 31.9,
+//: p95 33.8, max 49.2, against a `conflictTarget` it lags — p50 5.5,
+//: p90 43.6, max 53.5. So 32 is the p90 of the field this fires on:
+//: the three or four households in a settlement that have genuinely
+//: fallen apart, which is what "open discord" is for. At 8 — the first
+//: figure here, chosen before the measurement existed — most of the
+//: town would have qualified.
+const FAMILY_DISCORD_THRESHOLD = 32;
 
 //: **A flashpoint is an occasion, not a state**, and this constant is
 //: standing rule 7 applied to the thing that rule was written about.
@@ -1160,7 +1213,25 @@ function advanceTick(worldState) {
   candidateEvents.push(...runEnvironmentPhase(worldState));    // 1
   runResourcePhase(worldState);                                // 2
   candidateEvents.push(...runEconomyPhase(worldState));        // 3
-  runSocialPhase(worldState);                                  // 4
+  // **Phase 4's return value was discarded, and had been since it
+  // started returning one.** `runSocialPhase` builds and returns
+  // events — `feud_opened` from `crime.advanceFriction` and
+  // `partnership_formed` from `births.advanceBonds` — and this line
+  // read `runSocialPhase(worldState);` with no `candidateEvents.push`
+  // in front of it. So **no social event in the history of this engine
+  // has ever reached the event log**: every feud that opened and every
+  // partnership that formed happened, changed the world, and was
+  // recorded nowhere. Found by adding a third such event
+  // (`family_discord`), measuring a 400-tick world, and getting zero of
+  // them while the field it fires on plainly moved.
+  //
+  // The suite could not see it. `test/births.test.js` asserts on
+  // `advanceBonds`' RETURN, which is correct and complete for that
+  // function, and nothing anywhere asserted that phase 4's events
+  // arrive — the one shape a fixture never checks is what the caller
+  // does with the value. Every event here is a crossing rather than a
+  // condition (standing rule 7), so nothing floods.
+  candidateEvents.push(...runSocialPhase(worldState));          // 4
   candidateEvents.push(...runDecisionPhase(worldState));       // 5
   candidateEvents.push(...runMigrationPhase(worldState));      // 6
   candidateEvents.push(...runOrganizationPhase(worldState));   // 7
@@ -1331,5 +1402,14 @@ module.exports = {
   // that only shows over hundreds of ticks otherwise, which is how it
   // went unnoticed for the life of the project.
   runEnvironmentPhase,
+  // **Exported because a player action happens between ticks.** The
+  // Event phase is the only thing in the engine that turns a candidate
+  // event into an `events` row, and before this it was reachable only
+  // from inside `advanceTick`. A takeover a player performs through
+  // `POST /api/players/:id/action` is a real event in the world and had
+  // nowhere to be recorded — the alternative was a second event writer
+  // in `engine.js`, which is two sources of truth for the id sequence
+  // and the row shape.
+  recordEvents: runEventPhase,
   advanceTick,
 };

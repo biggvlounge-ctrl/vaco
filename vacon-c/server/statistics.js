@@ -109,6 +109,8 @@ const media = require('./media.js');
 const trade = require('./trade.js');
 const politics = require('./politics.js');
 const occupations = require('./occupations.js');
+const familyTraits = require('./familyTraits.js');
+const control = require('./control.js');
 
 // §9's MASTER BLOCK KEY, in its order. Every statistic belongs to one.
 const CATEGORIES = [
@@ -281,6 +283,33 @@ const CATALOGUE = [
     // large family who lives by themselves is a one-person household.
     key: 'solo_household_share', category: 'population', unit: 'share', scope: 'community',
     compute: (ctx) => households.soloShareIn(ctx.worldState, ctx.communityId),
+  },
+  {
+    key: 'family_cohesion', category: 'population', unit: 'share', scope: 'community',
+    // **The measurement that would have caught two constants.**
+    // `families.unity` was 50 and `families.conflict` 0 on every family
+    // in every world ever generated, and no statistic anywhere said so
+    // — a catalogue of 101 entries and not one of them read either
+    // field. `familyTraits.cohesionOf` composes them with the
+    // `cooperation` trait into the multiplier
+    // COMPOSITION_REQUIREMENTS_TRIBE_COHESION.md asks a takeover to
+    // pass, and this is its spread across the families living here.
+    //
+    // A family counts as living here if ANY living member does. Two
+    // branches in two neighbourhoods are one family with one unity, so
+    // splitting it between them would invent a number neither branch
+    // has.
+    compute: (ctx) => {
+      const scores = [];
+      for (const family of ctx.worldState.families || []) {
+        const members = familyTraits.livingMembers(ctx.worldState, family.id);
+        if (!members.some((n) => ctx.ids.has(n.id))) continue;
+        const score = familyTraits.cohesionOf(ctx.worldState, family.id);
+        if (score !== null) scores.push(score);
+      }
+      if (scores.length === 0) return null;
+      return round(scores.reduce((sum, s) => sum + s, 0) / scores.length, 4);
+    },
   },
   // **Both of these were declared unavailable and are now computed.**
   // The reason given was the same for each — "there is no birth
@@ -545,6 +574,25 @@ const CATALOGUE = [
       .filter((r) => r.status === 'active' && ctx.ids.has(r.entity_id))
       .map((r) => Number(r.wage))
       .filter((w) => Number.isFinite(w))),
+  },
+  {
+    key: 'control_key_force', category: 'territory', unit: 'count', scope: 'community',
+    // **What it would take to hold this block**, per
+    // `COMPOSITION_REQUIREMENTS_TRIBE_COHESION.md`'s Control Key.
+    // `control.compositionFor` scales the document's own 5:10:1 ratio
+    // by how many people are holding the place now, so this is a count
+    // of people and is reported rather than compared — a bigger
+    // neighbourhood needing more people is not a finding.
+    //
+    // Cheap on purpose: one composition, not the full
+    // `viableTargetsFor` sweep, which is quadratic in tribes × targets
+    // and has no business inside a per-area profile.
+    compute: (ctx) => {
+      const composition = control.compositionFor(ctx.worldState, {
+        scale: 'community', locationId: ctx.communityId, tick: ctx.tick,
+      });
+      return composition === null ? null : composition.total;
+    },
   },
   {
     key: 'titled_employment', category: 'economics', unit: 'share', scope: 'community',
