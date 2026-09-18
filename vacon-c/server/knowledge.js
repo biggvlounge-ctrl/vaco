@@ -517,6 +517,24 @@ function nudgeTrait(worldState, entityId, family, name, reach, tick, index, move
 //: comparison can be made: 400 sessions at STUDY_RATE 0.1 is 4,000
 //: ticks, a little under three times as long. Stated as the ratio
 //: rather than the count, so changing either stays honest.
+//:
+//: **A rung therefore takes about a decade, and will not appear in the
+//: 200-400 tick worlds this project measures.** 390 sessions at
+//: `STUDY_RATE` 0.1 is 3,900 ticks — 10.7 years against schooling's 4
+//: — and the measured runs bear that out exactly: 807 sessions across
+//: 150 people at tick 100 and 1,981 at tick 250, which is 13 each, so
+//: `self_taught` events are 0 in both. That is the mechanism working
+//: rather than failing, and it is written down here because the
+//: alternative reading — "it fires zero times, so it never fires" — is
+//: the fourteenth standing rule's shape and would be the obvious
+//: conclusion to draw from a short run. An adult who starts at 20 and
+//: lives to 70 has 18,250 ticks and climbs about four rungs. What DOES
+//: show in a short run is the `educational` family moving, which is
+//: the effect §24 actually turns on: **51.91 → 52.34 → 52.83 → 53.43
+//: across 0, 100, 250 and 400 ticks of a generated world, on 3,084
+//: study sessions**, with `technology.learningOf` following it digit
+//: for digit. A civilization that reads is now measurably better at
+//: recovering a technology than one that has forgotten how.
 const SELF_TAUGHT_PENALTY = 2.7;
 
 function sessionsPerLevel() {
