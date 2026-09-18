@@ -139,8 +139,35 @@ const FORCE_PARITY = 1;
 //: A specialist requirement is one person. The document says "a
 //: Hospital needs medical experts" without a count, and one is the
 //: smallest claim that is still a requirement — a second would be an
-//: invention.
+//: invention. **Superseded for anything with a crew** — see
+//: `landmarks.staffingFor` — and kept for targets that have none.
 const SPECIALISTS_REQUIRED = 1;
+
+// ---------------------------------------------------------------------
+// MATERIEL — a takeover needs things, not only bodies
+// ---------------------------------------------------------------------
+// **`assess` read only people.** A tribe of twenty could take a
+// government building barehanded, which is the same "make it easy"
+// failure the crew fixed on the maintenance side.
+//
+// **Requirements are §26 CATEGORIES, not named items**, and that is
+// deliberate. §27 gives Base_Values for seventeen items and `items.js`
+// says in its own header that no item is invented there — and there is
+// not a single weapon among the seventeen. Naming one would put a
+// fabricated item in the one table that exists to hold sourced ones.
+// §26's twenty trade categories include `tools` and `protection`, which
+// are the spec's own words for the two things the request named, so the
+// requirement is expressed in those and any item a world carries in
+// them counts.
+//
+//: One tool per pair of hands and one protective item per fighter.
+//: Definitions rather than tunings: you cannot force a door without
+//: something to force it with, and somebody going in first wants
+//: something between them and what is inside. Both scale with the
+//: composition, so a bigger job needs proportionally more — and neither
+//: is a number picked to feel right.
+const TOOLS_PER_HAND = 1;
+const PROTECTION_PER_FIGHTER = 1;
 
 //: How much a shared undertaking moves the trust between two people who
 //: went through it. Small on purpose: `crime.FRICTION_RATE` moves a
@@ -593,27 +620,61 @@ function maintenanceFor(worldState, options = {}) {
     requiredRoles.push({ role: largest, count: MINIMUM_MAINTENANCE });
   }
 
-  // Who has to know how to run it. For a property that is the landmark
-  // category's own post where it has one — a hospital needs a
-  // physician, a monument needs nobody — and otherwise the operating
-  // organization's, which is the same rule `compositionFor` applies.
-  const requiredSpecialists = scale === 'property'
-    ? specialistsForProperty(worldState, target, landmarks)
-    : definition.specialists(worldState, target).filter((s) => s.occupation);
+  // **The crew, and this is the half that was wrong.** The first
+  // version asked for ONE specialist — a hospital needed "1 physician"
+  // — and split everything else across the generic 5:10:1 role ratio.
+  // That is the "make it easy" failure: a place is not kept by
+  // thirty-one interchangeable bodies, it is kept by ten cooks, twenty
+  // on security and an engineer.
+  //
+  // `landmarks.staffingFor` divides the measured total by the
+  // category's own crew proportions, so a small government office and a
+  // large one have the same SHAPE of staff and different numbers of
+  // them. Where a target has no crew — an ordinary house, a community,
+  // a city — the generic roles remain the answer, because there is no
+  // named staff to ask for.
+  const crew = scale === 'property' && target.landmark_category
+    ? landmarks.staffingFor(target.landmark_category, need)
+    : null;
 
-  const security = requiredRoles.find((r) => r.role === 'enforcer')?.count ?? 0;
+  const requiredSpecialists = crew !== null
+    ? crew
+    : (scale === 'property'
+      ? specialistsForProperty(worldState, target, landmarks)
+      : definition.specialists(worldState, target).filter((s) => s.occupation));
+
+  // **Security is a post, not a share of a ratio, wherever a crew says
+  // so.** `officer` and `enforcer` are the two Combat-skill posts a
+  // crew can name; for a target with no crew it falls back to the
+  // enforcer share of the role composition, which is all there is.
+  const security = crew !== null
+    ? crew.filter((p) => occupations.skillOf(p.occupation) === 'Combat')
+      .reduce((sum, p) => sum + p.count, 0)
+    : (requiredRoles.find((r) => r.role === 'enforcer')?.count ?? 0);
 
   return {
     locationId,
     scale,
     size: size === null ? null : Math.round(size * 100) / 100,
     significance,
+    // Kept for targets with no crew, and reported alongside one where
+    // there is — a caller comparing two places should not have to know
+    // which kind each is.
     requiredRoles,
     requiredSpecialists,
-    // The two the request named separately.
+    crew,
+    // The two the request named separately: "how many employees it
+    // needs to maintain, how much security".
     staff: requiredSpecialists.reduce((sum, s) => sum + s.count, 0),
     security,
-    total: requiredRoles.reduce((sum, r) => sum + r.count, 0),
+    // **The crew is the total where there is one.** Rounding every post
+    // up to at least one means a crew can come to more than the
+    // headcount that produced it — a small hospital still needs a
+    // physician — and the requirement is the people you actually have
+    // to find, not the number that generated them.
+    total: crew !== null
+      ? crew.reduce((sum, p) => sum + p.count, 0)
+      : requiredRoles.reduce((sum, r) => sum + r.count, 0),
   };
 }
 
@@ -707,14 +768,53 @@ function compositionFor(worldState, options = {}) {
   const requiredSpecialists = definition.specialists(worldState, target)
     .filter((s) => s.occupation);
 
+  const total = requiredRoles.reduce((sum, r) => sum + r.count, 0);
+  const fighters = requiredRoles.find((r) => r.role === 'enforcer')?.count ?? 0;
+
   return {
     locationId,
     scale,
     defenders,
     requiredRoles,
     requiredSpecialists,
-    total: requiredRoles.reduce((sum, r) => sum + r.count, 0),
+    // **What they have to bring**, in §26's own trade categories rather
+    // than in named items — see the note on TOOLS_PER_HAND.
+    requiredMateriel: [
+      { category: 'tools', count: Math.max(1, Math.round(total * TOOLS_PER_HAND)) },
+      ...(fighters > 0
+        ? [{ category: 'protection', count: Math.round(fighters * PROTECTION_PER_FIGHTER) }]
+        : []),
+    ],
+    total,
   };
+}
+
+// ---------------------------------------------------------------------
+// What a tribe actually carries
+// ---------------------------------------------------------------------
+// Summed across every living member's holdings, by §26 category. A
+// tribe's kit is what its people are carrying — there is no shared
+// store in this schema and inventing one would be a table for a fact
+// `inventory` already holds.
+//
+// Quantity, not rows: five hammers in one holding is five tools.
+function materielOf(worldState, tribeId) {
+  // eslint-disable-next-line global-require
+  const inventory = require('./inventory.js');
+  // eslint-disable-next-line global-require
+  const items = require('./items.js');
+
+  const held = {};
+  for (const npc of familyTraits.livingMembers(worldState, tribeId)) {
+    for (const holding of inventory.holdingsOf(worldState, npc.id)) {
+      const item = items.findItem(worldState, holding.item_name);
+      if (!item || !item.category) continue;
+      const quantity = Number(holding.quantity);
+      if (!Number.isFinite(quantity) || quantity <= 0) continue;
+      held[item.category] = (held[item.category] ?? 0) + quantity;
+    }
+  }
+  return held;
 }
 
 // ---------------------------------------------------------------------
@@ -767,6 +867,15 @@ function assess(worldState, options = {}) {
       shortfalls.push({ occupation: requirement.occupation, need: requirement.count, have });
     }
   }
+  // **What they are carrying**, which `assess` did not read at all: a
+  // tribe of twenty could take a government building barehanded.
+  const carried = materielOf(worldState, tribeId);
+  for (const requirement of composition.requiredMateriel ?? []) {
+    const have = carried[requirement.category] ?? 0;
+    if (have < requirement.count) {
+      shortfalls.push({ category: requirement.category, need: requirement.count, have });
+    }
+  }
 
   const compositionRequirementMet = shortfalls.length === 0;
   const tribeCohesionScore = familyTraits.cohesionOf(worldState, tribeId);
@@ -785,6 +894,10 @@ function assess(worldState, options = {}) {
       : 0,
     composition,
     roster,
+    // What they are actually carrying, by §26 category — so a refusal
+    // says what to go and find rather than only that something is
+    // missing.
+    materiel: carried,
     shortfalls,
   };
 }
@@ -1162,6 +1275,9 @@ module.exports = {
   RATIO_TOTAL,
   FORCE_PARITY,
   SPECIALISTS_REQUIRED,
+  TOOLS_PER_HAND,
+  PROTECTION_PER_FIGHTER,
+  materielOf,
   SHARED_UNDERTAKING,
   SIGNIFICANT_FORCE,
   SCALE_NAMES,

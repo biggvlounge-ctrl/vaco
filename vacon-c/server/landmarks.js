@@ -241,6 +241,177 @@ const RETAIL_CATEGORIES = Object.keys(RETAIL_TYPES);
 //: lives.
 const CHAOS_ERA_CONDITION = [15, 55];
 
+// =====================================================================
+// CREWS — it is not the amount of people, it is the type of people
+// =====================================================================
+//
+// **The first version of the maintain key asked for one specialist.**
+// A hospital needed "1 physician" and everything else was a headcount
+// split by the generic 5:10:1 role ratio, which is the "make it easy"
+// failure exactly: a place is not kept by thirty-one interchangeable
+// bodies, it is kept by ten cooks, twenty on security and an engineer.
+//
+// `REBUILD_OCCUPATION_REQUIREMENTS_BLS_SOURCED.md` is the document that
+// would settle these numbers — "real BLS labor data methodology" — and
+// it is one of the forty-odd listed in `VACANCY_DOCUMENT_MANIFEST.md`
+// as MISSING. So the crews below are new design, and they are marked
+// as such rather than presented as recovered. If that document ever
+// turns up, this table is the one place to reconcile.
+//
+// ---------------------------------------------------------------------
+// Nine crews for thirty-three categories, not thirty-three tables
+// ---------------------------------------------------------------------
+// Each crew is a statement about what KIND of place something is, and
+// categories point at one. That is the same move `FORMS` makes for
+// height: thirty-three tuned tables would be thirty-three inventions,
+// and nine kinds is a claim a reader can check.
+//
+// **The counts are a RATIO, not a headcount** — read exactly the way
+// `COMPOSITION_REQUIREMENTS_TRIBE_COHESION.md`'s 5:10:1 is read. The
+// magnitude comes from `control.maintenanceFor`'s measured size and
+// significance; this says how it divides. So a small government office
+// and a large one have the same shape of staff and different numbers of
+// them, which is the thing that was missing.
+//
+// `state` is the request's own worked example — "10 cooks, 20 security,
+// an engineer" — used as the anchor the way the document's 5:10:1 was.
+// Every other crew is anchored against it rather than felt: a shop is
+// two people because a shop is two people, and a monument is a guard
+// because a monument needs keeping rather than operating.
+const CREWS = {
+  //: The request's own numbers, verbatim, plus the one post it implies
+  //: without naming: somebody runs the place.
+  state: [
+    { occupation: 'cook', count: 10 },
+    { occupation: 'officer', count: 20 },
+    { occupation: 'engineer', count: 1 },
+    { occupation: 'manager', count: 2 },
+  ],
+  care: [
+    { occupation: 'physician', count: 4 },
+    { occupation: 'orderly', count: 10 },
+    { occupation: 'cook', count: 3 },
+    { occupation: 'manager', count: 1 },
+  ],
+  learning: [
+    { occupation: 'librarian', count: 4 },
+    { occupation: 'teacher', count: 3 },
+    { occupation: 'manager', count: 1 },
+  ],
+  transit: [
+    { occupation: 'navigator', count: 3 },
+    { occupation: 'mechanic', count: 6 },
+    { occupation: 'labourer', count: 8 },
+    { occupation: 'officer', count: 6 },
+  ],
+  worship: [
+    { occupation: 'preacher', count: 2 },
+    { occupation: 'cook', count: 2 },
+    { occupation: 'labourer', count: 2 },
+  ],
+  venue: [
+    { occupation: 'curator', count: 2 },
+    { occupation: 'labourer', count: 6 },
+    { occupation: 'cook', count: 3 },
+    { occupation: 'officer', count: 5 },
+  ],
+  tower: [
+    { occupation: 'manager', count: 3 },
+    { occupation: 'engineer', count: 2 },
+    { occupation: 'officer', count: 4 },
+    { occupation: 'labourer', count: 4 },
+  ],
+  shop: [
+    { occupation: 'trader', count: 2 },
+    { occupation: 'labourer', count: 1 },
+  ],
+  //: A monument, a bridge, a cave, a rock. Nobody operates it and
+  //: somebody watches it — which is why `staff` is null for all of
+  //: these and this crew is a single guard. Holding a monument is
+  //: still not free, and that is the point.
+  unmanned: [
+    { occupation: 'officer', count: 1 },
+  ],
+};
+
+const CREW_NAMES = Object.keys(CREWS);
+
+// Which crew a category takes. Stated per category rather than inferred
+// from `propertyType`, because two categories can share a type and take
+// completely different staffs — a prison and a library are both
+// `government` and are not the same job.
+const CREW_BY_CATEGORY = {
+  skyscraper: 'tower',
+  university: 'learning',
+  'government-building': 'state',
+  prison: 'state',
+  'art-museum': 'venue',
+  church: 'worship',
+  mosque: 'worship',
+  synagogue: 'worship',
+  temple: 'worship',
+  'masonic-building': 'worship',
+  'historic-site': 'unmanned',
+  airport: 'transit',
+  'train-station': 'transit',
+  hospital: 'care',
+  'stadium-arena': 'venue',
+  library: 'learning',
+  'theater-concert-hall': 'venue',
+  'notable-bridge': 'unmanned',
+  'monument-memorial': 'unmanned',
+  'zoo-aquarium': 'venue',
+  'cave-system': 'unmanned',
+  'natural-formation': 'unmanned',
+  'other-distinctive-feature': 'unmanned',
+};
+
+// Retail is one kind of place, so it is one entry rather than ten.
+for (const category of Object.keys(RETAIL_TYPES)) CREW_BY_CATEGORY[category] = 'shop';
+
+function crewNameFor(category) {
+  return CREW_BY_CATEGORY[category] ?? null;
+}
+
+// The crew ratio for a category, or null where the category has none —
+// which is every ordinary house, and is why `control.maintenanceFor`
+// still falls back to the generic role composition.
+function crewFor(category) {
+  const name = crewNameFor(category);
+  return name ? CREWS[name] : null;
+}
+
+// The crew's own total, which is what a share of it is measured
+// against. The `state` crew comes to 33.
+function crewTotalFor(category) {
+  const crew = crewFor(category);
+  return crew === null ? null : crew.reduce((sum, post) => sum + post.count, 0);
+}
+
+// ---------------------------------------------------------------------
+// staffingFor
+// ---------------------------------------------------------------------
+// The crew ratio scaled to a real number of people. `total` is what
+// `control.maintenanceFor` measured from size and significance; this
+// divides it by the crew's own proportions.
+//
+// **Every post rounds UP to at least one.** A building that needs an
+// engineer needs an engineer, and rounding 0.4 of one down to zero is
+// how "don't make it easy" quietly becomes "no specialist required" —
+// which is the bug this table exists to fix. The consequence is that a
+// small place of a demanding kind costs more than its headcount
+// suggests, and that is correct: you cannot run a hospital with half a
+// physician.
+function staffingFor(category, total) {
+  const crew = crewFor(category);
+  if (crew === null) return null;
+  const crewTotal = crewTotalFor(category);
+  return crew.map((post) => ({
+    occupation: post.occupation,
+    count: Math.max(1, Math.round((total * post.count) / crewTotal)),
+  }));
+}
+
 // ---------------------------------------------------------------------
 // How tall a thing is, as three shapes rather than thirty-three numbers
 // ---------------------------------------------------------------------
@@ -565,6 +736,13 @@ module.exports = {
   CHAOS_ERA_CONDITION,
   DENSITY_TIERS,
   DENSITY_BOUNDARIES,
+  CREWS,
+  CREW_NAMES,
+  CREW_BY_CATEGORY,
+  crewNameFor,
+  crewFor,
+  crewTotalFor,
+  staffingFor,
   FORMS,
   formOf,
   floorsBandFor,

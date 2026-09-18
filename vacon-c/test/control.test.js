@@ -74,8 +74,40 @@ function world(options = {}) {
     entityTraits: [],
     entityOrganizationMemberships: [],
     events: [],
+    inventory: [],
+    barterItems: [],
     age,
   };
+}
+
+// **A takeover needs things, not only bodies** — `requiredMateriel` is
+// §26 categories, so a fixture that is testing the PEOPLE half has to
+// carry kit or every assertion picks up a tools shortfall it is not
+// about. One holding of plenty, on the first member, which is what
+// `materielOf` sums across a tribe.
+function kit(w, entityId, quantity = 200) {
+  w.inventory.push({
+    id: w.inventory.length + 1,
+    holder_entity_id: entityId,
+    item_name: 'Hammer',
+    quantity,
+    condition: 80,
+  });
+  w.inventory.push({
+    id: w.inventory.length + 1,
+    holder_entity_id: entityId,
+    // §26 `protection` has no sourced item — there is not a weapon
+    // among §27's seventeen — so a world that wants one supplies it
+    // through `barterItems`, which is the extension point `items.js`
+    // documents. Unpriced, like a book: this fixture is not testing
+    // barter.
+    item_name: 'Shield',
+    quantity,
+    condition: 80,
+  });
+  if (!w.barterItems.some((i) => i.name === 'Shield')) {
+    w.barterItems.push({ name: 'Shield', category: 'protection' });
+  }
 }
 
 let nextNpcId = 1;
@@ -88,6 +120,10 @@ function member(w, options = {}) {
   w.familyMemberships.push({
     entity_id: id, family_id: 900, role: 'sibling', generation_number: 1,
   });
+  // The tribe's kit rides with its first member. Every assertion below
+  // is about people, and a tribe with no tools fails on materiel before
+  // the people half is ever reached.
+  if (w.inventory.length === 0) kit(w, id);
   if (position) {
     w.employmentRecords.push({
       id, entity_id: id, employer_organization_id: organizationId, status: 'active', wage: 20, position,
@@ -550,4 +586,118 @@ test('cohesion comes from the family fields the document names', () => {
   member(w, { years: 30 });
   const resolution = control.assess(w, { scale: 'organization', locationId: 500, tribeId: 900 });
   assert.equal(resolution.tribeCohesionScore, familyTraits.cohesionOf(w, 900));
+});
+
+// ---------------------------------------------------------------------
+// Materiel — a takeover needs things, not only bodies
+// ---------------------------------------------------------------------
+
+test('a tribe with the people and no tools cannot take anything', () => {
+  // `assess` read only people until this existed: a tribe of twenty
+  // could take a government building barehanded.
+  const w = world();
+  w.organizations.push({ id: 500, type: 'club', leader_id: null });
+  member(w, { years: 30 });
+  // Strip the kit the fixture rides with, so this is the same tribe
+  // with nothing in its hands.
+  w.inventory = [];
+
+  const barehanded = control.assess(w, { scale: 'organization', locationId: 500, tribeId: 900 });
+  assert.equal(barehanded.compositionRequirementMet, false);
+  assert.ok(
+    barehanded.shortfalls.some((s) => s.category === 'tools'),
+    `no tools shortfall: ${JSON.stringify(barehanded.shortfalls)}`,
+  );
+
+  kit(w, w.npcs[0].id);
+  const armed = control.assess(w, { scale: 'organization', locationId: 500, tribeId: 900 });
+  assert.equal(armed.compositionRequirementMet, true);
+});
+
+test('requirements are §26 categories, not invented items', () => {
+  // §27 gives values for seventeen items and not one of them is a
+  // weapon. Naming one would put a fabricated item in the one table
+  // that exists to hold sourced ones.
+  const items = require('../server/items.js');
+  const w = world();
+  w.organizations.push({ id: 500, type: 'club', leader_id: null });
+  member(w, { years: 30 });
+  const composition = control.compositionFor(w, { scale: 'organization', locationId: 500 });
+  assert.ok(composition.requiredMateriel.length > 0);
+  for (const requirement of composition.requiredMateriel) {
+    assert.ok(
+      items.TRADE_CATEGORIES.includes(requirement.category),
+      `"${requirement.category}" is not one of §26's twenty categories`,
+    );
+    assert.ok(requirement.count > 0);
+  }
+});
+
+test('what a tribe carries is summed across its members, by quantity', () => {
+  const w = world();
+  const a = member(w, { years: 30 });
+  const b = member(w, { years: 30 });
+  w.inventory = [];
+  kit(w, a, 3);
+  kit(w, b, 4);
+  const carried = control.materielOf(w, 900);
+  assert.equal(carried.tools, 7, 'five hammers in one holding is five tools');
+  assert.equal(carried.protection, 7);
+  // Somebody outside the tribe carries nothing for it.
+  const outsider = defender(w);
+  kit(w, outsider, 99);
+  assert.equal(control.materielOf(w, 900).tools, 7);
+});
+
+// ---------------------------------------------------------------------
+// The crew — it is not the amount of people, it is the type
+// ---------------------------------------------------------------------
+
+test('a place is kept by named posts, not by interchangeable bodies', () => {
+  // The correction. The first maintain key asked for ONE specialist and
+  // split the rest across the generic 5:10:1 role ratio, so a hospital
+  // needed "1 physician" and thirty anybodies.
+  const landmarks = require('../server/landmarks.js');
+  const w = world();
+  for (let i = 0; i < 12; i += 1) {
+    w.properties.push({
+      id: 7000 + i, type: 'residential', land_size: 400, floors: 2, units: 1, occupants: [],
+    });
+  }
+  w.properties.push({
+    id: 8000, type: 'government', land_size: 9000, floors: 4, units: 1, occupants: [],
+    landmark_category: 'government-building', history_ref: null,
+  });
+
+  const maintain = control.maintenanceFor(w, { scale: 'property', locationId: 8000 });
+  assert.ok(Array.isArray(maintain.crew), 'a government building has no crew');
+  const posts = maintain.crew.map((p) => p.occupation);
+  // The request's own worked example: cooks, security, an engineer.
+  assert.ok(posts.includes('cook'));
+  assert.ok(posts.includes('officer'));
+  assert.ok(posts.includes('engineer'));
+  // Security is counted from the crew's Combat posts, not from a share
+  // of a generic ratio.
+  assert.ok(maintain.security > 0);
+  assert.equal(
+    maintain.security,
+    maintain.crew.filter((p) => occupations.skillOf(p.occupation) === 'Combat')
+      .reduce((sum, p) => sum + p.count, 0),
+  );
+  // And the crew IS the requirement.
+  assert.equal(maintain.total, maintain.crew.reduce((sum, p) => sum + p.count, 0));
+  void landmarks;
+});
+
+test('a place with no crew still has a requirement', () => {
+  // An ordinary house is not a category and never will be, so the
+  // generic role composition remains the answer for it.
+  const w = world();
+  w.properties.push({
+    id: 9000, type: 'residential', land_size: 400, floors: 2, units: 1, occupants: [],
+  });
+  const maintain = control.maintenanceFor(w, { scale: 'property', locationId: 9000 });
+  assert.equal(maintain.crew, null);
+  assert.ok(maintain.requiredRoles.length > 0);
+  assert.equal(maintain.total, 1);
 });
