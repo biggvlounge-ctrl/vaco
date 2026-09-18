@@ -502,10 +502,15 @@ test('a player serving a sentence cannot act, and can see why', () => {
   w.ownershipRecords = []; w.migrationRisk = [];
   justice.runJustice(w, { tick: 10 });
 
-  const verbs = {
-    acceptMission: () => ({}), resolveMission: () => ({}),
-    addScheduleEvent: () => ({}), reinforceHabit: () => ({}), resolveContest: () => ({}),
-  };
+  // **Built from the registry rather than written out.** This was a
+  // hand-written list of the five verbs that existed when it was
+  // written, and `assertVerbsPresent` refuses an incomplete set BEFORE
+  // it reaches the imprisonment check — so the day three verbs were
+  // added, this test failed with "verb set missing" while asserting
+  // something about prison. The registry exists so nothing has to
+  // enumerate it by hand; a test that enumerates it by hand is testing
+  // its own staleness.
+  const verbs = Object.fromEntries(actions.REQUIRED_VERBS.map((name) => [name, () => ({})]));
   assert.throws(
     () => actions.dispatchAction(w, 1, { action: 'accept-mission', missionId: 7 }, verbs),
     /serving a sentence/,
