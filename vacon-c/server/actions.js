@@ -144,6 +144,21 @@ const ACTIONS = {
     }),
   },
 
+  // **A building's past does not fix its future.** Take the Arch and
+  // make it a fortress. Only an owner may — which is what gives the
+  // takeover key a consequence beyond a line in the history.
+  'repurpose-property': {
+    summary: 'Change what a building you hold is for. Its history stays with it.',
+    modes: ['citizen'],
+    requires: ['propertyId', 'toType'],
+    verbs: ['repurposeProperty'],
+    run: (verbs, actorId, body) => verbs.repurposeProperty(actorId, {
+      propertyId: Number(body.propertyId),
+      toType: body.toType,
+      note: body.note ?? null,
+    }),
+  },
+
   // **The takeover key, as two verbs rather than one.**
   // `COMPOSITION_REQUIREMENTS_TRIBE_COHESION.md` splits the shapes the
   // same way: `ControlKeyComposition` is what a target requires and

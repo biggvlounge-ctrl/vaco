@@ -92,6 +92,7 @@ const statecraft = require('./statecraft.js');
 const media = require('./media.js');
 const occupations = require('./occupations.js');
 const knowledge = require('./knowledge.js');
+const landmarks = require('./landmarks.js');
 const worldStore = require('./worldStore.js');
 const { hashSeed, seededUnit } = require('./seeded.js');
 
@@ -150,6 +151,15 @@ const DEFAULTS = {
   // between them, and the libraries and the people who know a trade
   // are the other two thirds of §24's list.
   survivingBookRate: 0.12,
+  // **How many of THE KEY's twenty-three hero-tier categories a city
+  // gets, and how many of the retail list's ten.** Per city, drawn
+  // without replacement, so a settlement has one cathedral rather than
+  // four airports. Six and five is not a claim about real cities — it
+  // is enough for every generated world to contain a monument, a
+  // government building and a hardware store, which is what the
+  // takeover and maintain keys need to have anything to tell apart.
+  landmarksPerCity: 6,
+  shopsPerCity: 5,
 };
 
 // The ten infrastructure types a city gets, with capacity expressed
@@ -508,6 +518,14 @@ function generateWorld(options = {}) {
           condition: Math.round(random.range(25, 100, 'cond', c, b, h)),
           floors: 1 + random.int(3, 'floors', c, b, h),
           units: 1,
+          // **`bedrooms` was not a fact this engine held about anywhere
+          // anybody lived.** `units` is how many dwellings a building
+          // contains — 1 here, for every home in every world — and the
+          // question "how many bedrooms" had no column at all until
+          // `schema-extensions.sql` gained one. A one-bedroom apartment
+          // is the smallest thing anybody names, and it is now a thing
+          // a world can contain.
+          bedrooms: 1 + random.int(4, 'beds', c, b, h),
           lifecycleStage: 'operation',
           createdTick: tick,
         }));
@@ -852,6 +870,115 @@ function generateWorld(options = {}) {
           );
           rel.trust = Math.round(random.range(25, 85, 'rtrust', c, b, i, k));
         }
+      }
+    }
+
+    // ---- landmarks and shops ------------------------------------------
+    // **`properties.type` enumerates ten kinds and this file had only
+    // ever generated two.** Residential and commercial — so no world
+    // this engine ever built contained a monument, a historic site, a
+    // government building, a farm or an industrial one, and seven of
+    // the schema's ten property types had never existed.
+    //
+    // `THE_KEY_BUILDING_TYPES.md` names twenty-three hero-tier
+    // categories and calls them the definitive standard list;
+    // `COMPREHENSIVE_RETAIL_KEY_LOCATIONS.md` names ten retail types
+    // and says each is "tied directly to an existing skill or resource
+    // system rather than generic loot". Both are in
+    // `server/landmarks.js`; this places them.
+    //
+    // Per CITY rather than per community, because a city has one
+    // cathedral and one courthouse, not one per block — and drawn
+    // WITHOUT replacement so a settlement does not get four airports.
+    {
+      const cityCommunityRows = (w.communities || []).filter((cm) => cm.city_id === city.id);
+      const anchor = cityCommunityRows[0] ?? null;
+
+      const heroPool = [...landmarks.KEY_BUILDING_CATEGORIES];
+      for (let k = 0; k < config.landmarksPerCity && heroPool.length > 0; k += 1) {
+        const pick = heroPool.splice(random.int(heroPool.length, 'landmark', c, k), 1)[0];
+        const definition = landmarks.KEY_BUILDING_TYPES[pick];
+        const home = cityCommunityRows[random.int(
+          Math.max(1, cityCommunityRows.length), 'landmark-where', c, k,
+        )] ?? anchor;
+        const row = property.generateProperty(w, {
+          type: landmarks.propertyTypeFor(pick),
+          communityId: home ? home.id : null,
+          cityId: city.id,
+          // A landmark occupies real ground and a monument occupies
+          // little of it — the spread is wide on purpose, because a
+          // cave system and a masonic hall are both on this list.
+          landSize: Math.round(random.range(600, 12000, 'lland', c, k)),
+          value: Math.round(random.range(80000, 900000, 'lvalue', c, k)),
+          // These came through a collapse. `condition` is drawn low and
+          // wide: some of them are ruins and some were built to last.
+          condition: Math.round(random.range(20, 90, 'lcond', c, k)),
+          // From the category's own FORM, not one band for
+          // everything: the first version drew 1-40 for every landmark
+          // and produced a cave system with 23 floors.
+          floors: (() => {
+            const [lo, hi] = landmarks.floorsBandFor(pick);
+            return lo + random.int(hi - lo + 1, 'lfloors', c, k);
+          })(),
+          units: 1,
+          age: Math.round(random.range(20, 200, 'lage', c, k)),
+          lifecycleStage: 'operation',
+          createdTick: tick,
+        });
+        // **The link `history_ref` never had.** `designate` writes the
+        // `historical_records` row that carries this place's
+        // significance and points the property at it — the column was
+        // hard-coded null in `generateProperty` and the two tables had
+        // never been connected in any world.
+        landmarks.designate(w, {
+          propertyId: row.id,
+          category: pick,
+          significance: Math.round(
+            random.range(definition.significance[0], definition.significance[1], 'lsig', c, k),
+          ),
+          tick,
+          what: `the ${city.name} ${pick.replace(/-/g, ' ')}`,
+        });
+        summary.properties += 1;
+        summary.landmarks = (summary.landmarks ?? 0) + 1;
+      }
+
+      const retailPool = [...landmarks.RETAIL_CATEGORIES];
+      for (let k = 0; k < config.shopsPerCity && retailPool.length > 0; k += 1) {
+        const pick = retailPool.splice(random.int(retailPool.length, 'shop', c, k), 1)[0];
+        const definition = landmarks.RETAIL_TYPES[pick];
+        const home = cityCommunityRows[random.int(
+          Math.max(1, cityCommunityRows.length), 'shop-where', c, k,
+        )] ?? anchor;
+        const row = property.generateProperty(w, {
+          type: 'commercial',
+          communityId: home ? home.id : null,
+          cityId: city.id,
+          landSize: Math.round(random.range(200, 1800, 'sland', c, k)),
+          value: Math.round(random.range(15000, 140000, 'svalue', c, k)),
+          // `chaosEraState: "emptied"` is the retail document's own
+          // word for what a collapse left behind, applied as a
+          // condition ceiling rather than a flag: an emptied store is a
+          // building somebody stripped.
+          condition: Math.round(random.range(
+            landmarks.CHAOS_ERA_CONDITION[0], landmarks.CHAOS_ERA_CONDITION[1], 'scond', c, k,
+          )),
+          floors: 1 + random.int(2, 'sfloors', c, k),
+          units: 1,
+          lifecycleStage: 'operation',
+          createdTick: tick,
+        });
+        landmarks.designate(w, {
+          propertyId: row.id,
+          category: pick,
+          significance: Math.round(
+            random.range(definition.significance[0], definition.significance[1], 'ssig', c, k),
+          ),
+          tick,
+          what: `a ${pick.replace(/-/g, ' ')} on this corner`,
+        });
+        summary.properties += 1;
+        summary.shops = (summary.shops ?? 0) + 1;
       }
     }
 

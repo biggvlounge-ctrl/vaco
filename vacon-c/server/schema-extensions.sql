@@ -89,6 +89,45 @@ ALTER TABLE properties ADD COLUMN IF NOT EXISTS community_id BIGINT REFERENCES c
 ALTER TABLE properties ADD COLUMN IF NOT EXISTS city_id BIGINT REFERENCES cities(id);
 
 -- ---------------------------------------------------------------------
+-- `bedrooms`, and why `units` is not it
+-- ---------------------------------------------------------------------
+-- The base schema gives a property `floors` and `units`. `units` is how
+-- many dwellings a building contains; bedrooms is how many rooms ONE
+-- dwelling has, and they are different questions — a twelve-unit block
+-- of one-bedroom flats and a twelve-bedroom house have the same `units`
+-- reading under any encoding that tries to carry both in one integer.
+--
+-- It is added because "a one-bedroom apartment" is the smallest thing
+-- anybody names when they describe where they live, and because the
+-- maintain key in `server/control.js` reads a building's SIZE — a fact
+-- that has to be legible to a person, not just to an area calculation.
+--
+-- NULL for anything that is not somewhere people live. A monument has
+-- no bedrooms, and zero would be a claim that it has none rather than
+-- that the question does not apply.
+ALTER TABLE properties ADD COLUMN IF NOT EXISTS bedrooms INTEGER;
+
+-- ---------------------------------------------------------------------
+-- `landmark_category` and `former_type` — which landmark, and what it was
+-- ---------------------------------------------------------------------
+-- `properties.type` is the schema's own ten-value enumeration and it is
+-- COARSER than the two documents that name the things worth taking:
+-- THE_KEY_BUILDING_TYPES.md's twenty-three hero-tier categories and
+-- COMPREHENSIVE_RETAIL_KEY_LOCATIONS.md's ten retail types. Five hero
+-- categories collapse onto `historical_site` alone, so a row that
+-- recorded only the type could not tell a mosque from a bridge.
+--
+-- `former_type` exists because a landmark's past does not fix its
+-- future: `landmarks.repurpose` turns a monument into a fortress and
+-- the row has to say what it was. The HISTORY survives separately, in
+-- the `historical_records` row `history_ref` points at — this column is
+-- just the previous use, so the sequence is readable rather than
+-- inferred from the history log.
+ALTER TABLE properties ADD COLUMN IF NOT EXISTS landmark_category TEXT;
+ALTER TABLE properties ADD COLUMN IF NOT EXISTS former_type TEXT;
+ALTER TABLE properties ADD COLUMN IF NOT EXISTS repurposed_tick BIGINT;
+
+-- ---------------------------------------------------------------------
 -- `deceased` as an entity status — a value, not a column
 -- ---------------------------------------------------------------------
 -- Recorded here rather than by editing the locked base schema, and

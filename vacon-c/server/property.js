@@ -168,7 +168,27 @@ function generateProperty(worldState, options = {}) {
     operating_organization_id: options.operatingOrganizationId ?? null,
     density_tier: options.densityTier ?? null,
     lifecycle_stage: options.lifecycleStage ?? 'planning',  // schema DEFAULT
-    history_ref: null,
+    // **This was hard-coded `null` with no way for a caller to set it.**
+    // `historical_records` is a real table with a `significance` NUMERIC
+    // and a `where_location_id` pointing back at a property, and the
+    // two had never been connected in any world — historical value had
+    // a column, a table, a score and no link between them.
+    // `landmarks.designate` is the writer; this is the door it needed.
+    history_ref: options.historyRef ?? null,
+    // From server/schema-extensions.sql. `units` is how many dwellings a
+    // building contains and `bedrooms` is how many rooms one dwelling
+    // has — different questions, and "a one-bedroom apartment" is the
+    // smallest thing anybody names. NULL for anything that is not
+    // somewhere people live: a monument has no bedrooms, and zero would
+    // claim it has none rather than that the question does not apply.
+    bedrooms: options.bedrooms ?? null,
+    // Which of the two documents' named categories this is, where
+    // `properties.type` is too coarse to say — five hero-tier
+    // categories collapse onto `historical_site` alone. See
+    // server/landmarks.js.
+    landmark_category: options.landmarkCategory ?? null,
+    former_type: null,
+    repurposed_tick: null,
     // Not schema columns. Kept so a property can be placed in the world
     // the Community tier already models: the schema points the other way
     // round (entities.location_id references properties(id)), which
@@ -176,6 +196,23 @@ function generateProperty(worldState, options = {}) {
     community_id: options.communityId ?? null,
     city_id: options.cityId ?? null,
   };
+
+  // **`density_tier` was null on every property in every world.** It is
+  // a real TEXT column the schema gives no vocabulary for, so
+  // `landmarks.densityTierFor` supplies one and DERIVES the value from
+  // `land_size`, `units` and `floors` — all three of which this row
+  // already carries. Derived rather than drawn on purpose: density is
+  // not an independent fact about a building, it is what its own
+  // dimensions come to, and drawing it would let a world contain a
+  // one-storey house on a hectare tagged `dense`.
+  //
+  // An explicit `densityTier` still wins, so a caller that knows better
+  // than the arithmetic is not overruled by it.
+  if (property.density_tier === null) {
+    // eslint-disable-next-line global-require
+    property.density_tier = require('./landmarks.js').densityTierFor(property);
+  }
+
   store.push(property);
   return property;
 }
@@ -359,11 +396,41 @@ function advancePropertyLifecycle(worldState, property, tick) {
 
 // What is keeping this building up, in condition points per tick. See
 // the constants above for why these two and not others.
+// **Scaled by whether the place has the people it needs**, which is
+// what makes `control.maintainKey` load-bearing rather than a reading
+// nothing consumes. Before this, upkeep was two flat constants: a
+// one-bedroom flat and a cathedral held their condition equally well
+// on one occupant apiece, because nothing anywhere knew that one of
+// them is forty times the building.
+//
+// **An ordinary house does not move by a digit** (standing rule 12's
+// first clause). `control.upkeepOf(...).ratio` is people present over
+// people needed; a house needs one person and has one, so its ratio is
+// 1 and `Math.min(1, 1)` leaves both constants exactly as they were.
+// What changes is the case nobody was modelling: a big place with a
+// few people in it now gets a FRACTION of the upkeep, so a synagogue
+// that needs sixty-six and has four decays almost as fast as an empty
+// one — which is the honest answer and the reason the maintain key
+// exists.
+//
+// Capped at 1 rather than rewarding a surplus: forty people in a
+// two-bedroom house do not make it age backwards.
 function upkeepFor(worldState, property) {
   const occupants = Array.isArray(property.occupants) ? property.occupants.length : 0;
   const owner = getCurrentOwner(worldState, property.id);
-  return (occupants > 0 ? OCCUPANT_UPKEEP_PER_TICK : 0)
+  const base = (occupants > 0 ? OCCUPANT_UPKEEP_PER_TICK : 0)
     + (owner ? OWNER_UPKEEP_PER_TICK : 0);
+  if (base === 0) return 0;
+
+  // Lazily required: `control` requires `property` at module scope, so
+  // a top-level require here closes a cycle.
+  // eslint-disable-next-line global-require
+  const control = require('./control.js');
+  const upkeep = control.upkeepOf(worldState, { scale: 'property', locationId: property.id });
+  // A place the maintain key cannot read is left exactly as it was —
+  // unknown staffing is not zero staffing.
+  if (!upkeep || upkeep.ratio === null) return base;
+  return base * Math.max(0, Math.min(1, upkeep.ratio));
 }
 
 

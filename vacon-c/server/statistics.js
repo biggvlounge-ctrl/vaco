@@ -112,6 +112,7 @@ const occupations = require('./occupations.js');
 const familyTraits = require('./familyTraits.js');
 const control = require('./control.js');
 const knowledge = require('./knowledge.js');
+const landmarks = require('./landmarks.js');
 
 // §9's MASTER BLOCK KEY, in its order. Every statistic belongs to one.
 const CATEGORIES = [
@@ -575,6 +576,67 @@ const CATALOGUE = [
       .filter((r) => r.status === 'active' && ctx.ids.has(r.entity_id))
       .map((r) => Number(r.wage))
       .filter((w) => Number.isFinite(w))),
+  },
+  {
+    key: 'landmark_count', category: 'housing', unit: 'count', scope: 'community',
+    // **`properties.type` enumerates ten kinds and worldgen made two**,
+    // so no world this engine built ever contained a monument, a
+    // historic site or a government building. This counts what THE
+    // KEY's twenty-three hero-tier categories and the retail list's ten
+    // actually put in an area.
+    compute: (ctx) => propertiesIn(ctx).filter((p) => p.landmark_category).length,
+  },
+  {
+    key: 'mean_historical_significance', category: 'housing', unit: 'index', scope: 'community',
+    // What the places here are worth remembering, on
+    // `historical_records.significance`'s own 0-100. Null where nothing
+    // has a history, which is different from everything here being
+    // forgettable — `history_ref` was hard-coded null on every property
+    // in every world until `landmarks.designate` existed, so a restored
+    // world from before it answers null and says so.
+    compute: (ctx) => {
+      const scores = propertiesIn(ctx)
+        .map((p) => landmarks.significanceOf(ctx.worldState, p.id))
+        .filter((s) => s !== null && s > 0);
+      if (scores.length === 0) return null;
+      return round(scores.reduce((a, b) => a + b, 0) / scores.length, 2);
+    },
+  },
+  {
+    key: 'mean_bedrooms', category: 'housing', unit: 'count', scope: 'community',
+    // How big the homes are. `units` is how many dwellings a building
+    // holds and was 1 on every residential property ever generated;
+    // bedrooms is how many rooms one dwelling has and had no column at
+    // all. Homes only — a monument has no bedrooms, and averaging its
+    // null in as a zero is the `Number(null)` corollary.
+    compute: (ctx) => {
+      const counts = propertiesIn(ctx)
+        .filter((p) => p.bedrooms !== null && p.bedrooms !== undefined)
+        .map((p) => Number(p.bedrooms))
+        .filter((n) => Number.isFinite(n));
+      if (counts.length === 0) return null;
+      return round(counts.reduce((a, b) => a + b, 0) / counts.length, 2);
+    },
+  },
+  {
+    key: 'maintenance_shortfall', category: 'territory', unit: 'share', scope: 'community',
+    // **What share of this area's buildings have fewer people than they
+    // need.** The maintain key's whole point: a neglected place decays
+    // faster AND its takeover requirement has fallen with its headcount,
+    // so it is cheap to seize and expensive to keep. Before
+    // `control.maintenanceFor`, `property.upkeepFor` was two flat
+    // constants and a cathedral was as easy to keep up as a shed.
+    compute: (ctx) => {
+      const here = propertiesIn(ctx);
+      if (here.length === 0) return null;
+      const short = here.filter((p) => {
+        const upkeep = control.upkeepOf(ctx.worldState, {
+          scale: 'property', locationId: p.id, tick: ctx.tick,
+        });
+        return upkeep !== null && upkeep.neglected;
+      }).length;
+      return round(short / here.length, 4);
+    },
   },
   {
     key: 'control_key_force', category: 'territory', unit: 'count', scope: 'community',

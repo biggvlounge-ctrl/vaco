@@ -441,12 +441,20 @@ async function migrateWorldStateToPostgres(worldState) {
           // the FK-ordering test exists.
           `INSERT INTO properties (id, land_size, type, value, condition, occupants, floors, units,
                                    age, construction_date, utilities, operating_organization_id,
-                                   density_tier, lifecycle_stage, community_id, city_id)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+                                   density_tier, lifecycle_stage, community_id, city_id,
+                                   bedrooms, landmark_category, former_type, repurposed_tick)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
           [p.id, p.land_size, p.type, p.value, p.condition, JSON.stringify(p.occupants), p.floors,
             p.units, p.age, p.construction_date, JSON.stringify(p.utilities),
             p.operating_organization_id, p.density_tier, p.lifecycle_stage,
-            p.community_id ?? null, p.city_id ?? null]
+            p.community_id ?? null, p.city_id ?? null,
+            // From schema-extensions.sql. `bedrooms` is how many rooms
+            // one dwelling has, which `units` does not say; the other
+            // three carry which named landmark this is and what it used
+            // to be, because `properties.type` is coarser than the two
+            // documents that name the things worth taking.
+            p.bedrooms ?? null, p.landmark_category ?? null,
+            p.former_type ?? null, p.repurposed_tick ?? null]
         );
       }
       summary.properties = worldState.properties.length;

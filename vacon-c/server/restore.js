@@ -542,7 +542,14 @@ async function restoreWorldStateFromPostgres(worldState) {
       // as the string "7" matches no community, every housing
       // statistic reads null, and the world looks like one with no
       // buildings in it rather than one with a lost join.
-      'community_id', 'city_id']));
+      'community_id', 'city_id',
+      // Also from schema-extensions.sql, and standing rule 10 applies to
+      // all three: a `bedrooms` back as the string "2" makes
+      // `mean_bedrooms` a string concatenation, and a `history_ref` back
+      // as "41" matches no historical record, so `significanceOf`
+      // returns 0 and every landmark in a restored world reads as an
+      // ordinary building — which is exactly the maintain key's input.
+      'bedrooms', 'repurposed_tick', 'history_ref']));
   summary.properties = worldState.properties.length;
 
   worldState.ownershipRecords = (await q('SELECT * FROM ownership_records ORDER BY id')).map((o) =>

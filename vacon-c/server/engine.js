@@ -71,6 +71,7 @@ const flows = require('./flows.js');
 const contest = require('./contest.js');
 const control = require('./control.js');
 const meetings = require('./meetings.js');
+const landmarks = require('./landmarks.js');
 const behavior = require('./behavior.js');
 const actions = require('./actions.js');
 
@@ -862,6 +863,7 @@ const ACTION_VERBS = {
   assessTakeover: (...args) => assessTakeover(...args),
   attemptTakeover: (...args) => attemptTakeover(...args),
   holdMeeting: (...args) => holdMeeting(...args),
+  repurposeProperty: (...args) => repurposeProperty(...args),
 };
 
 function dispatchAction(playerId, body) {
@@ -958,6 +960,52 @@ function holdMeeting(entityId, options = {}) {
     tick: WorldState.tick,
   });
   return { ...result, events: tick.recordEvents(WorldState, result.events) };
+}
+
+// ---------------------------------------------------------------------------
+// Repurposing — a building's past does not fix its future
+// ---------------------------------------------------------------------------
+// **Only whoever holds it may change what it is.** `ownership_records`
+// is append-only and `property.getCurrentOwner` is the read over it, so
+// this is one lookup — and it is the check that makes the takeover key
+// mean something beyond a line in the history: you take the Arch, and
+// THEN you can make it a fortress.
+//
+// A family's holding counts for its members, which is how a tribe's
+// takeover becomes a tribe's building. `owner_type` is the schema's own
+// word for which of those a row records.
+function repurposeProperty(entityId, options = {}) {
+  const target = (WorldState.properties || []).find((p) => p.id === Number(options.propertyId));
+  if (!target) throw new Error(`no property with id ${options.propertyId}`);
+
+  const owner = property.getCurrentOwner(WorldState, target.id);
+  if (!owner) {
+    throw new Error(
+      `property ${target.id} has no recorded owner, and only an owner may change what a `
+      + 'building is. Take it first.',
+    );
+  }
+  const mine = owner.owner_entity_id === entityId
+    || (WorldState.familyMemberships || []).some(
+      (m) => m.entity_id === entityId && m.family_id === owner.owner_entity_id,
+    );
+  if (!mine) {
+    throw new Error(
+      `property ${target.id} belongs to ${owner.owner_type} ${owner.owner_entity_id}, `
+      + `not to entity ${entityId} or their family.`,
+    );
+  }
+
+  const result = landmarks.repurpose(WorldState, {
+    propertyId: target.id,
+    toType: options.toType,
+    tick: WorldState.tick,
+    note: options.note ?? null,
+  });
+  if (result === null) {
+    throw new Error(`property ${target.id} is already ${options.toType}`);
+  }
+  return result;
 }
 
 function assessTakeover(entityId, options = {}) {
@@ -1133,6 +1181,7 @@ module.exports = {
   verifyContest,
   assessTakeover,
   holdMeeting,
+  repurposeProperty,
   attemptTakeover,
   acceptMission,
   resolveMission,

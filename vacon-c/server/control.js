@@ -251,13 +251,27 @@ const SCALES = {
     // operates it. A flat is held by its occupants; a shop is held by
     // its staff. `properties.operating_organization_id` is the schema's
     // own link and `worldgen` sets it.
+    // **Two columns say who is in a building, and they must not be
+    // allowed to disagree quietly.** `npcs.home_property_id` is where
+    // somebody lives; `properties.occupants` is the JSONB list
+    // `households.js` writes from the same fact. In a generated world
+    // they agree — but `property.upkeepFor` reads the second and this
+    // reads the first, and the day they diverge, upkeep would silently
+    // scale to zero and every building in the world would decay at the
+    // full rate with nothing thrown. Caught by a fixture that set one
+    // and not the other.
+    //
+    // The union is the fix: a disagreement becomes harmless instead of
+    // catastrophic, and neither column has to be declared the winner.
     holders: (worldState, target) => {
-      const occupants = (worldState.npcs || []).filter((n) => n.home_property_id === target.id);
+      const byHome = (worldState.npcs || []).filter((n) => n.home_property_id === target.id);
+      const listed = Array.isArray(target.occupants) ? target.occupants : [];
+      const byList = (worldState.npcs || []).filter((n) => listed.includes(n.id));
       const staff = target.operating_organization_id
         ? employeesOf(worldState, target.operating_organization_id)
         : [];
       const seen = new Set();
-      return [...occupants, ...staff].filter((n) => !seen.has(n.id) && seen.add(n.id));
+      return [...byHome, ...byList, ...staff].filter((n) => !seen.has(n.id) && seen.add(n.id));
     },
     // None. A flat is a flat — there is nothing to know how to run.
     // A property OPERATED by an organization inherits that
@@ -407,6 +421,241 @@ const SCALES = {
     seize: () => ({ recorded: null, declared: 'civilizations have no control column in the schema' }),
   },
 };
+
+// =====================================================================
+// THE MAINTAIN KEY
+// =====================================================================
+//
+// **Taking a thing and keeping it are different numbers, and this
+// engine only had the first.**
+//
+// `property.upkeepFor` was the whole of maintenance: two flat constants,
+// one for "somebody lives here" and one for "somebody owns it". So a
+// one-bedroom flat and a government building cost exactly the same to
+// keep standing, and nothing anywhere asked for PEOPLE — a building
+// with an owner four cities away held its condition as well as one with
+// a staff of forty.
+//
+// ---------------------------------------------------------------------
+// Need, not headcount — and that is what makes the two keys differ
+// ---------------------------------------------------------------------
+// The takeover key asks **who is there**: a requirement of
+// `defenders x FORCE_PARITY`, because what you have to overcome is the
+// people holding the ground.
+//
+// The maintain key asks **what the place needs**, from the place
+// itself: how much building there is, and how much is asked of it.
+// Neither term reads who currently holds it, which is the entire point
+// — otherwise a building nobody looks after would need nothing.
+//
+// The relationship between the two then falls out rather than being
+// declared, and it is the one the request described:
+//
+//   held properly   people present >= need, so the takeover requirement
+//                   is at least the maintenance requirement, and
+//                   strictly more as soon as anybody is there beyond
+//                   the minimum. Taking it costs more than keeping it.
+//
+//   held exactly    present == need. The two keys meet. This is the
+//                   knife edge and it is honest: a place staffed to the
+//                   bone is as cheap to take as it is to keep.
+//
+//   neglected       present < need. **The takeover requirement drops
+//                   BELOW the maintenance requirement** — the thing is
+//                   cheap to seize and expensive to hold, which is the
+//                   trap. "You would have to have a certain amount to
+//                   maintain and keep it, because somebody else would
+//                   try to take it from you."
+//
+// No new constant carries that. It is two honest readings of the same
+// place, compared.
+//
+// ---------------------------------------------------------------------
+// The size term is measured against the world, not against a ruler
+// ---------------------------------------------------------------------
+// `footprintOf` is `land_size x floors` — the schema's own two columns,
+// multiplied, which is floor area. On its own that is a number in no
+// units anybody agreed on, so it is divided by the world's OWN median
+// building. Standing rule 17's corollary: the right reference is
+// usually inside the model. A property of typical size scores 1; the
+// airport in a measured world scores 28.
+//
+// A one-bedroom apartment therefore takes one person to maintain, and
+// that is a definition rather than a tuning — it is the floor the
+// request itself names, and every other number on the ladder is
+// relative to it.
+
+//: How much the importance of a place adds to what it costs to keep.
+//: At 1.0 a monument at significance 100 needs twice the people a
+//: warehouse of the same size needs, and one at significance 0 needs
+//: exactly the same. Doubling at the top of the scale is the mildest
+//: claim that still makes importance matter; anything less and a
+//: cathedral is a shed with a view.
+const SIGNIFICANCE_WEIGHT = 1.0;
+
+//: Nothing needs less than one person to keep. A building with nobody
+//: in it at all is what `property.advancePropertyLifecycle` already
+//: models — it rots at the full rate and is abandoned in about 250
+//: ticks — so zero is not a maintenance requirement, it is the absence
+//: of one.
+const MINIMUM_MAINTENANCE = 1;
+
+// Floor area, from the two columns the schema already carries. Null for
+// a target that is not a building — a community, a city and a country
+// are measured by their people instead, below.
+function footprintOf(property) {
+  if (!property) return null;
+  const land = Number(property.land_size);
+  if (!Number.isFinite(land) || land <= 0) return null;
+  return land * Math.max(1, Number(property.floors) || 1);
+}
+
+// The world's own typical building, so `footprintOf` becomes a multiple
+// rather than a number in invented units. Median, not mean: one airport
+// should not redefine what ordinary is.
+function medianFootprint(worldState) {
+  const values = (worldState.properties || [])
+    .map(footprintOf)
+    .filter((v) => v !== null)
+    .sort((a, b) => a - b);
+  if (values.length === 0) return null;
+  return values[Math.floor(values.length / 2)];
+}
+
+// How many typical buildings this one is worth. 1 for a typical one,
+// null where there is nothing to compare against.
+function sizeOf(worldState, property) {
+  const footprint = footprintOf(property);
+  const median = medianFootprint(worldState);
+  if (footprint === null || median === null || median <= 0) return null;
+  return footprint / median;
+}
+
+// ---------------------------------------------------------------------
+// maintenanceFor — the maintain key
+// ---------------------------------------------------------------------
+// Same shape as `compositionFor` on purpose: the two keys are read side
+// by side and a caller should not have to translate between them. The
+// roles come out of the same 5:10:1 ratio, because the document's
+// composition is a statement about what a working group looks like and
+// that is as true of a staff as of a raiding party — what differs is
+// the magnitude and where it is measured from.
+//
+// `staff` is called out separately from `security` because the request
+// separated them: "how many employees it needs to maintain, how much
+// security". They are the specialist requirement and the enforcer share
+// of the same composition, named so a caller does not have to know that.
+function maintenanceFor(worldState, options = {}) {
+  const { scale = null, locationId = null, tick = worldState.tick ?? 0 } = options;
+  const definition = SCALES[scale];
+  if (!definition) {
+    throw new Error(`control: "${scale}" is not a scale (one of: ${SCALE_NAMES.join(', ')}).`);
+  }
+  const target = definition.find(worldState, locationId);
+  if (target === null || target === undefined) return null;
+
+  // eslint-disable-next-line global-require
+  const landmarks = require('./landmarks.js');
+
+  let need;
+  let size = null;
+  let significance = 0;
+
+  if (scale === 'property') {
+    size = sizeOf(worldState, target);
+    significance = landmarks.significanceOf(worldState, target.id) ?? 0;
+    // A world with no comparable buildings cannot size this one, and
+    // an unsizeable building still needs somebody: the floor applies.
+    const scaled = size === null
+      ? MINIMUM_MAINTENANCE
+      : size * (1 + SIGNIFICANCE_WEIGHT * (significance / 100));
+    need = Math.max(MINIMUM_MAINTENANCE, Math.round(scaled));
+  } else {
+    // **Everything that is not a building is measured by its people**,
+    // because that is what those scales ARE: an organization is its
+    // staff, a community is its residents, a country is its population.
+    // The share is `1 / RATIO_TOTAL` — the document's own composition
+    // read as "one working group of sixteen keeps sixteen people's
+    // worth of place going", which is the only anchor available that
+    // is not a number chosen for the occasion.
+    const holders = definition.holders(worldState, target);
+    const people = holders.filter((n) => roleOf(worldState, n, tick) !== null).length;
+    need = Math.max(MINIMUM_MAINTENANCE, Math.round(people / RATIO_TOTAL));
+  }
+
+  const requiredRoles = ROLE_NAMES
+    .map((role) => ({ role, count: Math.round((need * COMPOSITION_RATIO[role]) / RATIO_TOTAL) }))
+    .filter((r) => r.count > 0);
+  if (requiredRoles.length === 0) {
+    const largest = ROLE_NAMES.reduce(
+      (best, r) => (COMPOSITION_RATIO[r] > COMPOSITION_RATIO[best] ? r : best),
+    );
+    requiredRoles.push({ role: largest, count: MINIMUM_MAINTENANCE });
+  }
+
+  // Who has to know how to run it. For a property that is the landmark
+  // category's own post where it has one — a hospital needs a
+  // physician, a monument needs nobody — and otherwise the operating
+  // organization's, which is the same rule `compositionFor` applies.
+  const requiredSpecialists = scale === 'property'
+    ? specialistsForProperty(worldState, target, landmarks)
+    : definition.specialists(worldState, target).filter((s) => s.occupation);
+
+  const security = requiredRoles.find((r) => r.role === 'enforcer')?.count ?? 0;
+
+  return {
+    locationId,
+    scale,
+    size: size === null ? null : Math.round(size * 100) / 100,
+    significance,
+    requiredRoles,
+    requiredSpecialists,
+    // The two the request named separately.
+    staff: requiredSpecialists.reduce((sum, s) => sum + s.count, 0),
+    security,
+    total: requiredRoles.reduce((sum, r) => sum + r.count, 0),
+  };
+}
+
+function specialistsForProperty(worldState, property, landmarks) {
+  const post = property.landmark_category
+    ? landmarks.staffPostFor(property.landmark_category)
+    : null;
+  if (post) return [{ occupation: post, count: SPECIALISTS_REQUIRED }];
+  return SCALES.property.specialists(worldState, property).filter((s) => s.occupation);
+}
+
+// ---------------------------------------------------------------------
+// upkeepOf — is this place actually being kept?
+// ---------------------------------------------------------------------
+// The comparison the two keys exist to support. `ratio` below 1 is a
+// neglected place: it has fewer people than it needs, so it is decaying
+// AND its takeover requirement has fallen with its headcount.
+//
+// Returns null for a target that does not exist. `ratio` is null — not
+// zero — where there is no maintenance requirement to divide by, which
+// cannot currently happen but would be a silent 0/0 if it did.
+function upkeepOf(worldState, options = {}) {
+  const { scale = null, locationId = null, tick = worldState.tick ?? 0 } = options;
+  const maintenance = maintenanceFor(worldState, { scale, locationId, tick });
+  if (maintenance === null) return null;
+  const composition = compositionFor(worldState, { scale, locationId, tick });
+  const present = composition ? composition.defenders : 0;
+
+  return {
+    locationId,
+    scale,
+    present,
+    needed: maintenance.total,
+    ratio: maintenance.total === 0 ? null : Math.round((present / maintenance.total) * 100) / 100,
+    neglected: present < maintenance.total,
+    // What it would cost somebody else to take it as it stands. Stated
+    // here so the trap is one reading rather than two calls: a
+    // neglected place is cheaper to seize than to keep.
+    takeoverCost: composition ? composition.total : null,
+    maintainCost: maintenance.total,
+  };
+}
 
 // ---------------------------------------------------------------------
 // compositionFor — ControlKeyComposition
@@ -920,6 +1169,13 @@ module.exports = {
   roleOf,
   isEnforcer,
   rosterOf,
+  SIGNIFICANCE_WEIGHT,
+  MINIMUM_MAINTENANCE,
+  footprintOf,
+  medianFootprint,
+  sizeOf,
+  maintenanceFor,
+  upkeepOf,
   compositionFor,
   assess,
   attempt,
