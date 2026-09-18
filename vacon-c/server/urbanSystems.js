@@ -583,8 +583,18 @@ const SYSTEMS = [
     n: 30,
     name: 'Construction',
     level: 'partial',
-    functions: ['advancePropertyLifecycle'],
-    note: 'Condition advances over time. Nothing is built by anyone.',
+    functions: ['advancePropertyLifecycle', 'stripProperty'],
+    note: 'Condition advances over time. **Nothing is built by anyone — but as of 18 Sep 2026 '
+      + 'something is deliberately UNbuilt.** `salvage.stripProperty` is the first thing in the '
+      + 'engine that changes a building\'s condition by somebody\'s decision rather than by the '
+      + 'calendar: an empty building is where glass, timber, cloth and stone come from, and a '
+      + 'trip costs it 10 condition and refuses once there is nothing left. Deliberately NOT '
+      + 'raised to modelled on the strength of that, because demolition is half a construction '
+      + 'system and the half that matters less: no property is ever founded, and '
+      + '`lifecycle_stage` still walks its stages on a timer nobody influences. Measured '
+      + 'against a world with salvage switched off, over 200 ticks: 96 properties at zero '
+      + 'condition without it, 101 with — the collapse of the housing stock is the '
+      + 'pre-existing decay, not this.',
   },
   {
     n: 31,

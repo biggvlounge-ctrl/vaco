@@ -209,7 +209,26 @@ function valueOfHoldings(worldState, entityId, options = {}) {
   const { cityId = null } = options;
   let total = 0;
   for (const holding of inventory.holdingsOf(worldState, entityId)) {
-    if (!findItem(worldState, holding.item_name)) continue;
+    const item = findItem(worldState, holding.item_name);
+    if (!item) continue;
+    // **An unpriced item is skipped, exactly as `trade.sellableOf`
+    // skips one**, and the two must agree or a person's store is worth
+    // one number when valued and another when sold. `barterScore`
+    // THROWS for an item with no `Base_Value` rather than guessing —
+    // which is right, because §27 gives seventeen values and inventing
+    // an eighteenth is what `items.js` exists to prevent — but that
+    // means this loop raised the moment anybody held one.
+    //
+    // `sellableOf` got this guard when it was written and this function
+    // did not, and by then the world was full of things it would throw
+    // on: `knowledge.js`'s books have been unpriced and in 12% of
+    // people's hands since §24, and `salvage.js` added ten materials
+    // and eight products on the same principle. It has no caller in
+    // `server/` today — `trade.js`'s own comment says `crime.js` calls
+    // it, and `crime.js` does not — so this was a loaded gun rather
+    // than a live crash, and the first honest caller would have stopped
+    // the tick.
+    if (!Number.isFinite(Number(item.baseValue))) continue;
     const score = barterScore(worldState, holding.item_name, { cityId });
     total += score.Final_Barter_Score
       * Number(holding.quantity)

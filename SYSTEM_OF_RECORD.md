@@ -980,7 +980,7 @@ trusted:
 
 The simulation engine is the one app in this repo whose "done" is not a
 list of routes, so it carries a measured completeness score rather than
-a criteria tally. **91.1%**, from
+a criteria tally. **91.3%**, from
 `vacon-c/dev-docs/GAME_COMPLETENESS.md`, which
 `vacon-c/scripts/completeness.mjs` regenerates and
 `vacon-c/test/completeness.test.js` fails on if stale — including a
@@ -990,7 +990,7 @@ check that the percent in THIS file matches the one the code measures.
 |---|---|---|
 | systems | 71.1% | the forty urban systems §7 names, at `urbanSystems.js`'s own four levels |
 | tables | 90.9% | schema tables a built world actually fills |
-| statistics | 89% | statistics a world can answer about itself |
+| statistics | 89.7% | statistics a world can answer about itself |
 | traits | 100% | traits something under `server/` reads |
 | traitDepth | 85.7% | trait columns a life actually changes |
 | habits | 100% | whether habits and routines carry information |
@@ -1129,7 +1129,12 @@ rose would be measuring the work rather than the world; and to
 **91.1%** on 18 Sep 2026 for the same reason again, when the takeover
 key, §24 knowledge recovery and meetings added eight statistics of
 which one, `knowledge_stock`, is declared unanswerable because
-knowledge is a §28 resource type that using does not use up), because the world
+knowledge is a §28 resource type that using does not use up; and back
+to **91.3%** with salvage, whose three statistics are all answerable —
+`salvageable_stock` measured 7.5% to 76% across five neighbourhoods,
+and `materials_held` and `things_made` return a real zero rather than a
+null in an area where nobody has salvaged yet, which is the difference
+the `known` flag exists to carry), because the world
 the report measures is now a contested settlement where thefts go
 unprosecuted, so `court_cases` is genuinely empty in it. A score that
 only ever rose would be measuring the work rather than the world. The pattern is consistent enough to be a rule: **the

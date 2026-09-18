@@ -623,6 +623,39 @@ test('nothing salvage adds is priced', () => {
   }
 });
 
+test('holding an unpriced material does not blow up a valuation', () => {
+  // **A loaded gun, found by asking what happens when the world is full
+  // of unpriced things.** `barterScore` throws for an item with no
+  // `Base_Value` rather than guessing one, which is correct.
+  // `trade.sellableOf` got a skip for that when it was written;
+  // `barter.valueOfHoldings` has the identical loop and did not, so it
+  // raised the moment anybody held a book or a piece of glass. It has no
+  // caller in `server/` today, which is the only reason no tick had
+  // already died of it.
+  //
+  // The two must agree: a store cannot be worth one number when valued
+  // and another when sold.
+  const barter = require('../server/barter.js');
+  const trade = require('../server/trade.js');
+  const w = world();
+  const p = person(w, { id: 1 });
+  inventory.give(w, { entityId: p.id, itemName: 'Hammer', quantity: 1, tick: w.tick });
+  const priced = barter.valueOfHoldings(w, p.id);
+  assert.ok(priced > 0);
+
+  hand(w, p.id, 'glass', 5);
+  assert.equal(barter.valueOfHoldings(w, p.id), priced, 'glass moved a barter valuation');
+  // `sellableOf` prices each holding and then drops the ones it could
+  // not price, so an unpriced material is absent from the list rather
+  // than present with a null — the two functions agree that glass is
+  // worth nothing to a trader, which is the point.
+  assert.equal(
+    trade.sellableOf(w, p.id).some((s) => s.holding.item_name === 'glass'),
+    false,
+    'glass turned up in a list of things somebody could sell',
+  );
+});
+
 test('a made product is materiel a tribe can count', () => {
   // The payoff of registering products as ordinary items rather than as
   // a parallel kind of thing: `control.materielOf` sums §26 categories

@@ -13,17 +13,17 @@ three places, a spec section's "roughly 25 of the 40", a catalogue of 67
 statistics that a real world answered 36 of, and seven trait families generated
 on every NPC and read by nothing.
 
-## 91.1% complete
+## 91.3% complete
 
 ```
-██████████████████░░  91.1%   313.45 of 344
+██████████████████░░  91.3%   320.45 of 351
 ```
 
 | axis | complete | score | what it measures |
 |---|---|---|---|
 | systems | **71.1%** | 28.45/40 | urban systems with mechanics |
 | tables | **90.9%** | 60/66 | schema tables a built world fills |
-| statistics | **89%** | 97/109 | statistics a world can answer |
+| statistics | **89.7%** | 104/116 | statistics a world can answer |
 | traits | **100%** | 114/114 | traits something reads |
 | traitDepth | **85.7%** | 6/7 | trait columns a life actually changes |
 | habits | **100%** | 8/8 | habit and routine depth |

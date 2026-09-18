@@ -71,6 +71,19 @@ function room(options = {}) {
       entity_id: i, family_id: 900, role: 'sibling', generation_number: 1,
     });
   }
+  // **A takeover needs things, not only bodies**, and this fixture was
+  // written before that was true. `control.compositionFor` grew a
+  // `requiredMateriel` term on 18 Sep 2026 and `control.test.js` got a
+  // `kit()` helper the same day, whose comment says exactly this: a
+  // fixture testing the PEOPLE half has to carry kit or every assertion
+  // picks up a tools shortfall it is not about. This one was missed, so
+  // "a tribe that sits down together takes a building more easily" had
+  // been failing on `tools: need 1, have 0` — three willing siblings and
+  // not a hammer between them — while its own subject, the meeting →
+  // trust → unity → cohesion chain, worked perfectly.
+  w.inventory.push({
+    id: 1, holder_entity_id: 1, item_name: 'Hammer', quantity: 50, condition: 80,
+  });
   return w;
 }
 
