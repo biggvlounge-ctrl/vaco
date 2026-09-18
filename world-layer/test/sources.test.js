@@ -44,6 +44,7 @@ const { LOCATION_TIERS, createWorldLayer, generateLocation, setLocationData } = 
 const overture = require('../imports/overtureImport');
 const nrhp = require('../imports/nrhpImport');
 const wikidata = require('../imports/wikidataImport');
+const noaa = require('../imports/noaaImport');
 
 // ---------------------------------------------------------------------
 // The registry
@@ -296,17 +297,191 @@ test('each fetch says why it cannot run and what to call instead', () => {
   // the work once records are in hand.
   for (const fetcher of [
     overture.fetchOverturePlaces,
+    overture.fetchOvertureDivisions,
+    overture.fetchOvertureBuildings,
     nrhp.fetchNrhpListings,
     wikidata.fetchWikidataEntities,
     wikidata.fetchCommonsImages,
+    noaa.fetchClimateNormals,
   ]) {
     assert.throws(fetcher, (error) => {
       assert.match(error.message, /not implemented/);
       assert.match(error.message, /proxy allowlist/);
-      assert.match(error.message, /import|attachImage/i);
+      assert.match(error.message, /import|attachImage|classify/i);
       return true;
     });
   }
+});
+
+// ---------------------------------------------------------------------
+// Overture Divisions — the neighbourhood names everything hangs on
+// ---------------------------------------------------------------------
+
+test('divisions produce the area NAMES a landmark pack matches on', () => {
+  // `vacon-c/server/landmarkPacks.js` matches an imported landmark to a
+  // neighbourhood by name. Until this, the only source of those names
+  // was somebody typing them.
+  const layer = createWorldLayer();
+  const { byLevel } = overture.importOvertureDivisions(layer, [
+    { name: 'Downtown', subtype: 'neighborhood', lat: 38.62, lng: -90.19 },
+    { name: 'Central West End', subtype: 'neighborhood', lat: 38.64, lng: -90.26 },
+    { name: 'St. Louis', subtype: 'locality', lat: 38.62, lng: -90.19 },
+  ]);
+  assert.deepEqual(byLevel.community, ['Downtown', 'Central West End']);
+  assert.deepEqual(byLevel.city, ['St. Louis']);
+});
+
+test('a subtype above what the engine models is skipped, not demoted', () => {
+  // Silently treating a country as a neighbourhood would put a state in
+  // a list of city blocks.
+  const layer = createWorldLayer();
+  const { skipped } = overture.importOvertureDivisions(layer, [
+    { name: 'United States', subtype: 'country', lat: 39, lng: -98 },
+  ]);
+  assert.match(skipped[0].reason, /not a level this engine models/);
+  assert.equal(overture.divisionLevelFor('country'), null);
+});
+
+test('a division with no point still contributes its name', () => {
+  // The NAME is the deliverable for a landmark pack; the point is a
+  // bonus. Losing the name because a centroid was missing would throw
+  // away the useful half.
+  const layer = createWorldLayer();
+  const { imported, byLevel } = overture.importOvertureDivisions(layer, [
+    { name: 'The Hill', subtype: 'neighborhood' },
+  ]);
+  assert.equal(imported.length, 0);
+  assert.deepEqual(byLevel.community, ['The Hill']);
+});
+
+// ---------------------------------------------------------------------
+// Overture Buildings — what land_size and floors are guessed at
+// ---------------------------------------------------------------------
+
+test('buildings carry real measurements, and null where the source is silent', () => {
+  // A plausible default is indistinguishable from a measurement, which
+  // is the whole reason worldgen's random bands are a problem worth
+  // solving rather than a style choice.
+  const layer = createWorldLayer();
+  const { imported } = overture.importOvertureBuildings(layer, [
+    { name: 'Wainwright Building', class: 'office', lat: 38.62, lng: -90.19, footprintArea: 1850, height: 45 },
+  ]);
+  const data = imported[0].buildingData;
+  assert.equal(data.propertyType, 'commercial');
+  assert.equal(data.footprintArea, 1850);
+  assert.equal(data.heightMetres, 45);
+  // Height and floors are different measurements. Deriving one from the
+  // other needs an assumed storey height — an invented constant.
+  assert.equal(data.numFloors, null);
+});
+
+test('an unclassified building does not quietly become a house', () => {
+  assert.equal(overture.propertyTypeFor('something_else'), null);
+  assert.equal(overture.propertyTypeFor(undefined), null);
+  assert.equal(overture.propertyTypeFor('warehouse'), 'industrial');
+});
+
+test('an unnamed building is kept — the footprint is the value, not the name', () => {
+  const layer = createWorldLayer();
+  const { imported } = overture.importOvertureBuildings(layer, [
+    { class: 'house', lat: 38.6201, lng: -90.1902, footprintArea: 120 },
+  ]);
+  assert.equal(imported.length, 1);
+  assert.equal(imported[0].buildingData.named, false);
+  assert.ok(imported[0].name.includes('38.62010'));
+});
+
+test('every Overture building class maps to a type the consuming schema defines', () => {
+  // `properties.type` is a closed enumeration in
+  // VACANCY_POSTGRESQL_SCHEMA.sql. A mapping that produced anything
+  // else would fail on insert rather than at import.
+  const schemaTypes = [
+    'residential', 'commercial', 'industrial', 'government', 'agricultural',
+    'mixed', 'farm', 'historical_site', 'digital_property', 'virtual_location',
+  ];
+  for (const [cls, type] of Object.entries(overture.BUILDING_CLASS_MAP)) {
+    assert.ok(schemaTypes.includes(type), `${cls} → "${type}" is not a properties.type`);
+  }
+});
+
+// ---------------------------------------------------------------------
+// NOAA — the column the engine names as unmodellable
+// ---------------------------------------------------------------------
+
+test('the climate vocabulary is Köppen, not one this project invented', () => {
+  // `migration.generateRegion` refuses to invent a climate vocabulary
+  // and says so; `barter.js` lists `regions.climate_key` as the first
+  // of three modifiers it cannot model. Köppen-Geiger is the published
+  // standard, so the key is an identifier rather than a label.
+  assert.equal(noaa.KOPPEN_GROUPS.A, 'tropical');
+  assert.equal(noaa.KOPPEN_GROUPS.E, 'polar');
+  assert.equal(Object.keys(noaa.KOPPEN_GROUPS).length, 5);
+});
+
+test('classification matches the published answer for known places', () => {
+  // St. Louis is Cfa, Phoenix is BWh, Singapore is Af. If the
+  // classifier disagrees with the literature it is wrong, and this is
+  // how that gets caught.
+  const stl = noaa.classify({
+    temperaturesC: [0.6, 3.1, 8.6, 14.7, 19.8, 24.6, 26.8, 26.0, 21.9, 15.2, 8.6, 2.6],
+    precipitationMm: [57, 55, 88, 106, 116, 99, 95, 76, 85, 84, 89, 68],
+    latitude: 38.62,
+  });
+  assert.equal(stl.climateKey, 'Cfa');
+  assert.equal(stl.group, 'temperate');
+
+  assert.equal(noaa.classify({
+    temperaturesC: [13, 15, 18, 22, 27, 32, 35, 34, 31, 24, 17, 12],
+    precipitationMm: [20, 20, 25, 10, 3, 1, 25, 25, 18, 15, 18, 25],
+    latitude: 33.4,
+  }).climateKey, 'BWh');
+
+  assert.equal(noaa.classify({
+    temperaturesC: [26, 27, 27, 28, 28, 28, 28, 28, 28, 27, 27, 26],
+    precipitationMm: [240, 160, 160, 180, 170, 160, 160, 175, 170, 195, 255, 290],
+    latitude: 1.35,
+  }).climateKey, 'Af');
+});
+
+test('a classification from half a year is refused, not estimated', () => {
+  assert.throws(() => noaa.classify({
+    temperaturesC: [1, 2, 3], precipitationMm: [1, 2, 3], latitude: 0,
+  }), /twelve monthly means/);
+  // And latitude is required rather than assumed north — "summer" is
+  // different either side of the equator and the dry-season letters
+  // depend on it.
+  assert.throws(() => noaa.classify({
+    temperaturesC: new Array(12).fill(10), precipitationMm: new Array(12).fill(50),
+  }), /requires latitude/);
+});
+
+test('the key keeps the numbers it was derived from', () => {
+  // A summary that destroys its inputs cannot be checked.
+  const result = noaa.classify({
+    temperaturesC: new Array(12).fill(15),
+    precipitationMm: new Array(12).fill(80),
+    latitude: 40,
+  });
+  assert.equal(result.measures.annualMeanC, 15);
+  assert.equal(result.measures.annualPrecipitationMm, 960);
+  assert.equal(result.source, 'noaa-climate-normals');
+});
+
+test('climate attaches to a region without destroying its other geography', () => {
+  const layer = createWorldLayer();
+  const { imported } = overture.importOvertureDivisions(layer, [
+    { name: 'Greater St. Louis', subtype: 'county', lat: 38.62, lng: -90.19 },
+  ], { levels: ['region'] });
+  const region = imported[0];
+
+  noaa.importClimateNormals(layer, region.id, {
+    temperaturesC: [0.6, 3.1, 8.6, 14.7, 19.8, 24.6, 26.8, 26.0, 21.9, 15.2, 8.6, 2.6],
+    precipitationMm: [57, 55, 88, 106, 116, 99, 95, 76, 85, 84, 89, 68],
+    stationId: 'GHCND:USW00013994',
+  });
+  assert.equal(region.geographyData.climate.climateKey, 'Cfa');
+  assert.equal(region.geographyData.level, 'region', 'attaching climate lost the division level');
+  assert.equal(region.geographyData.stationId, 'GHCND:USW00013994');
 });
 
 // ---------------------------------------------------------------------

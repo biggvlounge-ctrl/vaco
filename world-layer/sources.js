@@ -154,7 +154,7 @@ const SOURCES = {
     fills: ['geographyData'],
     tiers: ['regional', 'filler'],
     scale: 'global administrative boundaries',
-    wired: null,
+    wired: 'imports/overtureImport.js',
     note: 'Real city/county/state boundaries. Directly feeds the neighbourhood NAMES a '
       + 'landmark pack needs — `vacon-c/server/landmarkPacks.js` matches a place to an area '
       + 'by name, and that name has to come from somewhere.',
@@ -168,7 +168,7 @@ const SOURCES = {
     fills: ['buildingData'],
     tiers: ['filler'],
     scale: 'global building footprints',
-    wired: null,
+    wired: 'imports/overtureImport.js',
     note: 'Footprint, height and class. What `properties.land_size`, `.floors` and `.type` '
       + 'are currently drawn at random for.',
   },
@@ -329,7 +329,7 @@ const SOURCES = {
     fills: ['geographyData'],
     tiers: ['regional'],
     scale: 'U.S. weather and climate normals',
-    wired: null,
+    wired: 'imports/noaaImport.js',
     note: 'Feeds `vacon-c/server/weather.js`, whose climate is currently drawn from bands '
       + 'this project chose. **`regions.climate_key` is TEXT written by nothing** — '
       + '`barter.js` names that gap in its own header as one of three modifiers it cannot '

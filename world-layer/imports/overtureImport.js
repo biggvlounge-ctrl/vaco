@@ -189,6 +189,202 @@ function importOverturePlaces(worldLayer, placeRecords, options = {}) {
   return { imported, skipped };
 }
 
+// ---------------------------------------------------------------------
+// Divisions — the neighbourhood names everything else hangs on
+// ---------------------------------------------------------------------
+// **This is the theme that makes a per-region import land in the right
+// place.** `vacon-c/server/landmarkPacks.js` matches an imported
+// landmark to a neighbourhood BY NAME — `byArea` groups on the pack's
+// `area` field and `worldgen` looks for a community whose name matches.
+// Those names have to come from somewhere, and until now the only
+// source was somebody typing them.
+//
+// Overture Divisions carries real administrative boundaries at every
+// level from country down to neighbourhood, so a region import produces
+// its own area list instead of needing one supplied alongside.
+//
+// Divisions are AREAS, not points, and the world layer stores locations
+// with a single lat/lng. So a division is imported at its
+// representative point — which Overture ships as part of the record —
+// rather than by inventing a centroid from a polygon this file would
+// have to parse.
+
+//: Overture's `subtype` values, coarsest first. The engine's own
+//: hierarchy is region → city → community (`vacon-c/server/geo.js`), so
+//: only the three that correspond are mapped; a continent and a country
+//: are above anything VACON-C models.
+const DIVISION_SUBTYPES = {
+  region: 'region',
+  county: 'region',
+  locality: 'city',
+  localadmin: 'city',
+  neighborhood: 'community',
+  macrohood: 'community',
+  borough: 'community',
+};
+
+function divisionLevelFor(subtype) {
+  const key = typeof subtype === 'string' ? subtype.trim().toLowerCase() : null;
+  return key && DIVISION_SUBTYPES[key] ? DIVISION_SUBTYPES[key] : null;
+}
+
+// Import Overture Divisions as the area vocabulary for a region.
+//
+// Returns the area NAMES grouped by level as well as the locations,
+// because the names are the deliverable: a landmark pack needs
+// `areas: ['Downtown', 'Forest Park', ...]` and that list is exactly
+// this.
+function importOvertureDivisions(worldLayer, divisionRecords, options = {}) {
+  const { levels = ['city', 'community'] } = options;
+  if (!Array.isArray(divisionRecords)) {
+    throw new Error('importOvertureDivisions requires an array of division records');
+  }
+
+  const imported = [];
+  const skipped = [];
+  const byLevel = { region: [], city: [], community: [] };
+
+  for (const record of divisionRecords) {
+    const name = record?.names?.primary ?? record?.name ?? null;
+    const level = divisionLevelFor(record?.subtype);
+    if (!name) {
+      skipped.push({ record, reason: 'no name' });
+      continue;
+    }
+    if (level === null) {
+      // A continent or a country is above anything this engine models,
+      // and an unrecognised subtype is not silently demoted to the
+      // smallest level — that would put a state in a list of
+      // neighbourhoods.
+      skipped.push({ name, subtype: record?.subtype, reason: 'subtype is not a level this engine models' });
+      continue;
+    }
+    if (!levels.includes(level)) {
+      skipped.push({ name, reason: `level ${level} not requested` });
+      continue;
+    }
+
+    byLevel[level].push(name);
+
+    // A division is an area; the layer stores points. Overture ships a
+    // representative point on the record, so it is used rather than
+    // derived — deriving a centroid would mean parsing geometry this
+    // file has no business parsing.
+    const point = record?.representativePoint ?? record?.geometry?.coordinates ?? null;
+    const lng = record?.lng ?? (Array.isArray(point) ? point[0] : null);
+    const lat = record?.lat ?? (Array.isArray(point) ? point[1] : null);
+    if (typeof lat !== 'number' || typeof lng !== 'number') {
+      // Kept in `byLevel` regardless — **the NAME is usable even when
+      // the point is not**, and the name is what a landmark pack needs.
+      skipped.push({ name, reason: 'no representative point; name still collected' });
+      continue;
+    }
+
+    const location = generateLocation(worldLayer, { name, lat, lng, tier: 'filler' });
+    setLocationData(worldLayer, location.id, 'geographyData', {
+      level,
+      subtype: record.subtype,
+      source: 'overture-divisions',
+      parent: record?.parentDivisionId ?? null,
+    });
+    imported.push(location);
+  }
+
+  return { imported, skipped, byLevel };
+}
+
+// ---------------------------------------------------------------------
+// Buildings — what land_size and floors are currently drawn at random
+// ---------------------------------------------------------------------
+// `vacon-c/server/worldgen.js` draws a landmark's `land_size` from
+// `random.range(600, 12000)` and its `floors` from the category's form
+// band. Both are honest guesses in the absence of data. Overture
+// Buildings carries the real footprint area, height and level count for
+// global building stock.
+//
+// **Filler tier, and that is the point.** §7 prices filler as "fully
+// automated" — houses, stores, offices, generic buildings — and filler
+// is the overwhelming bulk of a city by count. A source that describes
+// it completely is a source that keeps it out of the tiers that cost
+// money.
+
+//: Overture building classes → `properties.type` in the consuming
+//: engine's schema enumeration. Anything unmapped stays null rather
+//: than becoming `residential`, which would quietly make every
+//: unclassified building a house.
+const BUILDING_CLASS_MAP = {
+  residential: 'residential',
+  house: 'residential',
+  apartments: 'residential',
+  commercial: 'commercial',
+  retail: 'commercial',
+  office: 'commercial',
+  industrial: 'industrial',
+  warehouse: 'industrial',
+  civic: 'government',
+  government: 'government',
+  school: 'government',
+  hospital: 'government',
+  religious: 'historical_site',
+  agricultural: 'agricultural',
+  barn: 'agricultural',
+  farm: 'farm',
+};
+
+function propertyTypeFor(buildingClass) {
+  const key = typeof buildingClass === 'string' ? buildingClass.trim().toLowerCase() : null;
+  return key && BUILDING_CLASS_MAP[key] ? BUILDING_CLASS_MAP[key] : null;
+}
+
+// Import Overture Buildings as filler-tier locations carrying real
+// footprint data.
+//
+// **Height and levels are different measurements and both are kept.**
+// Overture gives `height` in metres and `numFloors` where a source
+// knew it; deriving one from the other needs an assumed storey height,
+// which is exactly the kind of invented constant this project keeps
+// finding. A building with a height and no floor count reports that.
+function importOvertureBuildings(worldLayer, buildingRecords) {
+  if (!Array.isArray(buildingRecords)) {
+    throw new Error('importOvertureBuildings requires an array of building records');
+  }
+
+  const imported = [];
+  const skipped = [];
+  for (const record of buildingRecords) {
+    const coords = record?.geometry?.coordinates ?? null;
+    const lng = record?.lng ?? (Array.isArray(coords) ? coords[0] : null);
+    const lat = record?.lat ?? (Array.isArray(coords) ? coords[1] : null);
+    if (typeof lat !== 'number' || typeof lng !== 'number') {
+      skipped.push({ record, reason: 'no usable coordinates' });
+      continue;
+    }
+
+    // **Most buildings have no name and that is not a defect.**
+    // `generateLocation` requires one, so an unnamed building gets a
+    // stable synthetic label rather than being dropped — the footprint
+    // is the value here, not the name.
+    const name = record?.names?.primary ?? record?.name
+      ?? `building ${lat.toFixed(5)},${lng.toFixed(5)}`;
+
+    const location = generateLocation(worldLayer, { name, lat, lng, tier: 'filler' });
+    setLocationData(worldLayer, location.id, 'buildingData', {
+      source: 'overture-buildings',
+      propertyType: propertyTypeFor(record?.class ?? record?.subtype),
+      overtureClass: record?.class ?? null,
+      // Real measurements, kept as they arrive. Null where the source
+      // does not say — never a plausible default, which would be
+      // indistinguishable from a measurement.
+      footprintArea: typeof record?.footprintArea === 'number' ? record.footprintArea : null,
+      heightMetres: typeof record?.height === 'number' ? record.height : null,
+      numFloors: typeof record?.numFloors === 'number' ? record.numFloors : null,
+      named: Boolean(record?.names?.primary ?? record?.name),
+    });
+    imported.push(location);
+  }
+  return { imported, skipped };
+}
+
 function fetchOverturePlaces() {
   throw new Error(
     'fetchOverturePlaces is not implemented: overturemaps.org is outside this environment\'s '
@@ -200,10 +396,38 @@ function fetchOverturePlaces() {
   );
 }
 
+function fetchOvertureDivisions() {
+  throw new Error(
+    'fetchOvertureDivisions is not implemented: overturemaps.org is outside this '
+    + 'environment\'s outbound proxy allowlist (403 CONNECT, checked directly 18 Sep 2026). '
+    + 'Use `overturemaps download --bbox=... -f geojson --type=division_area`, or a DuckDB '
+    + 'query against the public buckets, and pass the records to '
+    + 'importOvertureDivisions(worldLayer, divisionRecords).',
+  );
+}
+
+function fetchOvertureBuildings() {
+  throw new Error(
+    'fetchOvertureBuildings is not implemented: overturemaps.org is outside this '
+    + 'environment\'s outbound proxy allowlist (403 CONNECT, checked directly 18 Sep 2026). '
+    + 'Use `overturemaps download --bbox=... -f geojson --type=building` and pass the '
+    + 'records to importOvertureBuildings(worldLayer, buildingRecords). Note this theme is '
+    + 'large — a city is hundreds of thousands of footprints, so bound the bbox.',
+  );
+}
+
 module.exports = {
   CATEGORY_MAP,
   HERO_CATEGORY_MAP,
+  DIVISION_SUBTYPES,
+  BUILDING_CLASS_MAP,
   categoryFor,
+  divisionLevelFor,
+  propertyTypeFor,
   importOverturePlaces,
+  importOvertureDivisions,
+  importOvertureBuildings,
   fetchOverturePlaces,
+  fetchOvertureDivisions,
+  fetchOvertureBuildings,
 };

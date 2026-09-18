@@ -254,11 +254,22 @@ rather than seven — is exactly the kind of consolidation that is cheap
 to state and expensive to retrofit, and it was taken seriously.
 
 **On the data sources: one of six was integrated, and that is now
-sixteen registered and five wired — 18 Sep 2026.** `sources.js` holds
+sixteen registered and eight wired — 18 Sep 2026.** `sources.js` holds
 every dataset this project has identified, each with its licence, its
 access path, the slice of the world model it fills and the tier it
 serves. Importers exist for UNESCO, the National Register of Historic
-Places, Overture Places, Wikidata and Wikimedia Commons.
+Places, Overture Places, Overture Divisions, Overture Buildings,
+Wikidata, Wikimedia Commons and NOAA climate normals.
+
+NOAA is worth singling out because it closes a column the game engine
+names as unmodellable. `vacon-c/server/barter.js` lists three §27 price
+modifiers it cannot model and puts `regions.climate_key` first — "TEXT
+written by nothing" — and `migration.generateRegion` accepts a
+`climateKey`, has never been passed one, and says inventing a climate
+vocabulary "would be the mistake the weather table is still open for".
+It was right to refuse: the vocabulary used is Köppen-Geiger, the
+published standard, and the tests check the classifier against the
+literature's own answers rather than against itself.
 
 Two of the sixteen are not named in any document here. Census ACS and
 BLS were added from this project's OWN lost document titles —
@@ -282,7 +293,9 @@ behind it. It has one now, from the data side.**
 world model have a working importer behind them and which specific
 sources would close the rest. Measured today: **hero 100%** (2 of 2
 slices — UNESCO, NRHP, Wikidata and Commons all aim at exactly this
-tier), **regional 43%**, **filler 25%**.
+tier), **regional 57%**, **filler 75%**. The first measurement was
+100/43/25 with five sources wired; three more moved it, which is the
+report doing its job.
 
 That is not the same measurement as artist hours, and it is not
 presented as one. It reports SHARES and deliberately never money:

@@ -7,7 +7,7 @@ that down, and what specifically has to be built to collect the saving?
 **The short answer**: the largest single lever is not a discount, it is
 a **reclassification** — every location a free dataset can describe
 completely is a location that moves out of the tier that costs money.
-Sixteen sources are now registered in `sources.js`, five have importers,
+Sixteen sources are now registered in `sources.js`, eight have importers,
 and `costModel.automationCoverage()` reports what that covers. This
 document is the reasoning; the numbers come from a command.
 
@@ -65,8 +65,13 @@ percentage.** Measured today:
 | Tier | Slices its sources speak to | Automated | Share |
 |---|---|---|---|
 | hero | landmark, population | 2 | **100%** |
-| regional | landmark, business, geography, transportation, building, population, economic | 3 | **43%** |
-| filler | geography, building, transportation, business | 1 | **25%** |
+| regional | landmark, business, geography, transportation, building, population, economic | 4 | **57%** |
+| filler | geography, building, transportation, business | 3 | **75%** |
+
+*(Eight of sixteen sources wired. The first pass measured 100/43/25 with
+five; Overture Divisions, Overture Buildings and NOAA moved regional and
+filler. Run `costModel.automationCoverage()` rather than trusting this
+table — it is generated from the registry and this is a snapshot.)*
 
 Hero being fully covered is the finding rather than a coincidence:
 UNESCO, NRHP, Wikidata and Commons all aim at exactly that tier, and
@@ -105,6 +110,27 @@ CC0 — the cleanest licence of any source here. Commons is licensed
 **UNESCO** — the top of the significance hierarchy and Tier 1's defined
 scope. Already wired before this pass.
 
+**Overture Divisions** — real administrative boundaries, which is where
+neighbourhood NAMES come from. `vacon-c/server/landmarkPacks.js` matches
+an imported landmark to an area by name, so without this the only source
+of those names was somebody typing them.
+
+**Overture Buildings** — footprint area, height and class for global
+building stock. This is what `worldgen` currently draws from
+`random.range(600, 12000)`, and filler is the overwhelming bulk of a
+city by count — §7 prices it as "fully automated", so describing it
+completely is what keeps it there.
+
+**NOAA climate normals** — closes a column the engine itself names as
+unmodellable. `barter.js` lists three §27 price modifiers it cannot
+model and puts `regions.climate_key` first; `migration.generateRegion`
+accepts a `climateKey`, has never been passed one, and says inventing a
+climate vocabulary "would be the mistake the weather table is still open
+for". It was right, and the vocabulary is not invented here either: it
+is **Köppen-Geiger**, the published standard, validated in the tests
+against the literature's own answers for St. Louis (Cfa), Phoenix (BWh)
+and Singapore (Af).
+
 ### Identified, not yet wired — the cheapest work left
 
 Each of these is an importer against a known free source with a known
@@ -113,13 +139,10 @@ is the best-value engineering available in this project.
 
 | Source | Closes | Why it matters |
 |---|---|---|
-| Overture Divisions | regional + filler `geographyData` | Real neighbourhood names, which is what a landmark pack matches areas on |
-| Overture Buildings | filler `buildingData` | Footprint, height, class — what `properties.land_size`/`.floors` are currently drawn at random for |
 | Census ACS | regional `populationData`, `economicData` | Real demographics per tract instead of chosen bands |
 | BLS (OES/QCEW) | regional `economicData` | Real employment and wages per occupation per metro — what `occupations.js` draws from a 1/tier pyramid |
 | Natural Earth | regional `geographyData` | Public domain, no conditions, the top of the boundary hierarchy |
 | USGS 3DEP | `geographyData` | Real elevation for the U.S. prototype region |
-| NOAA | `geographyData` | **Closes a named gap**: `regions.climate_key` is TEXT written by nothing, and `barter.js` names it in its own header as one of three modifiers it cannot model |
 
 ### Use last, or not at all
 
@@ -175,8 +198,11 @@ What is now true and was not before:
 2. **Sixteen sources are registered** with licence, access path, the
    slice each fills and the tier each serves — so nothing is
    named-but-unusable, which was the state of ten of them.
-3. **Five have importers.** The other eleven are a known, small amount
-   of work with a named payoff each.
+3. **Eight have importers.** The other eight are a known, small amount
+   of work with a named payoff each — and three of the first eight were
+   wired in the pass after this document was written, moving regional
+   from 43% to 57% and filler from 25% to 75%, which is what "eleven
+   importers, not a negotiation" looks like when somebody does three.
 4. **Coverage is measured per tier by a command**, closing the
    architecture document's own admission that the 90%/10% automation
    target "is an aspiration with no measurement behind it".
@@ -185,7 +211,7 @@ What is now true and was not before:
    unverified until somebody re-checks them, per the standing
    instruction that dataset terms change quietly.
 
-The next real saving is not a negotiation. It is eleven importers.
+The next real saving is not a negotiation. It is the remaining eight importers.
 
 ---
 
