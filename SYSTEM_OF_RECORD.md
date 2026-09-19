@@ -980,7 +980,7 @@ trusted:
 
 The simulation engine is the one app in this repo whose "done" is not a
 list of routes, so it carries a measured completeness score rather than
-a criteria tally. **91.3%**, from
+a criteria tally. **91.2%**, from
 `vacon-c/dev-docs/GAME_COMPLETENESS.md`, which
 `vacon-c/scripts/completeness.mjs` regenerates and
 `vacon-c/test/completeness.test.js` fails on if stale — including a
@@ -989,11 +989,30 @@ check that the percent in THIS file matches the one the code measures.
 | axis | complete | what it measures |
 |---|---|---|
 | systems | 71.1% | the forty urban systems §7 names, at `urbanSystems.js`'s own four levels |
-| tables | 90.9% | schema tables a built world actually fills |
+| tables | 90.2% | schema tables a built world actually fills |
 | statistics | 89.7% | statistics a world can answer about itself |
 | traits | 100% | traits something under `server/` reads |
 | traitDepth | 85.7% | trait columns a life actually changes |
 | habits | 100% | whether habits and routines carry information |
+
+**91.3% -> 91.2% on 19 Sep 2026, and the half-point is worth naming
+rather than nudging.** `migration_events` went from filled to empty in
+the 200-tick world the script measures, because the crime rescale of
+the same day changed what a neighbourhood reads as.
+
+`runMigration` takes its push pressure from
+`crime.dangerByCommunity`, which was returning **1.0 in 18 of 24
+measured areas** — the raw per-area rate against a reference of 40 that
+every populated area was two to four times over. So push was maximal
+almost everywhere and people fled constantly. Against the shrunk rate
+and a measured reference it now returns about 0.25, and they do not.
+
+**Migration is not broken and the mechanism was checked rather than
+assumed**: a 600-tick playtest produces 21 migration events. What
+changed is that 200 ticks is no longer long enough to guarantee one.
+The honest reading is that migration was over-triggered before, and
+this is a recalibration the fix earned rather than a loss — but the
+score is the score, so it is recorded down rather than explained away.
 
 Weighted by item count, deliberately: no document in the package says
 which half of a game matters more, so inventing a weighting would put a
