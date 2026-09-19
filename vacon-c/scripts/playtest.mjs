@@ -125,8 +125,16 @@ console.log('\n=== is there anything to find, and did anybody find it? ===');
   const d = discovery.describeDiscovery(w);
   console.log('finds: held', d.findsHeld, '| remaining', d.findsRemaining,
     '| taken', d.findsHeld - d.findsRemaining);
-  console.log('discovery guard — worthless/unreachable/unmakeable:',
-    d.poolless.length, '/', d.emptyCategories.length, '/', d.unreachableFields.length);
+  // **The labels have to name what is actually printed.** This read
+  // "worthless/unreachable/unmakeable" — salvage's three, copied onto
+  // discovery's three, which are different things. `poolless` is
+  // documented in discovery.js as expected and not a defect, so the
+  // mislabelled 7 read as seven broken items and sent somebody looking
+  // for a bug that was a category with no pool, on purpose.
+  console.log('discovery guard — poolless/emptyCategories/unreachableFields:',
+    d.poolless.length, '/', d.emptyCategories.length, '/', d.unreachableFields.length,
+    `(poolless is expected: ${d.poolless.length} of ${d.categories} Key categories have no `
+    + 'pool in the documents. The other two are the real guards.)');
   console.log('artifacts:', (w.artifacts || []).length,
     '| with a location:', (w.artifacts || []).filter((a) => a.location_id != null).length);
 }

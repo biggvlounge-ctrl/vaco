@@ -850,6 +850,51 @@ incident is DISPOSED OF, as a case or as a sanction, and never left in
 limbo. That is the claim worth holding, and it is the one that does not
 depend on which way a seeded world happened to fall.
 
+**A twenty-fifth, and it is the only one of these found in my own
+reasoning rather than in the code. A measurement is not its
+consequence.**
+
+`dev-docs/PLAYTEST_19_SEP_2026.md` recorded a real, correctly measured
+fact — median net worth rises tenfold over 600 ticks, monotonically, at
+every sample — and then drew a conclusion from it in the next sentence:
+that this "makes poverty-driven mechanics — `crime.deprivation`,
+`distress_sale`, the migration pressure — progressively unreachable."
+
+**The measurement was right and the conclusion was wrong**, and one
+look at the consumer would have said so. `areaStats.povertyLine` is
+RELATIVE:
+
+    const mid = median(worths);
+    return mid === null ? null : mid * POVERTY_MEDIAN_FRACTION;
+
+Half the median. If every wage-earner's savings inflate tenfold, the
+line inflates tenfold with them and the SHARE below it barely moves;
+`isBelowPovertyLine` is relative on both sides. Deprivation does not
+become unreachable. The nominal figures just get bigger.
+
+This is "citation is not presence" turned on an inference instead of a
+document. The whole file is about not trusting that a thing named
+somewhere is present — and the same discipline applies one step
+further along: **do not trust that a number moving somewhere means
+anything downstream until you have read what reads it.** A measured
+fact plus a plausible mechanism is still a guess, and it is a
+particularly convincing one because half of it is true.
+
+The tell is grammatical. "X rises, SO Y becomes unreachable" is a claim
+about Y, and Y has a file. Open it.
+
+What the correction produced was a better finding than the original,
+which is the usual outcome: `economy.getNetWorth` is `assets + savings
+- debt` and does not include the property somebody owns, while
+`property.currentValue` computes value from condition and `players.js`
+already rolls it up beside `netWorth` in the same dashboard. Eleven
+call sites read `getNetWorth`, including the poverty line itself and
+both of `crime.js`'s deprivation checks — so **a person who owns three
+buildings and no cash reads as destitute**, and the largest asset class
+in the world is invisible to every wealth-dependent mechanic. The third
+standing rule's shape, and it was sitting underneath a claim that
+sounded finished.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and
