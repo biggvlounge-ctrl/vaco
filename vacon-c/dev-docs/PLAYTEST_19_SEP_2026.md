@@ -74,6 +74,42 @@ cannot find a bug in** — the eleventh rule pointed at the diagnostic
 itself. It now prints landmarks per area, what has been found and made,
 both guards, and the new event types.
 
+### Two tests that were asserting the opposite of what they said
+
+The suite came out of this session at 1,158 pass / 2 fail. Both
+failures were fixtures rather than engine bugs, and one of them was
+covering a real defect.
+
+**`authority`: "a lived-in, owned home holds; an empty one rots".** The
+fixture listed `occupants: [1, 2]` in a world with no `npcs` array at
+all. `upkeepFor` reads `occupants.length` for the base and then scales
+it by `control.upkeepOf`, which resolves those ids against
+`worldState.npcs` — so a fully occupied house measured as staffed by
+nobody, ratio 0, upkeep 0. Failing since `03bbc7e`, three commits back,
+and not from this session's work.
+
+Giving the fixture real people exposed what it had been hiding, which
+is the twenty-third standing rule and finding 1 below: the one-decimal
+rounding on `condition` was a coarser quantum than the 0.05 a tick it
+was rounding, so a maintained house sat at exactly 80.1 for two hundred
+ticks. The assertion was `condition > 80`, which 80.1 satisfies — **an
+assertion on the DIRECTION passes for a mechanism that has stopped.** It
+asserts the RATE now.
+
+**`justice`: "a generated world reaches it, and reaching it is RARE".**
+It asserted that every cleared incident with a named perpetrator becomes
+a court case. `runJustice` charges where the state's writ reaches and
+files a `groupSanctions` row where it does not, which is the entire
+point of `authority.prosecutes` — so the assertion silently asserted
+that no area in the world is contested, and passed only while the seed
+happened not to produce one. It did: incident 2, community 2, regime
+`contested`. A working decline was reported as a broken cascade. It now
+asserts every cleared incident is DISPOSED OF, as a case or a sanction,
+and never both. That is the twenty-fourth standing rule.
+
+**After both: 1,178 tests, 1,161 pass, 0 fail, 17 skipped.** world-layer
+106 of 106.
+
 ---
 
 ## Found and NOT fixed — these are open, and deliberately so
@@ -82,23 +118,61 @@ Each of these is real, reproducible, and larger than a constant. They
 are written down rather than patched, because three of the four are
 arguably design decisions somebody should make on purpose.
 
-### 1. 85% of all buildings are ruins by tick 600
+### 1. 81% of all buildings are ruins by tick 600
 
-`properties at condition 0: 176 of 206.`
+`properties at condition 0: 166 of 206.`
 
-Property decays 0.4 a tick and `upkeepFor` only offsets it for a
-building somebody is actively keeping. Over 600 days that is 240 points
-against a starting condition drawn 20–90, so everything unmaintained
-reaches zero and stays there. Measured earlier with salvage disabled:
-96 of 196 at 200 ticks **without** any stripping, so this is the
-pre-existing decay and not the new system — `stripProperty` added five
-buildings out of 196 over 200 ticks.
+**This was 176 of 206, and the ten that moved are worth more than the
+number.** Chasing the first of the two test failures above led into
+`advancePropertyLifecycle`'s rounding, which was quantising a +0.05 a
+tick recovery at 0.1 — so a maintained building sat frozen instead of
+improving, and the 176 was measured with the inverse switched off by a
+tidiness measure. The rounding is two decimals now and buildings really
+do recover. It moved 85% to 81%.
 
-It is the thirteenth rule's shape at the scale of a city: a mechanism
-whose inverse only applies to a minority. A world older than about two
-years is a ruin field with a few kept buildings in it. That may be
-exactly right for a collapse setting — but it should be a decision,
-and right now it is an emergent consequence of one constant.
+Which means the finding survives its own fix, and the broken-down
+measurement says why. Same world, 600 ticks, split by whether anybody
+lives there and whether anybody owns it:
+
+| | n | at 0 | median | max |
+|---|---|---|---|---|
+| lived in + owned | 46 | 19 | 4.95 | 100 |
+| lived in only | 66 | 56 | 0 | 36 |
+| owned only | 16 | 13 | 0 | 39.45 |
+| **neither** | **78** | **78** | **0** | **0** |
+
+Three separate things, and only the first is a constant anybody should
+consider retuning:
+
+- **The inverse is about eight times weaker than the decay it
+  opposes.** Gross decay is 0.4 a tick; the best case, a lived-in owned
+  home, nets +0.05. A building that reaches zero needs **2,000 ticks —
+  five and a half years — to climb back to 100**, which is why the
+  lived-in-and-owned column has a median of 4.95: those are buildings
+  that fell early and are now crawling back at the only rate available.
+  A fall takes 250 ticks and a recovery takes 2,000.
+- **Understaffing is doing what it was built to do.** `upkeepFor`
+  scales by `control.upkeepOf(...).ratio`, so a landmark needing a crew
+  of sixty with four people in it decays at nearly the full rate. That
+  is deliberate and documented; it is not part of this finding.
+- **78 of 206 buildings have nobody in them and no owner at all** —
+  38% of the stock in a 148-person world. Those cannot be anything but
+  ruins under any constant, because both halves of the inverse are
+  absent. This is a worldgen question rather than a decay question:
+  the generator builds more buildings than the population it generates
+  can occupy or own.
+
+The earlier salvage control still holds — 96 of 196 at 200 ticks with
+stripping disabled, and `stripProperty` accounted for five buildings
+out of 196 over 200 ticks — so none of this is the new system.
+
+It remains the thirteenth rule's shape at the scale of a city, with the
+diagnosis sharpened: the inverse EXISTS, it is not missing, it is
+outmatched, and a third of the stock is outside its reach entirely. A
+world older than about two years is a ruin field with a few kept
+buildings in it. That may be exactly right for a collapse setting — but
+it should be a decision, and the three causes above are three different
+decisions, not one.
 
 ### 2. No mission is ever completed
 
