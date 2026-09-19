@@ -97,3 +97,64 @@ console.log('resources at zero supply:', (w.resources||[]).filter(r=>Number(r.su
 console.log('properties at condition 0:', (w.properties||[]).filter(p=>Number(p.condition)<=0).length, 'of', (w.properties||[]).length);
 console.log('infrastructure failed now:', (w.infrastructure||[]).filter(r=>r.failed_since_tick!==null).length, 'of', (w.infrastructure||[]).length);
 console.log('relationships above conflict 30:', (w.relationships||[]).filter(r=>Number(r.conflict)>30).length, 'of', (w.relationships||[]).length);
+
+// ---------------------------------------------------------------------
+// Added 19 Sep 2026, after a session that put four new systems into the
+// world. Everything above was blind to all of them — which is the
+// eleventh rule's shape pointed at the playtest itself: a system the
+// playtest cannot see is a system the playtest cannot find a bug in.
+// ---------------------------------------------------------------------
+const salvage = require('../server/salvage.js');
+const discovery = require('../server/discovery.js');
+const merchandise = require('../server/merchandise.js');
+const landmarks = require('../server/landmarks.js');
+
+console.log('\n=== is there anything to find, and did anybody find it? ===');
+{
+  const marks = (w.properties || []).filter((p) => p.landmark_category);
+  const named = marks.filter((p) => p.name);
+  console.log('landmarks:', marks.length, '| named:', named.length,
+    '| categories present:', new Set(marks.map((p) => p.landmark_category)).size,
+    'of', landmarks.ALL_CATEGORIES.length);
+  const areas = {};
+  for (const m of marks) areas[m.community_id] = (areas[m.community_id] || 0) + 1;
+  console.log('landmarks per area:', JSON.stringify(areas));
+  console.log('areas with none:',
+    (w.communities || []).filter((c) => !areas[c.id]).length, 'of', (w.communities || []).length);
+
+  const d = discovery.describeDiscovery(w);
+  console.log('finds: held', d.findsHeld, '| remaining', d.findsRemaining,
+    '| taken', d.findsHeld - d.findsRemaining);
+  console.log('discovery guard — worthless/unreachable/unmakeable:',
+    d.poolless.length, '/', d.emptyCategories.length, '/', d.unreachableFields.length);
+  console.log('artifacts:', (w.artifacts || []).length,
+    '| with a location:', (w.artifacts || []).filter((a) => a.location_id != null).length);
+}
+
+console.log('\n=== does anything get made, and out of what? ===');
+{
+  const held = {};
+  for (const h of w.inventory || []) held[h.item_name] = (held[h.item_name] || 0) + Number(h.quantity);
+  const materials = salvage.MATERIAL_NAMES.filter((m) => held[m]);
+  const products = salvage.PRODUCT_NAMES.filter((p) => held[p]);
+  console.log('materials in circulation:', materials.length, 'of', salvage.MATERIAL_NAMES.length,
+    '| units:', materials.reduce((a, m) => a + held[m], 0));
+  console.log('products made:', products.length, 'of', salvage.PRODUCT_NAMES.length,
+    '| units:', products.reduce((a, p) => a + held[p], 0));
+  const s = salvage.describeSalvage(w);
+  console.log('salvage guard — worthless/unreachable/unused/unmakeable:',
+    s.worthless.length, '/', s.unreachableMaterials.length, '/',
+    s.unusedMaterials.length, '/', s.unmakeableProducts.length);
+  const m = merchandise.describeMerchandise(w);
+  console.log('stocked locations:', m.stockedLocations, '| already taken:', m.alreadyTaken,
+    '| empty categories:', m.emptyCategories.length);
+}
+
+console.log('\n=== the new event types, which the log above lumps in ===');
+{
+  const wanted = ['thing_made', 'discovery_made', 'takeover_succeeded', 'takeover_failed',
+    'meeting_held', 'family_discord', 'partnership_formed', 'feud_opened'];
+  const counts = {};
+  for (const e of w.events || []) if (wanted.includes(e.type)) counts[e.type] = (counts[e.type] || 0) + 1;
+  for (const type of wanted) console.log(' ', type.padEnd(20), counts[type] || 0);
+}

@@ -598,3 +598,68 @@ test('every table the extension file creates is on the allowlist with a real rea
       `EXTENSION_TABLES names "${table}", which schema-extensions.sql does not create`);
   }
 });
+
+// ---------------------------------------------------------------------
+// A column the extension file adds and the migration never writes
+// ---------------------------------------------------------------------
+// **This test exists because a column slipped through, and the way it
+// slipped is the interesting part.**
+//
+// `communities.name` was added to `schema-extensions.sql` on 19 Sep
+// 2026, written by `territory.generateCommunity`, read by
+// `landmarkPacks.byArea` to match an imported landmark to the
+// neighbourhood it is really in — and **never added to the
+// `INSERT INTO communities` column list.** Nothing failed. The
+// migration succeeded, the restore succeeded, and a restored world
+// came back with every neighbourhood anonymous, so a pack that placed
+// the Gateway Arch in Downtown before a restart placed it at random
+// after one. It would have looked like the pack had simply not been
+// used.
+//
+// That is the tenth standing rule's neighbourhood: not a type
+// conversion, but the same silence. The checks above verify the schema
+// is well formed and that the migration's table coverage is complete;
+// none of them looked at whether a COLUMN the engine relies on actually
+// travels.
+//
+// The check is deliberately shallow — it asks whether the column name
+// appears in that table's INSERT column list, not whether the right
+// value is bound to it. A shallow check that runs is worth more than a
+// deep one that needs a live database, and `restore.test.js` covers the
+// round trip where one is reachable.
+test('every column schema-extensions.sql adds is written by the migration', () => {
+  const extensionSql = fs.readFileSync(
+    path.join(__dirname, '..', 'server', 'schema-extensions.sql'), 'utf8',
+  );
+  const migrateSource = fs.readFileSync(
+    path.join(__dirname, '..', 'server', 'migrate.js'), 'utf8',
+  );
+
+  // Every `INSERT INTO <table> (...)` column list in the migration.
+  const inserts = new Map();
+  const insertPattern = /INSERT INTO (\w+)\s*\(([^)]*)\)/g;
+  let insert = insertPattern.exec(migrateSource);
+  while (insert !== null) {
+    const columns = insert[2].split(',').map((c) => c.trim()).filter(Boolean);
+    const existing = inserts.get(insert[1]) ?? new Set();
+    for (const column of columns) existing.add(column);
+    inserts.set(insert[1], existing);
+    insert = insertPattern.exec(migrateSource);
+  }
+
+  const missing = [];
+  const columnPattern = /ALTER TABLE (\w+) ADD COLUMN IF NOT EXISTS (\w+)/g;
+  let added = columnPattern.exec(extensionSql);
+  while (added !== null) {
+    const [, table, column] = added;
+    const written = inserts.get(table);
+    if (!written || !written.has(column)) missing.push(`${table}.${column}`);
+    added = columnPattern.exec(extensionSql);
+  }
+
+  assert.deepEqual(
+    missing, [],
+    'these columns are added to the schema and never written by the migration, so a '
+    + 'restored world silently loses them',
+  );
+});

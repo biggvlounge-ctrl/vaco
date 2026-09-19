@@ -340,11 +340,19 @@ async function migrateWorldStateToPostgres(worldState) {
         await client.query(
           `INSERT INTO communities (id, city_id, population, tier, housing, crime, safety,
                                     employment, education, culture, reputation, leadership_npc_id,
-                                    geo_ref, geo_source, latitude, longitude)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+                                    geo_ref, geo_source, latitude, longitude, name)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
           [c.id, c.city_id, c.population, c.tier, c.housing, c.crime, c.safety,
             c.employment, c.education, c.culture, c.reputation, c.leadership_npc_id,
-            c.geo_ref ?? null, c.geo_source ?? null, c.latitude ?? null, c.longitude ?? null]
+            c.geo_ref ?? null, c.geo_source ?? null, c.latitude ?? null, c.longitude ?? null,
+            // From schema-extensions.sql. **A neighbourhood's name is
+            // load-bearing, not decoration**: `landmarkPacks.byArea`
+            // matches an imported landmark to a community by name, so
+            // a restored world that lost these would place every real
+            // landmark at random and look like it had simply generated
+            // one. NULL for a generated block, which is honest — only a
+            // pack supplies these.
+            c.name ?? null]
         );
       }
       summary.communities = worldState.communities.length;
