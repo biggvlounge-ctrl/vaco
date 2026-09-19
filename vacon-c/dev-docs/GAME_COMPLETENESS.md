@@ -13,16 +13,16 @@ three places, a spec section's "roughly 25 of the 40", a catalogue of 67
 statistics that a real world answered 36 of, and seven trait families generated
 on every NPC and read by nothing.
 
-## 91.3% complete
+## 91.2% complete
 
 ```
-██████████████████░░  91.3%   321.45 of 352
+██████████████████░░  91.2%   320.95 of 352
 ```
 
 | axis | complete | score | what it measures |
 |---|---|---|---|
 | systems | **71.1%** | 28.45/40 | urban systems with mechanics |
-| tables | **90.9%** | 60/66 | schema tables a built world fills |
+| tables | **90.2%** | 59.5/66 | schema tables a built world fills |
 | statistics | **89.7%** | 105/117 | statistics a world can answer |
 | traits | **100%** | 114/114 | traits something reads |
 | traitDepth | **85.7%** | 6/7 | trait columns a life actually changes |
@@ -68,7 +68,7 @@ The forty systems §7 names, at `server/urbanSystems.js`'s own four levels (mode
 | `36. Tourism` | partial | +0.5 |
 | `39. Reputation` | partial | +0.5 |
 
-### tables — 7 open
+### tables — 8 open
 
 Every `CREATE TABLE` in the schema and its extensions. A table a built world fills scores 1; one the engine writes but no world has ever used scores 0.5; one with no store at all scores 0.
 
@@ -77,6 +77,7 @@ Every `CREATE TABLE` in the schema and its extensions. A table a built world fil
 | `revolutions` | written, but unreached — assessRevolutions runs every tick; no generated world has fallen below approval 35 with 25% of the population informed | +0.5 |
 | `investments` | no store | +1 |
 | `trade_routes` | no store | +1 |
+| `migration_events` | empty in a built world | +0.5 |
 | `economy_snapshots` | no store | +1 |
 | `analytics_snapshots` | no store | +1 |
 | `vault_studios_links` | no store | +1 |

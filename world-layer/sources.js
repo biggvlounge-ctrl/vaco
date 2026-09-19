@@ -735,10 +735,73 @@ function realisedCoverage(worldLayer) {
   };
 }
 
+// ---------------------------------------------------------------------
+// licenceReviewOrder — the unbudgeted legal line, sequenced
+// ---------------------------------------------------------------------
+// **All twenty-four entries carry `licenceCheckedAt: null`**, and
+// `dev-docs/STANDING_INSTRUCTION_ONGOING_EVALUATION.md` says dataset
+// terms change quietly and must be re-checked at build time. Nobody has
+// costed that review, and it is the one line in the data budget that is
+// somebody's hourly rate rather than free.
+//
+// It does not have to be paid all at once. A source is **load-bearing**
+// if removing it leaves some field in `SLICE_FIELDS` with no wired
+// source at all; otherwise another wired source already covers
+// everything it does, and its review can wait.
+//
+// **Redundant does not mean worthless, and reading it that way would be
+// an expensive mistake.** UNESCO is redundant by this measure because
+// NRHP, GNIS and Wikidata also supply landmark names — but UNESCO IS
+// §7's definition of Tier 1 scope, and NRHP carries the published
+// significance grading that decides which locations cost money. Both
+// are cheap to keep and the coverage matrix cannot see why they matter.
+// This function sequences REVIEW; it does not recommend deletion.
+//
+// The exception worth acting on is a source that is both redundant and
+// encumbered: it carries conditions somebody has to clear, and nothing
+// depends on it.
+function licenceReviewOrder() {
+  const wired = SOURCE_NAMES.filter((key) => SOURCES[key].wired !== null);
+
+  const leavesAGap = (excluded) => {
+    for (const fields of Object.values(SLICE_FIELDS)) {
+      for (const field of fields) {
+        const live = field.source.filter(
+          (key) => key !== excluded && SOURCES[key] && SOURCES[key].wired !== null,
+        );
+        if (live.length === 0) return true;
+      }
+    }
+    return false;
+  };
+
+  const loadBearing = [];
+  const deferrable = [];
+  for (const key of wired) (leavesAGap(key) ? loadBearing : deferrable).push(key);
+
+  const { encumbered } = describeSources();
+  return {
+    // Review these first: a licence problem here is a coverage gap.
+    loadBearing,
+    // These can wait. Keeping them is still usually right — see above.
+    deferrable,
+    // **Both encumbered and load-bearing**: a licence problem here
+    // blocks a field with no alternative, so it is a decision rather
+    // than a review. Today that is the Religion Census, the only
+    // source for `npcs.religion`.
+    blockingLicenceRisk: loadBearing.filter((key) => encumbered.includes(key)),
+    // **Encumbered and depended on by nothing**: conditions to clear
+    // for no coverage. The cheapest thing in the registry to drop.
+    droppable: deferrable.filter((key) => encumbered.includes(key)),
+    unreviewed: wired.filter((key) => SOURCES[key].licenceCheckedAt === null).length,
+  };
+}
+
 module.exports = {
   WORLD_SLICES,
   SLICE_FIELDS,
   realisedCoverage,
+  licenceReviewOrder,
   UNCOVERED_BY_DESIGN,
   SOURCES,
   SOURCE_NAMES,

@@ -928,3 +928,69 @@ test('automationCoverage carries the depth report, not only the tier shares', ()
   assert.equal(typeof sources.realisedCoverage, 'function',
     'the only figure that measures data rather than code is missing');
 });
+
+// -- the licence review, sequenced ---------------------------------------
+
+test('licence review is sequenced by what a licence problem would break', () => {
+  // All twenty-four entries carry licenceCheckedAt: null and nobody has
+  // costed the review. It does not have to be paid at once: a source
+  // whose fields another wired source also covers can wait.
+  const order = sources.licenceReviewOrder();
+  assert.ok(order.loadBearing.length > 0);
+  assert.ok(order.deferrable.length > 0);
+  // Every wired source is in exactly one bucket.
+  const wired = sources.wiredSources();
+  assert.equal(order.loadBearing.length + order.deferrable.length, wired.length);
+  for (const key of [...order.loadBearing, ...order.deferrable]) {
+    assert.ok(wired.includes(key), `${key} is sequenced but not wired`);
+  }
+});
+
+test('a load-bearing source really is the last one covering something', () => {
+  // The mechanical claim, checked rather than asserted: unwire a
+  // load-bearing source and field depth must fall; unwire a deferrable
+  // one and it must not.
+  const order = sources.licenceReviewOrder();
+  const before = sources.fieldDepth().filled;
+
+  const bearing = order.loadBearing[0];
+  const originalBearing = sources.SOURCES[bearing].wired;
+  try {
+    sources.SOURCES[bearing].wired = null;
+    assert.ok(sources.fieldDepth().filled < before,
+      `${bearing} is listed as load-bearing but removing it costs no coverage`);
+  } finally {
+    sources.SOURCES[bearing].wired = originalBearing;
+  }
+
+  const spare = order.deferrable[0];
+  const originalSpare = sources.SOURCES[spare].wired;
+  try {
+    sources.SOURCES[spare].wired = null;
+    assert.equal(sources.fieldDepth().filled, before,
+      `${spare} is listed as deferrable but removing it lost coverage`);
+  } finally {
+    sources.SOURCES[spare].wired = originalSpare;
+  }
+});
+
+test('an encumbered source nothing depends on is called out as droppable', () => {
+  // OpenWeather is the only per-call cost in the registry and NOAA
+  // covers the prototype region free. Conditions to clear, for no
+  // coverage.
+  const order = sources.licenceReviewOrder();
+  assert.ok(order.droppable.includes('openweather'),
+    'the only paid source is no longer flagged as droppable — check whether something '
+    + 'started depending on it');
+});
+
+test('an encumbered source something DOES depend on is a decision, not a review', () => {
+  // The Religion Census is the only source for npcs.religion, and it
+  // is the one licence-encumbered entry in the registry. Either its
+  // terms get cleared or the field has no source at all.
+  const order = sources.licenceReviewOrder();
+  assert.ok(order.blockingLicenceRisk.includes('religionCensus'));
+  const religionField = sources.SLICE_FIELDS.populationData.find((f) => f.field === 'religion');
+  assert.deepEqual(religionField.source, ['religionCensus'],
+    'religion has gained an alternative source — the licence decision may no longer block it');
+});
