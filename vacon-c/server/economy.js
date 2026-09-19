@@ -321,10 +321,70 @@ function getLatestFinances(worldState, entityId) {
 // columns on individual_finances; income is a flow, excluded). Same
 // formula engine.js#getFamilyWealth() used inline before this module
 // existed — centralized here now.
+// **What somebody is worth, and for a long time it left out the
+// buildings they own.**
+//
+// This was `assets + savings - debt` off `individual_finances` alone.
+// `property.currentValue` computes a building's worth from its
+// condition, `property.getHoldings` rolls that up per owner, and
+// `players.js` prints it as `propertySummary.totalValue` in the same
+// dashboard, directly beside this number — and this number did not read
+// it. The third standing rule's shape: a computed rollup exists, is
+// correct, and the function that most needs it does not call it.
+//
+// **Eleven call sites read this**, including `areaStats.povertyLine`
+// (which IS the median of this), both of `crime.js`'s deprivation
+// checks, `births.povertyDepth`, `trade.js`, `motivation.js`,
+// `statistics.median_net_worth` and `engine.getFamilyWealth`. So a
+// person who owned three buildings and no cash read as destitute
+// everywhere in the engine at once.
+//
+// Measured on a 600-tick world before changing it, because adding to
+// this moves the poverty line and the line moves crime, births and
+// trade together (twelfth rule, first clause):
+//
+//   poor 53 -> 55 of 148 living, and only 6 people (4%) change status
+//   the poverty RATE moves at most 1 point at any sample
+//   23 of 58 property owners were classified destitute; the worst held
+//     41,275 in buildings against 5,894 in cash
+//
+// So the aggregate barely moves and the individual misclassification
+// was severe where it landed. It also halves a spurious trend: median
+// net worth rose 10x over 600 ticks reading savings alone and 5.3x
+// reading both, because **property decay is the sink the economy
+// looked like it was missing** — 56% of all property value in the world
+// is destroyed over 600 ticks (1,282,716 -> 561,879) and nothing that
+// reads wealth could see it.
+//
+// **Only `individual` ownership counts.** `ownership_records.owner_type`
+// also has family, organization, government and community; attributing
+// family-held property to each member would multiply one building
+// across everybody in the household, and `getFamilyWealth` sums member
+// net worths, so it would compound there too.
 function getNetWorth(worldState, entityId) {
   const finances = getLatestFinances(worldState, entityId);
-  if (!finances) return 0;
-  return (finances.assets || 0) + (finances.savings || 0) - (finances.debt || 0);
+  const liquid = finances
+    ? (finances.assets || 0) + (finances.savings || 0) - (finances.debt || 0)
+    : 0;
+  return liquid + ownedPropertyValue(worldState, entityId);
+}
+
+// The current value of the property this entity holds in its own name.
+//
+// Lazily required: `property.js` does not depend on this module today,
+// and a top-level require would make that a promise rather than a fact.
+function ownedPropertyValue(worldState, entityId) {
+  // eslint-disable-next-line global-require
+  const property = require('./property.js');
+  let total = 0;
+  for (const row of worldState.properties || []) {
+    const owner = property.getCurrentOwner(worldState, row.id);
+    if (!owner) continue;
+    if (owner.owner_type !== 'individual') continue;
+    if (owner.owner_entity_id !== entityId) continue;
+    total += property.currentValue(row);
+  }
+  return total;
 }
 
 
@@ -871,6 +931,7 @@ module.exports = {
   generateIndividualFinances,
   getLatestFinances,
   getNetWorth,
+  ownedPropertyValue,
   EMPLOYMENT_STATUSES,
   hireEntity,
   endEmployment,

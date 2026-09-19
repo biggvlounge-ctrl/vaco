@@ -319,3 +319,102 @@ test('refreshDemand reports only what moved', () => {
   w.npcs.push({ id: 8001, status: 'active', communityId: 1 });
   assert.equal(economy.refreshDemand(w).length, 1);
 });
+
+// -- net worth includes what you own -------------------------------------
+
+const property = require('../server/property.js');
+
+function wealthWorld() {
+  return {
+    tick: 0, nextEntityId: 1, entities: [],
+    npcs: [], properties: [], ownershipRecords: [], individualFinances: [],
+  };
+}
+
+test('somebody who owns a building is not destitute', () => {
+  // **Measured before this changed anything.** 23 of 58 property owners
+  // in a 600-tick world were classified below the poverty line; the
+  // worst held 41,275 in buildings against 5,894 in cash. The poverty
+  // line is the median of this function, so the misclassification
+  // reached crime.deprivation, births, trade and the statistics at once.
+  const w = wealthWorld();
+  const home = property.generateProperty(w, {
+    type: 'residential', value: 40000, lifecycleStage: 'operation',
+  });
+  home.condition = 100;
+  property.recordOwnership(w, {
+    entityId: home.id, ownerEntityId: 7, ownerType: 'individual', tick: 0,
+  });
+
+  assert.equal(economy.getNetWorth(w, 7), 40000,
+    'a person with no cash and a 40,000 building read as worth nothing');
+  assert.equal(economy.ownedPropertyValue(w, 7), 40000);
+});
+
+test('a decaying building takes its owner down with it', () => {
+  // This is the half that matters for the economy: property decay
+  // destroys 56% of all property value over 600 ticks, and before this
+  // nothing that reads wealth could see any of it. Net worth rose
+  // monotonically because it was reading one side of a two-sided
+  // ledger.
+  const w = wealthWorld();
+  const home = property.generateProperty(w, {
+    type: 'residential', value: 40000, lifecycleStage: 'operation',
+  });
+  home.condition = 100;
+  property.recordOwnership(w, {
+    entityId: home.id, ownerEntityId: 7, ownerType: 'individual', tick: 0,
+  });
+  const before = economy.getNetWorth(w, 7);
+
+  home.condition = 25;
+  const after = economy.getNetWorth(w, 7);
+  assert.ok(after < before, 'a building rotting to a quarter of its condition cost its owner nothing');
+  assert.equal(after, 10000, 'value should track condition straight-line');
+});
+
+test('family-held property is not counted into each member', () => {
+  // `ownership_records.owner_type` has family, organization, government
+  // and community beside individual. Attributing a family's house to
+  // every member would multiply one building across the household —
+  // and `getFamilyWealth` sums member net worths, so it would compound
+  // a second time there.
+  const w = wealthWorld();
+  const home = property.generateProperty(w, {
+    type: 'residential', value: 40000, lifecycleStage: 'operation',
+  });
+  home.condition = 100;
+  property.recordOwnership(w, {
+    entityId: home.id, ownerEntityId: 3, ownerType: 'family', tick: 0,
+  });
+  assert.equal(economy.getNetWorth(w, 3), 0,
+    'family-held property was attributed to an individual');
+});
+
+test('cash and property add rather than one replacing the other', () => {
+  const w = wealthWorld();
+  const home = property.generateProperty(w, {
+    type: 'residential', value: 10000, lifecycleStage: 'operation',
+  });
+  home.condition = 100;
+  property.recordOwnership(w, {
+    entityId: home.id, ownerEntityId: 7, ownerType: 'individual', tick: 0,
+  });
+  w.individualFinances.push({
+    id: 1, entity_id: 7, tick: 0, assets: 0, savings: 500, debt: 200, income: 0, expenses: 0,
+  });
+  assert.equal(economy.getNetWorth(w, 7), 10300, '10000 property + 500 savings - 200 debt');
+});
+
+test('somebody who owns nothing is unchanged by this', () => {
+  // Standing rule 12, first clause: an ordinary person's outcome must
+  // be bit-identical to what it was before the change existed, or the
+  // whole world has been recalibrated rather than a gap closed. 90 of
+  // 148 people in the measured world own no property at all.
+  const w = wealthWorld();
+  w.individualFinances.push({
+    id: 1, entity_id: 9, tick: 0, assets: 100, savings: 500, debt: 200, income: 0, expenses: 0,
+  });
+  assert.equal(economy.getNetWorth(w, 9), 400);
+  assert.equal(economy.ownedPropertyValue(w, 9), 0);
+});
