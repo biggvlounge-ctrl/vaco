@@ -255,7 +255,7 @@ const SOURCES = {
     fills: ['transportationData'],
     tiers: ['regional', 'filler'],
     scale: 'global road and rail network',
-    wired: null,
+    wired: 'imports/overtureTransportationImport.js',
     note: 'Roads and rail. **Deliberately not consumed by VACON-C**, which defers '
       + 'Transportation in CLAUDE.md — this is here for `transportation.js` in this layer, '
       + 'and wiring it into the game would cross a locked scope boundary.',
@@ -283,7 +283,7 @@ const SOURCES = {
     fills: ['geographyData'],
     tiers: ['regional'],
     scale: 'countries, states, regions, physical features',
-    wired: null,
+    wired: 'imports/naturalEarthImport.js',
     note: 'The coarsest and simplest of the boundary sources, and the only one with no '
       + 'licence conditions at all. Worth using for the top of the hierarchy even where '
       + 'Overture Divisions covers the detail.',
@@ -391,7 +391,7 @@ const SOURCES = {
     fills: ['buildingData', 'populationData'],
     tiers: ['regional'],
     scale: 'every U.S. public school and postsecondary institution',
-    wired: null,
+    wired: 'imports/ncesImport.js',
     note: 'Enrolment and staff counts per school. Feeds the `school` Key category directly — '
       + 'added on 18 Sep from two documents disagreeing — and gives '
       + '`statecraft.runSchooling` a real pupil-to-teacher ratio instead of a chosen one.',
@@ -405,7 +405,7 @@ const SOURCES = {
     fills: ['buildingData'],
     tiers: ['regional'],
     scale: 'every Medicare-certified U.S. hospital and facility',
-    wired: null,
+    wired: 'imports/cmsImport.js',
     note: 'Certified bed count per hospital — the single number that decides a hospital\'s '
       + 'crew in `landmarks.staffingFor` and its maintenance requirement in '
       + '`control.maintenanceFor`. Overlaps HIFLD\'s hospital layer and is more current; '
@@ -420,7 +420,7 @@ const SOURCES = {
     fills: ['populationData'],
     tiers: ['regional'],
     scale: 'incident-level reporting from most U.S. agencies',
-    wired: null,
+    wired: 'imports/fbiImport.js',
     note: '**Calibration, not content — and that is the valuable part.** NIBRS breaks '
       + 'offences down close to `crime.CRIME_CATEGORIES`\' own eight. CLAUDE.md\'s '
       + 'seventeenth standing rule records FOUR wrong thresholds in a row for the '
@@ -439,7 +439,7 @@ const SOURCES = {
     fills: ['populationData'],
     tiers: ['regional'],
     scale: 'model-based health estimates for every U.S. census tract',
-    wired: null,
+    wired: 'imports/cdcImport.js',
     note: 'Chronic condition and health-behaviour prevalence per tract. `vacon-c` already '
       + 'carries obesity, chronic-condition and nutrition statistics, and '
       + '`mortality.diseasePressure` scales death rates from a modelled figure. **Note what '
@@ -455,7 +455,7 @@ const SOURCES = {
     fills: ['geographyData'],
     tiers: ['regional'],
     scale: 'eighteen natural hazards, every U.S. county and tract',
-    wired: null,
+    wired: 'imports/femaImport.js',
     note: 'Expected annual loss and risk rating per hazard per county. '
       + '`vacon-c/server/weather.js` draws disasters from bands this project chose; this '
       + 'says which hazards a given region actually faces, so a river town floods and a '
@@ -471,7 +471,7 @@ const SOURCES = {
     fills: ['populationData'],
     tiers: ['regional'],
     scale: 'congregations and adherents by tradition, every U.S. county',
-    wired: null,
+    wired: 'imports/religionImport.js',
     note: '**Closes a gap this project measured and named.** `worldgen`\'s own history '
       + 'records five demographic statistics returning null "because nothing set religion, '
       + 'language or education", and `demographics.js` says `npcs.religion` is a real column '
@@ -534,7 +534,7 @@ const SOURCES = {
     fills: ['geographyData'],
     tiers: ['regional', 'filler'],
     scale: 'U.S. elevation at 1m-10m',
-    wired: null,
+    wired: 'imports/usgsImport.js',
     note: 'Real terrain for the U.S., which is where the prototype region is. '
       + '`vacon-c/server/geo.js` has a terrain concept and no elevation behind it.',
   },
@@ -562,7 +562,7 @@ const SOURCES = {
     fills: ['geographyData'],
     tiers: ['regional'],
     scale: 'global historical weather',
-    wired: null,
+    wired: 'imports/openweatherImport.js',
     note: '**The only entry here that is not free**, and the only one with a per-call cost, '
       + 'so it is the one to reach for last. NOAA covers the U.S. prototype region at no '
       + 'cost; this is for the global tier if that is ever built out.',
@@ -678,9 +678,67 @@ function fieldDepth() {
   };
 }
 
+// ---------------------------------------------------------------------
+// realisedCoverage — an importer is not an import
+// ---------------------------------------------------------------------
+// **Field depth reached 100% the day the last ten importers landed, and
+// nothing about the world got better.** That is the same failure
+// `fieldDepth` was added to fix, one level up: a number that measures
+// the CODE and is quoted as though it measured the DATA.
+//
+// Every source host in this registry returns 403 CONNECT at this
+// environment's proxy. Not one record has passed through any transform
+// here. So the honest headline is not 100% and not 78% — it is zero,
+// and it stays zero until a network that can reach these hosts runs the
+// `fetch*` half.
+//
+// This reads a real world layer and reports how much of it actually
+// carries imported data. It is the only figure in this file that cannot
+// be raised by writing more code.
+function realisedCoverage(worldLayer) {
+  const locations = worldLayer?.locations ?? [];
+  const sliceNames = Object.keys(SLICE_FIELDS);
+
+  let fieldsWithData = 0;
+  let possible = 0;
+  const bySlice = {};
+
+  for (const slice of sliceNames) {
+    const withData = locations.filter((l) => {
+      const value = l[slice];
+      if (value === null || value === undefined) return false;
+      if (Array.isArray(value)) return value.length > 0;
+      if (typeof value === 'object') return Object.keys(value).length > 0;
+      return true;
+    }).length;
+    bySlice[slice] = { locations: withData, of: locations.length };
+    fieldsWithData += withData;
+    possible += locations.length;
+  }
+
+  return {
+    locations: locations.length,
+    bySlice,
+    fieldsWithData,
+    possible,
+    // **Null for an empty world, not zero.** A world with no locations
+    // has not achieved 0% coverage; it has nothing to have covered.
+    // The `Number(null)` corollary, in the one number somebody would
+    // quote.
+    realisedDepth: possible === 0
+      ? null
+      : Math.round((fieldsWithData / possible) * 1000) / 1000,
+    note: 'What has actually been imported. Field depth measures whether a transform '
+      + 'exists; this measures whether data arrived. Every source host in this registry is '
+      + 'blocked at this environment\'s proxy, so on this machine it is zero by '
+      + 'construction — which is the honest number, not a failure of the importers.',
+  };
+}
+
 module.exports = {
   WORLD_SLICES,
   SLICE_FIELDS,
+  realisedCoverage,
   UNCOVERED_BY_DESIGN,
   SOURCES,
   SOURCE_NAMES,

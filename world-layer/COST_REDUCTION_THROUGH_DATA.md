@@ -7,9 +7,17 @@ that down, and what specifically has to be built to collect the saving?
 **The short answer**: the largest single lever is not a discount, it is
 a **reclassification** — every location a free dataset can describe
 completely is a location that moves out of the tier that costs money.
-Twenty-four sources are now registered in `sources.js`, twelve have importers,
-and `costModel.automationCoverage()` reports what that covers. This
-document is the reasoning; the numbers come from a command.
+Twenty-four sources are registered in `sources.js`, **twenty-two have
+importers**, and the two that do not are the two recommended against on
+licence grounds. This document is the reasoning; the numbers come from a
+command.
+
+**And the honest counterweight, first, because every figure below is
+downstream of it**: `sources.realisedCoverage()` reports **zero**. Not
+one record has passed through any of the twenty-two transforms, because
+every source host returns 403 CONNECT at this environment's proxy (§7).
+Coverage figures in this document measure whether a transform EXISTS.
+They are a statement about readiness, not about data.
 
 ---
 
@@ -60,25 +68,46 @@ So every wired dataset does two things, and the second is worth more:
 2. it lets a location be honestly classified down a tier (the large one).
 
 **This is why the coverage report is per tier rather than a single
-percentage.** Measured today:
+percentage.** Measured today, all three tiers are at **100%**.
 
-| Tier | Slices its sources speak to | Automated | Share |
-|---|---|---|---|
-| hero | landmark, population | 2 | **100%** |
-| regional | landmark, business, geography, transportation, building, population, economic | 6 | **86%** |
-| filler | geography, building, transportation, business, landmark | 4 | **80%** |
+*(Progression: 100/43/25 with five sources → 100/57/75 with Overture
+Divisions, Overture Buildings and NOAA → 100/71/75 with Census and BLS
+→ 100/86/80 with GNIS and HIFLD → **100/100/100** with the final ten.
+Run `costModel.automationCoverage()` rather than trusting this table.)*
 
-*(Twelve of twenty-four sources wired. The progression: 100/43/25 with
-five sources → 100/57/75 with Overture Divisions, Overture Buildings and
-NOAA → 100/71/75 with Census and BLS → **100/86/80** with GNIS and
-HIFLD. Run `costModel.automationCoverage()` rather than trusting this
-table — it is generated from the registry and this is a snapshot.)*
+### Three measurements, and each one replaced the last when it saturated
 
-**Transportation is the only remaining gap at either tier**, and it is
-one VACON-C defers by policy rather than one nobody has a source for:
-CLAUDE.md puts Transportation on the do-not-touch list, and Overture's
-Transportation theme sits in the registry unwired for exactly that
-reason.
+This is worth recording as a pattern rather than a footnote, because it
+happened twice in two days and the second time was self-inflicted.
+
+**Slice coverage** counted a slice automated if any wired source filled
+it. It reached 100/86/80 and then **could not move**: ten of the twelve
+then-unwired sources filled only slices already marked covered, and the
+two that would have moved it filled `transportationData`, which VACON-C
+defers by policy. The one road upward was closed on purpose, so the
+number read as very nearly finished while eight free sources sat
+unwired against real engine gaps. CLAUDE.md's twentieth rule — a
+measurement that cannot move is indistinguishable from one nobody is
+improving.
+
+**Field depth** (`sources.fieldDepth()`) replaced it: a slice is not one
+fact, so each is broken into the fields the engine actually consumes,
+each naming its consumer. It opened the number back up at 78% — 21 of
+27 — and named five closable gaps: elevation, hazard risk, religion,
+health prevalence and crime calibration.
+
+**Then the ten importers landed and field depth hit 100% too**, in a
+single pass, which is the same saturation one level up. It measures
+whether a transform exists. It cannot fall unless somebody deletes code,
+and it says nothing about whether a record ever arrived.
+
+**`sources.realisedCoverage(worldLayer)` is the third**, and it is the
+one that cannot be raised by writing more code: how much of a real world
+layer actually carries imported data. It is **zero**, and it stays zero
+until a network that can reach these hosts runs the `fetch*` half.
+
+The lesson generalises past this repository: *a coverage number that
+your own next commit can move is measuring you, not the world.*
 
 Hero being fully covered is the finding rather than a coincidence:
 UNESCO, NRHP, Wikidata and Commons all aim at exactly that tier, and
@@ -167,22 +196,34 @@ its real bed count, a plant with its megawatts, a treatment works with
 its throughput — which is precisely the number `landmarks.staffingFor`
 and `control.maintenanceFor` currently size a crew from a band.
 
-### Identified, not yet wired — the cheapest work left
+### The final ten, wired in one pass
 
-Each of these is an importer against a known free source with a known
-record shape. Against a five-figure art budget, a day of work per source
-is the best-value engineering available in this project.
+Each was an importer against a known free source with a known record
+shape. Against a five-figure art budget, a day of work per source is the
+best-value engineering available in this project — and these ten are
+done.
 
 | Source | Closes | Why it matters |
 |---|---|---|
-| Natural Earth | regional `geographyData` | Public domain, no conditions, the top of the boundary hierarchy |
-| USGS 3DEP | `geographyData` | Real elevation for the U.S. prototype region |
-| NCES (CCD, IPEDS) | school enrolment and staff | A real pupil-to-teacher ratio for `statecraft.runSchooling` |
-| CMS Provider of Services | hospital bed counts | More current than HIFLD's hospital layer; prefer whichever was refreshed last |
-| FBI CDE (UCR/NIBRS) | crime calibration | The outside reference CLAUDE.md's seventeenth rule lacked through four wrong thresholds |
-| CDC PLACES | tract health prevalence | What `mortality.diseasePressure` models from a chosen figure |
-| FEMA National Risk Index | hazard per county | So a river town floods and a plains town does not |
-| U.S. Religion Census | adherence per county | Closes `npcs.religion`, a real column set only where a caller supplies one |
+| Natural Earth | `geographyData.boundaries` | Public domain outright, the only boundary source with no conditions at all |
+| USGS 3DEP | `geographyData.elevation` | Writes `locations.terrainType` — a field accepted since the world layer was built and passed `null` by every caller |
+| FEMA National Risk Index | `geographyData.hazardRisk` | So a river town floods and a plains town does not. Maps only the four hazards `environment.SEVERE` runs; names the other nine |
+| NCES (CCD, IPEDS) | school enrolment and staff | A real pupil-to-teacher ratio for `statecraft.runSchooling`, and which rungs of the ladder a school serves |
+| CMS Provider of Services | hospital bed counts | A *refresh* source: decides against HIFLD by collection date, so neither is declared the winner |
+| FBI CDE (UCR/NIBRS) | `populationData.crimeCalibration` | The outside reference CLAUDE.md's seventeenth rule lacked through four wrong thresholds — see below |
+| CDC PLACES | tract health prevalence | A baseline for `mortality.diseasePressure`, centred so an ordinary place reads exactly 1 |
+| U.S. Religion Census | `npcs.religion` | The only source for a real column no generated world has ever written. The one licence-encumbered entry |
+| OpenWeather | climate outside NOAA's coverage | The only per-call-cost source. Refuses to overwrite a free NOAA classification |
+| Overture Transportation | `transportationData.roads` | Fills the world-layer slice. **VACON-C defers Transportation by policy and nothing consumes it** — stated on every row |
+
+**Three real bugs were caught by these tests before anything shipped**,
+and two were the same one: `per1kFrom100k(null)` returned a crime rate
+of **0** rather than null, and a suppressed CDC measure read as a
+neighbourhood with none of that condition — `Number(null)` is 0 and 0 is
+finite, the corollary CLAUDE.md already records, in a function about to
+calibrate a constant. The third: OpenWeather's guard against overwriting
+free NOAA data read `geographyData.source`, a field NOAA never writes,
+so the guard could never fire.
 
 ### Use last, or not at all
 
@@ -229,24 +270,22 @@ automatable is worse than one that admits a floor:
 
 ## 6. The honest bottom line
 
-**Realised saving today: nothing, and the reason is §7.** No import has
-run. Every source host returns 403 CONNECT at this environment's proxy,
-so what exists is twelve tested transforms and a `fetch*` that throws
-naming the block. A saving is realised when records reach
-`importRegion`, not when the importer compiles. Anyone quoting a figure
-from this document is quoting a **projection**, and the four numbered
-points below are the only parts of it with something behind them.
+**Realised saving today: nothing**, and the reason is §7 rather than
+the importers. What exists is twenty-two tested transforms and a
+`fetch*` that throws naming the block. A saving is realised when records
+reach an importer, not when one compiles.
 
 **Projected, with the only rate on file**: Overture's own document
 claims 10–15% off the content-population portion — North America
 $280K–$350K → $240K–$315K, full world $2.58M–$6.48M → $2.3M–$5.8M.
 That is roughly **$35K–$40K on North America and $280K–$680K globally**,
-and it is one source of twelve. **That percentage is deliberately not
-extended to the other eleven.** Nothing in this repository establishes a
-labour cost per slice, so multiplying 86% coverage into 86% cheaper
-would put an invented number where a measured one belongs — the same
-mistake `estimateBuildCost` refuses to make when it declines to treat an
-unsupplied rate as a rate of zero.
+and it is one source of twenty-two. **That percentage is deliberately
+not extended to the other twenty-one.** Nothing in this repository
+establishes a labour cost per slice, so multiplying 100% coverage into
+"100% cheaper" would put an invented number where a measured one
+belongs — the same mistake `estimateBuildCost` refuses to make when it
+declines to treat an unsupplied rate as a rate of zero. **The coverage
+figure reaching 100% changes the readiness, not the bill.**
 
 
 **Do not expect the $420K–$960K figure to fall to zero, and do not
@@ -261,16 +300,20 @@ What is now true and was not before:
    read "sixteen" after the registry grew and the sentence did not; the
    count comes from `sources.SOURCE_NAMES.length`, so run it rather than
    trusting a number typed into prose.)
-3. **Twelve have importers**, out of twenty-four. Seven of the
+3. **Twenty-two have importers**, out of twenty-four. Ten of the
    twenty-four are named in no surviving document and were added by
    research against gaps the ENGINE has — Census, BLS, GNIS, HIFLD,
-   NCES, CMS, FBI, CDC, FEMA and the Religion Census. Seven were wired
-   in the passes after this document was first written, taking regional
-   from 43% to 86% and filler from 25% to 80%. That is what "importers,
-   not a negotiation" looks like when somebody actually does them.
-4. **Coverage is measured per tier by a command**, closing the
+   NCES, CMS, FBI, CDC, FEMA and the Religion Census. Seventeen were
+   wired in the passes after this document was first written, taking
+   every tier to 100%. That is what "importers, not a negotiation"
+   looks like when somebody actually does them.
+4. **Coverage is measured by three commands, not one**, closing the
    architecture document's own admission that the 90%/10% automation
-   target "is an aspiration with no measurement behind it".
+   target "is an aspiration with no measurement behind it" — and then
+   closing the two ways that measurement went on to flatter itself.
+   `automationCoverage()` for the tiers, `fieldDepth()` for what is in
+   them, `realisedCoverage(worldLayer)` for what has actually arrived.
+   The third is zero and is the one to quote.
 5. **Licence exposure is counted** — four sources carry conditions that
    reach the shipped product (Cesium and OSM are ODbL share-alike,
    OpenWeather is commercial, and the U.S. Religion Census is an
@@ -279,12 +322,18 @@ What is now true and was not before:
    re-checks them, per the standing instruction that dataset terms
    change quietly.
 
-The next real saving is not a negotiation. It is the remaining
-importers — and three of them are ones to SKIP rather than build:
-Cesium OSM Buildings and OpenStreetMap carry ODbL share-alike for
-ground Overture already covers permissively, and OpenWeather is the
-only entry with a per-call cost where NOAA is free for the prototype
-region. Knowing which sources not to wire is part of the saving.
+**The next real saving is no longer an importer.** Twenty-two of
+twenty-four are built, and the two that are not are the two to SKIP:
+Cesium OSM Buildings and OpenStreetMap carry ODbL share-alike for ground
+Overture already covers permissively. Knowing which sources not to wire
+is part of the saving, and it is now the whole of what is left to
+decide.
+
+What remains is not engineering at all. It is **a network that can
+reach these hosts**, and then the licence re-check that
+`licenceCheckedAt: null` has been asking for on all twenty-four entries
+since the registry was written. Both are somebody's decision rather than
+somebody's commit.
 
 ---
 

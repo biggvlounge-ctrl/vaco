@@ -844,20 +844,71 @@ test('every slice with a source is broken into fields', () => {
   }
 });
 
-test('field depth is below slice coverage, and that is the point', () => {
-  // Slice coverage reports 7 of 7 non-design-excluded slices as having
-  // a source. If depth ever equals that, either the work is genuinely
-  // finished or the table has stopped naming gaps — and the second is
-  // far more likely, so this fails loudly either way and somebody
-  // re-reads it.
-  const depth = sources.fieldDepth();
-  assert.ok(depth.fields > 0);
-  assert.ok(depth.filled < depth.fields,
-    'every field is filled — verify that is true rather than that the table went stale');
-  // And the open list is actionable: each one names what would close it.
-  for (const open of depth.openFields) {
-    assert.ok(open.wouldClose.length > 0, `${open.slice}.${open.field} is open with no way to close it`);
+test('field depth responds to wiring, so it can still fall', () => {
+  // **This test used to assert depth was BELOW slice coverage**, on the
+  // grounds that a depth of 100% was more likely to mean a stale table
+  // than finished work. It fired, the cause was checked, and the cause
+  // was real: ten importers landed in one pass and every field this
+  // table names now has one.
+  //
+  // So the guard has to become one that can still fail, or it is the
+  // twentieth rule all over again — a check that passes because there
+  // is nothing left for it to catch. The mechanical version: unwire a
+  // source and the number MUST drop. If it does not, `fieldDepth` is
+  // reporting something other than what is wired.
+  const before = sources.fieldDepth();
+  assert.equal(before.filled, before.fields, 'every field has an importer — see the note above');
+
+  const key = 'usgs';
+  const original = sources.SOURCES[key].wired;
+  assert.ok(original, `${key} is expected to be wired for this test to mean anything`);
+  try {
+    sources.SOURCES[key].wired = null;
+    const after = sources.fieldDepth();
+    assert.ok(after.filled < before.filled,
+      'unwiring a source did not lower field depth, so the number is not reading the registry');
+    assert.ok(after.openFields.length > 0);
+    for (const open of after.openFields) {
+      assert.ok(open.wouldClose.length > 0,
+        `${open.slice}.${open.field} is open with no way to close it`);
+    }
+  } finally {
+    sources.SOURCES[key].wired = original;
   }
+});
+
+test('an importer is not an import — realised coverage is separate and is zero', () => {
+  // **The distinction the whole cost story turns on.** Field depth says
+  // every field has a transform written for it. It says nothing about
+  // whether any record has ever passed through one, and every source
+  // host returns 403 CONNECT at this environment's proxy.
+  //
+  // A fresh world layer has imported nothing, so this is the honest
+  // headline and it is 0. If it ever reports otherwise for an empty
+  // world, the measurement has started counting the code instead of
+  // the data.
+  const worldLayer = createWorldLayer();
+  const realised = sources.realisedCoverage(worldLayer);
+  assert.equal(realised.locations, 0);
+  assert.equal(realised.fieldsWithData, 0);
+  assert.equal(realised.realisedDepth, null,
+    'an empty world has no realised depth — 0% would claim it had been measured');
+});
+
+test('realised coverage rises only when data actually lands', () => {
+  const worldLayer = createWorldLayer();
+  const place = generateLocation(worldLayer, {
+    name: 'Somewhere', lat: 38.6, lng: -90.2, tier: 'regional',
+  });
+  assert.equal(sources.realisedCoverage(worldLayer).fieldsWithData, 0);
+
+  setLocationData(worldLayer, place.id, 'landmarkData', {
+    name: 'Somewhere', category: 'library', significance: 60, source: 'nrhp',
+  });
+  const after = sources.realisedCoverage(worldLayer);
+  assert.ok(after.fieldsWithData > 0, 'data landed and realised coverage did not move');
+  assert.ok(after.realisedDepth > 0 && after.realisedDepth < 1,
+    'one slice of one location should not read as a fully imported world');
 });
 
 test('automationCoverage carries the depth report, not only the tier shares', () => {
@@ -867,6 +918,13 @@ test('automationCoverage carries the depth report, not only the tier shares', ()
   // whose headline is pinned needs the number that is not.
   const report = costModel.automationCoverage();
   assert.ok(report.depth, 'automationCoverage lost the field depth report');
-  assert.ok(report.depth.depth < 1);
-  assert.ok(report.depth.openFields.length > 0);
+  assert.equal(report.depth.fields, report.depth.filled,
+    'every field now has an importer — if this fails, one was unwired and the cost '
+    + 'documents need re-reading rather than this number nudging');
+  // **And the depth report must not be the last word either.** Both
+  // numbers now read 100%, which measures the code and says nothing
+  // about whether a record ever arrived. `realisedCoverage` is the one
+  // that cannot be raised by writing more of it.
+  assert.equal(typeof sources.realisedCoverage, 'function',
+    'the only figure that measures data rather than code is missing');
 });
