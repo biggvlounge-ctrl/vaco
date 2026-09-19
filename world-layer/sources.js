@@ -266,6 +266,150 @@ const SOURCES = {
   },
 
   // -------------------------------------------------------------------
+  // Names, and the things a map is actually made of
+  //
+  // **Added 19 Sep 2026 and named in no document on file.** The owner
+  // asked for whatever further sources would help, so these are
+  // research rather than recovery — chosen against gaps the ENGINE
+  // has, not against a list. Each entry says which guess it replaces.
+  // -------------------------------------------------------------------
+  gnis: {
+    name: 'USGS Geographic Names Information System (GNIS)',
+    licence: 'U.S. Government Work — public domain',
+    licenceCheckedAt: null,
+    access: 'direct download, pipe-delimited national or per-state files',
+    host: 'usgs.gov',
+    fills: ['landmarkData', 'geographyData'],
+    tiers: ['regional', 'filler'],
+    scale: '~2.3 million named U.S. places and physical features',
+    wired: 'imports/gnisImport.js',
+    note: '**The naming problem, solved for a whole country.** Every named summit, valley, '
+      + 'cave, stream, church, school, hospital, cemetery and populated place in the United '
+      + 'States, each with a feature class and coordinates. Two of the Key\'s categories — '
+      + '`cave-system` and `natural-formation` — have no other source at all: UNESCO does '
+      + 'not list a local cave and the National Register does not list a bluff. This is also '
+      + 'the cheapest possible fix for the anonymous-landmark problem, because it is a flat '
+      + 'file with no API key and no rate limit.',
+  },
+  hifld: {
+    name: 'Homeland Infrastructure Foundation-Level Data (HIFLD Open)',
+    licence: 'U.S. Government Work — public domain for the open layers',
+    licenceCheckedAt: null,
+    access: 'ArcGIS Open Data portal, per-layer GeoJSON or shapefile',
+    host: 'hifld-geoplatform.hub.arcgis.com',
+    fills: ['buildingData', 'landmarkData'],
+    tiers: ['regional', 'filler'],
+    scale: 'hundreds of open national infrastructure layers',
+    wired: 'imports/hifldImport.js',
+    note: '**It publishes the engine\'s own ten infrastructure types, as layers.** '
+      + '`vacon-c/server/infrastructure.js` enumerates roads, bridges, rail, water systems, '
+      + 'electricity, internet, hospitals, schools, public safety and waste management — and '
+      + 'HIFLD has an open national layer for almost every one, with real capacity figures. '
+      + 'A hospital arrives with its bed count, which is what `landmarks.staffingFor` and '
+      + '`control.maintenanceFor` currently size from a band.',
+  },
+  nces: {
+    name: 'National Center for Education Statistics (CCD and IPEDS)',
+    licence: 'U.S. Government Work — public domain',
+    licenceCheckedAt: null,
+    access: 'NCES data files, and the Urban Institute Education Data API',
+    host: 'nces.ed.gov',
+    fills: ['buildingData', 'populationData'],
+    tiers: ['regional'],
+    scale: 'every U.S. public school and postsecondary institution',
+    wired: null,
+    note: 'Enrolment and staff counts per school. Feeds the `school` Key category directly — '
+      + 'added on 18 Sep from two documents disagreeing — and gives '
+      + '`statecraft.runSchooling` a real pupil-to-teacher ratio instead of a chosen one.',
+  },
+  cmsProviders: {
+    name: 'CMS Provider of Services file',
+    licence: 'U.S. Government Work — public domain',
+    licenceCheckedAt: null,
+    access: 'data.cms.gov, quarterly flat files',
+    host: 'data.cms.gov',
+    fills: ['buildingData'],
+    tiers: ['regional'],
+    scale: 'every Medicare-certified U.S. hospital and facility',
+    wired: null,
+    note: 'Certified bed count per hospital — the single number that decides a hospital\'s '
+      + 'crew in `landmarks.staffingFor` and its maintenance requirement in '
+      + '`control.maintenanceFor`. Overlaps HIFLD\'s hospital layer and is more current; '
+      + 'prefer whichever was refreshed last rather than merging both.',
+  },
+  fbiCrime: {
+    name: 'FBI Crime Data Explorer (UCR / NIBRS)',
+    licence: 'U.S. Government Work — public domain',
+    licenceCheckedAt: null,
+    access: 'FBI CDE API (free key), or the bulk NIBRS extracts',
+    host: 'api.usa.gov',
+    fills: ['populationData'],
+    tiers: ['regional'],
+    scale: 'incident-level reporting from most U.S. agencies',
+    wired: null,
+    note: '**Calibration, not content — and that is the valuable part.** NIBRS breaks '
+      + 'offences down close to `crime.CRIME_CATEGORIES`\' own eight. CLAUDE.md\'s '
+      + 'seventeenth standing rule records FOUR wrong thresholds in a row for the '
+      + 'aggression escalation floor, each measured against the wrong population; real '
+      + 'rates per 100,000 are the outside reference that argument lacked. Its own caveat, '
+      + 'from that rule: a real rate imports a society with a functioning state, and every '
+      + 'area in a generated world measures as `contested`. Use it to sanity-check ratios '
+      + 'between categories, not to set absolute levels.',
+  },
+  cdcPlaces: {
+    name: 'CDC PLACES',
+    licence: 'U.S. Government Work — public domain',
+    licenceCheckedAt: null,
+    access: 'data.cdc.gov (Socrata API), tract and county levels',
+    host: 'data.cdc.gov',
+    fills: ['populationData'],
+    tiers: ['regional'],
+    scale: 'model-based health estimates for every U.S. census tract',
+    wired: null,
+    note: 'Chronic condition and health-behaviour prevalence per tract. `vacon-c` already '
+      + 'carries obesity, chronic-condition and nutrition statistics, and '
+      + '`mortality.diseasePressure` scales death rates from a modelled figure. **Note what '
+      + 'PLACES actually is**: small-area estimates produced by a model, not counts. It is '
+      + 'the right shape for a simulation and the wrong thing to cite as observation.',
+  },
+  femaNri: {
+    name: 'FEMA National Risk Index',
+    licence: 'U.S. Government Work — public domain',
+    licenceCheckedAt: null,
+    access: 'hazards.fema.gov, county and tract tables',
+    host: 'hazards.fema.gov',
+    fills: ['geographyData'],
+    tiers: ['regional'],
+    scale: 'eighteen natural hazards, every U.S. county and tract',
+    wired: null,
+    note: 'Expected annual loss and risk rating per hazard per county. '
+      + '`vacon-c/server/weather.js` draws disasters from bands this project chose; this '
+      + 'says which hazards a given region actually faces, so a river town floods and a '
+      + 'plains town does not. Pairs with NOAA: NOAA gives the ordinary climate, FEMA gives '
+      + 'the tail.',
+  },
+  religionCensus: {
+    name: 'U.S. Religion Census (ASARB, via ARDA)',
+    licence: '**Not public domain — ARDA terms, free for research, verify before shipping**',
+    licenceCheckedAt: null,
+    access: 'thearda.com data archive, decennial county-level files',
+    host: 'thearda.com',
+    fills: ['populationData'],
+    tiers: ['regional'],
+    scale: 'congregations and adherents by tradition, every U.S. county',
+    wired: null,
+    note: '**Closes a gap this project measured and named.** `worldgen`\'s own history '
+      + 'records five demographic statistics returning null "because nothing set religion, '
+      + 'language or education", and `demographics.js` says `npcs.religion` is a real column '
+      + 'set only where a caller supplies one. This is the caller — real adherence shares '
+      + 'per county, which also decide how many churches, mosques, synagogues and temples a '
+      + 'region should have.\n'
+      + '**The one entry here whose licence is not public domain.** ARDA is an academic '
+      + 'archive with its own terms; treat it as unverified until somebody reads them, '
+      + 'which `describeSources` already counts it among.',
+  },
+
+  // -------------------------------------------------------------------
   // People, work and money
   // -------------------------------------------------------------------
   census: {
@@ -407,7 +551,9 @@ function describeSources() {
     // The ones with conditions that reach the SHIPPED product rather
     // than the build. Named because they are the ones that can cost
     // money or force a change late.
-    encumbered: SOURCE_NAMES.filter((key) => /ODbL|share-alike|Commercial/i.test(SOURCES[key].licence)),
+    encumbered: SOURCE_NAMES.filter(
+      (key) => /ODbL|share-alike|Commercial|Not public domain/i.test(SOURCES[key].licence),
+    ),
   };
 }
 

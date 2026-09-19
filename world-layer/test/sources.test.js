@@ -47,6 +47,8 @@ const wikidata = require('../imports/wikidataImport');
 const noaa = require('../imports/noaaImport');
 const census = require('../imports/censusImport');
 const bls = require('../imports/blsImport');
+const gnis = require('../imports/gnisImport');
+const hifld = require('../imports/hifldImport');
 
 // ---------------------------------------------------------------------
 // The registry
@@ -421,6 +423,141 @@ test('a labour market attaches to a city without destroying its other economics'
 });
 
 // ---------------------------------------------------------------------
+// GNIS — the two categories with no other source at all
+// ---------------------------------------------------------------------
+
+test('GNIS reaches cave-system and natural-formation, which nothing else does', () => {
+  // UNESCO does not list a local cave, the National Register does not
+  // list a bluff, and Overture carries no natural features. Without
+  // GNIS these two Key categories can be generated and never named.
+  const reachable = new Set(Object.values(gnis.FEATURE_CLASS_MAP));
+  assert.ok(reachable.has('cave-system'));
+  assert.ok(reachable.has('natural-formation'));
+});
+
+test('every GNIS class maps to a real Key category', () => {
+  const landmarks = require('../../vacon-c/server/landmarks.js');
+  for (const [featureClass, category] of Object.entries(gnis.FEATURE_CLASS_MAP)) {
+    assert.ok(landmarks.ALL_CATEGORIES.includes(category), `${featureClass} → "${category}"`);
+  }
+});
+
+test('a populated place names an AREA rather than becoming a landmark', () => {
+  // A town is the landmark pack's `area` field, not a monument to put
+  // in it.
+  const layer = createWorldLayer();
+  const result = gnis.importGnisFeatures(layer, [
+    { featureName: 'Kirkwood', featureClass: 'Populated Place', primaryLatitude: 38.58, primaryLongitude: -90.40 },
+    { featureName: 'Cliff Cave', featureClass: 'Cave', primaryLatitude: 38.45, primaryLongitude: -90.29 },
+  ]);
+  assert.deepEqual(result.places, ['Kirkwood']);
+  assert.equal(result.imported.length, 1);
+  assert.equal(result.imported[0].landmarkData.category, 'cave-system');
+});
+
+test('null island is skipped, not placed', () => {
+  // GNIS gives 0,0 for features whose coordinates were never captured.
+  // A Missouri cave in the Gulf of Guinea is worse than a missing one.
+  const layer = createWorldLayer();
+  const result = gnis.importGnisFeatures(layer, [
+    { featureName: 'Unlocated Cave', featureClass: 'Cave', primaryLatitude: 0, primaryLongitude: 0 },
+  ]);
+  assert.equal(result.imported.length, 0);
+  assert.equal(result.skippedByClass.cave, 1);
+});
+
+test('the creeks nobody wants are counted as deliberately skipped', () => {
+  // "We chose not to import 40,000 streams" and "the importer lost
+  // 40,000 streams" are different facts.
+  const layer = createWorldLayer();
+  const result = gnis.importGnisFeatures(layer, [
+    { featureName: 'Coldwater Creek', featureClass: 'Stream', primaryLatitude: 38.7, primaryLongitude: -90.3 },
+    { featureName: 'Some Gully', featureClass: 'Gully', primaryLatitude: 38.7, primaryLongitude: -90.3 },
+  ]);
+  const report = gnis.describeGnisImport(result);
+  assert.equal(report.imported, 0);
+  assert.equal(report.bulkSkipped, 2);
+});
+
+// ---------------------------------------------------------------------
+// HIFLD — the engine's own ten infrastructure types
+// ---------------------------------------------------------------------
+
+test('every HIFLD layer maps to a real infrastructure type', () => {
+  const infrastructure = require('../../vacon-c/server/infrastructure.js');
+  for (const [layer, definition] of Object.entries(hifld.LAYERS)) {
+    assert.ok(
+      infrastructure.INFRASTRUCTURE_TYPES.includes(definition.infrastructureType),
+      `${layer} → "${definition.infrastructureType}"`,
+    );
+  }
+});
+
+test('a layer that is also a Key landmark maps to a real category', () => {
+  const landmarks = require('../../vacon-c/server/landmarks.js');
+  for (const [layer, definition] of Object.entries(hifld.LAYERS)) {
+    if (definition.category === null) continue;
+    assert.ok(landmarks.ALL_CATEGORIES.includes(definition.category), `${layer} → ${definition.category}`);
+  }
+});
+
+test('an unnamed layer is refused rather than guessed from field names', () => {
+  // HIFLD is hundreds of layers with different schemas. Inferring which
+  // one this is would be how a fire station gets counted as a hospital.
+  assert.throws(
+    () => hifld.importHifldLayer(createWorldLayer(), 'mystery-layer', []),
+    /not a mapped HIFLD layer/,
+  );
+});
+
+test('a hospital arrives with its real bed count', () => {
+  // The number `landmarks.staffingFor` and `control.maintenanceFor`
+  // currently size a crew from a band for.
+  const layer = createWorldLayer();
+  const { imported } = hifld.importHifldLayer(layer, 'hospitals', [
+    { name: 'Barnes-Jewish Hospital', lat: 38.637, lng: -90.264, beds: 1266, county: 'St. Louis' },
+  ]);
+  assert.equal(imported[0].buildingData.capacity, 1266);
+  assert.equal(imported[0].buildingData.capacityUnit, 'beds');
+  assert.equal(imported[0].landmarkData.category, 'hospital');
+  assert.equal(imported[0].tier, 'regional');
+});
+
+test('a missing capacity is null, not zero', () => {
+  // A hospital with no recorded bed count is not a hospital with no
+  // beds, and the difference decides whether a band is still doing the
+  // work.
+  const layer = createWorldLayer();
+  const { imported } = hifld.importHifldLayer(layer, 'hospitals', [
+    { name: 'A Clinic', lat: 38.6, lng: -90.2 },
+  ]);
+  assert.equal(imported[0].buildingData.capacity, null);
+  assert.equal(imported[0].buildingData.capacityReported, false);
+});
+
+test('pure infrastructure is filler; a landmark somebody could take is regional', () => {
+  // §7's tiers: a hospital earns refinement, a pumping station does not.
+  const layer = createWorldLayer();
+  const { imported } = hifld.importHifldLayer(layer, 'wastewater-treatment', [
+    { name: 'Bissell Point Plant', lat: 38.66, lng: -90.19, flowMgd: 150 },
+  ]);
+  assert.equal(imported[0].tier, 'filler');
+  assert.equal(imported[0].landmarkData, null);
+});
+
+test('the two infrastructure types HIFLD does not cover are named', () => {
+  // Roads are Overture Transportation's job and internet infrastructure
+  // is not published as open national data in this form. Stated rather
+  // than left as a silent zero.
+  const layer = createWorldLayer();
+  hifld.importHifldLayer(layer, 'hospitals', [{ name: 'H', lat: 1, lng: 2, beds: 10 }]);
+  const report = hifld.describeInfrastructureCoverage(layer);
+  assert.ok(report.uncovered.includes('roads'));
+  assert.ok(report.uncovered.includes('internet'));
+  assert.deepEqual(report.byType.hospitals, { facilities: 1, withCapacity: 1 });
+});
+
+// ---------------------------------------------------------------------
 // Every fetch is honest about being blocked
 // ---------------------------------------------------------------------
 
@@ -440,6 +577,8 @@ test('each fetch says why it cannot run and what to call instead', () => {
     noaa.fetchClimateNormals,
     census.fetchAcsTracts,
     bls.fetchOesData,
+    gnis.fetchGnisFile,
+    hifld.fetchHifldLayer,
   ]) {
     assert.throws(fetcher, (error) => {
       assert.match(error.message, /not implemented/);

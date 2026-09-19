@@ -254,12 +254,13 @@ rather than seven — is exactly the kind of consolidation that is cheap
 to state and expensive to retrofit, and it was taken seriously.
 
 **On the data sources: one of six was integrated, and that is now
-sixteen registered and ten wired — 18-19 Sep 2026.** `sources.js` holds
+twenty-four registered and twelve wired — 18-19 Sep 2026.** `sources.js` holds
 every dataset this project has identified, each with its licence, its
 access path, the slice of the world model it fills and the tier it
 serves. Importers exist for UNESCO, the National Register of Historic
 Places, Overture Places, Overture Divisions, Overture Buildings,
-Wikidata, Wikimedia Commons, NOAA climate normals, Census ACS and BLS.
+Wikidata, Wikimedia Commons, NOAA climate normals, Census ACS, BLS, USGS
+GNIS and HIFLD Open.
 
 NOAA is worth singling out because it closes a column the game engine
 names as unmodellable. `vacon-c/server/barter.js` lists three §27 price
@@ -271,8 +272,14 @@ It was right to refuse: the vocabulary used is Köppen-Geiger, the
 published standard, and the tests check the classifier against the
 literature's own answers rather than against itself.
 
-Two of the sixteen are not named in any surviving document here. Census
-ACS and BLS were added from this project's OWN lost document titles —
+**Ten of the twenty-four are named in no surviving document here**, and
+were added by research against gaps the engine actually has rather than
+against a list: Census ACS, BLS, USGS GNIS, HIFLD Open, NCES, CMS
+Provider of Services, the FBI Crime Data Explorer, CDC PLACES, the FEMA
+National Risk Index and the U.S. Religion Census. Each entry in
+`sources.js` names the guess it replaces.
+
+Census ACS and BLS came from this project's OWN lost document titles —
 `REBUILD_OCCUPATION_REQUIREMENTS_BLS_SOURCED.md` was the BLS
 methodology document, recorded as written and gone. Wikimedia Commons
 was added under `dev-docs/STANDING_INSTRUCTION_ONGOING_EVALUATION.md`,
@@ -293,9 +300,11 @@ behind it. It has one now, from the data side.**
 world model have a working importer behind them and which specific
 sources would close the rest. Measured today: **hero 100%** (2 of 2
 slices — UNESCO, NRHP, Wikidata and Commons all aim at exactly this
-tier), **regional 71%**, **filler 75%**. The first measurement was
-100/43/25 with five sources wired; five more moved it, which is the
-report doing its job.
+tier), **regional 86%**, **filler 80%**. The first measurement was
+100/43/25 with five sources wired; seven more moved it, which is the
+report doing its job. The only remaining gap at either tier is
+transportation, which VACON-C defers by policy rather than for want of
+a source.
 
 That is not the same measurement as artist hours, and it is not
 presented as one. It reports SHARES and deliberately never money:

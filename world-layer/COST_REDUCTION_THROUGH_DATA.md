@@ -7,7 +7,7 @@ that down, and what specifically has to be built to collect the saving?
 **The short answer**: the largest single lever is not a discount, it is
 a **reclassification** — every location a free dataset can describe
 completely is a location that moves out of the tier that costs money.
-Sixteen sources are now registered in `sources.js`, ten have importers,
+Twenty-four sources are now registered in `sources.js`, twelve have importers,
 and `costModel.automationCoverage()` reports what that covers. This
 document is the reasoning; the numbers come from a command.
 
@@ -65,14 +65,20 @@ percentage.** Measured today:
 | Tier | Slices its sources speak to | Automated | Share |
 |---|---|---|---|
 | hero | landmark, population | 2 | **100%** |
-| regional | landmark, business, geography, transportation, building, population, economic | 5 | **71%** |
-| filler | geography, building, transportation, business | 3 | **75%** |
+| regional | landmark, business, geography, transportation, building, population, economic | 6 | **86%** |
+| filler | geography, building, transportation, business, landmark | 4 | **80%** |
 
-*(Ten of sixteen sources wired. The first pass measured 100/43/25 with
-five; Overture Divisions, Overture Buildings and NOAA took it to
-100/57/75, and Census ACS and BLS took regional to 71%. Run
-`costModel.automationCoverage()` rather than trusting this table — it is
-generated from the registry and this is a snapshot.)*
+*(Twelve of twenty-four sources wired. The progression: 100/43/25 with
+five sources → 100/57/75 with Overture Divisions, Overture Buildings and
+NOAA → 100/71/75 with Census and BLS → **100/86/80** with GNIS and
+HIFLD. Run `costModel.automationCoverage()` rather than trusting this
+table — it is generated from the registry and this is a snapshot.)*
+
+**Transportation is the only remaining gap at either tier**, and it is
+one VACON-C defers by policy rather than one nobody has a source for:
+CLAUDE.md puts Transportation on the do-not-touch list, and Overture's
+Transportation theme sits in the registry unwired for exactly that
+reason.
 
 Hero being fully covered is the finding rather than a coincidence:
 UNESCO, NRHP, Wikidata and Commons all aim at exactly that tier, and
@@ -147,6 +153,20 @@ employment counts and wages per occupation per metro, replacing
 methodology document cannot be recovered; the data it reasoned about is
 free and still published.
 
+**GNIS** — every named place and physical feature in the United States,
+about 2.3 million of them, as a flat file with no API key and no rate
+limit. **Two Key categories have no other source in the registry at
+all**: UNESCO does not list a local cave and the National Register does
+not list a bluff, so `cave-system` and `natural-formation` could be
+generated and never named. It is the cheapest fix available for the
+anonymous-landmark problem.
+
+**HIFLD Open** — publishes the engine's own ten infrastructure types as
+open national layers, eight of which are mapped. A hospital arrives with
+its real bed count, a plant with its megawatts, a treatment works with
+its throughput — which is precisely the number `landmarks.staffingFor`
+and `control.maintenanceFor` currently size a crew from a band.
+
 ### Identified, not yet wired — the cheapest work left
 
 Each of these is an importer against a known free source with a known
@@ -157,6 +177,12 @@ is the best-value engineering available in this project.
 |---|---|---|
 | Natural Earth | regional `geographyData` | Public domain, no conditions, the top of the boundary hierarchy |
 | USGS 3DEP | `geographyData` | Real elevation for the U.S. prototype region |
+| NCES (CCD, IPEDS) | school enrolment and staff | A real pupil-to-teacher ratio for `statecraft.runSchooling` |
+| CMS Provider of Services | hospital bed counts | More current than HIFLD's hospital layer; prefer whichever was refreshed last |
+| FBI CDE (UCR/NIBRS) | crime calibration | The outside reference CLAUDE.md's seventeenth rule lacked through four wrong thresholds |
+| CDC PLACES | tract health prevalence | What `mortality.diseasePressure` models from a chosen figure |
+| FEMA National Risk Index | hazard per county | So a river town floods and a plains town does not |
+| U.S. Religion Census | adherence per county | Closes `npcs.religion`, a real column set only where a caller supplies one |
 
 ### Use last, or not at all
 
@@ -212,20 +238,30 @@ What is now true and was not before:
 2. **Sixteen sources are registered** with licence, access path, the
    slice each fills and the tier each serves — so nothing is
    named-but-unusable, which was the state of ten of them.
-3. **Ten have importers.** The other six are a known, small amount of
-   work with a named payoff each — and five were wired in the passes
-   after this document was first written, taking regional from 43% to
-   71% and filler from 25% to 75%. That is what "importers, not a
-   negotiation" looks like when somebody actually does them.
+3. **Twelve have importers**, out of twenty-four. Seven of the
+   twenty-four are named in no surviving document and were added by
+   research against gaps the ENGINE has — Census, BLS, GNIS, HIFLD,
+   NCES, CMS, FBI, CDC, FEMA and the Religion Census. Seven were wired
+   in the passes after this document was first written, taking regional
+   from 43% to 86% and filler from 25% to 80%. That is what "importers,
+   not a negotiation" looks like when somebody actually does them.
 4. **Coverage is measured per tier by a command**, closing the
    architecture document's own admission that the 90%/10% automation
    target "is an aspiration with no measurement behind it".
-5. **Licence exposure is counted** — three sources carry conditions that
-   reach the shipped product, and all sixteen licences are flagged
-   unverified until somebody re-checks them, per the standing
-   instruction that dataset terms change quietly.
+5. **Licence exposure is counted** — four sources carry conditions that
+   reach the shipped product (Cesium and OSM are ODbL share-alike,
+   OpenWeather is commercial, and the U.S. Religion Census is an
+   academic archive with its own terms rather than public domain), and
+   all twenty-four licences are flagged unverified until somebody
+   re-checks them, per the standing instruction that dataset terms
+   change quietly.
 
-The next real saving is not a negotiation. It is the remaining six importers — and two of those (Cesium OSM Buildings, OpenStreetMap) are ones to skip rather than build, since Overture covers the same ground without ODbL's share-alike.
+The next real saving is not a negotiation. It is the remaining
+importers — and three of them are ones to SKIP rather than build:
+Cesium OSM Buildings and OpenStreetMap carry ODbL share-alike for
+ground Overture already covers permissively, and OpenWeather is the
+only entry with a per-call cost where NOAA is free for the prototype
+region. Knowing which sources not to wire is part of the saving.
 
 ---
 
