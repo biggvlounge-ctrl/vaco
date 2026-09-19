@@ -196,12 +196,117 @@ it enters. `distress_sale` (62 events) moves goods for money and
 only grows. There is no tax, no rent to an absent owner, no
 depreciation of savings.
 
-A world where everybody gets richer forever makes poverty-driven
-mechanics — `crime.deprivation`, `distress_sale`, the migration
-pressure — progressively unreachable. It is a slow absorbing state and
-it is exactly what the thirteenth rule says to look for.
+**That last sentence was wrong when I wrote it and is corrected
+here.** The claim was that a world where everybody gets richer forever
+makes poverty-driven mechanics — `crime.deprivation`, `distress_sale`,
+the migration pressure — progressively unreachable. It does not follow,
+and one look at `areaStats.povertyLine` would have said so:
 
-### 4. Four of five neighbourhoods sit at crime 100 and health 0
+```js
+const mid = median(worths);
+return mid === null ? null : mid * POVERTY_MEDIAN_FRACTION;
+```
+
+**The line is relative — half the median.** If every wage-earner's
+savings inflate tenfold, the line inflates tenfold with them and the
+SHARE below it barely moves. `isBelowPovertyLine` is relative on both
+sides. So deprivation does not become unreachable; the nominal figures
+just get bigger. Writing that down without checking the consumer was
+the same "citation is not presence" habit this project keeps finding,
+applied to my own reasoning.
+
+What survives is narrower and still real, and it is a different defect:
+
+**`economy.getNetWorth` is `assets + savings - debt` from
+`individual_finances` and does not include the property somebody
+owns.** `property.currentValue` computes value from condition — it
+exists, it is correct, and `players.js` rolls it up as
+`propertySummary.totalValue` in the same dashboard, right beside
+`netWorth`. Eleven call sites read `getNetWorth`: the poverty line
+itself (`areaStats`, twice), `crime.js` twice — who is deprived and who
+is worth stealing from — `births.js`, `trade.js`, `motivation.js`,
+`tick.js`, `statistics.median_net_worth` and `engine.getFamilyWealth`,
+which is just a sum of them.
+
+So **a person who owns three buildings and no cash reads as
+destitute**, and a saver with no home reads as comfortable. The largest
+asset class in the world is invisible to every wealth-dependent
+mechanic. That is the third standing rule's shape — Property Value is a
+computed rollup, it IS computed, and the function that most needs it
+does not read it.
+
+It also explains the monotonic rise better than the missing sink does:
+property decays (169 of 206 buildings at condition 0 by tick 600, so
+that value is being destroyed) while savings inflate, and `getNetWorth`
+sees only the inflating half. **The headline was measuring one side of
+a two-sided ledger.**
+
+The missing sink is still real — production creates money from nothing
+(`employer.assets += wage × WAGE_TO_OUTPUT × productivity`), payroll,
+barter and inheritance only move it, there is no taxation anywhere in
+`statecraft.js`, and nothing destroys money. But with a relative
+poverty line it inflates nominal figures without changing who is poor
+relative to whom, which is a far smaller problem than "10× and rising"
+made it sound.
+
+**Not fixed here on purpose.** Adding property to `getNetWorth` moves
+the poverty line, and the poverty line moves deprivation crime, birth
+rates and trade eligibility at once — the twelfth rule's first clause,
+where a change centred wrong recalibrates the world. It needs the
+before/after distribution measured first, and that measurement is the
+next thing to run rather than a change to make on a second guess.
+
+### 4. Four of five neighbourhoods sit at crime 100 and health 0 — FIXED, and re-played
+
+**Resolved, and the re-play is the proof.** Same world size, same 600
+ticks, after the fix described below:
+
+| | before | after |
+|---|---|---|
+| c1 | health 27, crime **0** | health 30, crime **25** |
+| c2 | health **0**, crime **100** | health 30, crime **25** |
+| c3 | health **0**, crime **100** | health 39, crime **32** |
+| c4 | health **0**, crime **100** | health 33, crime **35** |
+| c5 | health **0**, crime **100** | health 28, crime **19** |
+| stability | 1 STRUGGLING, 4 **COLLAPSING** | **5 STRUGGLING**, none collapsing |
+
+Five distinct crime values across a real spread, health off the floor
+in every area, and nothing else moved: 148 alive, 2,865 events, jobs
+62 → 96, both guards clean, 21 of 21 landmarks named.
+
+**Two causes, one fix, and the second was not the one that looked
+obvious.** Measured across five seeded 600-tick worlds, 24 communities:
+
+- **Calibration.** `DANGER_REFERENCE_PER_1K` was 40, chosen from a
+  sentence about a real society written before anybody measured what
+  this engine produces. The engine's own world rate is ~90 per 1,000
+  per year and per-area rates run p50 80, p90 364. Every populated area
+  was two to four times over the reference, so 18 of 24 read 100 and
+  the other 4 read 0 — four distinct values in the whole sample.
+- **Resolution.** A per-1,000 rate cannot be estimated from the 13–43
+  people this engine puts in a community. One incident read as 58–100;
+  the extreme in the sample was a community of **one person with six
+  incidents = 6,000 per 1,000**, which is not a rate, it is a division.
+
+Shrinkage toward the world rate fixes the second — a published method
+for small-area estimation, not something invented here. **k was
+estimated from the data, not picked**: method of moments gives 19.5,
+stable at either population floor. The unfiltered estimate is 1.8, and
+that is the part worth keeping — the single one-person community
+contributed **87% of the observed between-area variance** and was about
+to set the constant for the whole engine by itself.
+
+The reference is now 280, the p95 of the shrunk distribution.
+`dangerByCommunity` moved onto the same rate: it had been returning
+exactly 1 for those same 18 areas, so `traitDrift`'s pull toward
+criminality was the same constant in nearly every neighbourhood in
+every world.
+
+**`getCommunityHealth` subtracts `crime / 2`**, which is why one fix
+moved both numbers. That was the whole of finding 4: not two symptoms,
+one cause seen twice.
+
+### 4b. The original crime entry, kept for the record
 
 ```
 c1 pop 37 health 27 stab 37 STRUGGLING  crime   0
