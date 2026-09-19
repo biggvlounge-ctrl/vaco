@@ -396,15 +396,29 @@ function advancePropertyLifecycle(worldState, property, tick) {
     return property;
   }
 
-  // Rounded to one decimal. Repeated subtraction of 0.4 in binary
+  // Rounded to two decimals. Repeated subtraction of 0.4 in binary
   // floating point produces 86.39999999999998 after a handful of ticks,
   // which is not more precise than 86.4 -- it is the same number wearing
   // fourteen digits of noise, and every display then has to clean up
   // after the engine.
+  //
+  // **It was ONE decimal, and that quantum was bigger than the thing it
+  // was quantising.** A lived-in, owned home nets +0.05 a tick (0.45 of
+  // upkeep against 0.4 of decay), and the header above says in as many
+  // words that such a home "slowly improves". Rounded to 0.1 it does
+  // not: 80 goes to 80.05, rounds up to 80.1, and the next tick's
+  // 80.14999999999999 rounds back down to 80.1 — measured, a maintained
+  // house sat at exactly 80.1 for two hundred ticks. Whether the net
+  // gain vanished or doubled depended on which side of x.x5 the float
+  // noise fell, which is the one thing rounding was added to stop.
+  //
+  // Two decimals is the smallest quantum smaller than the smallest real
+  // per-tick change, so 0.05 accumulates as 0.05. The noise it was
+  // added for is still gone, and `condition` still reads cleanly.
   property.condition = Math.round(clamp(
     Number(property.condition ?? 100) - CONDITION_DECAY_PER_TICK + upkeepFor(worldState, property),
     0, 100,
-  ) * 10) / 10;
+  ) * 100) / 100;
   return property;
 }
 

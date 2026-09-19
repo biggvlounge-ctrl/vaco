@@ -348,12 +348,24 @@ test('runDiscovery reads communityId, not community_id', () => {
   // Standing rule 6, and `salvage.runSalvage` got this exact line wrong
   // first: an NPC is an engine object with `communityId`, a property is
   // a database row with `community_id`.
+  //
+  // **Sized so it does not depend on `SEARCH_CHANCE`.** The first
+  // version used one person over 600 ticks, which passed at a rate of
+  // 0.01 and failed the moment a playtest showed that rate stripped a
+  // world bare in eighty days. A test whose subject is a field name
+  // should not break when a balance constant moves, so this gives the
+  // draw enough opportunity to be certain at any plausible rate.
   const w = world();
-  const p = person(w, 1, { communityId: 1 });
-  delete p.community_id;
+  for (let i = 1; i <= 30; i += 1) {
+    const p = person(w, i, { communityId: 1 });
+    delete p.community_id;
+  }
   landmark(w, 100, 'library', 90, 1);
-  for (let t = 0; t < 600; t += 1) discovery.runDiscovery(w, w.tick + t);
-  assert.ok(discovery.remainingAt(w, 100) < discovery.findsAt(w, 100));
+  for (let t = 0; t < 3000; t += 1) discovery.runDiscovery(w, w.tick + t);
+  assert.ok(
+    discovery.remainingAt(w, 100) < discovery.findsAt(w, 100),
+    'nobody in thirty people searched anything in three thousand days — the lookup missed',
+  );
 });
 
 // ---------------------------------------------------------------------

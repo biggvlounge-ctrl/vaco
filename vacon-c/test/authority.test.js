@@ -272,7 +272,27 @@ test('a lived-in, owned home holds; an empty one rots', () => {
   // **The third one-way ratchet.** Condition fell 0.4 a tick with
   // nothing restoring it, so every building in every world was at 0 by
   // tick 300 and `communities.housing` read 0 everywhere.
-  const w = { tick: 0, properties: [], ownershipRecords: [] };
+  // **The occupants have to be PEOPLE.** `upkeepFor` reads
+  // `property.occupants.length` for the base, and `control.upkeepOf`
+  // scales that base by how many of them the maintain key can actually
+  // find in `worldState.npcs`. A fixture that lists two occupant ids
+  // and has no `npcs` array at all therefore reports a fully occupied
+  // house as staffed by nobody, ratio 0, upkeep 0 — and this test spent
+  // three commits asserting that a lived-in home holds while proving
+  // the opposite. Standing rule 6's shape at one remove: the field
+  // exists, the ids in it point at nothing.
+  // Age comes from `createdTick` against the world tick — `mortality
+  // .ageInYears` accepts no other spelling on purpose — so the world
+  // starts a working lifetime in, not at zero.
+  const w = {
+    tick: 34 * 365,
+    properties: [],
+    ownershipRecords: [],
+    npcs: [
+      { id: 1, createdTick: 0, status: 'active', home_property_id: 1 },
+      { id: 2, createdTick: 3 * 365, status: 'active', home_property_id: 1 },
+    ],
+  };
   const lived = {
     id: 1, condition: 80, age: 10, lifecycle_stage: 'operation', occupants: [1, 2],
   };
@@ -290,8 +310,16 @@ test('a lived-in, owned home holds; an empty one rots', () => {
     property.advancePropertyLifecycle(w, empty, t);
   }
 
-  assert.ok(lived.condition > 80,
-    `a home somebody lives in and somebody owns fell to ${lived.condition}`);
+  // **Not `> 80`.** That passed while a maintained house sat frozen at
+  // 80.1 for the whole two hundred ticks, because the old one-decimal
+  // rounding was a coarser quantum than the 0.05 a tick it was
+  // rounding. The claim is that the home IMPROVES, so the assertion is
+  // on the rate: 0.45 of upkeep against 0.4 of decay is +0.05 a tick,
+  // which over 200 ticks is +10, and anything much under that means the
+  // gain is being lost somewhere between the constants and the field.
+  assert.ok(lived.condition >= 89,
+    `a home somebody lives in and somebody owns should gain ~0.05 a tick `
+    + `(80 -> ~90 over 200 ticks); it read ${lived.condition}`);
   assert.equal(empty.condition, 0, 'a building nobody lives in or owns never decayed');
 
   // Both halves count, and neither alone holds a building up.

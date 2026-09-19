@@ -789,6 +789,67 @@ passed once the file was really in, which is the whole point of it.
 `git status` is clean.** The two are different questions and only one
 of them is about your file.
 
+**A twenty-third, and it is the thirteenth rule killed by a tidiness
+measure. A rounding quantum coarser than the per-step change erases
+the change — or doubles it, and which one depends on float noise.**
+
+`property.advancePropertyLifecycle` rounded `condition` to one decimal,
+for a good and stated reason: repeated subtraction of 0.4 in binary
+floating point produces `86.39999999999998`, which is the same number
+wearing fourteen digits of noise. The reason was right and the quantum
+was wrong. A lived-in, owned home nets **+0.05 a tick** — 0.3 of
+occupant upkeep plus 0.15 of owner upkeep against 0.4 of decay — and
+the file's own header says such a home "slowly improves".
+
+It does not. Measured: a maintained house went 80 → 80.05 → rounded up
+to **80.1, and sat at exactly 80.1 for two hundred ticks**, because
+`80.1 - 0.4 + 0.45` lands on `80.14999999999999` and rounds back down.
+Had the float noise fallen the other way it would have rounded up every
+tick instead and the house would have gained 0.1 a tick — **double** the
+real rate. So the guard added to remove float noise made the outcome
+depend on float noise, in the one place it decided whether an inverse
+existed at all.
+
+This is the thirteenth rule with a new cause. Buildings were the third
+one-way ratchet this project found and the inverse was built; the
+rounding then quietly took it back, and `dev-docs/PLAYTEST_19_SEP_2026
+.md`'s "85% of all buildings are ruins by tick 600" was measured with it
+in place. **When a value is rounded, check the quantum against the
+smallest real per-step change**, not against how many digits look tidy.
+
+And the reason it survived: `test/authority.test.js` asserted
+`lived.condition > 80`, which 80.1 satisfies. An assertion on the
+DIRECTION passes for a mechanism that has stopped; the assertion has to
+be on the RATE, because the rate is what was claimed.
+
+**A twenty-fourth, and it is the eighth rule's mirror image. A fixture
+whose subject is generated is untrustworthy; so is one whose ASSERTION
+encodes an accident of the seed.**
+
+`test/justice.test.js`'s "a generated world reaches it, and reaching it
+is RARE" built a seeded world, ran 200 ticks, and asserted that **every
+cleared incident with a named perpetrator becomes a court case.**
+`runJustice` does no such thing and never claimed to: `authority
+.prosecutes` charges where the state's writ reaches and files a
+`groupSanctions` row where it does not, because a contested area charges
+what it cannot ignore and lets the rest go. That branch is the entire
+point of `server/authority.js`.
+
+So the assertion silently asserted that **no area in this world is
+contested** — and passed for as long as the seed happened not to produce
+one. The day it did, incident 2 went unanswered in community 2 under
+regime `contested`, and a green suite reported a working decline as
+"the cascade is broken between policing and justice".
+
+The eighth rule is about the subject of a test being random. This is
+about the EXPECTATION being random: a two-branch decision asserted as
+though it had one branch, where the untaken branch is not a bug but the
+feature. **When the code under test can take more than one correct
+path, the assertion has to name all of them** — here, that every cleared
+incident is DISPOSED OF, as a case or as a sanction, and never left in
+limbo. That is the claim worth holding, and it is the one that does not
+depend on which way a seeded world happened to fall.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

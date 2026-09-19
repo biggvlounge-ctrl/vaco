@@ -49,6 +49,7 @@ const path = require('node:path');
 
 const justice = require('../server/justice.js');
 const crime = require('../server/crime.js');
+const authority = require('../server/authority.js');
 const politics = require('../server/politics.js');
 const behavior = require('../server/behavior.js');
 const statistics = require('../server/statistics.js');
@@ -445,10 +446,24 @@ test('a generated world reaches it, and reaching it is RARE', () => {
   // around two incidents, of which policing clears a fraction.
   //
   // So this asserts the pipeline is CONNECTED — every cleared incident
-  // with a living perpetrator becomes a case — rather than asserting a
+  // with a living perpetrator is DISPOSED OF — rather than asserting a
   // conviction count a small world cannot reliably produce. Tuning the
   // crime rate upward so a fixture could watch a trial would be
   // inflating a constant to make a new system look consequential.
+  //
+  // **"Disposed of" is two outcomes, not one, and the first version of
+  // this test only knew about one of them.** `runJustice` charges an
+  // offence where the state's writ reaches and files a `groupSanctions`
+  // row where it does not — a contested area charges what it cannot
+  // ignore and lets the rest go, which is the whole point of
+  // `authority.prosecutes`. Asserting that every cleared incident
+  // becomes a COURT CASE therefore asserts that no area in the world is
+  // contested, and it passed only for as long as this seed happened not
+  // to produce one. It stopped passing the day the seed did: incident 2
+  // went unanswered in community 2, regime `contested`, and the test
+  // called a working decline a broken cascade.
+  //
+  // The real claim is that nothing is left in limbo.
   const w = engine.WorldState;
   worldgen.generateWorld({
     cities: 2, communitiesPerCity: 2, populationPerCommunity: 12, seed: 'law',
@@ -460,11 +475,24 @@ test('a generated world reaches it, and reaching it is RARE', () => {
   const chargeable = w.crimeIncidents.filter(
     (i) => i.cleared === true && i.perpetrator_entity_id !== null,
   );
-  const charged = new Set(w.courtCases.map((c) => c.incident_id));
-  const missed = chargeable.filter((i) => !charged.has(i.id));
+  const disposed = new Set([
+    ...w.courtCases.map((c) => c.incident_id),
+    ...(w.groupSanctions || []).map((g) => g.incident_id),
+  ]);
+  const missed = chargeable.filter((i) => !disposed.has(i.id));
   assert.deepEqual(missed.map((i) => i.id), [],
-    'a cleared incident with a named perpetrator produced no case — the cascade is broken '
-    + 'between policing and justice');
+    'a cleared incident with a named perpetrator produced neither a court case nor a group '
+    + 'sanction — the cascade is broken between policing and justice');
+
+  // And every disposal names which of the two it was, so "the state
+  // declined" can never be read as "the state never looked".
+  for (const sanction of w.groupSanctions || []) {
+    assert.ok(authority.REGIMES.includes(sanction.regime),
+      `a declined offence recorded regime "${sanction.regime}", which is not a regime`);
+    assert.ok(!disposed.has(sanction.incident_id)
+      || !w.courtCases.some((c) => c.incident_id === sanction.incident_id),
+      `incident ${sanction.incident_id} was both charged and declined`);
+  }
 
   // Whatever cases there are, they are well formed.
   for (const caseRow of w.courtCases) {

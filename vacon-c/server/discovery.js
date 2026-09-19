@@ -291,7 +291,38 @@ function search(worldState, entityId, propertyId, options = {}) {
 // Who searches: anybody, employed or not. Searching a cathedral is not
 // a job — this is the correction `runSalvage` needed after measuring,
 // applied first time here rather than after.
-const SEARCH_CHANCE = 0.01;
+
+//: **How often somebody goes looking, and the first value was wrong by
+//: more than an order of magnitude.**
+//:
+//: At 0.01 a playtest stripped the world bare in **81 ticks** — under
+//: three months. 79% of everything findable was gone inside sixty days,
+//: so a player arriving in the second season of the first year would
+//: find every library already emptied and never know there had been
+//: anything in them. That is worse than the system not existing,
+//: because the world LOOKS like it should hold something.
+//:
+//: Measured on a generated world (150 people, 21 landmarks, supply 81),
+//: running the pass at candidate rates until nothing was left:
+//:
+//:     0.01     81 ticks   0.2 years
+//:     0.004   181 ticks   0.5 years
+//:     0.002   373 ticks   1.0 years
+//:     0.001   996 ticks   2.7 years
+//:     0.0005 1329 ticks   3.6 years
+//:
+//: 0.001 is chosen, and the argument is the one already written into
+//: this file's header rather than a preference about pacing: a person
+//: searches a landmark **once every two or three years**, which is what
+//: "a notable expedition" means. At 0.01 it was three or four times a
+//: year — a habit, and habits belong in `behavior.js`.
+//:
+//: **The supply is finite on purpose and does not replenish.** What a
+//: collapse left behind is what there is; once the libraries are picked
+//: clean they stay picked clean. So discovery is deliberately an
+//: early-world system that fades, and this rate decides how long that
+//: takes — about three years, rather than one season.
+const SEARCH_CHANCE = 0.001;
 const SEARCH_AGE = 16;
 
 function runDiscovery(worldState, tick = worldState.tick ?? 0) {
