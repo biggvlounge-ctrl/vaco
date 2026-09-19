@@ -486,3 +486,107 @@ test('ids survive a reseed, so a restored world does not reuse them', () => {
   const a = person(w, { communityId: c.id });
   assert.equal(crime.recordCrime(w, { category: 'theft', perpetratorId: a.id }).id, 42);
 });
+
+// -- the scale a player actually reads -------------------------------------
+
+test('a small area needs evidence before its own rate is believed', () => {
+  // **A per-1,000 rate cannot be estimated from thirty people.** One
+  // recorded incident in an area of 13 is 77 per 1,000, which on the
+  // raw rate against the old reference of 40 was an instant 100. The
+  // extreme in the measured sample was a community of ONE person with
+  // six incidents — 6,000 per 1,000 per year, which is not a crime
+  // rate, it is a division.
+  const w = {
+    tick: 400,
+    npcs: [],
+    communities: [{ id: 1 }, { id: 2 }],
+    crimeIncidents: [],
+  };
+  // Two areas, same single incident, very different populations.
+  for (let i = 1; i <= 5; i += 1) w.npcs.push({ id: i, communityId: 1, status: 'active' });
+  for (let i = 100; i < 200; i += 1) w.npcs.push({ id: i, communityId: 2, status: 'active' });
+  w.crimeIncidents.push({ id: 1, community_id: 1, category: 'theft', tick: 390 });
+  w.crimeIncidents.push({ id: 2, community_id: 2, category: 'theft', tick: 390 });
+
+  const since = { sinceTick: 35 };
+  const rawSmall = crime.ratePer1k(w, 1, since);
+  const rawBig = crime.ratePer1k(w, 2, since);
+  assert.equal(rawSmall, 200, 'one incident among five people is 200 per 1,000 raw');
+  assert.equal(rawBig, 10);
+
+  const shrunkSmall = crime.shrunkRatePer1k(w, 1, since);
+  const shrunkBig = crime.shrunkRatePer1k(w, 2, since);
+  // The small area is pulled hard toward the world rate; the large one
+  // barely moves, because it has the evidence to speak for itself.
+  assert.ok(shrunkSmall < rawSmall / 2,
+    `five people with one incident should not read as 200 per 1,000 (got ${shrunkSmall})`);
+  assert.ok(Math.abs(shrunkBig - rawBig) < Math.abs(shrunkSmall - rawSmall),
+    'the larger area should be shrunk less than the smaller one');
+});
+
+test('an area with no incidents is not proven safe', () => {
+  // Unknown is not zero, and it cuts this way too: thirty people with a
+  // quiet year in a violent town have not been shown to be safe. They
+  // inherit a little of the world's own rate.
+  const w = {
+    tick: 400,
+    npcs: [],
+    communities: [{ id: 1 }, { id: 2 }],
+    crimeIncidents: [],
+  };
+  for (let i = 1; i <= 30; i += 1) w.npcs.push({ id: i, communityId: 1, status: 'active' });
+  for (let i = 100; i <= 130; i += 1) w.npcs.push({ id: i, communityId: 2, status: 'active' });
+  // Everything happens in area 2.
+  for (let i = 0; i < 10; i += 1) {
+    w.crimeIncidents.push({ id: i + 1, community_id: 2, category: 'theft', tick: 380 });
+  }
+
+  const since = { sinceTick: 35 };
+  assert.equal(crime.ratePer1k(w, 1, since), 0);
+  assert.ok(crime.shrunkRatePer1k(w, 1, since) > 0,
+    'a quiet year in a violent town is not a proof of safety');
+  // But it is still clearly the safer of the two.
+  assert.ok(crime.shrunkRatePer1k(w, 1, since) < crime.shrunkRatePer1k(w, 2, since));
+});
+
+test('an empty area is unmeasured, not safe', () => {
+  const w = { tick: 400, npcs: [], communities: [{ id: 1 }], crimeIncidents: [] };
+  assert.equal(crime.shrunkRatePer1k(w, 1, { sinceTick: 35 }), null,
+    'an empty block has no crime rate — returning 0 would say it was measured and found safe');
+});
+
+test('the danger map and the displayed level are built from the same rate', () => {
+  // Third standing rule. `dangerByCommunity` used the raw rate against
+  // a reference of 40 and so returned exactly 1 for eighteen of the
+  // twenty-four measured areas — which made traitDrift's pull toward
+  // criminality the same constant in nearly every neighbourhood.
+  const w = {
+    tick: 400,
+    npcs: [],
+    communities: [{ id: 1 }],
+    crimeIncidents: [],
+  };
+  for (let i = 1; i <= 40; i += 1) w.npcs.push({ id: i, communityId: 1, status: 'active' });
+  for (let i = 0; i < 3; i += 1) {
+    w.crimeIncidents.push({ id: i + 1, community_id: 1, category: 'theft', tick: 380 });
+  }
+
+  const danger = crime.dangerByCommunity(w, { tick: 400 });
+  const expected = Math.min(
+    1,
+    crime.shrunkRatePer1k(w, 1, { sinceTick: 35 }) / crime.DANGER_REFERENCE_PER_1K,
+  );
+  assert.ok(Math.abs(danger.get(1) - expected) < 1e-9,
+    'dangerByCommunity is not using the same rate the displayed level uses');
+});
+
+test('the reference is above what the engine actually produces', () => {
+  // The old reference of 40 sat below the engine's own measured world
+  // rate of about 90 per 1,000 per year, so every populated area
+  // saturated by construction. A reference below what the model
+  // generates is not a scale, it is a threshold everything crosses.
+  assert.ok(crime.DANGER_REFERENCE_PER_1K > 90,
+    'the danger reference is below the engine\'s own measured crime rate, so every '
+    + 'populated area will read as maximally dangerous');
+  assert.ok(crime.SHRINKAGE_EXPOSURE > 0);
+});

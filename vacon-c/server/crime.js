@@ -696,12 +696,71 @@ function countsByCategory(worldState, communityId, options = {}) {
 //: would read as dangerous forever. One year of ticks is the shortest
 //: window that is not dominated by whether anything happened last week.
 //:
-//: 40 per 1,000 per year is the reference. Flagged interpretive: no
-//: document sets one, and it is chosen so that a settlement where
-//: roughly one person in twenty-five is involved in a recorded incident
-//: in a year reads as fully dangerous rather than merely bad.
+//: **The reference was 40 and it was wrong by a factor of seven,
+//: measured.** It was chosen so that "roughly one person in
+//: twenty-five involved in a recorded incident in a year reads as
+//: fully dangerous" — a sentence about a real society, written before
+//: anybody measured what THIS engine produces.
+//:
+//: Measured across five seeded 600-tick worlds, 24 communities:
+//:
+//:     raw per-area rate   p50 80   p90 364   max 6000
+//:     world rate          90 per 1,000 per year
+//:
+//: Every populated area sits two to four times over 40, so
+//: `communities.crime` read **100 in 18 of 24 areas and 0 in the
+//: other 4** — four distinct values across the whole sample, and a
+//: player looking at the two numbers they look at first could not tell
+//: four of five neighbourhoods apart. `getCommunityHealth` subtracts
+//: `crime / 2`, so the same defect floored health at 0 in the same
+//: areas. One cause, both symptoms.
+//:
+//: 280 is the 95th percentile of the SHRUNK distribution below, so the
+//: worst area in twenty reads as fully dangerous and everything else
+//: has somewhere to sit. Measured, not chosen — CLAUDE.md's twelfth
+//: rule, third clause, which this file has now been on the wrong side
+//: of twice.
 const DANGER_WINDOW_TICKS = 365;
-const DANGER_REFERENCE_PER_1K = 40;
+const DANGER_REFERENCE_PER_1K = 280;
+
+//: **How much exposure a small area needs before its own rate is
+//: believed**, in person-years. The second half of the same defect, and
+//: it is not the reference's fault.
+//:
+//: A per-1,000 rate cannot be estimated from thirty people. Measured on
+//: the same worlds: one recorded incident reads as 58-100 in an area of
+//: 13-43, and an area of 13 hits the ceiling on its first offence. The
+//: extreme case in the sample was a community of ONE person with six
+//: incidents — **6,000 per 1,000 per year**, which is not a crime rate,
+//: it is a division.
+//:
+//: The standard treatment for small-area rates is shrinkage toward the
+//: parent rate, and it is a published method rather than something
+//: invented here — the same justification as Köppen-Geiger in
+//: `world-layer/imports/noaaImport.js`. An area's estimate is pulled
+//: toward the world's own rate in proportion to how little evidence it
+//: has:
+//:
+//:     (incidents + k × worldRatePerPerson) / (personYears + k) × 1000
+//:
+//: **k = 20 was estimated from the data, not picked.** Method of
+//: moments on the measured worlds gives k ≈ 19.5, stable whether the
+//: floor is 5 or 10 residents. The unfiltered estimate is 1.8 — and
+//: that is worth recording, because the single one-person community
+//: contributed **87% of the observed between-area variance** and was
+//: about to set this constant for the whole engine on its own. A
+//: community of one person is not a community.
+//:
+//: What it does to the same 24 areas:
+//:
+//:     before   4 distinct values,  18 at 100, 4 at 0
+//:     after   20 distinct values,   1 at 100, 0 at 0
+//:
+//: Note that an area with no incidents no longer reads 0. That is
+//: deliberate and it is the honest half: thirty-five people with a
+//: quiet year in a violent town have not been shown to be safe, and
+//: `unknown is not zero` cuts this way too.
+const SHRINKAGE_EXPOSURE = 20;
 
 // How dangerous each community currently is, 0..1, keyed by community
 // id. Built once for a whole pass rather than asked per person —
@@ -714,18 +773,63 @@ function dangerByCommunity(worldState, options = {}) {
   const { tick = worldState.tick ?? 0, window = DANGER_WINDOW_TICKS } = options;
   const danger = new Map();
   for (const community of worldState.communities || []) {
-    const rate = ratePer1k(worldState, community.id, { sinceTick: tick - window });
+    // **The shrunk rate, the same one `territory.conditionsOf` reads.**
+    // This used the raw rate against a reference of 40, which means it
+    // returned exactly 1 for 18 of the 24 measured areas — so
+    // `traitDrift`'s pull toward criminality was the SAME in nearly
+    // every neighbourhood in every world, which is the constant this
+    // map exists to stop being. Two consumers of one number must not
+    // compute it two ways (third standing rule).
+    const rate = shrunkRatePer1k(worldState, community.id, { sinceTick: tick - window });
     if (rate === null) continue;
     danger.set(community.id, Math.min(1, rate / DANGER_REFERENCE_PER_1K));
   }
   return danger;
 }
 
+// The raw observed rate. Kept, because it is the honest count of what
+// happened and some questions want exactly that — but it is NOT what a
+// displayed 0..100 level should be built from at these populations.
+// See `SHRINKAGE_EXPOSURE`.
 function ratePer1k(worldState, communityId, options = {}) {
   const population = areaStats.residentsOf(worldState, communityId).length;
   if (population === 0) return null;
   const total = incidentsIn(worldState, communityId, options).length;
   return Math.round((total / population) * 1000 * 100) / 100;
+}
+
+// The world's own rate, which is the prior a small area is shrunk
+// toward. Null where there is nobody at all to have a rate.
+function worldRatePer1k(worldState, options = {}) {
+  const population = (worldState.npcs || []).filter((n) => n.status !== 'deceased').length;
+  if (population === 0) return null;
+  const { sinceTick = null } = options;
+  const total = (worldState.crimeIncidents || [])
+    .filter((i) => sinceTick === null || Number(i.tick) >= sinceTick).length;
+  return Math.round((total / population) * 1000 * 100) / 100;
+}
+
+// The rate a 0..100 level should be built from: the area's own
+// evidence, pulled toward the world's rate in proportion to how little
+// of it there is.
+//
+// **Returns null for an area with nobody in it**, exactly as
+// `ratePer1k` does — an empty block is unmeasured, not safe. And it
+// falls back to the raw rate where the world itself has no rate to
+// shrink toward, which cannot happen in a populated world but would
+// otherwise be a silent 0/0.
+function shrunkRatePer1k(worldState, communityId, options = {}) {
+  const population = areaStats.residentsOf(worldState, communityId).length;
+  if (population === 0) return null;
+  const incidents = incidentsIn(worldState, communityId, options).length;
+
+  const worldRate = worldRatePer1k(worldState, options);
+  if (worldRate === null) return ratePer1k(worldState, communityId, options);
+
+  const priorPerPerson = worldRate / 1000;
+  const shrunk = (incidents + SHRINKAGE_EXPOSURE * priorPerPerson)
+    / (population + SHRINKAGE_EXPOSURE);
+  return Math.round(shrunk * 1000 * 100) / 100;
 }
 
 // World totals, for the denominator a comparison needs.
@@ -764,6 +868,9 @@ module.exports = {
   ratePer1k,
   DANGER_WINDOW_TICKS,
   DANGER_REFERENCE_PER_1K,
+  SHRINKAGE_EXPOSURE,
+  shrunkRatePer1k,
+  worldRatePer1k,
   dangerByCommunity,
   worldCounts,
   sharesFamily,

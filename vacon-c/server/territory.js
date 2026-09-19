@@ -438,7 +438,15 @@ function conditionsOf(worldState, communityId, options = {}) {
   const since = { sinceTick: tick - window };
 
   // crime — what happens here.
-  const rate = crime.ratePer1k(worldState, communityId, since);
+  //
+  // **The SHRUNK rate, not the raw one.** A per-1,000 rate cannot be
+  // estimated from the thirteen-to-forty-three people this engine puts
+  // in a community: one recorded incident read as 58-100 on the old
+  // raw rate, so `crime` had two reachable values and four of five
+  // neighbourhoods were indistinguishable on the number a player looks
+  // at first. See `crime.SHRINKAGE_EXPOSURE` for the measurement and
+  // the method.
+  const rate = crime.shrunkRatePer1k(worldState, communityId, since);
   const crimeLevel = rate === null
     ? null
     : clamp(Math.round((rate / crime.DANGER_REFERENCE_PER_1K) * 100), 0, 100);
