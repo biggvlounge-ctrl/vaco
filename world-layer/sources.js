@@ -277,7 +277,7 @@ const SOURCES = {
     fills: ['populationData', 'economicData'],
     tiers: ['regional'],
     scale: 'every U.S. census tract, annually',
-    wired: null,
+    wired: 'imports/censusImport.js',
     note: '**Real demographics per neighbourhood, at the grain a community actually is.** '
       + 'VACON-C generates age, household, education and income distributions from bands '
       + 'this project chose; ACS publishes the real ones per tract, free. §9 permits '
@@ -294,7 +294,7 @@ const SOURCES = {
     fills: ['economicData'],
     tiers: ['regional'],
     scale: 'occupational employment and wages, per metro area',
-    wired: null,
+    wired: 'imports/blsImport.js',
     note: '**The occupation taxonomy\'s missing evidence.** '
       + '`REBUILD_OCCUPATION_REQUIREMENTS_BLS_SOURCED.md` — named by the master index, '
       + 'recorded as written, and not in this repository — was the BLS methodology '

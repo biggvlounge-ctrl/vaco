@@ -45,6 +45,8 @@ const overture = require('../imports/overtureImport');
 const nrhp = require('../imports/nrhpImport');
 const wikidata = require('../imports/wikidataImport');
 const noaa = require('../imports/noaaImport');
+const census = require('../imports/censusImport');
+const bls = require('../imports/blsImport');
 
 // ---------------------------------------------------------------------
 // The registry
@@ -286,6 +288,139 @@ test('describeImages reports the licence position, including the unknowns', () =
 });
 
 // ---------------------------------------------------------------------
+// Census ACS — real neighbourhoods, and §9's firewall
+// ---------------------------------------------------------------------
+
+test('ACS produces distributions and never a person', () => {
+  // §9 permits demographic modelling and FORBIDS demographics
+  // determining morality, criminality, intelligence or worth. That is a
+  // rule about what may read a distribution, not about where it came
+  // from — and real data makes it more pressing, because a measured
+  // number carries an authority an invented one does not.
+  const layer = createWorldLayer();
+  const place = generateLocation(layer, { name: 'Tract 1021', lat: 38.62, lng: -90.19, tier: 'filler' });
+  census.importAcsTract(layer, place.id, {
+    tractId: '29510102100',
+    population: 4120,
+    ageCounts: { '0-15': 800, '16-64': 2700, '65+': 620 },
+    attainment: { less_than_high_school: 300, high_school_graduate: 900, bachelors_degree: 700 },
+    medianHouseholdIncome: 48200,
+  });
+
+  assert.equal(place.populationData.containsIndividualAttributes, false);
+  // Shares, not counts — a tract has thousands of people and a
+  // generated community has dozens.
+  assert.ok(place.populationData.ageBands['0-15'] < 1);
+  assert.equal(place.economicData.medianHouseholdIncome, 48200);
+});
+
+test('an unattributed statistic is refused', () => {
+  // A figure with no tract id cannot be checked against the source, and
+  // an uncheckable statistic is indistinguishable from an invented one.
+  const layer = createWorldLayer();
+  const place = generateLocation(layer, { name: 'X', lat: 1, lng: 2, tier: 'filler' });
+  assert.throws(() => census.importAcsTract(layer, place.id, { population: 100 }), /tractId/);
+});
+
+test('ACS attainment maps onto the engine’s own six levels', () => {
+  const demographics = require('../../vacon-c/server/demographics.js');
+  for (const level of Object.values(census.ATTAINMENT_MAP)) {
+    assert.ok(demographics.EDUCATION_LEVELS.includes(level), `"${level}" is not an education level`);
+  }
+  // And the rung with no clean equivalent is declared rather than
+  // presented as a match.
+  assert.ok(census.APPROXIMATE_RUNGS.includes('vocational'));
+});
+
+test('an ACS category the map does not know is named, not folded into a neighbour', () => {
+  // A silent fold is how a distribution ends up shaped by the mapping
+  // rather than by the data.
+  const result = census.attainmentDistribution({
+    high_school_graduate: 100, doctorate_in_basket_weaving: 50,
+  });
+  assert.deepEqual(result.unmapped, ['doctorate_in_basket_weaving']);
+});
+
+test('suppressed figures are reported as missing, not smoothed to zero', () => {
+  // The Census Bureau suppresses figures for small populations to
+  // protect privacy. That is a real property of the source, and a null
+  // share is not a zero share.
+  const layer = createWorldLayer();
+  const place = generateLocation(layer, { name: 'Tract 9', lat: 1, lng: 2, tier: 'filler' });
+  census.importAcsTract(layer, place.id, { tractId: '29510000900', population: 12 });
+  const report = census.describeAcsCoverage(layer);
+  assert.equal(report.tracts, 1);
+  assert.deepEqual(report.suppressedOrMissing.attainment, ['Tract 9']);
+});
+
+// ---------------------------------------------------------------------
+// BLS — the lost document's data
+// ---------------------------------------------------------------------
+
+test('every engine occupation maps to a SOC group, and none is fictional', () => {
+  // **This test caught a real defect.** The first version of the map was
+  // written from memory of the occupation list rather than from the
+  // list: ten occupations that do not exist (`banker`, `programmer`,
+  // `nurse`, `smith`, `miner`...) and seven real ones unmapped. Hence
+  // comparing against the actual export rather than against a count.
+  const occupations = require('../../vacon-c/server/occupations.js');
+  const mapped = Object.keys(bls.SOC_GROUP_BY_OCCUPATION);
+
+  assert.deepEqual(
+    occupations.OCCUPATION_NAMES.filter((o) => bls.groupFor(o) === null), [],
+    'an occupation with no SOC group can never be informed by real employment data',
+  );
+  assert.deepEqual(
+    mapped.filter((m) => !occupations.OCCUPATION_NAMES.includes(m)), [],
+    'the map names an occupation this engine does not have',
+  );
+});
+
+test('every group used has a published name, and every named group is used', () => {
+  const used = new Set(Object.values(bls.SOC_GROUP_BY_OCCUPATION));
+  for (const group of used) assert.ok(bls.SOC_GROUP_NAMES[group], `group ${group} has no name`);
+  for (const group of Object.keys(bls.SOC_GROUP_NAMES)) {
+    assert.ok(used.has(group), `group ${group} is named and nothing maps to it`);
+  }
+});
+
+test('OES rows become an employment shape, with what the engine cannot model named', () => {
+  // A collapsed world has no paralegals. The share of a real labour
+  // market this engine cannot represent is a fact about the model worth
+  // reporting rather than dropping.
+  const shape = bls.toEmploymentShape([
+    { socGroup: '47-0000', employment: 5000 },
+    { socGroup: '29-0000', employment: 3000 },
+    { socGroup: '23-0000', employment: 2000 },
+  ]);
+  assert.equal(shape.shares['47'], 0.625);
+  assert.deepEqual(shape.unmodelledGroups, [{ group: '23', employment: 2000 }]);
+  assert.equal(shape.modelledShare, 0.8);
+});
+
+test('median and mean wages are both kept, and neither is derived', () => {
+  // Wage distributions are strongly skewed; a mean without a median
+  // hides exactly what a game economy cares about, and one cannot be
+  // computed from the other.
+  const table = bls.toWageTable([{ socGroup: '47-0000', medianWage: 48000, meanWage: 53000 }]);
+  assert.equal(table['47'].medianWage, 48000);
+  assert.equal(table['47'].meanWage, 53000);
+  assert.ok(table['47'].occupations.includes('labourer'));
+});
+
+test('a labour market attaches to a city without destroying its other economics', () => {
+  const layer = createWorldLayer();
+  const city = generateLocation(layer, { name: 'St. Louis', lat: 38.62, lng: -90.19, tier: 'regional' });
+  setLocationData(layer, city.id, 'economicData', { medianHouseholdIncome: 48200 });
+  bls.importOesMetro(layer, city.id, {
+    areaCode: '41180', areaName: 'St. Louis, MO-IL', year: 2023,
+    rows: [{ socGroup: '47-0000', employment: 5000, medianWage: 48000 }],
+  });
+  assert.equal(city.economicData.medianHouseholdIncome, 48200, 'the labour market overwrote the income');
+  assert.equal(city.economicData.labourMarket.areaCode, '41180');
+});
+
+// ---------------------------------------------------------------------
 // Every fetch is honest about being blocked
 // ---------------------------------------------------------------------
 
@@ -303,6 +438,8 @@ test('each fetch says why it cannot run and what to call instead', () => {
     wikidata.fetchWikidataEntities,
     wikidata.fetchCommonsImages,
     noaa.fetchClimateNormals,
+    census.fetchAcsTracts,
+    bls.fetchOesData,
   ]) {
     assert.throws(fetcher, (error) => {
       assert.match(error.message, /not implemented/);

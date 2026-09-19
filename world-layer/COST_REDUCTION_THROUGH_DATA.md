@@ -7,7 +7,7 @@ that down, and what specifically has to be built to collect the saving?
 **The short answer**: the largest single lever is not a discount, it is
 a **reclassification** — every location a free dataset can describe
 completely is a location that moves out of the tier that costs money.
-Sixteen sources are now registered in `sources.js`, eight have importers,
+Sixteen sources are now registered in `sources.js`, ten have importers,
 and `costModel.automationCoverage()` reports what that covers. This
 document is the reasoning; the numbers come from a command.
 
@@ -65,13 +65,14 @@ percentage.** Measured today:
 | Tier | Slices its sources speak to | Automated | Share |
 |---|---|---|---|
 | hero | landmark, population | 2 | **100%** |
-| regional | landmark, business, geography, transportation, building, population, economic | 4 | **57%** |
+| regional | landmark, business, geography, transportation, building, population, economic | 5 | **71%** |
 | filler | geography, building, transportation, business | 3 | **75%** |
 
-*(Eight of sixteen sources wired. The first pass measured 100/43/25 with
-five; Overture Divisions, Overture Buildings and NOAA moved regional and
-filler. Run `costModel.automationCoverage()` rather than trusting this
-table — it is generated from the registry and this is a snapshot.)*
+*(Ten of sixteen sources wired. The first pass measured 100/43/25 with
+five; Overture Divisions, Overture Buildings and NOAA took it to
+100/57/75, and Census ACS and BLS took regional to 71%. Run
+`costModel.automationCoverage()` rather than trusting this table — it is
+generated from the registry and this is a snapshot.)*
 
 Hero being fully covered is the finding rather than a coincidence:
 UNESCO, NRHP, Wikidata and Commons all aim at exactly that tier, and
@@ -131,6 +132,21 @@ is **Köppen-Geiger**, the published standard, validated in the tests
 against the literature's own answers for St. Louis (Cfa), Phoenix (BWh)
 and Singapore (Af).
 
+**Census ACS** — real age, household, attainment and income
+distributions per census TRACT, which is roughly a neighbourhood and
+therefore the one source whose grain matches what the engine calls a
+community. It produces distributions only and never a person: §9 permits
+demographic modelling and forbids demographics determining morality,
+criminality, intelligence or worth, and importing real numbers makes
+that firewall more important rather than less.
+
+**BLS (OES)** — the dataset the lost
+`REBUILD_OCCUPATION_REQUIREMENTS_BLS_SOURCED.md` was about. Real
+employment counts and wages per occupation per metro, replacing
+`drawOccupation`'s `1/tier` pyramid and `economy.js`'s wage bands. The
+methodology document cannot be recovered; the data it reasoned about is
+free and still published.
+
 ### Identified, not yet wired — the cheapest work left
 
 Each of these is an importer against a known free source with a known
@@ -139,8 +155,6 @@ is the best-value engineering available in this project.
 
 | Source | Closes | Why it matters |
 |---|---|---|
-| Census ACS | regional `populationData`, `economicData` | Real demographics per tract instead of chosen bands |
-| BLS (OES/QCEW) | regional `economicData` | Real employment and wages per occupation per metro — what `occupations.js` draws from a 1/tier pyramid |
 | Natural Earth | regional `geographyData` | Public domain, no conditions, the top of the boundary hierarchy |
 | USGS 3DEP | `geographyData` | Real elevation for the U.S. prototype region |
 
@@ -198,11 +212,11 @@ What is now true and was not before:
 2. **Sixteen sources are registered** with licence, access path, the
    slice each fills and the tier each serves — so nothing is
    named-but-unusable, which was the state of ten of them.
-3. **Eight have importers.** The other eight are a known, small amount
-   of work with a named payoff each — and three of the first eight were
-   wired in the pass after this document was written, moving regional
-   from 43% to 57% and filler from 25% to 75%, which is what "eleven
-   importers, not a negotiation" looks like when somebody does three.
+3. **Ten have importers.** The other six are a known, small amount of
+   work with a named payoff each — and five were wired in the passes
+   after this document was first written, taking regional from 43% to
+   71% and filler from 25% to 75%. That is what "importers, not a
+   negotiation" looks like when somebody actually does them.
 4. **Coverage is measured per tier by a command**, closing the
    architecture document's own admission that the 90%/10% automation
    target "is an aspiration with no measurement behind it".
@@ -211,7 +225,7 @@ What is now true and was not before:
    unverified until somebody re-checks them, per the standing
    instruction that dataset terms change quietly.
 
-The next real saving is not a negotiation. It is the remaining eight importers.
+The next real saving is not a negotiation. It is the remaining six importers — and two of those (Cesium OSM Buildings, OpenStreetMap) are ones to skip rather than build, since Overture covers the same ground without ODbL's share-alike.
 
 ---
 
