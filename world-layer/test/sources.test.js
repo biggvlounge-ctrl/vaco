@@ -803,3 +803,70 @@ test('the hero rate is still a per-unit rate, not a launch invoice', () => {
   assert.equal(Math.round(tierTotal[0] / tierScope), low);
   assert.equal(Math.round(tierTotal[1] / tierScope), high);
 });
+
+// -- field depth: the coverage number that can still move -----------------
+
+test('every source a field names is a real registry source', () => {
+  // The table is a wishlist the moment it can name a dataset nobody
+  // registered, licensed or checked the access path for.
+  for (const [slice, fields] of Object.entries(sources.SLICE_FIELDS)) {
+    for (const entry of fields) {
+      assert.ok(Array.isArray(entry.source) && entry.source.length > 0,
+        `${slice}.${entry.field} names no source at all`);
+      for (const key of entry.source) {
+        assert.ok(sources.SOURCES[key],
+          `${slice}.${entry.field} names "${key}", which is not in the registry`);
+      }
+    }
+  }
+});
+
+test('every field names the engine consumer that wants it', () => {
+  // **A field with no consumer is a field nobody asked for.** This is
+  // the guard against the table growing into a list of datasets that
+  // would be nice to have, which is how a budget line becomes fiction.
+  for (const [slice, fields] of Object.entries(sources.SLICE_FIELDS)) {
+    for (const entry of fields) {
+      assert.ok(typeof entry.consumer === 'string' && entry.consumer.length > 10,
+        `${slice}.${entry.field} names no consumer`);
+    }
+  }
+});
+
+test('every slice with a source is broken into fields', () => {
+  // Otherwise a slice could be added, counted as covered by the tier
+  // report, and never appear in the depth report at all — which is the
+  // exact blindness this table was added to remove.
+  const priced = sources.WORLD_SLICES.filter((s) => !sources.UNCOVERED_BY_DESIGN[s]);
+  for (const slice of priced) {
+    assert.ok(sources.SLICE_FIELDS[slice],
+      `${slice} is a real slice with no field breakdown, so its gaps are invisible`);
+  }
+});
+
+test('field depth is below slice coverage, and that is the point', () => {
+  // Slice coverage reports 7 of 7 non-design-excluded slices as having
+  // a source. If depth ever equals that, either the work is genuinely
+  // finished or the table has stopped naming gaps — and the second is
+  // far more likely, so this fails loudly either way and somebody
+  // re-reads it.
+  const depth = sources.fieldDepth();
+  assert.ok(depth.fields > 0);
+  assert.ok(depth.filled < depth.fields,
+    'every field is filled — verify that is true rather than that the table went stale');
+  // And the open list is actionable: each one names what would close it.
+  for (const open of depth.openFields) {
+    assert.ok(open.wouldClose.length > 0, `${open.slice}.${open.field} is open with no way to close it`);
+  }
+});
+
+test('automationCoverage carries the depth report, not only the tier shares', () => {
+  // The tier shares cannot move: ten of the twelve unwired sources fill
+  // only slices already marked covered, and the two that would move it
+  // fill transportation, which is deferred by policy. A cost report
+  // whose headline is pinned needs the number that is not.
+  const report = costModel.automationCoverage();
+  assert.ok(report.depth, 'automationCoverage lost the field depth report');
+  assert.ok(report.depth.depth < 1);
+  assert.ok(report.depth.openFields.length > 0);
+});

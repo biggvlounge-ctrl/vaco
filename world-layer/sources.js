@@ -92,6 +92,80 @@ const UNCOVERED_BY_DESIGN = {
     + 'question from this one.',
 };
 
+// ---------------------------------------------------------------------
+// SLICE_FIELDS — what is actually IN a slice, and who consumes it
+// ---------------------------------------------------------------------
+// **A slice marked "covered" was hiding most of its own gaps, and the
+// coverage number could no longer move.**
+//
+// `automationCoverage` counted a slice as automated if ANY wired source
+// filled it. Measured against the registry: ten of the twelve unwired
+// sources fill only slices already marked covered, so wiring NCES, CMS,
+// FBI, CDC, FEMA, the Religion Census, USGS or Natural Earth could not
+// move the reported figure by a single point. The only two that could
+// fill `transportationData`, which VACON-C defers by policy.
+//
+// So the number was pinned at 100/86/80 and **the one way to raise it
+// was closed on purpose**. That is the twentieth standing rule wearing
+// a different hat: a measurement that cannot move is indistinguishable
+// from one nobody is improving, and this one was reporting the data
+// work as very nearly finished while eight free sources sat unwired
+// against real engine gaps.
+//
+// A slice is not one fact. `populationData` marked covered by Census
+// alone still had religion, health prevalence and crime calibration
+// unsourced inside it — three columns the ENGINE names as unfilled, in
+// its own files, in as many words.
+//
+// **Every field below names the engine consumer that wants it**, so
+// this table cannot drift into a wishlist: a field with no consumer is
+// a field nobody asked for, and the test asserts each `source` key
+// exists in `SOURCES`.
+const SLICE_FIELDS = {
+  geographyData: [
+    { field: 'climate', consumer: 'regions.climate_key — barter.js names it first among the three §27 price modifiers it cannot model', source: ['noaa', 'openweather'] },
+    { field: 'boundaries', consumer: 'migration.generateRegion geographyKey', source: ['naturalEarth', 'overtureDivisions'] },
+    { field: 'elevation', consumer: 'geo.js terrain and distance', source: ['usgs'] },
+    { field: 'hazardRisk', consumer: 'environment.js — which disasters a region can actually have', source: ['femaNri'] },
+  ],
+  buildingData: [
+    { field: 'footprint', consumer: 'worldgen.js landSize, currently random.range(600, 12000)', source: ['overtureBuildings', 'cesiumBuildings'] },
+    { field: 'height', consumer: 'property.js floors and landmarks.js skyscraper classification', source: ['overtureBuildings', 'cesiumBuildings'] },
+    { field: 'buildingClass', consumer: 'property.generateProperty type', source: ['overtureBuildings'] },
+    { field: 'infrastructureCapacity', consumer: 'landmarks.staffingFor and control.maintenanceFor size a crew from how big a thing is', source: ['hifld', 'cmsProviders', 'nces'] },
+  ],
+  businessData: [
+    { field: 'name', consumer: 'properties.name — anonymous shops before this', source: ['overturePlaces'] },
+    { field: 'category', consumer: "COMPREHENSIVE_RETAIL_KEY_LOCATIONS.md's ten store types", source: ['overturePlaces'] },
+    { field: 'address', consumer: 'worldgen per-area shop placement', source: ['overturePlaces'] },
+  ],
+  landmarkData: [
+    { field: 'name', consumer: 'landmarks.designate — every landmark was anonymous', source: ['unesco', 'nrhp', 'gnis', 'wikidata'] },
+    { field: 'category', consumer: "landmarks.js's 34 Key categories", source: ['nrhp', 'gnis', 'overturePlaces'] },
+    { field: 'significance', consumer: 'landmarks.significanceFor — the tier decision that costs or saves the money', source: ['unesco', 'nrhp'] },
+    { field: 'referenceImage', consumer: 'Tier 1 reference gathering, which the hero rate pays for', source: ['wikimediaCommons'] },
+    { field: 'naturalFeatures', consumer: 'the cave-system and natural-formation categories, which no other source lists', source: ['gnis'] },
+  ],
+  populationData: [
+    { field: 'ageDistribution', consumer: 'worldgen population generation', source: ['census'] },
+    { field: 'householdStructure', consumer: 'households.js', source: ['census'] },
+    { field: 'attainment', consumer: 'demographics.EDUCATION_LEVELS and statecraft.runSchooling', source: ['census', 'nces'] },
+    { field: 'employmentShares', consumer: "occupations.drawOccupation, currently a 1/tier pyramid this project chose", source: ['bls'] },
+    { field: 'wages', consumer: 'economy.js, currently a band', source: ['bls'] },
+    // The three the engine itself names as unfilled.
+    { field: 'religion', consumer: 'npcs.religion — demographics.js calls it "a real TEXT column, set only where a caller supplies one"', source: ['religionCensus'] },
+    { field: 'healthPrevalence', consumer: 'mortality.diseasePressure, which multiplies chosen figures', source: ['cdcPlaces'] },
+    { field: 'crimeCalibration', consumer: "crime.DANGER_REFERENCE_PER_1K — CLAUDE.md's seventeenth rule cost four wrong thresholds for want of an outside reference", source: ['fbiCrime'] },
+  ],
+  transportationData: [
+    { field: 'roads', consumer: 'infrastructure.js roads — deferred by VACON-C policy', source: ['overtureTransportation', 'openstreetmap'] },
+  ],
+  economicData: [
+    { field: 'income', consumer: 'economy.js and property valuation', source: ['census'] },
+    { field: 'labourMarket', consumer: 'blsImport.importOesMetro', source: ['bls'] },
+  ],
+};
+
 const SOURCES = {
   // -------------------------------------------------------------------
   // Landmarks and heritage
@@ -557,8 +631,56 @@ function describeSources() {
   };
 }
 
+// ---------------------------------------------------------------------
+// fieldDepth — coverage that can still move
+// ---------------------------------------------------------------------
+// Per slice: how many of its FIELDS have a wired source behind them,
+// which fields do not, and which registry source would close each one.
+//
+// **This is the number to quote, not the slice count.** A slice counts
+// as covered the moment one field in it is filled, which is how
+// `populationData` read as done with religion, health prevalence and
+// crime calibration all unsourced inside it.
+function fieldDepth() {
+  const bySlice = {};
+  for (const [slice, fields] of Object.entries(SLICE_FIELDS)) {
+    const filled = [];
+    const open = [];
+    for (const entry of fields) {
+      const wired = entry.source.filter((key) => SOURCES[key] && SOURCES[key].wired !== null);
+      if (wired.length > 0) filled.push({ ...entry, wiredBy: wired });
+      else open.push({ ...entry, wouldClose: entry.source });
+    }
+    bySlice[slice] = {
+      fields: fields.length,
+      filled: filled.length,
+      open,
+      depth: fields.length === 0 ? null : Math.round((filled.length / fields.length) * 100) / 100,
+    };
+  }
+
+  // Everything still open, flattened, so the cheapest remaining work is
+  // one list rather than a walk through nine.
+  const openFields = [];
+  for (const [slice, entry] of Object.entries(bySlice)) {
+    for (const field of entry.open) openFields.push({ slice, ...field });
+  }
+
+  const total = Object.values(bySlice).reduce((sum, s) => sum + s.fields, 0);
+  const filled = Object.values(bySlice).reduce((sum, s) => sum + s.filled, 0);
+  return {
+    bySlice,
+    openFields,
+    fields: total,
+    filled,
+    // The honest headline. Slice coverage says 7 of 7; this does not.
+    depth: total === 0 ? null : Math.round((filled / total) * 100) / 100,
+  };
+}
+
 module.exports = {
   WORLD_SLICES,
+  SLICE_FIELDS,
   UNCOVERED_BY_DESIGN,
   SOURCES,
   SOURCE_NAMES,
@@ -566,4 +688,5 @@ module.exports = {
   sourcesFilling,
   wiredSources,
   describeSources,
+  fieldDepth,
 };

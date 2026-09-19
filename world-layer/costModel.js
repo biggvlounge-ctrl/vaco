@@ -237,8 +237,25 @@ function automationCoverage() {
   }
 
   const all = sources.describeSources();
+
+  // **The per-tier shares above had stopped being able to move**, and a
+  // number that cannot move is not a measurement. A slice counts as
+  // automated once ONE wired source fills it, so ten of the twelve
+  // remaining sources could be wired without changing a single point of
+  // 100/86/80 — and the two that would move it fill transportation,
+  // which VACON-C defers by policy. The figure read as very nearly
+  // finished because the only road upward had been closed on purpose.
+  //
+  // `sources.fieldDepth()` is the number that can still fall and rise:
+  // per slice, how many of its FIELDS have a wired source, and which
+  // registry source would close each one that does not. Reported beside
+  // the tier shares rather than instead of them — the tiers are what
+  // §7 prices, the depth is what is actually known.
+  const depth = sources.fieldDepth();
+
   return {
     byTier,
+    depth,
     sources: all.sources,
     wired: all.wired.length,
     unwired: all.unwired.length,
