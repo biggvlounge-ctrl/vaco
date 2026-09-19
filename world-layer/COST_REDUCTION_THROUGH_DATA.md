@@ -229,15 +229,38 @@ automatable is worse than one that admits a floor:
 
 ## 6. The honest bottom line
 
+**Realised saving today: nothing, and the reason is §7.** No import has
+run. Every source host returns 403 CONNECT at this environment's proxy,
+so what exists is twelve tested transforms and a `fetch*` that throws
+naming the block. A saving is realised when records reach
+`importRegion`, not when the importer compiles. Anyone quoting a figure
+from this document is quoting a **projection**, and the four numbered
+points below are the only parts of it with something behind them.
+
+**Projected, with the only rate on file**: Overture's own document
+claims 10–15% off the content-population portion — North America
+$280K–$350K → $240K–$315K, full world $2.58M–$6.48M → $2.3M–$5.8M.
+That is roughly **$35K–$40K on North America and $280K–$680K globally**,
+and it is one source of twelve. **That percentage is deliberately not
+extended to the other eleven.** Nothing in this repository establishes a
+labour cost per slice, so multiplying 86% coverage into 86% cheaper
+would put an invented number where a measured one belongs — the same
+mistake `estimateBuildCost` refuses to make when it declines to treat an
+unsupplied rate as a rate of zero.
+
+
 **Do not expect the $420K–$960K figure to fall to zero, and do not
 believe a percentage that arrives without a measurement behind it.**
 What is now true and was not before:
 
 1. The figure is understood as a **per-unit rate**, so a first release
    is scoped at $9,000–$40,000 rather than the lifetime total.
-2. **Sixteen sources are registered** with licence, access path, the
+2. **Twenty-four sources are registered** with licence, access path, the
    slice each fills and the tier each serves — so nothing is
-   named-but-unusable, which was the state of ten of them.
+   named-but-unusable, which was the state of ten of them. (This bullet
+   read "sixteen" after the registry grew and the sentence did not; the
+   count comes from `sources.SOURCE_NAMES.length`, so run it rather than
+   trusting a number typed into prose.)
 3. **Twelve have importers**, out of twenty-four. Seven of the
    twenty-four are named in no surviving document and were added by
    research against gaps the ENGINE has — Census, BLS, GNIS, HIFLD,
