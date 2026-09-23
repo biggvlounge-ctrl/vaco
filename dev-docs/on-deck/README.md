@@ -13,8 +13,8 @@ somebody's memory of it, which is the failure this repo keeps finding.
 
 | document | status | parked |
 |---|---|---|
-| `VACO_VERIFIED_BUSINESS_NETWORK_FREEZE.md` | frozen, audit begun and stopped | 17 Sep 2026 |
-| `VAGO_GROUP_WAGERS_FREEZE.md` | frozen, audit begun and stopped | 17 Sep 2026 |
+| `VACO_VERIFIED_BUSINESS_NETWORK_FREEZE.md` | frozen, audit begun and stopped; **text restored 23 Sep** | 17 Sep 2026 |
+| `VAGO_GROUP_WAGERS_FREEZE.md` | frozen, audit begun and stopped; **text restored 23 Sep** | 17 Sep 2026 |
 | `HVNTZ_CONNECTED_NETWORK_FREEZE.md` | frozen, **audit not started** | 23 Sep 2026 |
 | `VASH_TAP_FREEZE.md` | frozen, **audit not started** | 23 Sep 2026 |
 
@@ -23,6 +23,48 @@ add-ons were coming and that two had been sent; this folder holds those
 two. A count stated here rather than remembered is the point — if a
 third and fourth arrive and nothing records that they were expected,
 their absence looks like a decision rather than a gap.
+
+## The two restored on 23 Sep 2026, and why it is not a formatting note
+
+**Both 17 Sep freezes said "Verbatim as frozen by the owner" and were
+not verbatim.** The owner re-supplied the full text; comparing it
+against what was on file:
+
+- `VAGO_GROUP_WAGERS_FREEZE.md` had been condensed and reflowed. §17's
+  seven payout formats were folded into a running sentence and the
+  "BLIND GROUP — 10 PLAYERS" example was gone. 278 lines against 741.
+- `VACO_VERIFIED_BUSINESS_NETWORK_FREEZE.md` **lost content, not just
+  shape.** Missing entirely: **"BUSINESSES DO NOT JUMP DIRECTLY TO
+  TOKENIZATION"** — the freeze's own stated fundamental principle, the
+  sentence the whole five-level progression exists to enforce — and
+  **"Do not invisibly pool separate hub allocations unless a documented
+  community program explicitly authorizes pooling"**, a specific
+  constraint on how community money may be handled. 472 lines against
+  1,188.
+
+Both now carry the full text with a note recording what was restored.
+
+**Why this is the worst version of this repo's recurring failure.**
+Everywhere else, a document drifted from code and the code was
+authoritative, so the damage was bounded — you could always re-measure.
+Here the document IS the authority. There was nothing to re-derive it
+from. Had the audit resumed from the condensed copy, it would have
+planned tokenisation without the rule that tokenisation is a graduation,
+and community treasuries without the rule against pooling them — and
+every downstream artefact would have been consistent, tested, and built
+on a specification the owner never wrote.
+
+The instruction at the top of each file was already correct: *an edited
+copy is a different specification.* It was written and then not
+followed, in the same commit, by whoever filed the condensed text.
+
+**The rule this establishes: a frozen document is transcribed, never
+summarised, and a summary lives beside it rather than replacing it.**
+If a freeze is too long to file comfortably, that is not a reason to
+shorten it — the length is the specification. Any future freeze filed
+here should be diffed against the owner's message before the session
+that received it ends, because after that the original is gone and the
+copy becomes the truth by default.
 
 ## The two filed on 23 Sep 2026
 
