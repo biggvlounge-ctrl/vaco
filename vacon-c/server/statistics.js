@@ -1380,8 +1380,20 @@ const CATALOGUE = [
     key: 'terrain_and_water', category: 'environment', unit: 'share', scope: 'community',
     unavailable: '§9 asks for woods, rivers, lakes and flood zones. `regions.geography_key` '
       + 'and `regions.climate_key` are the only geography in the schema, both TEXT, both '
-      + 'written by nothing. dev-docs/LAND_AND_MAP_DATA.md names the real sources — USGS '
-      + '3DEP, the National Hydrography Dataset, NLCD and FEMA flood zones.',
+      + 'written by nothing. **This entry was re-read on 23 Sep 2026 because two of the four '
+      + 'sources it was waiting on now exist** — the twenty-first standing rule, which is '
+      + 'about exactly this: a declared gap goes stale in one direction, because nothing '
+      + 'prompts you to re-check what it was waiting for. `world-layer/imports/usgsImport.js` '
+      + 'now classifies terrain from 3DEP elevation and writes `locations.terrainType`, and '
+      + '`imports/femaImport.js` carries FEMA flood risk as `geographyData.hazardRisk`. '
+      + 'What is genuinely left is smaller and nameable: (1) the National Hydrography '
+      + 'Dataset and NLCD have no importer, so rivers, lakes and woodland specifically are '
+      + 'still unsourced; (2) no engine-side reader — this would arrive as a DATA pack the '
+      + 'way `landmarkPacks.js` reads landmarks, never a cross-directory require; and (3) '
+      + 'nothing has actually been imported, because every source host is blocked at this '
+      + 'environment\'s proxy (`world-layer/sources.realisedCoverage()` reports zero). The '
+      + 'statistic stays unavailable, but it is now two importers and a pack reader away '
+      + 'rather than four sources away.',
   },
 
   // ---- psychological -------------------------------------------------
