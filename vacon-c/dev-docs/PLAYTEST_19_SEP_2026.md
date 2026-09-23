@@ -378,20 +378,70 @@ draw is kept because the argmax is still wrong in principle and the
 tests are real, but **it is not the fix for this finding and must not
 be recorded as one.**
 
-#### What is actually being investigated
+#### The cause, measured: the margin is above the 99th percentile of its own input
 
-If the acceptable set has one member at the moment anybody decides,
-the herd is a property of the SCORE, not of how the winner is picked.
-`desirability` is two coarse terms — danger and work — both read from
-a world snapshot shared by every person alive, with **no per-person
-component at all**. `pushFor` already returns which need is pushing
-somebody, and that is exactly the per-person term the destination
-choice never consults: a person driven out by housing wants vacancies,
-a person driven out by income wants work, and today they are handed
-the same ranking.
+Instrumented the decision itself — every person under push, on every
+tick, for 400 ticks. 22,297 person-decisions:
 
-That is the next thing to measure and it is not yet measured, so it is
-not yet a finding.
+```
+destinations clearing current + PULL_MARGIN
+  zero:        22,286 decisions
+  one:             11 decisions
+  two or more:  never
+
+best available edge (score - current)
+  p50 0.036   p90 0.101   p99 0.146   max 0.182     PULL_MARGIN is 0.15
+
+vacancies: 10-26 per community, on every tick, never exhausted
+```
+
+**`PULL_MARGIN = 0.15` sits above the 99th percentile of the
+distribution it filters**, and the largest desirability gap between any
+two communities ever observed in 400 ticks is 0.182. Communities in a
+generated world are not fifteen points apart. 0.05% of decisions clear
+the bar.
+
+`PUSH_FLOOR = 30` fails the same test from the other side: **397 of 400
+ticks had somebody under push, peaking at 150 of 150 people.** A
+threshold the entire population is permanently past carries no
+information either. This world is 150 people who always want to leave
+and 21 who ever do.
+
+That is standing rule 12's third clause twice over — a threshold picked
+from what a number sounds like — and it explains the bursts exactly.
+The margin gates on a WORLD-level quantity, so on the rare tick some
+community's edge crosses it, it crosses **for everybody at once**, and
+they all pour into the single destination that qualified. The histogram
+is the proof: the acceptable set is never larger than one. Which is
+also, finally, why the weighted draw was inert — it was choosing among
+one option.
+
+It also kills the two hypotheses that preceded it, both of which were
+plausible and both of which were wrong:
+
+- **Not a vacancy artifact.** All four other communities were scoreable
+  on every one of 27,034 decisions in a separate 500-tick run;
+  vacancies never run out.
+- **Not the coarseness of `desirability` per se.** The terms being
+  world-level matters, but what makes the door shut is where the bar
+  is, not how few terms are under it.
+
+#### Why the constants are not changed here
+
+Rule 17 cost four wrong answers in a row to learn, and its lesson is
+that a snapshot percentile does not survive repeated sampling: every
+pushed person draws every tick, so a margin set at today's p95 would
+not remain a p95 gate. It also has to separate the threshold from the
+rate — conflating those is what produced the warzone in
+`resolveAggression`. Choosing `PULL_MARGIN` and `PUSH_FLOOR` is a real
+modelling decision wanting its own measurement of the joint behaviour
+over time. The distribution above is what that decision needs; making
+it is not this pass.
+
+One caveat stated rather than buried: the probe samples the world after
+`advanceTick`, so it is not bit-identical to the snapshot
+`runMigration` decides from mid-tick. The shape is the finding; the
+counts are indicative.
 
 ### 5b. Two things measured while chasing finding 5, and left open
 

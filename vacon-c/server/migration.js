@@ -100,6 +100,60 @@ const PUSH_BY_NEED = {
 //: **Two thresholds, not one** — the seventh standing rule. Without the
 //: gap, somebody sitting on the line would move back and forth every
 //: tick and fill the log with it.
+//:
+//: ---------------------------------------------------------------------
+//: **Both of these were picked from what a number sounds like, and both
+//: are measurably wrong. Neither has been changed yet, on purpose.**
+//: ---------------------------------------------------------------------
+//: Standing rule 12's third clause says to measure the population a
+//: cutoff will be applied to before choosing it. Measured, on 400 ticks
+//: of a generated world (`seed: playtest`), sampling every person under
+//: push on every tick — 22,297 person-decisions:
+//:
+//:     destinations clearing current + PULL_MARGIN
+//:       zero: 22,286 decisions
+//:       one:       11 decisions
+//:       two or more: never
+//:
+//:     best available edge (score - current)
+//:       p50 0.036   p90 0.101   p99 0.146   max 0.182
+//:
+//: `PULL_MARGIN` is 0.15, which sits **above the 99th percentile of the
+//: distribution it filters**, and the largest gap between any two
+//: communities ever observed is 0.182. Communities in a generated world
+//: are not fifteen points of desirability apart; 0.15 sounds like
+//: "meaningfully better" on a 0..1 scale and is in practice a closed
+//: door. 0.05% of decisions clear it.
+//:
+//: `PUSH_FLOOR` fails the same test from the other side: 397 of 400
+//: ticks had somebody under push, peaking at **150 of 150 people**. A
+//: threshold the whole population is permanently past carries no
+//: information either. The world is 150 people who always want to
+//: leave and 21 who ever do.
+//:
+//: Together they are why migration arrives in bursts. The margin is a
+//: threshold on a WORLD-level quantity, so on the rare tick some
+//: community's edge crosses it, it crosses for everybody at once —
+//: eleven people leaving together, into the one destination that
+//: qualifies. The histogram above is the proof: the acceptable set is
+//: never larger than one, which is also why adding a weighted draw to
+//: `destinationFor` changed nothing.
+//:
+//: **They are left alone because fixing them is rule 17's trap.** That
+//: rule cost four wrong answers in a row to learn, and its lesson is
+//: that a snapshot percentile does not survive repeated sampling: every
+//: pushed person gets a draw every tick, so a margin set at today's p95
+//: would not stay a p95 gate. Choosing these two numbers is a real
+//: modelling decision that wants its own measurement of the JOINT
+//: behaviour over time, and it must separate the threshold from the
+//: rate — conflating those is exactly what produced the warzone in
+//: `resolveAggression`. The measurement above is what that decision
+//: needs; making the decision is not this commit.
+//:
+//: One caveat on the numbers, stated rather than buried: the probe
+//: samples the world AFTER `advanceTick`, so it is not bit-identical to
+//: the snapshot `runMigration` decides from mid-tick. The shape of the
+//: distribution is the finding; the counts are indicative.
 const PUSH_FLOOR = 30;
 const PULL_MARGIN = 0.15;
 
