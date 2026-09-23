@@ -15,6 +15,46 @@ somebody's memory of it, which is the failure this repo keeps finding.
 |---|---|---|
 | `VACO_VERIFIED_BUSINESS_NETWORK_FREEZE.md` | frozen, audit begun and stopped | 17 Sep 2026 |
 | `VAGO_GROUP_WAGERS_FREEZE.md` | frozen, audit begun and stopped | 17 Sep 2026 |
+| `HVNTZ_CONNECTED_NETWORK_FREEZE.md` | frozen, **audit not started** | 23 Sep 2026 |
+| `VASH_TAP_FREEZE.md` | frozen, **audit not started** | 23 Sep 2026 |
+
+**More are expected.** The owner said on 23 Sep 2026 that three or four
+add-ons were coming and that two had been sent; this folder holds those
+two. A count stated here rather than remembered is the point — if a
+third and fourth arrive and nothing records that they were expected,
+their absence looks like a decision rather than a gap.
+
+## The two filed on 23 Sep 2026
+
+Both arrived as additive freezes with the same mandatory first step as
+the 17 Sep pair — inspect the existing implementation before writing
+anything — and neither audit has begun. What the earlier audit already
+established applies directly to both and is worth pointing at rather
+than rediscovering:
+
+**HVNTZ Connected Network.** HVNTZ has a real surface (40 routes) and
+Vault Studios exists, so the freeze's "extend, do not rebuild"
+instruction has something concrete to extend. Its §40 is an explicit
+non-duplication rule naming Vault Studios, VACA, VASH/VCoin, V4, DREA
+and VOID — all of which the earlier audit confirmed are real.
+
+**VASH TAP.** Its §1 and §7 forbid a second wallet, ledger or payment
+system, and the earlier audit already identified what that means in
+practice: **V3 is the canonical VCoin/VASH ledger** — `/api/vcoin/
+balance`, `transfer`, `settle`, `transactions`, `reconciliation`,
+`/api/vash/cashout`, `/api/vash/balance` — with a row-level ledger
+behind `DATABASE_URL` and idempotent settlement via `settleOnce.js`.
+That is the system §7 means. Note also the unverified owner correction
+below ("VACA is blockchain app in v3"), which bears on VASH TAP's
+identity resolution in §6 and §10.
+
+One thing in VASH TAP is worth flagging now because it is a claim about
+physics rather than architecture, and the freeze itself gets it right:
+§41 states that passive NFC does not continuously broadcast location
+and "must not be falsely represented as an NFC capability". Any
+geographic analytics built under §23 and §43 are therefore tap-event
+analytics, not location tracking, and the distinction should survive
+into whatever the dashboards say.
 
 ## What the partial audit established
 
