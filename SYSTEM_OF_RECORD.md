@@ -980,7 +980,7 @@ trusted:
 
 The simulation engine is the one app in this repo whose "done" is not a
 list of routes, so it carries a measured completeness score rather than
-a criteria tally. **91.2%**, from
+a criteria tally. **90.6%**, from
 `vacon-c/dev-docs/GAME_COMPLETENESS.md`, which
 `vacon-c/scripts/completeness.mjs` regenerates and
 `vacon-c/test/completeness.test.js` fails on if stale — including a
@@ -990,10 +990,32 @@ check that the percent in THIS file matches the one the code measures.
 |---|---|---|
 | systems | 71.1% | the forty urban systems §7 names, at `urbanSystems.js`'s own four levels |
 | tables | 90.2% | schema tables a built world actually fills |
-| statistics | 89.7% | statistics a world can answer about itself |
+| statistics | 88% | statistics a world can answer about itself |
 | traits | 100% | traits something under `server/` reads |
 | traitDepth | 85.7% | trait columns a life actually changes |
 | habits | 100% | whether habits and routines carry information |
+
+**91.2% -> 90.6% on 23 Sep 2026, and the measurement is what moved, not
+the engine.** Two justice statistics — `state_declined_share` and
+`group_answered_share` — went silent. Measured at the script's own
+200-tick horizon with its own seed: **4 incidents, 0 cleared.**
+`runJustice` only processes CLEARED incidents, so neither a court case
+nor a group sanction can exist, and both statistics are about what
+happens after one. Four of five areas are still `contested`, so the
+writ did not move; the chain never starts.
+
+The same 600-tick world produces 18 offences and 12 clearances, so the
+mechanism works. This is `migration_events` again from four days
+earlier, and together they name a property of the score worth stating
+plainly: **at 200 ticks several axes measure whether a rare event
+happened in a short window, not whether the engine can produce it.**
+
+The obvious response — run the script longer until the number recovers
+— is the wrong one, and it is worth writing down why. A measurement
+retuned because its result was disliked stops being a measurement. The
+horizon stays at 200, the drop is recorded, and the sensitivity is
+named here so the next person reading a dip knows to check the
+mechanism at length before treating it as a regression.
 
 **91.3% -> 91.2% on 19 Sep 2026, and the half-point is worth naming
 rather than nudging.** `migration_events` went from filled to empty in

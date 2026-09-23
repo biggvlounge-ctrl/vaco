@@ -170,6 +170,56 @@ const TABLE_UNREACHED = {
     + `${Math.round(politics.REVOLUTION_SPREAD_FLOOR * 100)}% of the population informed`,
 };
 
+//: Tables with no store, where that is a DECISION rather than an
+//: omission. **Credit stays 0 and that is the point** — the comment on
+//: `measureSystems` says a system deferred by scope "still is not in the
+//: game", and the same holds here: this list changes what the gap SAYS,
+//: never what it is worth. A deferral that raised the score would be a
+//: way to finish a project by declaring things out of it.
+//:
+//: Added 23 Sep 2026, after finding `vault_studios_links` and
+//: `analytics_snapshots` scored as open with no reason recorded anywhere
+//: in `server/` or `dev-docs/` — two points of gap that nobody could
+//: act on or dismiss, because nothing said which they were. An
+//: undeclared gap is the thirteenth rule's corollary upside down: a
+//: stated gap is a decision somebody can make, and an unstated one is
+//: just a number going down.
+const TABLE_NO_STORE_REASON = {
+  vault_studios_links: {
+    deferred: true,
+    note: 'CLAUDE.md defers this twice — the fifth standing rule says ecosystem apps '
+      + '(Vavlt Stvdios among them) are linked to, never rebuilt, and the explicit '
+      + 'do-not-touch list names subscription tiers and ecosystem link-outs. Its three '
+      + 'columns are a creator id and a tier, which is the link-out and the tier verbatim. '
+      + 'Building it would break scope in two places at once.',
+  },
+  trade_routes: {
+    deferred: true,
+    note: 'Transportation is on CLAUDE.md\'s explicit do-not-touch list, and economy.js '
+      + 'records this table as closed scope rather than a gap for that reason.',
+  },
+  economy_snapshots: {
+    note: 'A TIME SERIES, which is not the same thing as a rollup, and the distinction is '
+      + 'the open question. The third standing rule forbids storing what is computable — '
+      + 'but supply, demand and price at tick 300 are NOT computable at tick 900, because '
+      + 'the past is gone. So this is a real design decision nobody has made rather than a '
+      + 'rule-3 violation: either the engine keeps a history or it accepts that only the '
+      + 'present is answerable. `urbanSystems.js` marks it schemaOnly, which records the '
+      + 'state without deciding it.',
+  },
+  analytics_snapshots: {
+    note: 'The same open question as economy_snapshots, one tier up: population, gdp, '
+      + 'crime, birth and death rates and two indices, per tick. Every column is answerable '
+      + 'about the present by `statistics.js` and none is answerable about the past. '
+      + '`scripts/playtest.mjs` samples its own arc precisely because nothing persists one.',
+  },
+  investments: {
+    note: 'Genuinely unbuilt rather than deferred — economy.js names it alongside '
+      + 'trade_routes and is explicit that only trade_routes is closed by the '
+      + 'Transportation deferral. No mechanism anywhere creates, values or settles one.',
+  },
+};
+
 const TABLE_TO_ARRAY = (table) => table.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 
 function measureTables(worldState) {
@@ -183,7 +233,15 @@ function measureTables(worldState) {
       continue;
     }
     if (!Array.isArray(array)) {
-      items.push({ name: table, credit: 0, state: 'no store' });
+      // The reason, where there is one. Credit is 0 either way — see the
+      // note on TABLE_NO_STORE_REASON.
+      const reason = TABLE_NO_STORE_REASON[table];
+      items.push({
+        name: table,
+        credit: 0,
+        state: 'no store',
+        ...(reason ? { note: reason.note, deferred: Boolean(reason.deferred) } : {}),
+      });
       continue;
     }
     if (CORRECTLY_EMPTY[table] && array.length === 0) {
