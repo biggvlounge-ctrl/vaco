@@ -583,7 +583,7 @@ const CATALOGUE = [
     // Null rather than a tie-break where the area is empty — an area
     // with nobody in it has no aptitude, and naming one would be the
     // unknown-is-not-zero failure in a new field.
-    key: 'dominant_gift', category: 'demographics', unit: 'category', scope: 'community',
+    key: 'dominant_gift', category: 'demographic', unit: 'tier', scope: 'community',
     compute: (ctx) => {
       const counts = new Map();
       for (const npc of ctx.residents) {
@@ -601,7 +601,7 @@ const CATALOGUE = [
     // How far the average resident has got with what they were given.
     // Distinct from `dominant_gift`: one says what an area is for, this
     // says whether it has made anything of it.
-    key: 'median_mastery', category: 'demographics', unit: 'share', scope: 'community',
+    key: 'median_mastery', category: 'demographic', unit: 'share', scope: 'community',
     compute: (ctx) => {
       const values = ctx.residents
         .map((n) => gifts.giftOf(ctx.worldState, n.id))

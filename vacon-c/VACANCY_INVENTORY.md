@@ -47,7 +47,7 @@ the Postgres schema that already exists.
 
 ## 1. Server code — `vacon-c/server/`
 
-All 73 files present on disk, all committed, largest first.
+All 74 files present on disk, all committed, largest first.
 
 **`test/inventory.test.js` now fails when this table and `server/` disagree**, which is the guard this document has needed through three separate drifts (see the note below). The count and the file list are checked against the tree rather than typed.
 
@@ -88,6 +88,7 @@ read off disk, not recalled.
 | `justice.js` | 32,563 | **What happens after somebody is caught** — arrest, charge against the city's actual laws, judgement, sentence, release. Closes §7's Law Enforcement, Court and Prison, and found that `relationships.conflict` could never rise. | Built |
 | `keys.js` | 23,968 | **All 7 Key resolvers** — Resilience, Adaptability, Trust, Scarcity Response, Fear, Aggression, Territory. | Built |
 | `completeness.js` | 21,486 | **The running percent.** Six measured axes behind `dev-docs/GAME_COMPLETENESS.md`. | Built |
+| `gifts.js` | 21,121 | **The gift, and the mastery scale it sits on.** Every person has sixteen skills; the gift is the one their traits were always going to make them best at, chosen on natural aptitude alone so that training raises mastery without ever moving which gift somebody has. Mastery is read on David Hawkins' Map of Consciousness (17 named levels, 20–1000, logarithmic — a published scale, cited the same way Köppen-Geiger is), with 200 as the established line. Five bands from latent to mastered. Reads live traits through `getLiveEntity`, stores nothing. | Built |
 | `schema-extensions.sql` | 20,245 | Columns this engine added beyond the handoff schema, each with the reason in a comment. | Built |
 | `authority.js` | 20,427 | **How far the state's rule actually reaches in one area, 0..1** — trust, reach, grip and standing. Law is a scale of trust per place, not a city-wide absolute. | Built |
 | `migration.js` | 19,855 | People actually move: push from unmet need, pull from a better place, and a settling period so nobody churns. | Built |

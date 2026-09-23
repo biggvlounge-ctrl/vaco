@@ -79,7 +79,14 @@ const TICK = fs.readFileSync(path.join(SERVER_DIR, 'tick.js'), 'utf8');
 //     (remove the declared reasons, keep every other string) is the
 //     only one that holds.
 const ENGINE_CODE = (() => {
-  const skip = new Set(['migrate.js', 'restore.js', 'urbanSystems.js']);
+  // **`completeness.js` joined this list on 23 Sep 2026, and it is the
+  // fifth arrival the comment below predicted.** It names tables in
+  // `TABLE_NO_STORE_REASON` in order to say what the engine does NOT do
+  // with them — `economy_snapshots`, `investments`, `trade_routes` — so
+  // scanning it for table names reports the opposite of the truth.
+  // Same category as `urbanSystems.js` beside it: a module that
+  // DESCRIBES the engine is not the engine.
+  const skip = new Set(['migrate.js', 'restore.js', 'urbanSystems.js', 'completeness.js']);
   const strip = (src) => src
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/^\s*\/\/.*$/gm, '');
