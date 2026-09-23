@@ -314,3 +314,81 @@ test('ids survive a reseed', () => {
   w.regions.push({ id: 2, name: 'x' });
   assert.deepEqual(migration.reseedIds(w), { nextMigrationId: 6, nextRegionId: 3 });
 });
+
+// ---------------------------------------------------------------------
+// The herd, which is the whole reason `destinationFor` takes a draw
+// ---------------------------------------------------------------------
+// Measured on a 600-tick world before the change: 21 person-moves, on
+// exactly TWO ticks out of 600 — eleven into c5 at tick 295 and ten
+// from c3 to c2 at tick 453, with c1 and c4 seeing no arrival and no
+// departure at all. Every term `destinationFor` reads lives on the
+// `shared` snapshot `runMigration` builds once per pass, so everybody
+// pushed on a tick computed the same number and got the same answer.
+// `willingness` and `MOVE_CHANCE` vary whether somebody goes; nothing
+// varied where.
+
+test('two people pushed on the same tick do not have to go to the same place', () => {
+  // Three destinations, deliberately close in desirability: one clearly
+  // best, two others comfortably over the margin. An argmax sends every
+  // one of a hundred identical people to the same block.
+  const w = world();
+  community(w, 1); community(w, 2); community(w, 3); community(w, 4);
+  // Plenty of vacancies everywhere, so the draw is never forced by
+  // running out of homes — that is a different mechanism.
+  for (const c of [2, 3, 4]) for (let i = 0; i < 100; i += 1) home(w, c);
+  const shared = {
+    danger: new Map([[1, 0.9], [2, 0.1], [3, 0.2], [4, 0.3]]),
+    vacancies: migration.vacanciesByCommunity(w),
+    work: new Map([[1, 0.1], [2, 0.9], [3, 0.8], [4, 0.7]]),
+  };
+  const npc = { id: 1, communityId: 1, home_property_id: null };
+
+  const chosen = new Map();
+  for (let i = 0; i < 200; i += 1) {
+    const got = migration.destinationFor(w, npc, shared, { draw: i / 200 });
+    chosen.set(got.community.id, (chosen.get(got.community.id) ?? 0) + 1);
+  }
+  assert.ok(chosen.size >= 3,
+    `two hundred draws reached only ${chosen.size} of three acceptable destinations — `
+    + 'the choice is still collapsing onto its mode');
+  // The best place is still the most likely place. A draw that ignored
+  // the score would be a different bug wearing the same fix.
+  const best = [...chosen.entries()].sort((a, b) => b[1] - a[1])[0];
+  assert.equal(best[0], 2, `the most-chosen destination was c${best[0]}, not the best one`);
+});
+
+test('without a draw the ranking is unchanged, because it answers a different question', () => {
+  // "Where is best" and "where does this person go" are both worth
+  // being able to ask, and every caller that predates the draw asks
+  // the first one.
+  const w = world();
+  community(w, 1); community(w, 2); community(w, 3);
+  home(w, 2); home(w, 3);
+  const shared = {
+    danger: new Map([[1, 0.9], [2, 0.1], [3, 0.4]]),
+    vacancies: migration.vacanciesByCommunity(w),
+    work: new Map([[1, 0.1], [2, 0.9], [3, 0.6]]),
+  };
+  const npc = { id: 1, communityId: 1, home_property_id: null };
+  assert.equal(migration.destinationFor(w, npc, shared).community.id, 2);
+  assert.equal(migration.destinationFor(w, npc, shared, { draw: null }).community.id, 2);
+});
+
+test('a draw still refuses when nowhere clears the margin', () => {
+  // The draw decides between acceptable places. It must not become a
+  // way to move somebody somewhere no better than here — that would
+  // turn a threshold into a suggestion.
+  const w = world();
+  community(w, 1); community(w, 2);
+  home(w, 2);
+  const shared = {
+    danger: new Map([[1, 0.2], [2, 0.2]]),
+    vacancies: migration.vacanciesByCommunity(w),
+    work: new Map([[1, 0.8], [2, 0.8]]),
+  };
+  const npc = { id: 1, communityId: 1, home_property_id: null };
+  for (const draw of [0, 0.25, 0.5, 0.99]) {
+    assert.equal(migration.destinationFor(w, npc, shared, { draw }), null,
+      `a draw of ${draw} moved somebody to a place no better than where they are`);
+  }
+});

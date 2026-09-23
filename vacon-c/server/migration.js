@@ -284,9 +284,72 @@ function vacanciesByCommunity(worldState) {
   return vacant;
 }
 
-// The best place this person could go, or null if nowhere is enough
-// better to be worth it.
-function destinationFor(worldState, npc, shared) {
+// Where this person would go, or null if nowhere is enough better to be
+// worth it.
+//
+// ---------------------------------------------------------------------
+// It is a DRAW, not an argmax, and that is the whole of this function
+// ---------------------------------------------------------------------
+// The first version returned the highest-scoring acceptable community.
+// Every term it reads — danger, vacancies, work — lives on `shared`,
+// which `runMigration` builds once for the whole pass. So every person
+// pushed on the same tick computed the same number and got the same
+// answer: `willingness` and `MOVE_CHANCE` vary WHETHER somebody goes,
+// and nothing at all varied WHERE.
+//
+// Measured on a 600-tick world (seed `playtest`):
+//
+//     total person-moves: 21, on exactly TWO ticks out of 600
+//     tick 295: 11 moves, every one of them into c5
+//     tick 453: 10 moves, every one of them c3 -> c2
+//     c1 and c4: no arrival and no departure in 600 ticks
+//
+// That is not a migration system, it is two evacuations. A mechanism
+// that fires on 0.33% of ticks and empties one neighbourhood wholesale
+// into another is indistinguishable, to a player, from a scripted
+// event — and `SETTLING_TICKS` then locks the whole cohort at once,
+// which preserves the synchronisation rather than breaking it.
+//
+// That reads exactly like `drawOccupation`'s old mistake one file over
+// — take the top instead of weighting and drawing — which this
+// repository had already diagnosed and fixed once, and the general
+// form is worth stating either way: a per-person decision computed
+// from a per-world snapshot is not a per-person decision.
+//
+// So the acceptable destinations are weighted by how much better they
+// are than here — `score - current`, which is already the quantity
+// `PULL_MARGIN` is a threshold on, so no new number is introduced — and
+// one is drawn. The best place is still the most likely place. It is
+// just no longer the only one.
+//
+// ---------------------------------------------------------------------
+// **And on a real world this changed NOTHING, which is recorded here
+// rather than quietly left out.**
+// ---------------------------------------------------------------------
+// Re-measured on the same 600-tick world: byte-for-byte identical.
+// Same two ticks, same eleven and ten moves, same destinations. A draw
+// and an argmax agree when there is only one thing to choose between.
+//
+// That is the twentieth standing rule turned on the fix rather than on
+// a guard — a change whose effect was argued instead of measured, and
+// the measurement says zero. The draw is kept because the argmax is
+// wrong in principle and the tests for it are real, but **it is not
+// the fix for the herd and this comment must not be read as claiming
+// it is.**
+//
+// If the acceptable set has one member whenever anybody decides, the
+// herd belongs to the SCORE. `desirability` is two coarse terms, both
+// read from a snapshot shared by every person alive, with no
+// per-person component at all — while `pushFor` already knows which
+// need is driving this particular person out and nothing consults it.
+// See `dev-docs/PLAYTEST_19_SEP_2026.md` finding 5.
+//
+// `draw` is a unit value in [0,1). Without one the old ranking is
+// returned unchanged, because a caller asking "where is best" is a
+// different question from "where does this person go" and both are
+// worth being able to ask.
+function destinationFor(worldState, npc, shared, options = {}) {
+  const { draw = null } = options;
   const here = desirability(worldState, npc.communityId, shared);
   // Somewhere with no vacancy of its own still has a "here" worth
   // comparing against — a person living in a full block can still
@@ -296,15 +359,33 @@ function destinationFor(worldState, npc, shared) {
       + (shared.work.get(npc.communityId) ?? 0) * WORK_WEIGHT
     : here;
 
-  let best = null;
+  const options_ = [];
   for (const community of worldState.communities || []) {
     if (community.id === npc.communityId) continue;
     const score = desirability(worldState, community.id, shared);
     if (score === null) continue;
     if (score < current + PULL_MARGIN) continue;
-    if (!best || score > best.score) best = { community, score };
+    options_.push({ community, score, edge: score - current });
   }
-  return best;
+  if (options_.length === 0) return null;
+  // Sorted by id so the weighting walks the same order every time —
+  // §88 reaches derived choices too.
+  options_.sort((a, b) => a.community.id - b.community.id);
+
+  if (draw === null || !Number.isFinite(draw)) {
+    return options_.reduce((best, o) => (!best || o.score > best.score ? o : best), null);
+  }
+
+  const total = options_.reduce((sum, o) => sum + o.edge, 0);
+  // Every edge is at least PULL_MARGIN by the filter above, so the
+  // total cannot be zero and this is not the degenerate case the
+  // occupation draw has to guard for.
+  let cut = Math.max(0, Math.min(1, draw)) * total;
+  for (const o of options_) {
+    cut -= o.edge;
+    if (cut <= 0) return o;
+  }
+  return options_[options_.length - 1];
 }
 
 // ---------------------------------------------------------------------
@@ -412,7 +493,13 @@ function runMigration(worldState, options = {}) {
     const previous = lastMove.get(npc.id);
     if (previous !== undefined && tick - previous < SETTLING_TICKS) return;
 
-    const destination = destinationFor(worldState, npc, shared);
+    // A separate draw from the one that decides whether they go, so
+    // turning the move chance up does not also change where people
+    // end up — the seventeenth standing rule's lesson, where a floor
+    // and a rate were conflated and produced a warzone.
+    const destination = destinationFor(worldState, npc, shared, {
+      draw: seededUnit(seed, 'destination', tick, index),
+    });
     if (!destination) return;
 
     const homes = shared.vacancies.get(destination.community.id) ?? [];

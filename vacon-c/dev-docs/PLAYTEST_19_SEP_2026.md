@@ -326,6 +326,113 @@ The areas do differ on `writ`, `emp` and `edu`, so
 `areaStats` is working. It is the two headline numbers that have
 saturated.
 
+### 5. Migration fires on two ticks out of six hundred — OPEN
+
+Found by chasing something else. The 1,200-tick run left c2 with **one
+person** and c3 with eight while c1/c4/c5 held ~46, which looked like a
+death spiral. It is not: **16 deaths in the whole world over 1,200
+ticks**, against communities swinging by twenty-five people between
+samples. People were moving, not dying.
+
+Counted off `worldState.migrationEvents`, which is one row per person
+per move — not off the tick event log, which is what the first probe
+read and which reports the pass rather than the people:
+
+```
+total person-moves: 21 over 600 ticks
+ticks with any move: 2 of 600
+  tick 295: 11 moves, every one of them into c5
+  tick 453: 10 moves, every one of them c3 -> c2
+c1 and c4: no arrival and no departure in 600 ticks
+```
+
+**598 of 600 ticks had no migration at all**, and on the two that did,
+every mover went to the same place. That is not a migration system, it
+is two evacuations. A player watching this world sees nothing happen
+for nine months and then half a neighbourhood leaves at once.
+
+#### The first diagnosis was wrong, and the way it was wrong is the point
+
+`destinationFor` returned the highest-scoring acceptable community, and
+every term it reads — danger, vacancies, work — lives on the `shared`
+snapshot `runMigration` builds once per pass. So everybody pushed on
+the same tick computed the same number and got the same answer:
+`willingness` and `MOVE_CHANCE` vary WHETHER somebody goes, and nothing
+varied WHERE. That reads exactly like `drawOccupation`'s old mistake —
+take the top instead of weighting and drawing — which this repository
+had already diagnosed and fixed once.
+
+So the draw was built: acceptable destinations weighted by
+`score - current`, the quantity `PULL_MARGIN` is already a threshold
+on, so no new constant. Three tests hold it, including two hundred
+draws reaching all three of three acceptable destinations.
+
+**Re-measured on the same world, the result was byte-for-byte
+identical.** Same two ticks, same eleven and ten moves, same
+destinations. A draw and an argmax agree when there is only one thing
+to choose between, and the fix is inert on a real world.
+
+That is standing rule 20 turned on my own work: a change whose effect
+was argued rather than measured, and the measurement says zero. The
+draw is kept because the argmax is still wrong in principle and the
+tests are real, but **it is not the fix for this finding and must not
+be recorded as one.**
+
+#### What is actually being investigated
+
+If the acceptable set has one member at the moment anybody decides,
+the herd is a property of the SCORE, not of how the winner is picked.
+`desirability` is two coarse terms — danger and work — both read from
+a world snapshot shared by every person alive, with **no per-person
+component at all**. `pushFor` already returns which need is pushing
+somebody, and that is exactly the per-person term the destination
+choice never consults: a person driven out by housing wants vacancies,
+a person driven out by income wants work, and today they are handed
+the same ranking.
+
+That is the next thing to measure and it is not yet measured, so it is
+not yet a finding.
+
+### 5b. Two things measured while chasing finding 5, and left open
+
+Both are structural rather than defects with an obvious fix, and both
+are stated here rather than quietly patched.
+
+- **`desirability` reads an unknown as a zero.** `workByCommunity`
+  deliberately omits a community with no residents — its comment says
+  "an empty community is unknown, not jobless" — and `desirability`
+  then does `shared.work.get(id) ?? 0`, which is exactly the coercion
+  the guard exists to prevent. Verified directly: an empty community
+  with a free house and no crime at all scores **0.5**, read as
+  definitely jobless. This is the `Number(null)` corollary in CLAUDE.md
+  with a `??` instead of a cast.
+- **The labour market is global, so the pull term is not a fact about
+  the destination.** `runLabour`'s applicants are every unemployed NPC
+  in the world and its employers every staffed organization, with no
+  community term anywhere — and an `organizations` row has **no
+  community field at all**, so it could not filter locally without
+  going through `properties.operating_organization_id`, which it does
+  not. Measured at generation, 56 of 56 placeable hires are local,
+  because `worldgen` loops per community; every hire after generation
+  is location-blind. So "share of residents who hold a job" — half of
+  `desirability` — cannot be changed by moving, and the pull half of
+  the migration model rests on a quantity that is not a property of
+  the place.
+
+### 5c. Two wrong turns on the way, kept because the wrong version was the plausible one
+
+- **c2 is not collapsing, it is sloshing.** Over 600 ticks it went
+  30 -> 19 -> 29 -> 30. The 1,200-tick endpoint of one person is a
+  trough in an oscillation, not an absorbing state, and writing it up
+  as a one-way ratchet would have been the twenty-fifth rule again — a
+  correct measurement with a wrong consequence attached.
+- **`households.syncHouseholds` is not uncalled.** It looked like a
+  generator nothing invokes (rule 11), which would have frozen
+  `properties.occupants` at generation and broken `upkeepFor`,
+  `salvage` and the takeover composition at once. `runHouseholds`
+  wraps it and runs in the cross-cutting slot at `tick.js:1341`.
+  Occupants are live.
+
 ---
 
 ## What is working, measured
