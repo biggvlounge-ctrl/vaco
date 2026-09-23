@@ -28,6 +28,7 @@ const { getLiveEntity } = require('./entityTraits.js');
 const economy = require('./economy.js');
 const property = require('./property.js');
 const behavior = require('./behavior.js');
+const gifts = require('./gifts.js');
 
 let nextPlayerId = 1;
 
@@ -163,6 +164,12 @@ function getCitizenDashboard(worldState, playerId) {
       : null,
     propertySummary,
     netWorth,
+    // **What this person is FOR**, which is the one thing the dashboard
+    // could not say. It showed what a citizen owned, who they knew and
+    // how they were doing, and nothing about what they are good at.
+    // Computed from live traits on every read, never stored — the third
+    // standing rule, same as netWorth and familyWealth above it.
+    gift: gifts.giftOf(worldState, npcId),
     // Mood, habits and routine (architecture 4.5). The dashboard is the
     // "observe and be affected by" half of the Definition of Done, and
     // until the Behavior Engine existed it could show what a citizen

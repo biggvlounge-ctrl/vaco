@@ -91,6 +91,7 @@ const households = require('./households.js');
 const migration = require('./migration.js');
 const crime = require('./crime.js');
 const demographics = require('./demographics.js');
+const gifts = require('./gifts.js');
 const economy = require('./economy.js');
 const health = require('./health.js');
 const competition = require('./competition.js');
@@ -572,6 +573,43 @@ const CATALOGUE = [
     compute: (ctx) => median(ctx.residents
       .map((n) => economy.getNetWorth(ctx.worldState, n.id))
       .filter((w) => Number.isFinite(w))),
+  },
+  {
+    // **What an area is good at**, which §9 asks for nowhere and is the
+    // most useful single thing to know about a population you are about
+    // to take, trade with or recruit from. The modal gift: the skill
+    // more residents are born for than any other.
+    //
+    // Null rather than a tie-break where the area is empty — an area
+    // with nobody in it has no aptitude, and naming one would be the
+    // unknown-is-not-zero failure in a new field.
+    key: 'dominant_gift', category: 'demographics', unit: 'category', scope: 'community',
+    compute: (ctx) => {
+      const counts = new Map();
+      for (const npc of ctx.residents) {
+        const gift = gifts.giftOf(ctx.worldState, npc.id);
+        if (!gift) continue;
+        counts.set(gift.skill, (counts.get(gift.skill) ?? 0) + 1);
+      }
+      if (counts.size === 0) return null;
+      // Ties broken by name so a world reads the same way twice (§88).
+      return [...counts.entries()]
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0][0];
+    },
+  },
+  {
+    // How far the average resident has got with what they were given.
+    // Distinct from `dominant_gift`: one says what an area is for, this
+    // says whether it has made anything of it.
+    key: 'median_mastery', category: 'demographics', unit: 'share', scope: 'community',
+    compute: (ctx) => {
+      const values = ctx.residents
+        .map((n) => gifts.giftOf(ctx.worldState, n.id))
+        .filter((g) => g && g.mastery !== null)
+        .map((g) => g.mastery)
+        .sort((a, b) => a - b);
+      return values.length === 0 ? null : values[Math.floor(values.length / 2)];
+    },
   },
   {
     key: 'median_wage', category: 'economics', unit: 'currency', scope: 'community',

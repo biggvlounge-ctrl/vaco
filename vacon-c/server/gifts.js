@@ -101,6 +101,23 @@ const SCALE_MAX = 1000;
 //: here as the line above which a gift is **established** rather than
 //: merely present: everyone has a best skill, not everyone has made
 //: anything of it.
+//:
+//: **Measured before being trusted, and it failed the first time.**
+//: On a generated world of 149 people the first version put
+//: `establishedShare` at **1.000** — every single person cleared it,
+//: lowest calibration 216. A threshold nothing fails is decoration
+//: (fourteenth standing rule), and it was one line of measurement away
+//: from shipping as a flag that was always true.
+//:
+//: **The line was not moved to fix it.** 200 is Hawkins' own and
+//: shifting a published constant because a statistic looked wrong is
+//: the same move this project refused on the completeness horizon four
+//: days earlier. The defect was upstream, in how the gift was chosen —
+//: see `giftOf`. After that fix, on the same world and seed:
+//:
+//:     established   0.644 — 96 of 149 clear Courage, 53 do not
+//:     calibration   low 85 / median 261 / high 613
+//:     levels used   13 of the 17, Grief through Peace
 const ESTABLISHED_AT = 200;
 
 // ---------------------------------------------------------------------
@@ -275,9 +292,23 @@ function masteryOf(reading) {
 
 //: Named bands for mastery, so a number has a word. **Thresholds are
 //: interpretive and stated**: nothing in the package sets them, and the
-//: population they apply to is measured in `test/gifts.test.js` rather
-//: than assumed — the twelfth rule's third clause, which cost this
-//: project four wrong thresholds in `resolveAggression` alone.
+//: population they apply to was measured before they were kept — the
+//: twelfth rule's third clause, which cost this project four wrong
+//: thresholds in `resolveAggression` alone.
+//:
+//: Measured on 149 people after the selection fix in `giftOf`:
+//:
+//:     mastery   low 0.133 / median 0.772 / high 1
+//:     latent 46 · developing 26 · practised 16 · accomplished 6 ·
+//:     mastered 55
+//:
+//: **The 55 at `mastered` are a pile-up at the clamp and that is said
+//: rather than smoothed.** Mastery is `min(1, trained / natural)`, so
+//: everyone who has trained at or past their own aptitude lands on
+//: exactly 1.0. That is a real category — you have got everything out
+//: of the gift you were given — and not a rounding artifact, but it
+//: does mean the top band is a spike and the one below it is thin.
+//: Anybody rebanding this should know the shape before they do.
 const MASTERY_BANDS = [
   { at: 0, name: 'latent' },
   { at: 0.5, name: 'developing' },
@@ -324,7 +355,27 @@ function giftOf(worldState, entityId) {
 
   // Ties broken by name so the same world always reads the same way —
   // §88's replay guarantee reaches derived readings too.
-  readings.sort((a, b) => b.evidence - a.evidence || a.skill.localeCompare(b.skill));
+  // **The gift is what somebody is BORN for, so it is chosen on natural
+  // aptitude and not on combined evidence.**
+  //
+  // The first version sorted on `evidence`, which blends trained skill
+  // with natural aptitude — and that quietly broke mastery. Selecting
+  // the argmax over a blend preferentially picks skills where the
+  // TRAINED half happens to be high, so `trained / natural` came out at
+  // or above 1 almost by construction: measured, **140 of 149 people
+  // read as "mastered"**, which is not a scale, it is a greeting.
+  //
+  // Selecting on natural aptitude alone removes the bias, because the
+  // trained value plays no part in the choice. It is also the better
+  // model of what was asked for — a gift is the thing you are for, and
+  // mastery is what you have done about it. Somebody can have a gift
+  // they have never trained, which is the interesting case and the old
+  // version could not produce it.
+  readings.sort((a, b) => {
+    const an = a.natural ?? a.evidence;
+    const bn = b.natural ?? b.evidence;
+    return bn - an || a.skill.localeCompare(b.skill);
+  });
   const best = readings[0];
   const calibration = calibrate(best.evidence);
   const mastery = masteryOf(best);
