@@ -315,3 +315,104 @@ test('the catalogue can answer what share of work is titled', () => {
   assert.equal(tier.unit, 'tier');
   assert.ok(statistics.UNITS.tier, 'the tier unit is not declared');
 });
+
+// ---------------------------------------------------------------------
+// Aptitude — who gets which job, which the pyramid never said
+// ---------------------------------------------------------------------
+// The pyramid above fixed HOW MANY people hold each tier. It left WHICH
+// people entirely to the seeded cut, and measured on a 300-tick world
+// that showed: the mean skill value of the job somebody actually held
+// was 59.1 out of 100, in a population where one person's best skill
+// beats their worst by 75.7 points. Everybody was a specialist and
+// almost nobody was doing their speciality.
+
+function sheetWorld(entityId, skills) {
+  // Live trait rows, not `npc.traits` — the ninth standing rule. The
+  // draw reads through `getLiveEntity`, so the fixture has to supply
+  // what that reads: `current_value` on a row whose `trait_id` comes
+  // from the module registry.
+  const { getTraitId } = require('../server/traitDefinitions.js');
+  const w = { tick: 0, npcs: [{ id: entityId, status: 'active' }], organizations: [], families: [], entityTraits: [] };
+  for (const [name, value] of Object.entries(skills)) {
+    w.entityTraits.push({
+      entity_id: entityId, trait_id: getTraitId('skills', name),
+      base_value: value, key_modifier: 0, current_value: value,
+    });
+  }
+  return w;
+}
+
+test('a person flat at 50 draws exactly the distribution they drew before aptitude existed', () => {
+  // **Standing rule 12's first clause, held mechanically.** A modifier
+  // centred anywhere but the trait scale's own centre recalibrates the
+  // whole world the day it starts being read — the same failure as the
+  // evasion term that made every ordinary criminal 25% harder to catch.
+  // Here the check is exact rather than statistical: an entirely
+  // average person's weight is 1 for every occupation, so the draw is
+  // bit-identical to the tier-only pyramid.
+  const flat = Object.fromEntries(TRAIT_FAMILIES.skills.map((t) => [t.name ?? t, 50]));
+  for (let id = 1; id <= 60; id += 1) {
+    const npc = { id, education: 'higher' };
+    const w = sheetWorld(id, flat);
+    const withTraits = occupations.drawOccupation({
+      npc, worldState: w, organizationType: 'business', seed: 'centre',
+    });
+    const without = occupations.drawOccupation({
+      npc, organizationType: 'business', seed: 'centre',
+    });
+    assert.equal(withTraits, without,
+      `an average person at id ${id} drew ${withTraits} with traits and ${without} without`);
+  }
+});
+
+test('aptitude moves which job somebody gets, and does not dismantle the pyramid', () => {
+  // The claim is that people tend toward what they are good at. It is
+  // false if the measured skill of the job held does not rise, and it
+  // has overreached if the tier distribution stops being a pyramid —
+  // the file's own correction was about exactly that, a town of
+  // engineers and navigators with no labourers in it.
+  const specialists = [];
+  const generalists = [];
+  for (let id = 1; id <= 120; id += 1) {
+    // One strong skill each, rotated through the sixteen so no single
+    // trade is being tested; everything else well below average.
+    const names = TRAIT_FAMILIES.skills.map((t) => t.name ?? t);
+    const strong = names[id % names.length];
+    const sheet = Object.fromEntries(names.map((n) => [n, n === strong ? 95 : 25]));
+    const npc = { id, education: 'higher' };
+    const w = sheetWorld(id, sheet);
+    const got = occupations.drawOccupation({
+      npc, worldState: w, organizationType: 'business', seed: 'apt',
+    });
+    const flatGot = occupations.drawOccupation({
+      npc, organizationType: 'business', seed: 'apt',
+    });
+    if (got) specialists.push({ got, held: sheet[occupations.definitionOf(got).skill] });
+    if (flatGot) generalists.push({ got: flatGot, held: sheet[occupations.definitionOf(flatGot).skill] });
+  }
+  const mean = (xs) => xs.reduce((a, b) => a + b.held, 0) / xs.length;
+  assert.ok(mean(specialists) > mean(generalists) + 5,
+    `aptitude barely moved the skill of the job held: ${mean(specialists).toFixed(1)} `
+    + `with it against ${mean(generalists).toFixed(1)} without. A term that changes `
+    + 'nothing is decoration — standing rule 20.');
+
+  // And the pyramid survives. Tier 1 must still outnumber Tier 4.
+  const byTier = new Map();
+  for (const { got } of specialists) {
+    const tier = occupations.tierOf(got);
+    byTier.set(tier, (byTier.get(tier) ?? 0) + 1);
+  }
+  assert.ok((byTier.get(1) ?? 0) > (byTier.get(4) ?? 0),
+    `aptitude overturned the pyramid: Tier 1 ${byTier.get(1) ?? 0} against Tier 4 ${byTier.get(4) ?? 0}`);
+});
+
+test('a worldState is optional and its absence changes nothing', () => {
+  // Two callers pass one and every existing test does not. Without it
+  // the aptitude term is 1 for everything, which is the old behaviour
+  // rather than a person with no skills at all.
+  const npc = { id: 9, education: 'secondary' };
+  assert.equal(
+    occupations.drawOccupation({ npc, organizationType: 'business', seed: 'none' }),
+    occupations.drawOccupation({ npc, worldState: null, organizationType: 'business', seed: 'none' }),
+  );
+});

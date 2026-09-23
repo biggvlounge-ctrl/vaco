@@ -537,6 +537,32 @@ const WAGE_TO_OUTPUT = 1.3;
 // focused one earns several times it; a poor one costs money. That is
 // the relationship worth having, and it only reads correctly if the
 // centre is where the trait scale's centre is.
+//
+// ---------------------------------------------------------------------
+// The skill term is the JOB's skill, not the average of all sixteen
+// ---------------------------------------------------------------------
+// It used to be the mean of the whole sheet, which made specialisation
+// invisible: a person with Crafting 90 and everything else 40 scored
+// exactly the same as a generalist at 46. Measured on a 300-tick world,
+// one person's best skill minus their worst runs **75.7 points on
+// average** — people in this engine are enormously specialised, and the
+// economy could not tell.
+//
+// `occupations.js` names the one skill each occupation exercises, and
+// `traitDrift`'s work habit grows that exact skill, so the answer was
+// already on the employment record. Reading it means a farmer is paid
+// for farming.
+//
+// `JOB_SHARE` is half, not all, for a stated reason: a job is mostly
+// its trade and partly everything else somebody can do, and a pure
+// job-skill read would make a brilliant carpenter working as a cook
+// worth as little as a person with no skills at all. And the blend is
+// centred the way standing rule 12's first clause demands — somebody
+// whose job skill equals their own sixteen-skill mean scores exactly
+// what they scored before this term existed, whatever that mean is. The
+// change redistributes; it does not move the baseline.
+const JOB_SHARE = 0.5;
+
 function productivityOf(worldState, entityId) {
   const live = getLiveEntity(worldState, entityId);
   if (!live) return 0;
@@ -545,7 +571,19 @@ function productivityOf(worldState, entityId) {
     .map(Number)
     .filter((v) => Number.isFinite(v));
   if (skills.length === 0) return 0;
-  const skill = (skills.reduce((a, b) => a + b, 0) / skills.length) / 50;
+  const mean = skills.reduce((a, b) => a + b, 0) / skills.length;
+
+  // A record with no position is a real state, not a defect: every
+  // world restored from before `occupations.js` existed has
+  // `position: null` on every row, and `drawOccupation` returns null
+  // for an organization type that employs nobody. Those people keep the
+  // sheet mean, which is what they had.
+  const record = getEmployment(worldState, entityId);
+  const trade = record?.position ? occupations.definitionOf(record.position) : null;
+  const jobSkill = trade ? Number(live.traits?.skills?.[trade.skill]) : NaN;
+  const skill = (Number.isFinite(jobSkill)
+    ? JOB_SHARE * jobSkill + (1 - JOB_SHARE) * mean
+    : mean) / 50;
 
   // `?? 50` rather than `|| 50`: a real 0 is somebody with no immune
   // response at all, and `||` would quietly upgrade them to average.
@@ -856,6 +894,7 @@ function runLabour(worldState, tick, payrollEvents = []) {
     const hired_npc = (worldState.npcs || []).find((n) => n.id === applicant.id) ?? null;
     const position = occupations.drawOccupation({
       npc: hired_npc,
+      worldState,
       organizationType: employer.type ?? null,
       seed: worldState.seed ?? 'world',
       extra: [organizationId, tick],

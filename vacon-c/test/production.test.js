@@ -121,6 +121,86 @@ test('productivity reads live traits, not the frozen sheet', () => {
     'productivity read the frozen sheet on the object');
 });
 
+// ---------------------------------------------------------------------
+// The skill term is the JOB's skill
+// ---------------------------------------------------------------------
+// It used to be the mean of all sixteen. Measured on a 300-tick world,
+// one person's best skill beats their worst by **75.7 points on
+// average**, so a specialist and a generalist with the same mean were
+// worth exactly the same to an employer and the occupation taxonomy —
+// which names the skill each job exercises, and which `traitDrift`
+// grows — reached the economy nowhere at all.
+
+function setSkill(worldState, entityId, name, value) {
+  const def = INDIVIDUAL_DEFINITIONS.find((d) => d.family === 'skills' && d.name === name);
+  if (!def) throw new Error(`no skills trait named ${name}`);
+  const row = worldState.entityTraits.find(
+    (r) => r.entity_id === entityId && r.trait_id === def.trait_id,
+  );
+  if (!row) throw new Error(`entity ${entityId} has no row for ${name}`);
+  row.current_value = value;
+}
+
+test('somebody whose job skill equals their own mean scores what they always scored', () => {
+  // **Standing rule 12's first clause.** The blend has to be centred on
+  // the person's own sheet mean, not on 50 and not on anything else: a
+  // term centred elsewhere would silently revalue every worker in every
+  // world the day it started being read, which is the evasion modifier
+  // all over again. Held exactly rather than approximately.
+  const w = world();
+  const person = worker(w, 50);
+  const org = employer(w);
+  economy.hireEntity(w, {
+    entityId: person.id, employerOrganizationId: org.id, wage: 10, position: 'farmer',
+  });
+  assert.equal(economy.productivityOf(w, person.id), 1,
+    'a flat-50 farmer moved when the job skill became a term');
+});
+
+test('a specialist is worth more in their own trade than out of it', () => {
+  // The claim the change exists to make. Same person, same sheet, same
+  // employer — only the title differs. If this does not move, the
+  // occupation taxonomy is decoration in the economy.
+  const w = world();
+  const person = worker(w, 50);
+  setSkill(w, person.id, 'Agriculture', 95);
+  const org = employer(w);
+
+  economy.hireEntity(w, {
+    entityId: person.id, employerOrganizationId: org.id, wage: 10, position: 'farmer',
+  });
+  const inTrade = economy.productivityOf(w, person.id);
+  economy.endEmployment(w, { entityId: person.id });
+  economy.hireEntity(w, {
+    entityId: person.id, employerOrganizationId: org.id, wage: 10, position: 'cook',
+  });
+  const outOfTrade = economy.productivityOf(w, person.id);
+
+  assert.ok(inTrade > outOfTrade,
+    `a 95-Agriculture farmer (${inTrade.toFixed(3)}) should out-produce the same `
+    + `person put in a kitchen (${outOfTrade.toFixed(3)})`);
+  // And the person out of their trade is not ruined by it: half the
+  // term is still everything else they can do, which is why JOB_SHARE
+  // is a half rather than the whole thing.
+  assert.ok(outOfTrade > 0.5, `out of trade collapsed to ${outOfTrade.toFixed(3)}`);
+});
+
+test('an untitled job is a real state and keeps the sheet mean', () => {
+  // Every world restored from before `occupations.js` existed has
+  // `position: null` on every record, and `drawOccupation` returns null
+  // for an organization type that employs nobody. Reading those as a
+  // zero-skill job would revalue the entire restored population.
+  const w = world();
+  const person = worker(w, 50);
+  setSkill(w, person.id, 'Agriculture', 95);
+  const withoutJob = economy.productivityOf(w, person.id);
+  const org = employer(w);
+  economy.hireEntity(w, {
+    entityId: person.id, employerOrganizationId: org.id, wage: 10, position: null,
+  });
+  assert.equal(economy.productivityOf(w, person.id), withoutJob);
+});
+
 // -- production ---------------------------------------------------------
 
 test('a business earns from the people it employs', () => {

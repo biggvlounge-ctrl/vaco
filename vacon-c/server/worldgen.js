@@ -804,6 +804,7 @@ function generateWorld(options = {}) {
           // what work they can hold — and never on whether they hold any.
           position: occupations.drawOccupation({
             npc,
+            worldState: w,
             organizationType: employer.type,
             seed: config.seed,
             extra: [c, b, ai],

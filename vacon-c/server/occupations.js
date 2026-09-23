@@ -71,6 +71,7 @@
 
 const { seededDraw } = require('./seeded.js');
 const demographics = require('./demographics.js');
+const { getLiveEntity } = require('./entityTraits.js');
 
 // ---------------------------------------------------------------------
 // §25, verbatim in its own subjects
@@ -463,9 +464,63 @@ function qualifiedFor(npc, organizationType) {
 // reachable, and null only when the organization type employs nobody at
 // all — a `club` or a `religion` with no listed occupation is a real
 // answer, not an error.
+// ---------------------------------------------------------------------
+// Aptitude, and why the constant is 1
+// ---------------------------------------------------------------------
+// The tier pyramid says how many people do a job. It says nothing about
+// WHICH people, so until now the answer was "whoever the seeded cut
+// landed on". Measured on a 300-tick world, the mean skill value of the
+// job people actually held was **59.1 out of 100** — barely above the
+// average trait — in a population where one person's best skill beats
+// their worst by 75.7 points. A town of specialists, each doing
+// something else.
+//
+// `APTITUDE_PULL = 1` is not a fitted number. At exactly 1 the weight
+// collapses to `value / 50`: the skill relative to the average person's
+// skill, which is the same relationship `economy.productivityOf` reads
+// for the same reason. Half as likely at half the skill, twice as
+// likely at twice it. Any other value would be asserting something
+// about how much aptitude matters that nobody has measured.
+//
+// Swept 0, 0.25, 0.5, 1, 1.5, 2, 3, 5 on the same world, replaying the
+// real draw for the real hires at their real employers:
+//
+//     pull   mean skill of the job held   mean tier   tier 1 share
+//     0      59.1                         1.77        53%
+//     1      63.5                         1.79        53%
+//     3      74.3                         1.90        49%
+//
+// So it does something (+4.4 points of skill) without overturning the
+// pyramid (mean tier 1.77 -> 1.79), which is the trade this file cares
+// about. Turning it higher buys more matching by making everybody a
+// specialist, and the note above about a town of professionals is
+// exactly why that is the wrong direction.
+//
+// **It still gates nothing.** A weight of 0 at skill 0 means somebody
+// with no ability at all is not given that title while another is
+// available; it is not a bar on being hired, which stays productivity
+// and nothing else, and a pool whose weights all come to zero returns
+// its first entry rather than failing.
+const APTITUDE_PULL = 1;
+
+function aptitudeWeight(sheet, name) {
+  if (!sheet) return 1;
+  const skill = OCCUPATIONS[name].skill;
+  const value = Number(sheet.skills?.[skill]);
+  // **Centred on 50, which is the trait scale's own centre.** Standing
+  // rule 12's first clause: a modifier centred anywhere else silently
+  // recalibrates the world the day it starts being read. A person flat
+  // at 50 across all sixteen skills draws exactly the distribution this
+  // function produced before aptitude was a term in it, and
+  // `test/occupations.test.js` holds that.
+  if (!Number.isFinite(value)) return 1;
+  return Math.max(0, 1 + APTITUDE_PULL * ((value - 50) / 50));
+}
+
 function drawOccupation(options = {}) {
   const {
     npc = null, organizationType = null, seed = 'world', extra = [],
+    worldState = null,
   } = options;
   if (!organizationType) return null;
 
@@ -476,7 +531,16 @@ function drawOccupation(options = {}) {
   const pool = reachable.length > 0 ? reachable : [all[0]];
   if (pool.length === 1) return pool[0];
 
-  const weights = pool.map((name) => 1 / OCCUPATIONS[name].tier);
+  // **Live traits, never `npc.traits`.** Standing rule 9: the sheet on
+  // the NPC object is built once at generation and never refreshed, so
+  // weighting on it would sort people by who they were born as and
+  // ignore thirty years of work. `worldState` is optional because two
+  // callers and every existing test call this without one; without it
+  // the aptitude term is 1 for everything and the draw is the old
+  // tier-only pyramid.
+  const sheet = worldState && npc ? getLiveEntity(worldState, npc.id)?.traits ?? null : null;
+
+  const weights = pool.map((name) => (1 / OCCUPATIONS[name].tier) * aptitudeWeight(sheet, name));
   const total = weights.reduce((sum, wt) => sum + wt, 0);
   let cut = seededDraw([seed, 'occupation', npc ? npc.id : 0, ...extra]) * total;
   for (let i = 0; i < pool.length; i += 1) {
