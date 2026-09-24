@@ -1461,6 +1461,17 @@ function generateWorld(options = {}) {
   for (const cityId of summary.cities) {
     const rest = politics.LAW_CATEGORIES.filter((c) => !FOUNDING_CODE.includes(c));
     const categories = [...FOUNDING_CODE, random.pick(rest, 'law', cityId, 0)];
+    // **Centred at zero, not `-20, 30`.** That range's mean is +5, and
+    // three of these land on every NPC's political belief at
+    // `politics.enactLaw` — standing rule 12's first clause: a modifier
+    // not centred on its own scale's centre recalibrates the ordinary
+    // case rather than spreading around it. Measured on two seeds, 400
+    // ticks: government approval never dropped below 55, `revolutions`
+    // stayed at zero rows in every world this engine had ever run, and
+    // `assessRevolutions`' own floor (35) was never in reach — not
+    // because a hated government is rare, but because the founding code
+    // could not produce one. A symmetric range does not guarantee a
+    // revolution; it stops guaranteeing there is never one.
     categories.forEach((category, l) => {
       politics.enactLaw(w, {
         jurisdictionCityId: cityId,
@@ -1468,7 +1479,7 @@ function generateWorld(options = {}) {
         description: null,
         governmentOrganizationId: state.id,
         tick,
-        favourability: Math.round(random.range(-20, 30, 'law-fav', cityId, l)),
+        favourability: Math.round(random.range(-25, 25, 'law-fav', cityId, l)),
       });
       summary.laws += 1;
     });
