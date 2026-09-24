@@ -408,6 +408,68 @@ app.get('/api/factions/:id/territory', (req, res) => {
   res.json({ factionId: id, blocks, total: blocks.length });
 });
 
+// -- politics -----------------------------------------------------------------
+//
+// **Built, tested, and as unreachable as a generator nothing calls.**
+// `politics.js` is system #19 (Political) — governments, elections,
+// laws, revolutions — found and wired the same way contest.js and
+// behavior.js were, and unlike either of them it never got real HTTP
+// routes: `engine.js` did not even require the module. Read-only here
+// on purpose; a player-facing vote or law-enactment action is a
+// separate, later design question this pass does not answer.
+
+app.get('/api/governments', (_req, res) => {
+  const governments = engine.listGovernments();
+  res.json({ governments, total: governments.length });
+});
+
+// The same "necessary completion" reasoning /api/resources already
+// argues: without this, /api/governments reads empty on any world this
+// process did not restore from Postgres, which is unreachable rather
+// than merely thin.
+// audit-route-guards: open -- creates simulation content, no real-world principal; VACON-C is paused
+app.post('/api/governments', (req, res) => {
+  try {
+    res.status(201).json(engine.foundGovernment(req.body || {}));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/governments/:organizationId/approval', (req, res) => {
+  const approval = engine.approvalOf(req.params.organizationId);
+  if (approval === null) {
+    res.status(404).json({ error: `organization ${req.params.organizationId} is not a government` });
+    return;
+  }
+  res.json(approval);
+});
+
+app.get('/api/elections', (req, res) => {
+  const elections = engine.listElections(req.query.organizationId);
+  res.json({ elections, total: elections.length });
+});
+
+app.get('/api/elections/:id/votes', (req, res) => {
+  const votes = engine.votesFor(req.params.id);
+  res.json({ electionId: Number(req.params.id), votes, total: votes.length });
+});
+
+app.get('/api/laws', (req, res) => {
+  const { jurisdictionCityId, category, status } = req.query;
+  const laws = engine.listLaws({
+    jurisdictionCityId: jurisdictionCityId === undefined ? undefined : Number(jurisdictionCityId),
+    category,
+    status,
+  });
+  res.json({ laws, total: laws.length });
+});
+
+app.get('/api/revolutions', (_req, res) => {
+  const revolutions = engine.listRevolutions();
+  res.json({ revolutions, total: revolutions.length });
+});
+
 // -- territory and community -------------------------------------------------
 //
 // **Locked Phase 1 system #8, and until now entirely unreachable.**

@@ -76,6 +76,7 @@ const salvage = require('./salvage.js');
 const discovery = require('./discovery.js');
 const behavior = require('./behavior.js');
 const actions = require('./actions.js');
+const politics = require('./politics.js');
 
 // ---------------------------------------------------------------------------
 // In-memory WorldState
@@ -1128,6 +1129,58 @@ function getHoldings(ownerEntityId) {
 }
 
 // ---------------------------------------------------------------------------
+// Political — governments, elections, laws, revolutions
+// ---------------------------------------------------------------------------
+// The one "beyond the map" system (server/urbanSystems.js #19, same
+// discovery shape as contest.js and behavior.js: a table the schema
+// defined and no engine code touched) that never got the bound-wrapper
+// relationship every one of its siblings has here. `politics.js` was
+// never required by this file at all until now, so nothing under
+// `/api/*` could read a government, an election, a law or a
+// revolution — built, tested, and as unreachable as a generator
+// nothing calls.
+function listGovernments() {
+  return WorldState.governments;
+}
+
+// **Necessary completion beyond the read side**, the same posture
+// `POST /api/resources` already took for the economy: without a way to
+// found one, `/api/governments` would read empty over HTTP forever on
+// any world this process did not restore from Postgres, which is not
+// unreachable-but-thin, just unreachable.
+function foundGovernment(options) {
+  return politics.foundGovernment(WorldState, options);
+}
+
+function listElections(organizationId) {
+  return organizationId
+    ? WorldState.elections.filter((e) => e.organization_id === Number(organizationId))
+    : WorldState.elections;
+}
+
+function votesFor(electionId) {
+  return WorldState.votes.filter((v) => v.election_id === Number(electionId));
+}
+
+function listLaws(options) {
+  return politics.listLaws(WorldState, options);
+}
+
+function listRevolutions() {
+  return WorldState.revolutions;
+}
+
+// Null when the organization is not a government at all, distinct from
+// `computeApproval`'s own null for "nobody has an opinion yet" —
+// standing rule's own unknown-is-not-zero distinction, one layer up.
+function approvalOf(governmentOrganizationId) {
+  const government = politics.getGovernment(WorldState, Number(governmentOrganizationId));
+  if (!government) return null;
+  const topic = politics.topicForGovernment(government.organization_id);
+  return politics.computeApproval(WorldState, { topic });
+}
+
+// ---------------------------------------------------------------------------
 // Culture DNA
 // ---------------------------------------------------------------------------
 // Same bound-wrapper relationship as every other subsystem module.
@@ -1242,6 +1295,13 @@ module.exports = {
   getCurrentOwner,
   getOwnershipHistory,
   getHoldings,
+  listGovernments,
+  foundGovernment,
+  listElections,
+  votesFor,
+  listLaws,
+  listRevolutions,
+  approvalOf,
   CULTURE_TRAIT_FAMILIES: culture.CULTURE_TRAIT_FAMILIES,
   CULTURE_SCORED_FAMILIES: culture.CULTURE_SCORED_FAMILIES,
   CULTURE_STYLES: culture.CULTURE_STYLES,

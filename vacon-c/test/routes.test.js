@@ -1062,3 +1062,67 @@ test('a flow naming a signal the engine cannot read is refused', { skip: SKIP },
   assert.equal(res.status, 400);
   assert.match((await res.json()).error, /not a signal this engine reads/);
 });
+
+// -- politics -------------------------------------------------------------------
+
+test('every politics read answers 200 on a world with no government yet', { skip: SKIP }, async () => {
+  const paths = ['/governments', '/elections', '/laws', '/revolutions'];
+  for (const p of paths) {
+    const res = await get(p);
+    assert.equal(res.status, 200, `GET ${p} answered ${res.status}`);
+    const body = await res.json();
+    assert.equal(typeof body.total, 'number');
+  }
+});
+
+test('a government can be founded over HTTP, and then it is readable', { skip: SKIP }, async () => {
+  const org = await (await post('/organizations', {
+    name: 'The Council', type: 'government', founderId: null,
+  })).json();
+
+  const founded = await post('/governments', {
+    organizationId: org.id, systemType: 'council',
+  });
+  assert.equal(founded.status, 201);
+  const government = await founded.json();
+  assert.equal(government.organization_id, org.id);
+  assert.equal(government.system_type, 'council');
+
+  const { governments } = await (await get('/governments')).json();
+  assert.ok(governments.some((g) => g.organization_id === org.id),
+    'a government founded over HTTP must show up in the list');
+});
+
+test('only an organization of type "government" can be founded as one', { skip: SKIP }, async () => {
+  const business = await (await post('/organizations', {
+    name: 'Not A State', type: 'business', founderId: null,
+  })).json();
+
+  const res = await post('/governments', { organizationId: business.id, systemType: 'council' });
+  assert.equal(res.status, 400);
+  assert.match((await res.json()).error, /not "government"/);
+});
+
+test('GET /api/governments/:organizationId/approval 404s for a non-government organization', { skip: SKIP }, async () => {
+  const business = await (await post('/organizations', {
+    name: 'Not A State Either', type: 'business', founderId: null,
+  })).json();
+
+  const res = await get(`/governments/${business.id}/approval`);
+  assert.equal(res.status, 404);
+});
+
+test('GET /api/elections/:id/votes answers an empty tally for an election nobody voted in', { skip: SKIP }, async () => {
+  const res = await get('/elections/999999/votes');
+  assert.equal(res.status, 200, 'a non-existent election has zero votes, not an error');
+  const { votes, total } = await res.json();
+  assert.deepEqual(votes, []);
+  assert.equal(total, 0);
+});
+
+test('GET /api/laws accepts its filters without error', { skip: SKIP }, async () => {
+  const res = await get('/laws?jurisdictionCityId=1&category=criminal&status=active');
+  assert.equal(res.status, 200);
+  const { laws } = await res.json();
+  assert.ok(Array.isArray(laws));
+});

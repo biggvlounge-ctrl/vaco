@@ -20,7 +20,7 @@ There is a working simulation — traits across four tiers, seven Key
 resolvers, family, economy, territory, tick, players, artifacts and
 missions, plus Property, Culture DNA, Named Flow Templates, contest
 resolution and the Behavior Engine — and its HTTP surface is real:
-**81 routes**, up from 8 before any of this.
+**88 routes**, up from 8 before any of this.
 
 Since then, and not in the phase plan because nothing anticipated them:
 world generation, the uniform statistics catalogue, crime and policing,
@@ -192,9 +192,9 @@ them; `test/routes.test.js` asserts it.
 | Cross-cutting | 3 | 0 | 3 |
 | **Total** | **58** | **45** | **13** |
 
-**81 routes are registered in `server.js`** (counted, not remembered:
+**88 routes are registered in `server.js`** (counted, not remembered:
 `grep -cE "^app\.(get|post|put|patch|delete)\(" server.js`). Of those,
-**29 have no line anywhere in the map** — every path below was checked
+**36 have no line anywhere in the map** — every path below was checked
 against the map text with `:param` names normalised, so a rename cannot
 hide one:
 
@@ -209,21 +209,37 @@ hide one:
 `GET`/`POST /api/flows`, `GET`/`POST /api/entities/:id/habits`,
 `GET`/`POST /api/entities/:id/schedule`, `POST /api/entities/:id/stress`,
 `GET /api/entities/:id/behavior`, `GET /api/players/:id/actions`,
-`GET /api/economy/snapshots`. The map's own line is `GET /api/economy/
-snapshot` (singular, "current economy_snapshots for a given
-entity/tier") — already served, exactly as specified, by the existing
-`/api/economy/snapshot` (a different, pre-existing route reading
-current resources and market listings, not the `economy_snapshots`
-table, and left untouched because `public/index.html`'s Econ tab
-already depends on its exact shape). The plural route added 24 Sep 2026
-is the one that actually reads `economy_snapshots`, scoped by
-`entityId` because the table is per-entity history, and it has no line
-of its own to match.
+`GET /api/economy/snapshots`, `GET`/`POST /api/governments`,
+`GET /api/governments/:organizationId/approval`, `GET /api/elections`,
+`GET /api/elections/:id/votes`, `GET /api/laws`, `GET /api/revolutions`.
 
-The last of those is this file's own thesis in miniature. The map
-specifies `POST /api/players/:id/action` — the dispatcher — and no way
-to ask what may be dispatched. Without the menu route every client
-hard-codes the action list, and then the list lives in two places.
+`GET /api/economy/snapshots` is a special case rather than an omission:
+the map's own line is `GET /api/economy/snapshot` (singular, "current
+economy_snapshots for a given entity/tier") — already served, exactly
+as specified, by the existing `/api/economy/snapshot` (a different,
+pre-existing route reading current resources and market listings, not
+the `economy_snapshots` table, and left untouched because
+`public/index.html`'s Econ tab already depends on its exact shape). The
+plural route added 24 Sep 2026 is the one that actually reads
+`economy_snapshots`, scoped by `entityId` because the table is
+per-entity history, and it has no line of its own to match.
+
+The six politics routes are a different case again: `politics.js`
+(§7 system 19, Political) is not in the map at all, the same situation
+`contest.js` and `behavior.js` were in — a system the map never
+anticipated, found the same way (a table the schema defined and no
+engine code touched), and given real routes on its own merits once it
+existed, exactly as those two were. `POST /api/governments` is the
+usual completion this file keeps finding needed alongside a read: the
+map does not mention founding one at all, and without it
+`/api/governments` reads empty on any world this process did not
+restore from Postgres.
+
+`GET /api/players/:id/actions` is this file's own thesis in miniature.
+The map specifies `POST /api/players/:id/action` — the dispatcher —
+and no way to ask what may be dispatched. Without the menu route every
+client hard-codes the action list, and then the list lives in two
+places.
 
 They exist for one of two reasons, and the first is the pattern this
 whole file exists to record: **the map specifies what to read and what
