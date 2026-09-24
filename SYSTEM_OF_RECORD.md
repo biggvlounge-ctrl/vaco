@@ -13,8 +13,8 @@ person who built it can check whether a claim is still true.
 Every number below was produced by running the tool that owns it, not
 recalled. The commands are in §10 so they can be re-run.
 
-*Current as of commit `446eb74`, 161 commits, branch
-`claude/v4-proxy-server-s6dcp8`, 17 Sep 2026.*
+*Current as of commit `5cfb5b1`, 207 commits, branch
+`claude/v4-proxy-server-s6dcp8`, 24 Sep 2026.*
 
 **On the commit count.** An earlier revision of this line said 332. That
 number was not wrong when written and the history it counted is gone:
@@ -72,7 +72,7 @@ authorization work in §5 had to be done per app rather than once.
 | Containerised services | 36 + nginx + a LiveKit SFU |
 | Registry rows (incl. brand rows and the dev mock) | 37 |
 | Mutating HTTP routes | 524, all accounted for (472 guarded, 52 declared open with a reason) |
-| Automated tests | 2296 across 39 suites |
+| Automated tests | 2704 across 39 suites |
 | Persisted volumes | 30 |
 | Shared-module copies kept in sync | 210 |
 | Service credentials in `.env.example` | 28 callers |
@@ -824,7 +824,7 @@ run to produce the numbers here.
 built:** `node scripts/package-release.mjs` — see §11.
 
 ```sh
-node scripts/run-all-tests.mjs           # 2296/2296 across 39 suites (some skip without a database)
+node scripts/run-all-tests.mjs           # 2704/2704 across 39 suites (some skip without a database)
 node scripts/audit-route-guards.mjs --check   # 524/524 accounted for
 ./sync-shared-runtime.sh --check         # 210 copies current, none unmanaged
 ./sync-design-system.sh --check          # every serving app is a target
@@ -895,9 +895,9 @@ dependencies are installed.
 ### Per-suite
 
 ```
-vacon-c         945   vdp             147   void            142
+vacon-c        1222   vdp             147   void            142
 scripts         168   v3              111   vaco-media       51
-v4-proxy         42   world-layer      41   venvm            40
+v4-proxy         42   world-layer     172   venvm            40
 venvs            45   voken            37   vaco-analytics   39
 vaco-shell       36   vacay            24   voidmagic        28
 cvnvo/yap        35   vaco-operator    20   vacon            18

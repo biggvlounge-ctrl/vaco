@@ -259,7 +259,21 @@ const SYSTEMS = [
     tables: ['resources'],
     functions: ['advanceResourceTick'],
     note: 'Food is a resource with scarcity, and drought cascades to it — '
-      + 'see test/drought-cascade.test.js. No production or distribution chain.',
+      + 'see test/drought-cascade.test.js. No production or distribution chain, '
+      + 'and that gap was checked rather than assumed (24 Sep 2026): it does not '
+      + 'close the way Energy did. Water (#11) reaches `modelled` on the same '
+      + '`resources` row Food sits on, but through `infrastructure.type = '
+      + '\'water_systems\'` — the pipes can fail and be repaired, which is a real '
+      + 'mechanism beyond the resource itself. `infrastructure.INFRASTRUCTURE_TYPES` '
+      + 'is a fixed ten and none of them is food; inventing an eleventh is the exact '
+      + 'mistake #18 Prison already names and declines for the same reason (a made-up '
+      + 'capacity under every statistic that reads it). And a production term — a '
+      + 'farmer raising `resources.supply` — was considered and rejected for the '
+      + 'system underneath this one, not just for Food: CLAUDE.md\'s thirteenth '
+      + 'standing rule found supply a one-way ratchet and fixed it by restoring what '
+      + 'a condition actually took on expiry, explicitly choosing that over a '
+      + 'production model. Building one now for Food alone would re-open a question '
+      + 'already settled for every resource. Stays partial on purpose.',
   },
   {
     n: 11,

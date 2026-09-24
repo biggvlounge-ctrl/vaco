@@ -1,6 +1,6 @@
 {
-  "total": 2296,
-  "passed": 2247,
+  "total": 2704,
+  "passed": 2655,
   "failed": 0,
   "skipped": 49,
   "suites": 39,
@@ -132,8 +132,8 @@
       "skipped": 0
     },
     "vacon-c": {
-      "tests": 945,
-      "pass": 928,
+      "tests": 1222,
+      "pass": 1205,
       "fail": 0,
       "skipped": 17
     },
@@ -234,8 +234,8 @@
       "skipped": 0
     },
     "world-layer": {
-      "tests": 41,
-      "pass": 41,
+      "tests": 172,
+      "pass": 172,
       "fail": 0,
       "skipped": 0
     }
