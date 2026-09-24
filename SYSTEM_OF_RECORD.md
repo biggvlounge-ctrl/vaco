@@ -980,7 +980,7 @@ trusted:
 
 The simulation engine is the one app in this repo whose "done" is not a
 list of routes, so it carries a measured completeness score rather than
-a criteria tally. **90.6%**, from
+a criteria tally. **90.7%**, from
 `vacon-c/dev-docs/GAME_COMPLETENESS.md`, which
 `vacon-c/scripts/completeness.mjs` regenerates and
 `vacon-c/test/completeness.test.js` fails on if stale — including a
@@ -990,10 +990,34 @@ check that the percent in THIS file matches the one the code measures.
 |---|---|---|
 | systems | 71.1% | the forty urban systems §7 names, at `urbanSystems.js`'s own four levels |
 | tables | 90.2% | schema tables a built world actually fills |
-| statistics | 88% | statistics a world can answer about itself |
+| statistics | 88.2% | statistics a world can answer about itself |
 | traits | 100% | traits something under `server/` reads |
 | traitDepth | 85.7% | trait columns a life actually changes |
 | habits | 100% | whether habits and routines carry information |
+
+**90.6% -> 90.7% on 24 Sep 2026, and the denominator moved too.** The
+catalogue grew from 117 statistics to 119 — `dominant_gift` and
+`median_mastery`, from `server/gifts.js` — and both are answerable, so
+the numerator grew by two against a denominator that grew by two. The
+total went 318.95/352 to 320.95/354.
+
+That is a smaller rise than the day's work might suggest, and the
+reason is worth stating rather than leaving to be inferred: **most of
+what changed on 24 Sep is invisible to this metric.** The
+`seededUnit` defect — which meant `MOVE_CHANCE` had never gated
+anything, `environment.drawWeather` returned `clear` in every world
+ever generated, and every mission reward came out at its floor — does
+not move a single axis, because every one of those systems already
+scored as built. The metric asks whether a mechanism exists and is
+reached, not whether it does what it claims. A system wired to a
+constant passes it.
+
+`tribeMissions.js` is the same: `missions` was already a filled table
+and the statistics axis has no entry for "how many missions a world
+generates", so closing playtest finding 2 scores zero here. The percent
+is an honest floor on completeness and a poor measure of correctness,
+and the gap between those two is where this week's findings have all
+been.
 
 **91.2% -> 90.6% on 23 Sep 2026, and the measurement is what moved, not
 the engine.** Two justice statistics — `state_declined_share` and
