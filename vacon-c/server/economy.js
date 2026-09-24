@@ -563,6 +563,53 @@ const WAGE_TO_OUTPUT = 1.3;
 // change redistributes; it does not move the baseline.
 const JOB_SHARE = 0.5;
 
+// ---------------------------------------------------------------------
+// Electricity, the resource nothing consumed
+// ---------------------------------------------------------------------
+// `urbanSystems.js`'s Energy entry names this exactly: a grid can now
+// fail (`infrastructure.js`, 21 Sep 2026) and the outage moves
+// `resources` supply for the `energy` type — and stopped there. "No
+// need, habit or production step reads it", so a city with electricity
+// at zero behaved identically to one at full supply for every person
+// in it. §40 names electricity as the head of the whole bottleneck
+// chain; this is the first link.
+//
+// **A production step, not a need.** The fifteen `motivation.js` needs
+// are a closed, documented vocabulary — `needs.need_type`'s own schema
+// comment enumerates exactly fifteen, and electricity is not one of
+// them. Adding a sixteenth because it sounds like it belongs would be
+// inventing a need category the package never asked for. What §40
+// actually frames electricity as is an ECONOMIC input — a business
+// runs on power — so it belongs where `productivityOf` already reads
+// health and focus: a factor on what labour produces, not a personal
+// want.
+//
+// **Centred exactly like health and focus, on the same 0.75..1.25
+// band**, for the same reason standing rule 12's first clause always
+// gives: `getScarcity` returns 50 for supply meeting demand, so that
+// is where the factor must sit at 1.0, or reading electricity would
+// silently revalue every worker in a perfectly ordinary city the day
+// this shipped.
+//
+// **Unmeasured is neutral, never a penalty.** A world with no `energy`
+// resource row for a worker's city — restored from before this
+// existed, or one where nothing ever calls `generateResource` for it —
+// is unknown, not a blackout. The corollary already shipped wrong once
+// in `moodFor`; the fix here is the same explicit default the health
+// and focus terms already use.
+function energyFactor(worldState, entityId) {
+  const npc = (worldState.npcs || []).find((n) => n.id === entityId);
+  if (!npc || npc.communityId == null) return 1;
+  const community = (worldState.communities || []).find((c) => c.id === npc.communityId);
+  if (!community) return 1;
+  const resource = (worldState.resources || []).find(
+    (r) => r.city_id === community.city_id && r.resource_type === 'energy',
+  );
+  if (!resource) return 1;
+  const scarcity = getScarcity(resource);
+  return Math.max(0, 0.75 + (100 - scarcity) / 200);
+}
+
 function productivityOf(worldState, entityId) {
   const live = getLiveEntity(worldState, entityId);
   if (!live) return 0;
@@ -599,7 +646,8 @@ function productivityOf(worldState, entityId) {
   //
   // 0.75..1.25 keeps 1.0 at average, still halves the output of
   // somebody seriously ill, and leaves skill the dominant term.
-  return Math.max(0, skill * (0.75 + health / 200) * (0.75 + focus / 200));
+  return Math.max(0, skill * (0.75 + health / 200) * (0.75 + focus / 200)
+    * energyFactor(worldState, entityId));
 }
 
 // One tick of work, for everybody holding an active contract.
@@ -987,6 +1035,7 @@ module.exports = {
   WORKING_AGE,
   WAGE_TO_OUTPUT,
   productivityOf,
+  energyFactor,
   runProduction,
   getEmploymentRate,
 };

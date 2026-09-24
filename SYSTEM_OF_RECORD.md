@@ -980,7 +980,7 @@ trusted:
 
 The simulation engine is the one app in this repo whose "done" is not a
 list of routes, so it carries a measured completeness score rather than
-a criteria tally. **90.7%**, from
+a criteria tally. **90.8%**, from
 `vacon-c/dev-docs/GAME_COMPLETENESS.md`, which
 `vacon-c/scripts/completeness.mjs` regenerates and
 `vacon-c/test/completeness.test.js` fails on if stale — including a
@@ -988,12 +988,29 @@ check that the percent in THIS file matches the one the code measures.
 
 | axis | complete | what it measures |
 |---|---|---|
-| systems | 71.1% | the forty urban systems §7 names, at `urbanSystems.js`'s own four levels |
+| systems | 72.4% | the forty urban systems §7 names, at `urbanSystems.js`'s own four levels |
 | tables | 90.2% | schema tables a built world actually fills |
 | statistics | 88.2% | statistics a world can answer about itself |
 | traits | 100% | traits something under `server/` reads |
 | traitDepth | 85.7% | trait columns a life actually changes |
 | habits | 100% | whether habits and routines carry information |
+
+**90.7% -> 90.8% on 24 Sep 2026, same day, different cause.** Energy
+moved `partial` -> `modelled` on the systems axis. A grid could already
+fail (17 Sep) and the outage moved `resources` supply for `energy` —
+and nothing consumed it, so a blackout was a number nobody felt.
+`economy.energyFactor` is the first reader, folded into
+`productivityOf` as an economic input the same way health and focus
+already are, centred at 1.0 for supply meeting demand so an ordinary
+city's workers are unaffected. Measured end to end: failing a city's
+grid and running 20 ticks took a real worker's productivity from 1.556
+to 1.156.
+
+This is the systems axis's largest legitimate remaining bucket — 9.85
+of the 29.35 buildable points once Transportation and Supply Chain's
+scope-deferred credit is set aside — continued from the statistics
+axis, which turned out to be exhausted of safe wins the same day (see
+the entry above this one).
 
 **90.6% -> 90.7% on 24 Sep 2026, and the denominator moved too.** The
 catalogue grew from 117 statistics to 119 — `dominant_gift` and

@@ -234,20 +234,23 @@ const SYSTEMS = [
   {
     n: 9,
     name: 'Energy',
-    level: 'partial',
+    level: 'modelled',
     infrastructureTypes: ['electricity'],
     tables: ['resources'],
-    functions: ['failInfrastructure', 'repairInfrastructure', 'repairTicks'],
-    note: 'This was `slot` — "storage exists and nothing reads it" — and the reading it lacked '
-      + 'was failure. `failureRisk` was computed, crossed and consumed by nothing: a grid at '
-      + 'risk 0.95 behaved exactly like one at 0.05. Electricity can now fail, the outage runs '
-      + 'through the ordinary condition channel, and repair takes as long as the city\'s '
-      + '`funding` and its residents\' technology traits make it take — that column had no '
-      + 'reader anywhere in the engine before. **Partial and not modelled because nothing '
-      + 'CONSUMES energy**: the outage moves `resources` supply for a type no need, habit or '
-      + 'production step reads, so the grid going down is felt as a number rather than by '
-      + 'anybody. §40 names electricity as the head of the whole bottleneck chain and that '
-      + 'chain still runs through technology_eras instead.',
+    functions: ['failInfrastructure', 'repairInfrastructure', 'repairTicks',
+      'productivityOf', 'energyFactor'],
+    note: 'Was `slot`, then `partial` once a grid could fail and the outage moved `resources` '
+      + 'supply for `energy` — and stopped there, because nothing consumed it: a city at zero '
+      + 'supply behaved exactly like one at full supply. `economy.energyFactor` is the first '
+      + 'reader, 24 Sep 2026, folded into `productivityOf` as an economic input the way health '
+      + 'and focus already are — centred at 1.0 for supply meeting demand, the same 0.75..1.25 '
+      + 'band, for the same reason: a modifier off-centre from the trait scale\'s own centre '
+      + 'silently revalues the ordinary case. It is a production term rather than a sixteenth '
+      + '`motivation.js` need, because that vocabulary is a closed, documented fifteen and '
+      + 'electricity is not one of them. Measured end to end on a generated world: failing a '
+      + 'city\'s grid and running 20 ticks took a real worker\'s productivity from 1.556 to '
+      + '1.156. §40 names electricity as the head of the whole bottleneck chain; this is the '
+      + 'first link a person actually feels.',
   },
   {
     n: 10,

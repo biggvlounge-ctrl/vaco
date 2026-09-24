@@ -337,11 +337,14 @@ test('the four systems this was for are levelled to what the code does', () => {
   // and pipes that can take it away.
   assert.equal(level(11), 'modelled');
 
-  // **Energy stops at partial because nothing CONSUMES energy.** The
-  // outage moves a resource supply no need, habit or production step
-  // reads, so the grid going down is felt as a number rather than by
-  // anybody.
-  assert.equal(level(9), 'partial');
+  // **Energy moved to modelled, 24 Sep 2026 — this guard caught its
+  // own prediction coming true.** It used to assert NO consumer read
+  // the resource; `economy.energyFactor` is now exactly that consumer,
+  // folded into `productivityOf` as an economic input the same way
+  // health and focus already are. The check is flipped rather than
+  // deleted: it still fails if a THIRD, undocumented file starts
+  // reading `'energy'` without this system's level being reconsidered.
+  assert.equal(level(9), 'modelled');
   const consumers = require('node:fs').readdirSync(
     require('node:path').join(__dirname, '..', 'server'),
   ).filter((f) => f.endsWith('.js'))
@@ -349,8 +352,9 @@ test('the four systems this was for are levelled to what the code does', () => {
     .filter((f) => /'energy'/.test(require('node:fs').readFileSync(
       require('node:path').join(__dirname, '..', 'server', f), 'utf8',
     ).replace(/^\s*\/\/.*$/gm, '')));
-  assert.deepEqual(consumers, [],
-    `${consumers.join(', ')} reads the energy resource now, so system 9 has outgrown partial`);
+  assert.deepEqual(consumers, ['economy.js'],
+    `energy is read by [${consumers.join(', ')}], not exactly economy.js as expected — `
+    + 'a new or missing consumer means this system\'s level needs re-checking');
 
   // Waste: a real consequence, no volume flowing through it.
   assert.equal(level(12), 'partial');

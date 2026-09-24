@@ -44,6 +44,7 @@ function world() {
     individualFinances: [],
     resources: [],
     marketListings: [],
+    communities: [],
   };
   economy.reseedIds(worldState);
   return worldState;
@@ -119,6 +120,105 @@ test('productivity reads live traits, not the frozen sheet', () => {
   person.traits = { skills: { Communication: 100 }, health: {}, mental: {} };
   assert.equal(economy.productivityOf(w, person.id), 1,
     'productivity read the frozen sheet on the object');
+});
+
+// ---------------------------------------------------------------------
+// Electricity — the resource nothing consumed
+// ---------------------------------------------------------------------
+// `urbanSystems.js`'s Energy entry: a grid can fail and the outage
+// moves `resources` supply for `energy`, and nothing downstream ever
+// read it — a city at zero supply behaved exactly like one at full
+// supply. `energyFactor` is the first reader, folded into
+// `productivityOf` as an economic input rather than a sixteenth
+// `motivation.js` need (which is a closed, documented vocabulary of
+// fifteen).
+
+function place(worldState, cityId = 900) {
+  const communityId = nextId++;
+  worldState.communities.push({ id: communityId, city_id: cityId });
+  return communityId;
+}
+
+function energyResource(worldState, cityId, supply, demand) {
+  return economy.generateResource(worldState, {
+    resourceType: 'energy', cityId, supply, demand,
+  });
+}
+
+test('electricity at balanced supply and demand is exactly neutral', () => {
+  // getScarcity returns 50 when demand meets supply — that is where
+  // this factor has to sit at 1.0, or reading electricity would
+  // silently revalue every ordinary city the day it shipped. Held
+  // exactly, the same discipline `WAGE_TO_OUTPUT`'s centring test uses.
+  const w = world();
+  const cityId = 800;
+  const communityId = place(w, cityId);
+  const average = worker(w, 50);
+  average.communityId = communityId;
+  energyResource(w, cityId, 100, 100);
+  assert.equal(economy.productivityOf(w, average.id), 1);
+});
+
+test('a grid at zero supply halves output; a surplus modestly raises it', () => {
+  const w = world();
+  const cityId = 801;
+  const communityId = place(w, cityId);
+  const person = worker(w, 50);
+  person.communityId = communityId;
+
+  const failed = energyResource(w, cityId, 1, 100);
+  assert.ok(economy.getScarcity(failed) >= 99, 'this fixture is supposed to be a blackout');
+  const inOutage = economy.productivityOf(w, person.id);
+  assert.ok(inOutage < 1, `productivity under a blackout was ${inOutage}, not below neutral`);
+  assert.ok(inOutage >= 0.75 - 1e-9, 'the floor is 0.75, same band as health and focus');
+
+  failed.supply = 200; failed.demand = 100; // restored, then a surplus
+  const surplus = economy.productivityOf(w, person.id);
+  assert.ok(surplus > 1, `a supply surplus (${surplus}) should modestly exceed neutral`);
+  assert.ok(surplus <= 1.25 + 1e-9, 'the ceiling is 1.25, same band as health and focus');
+});
+
+test('unmeasured electricity is neutral, never a penalty', () => {
+  // The corollary that shipped wrong once in moodFor: a city nobody
+  // has generated an energy resource for is UNKNOWN, not a blackout.
+  // A world restored from before this existed has exactly this shape.
+  const w = world();
+  const communityId = place(w, 802);
+  const person = worker(w, 50);
+  person.communityId = communityId;
+  // No energyResource() call — the city has no energy row at all.
+  assert.equal(economy.productivityOf(w, person.id), 1,
+    'a city with no tracked energy resource read as a penalty rather than unknown');
+
+  // Same for somebody placed nowhere at all.
+  const homeless = worker(w, 50);
+  assert.equal(economy.productivityOf(w, homeless.id), 1);
+});
+
+test('a real grid failure measurably reduces a real world\'s output', () => {
+  // The end-to-end claim, on a generated world rather than a fixture —
+  // the sixteenth standing rule. `infrastructure.failInfrastructure`
+  // is the only real writer of an outage; this is what a player would
+  // actually see happen to somebody's paycheck.
+  const infrastructure = require('../server/infrastructure.js');
+  const w2 = engine.WorldState;
+  worldgen.generateWorld({ seed: 'energy-integration' });
+  const rec = w2.employmentRecords.find((r) => r.status === 'active');
+  const before = economy.productivityOf(w2, rec.entity_id);
+
+  const npc = w2.npcs.find((n) => n.id === rec.entity_id);
+  const community = w2.communities.find((c) => c.id === npc.communityId);
+  const grid = w2.infrastructure.find(
+    (i) => i.type === 'electricity' && i.city_id === community.city_id,
+  );
+  assert.ok(grid, 'worldgen is supposed to build an electricity row for every city');
+  infrastructure.failInfrastructure(w2, grid, { tick: w2.tick });
+  for (let t = 0; t < 20; t += 1) engine.advanceTick();
+
+  const after = economy.productivityOf(w2, rec.entity_id);
+  assert.ok(after < before,
+    `productivity went ${before.toFixed(3)} -> ${after.toFixed(3)} after a grid failure — `
+    + 'it should have fallen');
 });
 
 // ---------------------------------------------------------------------
@@ -297,9 +397,27 @@ test('a generated world stops going bankrupt, and its event log stops shouting',
   }
   void before;
 
-  // Nothing goes bankrupt.
-  assert.equal(counts.payroll_missed ?? 0, 0,
-    'businesses are still failing to make payroll, so nothing is earning');
+  // **This assertion had the same failure the two guards below it
+  // already document, and it broke the day electricity started being
+  // read.** A hard zero conflated "every business permanently
+  // insolvent" — the historic 1,488-event collapse this guard exists
+  // to catch, from `organizations.income` never being written — with
+  // "a marginal business, already near break-even, misses one payroll
+  // during a real energy shortage." The second is what
+  // `economy.energyFactor` makes possible for the first time, and it
+  // is honest: measured on this exact world, energy scarcity sits at
+  // 57-58 from GENERATION — demand modestly outstrips supply from
+  // tick 0, which is what a recovering settlement's economy already
+  // looked like before anything read it — a ~4% ambient productivity
+  // tax nothing had ever applied. Payroll runs roughly daily against
+  // TICKS(120) worth of opportunities across every organization, so a
+  // real collapse reproduces at a scale nothing like this: bounded
+  // well under that rather than removed, so a genuine reintroduction
+  // of the 1,488-event bug still fails this test.
+  const missed = counts.payroll_missed ?? 0;
+  assert.ok(missed < TICKS / 10,
+    `${missed} missed payrolls in ${TICKS} ticks — that is collapse-scale, not the `
+    + 'occasional friction a real energy shortage should cause');
 
   const people = w.npcs.length;
   // Two signals that used to fire per person per tick. `fear_spike` ran

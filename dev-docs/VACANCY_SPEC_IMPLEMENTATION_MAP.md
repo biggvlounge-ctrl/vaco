@@ -209,13 +209,22 @@ from memory with nothing in the repo to check it against. The forty are
 now data in `vacon-c/server/urbanSystems.js`, every citation verified
 by `vacon-c/test/urban-systems.test.js`, and the real breakdown is:
 
-**19 modelled, 18 partial, 3 slot-only, 0 absent**
+**20 modelled, 17 partial, 3 slot-only, 0 absent**
 
 | Level | Means | Systems |
 |---|---|---|
-| **modelled** (19) | Real mechanics; something advances or decides on it each tick | Population, Housing, Economy, **Employment**, **Health**, Infrastructure, **Water**, **Law Enforcement**, **Crime**, **Court**, **Political**, **Media**, Cultural, Community Organizations, Real Estate, Environmental, **Technology**, **Migration**, AI Decision |
-| **partial** (18) | A trait family or a live table with little driving it, or one phase covering two systems | Education, **Energy**, Food Supply, **Waste**, Gang, Organized Crime, **Prison**, **Government Services**, Communication, **Social Media**, **Religion**, Business, Construction, Weather, Disaster, **Military/National Guard**, **Tourism**, Reputation |
+| **modelled** (20) | Real mechanics; something advances or decides on it each tick | Population, Housing, Economy, **Employment**, **Health**, Infrastructure, **Water**, **Energy**, **Law Enforcement**, **Crime**, **Court**, **Political**, **Media**, Cultural, Community Organizations, Real Estate, Environmental, **Technology**, **Migration**, AI Decision |
+| **partial** (17) | A trait family or a live table with little driving it, or one phase covering two systems | Education, Food Supply, **Waste**, Gang, Organized Crime, **Prison**, **Government Services**, Communication, **Social Media**, **Religion**, Business, Construction, Weather, Disaster, **Military/National Guard**, **Tourism**, Reputation |
 | **slot** (3) | Storage exists and nothing reads it | Transportation, Fire & Emergency, Supply Chain |
+
+**Energy moved again, 24 Sep 2026.** The 17 Sep pass above gave it a
+failure mode; nothing consumed the outage it produced, so a city at
+zero electricity supply behaved exactly like one at full supply.
+`economy.energyFactor` is the first reader — folded into
+`productivityOf` as an economic input the same way health and focus
+already are, centred at 1.0 for supply meeting demand. Measured
+end to end: failing a city's grid and running 20 ticks took a real
+worker's productivity from 1.556 to 1.156.
 
 **Energy, Water and Waste all moved on 17 Sep 2026, and it was one
 missing mechanism between them.** `infrastructure.failureRisk` was
