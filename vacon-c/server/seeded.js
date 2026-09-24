@@ -35,7 +35,48 @@ function hashSeed(parts) {
 }
 
 // A number in [0, 1) from the seed. Deterministic by construction.
+//
+// ---------------------------------------------------------------------
+// **It takes a NUMBER, and it refuses anything else — because this has
+// silently returned 0 forever in three separate systems.**
+// ---------------------------------------------------------------------
+// `seededUnit(seed, 'purpose', id, tick)` looks exactly like
+// `seededDraw([seed, 'purpose', id, tick])` and is the natural thing to
+// type. It is also catastrophic and completely silent: the extra
+// arguments are ignored, `'world' || 1` keeps the STRING, the bitwise
+// operations below coerce it to 0, and every call returns **0**.
+//
+// Nothing throws, nothing looks wrong, and the consumer gets a
+// plausible constant for the life of the world. The three:
+//
+//   - `environment.drawWeather` — measured, 200 ticks, three cities,
+//     every one of them `clear` the entire time and not one weather
+//     event in any world ever generated.
+//   - `migration.runMigration`, twice. `0 >= chance` is false for any
+//     positive chance, so **`MOVE_CHANCE` has never gated anything**:
+//     every pushed person with an acceptable destination moved
+//     immediately, which is why moves arrived as whole cohorts. Fixing
+//     it took a 600-tick world from 21 moves in two herds to 2 moves by
+//     two individuals.
+//   - `tribeMissions.runTribeMissions` — every mission reward came out
+//     at exactly its floor, which is how the other two were found.
+//
+// That is the sixth standing rule's shape (a read that is not there
+// returns the same plausible value forever), and the fix for a rule
+// that keeps recurring is not another comment — it is making the
+// mistake impossible to make quietly. A string seed is now a crash at
+// the call site rather than a constant somewhere downstream.
+//
+// `hashSeed` is what turns parts into a number, and `seededDraw` does
+// both in one call, which is what nearly every caller actually wants.
 function seededUnit(seed) {
+  if (typeof seed !== 'number' || !Number.isFinite(seed)) {
+    throw new TypeError(
+      `seededUnit takes a finite NUMBER, got ${typeof seed} ${JSON.stringify(seed)}. `
+      + 'Did you mean seededDraw([...parts])? Passing the parts of a draw here '
+      + 'silently returns 0 on every call — see the note above this line.',
+    );
+  }
   // xorshift32, one round — enough to decorrelate adjacent seeds so
   // that contest 41 and contest 42 do not draw near-identical values.
   let x = seed || 1;
