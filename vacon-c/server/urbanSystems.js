@@ -119,11 +119,25 @@ const SYSTEMS = [
     n: 3,
     name: 'Economy',
     level: 'modelled',
-    tables: ['market_listings', 'individual_finances', 'resources'],
-    schemaOnly: ['economy_snapshots', 'investments'],
+    tables: ['market_listings', 'individual_finances', 'resources', 'economy_snapshots',
+      'analytics_snapshots'],
+    schemaOnly: ['investments'],
     phases: ['runEconomyPhase'],
     traitFamilies: ['economic'],
-    functions: ['resolveMarketPrice', 'getScarcity', 'getNetWorth'],
+    functions: ['resolveMarketPrice', 'getScarcity', 'getNetWorth', 'runSnapshots'],
+    note: '**`economy_snapshots`/`analytics_snapshots` are real, 24 Sep 2026** — the history '
+      + 'rule 3 does not forbid, since supply/demand/price at tick 300 are not computable at '
+      + 'tick 900. `server/snapshots.js`: one `analytics_snapshots` row every tick (world-level, '
+      + 'genuinely cheap — population, crime/birth-rate, a lifetime death share, migration '
+      + 'activity in the trailing year, mean education, unlocked eras); `economy_snapshots` '
+      + 'rows for every living individual and family on `statecraft.BUDGET_INTERVAL_TICKS` (a '
+      + 'quarter, reused rather than a new interval invented for the same question). Scoped to '
+      + 'individual/family only — `entities` rows exist for npc/organization/family, never for '
+      + 'a city or a civilization (`completeness.js`), so the schema comment\'s wider '
+      + '"community/city/region/civ" tier list has no id an FK could hold. `gdp` stays null: no '
+      + 'mechanism computes a monetary output aggregate, and `businesses.revenue`/`.profit` — '
+      + 'the columns a real one would sum — are unwritten, so a substitute would silently '
+      + 'redefine GDP as something else. Unknown is not zero.',
   },
   {
     n: 4,

@@ -47,7 +47,7 @@ the Postgres schema that already exists.
 
 ## 1. Server code — `vacon-c/server/`
 
-All 75 files present on disk, all committed, largest first.
+All 76 files present on disk, all committed, largest first.
 
 **`test/inventory.test.js` now fails when this table and `server/` disagree**, which is the guard this document has needed through three separate drifts (see the note below). The count and the file list are checked against the tree rather than typed.
 
@@ -75,6 +75,7 @@ read off disk, not recalled.
 | `trade.js` | 13,835 | **The occasion `barter.exchange` never had.** The exchange logic was complete, correct, tested and reached by nobody in a generated world — the eleventh standing rule, one file over. | Built |
 | `keysLog.js` | 6,901 | **The numeric half of the audit trail**, and the one that makes a resolution checkable rather than merely explained. `keys_log` was one of the last tables in the schema with no code touching it. | Built |
 | `landmarkPacks.js` | 9,673 | **Real named places, imported per region — and the reconciliation with `world-layer/`.** That module's own status said its consumers were unbuilt because VACON-C was paused; VACON-C was not paused, and had written a second, anonymous landmark system without finding it. A pack arrives as DATA, never a cross-directory require (the per-app Docker build context), and `data/st-louis.landmarks.json` is the worked example the import documents point at. | Built |
+| `snapshots.js` | 9,928 | **`economy_snapshots`/`analytics_snapshots` — the history rule 3 doesn't forbid.** One `analytics_snapshots` row every tick (world-level, gdp always null — no mechanism computes one); `economy_snapshots` rows for every living individual and family, quarterly, since cities and civilizations have no `entities` row an FK could hold. | Built |
 | `motivation.js` | 35,500 | **Needs, values and goals in one module**, per §4.5 ("Motivation Engine = Value System DNA restated"). Fifteen needs, fifteen values, one satisfier apiece and one declared absence. | Built |
 | `behavior.js` | 35,339 | **The Behavior Engine** — routine, mood and habits: the three tables architecture §4.5 named as genuinely new (`schedule_events`, `entity_state`, `habits`), all of which sat in the schema with zero code. | Built |
 | `politics.js` | 35,701 | Government, laws, and an election lifecycle with real candidates and votes. | Built |

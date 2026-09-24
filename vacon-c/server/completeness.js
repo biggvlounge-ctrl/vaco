@@ -198,21 +198,6 @@ const TABLE_NO_STORE_REASON = {
     note: 'Transportation is on CLAUDE.md\'s explicit do-not-touch list, and economy.js '
       + 'records this table as closed scope rather than a gap for that reason.',
   },
-  economy_snapshots: {
-    note: 'A TIME SERIES, which is not the same thing as a rollup, and the distinction is '
-      + 'the open question. The third standing rule forbids storing what is computable — '
-      + 'but supply, demand and price at tick 300 are NOT computable at tick 900, because '
-      + 'the past is gone. So this is a real design decision nobody has made rather than a '
-      + 'rule-3 violation: either the engine keeps a history or it accepts that only the '
-      + 'present is answerable. `urbanSystems.js` marks it schemaOnly, which records the '
-      + 'state without deciding it.',
-  },
-  analytics_snapshots: {
-    note: 'The same open question as economy_snapshots, one tier up: population, gdp, '
-      + 'crime, birth and death rates and two indices, per tick. Every column is answerable '
-      + 'about the present by `statistics.js` and none is answerable about the past. '
-      + '`scripts/playtest.mjs` samples its own arc precisely because nothing persists one.',
-  },
   investments: {
     note: 'Genuinely unbuilt rather than deferred — economy.js names it alongside '
       + 'trade_routes and is explicit that only trade_routes is closed by the '

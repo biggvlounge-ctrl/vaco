@@ -401,6 +401,15 @@ async function restoreWorldStateFromPostgres(worldState) {
       'new_government_organization_id']));
   summary.revolutions = worldState.revolutions.length;
 
+  worldState.economySnapshots = (await q('SELECT * FROM economy_snapshots ORDER BY id')).map((s) =>
+    nums(s, ['id', 'entity_id', 'tick', 'vcoin', 'supply', 'demand', 'price']));
+  summary.economy_snapshots = worldState.economySnapshots.length;
+
+  worldState.analyticsSnapshots = (await q('SELECT * FROM analytics_snapshots ORDER BY tick')).map((s) =>
+    nums(s, ['tick', 'population', 'gdp', 'crime_rate', 'birth_rate', 'death_rate', 'migration',
+      'education_index', 'technology_index']));
+  summary.analytics_snapshots = worldState.analyticsSnapshots.length;
+
   // -------------------------------------------------------------------
   // History
   // -------------------------------------------------------------------

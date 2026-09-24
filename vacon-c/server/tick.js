@@ -80,6 +80,7 @@ const control = require('./control.js');
 const salvage = require('./salvage.js');
 const discovery = require('./discovery.js');
 const knowledge = require('./knowledge.js');
+const snapshots = require('./snapshots.js');
 const { seededDraw } = require('./seeded.js');
 
 let nextEventId = 1;
@@ -1421,6 +1422,14 @@ function advanceTick(worldState) {
   const events = runEventPhase(worldState, candidateEvents);   // 9
   const historicalRecords = runHistoryPhase(worldState, events); // 10
   const reemergenceIndex = runReemergencePhase(worldState);    // 11
+
+  // History. Also not a twelfth phase, and last of all the cross-cutting
+  // layers rather than among them: it reads what the tick produced
+  // (`analytics_snapshots`) and what individuals now hold
+  // (`economy_snapshots`), so it runs after the Event/History/
+  // Reemergence phases have finished writing everything else a snapshot
+  // could report. See server/snapshots.js.
+  snapshots.runSnapshots(worldState, worldState.tick);
 
   return { tick: worldState.tick, events, historicalRecords, reemergenceIndex };
 }

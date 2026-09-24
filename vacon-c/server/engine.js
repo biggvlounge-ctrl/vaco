@@ -253,6 +253,8 @@ const WorldState = {
   laws: [],
   publicOpinion: [],
   revolutions: [],
+  economySnapshots: [],
+  analyticsSnapshots: [],
   entityTraits: [],
   memories: [],
   relationships: [],

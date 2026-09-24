@@ -13,16 +13,16 @@ three places, a spec section's "roughly 25 of the 40", a catalogue of 67
 statistics that a real world answered 36 of, and seven trait families generated
 on every NPC and read by nothing.
 
-## 90.8% complete
+## 91.4% complete
 
 ```
-██████████████████░░  90.8%   321.45 of 354
+██████████████████░░  91.4%   323.45 of 354
 ```
 
 | axis | complete | score | what it measures |
 |---|---|---|---|
 | systems | **72.4%** | 28.95/40 | urban systems with mechanics |
-| tables | **90.2%** | 59.5/66 | schema tables a built world fills |
+| tables | **93.2%** | 61.5/66 | schema tables a built world fills |
 | statistics | **88.2%** | 105/119 | statistics a world can answer |
 | traits | **100%** | 114/114 | traits something reads |
 | traitDepth | **85.7%** | 6/7 | trait columns a life actually changes |
@@ -67,7 +67,7 @@ The forty systems §7 names, at `server/urbanSystems.js`'s own four levels (mode
 | `36. Tourism` | partial | +0.5 |
 | `39. Reputation` | partial | +0.5 |
 
-### tables — 8 open
+### tables — 6 open
 
 Every `CREATE TABLE` in the schema and its extensions. A table a built world fills scores 1; one the engine writes but no world has ever used scores 0.5; one with no store at all scores 0.
 
@@ -77,8 +77,6 @@ Every `CREATE TABLE` in the schema and its extensions. A table a built world fil
 | `investments` | no store — Genuinely unbuilt rather than deferred — economy.js names it alongside trade_routes and is explicit that only trade_routes is closed by the Transportation deferral. No mechanism anywhere creates, values or settles one. | +1 |
 | `trade_routes` *(deferred by scope)* | no store — Transportation is on CLAUDE.md's explicit do-not-touch list, and economy.js records this table as closed scope rather than a gap for that reason. | +1 |
 | `migration_events` | empty in a built world | +0.5 |
-| `economy_snapshots` | no store — A TIME SERIES, which is not the same thing as a rollup, and the distinction is the open question. The third standing rule forbids storing what is computable — but supply, demand and price at tick 300 are NOT computable at tick 900, because the past is gone. So this is a real design decision nobody has made rather than a rule-3 violation: either the engine keeps a history or it accepts that only the present is answerable. `urbanSystems.js` marks it schemaOnly, which records the state without deciding it. | +1 |
-| `analytics_snapshots` | no store — The same open question as economy_snapshots, one tier up: population, gdp, crime, birth and death rates and two indices, per tick. Every column is answerable about the present by `statistics.js` and none is answerable about the past. `scripts/playtest.mjs` samples its own arc precisely because nothing persists one. | +1 |
 | `vault_studios_links` *(deferred by scope)* | no store — CLAUDE.md defers this twice — the fifth standing rule says ecosystem apps (Vavlt Stvdios among them) are linked to, never rebuilt, and the explicit do-not-touch list names subscription tiers and ecosystem link-outs. Its three columns are a creator id and a tier, which is the link-out and the tier verbatim. Building it would break scope in two places at once. | +1 |
 | `court_cases` | empty in a built world | +0.5 |
 

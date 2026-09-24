@@ -811,6 +811,25 @@ async function migrateWorldStateToPostgres(worldState) {
       }
       summary.revolutions = worldState.revolutions.length;
 
+      for (const s of worldState.economySnapshots || []) {
+        await client.query(
+          `INSERT INTO economy_snapshots (id, entity_id, tick, vcoin, resource_type, supply, demand, price)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+          [s.id, s.entity_id, s.tick, s.vcoin, s.resource_type, s.supply, s.demand, s.price]
+        );
+      }
+      summary.economy_snapshots = (worldState.economySnapshots || []).length;
+
+      for (const s of worldState.analyticsSnapshots || []) {
+        await client.query(
+          `INSERT INTO analytics_snapshots (tick, population, gdp, crime_rate, birth_rate, death_rate, migration, education_index, technology_index)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+          [s.tick, s.population, s.gdp, s.crime_rate, s.birth_rate, s.death_rate, s.migration,
+            s.education_index, s.technology_index]
+        );
+      }
+      summary.analytics_snapshots = (worldState.analyticsSnapshots || []).length;
+
       // ---------------------------------------------------------------
       // events, historical_records
       // ---------------------------------------------------------------
