@@ -69,6 +69,7 @@ const archetypes = require('./archetypes.js');
 const competition = require('./competition.js');
 const justice = require('./justice.js');
 const households = require('./households.js');
+const tribeMissions = require('./tribeMissions.js');
 const migration = require('./migration.js');
 const environment = require('./environment.js');
 const statecraft = require('./statecraft.js');
@@ -1368,6 +1369,23 @@ function advanceTick(worldState) {
   // a match they did not live to see. Before trait drift, which is what
   // turns the habit of turning up into being good at it.
   candidateEvents.push(...competition.runCompetition(worldState, { tick: worldState.tick }));
+
+  // What the tribes can now do — `TRIBE_GROWTH_MISSION_UNLOCK_SYSTEM.md`.
+  //
+  // `generateMission` had exactly one caller in the whole engine, in
+  // `worldgen.js`, at tick 0, so `mAvail` was 3 in every world forever
+  // and finding 2 of the 19 Sep playtest recorded that no mission had
+  // ever been completed. The eleventh standing rule with the generator
+  // called precisely once at the beginning of time.
+  //
+  // After `runLabour` (Economy phase) and after births and mortality,
+  // because the match it looks for is between a tribe's living members'
+  // OCCUPATIONS and what a nearby location asks for — so the hire that
+  // creates the match has to have happened already, and somebody who
+  // died this tick must not unlock anything.
+  candidateEvents.push(...tribeMissions.runTribeMissions(worldState, {
+    tick: worldState.tick,
+  }));
 
   // Trait drift, last of the cross-cutting layers and deliberately at
   // the end of them.

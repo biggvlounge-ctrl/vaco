@@ -48,7 +48,7 @@ const { getLiveEntity } = require('./entityTraits.js');
 const areaStats = require('./areaStats.js');
 const crime = require('./crime.js');
 const motivation = require('./motivation.js');
-const { seededUnit } = require('./seeded.js');
+const { seededDraw } = require('./seeded.js');
 
 let nextMigrationId = 1;
 let nextRegionId = 1;
@@ -552,7 +552,7 @@ function runMigration(worldState, options = {}) {
     // end up — the seventeenth standing rule's lesson, where a floor
     // and a rate were conflated and produced a warzone.
     const destination = destinationFor(worldState, npc, shared, {
-      draw: seededUnit(seed, 'destination', tick, index),
+      draw: seededDraw([seed, 'destination', tick, index]),
     });
     if (!destination) return;
 
@@ -560,7 +560,16 @@ function runMigration(worldState, options = {}) {
     if (homes.length === 0) return;
 
     const chance = MOVE_CHANCE * push.pressure * willingness(worldState, npc.id);
-    if (seededUnit(seed, 'migrate', tick, index) >= chance) return;
+    // **`seededDraw`, not `seededUnit`.** `seededUnit` takes a NUMBER;
+    // handed a string seed it coerces to 0 and returns 0 on every call
+    // forever, so `0 >= chance` was false for everybody and this line
+    // passed EVERY person through. `MOVE_CHANCE` has never gated
+    // anything in this engine, which is why moves arrive as a whole
+    // cohort at once rather than trickling: there was no per-person
+    // randomisation left in the pass at all. `environment.js` carries
+    // the same bug's post-mortem — 200 ticks of `clear` weather in
+    // three cities — and this file had it in two places.
+    if (seededDraw([seed, 'migrate', tick, index]) >= chance) return;
 
     const home = homes.shift();
     const row = relocate(worldState, {

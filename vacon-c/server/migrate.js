@@ -1005,10 +1005,20 @@ async function migrateWorldStateToPostgres(worldState) {
           // test/migrate.test.js was written for, and it survived
           // because that test only checks that every column named here
           // EXISTS. It never asked the other direction.
-          `INSERT INTO missions (id, artifact_id, objective, reward, controlling_faction_id, status,
+          // `location_property_id` joined the list when a mission became
+          // able to be about a PLACE as well as a thing — the takeover
+          // mission `TRIBE_GROWTH_MISSION_UNLOCK_SYSTEM.md` describes.
+          // It is read back by `tribeMissions.missionForLocation`, which
+          // is what stops a restored world re-opening every mission it
+          // already had, so dropping it here would be the same class of
+          // silent-unwritten-column defect this block's own comment is
+          // about.
+          `INSERT INTO missions (id, artifact_id, location_property_id, objective, reward,
+                                 controlling_faction_id, status,
                                  tick_generated, assigned_entity_id, tick_accepted, tick_resolved, outcome_note)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-          [m.id, m.artifact_id, m.objective, m.reward, m.controlling_faction_id, m.status,
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+          [m.id, m.artifact_id, m.location_property_id ?? null, m.objective, m.reward,
+            m.controlling_faction_id, m.status,
             m.tick_generated, m.assigned_entity_id ?? null, m.tick_accepted ?? null,
             m.tick_resolved ?? null, m.outcome_note ?? null]
         );

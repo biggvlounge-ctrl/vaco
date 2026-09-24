@@ -141,9 +141,26 @@ test('a generated world has artifacts and missions to take', () => {
   const { w } = world();
   assert.ok(w.artifacts.length > 0);
   assert.ok(w.missions.length > 0, 'listMissions returned nothing in every world ever built');
+  // **A mission is about a thing or about a place**, and the assertion
+  // has to name both branches — standing rule 24, an expectation
+  // written for a one-branch world where the code now has two correct
+  // paths. `tribeMissions.js` opens takeover missions from
+  // `TRIBE_GROWTH_MISSION_UNLOCK_SYSTEM.md`, whose target is a building
+  // rather than a relic, so `artifact_id` is legitimately null on them.
+  // What must never happen is a mission about NOTHING.
   for (const mission of w.missions) {
-    assert.ok(w.artifacts.some((a) => a.id === mission.artifact_id),
-      `mission ${mission.id} points at an artifact that does not exist`);
+    const thing = mission.artifact_id != null
+      && w.artifacts.some((a) => a.id === mission.artifact_id);
+    const place = mission.location_property_id != null
+      && w.properties.some((p) => p.id === mission.location_property_id);
+    assert.ok(thing || place,
+      `mission ${mission.id} names neither a real artifact nor a real property`);
+    if (mission.artifact_id != null) {
+      assert.ok(thing, `mission ${mission.id} points at an artifact that does not exist`);
+    }
+    if (mission.location_property_id != null) {
+      assert.ok(place, `mission ${mission.id} points at a property that does not exist`);
+    }
   }
 });
 

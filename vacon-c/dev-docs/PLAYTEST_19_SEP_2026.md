@@ -174,7 +174,7 @@ buildings in it. That may be exactly right for a collapse setting — but
 it should be a decision, and the three causes above are three different
 decisions, not one.
 
-### 2. No mission is ever completed
+### 2. No mission is ever completed — the supply half is FIXED
 
 `mAvail 3, mDone 0` — constant across all 600 ticks.
 
@@ -185,6 +185,46 @@ mission system is inert. `availableMissions` returns 3 forever.
 
 This is the eleventh rule again: `missions.js` is complete, correct,
 tested, and reached by nobody unless a human is driving.
+
+**The "3 forever" half is closed.** `server/tribeMissions.js` builds
+`TRIBE_GROWTH_MISSION_UNLOCK_SYSTEM.md` — a tribe whose roster can
+staff a nearby location unlocks it, and the location becomes a real
+mission. Measured on a generated world: 3 missions at tick 0, **6 by
+tick 5**, and the unlock fires ONCE per location rather than every tick
+(the mission's own existence is the memory, so it is a crossing).
+
+Two substrate defects had to be fixed first, and the guard found both
+before the feature was claimed to work:
+
+- **The institutions had no buildings.** Of 17 organizations in a
+  generated world, only the 10 businesses and the government seat
+  operated a property. The school, the infirmary, the reading room,
+  the press and both gangs had **no building anywhere** — and
+  `business` deliberately defines no specialist post, so the entire
+  "a Hospital needs medical experts" mechanic had exactly ONE location
+  it could ever fire on, and the hospital was not it. Housing them
+  took `locationsAskingForSomebody` from **1 to 7** and the distinct
+  occupations asked for from 1 to 6. The comment above that block
+  already said "a hero-tier location with no staff has no specialist
+  requirement to meet"; the staffing had been built and the BUILDING
+  half was never noticed — the twenty-first rule, stale in one
+  direction.
+- **Gating a mission on an artifact made it fire by coincidence.**
+  `generateMission` refused a null `artifact_id` on its own stated
+  grounds, though the base schema has always allowed one. Measured: 21
+  landmark properties, 17 operated ones, 6 both, and every artifact
+  discovered in 120 ticks landed in a `historical_site` with no
+  operator. A mission is now about a thing **or** a place —
+  `missions.location_property_id` in `schema-extensions.sql` — which is
+  what the document's own mission actually is ("the water plant
+  takeover becomes a real, newly-viable mission").
+
+**The `mDone 0` half stays open, and it is a different question.**
+Nothing makes an NPC accept a mission; `acceptMission` is reached only
+through the player verb. Whether the world should resolve its own
+missions is a design decision — a world that completes them before a
+player arrives leaves nothing to do — so it is recorded rather than
+guessed at.
 
 ### 3. Median net worth rises 10× and never falls
 
@@ -442,6 +482,67 @@ One caveat stated rather than buried: the probe samples the world after
 `advanceTick`, so it is not bit-identical to the snapshot
 `runMigration` decides from mid-tick. The shape is the finding; the
 counts are indicative.
+
+#### CORRECTION: `MOVE_CHANCE` had never gated anything, and that was most of the herd
+
+Found the next day, from an unrelated thread — every reward
+`tribeMissions.js` generated came out at exactly its floor. The cause
+was `seededUnit(seed, 'mission-reward', locationId)`.
+
+**`seededUnit` takes a NUMBER, not the parts of a draw.** Handed a
+string seed, `seed || 1` keeps the string, the bitwise operations
+coerce it to 0, and the function returns **0 on every call forever**.
+`seededDraw` is the one that takes parts. `environment.js` carries this
+exact bug's post-mortem in its own header — 200 ticks, three cities,
+every one of them `clear` and not a single weather event — and
+`migration.js` had it in **two** places:
+
+```js
+if (seededUnit(seed, 'migrate', tick, index) >= chance) return;   // always 0 >= chance -> false
+draw: seededUnit(seed, 'destination', tick, index),               // always 0 -> always the first option
+```
+
+The first line is the one that matters. `0 >= chance` is false for any
+positive chance, so **every pushed person with an acceptable
+destination moved immediately.** `MOVE_CHANCE` has never gated
+anything in this engine. There was no per-person randomisation left in
+the pass at all, which is why moves arrived as a whole cohort at once.
+
+Re-measured on the same 600-tick world with `seededDraw`:
+
+```
+                        before            after
+total person-moves      21                2
+ticks with any move     2 of 600          2 of 600
+shape                   11 at once,       one person at t316,
+                        then 10 at once   one at t327
+c2 population           30 -> 19 -> 1     30 -> 28 -> 29
+```
+
+**The herd is gone and it was an artifact of the broken rate gate.**
+So is most of the depopulation this finding started from: c2 no longer
+collapses, it drifts by two. The 1,200-tick run that showed c2 at one
+person was measuring a world where the move chance did not exist.
+
+Two things this does NOT change, and one it does:
+
+- The `PULL_MARGIN` measurement below stands. The margin still sits
+  above the 99th percentile of the distribution it filters; that was
+  measured directly off `desirability`, not through the broken draw.
+- The conclusion that the margin explains the *timing* stands — two
+  ticks out of six hundred, before and after.
+- **What it changes is the explanation of the SHAPE.** The commit that
+  recorded this finding said the bursts came from the margin gating on
+  a world-level quantity, so it opened for everybody at once. That is
+  half the story at most: the other half is that nothing downstream of
+  the margin was random, so everybody who passed it went. And the
+  reported "per-tick move chance p50 0.00679" described a number the
+  code computed and then never used.
+
+The weighted destination draw added for this finding was reported as
+inert. It was inert for **two** independent reasons — the acceptable
+set is capped at one by the margin, AND its own draw was returning 0 —
+and only the first was known at the time.
 
 ### 5b. Two things measured while chasing finding 5, and left open
 

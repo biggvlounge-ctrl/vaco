@@ -599,8 +599,8 @@ async function restoreWorldStateFromPostgres(worldState) {
   summary.artifacts = worldState.artifacts.length;
 
   worldState.missions = (await q('SELECT * FROM missions ORDER BY id')).map((m) =>
-    nums(m, ['id', 'artifact_id', 'reward', 'controlling_faction_id', 'tick_generated',
-      'assigned_entity_id', 'tick_accepted', 'tick_resolved']));
+    nums(m, ['id', 'artifact_id', 'location_property_id', 'reward', 'controlling_faction_id',
+      'tick_generated', 'assigned_entity_id', 'tick_accepted', 'tick_resolved']));
   summary.missions = worldState.missions.length;
 
   worldState.players = (await q('SELECT * FROM players ORDER BY id')).map((p) =>

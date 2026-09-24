@@ -67,10 +67,50 @@ function getArtifact(worldState, artifactId) {
 // organization that is genuinely a faction -- never trusted as a bare
 // id, the same "validate against real state, not caller-declared"
 // posture this whole session has used everywhere else.
+// **A mission is about a THING or about a PLACE, and it must be about
+// one of them.**
+//
+// The original rule here was stricter: an artifact, always, "not
+// created standalone; that's the one real, required input this
+// function enforces". That was right while the only mission this
+// engine had was "Recover it", and it stopped being right when
+// `TRIBE_GROWTH_MISSION_UNLOCK_SYSTEM.md` was built. That document's
+// mission is a takeover — "recruit someone with real water-treatment
+// experience, and the water plant takeover becomes a real,
+// newly-viable mission" — and a building is not an artifact.
+//
+// `missions.artifact_id` was nullable in the base schema the whole
+// time, so this was never a schema constraint; it was this function's
+// own invariant, and the invariant worth keeping is the one underneath
+// it: **a mission is never about nothing.** So either input satisfies
+// it and neither is optional on its own. `location_property_id` is in
+// `schema-extensions.sql` with the reason.
 function generateMission(worldState, options = {}) {
-  const artifact = getArtifact(worldState, options.artifactId);
-  if (!artifact) {
+  const wantsArtifact = options.artifactId != null;
+  const wantsLocation = options.locationId != null;
+  if (!wantsArtifact && !wantsLocation) {
+    throw new Error(
+      'generateMission requires an artifactId or a locationId — a mission is about '
+      + 'a real thing or a real place, never nothing.',
+    );
+  }
+
+  const artifact = wantsArtifact ? getArtifact(worldState, options.artifactId) : null;
+  if (wantsArtifact && !artifact) {
     throw new Error(`generateMission: no artifact with id ${options.artifactId} (missions.artifact_id references a real artifact).`);
+  }
+
+  // Validated against real state rather than trusted as a bare id, the
+  // same posture `controllingFactionId` gets below.
+  let location = null;
+  if (wantsLocation) {
+    location = (worldState.properties || []).find((p) => p.id === options.locationId) ?? null;
+    if (!location) {
+      throw new Error(
+        `generateMission: no property with id ${options.locationId} `
+        + '(missions.location_property_id references a real property).',
+      );
+    }
   }
   if (options.controllingFactionId != null) {
     const faction = worldState.organizations.find((o) => o.id === options.controllingFactionId && o.isFaction);
@@ -81,7 +121,8 @@ function generateMission(worldState, options = {}) {
 
   const mission = {
     id: nextMissionId++,
-    artifact_id: artifact.id,
+    artifact_id: artifact ? artifact.id : null,
+    location_property_id: location ? location.id : null,
     objective: options.objective ?? null,
     reward: options.reward ?? null,
     controlling_faction_id: options.controllingFactionId ?? null,

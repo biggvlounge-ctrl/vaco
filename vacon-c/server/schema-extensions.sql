@@ -571,3 +571,38 @@ ALTER TABLE properties ADD COLUMN IF NOT EXISTS name TEXT;
 -- neighbourhood on this column. NULL for a generated block: inventing
 -- neighbourhood names is a different job from placing real ones.
 ALTER TABLE communities ADD COLUMN IF NOT EXISTS name TEXT;
+
+-- The place a mission is about.
+-- Carries: `mission.location_property_id`, set by
+-- `missions.generateMission` and read by `tribeMissions.js`.
+--
+-- **`missions.artifact_id` is nullable in the base schema and
+-- `generateMission` refused a null anyway**, on the stated grounds
+-- that "a mission is always generated FROM a real artifact, not
+-- created standalone". That was right while the only mission in the
+-- engine was "Recover it", and it stopped being right when
+-- `TRIBE_GROWTH_MISSION_UNLOCK_SYSTEM.md` got built: that document's
+-- mission is a TAKEOVER — "recruit someone with real water-treatment
+-- experience, and the water plant takeover becomes a real,
+-- newly-viable mission" — and a building is not an artifact.
+--
+-- Without this column the target of such a mission could only live in
+-- the `objective` TEXT, which no code can read back. Measured on a
+-- 120-tick world, the two sets barely meet on their own: 21 landmark
+-- properties, 17 operated ones, 6 both, and every artifact discovery
+-- so far landed in a `historical_site` with no operator — so gating
+-- the whole mechanic on an artifact happening to turn up in a staffed
+-- building made it fire by coincidence or not at all.
+--
+-- It clears the bar this file sets, which is that the engine must READ
+-- the field rather than merely set it: `tribeMissions.missionForLocation`
+-- reads it to decide whether a location already has a mission, and
+-- that read is the memory that makes the unlock a CROSSING rather than
+-- a condition firing every tick forever (seventh standing rule).
+-- Losing it on restore would make every restored world re-open every
+-- mission it already had.
+--
+-- NULL for an artifact-recovery mission, which is about a thing rather
+-- than a place. A mission must name one or the other and
+-- `generateMission` enforces exactly that.
+ALTER TABLE missions ADD COLUMN IF NOT EXISTS location_property_id BIGINT REFERENCES properties(id);

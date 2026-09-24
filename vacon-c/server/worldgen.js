@@ -1154,6 +1154,58 @@ function generateWorld(options = {}) {
         }
       });
     }
+
+    // **And a building, because a staffed institution with no address
+    // is still not a location.**
+    //
+    // The comment above this block says "a hero-tier location with no
+    // staff has no specialist requirement to meet", the staffing was
+    // built, and the BUILDING half was never noticed — the
+    // twenty-first standing rule exactly, a note that goes stale in one
+    // direction once the thing it was waiting for arrives.
+    //
+    // Measured before this: of 17 organizations in a generated world,
+    // only the 10 businesses and the government seat operated a
+    // property at all. The school, the infirmary, the reading room, the
+    // press and both gangs had **no building anywhere**, which is
+    // `properties.operating_organization_id` — the schema's own link
+    // from a place to whoever runs it, and the only way
+    // `occupations.postFor` reaches a location. So
+    // `TRIBE_GROWTH_MISSION_UNLOCK_SYSTEM.md`'s whole mechanic ("a
+    // Hospital needs medical experts") had exactly ONE location in the
+    // world it could ever fire on, and the hospital was not it.
+    //
+    // Same pattern as the government seat below: take a standing
+    // building nobody else operates, deterministically, so the world
+    // stays replayable without a draw. Commercial stock first — a
+    // reading room belongs on a street, not in somebody's spare
+    // bedroom — then any non-residential, then an EMPTY home. A home
+    // with occupants is never taken: people live there, and
+    // `households.syncHouseholds` would have to disagree with itself.
+    {
+      const cityCommunities = new Set(
+        (w.communities || []).filter((cm) => cm.city_id === city.id).map((cm) => cm.id),
+      );
+      const free = (p) => p.operating_organization_id == null
+        && p.lifecycle_stage === 'operation'
+        && cityCommunities.has(p.community_id);
+      const empty = (p) => !Array.isArray(p.occupants) || p.occupants.length === 0;
+      const ranked = (p) => (p.type === 'commercial' ? 0 : (p.type !== 'residential' ? 1 : 2));
+
+      for (const spec of institutions) {
+        const home = (w.properties || [])
+          .filter((p) => free(p) && (p.type !== 'residential' || empty(p)))
+          .sort((a, b) => ranked(a) - ranked(b) || a.id - b.id)[0] ?? null;
+        // No spare building in this city is a real answer, not an
+        // error: a settlement can have a schoolmaster and nowhere to
+        // put the school. The organization still exists and still
+        // employs somebody; it simply has no address for the Control
+        // Key to attach a requirement to.
+        if (!home) continue;
+        home.operating_organization_id = spec.org.id;
+        summary.institutionsHoused = (summary.institutionsHoused ?? 0) + 1;
+      }
+    }
   }
 
   // ---------------------------------------------------------------------
@@ -1279,6 +1331,24 @@ function generateWorld(options = {}) {
     summary.organizations += 1;
     summary.mediaOutlets = 1;
     summary.mediaOutletId = press.id;
+
+    // **Premises, for the same reason the institutions get them.** The
+    // press is founded here rather than inside the city loop, so the
+    // housing pass above does not reach it — and `media` names
+    // `reporter` as its defining post, so without an address that
+    // occupation can never be a specialist requirement anywhere.
+    // Deterministic, and never a home somebody lives in.
+    const office = (w.properties || [])
+      .filter((p) => p.operating_organization_id == null
+        && p.lifecycle_stage === 'operation'
+        && (p.type !== 'residential'
+          || !Array.isArray(p.occupants) || p.occupants.length === 0))
+      .sort((a, b) => (a.type === 'commercial' ? 0 : 1) - (b.type === 'commercial' ? 0 : 1)
+        || a.id - b.id)[0] ?? null;
+    if (office) {
+      office.operating_organization_id = press.id;
+      summary.mediaOfficePropertyId = office.id;
+    }
   }
 
   // ---- the government ---------------------------------------------------
