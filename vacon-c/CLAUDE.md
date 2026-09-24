@@ -895,6 +895,55 @@ in the world is invisible to every wealth-dependent mechanic. The third
 standing rule's shape, and it was sitting underneath a claim that
 sounded finished.
 
+**A twenty-sixth, and it is about what to do when a rule keeps
+recurring. When the same defect lands in a THIRD place, stop fixing
+instances and change the contract.**
+
+`seededUnit` takes a number. `seededDraw` takes the parts of a draw.
+They are one word apart at the call site and the wrong one is
+completely silent: the extra arguments are ignored, `'world' || 1`
+keeps the string, the bitwise operations coerce it to 0, and every call
+returns **0** for the life of the world.
+
+Three systems, each found separately, each by accident:
+
+- **`environment.drawWeather`** — measured, 200 ticks, three cities,
+  every one of them `clear` the entire time and not one weather event
+  in any world this engine had ever generated. Its header carries the
+  post-mortem.
+- **`migration.runMigration`, in TWO places.** `0 >= chance` is false
+  for any positive chance, so **`MOVE_CHANCE` has never gated anything**
+  — every pushed person with an acceptable destination moved
+  immediately, and there was no per-person randomisation left in the
+  pass at all. That is why moves arrived as whole cohorts: 21 in two
+  herds over 600 ticks, which became **2 moves by two individuals**
+  once the call was right. Most of the depopulation in
+  `dev-docs/PLAYTEST_19_SEP_2026.md` finding 5 was this bug, and the
+  finding's own explanation of the SHAPE had to be corrected.
+- **`tribeMissions.runTribeMissions`** — every mission reward came out
+  at exactly its floor, which is how the other two were found.
+
+The environment post-mortem was already written, in this repository,
+with the measurement attached. It did not stop the next two, because a
+comment in one file is invisible at a call site in another. **A
+warning is not a guard.**
+
+So `seededUnit` now throws a `TypeError` naming `seededDraw` when
+handed anything but a finite number, and the mistake is a crash at the
+call site instead of a constant somewhere downstream. The whole suite
+passed unchanged, which is the evidence that nothing legitimately
+relied on the coercion.
+
+Two smaller things worth keeping from the same pass. `server/seeded.js`
+— the substrate under §88's replay guarantee, imported by seven modules
+— **had no test file at all**, which is why none of this was ever
+asserted. And the test that would have caught it is not a range check:
+a constant passes "is it in [0,1)" every time. The assertion has to be
+on the DISTRIBUTION — 1,000 draws, more than 990 distinct, mean between
+0.45 and 0.55, all ten deciles occupied — which is the twenty-third
+rule's lesson in a new place: **assert the property that was claimed,
+not the one that is easy to check.**
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and
