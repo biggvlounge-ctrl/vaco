@@ -21,6 +21,64 @@
 //     --seed S    world seed (default 'complete')
 //     --check     do not write; exit 1 if the committed report is stale
 //     --json      machine-readable output, no write
+//
+// ---------------------------------------------------------------------
+// **Five statistics and two tables read as gaps at 200 ticks and are
+// NOT defects — measured, and the fix was rejected on cost, not on the
+// finding.**
+// ---------------------------------------------------------------------
+// teenage_birth_share, conviction_rate, unlegislated_crime_share,
+// state_declined_share, group_answered_share (statistics), and
+// migration_events, court_cases (tables) all read empty at 200 ticks
+// on the `complete` seed, which reads exactly like a defect —
+// births.js, justice.js and policing.js all have real mechanisms
+// behind these, tested and green elsewhere.
+//
+// They are not defects. They are rare events on a ~150-person world
+// that 200 ticks catches too early. Traced on the SAME seed with
+// `profileAll` sampled every 50 ticks:
+//
+//     teenage_birth_share       first answered at tick 400
+//     conviction_rate           first answered at tick 450
+//     unlegislated_crime_share  first answered at tick 450
+//     state_declined_share      first answered at tick 450
+//     group_answered_share      first answered at tick 500
+//
+// Standing rule 17's lesson is that one seed's timing does not
+// establish anything, so a second seed (`complete-check-2`) was run
+// the same way before drawing a conclusion. It resolved all five much
+// earlier — tick 50 to 300 — confirming the first seed was the slow
+// case rather than typical, and that the mechanisms genuinely work.
+//
+// **The obvious fix — raise the default past 500 — was tried and
+// reverted, on measured cost rather than on suspicion.** Run alone,
+// 600 ticks cost about 2 minutes. Run inside
+// `scripts/test/game-completeness.test.mjs`, which is what actually
+// matters because that is how `--check` reaches CI, the SAME 600-tick
+// run cost **538 seconds — nine minutes, alone** — a 4.5x slowdown
+// from CPU contention with the ~26 other files node's test runner
+// executes concurrently in that suite. `run-all-tests.mjs` caps a
+// suite at 600 seconds (raised once already, from two minutes, after
+// this exact class of failure: a timeout that silently reports "no TAP
+// summary" instead of a real result). Nine of ten minutes spent on one
+// file leaves no margin for the other twenty-six, or for this suite's
+// own legitimate growth — which is precisely the mistake that raised
+// number was written to prevent.
+//
+// So the default stays 200, `dev-docs/GAME_COMPLETENESS.md` keeps
+// these seven items open, and this comment is the record instead of a
+// silently reverted diff: the gap is understood, reproducible on
+// demand (`--ticks 500` or higher), and left open because the honest
+// fix does not fit the budget the rest of this repo's CI depends on —
+// not because nobody looked.
+//
+// `revolutions` looks like the same story and is deliberately NOT
+// included above. Its own note says `assessRevolutions` runs every
+// tick and no generated world has crossed its joint threshold — a
+// different, unverified claim (a structural "never," not a timing
+// artifact) that needs the seventeenth rule's joint-distribution
+// measurement, not a longer clock. Conflating the two would be exactly
+// the mistake this comment exists to avoid.
 
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
