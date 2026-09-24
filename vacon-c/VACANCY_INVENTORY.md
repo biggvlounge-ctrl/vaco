@@ -20,7 +20,7 @@ There is a working simulation — traits across four tiers, seven Key
 resolvers, family, economy, territory, tick, players, artifacts and
 missions, plus Property, Culture DNA, Named Flow Templates, contest
 resolution and the Behavior Engine — and its HTTP surface is real:
-**79 routes**, up from 8 before any of this.
+**81 routes**, up from 8 before any of this.
 
 Since then, and not in the phase plan because nothing anticipated them:
 world generation, the uniform statistics catalogue, crime and policing,
@@ -192,9 +192,9 @@ them; `test/routes.test.js` asserts it.
 | Cross-cutting | 3 | 0 | 3 |
 | **Total** | **58** | **45** | **13** |
 
-**79 routes are registered in `server.js`** (counted, not remembered:
+**81 routes are registered in `server.js`** (counted, not remembered:
 `grep -cE "^app\.(get|post|put|patch|delete)\(" server.js`). Of those,
-**28 have no line anywhere in the map** — every path below was checked
+**29 have no line anywhere in the map** — every path below was checked
 against the map text with `:param` names normalised, so a rename cannot
 hide one:
 
@@ -208,7 +208,17 @@ hide one:
 `GET /api/cultures/:id`, `POST /api/cultures/:id/members`,
 `GET`/`POST /api/flows`, `GET`/`POST /api/entities/:id/habits`,
 `GET`/`POST /api/entities/:id/schedule`, `POST /api/entities/:id/stress`,
-`GET /api/entities/:id/behavior`, `GET /api/players/:id/actions`.
+`GET /api/entities/:id/behavior`, `GET /api/players/:id/actions`,
+`GET /api/economy/snapshots`. The map's own line is `GET /api/economy/
+snapshot` (singular, "current economy_snapshots for a given
+entity/tier") — already served, exactly as specified, by the existing
+`/api/economy/snapshot` (a different, pre-existing route reading
+current resources and market listings, not the `economy_snapshots`
+table, and left untouched because `public/index.html`'s Econ tab
+already depends on its exact shape). The plural route added 24 Sep 2026
+is the one that actually reads `economy_snapshots`, scoped by
+`entityId` because the table is per-entity history, and it has no line
+of its own to match.
 
 The last of those is this file's own thesis in miniature. The map
 specifies `POST /api/players/:id/action` — the dispatcher — and no way

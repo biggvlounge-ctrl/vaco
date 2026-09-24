@@ -999,6 +999,29 @@ app.get('/api/economy/snapshot', (_req, res) => {
   });
 });
 
+// GET /api/economy/snapshots?entityId=N -- the OTHER "current
+// economy_snapshots for a given entity/tier" the API map asks for, and
+// a different endpoint from the one above rather than a second
+// implementation of it: `/api/economy/snapshot` (singular) already has
+// a real consumer (`public/index.html`'s Econ tab) reading `resources`/
+// `marketListings`, and CLAUDE.md's contract rule is that an existing
+// endpoint keeps its exact shape. This one reads `server/snapshots.js`'s
+// actual `economy_snapshots` table -- the individual's or family's
+// wealth over time, not the world's current resource levels -- so it
+// needs the entity the spec's own wording names, and refuses rather
+// than guessing a default when the caller leaves it out.
+app.get('/api/economy/snapshots', (req, res) => {
+  const entityId = Number(req.query.entityId);
+  if (!Number.isFinite(entityId)) {
+    res.status(400).json({ error: 'entityId query parameter is required and must be a number' });
+    return;
+  }
+  const rows = (engine.WorldState.economySnapshots || [])
+    .filter((r) => r.entity_id === entityId)
+    .sort((a, b) => a.tick - b.tick);
+  res.json({ entityId, snapshots: rows });
+});
+
 // **Necessary completion beyond the literal spec**, the same posture
 // POST /api/artifacts already took. The API map's Phase 1 list names
 // GET /api/economy/snapshot and POST /api/economy/tick but no way to
@@ -1097,6 +1120,26 @@ app.post('/api/conditions', requireOperator('vacon-c:condition'), (req, res) => 
 
 app.get('/api/conditions', (_req, res) => {
   res.json({ conditions: engine.WorldState.activeConditions || [] });
+});
+
+// GET /api/analytics/:tick -- "analytics_snapshots for a given tick",
+// per the API map's cross-cutting section, literally. One row per
+// tick (server/snapshots.js), so a tick the world has already passed
+// either has a row or was never advanced through -- there is no
+// partial or averaged answer to give instead, so a missing one is a
+// 404 rather than a guess.
+app.get('/api/analytics/:tick', (req, res) => {
+  const tick = Number(req.params.tick);
+  if (!Number.isFinite(tick)) {
+    res.status(400).json({ error: 'tick must be a number' });
+    return;
+  }
+  const snapshot = (engine.WorldState.analyticsSnapshots || []).find((r) => r.tick === tick);
+  if (!snapshot) {
+    res.status(404).json({ error: `no analytics_snapshots row for tick ${tick}` });
+    return;
+  }
+  res.json({ snapshot });
 });
 
 // -- events and missions ----------------------------------------------------

@@ -272,6 +272,41 @@ test('a resource must declare its type, and a listing a name and price', { skip:
   assert.equal((await post('/market/listings', { productName: 'x' })).status, 400);
 });
 
+// -- economy_snapshots / analytics_snapshots -----------------------------------
+
+test('GET /api/economy/snapshots requires an entityId rather than guessing one', { skip: SKIP }, async () => {
+  const missing = await get('/economy/snapshots');
+  assert.equal(missing.status, 400, 'no entityId must not silently return everyone\'s history');
+
+  const { npc } = await (await post('/npc/generate', {})).json();
+  const res = await get(`/economy/snapshots?entityId=${npc.id}`);
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.entityId, npc.id);
+  assert.ok(Array.isArray(body.snapshots),
+    'an entity with no snapshot yet (not a quarter boundary) still gets an array, empty rather than missing');
+});
+
+test('GET /api/analytics/:tick answers a real reading, and 404s rather than guessing for one it has none of', { skip: SKIP }, async () => {
+  // `/api/tick` is operator-gated, so this uses the open server
+  // throughout rather than mixing it with the guarded one's world —
+  // two separate processes, two separate WorldStates.
+  const badTick = await fetch(`${OPEN}/analytics/not-a-number`);
+  assert.equal(badTick.status, 400);
+
+  const neverAdvanced = await fetch(`${OPEN}/analytics/999999`);
+  assert.equal(neverAdvanced.status, 404, 'a tick the world has not reached has no reading to give');
+
+  await openPost('/tick', {});
+  const state = await (await fetch(`${OPEN}/state`)).json();
+  const res = await fetch(`${OPEN}/analytics/${state.tick}`);
+  assert.equal(res.status, 200, `tick ${state.tick} was just advanced through and should have a row`);
+  const { snapshot } = await res.json();
+  assert.equal(snapshot.tick, state.tick);
+  assert.equal(snapshot.gdp, null, 'no mechanism computes a monetary aggregate — see server/snapshots.js');
+  assert.equal(typeof snapshot.population, 'number');
+});
+
 test('family wealth follows its members\' finances', { skip: SKIP }, async () => {
   // Without POST /api/entities/:id/finances every family reads 0
   // forever, because getFamilyWealth sums finances and nothing could
