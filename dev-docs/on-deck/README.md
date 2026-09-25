@@ -15,7 +15,7 @@ somebody's memory of it, which is the failure this repo keeps finding.
 |---|---|---|
 | `VACO_VERIFIED_BUSINESS_NETWORK_FREEZE.md` | frozen, **§30 audit complete 25 Sep 2026** — see below; Levels 1-3 built and shipped as `vaco-passport` | 17 Sep 2026 |
 | `VAGO_GROUP_WAGERS_FREEZE.md` | frozen, **audit complete 25 Sep 2026** — see below | 17 Sep 2026 |
-| `HVNTZ_CONNECTED_NETWORK_FREEZE.md` | frozen, **§40 audit complete 25 Sep 2026** — see below; §47 Phases 1-3 built (Network/Node/invite-accept-decline, Vault Studios stream link, Hunt checkpoint↔Network) plus §15-18's core revenue-sharing engine (percentage/fixed-amount splits) in `hvntz/lib/networkConnections.js`, `hvntz/lib/hunts.js` and `hvntz/lib/revenueShareAgreements.js` | 23 Sep 2026 |
+| `HVNTZ_CONNECTED_NETWORK_FREEZE.md` | frozen, **§40 audit complete 25 Sep 2026** — see below; §47 Phases 1-3 built (Network/Node/invite-accept-decline, Vault Studios stream link, Hunt checkpoint↔Network) plus §15-18's core revenue-sharing engine and growth analytics in `hvntz/lib/networkConnections.js`, `hvntz/lib/hunts.js`, `hvntz/lib/revenueShareAgreements.js` and `hvntz/lib/networkAnalytics.js` | 23 Sep 2026 |
 | `VASH_TAP_FREEZE.md` | frozen, **§1/§55 audit complete 25 Sep 2026** — see below; narrowest demo built and shipped | 23 Sep 2026 |
 
 **More are expected.** The owner said on 23 Sep 2026 that three or four

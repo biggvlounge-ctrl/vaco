@@ -194,7 +194,21 @@ curl http://localhost:8792/api/franchise-list/1
   sponsor-funded rewards, and time-limited agreements are each their
   own undertaking with no substrate to extend, same as the module's own
   header documents.
-- `server.js` — a real Express API (CommonJS) wrapping all thirteen
+- `lib/networkAnalytics.js` — Connected Network Growth Analytics, §18:
+  a real, deterministic rollup over Phases 1-4's own real data, same
+  shape as `lib/screenAnalytics.js`'s existing rollup. Six of §18's
+  thirteen named metrics are real here — network size, active nodes,
+  active creators/streams (a Node's own real `vavltChannelId`
+  reference IS the creator signal), Hunt participation (real
+  checkpoints whose own `networkId` names this Network), total revenue
+  distributed, and revenue attributed to each payee — because Phases
+  1-4 actually record the underlying data. The other seven (viewers,
+  watch time, conversions, subscriptions, advertising, sponsorship) are
+  honestly absent rather than approximated — none of that is tracked
+  anywhere in this ecosystem yet, and §18's own text ("network size
+  alone must NOT automatically guarantee revenue") is itself a warning
+  against synthesizing a number with no real source.
+- `server.js` — a real Express API (CommonJS) wrapping all fourteen
   modules.
 
 ## Verified
@@ -311,20 +325,26 @@ integrations, actual AI agents) or blocked on a system that doesn't
 exist elsewhere in this session yet (`venvs`'s CHOPZ Digital Twin
 system).
 
-**Connected Network Layer — Phases 1-3, plus Phase 4's core revenue
-engine, see `lib/networkConnections.js`, `lib/hunts.js` and
-`lib/revenueShareAgreements.js`.** A Node's own accept/decline, its
-one-person-one-Channel Vault Studios stream reference, a checkpoint's
-connection to its own business's Network, and a configurable
-percentage/fixed-amount revenue-sharing Agreement are all real. Not
-yet built, per its own §40 audit finding no substrate for any of it
-anywhere in the repo: the 8-camera/screen *session* layer (a Network
-grouping several Nodes' streams together the way `vavlt-stvdios/lib/
-screenSessions.js`'s `MAX_SCREENS = 8` groups Channels, still Phase 2
-but a separate step from a single Node's own stream reference); seven
-of §17's nine named split shapes (tiered percentages, performance
-bonuses, event/Hunt/creator-specific split overrides, sponsor-funded
-rewards, time-limited agreements — only `percentage` and
-`fixed-amount` are built); §18's own network-growth analytics rollup;
-any role beyond hub-owner vs. invited member; recurring per-person
-schedules; and temporary/archivable multi-business event networks.
+**Connected Network Layer — Phases 1-3, Phase 4's core revenue engine,
+and six of §18's thirteen analytics metrics, see
+`lib/networkConnections.js`, `lib/hunts.js`,
+`lib/revenueShareAgreements.js` and `lib/networkAnalytics.js`.** A
+Node's own accept/decline, its one-person-one-Channel Vault Studios
+stream reference, a checkpoint's connection to its own business's
+Network, a configurable percentage/fixed-amount revenue-sharing
+Agreement, and a real growth-analytics rollup (network size, active
+nodes/creators/streams, Hunt participation, revenue distributed and
+attributed per payee) are all real. Not yet built, per its own §40
+audit finding no substrate for any of it anywhere in the repo: the
+8-camera/screen *session* layer (a Network grouping several Nodes'
+streams together the way `vavlt-stvdios/lib/screenSessions.js`'s
+`MAX_SCREENS = 8` groups Channels, still Phase 2 but a separate step
+from a single Node's own stream reference); seven of §17's nine named
+split shapes (tiered percentages, performance bonuses, event/Hunt/
+creator-specific split overrides, sponsor-funded rewards, time-limited
+agreements — only `percentage` and `fixed-amount` are built); §18's
+other seven named metrics (viewers, watch time, conversions,
+subscriptions, advertising, sponsorship — none tracked anywhere in
+this ecosystem, so honestly absent rather than approximated); any role
+beyond hub-owner vs. invited member; recurring per-person schedules;
+and temporary/archivable multi-business event networks.

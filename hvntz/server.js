@@ -54,6 +54,7 @@ const {
   SPLIT_TYPES, AGREEMENT_STATUSES, findRevenueShareAgreement, createRevenueShareAgreement,
   archiveRevenueShareAgreement, distributeRevenue, distributionsForNetwork, agreementsForNetwork,
 } = require('./lib/revenueShareAgreements');
+const { networkGrowthAnalytics } = require('./lib/networkAnalytics');
 
 const { createServiceAuth } = require('./lib/serviceAuth.cjs');
 const { createDecisionLog } = require('./lib/decisionLog.cjs');
@@ -941,6 +942,16 @@ app.post('/api/revenue-share-agreements/:id/distribute', requireAgreementNetwork
 // `/api/business/:businessId/revenue`.
 app.get('/api/networks/:id/revenue-distributions', requireNetworkBusinessOwner(), (req, res) => {
   res.json({ distributions: distributionsForNetwork(store, Number(req.params.id)) });
+});
+
+// §18's own growth analytics — includes revenue-by-payee, so same
+// owner-only visibility as revenue-distributions above.
+app.get('/api/networks/:id/growth-analytics', requireNetworkBusinessOwner(), (req, res) => {
+  try {
+    res.json(networkGrowthAnalytics(store, Number(req.params.id)));
+  } catch (err) {
+    res.status(404).json({ error: err.message });
+  }
 });
 
 async function start() {
