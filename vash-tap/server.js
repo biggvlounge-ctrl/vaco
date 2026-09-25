@@ -261,6 +261,29 @@ app.post('/api/taps/:tapCode/assignments', requireSession(), requireTapBusinessO
   }
 });
 
+// §40, Lost/Stolen Tap — "Owner can immediately: Freeze Tap... Stop new
+// protected transactions." Same ownership check as assignment, since
+// it is the identical question: does this session own the business
+// this Tap belongs to. Scoped like the rest of this build to business
+// Taps (`requireTapBusinessOwner` requires `tap.businessId`) — a
+// personal Tap's freeze would need an identity-owner check this pass
+// never built, since no personal Tap exists in the seeded demo either.
+app.post('/api/taps/:tapCode/freeze', requireSession(), requireTapBusinessOwner, (req, res) => {
+  try {
+    res.json(freezeTap(store, { tapCode: req.params.tapCode }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/taps/:tapCode/unfreeze', requireSession(), requireTapBusinessOwner, (req, res) => {
+  try {
+    res.json(unfreezeTap(store, { tapCode: req.params.tapCode }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // -- payment -------------------------------------------------------------
 //
 // §7 end to end. `requireActor('fromUserId')` proves the spender's own

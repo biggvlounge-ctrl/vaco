@@ -35,10 +35,9 @@ explicitly rather than silently skipped):
 - **Any frontend** — Tap profile, business dashboard, spender dashboard,
   analytics UI. This is an API-only build, verified by curl and by the
   test suite, matching the "narrowest real demo" scope decision.
-- **Freeze/unfreeze and lock/unlock as routes.** The lib functions exist
-  (`lib/tap.js`'s `freezeTap`/`unfreezeTap`) and are unit-tested, but a
-  correct ownership check for exposing them over HTTP needs more design
-  than this pass scoped in.
+- **Lock/unlock as routes.** Distinct from freeze/unfreeze (§40, wired
+  below) — the freeze spec's own security section names them
+  separately, and no lock semantics beyond "frozen" were designed here.
 - **`decisionLog`.** Deliberately not wired — it hard-fails a route if
   `vaco-audit` is unreachable, and that coupling cost wasn't worth
   taking for a first slice.
@@ -92,6 +91,8 @@ alert) — steps 1 and 3's reads work standalone once seeded.
 | `GET /api/business/:businessId/taps` | none | |
 | `GET /api/taps/:tapCode/resolve` | none | §6 resolution; fails soft, not hard, if VACA is unreachable |
 | `POST /api/taps/:tapCode/assignments` | session, HVNTZ business owner (via the tap) | §5 dynamic assignment |
+| `POST /api/taps/:tapCode/freeze` | session, HVNTZ business owner (via the tap) | §40 lost/stolen Tap — stops payability immediately |
+| `POST /api/taps/:tapCode/unfreeze` | session, HVNTZ business owner (via the tap) | refuses if the Tap is not currently frozen |
 | `POST /api/taps/:tapCode/pay` | session, must be `fromUserId` | §7's flow — calls V3's real ledger, never a second one |
 | `GET /api/taps/:tapCode/transactions` | none | |
 | `GET /api/spenders/:userId/history` | session, own history only | §18 |

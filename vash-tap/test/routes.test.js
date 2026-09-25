@@ -154,6 +154,24 @@ test('POST /api/taps/:tapCode/assignments refuses an anonymous caller', { skip: 
   assert.equal(res.status, 401);
 });
 
+test('POST /api/taps/:tapCode/freeze and /unfreeze refuse an anonymous caller', { skip: SKIP }, async () => {
+  assert.equal((await post('/api/taps/VT-000002/freeze', {})).status, 401);
+  assert.equal((await post('/api/taps/VT-000002/unfreeze', {})).status, 401);
+});
+
+test('freeze/unfreeze with a session but no live HVNTZ gets a clean 502, not a hang', { skip: SKIP }, async () => {
+  // HVNTZ is unreachable for this whole suite (see test.before), so the
+  // ownership check in requireTapBusinessOwner cannot complete either
+  // way. This is the same regression coverage as the earlier "junk
+  // bearer token" test, for the route this build added afterward.
+  const res = await post('/api/taps/VT-000002/freeze', {}, {
+    'Content-Type': 'application/json',
+    Authorization: 'Bearer not-a-real-session-token',
+  });
+  const body = await res.json().catch(() => ({}));
+  assert.equal(res.status, 502, `expected 502, got ${res.status}: ${JSON.stringify(body)}`);
+});
+
 test('POST /api/taps/:tapCode/pay refuses an anonymous caller', { skip: SKIP }, async () => {
   const res = await post('/api/taps/VT-000001/pay', { fromUserId: 'ada', amount: 40 });
   assert.equal(res.status, 401);
