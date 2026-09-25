@@ -123,6 +123,10 @@ function createHvntzStore() {
     nextNetworkId: 1,
     networkNodes: [],
     nextNetworkNodeId: 1,
+    revenueShareAgreements: [],
+    nextRevenueShareAgreementId: 1,
+    revenueDistributions: [],
+    nextRevenueDistributionId: 1,
   };
 }
 

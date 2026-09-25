@@ -50,6 +50,10 @@ const {
   respondToInvitation, removeNode, linkVavltChannel, unlinkVavltChannel,
   nodesForIdentity, networkView, networksForBusiness,
 } = require('./lib/networkConnections');
+const {
+  SPLIT_TYPES, AGREEMENT_STATUSES, findRevenueShareAgreement, createRevenueShareAgreement,
+  archiveRevenueShareAgreement, distributeRevenue, distributionsForNetwork, agreementsForNetwork,
+} = require('./lib/revenueShareAgreements');
 
 const { createServiceAuth } = require('./lib/serviceAuth.cjs');
 const { createDecisionLog } = require('./lib/decisionLog.cjs');
@@ -322,6 +326,13 @@ const requireNodeNetworkBusinessOwner = () => requireBusinessOwner((req) => {
   const network = findNetwork(store, node.networkId);
   return network ? network.hubBusinessId : null;
 }, 'network');
+// A revenue-share agreement belongs to a network, same one-hop shape.
+const requireAgreementNetworkBusinessOwner = () => requireBusinessOwner((req) => {
+  const agreement = findRevenueShareAgreement(store, Number(req.params.id));
+  if (!agreement) return null;
+  const network = findNetwork(store, agreement.networkId);
+  return network ? network.hubBusinessId : null;
+}, 'network');
 
 // **The invited person, not the business, answers their own
 // invitation** — deliberately not `requireNodeNetworkBusinessOwner`.
@@ -347,6 +358,8 @@ app.get('/api/health', (_req, res) => {
   res.json({
     ok: true, revenueEventTypes: REVENUE_EVENT_TYPES.length, locationTypes: LOCATION_TYPES, adTiers: AD_TIERS,
     networkNodeStatuses: NETWORK_NODE_STATUSES, networks: store.networks.length, networkNodes: store.networkNodes.length,
+    revenueShareSplitTypes: SPLIT_TYPES, revenueShareAgreementStatuses: AGREEMENT_STATUSES,
+    revenueShareAgreements: store.revenueShareAgreements.length, revenueDistributions: store.revenueDistributions.length,
     // The decision log's own state, so an `observe` window with real
     // gaps in it is visible from outside rather than only in a log.
     decisionLog: decisionLog.describe(),
@@ -873,6 +886,61 @@ app.get('/api/identities/:identityId/network-nodes', requireSession(), (req, res
     return res.status(403).json({ error: 'you may only read your own network memberships' });
   }
   return res.json({ nodes: nodesForIdentity(store, req.params.identityId) });
+});
+
+// -- Revenue sharing, §15-18 -------------------------------------------------
+//
+// See lib/revenueShareAgreements.js's own header for scope. An
+// Agreement belongs to a Network, same ownership shape as everything
+// else scoped to it.
+
+app.post('/api/networks/:id/revenue-share-agreements', requireNetworkBusinessOwner(), (req, res) => {
+  try {
+    res.status(201).json(createRevenueShareAgreement(store, { ...req.body, networkId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/revenue-share-agreements/:id', (req, res) => {
+  const agreement = findRevenueShareAgreement(store, Number(req.params.id));
+  if (!agreement) return res.status(404).json({ error: `no revenue-share agreement with id ${req.params.id}` });
+  res.json(agreement);
+});
+
+app.get('/api/networks/:id/revenue-share-agreements', (req, res) => {
+  res.json({ agreements: agreementsForNetwork(store, Number(req.params.id)) });
+});
+
+app.post('/api/revenue-share-agreements/:id/archive', requireAgreementNetworkBusinessOwner(), (req, res) => {
+  try {
+    res.json(archiveRevenueShareAgreement(store, { agreementId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// The triggering business owner's own session is always the payer —
+// never a body-supplied payerId — so a business can only ever
+// distribute its own money, per this file's own header.
+app.post('/api/revenue-share-agreements/:id/distribute', requireAgreementNetworkBusinessOwner(), async (req, res) => {
+  try {
+    const distribution = await distributeRevenue(store, {
+      ...req.body,
+      agreementId: Number(req.params.id),
+      payerId: req.sessionUserId,
+      settleFn: settleVCoin,
+    });
+    res.status(201).json(distribution);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Financial detail — same session-gated, owner-only visibility as
+// `/api/business/:businessId/revenue`.
+app.get('/api/networks/:id/revenue-distributions', requireNetworkBusinessOwner(), (req, res) => {
+  res.json({ distributions: distributionsForNetwork(store, Number(req.params.id)) });
 });
 
 async function start() {

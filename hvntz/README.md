@@ -169,7 +169,32 @@ curl http://localhost:8792/api/franchise-list/1
   NOT include an 8-camera session/screen layer, a revenue-sharing
   engine, or any role beyond hub-owner vs. invited member — the audit
   found no substrate for any of those anywhere in the repo.
-- `server.js` — a real Express API (CommonJS) wrapping all twelve
+- `lib/revenueShareAgreements.js` — Connected Network Revenue Sharing,
+  §15-18: the single largest confirmed gap in the whole repo per the
+  §40 audit — every real settlement mechanism anywhere in this
+  ecosystem was hardcoded to exactly two legs (platform vs. one
+  recipient). An Agreement belongs to a real Network (never a floating
+  global config), with named `{role, payeeId, value}` shares in one of
+  two real split shapes — `percentage` (must sum to exactly 100) or
+  `fixed-amount` (must sum to exactly the distributed total).
+  `computeSplit` is solvent by construction: every leg is rounded
+  individually except the last, which absorbs the remainder, so the
+  sum always equals the distributed total to the cent — no money
+  invented or lost to rounding, the same discipline VAGO's
+  `predictionMarkets.js` already holds. `distributeRevenue` executes
+  through the same real, atomic `settleVCoin` -> V3's own
+  `POST /api/vcoin/settle` this app already uses elsewhere — not a
+  second ledger or a new execution primitive, just the missing
+  agreement layer on top of a real one. The triggering business
+  owner's own session is always the payer, never a body-supplied id, so
+  a business can only ever distribute its own money. Scoped
+  deliberately to the two split shapes §17's own worked example
+  actually uses (percentage, fixed-amount) — tiered percentages,
+  performance bonuses, event/Hunt/creator-specific split overrides,
+  sponsor-funded rewards, and time-limited agreements are each their
+  own undertaking with no substrate to extend, same as the module's own
+  header documents.
+- `server.js` — a real Express API (CommonJS) wrapping all thirteen
   modules.
 
 ## Verified
@@ -286,16 +311,20 @@ integrations, actual AI agents) or blocked on a system that doesn't
 exist elsewhere in this session yet (`venvs`'s CHOPZ Digital Twin
 system).
 
-**Connected Network Layer — Phases 1-3 only, see
-`lib/networkConnections.js` and `lib/hunts.js`.** A Node's own
-accept/decline, its one-person-one-Channel Vault Studios stream
-reference, and a checkpoint's connection to its own business's Network
-are all real. Not yet built, per its own §40 audit finding no
-substrate for any of it anywhere in the repo: the 8-camera/screen
-*session* layer (a Network grouping several Nodes' streams together
-the way `vavlt-stvdios/lib/screenSessions.js`'s `MAX_SCREENS = 8`
-groups Channels, still Phase 2 but a separate step from a single
-Node's own stream reference), a configurable N-party revenue-sharing
-engine (Phase 4 — the single largest confirmed gap in the freeze), any
-role beyond hub-owner vs. invited member, recurring per-person
-schedules, and temporary/archivable multi-business event networks.
+**Connected Network Layer — Phases 1-3, plus Phase 4's core revenue
+engine, see `lib/networkConnections.js`, `lib/hunts.js` and
+`lib/revenueShareAgreements.js`.** A Node's own accept/decline, its
+one-person-one-Channel Vault Studios stream reference, a checkpoint's
+connection to its own business's Network, and a configurable
+percentage/fixed-amount revenue-sharing Agreement are all real. Not
+yet built, per its own §40 audit finding no substrate for any of it
+anywhere in the repo: the 8-camera/screen *session* layer (a Network
+grouping several Nodes' streams together the way `vavlt-stvdios/lib/
+screenSessions.js`'s `MAX_SCREENS = 8` groups Channels, still Phase 2
+but a separate step from a single Node's own stream reference); seven
+of §17's nine named split shapes (tiered percentages, performance
+bonuses, event/Hunt/creator-specific split overrides, sponsor-funded
+rewards, time-limited agreements — only `percentage` and
+`fixed-amount` are built); §18's own network-growth analytics rollup;
+any role beyond hub-owner vs. invited member; recurring per-person
+schedules; and temporary/archivable multi-business event networks.
