@@ -17,6 +17,8 @@ const assert = require('node:assert/strict');
 const {
   createGroupWager, joinGroupWager, linkGroupWagerThread, resolveGroupWager,
   groupWagerView, findGroupWager, isGroupWagerLocked, VISIBILITIES,
+  INVITATION_STATUSES, findInvitation, invitationsForGroupWager,
+  inviteToGroupWager, markInvitationViewed, invitationView,
 } = require('../lib/groupWagers');
 const { createVagoStore } = require('../lib/store');
 
@@ -209,4 +211,124 @@ test('findGroupWager finds by id', async () => {
 test('isGroupWagerLocked treats a missing market as locked', () => {
   const groupWager = { entryDeadline: Date.now() + 100000 };
   assert.equal(isGroupWagerLocked(groupWager, null), true);
+});
+
+// -- §13 invitation state machine (Invited -> Viewed -> Funded) -----------------
+
+test('createGroupWager creates a real invited-status invitation for every name on the initial list', async () => {
+  const store = createVagoStore();
+  const groupWager = await createGroupWager(store, baseOptions({ visibility: 'private', invitedUserIds: ['bob', 'carol'] }));
+  const invitations = invitationsForGroupWager(store, groupWager.id);
+  assert.equal(invitations.length, 2);
+  assert.ok(invitations.every((i) => i.status === 'invited'));
+  assert.ok(invitations.every((i) => i.invitedAt !== null));
+  assert.ok(invitations.every((i) => i.viewedAt === null && i.fundedAt === null));
+});
+
+test('INVITATION_STATUSES is invited -> viewed -> funded, not the freeze\'s literal six names', () => {
+  assert.deepEqual(INVITATION_STATUSES, ['invited', 'viewed', 'funded']);
+});
+
+test('inviteToGroupWager only lets the creator invite, and only on a private group wager', async () => {
+  const store = createVagoStore();
+  const open = await createGroupWager(store, baseOptions());
+  assert.throws(
+    () => inviteToGroupWager(store, { groupWagerId: open.id, userId: 'dave', invitedBy: 'ada' }),
+    /not private/,
+  );
+
+  const priv = await createGroupWager(store, baseOptions({ visibility: 'private', invitedUserIds: ['bob'] }));
+  assert.throws(
+    () => inviteToGroupWager(store, { groupWagerId: priv.id, userId: 'dave', invitedBy: 'bob' }),
+    /only the creator may invite/,
+  );
+
+  const invitation = inviteToGroupWager(store, { groupWagerId: priv.id, userId: 'dave', invitedBy: 'ada' });
+  assert.equal(invitation.status, 'invited');
+  assert.ok(priv.invitedUserIds.includes('dave'), 'inviting later must also extend the group wager\'s own invitedUserIds');
+});
+
+test('inviteToGroupWager refuses inviting the same user twice', async () => {
+  const store = createVagoStore();
+  const groupWager = await createGroupWager(store, baseOptions({ visibility: 'private', invitedUserIds: ['bob'] }));
+  assert.throws(
+    () => inviteToGroupWager(store, { groupWagerId: groupWager.id, userId: 'bob', invitedBy: 'ada' }),
+    /already invited/,
+  );
+});
+
+test('markInvitationViewed transitions invited -> viewed, and is idempotent past that point', async () => {
+  const store = createVagoStore();
+  const groupWager = await createGroupWager(store, baseOptions({ visibility: 'private', invitedUserIds: ['bob'] }));
+  let invitation = markInvitationViewed(store, { groupWagerId: groupWager.id, userId: 'bob' });
+  assert.equal(invitation.status, 'viewed');
+  assert.ok(invitation.viewedAt !== null);
+
+  // Funding, then viewing again, must not regress the status backward.
+  await joinGroupWager(store, { groupWagerId: groupWager.id, userId: 'bob', side: 'yes', quantity: 5, settleFn: ledger() });
+  invitation = markInvitationViewed(store, { groupWagerId: groupWager.id, userId: 'bob' });
+  assert.equal(invitation.status, 'funded', 'viewing after funding must not undo the funded status');
+});
+
+test('markInvitationViewed throws for a user with no invitation', async () => {
+  const store = createVagoStore();
+  const groupWager = await createGroupWager(store, baseOptions());
+  assert.throws(
+    () => markInvitationViewed(store, { groupWagerId: groupWager.id, userId: 'nobody' }),
+    /has no invitation/,
+  );
+});
+
+test('joinGroupWager advances a real invitation straight to funded — no separate joined-not-funded state', async () => {
+  const store = createVagoStore();
+  const groupWager = await createGroupWager(store, baseOptions({ visibility: 'private', invitedUserIds: ['bob'] }));
+  await joinGroupWager(store, { groupWagerId: groupWager.id, userId: 'bob', side: 'yes', quantity: 5, settleFn: ledger() });
+  const invitation = findInvitation(store, groupWager.id, 'bob');
+  assert.equal(invitation.status, 'funded');
+  assert.ok(invitation.fundedAt !== null);
+});
+
+test('joinGroupWager on an OPEN group wager creates no invitation record for the joiner', async () => {
+  const store = createVagoStore();
+  const groupWager = await createGroupWager(store, baseOptions());
+  await joinGroupWager(store, { groupWagerId: groupWager.id, userId: 'bob', side: 'yes', quantity: 5, settleFn: ledger() });
+  assert.equal(findInvitation(store, groupWager.id, 'bob'), null, 'an OPEN group has no guest list, so joining it creates no invitation');
+});
+
+test('joinGroupWager by the creator (never invited to their own group) creates no invitation record', async () => {
+  const store = createVagoStore();
+  const groupWager = await createGroupWager(store, baseOptions({ visibility: 'private', invitedUserIds: ['bob'] }));
+  await joinGroupWager(store, { groupWagerId: groupWager.id, userId: 'ada', side: 'yes', quantity: 5, settleFn: ledger() });
+  assert.equal(findInvitation(store, groupWager.id, 'ada'), null);
+});
+
+test('invitationView merges the invitation\'s own state with the group wager\'s live locked/settled state, never a stored copy', async () => {
+  const store = createVagoStore();
+  const groupWager = await createGroupWager(store, baseOptions({ visibility: 'private', invitedUserIds: ['bob'] }));
+
+  let view = invitationView(store, groupWager.id, 'bob');
+  assert.equal(view.status, 'invited');
+  assert.equal(view.groupWagerLocked, false);
+  assert.equal(view.groupWagerStatus, 'open');
+
+  await resolveGroupWager(store, { groupWagerId: groupWager.id, outcome: 'yes', settleFn: ledger() });
+  view = invitationView(store, groupWager.id, 'bob');
+  assert.equal(view.status, 'invited', 'never funding leaves the invitation\'s own status alone');
+  assert.equal(view.groupWagerLocked, true, 'but the group\'s own live state still reflects that it settled');
+  assert.equal(view.groupWagerStatus, 'settled');
+});
+
+test('invitationView returns null for a user with no invitation', async () => {
+  const store = createVagoStore();
+  const groupWager = await createGroupWager(store, baseOptions());
+  assert.equal(invitationView(store, groupWager.id, 'nobody'), null);
+});
+
+test('reseedIds picks up the invitation id sequence too', async () => {
+  const { reseedIds } = require('../lib/groupWagers');
+  const store = createVagoStore();
+  await createGroupWager(store, baseOptions({ visibility: 'private', invitedUserIds: ['bob', 'carol'] }));
+  store.nextGroupWagerInvitationId = 1;
+  const seeded = reseedIds(store);
+  assert.equal(seeded.nextGroupWagerInvitationId, 3);
 });

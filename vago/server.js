@@ -51,8 +51,10 @@ const {
   createProp, getProp, resolveProp, createFantasyEntry, getFantasyEntry, gradeFantasyEntry, listEntriesForUser,
 } = require('./lib/fantasy');
 const {
-  VISIBILITIES: GROUP_WAGER_VISIBILITIES, createGroupWager, joinGroupWager,
+  VISIBILITIES: GROUP_WAGER_VISIBILITIES, INVITATION_STATUSES: GROUP_WAGER_INVITATION_STATUSES,
+  createGroupWager, joinGroupWager,
   linkGroupWagerThread, resolveGroupWager, groupWagerView,
+  invitationsForGroupWager, inviteToGroupWager, markInvitationViewed, invitationView,
 } = require('./lib/groupWagers');
 
 const app = express();
@@ -261,6 +263,7 @@ app.get('/api/health', (_req, res) => {
     fantasyPerfectPayoutTable: PERFECT_PAYOUT_TABLE,
     fantasyFlexPayoutTable: FLEX_PAYOUT_TABLE,
     groupWagerVisibilities: GROUP_WAGER_VISIBILITIES,
+    groupWagerInvitationStatuses: GROUP_WAGER_INVITATION_STATUSES,
   });
 });
 
@@ -607,6 +610,58 @@ app.post('/api/group-wagers/:id/resolve', requireOperator('vago:settle'), async 
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+});
+
+// §13's invitation state machine (Invited -> Viewed -> Funded; Locked
+// and Settled are read live from the group wager itself, see
+// `lib/groupWagers.js`'s own header). Only the creator may invite past
+// the initial list — same ownership check as the thread-link route
+// above, since both are "does this session own this group wager."
+app.post('/api/group-wagers/:id/invitations', requireSession(), (req, res) => {
+  try {
+    res.status(201).json(inviteToGroupWager(store, {
+      ...req.body, groupWagerId: Number(req.params.id), invitedBy: req.sessionUserId,
+    }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Creator-only read — a private group wager's guest list is not public
+// even to its own invitees, matching the visibility rule that made it
+// private in the first place.
+app.get('/api/group-wagers/:id/invitations', requireSession(), (req, res) => {
+  const groupWagerId = Number(req.params.id);
+  const existing = groupWagerView(store, groupWagerId);
+  if (!existing) return res.status(404).json({ error: `no group wager with id ${groupWagerId}` });
+  if (String(existing.creatorId) !== String(req.sessionUserId)) {
+    return res.status(403).json({ error: 'only the creator may read this group wager\'s invitations' });
+  }
+  res.json({ invitations: invitationsForGroupWager(store, groupWagerId) });
+});
+
+// The invitee's own action — `requireActor('userId')` the same way
+// `/join` already proves the acting session, since marking your own
+// invitation viewed is exactly that shape.
+app.post('/api/group-wagers/:id/invitations/view', requireActor('userId'), (req, res) => {
+  try {
+    res.json(markInvitationViewed(store, {
+      ...req.body, groupWagerId: Number(req.params.id),
+    }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// The invitee's own read — their own invitation plus the group's live
+// locked/settled state, not the whole guest list.
+app.get('/api/group-wagers/:id/invitations/:userId', requireSession(), (req, res) => {
+  if (String(req.params.userId) !== String(req.sessionUserId)) {
+    return res.status(403).json({ error: 'a user may only read their own invitation' });
+  }
+  const view = invitationView(store, Number(req.params.id), req.params.userId);
+  if (!view) return res.status(404).json({ error: `no invitation for ${req.params.userId} on group wager ${req.params.id}` });
+  res.json(view);
 });
 
 app.get('/api/sports/events', (_req, res) => {

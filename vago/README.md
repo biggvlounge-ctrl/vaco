@@ -331,9 +331,19 @@ if VACO Analytics is down). See `vaco-analytics/dev-docs/phase-5-live-metric-fee
   far.
 - A named VAGO agent — unlike Gibson (VOID) or Kenji (VOKEN), no
   VAGO-specific agent is confirmed in any of the three source docs.
-- Group Wager side wagers, team roles, a leaderboard, a real invitation
-  state machine, and QVAN-based group-risk monitoring — the §29 audit
-  found no substrate for any of them anywhere in the ecosystem, so
-  building them now would mean inventing a system the freeze assumes
-  already exists rather than reusing one. Multi-outcome group wagers
-  are also out of scope: `predictionMarkets.js` is binary only.
+- Group Wager side wagers, team roles, a leaderboard, and QVAN-based
+  group-risk monitoring — the §29 audit found no substrate for any of
+  them anywhere in the ecosystem, and each needs a subsystem invented
+  from nothing (a bracket/standings engine, a wager-to-wager
+  relationship, a real risk-analysis layer) rather than something to
+  extend. Multi-outcome group wagers are also out of scope:
+  `predictionMarkets.js` is binary only.
+- **The invitation state machine, added 25 Sep 2026, is real** —
+  `lib/groupWagers.js`'s `inviteToGroupWager`/`markInvitationViewed`,
+  three real per-invitee states (`invited -> viewed -> funded`) plus
+  the group wager's own already-live-computed locked/settled state read
+  alongside rather than copied on. §13's freeze text names six states
+  (`Invited -> Viewed -> Joined -> Funded -> Locked -> Settled`); this
+  collapses Joined and Funded into one, since `joinGroupWager` already
+  does JOIN+FUND as one atomic settlement — a system that cannot
+  observe a joined-not-funded moment should not pretend to track one.

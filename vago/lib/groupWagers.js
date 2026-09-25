@@ -33,15 +33,36 @@
 // access-control logic does not actually need).
 //
 // **Not built: tournaments, leagues, side wagers, team roles, a
-// leaderboard, an invitation state machine, or QVAN-based group-risk
-// monitoring.** The audit found no substrate for any of them anywhere
-// in the ecosystem -- each is its own undertaking.
+// leaderboard, or QVAN-based group-risk monitoring.** Each of those
+// needs a subsystem invented from nothing -- a bracket/standings
+// engine, a wager-to-wager relationship, a real risk-analysis layer --
+// which is the gap this session's own audits keep finding and keep
+// refusing to paper over.
+//
+// **The invitation state machine, added 25 Sep 2026, is different.**
+// It needs no external subsystem -- only a richer status on data this
+// module already owns (`groupWager.invitedUserIds`), the same shape as
+// HVNTZ's own Node invite/accept/decline. §13's own chain reads
+// "Invited -> Viewed -> Joined -> Funded -> Locked -> Settled", six
+// names, but `joinGroupWager` already does JOIN+FUND as one atomic
+// `buyContract` call -- this file's own comment on that function
+// already called that a feature ("no window where a participant is
+// charged but not recorded"), so a per-invitation status that pretends
+// a joined-not-yet-funded moment exists would invent a race this
+// system deliberately does not have. `INVITATION_STATUSES` below is
+// therefore `invited -> viewed -> funded` (three real states an
+// invitee's own actions cause), and Locked/Settled are read from the
+// group wager's own already-live-computed state
+// (`isGroupWagerLocked`/`groupWager.status`) rather than copied onto
+// the invitation -- the same "never a second copy of state that
+// already exists elsewhere" rule this session applies everywhere else.
 
 'use strict';
 
 const { createPredictionMarket, buyContract, resolveMarket, getPredictionMarket } = require('./predictionMarkets');
 
 const VISIBILITIES = ['open', 'private'];
+const INVITATION_STATUSES = ['invited', 'viewed', 'funded'];
 
 function findGroupWager(store, groupWagerId) {
   return store.groupWagers.find((g) => g.id === groupWagerId) || null;
@@ -54,6 +75,101 @@ function findGroupWager(store, groupWagerId) {
 // session's own tap/passport work kept finding in other apps.
 function isGroupWagerLocked(groupWager, market, now = Date.now()) {
   return now >= groupWager.entryDeadline || !market || market.status !== 'open';
+}
+
+function findInvitation(store, groupWagerId, userId) {
+  return store.groupWagerInvitations.find(
+    (i) => i.groupWagerId === groupWagerId && i.userId === userId,
+  ) || null;
+}
+
+function invitationsForGroupWager(store, groupWagerId) {
+  return store.groupWagerInvitations.filter((i) => i.groupWagerId === groupWagerId);
+}
+
+// Internal — both `createGroupWager` (for the initial list) and
+// `inviteToGroupWager` (for later additions) create one of these; a
+// caller never constructs the record shape directly.
+function createInvitation(store, groupWagerId, userId, now) {
+  if (findInvitation(store, groupWagerId, userId)) {
+    throw new Error(`createInvitation: ${userId} is already invited to group wager ${groupWagerId}`);
+  }
+  const invitation = {
+    id: store.nextGroupWagerInvitationId++,
+    groupWagerId,
+    userId,
+    status: 'invited',
+    invitedAt: now,
+    viewedAt: null,
+    fundedAt: null,
+  };
+  store.groupWagerInvitations.push(invitation);
+  return invitation;
+}
+
+// Only the creator may invite past the initial list — the same
+// ownership shape `linkGroupWagerThread`'s route already enforces, just
+// checked at the route layer there and here in the function itself
+// since there is no separate "existing" read needed first.
+function inviteToGroupWager(store, options = {}) {
+  const { groupWagerId, userId, invitedBy, now = Date.now() } = options;
+  const groupWager = findGroupWager(store, groupWagerId);
+  if (!groupWager) throw new Error(`inviteToGroupWager: no group wager ${groupWagerId}`);
+  if (groupWager.visibility !== 'private') {
+    throw new Error(`inviteToGroupWager: group wager ${groupWagerId} is not private — invitations only apply to private group wagers`);
+  }
+  if (String(invitedBy) !== String(groupWager.creatorId)) {
+    throw new Error('inviteToGroupWager: only the creator may invite someone to this group wager');
+  }
+  if (!userId) throw new Error('inviteToGroupWager requires a userId');
+
+  const invitation = createInvitation(store, groupWagerId, userId, now);
+  if (!groupWager.invitedUserIds.includes(userId)) groupWager.invitedUserIds.push(userId);
+  return invitation;
+}
+
+// The invitee's own action — §13's "Viewed" step. Idempotent: viewing
+// again, or viewing after already funding, is a no-op rather than an
+// error, since a real person re-opening a group wager they already
+// joined is the normal case, not a mistake to reject.
+function markInvitationViewed(store, options = {}) {
+  const { groupWagerId, userId, now = Date.now() } = options;
+  const invitation = findInvitation(store, groupWagerId, userId);
+  if (!invitation) throw new Error(`markInvitationViewed: ${userId} has no invitation to group wager ${groupWagerId}`);
+  if (invitation.status === 'invited') {
+    invitation.status = 'viewed';
+    invitation.viewedAt = now;
+  }
+  return invitation;
+}
+
+// Internal — called from `joinGroupWager` once `buyContract` actually
+// succeeds, never before. A user who joins an OPEN group wager they
+// were never invited to has no invitation record at all, which is
+// correct: invitations track a private group's own guest list, not
+// participation in general.
+function advanceInvitationToFunded(store, groupWagerId, userId, now) {
+  const invitation = findInvitation(store, groupWagerId, userId);
+  if (!invitation) return null;
+  invitation.status = 'funded';
+  invitation.fundedAt = now;
+  return invitation;
+}
+
+// A merged read, same reasoning as `groupWagerView`: the invitation's
+// own three real states plus the group's already-live-computed
+// locked/settled state, never copied onto the invitation itself.
+function invitationView(store, groupWagerId, userId, options = {}) {
+  const { now = Date.now() } = options;
+  const invitation = findInvitation(store, groupWagerId, userId);
+  if (!invitation) return null;
+  const groupWager = findGroupWager(store, groupWagerId);
+  const market = groupWager ? getPredictionMarket(store, groupWager.marketId) : null;
+  return {
+    ...invitation,
+    groupWagerLocked: groupWager ? isGroupWagerLocked(groupWager, market, now) : null,
+    groupWagerStatus: groupWager ? groupWager.status : null,
+  };
 }
 
 // **§5's own worked example**: "A user creates: '$20 Group Bet — Who
@@ -103,6 +219,13 @@ async function createGroupWager(store, options = {}) {
     createdAt: now,
   };
   store.groupWagers.push(groupWager);
+
+  // §13's invitation state machine starts here for every name on the
+  // initial list — each gets a real 'invited' record, not just a bare
+  // id sitting in `invitedUserIds`.
+  for (const userId of groupWager.invitedUserIds) {
+    createInvitation(store, groupWager.id, userId, now);
+  }
   return groupWager;
 }
 
@@ -132,6 +255,11 @@ async function joinGroupWager(store, options = {}) {
   }
 
   const result = await buyContract(store, { marketId: groupWager.marketId, userId, side, quantity, settleFn });
+  // Only after the real settlement confirms — same "never recorded
+  // before the ledger confirms" discipline as VASH TAP's payViaTap.
+  // A no-op for the creator or an OPEN-group joiner with no invitation
+  // record at all, which is correct: they were never on a guest list.
+  advanceInvitationToFunded(store, groupWagerId, userId, now);
   return { groupWager, ...result };
 }
 
@@ -188,11 +316,13 @@ function groupWagerView(store, groupWagerId, options = {}) {
 function reseedIds(store) {
   const maxOf = (rows) => rows.reduce((max, r) => (r.id > max ? r.id : max), 0);
   store.nextGroupWagerId = maxOf(store.groupWagers) + 1;
-  return { nextGroupWagerId: store.nextGroupWagerId };
+  store.nextGroupWagerInvitationId = maxOf(store.groupWagerInvitations) + 1;
+  return { nextGroupWagerId: store.nextGroupWagerId, nextGroupWagerInvitationId: store.nextGroupWagerInvitationId };
 }
 
 module.exports = {
   VISIBILITIES,
+  INVITATION_STATUSES,
   findGroupWager,
   isGroupWagerLocked,
   createGroupWager,
@@ -200,5 +330,10 @@ module.exports = {
   linkGroupWagerThread,
   resolveGroupWager,
   groupWagerView,
+  findInvitation,
+  invitationsForGroupWager,
+  inviteToGroupWager,
+  markInvitationViewed,
+  invitationView,
   reseedIds,
 };
