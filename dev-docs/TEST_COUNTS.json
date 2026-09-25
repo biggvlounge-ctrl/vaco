@@ -1,6 +1,6 @@
 {
-  "total": 2803,
-  "passed": 2754,
+  "total": 2828,
+  "passed": 2779,
   "failed": 0,
   "skipped": 49,
   "suites": 41,
@@ -36,8 +36,8 @@
       "skipped": 0
     },
     "hvntz": {
-      "tests": 14,
-      "pass": 14,
+      "tests": 34,
+      "pass": 34,
       "fail": 0,
       "skipped": 0
     },
@@ -150,8 +150,8 @@
       "skipped": 0
     },
     "vash-tap": {
-      "tests": 42,
-      "pass": 42,
+      "tests": 47,
+      "pass": 47,
       "fail": 0,
       "skipped": 0
     },
