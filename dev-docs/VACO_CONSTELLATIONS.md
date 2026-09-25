@@ -200,10 +200,14 @@ CHOPZ SHOP riding along).
   deleted.
 - **VENVS is the loose member, and it is worth saying so.** It is a
   consumer marketplace sitting with two pieces of infrastructure. The
-  one thing it genuinely shares is a frontend problem: **VENVS and VDP
-  are the only two frontends in the repo outside the design system** —
-  both predate it and build separately as Vite apps. That migration is
-  real work and it belongs to VENVS wherever VENVS sits.
+  one thing it genuinely shared with the other Vite frontend here was a
+  frontend problem — **VENVS and VDP were the only two frontends in the
+  repo outside the design system**, both predating it and building
+  separately as Vite apps. **VDP's half closed 25 Sep 2026** (its
+  top-level chrome only — CSS classes, not the `vaco-ui.js` runtime,
+  which would fight React for the DOM; the 25 district view components
+  are untouched, on purpose — see `vdp/README.md`'s own note on why).
+  VENVS's half is still open and belongs to VENVS wherever VENVS sits.
 - VACA (8 routes) and V4 Search (2 routes) are both untested. VACA is
   the identity gate other apps trust.
 
@@ -273,8 +277,10 @@ document: `vaco-shell/lib/registry.js` bundles **both `vdp` and
 - **VAGO** — prediction markets, sportsbook, esports, casino, fantasy,
   Gold Coin, AMOE
 
-- **Shared roadmap:** VDP's migration onto the design system (it is one
-  of the two Vite frontends outside it), and VAGO's compliance posture.
+- **Shared roadmap:** VAGO's compliance posture. VDP's design-system
+  migration (it was one of the two Vite frontends outside it) closed
+  25 Sep 2026 — chrome only, see the SYSTEMS section above and
+  `vdp/README.md`'s own note.
 - **VACON-C stays paused.** Its presence in a public constellation is a
   statement about what it *is*, not permission to resume it.
 - **Honest note on VDP:** VDP is a surface *over* the other seventeen —
@@ -347,7 +353,7 @@ reading it cold would re-do it.
 | **○ SYSTEMS** | Off-host backups, CI, `requireActor`, VACA tests all open | CI is live (`.github/workflows/ci.yml`) · `requireActor` is in 25 apps' `server.js` · VACA has 17/17 tests | **Off-host backups are still genuinely open** — `DISASTER_RECOVERY.md` §6's sync has never been run against a real remote, confirmed unchanged today. Still the real single point of failure under the ledger 29 apps settle through |
 | **■ VOKEN** | VOKEN's eight money flows and VEX's compliance gates both untested | `voken/test/money.test.js` names and covers all eight — packs, raffles, trades, all three auction types, fractional buy, secondary shares, merch, referral spins | VEX's gate is a broker-dealer registration requirement, not a code gap — no test suite closes it |
 | **✕ VVLTVRE** | The media vendor decision blocks six surfaces | **Unchanged** — still blocked on the same vendor decision, confirmed today via `COMPLETION_BY_APP.md`'s own standing gap list | Still the single highest-leverage decision in the repo; start with Pods on storage + CDN, no SFU needed |
-| **▲ GAMES** | VDP is one of two frontends outside the design system | **Unchanged** — `sync-design-system.sh` still excludes `vdp` by name | Still open — the last real frontend-migration gap alongside VENVS |
+| **▲ GAMES** | VDP is one of two frontends outside the design system | **Closed 25 Sep 2026** — `vdp` is now a `sync-design-system.sh` target; `App.jsx`'s chrome is real JSX on `vaco-design.css`'s classes | The 25 district view components (`WorldView` and its children) were deliberately left alone — see `vdp/README.md`'s own note on why forcing the design system onto a game canvas isn't a real improvement |
 | **◇ internal** | VACO Notify shipped · Analytics had 7 untested routes | Analytics now carries `routeGuards.test.js` alongside `analytics.test.js`, 39 tests total | Same caveat as ✕ VOID — worth a per-route confirmation, not just a suite-passes check, before calling it closed |
 
 ---
