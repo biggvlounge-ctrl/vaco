@@ -1,9 +1,9 @@
 {
-  "total": 2723,
-  "passed": 2674,
+  "total": 2760,
+  "passed": 2711,
   "failed": 0,
   "skipped": 49,
-  "suites": 39,
+  "suites": 40,
   "perSuite": {
     "chopz": {
       "tests": 8,
@@ -140,6 +140,12 @@
     "vago": {
       "tests": 45,
       "pass": 45,
+      "fail": 0,
+      "skipped": 0
+    },
+    "vash-tap": {
+      "tests": 37,
+      "pass": 37,
       "fail": 0,
       "skipped": 0
     },
