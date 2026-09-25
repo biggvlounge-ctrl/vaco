@@ -13,7 +13,7 @@ person who built it can check whether a claim is still true.
 Every number below was produced by running the tool that owns it, not
 recalled. The commands are in §10 so they can be re-run.
 
-*Current as of commit `dbd63b8`, 226 commits, branch
+*Current as of commit `2f0082c`, 231 commits, branch
 `claude/v4-proxy-server-s6dcp8`, 25 Sep 2026.*
 
 **On the commit count.** An earlier revision of this line said 332. That
@@ -69,14 +69,14 @@ authorization work in §5 had to be done per app rather than once.
 
 | | |
 |---|---|
-| Containerised services | 37 + nginx + a LiveKit SFU |
-| Registry rows (incl. brand rows and the dev mock) | 38 |
-| Mutating HTTP routes | 530, all accounted for (477 guarded, 53 declared open with a reason) |
-| Automated tests | 2765 across 40 suites |
-| Persisted volumes | 31 |
-| Shared-module copies kept in sync | 216 |
-| Service credentials in `.env.example` | 29 callers |
-| Servers carrying trace context | 37 |
+| Containerised services | 38 + nginx + a LiveKit SFU |
+| Registry rows (incl. brand rows and the dev mock) | 39 |
+| Mutating HTTP routes | 533, all accounted for (480 guarded, 53 declared open with a reason) |
+| Automated tests | 2787 across 41 suites |
+| Persisted volumes | 32 |
+| Shared-module copies kept in sync | 222 |
+| Service credentials in `.env.example` | 30 callers |
+| Servers carrying trace context | 38 |
 
 ---
 
@@ -824,13 +824,13 @@ run to produce the numbers here.
 built:** `node scripts/package-release.mjs` — see §11.
 
 ```sh
-node scripts/run-all-tests.mjs           # 2765/2765 across 40 suites (some skip without a database)
-node scripts/audit-route-guards.mjs --check   # 530/530 accounted for
-./sync-shared-runtime.sh --check         # 216 copies current, none unmanaged
+node scripts/run-all-tests.mjs           # 2787/2787 across 41 suites (some skip without a database)
+node scripts/audit-route-guards.mjs --check   # 533/533 accounted for
+./sync-shared-runtime.sh --check         # 222 copies current, none unmanaged
 ./sync-design-system.sh --check          # every serving app is a target
-node deploy/generate-docker-compose.js   # 37 apps + nginx, livekit, postgres, 31 volumes
+node deploy/generate-docker-compose.js   # 38 apps + nginx, livekit, postgres, 32 volumes
 git diff --exit-code docker-compose.yml  # generator output matches committed
-node scripts/generate-service-tokens.mjs --check   # .env.example matches 29 callers
+node scripts/generate-service-tokens.mjs --check   # .env.example matches 30 callers
 node scripts/audit-settlement-atomicity.mjs   # 0 split settlements, ceiling 0
 node scripts/restamp-record.mjs          # writes this document's own figures back
 ```
@@ -909,6 +909,7 @@ vxllage          13   dreams           15   shield           12
 vulture-flix     12   vulture-pods     12   chopz/chopz-shop 14
 vulture-studios  14   vex-trading      10   chopz             8
 vash-tap         42
+vaco-passport    22
 ```
 
 ---
