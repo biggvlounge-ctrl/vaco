@@ -13,7 +13,7 @@ person who built it can check whether a claim is still true.
 Every number below was produced by running the tool that owns it, not
 recalled. The commands are in §10 so they can be re-run.
 
-*Current as of commit `70b8117`, 218 commits, branch
+*Current as of commit `c4f0135`, 221 commits, branch
 `claude/v4-proxy-server-s6dcp8`, 25 Sep 2026.*
 
 **On the commit count.** An earlier revision of this line said 332. That
@@ -71,8 +71,8 @@ authorization work in §5 had to be done per app rather than once.
 |---|---|
 | Containerised services | 37 + nginx + a LiveKit SFU |
 | Registry rows (incl. brand rows and the dev mock) | 38 |
-| Mutating HTTP routes | 528, all accounted for (475 guarded, 53 declared open with a reason) |
-| Automated tests | 2760 across 40 suites |
+| Mutating HTTP routes | 530, all accounted for (477 guarded, 53 declared open with a reason) |
+| Automated tests | 2762 across 40 suites |
 | Persisted volumes | 31 |
 | Shared-module copies kept in sync | 216 |
 | Service credentials in `.env.example` | 29 callers |
@@ -824,8 +824,8 @@ run to produce the numbers here.
 built:** `node scripts/package-release.mjs` — see §11.
 
 ```sh
-node scripts/run-all-tests.mjs           # 2760/2760 across 40 suites (some skip without a database)
-node scripts/audit-route-guards.mjs --check   # 528/528 accounted for
+node scripts/run-all-tests.mjs           # 2762/2762 across 40 suites (some skip without a database)
+node scripts/audit-route-guards.mjs --check   # 530/530 accounted for
 ./sync-shared-runtime.sh --check         # 216 copies current, none unmanaged
 ./sync-design-system.sh --check          # every serving app is a target
 node deploy/generate-docker-compose.js   # 37 apps + nginx, livekit, postgres, 31 volumes
@@ -908,7 +908,7 @@ vavlt-stvdios    14   cvnvo            13   vago             45
 vxllage          13   dreams           15   shield           12
 vulture-flix     12   vulture-pods     12   chopz/chopz-shop 14
 vulture-studios  14   vex-trading      10   chopz             8
-vash-tap         37
+vash-tap         39
 ```
 
 ---
