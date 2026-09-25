@@ -1,0 +1,19 @@
+{
+  "name": "vash-tap",
+  "version": "1.0.0",
+  "description": "VASH TAP — the physical-to-digital interaction layer. Tap resolution, dynamic assignment, and payment attribution on top of V3's existing VASH/VCoin ledger and VACA identity. See dev-docs/on-deck/VASH_TAP_FREEZE.md and its own README audit entry for scope.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "pg": "^8.13.0"
+  }
+}

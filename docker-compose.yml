@@ -977,6 +977,36 @@ services:
       - shield
       - livekit
       - postgres
+  vash-tap:
+    build:
+      context: ./vash-tap
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8825
+    container_name: vash-tap
+    environment:
+      PORT: 8825
+      HVNTZ_API_URL: "http://hvntz:8792"
+      SHIELD_API_URL: "http://shield:8812"
+      V3_API_URL: "http://v3:8811"
+      VACA_API_URL: "http://vaca:8804"
+      VACO_NOTIFY_URL: "http://vaco-notify:8818"
+      VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
+      VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
+      VACO_SERVICE_NAME: vash-tap
+      VACO_SERVICE_TOKEN: "${VACO_TOKEN_VASH_TAP:?Set a V3 service token for vash-tap in .env}"
+      DATABASE_URL: "postgres://vacancy:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/vacancy"
+    ports:
+      - "8825:8825"
+    networks:
+      - vaco
+    restart: unless-stopped
+    volumes:
+      - "vash_tap_data:/app/data"
+    depends_on:
+      - v3
+      - shield
+      - postgres
   venvs:
     build:
       context: ./venvs
@@ -1090,6 +1120,7 @@ volumes:
   vaco_audit_data:
   vaco_operator_data:
   vaco_media_data:
+  vash_tap_data:
   vacon-c-pgdata:
 
 networks:

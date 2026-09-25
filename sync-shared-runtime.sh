@@ -50,7 +50,7 @@ cd "$REPO_ROOT"
 
 # Apps that guard a user-facing route with Shield.
 SHIELD_TARGETS=(
-  chopz chopz/chopz-shop cvnvo dreams hvntz v3 v4-proxy vaca vacay vaco-audit vaco-shell vacon-c vaco-notify vago vavlt-stvdios venvm void vex voidmagic voken
+  chopz chopz/chopz-shop cvnvo dreams hvntz v3 v4-proxy vaca vacay vaco-audit vaco-shell vacon-c vaco-notify vago vash-tap vavlt-stvdios venvm void vex voidmagic voken
   vsafe vulture-flix vulture-music vulture-pods vulture-studios vxllage vaco-media
   vaco-analytics
 )
@@ -101,7 +101,7 @@ DECISION_LOG_TARGETS=(
 # rather than filename, so none of them produces a false positive.
 PERSISTENCE_TARGETS=(
   chopz chopz/chopz-shop cvnvo cvnvo/yap dreams hvntz shield v3 vaca vacay
-  vaco-audit vaco-media vaco-notify vaco-operator vacon vago vavlt-stvdios
+  vaco-audit vaco-media vaco-notify vaco-operator vacon vago vash-tap vavlt-stvdios
   venvm vex void voidmagic voken vsafe vulture-flix vulture-music
   vulture-pods vulture-studios vxllage
 )
@@ -119,7 +119,7 @@ PERSISTENCE_TARGETS=(
 # shared/persistencePg.js for what that costs.
 PERSISTENCE_PG_TARGETS=(
   chopz chopz/chopz-shop cvnvo cvnvo/yap dreams hvntz shield v3 vaca
-  vacay vaco-audit vaco-media vaco-notify vaco-operator vacon vago
+  vacay vaco-audit vaco-media vaco-notify vaco-operator vacon vago vash-tap
   vavlt-stvdios venvm vex void voidmagic voken vsafe vulture-flix
   vulture-music vulture-pods vulture-studios vxllage
 )
@@ -162,7 +162,7 @@ OPERATOR_TARGETS=(
 TRACING_TARGETS=(
   chopz chopz/chopz-shop cvnvo cvnvo/yap dreams hvntz shield v3 v4-proxy v4-search
   vaca vacay vaco-analytics vaco-audit vaco-media vaco-notify vaco-operator vaco-shell
-  vacon vacon-c vago vavlt-stvdios venvm venvs-mock-backend vex vex-trading
+  vacon vacon-c vago vash-tap vavlt-stvdios venvm venvs-mock-backend vex vex-trading
   void voidmagic voken vsafe vulture-flix vulture-music vulture-pods vulture-studios vxllage
   vaco-mcp
 )
@@ -171,7 +171,7 @@ TRACING_TARGETS=(
 # discovered, because "this app is written to by other apps" is a real
 # architectural fact per app, not something to infer from a directory.
 SERVICE_TARGETS=(
-  v3 v4-proxy vaca vacay vacon vaco-analytics vaco-audit vaco-notify vsafe cvnvo voken vago hvntz dreams venvm void voidmagic vavlt-stvdios vulture-music vulture-flix vulture-pods vulture-studios vaco-shell vaco-operator vex vacon-c vaco-media
+  v3 v4-proxy vaca vacay vacon vaco-analytics vaco-audit vaco-notify vsafe cvnvo voken vago vash-tap hvntz dreams venvm void voidmagic vavlt-stvdios vulture-music vulture-flix vulture-pods vulture-studios vaco-shell vaco-operator vex vacon-c vaco-media
 )
 
 CHECK=0
