@@ -1,9 +1,9 @@
 {
-  "total": 2765,
-  "passed": 2716,
+  "total": 2787,
+  "passed": 2738,
   "failed": 0,
   "skipped": 49,
-  "suites": 40,
+  "suites": 41,
   "perSuite": {
     "chopz": {
       "tests": 8,
@@ -116,6 +116,12 @@
     "vaco-operator": {
       "tests": 20,
       "pass": 20,
+      "fail": 0,
+      "skipped": 0
+    },
+    "vaco-passport": {
+      "tests": 22,
+      "pass": 22,
       "fail": 0,
       "skipped": 0
     },
