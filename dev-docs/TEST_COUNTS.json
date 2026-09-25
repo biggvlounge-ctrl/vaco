@@ -1,6 +1,6 @@
 {
-  "total": 2760,
-  "passed": 2711,
+  "total": 2762,
+  "passed": 2713,
   "failed": 0,
   "skipped": 49,
   "suites": 40,
@@ -144,8 +144,8 @@
       "skipped": 0
     },
     "vash-tap": {
-      "tests": 37,
-      "pass": 37,
+      "tests": 39,
+      "pass": 39,
       "fail": 0,
       "skipped": 0
     },
