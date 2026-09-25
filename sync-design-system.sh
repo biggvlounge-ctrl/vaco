@@ -28,11 +28,21 @@ CHECK_ONLY=0
 [ "${1:-}" = "--check" ] && CHECK_ONLY=1
 
 # Every app that serves a frontend. vaco-shell is the source and is not
-# a target; vdp and venvs are Vite apps whose assets live elsewhere and
-# are handled by their own builds.
+# a target; venvs is a Vite app whose assets live elsewhere and are
+# handled by its own build.
+#
+# **vdp, added 25 Sep 2026, is a partial target.** It is still a Vite/
+# React app — its build handles its own JS — but its `index.html` now
+# links `vaco-design.css` directly (Vite serves anything under
+# `public/` as a static root, same as any other app here), so its own
+# self-check below requires it to be listed. `vaco-ui.js` is copied
+# alongside it like every other target, but VDP's own React code never
+# loads it: that runtime manipulates the DOM directly and would fight
+# React for ownership of it, so VDP takes the CSS half of the design
+# system only.
 TARGETS=(
   chopz chopz/chopz-shop cvnvo dreams hvntz shield v3 vaca vacay
-  vaco-passport vacon vacon-c vaco-analytics vago vash-tap vavlt-stvdios venvm vex vex-trading vaco-notify
+  vaco-passport vacon vacon-c vaco-analytics vago vash-tap vavlt-stvdios vdp venvm vex vex-trading vaco-notify
   void voidmagic voken vsafe vulture-flix vulture-music vulture-pods
   vulture-studios vxllage
   v4-proxy v4-search cvnvo/yap

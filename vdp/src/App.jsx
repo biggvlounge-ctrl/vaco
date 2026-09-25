@@ -152,64 +152,80 @@ export default function App() {
     }
   };
 
+  // **The masthead, not `vaco-ui.js`'s.** Every server-rendered app in
+  // the register gets its masthead from `VACO.app()`'s DOM-manipulating
+  // runtime; VDP is React, and importing a script that calls
+  // `document.getElementById(...).appendChild(...)` into a page React
+  // also owns is how the two fight over the same nodes. So this hand-
+  // builds the same markup — `.vaco-masthead`/`.vaco-brand`/
+  // `.vaco-wallet`, the exact classes `vaco-design.css` defines for it
+  // — as real JSX instead. Same contract, React's own rendering.
   return (
-    <div style={{ fontFamily: "system-ui, sans-serif", padding: 32, maxWidth: 480 }}>
-      <h1>VDP</h1>
-      <p style={{ color: "#666" }}>Digital Planet — the walkable, virtual layer. Wallet wired to V3, auth wired to Shield.</p>
-
-      {/*
-        **Exit, per `VDP_SHELL_EXIT_FLOW_RESOLUTION.md` -- but the
-        mechanism that document names does not exist.** It says every
-        Shell app screen "already receives a standard onBack handler"
-        and quotes `setScreen("hub")`. `vaco-shell` has no JSX and no
-        React at all: it is an Express app whose `public/index.html`
-        launches each app into a *new tab* (`target = '_blank'`, with
-        the Shield token on the query string). There is no component
-        tree for an onBack prop to travel through, and that quoted line
-        exists nowhere in this repo.
-
-        The document's instruction still stands and is followed here:
-        use the ecosystem's standard exit rather than inventing one.
-        The standard that actually exists is `vaco-ui.js`'s masthead
-        brand link home -- `brand.href = VACO.SHELL_URL`, titled "Back
-        to the VACO app store". VDP is deliberately outside
-        `sync-design-system.sh`'s targets (a Vite app whose assets live
-        elsewhere), so it does not inherit that masthead and needs the
-        same link built directly. This is that link, and it is the same
-        contract, not a bespoke one.
-      */}
-      <p style={{ margin: "0 0 16px" }}>
-        <a href={SHELL_URL} title="Back to the VACO app store" style={{ color: "#555", fontSize: 13 }}>
-          ← Back to the VACO app store
-        </a>
-      </p>
-
-      {!session && (
-        <button onClick={handleLogin} disabled={busy}>
-          {busy ? "Logging in…" : "Log in (Shield session)"}
-        </button>
-      )}
-
-      {session && (
-        <div>
-          <p>
-            Signed in as <strong>{session.userId}</strong> via Shield session.
-          </p>
-          <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16, marginBottom: 12 }}>
-            <div>VCoin balance: <strong>{vcoinBalance ?? "…"}</strong></div>
-            <div>VASH balance: <strong>{vashBalance ?? "…"}</strong></div>
-          </div>
-          <button onClick={handleCashOut} disabled={busy}>
-            {busy ? "Working…" : "Cash out 100 VCoin → VASH"}
-          </button>{" "}
-          <button onClick={handleLogout}>Log out</button>
-
-          <WorldView session={session} degvchiStore={degvchiStore} foodDistrictStore={foodDistrictStore} onPurchase={notifyStateChange} />
-          <ChopzView session={session} onPurchase={notifyStateChange} />
+    <>
+      <header className="vaco-masthead">
+        <div className="vaco-container vaco-masthead-inner">
+          <a className="vaco-brand" href={SHELL_URL} title="Back to the VACO app store">
+            <span className="vaco-brand-mark">VDP</span>
+            <span className="vaco-brand-tag">Digital Planet</span>
+          </a>
+          <span className="vaco-spacer" />
+          {session && (
+            <div className="vaco-row-tight">
+              {vcoinBalance !== null && (
+                <span className="vaco-wallet" title="VCoin balance, live from V3">
+                  <span className="vaco-price vaco-num">{vcoinBalance}</span>
+                </span>
+              )}
+              <span className="vaco-small vaco-dim">{session.userId}</span>
+              <button className="vaco-btn vaco-btn-ghost vaco-btn-sm" onClick={handleLogout}>Sign out</button>
+            </div>
+          )}
         </div>
-      )}
+      </header>
 
-      {error && <p style={{ color: "crimson" }}>Error: {error}</p>}
-    </div>
+      <main id="vaco-main" className="vaco-container">
+        <div className="vaco-stack">
+          <div className="vaco-row">
+            <h1 className="vaco-h1">Digital Planet</h1>
+          </div>
+          <p className="vaco-body vaco-dim" style={{ maxWidth: "64ch" }}>
+            The walkable, virtual layer — land ownership and the avatar economy. Wallet wired to V3, auth wired to Shield.
+          </p>
+
+          {!session && (
+            <div className="vaco-row">
+              <button className="vaco-btn vaco-btn-primary" onClick={handleLogin} disabled={busy}>
+                {busy ? "Logging in…" : "Log in (Shield session)"}
+              </button>
+            </div>
+          )}
+
+          {session && (
+            <div className="vaco-stack">
+              <div className="vaco-card vaco-stack-sm">
+                <div className="vaco-row-tight">
+                  <span className="vaco-label">VCoin balance</span>
+                  <span className="vaco-price vaco-num">{vcoinBalance ?? "…"}</span>
+                </div>
+                <div className="vaco-row-tight">
+                  <span className="vaco-label">VASH balance</span>
+                  <span className="vaco-num">{vashBalance ?? "…"}</span>
+                </div>
+                <div className="vaco-row">
+                  <button className="vaco-btn vaco-btn-primary" onClick={handleCashOut} disabled={busy}>
+                    {busy ? "Working…" : "Cash out 100 VCoin → VASH"}
+                  </button>
+                </div>
+              </div>
+
+              <WorldView session={session} degvchiStore={degvchiStore} foodDistrictStore={foodDistrictStore} onPurchase={notifyStateChange} />
+              <ChopzView session={session} onPurchase={notifyStateChange} />
+            </div>
+          )}
+
+          {error && <div className="vaco-notice vaco-notice-danger">Error: {error}</div>}
+        </div>
+      </main>
+    </>
   );
 }

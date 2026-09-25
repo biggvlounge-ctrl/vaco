@@ -708,3 +708,52 @@ VOKEN's real `/api/brand` endpoint — not hardcoded text.
   distinct players can't currently be tested inside the same live
   browser pass; multiplayer/shared-world state generally remains
   unbuilt (see above).
+
+## The design system, the CSS half only (25 Sep 2026)
+
+VDP and VENVS used to be the only two frontends outside
+`vaco-design.css` — both predate it and build as their own Vite apps,
+recorded as real, unscoped work in `dev-docs/VACO_CONSTELLATIONS.md`.
+This closes VDP's half of that.
+
+**Scoped to `App.jsx`'s own top-level chrome** — the masthead, the
+exit link home, the session/wallet card, the login button, the error
+notice — real JSX rewritten onto `vaco-design.css`'s own classes
+(`.vaco-masthead`, `.vaco-brand`, `.vaco-wallet`, `.vaco-card`,
+`.vaco-btn`, `.vaco-notice`, …), now added to `sync-design-system.sh`'s
+`TARGETS` so it can't drift. **Not touched: `WorldView` or any of the
+25 district view components** (`CombatSportsView`, `VacayView`,
+`VultureFlixView`, and so on, 3500+ lines total) — each is its own
+bespoke game/commerce surface, and forcing a card-and-table admin
+design system onto a walkable-world canvas would be fighting the
+medium the same way `vaco-ui.js`'s tab/masthead runtime would fight
+React for the DOM (see below). The honest scope here is "the chrome
+around the game looks like every other app," not "the game looks like
+a form."
+
+**`vaco-ui.js` itself is not used, and that is a real, load-bearing
+decision, not an oversight.** Every server-rendered app in the
+register gets its masthead from that runtime calling
+`document.getElementById(...).appendChild(...)` directly. VDP is
+React, which also wants to own the DOM — importing that script would
+mean two systems fighting over the same nodes. So `App.jsx` hand-
+builds the same masthead markup as real JSX instead: same classes,
+same contract, React's own rendering rather than a second one layered
+on top.
+
+**A real bug found and fixed in the process, worth recording because
+it would silently recur for the next app that tries this shortcut:**
+setting `--vaco-accent` in a `<style>:root{...}</style>` block does
+not reliably win. `vaco-design.css`'s own
+`@media (prefers-color-scheme: light) { :root:not([data-vaco-theme=
+"dark"]) { --vaco-accent: ... } }` has higher CSS specificity than a
+plain `:root {}` rule — the `:not([attr])` inside it counts — so on
+any browser or OS defaulting to light mode, that rule silently
+overrode VDP's own colour with the shared default teal, confirmed live
+in a headless Chromium pass before the fix. Every other app avoids
+this because `root.style.setProperty(...)` is an *inline* style, which
+beats any stylesheet selector regardless of specificity. `index.html`
+now sets the four accent tokens as an inline `style=""` attribute on
+`<html>` for the same reason — verified after the fix, under both
+light and dark `prefers-color-scheme` emulation, that VDP's own teal
+(`#4fa8a0`) held in both.

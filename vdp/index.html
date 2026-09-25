@@ -1,11 +1,35 @@
 <!doctype html>
-<html lang="en">
+<!--
+  VDP's own colour, per the design system's documented consumption
+  pattern (vaco-design.css's own header comment: "the per-app layer
+  owns COLOR — and only color"). Set as an INLINE style attribute
+  here, not a <style> block — found live: vaco-design.css's own
+  `@media (prefers-color-scheme: light) { :root:not([data-vaco-theme
+  ="dark"]) { --vaco-accent: ... } }` has higher specificity than a
+  plain `:root {}` rule (the `:not([attr])` inside it counts), so on
+  any browser or OS defaulting to light mode that rule silently won
+  over a <style>-block override and VDP rendered the shared default
+  teal instead of its own. `vaco-ui.js` never hits this because
+  `root.style.setProperty(...)` is an inline style, which beats every
+  selector in a stylesheet regardless of specificity — this does the
+  same thing by hand, since VDP doesn't load that runtime (see below).
+-->
+<html lang="en" style="--vaco-accent: #4fa8a0; --vaco-accent-soft: #4fa8a026; --vaco-accent-dim: #3a7d76; --vaco-accent-ink: #061715;">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>VDP</title>
+    <!--
+      `vaco-ui.js` manipulates the DOM directly
+      (`document.getElementById(...).appendChild(...)`) and would
+      fight React for ownership of it, so VDP takes the CSS half of
+      the design system only, not the JS half — see App.jsx's own
+      masthead for the hand-built equivalent of what that runtime
+      would otherwise render.
+    -->
+    <link rel="stylesheet" href="/vaco-design.css" />
   </head>
-  <body>
+  <body class="vaco">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
