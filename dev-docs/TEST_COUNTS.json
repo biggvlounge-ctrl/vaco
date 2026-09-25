@@ -1,6 +1,6 @@
 {
-  "total": 2844,
-  "passed": 2795,
+  "total": 2860,
+  "passed": 2811,
   "failed": 0,
   "skipped": 49,
   "suites": 41,
@@ -36,8 +36,8 @@
       "skipped": 0
     },
     "hvntz": {
-      "tests": 50,
-      "pass": 50,
+      "tests": 66,
+      "pass": 66,
       "fail": 0,
       "skipped": 0
     },
