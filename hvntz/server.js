@@ -52,7 +52,7 @@ const {
 } = require('./lib/networkConnections');
 const {
   SPLIT_TYPES, AGREEMENT_STATUSES, findRevenueShareAgreement, createRevenueShareAgreement,
-  archiveRevenueShareAgreement, distributeRevenue, distributionsForNetwork, agreementsForNetwork,
+  archiveRevenueShareAgreement, distributeRevenue, distributionsForNetwork, agreementsForNetwork, agreementView,
 } = require('./lib/revenueShareAgreements');
 const { networkGrowthAnalytics } = require('./lib/networkAnalytics');
 
@@ -904,9 +904,9 @@ app.post('/api/networks/:id/revenue-share-agreements', requireNetworkBusinessOwn
 });
 
 app.get('/api/revenue-share-agreements/:id', (req, res) => {
-  const agreement = findRevenueShareAgreement(store, Number(req.params.id));
-  if (!agreement) return res.status(404).json({ error: `no revenue-share agreement with id ${req.params.id}` });
-  res.json(agreement);
+  const view = agreementView(store, Number(req.params.id));
+  if (!view) return res.status(404).json({ error: `no revenue-share agreement with id ${req.params.id}` });
+  res.json(view);
 });
 
 app.get('/api/networks/:id/revenue-share-agreements', (req, res) => {

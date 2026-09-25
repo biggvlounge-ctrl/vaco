@@ -27,12 +27,16 @@
 // percentages, fixed amounts, tiered percentages, performance bonuses,
 // event-specific splits, Hunt-specific splits, creator-specific
 // splits, sponsor-funded rewards, time-limited agreements). This
-// builds the first two — `percentage` and `fixed-amount` — the two
-// concrete shapes §17's own worked example actually uses. The other
-// seven are each their own undertaking with no substrate to extend,
-// same as every other gap this session's audits have found — not a
-// silent scope-narrowing, an explicit one (see `NOT_BUILT` below and
-// the app's own README).
+// builds `percentage` and `fixed-amount` — the two concrete shapes
+// §17's own worked example actually uses — plus time-limited
+// agreements (an optional `expiresAt`; `distributeRevenue` refuses to
+// distribute through an expired one, the same "computed live, never
+// trusted from a cached field" discipline VASH TAP's
+// `currentAssignmentFor` and VAGO's `isGroupWagerLocked` already
+// hold). The remaining six are each their own undertaking with no
+// substrate to extend, same as every other gap this session's audits
+// have found — not a silent scope-narrowing, an explicit one (see the
+// app's own README).
 //
 // **An Agreement belongs to a Network, not a floating global config**
 // — §17's own worked example is literally "A business can establish:
@@ -59,7 +63,7 @@ function round2(n) {
 
 function createRevenueShareAgreement(store, options = {}) {
   const {
-    networkId, name, splitType, shares, now = Date.now(),
+    networkId, name, splitType, shares, expiresAt = null, now = Date.now(),
   } = options;
 
   const network = findNetwork(store, networkId);
@@ -84,6 +88,11 @@ function createRevenueShareAgreement(store, options = {}) {
       throw new Error(`createRevenueShareAgreement: percentage shares must sum to exactly 100 (got ${totalPercent})`);
     }
   }
+  if (expiresAt !== null) {
+    if (!Number.isFinite(expiresAt) || expiresAt <= now) {
+      throw new Error('createRevenueShareAgreement: expiresAt must be a timestamp in the future');
+    }
+  }
 
   const agreement = {
     id: store.nextRevenueShareAgreementId++,
@@ -92,10 +101,19 @@ function createRevenueShareAgreement(store, options = {}) {
     splitType,
     shares: shares.map((s) => ({ role: s.role, payeeId: s.payeeId, value: s.value })),
     status: 'active',
+    expiresAt,
     createdAt: now,
   };
   store.revenueShareAgreements.push(agreement);
   return agreement;
+}
+
+// §17's "time-limited agreements" — computed live from `expiresAt`
+// rather than a stored flag that a background job would need to flip,
+// same discipline VASH TAP's `currentAssignmentFor` and VAGO's
+// `isGroupWagerLocked` already hold for their own time boundaries.
+function isAgreementExpired(agreement, now = Date.now()) {
+  return agreement.expiresAt !== null && now >= agreement.expiresAt;
 }
 
 function archiveRevenueShareAgreement(store, options = {}) {
@@ -156,6 +174,9 @@ async function distributeRevenue(store, options = {}) {
   if (agreement.status !== 'active') {
     throw new Error(`distributeRevenue: agreement ${agreementId} is not active (status=${agreement.status})`);
   }
+  if (isAgreementExpired(agreement, now)) {
+    throw new Error(`distributeRevenue: agreement ${agreementId} expired at ${new Date(agreement.expiresAt).toISOString()}`);
+  }
   if (!payerId) throw new Error('distributeRevenue requires a payerId');
   if (typeof settleFn !== 'function') throw new Error('distributeRevenue requires settleFn(legs, meta)');
 
@@ -196,14 +217,27 @@ function agreementsForNetwork(store, networkId) {
   return store.revenueShareAgreements.filter((a) => a.networkId === networkId);
 }
 
+// A read view exposing the live-computed `expired` state alongside the
+// stored record, so a caller never has to re-derive `isAgreementExpired`
+// itself — the same "view carries the computed state" shape
+// `networkView`/`groupWagerView` already use elsewhere in this session.
+function agreementView(store, agreementId, options = {}) {
+  const { now = Date.now() } = options;
+  const agreement = findRevenueShareAgreement(store, agreementId);
+  if (!agreement) return null;
+  return { ...agreement, expired: isAgreementExpired(agreement, now) };
+}
+
 module.exports = {
   SPLIT_TYPES,
   AGREEMENT_STATUSES,
   findRevenueShareAgreement,
   createRevenueShareAgreement,
   archiveRevenueShareAgreement,
+  isAgreementExpired,
   computeSplit,
   distributeRevenue,
   distributionsForNetwork,
   agreementsForNetwork,
+  agreementView,
 };

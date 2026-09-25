@@ -15,7 +15,7 @@ const { createHvntzStore, registerBusiness } = require('../lib/revenueStack');
 const { createNetwork } = require('../lib/networkConnections');
 const {
   SPLIT_TYPES, findRevenueShareAgreement, createRevenueShareAgreement, archiveRevenueShareAgreement,
-  computeSplit, distributeRevenue, distributionsForNetwork, agreementsForNetwork,
+  isAgreementExpired, computeSplit, distributeRevenue, distributionsForNetwork, agreementsForNetwork, agreementView,
 } = require('../lib/revenueShareAgreements');
 
 function recorder() {
@@ -187,6 +187,79 @@ test('distributeRevenue records real §16 attribution when sourceType/sourceId a
   });
   assert.strictEqual(distribution.sourceType, 'hunt');
   assert.strictEqual(distribution.sourceId, 7);
+});
+
+// -- time-limited agreements (§17's own "time-limited agreements" shape) --------
+
+test('createRevenueShareAgreement refuses an expiresAt that is not in the future', async () => {
+  const store = createHvntzStore();
+  const { network } = hubNetwork(store);
+  const past = Date.now() - 1000;
+  assert.throws(
+    () => createRevenueShareAgreement(store, {
+      networkId: network.id, name: 'Split', splitType: 'percentage', shares: workedExampleShares(), expiresAt: past,
+    }),
+    /expiresAt must be a timestamp in the future/,
+  );
+});
+
+test('isAgreementExpired is computed live, never a stored flag — a background job never flips it', async () => {
+  const store = createHvntzStore();
+  const { network } = hubNetwork(store);
+  const agreement = createRevenueShareAgreement(store, {
+    networkId: network.id, name: 'Split', splitType: 'percentage', shares: workedExampleShares(), expiresAt: Date.now() + 50,
+  });
+  assert.strictEqual(isAgreementExpired(agreement), false);
+  assert.strictEqual(isAgreementExpired(agreement, agreement.expiresAt + 1), true, 'computed against a later "now" without any write to the record');
+});
+
+test('an agreement with no expiresAt is never expired', async () => {
+  const store = createHvntzStore();
+  const { network } = hubNetwork(store);
+  const agreement = createRevenueShareAgreement(store, {
+    networkId: network.id, name: 'Split', splitType: 'percentage', shares: workedExampleShares(),
+  });
+  assert.strictEqual(isAgreementExpired(agreement, Date.now() + 1000 * 60 * 60 * 24 * 365), false);
+});
+
+test('distributeRevenue refuses to distribute through an expired agreement', async () => {
+  const store = createHvntzStore();
+  const { network } = hubNetwork(store);
+  const agreement = createRevenueShareAgreement(store, {
+    networkId: network.id, name: 'Split', splitType: 'percentage', shares: workedExampleShares(), expiresAt: Date.now() + 50,
+  });
+  await new Promise((r) => setTimeout(r, 60));
+  await assert.rejects(
+    distributeRevenue(store, { agreementId: agreement.id, totalAmount: 100, payerId: 'owner-1', settleFn: recorder() }),
+    /expired at/,
+  );
+});
+
+test('distributeRevenue still succeeds right up until expiry', async () => {
+  const store = createHvntzStore();
+  const { network } = hubNetwork(store);
+  const agreement = createRevenueShareAgreement(store, {
+    networkId: network.id, name: 'Split', splitType: 'percentage', shares: workedExampleShares(), expiresAt: Date.now() + 60 * 60 * 1000,
+  });
+  const distribution = await distributeRevenue(store, { agreementId: agreement.id, totalAmount: 100, payerId: 'owner-1', settleFn: recorder() });
+  assert.ok(distribution.id);
+});
+
+test('agreementView exposes the live-computed expired state alongside the stored record', async () => {
+  const store = createHvntzStore();
+  const { network } = hubNetwork(store);
+  const agreement = createRevenueShareAgreement(store, {
+    networkId: network.id, name: 'Split', splitType: 'percentage', shares: workedExampleShares(), expiresAt: Date.now() + 50,
+  });
+  let view = agreementView(store, agreement.id);
+  assert.strictEqual(view.expired, false);
+  view = agreementView(store, agreement.id, { now: agreement.expiresAt + 1 });
+  assert.strictEqual(view.expired, true, 'a view computed past expiresAt reports expired without any stored mutation');
+});
+
+test('agreementView returns null for an unknown id, rather than throwing', () => {
+  const store = createHvntzStore();
+  assert.strictEqual(agreementView(store, 999999), null);
 });
 
 // -- archiveRevenueShareAgreement, and read views --------------------------------
