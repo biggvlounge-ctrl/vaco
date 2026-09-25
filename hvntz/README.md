@@ -165,10 +165,20 @@ curl http://localhost:8792/api/franchise-list/1
   both before check-in (§11's "LIVE NETWORK... select an available
   stream," a public read) and folded into `checkInAtCheckpoint`'s own
   response after it (§14's "You're now at a Network location") — the
-  same real data both times, not two separate views. Deliberately does
-  NOT include an 8-camera session/screen layer, a revenue-sharing
-  engine, or any role beyond hub-owner vs. invited member — the audit
-  found no substrate for any of those anywhere in the repo.
+  same real data both times, not two separate views. **§3/§39, the
+  8-camera/screen session layer**: `linkNetworkScreenSession`/
+  `unlinkNetworkScreenSession` reference a real Vault Studios
+  `'viewer'` screen session (`vavlt-stvdios/lib/screenSessions.js`'s
+  own `MAX_SCREENS = 8`, already exactly §2's worked example — up to 8
+  channels from unrelated owners). A link, not a creation: that
+  route's own `POST /api/screen-sessions` is `requireActor('ownerId')`
+  with no service-credential path, so HVNTZ cannot open one on a
+  business's behalf server-to-server — the business creates the real
+  session directly in Vault Studios, then links its id here, verified
+  as a real `'viewer'` session owned by this Network's own business
+  owner. Deliberately does NOT include any role beyond hub-owner vs.
+  invited member — the audit found no substrate for one anywhere in
+  the repo.
 - `lib/revenueShareAgreements.js` — Connected Network Revenue Sharing,
   §15-18: the single largest confirmed gap in the whole repo per the
   §40 audit — every real settlement mechanism anywhere in this
@@ -332,22 +342,25 @@ exist elsewhere in this session yet (`venvs`'s CHOPZ Digital Twin
 system).
 
 **Connected Network Layer — Phases 1-3, Phase 4's core revenue engine,
-and six of §18's thirteen analytics metrics, see
-`lib/networkConnections.js`, `lib/hunts.js`,
+six of §18's thirteen analytics metrics, and a §3/§39 screen-session
+link, see `lib/networkConnections.js`, `lib/hunts.js`,
 `lib/revenueShareAgreements.js` and `lib/networkAnalytics.js`.** A
 Node's own accept/decline, its one-person-one-Channel Vault Studios
 stream reference, a checkpoint's connection to its own business's
 Network, a configurable percentage/fixed-amount revenue-sharing
 Agreement — including §17's own "time-limited agreements" shape
-(`expiresAt`, computed-live `isAgreementExpired`) — and a real
+(`expiresAt`, computed-live `isAgreementExpired`) — a real
 growth-analytics rollup (network size, active nodes/creators/streams,
-Hunt participation, revenue distributed and attributed per payee) are
-all real. Not yet built, per its own §40 audit finding no substrate
-for any of it anywhere in the repo: the 8-camera/screen *session*
-layer (a Network grouping several Nodes' streams together the way
-`vavlt-stvdios/lib/screenSessions.js`'s `MAX_SCREENS = 8` groups
-Channels, still Phase 2 but a separate step from a single Node's own
-stream reference); six of §17's remaining named split shapes (tiered
+Hunt participation, revenue distributed and attributed per payee), and
+a Network's own link to a real Vault Studios `'viewer'` screen session
+(up to 8 channels from its Nodes' unrelated owners) are all real. Not
+yet built, per its own §40 audit finding no substrate for any of it
+anywhere in the repo: HVNTZ *creating or actively composing* that
+screen session on a business's behalf (Vault Studios' own
+`POST /api/screen-sessions` requires the real owner's own session, no
+service-credential path — a business creates it directly in Vault
+Studios today; only linking an existing one is built here); six of
+§17's remaining named split shapes (tiered
 percentages, performance bonuses, event/Hunt/creator-specific split
 overrides, sponsor-funded rewards — `percentage`, `fixed-amount` and
 time-limited are built); §18's other seven named metrics (viewers,

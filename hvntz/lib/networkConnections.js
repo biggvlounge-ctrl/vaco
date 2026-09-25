@@ -35,6 +35,20 @@
 // `linkVavltChannel` also verifies the channel's `ownerId` matches the
 // node's own `identityId`, so a Node can only carry a stream the same
 // real person actually owns.
+//
+// **§3/§39, the 8-camera/screen session layer — a link, not a
+// creation.** `vavlt-stvdios/lib/screenSessions.js` already extends
+// `MAX_SCREENS = 8` into exactly the shape §2's own worked example
+// wants — a `'viewer'` session freely combining up to 8 channels from
+// unrelated owners (a DJ's, a bartender's, a host's — each a
+// different real person). But its own `POST /api/screen-sessions` is
+// `requireActor('ownerId')`, a real Shield session with no service-
+// credential path, so HVNTZ cannot create one on a business's behalf
+// server-to-server. `linkNetworkScreenSession` follows the same
+// verify-and-reference shape as `linkVavltChannel` instead: the
+// business creates the real `'viewer'` session directly in Vault
+// Studios, then links its id here — never a second grouping model,
+// never a copy of the session's own channel list.
 
 'use strict';
 
@@ -66,6 +80,7 @@ function createNetwork(store, options = {}) {
     hubBusinessId: business.id,
     name,
     status: 'active',
+    screenSessionId: null,
     createdAt: now,
   };
   store.networks.push(network);
@@ -173,6 +188,45 @@ function unlinkVavltChannel(store, options = {}) {
   return node;
 }
 
+// §3/§39: verifies the real Vault Studios `'viewer'` screen session
+// is owned by this Network's own Hub business owner — the same
+// ownership-match discipline `linkVavltChannel` already holds for a
+// Node's own channel, applied at the business level instead. A
+// `'broadcaster'` session is refused outright: Vault Studios' own
+// validation would never let one include channels from more than one
+// owner in the first place, so a Network (whose Nodes are always
+// independently owned) can only ever compose a `'viewer'` session.
+async function linkNetworkScreenSession(store, options = {}) {
+  const { networkId, screenSessionId, sessionFetchFn, now = Date.now() } = options;
+  const network = findNetwork(store, networkId);
+  if (!network) throw new Error(`linkNetworkScreenSession: no network ${networkId}`);
+  if (!screenSessionId) throw new Error('linkNetworkScreenSession requires a screenSessionId');
+  if (typeof sessionFetchFn !== 'function') {
+    throw new Error('linkNetworkScreenSession requires sessionFetchFn(screenSessionId)');
+  }
+  const business = getBusiness(store, network.hubBusinessId);
+
+  const session = await sessionFetchFn(screenSessionId);
+  if (!session) throw new Error(`linkNetworkScreenSession: no Vault Studios screen session with id ${screenSessionId}`);
+  if (session.sessionType !== 'viewer') {
+    throw new Error(`linkNetworkScreenSession: screen session ${screenSessionId} must be a 'viewer' session (got '${session.sessionType}')`);
+  }
+  if (String(session.ownerId) !== String(business.ownerId)) {
+    throw new Error(`linkNetworkScreenSession: screen session ${screenSessionId} is not owned by this network's own business owner`);
+  }
+  network.screenSessionId = screenSessionId;
+  network.screenSessionLinkedAt = now;
+  return network;
+}
+
+function unlinkNetworkScreenSession(store, options = {}) {
+  const { networkId } = options;
+  const network = findNetwork(store, networkId);
+  if (!network) throw new Error(`unlinkNetworkScreenSession: no network ${networkId}`);
+  network.screenSessionId = null;
+  return network;
+}
+
 function nodesForNetwork(store, networkId) {
   return store.networkNodes.filter((n) => n.networkId === networkId);
 }
@@ -211,6 +265,8 @@ module.exports = {
   removeNode,
   linkVavltChannel,
   unlinkVavltChannel,
+  linkNetworkScreenSession,
+  unlinkNetworkScreenSession,
   nodesForNetwork,
   nodesForIdentity,
   networkView,

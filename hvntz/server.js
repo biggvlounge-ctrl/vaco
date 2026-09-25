@@ -48,6 +48,7 @@ const { getScreenAnalytics } = require('./lib/screenAnalytics');
 const {
   NETWORK_NODE_STATUSES, findNetwork, findNode, createNetwork, inviteNode,
   respondToInvitation, removeNode, linkVavltChannel, unlinkVavltChannel,
+  linkNetworkScreenSession, unlinkNetworkScreenSession,
   nodesForIdentity, networkView, networksForBusiness,
 } = require('./lib/networkConnections');
 const {
@@ -253,6 +254,32 @@ async function resolveVavltChannel(channelId, res) {
     return undefined;
   }
   return channel;
+}
+
+// §3/§39 — the same verify-the-real-thing pattern as
+// `fetchVavltChannel` above, one level up (a screen session rather
+// than a single channel).
+async function fetchVavltScreenSession(screenSessionId) {
+  const res = await fetch(`${VAVLT_STVDIOS_API_URL}/api/screen-sessions/${screenSessionId}`);
+  if (res.status === 404) return null;
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error || `fetchVavltScreenSession failed (${res.status})`);
+  return body;
+}
+
+async function resolveVavltScreenSession(screenSessionId, res) {
+  let session;
+  try {
+    session = await fetchVavltScreenSession(screenSessionId);
+  } catch (err) {
+    res.status(502).json({ error: `Vavlt Stvdios unreachable (${err.message})` });
+    return undefined;
+  }
+  if (!session) {
+    res.status(404).json({ error: `no Vavlt Stvdios screen session with id ${screenSessionId}` });
+    return undefined;
+  }
+  return session;
 }
 
 const {
@@ -952,6 +979,51 @@ app.get('/api/networks/:id/growth-analytics', requireNetworkBusinessOwner(), (re
   } catch (err) {
     res.status(404).json({ error: err.message });
   }
+});
+
+// -- §3/§39, the 8-camera/screen session layer ----------------------------
+//
+// See lib/networkConnections.js's own header for why this links an
+// already-created Vault Studios 'viewer' screen session rather than
+// creating one on the business's behalf.
+app.post('/api/networks/:id/screen-session', requireNetworkBusinessOwner(), async (req, res) => {
+  const { screenSessionId } = req.body || {};
+  if (screenSessionId === undefined || screenSessionId === null) {
+    return res.status(400).json({ error: 'this route requires a screenSessionId' });
+  }
+  const session = await resolveVavltScreenSession(screenSessionId, res);
+  if (session === undefined) return undefined;
+  try {
+    const network = await linkNetworkScreenSession(store, {
+      networkId: Number(req.params.id),
+      screenSessionId,
+      sessionFetchFn: async () => session,
+    });
+    return res.json(network);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/networks/:id/screen-session/unlink', requireNetworkBusinessOwner(), (req, res) => {
+  try {
+    res.json(unlinkNetworkScreenSession(store, { networkId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// The live composed read — real channels behind each screen, not just
+// the bare id — public, same visibility as a Network's own read
+// (`GET /api/networks/:id`), since §11/§14 already expose a
+// checkpoint's live Network reads with no session required.
+app.get('/api/networks/:id/screen-session', async (req, res) => {
+  const network = findNetwork(store, Number(req.params.id));
+  if (!network) return res.status(404).json({ error: `no network with id ${req.params.id}` });
+  if (!network.screenSessionId) return res.json({ screenSession: null });
+  const session = await resolveVavltScreenSession(network.screenSessionId, res);
+  if (session === undefined) return undefined;
+  return res.json({ screenSession: session });
 });
 
 async function start() {

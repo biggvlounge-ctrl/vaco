@@ -16,6 +16,7 @@ const { createHvntzStore, registerBusiness } = require('../lib/revenueStack');
 const {
   NETWORK_NODE_STATUSES, findNetwork, findNode, createNetwork, inviteNode,
   respondToInvitation, removeNode, linkVavltChannel, unlinkVavltChannel,
+  linkNetworkScreenSession, unlinkNetworkScreenSession,
   nodesForIdentity, networkView, networksForBusiness,
 } = require('../lib/networkConnections');
 
@@ -33,6 +34,16 @@ const fakeIdentityFetchFn = async (_subjectType, subjectId) => (
 const fakeChannelFetchFn = async (channelId) => {
   if (channelId === 501) return { id: 501, ownerId: 'dj-marcus', name: 'DJ Marcus Live', streamUrl: 'https://stream.example/marcus' };
   if (channelId === 502) return { id: 502, ownerId: 'someone-else', name: 'Not Marcus', streamUrl: 'https://stream.example/other' };
+  return null;
+};
+
+// Session 701 is a real 'viewer' session owned by 'owner-1' -- the
+// same ownerId `hubBusiness` below registers the Hub business under,
+// so the ownership-match check has a real match to test against.
+const fakeSessionFetchFn = async (screenSessionId) => {
+  if (screenSessionId === 701) return { id: 701, sessionType: 'viewer', ownerId: 'owner-1', channelIds: [501, 502] };
+  if (screenSessionId === 702) return { id: 702, sessionType: 'broadcaster', ownerId: 'owner-1', channelIds: [501] };
+  if (screenSessionId === 703) return { id: 703, sessionType: 'viewer', ownerId: 'someone-else', channelIds: [501] };
   return null;
 };
 
@@ -238,6 +249,57 @@ test('unlinkVavltChannel clears the reference', async () => {
   await linkVavltChannel(store, { nodeId: node.id, vavltChannelId: 501, channelFetchFn: fakeChannelFetchFn });
   const unlinked = unlinkVavltChannel(store, { nodeId: node.id });
   assert.strictEqual(unlinked.vavltChannelId, null);
+});
+
+// -- linkNetworkScreenSession / unlinkNetworkScreenSession (§3/§39) -----------
+
+test('linkNetworkScreenSession verifies the session is real rather than trusting the id', async () => {
+  const store = createHvntzStore();
+  const hub = hubBusiness(store);
+  const network = createNetwork(store, { hubBusinessId: hub.id, name: 'Net' });
+  await assert.rejects(
+    linkNetworkScreenSession(store, { networkId: network.id, screenSessionId: 404, sessionFetchFn: fakeSessionFetchFn }),
+    /no Vault Studios screen session with id 404/,
+  );
+  assert.strictEqual(network.screenSessionId, null);
+});
+
+test('linkNetworkScreenSession refuses a broadcaster session — a Network can only ever compose a viewer session', async () => {
+  const store = createHvntzStore();
+  const hub = hubBusiness(store);
+  const network = createNetwork(store, { hubBusinessId: hub.id, name: 'Net' });
+  await assert.rejects(
+    linkNetworkScreenSession(store, { networkId: network.id, screenSessionId: 702, sessionFetchFn: fakeSessionFetchFn }),
+    /must be a 'viewer' session \(got 'broadcaster'\)/,
+  );
+});
+
+test('linkNetworkScreenSession refuses a session not owned by this network\'s own business owner', async () => {
+  const store = createHvntzStore();
+  const hub = hubBusiness(store);
+  const network = createNetwork(store, { hubBusinessId: hub.id, name: 'Net' });
+  await assert.rejects(
+    linkNetworkScreenSession(store, { networkId: network.id, screenSessionId: 703, sessionFetchFn: fakeSessionFetchFn }),
+    /is not owned by this network's own business owner/,
+  );
+});
+
+test('linkNetworkScreenSession references the real session by id, without duplicating its channelIds', async () => {
+  const store = createHvntzStore();
+  const hub = hubBusiness(store);
+  const network = createNetwork(store, { hubBusinessId: hub.id, name: 'Net' });
+  const linked = await linkNetworkScreenSession(store, { networkId: network.id, screenSessionId: 701, sessionFetchFn: fakeSessionFetchFn });
+  assert.strictEqual(linked.screenSessionId, 701);
+  assert.strictEqual(Object.keys(linked).includes('channelIds'), false, 'a Network must not absorb the session\'s own channel list');
+});
+
+test('unlinkNetworkScreenSession clears the reference', async () => {
+  const store = createHvntzStore();
+  const hub = hubBusiness(store);
+  const network = createNetwork(store, { hubBusinessId: hub.id, name: 'Net' });
+  await linkNetworkScreenSession(store, { networkId: network.id, screenSessionId: 701, sessionFetchFn: fakeSessionFetchFn });
+  const unlinked = unlinkNetworkScreenSession(store, { networkId: network.id });
+  assert.strictEqual(unlinked.screenSessionId, null);
 });
 
 // -- views ---------------------------------------------------------------------
