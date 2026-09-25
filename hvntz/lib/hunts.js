@@ -19,9 +19,19 @@
 // both funded from the same real sponsor budget, matching the doc's
 // framing of hunt participation as a genuine revenue stream for the
 // host, not just a bounty system for hunters.
+//
+// **HVNTZ Connected Network, Phase 3 (§11/§14).** A checkpoint's
+// `networkId` connects it to its own host business's real Network
+// (`lib/networkConnections.js`) — never a second join entity, never
+// another business's Network. `checkpointLiveNetwork` surfaces that
+// Network's live nodes/streams both before check-in (§11's "LIVE
+// NETWORK... select an available stream") and after it (§14's "You're
+// now at a Network location", folded into `checkInAtCheckpoint`'s own
+// return value) — the same real data both times, not two views.
 
 const { getBusiness, getLocation, recordRevenueEvent } = require('./revenueStack');
 const { haversineDistanceKm } = require('./neighborProgram');
+const { findNetwork, networkView } = require('./networkConnections');
 
 const HUNT_INTENSITY_LEVELS = ['leisurely', 'moderate', 'action-based'];
 
@@ -59,8 +69,27 @@ function getHunt(store, huntId) {
   return store.hunts.find((h) => h.id === huntId) || null;
 }
 
+// §41's own instruction: "First inspect the current... database
+// architecture... First inspect the current Prisma/database
+// architecture. Reuse existing." A checkpoint's Network is not a new
+// join entity — a checkpoint already carries the `businessId` it's
+// hosted by, and §14's own worked example only ever connects a
+// checkpoint to *its own host business's* Network, never another
+// business's. `networkId` on a checkpoint enforces exactly that.
+function resolveCheckpointNetworkId(store, networkId, businessId) {
+  if (networkId === null || networkId === undefined) return null;
+  const network = findNetwork(store, networkId);
+  if (!network) throw new Error(`no network with id ${networkId}`);
+  if (network.hubBusinessId !== businessId) {
+    throw new Error(`network ${networkId} does not belong to this checkpoint's own business (${businessId})`);
+  }
+  return networkId;
+}
+
 function addCheckpoint(store, options = {}) {
-  const { huntId, businessId, locationId, bountyAmount, hostFee, clue, lat = null, lng = null } = options;
+  const {
+    huntId, businessId, locationId, bountyAmount, hostFee, clue, lat = null, lng = null, networkId = null,
+  } = options;
   const hunt = getHunt(store, huntId);
   if (!hunt) {
     throw new Error(`addCheckpoint: no hunt with id ${huntId}`);
@@ -80,6 +109,12 @@ function addCheckpoint(store, options = {}) {
   if (!clue) {
     throw new Error('addCheckpoint requires a clue');
   }
+  let resolvedNetworkId;
+  try {
+    resolvedNetworkId = resolveCheckpointNetworkId(store, networkId, businessId);
+  } catch (err) {
+    throw new Error(`addCheckpoint: ${err.message}`);
+  }
 
   const checkpoint = {
     id: hunt.nextCheckpointId++,
@@ -91,6 +126,7 @@ function addCheckpoint(store, options = {}) {
     clue,
     lat,
     lng,
+    networkId: resolvedNetworkId,
   };
   hunt.checkpoints.push(checkpoint);
   return checkpoint;
@@ -98,6 +134,49 @@ function addCheckpoint(store, options = {}) {
 
 function getCheckpoint(hunt, checkpointId) {
   return hunt.checkpoints.find((c) => c.id === checkpointId) || null;
+}
+
+// §41's Hunt Builder addition ("NETWORK — Select Network") as an
+// editable field, not creation-only — a checkpoint is often built
+// before its host business has a Network yet.
+function linkCheckpointNetwork(store, options = {}) {
+  const { huntId, checkpointId, networkId } = options;
+  const hunt = getHunt(store, huntId);
+  if (!hunt) throw new Error(`linkCheckpointNetwork: no hunt with id ${huntId}`);
+  const checkpoint = getCheckpoint(hunt, checkpointId);
+  if (!checkpoint) throw new Error(`linkCheckpointNetwork: no checkpoint ${checkpointId} on hunt ${huntId}`);
+  if (!networkId) throw new Error('linkCheckpointNetwork requires a networkId');
+  try {
+    checkpoint.networkId = resolveCheckpointNetworkId(store, networkId, checkpoint.businessId);
+  } catch (err) {
+    throw new Error(`linkCheckpointNetwork: ${err.message}`);
+  }
+  return checkpoint;
+}
+
+function unlinkCheckpointNetwork(store, options = {}) {
+  const { huntId, checkpointId } = options;
+  const hunt = getHunt(store, huntId);
+  if (!hunt) throw new Error(`unlinkCheckpointNetwork: no hunt with id ${huntId}`);
+  const checkpoint = getCheckpoint(hunt, checkpointId);
+  if (!checkpoint) throw new Error(`unlinkCheckpointNetwork: no checkpoint ${checkpointId} on hunt ${huntId}`);
+  checkpoint.networkId = null;
+  return checkpoint;
+}
+
+// §11 ("LIVE NETWORK... a user can select an available stream") and
+// §14 ("You're now at a Network location") are the same real data —
+// a checkpoint's connected Network's live nodes, each an optional
+// real Vault Studios stream reference — surfaced both BEFORE check-in
+// (this function, standalone) and immediately AFTER it (folded into
+// `checkInAtCheckpoint`'s own return value below). Returns null, not
+// an error, for a checkpoint with no connected Network — that is the
+// ordinary case, not a failure.
+function checkpointLiveNetwork(store, hunt, checkpointId) {
+  const checkpoint = getCheckpoint(hunt, checkpointId);
+  if (!checkpoint) throw new Error(`checkpointLiveNetwork: no checkpoint ${checkpointId} on hunt ${hunt.id}`);
+  if (!checkpoint.networkId) return null;
+  return networkView(store, checkpoint.networkId);
 }
 
 function hasCheckedIn(hunt, checkpointId, userId) {
@@ -180,7 +259,16 @@ async function checkInAtCheckpoint(store, options = {}) {
   }
 
   return {
-    checkpoint, bountyPaid: checkpoint.bountyAmount, hostFeeEvent: revenueEvent, remainingBudget: hunt.remainingBudget, vavltStvdiosPost,
+    checkpoint,
+    bountyPaid: checkpoint.bountyAmount,
+    hostFeeEvent: revenueEvent,
+    remainingBudget: hunt.remainingBudget,
+    vavltStvdiosPost,
+    // §14's own worked example, literally: "They complete the
+    // checkpoint. The Hunt can show: You're now at a Network
+    // location." Same real data `checkpointLiveNetwork` exposes
+    // pre-check-in for §11 — not a second, separate view.
+    liveNetwork: checkpointLiveNetwork(store, hunt, checkpointId),
   };
 }
 
@@ -245,6 +333,9 @@ module.exports = {
   getHunt,
   addCheckpoint,
   getCheckpoint,
+  linkCheckpointNetwork,
+  unlinkCheckpointNetwork,
+  checkpointLiveNetwork,
   hasCheckedIn,
   checkInAtCheckpoint,
   getHuntProgress,

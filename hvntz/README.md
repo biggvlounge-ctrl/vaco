@@ -136,9 +136,11 @@ curl http://localhost:8792/api/franchise-list/1
   and ad-submission activity, scoped to its `screen`-type locations —
   total revenue, revenue by event type, distinct advertiser count, and
   ad submissions by status.
-- `lib/networkConnections.js` — Connected Network Layer, Phase 1 + 2
-  (see `dev-docs/on-deck/HVNTZ_CONNECTED_NETWORK_FREEZE.md`, scoped by
-  its own §40 audit): a Network Hub is a real HVNTZ business, never a
+- `lib/networkConnections.js` (+ `lib/hunts.js` for Phase 3) — Connected
+  Network Layer, Phases 1-3 of `HVNTZ_CONNECTED_NETWORK_FREEZE.md`'s
+  own §47 numbering (distinct from this section's other "Phase N"
+  labels, which are the earlier Revenue Stack doc's own numbering —
+  scoped by its own §40 audit): a Network Hub is a real HVNTZ business, never a
   second business model — `createNetwork` verifies it against the same
   store `registerBusiness` writes to. `inviteNode` is §19's node
   invitation, VACA-deduped through a real
@@ -155,10 +157,18 @@ curl http://localhost:8792/api/franchise-list/1
   one real Channel per person, not per business), verified real and
   owner-matched before linking, never duplicated. Only that node's own
   identity may link or unlink it — the business does not assign
-  someone else's stream. Deliberately does NOT include an 8-camera
-  session/screen layer, a revenue-sharing engine, or any role beyond
-  hub-owner vs. invited member — the audit found no substrate for any
-  of those anywhere in the repo.
+  someone else's stream. **Phase 3** (`lib/hunts.js`): §11/§14, a Hunt
+  checkpoint's `networkId` connects it to its own host business's
+  Network — never a new join entity, and never another business's
+  Network (`addCheckpoint`/`linkCheckpointNetwork` both enforce the
+  match). `checkpointLiveNetwork` surfaces that Network's live nodes
+  both before check-in (§11's "LIVE NETWORK... select an available
+  stream," a public read) and folded into `checkInAtCheckpoint`'s own
+  response after it (§14's "You're now at a Network location") — the
+  same real data both times, not two separate views. Deliberately does
+  NOT include an 8-camera session/screen layer, a revenue-sharing
+  engine, or any role beyond hub-owner vs. invited member — the audit
+  found no substrate for any of those anywhere in the repo.
 - `server.js` — a real Express API (CommonJS) wrapping all twelve
   modules.
 
@@ -276,15 +286,16 @@ integrations, actual AI agents) or blocked on a system that doesn't
 exist elsewhere in this session yet (`venvs`'s CHOPZ Digital Twin
 system).
 
-**Connected Network Layer — Phases 1-2 only, see
-`lib/networkConnections.js`.** A Node's own accept/decline and its
-one-person-one-Channel Vault Studios stream reference are real. Not yet
-built, per its own §40 audit finding no substrate for any of it
-anywhere in the repo: the 8-camera/screen *session* layer (a Network
-grouping several Nodes' streams together the way `vavlt-stvdios/lib/
-screenSessions.js`'s `MAX_SCREENS = 8` groups Channels, still Phase 2
-but a separate step from a single Node's own stream reference), a
-configurable N-party revenue-sharing engine (Phase 4 — the single
-largest confirmed gap in the freeze), any role beyond hub-owner vs.
-invited member, recurring per-person schedules, and temporary/
-archivable multi-business event networks.
+**Connected Network Layer — Phases 1-3 only, see
+`lib/networkConnections.js` and `lib/hunts.js`.** A Node's own
+accept/decline, its one-person-one-Channel Vault Studios stream
+reference, and a checkpoint's connection to its own business's Network
+are all real. Not yet built, per its own §40 audit finding no
+substrate for any of it anywhere in the repo: the 8-camera/screen
+*session* layer (a Network grouping several Nodes' streams together
+the way `vavlt-stvdios/lib/screenSessions.js`'s `MAX_SCREENS = 8`
+groups Channels, still Phase 2 but a separate step from a single
+Node's own stream reference), a configurable N-party revenue-sharing
+engine (Phase 4 — the single largest confirmed gap in the freeze), any
+role beyond hub-owner vs. invited member, recurring per-person
+schedules, and temporary/archivable multi-business event networks.

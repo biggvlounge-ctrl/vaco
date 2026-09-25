@@ -36,7 +36,9 @@ const {
 } = require('./lib/neighborProgram');
 const { PACKAGE_TIERS, setCvnvoPlacement, getCvnvoPlacement } = require('./lib/cvnvoPlacement');
 const {
-  HUNT_INTENSITY_LEVELS, createHunt, getHunt, addCheckpoint, checkInAtCheckpoint, getHuntProgress, recommendBreak,
+  HUNT_INTENSITY_LEVELS, createHunt, getHunt, addCheckpoint, getCheckpoint,
+  linkCheckpointNetwork, unlinkCheckpointNetwork, checkpointLiveNetwork,
+  checkInAtCheckpoint, getHuntProgress, recommendBreak,
 } = require('./lib/hunts');
 const { getExplorePage } = require('./lib/explore');
 const {
@@ -297,6 +299,15 @@ const requireSubmissionBusinessOwner = () => requireBusinessOwner((req) => {
   const submission = getAdSubmission(store, Number(req.params.id));
   return submission ? submission.businessId : null;
 }, 'ad submission');
+
+// A checkpoint belongs to the business that hosts it — same shape as
+// `requireLocationBusinessOwner`, one hop through the hunt to find it.
+const requireCheckpointBusinessOwner = () => requireBusinessOwner((req) => {
+  const hunt = getHunt(store, Number(req.params.huntId));
+  if (!hunt) return null;
+  const checkpoint = getCheckpoint(hunt, Number(req.params.checkpointId));
+  return checkpoint ? checkpoint.businessId : null;
+}, 'checkpoint');
 
 // A network belongs to the business that is its Hub.
 const requireNetworkBusinessOwner = () => requireBusinessOwner((req) => {
@@ -592,6 +603,41 @@ app.post('/api/hunt/:huntId/checkpoint', requireBodyBusinessOwner(), (req, res) 
     res.status(201).json(addCheckpoint(store, { ...req.body, huntId: Number(req.params.huntId) }));
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+// §41's Hunt Builder "NETWORK — Select Network" addition, editable
+// after creation. Same owner check as creating the checkpoint itself.
+app.post('/api/hunt/:huntId/checkpoint/:checkpointId/network', requireCheckpointBusinessOwner(), (req, res) => {
+  try {
+    res.json(linkCheckpointNetwork(store, {
+      huntId: Number(req.params.huntId), checkpointId: Number(req.params.checkpointId), networkId: (req.body || {}).networkId,
+    }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/hunt/:huntId/checkpoint/:checkpointId/network/unlink', requireCheckpointBusinessOwner(), (req, res) => {
+  try {
+    res.json(unlinkCheckpointNetwork(store, { huntId: Number(req.params.huntId), checkpointId: Number(req.params.checkpointId) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// §11's pre-check-in "LIVE NETWORK" discovery — open, no session
+// required, same reasoning as the rest of this app's public Hunt/
+// checkpoint reads: a user deciding whether to walk to a checkpoint
+// needs to see what's live there before they have any reason to
+// authenticate.
+app.get('/api/hunt/:huntId/checkpoint/:checkpointId/live-network', (req, res) => {
+  const hunt = getHunt(store, Number(req.params.huntId));
+  if (!hunt) return res.status(404).json({ error: `no hunt with id ${req.params.huntId}` });
+  try {
+    return res.json({ liveNetwork: checkpointLiveNetwork(store, hunt, Number(req.params.checkpointId)) });
+  } catch (err) {
+    return res.status(404).json({ error: err.message });
   }
 });
 
