@@ -15,7 +15,7 @@ somebody's memory of it, which is the failure this repo keeps finding.
 |---|---|---|
 | `VACO_VERIFIED_BUSINESS_NETWORK_FREEZE.md` | frozen, **§30 audit complete 25 Sep 2026** — see below; Levels 1-3 built and shipped as `vaco-passport` | 17 Sep 2026 |
 | `VAGO_GROUP_WAGERS_FREEZE.md` | frozen, **audit complete 25 Sep 2026** — see below | 17 Sep 2026 |
-| `HVNTZ_CONNECTED_NETWORK_FREEZE.md` | frozen, **audit not started** | 23 Sep 2026 |
+| `HVNTZ_CONNECTED_NETWORK_FREEZE.md` | frozen, **§40 audit complete 25 Sep 2026** — see below | 23 Sep 2026 |
 | `VASH_TAP_FREEZE.md` | frozen, **§1/§55 audit complete 25 Sep 2026** — see below; narrowest demo built and shipped | 23 Sep 2026 |
 
 **More are expected.** The owner said on 23 Sep 2026 that three or four
@@ -472,6 +472,159 @@ functions that already exist. Side wagers, tournaments, leagues, BLIND/
 Before-the-Answer group modes, team roles, and QVAN-based group-risk
 monitoring are each their own undertaking with no substrate to extend,
 the same shape of gap the two audits before this one kept finding.
+
+## The HVNTZ Connected Network §40 audit, 25 Sep 2026
+
+The fourth and last on-deck freeze, and the largest by non-duplication
+surface: §40 names Vault Studios, VACA, VASH/VCoin, notifications,
+messaging, search, QVAN, V4, ARIES, MIA, VACON, DREA, maps, routing,
+analytics, advertising, business accounts/tiers, DREAMS, VOID, VDP,
+plus HVNTZ's own existing Hunts/Hunt Builder/Hunt Engine/checkpoints/
+rewards/sponsorships. Five parallel searches, each verified by reading
+the actual implementation rather than trusting a name.
+
+**The freeze's own factual claim is wrong, and it changes the shape of
+Phase 2.** §3 says "the existing eight-camera concept is retained." No
+eight-camera or camera/stream code of any kind exists anywhere in
+`hvntz/` — confirmed by exhaustive grep. The real eight-position
+concept lives in two *other* apps: `vavlt-stvdios/lib/
+screenSessions.js` (`MAX_SCREENS = 8`, an ordered array of `channelIds`
+capped at 8 — a session limit, not numbered slots) and `vdp/src/lib/
+stage.js` (`STAGE_CAMERAS`, 8 named roles wired into VENVS' "Stage"
+district). HVNTZ has no reference to, dependency on, or integration
+with either. Building §11-13's live-stream checkpoints means
+integrating with `vavlt-stvdios`, not extending anything inside
+`hvntz/` — a materially different Phase 2 than "retain and extend."
+
+**HVNTZ's own real surface (confirmed 40 routes, `hvntz/server.js`):**
+`registerBusiness` (`hvntz/lib/revenueStack.js:125`) is `{id, name,
+ownerId, createdAt}` — one owner, no tiers, no staff. `Location` adds
+`locationType ∈ ['screen','hub','business-locker']`. "Tiers" in HVNTZ
+today are three separate, unrelated things (a *computed* Digital Twin
+Level 1-3, a participation-type enum driving revenue share, and a
+CVNVO package tier for date-algorithm visibility) — no unified
+business-tier entity for §23's packages to hang off. Hunts/checkpoints
+are real, executable code (`hvntz/lib/hunts.js`) with real VCoin bounty
+payout and revenue-event recording (`hvntz/test/money.test.js` proves
+it) — but "Hunt Builder"/"Hunt Engine" are not named concepts anywhere,
+and there is exactly one checkpoint type: an unverified photo-proof
+check-in. §12's QR/NFC/geofence checkpoint types are a currently-empty
+verification layer, not an extension of several existing ones.
+
+**Real and reusable, confirmed by reading the code — build on these:**
+
+- **Vault Studios per-person streaming is already the whole design.**
+  `vavlt-stvdios/lib/channels.js`: one `Channel` = one `ownerId`,
+  explicitly "not one combined stream per business" per its own header.
+  §4's "DJ stream, Bartender A stream..." is not new architecture, it's
+  what Vault Studios already does — the gap is only that no `Channel`
+  carries a `businessId`/network membership today.
+- **Two real paywall/subscription mechanisms already exist.**
+  `vavlt-stvdios/lib/lockedContentTiers.js` (real 80/20 VCoin split,
+  `creatorId` already accepts "either an individual OR an
+  HVNTZ-onboarded business") and `vulture-flix/lib/subscriptions.js`
+  (three-tier Netflix-style, `ad-supported`/`standard`/`premium`). §9's
+  Level 2 paywall and §10's Level 3 advanced-creator-subscription each
+  have a real pattern to extend rather than invent.
+- **A real HVNTZ↔VOID integration point already exists.** `void/lib/
+  staffing.js`'s `requestHuntStaffing` (service-gated `POST /api/
+  hunt-staffing`) verifies an HVNTZ business via an injected fetch and
+  fills a role through VOID's existing staffing marketplace — direct
+  precedent for §19/§20's node invitation and scheduling, one level
+  removed from a green field.
+- **VACA's identity-dedup pattern is real and has three call sites to
+  copy.** `GET /api/identity-status/:subjectType/:subjectId`, consumed
+  by `cvnvo` (hard-fail), `void` (fail-soft), `vash-tap` (generic
+  wrapper). §19's "do not create duplicate accounts if the person
+  already exists in VACA" is exactly this: a per-app `subjectType`
+  (e.g. `hvntz-member`), one fetch before creating any invitation-
+  resolved record.
+- **V4-proxy's maps API already anticipates this.** `POST /api/maps/
+  place`'s own code comment names "a VOID station, an HVNTZ business"
+  as example callers — but nothing in `hvntz/` calls it today; HVNTZ's
+  Explore ranking uses a local Haversine implementation instead. §28's
+  "use existing V4 mapping" is real infrastructure sitting unused, not
+  infrastructure that needs building.
+- **Search, analytics ingest, and notification dispatch are all real
+  and cross-app**, same as the prior three audits found: `v4-search`
+  (unified index, HVNTZ already one of its adapters), `vaco-analytics`
+  (`POST /api/metrics/ingest`, dashboard, anomaly/alert), `vaco-notify`.
+- **DREAMS is the real advertising system** §24 wants reuse of — a full
+  ad marketplace (advertisers, campaigns, budget, launch, per-screen
+  revenue), and it already names HVNTZ, Vault Studios and VENVS in its
+  own build notes as apps it expects to integrate with later.
+
+**Confirmed NOT to exist — the real work is here, not in wiring:**
+
+- **A configurable N-party revenue-sharing engine — the biggest single
+  gap, and §15-18's central ask.** Every real settlement mechanism in
+  the repo (`hvntz/lib/revenueStack.js`, `void/lib/marketplace.js`
+  courier payouts, VAGO's `esportsStaking.js` pari-mutuel payout to
+  winners) is hardcoded to exactly two legs: platform vs. one
+  recipient, or proportional-by-stake to one role. Nothing supports
+  named per-agreement roles (business/DJ/bartender-pool/hosts/
+  platform) with configurable percentages — even `vaco-analytics/
+  VACO_REVENUE_SPLIT_MODEL.md`'s own 3-party sketch is documentation
+  with no implementing code. §16's revenue attribution across up to 13
+  named dimensions has no substrate to extend either.
+- **An invitation accept/decline state machine.** VAGO Group Wagers'
+  `invitedUserIds` is the closest thing in the repo, and it's a static
+  allow-list with no stored per-invite state and no accept/decline
+  transition — its own header says as much. The one real
+  submit→review→terminal-status shape in the repo, VOKEN's Cvltvre
+  Card application (`pending-review`→`accepted`/`declined`), is
+  one-sided (a reviewer decides, not the invited person responding) —
+  worth copying the *shape* of, not the semantics.
+- **Multi-role RBAC.** Zero role→capability grant matrices exist
+  anywhere in the repo (confirmed by grep across all apps) — every app
+  uses the same flat actor/operator-scope/service shape
+  `OPERATOR_ROLES_SCOPE.md` documents as deliberate. §7's 16 named
+  roles (Owner, Administrator, DJ, Bartender, Camera Operator, Sponsor,
+  Premium Member...) would be genuinely new infrastructure, not an
+  extension of anything.
+- **Recurring per-person schedules.** Every real "time window" in the
+  repo (`vacay/lib/bookings/bookings.js`'s overlap guard, VOID MAGIC's
+  single-instant `scheduledAt`) is a one-off reservation interval. No
+  "Friday 6PM-2AM" recurring day-of-week concept exists to extend for
+  §20.
+- **Ephemeral, archivable, multi-business groupings.** No `'archived'`
+  status literal exists anywhere in the repo. The closest analogues
+  (VAGO Group Wagers, VAVLT STVDIOS casino events, VXLLAGE village
+  events) are all single-host, single-entity, with no archive step —
+  §21's temporary event network spanning many businesses is new on
+  every axis: multi-business, time-bounded, archivable.
+- **QVAN is not a security system.** It is a chat persona
+  (`vacon/lib/agents.js`) routed to by keyword match
+  (`vacon/lib/orchestrator.js`) — no scanning, flagging API, or fraud
+  detection exists. §34's "reuse QVAN security... fraud detection" has
+  nothing real to reuse; same finding, same caveat, for MIA.
+- **DREA is not an AI Hunt-generation system.** There is no app named
+  `drea`. "DREA" is DREAMS' ad-copy-assistant persona, and separately
+  `hvntz/lib/drea.js` is a deterministic placement-exclusion/flagging
+  engine — explicitly *not* the AI, per its own comment. §29's "DREA
+  can propose a Hunt" is future work by the freeze's own words, not an
+  existing capability being extended.
+- **VENVS today has no resort/casino/venue-streaming concept at all.**
+  Real VENVS is analog commerce only (Shop/Marketplace/Publishing,
+  frontend-only, talking to a mock backend). The freeze's §32
+  "resort/casino/lounge/hotel" framing actually matches VDP's
+  `venusResort.js` (Venus Resort Complex), a different app. §32 is new
+  territory regardless of which app it lands in.
+- **ARIES does not exist.** Zero occurrences anywhere in the repo
+  outside the word "boundaries." The freeze names it once in its
+  "do not replace" list (§ list, near the top) and it corresponds to
+  nothing real.
+
+**What this means for scoping the actual build.** Unlike the three
+freezes before it, HVNTZ Connected Network's real gaps
+(revenue-sharing engine, invitation state machine, RBAC, recurring
+schedules, archivable multi-business groupings) are large enough that
+no single "narrowest slice" covers even one phase cleanly — §47's own
+PHASE 1 (Network entity + membership + permissions) already touches
+three of those five gaps at once. The freeze's own acceptance criteria
+(§48) are phrased as a 30-item checklist across all five phases, not a
+demo. Scoping this will need the owner's call on which phase, and how
+thin a slice within it, rather than a single obvious narrowest path.
 
 ## What the partial audit established
 
