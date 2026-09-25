@@ -13,10 +13,10 @@ somebody's memory of it, which is the failure this repo keeps finding.
 
 | document | status | parked |
 |---|---|---|
-| `VACO_VERIFIED_BUSINESS_NETWORK_FREEZE.md` | frozen, audit begun and stopped; **text restored 23 Sep** | 17 Sep 2026 |
+| `VACO_VERIFIED_BUSINESS_NETWORK_FREEZE.md` | frozen, **§30 audit complete 25 Sep 2026** — see below | 17 Sep 2026 |
 | `VAGO_GROUP_WAGERS_FREEZE.md` | frozen, audit begun and stopped; **text restored 23 Sep** | 17 Sep 2026 |
 | `HVNTZ_CONNECTED_NETWORK_FREEZE.md` | frozen, **audit not started** | 23 Sep 2026 |
-| `VASH_TAP_FREEZE.md` | frozen, **§1/§55 audit complete 25 Sep 2026** — see below | 23 Sep 2026 |
+| `VASH_TAP_FREEZE.md` | frozen, **§1/§55 audit complete 25 Sep 2026** — see below; narrowest demo built and shipped | 23 Sep 2026 |
 
 **More are expected.** The owner said on 23 Sep 2026 that three or four
 add-ons were coming and that two had been sent; this folder holds those
@@ -224,6 +224,152 @@ Done" checklist does not distinguish "wire an existing system" from
 distinction visible before code gets written against a false premise —
 the same failure this file's earlier entries already record happening
 twice.
+
+## The VACO Verified Business Network §30 audit, 25 Sep 2026
+
+The owner picked this freeze as the second add-on to resume. Its §30
+mandates the same "audit first" step every freeze here requires — this
+is that audit, four parallel searches against the categories §30 names
+by name (VACA, VASH, VCoin, V3, VOKEN, wallets, identity, business
+profiles, transactions, settlement, contracts, escrow, security/QVAN,
+multi-tenant isolation), each verified by reading the real
+implementation rather than trusting a name or a prior claim.
+
+**Real and reusable, confirmed by reading the code — build on these:**
+
+- **VACA verification is already generic, and already unused for
+  businesses.** `subjectType` is a free-form string VACA never
+  validates against an enum (`vaca/lib/verifications.js:47`) — real
+  callers already pass `voken-card`, `void-provider`, `cvnvo-user`,
+  `vash-tap-assignee`. Verifying a business needs no new VACA code,
+  only a real caller passing `subjectType: 'business'` — nobody does
+  today. HVNTZ's own `registerBusiness` (`hvntz/lib/
+  revenueStack.js:125-136`) calls VACA **zero** times; any session
+  authenticated as any `ownerId` can register a business with no
+  identity check at all (`requireActor('ownerId')` only proves the
+  session matches the field the caller supplied, not that a real
+  business exists behind it).
+- **V3/VCoin is real and the escrow pattern already exists on top of
+  it, proven three times over.** `voidmagic/lib/bookings.js:32,49-83`
+  charges a customer into a fixed `VOID_MAGIC_ESCROW_ACCOUNT` userId at
+  booking time and pays the host out later on a separate trigger; VAGO's
+  sportsbook (`vago/lib/sportsbook.js:145-192`) holds a stake in
+  `VAGO_HOUSE_ACCOUNT` and releases it only on event settlement; VOKEN's
+  fractional-ownership pool (`voken/lib/fractionalOwnership.js:107-140`)
+  does the same over `VOKEN_FRACTIONAL_POOL`, backed by the shared
+  race-safe `settleOnce.js` primitive. None of this is a first-class
+  ledger concept — every "escrow account" is just an ordinary V3 userId
+  by convention, no `held`/`pending` balance state exists in the schema
+  — but the pattern is real, proven three separate times, and is
+  exactly what §6/§12/§13's escrow language means in practice.
+- **External API-key access already exists, narrowly.** `void/lib/
+  externalIntegration.js:22-58` (`registerExternalBusiness`) issues a
+  real `crypto.randomBytes(16)` API key per external business and
+  authenticates inbound calls by it — genuinely distinct from the
+  internal `serviceAuth.cjs` token system. This is the one real
+  precedent for §14's Interoperability Gateway and §16's Developer
+  Portal, and it is VOID Direct only: no self-service portal, sandbox,
+  scoping, or third-party webhook registration exists anywhere.
+- **VOKEN's transfer/ownership machinery is real and mechanically
+  reusable — but hardcoded to a card/collectible domain, not a
+  business-token factory.** `transferEditionOwnership`
+  (`voken/lib/cultureCards.js:149-163`) checks real ownership before
+  moving anything; `mintCultureCard`'s required fields (`subjectPersonId`,
+  a fixed 10-value `category` enum, `rarityTier`) are baked into the
+  function signature (`cultureCards.js:21-38`) with no parameterized
+  schema for an arbitrary business-defined token, and there is no
+  RETIRE/burn operation anywhere. §11's "token factory" is a real
+  undertaking on top of this, not a config flag.
+
+**Named in the freeze, and confirmed NOT to exist — the real work is
+here, not in wiring:**
+
+- **Business Passport.** VACA's entire store is one flat array of
+  `{id, subjectType, subjectId, claimType, evidence (a free-text
+  string), status, grade, ...}` (`vaca/lib/verifications.js:52-64`)
+  reduced to a single boolean by `isIdentityVerified`
+  (`verifications.js:141-144`). There is no legal name, registration
+  number, authorized-representative list, license status, or document
+  field anywhere — nothing a Business Passport could be built from
+  except by adding real new fields.
+- **The five-tier progression (NETWORK MEMBER → ... → TOKENIZED
+  ASSETS).** No staged/leveled status concept exists anywhere in the
+  repo for any entity. The nearest-sounding hits (VOID driver tiers,
+  Vavlt Stvdios content tiers, VACON-C's simulation trait tiers) are
+  each a different, unrelated domain concept — none models progression
+  through ordered real-world business stages.
+- **Multi-tenant isolation (§17, "a foundational requirement").** No
+  employee/role/permission system scoped to a business exists anywhere.
+  HVNTZ's only access control is `requireBusinessOwner`
+  (`hvntz/server.js:206-239`) — single-`ownerId`-equality, a 403 or
+  nothing, no staff list, no roles. `void/lib/staffing.js` posts open
+  gig positions to a marketplace and persists no "this person works
+  here" record once one is filled.
+- **Role-based wallet/treasury authorization.** Confirmed absent
+  ecosystem-wide: no spend limits, multi-signature approval, or
+  "employee may act but not exceed X" check exists on any V3 account or
+  any money-moving path in the repo. §6's "employees must not
+  automatically control company treasury" has no existing gate to
+  extend — it would be new.
+- **Community Treasury / Proof-of-Impact (§19-25).** Zero real hits for
+  "community", "treasury", "dividend" or "allocation" as a fund
+  concept anywhere in the repo. The one near-miss is cosmetic: HVNTZ's
+  demo seed data names a payer id `'demo-vcoin-treasury'`
+  (`hvntz/lib/seedDemoData.js:48`) — a placeholder string, not an
+  object, ledger, or allocation mechanism. No 5-mile-radius service
+  area, no 25% split, no transparency ledger.
+- **Businesses have no wallet distinct from a personal balance.** V3's
+  schema is `userId`-keyed throughout (`v3/lib/vcoin.js:31-33`,
+  `v3/lib/ledgerPg.js:84,96,155,184`) with no `ownerType`/`accountType`
+  discriminator. HVNTZ's `registerBusiness` record carries no balance
+  field at all (`hvntz/lib/revenueStack.js:125-136`) — a business's
+  money is purely an aggregate of settled transfers to its owner's
+  individual personal userId, indistinguishable in the ledger from any
+  other person's balance.
+- **Contracts with defined terms, an approval step, and enforcement.**
+  Not found anywhere. The closest hit, VAGO's `predictionMarkets.js`
+  `contract` (`vago/lib/predictionMarkets.js:225-286`), is a market
+  position data object (quantity/price) with no terms or signing step
+  — a different meaning of the word entirely.
+- **Generic token classification.** VOKEN's `complianceGate.js:23,39-48`
+  is a flat two-entry admin on/off switch, not a system that could
+  assign different legal/economic rules to different business-defined
+  token types.
+- **Blockchain, anything.** No chain, no wallet address format, no
+  on-chain record of any kind, anywhere — consistent with the freeze's
+  own conditional language throughout ("if legally, financially,
+  technically and strategically approved").
+- **QVAN, reconfirmed.** Still exactly what the VASH TAP audit found: a
+  keyword-routed chat persona (`vacon/lib/orchestrator.js`,
+  `vaco-analytics/intelligence.js:107`), not enforced security or
+  fraud-detection code under any name.
+
+**What this means for scoping the actual build.** The freeze's own
+five-level progression already orders itself by how real its
+foundation is: **Level 1→2 (Network Member → Verified Business)** rests
+entirely on real, extendable infrastructure — VACA's already-generic
+verification plus a small, genuinely new Business Passport record
+referencing it and an existing HVNTZ business. **Level 3 (Network
+Business)** needs the proven-three-times escrow *pattern* generalized,
+which is real work but has real precedent to extend. **Levels 4-5
+(tokenization, tokenized assets) and the community-treasury,
+multi-tenant, VIG/SDK/developer-portal sections are each their own
+undertaking with no existing substrate** — building any of them now
+would be exactly the "plan tokenisation without the rule that
+tokenisation is a graduation" failure this folder's own history
+already records happening once, from working off a document instead of
+the codebase.
+
+**A correction to the note below: resolved, not still open.** The
+"partial audit" section beneath this one flags "VACA is blockchain app
+in v3" as an owner correction "not yet verified in code." The VASH TAP
+§1/§55 audit (25 Sep 2026, this session) settled it: `vaca/
+VACA_BLOCKCHAIN_IDENTITY_COMPARABLES.md` itself records that VACA was
+designed to live inside V3 and was later split out — it is a
+centralized, human-reviewed attestation service, not blockchain
+identity in any sense (no ledger, wallet, DIDs, or Verifiable
+Credentials). Left below rather than deleted, so the record shows what
+was asked and when it was actually settled.
 
 ## What the partial audit established
 
