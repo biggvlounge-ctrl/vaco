@@ -45,7 +45,8 @@ const {
 const { getScreenAnalytics } = require('./lib/screenAnalytics');
 const {
   NETWORK_NODE_STATUSES, findNetwork, findNode, createNetwork, inviteNode,
-  respondToInvitation, removeNode, nodesForIdentity, networkView, networksForBusiness,
+  respondToInvitation, removeNode, linkVavltChannel, unlinkVavltChannel,
+  nodesForIdentity, networkView, networksForBusiness,
 } = require('./lib/networkConnections');
 
 const { createServiceAuth } = require('./lib/serviceAuth.cjs');
@@ -217,6 +218,34 @@ async function resolveVacaIdentity(subjectType, subjectId, res) {
     return undefined;
   }
   return status;
+}
+
+// Vault Studios channel lookup for Phase 2's stream link — the same
+// verify-the-real-thing-exists pattern as `fetchHvntzBusiness`/
+// `fetchDreamsScreen` elsewhere in this session, reusing the
+// `VAVLT_STVDIOS_API_URL` this file already calls for photo-proof
+// check-ins and Map Search sync.
+async function fetchVavltChannel(channelId) {
+  const res = await fetch(`${VAVLT_STVDIOS_API_URL}/api/channels/${channelId}`);
+  if (res.status === 404) return null;
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error || `fetchVavltChannel failed (${res.status})`);
+  return body;
+}
+
+async function resolveVavltChannel(channelId, res) {
+  let channel;
+  try {
+    channel = await fetchVavltChannel(channelId);
+  } catch (err) {
+    res.status(502).json({ error: `Vavlt Stvdios unreachable (${err.message})` });
+    return undefined;
+  }
+  if (!channel) {
+    res.status(404).json({ error: `no Vavlt Stvdios channel with id ${channelId}` });
+    return undefined;
+  }
+  return channel;
 }
 
 const {
@@ -754,6 +783,38 @@ app.post('/api/network-nodes/:nodeId/respond', requireNodeIdentity(), (req, res)
 app.post('/api/network-nodes/:nodeId/remove', requireNodeNetworkBusinessOwner(), (req, res) => {
   try {
     res.json(removeNode(store, { nodeId: Number(req.params.nodeId) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Phase 2 -- a Node's stream is the same person's own real Vault
+// Studios channel, referenced not duplicated (see
+// lib/networkConnections.js's own header). Same guard as `respond` —
+// the node's own identity, not the Hub business — since this is that
+// person's own channel, not the business's to assign.
+app.post('/api/network-nodes/:nodeId/vavlt-channel', requireNodeIdentity(), async (req, res) => {
+  const { vavltChannelId } = req.body || {};
+  if (vavltChannelId === undefined || vavltChannelId === null) {
+    return res.status(400).json({ error: 'this route requires a vavltChannelId' });
+  }
+  const channel = await resolveVavltChannel(vavltChannelId, res);
+  if (channel === undefined) return undefined;
+  try {
+    const node = await linkVavltChannel(store, {
+      nodeId: Number(req.params.nodeId),
+      vavltChannelId,
+      channelFetchFn: async () => channel,
+    });
+    return res.json(node);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/network-nodes/:nodeId/vavlt-channel/unlink', requireNodeIdentity(), (req, res) => {
+  try {
+    res.json(unlinkVavltChannel(store, { nodeId: Number(req.params.nodeId) }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

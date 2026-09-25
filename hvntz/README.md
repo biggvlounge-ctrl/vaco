@@ -136,9 +136,9 @@ curl http://localhost:8792/api/franchise-list/1
   and ad-submission activity, scoped to its `screen`-type locations —
   total revenue, revenue by event type, distinct advertiser count, and
   ad submissions by status.
-- `lib/networkConnections.js` — Connected Network Layer, Phase 1 (see
-  `dev-docs/on-deck/HVNTZ_CONNECTED_NETWORK_FREEZE.md`, scoped by its
-  own §40 audit): a Network Hub is a real HVNTZ business, never a
+- `lib/networkConnections.js` — Connected Network Layer, Phase 1 + 2
+  (see `dev-docs/on-deck/HVNTZ_CONNECTED_NETWORK_FREEZE.md`, scoped by
+  its own §40 audit): a Network Hub is a real HVNTZ business, never a
   second business model — `createNetwork` verifies it against the same
   store `registerBusiness` writes to. `inviteNode` is §19's node
   invitation, VACA-deduped through a real
@@ -148,10 +148,17 @@ curl http://localhost:8792/api/franchise-list/1
   invite -> accept/decline state machine in this ecosystem where the
   **invited person**, not a reviewer or the inviting business, resolves
   their own invitation. `removeNode` is §7's "who can disconnect a
-  node," owner-only, at any point in a node's life. Deliberately does
-  NOT include streaming/camera linking, a revenue-sharing engine, or
-  any role beyond hub-owner vs. invited member — the audit found no
-  substrate for any of those anywhere in the repo.
+  node," owner-only, at any point in a node's life. **Phase 2**:
+  `linkVavltChannel`/`unlinkVavltChannel` are §4/§8's person-based
+  streaming — a Node's stream is a real reference to that same person's
+  own Vault Studios Channel (`vavlt-stvdios/lib/channels.js`, already
+  one real Channel per person, not per business), verified real and
+  owner-matched before linking, never duplicated. Only that node's own
+  identity may link or unlink it — the business does not assign
+  someone else's stream. Deliberately does NOT include an 8-camera
+  session/screen layer, a revenue-sharing engine, or any role beyond
+  hub-owner vs. invited member — the audit found no substrate for any
+  of those anywhere in the repo.
 - `server.js` — a real Express API (CommonJS) wrapping all twelve
   modules.
 
@@ -269,12 +276,15 @@ integrations, actual AI agents) or blocked on a system that doesn't
 exist elsewhere in this session yet (`venvs`'s CHOPZ Digital Twin
 system).
 
-**Connected Network Layer — Phase 1 foundation only, see
-`lib/networkConnections.js`.** Not yet built, per its own §40 audit
-finding no substrate for any of it anywhere in the repo: streaming or
-camera/screen linking to Vault Studios (Phase 2), a configurable
-N-party revenue-sharing engine (Phase 4 — the single largest confirmed
-gap in the freeze), any role beyond hub-owner vs. invited member,
-recurring per-person schedules, and temporary/archivable multi-business
-event networks. A Node's own accept/decline is real; a Network's
-Vault Studios stream, camera, or revenue-share agreement is not.
+**Connected Network Layer — Phases 1-2 only, see
+`lib/networkConnections.js`.** A Node's own accept/decline and its
+one-person-one-Channel Vault Studios stream reference are real. Not yet
+built, per its own §40 audit finding no substrate for any of it
+anywhere in the repo: the 8-camera/screen *session* layer (a Network
+grouping several Nodes' streams together the way `vavlt-stvdios/lib/
+screenSessions.js`'s `MAX_SCREENS = 8` groups Channels, still Phase 2
+but a separate step from a single Node's own stream reference), a
+configurable N-party revenue-sharing engine (Phase 4 — the single
+largest confirmed gap in the freeze), any role beyond hub-owner vs.
+invited member, recurring per-person schedules, and temporary/
+archivable multi-business event networks.

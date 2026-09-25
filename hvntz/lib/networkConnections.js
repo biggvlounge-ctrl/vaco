@@ -1,14 +1,13 @@
-// HVNTZ — Connected Network Layer, Phase 1 foundation.
+// HVNTZ — Connected Network Layer, Phase 1 + Phase 2 (streaming link).
 // Source: `dev-docs/on-deck/HVNTZ_CONNECTED_NETWORK_FREEZE.md`, scoped
 // by its own §40 audit (see `dev-docs/on-deck/README.md`, "The HVNTZ
-// Connected Network §40 audit") to the narrowest real slice of §47's
-// PHASE 1: a Network Hub (a real HVNTZ business, never a second
-// business model — §41's own instruction), Network Nodes (people that
-// business invites), and a real invite -> accept/decline state
-// machine. No streaming, no camera/screen linking, no revenue-sharing
+// Connected Network §40 audit"). Phase 1 (§47) is a Network Hub (a real
+// HVNTZ business, never a second business model — §41's own
+// instruction), Network Nodes (people that business invites), and a
+// real invite -> accept/decline state machine. No revenue-sharing
 // engine, and no role system beyond hub-owner vs. invited member — the
-// audit found no substrate for any of those anywhere in the repo, and
-// each is its own undertaking, not a Phase 1 detail.
+// audit found no substrate for either anywhere in the repo, and each
+// is its own undertaking, not this module's job.
 //
 // **Not a second identity system.** §19's own rule: "Do not create
 // duplicate accounts if the person already exists in VACA." Inviting a
@@ -24,6 +23,18 @@
 // invitee-driven. `respondToInvitation` below is the first place in
 // this ecosystem where the INVITED PERSON resolves their own
 // invitation, not a business or a reviewer.
+//
+// **Phase 2: not a second streaming platform.** §8's own rule: "Vault
+// Studios remains the streaming infrastructure. Do NOT create another
+// streaming platform." The audit confirmed Vault Studios
+// (`vavlt-stvdios/lib/channels.js`) already models exactly what §4
+// wants — one real Channel per PERSON, not one combined stream per
+// business — so a Node's stream is a *reference* to that person's own
+// real Channel (`channelFetchFn`, the same verify-don't-duplicate
+// pattern `registerTap`/`inviteNode` already use), never a copy of it.
+// `linkVavltChannel` also verifies the channel's `ownerId` matches the
+// node's own `identityId`, so a Node can only carry a stream the same
+// real person actually owns.
 
 'use strict';
 
@@ -94,6 +105,7 @@ async function inviteNode(store, options = {}) {
     invitedBy,
     invitedAt: now,
     respondedAt: null,
+    vavltChannelId: null,
   };
   store.networkNodes.push(node);
   return node;
@@ -125,6 +137,39 @@ function removeNode(store, options = {}) {
   if (node.status === 'removed') throw new Error(`removeNode: node ${nodeId} is already removed`);
   node.status = 'removed';
   node.respondedAt = node.respondedAt ?? now;
+  return node;
+}
+
+// §4/§8's person-based streaming: a Node's stream is a reference to
+// that same real person's own Vault Studios Channel, not a copy of it
+// — see this file's header. Scoped to `status === 'active'`: an
+// invitation still pending has no place showing a live stream to the
+// Network, and a removed/declined node obviously carries none either.
+async function linkVavltChannel(store, options = {}) {
+  const { nodeId, vavltChannelId, channelFetchFn } = options;
+  const node = findNode(store, nodeId);
+  if (!node) throw new Error(`linkVavltChannel: no node ${nodeId}`);
+  if (node.status !== 'active') {
+    throw new Error(`linkVavltChannel: node ${nodeId} must be active to carry a stream (status=${node.status})`);
+  }
+  if (!vavltChannelId) throw new Error('linkVavltChannel requires a vavltChannelId');
+  if (typeof channelFetchFn !== 'function') {
+    throw new Error('linkVavltChannel requires channelFetchFn(vavltChannelId)');
+  }
+  const channel = await channelFetchFn(vavltChannelId);
+  if (!channel) throw new Error(`linkVavltChannel: no Vault Studios channel with id ${vavltChannelId}`);
+  if (String(channel.ownerId) !== String(node.identityId)) {
+    throw new Error(`linkVavltChannel: channel ${vavltChannelId} is not owned by this node's own identity`);
+  }
+  node.vavltChannelId = vavltChannelId;
+  return node;
+}
+
+function unlinkVavltChannel(store, options = {}) {
+  const { nodeId } = options;
+  const node = findNode(store, nodeId);
+  if (!node) throw new Error(`unlinkVavltChannel: no node ${nodeId}`);
+  node.vavltChannelId = null;
   return node;
 }
 
@@ -164,6 +209,8 @@ module.exports = {
   inviteNode,
   respondToInvitation,
   removeNode,
+  linkVavltChannel,
+  unlinkVavltChannel,
   nodesForNetwork,
   nodesForIdentity,
   networkView,

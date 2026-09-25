@@ -1,9 +1,11 @@
-// HVNTZ — Connected Network Layer, Phase 1 (see lib/networkConnections.js's
-// own header for scope). Every VACA call is a fake function passed in
-// exactly the way server.js injects the real fetch — these tests never
-// touch the network, and assert both the happy path and the two rules
-// the freeze's §19/§40 name: no duplicate identity record is ever
-// created, and a Network never becomes a second business model.
+// HVNTZ — Connected Network Layer, Phase 1 + Phase 2 (see
+// lib/networkConnections.js's own header for scope). Every VACA/Vault
+// Studios call is a fake function passed in exactly the way server.js
+// injects the real fetch — these tests never touch the network, and
+// assert both the happy path and the rules the freeze's §4/§8/§19/§40
+// name: no duplicate identity record is ever created, a Network never
+// becomes a second business model, and a Node's stream is always a
+// reference to that same real person's own Vault Studios channel.
 
 'use strict';
 
@@ -13,7 +15,8 @@ const assert = require('node:assert');
 const { createHvntzStore, registerBusiness } = require('../lib/revenueStack');
 const {
   NETWORK_NODE_STATUSES, findNetwork, findNode, createNetwork, inviteNode,
-  respondToInvitation, removeNode, nodesForIdentity, networkView, networksForBusiness,
+  respondToInvitation, removeNode, linkVavltChannel, unlinkVavltChannel,
+  nodesForIdentity, networkView, networksForBusiness,
 } = require('../lib/networkConnections');
 
 function hubBusiness(store) {
@@ -23,6 +26,20 @@ function hubBusiness(store) {
 const fakeIdentityFetchFn = async (_subjectType, subjectId) => (
   subjectId === 'unverified-dj' ? { verified: false } : { verified: true, subjectId }
 );
+
+// Channel 501 is owned by 'dj-marcus' -- the same identity used to
+// invite a node throughout this file's other tests, so ownership
+// checks below have a real match to test against.
+const fakeChannelFetchFn = async (channelId) => {
+  if (channelId === 501) return { id: 501, ownerId: 'dj-marcus', name: 'DJ Marcus Live', streamUrl: 'https://stream.example/marcus' };
+  if (channelId === 502) return { id: 502, ownerId: 'someone-else', name: 'Not Marcus', streamUrl: 'https://stream.example/other' };
+  return null;
+};
+
+async function activeNode(store, network) {
+  const node = await inviteNode(store, { networkId: network.id, invitedIdentityId: 'dj-marcus', identityFetchFn: fakeIdentityFetchFn });
+  return respondToInvitation(store, { nodeId: node.id, response: 'accepted' });
+}
 
 // -- createNetwork -----------------------------------------------------------
 
@@ -160,6 +177,67 @@ test('a removed identity can be re-invited', async () => {
   removeNode(store, { nodeId: node.id });
   const again = await inviteNode(store, { networkId: network.id, invitedIdentityId: 'dj-marcus', identityFetchFn: fakeIdentityFetchFn });
   assert.notStrictEqual(again.id, node.id);
+});
+
+// -- linkVavltChannel / unlinkVavltChannel (§4/§8, Phase 2) -------------------
+
+test('linkVavltChannel verifies the channel is real rather than trusting the id', async () => {
+  const store = createHvntzStore();
+  const hub = hubBusiness(store);
+  const network = createNetwork(store, { hubBusinessId: hub.id, name: 'Net' });
+  const node = await activeNode(store, network);
+  await assert.rejects(
+    linkVavltChannel(store, { nodeId: node.id, vavltChannelId: 404, channelFetchFn: fakeChannelFetchFn }),
+    /no Vault Studios channel with id 404/,
+  );
+  assert.strictEqual(node.vavltChannelId, null);
+});
+
+test('linkVavltChannel refuses a channel owned by a different identity — a Node cannot borrow someone else\'s stream', async () => {
+  const store = createHvntzStore();
+  const hub = hubBusiness(store);
+  const network = createNetwork(store, { hubBusinessId: hub.id, name: 'Net' });
+  const node = await activeNode(store, network);
+  await assert.rejects(
+    linkVavltChannel(store, { nodeId: node.id, vavltChannelId: 502, channelFetchFn: fakeChannelFetchFn }),
+    /not owned by this node's own identity/,
+  );
+});
+
+test('linkVavltChannel references the real channel by id, without duplicating its fields', async () => {
+  const store = createHvntzStore();
+  const hub = hubBusiness(store);
+  const network = createNetwork(store, { hubBusinessId: hub.id, name: 'Net' });
+  const node = await activeNode(store, network);
+  const linked = await linkVavltChannel(store, { nodeId: node.id, vavltChannelId: 501, channelFetchFn: fakeChannelFetchFn });
+  assert.strictEqual(linked.vavltChannelId, 501);
+  assert.strictEqual(Object.keys(linked).includes('streamUrl'), false, 'a Node must not absorb the channel\'s own fields');
+});
+
+test('linkVavltChannel refuses a node that is not yet active — still-invited or declined/removed', async () => {
+  const store = createHvntzStore();
+  const hub = hubBusiness(store);
+  const network = createNetwork(store, { hubBusinessId: hub.id, name: 'Net' });
+  const invited = await inviteNode(store, { networkId: network.id, invitedIdentityId: 'dj-marcus', identityFetchFn: fakeIdentityFetchFn });
+  await assert.rejects(
+    linkVavltChannel(store, { nodeId: invited.id, vavltChannelId: 501, channelFetchFn: fakeChannelFetchFn }),
+    /must be active to carry a stream/,
+  );
+  const declined = respondToInvitation(store, { nodeId: invited.id, response: 'declined' });
+  await assert.rejects(
+    linkVavltChannel(store, { nodeId: declined.id, vavltChannelId: 501, channelFetchFn: fakeChannelFetchFn }),
+    /must be active to carry a stream/,
+  );
+});
+
+test('unlinkVavltChannel clears the reference', async () => {
+  const store = createHvntzStore();
+  const hub = hubBusiness(store);
+  const network = createNetwork(store, { hubBusinessId: hub.id, name: 'Net' });
+  const node = await activeNode(store, network);
+  await linkVavltChannel(store, { nodeId: node.id, vavltChannelId: 501, channelFetchFn: fakeChannelFetchFn });
+  const unlinked = unlinkVavltChannel(store, { nodeId: node.id });
+  assert.strictEqual(unlinked.vavltChannelId, null);
 });
 
 // -- views ---------------------------------------------------------------------
