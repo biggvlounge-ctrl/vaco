@@ -987,6 +987,7 @@ services:
     container_name: vash-tap
     environment:
       PORT: 8825
+      DREAMS_API_URL: "http://dreams:8814"
       HVNTZ_API_URL: "http://hvntz:8792"
       SHIELD_API_URL: "http://shield:8812"
       V3_API_URL: "http://v3:8811"

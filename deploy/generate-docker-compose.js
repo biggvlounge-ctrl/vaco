@@ -44,6 +44,7 @@ const apps = lines.map((l) => {
 const ENV_VAR_TO_SERVICE = {
   CHOPZ_SHOP_API_URL: "chopz-shop",
   CVNVO_API_URL: "cvnvo",
+  DREAMS_API_URL: "dreams",
   HVNTZ_API_URL: "hvntz",
   SHIELD_API_URL: "shield",
   V3_API_URL: "v3",
