@@ -119,7 +119,7 @@ hand, both optional:
 | Variable | What it is for | Needed? |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | Brings `v4-proxy` up. | Optional — without it that one app stays DOWN. |
-| `DATABASE_URL` | Puts 30 of the 35 backends on Postgres instead of files. | Set for you automatically when you attach Replit's PostgreSQL. |
+| `DATABASE_URL` | Puts 31 of the 36 backends on Postgres instead of files. | Set for you automatically when you attach Replit's PostgreSQL. |
 
 They go in Replit's **Secrets** pane, never in `.replit` — that file is
 committed to a public repository.
@@ -136,8 +136,8 @@ down" in the expected `35 up, 1 down` line above.
 that one variable is the whole configuration — nothing else to set, and
 nothing to run by hand.
 
-With it, 30 of the 35 backends keep their state in Postgres instead of
-a file: `vacon-c` loads its own 63-table world schema, and 28 others
+With it, 31 of the 36 backends keep their state in Postgres instead of
+a file: `vacon-c` loads its own 63-table world schema, and 30 others
 keep a document each in a `vaco.stores` table.
 
 The other 5 are not all waiting their turn. **2 apps keep state in JSON
