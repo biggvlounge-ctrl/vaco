@@ -1336,7 +1336,7 @@ are what stand between this and a real deployment.**
   ringing at nobody), `v4-search` and `vex-trading` (both stateless
   query layers over other apps' records).
 
-  **All 28 file-backed apps moved to the shared Postgres store backend on 11 Sep 2026 — 29 of the 34 backends on Postgres once VACON-C is counted.** `shared/persistencePg.js` is the same three-function
+  **All 28 file-backed apps moved to the shared Postgres store backend on 11 Sep 2026 — 30 of the 35 backends on Postgres once VACON-C is counted.** `shared/persistencePg.js` is the same three-function
   interface the other apps already use, over a `vaco.stores` table
   holding one JSONB document per app. An app converts by changing how
   its store is built; its libs, routes and guards do not move.

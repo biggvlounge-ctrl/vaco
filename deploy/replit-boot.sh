@@ -32,7 +32,7 @@
 #
 # VACON-C and its database
 #
-# **29 of the 34 backends use Postgres when it is there**, as of 11 Sep
+# **30 of the 35 backends use Postgres when it is there**, as of 11 Sep
 # 2026 -- this said "one app" until then. Attach Replit's built-in
 # PostgreSQL and DATABASE_URL is set for you; nothing else to configure.
 #

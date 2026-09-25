@@ -1,8 +1,8 @@
 # deploy/
 
-Real production-deployment tooling for the VACO ecosystem's 34 Express
+Real production-deployment tooling for the VACO ecosystem's 35 Express
 backends + 2 Vite frontends, plus nginx, the LiveKit SFU and a Postgres
-for VACON-C — 39 Compose services and 30 named volumes. (The Postgres
+for VACON-C — 40 Compose services and 31 named volumes. (The Postgres
 is not a general ecosystem database: every other app persists through
 `createPersistentStore` to a JSON store. VACON-C is a tick simulation
 whose durable record is Postgres, and it is the only service that uses
@@ -219,7 +219,7 @@ confirmed cross-app URLs resolve to the correct real service name +
 port per app (spot-checked `vulture-studios` → `shield`/`v3`/
 `vaco-analytics`/`vaco-audit`/`vaco-operator`/`vulture-flix`/
 `vulture-music`, all seven real, all correctly scoped — no unrelated
-var leaked in); confirmed exactly 30 named volumes, each declared once
+var leaked in); confirmed exactly 31 named volumes, each declared once
 and mounted by exactly one service, matching the real persisted-app
 list.
 
@@ -229,8 +229,8 @@ volume and `POSTGRES_PASSWORD`. The generator was re-run and
 `scripts/test/deploy-readme.test.mjs` re-checks every count in this
 paragraph against the real files on each run, which is what caught the
 stale numbers here. The rest of the checks above were not re-run for
-the new service.) `deploy/nginx-docker.conf`'s braces balance (40 open, 40 close)
-and all 36 expected `location` blocks appear exactly once, no
+the new service.) `deploy/nginx-docker.conf`'s braces balance (41 open, 41 close)
+and all 37 expected `location` blocks appear exactly once, no
 duplicates. **Not verified**: an actual `docker compose up --build` —
 no image has ever been built here, for any service. Run
 `docker compose up --build` yourself as the real first test before
@@ -271,7 +271,7 @@ quietly wrong.
 
 ## `ecosystem.config.js`
 A real [pm2](https://pm2.keymetrics.io/) process list for the
-**34 backends** (the 2 Vite frontends are deliberately excluded — they
+**35 backends** (the 2 Vite frontends are deliberately excluded — they
 get a real production build and are served as static files by nginx
 instead; see below). Four fewer entries than the Compose service
 count above, which additionally carries nginx and LiveKit as
@@ -380,14 +380,14 @@ every VDP/VENVS district client already builds its request URL
 **Not live-verified against a real nginx**: this sandbox's outbound
 package mirrors couldn't install `nginx` to run a real `nginx -t`
 against the generated file. What *is* verified: the generated config's
-braces are balanced (40 open, 40 close) and every one of the 36
-expected `location` blocks (33 backends + `/vdp/` + `/venvs/` + the
+braces are balanced (41 open, 41 close) and every one of the 37
+expected `location` blocks (34 backends + `/vdp/` + `/venvs/` + the
 `/` root) appears exactly once, no duplicates — a real bug this
 generator had on its first pass (`cvnvo` emitted twice) and was fixed
 before committing. Run `nginx -t` yourself as the first real check on
 your actual server before reloading nginx with it.
 
-(33 backends rather than 34 because the 34th, `vaco-shell`, *is* the
+(34 backends rather than 35 because the 35th, `vaco-shell`, *is* the
 `/` root — the app store is what a bare `https://yourdomain.com/`
 serves, so it has no prefixed location of its own.)
 

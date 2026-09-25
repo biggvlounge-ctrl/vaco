@@ -22,7 +22,7 @@
 #
 # Not good for: production -- though the reason narrowed on 11 Sep
 # 2026, and this comment carried the old, wider claim for a day: it
-# asserted that all of them were file-backed. 29 of the 34 backends are
+# asserted that all of them were file-backed. 30 of the 35 backends are
 # on Postgres when DATABASE_URL is set; 2 keep JSON files (vaco-shell,
 # vaco-analytics) and 3 keep no state at all.
 #
@@ -85,7 +85,7 @@ PORT = "8080"
 # that one variable is the whole configuration -- nothing else to set,
 # nothing to run by hand.
 #
-# 29 of the 34 backends use it: `vacon-c` loads its own 63-table world
+# 30 of the 35 backends use it: `vacon-c` loads its own 63-table world
 # schema into an empty database on first boot, and 28 others keep a
 # document each in a `vaco.stores` table. V3 goes further -- balances
 # and transactions are real rows.
