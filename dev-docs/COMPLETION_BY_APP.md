@@ -11,7 +11,7 @@ each app's test suite actually executed. Nothing here is recalled.
 `scripts/test/completion-report.test.mjs` fails if this file drifts
 from what the script emits, which is the failure mode that made
 `COMPLETION_AUDIT.md` read 31 apps and 522 tests when the real numbers
-were 36 and 2257.
+were 36 and 2262.
 
 ---
 
@@ -56,7 +56,7 @@ anything it can:
 | Express backends in the manifest | **36** |
 | Overall criteria met | **99%** (272/274) |
 | Apps at 100% | **34 / 36** |
-| Tests | **2257** |
+| Tests | **2262** |
 | Apps with no test suite | **0** |
 
 Two notes on that test count, so it is not read as contradicting
@@ -115,7 +115,7 @@ anything else:
 | `vxllage` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 13 |
 | `yap` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 35 |
 | `vaco-passport` | **85%** | 6/7 | ✅ | ❌ | — | ✅ | ✅ | ✅ | ✅ | ✅ | 22 |
-| `vash-tap` | **85%** | 6/7 | ✅ | ❌ | — | ✅ | ✅ | ✅ | ✅ | ✅ | 42 |
+| `vash-tap` | **85%** | 6/7 | ✅ | ❌ | — | ✅ | ✅ | ✅ | ✅ | ✅ | 47 |
 
 `—` means the criterion does not apply to that app and is excluded
 from both halves of its fraction — an app is never marked down for
