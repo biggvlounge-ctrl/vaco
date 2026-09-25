@@ -84,6 +84,7 @@ const FREE_LISTINGS = {
   'vaco-operator': 'infrastructure',
   'vaco-media': 'infrastructure',
   'vaco-notify': 'infrastructure',
+  'vash-tap': 'infrastructure',
 };
 
 //: Flagged interpretive: the publisher of every first-party app. In

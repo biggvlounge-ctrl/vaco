@@ -250,7 +250,7 @@ export const CONSTELLATIONS = [
     public: false,
     parents: [],
     appIds: ['vacon', 'vsafe', 'vaco-analytics', 'shield', 'vaco-audit',
-      'vaco-operator', 'vaco-media', 'vaco-notify'],
+      'vaco-operator', 'vaco-media', 'vaco-notify', 'vash-tap'],
     note: 'Real, running, and load-bearing. None of them is an app anybody opens.',
   },
 ];
