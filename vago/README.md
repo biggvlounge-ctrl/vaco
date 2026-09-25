@@ -190,6 +190,23 @@ curl -X POST http://localhost:8795/api/casino/sessions -H "Content-Type: applica
   protection, so its own perfect payout is deliberately lower than the
   straight Perfect table at the same count, the same real tradeoff
   DK's own product makes. Missing two or more still busts the entry.
+- `lib/groupWagers.js` — **Group Wagers, the narrowest real slice of
+  `dev-docs/on-deck/VAGO_GROUP_WAGERS_FREEZE.md`** (see its own §29
+  audit in `dev-docs/on-deck/README.md`). Not a second wagering
+  engine: a Group Wager is a named, creator-owned, open-or-private
+  wrapper (name, entry deadline, participant cap, invite list) around
+  one real `predictionMarkets.js` market — joining is `buyContract`,
+  resolving is `resolveMarket`, both already solvent and
+  `settleOnce`-protected. Binary outcomes only, inherited from the
+  underlying market. A group's own thread links a real VXLLAGE post
+  (`vxllage/lib/posts.js`, per the freeze's own §9/§21 instruction to
+  reuse VILLAGE's social infrastructure) rather than building a second
+  comment system — the creator posts through VXLLAGE's own real flow
+  with their own session and hands the post id back, since nothing
+  here forwards a caller's session to another app. Resolution is
+  `requireOperator('vago:settle')` plus a `decisionLog` entry, the same
+  shape `/api/markets/:id/resolve` already uses, because it settles
+  the same real pool.
 - `server.js` — a real Express API (CommonJS) wrapping the above.
 
 ## Verified
@@ -314,3 +331,9 @@ if VACO Analytics is down). See `vaco-analytics/dev-docs/phase-5-live-metric-fee
   far.
 - A named VAGO agent — unlike Gibson (VOID) or Kenji (VOKEN), no
   VAGO-specific agent is confirmed in any of the three source docs.
+- Group Wager side wagers, team roles, a leaderboard, a real invitation
+  state machine, and QVAN-based group-risk monitoring — the §29 audit
+  found no substrate for any of them anywhere in the ecosystem, so
+  building them now would mean inventing a system the freeze assumes
+  already exists rather than reusing one. Multi-outcome group wagers
+  are also out of scope: `predictionMarkets.js` is binary only.

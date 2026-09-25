@@ -24,6 +24,8 @@ function createVagoStore() {
     nextFantasyPropId: 1,
     fantasyEntries: [],
     nextFantasyEntryId: 1,
+    groupWagers: [],
+    nextGroupWagerId: 1,
   };
 }
 

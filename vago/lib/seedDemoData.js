@@ -38,6 +38,7 @@ const { submitAmoeEntry } = require('./amoe');
 const { startCasinoSession } = require('./casinoSession');
 const { createPredictionMarket, buyContract } = require('./predictionMarkets');
 const { createSportsEvent, eventProbabilities, placeSportsBet } = require('./sportsbook');
+const { createGroupWager, joinGroupWager } = require('./groupWagers');
 
 const DEMO_USERS = ['demo-user', 'demo-maya', 'demo-carlos', 'demo-priya'];
 const VAGO_EDITORIAL = 'vago-editorial';
@@ -216,6 +217,33 @@ async function seedCasinoSessions(store, { settleFn }) {
   }
 }
 
+// §5's own worked example, seeded for real through the real
+// createGroupWager/joinGroupWager functions server.js's own routes
+// call -- an open group wager with two demo participants already on
+// opposite sides, so a presenter sees real pool/participant numbers
+// rather than an empty shell.
+async function seedGroupWagers(store, { settleFn }) {
+  if (store.groupWagers.length > 0) return;
+
+  try {
+    const groupWager = await createGroupWager(store, {
+      creatorId: 'demo-user',
+      name: '$20 Group Bet — Who wins tonight?',
+      description: 'Cardinals vs. Cubs, winner take the pool.',
+      visibility: 'open',
+      maxParticipants: 20,
+      entryDeadline: Date.now() + 24 * 60 * 60 * 1000,
+      question: 'Will the Cardinals win tonight?',
+      category: 'sports',
+      source: 'real-world',
+    });
+    await joinGroupWager(store, { groupWagerId: groupWager.id, userId: 'demo-maya', side: 'yes', quantity: 20, settleFn });
+    await joinGroupWager(store, { groupWagerId: groupWager.id, userId: 'demo-carlos', side: 'no', quantity: 15, settleFn });
+  } catch (err) {
+    console.warn(`seedDemoData: skipped the demo group wager — ${err.message}`);
+  }
+}
+
 // Called once at server boot (`server.js`), guarded per-array by a
 // real emptiness check -- a persisted `data/store.json` loaded with
 // real markets/sessions is never touched, and restarting the server
@@ -227,6 +255,7 @@ async function seedDemoData(store, { settleFn }) {
   await seedPredictionMarkets(store, { settleFn });
   await seedSportsEvents(store, { settleFn });
   await seedCasinoSessions(store, { settleFn });
+  await seedGroupWagers(store, { settleFn });
 }
 
 module.exports = { seedDemoData, DEMO_USERS };

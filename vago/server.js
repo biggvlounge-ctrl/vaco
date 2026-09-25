@@ -50,6 +50,10 @@ const {
   MIN_PICKS, MAX_PICKS, FLEX_MIN_PICKS, PERFECT_PAYOUT_TABLE, FLEX_PAYOUT_TABLE,
   createProp, getProp, resolveProp, createFantasyEntry, getFantasyEntry, gradeFantasyEntry, listEntriesForUser,
 } = require('./lib/fantasy');
+const {
+  VISIBILITIES: GROUP_WAGER_VISIBILITIES, createGroupWager, joinGroupWager,
+  linkGroupWagerThread, resolveGroupWager, groupWagerView,
+} = require('./lib/groupWagers');
 
 const app = express();
 app.use(cors());
@@ -256,6 +260,7 @@ app.get('/api/health', (_req, res) => {
     fantasyFlexMinPicks: FLEX_MIN_PICKS,
     fantasyPerfectPayoutTable: PERFECT_PAYOUT_TABLE,
     fantasyFlexPayoutTable: FLEX_PAYOUT_TABLE,
+    groupWagerVisibilities: GROUP_WAGER_VISIBILITIES,
   });
 });
 
@@ -524,6 +529,84 @@ app.get('/api/predictions/real-world', (_req, res) => {
   res.json({
     markets: listMarketsBySource(store, 'real-world').map((m) => ({ ...m, ...getMarketPrice(m) })),
   });
+});
+
+// -- Group Wagers ----------------------------------------------------------
+//
+// §5's own example: "A user creates..." — a real session, not a
+// service, and the same reasoning `/api/markets` already documents for
+// why *creating* decides nothing ("Creating an event decides nothing;
+// settling it does").
+app.post('/api/group-wagers', requireActor('creatorId'), (req, res) => {
+  try {
+    res.status(201).json(createGroupWager(store, req.body || {}));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/group-wagers/:id', (req, res) => {
+  const view = groupWagerView(store, Number(req.params.id));
+  if (!view) return res.status(404).json({ error: `no group wager with id ${req.params.id}` });
+  res.json(view);
+});
+
+app.post('/api/group-wagers/:id/join', requireActor('userId'), async (req, res) => {
+  try {
+    res.status(201).json(await joinGroupWager(store, {
+      ...req.body, groupWagerId: Number(req.params.id), settleFn: settleVCoin,
+    }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// §9's shared thread. Only the creator links it — VXLLAGE's own
+// `POST /api/posts` is `requireActor('authorId')`, so the creator
+// posts through VXLLAGE's real flow with their own session and hands
+// the resulting post id back here; VAGO never creates it on their
+// behalf, which would need forwarding their session to another app,
+// a convention this ecosystem does not otherwise use.
+app.post('/api/group-wagers/:id/thread', requireSession(), (req, res) => {
+  const groupWagerId = Number(req.params.id);
+  const existing = groupWagerView(store, groupWagerId);
+  if (!existing) return res.status(404).json({ error: `no group wager with id ${groupWagerId}` });
+  if (String(existing.creatorId) !== String(req.sessionUserId)) {
+    return res.status(403).json({ error: 'only the creator may link this group wager\'s thread' });
+  }
+  try {
+    res.json(linkGroupWagerThread(store, { groupWagerId, threadPostId: (req.body || {}).threadPostId }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Decides an outcome — same operator-only, decision-logged shape as
+// `/api/markets/:id/resolve` right above, because it calls the same
+// real `resolveMarket` underneath and pays out the same real pool.
+app.post('/api/group-wagers/:id/resolve', requireOperator('vago:settle'), async (req, res) => {
+  try {
+    await decisionLog.record({
+      route: 'POST /api/group-wagers/:id/resolve',
+      outcomeKind: 'settlement',
+      subjectType: 'groupWager',
+      subjectId: req.params.id,
+      decidedBy: req.operator.operatorName,
+      decidedByKind: 'operator',
+      inputs: req.body || {},
+      reason: (req.body || {}).reason || null,
+    });
+  } catch (err) {
+    return res.status(503).json({ error: err.message });
+  }
+
+  try {
+    res.json(await resolveGroupWager(store, {
+      ...req.body, groupWagerId: Number(req.params.id), settleFn: settleVCoin,
+    }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 app.get('/api/sports/events', (_req, res) => {
