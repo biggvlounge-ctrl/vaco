@@ -537,9 +537,9 @@ app.get('/api/predictions/real-world', (_req, res) => {
 // service, and the same reasoning `/api/markets` already documents for
 // why *creating* decides nothing ("Creating an event decides nothing;
 // settling it does").
-app.post('/api/group-wagers', requireActor('creatorId'), (req, res) => {
+app.post('/api/group-wagers', requireActor('creatorId'), async (req, res) => {
   try {
-    res.status(201).json(createGroupWager(store, req.body || {}));
+    res.status(201).json(await createGroupWager(store, req.body || {}));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
