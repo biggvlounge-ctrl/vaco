@@ -288,11 +288,17 @@ document: `vaco-shell/lib/registry.js` bundles **both `vdp` and
 ## ◇ Internal — not public-facing
 
 **VACON · VSAFE · VACO Analytics · VACO Notify · Shield · VACO Audit ·
-VACO Operator · VACO Media**
+VACO Operator · VACO Media · VASH TAP · VACO Passport**
 
 *Directed: VACON is not an app the public sees, so it does not belong in
-a public constellation. The five added on 11 Sep 2026 follow the same
-rule — none is an app anybody opens.*
+a public constellation. The five added on 11 Sep 2026, and VASH TAP and
+VACO Passport added 25 Sep 2026, follow the same rule — none is an app
+anybody opens. VASH TAP and VACO Passport do carry real
+`public/index.html` frontends (built 25 Sep 2026, so both meet the
+completion report's "has a frontend" criterion) — but the person who
+opens one is always acting on behalf of a real HVNTZ business or as a
+Tap's spender, never as a customer of VASH TAP or VACO Passport
+themselves, which is the line this group actually draws.*
 
 | | What it is | Who consumes it |
 |---|---|---|
@@ -304,6 +310,8 @@ rule — none is an app anybody opens.*
 | **VACO Audit** | The append-only decision record | Every Group-2 route |
 | **VACO Operator** | Human-operator credentials and scopes | Group-2 routes |
 | **VACO Media** | The media control plane | Vault, Flix, Pods, CHOPZ, VXLLAGE |
+| **VASH TAP** | The physical-to-digital tap layer — tap, resolve, pay, attribute | HVNTZ businesses (Tap Points) and their spenders, through V3's ledger |
+| **VACO Passport** | The Business Passport, Levels 1-3 | HVNTZ businesses building VACA-verified network history |
 
 These are real, running, and load-bearing — VSAFE especially, since
 check-ins, screening and escalation are live mechanics that CVNVO
@@ -327,18 +335,20 @@ stayed internal. One parent, two different kinds of thing.
 
 ## What each constellation needs next
 
-Drawn from `VACO_ACCELERATION_MATRIX.md` and `COMPLETION_AUDIT.md`. The
-grouping does not create new work — it makes clear which work is one job
-and which is four.
+Drawn from `VACO_ACCELERATION_MATRIX.md` and `COMPLETION_AUDIT.md` when
+first written (26 Aug – 11 Sep 2026). **Re-verified 25 Sep 2026** —
+most of the original list had already closed and the table was pointing
+at finished work, which is worse than pointing at nothing: someone
+reading it cold would re-do it.
 
-| | Next | Why |
-|---|---|---|
-| **✕ VOID** | Tests for CVNVO, HVNTZ, YAP · a moderation queue · the notification channel | 126 untested routes, and the highest-liability product has no review step |
-| **○ SYSTEMS** | Off-host backups · CI · `requireActor` · tests for VACA | A gap here is 29 apps' gap. The Postgres move landed 11 Sep 2026; the backup gap did not |
-| **■ VOKEN** | VOKEN's eight money flows · VEX's compliance gates | Precondition for any restructuring of the VOKEN four |
-| **✕ VVLTVRE** | The media vendor decision — start with Pods on storage + CDN | One decision unblocks six surfaces; blocked on judgment, not effort |
-| **▲ GAMES** | Migrate VDP onto the design system | One of the last two frontends outside it |
-| **◇ internal** | *(done — VACO Notify shipped)* · tests for Analytics' 7 routes | VSAFE escalations had no channel; they now have one |
+| | Then (Aug–Sep 2026) | Now, checked 25 Sep 2026 | Real next |
+|---|---|---|---|
+| **✕ VOID** | 126 untested routes ecosystem-wide; YAP had no moderation queue; DREAMS alerts paged nobody | CVNVO/HVNTZ/YAP all carry real, green test suites (13/84/35 tests) · YAP has `lib/moderation.js` · DREAMS calls `vaco-notify` on alert (`dreams/server.js`) | A suite existing and passing is not the same claim as "every route tested" — re-run a per-route audit before trusting a specific untested-route count again |
+| **○ SYSTEMS** | Off-host backups, CI, `requireActor`, VACA tests all open | CI is live (`.github/workflows/ci.yml`) · `requireActor` is in 25 apps' `server.js` · VACA has 17/17 tests | **Off-host backups are still genuinely open** — `DISASTER_RECOVERY.md` §6's sync has never been run against a real remote, confirmed unchanged today. Still the real single point of failure under the ledger 29 apps settle through |
+| **■ VOKEN** | VOKEN's eight money flows and VEX's compliance gates both untested | `voken/test/money.test.js` names and covers all eight — packs, raffles, trades, all three auction types, fractional buy, secondary shares, merch, referral spins | VEX's gate is a broker-dealer registration requirement, not a code gap — no test suite closes it |
+| **✕ VVLTVRE** | The media vendor decision blocks six surfaces | **Unchanged** — still blocked on the same vendor decision, confirmed today via `COMPLETION_BY_APP.md`'s own standing gap list | Still the single highest-leverage decision in the repo; start with Pods on storage + CDN, no SFU needed |
+| **▲ GAMES** | VDP is one of two frontends outside the design system | **Unchanged** — `sync-design-system.sh` still excludes `vdp` by name | Still open — the last real frontend-migration gap alongside VENVS |
+| **◇ internal** | VACO Notify shipped · Analytics had 7 untested routes | Analytics now carries `routeGuards.test.js` alongside `analytics.test.js`, 39 tests total | Same caveat as ✕ VOID — worth a per-route confirmation, not just a suite-passes check, before calling it closed |
 
 ---
 
