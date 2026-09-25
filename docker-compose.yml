@@ -144,6 +144,7 @@ services:
       PORT: 8792
       SHIELD_API_URL: "http://shield:8812"
       V3_API_URL: "http://v3:8811"
+      VACA_API_URL: "http://vaca:8804"
       VACO_AUDIT_URL: "http://vaco-audit:8819"
       VACO_OPERATOR_URL: "http://vaco-operator:8820"
       VAVLT_STVDIOS_API_URL: "http://vavlt-stvdios:8808"
