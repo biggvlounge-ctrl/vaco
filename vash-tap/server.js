@@ -221,7 +221,10 @@ app.get('/api/business/:businessId/taps', (req, res) => {
 // has no account yet: someone tapping for the first time.
 app.get('/api/taps/:tapCode/resolve', async (req, res) => {
   try {
-    const resolved = await resolveTap(store, req.params.tapCode, { identityFetchFn: fetchVacaIdentityStatus });
+    const resolved = await resolveTap(store, req.params.tapCode, {
+      identityFetchFn: fetchVacaIdentityStatus,
+      businessFetchFn: fetchHvntzBusiness,
+    });
     res.json(resolved);
   } catch (err) {
     res.status(404).json({ error: err.message });

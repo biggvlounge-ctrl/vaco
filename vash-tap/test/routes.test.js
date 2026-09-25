@@ -115,6 +115,9 @@ test('GET /api/taps/:tapCode/resolve needs no session and returns the seeded cha
   assert.equal(body.tap.businessId, 9001);
   assert.equal(body.payable, true);
   assert.ok(body.assignment, 'the seeded chair should have a current assignment');
+  // HVNTZ is unreachable for this whole suite, same as VACA — business
+  // resolution must fail soft here too, not take the route down.
+  assert.strictEqual(body.business, null);
 });
 
 test('resolve fails soft when VACA is unreachable — the regression this build fixed', { skip: SKIP }, async () => {

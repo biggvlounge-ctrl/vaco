@@ -89,7 +89,7 @@ alert) — steps 1 and 3's reads work standalone once seeded.
 | `POST /api/taps` | session, HVNTZ business owner | registers a Tap against a real HVNTZ business |
 | `GET /api/taps/:tapCode` | none | |
 | `GET /api/business/:businessId/taps` | none | |
-| `GET /api/taps/:tapCode/resolve` | none | §6 resolution; fails soft, not hard, if VACA is unreachable |
+| `GET /api/taps/:tapCode/resolve` | none | §6 resolution (steps 1-6: id, status, assignment, VACA, business); fails soft, not hard, if VACA or HVNTZ is unreachable |
 | `POST /api/taps/:tapCode/assignments` | session, HVNTZ business owner (via the tap) | §5 dynamic assignment |
 | `POST /api/taps/:tapCode/freeze` | session, HVNTZ business owner (via the tap) | §40 lost/stolen Tap — stops payability immediately |
 | `POST /api/taps/:tapCode/unfreeze` | session, HVNTZ business owner (via the tap) | refuses if the Tap is not currently frozen |
@@ -100,16 +100,21 @@ alert) — steps 1 and 3's reads work standalone once seeded.
 
 ## Why some things fail with 502, not a hang
 
-Three cross-app dependencies (HVNTZ ownership checks, Shield session
-verification, VACA identity) are asked over real HTTP with no retry.
-An unreachable dependency answers 502 rather than hanging the request
-forever — the same distinction `shieldAuth.cjs` already draws for
-Shield ("Shield being unreachable is 502, not 401"), applied here to
-HVNTZ too (`resolveHvntzBusiness` in `server.js`). VACA is the one
-exception: identity verification on the public resolve route fails
-*soft* (`assigneeVerified: null`), matching VOID's own standing rule
-("VACA verification... fail soft, never block a real job") — resolution
-identifies the object, it doesn't authorize a payment.
+Cross-app dependencies (HVNTZ ownership checks, Shield session
+verification) are asked over real HTTP with no retry. On the
+session-gated, owner-only routes (registration, assignment, freeze/
+unfreeze, revenue), an unreachable dependency answers 502 rather than
+hanging the request forever — the same distinction `shieldAuth.cjs`
+already draws for Shield ("Shield being unreachable is 502, not 401"),
+applied here to HVNTZ too (`resolveHvntzBusiness` in `server.js`).
+
+The public resolve route is the one exception, on both of its
+dependencies: VACA identity verification (`assigneeVerified: null`)
+and HVNTZ business resolution (`business: null`) both fail *soft*,
+matching VOID's own standing rule ("VACA verification... fail soft,
+never block a real job") — resolution identifies the object, it
+doesn't authorize a payment, and the one route with no session
+requirement must not go down on a dependency it doesn't strictly need.
 
 ## Test
 

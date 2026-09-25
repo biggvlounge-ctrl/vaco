@@ -154,13 +154,14 @@ function currentAssignmentFor(store, tap, now = Date.now()) {
   return covering[0] || null;
 }
 
-// **§6, Tap Resolution** — steps 1-11 of the freeze's own numbered list,
+// **§6, Tap Resolution** — steps 1-6 of the freeze's own numbered list,
 // scoped to what this slice has: Tap ID, status, current assignment,
-// business, and the assignee's VACA verification. Product/service
-// resolution, permissions and "available actions" beyond payment are
-// out of scope here — nothing built provides them yet.
+// the assignee's VACA verification, and the resolved business. Steps
+// 7-10 (location, product/object/service/event, permissions, available
+// actions) are out of scope here — nothing built provides them yet, and
+// a Tap Point doesn't carry a locationId to resolve step 7 from.
 async function resolveTap(store, tapCode, options = {}) {
-  const { now = Date.now(), identityFetchFn = null } = options;
+  const { now = Date.now(), identityFetchFn = null, businessFetchFn = null } = options;
   const tap = findTap(store, tapCode);
   if (!tap) throw new Error(`resolveTap: no tap ${tapCode}`);
 
@@ -182,11 +183,26 @@ async function resolveTap(store, tapCode, options = {}) {
     }
   }
 
+  // Real resolution, not a pass-through of the id stored at
+  // registration time — a business can rename or move between when a
+  // Tap was registered and when it is tapped. Same fail-soft reasoning
+  // as identityFetchFn above: an HVNTZ outage must not break resolving
+  // the one thing this route exists to identify, the Tap itself.
+  let business = null;
+  if (tap.businessId && businessFetchFn) {
+    try {
+      business = await businessFetchFn(tap.businessId);
+    } catch {
+      business = null;
+    }
+  }
+
   return {
     tap,
     assignment,
     assigneeIdentityId: assignment ? assignment.assignedIdentityId : null,
     assigneeVerified,
+    business,
     payable: tap.status === 'active' && assignment !== null,
   };
 }

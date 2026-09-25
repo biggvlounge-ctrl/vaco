@@ -163,6 +163,30 @@ test('resolveTap fails soft, not hard, when identityFetchFn itself throws (VACA 
   assert.strictEqual(resolved.payable, true, 'payability depends on assignment, not on identity verification succeeding');
 });
 
+test('resolveTap resolves the real business, not just the stored id — §6 step 6', async () => {
+  const store = createTapStore();
+  const tap = await registerTap(store, { tapType: 'business', businessId: HUNT_ID, businessFetchFn: fakeBusinessFetchFn });
+  const resolved = await resolveTap(store, tap.tapCode, { businessFetchFn: fakeBusinessFetchFn });
+  assert.strictEqual(resolved.business.name, 'HUNT Barber Shop');
+});
+
+test('resolveTap fails soft, not hard, when businessFetchFn itself throws (HVNTZ unreachable)', async () => {
+  const store = createTapStore();
+  const tap = await registerTap(store, { tapType: 'business', businessId: HUNT_ID, businessFetchFn: fakeBusinessFetchFn });
+  await assignTap(store, { tapCode: tap.tapCode, assignedIdentityId: 'barber-1', identityFetchFn: fakeIdentityFetchFn });
+  const brokenBusinessFetchFn = async () => { throw new Error('ECONNREFUSED'); };
+  const resolved = await resolveTap(store, tap.tapCode, { businessFetchFn: brokenBusinessFetchFn });
+  assert.strictEqual(resolved.business, null, 'an HVNTZ outage must not throw resolveTap — it must report unknown');
+  assert.strictEqual(resolved.payable, true, 'payability must not depend on the business fetch succeeding');
+});
+
+test('resolveTap resolves business:null for a personal Tap with no businessId', async () => {
+  const store = createTapStore();
+  const tap = await registerTap(store, { tapType: 'personal', ownerIdentityId: 'ada' });
+  const resolved = await resolveTap(store, tap.tapCode, { businessFetchFn: fakeBusinessFetchFn });
+  assert.strictEqual(resolved.business, null);
+});
+
 test('resolveTap rejects a tap code that does not exist', async () => {
   const store = createTapStore();
   await assert.rejects(resolveTap(store, 'VT-999999'), /no tap VT-999999/);
