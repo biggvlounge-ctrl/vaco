@@ -32,11 +32,12 @@
 // Infrastructure just to keep the sizes tidy -- Operations &
 // Infrastructure correspondingly stands at 2 (VOID, V4).
 //
-// Nine apps are products of no bundle at all, which is what
+// Ten apps are products of no bundle at all, which is what
 // `parent: null, bundle: null` means: `shield`, `vaco-analytics`,
 // `vaco-audit`, `vaco-operator`, `vaco-media`, `vaco-notify`, `vacon`,
-// `vsafe`, `vash-tap` -- the cross-cutting services every app calls and
-// no user launches -- plus `v3-shield`, the legacy dev mock.
+// `vsafe`, `vash-tap`, `vaco-passport` -- the cross-cutting services
+// every app calls and no user launches -- plus `v3-shield`, the legacy
+// dev mock.
 //
 // **Two absences here are deliberate, and both have bitten before.**
 // `vex` (8816) is not listed because `vex-trading` (8817) is the shell
@@ -121,6 +122,7 @@ export const APPS = [
   { id: 'vaco-operator', name: 'VACO Operator', description: 'Human-operator credentials and scopes -- a separate, deliberately small credential, not a Shield role. Group-2 routes ("decisions with a loser") accept it and no service-token fallback.', url: 'http://localhost:8820', category: 'infra', parent: null, bundle: null },
   { id: 'vaco-media', name: 'VACO Media', description: 'The media control plane: live session grants and recorded-asset playback grants. Owns who gets a playable address and for how long; the transport and storage planes sit behind adapters.', url: 'http://localhost:8821', category: 'infra', parent: null, bundle: null },
   { id: 'vash-tap', name: 'VASH TAP', description: 'The physical-to-digital interaction layer -- Tap resolution, dynamic assignment, and payment attribution on top of V3\'s existing ledger. No frontend yet; narrowest real demo only (HUNT Barber Shop, Chair 1-5).', url: 'http://localhost:8825', category: 'infra', parent: null, bundle: null },
+  { id: 'vaco-passport', name: 'VACO Passport', description: 'The VACO Verified Business Network\'s Business Passport -- Levels 1-3 (Network Member, Verified Business, Network Business) on top of VACA\'s existing identity check and V3\'s real transaction history. No tokenization, no frontend yet.', url: 'http://localhost:8826', category: 'infra', parent: null, bundle: null },
 ];
 
 // The 6 real bundles, grouped by genuine functional similarity (not
@@ -250,7 +252,7 @@ export const CONSTELLATIONS = [
     public: false,
     parents: [],
     appIds: ['vacon', 'vsafe', 'vaco-analytics', 'shield', 'vaco-audit',
-      'vaco-operator', 'vaco-media', 'vaco-notify', 'vash-tap'],
+      'vaco-operator', 'vaco-media', 'vaco-notify', 'vash-tap', 'vaco-passport'],
     note: 'Real, running, and load-bearing. None of them is an app anybody opens.',
   },
 ];

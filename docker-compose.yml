@@ -1007,6 +1007,35 @@ services:
       - v3
       - shield
       - postgres
+  vaco-passport:
+    build:
+      context: ./vaco-passport
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8826
+    container_name: vaco-passport
+    environment:
+      PORT: 8826
+      HVNTZ_API_URL: "http://hvntz:8792"
+      SHIELD_API_URL: "http://shield:8812"
+      V3_API_URL: "http://v3:8811"
+      VACA_API_URL: "http://vaca:8804"
+      VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
+      VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
+      VACO_SERVICE_NAME: vaco-passport
+      VACO_SERVICE_TOKEN: "${VACO_TOKEN_VACO_PASSPORT:?Set a V3 service token for vaco-passport in .env}"
+      DATABASE_URL: "postgres://vacancy:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/vacancy"
+    ports:
+      - "8826:8826"
+    networks:
+      - vaco
+    restart: unless-stopped
+    volumes:
+      - "vaco_passport_data:/app/data"
+    depends_on:
+      - v3
+      - shield
+      - postgres
   venvs:
     build:
       context: ./venvs
@@ -1121,6 +1150,7 @@ volumes:
   vaco_operator_data:
   vaco_media_data:
   vash_tap_data:
+  vaco_passport_data:
   vacon-c-pgdata:
 
 networks:

@@ -185,6 +185,7 @@ APPS=(
   "vaco-operator:vaco-operator:node server.js:8820:/api/health"
   "vaco-media:vaco-media:node server.js:8821:/api/health"
   "vash-tap:vash-tap:node server.js:8825:/api/health"
+  "vaco-passport:vaco-passport:node server.js:8826:/api/health"
   "venvs:venvs:npm run dev:5173:/"
   "vdp:vdp:npm run dev:5174:/"
 )

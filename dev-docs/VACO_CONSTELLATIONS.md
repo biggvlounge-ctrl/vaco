@@ -31,17 +31,19 @@ the founder rather than guessed. This document records which is which.
                                                   VACO Operator
                                                   VACO Media
                                                   VASH TAP
+                                                  VACO Passport
 ```
 
 **18 public parents. One square, two X's, one triangle, one circle.**
-No parent in two places, none left out. The nine in ◇ sit outside the
+No parent in two places, none left out. The ten in ◇ sit outside the
 public structure entirely, because none of them is an app a customer
 opens.
 
-**The internal layer was drawn with three and now holds nine.** VACO
-Notify, Shield, VACO Audit, VACO Operator, VACO Media and VASH TAP were
-all built after 2026-08-26 — this document still refers to `vaco-notify`
-below as unbuilt "task #123", which is how you can tell. The public eighteen have
+**The internal layer was drawn with three and now holds ten.** VACO
+Notify, Shield, VACO Audit, VACO Operator, VACO Media, VASH TAP and VACO
+Passport were all built after 2026-08-26 — this document still refers
+to `vaco-notify` below as unbuilt "task #123", which is how you can
+tell. The public eighteen have
 not changed at all; only the internal list grew, and it grew silently,
 which is exactly the kind of omission
 `scripts/test/constellations.test.mjs` now prevents: every app the
