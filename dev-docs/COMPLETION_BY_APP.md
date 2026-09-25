@@ -54,8 +54,8 @@ anything it can:
 | Metric | Value |
 |---|---:|
 | Express backends in the manifest | **36** |
-| Overall criteria met | **99%** (272/274) |
-| Apps at 100% | **34 / 36** |
+| Overall criteria met | **100%** (276/276) |
+| Apps at 100% | **36 / 36** |
 | Tests | **2332** |
 | Apps with no test suite | **0** |
 
@@ -96,10 +96,12 @@ anything else:
 | `vaco-media` | **100%** | 6/6 | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | 51 |
 | `vaco-notify` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 17 |
 | `vaco-operator` | **100%** | 6/6 | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | 20 |
+| `vaco-passport` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 22 |
 | `vaco-shell` | **100%** | 6/6 | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | 36 |
 | `vacon` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 18 |
 | `vacon-c` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 1241 |
 | `vago` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 61 |
+| `vash-tap` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 47 |
 | `vavlt-stvdios` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 14 |
 | `venvm` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 40 |
 | `vex` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 16 |
@@ -114,8 +116,6 @@ anything else:
 | `vulture-studios` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 14 |
 | `vxllage` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 13 |
 | `yap` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 35 |
-| `vaco-passport` | **85%** | 6/7 | ✅ | ❌ | — | ✅ | ✅ | ✅ | ✅ | ✅ | 22 |
-| `vash-tap` | **85%** | 6/7 | ✅ | ❌ | — | ✅ | ✅ | ✅ | ✅ | ✅ | 47 |
 
 `—` means the criterion does not apply to that app and is excluded
 from both halves of its fraction — an app is never marked down for
@@ -136,5 +136,4 @@ lacking something it was never meant to have.
 
 ## Where the shortfalls are
 
-- **`vaco-passport`** (85%) — missing: has a frontend
-- **`vash-tap`** (85%) — missing: has a frontend
+Every app meets every criterion that applies to it.
