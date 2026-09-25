@@ -4,11 +4,14 @@
 // per its own §1/§55 audit (see `dev-docs/on-deck/README.md`, "The VASH
 // TAP §1/§55 audit"). This builds ONLY on infrastructure the audit
 // confirmed real: V3 (VCoin/VASH ledger), VACA (identity), HVNTZ
-// (business/location), vaco-notify (dispatch). It deliberately does NOT
-// attempt push notifications, general messaging, QVAN-based fraud
-// detection, employee accounts, recurring scheduling, or dimensioned
-// geographic analytics — the audit found none of those exist to reuse,
-// and building them is its own undertaking, not a VASH TAP detail.
+// (business/location), vaco-notify (dispatch), and — added later, same
+// reference-not-merge discipline — DREAMS (`dreams/lib/screens.js`,
+// the ecosystem's real ad/screen network) for the optional Tap<->screen
+// link. It deliberately does NOT attempt push notifications, general
+// messaging, QVAN-based fraud detection, employee accounts, recurring
+// scheduling, or dimensioned geographic analytics — the audit found
+// none of those exist to reuse, and building them is its own
+// undertaking, not a VASH TAP detail.
 //
 // **Not a second ledger.** §7's own rule: VASH TAP must use V3's
 // existing transaction system. Every function here that moves money
@@ -89,11 +92,49 @@ async function registerTap(store, options = {}) {
     ownerIdentityId,
     status: 'active',
     currentAssignmentId: null,
+    dreamsScreenId: null,
     metadata,
     createdAt: now,
     updatedAt: now,
   };
   store.taps.push(tap);
+  return tap;
+}
+
+// **DREAMS screen link — a reference, not a merge.** A business Tap
+// Point can optionally name a real DREAMS screen (the ecosystem's ad
+// network, `dreams/lib/screens.js`) at that same physical location, so
+// the location can also carry ad inventory. This never creates or
+// owns a screen record — `screenFetchFn` is DREAMS' own
+// `GET /api/screens/:id` in production, the same "verify the real
+// thing exists rather than trust a number" pattern `registerTap`
+// already uses for `businessId`. Scoped to `tapType === 'business'`
+// per the freeze-adjacent decision behind this feature: a screen sits
+// at a place, not on a person's wearable or embedded tap.
+async function linkDreamsScreen(store, options = {}) {
+  const { tapCode, dreamsScreenId, screenFetchFn, now = Date.now() } = options;
+  const tap = findTap(store, tapCode);
+  if (!tap) throw new Error(`linkDreamsScreen: no tap ${tapCode}`);
+  if (tap.tapType !== 'business') {
+    throw new Error(`linkDreamsScreen: only a business tap can carry a DREAMS screen (tap ${tapCode} is ${tap.tapType})`);
+  }
+  if (!dreamsScreenId) throw new Error('linkDreamsScreen requires a dreamsScreenId');
+  if (typeof screenFetchFn !== 'function') {
+    throw new Error('linkDreamsScreen requires screenFetchFn(dreamsScreenId)');
+  }
+  const screen = await screenFetchFn(dreamsScreenId);
+  if (!screen) throw new Error(`linkDreamsScreen: no DREAMS screen with id ${dreamsScreenId}`);
+  tap.dreamsScreenId = dreamsScreenId;
+  tap.updatedAt = now;
+  return tap;
+}
+
+function unlinkDreamsScreen(store, options = {}) {
+  const { tapCode, now = Date.now() } = options;
+  const tap = findTap(store, tapCode);
+  if (!tap) throw new Error(`unlinkDreamsScreen: no tap ${tapCode}`);
+  tap.dreamsScreenId = null;
+  tap.updatedAt = now;
   return tap;
 }
 
@@ -339,6 +380,8 @@ module.exports = {
   tapCodeFor,
   findTap,
   registerTap,
+  linkDreamsScreen,
+  unlinkDreamsScreen,
   assignTap,
   currentAssignmentFor,
   resolveTap,

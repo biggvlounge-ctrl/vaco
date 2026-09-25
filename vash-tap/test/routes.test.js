@@ -67,6 +67,7 @@ test.before(async () => {
       VACA_API_URL: 'http://127.0.0.1:1',
       HVNTZ_API_URL: 'http://127.0.0.1:1',
       VACO_NOTIFY_URL: 'http://127.0.0.1:1',
+      DREAMS_API_URL: 'http://127.0.0.1:1',
       SHIELD_API_URL: 'http://127.0.0.1:1',
       VACO_SERVICE_TOKENS: '',
       VACO_SERVICE_AUTH_MODE: 'enforce',
@@ -168,6 +169,23 @@ test('freeze/unfreeze with a session but no live HVNTZ gets a clean 502, not a h
   // way. This is the same regression coverage as the earlier "junk
   // bearer token" test, for the route this build added afterward.
   const res = await post('/api/taps/VT-000002/freeze', {}, {
+    'Content-Type': 'application/json',
+    Authorization: 'Bearer not-a-real-session-token',
+  });
+  const body = await res.json().catch(() => ({}));
+  assert.equal(res.status, 502, `expected 502, got ${res.status}: ${JSON.stringify(body)}`);
+});
+
+test('POST /api/taps/:tapCode/dreams-screen and /unlink refuse an anonymous caller', { skip: SKIP }, async () => {
+  assert.equal((await post('/api/taps/VT-000002/dreams-screen', { dreamsScreenId: 501 })).status, 401);
+  assert.equal((await post('/api/taps/VT-000002/dreams-screen/unlink', {})).status, 401);
+});
+
+test('dreams-screen link with a session but no live HVNTZ gets a clean 502, not a hang', { skip: SKIP }, async () => {
+  // Same ownership-boundary regression as freeze/unfreeze above —
+  // requireTapBusinessOwner asks unreachable HVNTZ before this route
+  // ever gets to asking unreachable DREAMS, and neither may hang.
+  const res = await post('/api/taps/VT-000002/dreams-screen', { dreamsScreenId: 501 }, {
     'Content-Type': 'application/json',
     Authorization: 'Bearer not-a-real-session-token',
   });

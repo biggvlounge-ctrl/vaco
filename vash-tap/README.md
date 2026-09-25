@@ -93,6 +93,8 @@ alert) — steps 1 and 3's reads work standalone once seeded.
 | `POST /api/taps/:tapCode/assignments` | session, HVNTZ business owner (via the tap) | §5 dynamic assignment |
 | `POST /api/taps/:tapCode/freeze` | session, HVNTZ business owner (via the tap) | §40 lost/stolen Tap — stops payability immediately |
 | `POST /api/taps/:tapCode/unfreeze` | session, HVNTZ business owner (via the tap) | refuses if the Tap is not currently frozen |
+| `POST /api/taps/:tapCode/dreams-screen` | session, HVNTZ business owner (via the tap) | links a real DREAMS screen id to a `business`-type Tap — a reference, never a copy of the screen's own record; requires the screen to exist |
+| `POST /api/taps/:tapCode/dreams-screen/unlink` | session, HVNTZ business owner (via the tap) | clears the link |
 | `POST /api/taps/:tapCode/pay` | session, must be `fromUserId` | §7's flow — calls V3's real ledger, never a second one |
 | `GET /api/taps/:tapCode/transactions` | none | |
 | `GET /api/spenders/:userId/history` | session, own history only | §18 |

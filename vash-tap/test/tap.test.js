@@ -17,6 +17,8 @@ const {
   TAP_TYPES,
   createTapStore,
   registerTap,
+  linkDreamsScreen,
+  unlinkDreamsScreen,
   assignTap,
   currentAssignmentFor,
   resolveTap,
@@ -307,6 +309,42 @@ test('freeze then unfreeze restores payability', async () => {
   unfreezeTap(store, { tapCode: tap.tapCode });
   const resolved = await resolveTap(store, tap.tapCode);
   assert.strictEqual(resolved.payable, true);
+});
+
+// -- DREAMS screen link ----------------------------------------------------
+
+const fakeScreenFetchFn = async (screenId) => (
+  screenId === 501 ? { id: 501, screenOwnerId: 'owner-hunt', locationName: 'HUNT Barber Shop', locationAddress: '1 Main St' } : null
+);
+
+test('linkDreamsScreen verifies the screen is real rather than trusting the id', async () => {
+  const store = createTapStore();
+  const tap = await registerTap(store, { tapType: 'business', businessId: HUNT_ID, businessFetchFn: fakeBusinessFetchFn });
+  await assert.rejects(
+    linkDreamsScreen(store, { tapCode: tap.tapCode, dreamsScreenId: 404, screenFetchFn: fakeScreenFetchFn }),
+    /no DREAMS screen with id 404/,
+  );
+  assert.strictEqual(tap.dreamsScreenId, null);
+});
+
+test('linkDreamsScreen refuses a non-business tap — a screen sits at a place, not on a wearable', async () => {
+  const store = createTapStore();
+  const tap = await registerTap(store, { tapType: 'personal', ownerIdentityId: 'ada' });
+  await assert.rejects(
+    linkDreamsScreen(store, { tapCode: tap.tapCode, dreamsScreenId: 501, screenFetchFn: fakeScreenFetchFn }),
+    /only a business tap can carry a DREAMS screen/,
+  );
+});
+
+test('linkDreamsScreen references the screen without duplicating it, and unlinkDreamsScreen clears it', async () => {
+  const store = createTapStore();
+  const tap = await registerTap(store, { tapType: 'business', businessId: HUNT_ID, businessFetchFn: fakeBusinessFetchFn });
+  const linked = await linkDreamsScreen(store, { tapCode: tap.tapCode, dreamsScreenId: 501, screenFetchFn: fakeScreenFetchFn });
+  assert.strictEqual(linked.dreamsScreenId, 501);
+  assert.strictEqual(Object.keys(linked).includes('locationName'), false, 'the Tap must not absorb the screen\'s own fields');
+
+  const unlinked = unlinkDreamsScreen(store, { tapCode: tap.tapCode });
+  assert.strictEqual(unlinked.dreamsScreenId, null);
 });
 
 // -- attribution and history ---------------------------------------------------

@@ -27,7 +27,8 @@ require('dotenv/config');
 
 const { attachStore } = require('./lib/storeBackend');
 const {
-  TAP_TYPES, createTapStore, registerTap, assignTap, resolveTap, payViaTap,
+  TAP_TYPES, createTapStore, registerTap, linkDreamsScreen, unlinkDreamsScreen,
+  assignTap, resolveTap, payViaTap,
   freezeTap, unfreezeTap, transactionsForTap, spenderHistory, revenueByTap, reseedIds,
 } = require('./lib/tap');
 const { seedDemoData } = require('./lib/seedDemoData');
@@ -61,6 +62,7 @@ const V3_API_URL = process.env.V3_API_URL || 'http://localhost:8811';
 const VACA_API_URL = process.env.VACA_API_URL || 'http://localhost:8804';
 const HVNTZ_API_URL = process.env.HVNTZ_API_URL || 'http://localhost:8792';
 const VACO_NOTIFY_URL = process.env.VACO_NOTIFY_URL || 'http://localhost:8818';
+const DREAMS_API_URL = process.env.DREAMS_API_URL || 'http://localhost:8814';
 
 // The credential this app presents AS a caller — distinct from
 // serviceAuth's allowlist above, which checks who calls *this* app.
@@ -111,6 +113,32 @@ async function resolveHvntzBusiness(businessId, res) {
     return undefined;
   }
   return business;
+}
+
+async function fetchDreamsScreen(screenId) {
+  const res = await fetch(`${DREAMS_API_URL}/api/screens/${screenId}`);
+  if (res.status === 404) return null;
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error || `fetchDreamsScreen failed (${res.status})`);
+  return body;
+}
+
+// Same "network failure is a 502, not a validation error" distinction
+// as `resolveHvntzBusiness` above — a DREAMS outage while linking a
+// screen must not read as "that screen doesn't exist."
+async function resolveDreamsScreen(screenId, res) {
+  let screen;
+  try {
+    screen = await fetchDreamsScreen(screenId);
+  } catch (err) {
+    res.status(502).json({ error: `DREAMS unreachable (${err.message})` });
+    return undefined;
+  }
+  if (!screen) {
+    res.status(404).json({ error: `no DREAMS screen with id ${screenId}` });
+    return undefined;
+  }
+  return screen;
 }
 
 async function fetchVacaIdentityStatus(subjectType, subjectId) {
@@ -282,6 +310,41 @@ app.post('/api/taps/:tapCode/freeze', requireSession(), requireTapBusinessOwner,
 app.post('/api/taps/:tapCode/unfreeze', requireSession(), requireTapBusinessOwner, (req, res) => {
   try {
     res.json(unfreezeTap(store, { tapCode: req.params.tapCode }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// -- DREAMS screen link ---------------------------------------------------
+//
+// Optional, reference-only: a business Tap Point can name a real DREAMS
+// screen at the same physical location, so that location also carries
+// ad inventory. Neither app's record moves — DREAMS keeps owning the
+// screen, VASH TAP keeps owning the Tap; this only stores the id.
+// Ownership check is the same `requireTapBusinessOwner` as freeze —
+// only the business that owns the Tap may point it at a screen.
+app.post('/api/taps/:tapCode/dreams-screen', requireSession(), requireTapBusinessOwner, async (req, res) => {
+  const { dreamsScreenId } = req.body || {};
+  if (dreamsScreenId === undefined || dreamsScreenId === null) {
+    return res.status(400).json({ error: 'this route requires a dreamsScreenId' });
+  }
+  const screen = await resolveDreamsScreen(dreamsScreenId, res);
+  if (!screen) return undefined;
+  try {
+    const tap = await linkDreamsScreen(store, {
+      tapCode: req.params.tapCode,
+      dreamsScreenId,
+      screenFetchFn: async () => screen,
+    });
+    return res.json(tap);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/taps/:tapCode/dreams-screen/unlink', requireSession(), requireTapBusinessOwner, (req, res) => {
+  try {
+    res.json(unlinkDreamsScreen(store, { tapCode: req.params.tapCode }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
