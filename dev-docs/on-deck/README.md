@@ -16,7 +16,7 @@ somebody's memory of it, which is the failure this repo keeps finding.
 | `VACO_VERIFIED_BUSINESS_NETWORK_FREEZE.md` | frozen, audit begun and stopped; **text restored 23 Sep** | 17 Sep 2026 |
 | `VAGO_GROUP_WAGERS_FREEZE.md` | frozen, audit begun and stopped; **text restored 23 Sep** | 17 Sep 2026 |
 | `HVNTZ_CONNECTED_NETWORK_FREEZE.md` | frozen, **audit not started** | 23 Sep 2026 |
-| `VASH_TAP_FREEZE.md` | frozen, **audit not started** | 23 Sep 2026 |
+| `VASH_TAP_FREEZE.md` | frozen, **§1/§55 audit complete 25 Sep 2026** — see below | 23 Sep 2026 |
 
 **More are expected.** The owner said on 23 Sep 2026 that three or four
 add-ons were coming and that two had been sent; this folder holds those
@@ -97,6 +97,133 @@ and "must not be falsely represented as an NFC capability". Any
 geographic analytics built under §23 and §43 are therefore tap-event
 analytics, not location tracking, and the distinction should survive
 into whatever the dashboards say.
+
+## The VASH TAP §1/§55 audit, 25 Sep 2026
+
+The owner picked VASH TAP as the first add-on to resume. Its §1 and §55
+both mandate inspecting the existing codebase against a ~30-item
+non-duplication list before writing any code — this is that audit, six
+parallel searches across the ~30 categories §1 names, each verified by
+reading the actual implementation rather than trusting a filename or a
+prior doc's claim.
+
+**Confirmed first: VASH TAP itself is entirely new.** A repo-wide
+search for `nfc|vash.?tap|wristband|tap.?point|tap.?resolution` outside
+this folder returns nothing. Nothing here is a wiring job — everything
+either reuses a real system below or has to be built from zero.
+
+**Real and reusable, confirmed by reading the code — build on these:**
+
+- **VASH/VCoin/ledger.** V3 remains the canonical ledger —
+  `/api/vcoin/{balance,transfer,settle,transactions,reconciliation}`,
+  `/api/vash/{cashout,balance}`, row-level, idempotent via
+  `settleOnce.js`. §7's "do not create a separate wallet/ledger" points
+  here.
+- **VACA identity — and the 23 Sep correction was wrong.** VACA is its
+  own app (`vaca/`, port 8804), and `vaca/VACA_BLOCKCHAIN_IDENTITY_
+  COMPARABLES.md` itself records that it was designed to live inside V3
+  and was split out — it is not blockchain identity in any sense (no
+  ledger, wallet, DIDs or Verifiable Credentials). It is a centralized,
+  human-reviewed attestation/KYC service:
+  `POST /api/verifications` → operator `approve`/`reject` →
+  `GET /api/identity-status/:subjectType/:subjectId`. Real, but
+  **siloed per consumer app** (`voken-card`, `void-provider`,
+  `cvnvo-user` are separate attestations for the same real person) —
+  "verify once, reuse everywhere" is only half built.
+- **Notification dispatch.** `vaco-notify` is a real cross-app
+  subscribe/dispatch service with delivery tracking
+  (`/api/notifications/undelivered`).
+- **Business + location (partial fit).** HVNTZ (`hvntz/lib/
+  revenueStack.js`) has a real business→locations model with lat/lng
+  and 14 revenue-event types, already the closest thing to §16's
+  "Chair 1 → $4,820" example. But `locationType` is a closed enum
+  (`screen`/`hub`/`business-locker` — hardware placements), not a
+  general venue/table/stage concept, and there is no unified business
+  model — VOID has a second, thinner "provider" business concept that
+  does not share a schema with HVNTZ's.
+  `vavlt-stvdios/lib/mapSearch.js` (Haversine `searchNearby`) is the
+  real geo-search engine if location matters.
+  `sync-design-system.sh` is real and small (two files — a CSS token
+  sheet and one JS file — not a component kit) with a `--check` drift
+  guard, and its target-app list is where a new frontend gets added.
+  API/DB/test conventions are consistent across the ecosystem: flat
+  JSON (no envelope), `{error}` on failure, Shield session or
+  service-token auth, `attachStore()`'s JSON-file-or-Postgres split,
+  `node --test` under each app's `test/`.
+
+**Named in the freeze, and confirmed NOT to exist — the real work is
+here, not in wiring:**
+
+- **Push notifications.** `vaco-notify` explicitly lists `push` in
+  `UNIMPLEMENTED_CHANNELS` and throws rather than silently accepting
+  one. No APNs/FCM/web-push/service-worker/VAPID anywhere in the repo.
+  §8's "immediate phone alert" is new infrastructure, not a call into
+  something that exists.
+- **General messaging/DMs.** The only real person-to-person message
+  store is `cvnvo/lib/messages.js`, and it is hard-scoped to an active
+  dating match (`sendMessage` throws once `match.expiresAt` passes) —
+  two arbitrary users cannot message each other anywhere in this
+  codebase today. §9's "reuse existing VACO messaging/DM
+  infrastructure" has nothing general-purpose to reuse.
+- **QVAN.** Not a security or fraud system at all — it is one of
+  fourteen chat personas in `vacon/lib/agents.js` (id `qvan`, a system
+  prompt telling an LLM to talk like a CSO) plus a keyword router that
+  decides which persona's prompt to use. No fraud detection, no
+  anomaly system tied to payments, exists under that name or any other
+  — the closest thing, `vaco-analytics`'s z-score anomaly detector, is
+  generic and metric-only. §21/§39's "use existing VACO/QVAN security
+  infrastructure" and §40's "Freeze Tap"/"Lock Tap" have no real
+  precedent to extend: the only account-level lock/suspend actions in
+  the whole repo are `vaco-operator`'s internal-operator disable and
+  VOID's per-skill provider suspension, neither a general "freeze this
+  person's account" mechanism.
+- **Rate limiting.** No throttling middleware exists on any Express
+  app in the repo. §21's "7 attempts in 60 seconds → lock" example is
+  a mechanism to build, not a policy to attach to something existing.
+  There is also no employee/staff model anywhere — VOID's `staffing.js`
+  posts open gig positions to its marketplace and does not persist a
+  "this person works here" record once filled — and no shift-scheduling
+  system with recurrence; VOID provider `availability` is explicit
+  `{startsAt, endsAt}` windows only, recurrence deliberately deferred
+  to a UI layer that doesn't exist. §5's barber-chair rotation example
+  has nothing underneath it.
+- **Dimensioned/geographic analytics.** `vaco-analytics`'s schema is
+  flat `{app, metric, value, timestamp}`, keyed only by app+metric —
+  no per-entity field (chair, employee, outfit, product) and no
+  location field at all. §15–17, §23 and §43's whole premise —
+  "Chair 1 vs Chair 2", revenue by market, drill-down to a specific Tap
+  — cannot be expressed in the schema that exists; it needs new,
+  dimensioned tables, which is most of the freeze's stated core
+  requirement (§15: "THIS IS A CORE REQUIREMENT").
+- **Profiles/avatars.** No shared profile concept — `vavlt-stvdios`,
+  VOID, V4-proxy ("twin" profiles, an unrelated concept despite the
+  name) and vxllage each have their own, scoped and non-interoperable.
+- **User accounts.** There is no canonical user object anywhere.
+  Shield holds only `{sessions, credentials}` keyed by an opaque
+  `userId` string every app supplies independently; `shieldAuth`/
+  `serviceAuth` (the ~26/27-copy shared libs) authenticate a session or
+  a service caller, never a user profile.
+- **ARIES.** Appears three times across the on-deck freezes as a bare
+  name with zero elaboration and has no implementation anywhere —
+  spec vocabulary, not a system.
+
+**Named in the freeze and confirmed real, contrary to what a name
+alone would suggest:** V4 (`v4-proxy`) really is the Anthropic proxy
+plus a maps/AI-twin/call-surface layer; MIA is a real, implemented
+agent-orchestration system (`vacon/lib/agents.js` + `orchestrator.js`,
+NOT the same app as `vacon-c`, the unrelated civilization simulation).
+
+**What this means for scoping the actual build.** §1's own rule —
+inspect and reuse, don't duplicate — cuts the other way once four of
+its named categories turn out to be missing rather than thin: building
+generic push infrastructure, a general messaging system, a real
+fraud/security layer, and dimensioned analytics are each their own
+undertaking, not a VASH TAP detail. The freeze's own §54 "Definition of
+Done" checklist does not distinguish "wire an existing system" from
+"design a new one from nothing," and this audit is what makes that
+distinction visible before code gets written against a false premise —
+the same failure this file's earlier entries already record happening
+twice.
 
 ## What the partial audit established
 
