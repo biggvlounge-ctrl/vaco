@@ -11,7 +11,7 @@ each app's test suite actually executed. Nothing here is recalled.
 `scripts/test/completion-report.test.mjs` fails if this file drifts
 from what the script emits, which is the failure mode that made
 `COMPLETION_AUDIT.md` read 31 apps and 522 tests when the real numbers
-were 35 and 2219.
+were 36 and 2241.
 
 ---
 
@@ -53,17 +53,17 @@ anything it can:
 
 | Metric | Value |
 |---|---:|
-| Express backends in the manifest | **35** |
-| Overall criteria met | **99%** (266/267) |
-| Apps at 100% | **34 / 35** |
-| Tests | **2219** |
+| Express backends in the manifest | **36** |
+| Overall criteria met | **99%** (272/274) |
+| Apps at 100% | **34 / 36** |
+| Tests | **2241** |
 | Apps with no test suite | **0** |
 
 Two notes on that test count, so it is not read as contradicting
 anything else:
 
 - It is **lower than `scripts/run-all-tests.mjs`'s**, and both are
-  right. This table counts only the 35 Express backends in the
+  right. This table counts only the 36 Express backends in the
   manifest. The full run also covers the Vite frontends (VDP, VENVS),
   the shared `scripts/` suites, `world-layer` and `vaco-mcp` — real
   tests, but not any single manifest app's.
@@ -114,6 +114,7 @@ anything else:
 | `vulture-studios` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 14 |
 | `vxllage` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 13 |
 | `yap` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 35 |
+| `vaco-passport` | **85%** | 6/7 | ✅ | ❌ | — | ✅ | ✅ | ✅ | ✅ | ✅ | 22 |
 | `vash-tap` | **85%** | 6/7 | ✅ | ❌ | — | ✅ | ✅ | ✅ | ✅ | ✅ | 42 |
 
 `—` means the criterion does not apply to that app and is excluded
@@ -135,4 +136,5 @@ lacking something it was never meant to have.
 
 ## Where the shortfalls are
 
+- **`vaco-passport`** (85%) — missing: has a frontend
 - **`vash-tap`** (85%) — missing: has a frontend
