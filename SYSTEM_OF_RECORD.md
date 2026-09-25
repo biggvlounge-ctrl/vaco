@@ -13,7 +13,7 @@ person who built it can check whether a claim is still true.
 Every number below was produced by running the tool that owns it, not
 recalled. The commands are in §10 so they can be re-run.
 
-*Current as of commit `7882600`, 232 commits, branch
+*Current as of commit `7df901c`, 238 commits, branch
 `claude/v4-proxy-server-s6dcp8`, 25 Sep 2026.*
 
 **On the commit count.** An earlier revision of this line said 332. That
@@ -71,8 +71,8 @@ authorization work in §5 had to be done per app rather than once.
 |---|---|
 | Containerised services | 38 + nginx + a LiveKit SFU |
 | Registry rows (incl. brand rows and the dev mock) | 39 |
-| Mutating HTTP routes | 533, all accounted for (480 guarded, 53 declared open with a reason) |
-| Automated tests | 2787 across 41 suites |
+| Mutating HTTP routes | 537, all accounted for (484 guarded, 53 declared open with a reason) |
+| Automated tests | 2803 across 41 suites |
 | Persisted volumes | 32 |
 | Shared-module copies kept in sync | 222 |
 | Service credentials in `.env.example` | 30 callers |
@@ -824,8 +824,8 @@ run to produce the numbers here.
 built:** `node scripts/package-release.mjs` — see §11.
 
 ```sh
-node scripts/run-all-tests.mjs           # 2787/2787 across 41 suites (some skip without a database)
-node scripts/audit-route-guards.mjs --check   # 533/533 accounted for
+node scripts/run-all-tests.mjs           # 2803/2803 across 41 suites (some skip without a database)
+node scripts/audit-route-guards.mjs --check   # 537/537 accounted for
 ./sync-shared-runtime.sh --check         # 222 copies current, none unmanaged
 ./sync-design-system.sh --check          # every serving app is a target
 node deploy/generate-docker-compose.js   # 38 apps + nginx, livekit, postgres, 32 volumes
