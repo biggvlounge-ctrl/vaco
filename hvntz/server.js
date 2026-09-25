@@ -43,6 +43,10 @@ const {
   submitAdContent, getAdSubmission, reviewAdSubmission, getAdSubmissions, runAdSubmission,
 } = require('./lib/adReview');
 const { getScreenAnalytics } = require('./lib/screenAnalytics');
+const {
+  NETWORK_NODE_STATUSES, findNetwork, findNode, createNetwork, inviteNode,
+  respondToInvitation, removeNode, nodesForIdentity, networkView, networksForBusiness,
+} = require('./lib/networkConnections');
 
 const { createServiceAuth } = require('./lib/serviceAuth.cjs');
 const { createDecisionLog } = require('./lib/decisionLog.cjs');
@@ -76,6 +80,7 @@ function serviceHeaders() {
 }
 
 const VAVLT_STVDIOS_API_URL = process.env.VAVLT_STVDIOS_API_URL || 'http://localhost:8808';
+const VACA_API_URL = process.env.VACA_API_URL || 'http://localhost:8804';
 // -- The store, and which backend holds it ----------------------------
 //
 // `let`, not `const`: with DATABASE_URL set this app's store lives in
@@ -188,6 +193,32 @@ async function postMapListing(listingOptions) {
   return body;
 }
 
+// VACA identity-status check for §19's node-invitation dedup — the
+// same real dedup pattern `cvnvo`, `void` and `vash-tap` already use.
+// This is HVNTZ's first call into VACA; nothing else in this app has
+// needed identity verification before now.
+async function fetchVacaIdentityStatus(subjectType, subjectId) {
+  const res = await fetch(`${VACA_API_URL}/api/identity-status/${subjectType}/${subjectId}`);
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error || `fetchVacaIdentityStatus failed (${res.status})`);
+  return body;
+}
+
+// Same "network failure is 502, not a validation error" distinction
+// this file already draws for its own ownership checks — VACA being
+// unreachable while inviting a Node must not read as "that person
+// isn't verified."
+async function resolveVacaIdentity(subjectType, subjectId, res) {
+  let status;
+  try {
+    status = await fetchVacaIdentityStatus(subjectType, subjectId);
+  } catch (err) {
+    res.status(502).json({ error: `VACA unreachable (${err.message})` });
+    return undefined;
+  }
+  return status;
+}
+
 const {
   requireActor, requireSession, requireCallingService,
 } = require('./lib/shieldAuth.cjs');
@@ -238,9 +269,44 @@ const requireSubmissionBusinessOwner = () => requireBusinessOwner((req) => {
   return submission ? submission.businessId : null;
 }, 'ad submission');
 
+// A network belongs to the business that is its Hub.
+const requireNetworkBusinessOwner = () => requireBusinessOwner((req) => {
+  const network = findNetwork(store, Number(req.params.id));
+  return network ? network.hubBusinessId : null;
+}, 'network');
+// A node belongs to a network, which belongs to a business — same
+// one-hop-away shape as `requireLocationBusinessOwner`.
+const requireNodeNetworkBusinessOwner = () => requireBusinessOwner((req) => {
+  const node = findNode(store, Number(req.params.nodeId));
+  if (!node) return null;
+  const network = findNetwork(store, node.networkId);
+  return network ? network.hubBusinessId : null;
+}, 'network');
+
+// **The invited person, not the business, answers their own
+// invitation** — deliberately not `requireNodeNetworkBusinessOwner`.
+// Same shape as VASH TAP's `requireTapBusinessOwner`: compose
+// `requireSession()` with a record-based identity check the generic
+// `requireActor(field)` cannot express, since the identity to match
+// lives on the node record, not in the request body. A factory
+// (called as `requireNodeIdentity()`), matching this file's other
+// custom guards, so `audit-route-guards.mjs` recognizes it as one.
+const requireNodeIdentity = () => (req, res, next) => {
+  const session = requireSession();
+  return session(req, res, () => {
+    const node = findNode(store, Number(req.params.nodeId));
+    if (!node) return res.status(404).json({ error: `no network node ${req.params.nodeId}` });
+    if (String(node.identityId) !== String(req.sessionUserId)) {
+      return res.status(403).json({ error: 'only the invited person may respond to their own invitation' });
+    }
+    return next();
+  });
+};
+
 app.get('/api/health', (_req, res) => {
   res.json({
     ok: true, revenueEventTypes: REVENUE_EVENT_TYPES.length, locationTypes: LOCATION_TYPES, adTiers: AD_TIERS,
+    networkNodeStatuses: NETWORK_NODE_STATUSES, networks: store.networks.length, networkNodes: store.networkNodes.length,
     // The decision log's own state, so an `observe` window with real
     // gaps in it is visible from outside rather than only in a log.
     decisionLog: decisionLog.describe(),
@@ -630,9 +696,81 @@ app.get('/api/screen-analytics/:businessId', (req, res) => {
   }
 });
 
+// -- Connected Network Layer, Phase 1 -------------------------------------
+//
+// See `lib/networkConnections.js`'s own header and the on-deck audit
+// for scope. A Network's Hub is a real HVNTZ business; a Node is a
+// real, VACA-verified identity that business has invited and who has
+// (or has not yet) accepted for themselves.
+
+app.post('/api/networks', requireBodyBusinessOwner(), (req, res) => {
+  try {
+    res.status(201).json(createNetwork(store, req.body || {}));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/networks/:id', (req, res) => {
+  const view = networkView(store, Number(req.params.id));
+  if (!view) return res.status(404).json({ error: `no network with id ${req.params.id}` });
+  res.json(view);
+});
+
+app.get('/api/business/:businessId/networks', (req, res) => {
+  res.json({ networks: networksForBusiness(store, Number(req.params.businessId)) });
+});
+
+app.post('/api/networks/:id/nodes', requireNetworkBusinessOwner(), async (req, res) => {
+  const { invitedIdentityId } = req.body || {};
+  if (!invitedIdentityId) {
+    return res.status(400).json({ error: 'this route requires an invitedIdentityId' });
+  }
+  const status = await resolveVacaIdentity('hvntz-network-member', invitedIdentityId, res);
+  if (status === undefined) return undefined;
+  try {
+    const node = await inviteNode(store, {
+      networkId: Number(req.params.id),
+      invitedIdentityId,
+      invitedBy: req.sessionUserId,
+      identityFetchFn: async () => status,
+    });
+    return res.status(201).json(node);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+});
+
+// The invited person's own answer — see `requireNodeIdentity`'s own
+// comment for why this is not an owner-gated route.
+app.post('/api/network-nodes/:nodeId/respond', requireNodeIdentity(), (req, res) => {
+  try {
+    res.json(respondToInvitation(store, { nodeId: Number(req.params.nodeId), response: (req.body || {}).response }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/network-nodes/:nodeId/remove', requireNodeNetworkBusinessOwner(), (req, res) => {
+  try {
+    res.json(removeNode(store, { nodeId: Number(req.params.nodeId) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// A person's own membership list — own identity only, same shape as
+// VASH TAP's `GET /api/spenders/:userId/history`.
+app.get('/api/identities/:identityId/network-nodes', requireSession(), (req, res) => {
+  if (String(req.params.identityId) !== String(req.sessionUserId)) {
+    return res.status(403).json({ error: 'you may only read your own network memberships' });
+  }
+  return res.json({ nodes: nodesForIdentity(store, req.params.identityId) });
+});
+
 async function start() {
   if (store.businesses.length === 0) {
-    await seedDemoData(store);
+    await seedDemoData(store, { identityFetchFn: fetchVacaIdentityStatus });
   }
   app.listen(PORT, () => {
     console.log(`HVNTZ Revenue Stack listening on http://localhost:${PORT}`);

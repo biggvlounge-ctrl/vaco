@@ -136,7 +136,23 @@ curl http://localhost:8792/api/franchise-list/1
   and ad-submission activity, scoped to its `screen`-type locations —
   total revenue, revenue by event type, distinct advertiser count, and
   ad submissions by status.
-- `server.js` — a real Express API (CommonJS) wrapping all eleven
+- `lib/networkConnections.js` — Connected Network Layer, Phase 1 (see
+  `dev-docs/on-deck/HVNTZ_CONNECTED_NETWORK_FREEZE.md`, scoped by its
+  own §40 audit): a Network Hub is a real HVNTZ business, never a
+  second business model — `createNetwork` verifies it against the same
+  store `registerBusiness` writes to. `inviteNode` is §19's node
+  invitation, VACA-deduped through a real
+  `GET /api/identity-status/:subjectType/:subjectId` call (the same
+  pattern `cvnvo`/`void`/`vash-tap` already use) so a Node never
+  becomes a shadow account. `respondToInvitation` is the first real
+  invite -> accept/decline state machine in this ecosystem where the
+  **invited person**, not a reviewer or the inviting business, resolves
+  their own invitation. `removeNode` is §7's "who can disconnect a
+  node," owner-only, at any point in a node's life. Deliberately does
+  NOT include streaming/camera linking, a revenue-sharing engine, or
+  any role beyond hub-owner vs. invited member — the audit found no
+  substrate for any of those anywhere in the repo.
+- `server.js` — a real Express API (CommonJS) wrapping all twelve
   modules.
 
 ## Verified
@@ -252,3 +268,13 @@ scope (physical hardware, drone routing, real third-party
 integrations, actual AI agents) or blocked on a system that doesn't
 exist elsewhere in this session yet (`venvs`'s CHOPZ Digital Twin
 system).
+
+**Connected Network Layer — Phase 1 foundation only, see
+`lib/networkConnections.js`.** Not yet built, per its own §40 audit
+finding no substrate for any of it anywhere in the repo: streaming or
+camera/screen linking to Vault Studios (Phase 2), a configurable
+N-party revenue-sharing engine (Phase 4 — the single largest confirmed
+gap in the freeze), any role beyond hub-owner vs. invited member,
+recurring per-person schedules, and temporary/archivable multi-business
+event networks. A Node's own accept/decline is real; a Network's
+Vault Studios stream, camera, or revenue-share agreement is not.

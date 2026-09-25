@@ -30,6 +30,7 @@ const {
   registerBusiness, registerLocation, recordRevenueEvent, getLocationsForBusiness,
 } = require('./revenueStack');
 const { createHunt, addCheckpoint } = require('./hunts');
+const { createNetwork, inviteNode, respondToInvitation } = require('./networkConnections');
 
 // Real, minimal in-memory transfer stub for seeding only. Resolves
 // immediately with a real record of what it "moved" -- no network
@@ -44,7 +45,7 @@ async function demoTransferFn(fromUserId, toUserId, amount, reason) {
 // (see server.js's own `store.businesses.length === 0` gate), so a
 // persisted store loaded from disk with real businesses is never
 // touched, and restarting the server twice never double-seeds.
-async function seedDemoData(store) {
+async function seedDemoData(store, { identityFetchFn = null } = {}) {
   const payerId = 'demo-vcoin-treasury';
   const sponsorId = 'demo-sponsor-stl-tourism';
 
@@ -157,12 +158,37 @@ async function seedDemoData(store) {
   // through it, not required for seeding itself.
   console.log(`[hvntz] getLocationsForBusiness confirms ${getLocationsForBusiness(store, cherokeeStreetMercantile.id).length} real location(s) for business #${cherokeeStreetMercantile.id}.`);
 
+  // -- Connected Network Layer, Phase 1: reuses the differentiator
+  // business as a real Hub rather than inventing a fourth business --
+  // one node already accepted (active), one still awaiting a response,
+  // so a live demo shows both states of the real invite/accept flow.
+  // A real VACA call, same as production; if VACA is unreachable this
+  // degrades the same way every other cross-app seed step in this
+  // ecosystem does -- a console warning, not a crashed boot.
+  let network = null;
+  if (identityFetchFn) {
+    try {
+      network = await createNetwork(store, { hubBusinessId: cherokeeStreetMercantile.id, name: `${cherokeeStreetMercantile.name} Network` });
+      const acceptedNode = await inviteNode(store, {
+        networkId: network.id, invitedIdentityId: 'demo-dj-marcus', invitedBy: cherokeeStreetMercantile.ownerId, identityFetchFn,
+      });
+      respondToInvitation(store, { nodeId: acceptedNode.id, response: 'accepted' });
+      await inviteNode(store, {
+        networkId: network.id, invitedIdentityId: 'demo-bartender-b', invitedBy: cherokeeStreetMercantile.ownerId, identityFetchFn,
+      });
+      console.log(`[hvntz] seeded Network "${network.name}" (#${network.id}) with 1 active node and 1 pending invitation.`);
+    } catch (err) {
+      console.warn(`[hvntz] seedDemoData: skipped the demo Network — ${err.message}`);
+    }
+  }
+
   return {
     hunt,
     businessCount: store.businesses.length,
     locationCount: store.locations.length,
     differentiatorBusinessId: cherokeeStreetMercantile.id,
     differentiatorEvents,
+    network,
   };
 }
 

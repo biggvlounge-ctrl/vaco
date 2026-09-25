@@ -119,6 +119,10 @@ function createHvntzStore() {
     nextHuntId: 1,
     adSubmissions: [],
     nextAdSubmissionId: 1,
+    networks: [],
+    nextNetworkId: 1,
+    networkNodes: [],
+    nextNetworkNodeId: 1,
   };
 }
 
