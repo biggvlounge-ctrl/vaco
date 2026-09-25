@@ -180,7 +180,7 @@ What *has* been driven for real, on Linux:
   to bind the gateway's port. Fixed, and held by a test.
 - `gateway.js` against the booted ecosystem — 33 of 34 apps answered
   200 through one port, the 34th being the one deliberately down.
-- The full test suite: 2873 tests across 41 suites.
+- The full test suite: 2878 tests across 41 suites.
 
 ## What Replit is good for here, and what it is not
 
