@@ -13,8 +13,8 @@ somebody's memory of it, which is the failure this repo keeps finding.
 
 | document | status | parked |
 |---|---|---|
-| `VACO_VERIFIED_BUSINESS_NETWORK_FREEZE.md` | frozen, **§30 audit complete 25 Sep 2026** — see below | 17 Sep 2026 |
-| `VAGO_GROUP_WAGERS_FREEZE.md` | frozen, audit begun and stopped; **text restored 23 Sep** | 17 Sep 2026 |
+| `VACO_VERIFIED_BUSINESS_NETWORK_FREEZE.md` | frozen, **§30 audit complete 25 Sep 2026** — see below; Levels 1-3 built and shipped as `vaco-passport` | 17 Sep 2026 |
+| `VAGO_GROUP_WAGERS_FREEZE.md` | frozen, **audit complete 25 Sep 2026** — see below | 17 Sep 2026 |
 | `HVNTZ_CONNECTED_NETWORK_FREEZE.md` | frozen, **audit not started** | 23 Sep 2026 |
 | `VASH_TAP_FREEZE.md` | frozen, **§1/§55 audit complete 25 Sep 2026** — see below; narrowest demo built and shipped | 23 Sep 2026 |
 
@@ -371,6 +371,108 @@ identity in any sense (no ledger, wallet, DIDs, or Verifiable
 Credentials). Left below rather than deleted, so the record shows what
 was asked and when it was actually settled.
 
+## The VAGO Group Wagers audit, 25 Sep 2026
+
+The owner picked this freeze as the third add-on to resume. Its own
+17 Sep audit note (preserved verbatim at the top of the frozen file)
+already found the named prerequisite infrastructure — "the existing
+VAGO Wager Contract Engine, Wager Graph, Wager Threads, Odds Layer,
+Escrow Adapter, Resolution Engine" — at **zero files each**. This
+audit went one step further: not just confirming those names are
+absent, but checking whether the real *mechanics* those names describe
+exist under a different name.
+
+**They do, partially, and it changes the scope.** `vago/lib/
+predictionMarkets.js`, read directly, is already a real, working,
+N-participant pooled wagering engine: `createPredictionMarket` opens a
+proposition, any number of users `buyContract` onto either side
+(`contracts: [{userId, side, quantity, avgPrice}]`), pricing is a real
+pari-mutuel `yesPool`/`noPool` (the "Odds Layer" in substance), custody
+is a real `VAGO_HOUSE_ACCOUNT` moved only through an injected
+`settleFn` (the "Escrow Adapter" in substance), and `resolveMarket`
+splits the entire real pool proportionally among winners,
+`settleOnce`-protected against duplicate payout (the "Resolution
+Engine" in substance, and solvent by construction — the module's own
+header records finding and fixing a real house-insolvency bug here on
+12 Sep 2026). This is not the "Wager Contract Engine" by that name and
+was never built for group wagers — but it is a real N-party pooled
+proposition mechanic, today, and §29's own rule ("do not create
+duplicate versions... build only the missing group-specific
+functionality") points straight at it.
+
+**Real and reusable, confirmed by reading the code — build on these:**
+
+- **The pooled wagering mechanic itself** — `predictionMarkets.js`,
+  above. Any "Group Wager" built now should be a social/organizational
+  frame around this, not a second pooling engine.
+- **A real thread/reply system, in a different app.** VAGO has no
+  thread/comment module of its own (grepped `vago/lib/` for
+  `thread|comment|discussion` — nothing). `vxllage/lib/posts.js` does:
+  `createPost`, `getReplies`, `getThread` (real recursive reply-tree
+  assembly), `likePost`, `repostPost`. The freeze's own §9 ("reuse the
+  existing VACO social/thread infrastructure") and §21 ("VAGO + VILLAGE
+  ... VAGO remains the wagering engine, VILLAGE remains the social/
+  community environment") both point at exactly this, by name.
+- **VACO Notify** for §13's invitation notifications — the same real
+  dispatch service VASH TAP and VACO Passport already call.
+- **V3/VCoin and `settleOnce`** — the real ledger and the real
+  idempotent-settlement primitive `predictionMarkets.js` already uses.
+
+**Named in the freeze, and confirmed NOT to exist — the real work is
+here, not in wiring:**
+
+- **No 3+-peer shared-pool mechanic anywhere else in VAGO.**
+  `sportsbook.js` is pure house-vs-bettor (each bet settles
+  individually against the house, no pooling among bettors).
+  `esportsStaking.js` is pari-mutuel but hard-capped at exactly 2
+  backed sides (`player1Id`/`player2Id`) — same 2-outcome shape as
+  `predictionMarkets.js`, not a peer group unit. `casinoSession.js` is
+  single-user only. `fantasy.js` grades each entry independently
+  against a fixed payout table, never against other entrants — no
+  shared-contest math anywhere in it.
+- **No group/team/party concept anywhere in VAGO.** Grepped for it —
+  the only hits are the unrelated "group-2 route" authorization-tier
+  phrase from `decisionLog.cjs`/`operatorAuth.cjs`.
+- **No invitation state machine anywhere in the repo.** §13's own
+  `Invited → Viewed → Joined → Funded → Locked → Settled` chain exists
+  only in the freeze text itself — nothing in the codebase models
+  per-invite states today.
+- **No tournament, bracket, league, or standings system anywhere in
+  VAGO.** Checked `sportsbook.js`, `esportsStaking.js`,
+  `casinoSession.js`, and `fantasy.js` directly for
+  `bracket|tournament|elimination|standings|leaderboard|contest|league`
+  — zero hits in any of them. §11 (tournaments) and §12 (leagues) have
+  nothing underneath them.
+- **No Side Wager architecture at all.** §8 assumes one already exists
+  ("Group wagers must work with the existing Side Wager architecture")
+  — it does not, so a parent-wager-to-side-wager relationship (§26's
+  "Wager Graph") has nothing to attach to yet.
+- **QVAN, reconfirmed a third time.** §24's "QVAN should monitor
+  group-specific risks" has no enforcement layer to extend — still a
+  chat persona, not security code, per the VASH TAP and VACO Passport
+  audits before this one.
+- **VAKA (§'s own list of systems to integrate with) is very likely a
+  typo for VACA** — it appears exactly once, nowhere else in this
+  freeze or any other document, and VACA is the real identity/
+  verification app every other freeze here names correctly. Flagged
+  rather than silently corrected, per this folder's own "an edited copy
+  is a different specification" rule — the frozen text is not amended
+  even to fix an apparent typo.
+
+**What this means for scoping the actual build.** The narrowest real
+slice is a social/organizational wrapper around
+`predictionMarkets.js`'s existing pooled mechanic — a named group
+(creator, entry deadline, max participants, invite list) that opens
+and locks one underlying prediction market, with `vxllage/lib/posts.js`
+providing the group's thread. That covers §1's OPEN/PRIVATE group
+types, §2's unbounded group size, most of §3's structure fields, §5's
+JOIN→FUND→LOCK flow (`buyContract` already does JOIN+FUND atomically),
+§9's thread, §14's escrow, and §15's settlement — all through
+functions that already exist. Side wagers, tournaments, leagues, BLIND/
+Before-the-Answer group modes, team roles, and QVAN-based group-risk
+monitoring are each their own undertaking with no substrate to extend,
+the same shape of gap the two audits before this one kept finding.
+
 ## What the partial audit established
 
 Recorded because it is the expensive part and it is easy to redo badly.
@@ -398,7 +500,13 @@ non-`node_modules` JS file:
   sportsbook, esports staking and AMOE — a different shape entirely.
   **Group wagers cannot be layered onto a wagering engine that has not
   been built**, so that engine is the real first task whenever this
-  resumes, not the group layer.
+  resumes, not the group layer. **Refined by the full VAGO Group Wagers
+  audit below (25 Sep 2026): the named engine doesn't exist, but a real
+  one does under a different name** — `predictionMarkets.js`'s pooled,
+  N-participant, pari-mutuel mechanic is functionally the Wager
+  Contract/Odds Layer/Escrow Adapter/Resolution Engine this note
+  found absent. The real first task turned out to be a social wrapper
+  around it, not a wagering engine built from zero.
 - `KYB` / "know your business" — 0 files.
 - `multi-tenant` / `multiTenant` — 0 files. VACO freeze §17 calls
   tenant isolation "a foundational requirement".
