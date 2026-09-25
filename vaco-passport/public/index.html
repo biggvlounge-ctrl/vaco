@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VACO Passport</title>
+<link rel="stylesheet" href="/vaco-design.css" />
+<style>
+  .level-track { display: flex; gap: var(--vaco-space-2); }
+  .level-step { flex: 1; text-align: center; padding: var(--vaco-space-2); border-radius: var(--vaco-radius-sm);
+    border: 1px solid var(--vaco-border); background: var(--vaco-surface); font-size: var(--vaco-text-sm); }
+  .level-step-done { background: var(--vaco-money-soft); border-color: var(--vaco-money); font-weight: var(--vaco-weight-bold); }
+  .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--vaco-space-3); }
+  .stat { display: flex; flex-direction: column; gap: 2px; }
+  .stat-value { font-size: var(--vaco-text-lg); font-weight: var(--vaco-weight-bold); font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body class="vaco">
+<script src="/vaco-ui.js"></script>
+<script>
+// VACO Passport — the Business Passport layer of the VACO Verified
+// Business Network, Levels 1-3.
+//
+// A real client of vaco-passport's own five routes. Nothing here
+// computes a level or a network-activity summary — both come straight
+// from lib/passport.js, which reads VACA's real verification and V3's
+// real transaction history rather than deriving a score of its own
+// (README: "Do NOT create an arbitrary subjective credit score").
+
+var el = VACO.el;
+var LEVELS = ['member', 'verified', 'network'];
+var LEVEL_LABEL = { member: 'Network Member', verified: 'Verified Business', network: 'Network Business' };
+
+function levelTrack(level) {
+  var track = el('div', 'level-track');
+  var reached = LEVELS.indexOf(level);
+  LEVELS.forEach(function (l, i) {
+    track.appendChild(el('div', 'level-step' + (i <= reached ? ' level-step-done' : ''), LEVEL_LABEL[l]));
+  });
+  return track;
+}
+
+function passportCard(passport) {
+  var lines = el('div', 'vaco-stack-sm');
+  lines.appendChild(levelTrack(passport.level));
+  lines.appendChild(el('p', 'vaco-small vaco-dim',
+    (passport.business ? passport.business.name : 'business ' + passport.businessId)
+    + (passport.verifiedAt ? ' · verified' : ' · not yet verified')));
+
+  if (passport.networkActivity) {
+    var stats = el('div', 'stat-row');
+    [['Transactions', passport.networkActivity.transactionCount],
+     ['Volume', VACO.round(passport.networkActivity.totalVolume)]].forEach(function (pair) {
+      var s = el('div', 'stat');
+      s.appendChild(el('span', 'vaco-label', pair[0]));
+      s.appendChild(el('span', 'stat-value', pair[1]));
+      stats.appendChild(s);
+    });
+    lines.appendChild(stats);
+  } else {
+    lines.appendChild(el('p', 'vaco-small vaco-dim', 'No network-activity assessment yet.'));
+  }
+
+  return VACO.card('Passport — business ' + passport.businessId, [lines],
+    { trailing: VACO.badge(LEVEL_LABEL[passport.level] || passport.level) });
+}
+
+function renderPassport(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.card('Look up a Passport', [
+    'Levels 1-3: Network Member, Verified Business, Network Business — earned in order, never re-created.',
+    VACO.form([{ name: 'businessId', label: 'Business id', type: 'number', value: 9001, width: '110px' }],
+      function (values) { return loadPassport(out, body, values.businessId); }, 'Load'),
+  ]));
+  out.appendChild(el('div', 'vaco-empty', 'Enter a business id above — try 9001, HUNT Barber Shop.'));
+  return VACO.mount(body, out);
+}
+
+function loadPassport(out, body, businessId) {
+  return VACO.api('/api/passports/' + encodeURIComponent(businessId))
+    .then(function (passport) {
+      var replacement = el('div', 'vaco-stack');
+      replacement.appendChild(passportCard(passport));
+      while (out.childNodes.length > 1) out.removeChild(out.lastChild);
+      out.appendChild(replacement);
+      VACO.mount(body, out);
+    })
+    .catch(function (err) {
+      while (out.childNodes.length > 1) out.removeChild(out.lastChild);
+      out.appendChild(VACO.notice('No Passport found: ' + VACO.escapeHtml(err.message), 'danger'));
+      VACO.mount(body, out);
+    });
+}
+
+function renderManage(body) {
+  var out = el('div', 'vaco-stack');
+  if (!VACO.userId()) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in as a business owner to register, verify, or advance a Passport.'));
+    return VACO.mount(body, out);
+  }
+
+  var result = el('div', 'vaco-stack');
+
+  out.appendChild(VACO.card('1. Register', [
+    'Level 1, Network Member — the passport a business earns the moment it registers, nothing to qualify for yet.',
+    VACO.form([{ name: 'businessId', label: 'Business id', type: 'number', value: 9002, width: '110px' }],
+      function (values) {
+        return VACO.post('/api/passports', { businessId: values.businessId }).then(function (passport) {
+          VACO.mount(result, passportCard(passport));
+          VACO.toast('Passport registered for business ' + passport.businessId, 'money');
+        });
+      }, 'Register'),
+  ]));
+
+  out.appendChild(VACO.card('2. Verify', [
+    'Level 1 -> 2. Calls VACA\'s own verification — a business cannot self-declare its way past this.',
+    VACO.form([{ name: 'businessId', label: 'Business id', type: 'number', value: 9002, width: '110px' }],
+      function (values) {
+        return VACO.post('/api/passports/' + encodeURIComponent(values.businessId) + '/verify', {}).then(function (passport) {
+          VACO.mount(result, passportCard(passport));
+          VACO.toast('Business ' + passport.businessId + ' verified', 'money');
+        });
+      }, 'Verify'),
+  ]));
+
+  out.appendChild(VACO.card('3. Assess network activity', [
+    'Level 2 -> 3. Reads V3\'s real transaction history for the owner — a count and a sum, never a derived score.',
+    VACO.form([{ name: 'businessId', label: 'Business id', type: 'number', value: 9002, width: '110px' }],
+      function (values) {
+        return VACO.post('/api/passports/' + encodeURIComponent(values.businessId) + '/network-activity', {}).then(function (passport) {
+          VACO.mount(result, passportCard(passport));
+          VACO.toast('Business ' + passport.businessId + ' network activity assessed', 'money');
+        });
+      }, 'Assess'),
+  ]));
+
+  out.appendChild(result);
+  return VACO.mount(body, out);
+}
+
+VACO.app({
+  id: 'vaco-passport',
+  name: 'VACO Passport',
+  tagline: 'The Business Passport',
+  //: A steel-blue passport-adjacent identity — trust and verification,
+  //: distinct from the warmer teals already in the register.
+  accent: '#3f6b8f',
+  accentDim: '#2c4f6b',
+  accentInk: '#081118',
+  tabs: [
+    { id: 'passport', label: 'Passport', heading: 'Business Passports',
+      blurb: 'Register, VACA-verify, real V3 activity — Levels 1 through 3, end to end.', render: renderPassport },
+    { id: 'manage', label: 'Manage', heading: 'Register, verify, advance', render: renderManage },
+  ],
+});
+</script>
+</body>
+</html>

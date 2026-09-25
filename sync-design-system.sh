@@ -32,7 +32,7 @@ CHECK_ONLY=0
 # are handled by their own builds.
 TARGETS=(
   chopz chopz/chopz-shop cvnvo dreams hvntz shield v3 vaca vacay
-  vacon vacon-c vaco-analytics vago vavlt-stvdios venvm vex vex-trading vaco-notify
+  vaco-passport vacon vacon-c vaco-analytics vago vash-tap vavlt-stvdios venvm vex vex-trading vaco-notify
   void voidmagic voken vsafe vulture-flix vulture-music vulture-pods
   vulture-studios vxllage
   v4-proxy v4-search cvnvo/yap

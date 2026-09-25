@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VASH TAP</title>
+<link rel="stylesheet" href="/vaco-design.css" />
+<style>
+  .payable-yes { color: var(--vaco-money); font-weight: var(--vaco-weight-bold); }
+  .payable-no { color: var(--vaco-danger); font-weight: var(--vaco-weight-bold); }
+  .receipt-total { font-size: var(--vaco-text-3xl); font-weight: var(--vaco-weight-bold); font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body class="vaco">
+<script src="/vaco-ui.js"></script>
+<script>
+// VASH TAP — the physical-to-digital interaction layer.
+//
+// A real client of the tap -> resolve -> pay -> attribute loop
+// documented in vash-tap/README.md, against the app's own 14 routes.
+// No game logic lives here: resolution, payability, and revenue
+// attribution are all computed server-side by lib/tap.js — this page
+// only asks for them and renders what comes back.
+
+var el = VACO.el;
+
+function tapCard(resolved) {
+  var tap = resolved.tap;
+  var lines = el('div', 'vaco-stack-sm');
+  lines.appendChild(el('p', 'vaco-small vaco-dim',
+    (resolved.business ? resolved.business.name : 'no business on record') + ' · ' + tap.tapType));
+
+  var payRow = el('div', 'vaco-row-tight');
+  payRow.appendChild(el('span', 'vaco-label', 'Payable'));
+  payRow.appendChild(el('span', resolved.payable ? 'payable-yes' : 'payable-no',
+    resolved.payable ? 'Yes' : 'No'));
+  lines.appendChild(payRow);
+
+  if (resolved.assignment) {
+    var whoRow = el('div', 'vaco-row-tight');
+    whoRow.appendChild(el('span', 'vaco-label', 'Assigned to'));
+    whoRow.appendChild(el('span', 'vaco-small', resolved.assigneeIdentityId));
+    if (resolved.assigneeVerified !== null) {
+      whoRow.appendChild(VACO.badge(resolved.assigneeVerified ? 'verified' : 'unverified',
+        resolved.assigneeVerified ? 'money' : 'warn'));
+    }
+    lines.appendChild(whoRow);
+  } else {
+    lines.appendChild(el('p', 'vaco-small vaco-dim', 'No one is currently assigned to this Tap.'));
+  }
+
+  return VACO.card(tap.tapCode, [lines], { trailing: VACO.badge(tap.status) });
+}
+
+function renderResolve(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.card('Tap resolution', [
+    'Tapping identifies the object first — no session needed. Authorization only matters at the payment step.',
+    VACO.form([{ name: 'tapCode', label: 'Tap code', value: 'VT-000001', width: '140px' }], function (values) {
+      return loadResolve(out, body, values.tapCode);
+    }, 'Tap'),
+  ]));
+  out.appendChild(el('div', 'vaco-empty', 'Enter a tap code above — try VT-000001 through VT-000005, HUNT Barber Shop\'s five chairs.'));
+  return VACO.mount(body, out);
+}
+
+function loadResolve(out, body, tapCode) {
+  return VACO.api('/api/taps/' + encodeURIComponent(tapCode) + '/resolve')
+    .then(function (resolved) {
+      return VACO.api('/api/taps/' + encodeURIComponent(tapCode) + '/transactions')
+        .catch(function () { return { transactions: [] }; })
+        .then(function (data) {
+          var replacement = el('div', 'vaco-stack');
+          replacement.appendChild(tapCard(resolved));
+          replacement.appendChild(VACO.card('Attribution', [
+            VACO.table([
+              { key: 'id', label: 'Id' },
+              { label: 'From', render: function (r) { return r.fromUserId; } },
+              { label: 'Amount', num: true, render: function (r) { return VACO.price(r.amount, { freeLabel: false }); } },
+              { label: 'Tip', num: true, render: function (r) { return VACO.price(r.tip, { freeLabel: false }); } },
+            ], data.transactions || [], { empty: 'No payments through this Tap yet.' }),
+          ]));
+          while (out.childNodes.length > 1) out.removeChild(out.lastChild);
+          out.appendChild(replacement);
+          VACO.mount(body, out);
+        });
+    })
+    .catch(function (err) {
+      while (out.childNodes.length > 1) out.removeChild(out.lastChild);
+      out.appendChild(VACO.notice('No Tap found: ' + VACO.escapeHtml(err.message), 'danger'));
+      VACO.mount(body, out);
+    });
+}
+
+function renderPay(body) {
+  var out = el('div', 'vaco-stack');
+  if (!VACO.userId()) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in above to pay through a Tap — a payment moves real VCoin from your own session.'));
+    return VACO.mount(body, out);
+  }
+
+  out.appendChild(VACO.card('Pay a tap', [
+    'Calls V3\'s real ledger through vash-tap\'s own attribution layer — never a second one.',
+    VACO.form([
+      { name: 'tapCode', label: 'Tap code', value: 'VT-000001', width: '140px' },
+      { name: 'amount', label: 'Amount', type: 'number', min: 1, value: 40, width: '90px' },
+      { name: 'tip', label: 'Tip', type: 'number', min: 0, value: 8, width: '80px' },
+      { name: 'message', label: 'Message', value: '', width: '180px' },
+    ], function (values) {
+      return VACO.post('/api/taps/' + encodeURIComponent(values.tapCode) + '/pay', {
+        fromUserId: VACO.userId(),
+        amount: values.amount,
+        tip: values.tip,
+        message: values.message || null,
+      }).then(function (record) {
+        VACO.refreshBalances().then(VACO.renderIdentity);
+        while (out.childNodes.length > 1) out.removeChild(out.lastChild);
+        out.appendChild(receiptCard(record));
+        VACO.mount(body, out);
+        VACO.toast('Paid ' + VACO.round(record.total) + ' through ' + record.tapCode, 'money');
+      });
+    }, 'Pay'),
+  ]));
+  return VACO.mount(body, out);
+}
+
+function receiptCard(record) {
+  var lines = el('div', 'vaco-stack-sm');
+  lines.appendChild(el('div', 'receipt-total', VACO.round(record.total)));
+  lines.appendChild(el('p', 'vaco-small vaco-dim',
+    VACO.round(record.amount) + ' + ' + VACO.round(record.tip) + ' tip · to ' + record.toUserId));
+  if (record.message) lines.appendChild(el('p', 'vaco-small', '"' + record.message + '"'));
+  if (record.notification) {
+    lines.appendChild(el('p', 'vaco-small vaco-dim', 'Alert: ' + record.notification.status));
+  }
+  return VACO.card('Paid — ' + record.tapCode, [lines], { trailing: VACO.badge(record.status) });
+}
+
+function renderHistory(body) {
+  var userId = VACO.userId();
+  if (!userId) {
+    return VACO.mount(body, el('div', 'vaco-empty', 'Sign in to see every payment you have made through any Tap.'));
+  }
+  return VACO.api('/api/spenders/' + encodeURIComponent(userId) + '/history')
+    .then(function (data) {
+      return VACO.mount(body, VACO.card('Your tap history', [
+        VACO.table([
+          { key: 'tapCode', label: 'Tap' },
+          { label: 'Total', num: true, render: function (r) { return VACO.price(r.total, { freeLabel: false }); } },
+          { key: 'toUserId', label: 'To' },
+          { label: 'Status', render: function (r) { return VACO.badge(r.status); } },
+        ], data.transactions || [], { empty: 'No payments made yet.' }),
+      ]));
+    });
+}
+
+function renderBusiness(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.card('Look up a business', [
+    VACO.form([{ name: 'businessId', label: 'Business id', type: 'number', value: 9001, width: '110px' }],
+      function (values) { return loadBusiness(out, body, values.businessId); }, 'Load'),
+  ]));
+
+  if (VACO.userId()) {
+    out.appendChild(VACO.card('Manage a tap', [
+      'Owner-only. Freezing a Tap stops it from being paid until unfrozen — §40\'s lost/stolen response.',
+      VACO.form([{ name: 'tapCode', label: 'Tap code', value: 'VT-000001', width: '140px' }], function (values) {
+        return VACO.post('/api/taps/' + encodeURIComponent(values.tapCode) + '/freeze', {})
+          .then(function () { VACO.toast(values.tapCode + ' frozen', 'warn'); });
+      }, 'Freeze'),
+      VACO.form([{ name: 'tapCode', label: 'Tap code', value: 'VT-000001', width: '140px' }], function (values) {
+        return VACO.post('/api/taps/' + encodeURIComponent(values.tapCode) + '/unfreeze', {})
+          .then(function () { VACO.toast(values.tapCode + ' unfrozen', 'money'); });
+      }, 'Unfreeze'),
+    ]));
+  }
+
+  out.appendChild(el('div', 'vaco-empty', 'Enter a business id above — try 9001, HUNT Barber Shop.'));
+  return VACO.mount(body, out);
+}
+
+function loadBusiness(out, body, businessId) {
+  return Promise.all([
+    VACO.api('/api/business/' + encodeURIComponent(businessId) + '/taps'),
+    VACO.api('/api/business/' + encodeURIComponent(businessId) + '/revenue').catch(function () { return null; }),
+  ]).then(function (r) {
+    var taps = r[0].taps || [], revenue = r[1];
+    var replacement = el('div', 'vaco-stack');
+    replacement.appendChild(VACO.card('Taps at business ' + businessId, [
+      VACO.table([
+        { key: 'tapCode', label: 'Tap' },
+        { key: 'tapType', label: 'Type' },
+        { label: 'Status', render: function (t) { return VACO.badge(t.status); } },
+      ], taps, { empty: 'No Taps registered for this business yet.' }),
+    ]));
+    if (revenue) {
+      replacement.appendChild(VACO.card('Revenue by tap', [
+        el('p', 'vaco-small vaco-dim', 'Tap -> transaction -> revenue, attributed per Tap — visible only to this business\'s owner.'),
+        VACO.table([
+          { key: 'tapCode', label: 'Tap' },
+          { label: 'Revenue', num: true, render: function (r2) { return VACO.price(r2.revenue, { freeLabel: false }); } },
+          { label: 'Tips', num: true, render: function (r2) { return VACO.price(r2.tips, { freeLabel: false }); } },
+          { key: 'transactions', label: 'Payments', num: true },
+        ], revenue.byTap || [], { empty: 'No revenue recorded yet.' }),
+      ]));
+    } else {
+      replacement.appendChild(el('div', 'vaco-empty', 'Sign in as this business\'s owner to see its revenue.'));
+    }
+    while (out.childNodes.length > 2) out.removeChild(out.lastChild);
+    out.appendChild(replacement);
+    VACO.mount(body, out);
+  }).catch(function (err) {
+    while (out.childNodes.length > 2) out.removeChild(out.lastChild);
+    out.appendChild(VACO.notice('Could not load business ' + businessId + ': ' + VACO.escapeHtml(err.message), 'danger'));
+    VACO.mount(body, out);
+  });
+}
+
+VACO.app({
+  id: 'vash-tap',
+  name: 'VASH TAP',
+  tagline: 'Tap. Resolve. Pay. Attribute.',
+  //: VASH TAP's identity: a punchy vermillion — the colour of an
+  //: instant contactless gesture, distinct from every warm-orange
+  //: neighbour already in the register.
+  accent: '#e0563f',
+  accentDim: '#b8402c',
+  accentInk: '#1a0904',
+  tabs: [
+    { id: 'resolve', label: 'Resolve', heading: 'Tap resolution',
+      blurb: 'What tapping does: identify the object. No session required.', render: renderResolve },
+    { id: 'pay', label: 'Pay', heading: 'Pay a tap', render: renderPay },
+    { id: 'history', label: 'My history', heading: 'Your tap history',
+      blurb: 'Every payment you have made through any Tap — complete, yours alone.', render: renderHistory },
+    { id: 'business', label: 'Business', heading: 'Business taps & revenue', render: renderBusiness },
+  ],
+});
+</script>
+</body>
+</html>

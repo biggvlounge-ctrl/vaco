@@ -32,9 +32,11 @@ explicitly rather than silently skipped):
   other two demo subjects. Both depend on a real entertainer/product
   model this ecosystem doesn't have yet; seeding them would fabricate
   data with nothing real underneath it.
-- **Any frontend** — Tap profile, business dashboard, spender dashboard,
-  analytics UI. This is an API-only build, verified by curl and by the
-  test suite, matching the "narrowest real demo" scope decision.
+- **A dimensioned analytics UI.** `public/index.html` covers resolve,
+  pay, spender history, and business taps/revenue against the app's own
+  14 routes — real data, no invented dashboards. What it does not add is
+  anything the API itself doesn't compute: no charts, no time series,
+  since the audit found no dimensioned analytics schema underneath.
 - **Lock/unlock as routes.** Distinct from freeze/unfreeze (§40, wired
   below) — the freeze spec's own security section names them
   separately, and no lock semantics beyond "frozen" were designed here.

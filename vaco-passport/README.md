@@ -61,8 +61,9 @@ skipped):
   extend yet.
 - **Community Treasury / Proof-of-Impact.** Zero real code found
   anywhere in the ecosystem for a community-fund concept.
-- **Any frontend.** API-only, verified by curl and the test suite,
-  matching VASH TAP's own "narrowest real demo" precedent.
+- **A rich Passport UI.** `public/index.html` covers lookup and the
+  register → verify → assess loop against the app's own five routes —
+  real data, no invented fields beyond what `lib/passport.js` stores.
 - **`decisionLog`.** Deliberately not wired — same coupling-cost
   reasoning as VASH TAP's own README.
 
