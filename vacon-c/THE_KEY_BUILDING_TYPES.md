@@ -109,6 +109,21 @@ what it holds is a game to play, not stock to search, and
 `server/discovery.js` says so the same way it already does for `prison`
 and `stadium-arena`.
 
+## Implementation note — added 26 Sep 2026, thirty-third through thirty-seventh
+
+Five named venue subtypes: `dome`, `amphitheater`, `hockey-arena`,
+`soccer-stadium`, `college-stadium`. All sit beside `stadium-arena`
+rather than replacing it, which stays the generic case. New design, no
+source document, named directly by the owner. `amphitheater` is
+`form: 'site'` rather than `'building'` — a classical or modern
+open-air amphitheater's tiered seating is closer to a monument's
+footprint than a floor count, the same reasoning `notable-bridge` and
+`monument-memorial` already use. `college-stadium` and `amphitheater`
+get `staff: 'manager'` rather than `'athlete'` — one is run by a
+university athletic department, the other is not a sports venue at
+all, and `discovery: null` for all five, matching `stadium-arena` and
+`casino`: not merchandise sites.
+
 Rivers and lakes are a narrower gap than "blocked": `gnisImport.js`
 deliberately excludes `stream` as a `BULK_CLASS` — its own comment says
 why, "we chose not to import 40,000 creeks" rather than a technical

@@ -132,6 +132,13 @@ const POOLS = {
   // Added 26 Sep 2026 alongside `landmarks.js`'s `casino`. Null for the
   // same reason `prison`/`stadium-arena` are: not a merchandise site.
   casino: null,
+  // Added 26 Sep 2026 alongside landmarks.js's five venue additions.
+  // Null for the same reason casino/prison/stadium-arena are.
+  dome: null,
+  amphitheater: null,
+  'hockey-arena': null,
+  'soccer-stadium': null,
+  'college-stadium': null,
   'other-distinctive-feature': null,
 
   // -- retail ---------------------------------------------------------

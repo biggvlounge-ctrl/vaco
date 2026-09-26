@@ -316,6 +316,43 @@ const KEY_BUILDING_TYPES = {
     significance: [40, 65], propertyType: 'commercial', staff: 'manager',
     discovery: null,
   },
+  //: **Five sports/entertainment venue types, added 26 Sep 2026 at the
+  //: owner's direct request.** All five sit beside `stadium-arena`
+  //: rather than replacing it — that category stays the generic case,
+  //: these are named subtypes the owner asked for by name. Same
+  //: standing as everything else in this note: new design, no source
+  //: document.
+  dome: {
+    significance: [45, 75], propertyType: 'commercial', staff: 'athlete',
+    discovery: null,
+  },
+  //: An amphitheater is not a sports venue and gets `manager` rather
+  //: than `athlete` for the same reason `theater-concert-hall` does —
+  //: it is a performance space. `form: 'site'` because the classical
+  //: sense (tiered open-air seating, no enclosing structure) is closer
+  //: to a monument's footprint than a building's floor count; a modern
+  //: open-air amphitheater is the same shape.
+  amphitheater: {
+    form: 'site',
+    significance: [35, 60], propertyType: 'commercial', staff: 'manager',
+    discovery: null,
+  },
+  'hockey-arena': {
+    significance: [45, 70], propertyType: 'commercial', staff: 'athlete',
+    discovery: null,
+  },
+  'soccer-stadium': {
+    significance: [45, 75], propertyType: 'commercial', staff: 'athlete',
+    discovery: null,
+  },
+  //: `manager` rather than `athlete` — a college stadium is run by a
+  //: university athletic department administratively, the same
+  //: distinction `curator` (museum) draws against `athlete` (pro
+  //: venue) elsewhere in this table.
+  'college-stadium': {
+    significance: [35, 60], propertyType: 'commercial', staff: 'manager',
+    discovery: null,
+  },
   'other-distinctive-feature': {
     significance: [30, 60], propertyType: 'historical_site', staff: null,
     discovery: null,
@@ -504,6 +541,11 @@ const CREW_BY_CATEGORY = {
   'corporate-headquarters': 'tower',
   'shopping-mall': 'venue',
   casino: 'venue',
+  dome: 'venue',
+  amphitheater: 'venue',
+  'hockey-arena': 'venue',
+  'soccer-stadium': 'venue',
+  'college-stadium': 'venue',
   'other-distinctive-feature': 'unmanned',
 };
 

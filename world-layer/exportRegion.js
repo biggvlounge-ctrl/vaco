@@ -72,6 +72,9 @@ const KEY_CATEGORIES = [
   'shopping-mall',
   // Thirty-second, same reasoning, added alongside server/gambling.js.
   'casino',
+  // Thirty-third through thirty-seventh, same reasoning, five named
+  // venue subtypes beside stadium-arena.
+  'dome', 'amphitheater', 'hockey-arena', 'soccer-stadium', 'college-stadium',
 ];
 
 // UNESCO inscription is treated as maximal historical importance by
