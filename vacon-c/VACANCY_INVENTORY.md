@@ -47,7 +47,7 @@ the Postgres schema that already exists.
 
 ## 1. Server code — `vacon-c/server/`
 
-All 80 files present on disk, all committed, largest first.
+All 81 files present on disk, all committed, largest first.
 
 **`test/inventory.test.js` now fails when this table and `server/` disagree**, which is the guard this document has needed through three separate drifts (see the note below). The count and the file list are checked against the tree rather than typed.
 
@@ -129,6 +129,7 @@ read off disk, not recalled.
 | `beliefs.js` | 8,674 | What an entity holds to be true, and how confidently. | Built |
 | `gambling.js` | 8,402 | **A house game against the world's own virtual economy — added 26 Sep 2026 at the owner's direct request, confined to `individual_finances.savings`, never real money.** `economic['Risk Appetite']`/`Greed` get their first reader; `psychological.Compulsiveness` gets a second. Not the `#291-305` real-money gambling gate `competition.js` already declines — that review still applies in full if this is ever wired to a real payment rail. | Built |
 | `persistence.js` | 8,638 | Loads the world before `app.listen` and checkpoints every 10 ticks. | Built, see §4 |
+| `heritage.js` | 7,158 | **Real ethnicity and religion values — added 26 Sep 2026 at the owner's direct request, reversing `worldgen.js`'s prior deliberate use of fictional names.** African nations with named ethnic/tribal groups, several Native American nations, a named "Foundational Black American" lineage, and broad coverage across the Americas, Europe, the Middle East and Asia. Changes only what values `npcs.ethnicity` can hold — `demographics.js`'s existing firewall (`test/ethnicity.test.js`: no generator of crime, policing, economy, mortality, traits or migration may read it) is untouched. | Built |
 | `worldStore.js` | 7,035 | Memory, relationships, knowledge — the write-back layer the contract requires. | Built |
 | `entityTraits.js` | 6,562 | Per-entity trait rows, trait sheets, Key modifiers, live entity resolution (`getLiveEntity`, the ninth standing rule's answer). | Built |
 | `decisions.js` | 6,365 | `decision_log` — why an NPC did anything, in its own words. | Built |

@@ -171,20 +171,50 @@ test('a child belongs to the household it was born into', () => {
   void births;
 });
 
-// -- the names are not real-world groups ----------------------------------
+// -- the names are real, broad, and include what was asked for ------------
 
-test('the generated groups are named for this setting', () => {
-  // Deliberate: the engine needs a dimension with more than one value
-  // so composition and diversity mean something, and borrowing real
-  // ethnonyms would attach real-world associations to a simulation that
-  // models none of them.
-  const source = fs.readFileSync(path.join(SERVER, 'worldgen.js'), 'utf8');
-  const match = source.match(/ethnicities: \[([^\]]+)\]/);
-  assert.ok(match, 'worldgen declares no ethnicities');
+// **Reversed 26 Sep 2026, at the owner's direct request.** This test
+// used to assert the opposite of what it asserts now: that every
+// generated group was a single fictional setting-style word, on the
+// grounds that "borrowing real ethnonyms would attach real-world
+// associations to a simulation that models none of them." That
+// reasoning is recorded in `server/heritage.js`'s header rather than
+// forgotten — it was sound, and it is being overridden on purpose by
+// the person who owns that decision, not quietly worked around.
+//
+// The firewall this file's OTHER tests hold — nothing outside
+// `demographics.js` may read `.ethnicity` — is exactly what makes the
+// reversal safe: real values can enter a purely-measured field without
+// reopening §9's clause, because nothing decides anything from them.
+test('the generated groups are real, broad, and worldgen draws from them', () => {
+  const heritage = require('../server/heritage.js');
+  const worldgen = require('../server/worldgen.js');
 
-  const names = match[1].split(',').map((s) => s.trim().replace(/^'|'$/g, ''));
-  assert.ok(names.length >= 3, 'fewer than three groups gives diversity almost nothing to say');
-  for (const name of names) {
-    assert.ok(/^[A-Z][a-z]+$/.test(name), `"${name}" is not a single setting-style name`);
-  }
+  assert.ok(heritage.ETHNICITIES.length >= 20,
+    'fewer than twenty groups is not the broad, real coverage that was asked for');
+  assert.equal(new Set(heritage.ETHNICITIES).size, heritage.ETHNICITIES.length,
+    'a duplicated entry would double-count one group as two');
+
+  // The specific thing asked for by name: a lineage distinct from a
+  // recent African immigrant's, for the descendants of the enslaved and
+  // free Black population in America before and after slavery.
+  assert.ok(heritage.ETHNICITIES.includes('Foundational Black American'));
+
+  // African nations with named ethnic/tribal groups, not just "African"
+  // as one undifferentiated entry — the other thing asked for by name.
+  const africanTribalEntries = heritage.ETHNICITIES.filter((e) => e.includes(' — '));
+  assert.ok(africanTribalEntries.length >= 8,
+    'too few nation-plus-group entries for the specificity that was asked for');
+
+  // Real breadth, not a list that only elaborates on one region while
+  // leaving every other group generic.
+  assert.ok(heritage.ETHNICITIES.some((e) => e.includes('Native American')));
+  assert.ok(heritage.ETHNICITIES.some((e) => /Mexican|Puerto Rican|Cuban|Dominican/.test(e)));
+  assert.ok(heritage.ETHNICITIES.some((e) => /Chinese|Vietnamese|Korean|Japanese|Indian/.test(e)));
+
+  // worldgen actually draws from this list rather than a copy of it —
+  // the same identity check `test/landmark-packs.test.js` holds between
+  // landmarks.js and exportRegion.js, for the same reason.
+  assert.equal(worldgen.DEFAULTS.ethnicities, heritage.ETHNICITIES);
+  assert.equal(worldgen.DEFAULTS.religions, heritage.RELIGIONS);
 });
