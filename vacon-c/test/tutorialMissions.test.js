@@ -13,6 +13,7 @@ const assert = require('node:assert/strict');
 
 const engine = require('../server/engine.js');
 const knowledge = require('../server/knowledge.js');
+const worldStore = require('../server/worldStore.js');
 const tutorialMissions = require('../server/tutorialMissions.js');
 
 // A landmark with a REAL significance, the same fixture shape
@@ -124,9 +125,76 @@ test('offerMentorMission skips somebody with no real occupation', () => {
   assert.equal(tutorialMissions.offerMentorMission(engine.WorldState, npc.id), null);
 });
 
-test('seedTutorialStart composes all three, and each half is independently real', () => {
+test('offerMysteryMission seeds a real crime and a real, confidence-weighted fact the victim actually holds', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 7006;
+  const victim = engine.generateNPC();
+  victim.communityId = 7006;
+  const perpetrator = engine.generateNPC();
+  perpetrator.communityId = 7006;
+  landmark(engine.WorldState, 7601, 'library', 7006);
+
+  const offer = tutorialMissions.offerMysteryMission(engine.WorldState, npc.id);
+  assert.ok(offer, 'no mystery mission was opened');
+  assert.equal(offer.victimId, victim.id);
+  assert.equal(offer.perpetratorId, perpetrator.id);
+  assert.equal(offer.incident.category, tutorialMissions.TUTORIAL_CRIME_CATEGORY);
+  assert.match(offer.mission.objective, new RegExp(victim.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+
+  const victimKnowledge = worldStore.getKnowledge(engine.WorldState, victim.id, perpetrator.id);
+  assert.ok(victimKnowledge.length > 0, 'the victim came away knowing nothing about who wronged them');
+  assert.ok(victimKnowledge[0].confidence_level > 0);
+});
+
+test('offerMysteryMission returns null without two other real people in the community', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 7007; // nobody else here
+  assert.equal(tutorialMissions.offerMysteryMission(engine.WorldState, npc.id), null);
+});
+
+test('Chain #2 end to end: asking the victim really moves the fact to the player, over the real dispatcher', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 7008;
+  const victim = engine.generateNPC();
+  victim.communityId = 7008;
+  const perpetrator = engine.generateNPC();
+  perpetrator.communityId = 7008;
+  landmark(engine.WorldState, 7701, 'library', 7008);
+
+  const offer = tutorialMissions.offerMysteryMission(engine.WorldState, npc.id);
+  const player = engine.generatePlayer({ linkedEntityId: npc.id });
+
+  // Before asking, the player's own NPC knows nothing about the culprit.
+  assert.equal(worldStore.getKnowledge(engine.WorldState, npc.id, perpetrator.id).length, 0);
+
+  engine.dispatchAction(player.id, { action: 'accept-mission', missionId: offer.mission.id });
+  engine.dispatchAction(player.id, {
+    action: 'call-meeting', attendeeIds: [victim.id], purpose: 'sit-down',
+  });
+
+  // shareAround really copied it — the same read GET /api/npcs/:id
+  // already serves.
+  const learned = worldStore.getKnowledge(engine.WorldState, npc.id, perpetrator.id);
+  assert.ok(learned.length > 0, 'asking around taught the player nothing');
+  assert.equal(learned[0].source_entity_id, victim.id, 'the fact does not say who it was heard from');
+
+  const resolved = engine.dispatchAction(player.id, {
+    action: 'resolve-mission', missionId: offer.mission.id, outcome: 'completed',
+  });
+  assert.equal(resolved.result.paid.amount, tutorialMissions.TUTORIAL_MYSTERY_REWARD);
+});
+
+test('seedTutorialStart composes all four, and each half is independently real', () => {
   const npc = engine.generateNPC({ education: 'basic' });
   npc.communityId = 7005;
+  // Order matters: offerMysteryMission casts the first two OTHER real
+  // NPCs in the community as victim/perpetrator, so they are generated
+  // before the mentor to keep this test's own assertions deterministic
+  // — the real function itself makes no such distinction.
+  const victim = engine.generateNPC();
+  victim.communityId = 7005;
+  const perpetrator = engine.generateNPC();
+  perpetrator.communityId = 7005;
   const mentor = engine.generateNPC();
   mentor.communityId = 7005;
   hire(engine.WorldState, mentor.id, 'trader');
@@ -137,6 +205,8 @@ test('seedTutorialStart composes all three, and each half is independently real'
   assert.ok(start.exploreMission);
   assert.ok(start.mentorMission);
   assert.equal(start.mentorId, mentor.id);
+  assert.ok(start.mysteryMission);
+  assert.equal(start.mysteryVictimId, victim.id);
 });
 
 test('seedTutorialStart is refused for an entity that does not exist', () => {

@@ -1,11 +1,11 @@
 // server/tutorialMissions.js
 //
-// Mission Chain #1 — "Start Here". See
+// Mission Chain #1 — "Start Here" — and Chain #2 — "Ask Around". See
 // `dev-docs/TUTORIAL_MISSIONS_DESIGN.md` for the full design note (the
-// six-reference mapping this closes the first slice of, and why each
-// step is real rather than invented).
+// six-reference mapping this closes the first two slices of, and why
+// each step is real rather than invented).
 //
-// **Three real steps, no new mechanic, no schema change:**
+// **Chain #1, three real steps, no new mechanic, no schema change:**
 //
 //   1. A starting book, seeded directly — not a mission. `generateMission`
 //      requires a real artifact or a real location; "study the book you
@@ -18,10 +18,19 @@
 //      landmark's finite capacity still supports several distinct real
 //      finds before it is searched out).
 //   3. A real Mission to meet, and separately learn from, a real NPC
-//      who holds a real occupation. `call-meeting` moves trust;
-//      `study` against that same person as an `experienced NPCs`
-//      source is the actual knowledge transfer — two real mechanics,
-//      not one pretending to be two.
+//      who holds a real occupation. `call-meeting`'s `shares` flag
+//      spreads facts for every purpose; a deliberate `study` against
+//      that same person as an `experienced NPCs` source afterward is a
+//      second, real, additional gain — see the design note's
+//      correction on what a meeting actually moves.
+//
+// **Chain #2, "Ask Around" — Carmen Sandiego's own loop, already real:**
+//
+//   `crime.recordCrime` gives a real victim a real, confidence-weighted
+//   fact naming who (probably) wronged them. `meetings.shareAround`
+//   (every real purpose, not just `teach`) copies that fact onto
+//   whoever the player brings to the table. `GET /api/npcs/:id` already
+//   answers what an NPC now knows — no new read route needed.
 //
 // Every function here takes `worldState` explicitly, same convention as
 // economy.js/players.js/missions.js.
@@ -30,6 +39,7 @@
 
 const knowledge = require('./knowledge.js');
 const inventory = require('./inventory.js');
+const crime = require('./crime.js');
 const discovery = require('./discovery.js');
 const missions = require('./missions.js');
 const occupations = require('./occupations.js');
@@ -43,6 +53,13 @@ const occupations = require('./occupations.js');
 //: token. Held here rather than inline so both missions agree.
 const TUTORIAL_EXPLORE_REWARD = 40;
 const TUTORIAL_MENTOR_REWARD = 40;
+const TUTORIAL_MYSTERY_REWARD = 40;
+
+//: §26/crime.js's eight real categories, and the one that reads as
+//: Carmen Sandiego's own register — mundane, solvable, not disturbing.
+//: `violent`/`domestic`/`sex_offense` exist for a real simulation's own
+//: reasons and have no place in a tutorial's first "who took this".
+const TUTORIAL_CRIME_CATEGORY = 'theft';
 
 //: The field a fresh citizen starts a book in, when the caller does not
 //: choose one. Agriculture is §24's own first-listed field and needs no
@@ -125,6 +142,49 @@ function offerMentorMission(worldState, npcId, options = {}) {
   return { mission, mentorId: mentor.id };
 }
 
+// Chain #2, "Ask Around". Seeds one real crime incident (a real victim
+// really comes away with a real, confidence-weighted fact about a real
+// perpetrator — `crime.recordCrime`'s own §9 mechanic, not anything
+// invented here) between two OTHER real NPCs in the citizen's
+// community, then opens a real Mission naming the victim. The player
+// learns the fact for real by `call-meeting`ing the victim — any real
+// purpose shares it, per the design note's correction — and reads it
+// back through the citizen's own already-real `GET /api/npcs/:id`.
+//
+// Returns null, not a thrown error, when the community does not have
+// two other real people to cast as victim and perpetrator — a real,
+// possible state for a small or freshly generated world.
+function offerMysteryMission(worldState, npcId, options = {}) {
+  const npc = (worldState.npcs || []).find((n) => n.id === npcId);
+  if (!npc) throw new Error(`offerMysteryMission: no NPC ${npcId}`);
+  if (npc.communityId == null) return null;
+
+  const others = (worldState.npcs || []).filter(
+    (other) => other.id !== npcId && other.communityId === npc.communityId,
+  );
+  if (others.length < 2) return null;
+  const [victim, perpetrator] = others;
+
+  const anchor = (worldState.properties || []).find((p) => p.community_id === npc.communityId);
+  if (!anchor) return null;
+
+  const incident = crime.recordCrime(worldState, {
+    category: options.category ?? TUTORIAL_CRIME_CATEGORY,
+    victimId: victim.id,
+    perpetratorId: perpetrator.id,
+    tick: worldState.tick,
+  });
+
+  const mission = missions.generateMission(worldState, {
+    locationId: anchor.id,
+    objective: `Find out who wronged ${victim.name} — ask around`,
+    reward: options.reward ?? TUTORIAL_MYSTERY_REWARD,
+  });
+  return {
+    mission, incident, victimId: victim.id, perpetratorId: perpetrator.id,
+  };
+}
+
 // The whole chain, offered together — what a citizen-mode player
 // binding gets the instant they exist. Each half is independently
 // optional (a community with nothing searchable, or nobody else
@@ -134,20 +194,26 @@ function seedTutorialStart(worldState, npcId, options = {}) {
   const book = giveStartingBook(worldState, npcId, options);
   const exploreMission = offerExploreMission(worldState, npcId, options);
   const mentor = offerMentorMission(worldState, npcId, options);
+  const mystery = offerMysteryMission(worldState, npcId, options);
   return {
     book,
     exploreMission,
     mentorMission: mentor?.mission ?? null,
     mentorId: mentor?.mentorId ?? null,
+    mysteryMission: mystery?.mission ?? null,
+    mysteryVictimId: mystery?.victimId ?? null,
   };
 }
 
 module.exports = {
   TUTORIAL_EXPLORE_REWARD,
   TUTORIAL_MENTOR_REWARD,
+  TUTORIAL_MYSTERY_REWARD,
+  TUTORIAL_CRIME_CATEGORY,
   DEFAULT_FIELD,
   giveStartingBook,
   offerExploreMission,
   offerMentorMission,
+  offerMysteryMission,
   seedTutorialStart,
 };

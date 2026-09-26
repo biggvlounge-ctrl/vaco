@@ -38,22 +38,39 @@ once, find something different each time — without inventing a
 room-by-room map layer this engine does not have and does not need for
 a tutorial's purposes.
 
-## A precise distinction worth keeping
+## A correction, found while researching Mission Chain #2
 
-**A meeting moves trust. Studying moves knowledge. They are not the
-same mechanic**, and CLAUDE.md's own §24 pass says so explicitly:
-"Meetings add no modifier at all, on purpose... a meeting moves the
-trust between the people at it." `study`'s `experienced NPCs` source is
-the real knowledge transfer — it reads a real occupation
-(`occupations.occupationOf`) off a real nearby NPC and teaches the
-field that occupation maps to.
+**The first version of this note said "a meeting moves trust, not
+knowledge" as a blanket claim. That is wrong, and the real picture is
+richer than what it replaced.** `meetings.hold`'s `PURPOSES` table
+carries two independent flags, not one:
 
-A tutorial that wants "talk to someone, then learn from them" gets both
-real steps rather than one pretending to be two: `call-meeting`
-(purpose `teach`) builds the relationship, then `study` against that
-same person as an `experienced NPCs` source is the actual learning.
-Nothing here invents a bridge between the two — they are independently
-real and happen to compose.
+- **`teaches`** — true only for `purpose: 'teach'`. The deepest-trade
+  holder at the table becomes the teacher and `hold()` calls
+  `knowledge.study(...)` **internally**, for real, for every other
+  attendee — the exact `experienced NPCs` mechanic Mission Chain #1
+  uses, already wired into the meeting itself.
+- **`shares`** — true for every real purpose (`sit-down`, `plan`,
+  `negotiate`, `teach`, `recruit`, `form alliance`). `shareAround`
+  copies every fact an attendee holds (`entity_knowledge`, excluding
+  facts about people in the room) to every other attendee, confidence
+  degraded by the teller's own distortion. CLAUDE.md's own line was
+  narrower than it reads: "no [takeover] modifier" was about the
+  takeover-composition multiplier specifically, not about knowledge in
+  general.
+
+So a meeting **always** moves facts (any purpose), and **additionally**
+teaches a trade (only `purpose: 'teach'`, and only if a real teacher is
+present). Mission Chain #1's mentor mission still calls `study`
+explicitly after the meeting rather than relying on the automatic
+`teach` path — that stays correct regardless of which purpose the
+player picks, and a second, deliberate study session on top of an
+automatic one is a real second gain, not a bug.
+
+**This is also the real substrate behind Mission Chain #2, below**:
+`shareAround` is a genuine "ask around and the story changes in the
+retelling" mechanic, already built, already tested — nothing here
+needed to be invented for Carmen Sandiego's clue-gathering to be real.
 
 ## Mission Chain #1 — "Start Here", the narrowest real slice
 
@@ -86,20 +103,51 @@ Three real, tested verbs, no new mechanic, no schema change:
 **Not built in this pass, named rather than skipped:** a river-city-
 ransom-style "take a building" mission (needs `control.js`'s takeover
 key, which is a much bigger real commitment — real money, a real
-faction, a real building someone else may hold); anything Carmen-
-Sandiego "gather three clues across town" (needs a multi-step objective
-tracked across several searches, which the current single-objective
-`missions.objective` field does not model without a real design
-decision about what a multi-part mission record looks like); Contra-
-style combat missions (needs a real "this fight is dangerous" framing
-around `contest.js`, and a decision about what a lost fight costs the
-player). Each is a real next chain, not invented here.
+faction, a real building someone else may hold); Contra-style combat
+missions (needs a real "this fight is dangerous" framing around
+`contest.js`, and a decision about what a lost fight costs the player).
+Each is a real next chain, not invented here.
+
+## Mission Chain #2 — "Ask Around", Carmen Sandiego's own loop
+
+A single-step objective (`missions.objective` is one string, not a
+tracked multi-part list) about a real fact somebody holds, learned by
+asking them — not the "gather three clues across town" full version
+that note above still correctly leaves open, but a real, complete first
+loop rather than nothing.
+
+**The substrate, found already built, not invented:**
+
+- `crime.recordCrime(worldState, { category, perpetratorId, victimId,
+  tick })` — a real incident, and the victim comes away with a real,
+  confidence-weighted fact naming the (possible) perpetrator
+  (`policing.evasionOf` against `perception.receivedConfidence` — an
+  unskilled offender is easy to identify, a careful one is not).
+- `meetings.shareAround` — any real meeting purpose copies what an
+  attendee knows to everyone else at the table, confidence degraded by
+  the teller's own distortion. This is the "ask around, the story
+  changes a little each time" mechanic.
+- `GET /api/npcs/:id` already answers `knowledge:
+  worldStore.getKnowledge(...)` — a player reading their own NPC
+  already sees every fact it holds. No new read route needed.
+
+**The chain:** `offerMysteryMission` seeds one real `theft` incident
+(mundane, not disturbing — Carmen Sandiego's own register) between two
+real NPCs in the citizen's community, which gives the victim a real
+fact. A real Mission is opened, objective naming the victim, tied to a
+real property in the community. The player accepts it, `call-meeting`s
+the victim (any purpose — `shares` is true for all of them), the fact
+copies onto the player's own NPC via `shareAround`, `GET /api/npcs/:id`
+shows them what they now know, and they resolve the mission
+`completed`. Nothing verifies the player actually read the fact before
+resolving — the same trust model every other mission in this engine
+already uses (`resolveMission`'s outcome is caller-declared).
 
 ## Where the code lives
 
-`server/tutorialMissions.js` — `seedTutorialStart(worldState, npcId)`,
-scoped to this one chain, following the same "takes worldState
-explicitly" convention as every other module here. Not a new player
-mode, not a new schema table — three real calls into
-`inventory.give`/`missions.generateMission` with content chosen for a
-first-time citizen.
+`server/tutorialMissions.js` — `seedTutorialStart(worldState, npcId)`
+for Chain #1, `offerMysteryMission(worldState, npcId)` for Chain #2,
+both following the same "takes worldState explicitly" convention as
+every other module here. Not a new player mode, not a new schema
+table — real calls into `inventory.give`/`missions.generateMission`/
+`crime.recordCrime` with content chosen for a first-time citizen.

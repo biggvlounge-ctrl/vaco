@@ -911,11 +911,12 @@ test('tutorial-start seeds a real book over HTTP, and studying it for real moves
 
   const start = await (await post(`/players/${player.id}/tutorial-start`, {})).json();
   assert.equal(start.book.itemName, `${start.book.field} book`);
-  // A freshly generated NPC over HTTP has no community — no landmark
-  // and no coworker exist for it to be about, so both missions are a
-  // real, honest null rather than an invented one.
+  // A freshly generated NPC over HTTP has no community — no landmark,
+  // coworker, victim or perpetrator exist for any of them to be about,
+  // so all three missions are a real, honest null rather than invented.
   assert.equal(start.exploreMission, null);
   assert.equal(start.mentorMission, null);
+  assert.equal(start.mysteryMission, null);
 
   const studied = await post(`/players/${player.id}/action`, {
     action: 'study', source: 'books', field: start.book.field,
