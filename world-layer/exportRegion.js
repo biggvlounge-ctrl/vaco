@@ -70,6 +70,8 @@ const KEY_CATEGORIES = [
   // reasoning as `park` above.
   'warehouse', 'public-housing', 'river', 'lake', 'corporate-headquarters',
   'shopping-mall',
+  // Thirty-second, same reasoning, added alongside server/gambling.js.
+  'casino',
 ];
 
 // UNESCO inscription is treated as maximal historical importance by

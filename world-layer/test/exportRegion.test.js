@@ -101,12 +101,12 @@ test('half a coordinate pair is dropped rather than exported', () => {
 });
 
 test('the Key is the documents’ twenty-three, plus the school they disagree about, plus six new ones', () => {
-  assert.equal(KEY_CATEGORIES.length, 31);
+  assert.equal(KEY_CATEGORIES.length, 32);
   assert.ok(KEY_CATEGORIES.includes('school'));
   assert.ok(KEY_CATEGORIES.includes('masonic-building'));
   assert.ok(KEY_CATEGORIES.includes('other-distinctive-feature'));
   assert.ok(KEY_CATEGORIES.includes('park'));
-  for (const category of ['warehouse', 'public-housing', 'river', 'lake', 'corporate-headquarters', 'shopping-mall']) {
+  for (const category of ['warehouse', 'public-housing', 'river', 'lake', 'corporate-headquarters', 'shopping-mall', 'casino']) {
     assert.ok(KEY_CATEGORIES.includes(category), category);
   }
 });

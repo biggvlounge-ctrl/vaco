@@ -68,8 +68,9 @@ const SOC_GROUP_BY_OCCUPATION = {
   teacher: '25', librarian: '25',
   // 27-0000 Arts, design, entertainment, sports and media
   curator: '27', athlete: '27', reporter: '27',
-  // 29-0000 Healthcare practitioners
-  physician: '29',
+  // 29-0000 Healthcare practitioners. `psychiatrist` (29-1223 in the
+  // real SOC) added 26 Sep 2026 alongside vacon-c/server/occupations.js.
+  physician: '29', psychiatrist: '29',
   // 31-0000 Healthcare support
   orderly: '31',
   // 33-0000 Protective service

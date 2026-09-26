@@ -99,6 +99,16 @@ them, and `world-layer/imports/gnisImport.js` already maps GNIS's
 GNIS rather than being blocked at this environment's proxy the way
 UNESCO/NRHP/Cesium are.
 
+## Implementation note — added 26 Sep 2026, a thirty-second, same day as `server/gambling.js`
+
+`casino`. Same standing as `corporate-headquarters`/`shopping-mall`:
+new design, no source document, named directly by the owner alongside
+the request that produced `server/gambling.js`. `discovery: null` in
+`server/landmarks.js` because a casino is not a merchandise site —
+what it holds is a game to play, not stock to search, and
+`server/discovery.js` says so the same way it already does for `prison`
+and `stadium-arena`.
+
 Rivers and lakes are a narrower gap than "blocked": `gnisImport.js`
 deliberately excludes `stream` as a `BULK_CLASS` — its own comment says
 why, "we chose not to import 40,000 creeks" rather than a technical

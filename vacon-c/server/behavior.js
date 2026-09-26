@@ -508,6 +508,11 @@ const STRESS_BY_EVENT = {
   // and this file already has both numbers to anchor it against rather
   // than inventing a third scale.
   withdrawal: 8,
+  // Added the same day alongside server/gambling.js. A notable loss is
+  // sized like `scarcity`; a notable win is `partnership_formed`'s own
+  // relief figure, halved — good news, not the best news anybody gets.
+  gambling_loss: 4,
+  gambling_win: -4,
 };
 
 // Apply this tick's events to the people they happened to.

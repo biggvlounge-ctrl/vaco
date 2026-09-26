@@ -61,6 +61,7 @@ const territory = require('./territory.js');
 const property = require('./property.js');
 const flows = require('./flows.js');
 const drugs = require('./drugs.js');
+const gambling = require('./gambling.js');
 const behavior = require('./behavior.js');
 const areaStats = require('./areaStats.js');
 const perception = require('./perception.js');
@@ -1310,6 +1311,12 @@ function advanceTick(worldState) {
   // stress this tick, the same guarantee `runSecurityPhase`'s crime
   // events already get. See server/drugs.js.
   candidateEvents.push(...drugs.runDrugs(worldState, { tick: worldState.tick }).events);
+
+  // Gambling urges, same slot and same reason as drugs immediately
+  // above: a cross-cutting effect of the population's own traits and
+  // savings, confined to the game's own virtual currency. See
+  // server/gambling.js.
+  candidateEvents.push(...gambling.runGambling(worldState, { tick: worldState.tick }).events);
 
   // The Behavior Engine. Also NOT a twelfth phase, and in the same slot
   // for the same reason: it observes a finished tick. Stress decays,

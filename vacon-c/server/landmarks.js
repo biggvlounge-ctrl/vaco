@@ -306,6 +306,16 @@ const KEY_BUILDING_TYPES = {
     significance: [40, 65], propertyType: 'commercial', staff: 'manager',
     discovery: 'clothing, general merchandise',
   },
+  //: **`casino`, added 26 Sep 2026 alongside `server/gambling.js`.**
+  //: Same standing as `corporate-headquarters`/`shopping-mall` right
+  //: above — new design, no source document, named directly by the
+  //: owner. `discovery: null` because a casino is not a loot site the
+  //: way a hardware store is; what it holds is the game
+  //: `server/gambling.js` plays, not merchandise on a shelf.
+  casino: {
+    significance: [40, 65], propertyType: 'commercial', staff: 'manager',
+    discovery: null,
+  },
   'other-distinctive-feature': {
     significance: [30, 60], propertyType: 'historical_site', staff: null,
     discovery: null,
@@ -493,6 +503,7 @@ const CREW_BY_CATEGORY = {
   lake: 'unmanned',
   'corporate-headquarters': 'tower',
   'shopping-mall': 'venue',
+  casino: 'venue',
   'other-distinctive-feature': 'unmanned',
 };
 

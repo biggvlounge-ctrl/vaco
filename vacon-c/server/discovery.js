@@ -129,6 +129,9 @@ const POOLS = {
   lake: { itemCategories: ['materials', 'water'] },
   'corporate-headquarters': { books: ['government', 'technology'] },
   'shopping-mall': { itemCategories: ['clothing', 'tools'] },
+  // Added 26 Sep 2026 alongside `landmarks.js`'s `casino`. Null for the
+  // same reason `prison`/`stadium-arena` are: not a merchandise site.
+  casino: null,
   'other-distinctive-feature': null,
 
   // -- retail ---------------------------------------------------------

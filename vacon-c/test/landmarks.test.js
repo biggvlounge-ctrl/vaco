@@ -77,10 +77,10 @@ test('THE KEY’s twenty-three categories are all here, plus the school and the 
   // directly at the owner's request, the same way the Key's own final
   // entry ("any other genuinely distinctive feature") already allows
   // for.
-  assert.equal(landmarks.KEY_BUILDING_CATEGORIES.length, 31);
+  assert.equal(landmarks.KEY_BUILDING_CATEGORIES.length, 32);
   assert.ok(landmarks.KEY_BUILDING_CATEGORIES.includes('school'));
   assert.ok(landmarks.KEY_BUILDING_CATEGORIES.includes('park'));
-  for (const category of ['warehouse', 'public-housing', 'river', 'lake', 'corporate-headquarters', 'shopping-mall']) {
+  for (const category of ['warehouse', 'public-housing', 'river', 'lake', 'corporate-headquarters', 'shopping-mall', 'casino']) {
     assert.ok(landmarks.KEY_BUILDING_CATEGORIES.includes(category), category);
   }
   for (const category of landmarks.KEY_BUILDING_CATEGORIES) {
