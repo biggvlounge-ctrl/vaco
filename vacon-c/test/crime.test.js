@@ -23,6 +23,8 @@ const areaStats = require('../server/areaStats.js');
 const economy = require('../server/economy.js');
 const territory = require('../server/territory.js');
 const engine = require('../server/engine.js');
+const inventory = require('../server/inventory.js');
+const drugs = require('../server/drugs.js');
 
 function world({ tick = 100 } = {}) {
   const worldState = {
@@ -352,6 +354,53 @@ test('the same world and the same tick commit the same crimes', () => {
   nextId = 20000;
 });
 
+// -- drug possession ------------------------------------------------------
+
+function worldWithInventory({ tick = 100 } = {}) {
+  const w = world({ tick });
+  w.inventory = [];
+  w.barterItems = [];
+  drugs.registerItems(w);
+  return w;
+}
+
+test('holding contraband is what makes a drug offence possible at all', () => {
+  // Same shape as `gun`: nothing to catch without something to be
+  // caught holding. `DRUG_CATCH_RATE` is small per tick on purpose.
+  // Twenty-fourth standing rule's lesson, applied rather than repeated:
+  // a single id's own seeded draw can land unluckily across even
+  // several thousand ticks (about an 8% chance of zero at this rate),
+  // so this spreads the same total number of draws across many holders
+  // instead of trusting one id to be lucky.
+  const w = worldWithInventory();
+  const c = territory.generateCommunity(w, {});
+  const holders = [];
+  for (let i = 0; i < 20; i += 1) {
+    const holder = person(w, { communityId: c.id });
+    inventory.give(w, { entityId: holder.id, itemName: drugs.NARCOTICS_ITEM, quantity: 5 });
+    holders.push(holder.id);
+  }
+
+  let incidents = [];
+  for (let t = 1; t <= 3000; t += 1) incidents = incidents.concat(crime.runDrugCrime(w, t));
+  assert.ok(incidents.length > 0, 'nobody was ever caught holding contraband across 20 holders x 3000 ticks');
+  for (const incident of incidents) {
+    assert.equal(incident.category, 'drug');
+    assert.ok(holders.includes(incident.perpetrator_entity_id));
+    assert.equal(incident.victim_entity_id, null);
+  }
+});
+
+test('holding nothing means nothing to catch', () => {
+  const w = worldWithInventory();
+  const c = territory.generateCommunity(w, {});
+  person(w, { communityId: c.id });
+
+  let incidents = [];
+  for (let t = 1; t <= 5000; t += 1) incidents = incidents.concat(crime.runDrugCrime(w, t));
+  assert.equal(incidents.length, 0);
+});
+
 // -- honest zeroes ------------------------------------------------------
 
 test('every category §9 names is countable, and the ungenerated ones say why', () => {
@@ -377,8 +426,13 @@ test('every category §9 names is countable, and the ungenerated ones say why', 
   // offence something to be armed WITH. Its declared reason was
   // precisely "no weapon exists anywhere in the schema", and that
   // stopped being true.
+  //
+  // `drug` joined the same way, 26 Sep 2026: `server/drugs.js` gave an
+  // offence something to be caught holding, and its declared reason —
+  // "no substance, contraband or illicit trade exists" — stopped being
+  // true too.
   assert.deepEqual(crime.GENERATED_CATEGORIES.sort(),
-    ['domestic', 'gun', 'property', 'theft', 'violent']);
+    ['domestic', 'drug', 'gun', 'property', 'theft', 'violent']);
 });
 
 test('sex_offense is recordable and nothing in the engine generates one', () => {

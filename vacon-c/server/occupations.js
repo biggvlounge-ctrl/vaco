@@ -198,6 +198,18 @@ const OCCUPATIONS = {
     tier: 4, skill: 'Medicine', source: 'medicine',
     employers: ['hospital', 'military'],
   },
+  // Added 26 Sep 2026 at the owner's direct request. Not in §25's own
+  // subject list under any tier — marked `implied` for the same reason
+  // `teacher`/`orderly`/`librarian`/`curator` above are: no separate
+  // "Psychiatry" skill exists in the sixteen `skills` traits, and no
+  // `clinic`/`asylum` organization type exists in the schema's fixed
+  // `organizations.type` enum (adding one is a migration, not a code
+  // change, and was not done here). Reuses `Medicine` and `hospital`
+  // rather than inventing either, the same way `orderly` does.
+  psychiatrist: {
+    tier: 4, skill: 'Medicine', source: 'implied',
+    employers: ['hospital'],
+  },
   engineer: {
     tier: 4, skill: 'Engineering', source: 'engineering',
     employers: ['business', 'corporation', 'government', 'military', 'research'],

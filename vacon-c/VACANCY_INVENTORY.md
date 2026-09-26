@@ -47,7 +47,7 @@ the Postgres schema that already exists.
 
 ## 1. Server code — `vacon-c/server/`
 
-All 77 files present on disk, all committed, largest first.
+All 78 files present on disk, all committed, largest first.
 
 **`test/inventory.test.js` now fails when this table and `server/` disagree**, which is the guard this document has needed through three separate drifts (see the note below). The count and the file list are checked against the tree rather than typed.
 
@@ -118,6 +118,7 @@ read off disk, not recalled.
 | `succession.js` | 12,172 | Inheritance — an estate settled by name across holdings, family and property. | Built |
 | `inventory.js` | 11,717 | Who holds what: `give`, `take`, and holdings by item name. | Built |
 | `demographics.js` | 11,514 | Languages, religion, education and ethnicity — composition and diversity. **Counts, never decides**; see `test/ethnicity.test.js`. | Built |
+| `drugs.js` | 11,277 | **Production, use and dependency — added 26 Sep 2026 at the owner's direct request.** Gives `crime.js`'s `drug` category the object it was waiting for (the same fix `gun` already had) and `criminal['Black Market Ties']` its first reader; `psychological['Substance Dependency']` (new) is its only writer. Runs automatically every tick, unlike `merchandise.js`/`salvage.js`. | Built |
 | `tierTraits.js` | 10,950 | The CITY and CIVILIZATION tier sheets, and **the reconciliation**: all thirty-three named dimensions against the column, rollup, system or deferral that already answers twenty-eight of them. | Built |
 | `actions.js` | 10,805 | **The player action dispatcher** — a registry over verbs that already exist. The actor is always the player's own linked entity, never a request field. | Built |
 | `households.js` | 10,386 | **Who actually lives together.** Before this, homes were handed out one per person and nobody had ever lived with anybody. | Built |

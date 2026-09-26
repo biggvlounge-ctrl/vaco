@@ -502,6 +502,12 @@ const STRESS_BY_EVENT = {
   birth: -10,
   partnership_formed: -8,
   fear_spike: 6,
+  // Added 26 Sep 2026 alongside server/drugs.js. Between `scarcity` (a
+  // shortage of something everybody needs) and `crime` (having been
+  // victimized) in size — dependency without access is a real load,
+  // and this file already has both numbers to anchor it against rather
+  // than inventing a third scale.
+  withdrawal: 8,
 };
 
 // Apply this tick's events to the people they happened to.

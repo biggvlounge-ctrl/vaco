@@ -14,13 +14,21 @@
 // considered fully "in order."
 //
 // Verified against VACANCY_TRAIT_DATABASE_ATTACHMENT.md (Document 7,
-// full handoff): this file's TRAIT_FAMILIES is byte-identical to that
+// full handoff): this file's TRAIT_FAMILIES was byte-identical to that
 // doc's literal object, including skills — 20 families, 114 traits.
 // The "18 families, 92 traits" / "19 families, 98 traits" language
 // elsewhere (including in that same doc's own prose) undercounts its
 // own listed array by one family; that's a pre-existing off-by-one in
 // the docs' summary text, not a data mismatch — the literal data was
 // correct here all along.
+//
+// 116 traits as of 26 Sep 2026: two added to `psychological`
+// (`Manipulation`, `Substance Dependency`), neither in the source
+// document, both owner-requested — see the family definition below for
+// why. Historical "114"/"44 of 114" measurements elsewhere in this
+// codebase (barter.js, economy.js, trait-families.test.js) describe a
+// specific measurement taken before that date and are left as the
+// measurement they were, not restated.
 
 'use strict';
 
@@ -37,8 +45,15 @@ const TRAIT_FAMILIES = {
            'Adaptability', 'Risk Assessment', 'Learning Speed', 'Curiosity'],
   emotional: ['Empathy', 'Volatility', 'Resilience', 'Optimism',
               'Attachment Style', 'Grief Processing'],
+  // `Manipulation` and `Substance Dependency` added 26 Sep 2026 at the
+  // owner's direct request, for the exploitative-negotiation behavior
+  // wired into `meetings.js` and the drug-addiction mechanic wired into
+  // `crime.js`/`traitDrift.js` — see those files' own headers. Neither
+  // is from a source document; both are new, same standing as the
+  // landmark categories added the same day.
   psychological: ['Paranoia', 'Impulsivity', 'Narcissism', 'Trust Threshold',
-                  'Delusion Susceptibility', 'Compulsiveness'],
+                  'Delusion Susceptibility', 'Compulsiveness', 'Manipulation',
+                  'Substance Dependency'],
   behavioral: ['Aggression', 'Patience', 'Honesty', 'Discipline',
                'Recklessness', 'Conformity'],
   social: ['Charisma', 'Persuasion', 'Network Reach', 'Reputation',

@@ -55,8 +55,14 @@
 //   domestic   ✅ the same escalation between two people in one family
 //   theft      ✅ deprivation, against a wealthier resident
 //   property   ✅ deprivation, with nobody to take from
-//   drug       ✗  no substance, contraband or trade in one exists
-//   gun        ✗  no weapon exists anywhere in the schema
+//   gun        ✅ an escalation where the aggressor is armed
+//                 (server/inventory.js gave it something to be armed
+//                 with — see the `gun` entry in CATEGORIES below)
+//   drug       ✅ possession of contraband, caught rather than
+//                 committed (server/drugs.js gave it the object it was
+//                 waiting for, added 26 Sep 2026 at the owner's direct
+//                 request — the same fix `gun` already had, one row
+//                 down)
 //   fraud      ✗  market listings resolve honestly; there is no
 //                 contract, claim or instrument to falsify
 //   sex_offense ✗ **not a gap — a decision.** The category exists so
@@ -126,9 +132,11 @@ const CATEGORIES = {
     note: 'deprivation with no wealthier resident present to take from',
   },
   drug: {
-    generated: false,
-    substrate: 'no substance, contraband or illicit trade exists. resources.resource_type is '
-      + 'open TEXT and nothing produces one, so a drug offence has no object.',
+    generated: true,
+    note: 'possession of contraband caught rather than committed. This was declared '
+      + 'ungeneratable — "no substance, contraband or illicit trade exists" — until '
+      + 'server/drugs.js gave an offence something to be caught holding, the same shape '
+      + '`gun` was fixed in.',
   },
   theft: {
     generated: true,
@@ -170,6 +178,12 @@ const GENERATED_CATEGORIES = CRIME_CATEGORIES.filter((c) => CATEGORIES[c].genera
 //: zero under a total shortage draws against BASE_DEPRIVATION_RISK.
 const BASE_DEPRIVATION_RISK = 0.0006;   // per tick, at full deprivation
 const SCARCITY_WEIGHT = 0.5;            // how much a shortage adds on top of poverty
+
+//: `drug`'s own per-tick ceiling, at perfect identifiability
+//: (`policing.evasionOf` = 0). Same order of magnitude as
+//: `BASE_DEPRIVATION_RISK` for the same reason: neither document gives
+//: a rate, so this is the shape of the model, not a measured constant.
+const DRUG_CATCH_RATE = 0.001;
 
 // Severity, 0..100, in the same currency as `events.severity` and
 // `historical_records.significance` so the three agree.
@@ -587,6 +601,43 @@ function runDeprivationCrime(worldState, tick = worldState.tick ?? 0) {
   return incidents;
 }
 
+// -- drug possession --------------------------------------------------
+
+// Possession, caught rather than committed. Unlike theft/property, this
+// reads no deprivation term at all — holding contraband is the offence
+// regardless of why somebody has it, the same way `gun` above does not
+// ask whether the aggressor NEEDED to be armed.
+//
+// `policing.evasionOf` is required lazily for the reason `recordCrime`
+// already requires it lazily: `policing.js` requires this file at
+// module scope, and a top-level require here would be the cycle.
+function runDrugCrime(worldState, tick = worldState.tick ?? 0) {
+  // eslint-disable-next-line global-require
+  const policing = require('./policing.js');
+  // eslint-disable-next-line global-require
+  const drugs = require('./drugs.js');
+
+  const incidents = [];
+  for (const npc of worldState.npcs || []) {
+    if (npc.status !== 'active') continue;
+    const held = inventory.quantityOf(worldState, npc.id, drugs.NARCOTICS_ITEM);
+    if (held <= 0) continue;
+
+    const caught = 1 - policing.evasionOf(worldState, npc.id);
+    if (seededDraw([worldState.seed ?? 'world', 'crime:drug', npc.id, tick])
+      >= caught * DRUG_CATCH_RATE) continue;
+
+    incidents.push(recordCrime(worldState, {
+      category: 'drug',
+      perpetratorId: npc.id,
+      victimId: null,
+      tick,
+      detail: `caught holding ${held} unit(s) of contraband`,
+    }));
+  }
+  return incidents;
+}
+
 // -- friction -------------------------------------------------------------
 
 // How much strain these two are under, 0..1, from what the Behavior
@@ -863,6 +914,8 @@ module.exports = {
   recordEscalation,
   deprivationPressure,
   runDeprivationCrime,
+  DRUG_CATCH_RATE,
+  runDrugCrime,
   incidentsIn,
   countsByCategory,
   ratePer1k,

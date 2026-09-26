@@ -94,6 +94,7 @@ const occupations = require('./occupations.js');
 const knowledge = require('./knowledge.js');
 const landmarks = require('./landmarks.js');
 const salvage = require('./salvage.js');
+const drugs = require('./drugs.js');
 const landmarkPacks = require('./landmarkPacks.js');
 const merchandise = require('./merchandise.js');
 const worldStore = require('./worldStore.js');
@@ -1611,6 +1612,11 @@ function generateWorld(options = {}) {
   // real pools draw on and no item in any world belonged to, so a
   // grocery store search found nothing, every time.
   summary.merchandiseItems = merchandise.registerItems(w);
+  // **The one item drug crime and dependency need to exist at all.**
+  // Registered, not distributed — nobody starts holding any; it arrives
+  // through `drugs.runProduction` the same way scrap arrives through
+  // salvage. See server/drugs.js.
+  summary.drugItems = drugs.registerItems(w);
   summary.knowledgeItems = 0;
   made.people.forEach((npc, pi) => {
     if (random.unit('book', pi) > config.survivingBookRate) return;

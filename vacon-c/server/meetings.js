@@ -81,6 +81,7 @@ const knowledge = require('./knowledge.js');
 const occupations = require('./occupations.js');
 const keys = require('./keys.js');
 const mortality = require('./mortality.js');
+const { getLiveEntity } = require('./entityTraits.js');
 
 // ---------------------------------------------------------------------
 // The purposes
@@ -229,14 +230,21 @@ function hold(worldState, options = {}) {
   for (let i = 0; i < attendees.length; i += 1) {
     for (let j = i + 1; j < attendees.length; j += 1) {
       const delta = trustDelta(worldState, attendees[i].id, attendees[j].id, definition);
-      if (delta === 0) continue;
-      const rel = worldStore.adjustRelationship(
-        worldState, attendees[i].id, attendees[j].id, 'social', { trust: delta },
-      );
-      // `adjustRelationship` adds and does not clamp — the same guard
-      // `control.attempt` needs, for the same reason.
-      rel.trust = Math.max(0, Math.min(100, rel.trust));
-      moved.relationships += 1;
+      if (delta !== 0) {
+        const rel = worldStore.adjustRelationship(
+          worldState, attendees[i].id, attendees[j].id, 'social', { trust: delta },
+        );
+        // `adjustRelationship` adds and does not clamp — the same guard
+        // `control.attempt` needs, for the same reason.
+        rel.trust = Math.max(0, Math.min(100, rel.trust));
+        moved.relationships += 1;
+      }
+      // Manipulation reads even where `delta` was 0 — a negotiation
+      // between two people who already feel nothing for each other can
+      // still be lopsided.
+      if (definition.contested) {
+        applyManipulation(worldState, attendees[i], attendees[j]);
+      }
     }
   }
 
@@ -336,6 +344,55 @@ function trustDelta(worldState, a, b, definition) {
   // negotiation, and it goes the ordinary way.
   if (feeling === null) return definition.trust;
   return Math.round(definition.trust * feeling * 100) / 100;
+}
+
+// ---------------------------------------------------------------------
+// Manipulation — the asymmetric edge a shared trust field cannot hold
+// ---------------------------------------------------------------------
+// `relationships.trust` is one number for the pair — every write in
+// this file and every other module that touches a relationship applies
+// the same delta to both parties, because there is only one row.
+// "The manipulator comes out ahead at the other's expense" cannot live
+// there. `relationships.debt` can: a real schema column, initialised to
+// 0 by `worldStore.getOrCreateRelationship` and, before this, written
+// and read by nothing anywhere in `server/` (confirmed by grep — every
+// other `.debt` hit in the codebase is `individual_finances.debt`, an
+// unrelated field). It is the schema's own home for "one of us owes the
+// other," which is exactly what a lopsided negotiation leaves behind.
+//
+// Only `negotiate` reads it (`definition.contested` in the caller) —
+// a teaching session or a sit-down has no side for Manipulation to
+// favor.
+//: How much of a Manipulation edge, in points, before a negotiation
+//: counts as lopsided rather than merely uneven. Below this, ordinary
+//: variance between two people is not manipulation.
+const MANIPULATION_EDGE = 20;
+//: How much debt one lopsided negotiation creates. This file's own
+//: convention above is "one afternoon moves a relationship by about 2
+//: points" (`trust: 2` on every non-contested purpose); a manipulator
+//: walking away owed a favor is a comparably sized event, not a
+//: life-changing one.
+const MANIPULATION_DEBT = 2;
+
+function manipulationOf(entity) {
+  return entity?.traits?.psychological?.Manipulation ?? 50;
+}
+
+// `rel.debt`'s sign convention, since nothing else had ever set one:
+// positive means `entity_b_id` owes `entity_a_id`. `a`/`b` are this
+// call's own arguments and may not match `entity_a_id`/`entity_b_id`'s
+// order — `getOrCreateRelationship` fixes that order on whichever
+// caller reaches a pair first, which can be an earlier, unrelated
+// event.
+function applyManipulation(worldState, a, b) {
+  const edge = manipulationOf(getLiveEntity(worldState, a.id))
+    - manipulationOf(getLiveEntity(worldState, b.id));
+  if (Math.abs(edge) < MANIPULATION_EDGE) return;
+  const rel = worldStore.adjustRelationship(worldState, a.id, b.id, 'social', {});
+  const aIsRelA = a.id === rel.entity_a_id;
+  // edge > 0: `a` manipulated `b`, so `b` now owes `a`.
+  const bOwesA = edge > 0;
+  rel.debt += (bOwesA === aIsRelA) ? MANIPULATION_DEBT : -MANIPULATION_DEBT;
 }
 
 // Whoever holds the highest-tier occupation at the table, ties broken

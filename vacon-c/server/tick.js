@@ -60,6 +60,7 @@ const keys = require('./keys.js');
 const territory = require('./territory.js');
 const property = require('./property.js');
 const flows = require('./flows.js');
+const drugs = require('./drugs.js');
 const behavior = require('./behavior.js');
 const areaStats = require('./areaStats.js');
 const perception = require('./perception.js');
@@ -1046,6 +1047,21 @@ function runSecurityPhase(worldState) {
     });
   }
 
+  // Drug possession — caught rather than committed, and independent of
+  // deprivation on purpose: holding contraband is the offence
+  // regardless of why, the same way an armed escalation above does not
+  // ask whether the aggressor needed to be. Same phase, same reason:
+  // crime is what Security is for.
+  for (const incident of crime.runDrugCrime(worldState, worldState.tick)) {
+    events.push({
+      type: 'crime', severity: incident.severity >= 60 ? 'high' : 'medium',
+      note: `${incident.category} offence by entity ${incident.perpetrator_entity_id}`,
+      tick: incident.tick,
+      affected_entity_ids: [incident.perpetrator_entity_id],
+      global_effects: { crimeIncidentId: incident.id, crimeCategory: incident.category },
+    });
+  }
+
   // The policing half of this phase, which did nothing until
   // `server/policing.js` existed. `urbanSystems.js` said so in system
   // 13's own note: "One phase covers this and Crime together. No
@@ -1285,6 +1301,15 @@ function advanceTick(worldState) {
   // run earlier and a flow reads a half-updated world; run after the
   // Event phase and its events would miss the tick they describe.
   candidateEvents.push(...flows.resolveFlows(worldState));     // (flows)
+
+  // Drug production, use and withdrawal. Also NOT a twelfth phase, same
+  // slot as flows and for the same shape of reason: it is a
+  // cross-cutting effect of the population's own traits and holdings,
+  // not a stage every property or community passes through. Runs before
+  // `applyEventStress` below so a `withdrawal` event this tick raises
+  // stress this tick, the same guarantee `runSecurityPhase`'s crime
+  // events already get. See server/drugs.js.
+  candidateEvents.push(...drugs.runDrugs(worldState, { tick: worldState.tick }).events);
 
   // The Behavior Engine. Also NOT a twelfth phase, and in the same slot
   // for the same reason: it observes a finished tick. Stress decays,
