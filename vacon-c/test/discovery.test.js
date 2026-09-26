@@ -374,7 +374,7 @@ test('runDiscovery reads communityId, not community_id', () => {
 
 test('describeDiscovery names the poolless categories rather than hiding them', () => {
   const report = discovery.describeDiscovery(world());
-  assert.equal(report.categories, 34);
+  assert.equal(report.categories, 36);
   assert.ok(report.poolless.includes('prison'));
   assert.ok(report.poolless.length < report.categories, 'nothing is searchable at all');
 });

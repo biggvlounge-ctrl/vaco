@@ -62,26 +62,33 @@ const actions = require('../server/actions.js');
 // The vocabularies are the documents'
 // ---------------------------------------------------------------------
 
-test('THE KEY’s twenty-three categories are all here, plus the school', () => {
-  // **Twenty-four, and the twenty-fourth comes from a disagreement
-  // between two documents this repo HAS.** `THE_KEY_BUILDING_TYPES.md`
-  // lists twenty-three and no school;
+test('THE KEY’s twenty-three categories are all here, plus the school and the park', () => {
+  // **Twenty-five.** The twenty-fourth (school) comes from a
+  // disagreement between two documents this repo HAS.
+  // `THE_KEY_BUILDING_TYPES.md` lists twenty-three and no school;
   // `KEY_LOCATION_DISCOVERY_WORD_OF_MOUTH_SYSTEM.md` names schools as a
   // Key building type twice — "(skyscrapers, churches, schools,
   // hospitals, caves)" and "Schools/Libraries → knowledge books across
   // every category". Both are present and both are the owner's. See
   // `landmarks.js` for why the tie breaks toward including it.
-  assert.equal(landmarks.KEY_BUILDING_CATEGORIES.length, 24);
+  //
+  // The twenty-fifth (park) is not a document reconciliation — it was
+  // added 26 Sep 2026 directly at the owner's request, the same way the
+  // Key's own final entry ("any other genuinely distinctive feature")
+  // already allows for.
+  assert.equal(landmarks.KEY_BUILDING_CATEGORIES.length, 25);
   assert.ok(landmarks.KEY_BUILDING_CATEGORIES.includes('school'));
+  assert.ok(landmarks.KEY_BUILDING_CATEGORIES.includes('park'));
   for (const category of landmarks.KEY_BUILDING_CATEGORIES) {
     // `alwaysHeroTier: true` for every one, per the document.
     assert.equal(landmarks.isHeroTier(category), true, category);
   }
 });
 
-test('the retail list’s ten are here and are not hero-tier', () => {
-  assert.equal(landmarks.RETAIL_CATEGORIES.length, 10);
+test('the retail list’s ten are here, plus the junkyard, and none are hero-tier', () => {
+  assert.equal(landmarks.RETAIL_CATEGORIES.length, 11);
   assert.ok(landmarks.RETAIL_CATEGORIES.includes('hardware-store'));
+  assert.ok(landmarks.RETAIL_CATEGORIES.includes('junkyard'));
   for (const category of landmarks.RETAIL_CATEGORIES) {
     assert.equal(landmarks.isHeroTier(category), false, category);
     assert.equal(landmarks.propertyTypeFor(category), 'commercial');

@@ -62,7 +62,10 @@ const FEATURE_CLASS_MAP = {
   school: 'school',
   hospital: 'hospital',
   bridge: 'notable-bridge',
-  park: 'other-distinctive-feature',
+  // Was `other-distinctive-feature` until `park` became a real Key
+  // category (26 Sep 2026, `THE_KEY_BUILDING_TYPES.md`'s implementation
+  // note) — GNIS already carried this class, nothing to import twice.
+  park: 'park',
   museum: 'art-museum',
   tower: 'skyscraper',
   airport: 'airport',

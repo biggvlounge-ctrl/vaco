@@ -105,6 +105,12 @@ const POOLS = {
   // category that yields a resource AND a relic.
   'cave-system': { itemCategories: ['materials', 'metals'], artifacts: true },
   'natural-formation': { itemCategories: ['materials', 'metals'] },
+  // Added 26 Sep 2026 alongside `landmarks.js`'s `park` category —
+  // same pool as `natural-formation`, because `landmarks.js` gives it
+  // the identical "natural resources" discovery text and for the same
+  // reason: it is kept, not operated, and there is no third vocabulary
+  // to invent one from.
+  park: { itemCategories: ['materials', 'metals'] },
   'other-distinctive-feature': null,
 
   // -- retail ---------------------------------------------------------
@@ -125,6 +131,13 @@ const POOLS = {
   bookstore: { books: 'all' },
   'gun-store': null,
   'department-store': null,
+  // Added 26 Sep 2026 alongside `landmarks.js`'s `junkyard` category.
+  // `landmarks.js` names "scrap metal, salvage materials, vehicle
+  // parts" as its discovery text; this is that text turned into the
+  // same §26 references `auto-parts-store` already uses for the
+  // vehicle half, plus the metals/materials `cave-system` and
+  // `natural-formation` already use for scrap.
+  junkyard: { itemCategories: ['metals', 'materials', 'repair', 'transport'] },
 };
 
 //: How much a place holds, per point of historical significance.

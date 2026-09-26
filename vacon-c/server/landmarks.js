@@ -223,6 +223,27 @@ const KEY_BUILDING_TYPES = {
     significance: [35, 65], propertyType: 'agricultural', staff: null,
     discovery: 'natural resources',
   },
+  //: **A twenty-fifth, and unlike the school this one comes from
+  //: neither document — it is new, added 26 Sep 2026 at the owner's
+  //: direct request** ("penitentiaries, hospitals... caves... parks...
+  //: St. Louis was the template") rather than reconciled from a
+  //: conflict between two specs. It is added the same way the school
+  //: was justified: the Key's own final entry is "any other genuinely
+  //: distinctive feature not covered above", and a park is exactly
+  //: that at St. Louis's own scale — Forest Park is larger than New
+  //: York's Central Park, and the sample pack already names an area
+  //: after it without ever naming the park itself as a landmark.
+  //:
+  //: `form: 'site'` and `staff: null` for the same reason as
+  //: `cave-system`/`natural-formation` right above it: a park is kept,
+  //: not operated, and does not get storeys. `propertyType` matches
+  //: those two rather than `historical_site`, because the schema
+  //: question is "how much land, not how many floors" for all three.
+  park: {
+    form: 'site',
+    significance: [35, 70], propertyType: 'agricultural', staff: null,
+    discovery: 'natural resources',
+  },
   'other-distinctive-feature': {
     significance: [30, 60], propertyType: 'historical_site', staff: null,
     discovery: null,
@@ -261,6 +282,16 @@ const RETAIL_TYPES = {
   bookstore: { significance: [20, 45], discovery: 'additional book source' },
   'gun-store': { significance: [25, 50], discovery: null },
   'department-store': { significance: [20, 45], discovery: null },
+  //: **An eleventh, added 26 Sep 2026 alongside `park` above, for the
+  //: same reason and outside the document's own ten.** It is not
+  //: invented loot: `salvage.js`'s `MATERIALS` already carries
+  //: `scrap_metal` and `junk` as real §26 categories with nothing that
+  //: places them, and a junkyard is the location that would. It sits in
+  //: the retail list rather than the Key because it is not hero-tier —
+  //: a scrapyard matters the way a hardware store does, not the way a
+  //: hospital does — and `chaosEraState: "emptied"` still applies: a
+  //: collapse strips a junkyard's easy pickings same as a pharmacy's.
+  junkyard: { significance: [15, 40], discovery: 'scrap metal, salvage materials, vehicle parts' },
 };
 
 const RETAIL_CATEGORIES = Object.keys(RETAIL_TYPES);
@@ -393,6 +424,7 @@ const CREW_BY_CATEGORY = {
   'zoo-aquarium': 'venue',
   'cave-system': 'unmanned',
   'natural-formation': 'unmanned',
+  park: 'unmanned',
   'other-distinctive-feature': 'unmanned',
 };
 

@@ -71,3 +71,38 @@ Cesium import `AUTOMATED_HISTORIC_LANDMARK_IMPORT_SYSTEM.md` specifies,
 or pasted in. `data/st-louis.landmarks.json` is the worked example and
 declares itself a sample rather than a register import, because the
 three real sources are blocked at this environment's proxy.
+
+## Implementation note — added 26 Sep 2026, and it is a new category, not a correction
+
+A twenty-fifth: `park`. Unlike `school` above, this one does not come
+from a disagreement between two documents already in the repository —
+it was added directly at the owner's request ("penitentiaries,
+hospitals... caves... parks... St. Louis was the template"). It fits
+the same open door the Key's own last entry leaves ("any other
+genuinely distinctive feature not covered above"), and St. Louis is
+again the worked example: Forest Park is larger than New York's Central
+Park, and the sample pack already names an AREA after it without ever
+naming the park itself as a landmark. That gap is now closed in
+`data/st-louis.landmarks.json`.
+
+Coded in `server/landmarks.js` as a `site`-form, unstaffed category
+alongside `cave-system` and `natural-formation` — a park is kept, not
+operated, the same as those two. `world-layer/exportRegion.js` carries
+the identical addition, and `landmark-packs.test.js` is the assertion
+that keeps the two from drifting apart.
+
+Real named parks and caves beyond city limits — the Ozarks, the
+Illinois side of the confluence — are the same "not yet" as the 68
+absent named landmarks above: the category exists and is ready to hold
+them, and `world-layer/imports/gnisImport.js` already maps GNIS's
+`park` and `cave` feature classes onto them, once the network reaches
+GNIS rather than being blocked at this environment's proxy the way
+UNESCO/NRHP/Cesium are.
+
+Rivers and lakes are a narrower gap than "blocked": `gnisImport.js`
+deliberately excludes `stream` as a `BULK_CLASS` — its own comment says
+why, "we chose not to import 40,000 creeks" rather than a technical
+limit — and carries no `lake` mapping at all yet. A named river or lake
+(the Mississippi, the Meramec, Lake of the Ozarks) is reachable the
+same way a named park now is, but it is an importer change, not
+something the network being open would fix by itself.
