@@ -1,7 +1,7 @@
 {
   "region": "St. Louis, Missouri",
   "source": "sample",
-  "note": "READ THIS BEFORE TRUSTING THE ROWS. `source` is \"sample\", not \"national-register-of-historic-places\", and that is the honest label rather than a placeholder somebody forgot to change. AUTOMATED_HISTORIC_LANDMARK_IMPORT_SYSTEM.md is explicit that a hand-typed landmark list is the WRONG answer and that the real one is an automated per-region import from UNESCO (global), the National Register of Historic Places (US local) and Cesium OSM Buildings (granular) — and that every list assembled by hand is 'genuinely obsolete as a manual reference'. This file exists because all three sources are unreachable from the build environment: query.wikidata.org, whc.unesco.org and services1.arcgis.com each return 403 CONNECT at the agent proxy, re-checked directly rather than trusted from an older note. So this is the shape an import produces, filled with well-known public St. Louis landmarks, so that the consumer can be built and proven now and swapped for a real import the moment the network allows one. `significance` is an interpretive score on the engine's own 0-100 scale, not a figure any register publishes. Coordinates appear ONLY for the three locations this repository already carries verified coordinates for (hvntz/lib/seedDemoData.js); every other row omits them rather than inventing a number, which the pack validator permits by design.",
+  "note": "READ THIS BEFORE TRUSTING THE ROWS. `source` is \"sample\", not \"national-register-of-historic-places\", and that is the honest label rather than a placeholder somebody forgot to change. AUTOMATED_HISTORIC_LANDMARK_IMPORT_SYSTEM.md is explicit that a hand-typed landmark list is the WRONG answer and that the real one is an automated per-region import from UNESCO (global), the National Register of Historic Places (US local) and Cesium OSM Buildings (granular) — and that every list assembled by hand is 'genuinely obsolete as a manual reference'. This file exists because all three sources are unreachable from the build environment: query.wikidata.org, whc.unesco.org and services1.arcgis.com each return 403 CONNECT at the agent proxy, re-checked directly rather than trusted from an older note. So this is the shape an import produces, filled with well-known public St. Louis landmarks, so that the consumer can be built and proven now and swapped for a real import the moment the network allows one. `significance` is an interpretive score on the engine's own 0-100 scale, not a figure any register publishes. Coordinates appear ONLY for locations this repository carries verified coordinates for; every other row omits them rather than inventing a number, which the pack validator permits by design. 26 Sep 2026: added Forest Park itself under the new `park` category — the area below has been named after it since this file was first written, and nothing in it was ever the park. No junkyard entry is added, on purpose: `junkyard` is a retail category worldgen places procedurally like `hardware-store`, not a named hero landmark, and this pack only carries named ones.",
   "areas": [
     "Downtown",
     "Forest Park",
@@ -54,6 +54,13 @@
       "area": "Downtown",
       "tier": "regional",
       "significance": 62
+    },
+    {
+      "name": "Forest Park",
+      "category": "park",
+      "area": "Forest Park",
+      "tier": "hero",
+      "significance": 88
     },
     {
       "name": "Saint Louis Art Museum",

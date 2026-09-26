@@ -223,6 +223,136 @@ const KEY_BUILDING_TYPES = {
     significance: [35, 65], propertyType: 'agricultural', staff: null,
     discovery: 'natural resources',
   },
+  //: **A twenty-fifth, and unlike the school this one comes from
+  //: neither document — it is new, added 26 Sep 2026 at the owner's
+  //: direct request** ("penitentiaries, hospitals... caves... parks...
+  //: St. Louis was the template") rather than reconciled from a
+  //: conflict between two specs. It is added the same way the school
+  //: was justified: the Key's own final entry is "any other genuinely
+  //: distinctive feature not covered above", and a park is exactly
+  //: that at St. Louis's own scale — Forest Park is larger than New
+  //: York's Central Park, and the sample pack already names an area
+  //: after it without ever naming the park itself as a landmark.
+  //:
+  //: `form: 'site'` and `staff: null` for the same reason as
+  //: `cave-system`/`natural-formation` right above it: a park is kept,
+  //: not operated, and does not get storeys. `propertyType` matches
+  //: those two rather than `historical_site`, because the schema
+  //: question is "how much land, not how many floors" for all three.
+  park: {
+    form: 'site',
+    significance: [35, 70], propertyType: 'agricultural', staff: null,
+    discovery: 'natural resources',
+  },
+  //: **A twenty-sixth through thirty-first, added 26 Sep 2026 in the
+  //: same batch, at the same direct request** ("every river, park...
+  //: warehouses, major corporations... skyscrapers... apartment
+  //: buildings... public housing"). None of these six come from either
+  //: source document — they are new, and each is called out below for
+  //: why it earns a place rather than being invented for its own sake.
+  //:
+  //: **`warehouse` and `public-housing` close a gap this file itself
+  //: had rather than the documents**: `propertyType` has mapped every
+  //: other category onto nine of the schema's ten `properties.type`
+  //: values since this file was written, and `industrial` and
+  //: `residential` were the two nothing here had ever used — the
+  //: eleventh standing rule's shape, one level down, inside a file
+  //: that exists specifically to close that kind of gap. A logistics
+  //: warehouse and a large housing complex are exactly what those two
+  //: schema types are for.
+  warehouse: {
+    significance: [30, 55], propertyType: 'industrial', staff: 'logistician',
+    discovery: 'goods in transit, tools, construction materials',
+  },
+  'public-housing': {
+    significance: [25, 50], propertyType: 'residential', staff: 'manager',
+    discovery: null,
+  },
+  //: **`river` and `lake`.** `world-layer/imports/gnisImport.js`
+  //: already carries GNIS's `stream` class and deliberately excludes it
+  //: as a `BULK_CLASS` — "we chose not to import 40,000 creeks" — and
+  //: has no `lake` mapping at all. Neither omission is a reason for the
+  //: category not to exist here: a pack can still name the Mississippi
+  //: or the Meramec by hand the way `data/st-louis.landmarks.json`
+  //: already names Confluence Point, and wiring a real bulk import is a
+  //: separate, later decision about volume, not about whether the
+  //: category is real. `itemCategories` in `discovery.js` gives both
+  //: the `water` trade category neither `cave-system` nor
+  //: `natural-formation` ever had a reason to carry.
+  river: {
+    form: 'site',
+    significance: [45, 80], propertyType: 'agricultural', staff: null,
+    discovery: 'natural resources, fresh water',
+  },
+  lake: {
+    form: 'site',
+    significance: [35, 65], propertyType: 'agricultural', staff: null,
+    discovery: 'natural resources, fresh water',
+  },
+  //: **`corporate-headquarters` and `shopping-mall`.** Both are new
+  //: design with no source document and no real importer naming them
+  //: yet (`world-layer/imports/overtureImport.js` reaches
+  //: `department-store`, already in the retail list, but nothing named
+  //: "corporation" or "mall"). Added because the owner named them
+  //: directly rather than reconciled from a conflict — the same
+  //: standing as `park`, `junkyard`, `warehouse` and `public-housing`
+  //: above and not a claim that a document said so.
+  'corporate-headquarters': {
+    form: 'tower',
+    significance: [55, 85], propertyType: 'commercial', staff: 'financier',
+    discovery: 'business records, technology',
+  },
+  'shopping-mall': {
+    significance: [40, 65], propertyType: 'commercial', staff: 'manager',
+    discovery: 'clothing, general merchandise',
+  },
+  //: **`casino`, added 26 Sep 2026 alongside `server/gambling.js`.**
+  //: Same standing as `corporate-headquarters`/`shopping-mall` right
+  //: above — new design, no source document, named directly by the
+  //: owner. `discovery: null` because a casino is not a loot site the
+  //: way a hardware store is; what it holds is the game
+  //: `server/gambling.js` plays, not merchandise on a shelf.
+  casino: {
+    significance: [40, 65], propertyType: 'commercial', staff: 'manager',
+    discovery: null,
+  },
+  //: **Five sports/entertainment venue types, added 26 Sep 2026 at the
+  //: owner's direct request.** All five sit beside `stadium-arena`
+  //: rather than replacing it — that category stays the generic case,
+  //: these are named subtypes the owner asked for by name. Same
+  //: standing as everything else in this note: new design, no source
+  //: document.
+  dome: {
+    significance: [45, 75], propertyType: 'commercial', staff: 'athlete',
+    discovery: null,
+  },
+  //: An amphitheater is not a sports venue and gets `manager` rather
+  //: than `athlete` for the same reason `theater-concert-hall` does —
+  //: it is a performance space. `form: 'site'` because the classical
+  //: sense (tiered open-air seating, no enclosing structure) is closer
+  //: to a monument's footprint than a building's floor count; a modern
+  //: open-air amphitheater is the same shape.
+  amphitheater: {
+    form: 'site',
+    significance: [35, 60], propertyType: 'commercial', staff: 'manager',
+    discovery: null,
+  },
+  'hockey-arena': {
+    significance: [45, 70], propertyType: 'commercial', staff: 'athlete',
+    discovery: null,
+  },
+  'soccer-stadium': {
+    significance: [45, 75], propertyType: 'commercial', staff: 'athlete',
+    discovery: null,
+  },
+  //: `manager` rather than `athlete` — a college stadium is run by a
+  //: university athletic department administratively, the same
+  //: distinction `curator` (museum) draws against `athlete` (pro
+  //: venue) elsewhere in this table.
+  'college-stadium': {
+    significance: [35, 60], propertyType: 'commercial', staff: 'manager',
+    discovery: null,
+  },
   'other-distinctive-feature': {
     significance: [30, 60], propertyType: 'historical_site', staff: null,
     discovery: null,
@@ -261,6 +391,16 @@ const RETAIL_TYPES = {
   bookstore: { significance: [20, 45], discovery: 'additional book source' },
   'gun-store': { significance: [25, 50], discovery: null },
   'department-store': { significance: [20, 45], discovery: null },
+  //: **An eleventh, added 26 Sep 2026 alongside `park` above, for the
+  //: same reason and outside the document's own ten.** It is not
+  //: invented loot: `salvage.js`'s `MATERIALS` already carries
+  //: `scrap_metal` and `junk` as real §26 categories with nothing that
+  //: places them, and a junkyard is the location that would. It sits in
+  //: the retail list rather than the Key because it is not hero-tier —
+  //: a scrapyard matters the way a hardware store does, not the way a
+  //: hospital does — and `chaosEraState: "emptied"` still applies: a
+  //: collapse strips a junkyard's easy pickings same as a pharmacy's.
+  junkyard: { significance: [15, 40], discovery: 'scrap metal, salvage materials, vehicle parts' },
 };
 
 const RETAIL_CATEGORIES = Object.keys(RETAIL_TYPES);
@@ -393,6 +533,19 @@ const CREW_BY_CATEGORY = {
   'zoo-aquarium': 'venue',
   'cave-system': 'unmanned',
   'natural-formation': 'unmanned',
+  park: 'unmanned',
+  warehouse: 'transit',
+  'public-housing': 'tower',
+  river: 'unmanned',
+  lake: 'unmanned',
+  'corporate-headquarters': 'tower',
+  'shopping-mall': 'venue',
+  casino: 'venue',
+  dome: 'venue',
+  amphitheater: 'venue',
+  'hockey-arena': 'venue',
+  'soccer-stadium': 'venue',
+  'college-stadium': 'venue',
   'other-distinctive-feature': 'unmanned',
 };
 

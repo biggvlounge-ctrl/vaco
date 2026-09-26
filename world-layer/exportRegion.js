@@ -59,6 +59,22 @@ const KEY_CATEGORIES = [
   // `landmark-packs.test.js` for the assertion that keeps these two
   // copies identical.
   'school',
+  // **A twenty-fifth, added 26 Sep 2026.** Not a document
+  // reconciliation like `school` — a new category added directly at
+  // the owner's request, alongside the retail-list `junkyard` that
+  // stays out of this array because it is not hero-tier. See
+  // `vacon-c/server/landmarks.js` for the reasoning and
+  // `landmark-packs.test.js` for the identity assertion.
+  'park',
+  // Twenty-sixth through thirty-first, same date, same batch, same
+  // reasoning as `park` above.
+  'warehouse', 'public-housing', 'river', 'lake', 'corporate-headquarters',
+  'shopping-mall',
+  // Thirty-second, same reasoning, added alongside server/gambling.js.
+  'casino',
+  // Thirty-third through thirty-seventh, same reasoning, five named
+  // venue subtypes beside stadium-arena.
+  'dome', 'amphitheater', 'hockey-arena', 'soccer-stadium', 'college-stadium',
 ];
 
 // UNESCO inscription is treated as maximal historical importance by

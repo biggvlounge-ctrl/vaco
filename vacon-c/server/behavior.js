@@ -502,6 +502,28 @@ const STRESS_BY_EVENT = {
   birth: -10,
   partnership_formed: -8,
   fear_spike: 6,
+  // Added 26 Sep 2026 alongside server/drugs.js. Between `scarcity` (a
+  // shortage of something everybody needs) and `crime` (having been
+  // victimized) in size — dependency without access is a real load,
+  // and this file already has both numbers to anchor it against rather
+  // than inventing a third scale.
+  withdrawal: 8,
+  // Added the same day alongside server/gambling.js. A notable loss is
+  // sized like `scarcity`; a notable win is `partnership_formed`'s own
+  // relief figure, halved — good news, not the best news anybody gets.
+  gambling_loss: 4,
+  gambling_win: -4,
+  // Added the same day alongside server/warfare.js. `war_casualty`
+  // (somebody died) sits just under `death` itself — the winner
+  // witnessed it and did it, which is not quite the same load as losing
+  // someone close, and `war_battle` (nobody died) is sized like
+  // `conflict_escalation`: real violence, survived.
+  war_battle: 14,
+  war_casualty: 26,
+  // Added the same day alongside births.js's Libido/Fidelity mechanic.
+  // Sized against `crime`'s own 12 — a discovered betrayal by someone
+  // close is a comparable blow to being victimized by a stranger.
+  infidelity_discovered: 18,
 };
 
 // Apply this tick's events to the people they happened to.

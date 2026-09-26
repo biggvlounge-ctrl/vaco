@@ -279,7 +279,15 @@ test('a generated world answers most of the catalogue, where an empty one answer
   // which is the answerable question. Closing this needs a resource
   // whose stock changes by discovery and loss rather than by production
   // and consumption, which is a different model and not a missing line.
-  assert.equal(structural.size, 9, 'the declared-gap count moved without this test being updated');
+  //
+  // **8 again as of 26 Sep 2026, and this time the gap closed rather
+  // than moved.** `informal_economy_share` declared itself unavailable
+  // in its own words: "every movement of value is recorded the same
+  // way... there are no books to be off." `server/drugs.js`'s informal
+  // trade ledger (`worldState.informalTransactions`) is exactly a book
+  // that is off, so the statistic now compares informal value against
+  // formal wages instead of declaring the question unanswerable.
+  assert.equal(structural.size, 8, 'the declared-gap count moved without this test being updated');
 });
 
 test('a fresh world has routines, and running it engages the Behavior Engine', () => {

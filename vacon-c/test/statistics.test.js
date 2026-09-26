@@ -242,16 +242,67 @@ test('a crime category nothing generates carries a caveat on its zero', () => {
   person(w, { communityId: c.id });
   const profile = statistics.profileFor(w, c.id);
 
-  // `gun` used to be the example here and is generated now, so the
-  // caveat moved to a category that is still ungenerated. The point of
-  // the test is unchanged: a zero that means "nobody did it" and a
-  // zero that means "we do not model this" have to be distinguishable.
-  assert.equal(profile.statistics.drug_crime_per_1k.value, 0);
-  assert.match(profile.statistics.drug_crime_per_1k.caveat, /nothing in the engine generates/);
+  // `gun` used to be the example here, then `drug`, then `fraud` — all
+  // three are generated now, so the caveat moved to the one category
+  // that is deliberately and permanently ungenerated rather than
+  // waiting on an object to falsify or hold. The point of the test is
+  // unchanged: a zero that means "nobody did it" and a zero that means
+  // "we do not model this" have to be distinguishable.
+  assert.equal(profile.statistics.sex_offense_crime_per_1k.value, 0);
+  assert.match(profile.statistics.sex_offense_crime_per_1k.caveat, /nothing in the engine generates/);
   assert.equal(profile.statistics.violent_crime_per_1k.caveat, undefined,
     'violent crime IS generated and should carry no caveat');
   assert.equal(profile.statistics.gun_crime_per_1k.caveat, undefined,
     'gun crime is generated now that inventory exists');
+  assert.equal(profile.statistics.drug_crime_per_1k.caveat, undefined,
+    'drug crime is generated now that server/drugs.js exists');
+  assert.equal(profile.statistics.fraud_crime_per_1k.caveat, undefined,
+    'fraud is generated now that a falsified position claim exists');
+  assert.equal(profile.statistics.drug_crime_per_1k.caveat, undefined,
+    'drug crime is generated now that server/drugs.js exists');
+});
+
+test('informal_economy_share is null with nothing moving, and real once something does', () => {
+  const w = world();
+  w.informalTransactions = [];
+  const c = territory.generateCommunity(w, {});
+  const seller = person(w, { communityId: c.id });
+  const buyer = person(w, { communityId: c.id });
+
+  // Nobody employed and nothing informal has moved — a share of
+  // nothing is not a measurement.
+  assert.equal(statistics.profileFor(w, c.id).statistics.informal_economy_share.value, null);
+
+  const employer = { id: nextId++, type: 'business', assets: 100000, expenses: 0 };
+  w.organizations.push(employer);
+  economy.hireEntity(w, { entityId: seller.id, employerOrganizationId: employer.id, wage: 80 });
+
+  w.informalTransactions.push({ id: 1, sellerId: seller.id, buyerId: buyer.id, amount: 20, tick: w.tick });
+
+  const share = statistics.profileFor(w, c.id).statistics.informal_economy_share.value;
+  // 20 informal against 80 formal wage = 20/(20+80) = 0.2.
+  assert.equal(share, 0.2);
+});
+
+test('informal_economy_share only counts a resident’s own transactions, and only recent ones', () => {
+  const w = world();
+  const c = territory.generateCommunity(w, {});
+  const resident = person(w, { communityId: c.id });
+  const outsider1 = person(w, {});
+  const outsider2 = person(w, {});
+
+  w.informalTransactions = [
+    // Neither side is a resident of this community.
+    { id: 1, sellerId: outsider1.id, buyerId: outsider2.id, amount: 999, tick: w.tick },
+    // A resident, but far outside the statistic's own window.
+    { id: 2, sellerId: resident.id, buyerId: outsider1.id, amount: 999, tick: w.tick - 10000 },
+    // A resident, recent — the one that should count.
+    { id: 3, sellerId: resident.id, buyerId: outsider1.id, amount: 20, tick: w.tick },
+  ];
+
+  const share = statistics.profileFor(w, c.id).statistics.informal_economy_share.value;
+  // No formal wages at all, so an entirely informal economy reads as 1.
+  assert.equal(share, 1);
 });
 
 test('the crime entries come from crime.js, so the two cannot disagree', () => {

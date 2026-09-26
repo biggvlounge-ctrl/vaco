@@ -38,6 +38,7 @@ const knowledge = require('../server/knowledge.js');
 const engine = require('../server/engine.js');
 const actions = require('../server/actions.js');
 const worldStore = require('../server/worldStore.js');
+const { getTraitId } = require('../server/traitDefinitions.js');
 
 const YEAR = 365;
 
@@ -213,6 +214,51 @@ test('a negotiation between people who have wronged each other goes badly', () =
   const untouched = room({ people: 2 });
   const baseline = worldStore.getOrCreateRelationship(untouched, 1, 2, 'social').trust;
   assert.equal(neutral - baseline, meetings.PURPOSES.negotiate.trust);
+});
+
+// ---------------------------------------------------------------------
+// Manipulation — the one asymmetric thing a shared trust field cannot hold
+// ---------------------------------------------------------------------
+
+function withManipulation(entityId, value, w) {
+  w.entityTraits.push({
+    entity_id: entityId,
+    trait_id: getTraitId('psychological', 'Manipulation'),
+    base_value: value,
+    key_modifier: 0,
+    current_value: value,
+  });
+  return w;
+}
+
+test('a lopsided negotiation leaves the manipulated party owing a debt', () => {
+  const w = room({ people: 2 });
+  withManipulation(1, 90, w);
+  withManipulation(2, 10, w);
+  meetings.hold(w, { attendeeIds: [1, 2], purpose: 'negotiate' });
+  const rel = w.relationships[0];
+  // 1 manipulated 2, so 2 owes 1 — asserted by direction against
+  // `entity_a_id`/`entity_b_id` rather than a hard-coded sign, because
+  // `getOrCreateRelationship` fixes that order on whichever id called
+  // first, not on which id is the manipulator.
+  const oneOwedByTwo = rel.entity_a_id === 1 ? rel.debt > 0 : rel.debt < 0;
+  assert.ok(oneOwedByTwo, `debt did not point from the manipulated party to the manipulator: ${rel.debt}`);
+});
+
+test('an even negotiation creates no debt at all', () => {
+  const w = room({ people: 2 });
+  withManipulation(1, 55, w);
+  withManipulation(2, 50, w);
+  meetings.hold(w, { attendeeIds: [1, 2], purpose: 'negotiate' });
+  assert.equal(w.relationships[0].debt, 0);
+});
+
+test('manipulation only reads on negotiate, not on a sit-down', () => {
+  const w = room({ people: 2 });
+  withManipulation(1, 95, w);
+  withManipulation(2, 5, w);
+  meetings.hold(w, { attendeeIds: [1, 2], purpose: 'sit-down' });
+  assert.equal(w.relationships[0].debt, 0);
 });
 
 test('everybody remembers it, and remembers who else was there', () => {

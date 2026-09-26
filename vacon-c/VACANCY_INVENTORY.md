@@ -47,7 +47,7 @@ the Postgres schema that already exists.
 
 ## 1. Server code — `vacon-c/server/`
 
-All 77 files present on disk, all committed, largest first.
+All 81 files present on disk, all committed, largest first.
 
 **`test/inventory.test.js` now fails when this table and `server/` disagree**, which is the guard this document has needed through three separate drifts (see the note below). The count and the file list are checked against the tree rather than typed.
 
@@ -63,7 +63,7 @@ read off disk, not recalled.
 |---|---|---|---|
 | `migrate.js` | 57,000 | WorldState → PostgreSQL migration. | Built, see §4 |
 | `tick.js` | 56,547 | The eleven-phase tick pipeline, environmental conditions, and the cross-cutting slot. **Conditions now give back what they took** — see CLAUDE.md, thirteenth standing rule. | Built |
-| `statistics.js` | 60,429 | The uniform statistics catalogue — every reading an area can give about itself, in one shape, with declared absences as data. | Built |
+| `statistics.js` | 85,324 | The uniform statistics catalogue — every reading an area can give about itself, in one shape, with declared absences as data. | Built |
 | `engine.js` | 45,291 | The simulation core. Re-exports the whole subsystem surface, and holds `WorldState`. | Built |
 | `worldgen.js` | 47,288 | **Assembles a whole world** by calling the generators that already existed. The eleventh standing rule's answer: before this, every world was a crowd of people standing in an empty field. | Built |
 | `control.js` | 37,243 | **The takeover key** — `COMPOSITION_REQUIREMENTS_TRIBE_COHESION.md`'s `ControlKeyComposition` and `TakeoverAttemptResolution`, across six scales from a one-bedroom apartment to a country. The 5:10:1 composition is the document's, used as a ratio against however many people hold the target now. | Built |
@@ -116,8 +116,10 @@ read off disk, not recalled.
 | `health.js` | 12,799 | **A population's health** — the `health` family's first reader besides `mortality.vitalityOf`, plus physical exertion. Its header records why body composition is a declared absence rather than a statistic. | Built |
 | `culture.js` | 12,176 | **Culture DNA (Phase 2)** — sixteen named families stored three ways, tier-level attachment. | Built |
 | `succession.js` | 12,172 | Inheritance — an estate settled by name across holdings, family and property. | Built |
+| `warfare.js` | 12,029 | **Armed conflict between two organizations — added 26 Sep 2026 at the owner's direct request.** The first caller of `contest.js`'s `combat` discipline (built, deliberately excluded from `competition.js`'s games) and of `mortality.killEntity` (exported, called by nothing until this). A decisive winner is left to attempt a takeover through the existing `control.js` system rather than this file seizing territory itself. No Postgres table for `worldState.wars` yet — no reachable instance to migrate against from this environment. | Built |
 | `inventory.js` | 11,717 | Who holds what: `give`, `take`, and holdings by item name. | Built |
 | `demographics.js` | 11,514 | Languages, religion, education and ethnicity — composition and diversity. **Counts, never decides**; see `test/ethnicity.test.js`. | Built |
+| `drugs.js` | 16,795 | **Production, use and dependency — added 26 Sep 2026 at the owner's direct request.** Gives `crime.js`'s `drug` category the object it was waiting for (the same fix `gun` already had) and `criminal['Black Market Ties']` its first reader; `psychological['Substance Dependency']` (new) is its only writer. Runs automatically every tick, unlike `merchandise.js`/`salvage.js`. Also closes `statistics.js`'s `informal_economy_share`: a seeded buyer draw and its own `worldState.informalTransactions` ledger, moved through the ordinary formal ledger and recorded a second time as informal. | Built |
 | `tierTraits.js` | 10,950 | The CITY and CIVILIZATION tier sheets, and **the reconciliation**: all thirty-three named dimensions against the column, rollup, system or deferral that already answers twenty-eight of them. | Built |
 | `actions.js` | 10,805 | **The player action dispatcher** — a registry over verbs that already exist. The actor is always the player's own linked entity, never a request field. | Built |
 | `households.js` | 10,386 | **Who actually lives together.** Before this, homes were handed out one per person and nobody had ever lived with anybody. | Built |
@@ -125,7 +127,9 @@ read off disk, not recalled.
 | `missions.js` | 9,545 | Artifacts and missions, with a real available → accepted → completed/failed/abandoned state machine. | Built |
 | `players.js` | 9,311 | Player generation, citizen dashboard — including mood, habits and routine. | Built |
 | `beliefs.js` | 8,674 | What an entity holds to be true, and how confidently. | Built |
+| `gambling.js` | 8,402 | **A house game against the world's own virtual economy — added 26 Sep 2026 at the owner's direct request, confined to `individual_finances.savings`, never real money.** `economic['Risk Appetite']`/`Greed` get their first reader; `psychological.Compulsiveness` gets a second. Not the `#291-305` real-money gambling gate `competition.js` already declines — that review still applies in full if this is ever wired to a real payment rail. | Built |
 | `persistence.js` | 8,638 | Loads the world before `app.listen` and checkpoints every 10 ticks. | Built, see §4 |
+| `heritage.js` | 7,158 | **Real ethnicity and religion values — added 26 Sep 2026 at the owner's direct request, reversing `worldgen.js`'s prior deliberate use of fictional names.** African nations with named ethnic/tribal groups, several Native American nations, a named "Foundational Black American" lineage, and broad coverage across the Americas, Europe, the Middle East and Asia. Changes only what values `npcs.ethnicity` can hold — `demographics.js`'s existing firewall (`test/ethnicity.test.js`: no generator of crime, policing, economy, mortality, traits or migration may read it) is untouched. | Built |
 | `worldStore.js` | 7,035 | Memory, relationships, knowledge — the write-back layer the contract requires. | Built |
 | `entityTraits.js` | 6,562 | Per-entity trait rows, trait sheets, Key modifiers, live entity resolution (`getLiveEntity`, the ninth standing rule's answer). | Built |
 | `decisions.js` | 6,365 | `decision_log` — why an NPC did anything, in its own words. | Built |

@@ -117,6 +117,13 @@ const landmarks = require('./landmarks.js');
 const salvage = require('./salvage.js');
 const discovery = require('./discovery.js');
 const inventory = require('./inventory.js');
+const drugs = require('./drugs.js');
+
+//: `informal_economy_share`'s own window — same order of magnitude as
+//: `crime.DANGER_WINDOW_TICKS` (365), and flagged the same way: no
+//: document times an economic measurement, so this is the shape of the
+//: model.
+const INFORMAL_ECONOMY_WINDOW_TICKS = 90;
 
 // §9's MASTER BLOCK KEY, in its order. Every statistic belongs to one.
 const CATEGORIES = [
@@ -904,12 +911,30 @@ const CATALOGUE = [
       ctx.population,
     ),
   },
+  // **Closed 26 Sep 2026 — `server/drugs.js`'s `runInformalTrade` gave
+  // this an actual off-the-books transaction to measure.** Cash still
+  // moves through the ordinary `individual_finances` ledger every other
+  // trade uses (a black-market sale does not print money); what makes
+  // it informal is that it is ALSO written to
+  // `worldState.informalTransactions`, a ledger nothing else touches.
+  // Compared here against the recent formal wage bill for the same
+  // residents — active `employment_records.wage`, the plainest regular
+  // value flow already in the schema — over the same window, so the
+  // two totals describe "lately" rather than "ever". `null`, not zero,
+  // where neither channel moved anything: a share of nothing is not a
+  // measurement.
   {
     key: 'informal_economy_share', category: 'economics', unit: 'share', scope: 'community',
-    unavailable: 'every movement of value is recorded the same way — payroll, production and '
-      + 'barter.exchange all write individual_finances or organizations. Nothing is off the '
-      + 'books, because there are no books to be off: an informal economy needs a formal one '
-      + 'to be outside of, and a way to transact without being recorded.',
+    compute: (ctx) => {
+      const informal = drugs.informalValueIn(ctx.worldState, ctx.ids, {
+        sinceTick: INFORMAL_ECONOMY_WINDOW_TICKS, tick: ctx.tick,
+      });
+      const formal = (ctx.worldState.employmentRecords || [])
+        .filter((r) => r.status === 'active' && ctx.ids.has(r.entity_id))
+        .reduce((sum, r) => sum + (Number(r.wage) || 0), 0);
+      const total = informal + formal;
+      return total === 0 ? null : Math.round((informal / total) * 10000) / 10000;
+    },
   },
   {
     key: 'resource_stock', category: 'economics', unit: 'count', scope: 'city',

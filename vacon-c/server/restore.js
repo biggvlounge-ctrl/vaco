@@ -60,6 +60,7 @@ const { reseedAll } = require('./idSequences.js');
 // `barterItems` note where `inventory` is loaded.
 const knowledge = require('./knowledge.js');
 const salvage = require('./salvage.js');
+const drugs = require('./drugs.js');
 const merchandise = require('./merchandise.js');
 
 // Turn `SELECT *` rows into what the engine expects. Postgres returns
@@ -489,6 +490,7 @@ async function restoreWorldStateFromPostgres(worldState) {
   knowledge.registerItems(worldState);
   salvage.registerItems(worldState);
   merchandise.registerItems(worldState);
+  drugs.registerItems(worldState);
   summary.barter_items = (worldState.barterItems || []).length;
 
   worldState.decisionLog = (await q('SELECT * FROM decision_log ORDER BY id')).map((d) =>

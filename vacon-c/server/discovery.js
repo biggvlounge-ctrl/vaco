@@ -105,6 +105,40 @@ const POOLS = {
   // category that yields a resource AND a relic.
   'cave-system': { itemCategories: ['materials', 'metals'], artifacts: true },
   'natural-formation': { itemCategories: ['materials', 'metals'] },
+  // Added 26 Sep 2026 alongside `landmarks.js`'s `park` category —
+  // same pool as `natural-formation`, because `landmarks.js` gives it
+  // the identical "natural resources" discovery text and for the same
+  // reason: it is kept, not operated, and there is no third vocabulary
+  // to invent one from.
+  park: { itemCategories: ['materials', 'metals'] },
+  // Added 26 Sep 2026 alongside landmarks.js's same-batch categories.
+  // `warehouse` gets the vehicle/repair half `auto-parts-store` already
+  // draws on, since a distribution warehouse is stocked for transit
+  // rather than for one trade.
+  warehouse: { itemCategories: ['tools', 'materials', 'transport'] },
+  // A housing complex is homes, not a resource site — no document and
+  // no real importer names a merchandise pool for one, so this is null
+  // exactly the way `prison` and `stadium-arena` are null above: not
+  // searchable for loot, just a real place on the map.
+  'public-housing': null,
+  // `river`/`lake` get the one §26 category `cave-system` and
+  // `natural-formation` never had a reason to carry: `water`, a real
+  // trade category (`items.TRADE_CATEGORIES`) nothing else in this
+  // pool table reaches yet.
+  river: { itemCategories: ['materials', 'water'] },
+  lake: { itemCategories: ['materials', 'water'] },
+  'corporate-headquarters': { books: ['government', 'technology'] },
+  'shopping-mall': { itemCategories: ['clothing', 'tools'] },
+  // Added 26 Sep 2026 alongside `landmarks.js`'s `casino`. Null for the
+  // same reason `prison`/`stadium-arena` are: not a merchandise site.
+  casino: null,
+  // Added 26 Sep 2026 alongside landmarks.js's five venue additions.
+  // Null for the same reason casino/prison/stadium-arena are.
+  dome: null,
+  amphitheater: null,
+  'hockey-arena': null,
+  'soccer-stadium': null,
+  'college-stadium': null,
   'other-distinctive-feature': null,
 
   // -- retail ---------------------------------------------------------
@@ -125,6 +159,13 @@ const POOLS = {
   bookstore: { books: 'all' },
   'gun-store': null,
   'department-store': null,
+  // Added 26 Sep 2026 alongside `landmarks.js`'s `junkyard` category.
+  // `landmarks.js` names "scrap metal, salvage materials, vehicle
+  // parts" as its discovery text; this is that text turned into the
+  // same §26 references `auto-parts-store` already uses for the
+  // vehicle half, plus the metals/materials `cave-system` and
+  // `natural-formation` already use for scrap.
+  junkyard: { itemCategories: ['metals', 'materials', 'repair', 'transport'] },
 };
 
 //: How much a place holds, per point of historical significance.

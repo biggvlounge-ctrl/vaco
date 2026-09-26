@@ -14,13 +14,23 @@
 // considered fully "in order."
 //
 // Verified against VACANCY_TRAIT_DATABASE_ATTACHMENT.md (Document 7,
-// full handoff): this file's TRAIT_FAMILIES is byte-identical to that
+// full handoff): this file's TRAIT_FAMILIES was byte-identical to that
 // doc's literal object, including skills — 20 families, 114 traits.
 // The "18 families, 92 traits" / "19 families, 98 traits" language
 // elsewhere (including in that same doc's own prose) undercounts its
 // own listed array by one family; that's a pre-existing off-by-one in
 // the docs' summary text, not a data mismatch — the literal data was
 // correct here all along.
+//
+// 120 traits as of 26 Sep 2026: two added to `psychological`
+// (`Manipulation`, `Substance Dependency`) and four more to `emotional`
+// (`Libido`, `Fidelity`, `Gender Expression`, `Sexuality`), none of
+// them in the source document, all owner-requested — see each family
+// definition below for why.
+// Historical "114"/"44 of 114" measurements elsewhere in this
+// codebase (barter.js, economy.js, trait-families.test.js) describe a
+// specific measurement taken before that date and are left as the
+// measurement they were, not restated.
 
 'use strict';
 
@@ -35,10 +45,35 @@ const TRAIT_FAMILIES = {
              'Recovery Rate', 'Vision Acuity', 'Stamina'],
   mental: ['Intelligence', 'Memory', 'Focus', 'Problem Solving', 'Creativity',
            'Adaptability', 'Risk Assessment', 'Learning Speed', 'Curiosity'],
+  // `Libido` and `Fidelity` added 26 Sep 2026 at the owner's direct
+  // request, alongside the partnership/infidelity mechanic wired into
+  // `births.js`'s existing bond system — see that file's own header.
+  // Neither is from a source document; both sit beside `Attachment
+  // Style` because they modulate the same mechanic it does.
+  // `Gender Expression` and `Sexuality` added 26 Sep 2026 at the
+  // owner's direct request, alongside `births.js`'s attraction
+  // mechanic — see that file's own header. Both are continuous (0-100)
+  // rather than a categorical field: `Gender Expression` is where
+  // somebody sits on a spectrum, purely descriptive and never read by
+  // the fertility/bearing-parent logic, which stays exactly what it
+  // was ("no sex or gender field is invented" there, and that decision
+  // is untouched — this is a relational-attraction trait, not a
+  // reproductive one). `Sexuality` is the Expression somebody is drawn
+  // to, on the same scale, which is what makes the whole spectrum —
+  // straight, gay, bisexual, and everything between — one continuum
+  // rather than an enum with cases to enumerate.
   emotional: ['Empathy', 'Volatility', 'Resilience', 'Optimism',
-              'Attachment Style', 'Grief Processing'],
+              'Attachment Style', 'Grief Processing', 'Libido', 'Fidelity',
+              'Gender Expression', 'Sexuality'],
+  // `Manipulation` and `Substance Dependency` added 26 Sep 2026 at the
+  // owner's direct request, for the exploitative-negotiation behavior
+  // wired into `meetings.js` and the drug-addiction mechanic wired into
+  // `crime.js`/`traitDrift.js` — see those files' own headers. Neither
+  // is from a source document; both are new, same standing as the
+  // landmark categories added the same day.
   psychological: ['Paranoia', 'Impulsivity', 'Narcissism', 'Trust Threshold',
-                  'Delusion Susceptibility', 'Compulsiveness'],
+                  'Delusion Susceptibility', 'Compulsiveness', 'Manipulation',
+                  'Substance Dependency'],
   behavioral: ['Aggression', 'Patience', 'Honesty', 'Discipline',
                'Recklessness', 'Conformity'],
   social: ['Charisma', 'Persuasion', 'Network Reach', 'Reputation',

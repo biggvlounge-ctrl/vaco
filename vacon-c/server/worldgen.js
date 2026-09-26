@@ -94,9 +94,11 @@ const occupations = require('./occupations.js');
 const knowledge = require('./knowledge.js');
 const landmarks = require('./landmarks.js');
 const salvage = require('./salvage.js');
+const drugs = require('./drugs.js');
 const landmarkPacks = require('./landmarkPacks.js');
 const merchandise = require('./merchandise.js');
 const worldStore = require('./worldStore.js');
+const heritage = require('./heritage.js');
 const { hashSeed, seededUnit } = require('./seeded.js');
 
 //: Everything below is flagged interpretive. No document specifies a
@@ -118,14 +120,20 @@ const DEFAULTS = {
   employmentRate: 0.55,
   gangMembershipRate: 0.06,
   languages: ['Riverine', 'Highland', 'Old Tongue'],
-  religions: ['Tidewater', 'Ridge', 'None'],
-  //: The ethnic groups a world is drawn from. **Deliberately named for
-  //: this setting rather than for any real-world group** — the engine
-  //: needs a demographic dimension with more than one value in it so
-  //: composition and diversity mean something, and borrowing real
-  //: ethnonyms would attach real-world associations to a simulation
-  //: that models none of them.
-  ethnicities: ['Riverborn', 'Highland', 'Coastwise', 'Outlander'],
+  //: Real religions as of 26 Sep 2026 — see `server/heritage.js` for
+  //: why this replaces the earlier fictional list, and the same
+  //: override path (`DEFAULTS.religions`) that always existed.
+  religions: heritage.RELIGIONS,
+  //: Real nationalities and ethnic/tribal groups, replacing the
+  //: fictional list this file carried until 26 Sep 2026. That list's
+  //: own reasoning — "borrowing real ethnonyms would attach real-world
+  //: associations to a simulation that models none of them" — is not
+  //: forgotten, it is reversed at the owner's direct request. See
+  //: `server/heritage.js`'s header for the firewall this does not
+  //: touch: nothing outside `demographics.js` may read this field, and
+  //: `test/ethnicity.test.js` enforces that against these real values
+  //: exactly as it did against the fictional ones.
+  ethnicities: heritage.ETHNICITIES,
 
   // **Everything below exists because the table was empty.** Each one
   // names a system that is built, tested and green, and that no world
@@ -1611,6 +1619,11 @@ function generateWorld(options = {}) {
   // real pools draw on and no item in any world belonged to, so a
   // grocery store search found nothing, every time.
   summary.merchandiseItems = merchandise.registerItems(w);
+  // **The one item drug crime and dependency need to exist at all.**
+  // Registered, not distributed — nobody starts holding any; it arrives
+  // through `drugs.runProduction` the same way scrap arrives through
+  // salvage. See server/drugs.js.
+  summary.drugItems = drugs.registerItems(w);
   summary.knowledgeItems = 0;
   made.people.forEach((npc, pi) => {
     if (random.unit('book', pi) > config.survivingBookRate) return;

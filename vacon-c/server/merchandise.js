@@ -79,6 +79,15 @@ const STOCK = {
   // rather than a duplicate entry, because two modules registering the
   // same name under different definitions is the divergence
   // `registerItems` being idempotent by name exists to prevent.
+
+  // Added 26 Sep 2026, not from the retail document — `landmarks.js`'s
+  // new `river`/`lake` categories give `water` a discovery pool
+  // (`discovery.js`) and nothing in this file or `salvage.js` had ever
+  // put an item in that §26 category, which the merchandise guard below
+  // caught the moment those two pools existed. Named plainly rather
+  // than reaching for the document's retail-noun style, because no
+  // retail location sells this — a river does.
+  'clean water': { category: 'water' },
 };
 
 const STOCK_NAMES = Object.keys(STOCK);
