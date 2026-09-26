@@ -880,6 +880,31 @@ test('the dispatcher tells a caller what it will accept', { skip: SKIP }, async 
   assert.equal((await get('/players/999999/actions')).status, 404);
 });
 
+test('study is offered, and a real HTTP caller cannot study a source they cannot reach', { skip: SKIP }, async () => {
+  // Over HTTP there is no `/api/inventory` grant route — items only
+  // enter a world through gameplay (search-location, make-thing,
+  // artifacts) — so this checks what the HTTP surface can actually
+  // check without one: the verb is on the real menu, and naming a
+  // source/field this NPC has no real access to is refused with the
+  // engine's own reason, not a generic 500.
+  const { npc } = await (await post('/npc/generate')).json();
+  const player = await (await post('/players', { linkedEntityId: npc.id })).json();
+
+  const menu = await (await get(`/players/${player.id}/actions`)).json();
+  assert.ok(menu.actions.some((a) => a.action === 'study'), 'study is not on the real menu');
+
+  const sources = await (await get(`/players/${player.id}/study-sources`)).json();
+  assert.ok(Array.isArray(sources.sources), 'study-sources must answer with the real candidate list');
+
+  const refused = await post(`/players/${player.id}/action`, {
+    action: 'study', source: 'universities', field: 'science',
+  });
+  assert.equal(refused.status, 400);
+  assert.match((await refused.json()).error, /no real way to study/);
+
+  assert.equal((await get('/players/999999/study-sources')).status, 404);
+});
+
 test('/api/missions/available/:entityId is not swallowed by /api/missions/:id',
   { skip: SKIP }, async () => {
     // `available` is a literal under a prefix that also has a `:id`

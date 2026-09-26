@@ -250,6 +250,25 @@ const ACTIONS = {
     ),
   },
 
+  // **§24, the player-facing half.** `knowledge.study()` has moved real
+  // traits — the field's skill, Literacy, Self-Taught Aptitude — since
+  // the file that built it, and nothing ever let a player trigger it.
+  // `source`/`field` name one of `knowledge.sourcesFor`'s own real
+  // candidates (a book you carry, a library in your city, somebody
+  // nearby who holds a trade) — validated against what this entity can
+  // actually reach right now, same posture `generateMission` already
+  // holds for an artifact or location: never trust a caller-declared
+  // pair, confirm it against real state first.
+  study: {
+    summary: 'Study from a book you carry, a place in your city, or somebody nearby.',
+    modes: ['citizen'],
+    requires: ['source', 'field'],
+    verbs: ['studySource'],
+    run: (verbs, actorId, body) => verbs.studySource(actorId, {
+      source: body.source, field: body.field, teacherId: body.teacherId ?? null,
+    }),
+  },
+
   'enter-contest': {
     summary: 'Compete against a named opponent.',
     modes: ['citizen'],

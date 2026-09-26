@@ -744,6 +744,19 @@ app.get('/api/players/:id/citizen-dashboard', (req, res) => {
   }
 });
 
+// §24, the "look before you act" read for `study`. Same shape as
+// `/api/players/:id/actions` above: a client that cannot ask what its
+// player could study has to hard-code the list.
+app.get('/api/players/:id/study-sources', (req, res) => {
+  const player = (engine.WorldState.players || []).find((p) => p.id === Number(req.params.id));
+  if (!player) return res.status(404).json({ error: `no player with id ${req.params.id}` });
+  try {
+    return res.json({ sources: engine.studySourcesFor(player.linked_entity_id) });
+  } catch (err) {
+    return res.status(404).json({ error: err.message });
+  }
+});
+
 // -- missions: the state machine ----------------------------------------------
 //
 // The engine's first real player verb. Everything else here reads a

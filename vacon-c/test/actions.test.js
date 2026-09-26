@@ -77,7 +77,7 @@ test('every verb an action names is one the engine actually supplies', () => {
     ['acceptMission', 'addScheduleEvent', 'assessTakeover', 'attemptTakeover',
       'breakDownItem', 'canMakeThing', 'holdMeeting', 'makeThing', 'reinforceHabit',
       'repurposeProperty', 'resolveContest', 'searchLocation', 'stripBuilding',
-      'resolveMission'].sort(),
+      'resolveMission', 'studySource'].sort(),
   );
 });
 

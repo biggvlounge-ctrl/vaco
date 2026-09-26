@@ -74,6 +74,7 @@ const meetings = require('./meetings.js');
 const landmarks = require('./landmarks.js');
 const salvage = require('./salvage.js');
 const discovery = require('./discovery.js');
+const knowledge = require('./knowledge.js');
 const behavior = require('./behavior.js');
 const actions = require('./actions.js');
 const politics = require('./politics.js');
@@ -874,6 +875,7 @@ const ACTION_VERBS = {
   makeThing: (...args) => makeThing(...args),
   canMakeThing: (...args) => canMakeThing(...args),
   searchLocation: (...args) => searchLocation(...args),
+  studySource: (...args) => studySource(...args),
 };
 
 function dispatchAction(playerId, body) {
@@ -1052,6 +1054,47 @@ function searchLocation(entityId, options = {}) {
   return discovery.search(WorldState, entityId, Number(options.propertyId), {
     tick: WorldState.tick,
   });
+}
+
+// ---------------------------------------------------------------------
+// Study — §24, the player-facing half
+// ---------------------------------------------------------------------
+// Thin for the same reason as the salvage wrappers above: the action
+// dispatcher calls the engine, never `knowledge.js` directly, so this
+// exists to be the one place `assertVerbsPresent` protects.
+//
+// **Validated against `sourcesFor`, not trusted as a bare pair.** A
+// player could otherwise name `{source: 'universities', field:
+// 'science'}` with no university in their city and no such claim would
+// ever be checked — the same "confirm it against real state first"
+// rule `generateMission` already holds for an artifact or a location.
+function studySource(entityId, options = {}) {
+  const candidates = knowledge.sourcesFor(WorldState, entityId, { tick: WorldState.tick });
+  const match = candidates.find((c) => c.source === options.source && c.field === options.field
+    && (options.teacherId == null || c.teacherId === Number(options.teacherId)));
+  if (!match) {
+    throw new Error(
+      `entity ${entityId} has no real way to study "${options.field}" from "${options.source}" right now `
+      + '— they may not carry it, no such place is open in their city, or nobody nearby teaches it.',
+    );
+  }
+
+  const moved = knowledge.study(WorldState, entityId, match, { tick: WorldState.tick });
+  if (!moved) {
+    throw new Error(
+      `entity ${entityId} could not learn anything from this session — they may not be able to read `
+      + 'yet (see knowledge.canRead), or they already know more than this source has left to teach.',
+    );
+  }
+  return moved;
+}
+
+// A read, not an action — what this entity could name in `study` right
+// now. `GET /api/players/:id/study-sources` in server.js, alongside
+// `availableMissions` above as the same shape of "look before you act".
+function studySourcesFor(entityId) {
+  if (!getLiveEntity(entityId)) throw new Error(`no entity with id ${entityId}`);
+  return knowledge.sourcesFor(WorldState, entityId, { tick: WorldState.tick });
 }
 
 function assessTakeover(entityId, options = {}) {
@@ -1263,6 +1306,7 @@ module.exports = {
   dispatchAction,
   listActions,
   availableMissions,
+  studySourcesFor,
   TICK_INTERVALS: behavior.TICK_INTERVALS,
   SCHEDULE_FREQUENCIES: behavior.FREQUENCIES,
   getEntityState,
