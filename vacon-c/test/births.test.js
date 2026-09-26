@@ -671,13 +671,27 @@ test('fidelity does not slow anybody down before they have an existing partner',
   setTrait(w, a.id, 'emotional', 'Fidelity', 100);
   setTrait(w, a.id, 'emotional', 'Libido', 50);
   setTrait(w, b.id, 'emotional', 'Libido', 50);
+  // A fixed, known attraction match (both at the trait default) so the
+  // expected growth is computable rather than random — `Sexuality` and
+  // `Gender Expression` matching exactly is a real, above-average
+  // compatibility (see MEASURED_MEAN_COMPATIBILITY), not 1x, and the
+  // test computes that expectation through the real function instead of
+  // assuming it away.
+  for (const [id, family, name] of [
+    [a.id, 'emotional', 'Gender Expression'], [a.id, 'emotional', 'Sexuality'],
+    [b.id, 'emotional', 'Gender Expression'], [b.id, 'emotional', 'Sexuality'],
+  ]) setTrait(w, id, family, name, 50);
   w.relationships.push({
     id: nextId++, entity_a_id: a.id, entity_b_id: b.id, relationship_type: 'social',
     love: 0, trust: 50, conflict: 0, interaction_count: births.BOND_CONTACT_FLOOR,
   });
+  const expectedCompatibility = births.attractionCompatibility(
+    getLiveEntity(w, a.id), getLiveEntity(w, b.id),
+  );
   births.advanceBonds(w, 1);
   const love = w.relationships.find((r) => r.entity_a_id === a.id).love;
-  assert.equal(love, births.BOND_GROWTH, 'fidelity applied even with no existing partner to be unfaithful to');
+  assert.equal(love, births.BOND_GROWTH * expectedCompatibility,
+    'fidelity applied even with no existing partner to be unfaithful to');
 });
 
 // `BOND_GROWTH` (0.25/tick) times the multipliers below crosses one
@@ -742,4 +756,83 @@ test('discovery costs the existing partnership real trust, love and conflict', (
   assert.ok(after.trust < before.trust);
   assert.ok(after.love < before.love);
   assert.ok(after.conflict > before.conflict);
+});
+
+// ---------------------------------------------------------------------
+// Gender Expression and Sexuality — added 26 Sep 2026
+// ---------------------------------------------------------------------
+
+test('attraction is at its floor and no lower at the far end of the scale', () => {
+  assert.equal(births.attractionOf(0, 100), births.ATTRACTION_FLOOR);
+  assert.equal(births.attractionOf(100, 0), births.ATTRACTION_FLOOR);
+});
+
+test('attraction peaks when a partner sits exactly where sexuality points', () => {
+  assert.equal(births.attractionOf(50, 50), 1);
+  assert.equal(births.attractionOf(0, 0), 1);
+  assert.equal(births.attractionOf(100, 100), 1);
+});
+
+test('the whole spectrum is one continuum: nothing here assigns an orientation label', () => {
+  // Drawn to people like yourself, drawn to people unlike yourself, and
+  // everything between are the same formula at different inputs — the
+  // point of building it this way rather than as an enum.
+  const drawnToSimilar = births.attractionOf(/* sexuality */ 80, /* partner's expression */ 80);
+  const drawnToOpposite = births.attractionOf(/* sexuality */ 80, /* partner's expression */ 20);
+  const drawnBroadly = births.attractionOf(/* sexuality */ 50, /* partner's expression */ 70);
+  assert.ok(drawnToSimilar > drawnToOpposite);
+  assert.ok(drawnBroadly > births.ATTRACTION_FLOOR);
+});
+
+test('an average pairing bonds at exactly the rate this file always used, before either trait existed', () => {
+  // The population mean, not a specific value — this is the twelfth
+  // standing rule's discipline applied to a trait PAIR rather than one
+  // trait, and MEASURED_MEAN_COMPATIBILITY is what makes it hold: a
+  // pairing at that exact measured average compatibility should
+  // land back on a 1x multiplier once normalised.
+  const w = world();
+  const a = person(w, { age: 30 });
+  const b = person(w, { age: 30 });
+  setTrait(w, a.id, 'emotional', 'Libido', 50);
+  setTrait(w, b.id, 'emotional', 'Libido', 50);
+  // Construct a pairing whose raw compatibility equals the measured
+  // population mean exactly, by placing the distance so that
+  // 1 - distance/100 == MEASURED_MEAN_COMPATIBILITY in both directions.
+  const distance = Math.round((1 - births.MEASURED_MEAN_COMPATIBILITY) * 100);
+  setTrait(w, a.id, 'emotional', 'Sexuality', 50);
+  setTrait(w, a.id, 'emotional', 'Gender Expression', 50);
+  setTrait(w, b.id, 'emotional', 'Sexuality', 50 + distance);
+  setTrait(w, b.id, 'emotional', 'Gender Expression', 50 + distance);
+  const liveA = getLiveEntity(w, a.id);
+  const liveB = getLiveEntity(w, b.id);
+  const compatibility = births.attractionCompatibility(liveA, liveB);
+  assert.ok(Math.abs(compatibility - 1) < 0.02,
+    `a mean-compatibility pairing should normalise to ~1x, got ${compatibility}`);
+});
+
+test('a well-matched pairing bonds faster than a poorly-matched one, all else equal', () => {
+  function trial(aSexuality, aExpression, bSexuality, bExpression) {
+    const w = world();
+    const a = person(w, { age: 30 });
+    const b = person(w, { age: 30 });
+    setTrait(w, a.id, 'emotional', 'Libido', 50);
+    setTrait(w, b.id, 'emotional', 'Libido', 50);
+    setTrait(w, a.id, 'emotional', 'Sexuality', aSexuality);
+    setTrait(w, a.id, 'emotional', 'Gender Expression', aExpression);
+    setTrait(w, b.id, 'emotional', 'Sexuality', bSexuality);
+    setTrait(w, b.id, 'emotional', 'Gender Expression', bExpression);
+    w.relationships.push({
+      id: nextId++, entity_a_id: a.id, entity_b_id: b.id, relationship_type: 'social',
+      love: 0, trust: 50, conflict: 0, interaction_count: births.BOND_CONTACT_FLOOR,
+    });
+    births.advanceBonds(w, 1);
+    return w.relationships.find((r) => r.entity_a_id === a.id).love;
+  }
+
+  // A drawn to B's expression exactly, and B drawn to A's exactly.
+  const wellMatched = trial(70, 70, 70, 70);
+  // A drawn to the opposite of what B presents, and vice versa.
+  const poorlyMatched = trial(70, 70, 0, 0);
+  assert.ok(wellMatched > poorlyMatched,
+    `a well-matched pair (${wellMatched}) did not outgrow a poorly-matched one (${poorlyMatched})`);
 });

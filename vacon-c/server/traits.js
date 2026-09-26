@@ -22,10 +22,11 @@
 // the docs' summary text, not a data mismatch — the literal data was
 // correct here all along.
 //
-// 118 traits as of 26 Sep 2026: two added to `psychological`
-// (`Manipulation`, `Substance Dependency`) and two more to `emotional`
-// (`Libido`, `Fidelity`), neither pair in the source document, both
-// owner-requested — see each family definition below for why.
+// 120 traits as of 26 Sep 2026: two added to `psychological`
+// (`Manipulation`, `Substance Dependency`) and four more to `emotional`
+// (`Libido`, `Fidelity`, `Gender Expression`, `Sexuality`), none of
+// them in the source document, all owner-requested — see each family
+// definition below for why.
 // Historical "114"/"44 of 114" measurements elsewhere in this
 // codebase (barter.js, economy.js, trait-families.test.js) describe a
 // specific measurement taken before that date and are left as the
@@ -49,8 +50,21 @@ const TRAIT_FAMILIES = {
   // `births.js`'s existing bond system — see that file's own header.
   // Neither is from a source document; both sit beside `Attachment
   // Style` because they modulate the same mechanic it does.
+  // `Gender Expression` and `Sexuality` added 26 Sep 2026 at the
+  // owner's direct request, alongside `births.js`'s attraction
+  // mechanic — see that file's own header. Both are continuous (0-100)
+  // rather than a categorical field: `Gender Expression` is where
+  // somebody sits on a spectrum, purely descriptive and never read by
+  // the fertility/bearing-parent logic, which stays exactly what it
+  // was ("no sex or gender field is invented" there, and that decision
+  // is untouched — this is a relational-attraction trait, not a
+  // reproductive one). `Sexuality` is the Expression somebody is drawn
+  // to, on the same scale, which is what makes the whole spectrum —
+  // straight, gay, bisexual, and everything between — one continuum
+  // rather than an enum with cases to enumerate.
   emotional: ['Empathy', 'Volatility', 'Resilience', 'Optimism',
-              'Attachment Style', 'Grief Processing', 'Libido', 'Fidelity'],
+              'Attachment Style', 'Grief Processing', 'Libido', 'Fidelity',
+              'Gender Expression', 'Sexuality'],
   // `Manipulation` and `Substance Dependency` added 26 Sep 2026 at the
   // owner's direct request, for the exploitative-negotiation behavior
   // wired into `meetings.js` and the drug-addiction mechanic wired into

@@ -231,6 +231,61 @@ function fidelityMultiplier(value) {
   return 1.5 - normalizedTrait(value) / 100; // 0 -> 1.5x (strays faster), 100 -> 0.5x (strays slower)
 }
 
+// ---------------------------------------------------------------------
+// Attraction — Gender Expression and Sexuality, one continuum
+// ---------------------------------------------------------------------
+// Neither trait is categorical, so there is no "compatible orientation
+// pair" table to write and no case to have missed: `Sexuality` is
+// simply the `Gender Expression` value somebody is drawn to, on the
+// SAME 0-100 scale, and how close a real partner's `Expression` sits to
+// that number is how strong the pull is. A person whose `Sexuality`
+// sits near their own `Expression` reads as drawn to people like
+// themselves; near the opposite end, drawn to people unlike themselves;
+// in the middle, drawn broadly. Nothing here assigns a label — the
+// whole spectrum, including bisexuality, is what the arithmetic
+// produces, not a category this file chose to include.
+//
+// **A floor, not a wall.** `ATTRACTION_FLOOR` keeps even a poor match
+// from reaching zero — this dampens how fast a bond can grow into a
+// partnership, exactly like `fidelityMultiplier` above, and does not
+// forbid one. A model that hard-blocked a pairing outright would be
+// asserting something about real people this file has no business
+// asserting; a model that only says "less likely" is the honest
+// version of the same idea.
+const ATTRACTION_FLOOR = 0.15;
+
+// One person's pull toward another, 0..1: 1 when the other's Expression
+// exactly matches what this person's Sexuality is drawn to, falling off
+// linearly to the floor at the opposite end of the 0-100 scale.
+function attractionOf(sexuality, otherExpression) {
+  const distance = Math.abs(normalizedTrait(otherExpression) - normalizedTrait(sexuality));
+  return Math.max(ATTRACTION_FLOOR, 1 - distance / 100);
+}
+
+//: **Measured, not guessed — the twelfth standing rule's discipline
+//: again.** `randomTraitValue`'s own distribution (the mean of three
+//: uniforms, not a flat 0-100) clusters near 50, so two independently
+//: generated traits land close together far more often than a uniform
+//: model would suggest. Two million simulated pairs against that real
+//: generator, not a uniform assumption, put the population's own mean
+//: compatibility at 0.81 — this is that measurement, divided back out
+//: so an AVERAGE pairing's bond grows at exactly the rate this file
+//: always used, and only a pairing that deviates from average speeds
+//: up or slows down. Re-measure if `randomTraitValue`'s distribution
+//: ever changes; this is a fact about that function, not a constant
+//: chosen independently of it.
+const MEASURED_MEAN_COMPATIBILITY = 0.81;
+
+// Mutual: both people's pull toward each other, averaged. A bond is
+// two people, and one side being drawn to the other while the reverse
+// is not is a real, ordinary thing this averages down rather than
+// hides.
+function attractionCompatibility(liveA, liveB) {
+  const aToB = attractionOf(liveA?.traits?.emotional?.Sexuality, liveB?.traits?.emotional?.['Gender Expression']);
+  const bToA = attractionOf(liveB?.traits?.emotional?.Sexuality, liveA?.traits?.emotional?.['Gender Expression']);
+  return ((aToB + bToA) / 2) / MEASURED_MEAN_COMPATIBILITY;
+}
+
 // Every OTHER partner this entity already has above the floor —
 // "other" meaning not the person on the far end of the relationship
 // currently being grown. Plural on purpose: this schema has never
@@ -313,6 +368,7 @@ function advanceBonds(worldState, tick = worldState.tick ?? 0) {
     let rate = BOND_GROWTH * (1 + Math.max(-0.5, (trust - 50) / 50));
     rate *= (libidoMultiplier(liveA?.traits?.emotional?.Libido)
       + libidoMultiplier(liveB?.traits?.emotional?.Libido)) / 2;
+    rate *= attractionCompatibility(liveA, liveB);
     // Fidelity only ever applies to the side that already has someone
     // else — a person with no existing partner has nothing to be
     // unfaithful TO, and their own Fidelity has nothing to slow yet.
@@ -737,6 +793,10 @@ module.exports = {
   BOND_GROWTH,
   libidoMultiplier,
   fidelityMultiplier,
+  ATTRACTION_FLOOR,
+  attractionOf,
+  MEASURED_MEAN_COMPATIBILITY,
+  attractionCompatibility,
   otherPartnersOf,
   DISCOVERY_CHANCE_FLOOR,
   DISCOVERY_CHANCE_AT_MAX_PARANOIA,
