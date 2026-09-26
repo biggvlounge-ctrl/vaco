@@ -75,6 +75,7 @@ const landmarks = require('./landmarks.js');
 const salvage = require('./salvage.js');
 const discovery = require('./discovery.js');
 const knowledge = require('./knowledge.js');
+const tutorialMissions = require('./tutorialMissions.js');
 const behavior = require('./behavior.js');
 const actions = require('./actions.js');
 const politics = require('./politics.js');
@@ -1097,6 +1098,20 @@ function studySourcesFor(entityId) {
   return knowledge.sourcesFor(WorldState, entityId, { tick: WorldState.tick });
 }
 
+// ---------------------------------------------------------------------
+// Mission Chain #1 — "Start Here"
+// ---------------------------------------------------------------------
+// Not a player action — this seeds a fresh citizen's own opening state
+// (a starting book, up to two real missions) once, explicitly, rather
+// than firing automatically inside generatePlayer(). generatePlayer()
+// is used by tests and other flows that do not want tutorial content
+// appearing uninvited; a caller who wants the tutorial asks for it. See
+// dev-docs/TUTORIAL_MISSIONS_DESIGN.md.
+function seedTutorialStart(entityId, options = {}) {
+  if (!getLiveEntity(entityId)) throw new Error(`no entity with id ${entityId}`);
+  return tutorialMissions.seedTutorialStart(WorldState, entityId, options);
+}
+
 function assessTakeover(entityId, options = {}) {
   return control.assess(WorldState, {
     scale: options.scale,
@@ -1307,6 +1322,7 @@ module.exports = {
   listActions,
   availableMissions,
   studySourcesFor,
+  seedTutorialStart,
   TICK_INTERVALS: behavior.TICK_INTERVALS,
   SCHEDULE_FREQUENCIES: behavior.FREQUENCIES,
   getEntityState,

@@ -757,6 +757,21 @@ app.get('/api/players/:id/study-sources', (req, res) => {
   }
 });
 
+// Mission Chain #1 — "Start Here". See
+// dev-docs/TUTORIAL_MISSIONS_DESIGN.md. Explicit and separate from
+// POST /api/players — a caller who wants tutorial content asks for it;
+// plain player creation stays exactly what it was.
+// audit-route-guards: open -- seeds the CALLING player's own opening state (a book, up to two real missions); nothing here reads or writes another player's world
+app.post('/api/players/:id/tutorial-start', (req, res) => {
+  const player = (engine.WorldState.players || []).find((p) => p.id === Number(req.params.id));
+  if (!player) return res.status(404).json({ error: `no player with id ${req.params.id}` });
+  try {
+    return res.status(201).json(engine.seedTutorialStart(player.linked_entity_id, req.body || {}));
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+});
+
 // -- missions: the state machine ----------------------------------------------
 //
 // The engine's first real player verb. Everything else here reads a

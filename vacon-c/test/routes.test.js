@@ -905,6 +905,28 @@ test('study is offered, and a real HTTP caller cannot study a source they cannot
   assert.equal((await get('/players/999999/study-sources')).status, 404);
 });
 
+test('tutorial-start seeds a real book over HTTP, and studying it for real moves traits', { skip: SKIP }, async () => {
+  const { npc } = await (await post('/npc/generate', { education: 'basic' })).json();
+  const player = await (await post('/players', { linkedEntityId: npc.id })).json();
+
+  const start = await (await post(`/players/${player.id}/tutorial-start`, {})).json();
+  assert.equal(start.book.itemName, `${start.book.field} book`);
+  // A freshly generated NPC over HTTP has no community — no landmark
+  // and no coworker exist for it to be about, so both missions are a
+  // real, honest null rather than an invented one.
+  assert.equal(start.exploreMission, null);
+  assert.equal(start.mentorMission, null);
+
+  const studied = await post(`/players/${player.id}/action`, {
+    action: 'study', source: 'books', field: start.book.field,
+  });
+  assert.equal(studied.status, 200);
+  const moved = (await studied.json()).result;
+  assert.ok(moved.traits.length > 0, 'the seeded book did not actually teach anything over HTTP');
+
+  assert.equal((await post('/players/999999/tutorial-start', {})).status, 404);
+});
+
 test('/api/missions/available/:entityId is not swallowed by /api/missions/:id',
   { skip: SKIP }, async () => {
     // `available` is a literal under a prefix that also has a `:id`
