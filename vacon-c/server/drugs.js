@@ -53,6 +53,7 @@
 
 const items = require('./items.js');
 const inventory = require('./inventory.js');
+const economy = require('./economy.js');
 const { getLiveEntity, applyKeyModifier } = require('./entityTraits.js');
 const { seededDraw } = require('./seeded.js');
 
@@ -123,6 +124,121 @@ function runProduction(worldState, tick) {
     produced += 1;
   }
   return produced;
+}
+
+// ---------------------------------------------------------------------
+// Informal trade — statistics.js's `informal_economy_share`, closed
+// ---------------------------------------------------------------------
+// `statistics.js` declared this unavailable in its own words: "every
+// movement of value is recorded the same way — payroll, production and
+// barter.exchange all write individual_finances or organizations.
+// Nothing is off the books, because there are no books to be off." A
+// dealer handing off a unit for cash is exactly a book that should be
+// off, and until now `runProduction` only ever handed narcotics to the
+// producer themselves — never sold to anyone, so there was no
+// transaction to be informal about, only a windfall.
+//
+// The cash still moves through the ordinary, formal ledger
+// (`economy.generateIndividualFinances`) — a black-market sale does not
+// print money, it moves it same as any other trade. What makes it
+// INFORMAL is that this file ALSO records it in `worldState
+// .informalTransactions`, a ledger nothing else writes to, which is
+// what lets a statistic compare "value that moved this way" against
+// "value that moved through payroll" — the two totals `statistics.js`'s
+// `informal_economy_share` reads.
+//: Flagged interpretive, the same status every other price and rate in
+//: this file carries: no document prices a street sale.
+const STREET_PRICE = 20;
+const SALE_CHANCE_AT_MAX_TIES = 0.3;
+
+let nextInformalTransactionId = 1;
+
+function reseedIds(worldState) {
+  nextInformalTransactionId = (worldState.informalTransactions || [])
+    .reduce((max, t) => Math.max(max, t.id), 0) + 1;
+}
+
+// A living NPC who is not the seller and does not already hold any —
+// selling to somebody who is already stocked is not what moves a
+// market, and `runUseAndWithdrawal` below is what a existing holder's
+// stash is for. Picked by a seeded index so a replay of the same world
+// picks the same buyer, the same as `warfare.js` picks a fighter.
+function buyerFor(worldState, sellerId, tick) {
+  const eligible = (worldState.npcs || []).filter((n) => n.status === 'active'
+    && n.id !== sellerId
+    && inventory.quantityOf(worldState, n.id, NARCOTICS_ITEM) === 0
+    && Number(economy.getLatestFinances(worldState, n.id)?.savings ?? 0) >= STREET_PRICE);
+  if (eligible.length === 0) return null;
+  const index = Math.floor(
+    seededDraw([worldState.seed ?? 'world', 'drugs:buyer', sellerId, tick]) * eligible.length,
+  );
+  return eligible[index];
+}
+
+// One tick's worth of dealing to somebody else, as opposed to
+// `runProduction`'s windfall to the dealer themselves. Reads
+// `criminal['Black Market Ties']` again — the same trait, because
+// selling to a stranger and manufacturing in the first place are the
+// same connections doing two different things.
+function runInformalTrade(worldState, tick) {
+  if (!Array.isArray(worldState.informalTransactions)) worldState.informalTransactions = [];
+  let sold = 0;
+  for (const npc of worldState.npcs || []) {
+    if (npc.status !== 'active') continue;
+    if (inventory.quantityOf(worldState, npc.id, NARCOTICS_ITEM) < 1) continue;
+    const ties = tiesOf(worldState, npc.id);
+    if (ties < PRODUCTION_TIES_FLOOR) continue;
+    const chance = ((ties - PRODUCTION_TIES_FLOOR) / (100 - PRODUCTION_TIES_FLOOR))
+      * SALE_CHANCE_AT_MAX_TIES;
+    if (seededDraw([worldState.seed ?? 'world', 'drugs:sell', npc.id, tick]) >= chance) continue;
+
+    const buyer = buyerFor(worldState, npc.id, tick);
+    if (!buyer) continue;
+
+    inventory.transfer(worldState, {
+      fromId: npc.id, toId: buyer.id, itemName: NARCOTICS_ITEM, quantity: 1, tick,
+    });
+
+    const sellerFinances = economy.getLatestFinances(worldState, npc.id);
+    const buyerFinances = economy.getLatestFinances(worldState, buyer.id);
+    economy.generateIndividualFinances(worldState, npc.id, {
+      income: sellerFinances?.income ?? 0,
+      savings: (sellerFinances?.savings ?? 0) + STREET_PRICE,
+      debt: sellerFinances?.debt ?? 0,
+      assets: sellerFinances?.assets ?? 0,
+      tick,
+    });
+    economy.generateIndividualFinances(worldState, buyer.id, {
+      income: buyerFinances?.income ?? 0,
+      savings: (buyerFinances?.savings ?? 0) - STREET_PRICE,
+      debt: buyerFinances?.debt ?? 0,
+      assets: buyerFinances?.assets ?? 0,
+      tick,
+    });
+
+    worldState.informalTransactions.push({
+      id: nextInformalTransactionId,
+      sellerId: npc.id,
+      buyerId: buyer.id,
+      amount: STREET_PRICE,
+      tick,
+    });
+    nextInformalTransactionId += 1;
+    sold += 1;
+  }
+  return sold;
+}
+
+// Every informal transaction touching a given set of resident ids
+// (either side), within an optional recent window — the same "lately,
+// not ever" shape `crime.dangerByCommunity` already uses, read by
+// `statistics.js` rather than reimplemented there.
+function informalValueIn(worldState, ids, options = {}) {
+  const { sinceTick = null, tick = worldState.tick ?? 0 } = options;
+  return (worldState.informalTransactions || [])
+    .filter((t) => (sinceTick === null || t.tick > tick - sinceTick))
+    .filter((t) => ids.has(t.sellerId) || ids.has(t.buyerId))
+    .reduce((sum, t) => sum + Number(t.amount), 0);
 }
 
 // ---------------------------------------------------------------------
@@ -218,8 +334,11 @@ function runDrugs(worldState, options = {}) {
   const { tick = worldState.tick ?? 0 } = options;
   registerItems(worldState);
   const produced = runProduction(worldState, tick);
+  const sold = runInformalTrade(worldState, tick);
   const events = runUseAndWithdrawal(worldState, tick);
-  return { produced, events };
+  return {
+    produced, sold, events,
+  };
 }
 
 // The measurement. How much of this a world actually has, so "it is
@@ -230,7 +349,9 @@ function describeDrugs(worldState) {
     .filter((n) => inventory.quantityOf(worldState, n.id, NARCOTICS_ITEM) > 0).length;
   const dependent = (worldState.npcs || [])
     .filter((n) => dependencyOf(worldState, n.id) >= WITHDRAWAL_DEPENDENCY_FLOOR).length;
-  return { holders, dependent };
+  return {
+    holders, dependent, informalTransactions: (worldState.informalTransactions || []).length,
+  };
 }
 
 module.exports = {
@@ -239,10 +360,16 @@ module.exports = {
   PRODUCTION_TIES_FLOOR,
   DEPENDENCY_PER_USE,
   WITHDRAWAL_DEPENDENCY_FLOOR,
+  STREET_PRICE,
+  SALE_CHANCE_AT_MAX_TIES,
   registerItems,
   tiesOf,
   producesThisTick,
   runProduction,
+  reseedIds,
+  buyerFor,
+  runInformalTrade,
+  informalValueIn,
   propensityOf,
   dependencyOf,
   runUseAndWithdrawal,

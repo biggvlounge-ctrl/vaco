@@ -10,22 +10,28 @@ const assert = require('node:assert/strict');
 
 const drugs = require('../server/drugs.js');
 const inventory = require('../server/inventory.js');
+const economy = require('../server/economy.js');
 const { getTraitId } = require('../server/traitDefinitions.js');
 
 function world({ tick = 100 } = {}) {
-  return {
+  const w = {
     tick,
     npcs: [],
     entityTraits: [],
     inventory: [],
     barterItems: [],
+    individualFinances: [],
+    informalTransactions: [],
   };
+  drugs.reseedIds(w);
+  return w;
 }
 
 let nextId = 1;
-function person(w, traits = {}) {
+function person(w, traits = {}, { savings = 0 } = {}) {
   const npc = { id: nextId++, status: 'active' };
   w.npcs.push(npc);
+  economy.generateIndividualFinances(w, npc.id, { savings, tick: w.tick });
   for (const [family, values] of Object.entries(traits)) {
     for (const [name, value] of Object.entries(values)) {
       w.entityTraits.push({
@@ -138,4 +144,78 @@ test('describeDrugs counts holders and the dependent separately from each other'
   const report = drugs.describeDrugs(w);
   assert.equal(report.holders, 1);
   assert.equal(report.dependent, 1);
+});
+
+// ---------------------------------------------------------------------
+// Informal trade — statistics.js's informal_economy_share, closed
+// ---------------------------------------------------------------------
+
+test('a dealer only sells to someone who does not already hold any', () => {
+  const w = world();
+  drugs.registerItems(w);
+  const dealer = person(w, { criminal: { 'Black Market Ties': 100 } });
+  const stocked = person(w, {}, { savings: 1000 });
+  inventory.give(w, { entityId: stocked.id, itemName: drugs.NARCOTICS_ITEM, quantity: 1 });
+  inventory.give(w, { entityId: dealer.id, itemName: drugs.NARCOTICS_ITEM, quantity: 5 });
+
+  const buyer = drugs.buyerFor(w, dealer.id, 1);
+  assert.notEqual(buyer?.id, stocked.id, 'offered a sale to somebody already holding some');
+});
+
+test('a dealer never sells to someone who cannot afford it', () => {
+  const w = world();
+  const dealer = person(w, { criminal: { 'Black Market Ties': 100 } });
+  person(w, {}, { savings: drugs.STREET_PRICE - 1 }); // one short
+  const buyer = drugs.buyerFor(w, dealer.id, 1);
+  assert.equal(buyer, null);
+});
+
+test('a sale moves the item and the cash, and records an informal transaction', () => {
+  // tick 0, not the usual fixture default — `economy.generateIndividualFinances`
+  // is append-only and picks the highest tick, so a person seeded at
+  // tick 100 and then sold to on ticks 1..99 would have every sale's
+  // result shadowed by the seed row for as long as the loop stayed
+  // below it. See test/gambling.test.js for the same fix.
+  const w = world({ tick: 0 });
+  drugs.registerItems(w);
+  const dealer = person(w, { criminal: { 'Black Market Ties': 100 } });
+  const buyer = person(w, {}, { savings: 1000 });
+  inventory.give(w, { entityId: dealer.id, itemName: drugs.NARCOTICS_ITEM, quantity: 5 });
+
+  let sold = 0;
+  for (let t = 1; t <= 2000 && sold === 0; t += 1) sold += drugs.runInformalTrade(w, t);
+  assert.ok(sold > 0, 'no sale happened across 2000 ticks at maximum Black Market Ties');
+
+  const transaction = w.informalTransactions[0];
+  assert.equal(transaction.sellerId, dealer.id);
+  assert.equal(transaction.buyerId, buyer.id);
+  assert.equal(transaction.amount, drugs.STREET_PRICE);
+
+  assert.equal(economy.getLatestFinances(w, dealer.id).savings, drugs.STREET_PRICE);
+  assert.equal(economy.getLatestFinances(w, buyer.id).savings, 1000 - drugs.STREET_PRICE);
+  assert.equal(inventory.quantityOf(w, buyer.id, drugs.NARCOTICS_ITEM), 1);
+});
+
+test('an ordinary person with no black-market ties never deals to anyone', () => {
+  const w = world();
+  drugs.registerItems(w);
+  const holder = person(w, { criminal: { 'Black Market Ties': 50 } });
+  person(w, {}, { savings: 1000 });
+  inventory.give(w, { entityId: holder.id, itemName: drugs.NARCOTICS_ITEM, quantity: 5 });
+
+  let sold = 0;
+  for (let t = 1; t <= 2000; t += 1) sold += drugs.runInformalTrade(w, t);
+  assert.equal(sold, 0);
+  assert.equal(w.informalTransactions.length, 0);
+});
+
+test('informalValueIn sums only transactions touching the named ids, within the window', () => {
+  const w = world();
+  w.informalTransactions.push(
+    { id: 1, sellerId: 10, buyerId: 20, amount: 20, tick: 95 },
+    { id: 2, sellerId: 30, buyerId: 40, amount: 20, tick: 95 }, // neither id named
+    { id: 3, sellerId: 10, buyerId: 50, amount: 20, tick: 1 }, // too old for the window
+  );
+  const value = drugs.informalValueIn(w, new Set([10, 20]), { sinceTick: 90, tick: 100 });
+  assert.equal(value, 20);
 });

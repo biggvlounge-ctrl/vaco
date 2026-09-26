@@ -262,6 +262,49 @@ test('a crime category nothing generates carries a caveat on its zero', () => {
     'drug crime is generated now that server/drugs.js exists');
 });
 
+test('informal_economy_share is null with nothing moving, and real once something does', () => {
+  const w = world();
+  w.informalTransactions = [];
+  const c = territory.generateCommunity(w, {});
+  const seller = person(w, { communityId: c.id });
+  const buyer = person(w, { communityId: c.id });
+
+  // Nobody employed and nothing informal has moved — a share of
+  // nothing is not a measurement.
+  assert.equal(statistics.profileFor(w, c.id).statistics.informal_economy_share.value, null);
+
+  const employer = { id: nextId++, type: 'business', assets: 100000, expenses: 0 };
+  w.organizations.push(employer);
+  economy.hireEntity(w, { entityId: seller.id, employerOrganizationId: employer.id, wage: 80 });
+
+  w.informalTransactions.push({ id: 1, sellerId: seller.id, buyerId: buyer.id, amount: 20, tick: w.tick });
+
+  const share = statistics.profileFor(w, c.id).statistics.informal_economy_share.value;
+  // 20 informal against 80 formal wage = 20/(20+80) = 0.2.
+  assert.equal(share, 0.2);
+});
+
+test('informal_economy_share only counts a resident’s own transactions, and only recent ones', () => {
+  const w = world();
+  const c = territory.generateCommunity(w, {});
+  const resident = person(w, { communityId: c.id });
+  const outsider1 = person(w, {});
+  const outsider2 = person(w, {});
+
+  w.informalTransactions = [
+    // Neither side is a resident of this community.
+    { id: 1, sellerId: outsider1.id, buyerId: outsider2.id, amount: 999, tick: w.tick },
+    // A resident, but far outside the statistic's own window.
+    { id: 2, sellerId: resident.id, buyerId: outsider1.id, amount: 999, tick: w.tick - 10000 },
+    // A resident, recent — the one that should count.
+    { id: 3, sellerId: resident.id, buyerId: outsider1.id, amount: 20, tick: w.tick },
+  ];
+
+  const share = statistics.profileFor(w, c.id).statistics.informal_economy_share.value;
+  // No formal wages at all, so an entirely informal economy reads as 1.
+  assert.equal(share, 1);
+});
+
 test('the crime entries come from crime.js, so the two cannot disagree', () => {
   const fromCatalogue = statistics.CATALOGUE
     .filter((s) => s.category === 'crime' && s.key.endsWith('_crime_per_1k'))
