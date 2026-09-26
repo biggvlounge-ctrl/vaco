@@ -111,6 +111,24 @@ const POOLS = {
   // reason: it is kept, not operated, and there is no third vocabulary
   // to invent one from.
   park: { itemCategories: ['materials', 'metals'] },
+  // Added 26 Sep 2026 alongside landmarks.js's same-batch categories.
+  // `warehouse` gets the vehicle/repair half `auto-parts-store` already
+  // draws on, since a distribution warehouse is stocked for transit
+  // rather than for one trade.
+  warehouse: { itemCategories: ['tools', 'materials', 'transport'] },
+  // A housing complex is homes, not a resource site — no document and
+  // no real importer names a merchandise pool for one, so this is null
+  // exactly the way `prison` and `stadium-arena` are null above: not
+  // searchable for loot, just a real place on the map.
+  'public-housing': null,
+  // `river`/`lake` get the one §26 category `cave-system` and
+  // `natural-formation` never had a reason to carry: `water`, a real
+  // trade category (`items.TRADE_CATEGORIES`) nothing else in this
+  // pool table reaches yet.
+  river: { itemCategories: ['materials', 'water'] },
+  lake: { itemCategories: ['materials', 'water'] },
+  'corporate-headquarters': { books: ['government', 'technology'] },
+  'shopping-mall': { itemCategories: ['clothing', 'tools'] },
   'other-distinctive-feature': null,
 
   // -- retail ---------------------------------------------------------

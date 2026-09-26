@@ -106,3 +106,61 @@ limit — and carries no `lake` mapping at all yet. A named river or lake
 (the Mississippi, the Meramec, Lake of the Ozarks) is reachable the
 same way a named park now is, but it is an importer change, not
 something the network being open would fix by itself.
+
+## Implementation note — added 26 Sep 2026, same day, six more, same non-correction
+
+`warehouse`, `public-housing`, `river`, `lake`, `corporate-headquarters`,
+`shopping-mall` — twenty-sixth through thirty-first. None come from
+either source document; all six were named directly by the owner in
+the same request as `park` above ("every river, park... warehouses,
+major corporations... skyscrapers... apartment buildings... public
+housing"), and are held to the same standard: said here plainly rather
+than dressed up as a document finding.
+
+Two of the six are not really new categories so much as a gap this
+FILE had. `propertyTypeFor` has mapped every other category onto nine
+of the schema's ten `properties.type` values since this file was
+written — `industrial` and `residential` were the two nothing here had
+ever used, which is the eleventh standing rule's shape one level down:
+a schema type nothing writes to is indistinguishable from a schema type
+that does not exist, inside the one file whose whole job is closing
+exactly that kind of gap for landmarks. `warehouse` is `industrial`;
+`public-housing` is `residential`.
+
+`river` and `lake` sit beside `park` in the "gnisImport.js already has
+half the story" note above, and were given the one thing neither
+`cave-system` nor `natural-formation` ever needed: the `water` §26
+trade category, real in `items.TRADE_CATEGORIES` since before this file
+existed and never given an item. Adding the pool
+(`discovery.js`) surfaced that gap immediately — `test/discovery.test.js`'s
+own "the guard reports item categories no item in the world belongs to"
+failed the moment `river`/`lake` existed, which is the guard doing
+exactly what it was built for. Closed the same way the original four
+(`clothing`/`food`/`repair`/`transport`) were: one named item in
+`merchandise.js` (`clean water`), not a document quote, because no
+retail location in either source document sells this — a river does.
+
+`corporate-headquarters` and `shopping-mall` have no source document and
+no real importer naming them yet — `world-layer/imports/overtureImport.js`
+reaches `department-store`, already in the retail list, but nothing
+named "corporation" or "mall" anywhere in `world-layer/`. Added on the
+same standing as everything else in this note: the owner said so
+directly, and that is a real reason, distinct from "a document already
+said so."
+
+Deliberately NOT done in this pass, and worth recording rather than
+silently dropping: the owner also asked for "high schools, middle
+schools." `world-layer/imports/ncesImport.js` was checked first, and it
+does NOT support fragmenting `school` by level — it already treats
+every K-12 building as one landmark category (`category: 'school'`,
+`ncesImport.js` line 59) and separately maps grade spans onto
+`demographics.EDUCATION_LEVELS`' `primary`/`secondary` rungs, a
+population-attainment concept unconnected to landmark categories.
+Inventing `elementary-school`/`middle-school`/`high-school` as three
+new Key categories would have contradicted the one real source that
+already covers this, which is the exact mistake `server/landmarks.js`
+itself was built to stop repeating (see the "two disagreeing answers"
+note near the top of this file). If grade-level matters to gameplay,
+the fix is carrying `ncesImport.js`'s existing `primary`/`secondary`
+read through to a landmark's data rather than a new category —
+unbuilt, and a different piece of work from this one.

@@ -244,6 +244,68 @@ const KEY_BUILDING_TYPES = {
     significance: [35, 70], propertyType: 'agricultural', staff: null,
     discovery: 'natural resources',
   },
+  //: **A twenty-sixth through thirty-first, added 26 Sep 2026 in the
+  //: same batch, at the same direct request** ("every river, park...
+  //: warehouses, major corporations... skyscrapers... apartment
+  //: buildings... public housing"). None of these six come from either
+  //: source document — they are new, and each is called out below for
+  //: why it earns a place rather than being invented for its own sake.
+  //:
+  //: **`warehouse` and `public-housing` close a gap this file itself
+  //: had rather than the documents**: `propertyType` has mapped every
+  //: other category onto nine of the schema's ten `properties.type`
+  //: values since this file was written, and `industrial` and
+  //: `residential` were the two nothing here had ever used — the
+  //: eleventh standing rule's shape, one level down, inside a file
+  //: that exists specifically to close that kind of gap. A logistics
+  //: warehouse and a large housing complex are exactly what those two
+  //: schema types are for.
+  warehouse: {
+    significance: [30, 55], propertyType: 'industrial', staff: 'logistician',
+    discovery: 'goods in transit, tools, construction materials',
+  },
+  'public-housing': {
+    significance: [25, 50], propertyType: 'residential', staff: 'manager',
+    discovery: null,
+  },
+  //: **`river` and `lake`.** `world-layer/imports/gnisImport.js`
+  //: already carries GNIS's `stream` class and deliberately excludes it
+  //: as a `BULK_CLASS` — "we chose not to import 40,000 creeks" — and
+  //: has no `lake` mapping at all. Neither omission is a reason for the
+  //: category not to exist here: a pack can still name the Mississippi
+  //: or the Meramec by hand the way `data/st-louis.landmarks.json`
+  //: already names Confluence Point, and wiring a real bulk import is a
+  //: separate, later decision about volume, not about whether the
+  //: category is real. `itemCategories` in `discovery.js` gives both
+  //: the `water` trade category neither `cave-system` nor
+  //: `natural-formation` ever had a reason to carry.
+  river: {
+    form: 'site',
+    significance: [45, 80], propertyType: 'agricultural', staff: null,
+    discovery: 'natural resources, fresh water',
+  },
+  lake: {
+    form: 'site',
+    significance: [35, 65], propertyType: 'agricultural', staff: null,
+    discovery: 'natural resources, fresh water',
+  },
+  //: **`corporate-headquarters` and `shopping-mall`.** Both are new
+  //: design with no source document and no real importer naming them
+  //: yet (`world-layer/imports/overtureImport.js` reaches
+  //: `department-store`, already in the retail list, but nothing named
+  //: "corporation" or "mall"). Added because the owner named them
+  //: directly rather than reconciled from a conflict — the same
+  //: standing as `park`, `junkyard`, `warehouse` and `public-housing`
+  //: above and not a claim that a document said so.
+  'corporate-headquarters': {
+    form: 'tower',
+    significance: [55, 85], propertyType: 'commercial', staff: 'financier',
+    discovery: 'business records, technology',
+  },
+  'shopping-mall': {
+    significance: [40, 65], propertyType: 'commercial', staff: 'manager',
+    discovery: 'clothing, general merchandise',
+  },
   'other-distinctive-feature': {
     significance: [30, 60], propertyType: 'historical_site', staff: null,
     discovery: null,
@@ -425,6 +487,12 @@ const CREW_BY_CATEGORY = {
   'cave-system': 'unmanned',
   'natural-formation': 'unmanned',
   park: 'unmanned',
+  warehouse: 'transit',
+  'public-housing': 'tower',
+  river: 'unmanned',
+  lake: 'unmanned',
+  'corporate-headquarters': 'tower',
+  'shopping-mall': 'venue',
   'other-distinctive-feature': 'unmanned',
 };
 

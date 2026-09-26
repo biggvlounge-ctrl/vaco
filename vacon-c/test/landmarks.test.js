@@ -72,13 +72,17 @@ test('THE KEY’s twenty-three categories are all here, plus the school and the 
   // every category". Both are present and both are the owner's. See
   // `landmarks.js` for why the tie breaks toward including it.
   //
-  // The twenty-fifth (park) is not a document reconciliation — it was
-  // added 26 Sep 2026 directly at the owner's request, the same way the
-  // Key's own final entry ("any other genuinely distinctive feature")
-  // already allows for.
-  assert.equal(landmarks.KEY_BUILDING_CATEGORIES.length, 25);
+  // The twenty-fifth (park) through thirty-first (shopping-mall) are
+  // not a document reconciliation — all six were added 26 Sep 2026
+  // directly at the owner's request, the same way the Key's own final
+  // entry ("any other genuinely distinctive feature") already allows
+  // for.
+  assert.equal(landmarks.KEY_BUILDING_CATEGORIES.length, 31);
   assert.ok(landmarks.KEY_BUILDING_CATEGORIES.includes('school'));
   assert.ok(landmarks.KEY_BUILDING_CATEGORIES.includes('park'));
+  for (const category of ['warehouse', 'public-housing', 'river', 'lake', 'corporate-headquarters', 'shopping-mall']) {
+    assert.ok(landmarks.KEY_BUILDING_CATEGORIES.includes(category), category);
+  }
   for (const category of landmarks.KEY_BUILDING_CATEGORIES) {
     // `alwaysHeroTier: true` for every one, per the document.
     assert.equal(landmarks.isHeroTier(category), true, category);

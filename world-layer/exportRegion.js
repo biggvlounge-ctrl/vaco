@@ -66,6 +66,10 @@ const KEY_CATEGORIES = [
   // `vacon-c/server/landmarks.js` for the reasoning and
   // `landmark-packs.test.js` for the identity assertion.
   'park',
+  // Twenty-sixth through thirty-first, same date, same batch, same
+  // reasoning as `park` above.
+  'warehouse', 'public-housing', 'river', 'lake', 'corporate-headquarters',
+  'shopping-mall',
 ];
 
 // UNESCO inscription is treated as maximal historical importance by
