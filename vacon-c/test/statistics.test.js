@@ -242,17 +242,22 @@ test('a crime category nothing generates carries a caveat on its zero', () => {
   person(w, { communityId: c.id });
   const profile = statistics.profileFor(w, c.id);
 
-  // `gun` used to be the example here, then `drug` — both are generated
-  // now, so the caveat moved again, to a category that is still
-  // ungenerated. The point of the test is unchanged: a zero that means
-  // "nobody did it" and a zero that means "we do not model this" have
-  // to be distinguishable.
-  assert.equal(profile.statistics.fraud_crime_per_1k.value, 0);
-  assert.match(profile.statistics.fraud_crime_per_1k.caveat, /nothing in the engine generates/);
+  // `gun` used to be the example here, then `drug`, then `fraud` — all
+  // three are generated now, so the caveat moved to the one category
+  // that is deliberately and permanently ungenerated rather than
+  // waiting on an object to falsify or hold. The point of the test is
+  // unchanged: a zero that means "nobody did it" and a zero that means
+  // "we do not model this" have to be distinguishable.
+  assert.equal(profile.statistics.sex_offense_crime_per_1k.value, 0);
+  assert.match(profile.statistics.sex_offense_crime_per_1k.caveat, /nothing in the engine generates/);
   assert.equal(profile.statistics.violent_crime_per_1k.caveat, undefined,
     'violent crime IS generated and should carry no caveat');
   assert.equal(profile.statistics.gun_crime_per_1k.caveat, undefined,
     'gun crime is generated now that inventory exists');
+  assert.equal(profile.statistics.drug_crime_per_1k.caveat, undefined,
+    'drug crime is generated now that server/drugs.js exists');
+  assert.equal(profile.statistics.fraud_crime_per_1k.caveat, undefined,
+    'fraud is generated now that a falsified position claim exists');
   assert.equal(profile.statistics.drug_crime_per_1k.caveat, undefined,
     'drug crime is generated now that server/drugs.js exists');
 });

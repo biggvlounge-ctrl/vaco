@@ -1064,6 +1064,18 @@ function runSecurityPhase(worldState) {
     });
   }
 
+  // Fraud — a falsified position claim, deprivation-driven exactly like
+  // the theft/property pass above. Same phase, same reason.
+  for (const incident of crime.runFraudCrime(worldState, worldState.tick)) {
+    events.push({
+      type: 'crime', severity: incident.severity >= 60 ? 'high' : 'medium',
+      note: `${incident.category} offence by entity ${incident.perpetrator_entity_id}`,
+      tick: incident.tick,
+      affected_entity_ids: [incident.perpetrator_entity_id],
+      global_effects: { crimeIncidentId: incident.id, crimeCategory: incident.category },
+    });
+  }
+
   // The policing half of this phase, which did nothing until
   // `server/policing.js` existed. `urbanSystems.js` said so in system
   // 13's own note: "One phase covers this and Crime together. No

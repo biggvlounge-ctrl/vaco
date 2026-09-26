@@ -63,8 +63,11 @@
 //                 waiting for, added 26 Sep 2026 at the owner's direct
 //                 request — the same fix `gun` already had, one row
 //                 down)
-//   fraud      ✗  market listings resolve honestly; there is no
-//                 contract, claim or instrument to falsify
+//   fraud      ✅ a falsified employment_records.position claim,
+//                 inflating a wage above what the position really pays
+//                 (added 26 Sep 2026 at the owner's direct request —
+//                 employment_records was this file's own nearest-
+//                 substrate suggestion, one row up from where it is now)
 //   sex_offense ✗ **not a gap — a decision.** The category exists so
 //                 the statistic can be reported honestly by a world
 //                 that has one (an import, a scenario, a scripted
@@ -107,6 +110,7 @@ const mortality = require('./mortality.js');
 const worldStore = require('./worldStore.js');
 const inventory = require('./inventory.js');
 const items = require('./items.js');
+const occupations = require('./occupations.js');
 
 // An item's base worth, for choosing what a thief takes. Deliberately
 // the BASE value rather than the local barter score: a thief in the
@@ -149,10 +153,11 @@ const CATEGORIES = {
       + 'schema" — until server/inventory.js gave an offence something to be armed WITH.',
   },
   fraud: {
-    generated: false,
-    substrate: 'market_listings resolve honestly and there is no contract, claim, insurance '
-      + 'or instrument to falsify. employment_records and ownership_records are the nearest '
-      + 'substrate and neither can currently be forged.',
+    generated: true,
+    note: 'a falsified employment_records.position claim, inflating a wage above what the '
+      + 'position actually held pays. This was declared ungeneratable — "no contract, claim, '
+      + 'insurance or instrument to falsify" — until this file used the instrument its own '
+      + 'substrate note named as the nearest one: employment_records itself.',
   },
   domestic: {
     generated: true,
@@ -184,6 +189,14 @@ const SCARCITY_WEIGHT = 0.5;            // how much a shortage adds on top of po
 //: `BASE_DEPRIVATION_RISK` for the same reason: neither document gives
 //: a rate, so this is the shape of the model, not a measured constant.
 const DRUG_CATCH_RATE = 0.001;
+
+//: `fraud`'s own per-tick rate, at full deprivation — same order of
+//: magnitude as `BASE_DEPRIVATION_RISK`, for the same reason.
+const FRAUD_RISK = 0.0004;
+//: How much a falsified position claim inflates the wage it pays.
+//: Flagged interpretive, same status as every other rate in this file:
+//: no document prices a fraud.
+const FRAUD_WAGE_INFLATION = 1.5;
 
 // Severity, 0..100, in the same currency as `events.severity` and
 // `historical_records.significance` so the three agree.
@@ -638,6 +651,65 @@ function runDrugCrime(worldState, tick = worldState.tick ?? 0) {
   return incidents;
 }
 
+// -- fraud ------------------------------------------------------------
+
+// A falsified position claim. Deprivation-driven, the same population
+// and pressure `runDeprivationCrime` already reads — this is not a
+// different kind of person committing fraud, it is the same pressure
+// finding a different object, exactly as the header argues for theft
+// and property.
+//
+// Requires an actual job to falsify FROM, and a real, higher-tier post
+// that exists at the same employer to falsify TO — `occupations
+// .occupationsFor` names what an organization of this type actually
+// employs, so a claimed promotion is always to a post that is real
+// somewhere in this world, never invented for the occasion.
+function runFraudCrime(worldState, tick = worldState.tick ?? 0) {
+  const line = areaStats.povertyLine(worldState);
+  const scarcity = mortality.survivalScarcity(worldState);
+  const incidents = [];
+  if (line === null) return incidents;
+
+  for (const record of worldState.employmentRecords || []) {
+    if (record.status !== 'active') continue;
+    const npc = (worldState.npcs || []).find((n) => n.id === record.entity_id);
+    if (!npc) continue;
+
+    const pressure = deprivationPressure(worldState, npc, { line, scarcity });
+    if (pressure <= 0) continue;
+    if (seededDraw([worldState.seed ?? 'world', 'crime:fraud', npc.id, tick])
+      >= pressure * FRAUD_RISK) continue;
+
+    const employer = (worldState.organizations || [])
+      .find((o) => o.id === record.employer_organization_id);
+    if (!employer) continue;
+
+    const realTier = occupations.tierOf(record.position) ?? 1;
+    // The lowest post above their own that this employer actually
+    // has — a believable stretch, not a leap from clerk to director in
+    // one incident.
+    const claimed = occupations.occupationsFor(employer.type)
+      .find((name) => occupations.tierOf(name) > realTier);
+    if (!claimed) continue; // nothing higher to claim at this employer
+
+    const oldWage = Number(record.wage) || 0;
+    const newWage = Math.round(oldWage * FRAUD_WAGE_INFLATION * 100) / 100;
+    const oldPosition = record.position;
+    record.position = claimed;
+    record.wage = newWage;
+
+    incidents.push(recordCrime(worldState, {
+      category: 'fraud',
+      perpetratorId: npc.id,
+      victimId: null,
+      tick,
+      detail: `falsified position from "${oldPosition}" (tier ${realTier}) to `
+        + `"${claimed}" (tier ${occupations.tierOf(claimed)}); wage ${oldWage} -> ${newWage}`,
+    }));
+  }
+  return incidents;
+}
+
 // -- friction -------------------------------------------------------------
 
 // How much strain these two are under, 0..1, from what the Behavior
@@ -916,6 +988,9 @@ module.exports = {
   runDeprivationCrime,
   DRUG_CATCH_RATE,
   runDrugCrime,
+  FRAUD_RISK,
+  FRAUD_WAGE_INFLATION,
+  runFraudCrime,
   incidentsIn,
   countsByCategory,
   ratePer1k,
