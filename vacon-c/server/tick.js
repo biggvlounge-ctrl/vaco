@@ -62,6 +62,7 @@ const property = require('./property.js');
 const flows = require('./flows.js');
 const drugs = require('./drugs.js');
 const gambling = require('./gambling.js');
+const warfare = require('./warfare.js');
 const behavior = require('./behavior.js');
 const areaStats = require('./areaStats.js');
 const perception = require('./perception.js');
@@ -1317,6 +1318,13 @@ function advanceTick(worldState) {
   // savings, confined to the game's own virtual currency. See
   // server/gambling.js.
   candidateEvents.push(...gambling.runGambling(worldState, { tick: worldState.tick }).events);
+
+  // Warfare — battles in whatever wars are currently active. Same slot,
+  // same reason: a war's battles are a cross-cutting consequence of who
+  // declared what, not a stage every organization passes through. Runs
+  // before `applyEventStress` below so a battle this tick raises stress
+  // this tick. See server/warfare.js.
+  candidateEvents.push(...warfare.runWarfare(worldState, { tick: worldState.tick }));
 
   // The Behavior Engine. Also NOT a twelfth phase, and in the same slot
   // for the same reason: it observes a finished tick. Stress decays,

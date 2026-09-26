@@ -47,7 +47,7 @@ the Postgres schema that already exists.
 
 ## 1. Server code — `vacon-c/server/`
 
-All 79 files present on disk, all committed, largest first.
+All 80 files present on disk, all committed, largest first.
 
 **`test/inventory.test.js` now fails when this table and `server/` disagree**, which is the guard this document has needed through three separate drifts (see the note below). The count and the file list are checked against the tree rather than typed.
 
@@ -116,6 +116,7 @@ read off disk, not recalled.
 | `health.js` | 12,799 | **A population's health** — the `health` family's first reader besides `mortality.vitalityOf`, plus physical exertion. Its header records why body composition is a declared absence rather than a statistic. | Built |
 | `culture.js` | 12,176 | **Culture DNA (Phase 2)** — sixteen named families stored three ways, tier-level attachment. | Built |
 | `succession.js` | 12,172 | Inheritance — an estate settled by name across holdings, family and property. | Built |
+| `warfare.js` | 12,029 | **Armed conflict between two organizations — added 26 Sep 2026 at the owner's direct request.** The first caller of `contest.js`'s `combat` discipline (built, deliberately excluded from `competition.js`'s games) and of `mortality.killEntity` (exported, called by nothing until this). A decisive winner is left to attempt a takeover through the existing `control.js` system rather than this file seizing territory itself. No Postgres table for `worldState.wars` yet — no reachable instance to migrate against from this environment. | Built |
 | `inventory.js` | 11,717 | Who holds what: `give`, `take`, and holdings by item name. | Built |
 | `demographics.js` | 11,514 | Languages, religion, education and ethnicity — composition and diversity. **Counts, never decides**; see `test/ethnicity.test.js`. | Built |
 | `drugs.js` | 11,277 | **Production, use and dependency — added 26 Sep 2026 at the owner's direct request.** Gives `crime.js`'s `drug` category the object it was waiting for (the same fix `gun` already had) and `criminal['Black Market Ties']` its first reader; `psychological['Substance Dependency']` (new) is its only writer. Runs automatically every tick, unlike `merchandise.js`/`salvage.js`. | Built |

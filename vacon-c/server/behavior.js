@@ -513,6 +513,13 @@ const STRESS_BY_EVENT = {
   // relief figure, halved — good news, not the best news anybody gets.
   gambling_loss: 4,
   gambling_win: -4,
+  // Added the same day alongside server/warfare.js. `war_casualty`
+  // (somebody died) sits just under `death` itself — the winner
+  // witnessed it and did it, which is not quite the same load as losing
+  // someone close, and `war_battle` (nobody died) is sized like
+  // `conflict_escalation`: real violence, survived.
+  war_battle: 14,
+  war_casualty: 26,
 };
 
 // Apply this tick's events to the people they happened to.
