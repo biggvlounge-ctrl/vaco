@@ -22,10 +22,11 @@
 // the docs' summary text, not a data mismatch — the literal data was
 // correct here all along.
 //
-// 116 traits as of 26 Sep 2026: two added to `psychological`
-// (`Manipulation`, `Substance Dependency`), neither in the source
-// document, both owner-requested — see the family definition below for
-// why. Historical "114"/"44 of 114" measurements elsewhere in this
+// 118 traits as of 26 Sep 2026: two added to `psychological`
+// (`Manipulation`, `Substance Dependency`) and two more to `emotional`
+// (`Libido`, `Fidelity`), neither pair in the source document, both
+// owner-requested — see each family definition below for why.
+// Historical "114"/"44 of 114" measurements elsewhere in this
 // codebase (barter.js, economy.js, trait-families.test.js) describe a
 // specific measurement taken before that date and are left as the
 // measurement they were, not restated.
@@ -43,8 +44,13 @@ const TRAIT_FAMILIES = {
              'Recovery Rate', 'Vision Acuity', 'Stamina'],
   mental: ['Intelligence', 'Memory', 'Focus', 'Problem Solving', 'Creativity',
            'Adaptability', 'Risk Assessment', 'Learning Speed', 'Curiosity'],
+  // `Libido` and `Fidelity` added 26 Sep 2026 at the owner's direct
+  // request, alongside the partnership/infidelity mechanic wired into
+  // `births.js`'s existing bond system — see that file's own header.
+  // Neither is from a source document; both sit beside `Attachment
+  // Style` because they modulate the same mechanic it does.
   emotional: ['Empathy', 'Volatility', 'Resilience', 'Optimism',
-              'Attachment Style', 'Grief Processing'],
+              'Attachment Style', 'Grief Processing', 'Libido', 'Fidelity'],
   // `Manipulation` and `Substance Dependency` added 26 Sep 2026 at the
   // owner's direct request, for the exploitative-negotiation behavior
   // wired into `meetings.js` and the drug-addiction mechanic wired into

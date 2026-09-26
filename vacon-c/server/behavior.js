@@ -520,6 +520,10 @@ const STRESS_BY_EVENT = {
   // `conflict_escalation`: real violence, survived.
   war_battle: 14,
   war_casualty: 26,
+  // Added the same day alongside births.js's Libido/Fidelity mechanic.
+  // Sized against `crime`'s own 12 — a discovered betrayal by someone
+  // close is a comparable blow to being victimized by a stranger.
+  infidelity_discovered: 18,
 };
 
 // Apply this tick's events to the people they happened to.

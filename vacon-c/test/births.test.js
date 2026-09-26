@@ -17,8 +17,9 @@ const economy = require('../server/economy.js');
 const mortality = require('../server/mortality.js');
 const territory = require('../server/territory.js');
 const statistics = require('../server/statistics.js');
-const { INDIVIDUAL_DEFINITIONS } = require('../server/traitDefinitions.js');
-const { generateEntityTraits } = require('../server/entityTraits.js');
+const { INDIVIDUAL_DEFINITIONS, getTraitId } = require('../server/traitDefinitions.js');
+const { generateEntityTraits, getLiveEntity } = require('../server/entityTraits.js');
+const worldStore = require('../server/worldStore.js');
 
 let nextId = 70000;
 
@@ -88,6 +89,25 @@ function couple(worldState, a, b, love = 90) {
     id: nextId++, entity_a_id: a.id, entity_b_id: b.id,
     relationship_type: 'social', love, trust: 80, conflict: 0,
   });
+}
+
+// Overwrites one already-generated trait row in place — `person()`
+// builds every row through the real generator, so this changes a
+// single value rather than building a fixture by hand.
+function setTrait(worldState, entityId, family, name, value) {
+  const traitId = getTraitId(family, name);
+  const row = worldState.entityTraits.find(
+    (r) => r.entity_id === entityId && r.trait_id === traitId,
+  );
+  if (!row) throw new Error(`setTrait: no ${family}.${name} row for entity ${entityId}`);
+  row.base_value = value;
+  row.temporary_modifier = 0;
+  row.permanent_modifier = 0;
+  row.experience_modifier = 0;
+  row.environmental_modifier = 0;
+  row.relationship_modifier = 0;
+  row.key_modifier = 0;
+  row.current_value = value;
 }
 
 // -- the fertility curve ------------------------------------------------
@@ -555,4 +575,171 @@ test('contact still accumulates when there is nothing to reassess', () => {
   // seventeen. A memory per relationship per tick would be sixty.
   assert.ok(theirs < 60,
     `the Social phase wrote ${theirs} memories for two people in 60 ticks`);
+});
+
+// ---------------------------------------------------------------------
+// Libido and Fidelity — added 26 Sep 2026
+// ---------------------------------------------------------------------
+
+test('both multipliers are neutral at the trait default, so an average person is unchanged', () => {
+  assert.equal(births.libidoMultiplier(50), 1);
+  assert.equal(births.fidelityMultiplier(50), 1);
+  assert.equal(births.libidoMultiplier(undefined), 1, 'a missing value should read as the default');
+  assert.equal(births.fidelityMultiplier(null), 1, 'a missing value should read as the default');
+});
+
+test('libido raises the multiplier, fidelity lowers it, at the extremes', () => {
+  assert.equal(births.libidoMultiplier(0), 0.5);
+  assert.equal(births.libidoMultiplier(100), 1.5);
+  assert.equal(births.fidelityMultiplier(0), 1.5);
+  assert.equal(births.fidelityMultiplier(100), 0.5);
+});
+
+test('otherPartnersOf finds every other partner above the floor and excludes the one named', () => {
+  const w = world();
+  const a = person(w, { age: 30 });
+  const b = person(w, { age: 30 });
+  const c = person(w, { age: 30 });
+  const d = person(w, { age: 30 }); // below the floor, not a partner
+  couple(w, a, b, births.PARTNER_BOND_FLOOR);
+  couple(w, a, c, births.PARTNER_BOND_FLOOR + 5);
+  couple(w, a, d, births.PARTNER_BOND_FLOOR - 10);
+
+  assert.deepEqual(new Set(births.otherPartnersOf(w, a.id, b.id)), new Set([c.id]));
+  assert.deepEqual(new Set(births.otherPartnersOf(w, a.id, null)), new Set([b.id, c.id]));
+});
+
+test('a high-libido pair bonds faster than an ordinary pair under identical conditions', () => {
+  const w = world();
+  const hot1 = person(w, { age: 30 });
+  const hot2 = person(w, { age: 30 });
+  setTrait(w, hot1.id, 'emotional', 'Libido', 100);
+  setTrait(w, hot2.id, 'emotional', 'Libido', 100);
+  w.relationships.push({
+    id: nextId++, entity_a_id: hot1.id, entity_b_id: hot2.id, relationship_type: 'social',
+    love: 0, trust: 50, conflict: 0, interaction_count: births.BOND_CONTACT_FLOOR,
+  });
+
+  const cold1 = person(w, { age: 30 });
+  const cold2 = person(w, { age: 30 });
+  setTrait(w, cold1.id, 'emotional', 'Libido', 50);
+  setTrait(w, cold2.id, 'emotional', 'Libido', 50);
+  w.relationships.push({
+    id: nextId++, entity_a_id: cold1.id, entity_b_id: cold2.id, relationship_type: 'social',
+    love: 0, trust: 50, conflict: 0, interaction_count: births.BOND_CONTACT_FLOOR,
+  });
+
+  for (let t = 1; t <= 5; t += 1) births.advanceBonds(w, t);
+
+  const hotLove = w.relationships.find((r) => r.entity_a_id === hot1.id).love;
+  const coldLove = w.relationships.find((r) => r.entity_a_id === cold1.id).love;
+  assert.ok(hotLove > coldLove, `high libido (${hotLove}) did not outgrow the ordinary pair (${coldLove})`);
+});
+
+test('high fidelity slows growing a second bond; low fidelity speeds it up', () => {
+  function trial(fidelityValue) {
+    const w = world();
+    const a = person(w, { age: 30 });
+    const existingPartner = person(w, { age: 30 });
+    const rival = person(w, { age: 30 });
+    setTrait(w, a.id, 'emotional', 'Fidelity', fidelityValue);
+    setTrait(w, a.id, 'emotional', 'Libido', 50);
+    setTrait(w, rival.id, 'emotional', 'Libido', 50);
+    setTrait(w, rival.id, 'psychological', 'Paranoia', 0);
+    setTrait(w, existingPartner.id, 'psychological', 'Paranoia', 0);
+    // An already-established partnership, well above the floor.
+    couple(w, a, existingPartner, 90);
+    // A second relationship, just starting to grow.
+    w.relationships.push({
+      id: nextId++, entity_a_id: a.id, entity_b_id: rival.id, relationship_type: 'social',
+      love: 0, trust: 50, conflict: 0, interaction_count: births.BOND_CONTACT_FLOOR,
+    });
+    for (let t = 1; t <= 5; t += 1) births.advanceBonds(w, t);
+    return w.relationships.find((r) => r.entity_a_id === a.id && r.entity_b_id === rival.id).love;
+  }
+
+  const faithful = trial(100);
+  const unfaithful = trial(0);
+  assert.ok(unfaithful > faithful,
+    `low fidelity (${unfaithful}) did not grow a second bond faster than high fidelity (${faithful})`);
+});
+
+test('fidelity does not slow anybody down before they have an existing partner', () => {
+  const w = world();
+  const a = person(w, { age: 30 });
+  const b = person(w, { age: 30 });
+  setTrait(w, a.id, 'emotional', 'Fidelity', 100);
+  setTrait(w, a.id, 'emotional', 'Libido', 50);
+  setTrait(w, b.id, 'emotional', 'Libido', 50);
+  w.relationships.push({
+    id: nextId++, entity_a_id: a.id, entity_b_id: b.id, relationship_type: 'social',
+    love: 0, trust: 50, conflict: 0, interaction_count: births.BOND_CONTACT_FLOOR,
+  });
+  births.advanceBonds(w, 1);
+  const love = w.relationships.find((r) => r.entity_a_id === a.id).love;
+  assert.equal(love, births.BOND_GROWTH, 'fidelity applied even with no existing partner to be unfaithful to');
+});
+
+// `BOND_GROWTH` (0.25/tick) times the multipliers below crosses one
+// point in two or three ticks, not one — so every trial here runs
+// several ticks and asks whether a crossing (and therefore a discovery
+// chance) happened ANYWHERE in the run, not on the first tick alone.
+const DISCOVERY_TRIAL_TICKS = 10;
+
+function setUpAffair(w, { existingPartnerParanoia }) {
+  const unfaithful = person(w, { age: 30 });
+  const existingPartner = person(w, { age: 30 });
+  const rival = person(w, { age: 30 });
+  setTrait(w, existingPartner.id, 'psychological', 'Paranoia', existingPartnerParanoia);
+  setTrait(w, unfaithful.id, 'emotional', 'Libido', 100);
+  setTrait(w, unfaithful.id, 'emotional', 'Fidelity', 0); // strays as fast as this model allows
+  setTrait(w, rival.id, 'emotional', 'Libido', 100);
+  couple(w, unfaithful, existingPartner, 90);
+  w.relationships.push({
+    id: nextId++, entity_a_id: unfaithful.id, entity_b_id: rival.id, relationship_type: 'social',
+    love: births.PARTNER_BOND_FLOOR - 1, trust: 50, conflict: 0,
+    interaction_count: births.BOND_CONTACT_FLOOR,
+  });
+  return { unfaithful, existingPartner, rival };
+}
+
+test('a partner with high paranoia discovers a new bond far more often than one with none', () => {
+  function trialsDiscovering(paranoia, count) {
+    let discovered = 0;
+    for (let i = 0; i < count; i += 1) {
+      const w = world();
+      setUpAffair(w, { existingPartnerParanoia: paranoia });
+      let anyDiscovered = false;
+      for (let t = 1; t <= DISCOVERY_TRIAL_TICKS; t += 1) {
+        const events = births.advanceBonds(w, i * DISCOVERY_TRIAL_TICKS + t);
+        if (events.some((e) => e.type === 'infidelity_discovered')) anyDiscovered = true;
+      }
+      if (anyDiscovered) discovered += 1;
+    }
+    return discovered;
+  }
+
+  const paranoidDiscoveries = trialsDiscovering(100, 60);
+  const trustingDiscoveries = trialsDiscovering(0, 60);
+  assert.ok(paranoidDiscoveries > trustingDiscoveries,
+    `a paranoid partner (${paranoidDiscoveries}/60) did not discover more than a trusting one (${trustingDiscoveries}/60)`);
+  assert.ok(trustingDiscoveries < 60, 'even a floor chance should not discover every single time');
+});
+
+test('discovery costs the existing partnership real trust, love and conflict', () => {
+  const w = world();
+  const { unfaithful, existingPartner } = setUpAffair(w, { existingPartnerParanoia: 100 });
+  const before = { ...worldStore.getOrCreateRelationship(w, unfaithful.id, existingPartner.id, 'social') };
+
+  let discovered = false;
+  for (let t = 1; t <= DISCOVERY_TRIAL_TICKS && !discovered; t += 1) {
+    const events = births.advanceBonds(w, t);
+    if (events.some((e) => e.type === 'infidelity_discovered')) discovered = true;
+  }
+  assert.ok(discovered, 'a fully paranoid partner failed to discover an infidelity');
+
+  const after = worldStore.getOrCreateRelationship(w, unfaithful.id, existingPartner.id, 'social');
+  assert.ok(after.trust < before.trust);
+  assert.ok(after.love < before.love);
+  assert.ok(after.conflict > before.conflict);
 });

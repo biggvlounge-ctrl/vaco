@@ -191,6 +191,94 @@ function environmentalFertility(worldState, bearer, { scarcity, pressure, line }
 
 // -- bonds ---------------------------------------------------------------
 
+// ---------------------------------------------------------------------
+// Libido and Fidelity — added 26 Sep 2026 at the owner's direct request
+// ---------------------------------------------------------------------
+// Neither trait is from a source document. Both modulate the bond
+// mechanic directly above rather than a new one: `Libido` is how
+// readily somebody grows close to anybody, `Fidelity` is how much
+// already having a partner slows growing close to somebody ELSE — the
+// same "partnership" concept this file already has, since nothing in
+// this schema has ever modelled marriage or exclusivity as a hard
+// state. That is a real limit, stated rather than worked around: there
+// is no "married" flag to check, only `relationships.love` crossing
+// `PARTNER_BOND_FLOOR`, possibly with more than one partner at once,
+// exactly as `fertilePartnerships` below already has to handle.
+//
+// **Both multipliers are centred on the trait's own default (50), the
+// twelfth standing rule's discipline.** An average person's bond grows
+// at exactly the rate this file used before either trait existed —
+// Libido 50 and Fidelity 50 both return 1. Only somebody who deviates
+// from average changes anything, which is what stops this from quietly
+// recalibrating every relationship in every existing test and every
+// already-generated world.
+// **`Number(null)` is 0, and 0 is finite** — CLAUDE.md's own corollary,
+// hit here in a new place. `value === null` (an entity with no such
+// trait row) has to be caught explicitly before the numeric check, or
+// a missing trait reads as the single worst possible value instead of
+// the neutral default.
+function normalizedTrait(value) {
+  if (value === null || value === undefined) return 50;
+  const v = Number(value);
+  return Number.isFinite(v) ? v : 50;
+}
+
+function libidoMultiplier(value) {
+  return 0.5 + normalizedTrait(value) / 100; // 0 -> 0.5x, 50 -> 1x, 100 -> 1.5x
+}
+
+function fidelityMultiplier(value) {
+  return 1.5 - normalizedTrait(value) / 100; // 0 -> 1.5x (strays faster), 100 -> 0.5x (strays slower)
+}
+
+// Every OTHER partner this entity already has above the floor —
+// "other" meaning not the person on the far end of the relationship
+// currently being grown. Plural on purpose: this schema has never
+// enforced exclusivity, so a person can already hold more than one.
+function otherPartnersOf(worldState, entityId, excludingId) {
+  const out = [];
+  for (const r of worldState.relationships || []) {
+    if (r.entity_a_id !== entityId && r.entity_b_id !== entityId) continue;
+    const otherId = r.entity_a_id === entityId ? r.entity_b_id : r.entity_a_id;
+    if (otherId === excludingId) continue;
+    if ((r.love ?? 0) >= PARTNER_BOND_FLOOR) out.push(otherId);
+  }
+  return out;
+}
+
+//: Below this Paranoia, an existing partner still notices sometimes —
+//: nobody is completely unsuspecting — and above it, most of the time.
+//: `psychological.Paranoia` already exists and already means "reads
+//: more into what is happening around them"; reused rather than a
+//: second trait for the same idea.
+const DISCOVERY_CHANCE_FLOOR = 0.05;
+const DISCOVERY_CHANCE_AT_MAX_PARANOIA = 0.6;
+//: What discovering it costs the existing partnership. Sized against
+//: `crime.SEVERITY.domestic` (65) rather than invented independently —
+//: a discovered betrayal is a comparable blow to the relationship a
+//: domestic offence already is.
+const INFIDELITY_TRUST_HIT = 25;
+const INFIDELITY_LOVE_HIT = 20;
+const INFIDELITY_CONFLICT = 25;
+
+function paranoiaOf(worldState, entityId) {
+  const live = getLiveEntity(worldState, entityId);
+  return normalizedTrait(live?.traits?.psychological?.Paranoia);
+}
+
+// One existing partner's chance of noticing a NEW bond their partner
+// just formed with somebody else, this tick, seeded so a replay finds
+// the same thing at the same moment every time.
+function discovers(worldState, existingPartnerId, unfaithfulId, rivalId, tick) {
+  const paranoia = paranoiaOf(worldState, existingPartnerId);
+  const chance = DISCOVERY_CHANCE_FLOOR
+    + (paranoia / 100) * (DISCOVERY_CHANCE_AT_MAX_PARANOIA - DISCOVERY_CHANCE_FLOOR);
+  return seededDraw([
+    worldState.seed ?? 'world', 'infidelity:discover',
+    existingPartnerId, unfaithfulId, rivalId, tick,
+  ]) < chance;
+}
+
 // Grow `love` where there is trust and repeated contact.
 //
 // Called from `runSocialPhase`, which is where relationships already
@@ -207,11 +295,30 @@ function advanceBonds(worldState, tick = worldState.tick ?? 0) {
 
     const before = relationship.love ?? 0;
     if (before >= 100) continue;
+
+    const aId = relationship.entity_a_id;
+    const bId = relationship.entity_b_id;
+    const liveA = getLiveEntity(worldState, aId);
+    const liveB = getLiveEntity(worldState, bId);
+    // Already-established partners of EITHER side, read before this
+    // tick's growth — used both to dampen a wandering bond by Fidelity
+    // and, on a crossing, to decide who might notice.
+    const aOthers = otherPartnersOf(worldState, aId, bId);
+    const bOthers = otherPartnersOf(worldState, bId, aId);
+
     // Trust accelerates, never gates: a pair at trust 100 bonds twice
     // as fast as a pair at the neutral 50, and a pair below neutral
     // still bonds, slowly, on contact alone.
     const trust = relationship.trust ?? 50;
-    const rate = BOND_GROWTH * (1 + Math.max(-0.5, (trust - 50) / 50));
+    let rate = BOND_GROWTH * (1 + Math.max(-0.5, (trust - 50) / 50));
+    rate *= (libidoMultiplier(liveA?.traits?.emotional?.Libido)
+      + libidoMultiplier(liveB?.traits?.emotional?.Libido)) / 2;
+    // Fidelity only ever applies to the side that already has someone
+    // else — a person with no existing partner has nothing to be
+    // unfaithful TO, and their own Fidelity has nothing to slow yet.
+    if (aOthers.length > 0) rate *= fidelityMultiplier(liveA?.traits?.emotional?.Fidelity);
+    if (bOthers.length > 0) rate *= fidelityMultiplier(liveB?.traits?.emotional?.Fidelity);
+
     relationship.love = Math.min(100, before + rate);
     // The crossing, not the condition — standing rule 7. A pair that
     // sits above the floor forever would otherwise report a new
@@ -220,11 +327,51 @@ function advanceBonds(worldState, tick = worldState.tick ?? 0) {
       formed.push({
         type: 'partnership_formed',
         severity: 'low',
-        note: `Entity ${relationship.entity_a_id} and entity ${relationship.entity_b_id} formed a partnership`,
+        note: `Entity ${aId} and entity ${bId} formed a partnership`,
         tick,
-        affected_entity_ids: [relationship.entity_a_id, relationship.entity_b_id],
+        affected_entity_ids: [aId, bId],
         global_effects: {},
       });
+
+      // A NEW bond crossing the floor while either side already had one
+      // is the moment there is something to discover. Each existing
+      // partner gets their own, independent chance — a jealous ex does
+      // not make a trusting one suspicious.
+      for (const [unfaithfulId, rivalId, existingPartners] of [
+        [aId, bId, aOthers], [bId, aId, bOthers],
+      ]) {
+        for (const existingPartnerId of existingPartners) {
+          if (!discovers(worldState, existingPartnerId, unfaithfulId, rivalId, tick)) continue;
+
+          const rel = worldStore.adjustRelationship(worldState, unfaithfulId, existingPartnerId, 'social', {
+            trust: -INFIDELITY_TRUST_HIT,
+            love: -INFIDELITY_LOVE_HIT,
+            conflict: INFIDELITY_CONFLICT,
+          });
+          rel.trust = Math.max(0, rel.trust);
+          rel.love = Math.max(0, rel.love);
+
+          worldStore.addMemory(worldState, {
+            entityId: existingPartnerId,
+            tick,
+            memoryType: 'negative',
+            category: 'conflict',
+            description: `Discovered entity ${unfaithfulId} had formed a bond with entity ${rivalId}.`,
+            importance: 80,
+            emotionLevel: -80,
+            relatedEntityIds: [unfaithfulId],
+          });
+
+          formed.push({
+            type: 'infidelity_discovered',
+            severity: 'high',
+            note: `Entity ${existingPartnerId} discovered entity ${unfaithfulId}'s bond with entity ${rivalId}`,
+            tick,
+            affected_entity_ids: [existingPartnerId, unfaithfulId],
+            global_effects: { rivalId },
+          });
+        }
+      }
     }
   }
   return formed;
@@ -588,6 +735,14 @@ module.exports = {
   BOND_CONTACT_FLOOR,
   BOND_CONFLICT_CEILING,
   BOND_GROWTH,
+  libidoMultiplier,
+  fidelityMultiplier,
+  otherPartnersOf,
+  DISCOVERY_CHANCE_FLOOR,
+  DISCOVERY_CHANCE_AT_MAX_PARANOIA,
+  INFIDELITY_TRUST_HIT,
+  INFIDELITY_LOVE_HIT,
+  INFIDELITY_CONFLICT,
   advanceBonds,
   SCARCITY_SUPPRESSION,
   DISEASE_SUPPRESSION,
