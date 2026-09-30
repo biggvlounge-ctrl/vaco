@@ -13,7 +13,7 @@ called real.
 | **Maniac Mansion** | One place, several different things to find/do inside | `discovery.search` | Real — see below |
 | **Carmen Sandiego** | Gather clues, including from NPCs | `discovery.search` (objects) + `study` from an `experienced NPCs` source (people) + `entity_knowledge` (a fact, held with confidence) | Real |
 | **Oregon Trail** | Resource pressure, having the right things to survive | `mortality.survivalScarcity` (real, measured 0..1 food/water/medicine shortage) + `areaStats.povertyLine`/`crime.js`'s real deprivation pressure + `barter.exchange` (now wired as the `trade` action) | Real — built as Mission Chain #3, see below |
-| **River City Ransom**, 2026 | Gangs, tools/weapons, taking a city | `organizations` as factions + `control.js`'s takeover key + `contest.js` combat + `salvage.js`'s crafted `protection`-category items | Real, but thinner than "buy a weapon at a shop" — there is no dedicated weapon category, only tools (Hammer, Saw) and crafted `protection` items (a blade). Anything sold as a "weapon" is honestly a crafted `protection` item, not a new category. |
+| **River City Ransom**, 2026 | Gangs, tools/weapons, taking a city | The player's own real family as the tribe + `control.viableTargetsFor`/`assess-takeover`/`attempt-takeover` (already-built player actions, never yet used by a mission) + `control.materielOf`'s real §26 `tools`/`protection` categories | Real — built as Mission Chain #4, see below. Thinner than "buy a weapon at a shop": there is no dedicated weapon category, only tools (Hammer, Saw) and crafted `protection` items (a blade). Anything sold as a "weapon" is honestly a crafted `protection` item, not a new category. |
 | **Contra** | The gameplay energy | `contest.js`'s combat resolver — a real, seeded, dangerous fight | Real as a *fight*, not as run-and-gun. VACON-C is a tick-based simulation (a tick is a day) behind a REST API — there is no real-time movement/aiming/shooting layer, and building one is a different kind of project, not a mission-content pass. What carries Contra's spirit honestly is real stakes in a real fight, not literal action gameplay. |
 
 ## The one thing that needed checking: Maniac Mansion
@@ -193,16 +193,65 @@ uses. `GET /api/players/:id/survival-status` is the look-before/after
 read, same shape as `study-sources`: real city id, real scarcity
 reading, real poverty line and net worth, real `atRisk` boolean.
 
+## Mission Chain #4 — "Take the Block", River City Ransom, 2026
+
+**No gap this time — just two real verbs nobody had ever pointed a
+mission at.** `assess-takeover`/`attempt-takeover` (`server/actions.js`,
+`server/control.js`) have been real player actions since 18 Sep 2026.
+What was missing was content: nothing had ever named a real target for
+a fresh citizen to try them against.
+
+**The substrate, all already built:**
+
+- `control.viableTargetsFor(worldState, { tribeId, cityId })` already
+  ranks every real target `assess()` would currently call winnable for
+  a given tribe — real composition math (§26 `tools`/`protection`
+  categories a tribe actually carries, `familyTraits.cohesionOf`), not
+  a guess made here.
+- The player's own real family IS the gang. `control.js`'s own
+  cohesion math (unity pulling, conflict discounting, `roleOf`'s
+  enforcer/labour/elder split) is exactly the tribe-loyalty mechanic
+  the reference asks for, brought forward rather than invented —
+  "2026" means real property and a real family, not 1989 Japan.
+- "Tools and weapons": `control.materielOf` sums a tribe's real §26
+  `tools`/`protection` holdings. There is no dedicated weapon category
+  in this engine (the mapping table above says why), so the honest
+  translation is a tribe that shows up with real tools, not an
+  invented arsenal.
+
+**The chain:** `offerTakeoverMission` reads the real targets available
+to the citizen's own family and — scoped to `scale: 'property'` only,
+since `missions.location_property_id` references a real property row
+and the other three scales (`community`/`infrastructure`/
+`organization`) have nowhere to sit in that column — names the single
+easiest real one. Returns null when the citizen has no real family
+(`control.js`'s own "a tribe of one has none [cohesion] to measure") or
+when nothing reachable is currently winnable, both real possible
+states. The player accepts the Mission, `assess-takeover`s it (look
+before you leap — the same posture `make-thing`'s `check` flag holds),
+`attempt-takeover`s it, and resolves the mission `completed` — the same
+caller-declared trust model every mission here uses; nothing forces the
+attempt to have succeeded first, since `resolveMission`'s outcome has
+never been auto-verified for any mission in this engine.
+
+**Not built in this pass, named rather than skipped:** Contra's combat
+stakes around `contest.js` — a real fight with something real to lose —
+remains the one reference still open. It needs a decision this pass
+did not make: what a LOST fight costs the player, which is a design
+call about stakes rather than a missing system to wire.
+
 ## Where the code lives
 
 `server/tutorialMissions.js` — `seedTutorialStart(worldState, npcId)`
-composes all three chains, `offerMysteryMission(worldState, npcId)` for
-Chain #2 and `offerSurvivalMission(worldState, npcId)` for Chain #3
-individually, all following the same "takes worldState explicitly"
-convention as every other module here. Not a new player mode, not a
-new schema table — real calls into `inventory.give`/
-`missions.generateMission`/`crime.recordCrime`/`mortality
-.survivalScarcity`/`areaStats.povertyLine` with content chosen for a
+composes all four chains, and `offerMysteryMission`/
+`offerSurvivalMission`/`offerTakeoverMission` individually for Chains
+#2–#4, all following the same "takes worldState explicitly" convention
+as every other module here. Not a new player mode, not a new schema
+table — real calls into `inventory.give`/`missions.generateMission`/
+`crime.recordCrime`/`mortality.survivalScarcity`/`areaStats
+.povertyLine`/`control.viableTargetsFor` with content chosen for a
 first-time citizen. `server/actions.js`'s `trade` action and
 `server/engine.js`'s `tradeWith`/`quoteTrade`/`survivalStatusFor` are
-Chain #3's other half — `barter.exchange`, reachable at last.
+Chain #3's other half — `barter.exchange`, reachable at last. Chain #4
+needed no new action verb at all: `assess-takeover`/`attempt-takeover`
+were already real and simply had no mission pointing at them yet.

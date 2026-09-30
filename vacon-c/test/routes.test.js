@@ -918,6 +918,7 @@ test('tutorial-start seeds a real book over HTTP, and studying it for real moves
   assert.equal(start.mentorMission, null);
   assert.equal(start.mysteryMission, null);
   assert.equal(start.survivalMission, null);
+  assert.equal(start.takeoverMission, null);
 
   const studied = await post(`/players/${player.id}/action`, {
     action: 'study', source: 'books', field: start.book.field,

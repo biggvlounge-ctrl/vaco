@@ -15,7 +15,10 @@ const engine = require('../server/engine.js');
 const knowledge = require('../server/knowledge.js');
 const worldStore = require('../server/worldStore.js');
 const economy = require('../server/economy.js');
+const inventory = require('../server/inventory.js');
 const tutorialMissions = require('../server/tutorialMissions.js');
+
+const YEAR = 365;
 
 // A landmark with a REAL significance, the same fixture shape
 // discovery.test.js uses — `significanceOf` reads through
@@ -208,7 +211,6 @@ test('offerSurvivalMission opens a real Mission over a real, measured shortage',
     income: 0, savings: 1000, debt: 0, assets: 0,
   });
   const seller = engine.generateNPC();
-  const inventory = require('../server/inventory.js');
   inventory.give(engine.WorldState, {
     entityId: seller.id, itemName: 'Hammer', quantity: 1, tick: engine.WorldState.tick,
   });
@@ -246,7 +248,74 @@ test('survivalStatusFor is a real, live read of the same threshold the mission u
   assert.equal(typeof status.atRisk, 'boolean');
 });
 
-test('seedTutorialStart composes all five, and each half is independently real', () => {
+test('offerTakeoverMission opens a real Mission over the easiest real, currently winnable property', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 7012;
+  npc.createdTick = engine.WorldState.tick - 30 * YEAR; // old enough to count as labour at all
+  engine.WorldState.communities.push({ id: 7012, city_id: 9012 });
+  const family = engine.generateFamily({ surname: 'Ransom' });
+  engine.addFamilyMember(family.id, npc.id, 'founder', 1);
+  landmark(engine.WorldState, 7902, 'shop', 7012);
+  inventory.give(engine.WorldState, {
+    entityId: npc.id, itemName: 'Hammer', quantity: 1, tick: engine.WorldState.tick,
+  });
+
+  const offer = tutorialMissions.offerTakeoverMission(engine.WorldState, npc.id);
+  assert.ok(offer, 'no takeover mission was opened');
+  assert.equal(offer.locationId, 7902);
+  assert.equal(offer.tribeId, family.id);
+  assert.match(offer.mission.objective, /take/);
+  assert.ok(offer.finalSuccessProbability > 0);
+
+  // Real end to end: look before you leap (`assess-takeover`, already
+  // a real player action), then try it (`attempt-takeover`), then
+  // resolve the mission — the same two verbs Phase 3 already built and
+  // no mission had ever used.
+  const player = engine.generatePlayer({ linkedEntityId: npc.id });
+  const accepted = engine.dispatchAction(player.id, {
+    action: 'accept-mission', missionId: offer.mission.id,
+  });
+  assert.equal(accepted.result.mission.status, 'accepted');
+
+  const assessed = engine.dispatchAction(player.id, {
+    action: 'assess-takeover', scale: 'property', locationId: 7902,
+  });
+  assert.equal(assessed.result.resolution.compositionRequirementMet, true);
+
+  const attempted = engine.dispatchAction(player.id, {
+    action: 'attempt-takeover', scale: 'property', locationId: 7902,
+  });
+  assert.ok(attempted.result, 'attempt-takeover must answer something either way');
+
+  const resolved = engine.dispatchAction(player.id, {
+    action: 'resolve-mission', missionId: offer.mission.id, outcome: 'completed',
+  });
+  assert.equal(resolved.result.paid.amount, tutorialMissions.TUTORIAL_TAKEOVER_REWARD);
+});
+
+test('offerTakeoverMission returns null for a citizen with no real family to act as a tribe', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 7013;
+  npc.createdTick = engine.WorldState.tick - 30 * YEAR;
+  engine.WorldState.communities.push({ id: 7013, city_id: 9013 });
+  landmark(engine.WorldState, 7903, 'shop', 7013);
+  assert.equal(tutorialMissions.offerTakeoverMission(engine.WorldState, npc.id), null);
+});
+
+test('offerTakeoverMission returns null when nothing reachable is currently winnable', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 7014;
+  npc.createdTick = engine.WorldState.tick - 30 * YEAR;
+  engine.WorldState.communities.push({ id: 7014, city_id: 9014 });
+  const family = engine.generateFamily({ surname: 'Empty-Handed' });
+  engine.addFamilyMember(family.id, npc.id, 'founder', 1);
+  // A real property exists, but the tribe carries no real tools at all
+  // — a real, possible shortfall, not a gap in the check.
+  landmark(engine.WorldState, 7904, 'shop', 7014);
+  assert.equal(tutorialMissions.offerTakeoverMission(engine.WorldState, npc.id), null);
+});
+
+test('seedTutorialStart composes all six, and each half is independently real', () => {
   const npc = engine.generateNPC({ education: 'basic' });
   npc.communityId = 7005;
   // Order matters: offerMysteryMission casts the first two OTHER real
@@ -275,6 +344,7 @@ test('seedTutorialStart composes all five, and each half is independently real',
   assert.equal(start.mysteryVictimId, victim.id);
   assert.ok(start.survivalMission, 'the real medicine shortage should have opened a survival mission too');
   assert.ok(start.survivalScarcity > 0);
+  assert.equal(start.takeoverMission, null, 'this citizen belongs to no family, so no tribe can act');
 });
 
 test('seedTutorialStart is refused for an entity that does not exist', () => {

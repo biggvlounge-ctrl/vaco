@@ -1,9 +1,9 @@
 // server/tutorialMissions.js
 //
-// Mission Chain #1 — "Start Here" — Chain #2 — "Ask Around" — and
-// Chain #3 — "Keep Enough Set Aside". See
+// Mission Chain #1 — "Start Here" — Chain #2 — "Ask Around" — Chain #3
+// — "Keep Enough Set Aside" — and Chain #4 — "Take the Block". See
 // `dev-docs/TUTORIAL_MISSIONS_DESIGN.md` for the full design note (the
-// six-reference mapping this closes three slices of, and why each step
+// six-reference mapping this closes four slices of, and why each step
 // is real rather than invented).
 //
 // **Chain #1, three real steps, no new mechanic, no schema change:**
@@ -49,6 +49,20 @@
 //   verb a player has to answer it with: sell something they carry to
 //   build savings back above the line.
 //
+// **Chain #4, "Take the Block" — River City Ransom, 2026:**
+//
+//   `control.viableTargetsFor` already ranks every real, currently
+//   winnable target for a real tribe — `assess`'s own composition and
+//   cohesion math, not a guess. This mission names the easiest real
+//   property it finds and hands the player the two real verbs
+//   (`assess-takeover`/`attempt-takeover`) that were already sitting
+//   unused by any mission. "The gang" is the player's own real family
+//   (`control.js`'s own cohesion math is exactly the tribe-loyalty
+//   mechanic the reference asks for); "tools and weapons" are honestly
+//   `control.materielOf`'s real §26 `tools`/`protection` categories,
+//   not an invented weapon system — the design note records why
+//   nothing sharper exists here.
+//
 // Every function here takes `worldState` explicitly, same convention as
 // economy.js/players.js/missions.js.
 
@@ -63,6 +77,7 @@ const occupations = require('./occupations.js');
 const economy = require('./economy.js');
 const areaStats = require('./areaStats.js');
 const mortality = require('./mortality.js');
+const control = require('./control.js');
 
 //: Chosen, not measured — there is nothing in this engine a tutorial
 //: reward could be derived from, unlike the thresholds this project's
@@ -75,6 +90,7 @@ const TUTORIAL_EXPLORE_REWARD = 40;
 const TUTORIAL_MENTOR_REWARD = 40;
 const TUTORIAL_MYSTERY_REWARD = 40;
 const TUTORIAL_SURVIVAL_REWARD = 40;
+const TUTORIAL_TAKEOVER_REWARD = 40;
 
 //: §26/crime.js's eight real categories, and the one that reads as
 //: Carmen Sandiego's own register — mundane, solvable, not disturbing.
@@ -263,17 +279,72 @@ function offerSurvivalMission(worldState, npcId, options = {}) {
   };
 }
 
+// Chain #4, "Take the Block" — River City Ransom, 2026.
+// `control.viableTargetsFor` already ranks every real, currently
+// winnable target for a real tribe — `assess()`'s own composition and
+// cohesion math, not a guess here — so this names the single easiest
+// one rather than assessing anything itself. Scoped to `scale:
+// 'property'` targets only: `community`, `infrastructure` and
+// `organization` scales are real targets too, but
+// `missions.generateMission`'s `locationId` references a real
+// PROPERTY row, so only a property target has a real column to sit
+// in.
+//
+// Returns null, not a thrown error, when the citizen has no real
+// family to act as a tribe with (`control.js`'s own "a tribe of one
+// has none [cohesion] to measure") or when no property anywhere
+// reachable is currently winnable for it — both real, possible
+// states, same as the other three chains' preconditions.
+function offerTakeoverMission(worldState, npcId, options = {}) {
+  const npc = (worldState.npcs || []).find((n) => n.id === npcId);
+  if (!npc) throw new Error(`offerTakeoverMission: no NPC ${npcId}`);
+
+  const membership = (worldState.familyMemberships || []).find((m) => m.entity_id === npcId);
+  if (!membership) return null;
+  const tribeId = membership.family_id;
+
+  const cityId = npc.communityId == null ? null : cityOf(worldState, npc);
+  const targets = control
+    .viableTargetsFor(worldState, { tribeId, cityId, tick: worldState.tick })
+    .filter((t) => t.scale === 'property');
+  if (targets.length === 0) return null;
+
+  // Already sorted by `viableTargetsFor` — best odds first, fewest
+  // people required as the tiebreak — so the first entry is the
+  // easiest real target, which is the right one to hand a citizen
+  // still learning the takeover key.
+  const target = targets[0];
+  const property = (worldState.properties || []).find((p) => p.id === target.locationId);
+  if (!property) return null;
+  const label = property.name
+    ?? (property.landmark_category ? property.landmark_category.replace(/-/g, ' ') : property.type)
+    ?? 'this property';
+
+  const mission = missions.generateMission(worldState, {
+    locationId: property.id,
+    objective: `Your family could really take ${label} — check what it would take, then try it`,
+    reward: options.reward ?? TUTORIAL_TAKEOVER_REWARD,
+  });
+  return {
+    mission,
+    tribeId,
+    locationId: property.id,
+    finalSuccessProbability: target.finalSuccessProbability,
+  };
+}
+
 // The whole chain, offered together — what a citizen-mode player
 // binding gets the instant they exist. Each half is independently
 // optional (a community with nothing searchable, or nobody else
 // employed, is a real state) so this reports what it actually managed
-// rather than pretending every world can offer all three.
+// rather than pretending every world can offer all four.
 function seedTutorialStart(worldState, npcId, options = {}) {
   const book = giveStartingBook(worldState, npcId, options);
   const exploreMission = offerExploreMission(worldState, npcId, options);
   const mentor = offerMentorMission(worldState, npcId, options);
   const mystery = offerMysteryMission(worldState, npcId, options);
   const survival = offerSurvivalMission(worldState, npcId, options);
+  const takeover = offerTakeoverMission(worldState, npcId, options);
   return {
     book,
     exploreMission,
@@ -283,6 +354,8 @@ function seedTutorialStart(worldState, npcId, options = {}) {
     mysteryVictimId: mystery?.victimId ?? null,
     survivalMission: survival?.mission ?? null,
     survivalScarcity: survival?.scarcity ?? null,
+    takeoverMission: takeover?.mission ?? null,
+    takeoverLocationId: takeover?.locationId ?? null,
   };
 }
 
@@ -291,6 +364,7 @@ module.exports = {
   TUTORIAL_MENTOR_REWARD,
   TUTORIAL_MYSTERY_REWARD,
   TUTORIAL_SURVIVAL_REWARD,
+  TUTORIAL_TAKEOVER_REWARD,
   TUTORIAL_CRIME_CATEGORY,
   DEFAULT_FIELD,
   giveStartingBook,
@@ -298,5 +372,6 @@ module.exports = {
   offerMentorMission,
   offerMysteryMission,
   offerSurvivalMission,
+  offerTakeoverMission,
   seedTutorialStart,
 };
