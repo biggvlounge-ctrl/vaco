@@ -255,14 +255,14 @@ test('offerTakeoverMission opens a real Mission over the easiest real, currently
   engine.WorldState.communities.push({ id: 7012, city_id: 9012 });
   const family = engine.generateFamily({ surname: 'Ransom' });
   engine.addFamilyMember(family.id, npc.id, 'founder', 1);
-  landmark(engine.WorldState, 7902, 'shop', 7012);
+  landmark(engine.WorldState, 7912, 'shop', 7012);
   inventory.give(engine.WorldState, {
     entityId: npc.id, itemName: 'Hammer', quantity: 1, tick: engine.WorldState.tick,
   });
 
   const offer = tutorialMissions.offerTakeoverMission(engine.WorldState, npc.id);
   assert.ok(offer, 'no takeover mission was opened');
-  assert.equal(offer.locationId, 7902);
+  assert.equal(offer.locationId, 7912);
   assert.equal(offer.tribeId, family.id);
   assert.match(offer.mission.objective, /take/);
   assert.ok(offer.finalSuccessProbability > 0);
@@ -278,12 +278,12 @@ test('offerTakeoverMission opens a real Mission over the easiest real, currently
   assert.equal(accepted.result.mission.status, 'accepted');
 
   const assessed = engine.dispatchAction(player.id, {
-    action: 'assess-takeover', scale: 'property', locationId: 7902,
+    action: 'assess-takeover', scale: 'property', locationId: 7912,
   });
   assert.equal(assessed.result.resolution.compositionRequirementMet, true);
 
   const attempted = engine.dispatchAction(player.id, {
-    action: 'attempt-takeover', scale: 'property', locationId: 7902,
+    action: 'attempt-takeover', scale: 'property', locationId: 7912,
   });
   assert.ok(attempted.result, 'attempt-takeover must answer something either way');
 
@@ -315,7 +315,105 @@ test('offerTakeoverMission returns null when nothing reachable is currently winn
   assert.equal(tutorialMissions.offerTakeoverMission(engine.WorldState, npc.id), null);
 });
 
-test('seedTutorialStart composes all six, and each half is independently real', () => {
+test('offerShowdownMission names the toughest real opponent in the community, by real combat rating', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 8001;
+  const weak = engine.generateNPC();
+  weak.communityId = 8001;
+  const tough = engine.generateNPC();
+  tough.communityId = 8001;
+  landmark(engine.WorldState, 8101, 'shop', 8001);
+
+  const weakRating = engine.rateEntity(weak.id, 'combat').rating;
+  // Push the tough NPC's live combat traits above the weak one's by a
+  // real, measured amount, through the same key-modifier path every
+  // resolver in this engine uses — not a hand-set field.
+  engine.applyKeyModifier(tough.id, 'combat', 'Melee Skill', 100, engine.WorldState.tick);
+  engine.applyKeyModifier(tough.id, 'combat', 'Weapon Mastery', 100, engine.WorldState.tick);
+  const toughRating = engine.rateEntity(tough.id, 'combat').rating;
+  assert.ok(toughRating > weakRating, 'the fixture must actually produce a tougher opponent');
+
+  const offer = tutorialMissions.offerShowdownMission(engine.WorldState, npc.id);
+  assert.ok(offer, 'no showdown mission was opened');
+  assert.equal(offer.opponentId, tough.id, 'the toughest real opponent must be the one named');
+  assert.match(offer.mission.objective, new RegExp(tough.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+});
+
+test('offerShowdownMission returns null for a citizen with nobody real to fight', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 8002; // alone
+  assert.equal(tutorialMissions.offerShowdownMission(engine.WorldState, npc.id), null);
+});
+
+test('Chain #5 end to end: entering the real fight costs real stress either way, more for losing', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 8003;
+  const opponent = engine.generateNPC();
+  opponent.communityId = 8003;
+  landmark(engine.WorldState, 8301, 'shop', 8003);
+
+  const offer = tutorialMissions.offerShowdownMission(engine.WorldState, npc.id);
+  assert.ok(offer);
+  assert.equal(offer.opponentId, opponent.id);
+
+  const player = engine.generatePlayer({ linkedEntityId: npc.id });
+  engine.dispatchAction(player.id, { action: 'accept-mission', missionId: offer.mission.id });
+
+  // Pin `loadMultiplier` to exactly 1 for BOTH fighters (equal
+  // Volatility/Resilience, at whatever the clamp ceiling is) so the
+  // stress delta below is a known constant rather than either
+  // person's own random resilience — the eighth standing rule's own
+  // fix, applied here.
+  for (const id of [npc.id, opponent.id]) {
+    engine.applyKeyModifier(id, 'emotional', 'Volatility', 1000, engine.WorldState.tick);
+    engine.applyKeyModifier(id, 'emotional', 'Resilience', 1000, engine.WorldState.tick);
+  }
+
+  const before = engine.getEntityState(npc.id)?.stressLevel ?? 0;
+  const fought = engine.dispatchAction(player.id, {
+    action: 'enter-contest', opponentId: opponent.id, discipline: 'combat', contestId: 'showdown-8003',
+  });
+  assert.equal(fought.result.stakesApplied, true);
+  assert.ok(fought.result.events.length > 0, 'a real fight must reach the event log');
+
+  // `winProbability` is capped at 0.97 — never certain — so either
+  // real outcome is a real possibility here and the assertion has to
+  // name both, not assume the favourite always wins.
+  const npcWon = fought.result.winnerId === npc.id;
+  const expected = npcWon ? engine.SHOWDOWN_STRESS_WIN : engine.SHOWDOWN_STRESS_LOSS;
+  const after = engine.getEntityState(npc.id)?.stressLevel ?? 0;
+  assert.equal(
+    Math.round((after - before) * 100) / 100, expected,
+    `${npcWon ? 'winning' : 'losing'} must cost exactly the real, matching stress constant`,
+  );
+  assert.ok(
+    engine.SHOWDOWN_STRESS_LOSS > engine.SHOWDOWN_STRESS_WIN,
+    'losing must cost more than winning, or the fight was never dangerous',
+  );
+
+  // The other four disciplines stay exactly as they were — a friendly
+  // game must not suddenly cost more through the dispatcher than it
+  // does through a tick.
+  const other = engine.generateNPC();
+  other.communityId = 8003;
+  const beforeGame = engine.getEntityState(npc.id)?.stressLevel ?? 0;
+  const game = engine.dispatchAction(player.id, {
+    action: 'enter-contest', opponentId: other.id, discipline: 'wits', contestId: 'card-game-8003',
+  });
+  assert.equal(game.result.stakesApplied, undefined);
+  assert.equal(engine.getEntityState(npc.id)?.stressLevel ?? 0, beforeGame);
+
+  const resolved = engine.dispatchAction(player.id, {
+    action: 'resolve-mission', missionId: offer.mission.id, outcome: npcWon ? 'completed' : 'failed',
+  });
+  if (npcWon) {
+    assert.equal(resolved.result.paid.amount, tutorialMissions.TUTORIAL_SHOWDOWN_REWARD);
+  } else {
+    assert.equal(resolved.result.paid, null, 'a lost fight paid out nothing, same as any other failed mission');
+  }
+});
+
+test('seedTutorialStart composes all seven, and each half is independently real', () => {
   const npc = engine.generateNPC({ education: 'basic' });
   npc.communityId = 7005;
   // Order matters: offerMysteryMission casts the first two OTHER real
@@ -345,6 +443,8 @@ test('seedTutorialStart composes all six, and each half is independently real', 
   assert.ok(start.survivalMission, 'the real medicine shortage should have opened a survival mission too');
   assert.ok(start.survivalScarcity > 0);
   assert.equal(start.takeoverMission, null, 'this citizen belongs to no family, so no tribe can act');
+  assert.ok(start.showdownMission, 'real other people in the community means a real opponent exists');
+  assert.ok([victim.id, perpetrator.id, mentor.id].includes(start.showdownOpponentId));
 });
 
 test('seedTutorialStart is refused for an entity that does not exist', () => {

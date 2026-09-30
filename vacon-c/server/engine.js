@@ -78,6 +78,7 @@ const knowledge = require('./knowledge.js');
 const barter = require('./barter.js');
 const mortality = require('./mortality.js');
 const areaStats = require('./areaStats.js');
+const worldStore = require('./worldStore.js');
 const tutorialMissions = require('./tutorialMissions.js');
 const behavior = require('./behavior.js');
 const actions = require('./actions.js');
@@ -924,8 +925,68 @@ function rateEntity(entityId, discipline) {
   return contest.rateEntity(WorldState, entityId, discipline);
 }
 
+// **Stakes, for combat specifically.** `contest.js`'s own header is
+// explicit that the module "decides who wins. It does not pay, book,
+// or broadcast" — deliberately no side effects, so VDP's Combat Sports
+// district (which calls it directly, never through here) stays exactly
+// as fast and pure as it is today. `competition.js`'s tick-driven
+// games hold the other four disciplines and name the reason combat is
+// excluded from them: "it holds games, not fights" — combat is left
+// for "a caller who means it". A player entering combat through their
+// own action IS that caller, and a fight nothing costs was never
+// dangerous.
+//
+// **Combat only — sport/teamSport/precision/wits are unchanged.**
+// Those are competition.js's own safe settlement games; entering one
+// through the dispatcher must not suddenly cost more than entering one
+// through a tick does.
+//
+//: Chosen, not measured — there is no source document to derive "the
+//: cost of a fight" from, unlike `tick.js`'s own DAILY_* stress
+//: constants, which are RATES against a recurring condition rather
+//: than a single event. A fight is a one-time shock: large enough to
+//: read as real danger, small enough that a single loss does not by
+//: itself put an ordinary person into crisis.
+const SHOWDOWN_STRESS_WIN = 5;
+const SHOWDOWN_STRESS_LOSS = 15;
+
 function resolveContest(options) {
-  return contest.resolveContest(WorldState, options);
+  const result = contest.resolveContest(WorldState, options);
+  if (result.discipline !== 'combat') return result;
+
+  const now = WorldState.tick;
+  const entrantIds = result.ratings.map((r) => r.entityId);
+  for (const entityId of entrantIds) {
+    const won = entityId === result.winnerId;
+    behavior.applyStress(WorldState, entityId, won ? SHOWDOWN_STRESS_WIN : SHOWDOWN_STRESS_LOSS);
+    worldStore.addMemory(WorldState, {
+      entityId,
+      memoryType: won ? 'positive' : 'negative',
+      category: 'conflict',
+      description: won ? 'won a real fight' : 'lost a real fight',
+      importance: 60,
+      emotionLevel: won ? 55 : 75,
+      relatedEntityIds: entrantIds.filter((id) => id !== entityId),
+      tick: now,
+    });
+  }
+
+  const recorded = tick.recordEvents(WorldState, [{
+    type: 'combat_showdown',
+    severity: 'medium',
+    note: `combat: ${result.winnerId} beat ${entrantIds.filter((id) => id !== result.winnerId).join(', ')}`,
+    tick: now,
+    affected_entity_ids: entrantIds,
+    global_effects: {
+      discipline: 'combat',
+      winnerId: result.winnerId,
+      favouriteId: result.favouriteId,
+      upset: result.upset,
+      contestId: result.contestId,
+    },
+  }]);
+
+  return { ...result, stakesApplied: true, events: recorded };
 }
 
 function verifyContest(result) {
@@ -1412,6 +1473,8 @@ module.exports = {
   DISCIPLINES: contest.DISCIPLINES,
   DISCIPLINE_NAMES: contest.DISCIPLINE_NAMES,
   rateEntity,
+  SHOWDOWN_STRESS_WIN,
+  SHOWDOWN_STRESS_LOSS,
   resolveContest,
   verifyContest,
   assessTakeover,

@@ -14,7 +14,7 @@ called real.
 | **Carmen Sandiego** | Gather clues, including from NPCs | `discovery.search` (objects) + `study` from an `experienced NPCs` source (people) + `entity_knowledge` (a fact, held with confidence) | Real |
 | **Oregon Trail** | Resource pressure, having the right things to survive | `mortality.survivalScarcity` (real, measured 0..1 food/water/medicine shortage) + `areaStats.povertyLine`/`crime.js`'s real deprivation pressure + `barter.exchange` (now wired as the `trade` action) | Real — built as Mission Chain #3, see below |
 | **River City Ransom**, 2026 | Gangs, tools/weapons, taking a city | The player's own real family as the tribe + `control.viableTargetsFor`/`assess-takeover`/`attempt-takeover` (already-built player actions, never yet used by a mission) + `control.materielOf`'s real §26 `tools`/`protection` categories | Real — built as Mission Chain #4, see below. Thinner than "buy a weapon at a shop": there is no dedicated weapon category, only tools (Hammer, Saw) and crafted `protection` items (a blade). Anything sold as a "weapon" is honestly a crafted `protection` item, not a new category. |
-| **Contra** | The gameplay energy | `contest.js`'s combat resolver — a real, seeded, dangerous fight | Real as a *fight*, not as run-and-gun. VACON-C is a tick-based simulation (a tick is a day) behind a REST API — there is no real-time movement/aiming/shooting layer, and building one is a different kind of project, not a mission-content pass. What carries Contra's spirit honestly is real stakes in a real fight, not literal action gameplay. |
+| **Contra** | The gameplay energy | `contest.js`'s combat resolver, now with real stakes wired in `engine.js#resolveContest` — real stress, a real memory, a real event, for entering `combat` through the dispatcher | Real as a *fight*, not as run-and-gun — built as Mission Chain #5, see below. VACON-C is a tick-based simulation (a tick is a day) behind a REST API — there is no real-time movement/aiming/shooting layer, and building one is a different kind of project, not a mission-content pass. What carries Contra's spirit honestly is real stakes in a real fight, not literal action gameplay. |
 
 ## The one thing that needed checking: Maniac Mansion
 
@@ -234,24 +234,72 @@ caller-declared trust model every mission here uses; nothing forces the
 attempt to have succeeded first, since `resolveMission`'s outcome has
 never been auto-verified for any mission in this engine.
 
-**Not built in this pass, named rather than skipped:** Contra's combat
-stakes around `contest.js` — a real fight with something real to lose —
-remains the one reference still open. It needs a decision this pass
-did not make: what a LOST fight costs the player, which is a design
-call about stakes rather than a missing system to wire.
+## Mission Chain #5 — "Pick Your Fights", Contra's own stakes
+
+**The one reference left with a genuine open question rather than a
+missing system**, and this pass answers it. `contest.js` could already
+resolve a real, seeded, dangerous fight from live `combat` traits — the
+decision left open was what a LOST fight costs the player, since
+`contest.js`'s own header is explicit that it "decides who wins. It
+does not pay, book, or broadcast."
+
+**Where the stakes live, and why not inside `contest.js` itself.**
+`competition.js`'s tick-driven games hold the OTHER four disciplines
+(`sport`/`teamSport`/`precision`/`wits`) and name, by name, why combat
+is excluded from them: "it holds games, not fights" — reserving combat
+for "a caller who means it". A player entering `combat` through their
+own action IS that caller. So the stakes are wired into
+`server/engine.js#resolveContest` — the bound layer every action
+already goes through — rather than into `contest.js` (which VDP's
+Combat Sports district calls directly and must stay exactly as pure)
+or into `competition.js` (whose tick-driven games never touch combat at
+all, and must keep not touching it).
+
+**What actually happens, and to what.** Entering `combat` through the
+dispatcher now applies, to BOTH entrants: real stress
+(`behavior.applyStress` — more for the loser than the winner, two
+flagged-interpretive constants, since no document prices the cost of a
+fight) and a real memory (`worldStore.addMemory`, category `conflict`,
+positive or negative by outcome) — plus one real event in the log. The
+other four disciplines are completely unchanged: a friendly game
+entered through the dispatcher must not suddenly cost more than one
+held by a tick.
+
+**Not gambling, on purpose.** `competition.js`'s own header already
+states the constraint this had to respect: "nothing here stakes
+anything, pays anything or prices anything" — gambling/casino systems
+stay closed pending compliance review (CLAUDE.md's locked scope). So
+the stakes here are never money: no wager, no side bet, nothing priced.
+What is at risk is the mission's own ordinary reward (paid only on
+`resolveMission`'s `completed`, exactly like every other mission) and
+real, measured stress — a state change, not a financial one.
+
+**The chain:** `offerShowdownMission` names the single toughest real
+opponent in the citizen's own community, by real `combat` rating
+(`contest.rateEntity`) — the reference asks for gameplay ENERGY, and a
+fight against the easiest person in town has none. The player accepts
+the Mission and `enter-contest`s the named opponent with
+`discipline: 'combat'` — the existing action, now carrying real stakes
+— and resolves the mission either way. `winProbability` is capped at
+0.97, never certain, so a favourite can still lose; nothing here makes
+the fight safe.
 
 ## Where the code lives
 
 `server/tutorialMissions.js` — `seedTutorialStart(worldState, npcId)`
-composes all four chains, and `offerMysteryMission`/
-`offerSurvivalMission`/`offerTakeoverMission` individually for Chains
-#2–#4, all following the same "takes worldState explicitly" convention
-as every other module here. Not a new player mode, not a new schema
-table — real calls into `inventory.give`/`missions.generateMission`/
-`crime.recordCrime`/`mortality.survivalScarcity`/`areaStats
-.povertyLine`/`control.viableTargetsFor` with content chosen for a
-first-time citizen. `server/actions.js`'s `trade` action and
+composes all five chains, and `offerMysteryMission`/
+`offerSurvivalMission`/`offerTakeoverMission`/`offerShowdownMission`
+individually for Chains #2–#5, all following the same "takes
+worldState explicitly" convention as every other module here. Not a
+new player mode, not a new schema table — real calls into
+`inventory.give`/`missions.generateMission`/`crime.recordCrime`/
+`mortality.survivalScarcity`/`areaStats.povertyLine`/
+`control.viableTargetsFor`/`contest.rateEntity` with content chosen for
+a first-time citizen. `server/actions.js`'s `trade` action and
 `server/engine.js`'s `tradeWith`/`quoteTrade`/`survivalStatusFor` are
-Chain #3's other half — `barter.exchange`, reachable at last. Chain #4
-needed no new action verb at all: `assess-takeover`/`attempt-takeover`
-were already real and simply had no mission pointing at them yet.
+Chain #3's other half — `barter.exchange`, reachable at last. Chains #4
+and #5 needed no new action verb at all: `assess-takeover`/
+`attempt-takeover`/`enter-contest` were already real and simply had no
+mission pointing at them yet (#4), or nothing real riding on the
+outcome (#5) — `server/engine.js#resolveContest`'s combat-stakes branch
+is that missing piece.

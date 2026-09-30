@@ -1,10 +1,11 @@
 // server/tutorialMissions.js
 //
 // Mission Chain #1 — "Start Here" — Chain #2 — "Ask Around" — Chain #3
-// — "Keep Enough Set Aside" — and Chain #4 — "Take the Block". See
-// `dev-docs/TUTORIAL_MISSIONS_DESIGN.md` for the full design note (the
-// six-reference mapping this closes four slices of, and why each step
-// is real rather than invented).
+// — "Keep Enough Set Aside" — Chain #4 — "Take the Block" — and Chain
+// #5 — "Pick Your Fights". See `dev-docs/TUTORIAL_MISSIONS_DESIGN.md`
+// for the full design note (the six-reference mapping this closes all
+// five real slices of, and why each step is real rather than
+// invented).
 //
 // **Chain #1, three real steps, no new mechanic, no schema change:**
 //
@@ -63,6 +64,23 @@
 //   not an invented weapon system — the design note records why
 //   nothing sharper exists here.
 //
+// **Chain #5, "Pick Your Fights" — Contra's own stakes:**
+//
+//   The one reference left with a genuine open question rather than a
+//   missing system: `contest.js` could already resolve a real,
+//   dangerous fight, but the design note's own earlier pass named the
+//   gap precisely — "a decision about what a lost fight costs the
+//   player". `server/engine.js#resolveContest` now answers it: entering
+//   the `combat` discipline through the dispatcher applies real stress
+//   to both entrants (more to the loser) and a real memory of the
+//   fight, through `behavior.applyStress`/`worldStore.addMemory` —
+//   both already real, neither previously reached by a contest. The
+//   other four disciplines (`competition.js`'s own safe settlement
+//   games) are untouched on purpose. This mission names the single
+//   toughest real opponent in the citizen's own community, by real
+//   `combat` rating, and hands them the existing `enter-contest` verb
+//   — no new action needed, the same shape as Chain #4.
+//
 // Every function here takes `worldState` explicitly, same convention as
 // economy.js/players.js/missions.js.
 
@@ -78,6 +96,7 @@ const economy = require('./economy.js');
 const areaStats = require('./areaStats.js');
 const mortality = require('./mortality.js');
 const control = require('./control.js');
+const contest = require('./contest.js');
 
 //: Chosen, not measured — there is nothing in this engine a tutorial
 //: reward could be derived from, unlike the thresholds this project's
@@ -91,6 +110,7 @@ const TUTORIAL_MENTOR_REWARD = 40;
 const TUTORIAL_MYSTERY_REWARD = 40;
 const TUTORIAL_SURVIVAL_REWARD = 40;
 const TUTORIAL_TAKEOVER_REWARD = 40;
+const TUTORIAL_SHOWDOWN_REWARD = 40;
 
 //: §26/crime.js's eight real categories, and the one that reads as
 //: Carmen Sandiego's own register — mundane, solvable, not disturbing.
@@ -333,11 +353,50 @@ function offerTakeoverMission(worldState, npcId, options = {}) {
   };
 }
 
+// Chain #5, "Pick Your Fights" — Contra's own stakes. Names the
+// single toughest real opponent in the citizen's own community, by
+// real `combat` rating (`contest.rateEntity`) — the reference asks for
+// gameplay ENERGY, and a fight against the easiest person in town has
+// none. The stakes themselves live in `engine.js#resolveContest` (real
+// stress, a real memory), not here — this function only ever picks a
+// real opponent and opens a real Mission naming them.
+//
+// Returns null, not a thrown error, when the citizen has no community
+// (nobody to challenge, nowhere to anchor the Mission) — a real,
+// possible state, same as the other four chains' preconditions.
+function offerShowdownMission(worldState, npcId, options = {}) {
+  const npc = (worldState.npcs || []).find((n) => n.id === npcId);
+  if (!npc) throw new Error(`offerShowdownMission: no NPC ${npcId}`);
+  if (npc.communityId == null) return null;
+
+  const others = (worldState.npcs || []).filter(
+    (other) => other.id !== npcId && other.communityId === npc.communityId,
+  );
+  if (others.length === 0) return null;
+
+  const rated = others
+    .map((other) => ({ npc: other, rating: contest.rateEntity(worldState, other.id, 'combat').rating }))
+    .sort((a, b) => b.rating - a.rating);
+  const opponent = rated[0];
+
+  const anchor = (worldState.properties || []).find((p) => p.community_id === npc.communityId);
+  if (!anchor) return null;
+
+  const mission = missions.generateMission(worldState, {
+    locationId: anchor.id,
+    objective: `${opponent.npc.name} is the one to beat here — a real fight, real stakes`,
+    reward: options.reward ?? TUTORIAL_SHOWDOWN_REWARD,
+  });
+  return {
+    mission, opponentId: opponent.npc.id, opponentRating: opponent.rating,
+  };
+}
+
 // The whole chain, offered together — what a citizen-mode player
 // binding gets the instant they exist. Each half is independently
 // optional (a community with nothing searchable, or nobody else
 // employed, is a real state) so this reports what it actually managed
-// rather than pretending every world can offer all four.
+// rather than pretending every world can offer all five.
 function seedTutorialStart(worldState, npcId, options = {}) {
   const book = giveStartingBook(worldState, npcId, options);
   const exploreMission = offerExploreMission(worldState, npcId, options);
@@ -345,6 +404,7 @@ function seedTutorialStart(worldState, npcId, options = {}) {
   const mystery = offerMysteryMission(worldState, npcId, options);
   const survival = offerSurvivalMission(worldState, npcId, options);
   const takeover = offerTakeoverMission(worldState, npcId, options);
+  const showdown = offerShowdownMission(worldState, npcId, options);
   return {
     book,
     exploreMission,
@@ -356,6 +416,8 @@ function seedTutorialStart(worldState, npcId, options = {}) {
     survivalScarcity: survival?.scarcity ?? null,
     takeoverMission: takeover?.mission ?? null,
     takeoverLocationId: takeover?.locationId ?? null,
+    showdownMission: showdown?.mission ?? null,
+    showdownOpponentId: showdown?.opponentId ?? null,
   };
 }
 
@@ -365,6 +427,7 @@ module.exports = {
   TUTORIAL_MYSTERY_REWARD,
   TUTORIAL_SURVIVAL_REWARD,
   TUTORIAL_TAKEOVER_REWARD,
+  TUTORIAL_SHOWDOWN_REWARD,
   TUTORIAL_CRIME_CATEGORY,
   DEFAULT_FIELD,
   giveStartingBook,
@@ -373,5 +436,6 @@ module.exports = {
   offerMysteryMission,
   offerSurvivalMission,
   offerTakeoverMission,
+  offerShowdownMission,
   seedTutorialStart,
 };

@@ -160,6 +160,27 @@ test('a contest always includes the player who entered it', () => {
   assert.equal(result.actorEntityId, mine.npc.id);
 });
 
+test('entering combat through the dispatcher applies real stakes; entering a house game does not', () => {
+  // `contest.js` itself writes nothing — "this module decides who
+  // wins, it does not pay, book, or broadcast" — and `competition.js`'s
+  // tick-driven games explicitly exclude combat as the dangerous
+  // discipline reserved for "a caller who means it". A player entering
+  // combat through their own action is that caller.
+  const mine = citizen();
+  const a = engine.generateNPC();
+  const fought = engine.dispatchAction(mine.player.id, {
+    action: 'enter-contest', opponentId: a.id, discipline: 'combat', contestId: 'stakes-check',
+  });
+  assert.equal(fought.result.stakesApplied, true);
+  assert.ok(fought.result.events.length > 0);
+
+  const b = engine.generateNPC();
+  const game = engine.dispatchAction(mine.player.id, {
+    action: 'enter-contest', opponentId: b.id, discipline: 'wits', contestId: 'stakes-check-2',
+  });
+  assert.equal(game.result.stakesApplied, undefined, 'a friendly game must not carry combat stakes');
+});
+
 test('every dispatch reports which entity actually acted', () => {
   // So a caller can see that the actor was not the one they may have
   // tried to name.
