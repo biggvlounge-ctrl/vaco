@@ -20,7 +20,7 @@ There is a working simulation — traits across four tiers, seven Key
 resolvers, family, economy, territory, tick, players, artifacts and
 missions, plus Property, Culture DNA, Named Flow Templates, contest
 resolution and the Behavior Engine — and its HTTP surface is real:
-**90 routes**, up from 8 before any of this.
+**91 routes**, up from 8 before any of this.
 
 Since then, and not in the phase plan because nothing anticipated them:
 world generation, the uniform statistics catalogue, crime and policing,
@@ -108,7 +108,7 @@ read off disk, not recalled.
 | `environment.js` | 13,372 | Weather, climate and where a drought lives — `environment_state`, one row per city, and severe weather through the existing condition channel. | Built |
 | `territory.js` | 31,762 | Cities, communities, territory blocks, control resolution, city reemergence and community health (both computed on read). | Built |
 | `knowledge.js` | 29,768 | **§24 KNOWLEDGE RECOVERY** — ten named sources, nine unlockable fields, and the three things reading moves: the field's skill, the `educational` family `technology.learningOf` averages, and attainment for the self-taught. Books are unpriced on purpose. | Built |
-| `tutorialMissions.js` | 9,856 | **Mission Chain #1 "Start Here" + Chain #2 "Ask Around"** — a seeded starting book, a real Mission over a real searchable landmark, a real Mission naming a real NPC who holds a real occupation, and a real Mission naming a real crime victim (`crime.recordCrime`'s own real, confidence-weighted fact, learned for real via `meetings.shareAround`). Composes `knowledge.js`/`discovery.js`/`missions.js`/`occupations.js`/`crime.js`; adds no mechanic of its own. | Built |
+| `tutorialMissions.js` | 14,051 | **Mission Chain #1 "Start Here" + Chain #2 "Ask Around" + Chain #3 "Keep Enough Set Aside"** — a seeded starting book, a real Mission over a real searchable landmark, a real Mission naming a real NPC who holds a real occupation, a real Mission naming a real crime victim (`crime.recordCrime`'s own real, confidence-weighted fact, learned for real via `meetings.shareAround`), and a real Mission over a real, measured food/water/medicine shortage (`mortality.survivalScarcity` against `areaStats.povertyLine` — the same threshold `crime.js`'s deprivation checks already read). Composes `knowledge.js`/`discovery.js`/`missions.js`/`occupations.js`/`crime.js`/`economy.js`/`areaStats.js`/`mortality.js`; adds no mechanic of its own. | Built |
 | `orgArchetypes.js` | 16,474 | **Kinds of organization, so a scenario can name its own.** Ten archetypes over the schema's own `organizations.type`, expressed as bands rather than values. Names nothing and refuses to be asked to — see its header on why there is no roster of real agencies or parties. | Built |
 | `meetings.js` | 19,484 | **Sitting down together.** The spec's `negotiate` / `teach` / `recruit` / `form alliance`, none of which had a home. Adds no planning bonus: a meeting moves trust, trust is what family unity converges on, unity is the takeover multiplier. | Built |
 | `occupations.js` | 23,300 | **What a person does for a living** — §25's seven knowledge tiers turned into thirty-four occupations, and the answer to `employment_records.position` being a column no caller ever wrote. Owns `DEFINING_POST`, the one vocabulary `worldgen` and `control` both read. | Built |
@@ -193,9 +193,9 @@ them; `test/routes.test.js` asserts it.
 | Cross-cutting | 3 | 0 | 3 |
 | **Total** | **58** | **45** | **13** |
 
-**90 routes are registered in `server.js`** (counted, not remembered:
+**91 routes are registered in `server.js`** (counted, not remembered:
 `grep -cE "^app\.(get|post|put|patch|delete)\(" server.js`). Of those,
-**36 have no line anywhere in the map** — every path below was checked
+**37 have no line anywhere in the map** — every path below was checked
 against the map text with `:param` names normalised, so a rename cannot
 hide one:
 
@@ -212,7 +212,8 @@ hide one:
 `GET /api/entities/:id/behavior`, `GET /api/players/:id/actions`,
 `GET /api/economy/snapshots`, `GET`/`POST /api/governments`,
 `GET /api/governments/:organizationId/approval`, `GET /api/elections`,
-`GET /api/elections/:id/votes`, `GET /api/laws`, `GET /api/revolutions`.
+`GET /api/elections/:id/votes`, `GET /api/laws`, `GET /api/revolutions`,
+`GET /api/players/:id/survival-status`.
 
 `GET /api/economy/snapshots` is a special case rather than an omission:
 the map's own line is `GET /api/economy/snapshot` (singular, "current

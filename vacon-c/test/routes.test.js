@@ -917,6 +917,7 @@ test('tutorial-start seeds a real book over HTTP, and studying it for real moves
   assert.equal(start.exploreMission, null);
   assert.equal(start.mentorMission, null);
   assert.equal(start.mysteryMission, null);
+  assert.equal(start.survivalMission, null);
 
   const studied = await post(`/players/${player.id}/action`, {
     action: 'study', source: 'books', field: start.book.field,
@@ -926,6 +927,50 @@ test('tutorial-start seeds a real book over HTTP, and studying it for real moves
   assert.ok(moved.traits.length > 0, 'the seeded book did not actually teach anything over HTTP');
 
   assert.equal((await post('/players/999999/tutorial-start', {})).status, 404);
+});
+
+test('trade is offered, and a real HTTP caller can price or attempt one with a real seller',
+  { skip: SKIP }, async () => {
+    const { npc } = await (await post('/npc/generate')).json();
+    const player = await (await post('/players', { linkedEntityId: npc.id })).json();
+    const { npc: seller } = await (await post('/npc/generate')).json();
+    await post(`/entities/${npc.id}/finances`, {
+      income: 0, savings: 1000, debt: 0, assets: 0,
+    });
+
+    const menu = await (await get(`/players/${player.id}/actions`)).json();
+    assert.ok(menu.actions.some((a) => a.action === 'trade'), 'trade is not on the real menu');
+
+    const quoted = await post(`/players/${player.id}/action`, {
+      action: 'trade', sellerId: seller.id, itemName: 'Hammer', quantity: 1, check: true,
+    });
+    assert.equal(quoted.status, 200);
+    const quote = (await quoted.json()).result.quote;
+    assert.ok(quote.total > 0, 'a real sourced item must price above zero over HTTP too');
+
+    // Over HTTP there is no /api/inventory grant route (the same
+    // limitation study's own HTTP test names above), so this seller
+    // really holds nothing — the honest refusal `barter.exchange`
+    // gives, not a generic 500.
+    const traded = await post(`/players/${player.id}/action`, {
+      action: 'trade', sellerId: seller.id, itemName: 'Hammer', quantity: 1,
+    });
+    assert.equal(traded.status, 200);
+    const result = (await traded.json()).result;
+    assert.equal(result.settled, false);
+    assert.match(result.reason, /holds none/);
+  });
+
+test('survival-status answers a real, live read over HTTP', { skip: SKIP }, async () => {
+  const { npc } = await (await post('/npc/generate')).json();
+  const player = await (await post('/players', { linkedEntityId: npc.id })).json();
+
+  const status = await (await get(`/players/${player.id}/survival-status`)).json();
+  assert.equal(status.cityId, null, 'a freshly generated NPC over HTTP has no community');
+  assert.ok(status.scarcity >= 0 && status.scarcity <= 1);
+  assert.equal(typeof status.atRisk, 'boolean');
+
+  assert.equal((await get('/players/999999/survival-status')).status, 404);
 });
 
 test('/api/missions/available/:entityId is not swallowed by /api/missions/:id',

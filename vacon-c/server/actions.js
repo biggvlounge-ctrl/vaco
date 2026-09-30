@@ -269,6 +269,32 @@ const ACTIONS = {
     }),
   },
 
+  // **§26/§27/§28, the player-facing half.** `barter.exchange` moves
+  // real value and a real held object between two entities and has
+  // been reachable by nobody since it was written — no route, no
+  // verb, `study`'s own gap one file over. `check` is the same
+  // look-before-you-spend flag `make-thing` already carries: a quote
+  // (`quoteTrade`/`barter.agreedPrice`) costs nothing, a trade
+  // (`tradeWith`/`barter.exchange`) can fail for real reasons
+  // (savings, what the seller actually holds) and returns why.
+  trade: {
+    summary: 'Trade with somebody nearby for what they hold — or check the price first.',
+    modes: ['citizen'],
+    requires: ['sellerId', 'itemName'],
+    verbs: ['tradeWith', 'quoteTrade'],
+    run: (verbs, actorId, body) => (
+      body.check === true
+        ? {
+          quote: verbs.quoteTrade(actorId, {
+            sellerId: body.sellerId, itemName: body.itemName, quantity: body.quantity,
+          }),
+        }
+        : verbs.tradeWith(actorId, {
+          sellerId: body.sellerId, itemName: body.itemName, quantity: body.quantity,
+        })
+    ),
+  },
+
   'enter-contest': {
     summary: 'Compete against a named opponent.',
     modes: ['citizen'],

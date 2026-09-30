@@ -75,6 +75,9 @@ const landmarks = require('./landmarks.js');
 const salvage = require('./salvage.js');
 const discovery = require('./discovery.js');
 const knowledge = require('./knowledge.js');
+const barter = require('./barter.js');
+const mortality = require('./mortality.js');
+const areaStats = require('./areaStats.js');
 const tutorialMissions = require('./tutorialMissions.js');
 const behavior = require('./behavior.js');
 const actions = require('./actions.js');
@@ -877,6 +880,8 @@ const ACTION_VERBS = {
   canMakeThing: (...args) => canMakeThing(...args),
   searchLocation: (...args) => searchLocation(...args),
   studySource: (...args) => studySource(...args),
+  quoteTrade: (...args) => quoteTrade(...args),
+  tradeWith: (...args) => tradeWith(...args),
 };
 
 function dispatchAction(playerId, body) {
@@ -1096,6 +1101,75 @@ function studySource(entityId, options = {}) {
 function studySourcesFor(entityId) {
   if (!getLiveEntity(entityId)) throw new Error(`no entity with id ${entityId}`);
   return knowledge.sourcesFor(WorldState, entityId, { tick: WorldState.tick });
+}
+
+// ---------------------------------------------------------------------
+// Trade — §26/§27/§28, the player-facing half
+// ---------------------------------------------------------------------
+// `barter.exchange` has been real, complete and reachable by nothing
+// since it was written: no action verb, no route, so no player has
+// ever been able to actually acquire anything. This is `studySource`'s
+// own gap, one file over.
+//
+// **`cityId` is derived from the actor's own community, never taken
+// from the caller** — the same posture `tribeIdFor` holds for a
+// takeover: a player's own location sets which market they are
+// bartering in, not whichever city happens to price something in
+// their favour. The same lookup `knowledge.js`/`statecraft.js` each do
+// locally for the same reason.
+function cityOfEntity(entityId) {
+  const npc = (WorldState.npcs || []).find((n) => n.id === entityId);
+  const community = (WorldState.communities || []).find((c) => c.id === npc?.communityId);
+  return community?.city_id ?? null;
+}
+
+// A read, not an action — the price a trade would settle at, without
+// moving anything. `make-thing`'s `check` flag is the precedent: look
+// before you spend what you are carrying.
+function quoteTrade(entityId, options = {}) {
+  if (!getLiveEntity(entityId)) throw new Error(`no entity with id ${entityId}`);
+  return barter.agreedPrice(WorldState, options.itemName, {
+    buyerId: entityId,
+    sellerId: options.sellerId == null ? null : Number(options.sellerId),
+    quantity: options.quantity ?? 1,
+    cityId: cityOfEntity(entityId),
+  });
+}
+
+function tradeWith(entityId, options = {}) {
+  if (!getLiveEntity(entityId)) throw new Error(`no entity with id ${entityId}`);
+  return barter.exchange(WorldState, {
+    buyerId: entityId,
+    sellerId: Number(options.sellerId),
+    itemName: options.itemName,
+    quantity: options.quantity ?? 1,
+    cityId: cityOfEntity(entityId),
+    tick: WorldState.tick,
+  });
+}
+
+// A read, not an action — the real Oregon Trail stakes for this
+// entity right now: `mortality.survivalScarcity` is how short their
+// city is of food/water/medicine (0..1, the worst of the three, not
+// the average) and `areaStats.isBelowPovertyLine` against their own
+// `getNetWorth` is the same real threshold `crime.js`'s two
+// deprivation checks already read — a resident below it, in a city
+// that is really short, has a real per-tick chance of being pushed
+// into theft by `crime.advanceFriction`'s own mechanism, already
+// running, not simulated here. See dev-docs/TUTORIAL_MISSIONS_DESIGN.md.
+function survivalStatusFor(entityId) {
+  if (!getLiveEntity(entityId)) throw new Error(`no entity with id ${entityId}`);
+  const cityId = cityOfEntity(entityId);
+  const scarcity = mortality.survivalScarcity(WorldState, cityId);
+  const povertyLine = areaStats.povertyLine(WorldState);
+  const netWorth = economy.getNetWorth(WorldState, entityId);
+  return {
+    cityId,
+    scarcity,
+    povertyLine,
+    netWorth,
+    atRisk: scarcity > 0 && areaStats.isBelowPovertyLine(netWorth, povertyLine),
+  };
 }
 
 // ---------------------------------------------------------------------
@@ -1322,6 +1396,9 @@ module.exports = {
   listActions,
   availableMissions,
   studySourcesFor,
+  quoteTrade,
+  tradeWith,
+  survivalStatusFor,
   seedTutorialStart,
   TICK_INTERVALS: behavior.TICK_INTERVALS,
   SCHEDULE_FREQUENCIES: behavior.FREQUENCIES,

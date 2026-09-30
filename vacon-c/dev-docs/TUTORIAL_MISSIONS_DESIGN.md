@@ -12,7 +12,7 @@ called real.
 | **Zelda** | Progression gated by finding/learning the right thing | The mission state machine (`server/missions.js`) + `study` | Both real |
 | **Maniac Mansion** | One place, several different things to find/do inside | `discovery.search` | Real — see below |
 | **Carmen Sandiego** | Gather clues, including from NPCs | `discovery.search` (objects) + `study` from an `experienced NPCs` source (people) + `entity_knowledge` (a fact, held with confidence) | Real |
-| **Oregon Trail** | Resource pressure, having the right things to survive | `economy.js`'s real supply/demand + `inventory.js` + real mortality from deprivation | Real |
+| **Oregon Trail** | Resource pressure, having the right things to survive | `mortality.survivalScarcity` (real, measured 0..1 food/water/medicine shortage) + `areaStats.povertyLine`/`crime.js`'s real deprivation pressure + `barter.exchange` (now wired as the `trade` action) | Real — built as Mission Chain #3, see below |
 | **River City Ransom**, 2026 | Gangs, tools/weapons, taking a city | `organizations` as factions + `control.js`'s takeover key + `contest.js` combat + `salvage.js`'s crafted `protection`-category items | Real, but thinner than "buy a weapon at a shop" — there is no dedicated weapon category, only tools (Hammer, Saw) and crafted `protection` items (a blade). Anything sold as a "weapon" is honestly a crafted `protection` item, not a new category. |
 | **Contra** | The gameplay energy | `contest.js`'s combat resolver — a real, seeded, dangerous fight | Real as a *fight*, not as run-and-gun. VACON-C is a tick-based simulation (a tick is a day) behind a REST API — there is no real-time movement/aiming/shooting layer, and building one is a different kind of project, not a mission-content pass. What carries Contra's spirit honestly is real stakes in a real fight, not literal action gameplay. |
 
@@ -143,11 +143,66 @@ shows them what they now know, and they resolve the mission
 resolving — the same trust model every other mission in this engine
 already uses (`resolveMission`'s outcome is caller-declared).
 
+## Mission Chain #3 — "Keep Enough Set Aside", Oregon Trail's own loop
+
+**The gap found researching this one, the same shape as `study()`
+before Chain #1 wired it:** `barter.exchange` — the real function that
+moves a real object and real money between two entities, seven fields
+per item, buyer/seller barter-skill and trust read for real, a real
+"seller must actually hold it, fall back to an untracked-goods proxy
+otherwise" check — was reachable by nobody. No action verb, no route.
+`grep -rn "barter\." server/actions.js server.js` returned nothing.
+Fixed the same way `study` was: a `trade` action
+(`server/actions.js`), `tradeWith`/`quoteTrade` engine wrappers
+(`server/engine.js`) bound into `ACTION_VERBS`, `quoteTrade` carrying
+the same look-before-you-spend `check` flag `make-thing` already uses.
+`cityId` is derived from the actor's own community, never taken from
+the caller — the same posture `tribeIdFor` holds for a takeover, so a
+player cannot barter in a city they are not in to game the price.
+
+**What "having the right things to survive" honestly maps to.** No
+food, water or medicine item in this engine carries a real `Base_Value`
+— §27 prices seventeen items (metals, gems, materials, two tools, a
+musical instrument) and none of them are survival goods, and
+`merchandise.js`'s own header already recorded this gap for `clothing`,
+`food`, `repair` and `transport` categories. So a player cannot
+literally buy a loaf of bread here, and inventing a price for one would
+be exactly what `items.js`'s own rule forbids. What IS real: survival
+pressure is measured at the CITY level
+(`mortality.survivalScarcity` — the worst of food/water/medicine
+scarcity, not the average) and a resident's own economic standing
+(`areaStats.povertyLine`/`isBelowPovertyLine` against `getNetWorth`) is
+the exact real threshold `crime.js`'s two deprivation checks already
+read — a poor resident in a scarce city has a real, elevated per-tick
+chance of being pushed into theft by `crime.advanceFriction`'s own
+mechanism, already running. Staying above that line is the real stake;
+`trade` (selling something real you carry, e.g. a tool) is the real
+verb that raises it.
+
+**The chain:** `offerSurvivalMission` reads the real scarcity for the
+citizen's own city. If nothing is really short, it returns null — this
+is the one chain of the three that is a correct, expected absence in an
+ordinary well-supplied world, not a gap, unlike Chains #1/#2's
+preconditions (a searchable landmark, two other real people) which are
+closer to universal. When a real shortage exists, a Mission opens
+naming it and the measured percentage, tied to a real property in the
+community. The player accepts it, `trade`s something they carry for
+money (or otherwise raises their own savings), and resolves the mission
+`completed` — the same caller-declared trust model every mission here
+uses. `GET /api/players/:id/survival-status` is the look-before/after
+read, same shape as `study-sources`: real city id, real scarcity
+reading, real poverty line and net worth, real `atRisk` boolean.
+
 ## Where the code lives
 
 `server/tutorialMissions.js` — `seedTutorialStart(worldState, npcId)`
-for Chain #1, `offerMysteryMission(worldState, npcId)` for Chain #2,
-both following the same "takes worldState explicitly" convention as
-every other module here. Not a new player mode, not a new schema
-table — real calls into `inventory.give`/`missions.generateMission`/
-`crime.recordCrime` with content chosen for a first-time citizen.
+composes all three chains, `offerMysteryMission(worldState, npcId)` for
+Chain #2 and `offerSurvivalMission(worldState, npcId)` for Chain #3
+individually, all following the same "takes worldState explicitly"
+convention as every other module here. Not a new player mode, not a
+new schema table — real calls into `inventory.give`/
+`missions.generateMission`/`crime.recordCrime`/`mortality
+.survivalScarcity`/`areaStats.povertyLine` with content chosen for a
+first-time citizen. `server/actions.js`'s `trade` action and
+`server/engine.js`'s `tradeWith`/`quoteTrade`/`survivalStatusFor` are
+Chain #3's other half — `barter.exchange`, reachable at last.

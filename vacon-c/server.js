@@ -757,6 +757,20 @@ app.get('/api/players/:id/study-sources', (req, res) => {
   }
 });
 
+// Oregon Trail's own read: the real scarcity and poverty-line
+// standing behind Mission Chain #3. Same shape as `study-sources`
+// above — a client that cannot ask "am I at risk right now" has to
+// guess at numbers this already computes for real.
+app.get('/api/players/:id/survival-status', (req, res) => {
+  const player = (engine.WorldState.players || []).find((p) => p.id === Number(req.params.id));
+  if (!player) return res.status(404).json({ error: `no player with id ${req.params.id}` });
+  try {
+    return res.json(engine.survivalStatusFor(player.linked_entity_id));
+  } catch (err) {
+    return res.status(404).json({ error: err.message });
+  }
+});
+
 // Mission Chain #1 — "Start Here". See
 // dev-docs/TUTORIAL_MISSIONS_DESIGN.md. Explicit and separate from
 // POST /api/players — a caller who wants tutorial content asks for it;

@@ -32,6 +32,8 @@ const assert = require('node:assert/strict');
 
 const actions = require('../server/actions.js');
 const engine = require('../server/engine.js');
+const inventory = require('../server/inventory.js');
+const economy = require('../server/economy.js');
 
 function citizen({ savings = 100 } = {}) {
   const npc = engine.generateNPC();
@@ -75,9 +77,9 @@ test('every verb an action names is one the engine actually supplies', () => {
   assert.deepEqual(
     actions.REQUIRED_VERBS,
     ['acceptMission', 'addScheduleEvent', 'assessTakeover', 'attemptTakeover',
-      'breakDownItem', 'canMakeThing', 'holdMeeting', 'makeThing', 'reinforceHabit',
+      'breakDownItem', 'canMakeThing', 'holdMeeting', 'makeThing', 'quoteTrade', 'reinforceHabit',
       'repurposeProperty', 'resolveContest', 'searchLocation', 'stripBuilding',
-      'resolveMission', 'studySource'].sort(),
+      'resolveMission', 'studySource', 'tradeWith'].sort(),
   );
 });
 
@@ -228,6 +230,71 @@ test('a habit practised through the dispatcher is the player\'s own', () => {
   engine.dispatchAction(player.id, { action: 'practise-habit', name: 'whittling', amount: 10 });
   assert.equal(engine.listHabits(npc.id).length, 1);
   assert.equal(engine.listHabits(other.id).length, 0, 'nobody else picked it up');
+});
+
+// ---------------------------------------------------------------------------
+// Trade — barter.exchange, reachable at last
+// ---------------------------------------------------------------------------
+
+test('a quote through the dispatcher prices a real item and moves nothing', () => {
+  const { player } = citizen({ savings: 1000 });
+  const seller = engine.generateNPC();
+  inventory.give(engine.WorldState, {
+    entityId: seller.id, itemName: 'Hammer', quantity: 5, tick: engine.WorldState.tick,
+  });
+
+  const out = engine.dispatchAction(player.id, {
+    action: 'trade', sellerId: seller.id, itemName: 'Hammer', quantity: 2, check: true,
+  });
+  assert.ok(out.result.quote.total > 0, 'a real sourced item must price above zero');
+  assert.equal(
+    inventory.quantityOf(engine.WorldState, seller.id, 'Hammer'), 5,
+    'a quote must not move the goods',
+  );
+});
+
+test('a trade through the dispatcher moves real value and the real object', () => {
+  const { npc: buyerNpc, player } = citizen({ savings: 1000 });
+  const seller = engine.generateNPC();
+  inventory.give(engine.WorldState, {
+    entityId: seller.id, itemName: 'Hammer', quantity: 5, tick: engine.WorldState.tick,
+  });
+  const sellerBefore = economy.getLatestFinances(engine.WorldState, seller.id);
+
+  const out = engine.dispatchAction(player.id, {
+    action: 'trade', sellerId: seller.id, itemName: 'Hammer', quantity: 2,
+  });
+
+  assert.equal(out.result.settled, true, out.result.reason);
+  assert.equal(out.result.moved.moved, 2, 'the hammers themselves must move, not just the value');
+  assert.equal(inventory.quantityOf(engine.WorldState, seller.id, 'Hammer'), 3);
+  assert.equal(inventory.quantityOf(engine.WorldState, buyerNpc.id, 'Hammer'), 2);
+
+  const buyerAfter = economy.getLatestFinances(engine.WorldState, buyerNpc.id);
+  const sellerAfter = economy.getLatestFinances(engine.WorldState, seller.id);
+  assert.equal(buyerAfter.savings, 1000 - out.result.deal.total);
+  assert.equal(sellerAfter.savings, (sellerBefore?.savings ?? 0) + out.result.deal.total);
+});
+
+test('a trade refuses without a real seller who actually holds the goods', () => {
+  const { player } = citizen({ savings: 1000 });
+  const seller = engine.generateNPC(); // holds nothing, has no assets either
+  const out = engine.dispatchAction(player.id, {
+    action: 'trade', sellerId: seller.id, itemName: 'Hammer', quantity: 2,
+  });
+  assert.equal(out.result.settled, false);
+  assert.match(out.result.reason, /holds none/);
+});
+
+test('naming an actor is refused for trade too, the same as every other action', () => {
+  const { player } = citizen({ savings: 1000 });
+  const seller = engine.generateNPC();
+  assert.throws(
+    () => engine.dispatchAction(player.id, {
+      action: 'trade', sellerId: seller.id, itemName: 'Hammer', entityId: seller.id,
+    }),
+    /acts as themselves/,
+  );
 });
 
 // ---------------------------------------------------------------------------

@@ -14,6 +14,7 @@ const assert = require('node:assert/strict');
 const engine = require('../server/engine.js');
 const knowledge = require('../server/knowledge.js');
 const worldStore = require('../server/worldStore.js');
+const economy = require('../server/economy.js');
 const tutorialMissions = require('../server/tutorialMissions.js');
 
 // A landmark with a REAL significance, the same fixture shape
@@ -184,7 +185,68 @@ test('Chain #2 end to end: asking the victim really moves the fact to the player
   assert.equal(resolved.result.paid.amount, tutorialMissions.TUTORIAL_MYSTERY_REWARD);
 });
 
-test('seedTutorialStart composes all four, and each half is independently real', () => {
+test('offerSurvivalMission opens a real Mission over a real, measured shortage', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 7009;
+  engine.WorldState.communities.push({ id: 7009, city_id: 9009 });
+  landmark(engine.WorldState, 7901, 'library', 7009);
+  economy.generateResource(engine.WorldState, {
+    cityId: 9009, resourceType: 'food', supply: 1, demand: 100,
+  });
+
+  const offer = tutorialMissions.offerSurvivalMission(engine.WorldState, npc.id);
+  assert.ok(offer, 'no survival mission was opened');
+  assert.ok(offer.scarcity > 0, 'a demand:100/supply:1 resource must read as a real shortage');
+  assert.equal(offer.mission.location_property_id, 7901);
+  assert.match(offer.mission.objective, /shortage/);
+  assert.equal(typeof offer.atRisk, 'boolean');
+
+  // Real end to end: sell something real to build savings, same verb
+  // the design note names as the answer to this mission.
+  const player = engine.generatePlayer({ linkedEntityId: npc.id });
+  engine.generateIndividualFinances(npc.id, {
+    income: 0, savings: 1000, debt: 0, assets: 0,
+  });
+  const seller = engine.generateNPC();
+  const inventory = require('../server/inventory.js');
+  inventory.give(engine.WorldState, {
+    entityId: seller.id, itemName: 'Hammer', quantity: 1, tick: engine.WorldState.tick,
+  });
+  const accepted = engine.dispatchAction(player.id, { action: 'accept-mission', missionId: offer.mission.id });
+  assert.equal(accepted.result.mission.status, 'accepted');
+  const traded = engine.dispatchAction(player.id, {
+    action: 'trade', sellerId: seller.id, itemName: 'Hammer', quantity: 1,
+  });
+  assert.equal(traded.result.settled, true, traded.result.reason);
+  const resolved = engine.dispatchAction(player.id, {
+    action: 'resolve-mission', missionId: offer.mission.id, outcome: 'completed',
+  });
+  assert.equal(resolved.result.paid.amount, tutorialMissions.TUTORIAL_SURVIVAL_REWARD);
+});
+
+test('offerSurvivalMission returns null when the city is not really short of anything', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 7010;
+  engine.WorldState.communities.push({ id: 7010, city_id: 9010 });
+  landmark(engine.WorldState, 7902, 'library', 7010);
+  // No resources tracked at all for city 9010 — survivalScarcity reads 0.
+  assert.equal(tutorialMissions.offerSurvivalMission(engine.WorldState, npc.id), null);
+});
+
+test('survivalStatusFor is a real, live read of the same threshold the mission uses', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 7011;
+  engine.WorldState.communities.push({ id: 7011, city_id: 9011 });
+  economy.generateResource(engine.WorldState, {
+    cityId: 9011, resourceType: 'water', supply: 1, demand: 50,
+  });
+  const status = engine.survivalStatusFor(npc.id);
+  assert.equal(status.cityId, 9011);
+  assert.ok(status.scarcity > 0);
+  assert.equal(typeof status.atRisk, 'boolean');
+});
+
+test('seedTutorialStart composes all five, and each half is independently real', () => {
   const npc = engine.generateNPC({ education: 'basic' });
   npc.communityId = 7005;
   // Order matters: offerMysteryMission casts the first two OTHER real
@@ -199,6 +261,10 @@ test('seedTutorialStart composes all four, and each half is independently real',
   mentor.communityId = 7005;
   hire(engine.WorldState, mentor.id, 'trader');
   landmark(engine.WorldState, 7501, 'library', 7005);
+  engine.WorldState.communities.push({ id: 7005, city_id: 9005 });
+  economy.generateResource(engine.WorldState, {
+    cityId: 9005, resourceType: 'medicine', supply: 1, demand: 80,
+  });
 
   const start = engine.seedTutorialStart(npc.id);
   assert.equal(start.book.field, tutorialMissions.DEFAULT_FIELD);
@@ -207,6 +273,8 @@ test('seedTutorialStart composes all four, and each half is independently real',
   assert.equal(start.mentorId, mentor.id);
   assert.ok(start.mysteryMission);
   assert.equal(start.mysteryVictimId, victim.id);
+  assert.ok(start.survivalMission, 'the real medicine shortage should have opened a survival mission too');
+  assert.ok(start.survivalScarcity > 0);
 });
 
 test('seedTutorialStart is refused for an entity that does not exist', () => {

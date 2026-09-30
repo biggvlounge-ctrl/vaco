@@ -1,9 +1,10 @@
 // server/tutorialMissions.js
 //
-// Mission Chain #1 — "Start Here" — and Chain #2 — "Ask Around". See
+// Mission Chain #1 — "Start Here" — Chain #2 — "Ask Around" — and
+// Chain #3 — "Keep Enough Set Aside". See
 // `dev-docs/TUTORIAL_MISSIONS_DESIGN.md` for the full design note (the
-// six-reference mapping this closes the first two slices of, and why
-// each step is real rather than invented).
+// six-reference mapping this closes three slices of, and why each step
+// is real rather than invented).
 //
 // **Chain #1, three real steps, no new mechanic, no schema change:**
 //
@@ -32,6 +33,22 @@
 //   whoever the player brings to the table. `GET /api/npcs/:id` already
 //   answers what an NPC now knows — no new read route needed.
 //
+// **Chain #3, "Keep Enough Set Aside" — Oregon Trail's own loop:**
+//
+//   `mortality.survivalScarcity` is a real, measured 0..1 reading of
+//   how short a city is of food, water or medicine. `areaStats
+//   .povertyLine`/`isBelowPovertyLine` against the player's own real
+//   `getNetWorth` is the same threshold `crime.js`'s deprivation
+//   checks read — falling below it, in a city that is really short, is
+//   a real, elevated chance of being pushed into theft by
+//   `crime.advanceFriction`'s own already-running mechanism. This
+//   mission names a stake that is already live rather than seeding
+//   one, so it is the one chain of the three that can be unavailable
+//   in an ordinary, well-supplied world — a real and correct null, not
+//   a gap. `trade`/`barter.exchange` (`server/actions.js`) is the real
+//   verb a player has to answer it with: sell something they carry to
+//   build savings back above the line.
+//
 // Every function here takes `worldState` explicitly, same convention as
 // economy.js/players.js/missions.js.
 
@@ -43,6 +60,9 @@ const crime = require('./crime.js');
 const discovery = require('./discovery.js');
 const missions = require('./missions.js');
 const occupations = require('./occupations.js');
+const economy = require('./economy.js');
+const areaStats = require('./areaStats.js');
+const mortality = require('./mortality.js');
 
 //: Chosen, not measured — there is nothing in this engine a tutorial
 //: reward could be derived from, unlike the thresholds this project's
@@ -54,6 +74,7 @@ const occupations = require('./occupations.js');
 const TUTORIAL_EXPLORE_REWARD = 40;
 const TUTORIAL_MENTOR_REWARD = 40;
 const TUTORIAL_MYSTERY_REWARD = 40;
+const TUTORIAL_SURVIVAL_REWARD = 40;
 
 //: §26/crime.js's eight real categories, and the one that reads as
 //: Carmen Sandiego's own register — mundane, solvable, not disturbing.
@@ -185,6 +206,63 @@ function offerMysteryMission(worldState, npcId, options = {}) {
   };
 }
 
+// `knowledge.js` has its own private copy of exactly this lookup, for
+// exactly the same reason `statecraft.js`/`trade.js`/`media.js` each
+// do too — communities carry the real `city_id`, NPCs carry only
+// `communityId`, and this file has no cause to reach into a sibling
+// module's internals to save three lines.
+function cityOf(worldState, npc) {
+  const community = (worldState.communities || []).find((c) => c.id === npc.communityId);
+  return community?.city_id ?? null;
+}
+
+// Chain #3, "Keep Enough Set Aside" — Oregon Trail's own loop: real
+// resource pressure, not survival dressed up as flavour text.
+//
+// `mortality.survivalScarcity` is a real, measured 0..1 reading of how
+// short a city actually is of food, water or medicine (the worst of
+// the three, not the average — a city drowning in food and out of
+// water is not coping). `areaStats.povertyLine`/`isBelowPovertyLine`
+// is the exact real threshold `crime.js`'s two deprivation checks
+// already read: a resident below it, in a city that is really short,
+// has a real, elevated per-tick chance of being pushed into theft by
+// `crime.advanceFriction`'s own mechanism — already running, nothing
+// invented here. This mission does not manufacture a stake the way
+// Chain #2 seeds a crime; it names a stake that is already live in the
+// world, which is why it can fail to apply.
+//
+// Returns null, not a thrown error, when the city has no real
+// scarcity reading at all — no food/water/medicine resources tracked
+// for it, so there is nothing real to stake an Oregon Trail mission
+// on. A freshly generated citizen with plenty all around is a real,
+// possible state, same as a community with nothing left to search.
+function offerSurvivalMission(worldState, npcId, options = {}) {
+  const npc = (worldState.npcs || []).find((n) => n.id === npcId);
+  if (!npc) throw new Error(`offerSurvivalMission: no NPC ${npcId}`);
+  if (npc.communityId == null) return null;
+
+  const cityId = cityOf(worldState, npc);
+  const scarcity = mortality.survivalScarcity(worldState, cityId);
+  if (scarcity <= 0) return null;
+
+  const anchor = (worldState.properties || []).find((p) => p.community_id === npc.communityId);
+  if (!anchor) return null;
+
+  const line = areaStats.povertyLine(worldState);
+  const netWorth = economy.getNetWorth(worldState, npcId);
+  const atRisk = line !== null && areaStats.isBelowPovertyLine(netWorth, line);
+
+  const mission = missions.generateMission(worldState, {
+    locationId: anchor.id,
+    objective: `Food, water or medicine is running short here (${Math.round(scarcity * 100)}% `
+      + 'shortage) — keep enough set aside that you are not the one caught short',
+    reward: options.reward ?? TUTORIAL_SURVIVAL_REWARD,
+  });
+  return {
+    mission, cityId, scarcity, povertyLine: line, netWorth, atRisk,
+  };
+}
+
 // The whole chain, offered together — what a citizen-mode player
 // binding gets the instant they exist. Each half is independently
 // optional (a community with nothing searchable, or nobody else
@@ -195,6 +273,7 @@ function seedTutorialStart(worldState, npcId, options = {}) {
   const exploreMission = offerExploreMission(worldState, npcId, options);
   const mentor = offerMentorMission(worldState, npcId, options);
   const mystery = offerMysteryMission(worldState, npcId, options);
+  const survival = offerSurvivalMission(worldState, npcId, options);
   return {
     book,
     exploreMission,
@@ -202,6 +281,8 @@ function seedTutorialStart(worldState, npcId, options = {}) {
     mentorId: mentor?.mentorId ?? null,
     mysteryMission: mystery?.mission ?? null,
     mysteryVictimId: mystery?.victimId ?? null,
+    survivalMission: survival?.mission ?? null,
+    survivalScarcity: survival?.scarcity ?? null,
   };
 }
 
@@ -209,11 +290,13 @@ module.exports = {
   TUTORIAL_EXPLORE_REWARD,
   TUTORIAL_MENTOR_REWARD,
   TUTORIAL_MYSTERY_REWARD,
+  TUTORIAL_SURVIVAL_REWARD,
   TUTORIAL_CRIME_CATEGORY,
   DEFAULT_FIELD,
   giveStartingBook,
   offerExploreMission,
   offerMentorMission,
   offerMysteryMission,
+  offerSurvivalMission,
   seedTutorialStart,
 };
