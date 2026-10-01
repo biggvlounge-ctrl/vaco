@@ -18,9 +18,16 @@
 //
 // `grep -rn "barter\." server/*.js` returns **nothing outside
 // `barter.js` and `inventory.js`** — no route, no tick phase, and
-// `engine.js` does not mention the module at all. Part of it IS
-// reached: `crime.js` calls `valueOfHoldings` to decide which item a
-// thief takes. **The trade half has never run.**
+// `engine.js` does not mention the module at all. **This paragraph
+// used to claim `crime.js` reaches part of it** — "`crime.js` calls
+// `valueOfHoldings` to decide which item a thief takes" — and that was
+// false even when it was written: `crime.js` has always priced a
+// theft's target item with its own private `barterValue()`, never
+// `barter.valueOfHoldings`. The false claim was noticed and recorded
+// in a commit message 18 Sep 2026 and never corrected here, which is
+// why `valueOfHoldings` went on having no real caller in `server/` for
+// another 13 days — see `economy.js#heldInventoryValue` for where it
+// finally got one. **The trade half had never run.**
 //
 // That is CLAUDE.md's own recorded shape for `contest.js`: "a resolver
 // nothing calls is the eleventh rule's sibling" — five disciplines,

@@ -223,11 +223,15 @@ function valueOfHoldings(worldState, entityId, options = {}) {
     // did not, and by then the world was full of things it would throw
     // on: `knowledge.js`'s books have been unpriced and in 12% of
     // people's hands since §24, and `salvage.js` added ten materials
-    // and eight products on the same principle. It has no caller in
-    // `server/` today — `trade.js`'s own comment says `crime.js` calls
-    // it, and `crime.js` does not — so this was a loaded gun rather
-    // than a live crash, and the first honest caller would have stopped
-    // the tick.
+    // and eight products on the same principle. **This had no real
+    // caller in `server/` for a long time** — `trade.js`'s own header
+    // used to claim `crime.js` called it, and `crime.js` never did; it
+    // has always priced a theft's target with its own private
+    // `barterValue()`. So this was a loaded gun rather than a live
+    // crash. `economy.js#heldInventoryValue` is the first honest
+    // caller, now that `economy.getNetWorth` folds this in — see its
+    // header for the "owns three buildings, reads as destitute" shape
+    // this closes for inventory holdings specifically.
     if (!Number.isFinite(Number(item.baseValue))) continue;
     const score = barterScore(worldState, holding.item_name, { cityId });
     total += score.Final_Barter_Score

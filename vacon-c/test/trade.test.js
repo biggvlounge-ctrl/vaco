@@ -310,9 +310,9 @@ test('a shortage in one city does not raise distress-sale pressure in another', 
   // RISK` (asserted below), so this needs a tenth of that test's
   // person-ticks for the same statistical separation.
   //
-  // **Why each seller's finances are reset every tick.** A real sale
-  // pays the seller, and `economy.getNetWorth` would carry them over
-  // the poverty line after two or three — at which point
+  // **Why each seller's finances AND inventory are reset every tick.**
+  // A real sale pays the seller, and `economy.getNetWorth` would carry
+  // them over the poverty line after two or three — at which point
   // `deprivationPressure` returns 0 and they stop selling in EITHER
   // city, for the same number of sales, regardless of how much
   // pressure drove them there. That would make the two cities
@@ -323,6 +323,17 @@ test('a shortage in one city does not raise distress-sale pressure in another', 
   // same way a theft in `crime.js` does not change the thief's
   // recorded net worth — holding pressure constant is what makes the
   // incident COUNT the thing that differs.
+  //
+  // **Topped up to exactly one Silver Ingot, not stockpiled.**
+  // `economy.getNetWorth` now folds in `barter.valueOfHoldings`
+  // (`economy.js#heldInventoryValue`), so a seller holding fifty — this
+  // fixture's own earlier amount, chosen only so a sale never ran them
+  // out — would price at roughly 2,500 and read as comfortably above
+  // the line regardless of savings, which is exactly the bug that fix
+  // closed. One unit (~50) keeps combined net worth near 150, still
+  // under the 250 line, and giving back only what a sale actually took
+  // (0 or 1) keeps a seller able to try again next tick without ever
+  // holding more than they need to.
   const w = marketWorld();
   w.communities.push({ id: 2, city_id: 2, population: 0 });
   w.cities.push({ id: 2, name: 'Testbed Two' });
@@ -331,7 +342,7 @@ test('a shortage in one city does not raise distress-sale pressure in another', 
   function seedCity(communityId, cityId) {
     for (let i = 0; i < 20; i += 1) {
       const seller = person(w, { savings: 100, communityId });
-      inventory.give(w, { entityId: seller.id, itemName: 'Silver Ingot', quantity: 50 });
+      inventory.give(w, { entityId: seller.id, itemName: 'Silver Ingot', quantity: 1 });
       poorByCity[cityId].push(seller);
     }
     for (let i = 0; i < 15; i += 1) person(w, { savings: 500, communityId });
@@ -355,6 +366,10 @@ test('a shortage in one city does not raise distress-sale pressure in another', 
     }
     for (const seller of [...poorByCity[1], ...poorByCity[2]]) {
       economy.getLatestFinances(w, seller.id).savings = 100;
+      const held = inventory.quantityOf(w, seller.id, 'Silver Ingot');
+      if (held < 1) {
+        inventory.give(w, { entityId: seller.id, itemName: 'Silver Ingot', quantity: 1 - held });
+      }
     }
   }
 

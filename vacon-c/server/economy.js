@@ -366,7 +366,32 @@ function getNetWorth(worldState, entityId) {
   const liquid = finances
     ? (finances.assets || 0) + (finances.savings || 0) - (finances.debt || 0)
     : 0;
-  return liquid + ownedPropertyValue(worldState, entityId);
+  return liquid + ownedPropertyValue(worldState, entityId) + heldInventoryValue(worldState, entityId);
+}
+
+// The current value of what this entity is physically holding —
+// unequipped and equipped alike, the same population `barter.
+// valueOfHoldings` prices.
+//
+// **The same gap the property fix above closed, one asset class
+// later.** `barter.valueOfHoldings` is complete, tested, and had no
+// caller anywhere in `server/` — its own header already named this:
+// "It has no caller in server/ today... so this was a loaded gun
+// rather than a live crash." A person holding nothing but a Gold Bar
+// (base value 1800) read as net worth 0 and therefore maximally
+// destitute to `crime.deprivationPressure` and every poverty-line
+// check, exactly the "owns three buildings, reads as destitute"
+// failure the property fix above describes — just for what somebody
+// is carrying instead of what they own.
+//
+// Lazily required for the same reason `ownedPropertyValue` requires
+// `property.js` lazily: `barter.js` already requires THIS module at
+// its own top level, so a top-level require here would be the real
+// cycle rather than a hypothetical one.
+function heldInventoryValue(worldState, entityId) {
+  // eslint-disable-next-line global-require
+  const barter = require('./barter.js');
+  return barter.valueOfHoldings(worldState, entityId);
 }
 
 // The current value of the property this entity holds in its own name.

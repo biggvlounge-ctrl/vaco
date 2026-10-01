@@ -14,6 +14,8 @@ const economy = require('../server/economy.js');
 const tick = require('../server/tick.js');
 const territory = require('../server/territory.js');
 const crime = require('../server/crime.js');
+const inventory = require('../server/inventory.js');
+const barter = require('../server/barter.js');
 
 function freshWorld() {
   return {
@@ -462,6 +464,7 @@ function wealthWorld() {
   return {
     tick: 0, nextEntityId: 1, entities: [],
     npcs: [], properties: [], ownershipRecords: [], individualFinances: [],
+    inventory: [], resources: [], communities: [],
   };
 }
 
@@ -551,4 +554,72 @@ test('somebody who owns nothing is unchanged by this', () => {
   });
   assert.equal(economy.getNetWorth(w, 9), 400);
   assert.equal(economy.ownedPropertyValue(w, 9), 0);
+});
+
+// -- net worth includes what you are carrying ------------------------------
+//
+// The same gap the property section above closes, one asset class
+// later: `barter.valueOfHoldings` was complete, tested, and had no
+// real caller anywhere in `server/` — see its own header and
+// `economy.js#heldInventoryValue`. A person holding nothing but a
+// priced item read as worth nothing at all.
+
+test('somebody holding a valuable item is not destitute', () => {
+  const w = wealthWorld();
+  w.npcs.push({ id: 11, status: 'active' });
+  inventory.give(w, { entityId: 11, itemName: 'Gold Bar' });
+
+  const held = barter.valueOfHoldings(w, 11);
+  assert.ok(held > 0, 'a Gold Bar priced at nothing');
+  assert.equal(economy.getNetWorth(w, 11), held,
+    'a person with no cash and a priced holding read as worth nothing');
+});
+
+test('cash, property and inventory all add rather than any one replacing another', () => {
+  const w = wealthWorld();
+  w.npcs.push({ id: 12, status: 'active' });
+  const home = property.generateProperty(w, {
+    type: 'residential', value: 10000, lifecycleStage: 'operation',
+  });
+  home.condition = 100;
+  property.recordOwnership(w, {
+    entityId: home.id, ownerEntityId: 12, ownerType: 'individual', tick: 0,
+  });
+  w.individualFinances.push({
+    id: 1, entity_id: 12, tick: 0, assets: 0, savings: 500, debt: 200, income: 0, expenses: 0,
+  });
+  inventory.give(w, { entityId: 12, itemName: 'Gold Bar' });
+  const held = barter.valueOfHoldings(w, 12);
+
+  assert.equal(economy.getNetWorth(w, 12), 10000 + 500 - 200 + held,
+    '10000 property + 500 savings - 200 debt + the Gold Bar, not any one of them alone');
+});
+
+test('an equipped item still counts — it is still theirs', () => {
+  // `trade.sellableOf` excludes an equipped item because selling the
+  // coat off your own back is a different decision from selling a
+  // spare — but wearing it does not make it not yours. Net worth and
+  // "what is for sale right now" are different questions, and
+  // `barter.valueOfHoldings` (unlike `trade.sellableOf`) deliberately
+  // asks the first one.
+  const w = wealthWorld();
+  w.npcs.push({ id: 13, status: 'active' });
+  inventory.give(w, { entityId: 13, itemName: 'Gold Bar', equipped: true });
+
+  assert.ok(economy.getNetWorth(w, 13) > 0, 'an equipped item vanished from net worth');
+});
+
+test('an item with no catalogue price is skipped, not thrown on', () => {
+  // `barterScore` throws for an item with no `Base_Value` — right for a
+  // caller asking a direct question about a priced good, wrong for a
+  // sweep over a whole population's finances. `getNetWorth` has 18 call
+  // sites; one person holding an unpriced book must not take the tick
+  // down with them.
+  const w = wealthWorld();
+  w.npcs.push({ id: 14, status: 'active' });
+  w.barterItems = [{ name: 'Field Notes', category: 'knowledge' }];
+  inventory.give(w, { entityId: 14, itemName: 'Field Notes' });
+
+  assert.doesNotThrow(() => economy.getNetWorth(w, 14));
+  assert.equal(economy.getNetWorth(w, 14), 0);
 });
