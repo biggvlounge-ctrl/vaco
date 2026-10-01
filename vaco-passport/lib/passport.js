@@ -61,19 +61,35 @@ async function registerPassport(store, options = {}) {
   if (businessId === undefined || businessId === null) {
     throw new Error('registerPassport requires a businessId');
   }
+  // **Normalized to a real number here, once, rather than trusting
+  // whatever type the caller sent.** An audit found this was exactly
+  // the gap VASH TAP's own `registerTap` had before its own fix:
+  // `findPassport` and every route but this one compare with
+  // `Number(req.params.businessId) === passport.businessId`, and HVNTZ's
+  // own `business.id` is a real number (`nextBusinessId++`). A client
+  // that JSON-encoded the id as a string — an easy, honest mistake,
+  // since it travels as a URL segment everywhere else in this
+  // ecosystem — registered a real Passport that `GET
+  // /api/passports/:businessId`, `verify` and `network-activity` then
+  // silently never found: `"9002" !== 9002`, permanently, with no
+  // recovery but editing the store directly.
+  const normalizedBusinessId = Number(businessId);
+  if (!Number.isFinite(normalizedBusinessId)) {
+    throw new Error(`registerPassport: businessId must be a number, got ${JSON.stringify(businessId)}`);
+  }
   if (typeof businessFetchFn !== 'function') {
     throw new Error('registerPassport requires businessFetchFn(businessId)');
   }
-  const business = await businessFetchFn(businessId);
-  if (!business) throw new Error(`registerPassport: no business with id ${businessId}`);
+  const business = await businessFetchFn(normalizedBusinessId);
+  if (!business) throw new Error(`registerPassport: no business with id ${normalizedBusinessId}`);
 
-  if (findPassport(store, businessId)) {
-    throw new Error(`registerPassport: business ${businessId} already has a Passport`);
+  if (findPassport(store, normalizedBusinessId)) {
+    throw new Error(`registerPassport: business ${normalizedBusinessId} already has a Passport`);
   }
 
   const passport = {
     id: store.nextPassportId++,
-    businessId,
+    businessId: normalizedBusinessId,
     level: 'member',
     verifiedAt: null,
     networkActivity: null,

@@ -42,6 +42,41 @@ test('registerPassport verifies the business is real rather than trusting the id
   assert.strictEqual(store.passports.length, 0, 'a Passport for a business that does not exist must not be recorded');
 });
 
+test('registerPassport normalizes a string businessId to the real number HVNTZ uses', async () => {
+  // The gap an audit found: HVNTZ's own `GET /api/business/:id` route
+  // coerces (`Number(req.params.id)`) — a real `fetchHvntzBusiness`
+  // call succeeds whether the caller's businessId was a string or a
+  // number, because it only ever travels as a URL segment. But nothing
+  // coerced what got STORED on the passport, so a client that
+  // JSON-encoded businessId as `"9001"` registered a real Passport that
+  // `GET /api/passports/:businessId`, `verify` and `network-activity`
+  // (all of which compare with `Number(...) === passport.businessId`)
+  // then never found — an easy, honest client mistake with no test
+  // covering it. `looseBusinessFetchFn` mimics HVNTZ's own real
+  // coercion rather than `fakeBusinessFetchFn`'s strict one, so this
+  // test actually exercises the gap instead of just failing the lookup
+  // outright.
+  const looseBusinessFetchFn = async (businessId) => (
+    Number(businessId) === HUNT_ID ? { id: HUNT_ID, name: 'HUNT Barber Shop', ownerId: 'owner-hunt-barber-shop' } : null
+  );
+  const store = createPassportStore();
+  const passport = await registerPassport(store, {
+    businessId: String(HUNT_ID), businessFetchFn: looseBusinessFetchFn,
+  });
+  assert.strictEqual(passport.businessId, HUNT_ID, 'stored businessId must be the real number, not the string a client sent');
+  assert.strictEqual(typeof passport.businessId, 'number');
+  assert.strictEqual(findPassport(store, HUNT_ID), passport, 'the real number lookup every other route uses must find it');
+});
+
+test('registerPassport rejects a businessId that cannot be a real number', async () => {
+  const store = createPassportStore();
+  await assert.rejects(
+    registerPassport(store, { businessId: 'not-a-number', businessFetchFn: fakeBusinessFetchFn }),
+    /businessId must be a number/,
+  );
+  assert.strictEqual(store.passports.length, 0);
+});
+
 test('registerPassport starts a business at Level 1, member', async () => {
   const store = createPassportStore();
   const passport = await registerPassport(store, { businessId: HUNT_ID, businessFetchFn: fakeBusinessFetchFn });
