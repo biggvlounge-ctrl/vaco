@@ -167,7 +167,8 @@ function computeSplit(agreement, totalAmount) {
 // own `decisionLog`).
 async function distributeRevenue(store, options = {}) {
   const {
-    agreementId, totalAmount, payerId, sourceType = null, sourceId = null, settleFn, now = Date.now(),
+    agreementId, totalAmount, payerId, sourceType = null, sourceId = null,
+    idempotencyKey, settleFn, now = Date.now(),
   } = options;
   const agreement = findRevenueShareAgreement(store, agreementId);
   if (!agreement) throw new Error(`distributeRevenue: no agreement ${agreementId}`);
@@ -178,9 +179,27 @@ async function distributeRevenue(store, options = {}) {
     throw new Error(`distributeRevenue: agreement ${agreementId} expired at ${new Date(agreement.expiresAt).toISOString()}`);
   }
   if (!payerId) throw new Error('distributeRevenue requires a payerId');
+  // **Required, per distribution, not per agreement.** An audit found
+  // the reason below used to be `hvntz_revenue_share:${agreement.id}`
+  // alone — the SAME string for every distribution ever made against
+  // one agreement, forever. V3's idempotency guard is supposed to 422
+  // a reused key whose body differs, but its own fingerprint had an
+  // independent bug (see v3/lib/idempotency.js's own header) that made
+  // it blind to leg amounts, so a second, genuinely different
+  // distribution silently replayed the FIRST one's result instead of
+  // moving any money. With that fixed, reusing one key per agreement
+  // stops being silently wrong and becomes loudly broken instead — a
+  // business could never distribute through the same agreement twice,
+  // which defeats §17/§44's own point: this is for RECURRING network
+  // revenue. A key per distribution, supplied by the caller the same
+  // way VASH TAP's own `/pay` route requires one, is what makes a
+  // genuine retry (same key) safe to repeat and a genuine second
+  // distribution (a new key) actually go through.
+  if (!idempotencyKey) throw new Error('distributeRevenue requires an idempotencyKey');
   if (typeof settleFn !== 'function') throw new Error('distributeRevenue requires settleFn(legs, meta)');
 
   const legs = computeSplit(agreement, totalAmount);
+  const reason = `hvntz_revenue_share:${agreement.id}:${idempotencyKey}`;
 
   // Never recorded as distributed before the ledger confirms it —
   // the same rule VASH TAP's `payViaTap` and VAGO's group wagers
@@ -189,9 +208,9 @@ async function distributeRevenue(store, options = {}) {
   // below runs and no distribution record exists for money that never
   // actually moved.
   const settlementLegs = legs.map((leg) => ({
-    fromUserId: payerId, toUserId: leg.payeeId, amount: leg.amount, reason: `hvntz_revenue_share:${agreement.id}`,
+    fromUserId: payerId, toUserId: leg.payeeId, amount: leg.amount, reason,
   }));
-  const settlementResult = await settleFn(settlementLegs, { reason: `hvntz_revenue_share:${agreement.id}` });
+  const settlementResult = await settleFn(settlementLegs, { reason });
 
   const distribution = {
     id: store.nextRevenueDistributionId++,
@@ -201,6 +220,7 @@ async function distributeRevenue(store, options = {}) {
     payerId,
     sourceType,
     sourceId,
+    idempotencyKey,
     legs,
     settlementId: settlementResult && settlementResult.id !== undefined ? settlementResult.id : null,
     createdAt: now,

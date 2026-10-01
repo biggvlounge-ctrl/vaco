@@ -76,14 +76,30 @@ function getHunt(store, huntId) {
 // hosted by, and §14's own worked example only ever connects a
 // checkpoint to *its own host business's* Network, never another
 // business's. `networkId` on a checkpoint enforces exactly that.
+// **Normalized to a real number here, once.** An audit found that
+// `linkCheckpointNetwork`'s own route (`server.js`'s `/network` link)
+// coerces `huntId` and `checkpointId` with `Number(req.params...)` right
+// next to this call but passed `networkId` through from the JSON body
+// completely raw — unlike every sibling id in this file. `findNetwork`
+// compares with strict `===` against a real auto-incremented number, so
+// a client that JSON-encoded `networkId` as a string registered a
+// Tap... no, a checkpoint/network link that then threw "no network with
+// id" even for a real network, purely because `"1" !== 1`. The same
+// shape already found and fixed twice this session in vash-tap and
+// vaco-passport. Fixed once, here, so both this function's callers
+// (the link route and `addCheckpoint`'s own inline `networkId`) get it.
 function resolveCheckpointNetworkId(store, networkId, businessId) {
   if (networkId === null || networkId === undefined) return null;
-  const network = findNetwork(store, networkId);
-  if (!network) throw new Error(`no network with id ${networkId}`);
-  if (network.hubBusinessId !== businessId) {
-    throw new Error(`network ${networkId} does not belong to this checkpoint's own business (${businessId})`);
+  const normalizedNetworkId = Number(networkId);
+  if (!Number.isFinite(normalizedNetworkId)) {
+    throw new Error(`networkId must be a number, got ${JSON.stringify(networkId)}`);
   }
-  return networkId;
+  const network = findNetwork(store, normalizedNetworkId);
+  if (!network) throw new Error(`no network with id ${normalizedNetworkId}`);
+  if (network.hubBusinessId !== businessId) {
+    throw new Error(`network ${normalizedNetworkId} does not belong to this checkpoint's own business (${businessId})`);
+  }
+  return normalizedNetworkId;
 }
 
 function addCheckpoint(store, options = {}) {

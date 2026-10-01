@@ -96,6 +96,25 @@ test('linkCheckpointNetwork connects an existing checkpoint to its business\'s N
   assert.strictEqual(linked.networkId, network.id);
 });
 
+test('linkCheckpointNetwork normalizes a string networkId to the real number findNetwork uses', async () => {
+  // The gap an audit found: this route's own siblings (huntId,
+  // checkpointId) coerce with Number(req.params...) right next to it,
+  // but networkId came straight from the JSON body uncoerced. A client
+  // that JSON-encoded networkId as a string threw "no network with id"
+  // for a network that genuinely existed, because findNetwork compares
+  // with strict === against a real number. Same shape as the
+  // businessId bug already found and fixed in vash-tap and
+  // vaco-passport this session.
+  const store = createHvntzStore();
+  const { business, hunt, checkpoint } = await checkpointFixture(store);
+  const network = createNetwork(store, { hubBusinessId: business.id, name: 'The Standard Rooftop Network' });
+  const linked = linkCheckpointNetwork(store, {
+    huntId: hunt.id, checkpointId: checkpoint.id, networkId: String(network.id),
+  });
+  assert.strictEqual(linked.networkId, network.id);
+  assert.strictEqual(typeof linked.networkId, 'number');
+});
+
 test('linkCheckpointNetwork refuses a network belonging to a different business', async () => {
   const store = createHvntzStore();
   const { hunt, checkpoint } = await checkpointFixture(store);

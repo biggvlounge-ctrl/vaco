@@ -69,11 +69,29 @@ async function ensureSchema(pool) {
   await pool.query(SCHEMA);
 }
 
+// Deterministic, deep: every object's own keys sorted, at every level
+// of nesting. Own copy, same reason `lib/idempotency.js`'s version is
+// — see that file's own header for the bug this form avoids: passing
+// an array to `JSON.stringify` as a replacer filters EVERY nesting
+// level by that same top-level key list, which silently stripped a
+// settle request's own leg amounts and recipients out of the
+// fingerprint there. This file's previous `JSON.stringify(body)` never
+// had that specific bug, but it also was not byte-identical to the
+// in-memory version's own fingerprint (different separator, no key
+// sorting) despite this function's own comment claiming "the same
+// fingerprint" — now it actually is.
+function stableStringify(value) {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+  const keys = Object.keys(value).sort();
+  return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify(value[k])}`).join(',')}}`;
+}
+
 // The same fingerprint the in-memory version computes, so a key issued
 // against one backend means the same thing against the other.
 function fingerprint(routeName, body) {
   return crypto.createHash('sha256')
-    .update(`${routeName}:${JSON.stringify(body)}`)
+    .update(`${routeName}\n${stableStringify(body || {})}`)
     .digest('hex');
 }
 
@@ -201,4 +219,4 @@ async function describeIdempotency(pool) {
   };
 }
 
-module.exports = { SCHEMA, ensureSchema, fingerprint, idempotent, sweepExpired, describeIdempotency };
+module.exports = { SCHEMA, ensureSchema, stableStringify, fingerprint, idempotent, sweepExpired, describeIdempotency };

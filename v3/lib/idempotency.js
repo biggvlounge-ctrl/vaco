@@ -45,11 +45,42 @@ const MS_PER_HOUR = 60 * 60 * 1000;
 
 class IdempotencyConflictError extends Error {}
 
+// Deterministic, deep: every object's own keys sorted, at every level
+// of nesting, not just the top one.
+//
+// **The bug this replaces.** The previous version was
+// `JSON.stringify(body, Object.keys(body).sort())` — passing an array
+// as `JSON.stringify`'s second argument makes it a property ALLOWLIST,
+// and per the spec that allowlist applies at every nesting level, not
+// just the top. For a settle request `{ legs: [...], reason: '...' }`,
+// the allowlist is `['legs', 'reason']` — so every leg object's own
+// keys (`fromUserId`, `toUserId`, `amount`) matched neither name and
+// were silently dropped, fingerprinting `{legs:[{fromUserId:'a',...,
+// amount:100}]}` and `{legs:[{fromUserId:'a',...,amount:99999}]}`
+// identically. Two settlements with the same `reason` but genuinely
+// different amounts or recipients fingerprinted the same, so a reused
+// key did not hit the 422 "different request" guard this file's own
+// header promises — it silently replayed the FIRST settlement's result
+// for the second, different one. Confirmed: `hvntz/lib/
+// revenueShareAgreements.js#distributeRevenue` reused one key per
+// AGREEMENT rather than per distribution, relying on exactly this
+// 422 to catch any accidental reuse, and the guard was not catching it.
+//
+// No test caught this because this file had no test suite at all —
+// only the Postgres-backed sibling (`idempotencyPg.js`, which never
+// had this bug, since it fingerprints with plain `JSON.stringify(body)`
+// and no replacer) has one. See test/idempotency.test.js.
+function stableStringify(value) {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+  const keys = Object.keys(value).sort();
+  return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify(value[k])}`).join(',')}}`;
+}
+
 // A stable fingerprint of what was actually asked. Key order is
 // normalised so two logically identical bodies hash the same.
 function fingerprint(route, body) {
-  const stable = JSON.stringify(body, Object.keys(body || {}).sort());
-  return crypto.createHash('sha256').update(`${route}\n${stable}`).digest('hex');
+  return crypto.createHash('sha256').update(`${route}\n${stableStringify(body || {})}`).digest('hex');
 }
 
 function readKey(req) {
@@ -144,6 +175,7 @@ function describeIdempotency(store) {
 module.exports = {
   DEFAULT_RETENTION_HOURS,
   IdempotencyConflictError,
+  stableStringify,
   fingerprint,
   readKey,
   findRecord,

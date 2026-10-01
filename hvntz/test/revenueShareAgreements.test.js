@@ -26,6 +26,38 @@ function recorder() {
   return fn;
 }
 
+// **A settleFn that actually enforces V3's real idempotency contract**,
+// faithfully enough to catch the bug `recorder()` cannot: every other
+// test in this file uses `recorder()`, which accepts any call and never
+// looks at `meta.reason` — so it would record two settlements as "both
+// happened" even if the real V3 ledger would have replayed the first
+// one's result for the second. server.js's own `settleVCoin` derives
+// V3's real `Idempotency-Key` header from `meta.reason` alone (see its
+// own comment), so this keys its memory the same way: a repeated
+// reason with the SAME legs replays; a repeated reason with DIFFERENT
+// legs is refused, mirroring V3's real 422 rather than its pre-fix
+// silent replay.
+function fakeV3IdempotentSettleFn() {
+  const byReason = new Map();
+  let realCalls = 0;
+  const fn = async (settlementLegs, meta = {}) => {
+    const print = JSON.stringify(settlementLegs);
+    const existing = meta.reason ? byReason.get(meta.reason) : undefined;
+    if (existing) {
+      if (existing.print !== print) {
+        throw new Error(`Idempotency-Key "${meta.reason}" was already used for a different request`);
+      }
+      return { ...existing.result, idempotentReplay: true };
+    }
+    realCalls += 1;
+    const result = { id: `settlement-${realCalls}` };
+    if (meta.reason) byReason.set(meta.reason, { print, result });
+    return result;
+  };
+  fn.realCalls = () => realCalls;
+  return fn;
+}
+
 function hubNetwork(store) {
   const business = registerBusiness(store, { name: 'The Standard Rooftop', ownerId: 'owner-1' });
   const network = createNetwork(store, { hubBusinessId: business.id, name: 'The Standard Rooftop Network' });
@@ -140,7 +172,7 @@ test('distributeRevenue moves real money to every named payee, matching §17\'s 
   });
   const settleFn = recorder();
   const distribution = await distributeRevenue(store, {
-    agreementId: agreement.id, totalAmount: 10000, payerId: 'owner-1', settleFn,
+    agreementId: agreement.id, totalAmount: 10000, payerId: 'owner-1', idempotencyKey: 'dist-1', settleFn,
   });
   assert.strictEqual(settleFn.totalTo('dj-marcus'), 1500);
   assert.strictEqual(settleFn.totalTo('bartender-pool-account'), 1500);
@@ -157,7 +189,7 @@ test('distributeRevenue refuses to distribute through an archived agreement', as
   });
   archiveRevenueShareAgreement(store, { agreementId: agreement.id });
   await assert.rejects(
-    distributeRevenue(store, { agreementId: agreement.id, totalAmount: 100, payerId: 'owner-1', settleFn: recorder() }),
+    distributeRevenue(store, { agreementId: agreement.id, totalAmount: 100, payerId: 'owner-1', idempotencyKey: 'dist-1', settleFn: recorder() }),
     /is not active/,
   );
 });
@@ -170,7 +202,7 @@ test('distributeRevenue records nothing when settleFn throws — never recorded 
   });
   const failingSettleFn = async () => { throw new Error('insufficient balance'); };
   await assert.rejects(
-    distributeRevenue(store, { agreementId: agreement.id, totalAmount: 100, payerId: 'owner-1', settleFn: failingSettleFn }),
+    distributeRevenue(store, { agreementId: agreement.id, totalAmount: 100, payerId: 'owner-1', idempotencyKey: 'dist-1', settleFn: failingSettleFn }),
     /insufficient balance/,
   );
   assert.strictEqual(store.revenueDistributions.length, 0);
@@ -183,7 +215,8 @@ test('distributeRevenue records real §16 attribution when sourceType/sourceId a
     networkId: network.id, name: 'Split', splitType: 'percentage', shares: workedExampleShares(),
   });
   const distribution = await distributeRevenue(store, {
-    agreementId: agreement.id, totalAmount: 100, payerId: 'owner-1', sourceType: 'hunt', sourceId: 7, settleFn: recorder(),
+    agreementId: agreement.id, totalAmount: 100, payerId: 'owner-1', sourceType: 'hunt', sourceId: 7,
+    idempotencyKey: 'dist-1', settleFn: recorder(),
   });
   assert.strictEqual(distribution.sourceType, 'hunt');
   assert.strictEqual(distribution.sourceId, 7);
@@ -230,7 +263,7 @@ test('distributeRevenue refuses to distribute through an expired agreement', asy
   });
   await new Promise((r) => setTimeout(r, 60));
   await assert.rejects(
-    distributeRevenue(store, { agreementId: agreement.id, totalAmount: 100, payerId: 'owner-1', settleFn: recorder() }),
+    distributeRevenue(store, { agreementId: agreement.id, totalAmount: 100, payerId: 'owner-1', idempotencyKey: 'dist-1', settleFn: recorder() }),
     /expired at/,
   );
 });
@@ -241,7 +274,9 @@ test('distributeRevenue still succeeds right up until expiry', async () => {
   const agreement = createRevenueShareAgreement(store, {
     networkId: network.id, name: 'Split', splitType: 'percentage', shares: workedExampleShares(), expiresAt: Date.now() + 60 * 60 * 1000,
   });
-  const distribution = await distributeRevenue(store, { agreementId: agreement.id, totalAmount: 100, payerId: 'owner-1', settleFn: recorder() });
+  const distribution = await distributeRevenue(store, {
+    agreementId: agreement.id, totalAmount: 100, payerId: 'owner-1', idempotencyKey: 'dist-1', settleFn: recorder(),
+  });
   assert.ok(distribution.id);
 });
 
@@ -296,7 +331,70 @@ test('distributionsForNetwork lists only that network\'s own real distributions'
   const agreement = createRevenueShareAgreement(store, {
     networkId: network.id, name: 'Split', splitType: 'percentage', shares: workedExampleShares(),
   });
-  await distributeRevenue(store, { agreementId: agreement.id, totalAmount: 100, payerId: 'owner-1', settleFn: recorder() });
-  await distributeRevenue(store, { agreementId: agreement.id, totalAmount: 200, payerId: 'owner-1', settleFn: recorder() });
+  // **Two real, distinct distributions against the SAME agreement —
+  // the bug an audit found.** `idempotencyKey` has to differ here: the
+  // old code reused one key per AGREEMENT regardless of how many
+  // distributions were made through it, so the second call below
+  // would have silently replayed the first one's result instead of
+  // actually moving the 200.
+  await distributeRevenue(store, { agreementId: agreement.id, totalAmount: 100, payerId: 'owner-1', idempotencyKey: 'dist-1', settleFn: recorder() });
+  await distributeRevenue(store, { agreementId: agreement.id, totalAmount: 200, payerId: 'owner-1', idempotencyKey: 'dist-2', settleFn: recorder() });
   assert.strictEqual(distributionsForNetwork(store, network.id).length, 2);
+});
+
+test('a second, genuinely different distribution against one agreement actually settles, against a real idempotency-enforcing ledger', async () => {
+  // The bug itself, proven against something that behaves like the
+  // real V3 ledger rather than `recorder()`'s unconditional accept.
+  // Before the fix, `distributeRevenue` sent BOTH settlements under the
+  // identical reason `hvntz_revenue_share:${agreement.id}` — no per-
+  // distribution component at all — so this fake (and the real V3
+  // idempotency middleware it mirrors) would have refused the second,
+  // different-amount call outright rather than letting it settle.
+  const store = createHvntzStore();
+  const { network } = hubNetwork(store);
+  const agreement = createRevenueShareAgreement(store, {
+    networkId: network.id, name: 'Split', splitType: 'percentage', shares: workedExampleShares(),
+  });
+  const settleFn = fakeV3IdempotentSettleFn();
+
+  const first = await distributeRevenue(store, {
+    agreementId: agreement.id, totalAmount: 100, payerId: 'owner-1', idempotencyKey: 'payout-week-1', settleFn,
+  });
+  const second = await distributeRevenue(store, {
+    agreementId: agreement.id, totalAmount: 200, payerId: 'owner-1', idempotencyKey: 'payout-week-2', settleFn,
+  });
+
+  assert.strictEqual(settleFn.realCalls(), 2, 'the second, genuinely different distribution did not reach the ledger as a real settlement');
+  assert.notStrictEqual(first.settlementId, second.settlementId);
+  assert.strictEqual(Math.round(first.legs.reduce((n, l) => n + l.amount, 0) * 100) / 100, 100);
+  assert.strictEqual(Math.round(second.legs.reduce((n, l) => n + l.amount, 0) * 100) / 100, 200);
+});
+
+test('a genuine retry with the SAME idempotencyKey replays rather than settling twice', async () => {
+  const store = createHvntzStore();
+  const { network } = hubNetwork(store);
+  const agreement = createRevenueShareAgreement(store, {
+    networkId: network.id, name: 'Split', splitType: 'percentage', shares: workedExampleShares(),
+  });
+  const settleFn = fakeV3IdempotentSettleFn();
+  const options = {
+    agreementId: agreement.id, totalAmount: 100, payerId: 'owner-1', idempotencyKey: 'payout-week-1', settleFn,
+  };
+
+  await distributeRevenue(store, options);
+  await distributeRevenue(store, options);
+
+  assert.strictEqual(settleFn.realCalls(), 1, 'a retried distribution with the same key reached the ledger twice');
+});
+
+test('distributeRevenue requires an idempotencyKey', async () => {
+  const store = createHvntzStore();
+  const { network } = hubNetwork(store);
+  const agreement = createRevenueShareAgreement(store, {
+    networkId: network.id, name: 'Split', splitType: 'percentage', shares: workedExampleShares(),
+  });
+  await assert.rejects(
+    distributeRevenue(store, { agreementId: agreement.id, totalAmount: 100, payerId: 'owner-1', settleFn: recorder() }),
+    /requires an idempotencyKey/,
+  );
 });

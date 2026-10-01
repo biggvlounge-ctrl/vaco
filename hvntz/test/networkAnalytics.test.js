@@ -96,8 +96,13 @@ test('networkGrowthAnalytics reports real total revenue and per-payee revenue fr
     splitType: 'percentage',
     shares: [{ role: 'business', payeeId: 'owner-1', value: 80 }, { role: 'dj', payeeId: 'dj-marcus', value: 20 }],
   });
-  await distributeRevenue(store, { agreementId: agreement.id, totalAmount: 100, payerId: 'owner-1', settleFn: recorder() });
-  await distributeRevenue(store, { agreementId: agreement.id, totalAmount: 50, payerId: 'owner-1', settleFn: recorder() });
+  // Distinct idempotencyKeys: the bug an audit found reused one key
+  // per agreement regardless of how many distributions went through
+  // it, so the second real distribution below would have silently
+  // replayed the first one's $100 result instead of moving its own 50
+  // — this exact fixture is what first exposed it.
+  await distributeRevenue(store, { agreementId: agreement.id, totalAmount: 100, payerId: 'owner-1', idempotencyKey: 'dist-1', settleFn: recorder() });
+  await distributeRevenue(store, { agreementId: agreement.id, totalAmount: 50, payerId: 'owner-1', idempotencyKey: 'dist-2', settleFn: recorder() });
 
   const analytics = networkGrowthAnalytics(store, network.id);
   assert.strictEqual(analytics.distributionCount, 2);
