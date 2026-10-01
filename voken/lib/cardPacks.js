@@ -119,9 +119,21 @@ async function openPack(store, options = {}) {
     }
   }
 
+  // Keyed by a per-open nonce, not packTierId alone. packTierId names
+  // a fixed catalog tier (e.g. "basic"), shared by every single
+  // purchase of that tier by every buyer forever -- the old key meant
+  // the first person anywhere to buy a "basic" pack got charged and
+  // minted, and every other buyer of that same tier afterward (a
+  // different buyerId, so a genuinely different settlement) would be
+  // refused by V3 as "already used for a different request" once its
+  // fingerprint actually hashes leg content. Same shape found and
+  // fixed across this app's auctions, merch, and fractional-share
+  // purchases this session.
+  const packOpenId = store.nextPackOpenId++;
+  const reason = `voken_pack_open:${packTierId}:${packOpenId}`;
   await settleFn(
-    [{ fromUserId: buyerId, toUserId: VOKEN_PLATFORM_ACCOUNT, amount: packTier.price, reason: `voken_pack_open:${packTierId}` }],
-    { reason: `voken_pack_open:${packTierId}` },
+    [{ fromUserId: buyerId, toUserId: VOKEN_PLATFORM_ACCOUNT, amount: packTier.price, reason }],
+    { reason },
   );
 
   const cardsReceived = selected.map((card) => ({

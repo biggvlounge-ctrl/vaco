@@ -11,6 +11,8 @@
 // multiplier below is a real, deterministic, bounded, flagged
 // interpretive choice, matching this project's established pattern.
 
+const { settleOnce } = require('./settleOnce');
+
 const ITEM_TYPES = ['t-shirt', 'hat', 'other'];
 const MERCH_SCARCITY_PRICE_MULTIPLIER = 1.0; // price up to 2x basePrice once fully sold out
 
@@ -71,16 +73,38 @@ async function purchaseMerchItem(store, options = {}) {
   if (typeof settleFn !== 'function') throw new Error('purchaseMerchItem requires a settleFn(legs, meta)');
 
   const price = listing.currentDynamicPrice;
-  await settleFn(
-    [{ fromUserId: buyerId, toUserId: listing.creatorId, amount: price, reason: `voken_merch:${listing.id}` }],
-    { reason: `voken_merch:${listing.id}` },
-  );
+  // Two bugs, found together: the reason/idempotency key was
+  // `voken_merch:${listing.id}` alone -- identical for every unit of a
+  // multi-item listing, not per purchase. With V3's fingerprint
+  // actually hashing leg content, the second buyer of a listing (a
+  // different buyerId, often a different dynamically-repriced amount)
+  // would be refused as "already used for a different request" --
+  // only the first buyer of any listing could ever complete a
+  // purchase. And the supply check above ran before the settleFn
+  // await with the decrement written only afterward, the same
+  // claim-after-pay race settleOnce.js documents: concurrent buyers of
+  // the last unit could all pass the check and all pay, overselling a
+  // "fixed, limited run." purchaseNumber (the 1-indexed sale of this
+  // listing) fixes the key; settleOnce claims the decremented supply
+  // synchronously, before the payment, fixing the race.
+  const purchaseNumber = listing.soldCount + 1;
+  const reason = `voken_merch:${listing.id}:${purchaseNumber}`;
+  const remainingAfter = listing.remainingSupply - 1;
+  const soldAfter = listing.soldCount + 1;
+  const claim = {
+    remainingSupply: remainingAfter,
+    soldCount: soldAfter,
+    currentDynamicPrice: computeDynamicPrice(listing.basePrice, listing.totalSupply, soldAfter),
+    status: remainingAfter === 0 ? 'sold-out' : listing.status,
+  };
 
-  listing.remainingSupply -= 1;
-  listing.soldCount += 1;
-  listing.purchases.push({ buyerId, price, at: Date.now() });
-  listing.currentDynamicPrice = computeDynamicPrice(listing.basePrice, listing.totalSupply, listing.soldCount);
-  if (listing.remainingSupply === 0) listing.status = 'sold-out';
+  await settleOnce(listing, claim, async () => {
+    await settleFn(
+      [{ fromUserId: buyerId, toUserId: listing.creatorId, amount: price, reason }],
+      { reason },
+    );
+    listing.purchases.push({ buyerId, price, at: Date.now() });
+  });
 
   return { listing, pricePaid: price };
 }

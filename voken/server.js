@@ -592,29 +592,26 @@ app.post('/api/auction/:id/bid', requireActor('bidderId'), async (req, res) => {
 
 // **Why this route gets an idempotency key and most do not.**
 //
-// The key must identify a logical operation, so that a retry replays
-// and a genuinely new operation does not. Deriving one automatically
-// from (from, to, amount, reason) is tempting and wrong: those are the
-// same fields V3 already fingerprints, so it would add nothing, and it
-// would silently collapse two real identical purchases -- buying the
-// same pack twice at the same price -- into one. Blocking a customer's
-// second purchase is as bad as double-charging their first.
-//
-// An auction ending is different: it is once-only by nature. Auction
-// 7 settles exactly once, so `voken:auction-end:7` is stable across
-// retries and can never collide with a different operation.
-//
-// The injected-transferFn pattern makes this free -- the key is bound
-// at the call site by wrapping the function, and no lib module changes.
+// `endAuction`/`acceptOffer` take the same `settleFn(legs, meta)`
+// convention as every other settlement path in this app, so they're
+// wired to `settleVCoin` directly, the same as `placeBid`'s route
+// below. These two used to build an injected `transferFn(from, to,
+// amount, reason)` closure instead -- a calling convention
+// `settleVCoin` stopped supporting when the consecutive-transfer
+// helper it replaced was removed (see `settleVCoin`'s own header).
+// `lib/auctions.js` has only ever destructured `settleFn`, so that
+// option was always undefined and every real auction close or offer
+// acceptance threw before any money moved or any card changed hands
+// -- the two mechanics that actually pay out a seller were
+// unreachable through the real HTTP API, even though
+// `test/money.test.js` calls the lib functions directly with the
+// right key and stayed green throughout. `settle()` in
+// lib/auctions.js already builds a `reason` keyed by `auction.id`
+// that is unique and stable across retries, so no wrapping is needed
+// here.
 app.post('/api/auction/:id/end', requireAuctionSeller(), async (req, res) => {
   try {
-    const auctionId = Number(req.params.id);
-    res.json(await endAuction(store, {
-      auctionId,
-      transferFn: (from, to, amount, reason) => settleVCoin(
-        from, to, amount, reason, `voken:auction-end:${auctionId}`,
-      ),
-    }));
+    res.json(await endAuction(store, { auctionId: Number(req.params.id), settleFn: settleVCoin }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -623,14 +620,7 @@ app.post('/api/auction/:id/end', requireAuctionSeller(), async (req, res) => {
 app.post('/api/auction/:id/accept-offer', requireAuctionSeller(), async (req, res) => {
   try {
     // Also once-only: accepting an offer settles that auction.
-    const auctionId = Number(req.params.id);
-    res.json(await acceptOffer(store, {
-      ...req.body,
-      auctionId,
-      transferFn: (from, to, amount, reason) => settleVCoin(
-        from, to, amount, reason, `voken:auction-accept-offer:${auctionId}`,
-      ),
-    }));
+    res.json(await acceptOffer(store, { ...req.body, auctionId: Number(req.params.id), settleFn: settleVCoin }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

@@ -10,6 +10,7 @@
 // parallel ownership system.
 
 const { getCultureCard, transferEditionOwnership } = require('./cultureCards');
+const { settleOnce } = require('./settleOnce');
 
 const AUCTION_TYPES = ['instant', 'english', 'dutch', 'offer'];
 const AUCTION_STATUSES = ['open', 'sold', 'unsold'];
@@ -108,18 +109,38 @@ function getCurrentDutchPrice(auction, now = Date.now()) {
   return round(Math.max(decayed, auction.reservePrice));
 }
 
+// **Claimed before it's paid, not after.** This used to check
+// `auction.status !== 'open'` in the caller, await settleFn, and only
+// then write `status: 'sold'` -- the same race settleOnce.js's own
+// header documents in four other apps. Two concurrent instant-buy or
+// dutch-buy requests (a double-click, a retried client) on the same
+// auction both pass the open check before either awaits, both pay the
+// seller, and transferEditionOwnership runs twice -- the second call
+// silently overwrites ownership, leaving one buyer paid with no card.
 async function settle(store, auction, buyerId, price, settleFn) {
-  await settleFn(
-    [{ fromUserId: buyerId, toUserId: auction.sellerId, amount: price, reason: `voken_vado_${auction.auctionType}:${auction.cardId}` }],
-    { reason: `voken_vado_${auction.auctionType}:${auction.cardId}` },
-  );
-  transferEditionOwnership(store, {
-    cardId: auction.cardId, editionNumber: auction.editionNumber, format: auction.format,
-    fromOwnerId: auction.sellerId, toOwnerId: buyerId,
+  // Keyed by auction.id, not cardId: a card can be sold, then
+  // re-listed and sold again later through the same auctionType, and
+  // the second sale is a genuinely different settlement (different
+  // buyer, possibly a different seller and price). Keying on cardId
+  // alone made every resale of the same card through the same
+  // mechanism share one idempotency key -- the first sale's reason,
+  // forever. With V3's fingerprint actually hashing leg content (see
+  // v3/lib/idempotency.js), a real second sale with different legs
+  // would be refused as "already used for a different request",
+  // permanently blocking a card from ever being resold. Same key-
+  // scoping shape already found and fixed in hvntz's distributeRevenue
+  // this session.
+  const reason = `voken_vado_${auction.auctionType}:${auction.id}`;
+  await settleOnce(auction, { status: 'sold', soldPrice: price, buyerId }, async () => {
+    await settleFn(
+      [{ fromUserId: buyerId, toUserId: auction.sellerId, amount: price, reason }],
+      { reason },
+    );
+    transferEditionOwnership(store, {
+      cardId: auction.cardId, editionNumber: auction.editionNumber, format: auction.format,
+      fromOwnerId: auction.sellerId, toOwnerId: buyerId,
+    });
   });
-  auction.status = 'sold';
-  auction.soldPrice = price;
-  auction.buyerId = buyerId;
 }
 
 async function placeBid(store, options = {}) {

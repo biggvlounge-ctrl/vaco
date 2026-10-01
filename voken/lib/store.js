@@ -12,6 +12,7 @@ function createVokenStore() {
     establishedCreatorAssessments: [],
     cardPackTiers: [],
     nextPackTierId: 1,
+    nextPackOpenId: 1,
     raffles: [],
     nextRaffleId: 1,
     trades: [],

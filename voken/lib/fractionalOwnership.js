@@ -180,14 +180,26 @@ async function buyShares(store, options = {}) {
   //
   // `status: 'fully-sold'` joins the claim so a listing that this
   // purchase completes closes in the same indivisible step.
+  // Keyed by listing.id and the share offset this purchase starts
+  // from (unique because soldShares is claimed atomically below, so
+  // no two purchases can share a starting offset), not by cardId
+  // alone. A listing takes many purchases from many buyers before it
+  // sells out, and cardId was the same for every one of them --
+  // sharing one idempotency key across genuinely different buyers and
+  // amounts. With V3's fingerprint actually hashing leg content, every
+  // purchase after the first into a given listing would have been
+  // refused as "already used for a different request." Same shape
+  // already found and fixed in this function's own siblings
+  // (lib/auctions.js settle(), buySecondaryShares, purchaseMerchItem).
+  const reason = `voken_fractional_shares:${listing.id}:${listing.soldShares}`;
   const soldAfter = listing.soldShares + shareCount;
   const claim = { soldShares: soldAfter };
   if (soldAfter === listing.totalShares) claim.status = 'fully-sold';
 
   await settleOnce(listing, claim, async () => {
     await settleFn(
-      [{ fromUserId: buyerId, toUserId: listing.sellerId, amount: cost, reason: `voken_fractional_shares:${listing.cardId}` }],
-      { reason: `voken_fractional_shares:${listing.cardId}` },
+      [{ fromUserId: buyerId, toUserId: listing.sellerId, amount: cost, reason }],
+      { reason },
     );
   });
 
@@ -337,39 +349,56 @@ async function buySecondaryShares(store, options = {}) {
 
   const fractionalListing = getFractionalListing(store, secondaryListing.fractionalListingId);
   const cost = round(secondaryListing.shareCount * secondaryListing.pricePerShare);
-  await settleFn(
-    [{ fromUserId: buyerId, toUserId: secondaryListing.sellerId, amount: cost, reason: `voken_secondary_shares:${secondaryListing.cardId}` }],
-    { reason: `voken_secondary_shares:${secondaryListing.cardId}` },
-  );
-
-  // Real per-lot debit: remove exactly the shares from exactly the
-  // lots this listing actually drew from, deleting a lot entirely once
-  // it's fully sold off rather than leaving a real zero-share husk.
-  const sellerHolding = fractionalListing.shareholders.find((s) => s.userId === secondaryListing.sellerId);
-  for (const allocation of secondaryListing.lotAllocations) {
-    const lot = sellerHolding.lots.find((l) => l.id === allocation.lotId);
-    if (lot) {
-      lot.shares -= allocation.shares;
-      lot.listedShares -= allocation.shares;
-    }
-  }
-  sellerHolding.lots = sellerHolding.lots.filter((lot) => lot.shares > 0);
-
-  // A real, brand-new, immediately-sellable lot -- secondary-acquired
-  // shares were never subject to the primary-purchase lockup at all.
+  // Two bugs, found together, the same shape already fixed in
+  // lib/auctions.js's settle() and lib/limitedEditionMerch.js's
+  // purchaseMerchItem this session. First: the reason/idempotency key
+  // was keyed by `secondaryListing.cardId`, not `secondaryListing.id`
+  // -- a card can have many secondary listings over its life (each a
+  // different lot, different seller, different price), and all of
+  // them shared one key. A later genuinely different secondary sale of
+  // the same card would be refused by V3 as "already used for a
+  // different request" once its own first sale had gone through.
+  // Second: `secondaryListing.status` was only written to 'sold' after
+  // the settlement awaited, so two concurrent buyers of the same
+  // listing could both pass the `status !== 'open'` guard and both
+  // pay -- this sibling's own `buyShares` was already hardened against
+  // exactly this race with settleOnce; this function never was.
+  const reason = `voken_secondary_shares:${secondaryListing.id}`;
   const now = Date.now();
-  const buyerLot = {
-    id: store.nextFractionalLotId++, shares: secondaryListing.shareCount, listedShares: 0, lockedUntil: null, purchasedAt: now,
-  };
-  const buyerHolding = fractionalListing.shareholders.find((s) => s.userId === buyerId);
-  if (buyerHolding) {
-    buyerHolding.lots.push(buyerLot);
-  } else {
-    fractionalListing.shareholders.push({ userId: buyerId, lots: [buyerLot] });
-  }
 
-  secondaryListing.status = 'sold';
-  secondaryListing.soldAt = now;
+  await settleOnce(secondaryListing, { status: 'sold', soldAt: now }, async () => {
+    await settleFn(
+      [{ fromUserId: buyerId, toUserId: secondaryListing.sellerId, amount: cost, reason }],
+      { reason },
+    );
+
+    // Real per-lot debit: remove exactly the shares from exactly the
+    // lots this listing actually drew from, deleting a lot entirely
+    // once it's fully sold off rather than leaving a real zero-share
+    // husk.
+    const sellerHolding = fractionalListing.shareholders.find((s) => s.userId === secondaryListing.sellerId);
+    for (const allocation of secondaryListing.lotAllocations) {
+      const lot = sellerHolding.lots.find((l) => l.id === allocation.lotId);
+      if (lot) {
+        lot.shares -= allocation.shares;
+        lot.listedShares -= allocation.shares;
+      }
+    }
+    sellerHolding.lots = sellerHolding.lots.filter((lot) => lot.shares > 0);
+
+    // A real, brand-new, immediately-sellable lot -- secondary-acquired
+    // shares were never subject to the primary-purchase lockup at all.
+    const buyerLot = {
+      id: store.nextFractionalLotId++, shares: secondaryListing.shareCount, listedShares: 0, lockedUntil: null, purchasedAt: now,
+    };
+    const buyerHolding = fractionalListing.shareholders.find((s) => s.userId === buyerId);
+    if (buyerHolding) {
+      buyerHolding.lots.push(buyerLot);
+    } else {
+      fractionalListing.shareholders.push({ userId: buyerId, lots: [buyerLot] });
+    }
+  });
+
   return { secondaryListing, fractionalListing, amountPaid: cost };
 }
 

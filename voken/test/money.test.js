@@ -85,6 +85,46 @@ function ledger(initial = {}) {
   return fn;
 }
 
+// A faithful fake of V3's real idempotency behavior, not a spy. The
+// plain `ledger()` above applies every settlement it's handed and
+// never looks at `meta.reason` at all, so it cannot tell a genuinely
+// unique key from a reused one — which is exactly how six real key-
+// collision bugs (auctions.js settle(), cardPacks.js openPack,
+// referralGrowth.js's tier bonus and spin, fractionalOwnership.js's
+// buyShares and buySecondaryShares, limitedEditionMerch.js's
+// purchaseMerchItem) shipped with a green test suite behind them.
+// This fake keys by `meta.reason`: a repeat with the same key AND the
+// same legs replays; a repeat with the same key and DIFFERENT legs is
+// refused, exactly like the real `/api/vcoin/settle` with V3's own
+// (now-fixed) deep-stable-stringify fingerprint.
+function idempotentLedger(initial = {}) {
+  const inner = ledger(initial);
+  const seen = new Map();
+  const fn = async (legs, meta = {}) => {
+    const key = meta && meta.reason;
+    const fingerprint = JSON.stringify(legs);
+    if (key) {
+      const prior = seen.get(key);
+      if (prior) {
+        if (prior.fingerprint !== fingerprint) {
+          throw new Error(`Idempotency-Key "${key}" was already used for a different request`);
+        }
+        return { ...prior.result, idempotentReplay: true };
+      }
+    }
+    const result = await inner(legs, meta);
+    if (key) seen.set(key, { fingerprint, result });
+    return result;
+  };
+  fn.of = inner.of;
+  fn.moves = inner.moves;
+  fn.calls = inner.calls;
+  fn.movedNothing = inner.movedNothing;
+  fn.drift = inner.drift;
+  fn.realCalls = () => inner.calls.length;
+  return fn;
+}
+
 function card(store, overrides = {}) {
   return mintCultureCard(store, {
     subjectPersonId: 'nova',
@@ -131,6 +171,29 @@ test('opening a pack charges the buyer the tier price and mints them editions', 
       'a charged buyer must actually own what they bought');
   }
   assert.strictEqual(settleFn.drift(), 0);
+});
+
+test('two different buyers of the same pack tier both actually get charged, against a real idempotency-enforcing ledger', async () => {
+  // The bug this test closes: the reason/idempotency key was
+  // `voken_pack_open:${packTierId}` alone -- packTierId names a fixed
+  // catalog tier, the same for every purchase of that tier by every
+  // buyer, forever. The first buyer of "standard" anywhere would be
+  // charged and minted; every later buyer (a different buyerId, so a
+  // genuinely different settlement) would be refused by a real,
+  // fingerprint-checking ledger as "already used for a different
+  // request." A per-open nonce fixes it.
+  const store = createVokenStore();
+  const settleFn = idempotentLedger({ sam: 500, rio: 500 });
+  const tier = packs.createPackTier(store, { tierName: 'standard', price: 40, cardsPerPack: 3 });
+  const ids = [card(store).id, card(store).id, card(store).id, card(store).id];
+
+  await packs.openPack(store, { packTierId: tier.packTierId, buyerId: 'sam', candidateCardIds: ids, settleFn, rng: () => 0.5 });
+  await packs.openPack(store, { packTierId: tier.packTierId, buyerId: 'rio', candidateCardIds: ids, settleFn, rng: () => 0.5 });
+
+  assert.strictEqual(settleFn.realCalls(), 2, 'both purchases must actually reach the ledger');
+  assert.strictEqual(settleFn.of('sam'), 460);
+  assert.strictEqual(settleFn.of('rio'), 460);
+  assert.strictEqual(settleFn.of(VOKEN_PLATFORM_ACCOUNT), 80);
 });
 
 test('a declined charge mints nothing — no free cards', async () => {
@@ -387,6 +450,69 @@ test('an auction of an edition the seller does not own is refused', () => {
   }), /.*/);
 });
 
+test('a card resold through a second instant auction actually settles, against a real idempotency-enforcing ledger', async () => {
+  // The bug this test closes: settle()'s reason/idempotency key used
+  // to be `voken_vado_${auctionType}:${cardId}` -- the same for EVERY
+  // auction ever run on that card through that auctionType. A plain
+  // ledger (every other test above uses one) applies whatever it's
+  // handed and would never notice; a real V3-shaped ledger, keyed by
+  // reason and comparing leg content, refuses a second genuinely
+  // different settlement under a reused key. Keying by auction.id
+  // instead fixes it.
+  const store = createVokenStore();
+  const settleFn = idempotentLedger({ sam: 1000, rio: 1000 });
+  const subject = cardOwnedBy(store, 'nova');
+
+  const firstAuction = auctions.createAuction(store, {
+    cardId: subject.id, editionNumber: 1, format: 'digital',
+    sellerId: 'nova', auctionType: 'instant', startingPrice: 100, reservePrice: 100, now: NOW,
+  });
+  await auctions.placeBid(store, { auctionId: firstAuction.id, bidderId: 'sam', bidAmount: 100, settleFn, now: NOW });
+  assert.strictEqual(getCultureCard(store, subject.id).editions[0].ownerId, 'sam');
+
+  // sam now owns the edition and lists it again, a genuinely different
+  // sale with a different seller, buyer, and (here) price.
+  const secondAuction = auctions.createAuction(store, {
+    cardId: subject.id, editionNumber: 1, format: 'digital',
+    sellerId: 'sam', auctionType: 'instant', startingPrice: 150, reservePrice: 150, now: NOW,
+  });
+  await auctions.placeBid(store, { auctionId: secondAuction.id, bidderId: 'rio', bidAmount: 150, settleFn, now: NOW });
+
+  assert.strictEqual(settleFn.realCalls(), 2, 'both sales must actually reach the ledger, not replay the first');
+  assert.strictEqual(getCultureCard(store, subject.id).editions[0].ownerId, 'rio', 'the second sale must actually transfer the edition');
+  assert.strictEqual(settleFn.of('sam'), 1050, '-100 to buy, +150 to resell');
+  assert.strictEqual(settleFn.of('rio'), 850);
+});
+
+test('two concurrent buys of the same instant auction — only one settles, the other is refused', async () => {
+  // settle()'s status write used to happen after the settlement
+  // awaited, not before -- the same claim-after-pay race
+  // lib/settleOnce.js's own header documents in four other apps. Two
+  // concurrent instant-buy requests on the same auction both used to
+  // pass the "is it still open" check before either awaited, both
+  // paid the seller, and transferEditionOwnership ran twice.
+  const store = createVokenStore();
+  const settleFn = idempotentLedger({ sam: 1000, rio: 1000 });
+  const subject = cardOwnedBy(store, 'nova');
+  const auction = auctions.createAuction(store, {
+    cardId: subject.id, editionNumber: 1, format: 'digital',
+    sellerId: 'nova', auctionType: 'instant', startingPrice: 100, reservePrice: 100, now: NOW,
+  });
+
+  const results = await Promise.allSettled([
+    auctions.placeBid(store, { auctionId: auction.id, bidderId: 'sam', bidAmount: 100, settleFn, now: NOW }),
+    auctions.placeBid(store, { auctionId: auction.id, bidderId: 'rio', bidAmount: 100, settleFn, now: NOW }),
+  ]);
+
+  const fulfilled = results.filter((r) => r.status === 'fulfilled');
+  const rejected = results.filter((r) => r.status === 'rejected');
+  assert.strictEqual(fulfilled.length, 1, 'exactly one buyer may win the same auction');
+  assert.strictEqual(rejected.length, 1);
+  assert.strictEqual(settleFn.realCalls(), 1, 'the seller must be paid exactly once');
+  const winner = fulfilled[0].value.buyerId;
+  assert.strictEqual(getCultureCard(store, subject.id).editions[0].ownerId, winner);
+});
+
 // -- 5 & 6. Fractional shares, primary and secondary ----------------------
 
 test('fractional buying is refused while the compliance gate is closed', async () => {
@@ -436,6 +562,30 @@ test('a cleared fractional purchase pays the seller and cannot oversell', async 
     listingId: listing.id, buyerId: 'sam', shareCount: 1, settleFn, now: NOW,
   }), /shares remain|not open/);
   assert.strictEqual(settleFn.drift(), 0);
+});
+
+test('two different buyers of the same fractional listing both actually get charged, against a real idempotency-enforcing ledger', async () => {
+  // The bug this test closes: the reason/idempotency key was
+  // `voken_fractional_shares:${listing.cardId}` -- the same for every
+  // buyer who buys into that listing before it sells out. A real,
+  // fingerprint-checking ledger would refuse every buyer after the
+  // first as "already used for a different request." Keying by
+  // listing.id and the share offset the purchase starts from fixes
+  // it, since that offset is claimed atomically and can't repeat.
+  const store = createVokenStore();
+  setComplianceStatus(store, 'fractional-ownership', true);
+  const settleFn = idempotentLedger({ sam: 1000, rio: 1000 });
+  const subject = cardOwnedBy(store, 'nova');
+  const listing = fractional.createFractionalListing(store, {
+    cardId: subject.id, editionNumber: 1, format: 'digital',
+    sellerId: 'nova', totalShares: 10, pricePerShare: 50,
+  });
+
+  await fractional.buyShares(store, { listingId: listing.id, buyerId: 'sam', shareCount: 4, settleFn, now: NOW });
+  await fractional.buyShares(store, { listingId: listing.id, buyerId: 'rio', shareCount: 6, settleFn, now: NOW });
+
+  assert.strictEqual(settleFn.realCalls(), 2, 'both purchases must actually reach the ledger');
+  assert.strictEqual(settleFn.of('nova'), 500, 'the seller must be paid for both purchases, not just the first');
 });
 
 test('the underlying edition moves into the pool, not to a shareholder', () => {
@@ -514,6 +664,39 @@ test('you cannot buy your own secondary listing', async () => {
   }), /cannot buy your own listing/);
 });
 
+test('two different secondary sales of the same card both actually settle, against a real idempotency-enforcing ledger', async () => {
+  // The bug this test closes: the reason/idempotency key was
+  // `voken_secondary_shares:${secondaryListing.cardId}` -- the same
+  // for every secondary listing ever made of that card, no matter how
+  // many different lots, sellers, or buyers later trade it. A real,
+  // fingerprint-checking ledger would refuse every secondary sale
+  // after the first on that card as "already used for a different
+  // request." Keying by secondaryListing.id instead fixes it.
+  const store = createVokenStore();
+  setComplianceStatus(store, 'fractional-ownership', true);
+  const settleFn = idempotentLedger({ sam: 1000, rio: 1000, mo: 1000 });
+  const subject = cardOwnedBy(store, 'nova');
+  const listing = fractional.createFractionalListing(store, {
+    cardId: subject.id, editionNumber: 1, format: 'digital',
+    sellerId: 'nova', totalShares: 10, pricePerShare: 50,
+  });
+  await fractional.buyShares(store, { listingId: listing.id, buyerId: 'sam', shareCount: 5, settleFn, now: NOW });
+
+  const afterLockup = NOW + 200 * DAY;
+  const firstSecondary = fractional.createSecondaryListing(store, {
+    fractionalListingId: listing.id, sellerId: 'sam', shareCount: 2, pricePerShare: 80, now: afterLockup,
+  });
+  await fractional.buySecondaryShares(store, { secondaryListingId: firstSecondary.id, buyerId: 'rio', settleFn });
+
+  const secondSecondary = fractional.createSecondaryListing(store, {
+    fractionalListingId: listing.id, sellerId: 'sam', shareCount: 3, pricePerShare: 90, now: afterLockup,
+  });
+  await fractional.buySecondaryShares(store, { secondaryListingId: secondSecondary.id, buyerId: 'mo', settleFn });
+
+  assert.strictEqual(settleFn.realCalls(), 3, 'the primary purchase and both secondary sales must all actually reach the ledger');
+  assert.strictEqual(settleFn.of('sam'), 1000 - 250 + 160 + 270, 'sam is paid for both secondary sales, not just the first');
+});
+
 // -- 7. Limited-edition merch ---------------------------------------------
 
 test('merch pays the creator directly, at the live dynamic price', async () => {
@@ -536,6 +719,49 @@ test('merch pays the creator directly, at the live dynamic price', async () => {
   assert.strictEqual(second.pricePaid, 125);
   assert.strictEqual(settleFn.of('nova'), 225);
   assert.strictEqual(settleFn.drift(), 0);
+});
+
+test('two different buyers of the same merch listing both actually get charged, against a real idempotency-enforcing ledger', async () => {
+  // The bug this test closes: the reason/idempotency key was
+  // `voken_merch:${listing.id}` alone -- the same for every unit of a
+  // multi-item listing. A real, fingerprint-checking ledger would
+  // refuse the second buyer (a different buyerId, and here a
+  // different dynamically-repriced amount) as "already used for a
+  // different request." A per-purchase sequence number in the key,
+  // claimed atomically alongside the supply decrement, fixes it.
+  const store = createVokenStore();
+  const settleFn = idempotentLedger({ sam: 1000, rio: 1000 });
+  const listing = merch.createMerchListing(store, {
+    creatorId: 'nova', itemType: 't-shirt', totalSupply: 4, basePrice: 100,
+  });
+
+  await merch.purchaseMerchItem(store, { listingId: listing.id, buyerId: 'sam', settleFn });
+  await merch.purchaseMerchItem(store, { listingId: listing.id, buyerId: 'rio', settleFn });
+
+  assert.strictEqual(settleFn.realCalls(), 2, 'both purchases must actually reach the ledger');
+  assert.strictEqual(settleFn.of('nova'), 225, '100 from sam plus 125 (scarcity-repriced) from rio');
+});
+
+test('two concurrent buyers of the last merch unit — only one succeeds, the other sees it sold out', async () => {
+  // The claim-after-pay race lib/settleOnce.js's own header documents:
+  // remainingSupply was checked before the settlement awaited and
+  // decremented only afterward, so two concurrent buyers of the last
+  // unit could both pass the check and both pay, overselling a
+  // "fixed, limited run."
+  const store = createVokenStore();
+  const settleFn = idempotentLedger({ sam: 1000, rio: 1000 });
+  const listing = merch.createMerchListing(store, {
+    creatorId: 'nova', itemType: 'hat', totalSupply: 1, basePrice: 50,
+  });
+
+  const results = await Promise.allSettled([
+    merch.purchaseMerchItem(store, { listingId: listing.id, buyerId: 'sam', settleFn }),
+    merch.purchaseMerchItem(store, { listingId: listing.id, buyerId: 'rio', settleFn }),
+  ]);
+
+  assert.strictEqual(results.filter((r) => r.status === 'fulfilled').length, 1, 'only one buyer may win the last unit');
+  assert.strictEqual(settleFn.realCalls(), 1);
+  assert.strictEqual(listing.remainingSupply, 0);
 });
 
 test('merch cannot be oversold past its supply', async () => {
@@ -578,6 +804,33 @@ test('a referral tier bonus is paid by the platform, once', async () => {
   assert.strictEqual(settleFn.drift(), 0);
 });
 
+test('two different referrers who each cross the same tier both actually get paid, against a real idempotency-enforcing ledger', async () => {
+  // The bug this test closes: the reason/idempotency key was
+  // `voken_referral_tier:${threshold}` alone -- the same fixed, small
+  // set of threshold values shared by EVERY referrer who ever crosses
+  // them. A real, fingerprint-checking ledger would pay the first
+  // referrer anywhere to cross a tier and then refuse every other
+  // referrer who ever crosses that same tier afterward (a different
+  // referrerId, so a genuinely different settlement) as "already used
+  // for a different request." Keying by referrerId as well fixes it.
+  const store = createVokenStore();
+  const settleFn = idempotentLedger({ [VOKEN_PLATFORM_ACCOUNT]: 10000 });
+  const firstTier = referrals.REFERRAL_TIERS[0];
+
+  for (let i = 0; i < firstTier.threshold; i += 1) {
+    // eslint-disable-next-line no-await-in-loop -- sequential by design
+    await referrals.recordReferral(store, { referrerId: 'ada', refereeId: `ada-friend-${i}`, settleFn, now: NOW });
+  }
+  for (let i = 0; i < firstTier.threshold; i += 1) {
+    // eslint-disable-next-line no-await-in-loop -- sequential by design
+    await referrals.recordReferral(store, { referrerId: 'bo', refereeId: `bo-friend-${i}`, settleFn, now: NOW });
+  }
+
+  assert.strictEqual(settleFn.realCalls(), 2, 'both referrers crossing the same tier must each actually reach the ledger');
+  assert.strictEqual(settleFn.of('ada'), firstTier.bonusVCoin);
+  assert.strictEqual(settleFn.of('bo'), firstTier.bonusVCoin, 'the second referrer to cross this tier must be paid too');
+});
+
 test('the same person cannot be referred twice, and you cannot refer yourself', async () => {
   const store = createVokenStore();
   const settleFn = ledger({ [VOKEN_PLATFORM_ACCOUNT]: 10000 });
@@ -617,6 +870,40 @@ test('a spin pays only a real prize, and consumes the spin', async () => {
 
   const progress = referrals.getReferralProgress(store, 'ada');
   assert.strictEqual(progress.spinsAvailable, firstTier.spinsAwarded - 1);
+});
+
+test('two concurrent spins both actually get paid, against a real idempotency-enforcing ledger', async () => {
+  // The bug this test closes: the nonce used in the reason/idempotency
+  // key (`voken_spin_prize:${nonce}`) was read from store.nextSpinId
+  // and only incremented afterward, when the spin record was built --
+  // so two concurrent spins could both read the same nonce before
+  // either incremented it, giving them the same key for what are, in
+  // general, two different prizes. Allocating the nonce up front,
+  // before either spin's settlement runs, fixes it.
+  const store = createVokenStore();
+  const settleFn = idempotentLedger({ [VOKEN_PLATFORM_ACCOUNT]: 10000 });
+  // Tier 1 (threshold 3) grants a cumulative 2 spins, so ada has two
+  // real spins to use concurrently.
+  for (let i = 0; i < 3; i += 1) {
+    // eslint-disable-next-line no-await-in-loop -- sequential by design
+    await referrals.recordReferral(store, { referrerId: 'ada', refereeId: `friend-${i}`, settleFn, now: NOW });
+  }
+  assert.strictEqual(referrals.getReferralProgress(store, 'ada').spinsAvailable, 2);
+
+  const [spinA, spinB] = await Promise.all([
+    referrals.spinWheel(store, { userId: 'ada', clientSeed: 'seed-a', settleFn, now: NOW }),
+    referrals.spinWheel(store, { userId: 'ada', clientSeed: 'seed-b', settleFn, now: NOW }),
+  ]);
+
+  // Both calls run synchronously up to this read before either awaits,
+  // so a nonce read without being claimed first is the same for both
+  // regardless of which prizes are actually drawn -- asserting on
+  // `nonce` directly (not `id`, which the old code only assigned
+  // after its own later await, by which point the two calls had
+  // already interleaved and could coincidentally differ) is what
+  // actually pins down the root cause.
+  assert.notStrictEqual(spinA.nonce, spinB.nonce, 'each spin must claim its own nonce before settling, not read a shared one');
+  assert.strictEqual(referrals.getReferralProgress(store, 'ada').spinsAvailable, 0);
 });
 
 test('spinning with no spins available pays nothing', async () => {

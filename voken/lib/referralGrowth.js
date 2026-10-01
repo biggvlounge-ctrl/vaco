@@ -115,9 +115,20 @@ async function recordReferral(store, options = {}) {
   if (justCrossed && !record.tiersReached.includes(justCrossed.threshold)) {
     record.tiersReached.push(justCrossed.threshold);
     record.spinsAvailable += justCrossed.spinsAwarded;
+    // Keyed by referrerId as well as the threshold, not the threshold
+    // alone. Every referrer who ever crosses, say, tier 5 shares that
+    // same fixed, small set of threshold values -- the old key meant
+    // the first person anywhere to cross a tier got paid, and every
+    // other referrer who ever crossed that same tier afterward (a
+    // different referrerId, so a different settlement) would be
+    // refused by V3 as "already used for a different request" once
+    // its fingerprint actually hashes leg content. referrerId plus
+    // threshold is unique per crossing because `tiersReached` already
+    // guards against the same referrer crossing a tier twice.
+    const reason = `voken_referral_tier:${referrerId}:${justCrossed.threshold}`;
     await settleFn(
-      [{ fromUserId: VOKEN_PLATFORM_ACCOUNT, toUserId: referrerId, amount: justCrossed.bonusVCoin, reason: `voken_referral_tier:${justCrossed.threshold}` }],
-      { reason: `voken_referral_tier:${justCrossed.threshold}` },
+      [{ fromUserId: VOKEN_PLATFORM_ACCOUNT, toUserId: referrerId, amount: justCrossed.bonusVCoin, reason }],
+      { reason },
     );
     tierReached = justCrossed;
   }
@@ -151,7 +162,15 @@ async function spinWheel(store, options = {}) {
 
   const serverSeed = generateServerSeed();
   const serverSeedHash = hashServerSeed(serverSeed);
-  const nonce = store.nextSpinId;
+  // Allocated here, before the settlement awaits, not read now and
+  // incremented afterward in the spin record below. Two concurrent
+  // spins both used to read the same store.nextSpinId value before
+  // either call reached the line that incremented it, so both built
+  // the same `voken_spin_prize:<nonce>` reason -- a genuine second
+  // spin with a different prize would then be refused by V3 as
+  // "already used for a different request" even though the player had
+  // a real spin available and should have been paid for it.
+  const nonce = store.nextSpinId++;
   const float = deriveFloat(serverSeed, clientSeed, nonce, 0);
   const prize = pickPrize(float);
 
@@ -165,7 +184,7 @@ async function spinWheel(store, options = {}) {
   }
 
   const spin = {
-    id: store.nextSpinId++,
+    id: nonce,
     userId,
     prizeLabel: prize.label,
     vcoinWon: prize.vcoin,
