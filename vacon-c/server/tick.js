@@ -88,6 +88,16 @@ const { seededDraw } = require('./seeded.js');
 
 let nextEventId = 1;
 
+// `mortality.js`/`births.js`/`crime.js`/`trade.js`/`knowledge.js`/
+// `statecraft.js`/`media.js` each carry their own copy of exactly this
+// lookup, for exactly the same reason: communities carry the real
+// `city_id`, NPCs carry only `communityId`, and this file has no cause
+// to reach into a sibling module's internals to save three lines.
+function cityOf(worldState, npc) {
+  const community = (worldState.communities || []).find((c) => c.id === npc.communityId);
+  return community?.city_id ?? null;
+}
+
 // ---------------------------------------------------------------------------
 // Environmental conditions — the mechanism for triggering a "drought-
 // style cascade" (the locked Definition of Done's own test scenario).
@@ -276,10 +286,17 @@ function runResourcePhase(worldState) {
 // resolveFear, which until now only ever received manually-seeded
 // knowledge in verification.
 //
-// Honestly broad, not targeted: no location/Community system exists
-// yet to scope the broadcast to "nearby" NPCs specifically, so it
-// reaches every NPC in WorldState. Narrowing this is exactly the kind
-// of thing Territory/Community (not yet built) would enable.
+// **Was honestly broad, not targeted** — Territory/Community has
+// since been built, and this comment is the reason the gap outlived
+// it: "not yet built" kept being true right up until it stopped being
+// checked. `resources.city_id` means one world-wide
+// `scarcityByType`/`scarcityNews` keyed on `resource_type` alone
+// collapsed every city's own reading into one (whichever city was
+// iterated last), so a famine in one city could go completely
+// unbroadcast while a healthy city's population somehow "learned" of
+// a shortage it did not have — and the broadcast loop itself reached
+// `worldState.npcs` directly, every NPC in the world, regardless of
+// which city's resource had crossed the threshold. See `cityOf` above.
 // ---------------------------------------------------------------------------
 const SCARCITY_BROADCAST_THRESHOLD = 60;
 
@@ -384,9 +401,20 @@ function runEconomyPhase(worldState) {
   // depend on it. The original order priced listings first and computed
   // scarcity afterwards, which was harmless only while the two were
   // unconnected -- the cascade test found exactly that disconnection.
-  const scarcityByType = new Map();
+  //
+  // **Keyed on `(cityId, resourceType)`, not `resourceType` alone.**
+  // `resources` carries one row per city per type — `worldgen.js`
+  // generates food/water/medicine/etc separately for every city — so a
+  // map keyed on type alone had exactly one slot for "food" in the
+  // whole world, and whichever city's row was iterated last silently
+  // overwrote every other city's reading.
+  const cityScarcityKey = (cityId, resourceType) => `${cityId}:${resourceType}`;
+  const scarcityByCityAndType = new Map();
   for (const resource of worldState.resources) {
-    scarcityByType.set(resource.resource_type, economy.getScarcity(resource));
+    scarcityByCityAndType.set(
+      cityScarcityKey(resource.city_id ?? null, resource.resource_type),
+      economy.getScarcity(resource),
+    );
   }
 
   for (const listing of worldState.marketListings) {
@@ -394,7 +422,9 @@ function runEconomyPhase(worldState) {
     // is the pre-existing behaviour for any good with no raw input.
     const inputScarcity = listing.resource_type === null || listing.resource_type === undefined
       ? null
-      : scarcityByType.get(listing.resource_type) ?? null;
+      : scarcityByCityAndType.get(
+        cityScarcityKey(listing.city_id ?? null, listing.resource_type),
+      ) ?? null;
     economy.resolveMarketPrice(listing, worldState.tick, inputScarcity);
   }
 
@@ -415,25 +445,43 @@ function runEconomyPhase(worldState) {
   // not: people already know. So the broadcast fires when a resource
   // CROSSES into scarcity, and again only if it worsens materially.
   // `worldState.scarcityNews` holds the level last broadcast per
-  // resource type — an in-memory working field with no table, same as
-  // `migrationRisk` and `reemergenceIndex` beside it, and losing it on
-  // a restore costs at most one extra broadcast.
+  // **city and** resource type — an in-memory working field with no
+  // table, same as `migrationRisk` and `reemergenceIndex` beside it,
+  // and losing it on a restore costs at most one extra broadcast per
+  // city.
+  //
+  // **Per city, not per resource type alone.** Keying this (and the
+  // recipient list below) on `resource_type` alone meant a shortage
+  // already broadcast in one city could silently suppress the
+  // broadcast for a SEPARATE, later shortage of the same resource type
+  // in a different city — "already news, no worse than when it was
+  // announced" compared a city that had never heard anything against
+  // another city's number.
   worldState.scarcityNews = worldState.scarcityNews || {};
 
   for (const resource of worldState.resources) {
-    const scarcity = scarcityByType.get(resource.resource_type);
-    const lastBroadcast = worldState.scarcityNews[resource.resource_type];
+    const key = cityScarcityKey(resource.city_id ?? null, resource.resource_type);
+    const scarcity = scarcityByCityAndType.get(key);
+    const lastBroadcast = worldState.scarcityNews[key];
 
     if (scarcity <= SCARCITY_BROADCAST_THRESHOLD) {
       // It has eased. Clear the mark so a fresh crossing is news again.
-      delete worldState.scarcityNews[resource.resource_type];
+      delete worldState.scarcityNews[key];
       continue;
     }
     // Already news, and no worse than when it was announced.
     if (lastBroadcast !== undefined && scarcity < lastBroadcast + SCARCITY_NEWS_STEP) continue;
-    worldState.scarcityNews[resource.resource_type] = scarcity;
+    worldState.scarcityNews[key] = scarcity;
 
-    for (const npc of worldState.npcs) {
+    // **The resource's own city, not every NPC in the world.** A null
+    // `city_id` (a world-wide resource; real generated worlds never
+    // produce one — see `worldgen.js`) keeps the old broad behaviour,
+    // because there is no city to narrow it to.
+    const recipients = resource.city_id === null || resource.city_id === undefined
+      ? worldState.npcs
+      : worldState.npcs.filter((npc) => cityOf(worldState, npc) === resource.city_id);
+
+    for (const npc of recipients) {
       worldStore.addKnowledge(worldState, {
         entityId: npc.id,
         subjectEntityId: null,
@@ -457,7 +505,7 @@ function runEconomyPhase(worldState) {
       note: `${resource.resource_type} scarcity reached ${scarcity}`,
       tick: worldState.tick,
       affected_entity_ids: [],
-      global_effects: { resourceType: resource.resource_type, scarcity },
+      global_effects: { resourceType: resource.resource_type, cityId: resource.city_id ?? null, scarcity },
     });
   }
 
@@ -1494,4 +1542,13 @@ module.exports = {
   // and the row shape.
   recordEvents: runEventPhase,
   advanceTick,
+  // **Exported so the scarcity broadcast/pricing can be tested on a
+  // fixture rather than only through a full generated world.** The
+  // city-scoping bug this guards — one city's shortage silently
+  // overwriting another's in `scarcityByCityAndType`/`scarcityNews`,
+  // and the broadcast reaching every NPC in the world rather than the
+  // city with the actual shortage — only shows up with at least two
+  // cities' resources in play at once, which `advanceTick`'s other
+  // phases make expensive to set up just to reach this one.
+  runEconomyPhase,
 };

@@ -11,6 +11,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const economy = require('../server/economy.js');
+const tick = require('../server/tick.js');
+const territory = require('../server/territory.js');
+const crime = require('../server/crime.js');
 
 function freshWorld() {
   return {
@@ -176,6 +179,137 @@ test('a listing with no resource_type is unaffected by any scarcity', () => {
   assert.equal(listing.resource_type, null);
   economy.resolveMarketPrice(listing, 1, null);
   assert.equal(listing.price, 100);
+});
+
+// -- the scarcity broadcast is per city (tick.js#runEconomyPhase) -----------
+//
+// `resolveMarketPrice`'s own input scarcity is correct above; this is
+// about where that NUMBER comes from. `runEconomyPhase` pre-computes it
+// once per pass, in a Map `resources` has one row per CITY per
+// resource type to fill — and the map used to be keyed on
+// `resource_type` alone, so whichever city's row was processed last
+// silently overwrote every other city's reading. A famine in one city
+// could price goods and broadcast "verified" shortage knowledge in a
+// city with no shortage of its own — or, depending on iteration order,
+// not get announced at all because a healthy city's number overwrote
+// it first — and the recipient list reached every NPC in
+// `worldState.npcs` directly, never narrowed to the city that actually
+// had the shortage.
+
+function tickWorld() {
+  const w = {
+    tick: 0, npcs: [], resources: [], marketListings: [], individualFinances: [],
+    memories: [], relationships: [], entityKnowledge: [], entityTraits: [],
+    deceased: [], communities: [], cities: [], organizations: [], families: [],
+    familyMemberships: [], entityState: [], historicalRecords: [],
+    activeConditions: [], employmentRecords: [], crimeIncidents: [], territoryBlocks: [],
+    properties: [], ownershipRecords: [], infrastructure: [], inventory: [],
+  };
+  territory.reseedIds(w);
+  economy.reseedIds(w);
+  crime.reseedIds(w);
+  return w;
+}
+
+let nextResidentId = 90000;
+function resident(w, communityId) {
+  const npc = { id: nextResidentId += 1, status: 'active', communityId, home_property_id: null };
+  w.npcs.push(npc);
+  return npc;
+}
+
+test('a shortage in one city does not price goods or broadcast into another', () => {
+  const w = tickWorld();
+  const starvingCity = territory.generateCity(w, { name: 'Starving' });
+  const fineCity = territory.generateCity(w, { name: 'Fine' });
+  const starving = territory.generateCommunity(w, { cityId: starvingCity.id });
+  const fine = territory.generateCommunity(w, { cityId: fineCity.id });
+  const starvingResident = resident(w, starving.id);
+  const fineResident = resident(w, fine.id);
+
+  // **Order matters, and it is the point.** The fine city's resource is
+  // generated FIRST and the starving city's SECOND — the one ordering
+  // that would make a `resource_type`-only Map read back the WORSE
+  // (starving) value for both cities, because the later insert wins.
+  economy.generateResource(w, {
+    cityId: fineCity.id, resourceType: 'food', supply: 100, demand: 100,
+  });
+  economy.generateResource(w, {
+    cityId: starvingCity.id, resourceType: 'food', supply: 1, demand: 1000,
+  });
+
+  const fineListing = economy.generateMarketListing(w, {
+    cityId: fineCity.id, productName: 'bread', resourceType: 'food', price: 10, supply: 60, demand: 90,
+  });
+
+  const events = tick.runEconomyPhase(w);
+
+  // The fine city's own food is perfectly balanced (scarcity 50,
+  // neutral) — its bread must price as if fed that, not the starving
+  // city's 100.
+  const correctlyPriced = { price: 10, supply: 60, demand: 90 };
+  economy.resolveMarketPrice(correctlyPriced, w.tick, 50);
+  assert.equal(
+    Math.round(fineListing.price * 100), Math.round(correctlyPriced.price * 100),
+    `the fine city's bread priced at ${fineListing.price}, not off its own balanced food `
+    + `supply (expected ${correctlyPriced.price})`,
+  );
+
+  // Exactly one city has a real shortage, so exactly one broadcast.
+  const scarcityEvents = events.filter((e) => e.type === 'scarcity');
+  assert.equal(scarcityEvents.length, 1,
+    `${scarcityEvents.length} scarcity events for one real shortage`);
+  assert.equal(scarcityEvents[0].global_effects.cityId, starvingCity.id);
+
+  const heard = new Set(w.entityKnowledge.map((k) => k.entity_id));
+  assert.ok(heard.has(starvingResident.id), 'the starving city never heard about its own famine');
+  assert.ok(!heard.has(fineResident.id),
+    'a city with no shortage of its own heard "verified" news of one anyway');
+});
+
+test('a second city\'s own later shortage is still news, not suppressed by the first', () => {
+  // The other half of the same key collision: `scarcityNews` tracked
+  // "the level last broadcast" per resource type ALONE, so a shortage
+  // already announced in one city could silently gate the announcement
+  // of a SEPARATE, later shortage of the same resource type in another
+  // city — "no worse than when it was announced" compared a city that
+  // had never heard anything against a different city's number.
+  const w = tickWorld();
+  const cityA = territory.generateCity(w, { name: 'A' });
+  const cityB = territory.generateCity(w, { name: 'B' });
+  const communityA = territory.generateCommunity(w, { cityId: cityA.id });
+  const communityB = territory.generateCommunity(w, { cityId: cityB.id });
+  resident(w, communityA.id);
+  const residentB = resident(w, communityB.id);
+
+  const foodA = economy.generateResource(w, {
+    cityId: cityA.id, resourceType: 'food', supply: 1, demand: 1000,
+  });
+  const foodB = economy.generateResource(w, {
+    cityId: cityB.id, resourceType: 'food', supply: 100, demand: 100,
+  });
+
+  // Tick 1: city A's famine crosses the threshold and is announced.
+  w.tick = 1;
+  const first = tick.runEconomyPhase(w).filter((e) => e.type === 'scarcity');
+  assert.equal(first.length, 1);
+  assert.equal(first[0].global_effects.cityId, cityA.id);
+
+  // Tick 2: city B develops its OWN famine, no better or worse than
+  // city A's already-announced level — a city-blind dedup would treat
+  // this as "already news" and skip it.
+  foodB.supply = 1;
+  foodB.demand = 1000;
+  w.tick = 2;
+  const second = tick.runEconomyPhase(w).filter((e) => e.type === 'scarcity');
+  assert.equal(second.length, 1, 'city B\'s own first famine was not announced');
+  assert.equal(second[0].global_effects.cityId, cityB.id);
+
+  const heardOnTickTwo = w.entityKnowledge
+    .filter((k) => k.acquired_tick === 2)
+    .map((k) => k.entity_id);
+  assert.deepEqual(heardOnTickTwo, [residentB.id]);
+  void foodA;
 });
 
 // -- personal wealth ---------------------------------------------------------
