@@ -101,8 +101,28 @@ export async function purchaseWearable(store, options = {}) {
     throw new Error(`purchaseWearable: ${buyerId} already owns wearable ${wearableId}`);
   }
 
-  await transferFn(buyerId, wearable.creatorId, wearable.price, `venvs_degvchi_purchase:${wearable.id}`);
-  store.ownership.push({ userId: buyerId, wearableId });
+  // Claimed before the money moves, not after. This used to await
+  // transferFn and only push the ownership row afterward, so a second
+  // call for the same buyer+wearable (two tabs, a double-submit that
+  // races past the UI's own disabled state, a client retry) fired
+  // before the first call's transferFn resolved would pass the
+  // ownsWearable guard above too — both calls would charge the buyer
+  // and both would push a duplicate ownership row. Pushing the row
+  // synchronously, before the first await, means a second concurrent
+  // call sees it and is refused by the same guard; rolling it back on
+  // a failed transfer means a declined charge never leaves behind
+  // ownership of an item that was never actually paid for.
+  const ownershipRow = { userId: buyerId, wearableId };
+  store.ownership.push(ownershipRow);
+  try {
+    await transferFn(buyerId, wearable.creatorId, wearable.price, `venvs_degvchi_purchase:${wearable.id}`);
+  } catch (err) {
+    const index = store.ownership.indexOf(ownershipRow);
+    if (index !== -1) {
+      store.ownership.splice(index, 1);
+    }
+    throw err;
+  }
   return wearable;
 }
 

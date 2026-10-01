@@ -193,6 +193,37 @@ test('the same person cannot buy the same wearable twice', () => {
     .then(() => assert.equal(transferFn.moves.length, 1, 'and they were not charged for the attempt'));
 });
 
+test('two concurrent purchases of the same wearable by the same buyer — only one charges, the other is refused', async () => {
+  // purchaseWearable used to await transferFn and only push the
+  // ownership row afterward, so the ownsWearable guard above was
+  // check-then-act: two calls for the same buyer+wearable fired
+  // before the first one's transferFn resolved (two tabs, a
+  // double-submit that races past the UI's own disabled state, a
+  // client retry) both passed the guard while it was still false,
+  // both charged the buyer, and both pushed a duplicate ownership
+  // row. Claiming the row synchronously, before the first await,
+  // fixes it -- reproduced directly against the real module before
+  // the fix (2 charges, 2 ownership rows for one item).
+  const store = createDegvchi();
+  const item = registerWearable(store, {
+    name: 'Coat', category: WEARABLE_CATEGORIES[0], price: 10, creatorId: 'maker',
+  });
+  const transferFn = ledger();
+
+  const results = await Promise.allSettled([
+    purchaseWearable(store, { wearableId: item.id, buyerId: 'p1', transferFn }),
+    purchaseWearable(store, { wearableId: item.id, buyerId: 'p1', transferFn }),
+  ]);
+
+  assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1, 'only one of the two concurrent purchases may succeed');
+  assert.equal(transferFn.moves.length, 1, 'the buyer must be charged exactly once');
+  assert.equal(
+    store.ownership.filter((o) => o.userId === 'p1' && o.wearableId === item.id).length,
+    1,
+    'exactly one ownership row, not two',
+  );
+});
+
 test('a purchase needs a real payment function, not a promise to have one', () => {
   const store = createDegvchi();
   const item = registerWearable(store, {
