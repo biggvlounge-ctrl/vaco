@@ -62,6 +62,8 @@ const path = require('node:path');
 const urbanSystems = require('./urbanSystems.js');
 const statistics = require('./statistics.js');
 const politics = require('./politics.js');
+const crime = require('./crime.js');
+const migration = require('./migration.js');
 const { TRAIT_FAMILIES } = require('./traits.js');
 
 const SERVER_DIR = __dirname;
@@ -168,6 +170,25 @@ const TABLE_UNREACHED = {
   revolutions: 'assessRevolutions runs every tick; no generated world has fallen below '
     + `approval ${politics.REVOLUTION_APPROVAL_FLOOR} with `
     + `${Math.round(politics.REVOLUTION_SPREAD_FLOOR * 100)}% of the population informed`,
+  // Audited 1 Oct 2026, because the bare "empty in a built world" state
+  // below reads like the eleventh standing rule's shape — a generator
+  // nothing calls — and neither of these is that. Both have a real
+  // writer, reached every tick, gated by a deliberately rare or
+  // measured-correct condition rather than by nothing calling them.
+  court_cases: `justice.judge() writes a row and runJustice calls it every tick in the `
+    + `Security phase, after policing. The input is rare by design — crime itself draws `
+    + `against a BASE_DEPRIVATION_RISK of ${crime.BASE_DEPRIVATION_RISK} per tick — and only `
+    + 'part of what is cleared reaches a court rather than a group sanction '
+    + '(authority.prosecutes, for an area the state\'s writ does not reach). Running the '
+    + 'seed longer finds one eventually (conviction_rate first answers around tick 450 on '
+    + 'this seed); it is not a wired-but-silent mechanism.',
+  migration_events: 'migration.relocate() writes a row and runMigrationPhase calls it every '
+    + `tick. PULL_MARGIN (${migration.PULL_MARGIN}) sits above the 99th percentile of the `
+    + 'gaps it filters on this seed, so almost every push finds no acceptable destination — '
+    + 'measured, not an uncalled generator (CLAUDE.md\'s twenty-sixth standing rule: about '
+    + '2 moves in 600 ticks since the seededUnit fix made MOVE_CHANCE gate for real). '
+    + 'Re-tuning the threshold would be the exact "inflate a constant to look consequential" '
+    + 'trap the seventeenth standing rule names.',
 };
 
 //: Tables with no store, where that is a DECISION rather than an

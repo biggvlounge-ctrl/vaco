@@ -32,13 +32,18 @@
 // does not apply here: a crime had no other way to be attributed to an
 // area. A child is in an area by being a person in one.
 //
-// **The caveat, stated rather than discovered later:** the area a birth
-// is counted in is the child's CURRENT community, which is exact today
-// because nothing moves — `migration_events` is a schema-only table and
-// `runMigrationPhase` computes a risk signal that relocates nobody. The
-// day migration is built, a birth's community has to be recorded at the
-// time rather than read off the child, and `birthsIn` is the function
-// that changes.
+// **The caveat this file stated rather than waited to be caught by,
+// closed on 1 Oct 2026.** This note used to say the area a birth is
+// counted in was the child's CURRENT community, exact only because
+// nothing moved yet, and that `birthsIn` was the function that would
+// have to change once migration existed. Migration exists now
+// (`server/migration.js`), and `birthsIn` does not read the live field
+// any more — `birthCommunityOf` resolves it from the real
+// `migration_events` log instead (the earliest event names where
+// somebody moved FROM, which is where they were born; nobody who never
+// moved has one, and for them the live field was always exact). No new
+// table, no new column — the fact was already being recorded for a
+// different reason and simply never read back for this one.
 //
 // **2. A child inherits; it does not roll.** Trait values are the mean
 // of the two parents' LIVE values with a seeded deviation — standing
@@ -542,6 +547,30 @@ function birthRecordFor(worldState, entityId) {
   ) || null;
 }
 
+// **Where somebody was actually born, immune to a later move.** The
+// header's own caveat, closed: `npc.communityId` is live and
+// `migration.relocate` is the only thing that ever writes it after
+// birth (confirmed — `areaStats.placeInCommunity` is its one other
+// caller, at world generation, before anybody the engine itself bore
+// exists), and `relocate` logs a real `migration_events` row every
+// time it moves somebody. So the EARLIEST such row for this entity
+// names where they moved FROM, which is where they were born. Nobody
+// who has never migrated has one, and for them the live field has
+// never been touched, so it is still exact — which is why this reads
+// the log first and falls back to the live field rather than the
+// other way round.
+function birthCommunityOf(worldState, entityId) {
+  let earliest = null;
+  for (const event of worldState.migrationEvents || []) {
+    if (event.entity_id !== entityId) continue;
+    if (earliest === null || event.tick < earliest.tick) earliest = event;
+  }
+  if (earliest) return earliest.from_location_id ?? null;
+  const npc = (worldState.npcs || []).find((n) => n.id === entityId)
+    ?? (worldState.deceased || []).find((n) => n.id === entityId);
+  return npc?.communityId ?? null;
+}
+
 // Everybody born in an area, living or dead.
 //
 // **The dead are included on purpose.** A birth happened whether or
@@ -549,18 +578,18 @@ function birthRecordFor(worldState, entityId) {
 // infant deaths would make a lethal world look like a barren one —
 // which are opposite findings.
 //
-// See the header on which area this is: the child's CURRENT community,
-// exact today because nothing moves.
+// **The area is where they were BORN, not where they live now** — the
+// header's own caveat about migration, closed via `birthCommunityOf`.
 function birthsIn(worldState, communityId, options = {}) {
   const { sinceTick = null } = options;
   const everybody = [...worldState.npcs, ...(worldState.deceased || [])];
   return everybody.filter((n) => {
-    if (n.communityId !== communityId) return false;
     if (sinceTick !== null && (n.createdTick ?? 0) < sinceTick) return false;
     // Only people this world actually bore. A world seeded with 400
     // founders did not give birth to them, and counting them would
     // report an enormous birth rate on tick 0.
-    return birthRecordFor(worldState, n.id) !== null;
+    if (birthRecordFor(worldState, n.id) === null) return false;
+    return birthCommunityOf(worldState, n.id) === communityId;
   });
 }
 
@@ -599,6 +628,7 @@ module.exports = {
   bearChild,
   runBirths,
   birthRecordFor,
+  birthCommunityOf,
   birthsIn,
   bearerAgeAt,
 };

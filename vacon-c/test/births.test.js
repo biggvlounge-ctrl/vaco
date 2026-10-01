@@ -16,6 +16,7 @@ const births = require('../server/births.js');
 const economy = require('../server/economy.js');
 const mortality = require('../server/mortality.js');
 const territory = require('../server/territory.js');
+const migration = require('../server/migration.js');
 const statistics = require('../server/statistics.js');
 const { INDIVIDUAL_DEFINITIONS } = require('../server/traitDefinitions.js');
 const { generateEntityTraits } = require('../server/entityTraits.js');
@@ -348,6 +349,44 @@ test('a child who dies is still a birth that happened', () => {
   assert.equal(births.birthsIn(w, c.id).length, 1);
   mortality.recordDeath(w, { entityId: child.id, cause: 'disease', tick: w.tick + 1 });
   assert.equal(births.birthsIn(w, c.id).length, 1, 'the birth stopped counting when the child died');
+});
+
+test('birthsIn attributes a birth to where it happened, not to where the child lives after moving', () => {
+  // The caveat this file's own header used to carry, closed: `migrate`
+  // was built after `birthsIn` first shipped, and the day it existed
+  // a later move was supposed to stop erasing where somebody was born.
+  const w = world();
+  const home = territory.generateCommunity(w, {});
+  const away = territory.generateCommunity(w, {});
+  const a = person(w, { communityId: home.id, age: 27 });
+  const b = person(w, { communityId: home.id, age: 29 });
+  const { child } = births.bearChild(w, { bearerId: a.id, otherParentId: b.id });
+
+  assert.equal(births.birthsIn(w, home.id).length, 1, 'the birth has to count where it actually happened');
+  assert.equal(births.birthsIn(w, away.id).length, 0);
+
+  migration.relocate(w, {
+    entityId: child.id, toCommunityId: away.id, migrationType: 'economic', tick: w.tick,
+  });
+  assert.equal(child.communityId, away.id, 'the fixture itself must have actually moved them');
+
+  assert.equal(
+    births.birthsIn(w, home.id).length, 1,
+    'a later move must not erase where somebody was born',
+  );
+  assert.equal(
+    births.birthsIn(w, away.id).length, 0,
+    'moving somewhere does not make that where they were born',
+  );
+});
+
+test('birthCommunityOf falls back to the live field for someone who has never migrated', () => {
+  const w = world();
+  const c = territory.generateCommunity(w, {});
+  const a = person(w, { communityId: c.id, age: 27 });
+  const b = person(w, { communityId: c.id, age: 29 });
+  const { child } = births.bearChild(w, { bearerId: a.id, otherParentId: b.id });
+  assert.equal(births.birthCommunityOf(w, child.id), c.id);
 });
 
 test('the teenage birth statistics read the bearing parent\'s real age', () => {

@@ -55,9 +55,13 @@
 // ---------------------------------------------------------------------
 // What it does NOT do
 //
-// No migration (nobody moves — `migration_events` is still schema-only
-// and `runMigrationPhase` produces a risk signal that relocates
-// nobody). No transportation of any kind, which stays deferred. No
+// No migration SEEDED at generation — worldgen places every founder
+// once and leaves it there. (Migration itself is real and runs inside
+// the tick pipeline: `server/migration.js`'s `runMigrationPhase`
+// really does relocate people now, logging a `migration_events` row
+// each time — this comment used to say otherwise, from before the
+// `seededUnit` fix named in CLAUDE.md's twenty-sixth standing rule.)
+// No transportation of any kind, which stays deferred. No
 // government, election or law: `politics.js` is real and founding a
 // government is a decision about a world rather than a fact of one, so
 // it is left to the caller. No prison, because there is none.
