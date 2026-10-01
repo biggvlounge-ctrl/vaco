@@ -18,11 +18,13 @@ const VOKEN_API_URL = import.meta.env?.VITE_VOKEN_API_URL || "http://localhost:8
 
 async function requestJson(path, options) {
   const res = await fetch(`${VOKEN_API_URL}${path}`, options);
-  const body = await res.json();
   if (!res.ok) {
-    throw new Error(body.error || `${path} failed (${res.status})`);
+    const text = await res.text();
+    let message = `${path} failed (${res.status})`;
+    try { message = JSON.parse(text).error || message; } catch { /* not JSON */ }
+    throw new Error(message);
   }
-  return body;
+  return res.json();
 }
 
 export async function getBrandInfo() {

@@ -34,11 +34,18 @@ export async function transferVCoin({ fromUserId, toUserId, amount, reason }) {
     headers: { "Content-Type": "application/json", ...sessionHeaders() },
     body: JSON.stringify({ fromUserId, toUserId, amount, reason }),
   });
-  const body = await res.json();
+  // Checked before parsing, like every GET above in this same file: a
+  // non-2xx from a proxy or an upstream outage can answer with a
+  // non-JSON body, and res.json() would throw an opaque SyntaxError
+  // that hides the real status -- worse here than on a GET, since this
+  // call can fail to report success after V3 already moved the money.
   if (!res.ok) {
-    throw new Error(body.error || `transferVCoin failed (${res.status})`);
+    const text = await res.text();
+    let message = `transferVCoin failed (${res.status})`;
+    try { message = JSON.parse(text).error || message; } catch { /* not JSON */ }
+    throw new Error(message);
   }
-  return body;
+  return res.json();
 }
 
 export async function getVCoinTransactions(userId) {
@@ -58,11 +65,13 @@ export async function cashOutToVash({ userId, vcoinAmount }) {
     headers: { "Content-Type": "application/json", ...sessionHeaders() },
     body: JSON.stringify({ userId, vcoinAmount }),
   });
-  const body = await res.json();
   if (!res.ok) {
-    throw new Error(body.error || `cashOutToVash failed (${res.status})`);
+    const text = await res.text();
+    let message = `cashOutToVash failed (${res.status})`;
+    try { message = JSON.parse(text).error || message; } catch { /* not JSON */ }
+    throw new Error(message);
   }
-  return body;
+  return res.json();
 }
 
 export async function getVashBalance(userId) {
