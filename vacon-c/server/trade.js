@@ -183,8 +183,6 @@ function runMarket(worldState, tick = worldState.tick ?? 0) {
   // pass silently do nothing while looking wired.
   if (line === null) return { trades, events };
 
-  const scarcity = mortality.survivalScarcity(worldState);
-
   // Residents indexed by community once for the pass rather than
   // filtered per seller — `traitDrift.indexRows` and
   // `crime.dangerByCommunity` both cost this lesson.
@@ -200,11 +198,25 @@ function runMarket(worldState, tick = worldState.tick ?? 0) {
     cityOf.set(community.id, community.city_id ?? null);
   }
 
+  // **Per city, not once for the world** — the same bug `runMortality`,
+  // `runBirths` and `runDeprivationCrime` had: a famine in one city used
+  // to push distress sales everywhere, because this read ONE world-wide
+  // scarcity value and applied it to every seller regardless of which
+  // city they were actually in.
+  const scarcityByCity = new Map();
+  const scarcityFor = (cityId) => {
+    if (scarcityByCity.has(cityId)) return scarcityByCity.get(cityId);
+    const value = mortality.survivalScarcity(worldState, cityId);
+    scarcityByCity.set(cityId, value);
+    return value;
+  };
+
   for (const npc of worldState.npcs || []) {
     if (npc.status === 'imprisoned') continue;
     if (npc.communityId === null || npc.communityId === undefined) continue;
 
-    const pressure = crime.deprivationPressure(worldState, npc, { line, scarcity });
+    const cityId = cityOf.get(npc.communityId) ?? null;
+    const pressure = crime.deprivationPressure(worldState, npc, { line, scarcity: scarcityFor(cityId) });
     if (pressure <= 0) continue;
 
     // Seeded on the person and the tick (§88), at a rate proportional
@@ -213,7 +225,6 @@ function runMarket(worldState, tick = worldState.tick ?? 0) {
     if (seededDraw([worldState.seed ?? 'world', 'sale', npc.id, tick])
         >= pressure * DISTRESS_SALE_RATE) continue;
 
-    const cityId = cityOf.get(npc.communityId) ?? null;
     const sellable = sellableOf(worldState, npc.id, { cityId });
     if (sellable.length === 0) continue;
 

@@ -204,8 +204,14 @@ function contextFor(worldState, communityId, shared = {}) {
     ids,
     population: residents.length,
     line: shared.line !== undefined ? shared.line : areaStats.povertyLine(worldState),
-    scarcity: shared.scarcity !== undefined ? shared.scarcity : mortality.survivalScarcity(worldState),
-    pressure: shared.pressure !== undefined ? shared.pressure : mortality.diseasePressure(worldState),
+    // **The already-known `cityId` above, not a world-wide read.** The
+    // same bug `runMortality`/`runBirths`/`runDeprivationCrime`/
+    // `runMarket`/`runTraitDrift` each had: a famine in one city used
+    // to describe the environment of every area's profile, because
+    // this read `survivalScarcity`/`diseasePressure` with no city at
+    // all. `cityId` was already sitting three lines up.
+    scarcity: shared.scarcity !== undefined ? shared.scarcity : mortality.survivalScarcity(worldState, cityId),
+    pressure: shared.pressure !== undefined ? shared.pressure : mortality.diseasePressure(worldState, cityId),
   };
 }
 
@@ -1398,11 +1404,18 @@ const CATALOGUE = [
     },
   },
   {
-    key: 'survival_scarcity', category: 'environment', unit: 'share', scope: 'world',
+    // **`scope: 'city'`, not `'world'`.** `ctx.scarcity` now reads
+    // `mortality.survivalScarcity(worldState, ctx.cityId)` — the same
+    // city-scoping fix every other reader of it got — so this is no
+    // longer the same number everywhere, and the old `'world'` label
+    // would be describing behaviour this statistic no longer has.
+    key: 'survival_scarcity', category: 'environment', unit: 'share', scope: 'city',
     compute: (ctx) => round(ctx.scarcity),
   },
   {
-    key: 'disease_pressure', category: 'environment', unit: 'index', scope: 'world',
+    // Same correction, same reason: `ctx.pressure` reads
+    // `mortality.diseasePressure(worldState, ctx.cityId)`.
+    key: 'disease_pressure', category: 'environment', unit: 'index', scope: 'city',
     compute: (ctx) => round(ctx.pressure, 3),
   },
   {
@@ -1557,15 +1570,36 @@ function profileFor(worldState, communityId, shared = {}) {
   return { communityId, tick: ctx.tick, population: ctx.population, statistics };
 }
 
-// Every area, with the world-level work done once.
+// Every area, with the world-level work done once — **per city**, not
+// once for the whole world. A single shared `scarcity`/`pressure` here
+// used to describe every community's profile with the world-wide
+// reading, the same bug every other `survivalScarcity`/`diseasePressure`
+// caller in the tick pipeline had. Cached per city rather than
+// recomputed per community, so communities sharing a city still cost
+// one read each, not one per community.
 function profileAll(worldState, options = {}) {
-  const shared = {
-    tick: options.tick ?? worldState.tick ?? 0,
-    line: areaStats.povertyLine(worldState),
-    scarcity: mortality.survivalScarcity(worldState),
-    pressure: mortality.diseasePressure(worldState),
+  const tick = options.tick ?? worldState.tick ?? 0;
+  const line = areaStats.povertyLine(worldState);
+  const scarcityByCity = new Map();
+  const scarcityFor = (cityId) => {
+    if (scarcityByCity.has(cityId)) return scarcityByCity.get(cityId);
+    const value = mortality.survivalScarcity(worldState, cityId);
+    scarcityByCity.set(cityId, value);
+    return value;
   };
-  return worldState.communities.map((c) => profileFor(worldState, c.id, shared));
+  const pressureByCity = new Map();
+  const pressureFor = (cityId) => {
+    if (pressureByCity.has(cityId)) return pressureByCity.get(cityId);
+    const value = mortality.diseasePressure(worldState, cityId);
+    pressureByCity.set(cityId, value);
+    return value;
+  };
+  return worldState.communities.map((c) => profileFor(worldState, c.id, {
+    tick,
+    line,
+    scarcity: scarcityFor(c.city_id ?? null),
+    pressure: pressureFor(c.city_id ?? null),
+  }));
 }
 
 // -- comparison ---------------------------------------------------------

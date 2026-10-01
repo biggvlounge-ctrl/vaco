@@ -98,14 +98,15 @@ function marketWorld({ tick = 100 } = {}) {
   return w;
 }
 
-function person(w, { savings = 0, assets = 0, traitValue = 50 } = {}) {
-  const npc = { id: nextId++, status: 'active', communityId: 1, home_property_id: null };
+function person(w, { savings = 0, assets = 0, traitValue = 50, communityId = 1 } = {}) {
+  const npc = { id: nextId++, status: 'active', communityId, home_property_id: null };
   w.npcs.push(npc);
   w.entityTraits.push(...generateEntityTraits(
     npc.id, w.tick, INDIVIDUAL_DEFINITIONS, () => traitValue,
   ));
   economy.generateIndividualFinances(w, npc.id, { savings, assets, tick: w.tick });
-  w.communities[0].population = w.npcs.length;
+  const community = w.communities.find((c) => c.id === communityId);
+  if (community) community.population = w.npcs.filter((n) => n.communityId === communityId).length;
   return npc;
 }
 
@@ -297,6 +298,72 @@ test('nobody above the line sells anything', () => {
     w.tick = 100 + t;
     assert.equal(trade.runMarket(w, w.tick).trades.length, 0);
   }
+});
+
+test('a shortage in one city does not raise distress-sale pressure in another', () => {
+  // The same bug `crime.js`'s deprivation-crime pass had, one file
+  // over — see that file's own regression test for the measurement
+  // this one reuses: `crime.deprivationPressure` (the function both
+  // passes call) genuinely reads 0.9 in a city with a real local
+  // shortage against 0.6 in a city with none, for the same poverty
+  // depth. `DISTRESS_SALE_RATE` is ten times `crime.BASE_DEPRIVATION_
+  // RISK` (asserted below), so this needs a tenth of that test's
+  // person-ticks for the same statistical separation.
+  //
+  // **Why each seller's finances are reset every tick.** A real sale
+  // pays the seller, and `economy.getNetWorth` would carry them over
+  // the poverty line after two or three — at which point
+  // `deprivationPressure` returns 0 and they stop selling in EITHER
+  // city, for the same number of sales, regardless of how much
+  // pressure drove them there. That would make the two cities
+  // converge on the same total once both populations finish
+  // "graduating" out of poverty, hiding the rate difference this test
+  // exists to catch. Resetting savings back to the baseline after each
+  // tick keeps every poor resident poor for the life of the run, the
+  // same way a theft in `crime.js` does not change the thief's
+  // recorded net worth — holding pressure constant is what makes the
+  // incident COUNT the thing that differs.
+  const w = marketWorld();
+  w.communities.push({ id: 2, city_id: 2, population: 0 });
+  w.cities.push({ id: 2, name: 'Testbed Two' });
+
+  const poorByCity = { 1: [], 2: [] };
+  function seedCity(communityId, cityId) {
+    for (let i = 0; i < 20; i += 1) {
+      const seller = person(w, { savings: 100, communityId });
+      inventory.give(w, { entityId: seller.id, itemName: 'Silver Ingot', quantity: 50 });
+      poorByCity[cityId].push(seller);
+    }
+    for (let i = 0; i < 15; i += 1) person(w, { savings: 500, communityId });
+    for (let i = 0; i < 6; i += 1) person(w, { savings: 5000, communityId });
+  }
+  seedCity(1, 1);
+  seedCity(2, 2);
+
+  economy.generateResource(w, { cityId: 1, resourceType: 'food', supply: 1, demand: 1000 });
+  economy.generateResource(w, { cityId: 1, resourceType: 'water', supply: 1, demand: 1000 });
+  economy.generateResource(w, { cityId: 1, resourceType: 'medicine', supply: 1, demand: 1000 });
+
+  let starvingSales = 0;
+  let fineSales = 0;
+  for (let t = 1; t <= 2000; t += 1) {
+    w.tick = t;
+    const { trades } = trade.runMarket(w, t);
+    for (const settled of trades) {
+      if (poorByCity[1].some((p) => p.id === settled.sellerId)) starvingSales += 1;
+      else if (poorByCity[2].some((p) => p.id === settled.sellerId)) fineSales += 1;
+    }
+    for (const seller of [...poorByCity[1], ...poorByCity[2]]) {
+      economy.getLatestFinances(w, seller.id).savings = 100;
+    }
+  }
+
+  assert.ok(starvingSales > fineSales,
+    `the real shortage should push more distress sales where it is (${starvingSales} vs ${fineSales})`);
+  assert.ok(
+    fineSales < starvingSales * 0.75,
+    `a city with no shortage of its own should not track the starving city's rate this closely (${fineSales} vs ${starvingSales})`,
+  );
 });
 
 test('a world with no poverty line to read trades nothing and throws nothing', () => {

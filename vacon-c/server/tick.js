@@ -34,10 +34,13 @@
 // since built (see dev-docs/territory-community/) and the Organization
 // phase below now uses it for real; Property was since built too (see
 // server/property.js) and the Environment phase now ages every standing
-// building. What still keeps the Migration phase to a risk signal is
-// narrower than it was: properties exist to move into, but nothing
-// chooses a destination or writes `occupants`, and City has no
-// generation of its own beyond territory.js#generateCity(). Each
+// building. The Migration phase used to be a risk signal only —
+// properties existed to move into, but nothing chose a destination or
+// wrote `occupants`. Both are closed now: `server/migration.js`'s
+// `destinationFor`/`relocate` choose a real destination and really
+// move somebody, and `server/households.js`'s `syncHouseholds` writes
+// `properties.occupants` from who actually lives there. City still has
+// no generation of its own beyond territory.js#generateCity(). Each
 // still-minimal phase is commented explaining exactly what's missing,
 // not silently faked.
 
@@ -731,7 +734,7 @@ function runMigrationPhase(worldState) {
       if (!crossed) continue;
       events.push({
         type: 'migration_risk', severity: risk > 80 ? 'high' : 'moderate',
-        note: `${npc.name} showing migration risk (${risk}) — no relocation system built yet`,
+        note: `${npc.name} showing migration risk (${risk})`,
         tick: worldState.tick, affected_entity_ids: [npc.id], global_effects: {},
       });
     }
@@ -1409,7 +1412,25 @@ function advanceTick(worldState) {
   // of a tick.
   traitDrift.runTraitDrift(worldState, {
     tick: worldState.tick,
-    scarcity: mortality.survivalScarcity(worldState),
+    // **Per community, by the community's own city** — the same bug
+    // `runMortality`/`runBirths`/`runDeprivationCrime`/`runMarket` had:
+    // a single world-wide `survivalScarcity()` read meant a famine in
+    // one city pressed on every community's trait drift, not just the
+    // one actually living through it. Cached per city within the pass
+    // rather than recomputed per community, the same shape
+    // `conditionByCommunity` already uses one line down.
+    scarcityByCommunity: (() => {
+      const byCity = new Map();
+      const scarcityFor = (cityId) => {
+        if (byCity.has(cityId)) return byCity.get(cityId);
+        const value = mortality.survivalScarcity(worldState, cityId);
+        byCity.set(cityId, value);
+        return value;
+      };
+      return new Map((worldState.communities || []).map(
+        (c) => [c.id, scarcityFor(c.city_id ?? null)],
+      ));
+    })(),
     crimeByCommunity: crime.dangerByCommunity(worldState),
     // A community inherits its city's infrastructure condition — the
     // water systems and roads a block depends on are the city's, not

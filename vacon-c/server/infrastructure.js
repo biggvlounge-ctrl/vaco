@@ -535,6 +535,7 @@ function failInfrastructure(worldState, row, options = {}) {
       name: effect.disease,
       mortalityMultiplier: effect.mortalityMultiplier,
       ticksRemaining: ticks,
+      cityId: row.city_id,
       tick,
     });
   } else if (effect) {

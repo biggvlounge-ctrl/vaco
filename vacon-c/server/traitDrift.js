@@ -552,10 +552,18 @@ function driftTemporary(worldState, entityId, tick, stress, index = null) {
 // state: `survivalScarcity` is what `mortality.js` already computes for
 // deprivation deaths, and crime is counted per resident from the
 // incidents `crime.js` already records.
-function pressuresFor(worldState, scarcity, crimeByCommunity, conditionByCommunity, communityId) {
+//
+// **`scarcityByCommunity`, not a single number** — the same bug
+// `runMortality`/`runBirths`/`runDeprivationCrime`/`runMarket` had: a
+// famine in one city used to press on every community's trait drift,
+// not just the one actually living through it. `conditionByCommunity`
+// already got this right (infrastructure is read per community's city);
+// scarcity read it wrong by being the one caller left passing a bare
+// scalar.
+function pressuresFor(worldState, scarcityByCommunity, crimeByCommunity, conditionByCommunity, communityId) {
   const condition = conditionByCommunity.get(communityId);
   return {
-    scarcity: clamp(scarcity, 0, 1),
+    scarcity: clamp(scarcityByCommunity.get(communityId) ?? 0, 0, 1),
     danger: clamp(crimeByCommunity.get(communityId) ?? 0, 0, 1),
     // Centred on 50 and signed: negative where a place is better kept
     // than ordinary, positive where it is worse. Null — a community in
@@ -580,7 +588,7 @@ function pressuresFor(worldState, scarcity, crimeByCommunity, conditionByCommuni
 function runTraitDrift(worldState, options = {}) {
   const {
     tick = worldState.tick ?? 0,
-    scarcity = 0,
+    scarcityByCommunity = new Map(),
     crimeByCommunity = new Map(),
     conditionByCommunity = new Map(),
   } = options;
@@ -603,7 +611,7 @@ function runTraitDrift(worldState, options = {}) {
     moved += driftEnvironment(
       worldState, npc.id, tick,
       pressuresFor(
-        worldState, scarcity, crimeByCommunity, conditionByCommunity, npc.communityId,
+        worldState, scarcityByCommunity, crimeByCommunity, conditionByCommunity, npc.communityId,
       ),
       index,
     );

@@ -501,7 +501,9 @@ test('the environment is reported beside the statistics, not inside them', () =>
   const c = territory.generateCommunity(w, { cityId: city.id });
   person(w, { communityId: c.id });
   economy.generateResource(w, { cityId: city.id, resourceType: 'food', supply: 10, demand: 90 });
-  mortality.addDiseaseOutbreak(w, { name: 'fever', mortalityMultiplier: 2, ticksRemaining: 5 });
+  mortality.addDiseaseOutbreak(w, {
+    name: 'fever', mortalityMultiplier: 2, ticksRemaining: 5, cityId: city.id,
+  });
 
   const env = statistics.environmentFor(w, c.id);
   assert.equal(env.cityId, city.id);
@@ -515,6 +517,47 @@ test('the environment is reported beside the statistics, not inside them', () =>
   // And none of it leaked into the area's own statistics.
   const profile = statistics.profileFor(w, c.id);
   assert.equal('cityName' in profile.statistics, false);
+});
+
+test('a shortage in one city is not reported as every city\'s environment', () => {
+  // The same bug `runMortality`/`runBirths`/`runDeprivationCrime`/
+  // `runMarket`/`runTraitDrift` each had: `contextFor` used to read
+  // `mortality.survivalScarcity(worldState)` with no city at all, even
+  // though it had already resolved this exact community's `cityId`
+  // three lines up — and `profileAll` compounded it by computing that
+  // one world-wide reading ONCE and handing the same number to every
+  // community's profile regardless of which city it was in. No seeded
+  // draw sits downstream of either reading, so this is an exact
+  // comparison rather than a statistical one.
+  const w = world();
+  const starvingCity = territory.generateCity(w, { name: 'Starving' });
+  const fineCity = territory.generateCity(w, { name: 'Fine' });
+  const starving = territory.generateCommunity(w, { cityId: starvingCity.id });
+  const fine = territory.generateCommunity(w, { cityId: fineCity.id });
+  person(w, { communityId: starving.id });
+  person(w, { communityId: fine.id });
+  economy.generateResource(w, {
+    cityId: starvingCity.id, resourceType: 'food', supply: 1, demand: 1000,
+  });
+
+  const starvingEnv = statistics.environmentFor(w, starving.id);
+  const fineEnv = statistics.environmentFor(w, fine.id);
+  assert.ok(starvingEnv.survivalScarcity > 0, 'the real shortage did not register at all');
+  assert.equal(fineEnv.survivalScarcity, 0,
+    `a city with no shortage of its own reported ${fineEnv.survivalScarcity}`);
+
+  // `profileAll`'s shared world-level work must not share the READING,
+  // only the cost of computing it — each community still gets its own
+  // city's number back in its own `survival_scarcity` statistic.
+  const all = statistics.profileAll(w);
+  const starvingProfile = all.find((p) => p.communityId === starving.id);
+  const fineProfile = all.find((p) => p.communityId === fine.id);
+  assert.equal(
+    starvingProfile.statistics.survival_scarcity.value, starvingEnv.survivalScarcity,
+  );
+  assert.equal(fineProfile.statistics.survival_scarcity.value, 0,
+    `profileAll leaked the starving city's reading into the fine one `
+    + `(${fineProfile.statistics.survival_scarcity.value})`);
 });
 
 test('a community with no city reports what it can and null for the rest', () => {

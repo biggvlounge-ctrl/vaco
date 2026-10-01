@@ -113,6 +113,16 @@ function barterValue(worldState, itemName) {
 const { seededDraw } = require('./seeded.js');
 const { nextAfter } = require('./nextAfter.js');
 
+// `mortality.js`/`births.js`/`knowledge.js`/`statecraft.js`/`trade.js`/
+// `media.js` each carry their own copy of exactly this lookup, for
+// exactly the same reason: communities carry the real `city_id`, NPCs
+// carry only `communityId`, and this file has no cause to reach into a
+// sibling module's internals to save three lines.
+function cityOf(worldState, npc) {
+  const community = (worldState.communities || []).find((c) => c.id === npc.communityId);
+  return community?.city_id ?? null;
+}
+
 // §9's seven, verbatim and in its order, plus the one that was asked
 // for. `generated` says whether anything in this engine produces it;
 // `substrate` says what it is waiting for when nothing does.
@@ -524,7 +534,17 @@ function deprivationPressure(worldState, npc, { line, scarcity }) {
 // Runs inside the Security phase — the pipeline stays at eleven.
 function runDeprivationCrime(worldState, tick = worldState.tick ?? 0) {
   const line = areaStats.povertyLine(worldState);
-  const scarcity = mortality.survivalScarcity(worldState);
+  // **Per city, not once for the world** — the same bug `runMortality`
+  // and `runBirths` had: a famine in one city used to raise deprivation
+  // pressure, and therefore theft, everywhere else too. `line` stays
+  // world-wide on purpose (`areaStats.povertyLine`'s own design).
+  const scarcityByCity = new Map();
+  const scarcityFor = (cityId) => {
+    if (scarcityByCity.has(cityId)) return scarcityByCity.get(cityId);
+    const value = mortality.survivalScarcity(worldState, cityId);
+    scarcityByCity.set(cityId, value);
+    return value;
+  };
   const incidents = [];
   if (line === null) return incidents;
 
@@ -543,6 +563,7 @@ function runDeprivationCrime(worldState, tick = worldState.tick ?? 0) {
   }
 
   for (const npc of worldState.npcs) {
+    const scarcity = scarcityFor(cityOf(worldState, npc));
     const pressure = deprivationPressure(worldState, npc, { line, scarcity });
     if (pressure <= 0) continue;
     if (seededDraw([npc.id, tick, 'crime:deprivation']) >= pressure * BASE_DEPRIVATION_RISK) continue;

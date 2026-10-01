@@ -332,6 +332,68 @@ test('a comfortable world with no shortage generates no deprivation crime', () =
   assert.equal(w.crimeIncidents.length, 0);
 });
 
+test('a shortage in one city does not raise deprivation pressure in another', () => {
+  // The same real bug `runMortality`/`runBirths` had, one file over:
+  // `scarcity` used to be read once for the whole world, so a famine
+  // in one city amplified deprivation pressure — and therefore theft —
+  // everywhere else too.
+  //
+  // **Why 20,000 ticks and not a few hundred.** The draw is
+  // `seededDraw([npc.id, tick, ...]) >= pressure * BASE_DEPRIVATION_RISK`
+  // — at `BASE_DEPRIVATION_RISK = 0.0006` a single poor person draws a
+  // theft perhaps once every few hundred ticks, so at the population
+  // and tick counts an earlier version of this test used (41 people,
+  // 400 ticks) the fixed and the broken code produced counts within a
+  // few incidents of each other either way — not because the fix does
+  // nothing, but because the sample was too small to see it. Measured
+  // directly (`crime.deprivationPressure` on a sample resident of
+  // each city): the fix genuinely produces 0.9 in the starving city
+  // against 0.6 in the fine one. 20 poor residents per city over
+  // 20,000 ticks (40,000 draws per city — about the same statistical
+  // weight as a bigger population run for fewer ticks, at a fraction
+  // of the cost `economy.getNetWorth`'s per-call scan makes a larger
+  // population carry) is enough for that 0.9-vs-0.6 gap to separate
+  // from sampling noise: measured here, fixed gives roughly a 0.6
+  // ratio of fine to starving incidents, reverting `crime.js` alone
+  // (`git stash -- server/crime.js`) collapses that to roughly 0.8,
+  // because reverted code reads the SAME world-wide scarcity for both
+  // cities and the two populations' counts converge toward each other.
+  const w = world({ tick: 1 });
+  const starving = territory.generateCommunity(w, { cityId: 1 });
+  const fine = territory.generateCommunity(w, { cityId: 2 });
+  // The same real poverty in both cities, so any DIFFERENCE in crime
+  // between them has to come from the shortage, not from who is poor.
+  // Savings of 100 against a line of 250 (median 500 * the real 0.5
+  // fraction) gives a PARTIAL depth of 0.6 — not already clamped at
+  // the maximum — so there is real headroom left for a shortage to
+  // move pressure higher, the same way `deprivationPressure`'s own
+  // unit tests above use `scarcity: 1` against a `halfway` depth.
+  for (const c of [starving, fine]) {
+    for (let i = 0; i < 20; i += 1) person(w, { communityId: c.id, savings: 100 });
+    for (let i = 0; i < 15; i += 1) person(w, { communityId: c.id, savings: 500 });
+    for (let i = 0; i < 6; i += 1) person(w, { communityId: c.id, savings: 1000 });
+  }
+  economy.generateResource(w, { cityId: 1, resourceType: 'food', supply: 1, demand: 1000 });
+  economy.generateResource(w, { cityId: 1, resourceType: 'water', supply: 1, demand: 1000 });
+  economy.generateResource(w, { cityId: 1, resourceType: 'medicine', supply: 1, demand: 1000 });
+
+  for (let t = 1; t <= 20000; t += 1) {
+    w.tick = t;
+    crime.runDeprivationCrime(w, t);
+  }
+
+  const inStarving = crime.incidentsIn(w, starving.id).length;
+  const inFine = crime.incidentsIn(w, fine.id).length;
+  assert.ok(inStarving > inFine, `the real shortage should raise crime where it is (${inStarving} vs ${inFine})`);
+  // The ratio, not just the direction: the fine city's count has to sit
+  // meaningfully below the starving one, not merely edge under it on
+  // sampling noise the way the leaked (reverted) reading also can.
+  assert.ok(
+    inFine < inStarving * 0.75,
+    `a city with no shortage of its own should not track the starving city's rate this closely (${inFine} vs ${inStarving})`,
+  );
+});
+
 test('the same world and the same tick commit the same crimes', () => {
   // §88's replay guarantee. Two identical worlds, run identically,
   // must produce identical incidents — a crime generator on

@@ -88,6 +88,19 @@ const { INDIVIDUAL_DEFINITIONS } = require('./traitDefinitions.js');
 const { generateEntityTraits, traitsToSheet, getLiveEntity } = require('./entityTraits.js');
 const { seededDraw, seededUnit, hashSeed } = require('./seeded.js');
 
+// `mortality.js`/`knowledge.js`/`statecraft.js`/`trade.js`/`media.js`
+// each carry their own copy of exactly this lookup, for exactly the
+// same reason: communities carry the real `city_id`, NPCs carry only
+// `communityId`, and this file has no cause to reach into a sibling
+// module's internals to save three lines. (Not to be confused with
+// `birthCommunityOf` below, which answers a different question — where
+// somebody WAS born, immune to a later move. This answers where a
+// bearer IS, right now, for environmental fertility.)
+function cityOf(worldState, npc) {
+  const community = (worldState.communities || []).find((c) => c.id === npc.communityId);
+  return community?.city_id ?? null;
+}
+
 //: The one hard gate in this file, and it is biology rather than a
 //: rule about the environment: a child cannot bear a child.
 const FERTILITY_MIN_AGE = 15;
@@ -477,8 +490,22 @@ function bearChild(worldState, options = {}) {
 // population. Births run AFTER mortality on the tick so that nobody is
 // born to a parent who died earlier in the same tick.
 function runBirths(worldState, tick = worldState.tick ?? 0) {
-  const scarcity = mortality.survivalScarcity(worldState);
-  const pressure = mortality.diseasePressure(worldState);
+  // **Per city, not once for the world** — the same bug `runMortality`
+  // had and for the same reason: a drought or outbreak in one city
+  // made every bearer everywhere read as environmentally stressed.
+  // `line` stays world-wide on purpose — `areaStats.povertyLine` is
+  // deliberately computed over the whole world (its own header: "a
+  // community is poor relative to the world, not relative to itself").
+  const byCity = new Map();
+  const readingsFor = (cityId) => {
+    if (byCity.has(cityId)) return byCity.get(cityId);
+    const reading = {
+      scarcity: mortality.survivalScarcity(worldState, cityId),
+      pressure: mortality.diseasePressure(worldState, cityId),
+    };
+    byCity.set(cityId, reading);
+    return reading;
+  };
   const line = areaStats.povertyLine(worldState);
   const births = [];
   const events = [];
@@ -504,6 +531,7 @@ function runBirths(worldState, tick = worldState.tick ?? 0) {
     const last = lastBorneTick(worldState, pair.bearer.id);
     if (last !== null && tick - last < GESTATION_TICKS) continue;
 
+    const { scarcity, pressure } = readingsFor(cityOf(worldState, pair.bearer));
     const annual = BASE_ANNUAL_BIRTH_RATE
       * pair.fertility
       * environmentalFertility(worldState, pair.bearer, { scarcity, pressure, line });

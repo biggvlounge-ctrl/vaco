@@ -286,6 +286,38 @@ test('a comfortable world bears children and a collapsing one does not', () => {
   assert.ok(famine < plenty, `famine bore ${famine}, plenty bore ${plenty}`);
 });
 
+test('a famine in one city does not suppress births in another', () => {
+  // The same real bug `runMortality` had, one file over: `scarcity`
+  // used to be read once for the whole world, so a famine anywhere
+  // made every bearer everywhere read as environmentally stressed.
+  const w = world();
+  const starving = territory.generateCommunity(w, { cityId: 1 });
+  const fine = territory.generateCommunity(w, { cityId: 2 });
+  for (const c of [starving, fine]) {
+    for (let i = 0; i < 20; i += 1) {
+      const a = person(w, { communityId: c.id, age: 27 });
+      const b = person(w, { communityId: c.id, age: 29 });
+      couple(w, a, b);
+    }
+  }
+  economy.generateResource(w, { cityId: 1, resourceType: 'food', supply: 1, demand: 1000 });
+  economy.generateResource(w, { cityId: 1, resourceType: 'water', supply: 1, demand: 1000 });
+  economy.generateResource(w, { cityId: 1, resourceType: 'medicine', supply: 1, demand: 1000 });
+
+  for (let t = 1; t <= 730; t += 1) {
+    w.tick = w.tick + 1;
+    births.runBirths(w, w.tick);
+  }
+
+  const starvingBirths = births.birthsIn(w, starving.id).length;
+  const fineBirths = births.birthsIn(w, fine.id).length;
+  assert.ok(fineBirths > 0, 'twenty couples with no real shortage bore nobody');
+  assert.ok(
+    starvingBirths < fineBirths,
+    `city 1's famine should not have reached city 2 (${starvingBirths} vs ${fineBirths})`,
+  );
+});
+
 test('the same world and the same tick bear the same children', () => {
   // §88's replay guarantee. A birth generator on Math.random() makes
   // every world unreproducible.

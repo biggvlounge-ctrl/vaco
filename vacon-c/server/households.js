@@ -34,12 +34,13 @@
 // ---------------------------------------------------------------------
 // It also writes `properties.occupants`, which nothing did
 //
-// `tick.js`'s own header names this gap in its list of what keeps the
+// `tick.js`'s own header named this gap in its list of what kept the
 // Migration phase thin: "properties exist to move into, but nothing
-// chooses a destination or writes `occupants`". Half of that is closed
+// chooses a destination or writes `occupants`". Half of that was closed
 // here — `occupants` is now the household living in the building, which
-// is what the column means. Choosing a destination is migration's job
-// and stays open.
+// is what the column means. Choosing a destination was migration's job,
+// and `server/migration.js`'s `destinationFor`/`relocate` have closed
+// the other half since.
 
 'use strict';
 

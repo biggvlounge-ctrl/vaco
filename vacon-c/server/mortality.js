@@ -79,6 +79,16 @@ const membership = require('./membership.js');
 const behavior = require('./behavior.js');
 const succession = require('./succession.js');
 
+// `knowledge.js`/`statecraft.js`/`trade.js`/`media.js` each carry their
+// own copy of exactly this lookup, for exactly the same reason:
+// communities carry the real `city_id`, NPCs carry only `communityId`,
+// and this file has no cause to reach into a sibling module's
+// internals to save three lines.
+function cityOf(worldState, npc) {
+  const community = (worldState.communities || []).find((c) => c.id === npc.communityId);
+  return community?.city_id ?? null;
+}
+
 // A tick is a day — `behavior.js` chooses that and says so, and
 // `worldState.tickIntervals` overrides it wholesale. This is the same
 // choice expressed as a year, so the two cannot disagree silently.
@@ -236,10 +246,20 @@ function vitalityOf(worldState, entityId) {
 // `mortalityMultiplier` is what makes it lethal. A condition without
 // one is an ordinary environmental event and mortality ignores it, so
 // existing conditions do not silently start killing people.
+//
+// **`cityId`, not `communityId`.** This used to take `communityId` and
+// nothing ever passed one — `infrastructure.js`'s one real caller sat
+// right next to a sibling branch that scopes its own condition with
+// `cityId: row.city_id` and never passed the equivalent here, so every
+// outbreak an infrastructure failure caused was silently world-wide.
+// Renamed to match the scope every other condition in this engine
+// already uses (`environment.js`'s weather, `infrastructure.js`'s own
+// outage conditions) — a city is the real unit a hospital or a water
+// system serves, not a community.
 function addDiseaseOutbreak(worldState, options = {}) {
   const {
     name, mortalityMultiplier, ticksRemaining = 30,
-    communityId = null, tick = worldState.tick ?? 0,
+    cityId = null, tick = worldState.tick ?? 0,
   } = options;
 
   if (!name) throw new Error('addDiseaseOutbreak requires a name');
@@ -255,7 +275,7 @@ function addDiseaseOutbreak(worldState, options = {}) {
     name,
     mortalityMultiplier,
     ticksRemaining,
-    communityId,
+    cityId,
     startedTick: tick,
   };
   worldState.activeConditions.push(condition);
@@ -265,9 +285,18 @@ function addDiseaseOutbreak(worldState, options = {}) {
 // The combined multiplier from every active disease. Multiplied rather
 // than summed: two epidemics at once are worse than either, and
 // summing would let three mild outbreaks add up to certain death.
-function diseasePressure(worldState) {
+//
+// **`cityId` narrows the reading, the same optional parameter
+// `survivalScarcity` already takes and with the same filter shape** —
+// without it this reads every outbreak anywhere, which is right for
+// "is this world sick" and wrong for "is this city". A world-wide
+// drought making every city read as starving was the bug that gave
+// `survivalScarcity` its own `cityId`; an outbreak scoped to one city
+// raising every city's death rate is the same bug one file over.
+function diseasePressure(worldState, cityId = null) {
   let pressure = 1;
   for (const condition of worldState.activeConditions || []) {
+    if (cityId !== null && condition.cityId !== cityId) continue;
     const multiplier = Number(condition.mortalityMultiplier);
     if (!Number.isFinite(multiplier) || multiplier <= 1) continue;
     pressure *= multiplier;
@@ -529,8 +558,19 @@ function killEntity(worldState, options = {}) {
 // becomes an event and a record on the tick it happened rather than
 // the next one. The pipeline stays at eleven.
 function runMortality(worldState, tick = worldState.tick ?? 0) {
-  const pressure = diseasePressure(worldState);
-  const scarcity = survivalScarcity(worldState);
+  // **Per city, not once for the world.** A single world-wide reading
+  // made one city's drought or outbreak starve and sicken every other
+  // city too — the exact bug `survivalScarcity`'s own header already
+  // named. Cached by city so a population of any size still computes
+  // each real city's scarcity/pressure exactly once per tick.
+  const byCity = new Map();
+  const readingsFor = (cityId) => {
+    if (byCity.has(cityId)) return byCity.get(cityId);
+    const reading = { pressure: diseasePressure(worldState, cityId), scarcity: survivalScarcity(worldState, cityId) };
+    byCity.set(cityId, reading);
+    return reading;
+  };
+
   const events = [];
   const deaths = [];
 
@@ -538,6 +578,7 @@ function runMortality(worldState, tick = worldState.tick ?? 0) {
   // Mutating a collection while walking it skips the element after
   // every removal — half the population would be spared at random.
   for (const npc of [...worldState.npcs]) {
+    const { pressure, scarcity } = readingsFor(cityOf(worldState, npc));
     const age = ageInYears(worldState, npc, tick);
     const annual = annualDeathRisk(worldState, npc.id, { age, pressure, scarcity });
     if (annual <= 0) continue;
@@ -561,7 +602,11 @@ function runMortality(worldState, tick = worldState.tick ?? 0) {
     events.push(death.event);
   }
 
-  return { deaths, events, pressure };
+  // No single `pressure`/`scarcity` in the return any more — each city
+  // can have its own now, and nothing reads a top-level value from
+  // here, so reporting one would be exactly the computed-field-nobody-
+  // reads pattern this project's own rules warn about.
+  return { deaths, events };
 }
 
 // -- reading the dead ---------------------------------------------------

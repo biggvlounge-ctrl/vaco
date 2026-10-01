@@ -140,7 +140,7 @@ test('an ordinary person in an ordinary place does not drift', () => {
     .map((r) => ({ ...r }));
 
   for (let t = 0; t < 50; t += 1) {
-    drift.runTraitDrift(w, { tick: w.tick + t, scarcity: 0, crimeByCommunity: new Map() });
+    drift.runTraitDrift(w, { tick: w.tick + t, scarcityByCommunity: new Map(), crimeByCommunity: new Map() });
   }
 
   for (const before of snapshot) {
@@ -150,6 +150,51 @@ test('an ordinary person in an ordinary place does not drift', () => {
     assert.equal(now.current_value, before.current_value,
       `${getDefinition(before.trait_id).name} drifted with no habits, no danger and no scarcity`);
   }
+});
+
+test('a shortage in one city does not press trait drift in another', () => {
+  // The same bug `runMortality`/`runBirths`/`runDeprivationCrime`/
+  // `runMarket` had, one file over: `scarcity` used to be a single
+  // number computed once for the whole world (`mortality.
+  // survivalScarcity(worldState)`, no city) and applied to every
+  // community's trait drift alike — so a famine in one city wore down
+  // people living through no shortage at all.
+  //
+  // **No seeded draw sits between `pressuresFor` and
+  // `driftEnvironment`**, unlike the crime/births/market versions of
+  // this test, so this does not need a statistical sample — the
+  // comparison is exact every run.
+  const mortality = require('../server/mortality.js');
+  const economy = require('../server/economy.js');
+
+  const w = world({
+    communities: [{ id: 1, city_id: 1 }, { id: 2, city_id: 2 }],
+    resources: [],
+  });
+  const starving = person(w, 50, { communityId: 1 });
+  const fine = person(w, 50, { communityId: 2 });
+  economy.generateResource(w, { cityId: 1, resourceType: 'food', supply: 1, demand: 1000 });
+
+  const starvingBefore = valueOf(w, starving, 'emotional', 'Optimism').environmental_modifier;
+  const fineBefore = valueOf(w, fine, 'emotional', 'Optimism').environmental_modifier;
+
+  // Built the way `tick.js` builds it: each community's own city.
+  const scarcityByCommunity = new Map(w.communities.map(
+    (c) => [c.id, mortality.survivalScarcity(w, c.city_id)],
+  ));
+  for (let t = 0; t < 20; t += 1) {
+    drift.runTraitDrift(w, {
+      tick: w.tick + t, scarcityByCommunity, crimeByCommunity: new Map(),
+    });
+  }
+
+  const starvingAfter = valueOf(w, starving, 'emotional', 'Optimism').environmental_modifier;
+  const fineAfter = valueOf(w, fine, 'emotional', 'Optimism').environmental_modifier;
+
+  assert.ok(starvingAfter < starvingBefore,
+    'the real shortage should have worn down the person actually living through it');
+  assert.equal(fineAfter, fineBefore,
+    'a person in a city with no shortage of its own drifted anyway');
 });
 
 test('a place better than ordinary drifts people the other way', () => {

@@ -133,6 +133,24 @@ test('sanitation failing is an epidemic, through the channel that exists', () =>
   const [condition] = w.activeConditions;
   assert.equal(condition.conditionType, 'disease');
   assert.equal(condition.resourceType, undefined);
+  assert.equal(condition.cityId, 1, 'an outbreak in one city sickened every city');
+});
+
+test('an outbreak in one city does not sicken another', () => {
+  // The same real bug the water test above already guards against
+  // (`condition.cityId` on the OUTAGE condition), one channel over —
+  // `addDiseaseOutbreak` used to take `communityId` and nothing ever
+  // passed one, so every outbreak this function could cause was
+  // silently world-wide.
+  const w = cityWorld();
+  w.cities.push({ id: 2 });
+  const waste = infrastructure.generateInfrastructure(w, {
+    cityId: 1, type: 'waste_management', condition: 40, funding: 20,
+  });
+
+  infrastructure.failInfrastructure(w, waste, { tick: 5 });
+  assert.ok(mortality.diseasePressure(w, 1) > 1, 'city 1 has the real outbreak');
+  assert.equal(mortality.diseasePressure(w, 2), 1, 'city 2 has no outbreak of its own');
 });
 
 test('a type nothing consumes fails quietly, and says so', () => {
