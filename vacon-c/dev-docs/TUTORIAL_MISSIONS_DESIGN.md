@@ -257,13 +257,30 @@ all, and must keep not touching it).
 
 **What actually happens, and to what.** Entering `combat` through the
 dispatcher now applies, to BOTH entrants: real stress
-(`behavior.applyStress` — more for the loser than the winner, two
-flagged-interpretive constants, since no document prices the cost of a
-fight) and a real memory (`worldStore.addMemory`, category `conflict`,
-positive or negative by outcome) — plus one real event in the log. The
-other four disciplines are completely unchanged: a friendly game
-entered through the dispatcher must not suddenly cost more than one
-held by a tick.
+(`behavior.applyStress` — more for the loser than the winner) and a
+real memory (`worldStore.addMemory`, category `conflict`, positive or
+negative by outcome) — plus one real event in the log. The other four
+disciplines are completely unchanged: a friendly game entered through
+the dispatcher must not suddenly cost more than one held by a tick.
+
+**Pride, stamina, and skills — the follow-up ask, mapped onto real
+traits rather than invented ones.** There is no trait literally named
+"pride" in the 114-trait sheet; the owner picked `personality
+.Confidence` as the real one it means — self-belief, moved
+symmetrically by the outcome (unlike stress, there is no argument that
+a pride swing should be lopsided; a win and a loss are the same event
+from either side of it). Stamina is real too
+(`physical.Stamina`) and costs the SAME for both entrants regardless
+of outcome — a fight is equally tiring whether you win it or not,
+which is why this one does not split win/loss the way stress and
+confidence do. And "could also gain skills" is real, but earned the
+same slow way `competition.js`'s friendly games already grow
+athleticism: a new `sparring` entry in `traitDrift.EXERCISES`
+(`skills.Combat`/`physical.Stamina`) is reinforced as a habit on both
+entrants — one bout barely moves it, same as `compete`'s own measured
+48.92→49.10 over 600 ticks; a habit of real fighting moves it for
+real. All three live in `server/engine.js#resolveContest`'s combat
+branch, right alongside the stress/memory/event write-back.
 
 **Not gambling, on purpose.** `competition.js`'s own header already
 states the constraint this had to respect: "nothing here stakes

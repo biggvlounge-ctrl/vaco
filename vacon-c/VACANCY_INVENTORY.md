@@ -86,7 +86,7 @@ read off disk, not recalled.
 | `urbanSystems.js` | 35,633 | The forty urban systems §7 names, at four levels of presence — the `systems` axis of the percent. | Built |
 | `births.js` | 25,851 | Conception, gestation and birth, including what a child inherits. | Built |
 | `economy.js` | 25,317 | Resources, scarcity, market listings, price resolution, individual finances, net worth. | Built |
-| `traitDrift.js` | 25,026 | **What a life does to a person** — the six `entity_traits` columns nothing ever moved: experience, environment, relationship contagion, temporary strain. | Built |
+| `traitDrift.js` | 27,885 | **What a life does to a person** — the six `entity_traits` columns nothing ever moved: experience, environment, relationship contagion, temporary strain. `EXERCISES.sparring` (`skills.Combat`/`physical.Stamina`) is Mission Chain #5's "could also gain skills" half — reinforced by `server/engine.js#resolveContest` on both entrants of a real `combat` fight, the same slow-habit shape `compete` already uses for friendly games. | Built |
 | `justice.js` | 32,563 | **What happens after somebody is caught** — arrest, charge against the city's actual laws, judgement, sentence, release. Closes §7's Law Enforcement, Court and Prison, and found that `relationships.conflict` could never rise. | Built |
 | `keys.js` | 23,968 | **All 7 Key resolvers** — Resilience, Adaptability, Trust, Scarcity Response, Fear, Aggression, Territory. | Built |
 | `completeness.js` | 21,486 | **The running percent.** Six measured axes behind `dev-docs/GAME_COMPLETENESS.md`. | Built |

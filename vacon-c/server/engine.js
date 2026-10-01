@@ -950,6 +950,30 @@ function rateEntity(entityId, discipline) {
 const SHOWDOWN_STRESS_WIN = 5;
 const SHOWDOWN_STRESS_LOSS = 15;
 
+//: There is no trait literally named "pride" in the 114-trait sheet.
+//: `personality.Confidence` is the real one it maps to — an internal
+//: measure of self-belief, which is what winning or losing a real
+//: fight actually moves. Symmetric on purpose: unlike stress (where
+//: losing is argued to cost more because it is the physically worse
+//: outcome), there is no equivalent argument that a pride swing should
+//: be lopsided — a win and a loss are the same event seen from either
+//: side of it.
+const SHOWDOWN_CONFIDENCE_SWING = 8;
+
+//: Exertion, not outcome — a fight costs real stamina whether you win
+//: it or not, which is why this applies to both entrants alike rather
+//: than splitting win/loss the way stress does. `physical.Stamina` is
+//: clamped 0..100 by `applyKeyModifier` itself, so repeated fighting
+//: depletes it without going negative.
+const SHOWDOWN_STAMINA_COST = 10;
+
+//: How much one real fight reinforces the habit of fighting —
+//: `competition.js`'s own `COMPETE_REINFORCEMENT` for its friendly
+//: games, reused rather than re-guessed: both are "how much one bout
+//: moves a habit", and a showdown through the dispatcher is not a
+//: different KIND of occasion, only a more dangerous one.
+const SHOWDOWN_SPARRING_REINFORCEMENT = 2;
+
 function resolveContest(options) {
   const result = contest.resolveContest(WorldState, options);
   if (result.discipline !== 'combat') return result;
@@ -959,6 +983,16 @@ function resolveContest(options) {
   for (const entityId of entrantIds) {
     const won = entityId === result.winnerId;
     behavior.applyStress(WorldState, entityId, won ? SHOWDOWN_STRESS_WIN : SHOWDOWN_STRESS_LOSS);
+    applyKeyModifierTo(
+      WorldState, entityId, 'personality', 'Confidence',
+      won ? SHOWDOWN_CONFIDENCE_SWING : -SHOWDOWN_CONFIDENCE_SWING, now,
+    );
+    applyKeyModifierTo(WorldState, entityId, 'physical', 'Stamina', -SHOWDOWN_STAMINA_COST, now);
+    // "Could also gain skills" — real, but slow and earned, the same
+    // way `compete` grows athleticism: one bout barely moves it, a
+    // habit of fighting does. Reinforced for both entrants, winner or
+    // not — showing up to the fight is the thing being practised.
+    reinforceHabit(entityId, 'sparring', { amount: SHOWDOWN_SPARRING_REINFORCEMENT });
     worldStore.addMemory(WorldState, {
       entityId,
       memoryType: won ? 'positive' : 'negative',
@@ -1475,6 +1509,9 @@ module.exports = {
   rateEntity,
   SHOWDOWN_STRESS_WIN,
   SHOWDOWN_STRESS_LOSS,
+  SHOWDOWN_CONFIDENCE_SWING,
+  SHOWDOWN_STAMINA_COST,
+  SHOWDOWN_SPARRING_REINFORCEMENT,
   resolveContest,
   verifyContest,
   assessTakeover,

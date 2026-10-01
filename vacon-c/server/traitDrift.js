@@ -172,6 +172,19 @@ const EXERCISES = {
     ['sports', 'Coordination'],
     ['physical', 'Stamina'],
   ],
+  // **A real fight, not a friendly game.** `server/engine.js#resolveContest`
+  // reinforces this on both entrants whenever a player enters the
+  // `combat` discipline through the dispatcher — Mission Chain #5's
+  // own stakes, the showdown's "could also gain skills" half. Narrow,
+  // the same way `compete` is: fighting builds the skill of fighting
+  // and the stamina to keep doing it. Bloodlust and Composure Under
+  // Fire are left out on purpose — those are temperament, not
+  // something practice grows, the same argument `compete` already
+  // makes about Competitive Drive.
+  sparring: [
+    ['skills', 'Combat'],
+    ['physical', 'Stamina'],
+  ],
   'self-medicating': [
     // A harmful habit exercises something too — that is what makes it
     // harmful rather than merely sad. It is the only negative entry

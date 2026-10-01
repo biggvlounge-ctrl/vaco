@@ -20,6 +20,15 @@ const tutorialMissions = require('../server/tutorialMissions.js');
 
 const YEAR = 365;
 
+// Pushes a live trait to an exact value via the same real
+// `applyKeyModifier` write path every Key resolver uses, rather than
+// setting the field directly — so a test that needs a known starting
+// point does not read a value a resolver could never have produced.
+function setTrait(entityId, family, name, target) {
+  const current = engine.getLiveEntity(entityId).traits[family][name];
+  engine.applyKeyModifier(entityId, family, name, target - current, engine.WorldState.tick);
+}
+
 // A landmark with a REAL significance, the same fixture shape
 // discovery.test.js uses — `significanceOf` reads through
 // `properties.history_ref`, so a bare number on the property would
@@ -363,13 +372,19 @@ test('Chain #5 end to end: entering the real fight costs real stress either way,
   // Volatility/Resilience, at whatever the clamp ceiling is) so the
   // stress delta below is a known constant rather than either
   // person's own random resilience — the eighth standing rule's own
-  // fix, applied here.
+  // fix, applied here. Confidence and Stamina are pinned to the middle
+  // of their real 0..100 range for the same reason: a random birth
+  // draw near either clamp would silently truncate the deltas below.
   for (const id of [npc.id, opponent.id]) {
     engine.applyKeyModifier(id, 'emotional', 'Volatility', 1000, engine.WorldState.tick);
     engine.applyKeyModifier(id, 'emotional', 'Resilience', 1000, engine.WorldState.tick);
+    setTrait(id, 'personality', 'Confidence', 50);
+    setTrait(id, 'physical', 'Stamina', 50);
   }
 
   const before = engine.getEntityState(npc.id)?.stressLevel ?? 0;
+  const confidenceBefore = engine.getLiveEntity(npc.id).traits.personality.Confidence;
+  const staminaBefore = engine.getLiveEntity(npc.id).traits.physical.Stamina;
   const fought = engine.dispatchAction(player.id, {
     action: 'enter-contest', opponentId: opponent.id, discipline: 'combat', contestId: 'showdown-8003',
   });
@@ -390,6 +405,31 @@ test('Chain #5 end to end: entering the real fight costs real stress either way,
     engine.SHOWDOWN_STRESS_LOSS > engine.SHOWDOWN_STRESS_WIN,
     'losing must cost more than winning, or the fight was never dangerous',
   );
+
+  // Pride — mapped to the one real trait that is actually about
+  // self-belief, `personality.Confidence` — swings symmetrically with
+  // the outcome, unlike stress.
+  const confidenceAfter = engine.getLiveEntity(npc.id).traits.personality.Confidence;
+  const confidenceSwing = npcWon ? engine.SHOWDOWN_CONFIDENCE_SWING : -engine.SHOWDOWN_CONFIDENCE_SWING;
+  assert.equal(
+    Math.round((confidenceAfter - confidenceBefore) * 100) / 100, confidenceSwing,
+    'pride must swing by exactly the real, matching confidence constant',
+  );
+
+  // Stamina — real exertion, the same for both outcomes, since a fight
+  // is equally tiring whether you win it or not.
+  const staminaAfter = engine.getLiveEntity(npc.id).traits.physical.Stamina;
+  assert.equal(
+    Math.round((staminaAfter - staminaBefore) * 100) / 100, -engine.SHOWDOWN_STAMINA_COST,
+    'a real fight must cost real stamina regardless of who won',
+  );
+
+  // Skills — real, but earned slowly through the habit of fighting,
+  // the same way `compete` grows athleticism. One bout starts the
+  // habit; it does not hand over a skill point outright.
+  const sparring = engine.listHabits(npc.id).find((h) => h.habit_name === 'sparring');
+  assert.ok(sparring, 'entering a real fight must start the real habit of fighting');
+  assert.ok(sparring.strength > 0);
 
   // The other four disciplines stay exactly as they were — a friendly
   // game must not suddenly cost more through the dispatcher than it
