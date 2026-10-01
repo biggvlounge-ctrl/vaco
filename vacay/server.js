@@ -135,9 +135,19 @@ async function settleVCoin(legs, meta = {}) {
     },
     body: JSON.stringify({ legs, reason: meta.reason ?? null }),
   });
-  const body = await res.json();
-  if (!res.ok) throw new Error(body.error || `settleVCoin failed (${res.status})`);
-  return body;
+  // Checked before parsing: a non-2xx from a proxy or an upstream
+  // outage can answer with an HTML/plain-text body, and res.json()
+  // would throw an opaque SyntaxError that hides the real status and
+  // (worse) can fire after V3 already committed the settlement --
+  // the same res.ok-before-parse fix already applied to every other
+  // cross-app fetch this session.
+  if (!res.ok) {
+    const text = await res.text();
+    let message = `settleVCoin failed (${res.status})`;
+    try { message = JSON.parse(text).error || message; } catch { /* not JSON */ }
+    throw new Error(message);
+  }
+  return res.json();
 }
 
 async function requestVoidJob(verticalId, customerId, quantity, unitPrice) {
@@ -148,9 +158,13 @@ async function requestVoidJob(verticalId, customerId, quantity, unitPrice) {
       verticalId, customerId, quantity, unitPrice,
     }),
   });
-  const body = await res.json();
-  if (!res.ok) throw new Error(body.error || `requestVoidJob failed (${res.status})`);
-  return body;
+  if (!res.ok) {
+    const text = await res.text();
+    let message = `requestVoidJob failed (${res.status})`;
+    try { message = JSON.parse(text).error || message; } catch { /* not JSON */ }
+    throw new Error(message);
+  }
+  return res.json();
 }
 
 async function requestVoidHourlyBooking(riderId, driverId, blockHours, hourlyRate, overageRatePerMile, overageRatePerMinute) {
@@ -161,9 +175,13 @@ async function requestVoidHourlyBooking(riderId, driverId, blockHours, hourlyRat
       riderId, driverId, blockHours, hourlyRate, overageRatePerMile, overageRatePerMinute,
     }),
   });
-  const body = await res.json();
-  if (!res.ok) throw new Error(body.error || `requestVoidHourlyBooking failed (${res.status})`);
-  return body;
+  if (!res.ok) {
+    const text = await res.text();
+    let message = `requestVoidHourlyBooking failed (${res.status})`;
+    try { message = JSON.parse(text).error || message; } catch { /* not JSON */ }
+    throw new Error(message);
+  }
+  return res.json();
 }
 
 app.get('/api/health', (_req, res) => {

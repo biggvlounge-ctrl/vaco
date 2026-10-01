@@ -28,6 +28,7 @@ const bookings = require('../lib/bookings/bookings');
 const listings = require('../lib/bookings/listings');
 const rentals = require('../lib/auto/rentals');
 const vehicles = require('../lib/auto/vehicles');
+const carListings = require('../lib/auto/carListings');
 const flightCatalog = require('../lib/flights/flights');
 const reservations = require('../lib/flights/reservations');
 const leads = require('../lib/home/leads');
@@ -388,6 +389,36 @@ test('the same vehicle cannot be rented to two people at once', async () => {
     startDate: NOW + 6 * DAY, endDate: NOW + 9 * DAY, settleFn, now: NOW,
   }), /.*/);
   assert.strictEqual(settleFn.of('rio'), 1000, 'the refused renter must not be charged');
+});
+
+test('a for-sale listing actually collects its flat fee — the bug this test closes', async () => {
+  // createForSaleListing used to call a single-leg transferFn(from,
+  // to, amount, reason) left over from before this app's atomic
+  // settleFn(legs, meta) migration, while routes.js already wired it
+  // up with settleFn. options.transferFn was always undefined, so
+  // every real POST /api/auto/for-sale-listings threw before a
+  // listing was created or a fee was collected — this is the one
+  // money-moving function in the whole app that had no test and no
+  // working call path.
+  const store = createVacayStore();
+  const settleFn = ledger({ priya: 1000 });
+
+  const listing = await carListings.createForSaleListing(store.auto, {
+    sellerId: 'priya', make: 'Honda', model: 'Civic', year: 2019, mileage: 42000,
+    price: 18000, marketAveragePrice: 19000, settleFn, now: NOW,
+  });
+
+  assert.strictEqual(settleFn.of('priya'), 1000 - carListings.LISTING_FEE);
+  assert.strictEqual(settleFn.of(carListings.VACAY_AUTO_LISTINGS_ACCOUNT), carListings.LISTING_FEE);
+  assert.strictEqual(listing.status, 'active');
+});
+
+test('createForSaleListing requires a settleFn, not the old transferFn shape', async () => {
+  const store = createVacayStore();
+  await assert.rejects(() => carListings.createForSaleListing(store.auto, {
+    sellerId: 'priya', make: 'Honda', model: 'Civic', year: 2019, mileage: 42000,
+    price: 18000, marketAveragePrice: 19000, now: NOW,
+  }), /requires a settleFn/);
 });
 
 // -- Flights ------------------------------------------------------------

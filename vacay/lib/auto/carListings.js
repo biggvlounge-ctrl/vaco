@@ -49,7 +49,7 @@ function computePriceRating(price, marketAveragePrice) {
 
 async function createForSaleListing(store, options = {}) {
   const {
-    sellerId, make, model, year, mileage, price, marketAveragePrice, transferFn, now = Date.now(),
+    sellerId, make, model, year, mileage, price, marketAveragePrice, settleFn, now = Date.now(),
   } = options;
 
   if (!sellerId) throw new Error('createForSaleListing requires a sellerId');
@@ -61,12 +61,25 @@ async function createForSaleListing(store, options = {}) {
   if (!Number.isFinite(marketAveragePrice) || marketAveragePrice <= 0) {
     throw new Error('createForSaleListing requires a positive marketAveragePrice');
   }
-  if (typeof transferFn !== 'function') throw new Error('createForSaleListing requires a transferFn(fromUserId, toUserId, amount, reason)');
+  if (typeof settleFn !== 'function') throw new Error('createForSaleListing requires a settleFn(legs, meta)');
 
-  await transferFn(sellerId, VACAY_AUTO_LISTINGS_ACCOUNT, LISTING_FEE, 'vacay_auto_listing_fee');
+  // This used to call a single-leg `transferFn(from, to, amount,
+  // reason)` left over from before every other module in this app
+  // (bookings.js, rentals.js, fleetRentals.js, experienceBookings.js,
+  // reservations.js, leads.js) was migrated to the one-atomic-call
+  // `settleFn(legs, meta)` convention. routes.js was already wiring
+  // this function up with `settleFn`, so `options.transferFn` was
+  // always undefined and every real call threw before a listing was
+  // ever created or a fee ever collected -- the whole CarGurus-style
+  // listing feature was unreachable.
+  const listingId = store.nextForSaleListingId++;
+  const reason = `vacay_auto_listing_fee:${listingId}`;
+  await settleFn([
+    { fromUserId: sellerId, toUserId: VACAY_AUTO_LISTINGS_ACCOUNT, amount: LISTING_FEE, reason },
+  ], { reason });
 
   const listing = {
-    id: store.nextForSaleListingId++,
+    id: listingId,
     sellerId,
     make,
     model,
