@@ -81,6 +81,20 @@
 //   `combat` rating, and hands them the existing `enter-contest` verb
 //   — no new action needed, the same shape as Chain #4.
 //
+// **The progress tracker.** `seedTutorialStart` hands back every
+// mission it opened once, in the HTTP response — and nothing
+// remembered which real Mission ids belonged to a citizen's own
+// tutorial sequence afterward, so there was no way to ask "where am I
+// in this" later without re-seeding. `tutorialProgressFor` answers it
+// from `worldState.tutorialProgress` (ids only, never a status —
+// status is read live from `missions.getMission`, standing rule 3's
+// own argument against duplicating a computable rollup).
+//
+// Chain #1 is reported as its own two real Missions (explore, mentor)
+// rather than one collapsed "done" boolean — collapsing it would mean
+// inventing a rule for what "chain 1 complete" means that neither
+// mission's own state machine asserts.
+//
 // Every function here takes `worldState` explicitly, same convention as
 // economy.js/players.js/missions.js.
 
@@ -405,7 +419,7 @@ function seedTutorialStart(worldState, npcId, options = {}) {
   const survival = offerSurvivalMission(worldState, npcId, options);
   const takeover = offerTakeoverMission(worldState, npcId, options);
   const showdown = offerShowdownMission(worldState, npcId, options);
-  return {
+  const start = {
     book,
     exploreMission,
     mentorMission: mentor?.mission ?? null,
@@ -418,6 +432,89 @@ function seedTutorialStart(worldState, npcId, options = {}) {
     takeoverLocationId: takeover?.locationId ?? null,
     showdownMission: showdown?.mission ?? null,
     showdownOpponentId: showdown?.opponentId ?? null,
+  };
+  recordTutorialProgress(worldState, npcId, start);
+  return start;
+}
+
+// ---------------------------------------------------------------------
+// The progress tracker
+// ---------------------------------------------------------------------
+// **Chain 1, "Start Here", is really two real Missions** (explore the
+// landmark, learn from the mentor) plus the seeded book — see the file
+// header for why the book is not a third. Reported as two rows under
+// one chain label rather than collapsed into a single "done" boolean,
+// because collapsing would mean inventing a rule for what "chain 1
+// complete" means that neither mission's own state machine asserts.
+//
+// `missionKey` names the field `seedTutorialStart`'s own return object
+// already uses — one table, read in both directions, so a renamed
+// field here fails loudly instead of quietly tracking nothing.
+const CHAIN_MISSIONS = [
+  { chain: 1, name: 'Start Here', part: 'explore the landmark', missionKey: 'exploreMission' },
+  { chain: 1, name: 'Start Here', part: 'learn from the mentor', missionKey: 'mentorMission' },
+  { chain: 2, name: 'Ask Around', part: null, missionKey: 'mysteryMission' },
+  { chain: 3, name: 'Keep Enough Set Aside', part: null, missionKey: 'survivalMission' },
+  { chain: 4, name: 'Take the Block', part: null, missionKey: 'takeoverMission' },
+  { chain: 5, name: 'Pick Your Fights', part: null, missionKey: 'showdownMission' },
+];
+
+// **Only the mission id is stored — never a status.** A mission's
+// status is computable from the mission itself at any time
+// (`missions.getMission`), and standing rule 3 is explicit that a
+// computable rollup is never duplicated. The id is the one fact this
+// row exists to remember: nothing else in the engine records which
+// Missions belong to a citizen's own tutorial sequence, and without it
+// a progress read after the seeding response is gone would have
+// nothing to look up.
+function recordTutorialProgress(worldState, npcId, start) {
+  if (!Array.isArray(worldState.tutorialProgress)) worldState.tutorialProgress = [];
+  const row = {
+    entityId: npcId,
+    bookField: start.book?.field ?? null,
+    exploreMissionId: start.exploreMission?.id ?? null,
+    mentorMissionId: start.mentorMission?.id ?? null,
+    mysteryMissionId: start.mysteryMission?.id ?? null,
+    survivalMissionId: start.survivalMission?.id ?? null,
+    takeoverMissionId: start.takeoverMission?.id ?? null,
+    showdownMissionId: start.showdownMission?.id ?? null,
+  };
+  const existing = (worldState.tutorialProgress || []).findIndex((r) => r.entityId === npcId);
+  if (existing === -1) worldState.tutorialProgress.push(row);
+  else worldState.tutorialProgress[existing] = row;
+  return row;
+}
+
+// The real, live read a tracker needs: every tutorial Mission this
+// citizen was ever offered, with its CURRENT status, not the status at
+// the moment it was seeded. Returns an honest "not offered" rather
+// than a thrown error for a chain whose real precondition never held
+// (no community, no family, nobody to fight) — the same null-is-not-a-
+// gap posture every `offer*Mission` function already takes.
+function tutorialProgressFor(worldState, npcId) {
+  const npc = (worldState.npcs || []).find((n) => n.id === npcId);
+  if (!npc) throw new Error(`tutorialProgressFor: no NPC ${npcId}`);
+
+  const row = (worldState.tutorialProgress || []).find((r) => r.entityId === npcId) ?? null;
+  const chainMissions = CHAIN_MISSIONS.map((entry) => {
+    const missionId = row ? row[`${entry.missionKey}Id`] ?? null : null;
+    const mission = missionId != null ? missions.getMission(worldState, missionId) : null;
+    return {
+      chain: entry.chain,
+      name: entry.name,
+      part: entry.part,
+      missionId,
+      status: missionId == null ? 'not offered' : (mission?.status ?? 'unknown'),
+    };
+  });
+
+  const completedCount = chainMissions.filter((m) => m.status === 'completed').length;
+  return {
+    book: { given: row?.bookField != null, field: row?.bookField ?? null },
+    chainMissions,
+    totalMissions: chainMissions.length,
+    completedCount,
+    allComplete: completedCount === chainMissions.length,
   };
 }
 
@@ -438,4 +535,7 @@ module.exports = {
   offerTakeoverMission,
   offerShowdownMission,
   seedTutorialStart,
+  CHAIN_MISSIONS,
+  recordTutorialProgress,
+  tutorialProgressFor,
 };

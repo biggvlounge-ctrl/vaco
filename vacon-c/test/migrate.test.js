@@ -63,6 +63,11 @@ const NOT_CARRIED = {
     + 'survive a checkpoint: the memories, the `compete` habits, the `competition` on a '
     + 'relationship, and the events. Inventing a table here would be a schema decision '
     + 'taken inside a migration',
+  tutorialProgress: 'which real Mission ids belong to a citizen\'s own tutorial sequence — '
+    + 'bookkeeping with no schema table of its own, the same shape as `contests`. Every '
+    + 'Mission it names IS carried (missions is a real migrated table); losing this index '
+    + 'after a restore only means tutorialProgressFor cannot look the ids up again, not that '
+    + 'any real mission state is lost.',
 };
 
 // The additive DDL in server/schema-extensions.sql is part of the real

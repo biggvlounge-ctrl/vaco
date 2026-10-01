@@ -930,6 +930,22 @@ test('tutorial-start seeds a real book over HTTP, and studying it for real moves
   assert.equal((await post('/players/999999/tutorial-start', {})).status, 404);
 });
 
+test('tutorial-progress answers a real, live read over HTTP', { skip: SKIP }, async () => {
+  const { npc } = await (await post('/npc/generate')).json();
+  const player = await (await post('/players', { linkedEntityId: npc.id })).json();
+
+  await post(`/players/${player.id}/tutorial-start`, {});
+  const progress = await (await get(`/players/${player.id}/tutorial-progress`)).json();
+  assert.equal(progress.totalMissions, 6);
+  // No community over HTTP means every chain but the book is a real,
+  // correct "not offered" — the same absence tutorial-start's own
+  // nulls already report.
+  assert.ok(progress.chainMissions.every((m) => m.status === 'not offered'));
+  assert.equal(progress.book.given, true);
+
+  assert.equal((await get('/players/999999/tutorial-progress')).status, 404);
+});
+
 test('trade is offered, and a real HTTP caller can price or attempt one with a real seller',
   { skip: SKIP }, async () => {
     const { npc } = await (await post('/npc/generate')).json();

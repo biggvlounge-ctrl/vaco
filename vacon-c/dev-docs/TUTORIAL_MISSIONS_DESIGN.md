@@ -301,22 +301,54 @@ the Mission and `enter-contest`s the named opponent with
 0.97, never certain, so a favourite can still lose; nothing here makes
 the fight safe.
 
+## The progress tracker
+
+**What was missing after Chain #5 shipped.** `seedTutorialStart` hands
+back every Mission it opened once, in the HTTP response — and nothing
+remembered which real Mission ids belonged to a citizen's own tutorial
+sequence afterward. A client that discarded that response had no way
+to ask "where am I in this" later without re-seeding, which would
+offer a second, duplicate set of missions rather than report on the
+first.
+
+**The fix stores the minimum, and reads the rest live.** A mission's
+`status` is computable at any time from the mission itself
+(`missions.getMission`) — standing rule 3's own argument against
+duplicating a computable rollup — so `worldState.tutorialProgress`
+(in-memory, no schema table, the same shape `contests` already uses)
+remembers only the six real Mission ids a citizen was offered.
+`tutorialProgressFor(worldState, npcId)` reads each one's CURRENT real
+status and reports it, chain by chain.
+
+**Chain #1 is reported as its own two real Missions**, not collapsed
+into one "done" boolean. It is really two (explore the landmark, learn
+from the mentor) plus a seeded book that is not a Mission at all —
+inventing a rule for what "chain 1 complete" means would be asserting
+something neither mission's own state machine does. A chain that was
+never offered (a real, correct absence — no community, no family,
+nobody to fight) reports `status: 'not offered'` rather than a missing
+row or a thrown error.
+
+`GET /api/players/:id/tutorial-progress` is the HTTP surface, same
+shape as `study-sources`/`survival-status` — a read, not an action.
+
 ## Where the code lives
 
 `server/tutorialMissions.js` — `seedTutorialStart(worldState, npcId)`
-composes all five chains, and `offerMysteryMission`/
-`offerSurvivalMission`/`offerTakeoverMission`/`offerShowdownMission`
-individually for Chains #2–#5, all following the same "takes
-worldState explicitly" convention as every other module here. Not a
-new player mode, not a new schema table — real calls into
-`inventory.give`/`missions.generateMission`/`crime.recordCrime`/
-`mortality.survivalScarcity`/`areaStats.povertyLine`/
-`control.viableTargetsFor`/`contest.rateEntity` with content chosen for
-a first-time citizen. `server/actions.js`'s `trade` action and
-`server/engine.js`'s `tradeWith`/`quoteTrade`/`survivalStatusFor` are
-Chain #3's other half — `barter.exchange`, reachable at last. Chains #4
-and #5 needed no new action verb at all: `assess-takeover`/
-`attempt-takeover`/`enter-contest` were already real and simply had no
-mission pointing at them yet (#4), or nothing real riding on the
+composes all five chains and records their Mission ids, and
+`offerMysteryMission`/`offerSurvivalMission`/`offerTakeoverMission`/
+`offerShowdownMission`/`tutorialProgressFor` individually, all
+following the same "takes worldState explicitly" convention as every
+other module here. Not a new player mode, not a new schema table —
+real calls into `inventory.give`/`missions.generateMission`/
+`crime.recordCrime`/`mortality.survivalScarcity`/`areaStats
+.povertyLine`/`control.viableTargetsFor`/`contest.rateEntity` with
+content chosen for a first-time citizen. `server/actions.js`'s `trade`
+action and `server/engine.js`'s `tradeWith`/`quoteTrade`/
+`survivalStatusFor` are Chain #3's other half — `barter.exchange`,
+reachable at last. Chains #4 and #5 needed no new action verb at all:
+`assess-takeover`/`attempt-takeover`/`enter-contest` were already real
+and simply had no mission pointing at them yet (#4), or nothing real
+riding on the
 outcome (#5) — `server/engine.js#resolveContest`'s combat-stakes branch
 is that missing piece.

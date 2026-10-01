@@ -786,6 +786,19 @@ app.post('/api/players/:id/tutorial-start', (req, res) => {
   }
 });
 
+// The progress tracker — every tutorial Mission this player was ever
+// offered, read live rather than only once in the tutorial-start
+// response. Same shape as `study-sources`/`survival-status`.
+app.get('/api/players/:id/tutorial-progress', (req, res) => {
+  const player = (engine.WorldState.players || []).find((p) => p.id === Number(req.params.id));
+  if (!player) return res.status(404).json({ error: `no player with id ${req.params.id}` });
+  try {
+    return res.json(engine.tutorialProgressFor(player.linked_entity_id));
+  } catch (err) {
+    return res.status(404).json({ error: err.message });
+  }
+});
+
 // -- missions: the state machine ----------------------------------------------
 //
 // The engine's first real player verb. Everything else here reads a

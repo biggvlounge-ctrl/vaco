@@ -485,6 +485,74 @@ test('seedTutorialStart composes all seven, and each half is independently real'
   assert.equal(start.takeoverMission, null, 'this citizen belongs to no family, so no tribe can act');
   assert.ok(start.showdownMission, 'real other people in the community means a real opponent exists');
   assert.ok([victim.id, perpetrator.id, mentor.id].includes(start.showdownOpponentId));
+
+  // The tracker reports the same six real Missions, live.
+  const progress = engine.tutorialProgressFor(npc.id);
+  assert.equal(progress.totalMissions, 6);
+  assert.equal(progress.completedCount, 0);
+  assert.equal(progress.allComplete, false);
+  assert.equal(progress.book.given, true);
+  assert.equal(progress.book.field, tutorialMissions.DEFAULT_FIELD);
+
+  const byKey = (key) => progress.chainMissions.find((m) => m.missionId === start[key]?.id);
+  assert.equal(byKey('exploreMission').status, 'available');
+  assert.equal(byKey('mentorMission').status, 'available');
+  assert.equal(byKey('mysteryMission').status, 'available');
+  assert.equal(byKey('survivalMission').status, 'available');
+  assert.equal(byKey('showdownMission').status, 'available');
+
+  // Chain 4 was never offered — a real, correct absence, not a gap —
+  // and the tracker says so rather than pretending it exists.
+  const takeoverRow = progress.chainMissions.find((m) => m.chain === 4);
+  assert.equal(takeoverRow.missionId, null);
+  assert.equal(takeoverRow.status, 'not offered');
+});
+
+test('tutorialProgressFor reflects real mission status changes, live', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 7015;
+  engine.WorldState.communities.push({ id: 7015, city_id: 9015 });
+  landmark(engine.WorldState, 7905, 'library', 7015);
+
+  const offer = tutorialMissions.offerExploreMission(engine.WorldState, npc.id);
+  const player = engine.generatePlayer({ linkedEntityId: npc.id });
+
+  // Record just this one mission's tracking row through the real
+  // function `seedTutorialStart` uses internally, so this test does
+  // not depend on the other five chains' real preconditions holding
+  // too.
+  tutorialMissions.recordTutorialProgress(engine.WorldState, npc.id, { exploreMission: offer });
+
+  const before = engine.tutorialProgressFor(npc.id);
+  const row = before.chainMissions.find((m) => m.chain === 1 && m.part === 'explore the landmark');
+  assert.equal(row.status, 'available');
+
+  engine.dispatchAction(player.id, { action: 'accept-mission', missionId: offer.id });
+  const afterAccept = engine.tutorialProgressFor(npc.id);
+  assert.equal(
+    afterAccept.chainMissions.find((m) => m.missionId === offer.id).status, 'accepted',
+  );
+
+  engine.dispatchAction(player.id, {
+    action: 'resolve-mission', missionId: offer.id, outcome: 'completed',
+  });
+  const afterResolve = engine.tutorialProgressFor(npc.id);
+  assert.equal(
+    afterResolve.chainMissions.find((m) => m.missionId === offer.id).status, 'completed',
+  );
+  assert.equal(afterResolve.completedCount, 1);
+});
+
+test('tutorialProgressFor is refused for an entity that does not exist', () => {
+  assert.throws(() => engine.tutorialProgressFor(999999), /no entity with id/);
+});
+
+test('tutorialProgressFor for a citizen who was never seeded reports every chain as not offered', () => {
+  const npc = engine.generateNPC();
+  const progress = engine.tutorialProgressFor(npc.id);
+  assert.equal(progress.totalMissions, 6);
+  assert.ok(progress.chainMissions.every((m) => m.status === 'not offered' && m.missionId === null));
+  assert.equal(progress.book.given, false);
 });
 
 test('seedTutorialStart is refused for an entity that does not exist', () => {

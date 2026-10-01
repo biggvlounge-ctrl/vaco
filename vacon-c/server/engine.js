@@ -225,6 +225,15 @@ const WorldState = {
   // among what a checkpoint does not carry rather than inventing a
   // table for it here.
   contests: [],
+  // Which real Mission ids belong to a citizen's own tutorial
+  // sequence — `seedTutorialStart` hands every one back once, in the
+  // HTTP response, and nothing remembered them afterward, so there was
+  // no way to ask "where am I in this" later without re-seeding and
+  // duplicating missions. Only the ids: a mission's STATUS is read
+  // live from `missions.getMission`, never duplicated here. In-memory
+  // with no schema table, the same shape as `contests` — see
+  // `server/tutorialMissions.js#tutorialProgressFor`.
+  tutorialProgress: [],
   // What happened after somebody was caught. `server/justice.js` —
   // arrest, charge, judgement, sentence, release. Before it, a
   // settlement could name the person who committed a crime, clear the
@@ -1281,6 +1290,14 @@ function seedTutorialStart(entityId, options = {}) {
   return tutorialMissions.seedTutorialStart(WorldState, entityId, options);
 }
 
+// A read, not an action — every tutorial Mission this citizen was
+// ever offered, with each one's CURRENT real status. Same
+// look-before/after shape as `study-sources`/`survival-status`.
+function tutorialProgressFor(entityId) {
+  if (!getLiveEntity(entityId)) throw new Error(`no entity with id ${entityId}`);
+  return tutorialMissions.tutorialProgressFor(WorldState, entityId);
+}
+
 function assessTakeover(entityId, options = {}) {
   return control.assess(WorldState, {
     scale: options.scale,
@@ -1495,6 +1512,7 @@ module.exports = {
   tradeWith,
   survivalStatusFor,
   seedTutorialStart,
+  tutorialProgressFor,
   TICK_INTERVALS: behavior.TICK_INTERVALS,
   SCHEDULE_FREQUENCIES: behavior.FREQUENCIES,
   getEntityState,
