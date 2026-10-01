@@ -67,10 +67,13 @@ production uses — not hand-built store records.
 curl http://localhost:8825/api/taps/VT-000001/resolve
 
 # 2. Pay it — requires a live V3 and Shield session for fromUserId.
+# idempotencyKey is required, not optional: it is what makes a retried
+# tap (a timeout, a double-tap, a flaky connection) safe to repeat
+# instead of charging twice. Generate a fresh one per real payment.
 curl -X POST http://localhost:8825/api/taps/VT-000001/pay \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <a real Shield session token for fromUserId>" \
-  -d '{"fromUserId":"ada","amount":40,"tip":8,"message":"great fade"}'
+  -d '{"fromUserId":"ada","amount":40,"tip":8,"message":"great fade","idempotencyKey":"<a fresh uuid per payment>"}'
 
 # 3. Attribution — Chair 1's revenue, and the spender's own history.
 curl http://localhost:8825/api/business/9001/revenue \
@@ -97,8 +100,8 @@ alert) — steps 1 and 3's reads work standalone once seeded.
 | `POST /api/taps/:tapCode/unfreeze` | session, HVNTZ business owner (via the tap) | refuses if the Tap is not currently frozen |
 | `POST /api/taps/:tapCode/dreams-screen` | session, HVNTZ business owner (via the tap) | links a real DREAMS screen id to a `business`-type Tap — a reference, never a copy of the screen's own record; requires the screen to exist |
 | `POST /api/taps/:tapCode/dreams-screen/unlink` | session, HVNTZ business owner (via the tap) | clears the link |
-| `POST /api/taps/:tapCode/pay` | session, must be `fromUserId` | §7's flow — calls V3's real ledger, never a second one |
-| `GET /api/taps/:tapCode/transactions` | none | |
+| `POST /api/taps/:tapCode/pay` | session, must be `fromUserId` | §7's flow — calls V3's real ledger, never a second one; requires `idempotencyKey` |
+| `GET /api/taps/:tapCode/transactions` | session, HVNTZ business owner (via the tap) | transaction detail for one Tap is the business's own data |
 | `GET /api/spenders/:userId/history` | session, own history only | §18 |
 | `GET /api/business/:businessId/revenue` | session, HVNTZ business owner | §16 revenue-by-tap |
 

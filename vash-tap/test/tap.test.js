@@ -78,6 +78,39 @@ test('registerTap accepts a personal tap with no business at all', async () => {
   assert.strictEqual(tap.ownerIdentityId, 'ada');
 });
 
+test('registerTap normalizes a string businessId to the real number HVNTZ uses', async () => {
+  // The gap an audit found: HVNTZ's own `GET /api/business/:id` route
+  // coerces (`Number(req.params.id)`) — a real `fetchHvntzBusiness`
+  // call succeeds whether the caller's businessId was a string or a
+  // number, because it only ever travels as a URL segment. But nothing
+  // coerced what got STORED on the tap, so a client that JSON-encoded
+  // businessId as `"9001"` registered a real, payable tap that
+  // `/api/business/:id/taps` and `revenueByTap` (both compare with
+  // `Number(...) === tap.businessId`) then never found — an easy,
+  // honest client mistake with no test covering it.
+  //
+  // `looseBusinessFetchFn` mimics HVNTZ's own real coercion rather than
+  // `fakeBusinessFetchFn`'s strict one, so this test actually exercises
+  // the gap instead of just failing the lookup outright.
+  const looseBusinessFetchFn = async (businessId) => (
+    Number(businessId) === HUNT_ID ? { id: HUNT_ID, name: 'HUNT Barber Shop', ownerId: 'owner-hunt' } : null
+  );
+  const store = createTapStore();
+  const tap = await registerTap(store, {
+    tapType: 'business', businessId: String(HUNT_ID), businessFetchFn: looseBusinessFetchFn,
+  });
+  assert.strictEqual(tap.businessId, HUNT_ID, 'stored businessId must be the real number, not the string a client sent');
+  assert.strictEqual(typeof tap.businessId, 'number');
+});
+
+test('registerTap rejects a businessId that cannot be a real number', async () => {
+  const store = createTapStore();
+  await assert.rejects(
+    registerTap(store, { tapType: 'business', businessId: 'not-a-number', businessFetchFn: fakeBusinessFetchFn }),
+    /businessId must be a number/,
+  );
+});
+
 test('every declared TAP_TYPES value is accepted', async () => {
   for (const tapType of TAP_TYPES) {
     const store = createTapStore();
@@ -163,6 +196,25 @@ test('resolveTap fails soft, not hard, when identityFetchFn itself throws (VACA 
   const resolved = await resolveTap(store, tap.tapCode, { identityFetchFn: brokenIdentityFetchFn });
   assert.strictEqual(resolved.assigneeVerified, null, 'a VACA outage must not throw resolveTap — it must report unknown');
   assert.strictEqual(resolved.payable, true, 'payability depends on assignment, not on identity verification succeeding');
+});
+
+test('resolveTap reports payable:false when VACA has explicitly revoked the assignee', async () => {
+  // The gap an audit found: `assigneeVerified` was computed and then
+  // never read by `payable`. `null` (VACA unreachable) stays payable,
+  // tested above — but `false` is VACA actually answering the question,
+  // not an outage, and an assignee verified at assignment time who is
+  // later flagged or revoked by VACA must not stay payable forever.
+  const store = createTapStore();
+  const tap = await registerTap(store, { tapType: 'business', businessId: HUNT_ID, businessFetchFn: fakeBusinessFetchFn });
+  // `identityFetchFn: null` at assignment time — assignTap only checks
+  // VACA when given a fetcher, and this assignment needs to exist
+  // regardless of the (unverified) identity, to isolate resolveTap's
+  // own read of a later, real `verified: false`.
+  await assignTap(store, { tapCode: tap.tapCode, assignedIdentityId: 'unverified-barber' });
+  const resolved = await resolveTap(store, tap.tapCode, { identityFetchFn: fakeIdentityFetchFn });
+  assert.strictEqual(resolved.assigneeVerified, false);
+  assert.strictEqual(resolved.payable, false,
+    'a tap assigned to someone VACA has explicitly not verified read as payable');
 });
 
 test('resolveTap resolves the real business, not just the stored id — §6 step 6', async () => {
@@ -252,6 +304,49 @@ test('payViaTap calls the ledger with amount + tip as one total, and routes to t
   assert.strictEqual(record.total, 48);
   assert.strictEqual(record.v3TransactionId, 555);
   assert.strictEqual(record.status, 'completed');
+});
+
+test('payViaTap with the same idempotencyKey returns the same record and never touches the ledger twice', async () => {
+  // The gap an audit found: even when a caller correctly reuses an
+  // idempotency key (so the real ledger charges only once), this
+  // function pushed a brand new local transaction row on every call —
+  // so revenue and spender history double-counted a payment the
+  // ledger itself knew had only happened once.
+  const store = createTapStore();
+  const tap = await registerTap(store, { tapType: 'business', businessId: HUNT_ID, businessFetchFn: fakeBusinessFetchFn });
+  await assignTap(store, { tapCode: tap.tapCode, assignedIdentityId: 'barber-1', identityFetchFn: fakeIdentityFetchFn });
+  const calls = [];
+  const options = {
+    tapCode: tap.tapCode, fromUserId: 'ada', amount: 40, tip: 8,
+    idempotencyKey: 'tap-retry-key-1', transferFn: fakeTransferFn(calls),
+  };
+
+  const first = await payViaTap(store, options);
+  const second = await payViaTap(store, options);
+
+  assert.strictEqual(calls.length, 1, 'a retried tap reached the ledger a second time');
+  assert.strictEqual(second, first, 'a retry with the same key must return the SAME record, not a new one');
+  assert.strictEqual(store.transactions.length, 1, 'a retry recorded a second local transaction');
+});
+
+test('payViaTap with no idempotencyKey charges again on every call — the exposure this leaves, by design', async () => {
+  // Not a bug by itself — an idempotency key is opt-in at this layer,
+  // the same posture V3's own ledger takes (see server.js's own
+  // comment on why the HTTP route requires it instead). This pins
+  // down what "opt-in" actually means: with no key at all, payViaTap
+  // has nothing to deduplicate against and correctly charges every
+  // time, which is exactly why the real HTTP route refuses to omit it.
+  const store = createTapStore();
+  const tap = await registerTap(store, { tapType: 'business', businessId: HUNT_ID, businessFetchFn: fakeBusinessFetchFn });
+  await assignTap(store, { tapCode: tap.tapCode, assignedIdentityId: 'barber-1', identityFetchFn: fakeIdentityFetchFn });
+  const calls = [];
+  const options = { tapCode: tap.tapCode, fromUserId: 'ada', amount: 40, transferFn: fakeTransferFn(calls) };
+
+  await payViaTap(store, options);
+  await payViaTap(store, options);
+
+  assert.strictEqual(calls.length, 2);
+  assert.strictEqual(store.transactions.length, 2);
 });
 
 test('payViaTap never records a transaction when the ledger transfer throws — §7\'s own rule', async () => {

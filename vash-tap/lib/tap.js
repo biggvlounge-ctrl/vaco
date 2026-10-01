@@ -74,12 +74,29 @@ async function registerTap(store, options = {}) {
   if (!businessId && !ownerIdentityId) {
     throw new Error('registerTap requires a businessId (business tap) or an ownerIdentityId (personal tap)');
   }
-  if (businessId) {
+  // **Normalized to a real number here, once, rather than trusting
+  // whatever type the caller sent.** HVNTZ's own `business.id` is
+  // `nextBusinessId++` — always a number — and every reader of
+  // `tap.businessId` (`/api/business/:id/taps`, `revenueByTap`)
+  // compares with `Number(req.params.businessId) === tap.businessId`.
+  // A client that JSON-encodes the id as a string (an easy, honest
+  // mistake — HVNTZ's own HTTP responses print it inside a URL path
+  // segment, which IS a string) would register a real, payable Tap
+  // that every revenue and taps query then silently never finds,
+  // because `"9001" !== 9001`. An audit found this with no test
+  // covering it.
+  const normalizedBusinessId = businessId === null || businessId === undefined
+    ? null
+    : Number(businessId);
+  if (businessId && !Number.isFinite(normalizedBusinessId)) {
+    throw new Error(`registerTap: businessId must be a number, got ${JSON.stringify(businessId)}`);
+  }
+  if (normalizedBusinessId) {
     if (typeof businessFetchFn !== 'function') {
       throw new Error('registerTap requires businessFetchFn(businessId) when businessId is set');
     }
-    const business = await businessFetchFn(businessId);
-    if (!business) throw new Error(`registerTap: no business with id ${businessId}`);
+    const business = await businessFetchFn(normalizedBusinessId);
+    if (!business) throw new Error(`registerTap: no business with id ${normalizedBusinessId}`);
   }
 
   const id = store.nextTapId++;
@@ -88,7 +105,7 @@ async function registerTap(store, options = {}) {
     tapCode: tapCodeFor(id),
     tapType,
     objectType,
-    businessId: businessId ?? null,
+    businessId: normalizedBusinessId,
     ownerIdentityId,
     status: 'active',
     currentAssignmentId: null,
@@ -244,7 +261,16 @@ async function resolveTap(store, tapCode, options = {}) {
     assigneeIdentityId: assignment ? assignment.assignedIdentityId : null,
     assigneeVerified,
     business,
-    payable: tap.status === 'active' && assignment !== null,
+    // **`assigneeVerified` was computed above and never read here —
+    // the gap an audit found.** `null` (VACA unreachable, or no
+    // identityFetchFn given) stays fail-soft, same reasoning as the
+    // try/catch above: an outage must not block every payment in the
+    // ecosystem. But `false` is not "unknown" — it is VACA answering
+    // the question and saying no, which is exactly the signal this
+    // field exists to carry into an authorization decision. Without
+    // this, an assignee verified when ASSIGNED but later flagged or
+    // revoked by VACA stayed payable forever.
+    payable: tap.status === 'active' && assignment !== null && assigneeVerified !== false,
   };
 }
 
@@ -259,7 +285,7 @@ async function resolveTap(store, tapCode, options = {}) {
 // today-version of that requirement, not a finished one.
 async function payViaTap(store, options = {}) {
   const {
-    tapCode, fromUserId, amount, tip = 0, message = null,
+    tapCode, fromUserId, amount, tip = 0, message = null, idempotencyKey = null,
     now = Date.now(), transferFn, notifyFn = null, identityFetchFn = null,
   } = options;
 
@@ -267,6 +293,20 @@ async function payViaTap(store, options = {}) {
   if (!Number.isFinite(amount) || amount <= 0) throw new Error('payViaTap requires a positive amount');
   if (!Number.isFinite(tip) || tip < 0) throw new Error('payViaTap: tip must be zero or a positive number');
   if (typeof transferFn !== 'function') throw new Error('payViaTap requires transferFn(fromUserId, toUserId, amount, reason)');
+
+  // **A retry with the same key returns the SAME record rather than
+  // moving money again.** An audit found that even when a caller does
+  // pass `idempotencyKey` through to V3 (so the ledger itself correctly
+  // charges once), this function still pushed a brand new local
+  // transaction row on every call — so revenue and spender history
+  // double-counted a payment the ledger knew had only happened once.
+  // Checked before touching the ledger at all, so a retry this function
+  // already knows about costs nothing further — no second network call,
+  // no second notification.
+  if (idempotencyKey) {
+    const existing = store.transactions.find((t) => t.idempotencyKey === idempotencyKey);
+    if (existing) return existing;
+  }
 
   const resolved = await resolveTap(store, tapCode, { now, identityFetchFn });
   if (!resolved.payable) {
@@ -286,6 +326,7 @@ async function payViaTap(store, options = {}) {
     tapId: resolved.tap.id,
     tapCode,
     v3TransactionId: ledgerResult && ledgerResult.id !== undefined ? ledgerResult.id : null,
+    idempotencyKey,
     assignmentId: resolved.assignment.id,
     businessId: resolved.tap.businessId,
     fromUserId,

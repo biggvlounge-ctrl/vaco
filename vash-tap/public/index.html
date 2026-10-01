@@ -112,6 +112,12 @@ function renderPay(body) {
         amount: values.amount,
         tip: values.tip,
         message: values.message || null,
+        // Required, not optional — a retried tap (a timeout, a
+        // double-tap, this very form submitted twice) must be safe to
+        // repeat, not a second charge. Generated fresh per submission,
+        // so a genuine resubmit after a real failure is still a new
+        // payment rather than silently swallowed.
+        idempotencyKey: (crypto.randomUUID ? crypto.randomUUID() : 'vash-tap-' + Date.now() + '-' + Math.random()),
       }).then(function (record) {
         VACO.refreshBalances().then(VACO.renderIdentity);
         while (out.childNodes.length > 1) out.removeChild(out.lastChild);

@@ -358,12 +358,28 @@ app.post('/api/taps/:tapCode/dreams-screen/unlink', requireSession(), requireTap
 app.post('/api/taps/:tapCode/pay', requireActor('fromUserId'), async (req, res) => {
   try {
     const { fromUserId, amount, tip, message, idempotencyKey } = req.body || {};
+    // **Required, not merely supported.** V3's own idempotency layer
+    // is deliberately opt-in — forcing the key would 400 every one of
+    // its eighteen existing integrations on their next deploy (see
+    // v3/lib/idempotency.js's own header). That reasoning does not
+    // apply here: vash-tap is new, this is its only payment route, and
+    // there is no existing caller to break. An audit found the demo's
+    // own documented curl example sent no key at all, which means a
+    // retried tap — a timeout, a double-tap, a flaky connection, the
+    // exact case idempotency exists for — charged the spender twice
+    // with nothing anywhere to notice. Requiring it here closes that
+    // at the one real entry point rather than leaving it opt-in and
+    // hoping every future caller remembers.
+    if (!idempotencyKey) {
+      return res.status(400).json({ error: 'this route requires idempotencyKey, to make a retried tap safe to repeat' });
+    }
     const record = await payViaTap(store, {
       tapCode: req.params.tapCode,
       fromUserId,
       amount,
       tip,
       message,
+      idempotencyKey,
       identityFetchFn: fetchVacaIdentityStatus,
       transferFn: (from, to, total, reason) => transferViaV3(from, to, total, reason, idempotencyKey),
       notifyFn: sendViaNotify,
@@ -375,8 +391,16 @@ app.post('/api/taps/:tapCode/pay', requireActor('fromUserId'), async (req, res) 
 });
 
 // -- attribution and history ---------------------------------------------
-
-app.get('/api/taps/:tapCode/transactions', (req, res) => {
+//
+// **Owner-only, not open.** A tapCode is semi-public — meant to be
+// printed on a physical plaque per §27 — but the transactions it
+// resolves to carry `fromUserId`, `amount`, `tip` and `message`. An
+// audit found this route had no auth at all, the only one of the
+// attribution/history routes that didn't, which meant anyone who could
+// read a plaque could read every payment made at it. Same ownership
+// check `revenueByTap` and freeze/unfreeze already use — this is the
+// business's own data about its own Tap.
+app.get('/api/taps/:tapCode/transactions', requireSession(), requireTapBusinessOwner, (req, res) => {
   res.json({ transactions: transactionsForTap(store, req.params.tapCode) });
 });
 

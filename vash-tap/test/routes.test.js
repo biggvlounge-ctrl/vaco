@@ -203,6 +203,15 @@ test('GET /api/spenders/:userId/history refuses an anonymous caller', { skip: SK
   assert.equal(res.status, 401);
 });
 
+test('GET /api/taps/:tapCode/transactions refuses an anonymous caller', { skip: SKIP }, async () => {
+  // An audit found this route had no auth at all — the tapCode on a
+  // physical plaque is semi-public, but the transactions it resolves
+  // to carry fromUserId, amount, tip and message. Same ownership gate
+  // as revenue and freeze/unfreeze now.
+  const res = await fetch(`${BASE}/api/taps/VT-000001/transactions`);
+  assert.equal(res.status, 401);
+});
+
 test('GET /api/business/:businessId/revenue refuses an anonymous caller', { skip: SKIP }, async () => {
   const res = await fetch(`${BASE}/api/business/9001/revenue`);
   assert.equal(res.status, 401);
