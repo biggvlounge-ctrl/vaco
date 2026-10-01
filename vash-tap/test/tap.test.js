@@ -157,6 +157,27 @@ test('a dynamic reassignment — Chair 7\'s own worked example — resolves to w
   assert.strictEqual(current.id, afternoon.id, 'the ended morning assignment must not still be current');
 });
 
+test('currentAssignmentFor self-corrects the Tap\'s own stale currentAssignmentId', async () => {
+  // The gap an audit found: `currentAssignmentId` was written once, at
+  // `assignTap` time, and never again — so once the clock moved past
+  // `endAt`, the raw field `GET /api/taps/:tapCode` actually returns
+  // stayed pointed at an assignment that had already ended, even though
+  // `currentAssignmentFor` itself always resolved correctly.
+  const store = createTapStore();
+  const tap = await registerTap(store, { tapType: 'business', businessId: HUNT_ID, businessFetchFn: fakeBusinessFetchFn });
+  const now = Date.now();
+  const morning = await assignTap(store, {
+    tapCode: tap.tapCode, assignedIdentityId: 'morning-barber', identityFetchFn: fakeIdentityFetchFn,
+    startAt: now, endAt: now + 1000, now,
+  });
+  assert.strictEqual(tap.currentAssignmentId, morning.id, 'the field should be set while the assignment is live');
+
+  const afterItEnded = currentAssignmentFor(store, tap, now + 2000);
+  assert.strictEqual(afterItEnded, null, 'the resolved value must reflect the clock moving past endAt');
+  assert.strictEqual(tap.currentAssignmentId, null,
+    'the stored field stayed pointed at an assignment that had already ended');
+});
+
 test('assignTap rejects an endAt at or before startAt', async () => {
   const store = createTapStore();
   const tap = await registerTap(store, { tapType: 'business', businessId: HUNT_ID, businessFetchFn: fakeBusinessFetchFn });

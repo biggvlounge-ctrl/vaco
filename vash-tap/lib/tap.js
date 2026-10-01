@@ -204,12 +204,30 @@ async function assignTap(store, options = {}) {
 // The assignment covering `now`, freshly resolved rather than trusted
 // from `currentAssignmentId` — a restart, a restore, or simply the
 // clock moving past `endAt` must not require a write to become true.
+//
+// **Self-correcting, not merely read-only.** An audit found that
+// `currentAssignmentId` was written once, at `assignTap` time, and
+// never again — so the moment that assignment's own `endAt` passed, or
+// a later assignment started covering `now`, the raw field on the Tap
+// (what `GET /api/taps/:tapCode` actually returns) went stale and
+// stayed stale forever, even though resolution itself was always
+// correct here. Rather than build a scheduler nothing else in this app
+// has, the field is brought back in line with what this function just
+// computed — cheap (one id comparison), and it means the stored value
+// is at most as stale as "nobody has resolved this Tap since it
+// changed," not "nobody has resolved it since it was first assigned."
 function currentAssignmentFor(store, tap, now = Date.now()) {
   const covering = store.assignments
     .filter((a) => a.tapId === tap.id && a.status === 'active'
       && a.startAt <= now && (a.endAt === null || a.endAt > now))
     .sort((a, b) => b.startAt - a.startAt);
-  return covering[0] || null;
+  const current = covering[0] || null;
+  const currentId = current ? current.id : null;
+  if (tap.currentAssignmentId !== currentId) {
+    tap.currentAssignmentId = currentId;
+    tap.updatedAt = now;
+  }
+  return current;
 }
 
 // **§6, Tap Resolution** — steps 1-6 of the freeze's own numbered list,
