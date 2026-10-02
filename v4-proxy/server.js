@@ -25,6 +25,7 @@ import {
   ANIMATION_STATES, ANIMATION_EVENTS,
 } from "./lib/twinProfiles.js";
 import { createV4Store } from "./lib/store.js";
+import { isValidContentBlocks } from "./lib/agentContent.js";
 import * as maps from "./lib/maps.js";
 import {
   placeCall, answerCall, declineCall, endCall, recordCallEvent,
@@ -388,8 +389,14 @@ app.post("/api/agent", actorOrService(requireSession()), async (req, res) => {
     return res.status(400).json({ error: "Missing or invalid 'messages' array." });
   }
   for (const m of messages) {
-    if (!m || (m.role !== "user" && m.role !== "assistant") || typeof m.content !== "string") {
-      return res.status(400).json({ error: "Each message needs role 'user'|'assistant' and string content." });
+    if (!m || (m.role !== "user" && m.role !== "assistant")) {
+      return res.status(400).json({ error: "Each message needs role 'user' or 'assistant'." });
+    }
+    if (typeof m.content !== "string" && !isValidContentBlocks(m.content)) {
+      return res.status(400).json({
+        error: "Each message's content must be a string, or an array of real Anthropic content blocks "
+          + "({type:'text', text} or {type:'image', source:{type:'base64', media_type, data}}).",
+      });
     }
   }
 
