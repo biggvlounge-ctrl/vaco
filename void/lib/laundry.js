@@ -27,6 +27,7 @@
 
 const { canWorkVertical, requireProvider } = require('./providerProfiles');
 const { settleJob } = require('./settlement');
+const { settleOnce } = require('./settleOnce');
 
 const LAUNDRY_VERTICAL_ID = 'laundry';
 
@@ -292,18 +293,23 @@ async function markDelivered(store, options = {}) {
     );
   }
 
-  await settleJob({
-    job: order,
-    verticalId: LAUNDRY_VERTICAL_ID,
-    total: order.actualTotal,
-    label: 'laundry',
-    reference: orderId,
-    settleFn,
-    now,
+  // Claimed before the money moves, not after -- same claim-before-pay
+  // race fixed in petCare.js's completeBooking, applied here:
+  // cancelOrder's guard (`status === 'delivered'`) must see the claim
+  // before a concurrent cancel can slip past it and then be silently
+  // overwritten once this settlement resolves.
+  await settleOnce(order, { status: 'delivered', deliveredAt: now }, async () => {
+    await settleJob({
+      job: order,
+      verticalId: LAUNDRY_VERTICAL_ID,
+      total: order.actualTotal,
+      label: 'laundry',
+      reference: orderId,
+      settleFn,
+      now,
+    });
   });
 
-  order.status = 'delivered';
-  order.deliveredAt = now;
   return order;
 }
 

@@ -47,6 +47,7 @@ const {
 const { canWorkVertical, requireProvider } = require('./providerProfiles');
 const { VERTICALS } = require('./verticals');
 const { settleJob } = require('./settlement');
+const { settleOnce } = require('./settleOnce');
 
 const ARCHETYPES = ['recurring', 'round-trip', 'appointment', 'quote'];
 
@@ -400,18 +401,33 @@ async function advanceBooking(store, options = {}) {
     // the same four settlement fields this block set, and refuses a
     // priceless job with the same rule, so the behaviour is unchanged
     // apart from the two legs now moving atomically.
-    await settleJob({
-      job: booking,
-      verticalId: booking.verticalId,
-      total: booking.actualTotal ?? booking.estimatedTotal,
-      label: 'service',
-      reference: bookingId,
-      settleFn,
-      now,
+    //
+    // **`status: to` is claimed synchronously here too, via
+    // settleOnce, not written after the await below.** The
+    // `recurring` archetype's own lifecycle allows both `completed`
+    // and `cancelled` from `in-progress`, so a `cancelServiceBooking`
+    // call landing while this settlement is in flight used to pass
+    // its own guard (which reads `booking.status` and was still
+    // `in-progress`), set `status = 'cancelled'`, and then have that
+    // silently clobbered back to `to` once settleJob resolved -- after
+    // the provider had already been paid. Claiming the status before
+    // the await means a concurrent cancel now sees it immediately and
+    // is refused by its own existing lifecycle check.
+    await settleOnce(booking, { status: to }, async () => {
+      await settleJob({
+        job: booking,
+        verticalId: booking.verticalId,
+        total: booking.actualTotal ?? booking.estimatedTotal,
+        label: 'service',
+        reference: bookingId,
+        settleFn,
+        now,
+      });
     });
+  } else {
+    booking.status = to;
   }
 
-  booking.status = to;
   booking.history.push({ status: to, at: now });
   if (to === 'completed' || to === 'returned') booking.completedAt = now;
   return booking;

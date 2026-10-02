@@ -180,6 +180,49 @@ test('a refused pet care settlement does not double-pay on retry', async () => {
     'the walker was paid twice for one booking');
 });
 
+test('a cancel racing a completion does not get silently clobbered after the walker is paid', async () => {
+  // **The regression.** completeBooking used to check `status ===
+  // 'confirmed'`, await settleJob (a real network round-trip), and
+  // only then write `status = 'completed'` -- unconditionally, with no
+  // re-check. A cancelBooking call landing while that settlement was
+  // in flight saw `status` still `'confirmed'`, passed its own guard,
+  // and set `status = 'cancelled'`. When the completion's await
+  // resolved, it blindly overwrote that back to `'completed'` -- after
+  // the walker had already been paid. The booking then read
+  // "completed" with zero trace the customer ever cancelled.
+  //
+  // completeBooking now claims `'completed'` synchronously, via
+  // settleOnce, before the await -- so whichever of the two calls
+  // reaches its own synchronous guard first wins the booking, and the
+  // other is refused by the ordinary status check. No interleaving
+  // window remains.
+  const store = createVoidStore();
+  const settleFn = ledger();
+  const { mg, pet } = confirmedBooking(store);
+  // The intro gate reads a *completed* meet-and-greet, not merely a
+  // confirmed one -- confirmedBooking() only confirms it.
+  await petCare.completeBooking(store, { bookingId: mg.id, settleFn, now: NOW });
+  const b = petCare.createBooking(store, {
+    petId: pet.id, providerId: 'walker', service: 'walk', price: 40,
+    scheduledFor: NOW + 9 * H, now: NOW,
+  });
+  petCare.confirmBooking(store, { bookingId: b.id });
+
+  const results = await Promise.allSettled([
+    petCare.completeBooking(store, { bookingId: b.id, settleFn, now: NOW + 10 * H }),
+    (async () => petCare.cancelBooking(store, { bookingId: b.id }))(),
+  ]);
+
+  const fulfilled = results.filter((r) => r.status === 'fulfilled');
+  assert.equal(fulfilled.length, 1, 'exactly one of complete/cancel may win the race');
+  assert.equal(settleFn.calls.length, 1, 'the walker must be paid exactly once, not zero or twice');
+  // Whichever one won, the booking's final status must match what was
+  // actually paid for -- a 'completed' booking the walker was paid for
+  // must stay completed, and a 'cancelled' booking must never have
+  // been silently flipped back after the fact.
+  assert.equal(b.status, 'completed', 'completeBooking ran first in this ordering and must hold the booking');
+});
+
 // -- the service engine, which is 23 of the 25 verticals ----------------
 
 test('the service engine settles through settlement.js, in one call', async () => {
@@ -208,4 +251,44 @@ test('the service engine settles through settlement.js, in one call', async () =
   assert.equal(settleFn.calls[0].legs.length, 2);
   assert.equal(b.settledTotal, 200);
   assert.equal(b.providerPayout + b.platformFee, 200);
+});
+
+test('a cancel racing advanceBooking(to: completed) does not get silently clobbered after the provider is paid', async () => {
+  // **The same regression as petCare's, in the module that actually
+  // carries 23 of VOID's 25 verticals.** `recurring`'s own lifecycle
+  // allows 'in-progress' -> both 'completed' and 'cancelled' -- the
+  // engine's header on `advanceBooking` names this exact archetype as
+  // the one genuinely exposed. Before settleOnce, advanceBooking
+  // checked the status, awaited settleJob, and only then wrote
+  // `status = to` unconditionally. A cancelServiceBooking call landing
+  // during that await saw 'in-progress', passed its own guard, and set
+  // 'cancelled' -- which the resolving advanceBooking then overwrote
+  // back to 'completed', after the provider had already been paid.
+  //
+  // advanceBooking now claims `status: to` synchronously via
+  // settleOnce before the await, so whichever call's synchronous guard
+  // runs first wins the booking outright.
+  const store = createVoidStore();
+  const settleFn = ledger();
+
+  registerProvider(store, { providerId: 'coach', displayName: 'coach', homeBaseLat: 40.7, homeBaseLng: -74 });
+  addSkill(store, { providerId: 'coach', verticalId: 'personalTraining', now: NOW });
+  vet(store, 'coach', 'personalTraining');
+  const b = engine.createServiceBooking(store, {
+    verticalId: 'personalTraining', customerId: 'sam', providerId: 'coach',
+    service: 'one-to-one-session', scheduledFor: NOW + 48 * H, quotedTotal: 80,
+    isIntroSession: true, now: NOW,
+  });
+  await engine.advanceBooking(store, { bookingId: b.id, to: 'confirmed', settleFn, now: NOW });
+  await engine.advanceBooking(store, { bookingId: b.id, to: 'in-progress', settleFn, now: NOW });
+
+  const results = await Promise.allSettled([
+    engine.advanceBooking(store, { bookingId: b.id, to: 'completed', settleFn, now: NOW + 49 * H }),
+    (async () => engine.cancelServiceBooking(store, { bookingId: b.id }))(),
+  ]);
+
+  const fulfilled = results.filter((r) => r.status === 'fulfilled');
+  assert.equal(fulfilled.length, 1, 'exactly one of complete/cancel may win the race');
+  assert.equal(settleFn.calls.length, 1, 'the coach must be paid exactly once, not zero or twice');
+  assert.equal(b.status, 'completed', 'advanceBooking ran first in this ordering and must hold the booking');
 });

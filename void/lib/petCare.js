@@ -26,6 +26,7 @@
 
 const { canWorkVertical, requireProvider } = require('./providerProfiles');
 const { settleJob } = require('./settlement');
+const { settleOnce } = require('./settleOnce');
 
 const PET_CARE_VERTICAL_ID = 'petCare';
 
@@ -267,21 +268,32 @@ async function completeBooking(store, options = {}) {
     throw new PetCareError(`completeBooking: booking ${bookingId} is ${booking.status}, must be confirmed`);
   }
 
-  if (!booking.isMeetAndGreet) {
-    await settleJob({
-      job: booking,
-      verticalId: PET_CARE_VERTICAL_ID,
-      total: booking.price,
-      label: 'petcare',
-      reference: bookingId,
-      settleFn,
-      now,
-    });
-  }
+  // Claimed before the money moves, not after. This used to await
+  // settleJob and only then write booking.status = 'completed' --
+  // cancelBooking's own guard (`status === 'completed'`) ran against
+  // whatever status was there *before* this function's await, so a
+  // cancelBooking call landing while a completeBooking settlement was
+  // still in flight passed its guard, set status = 'cancelled', and
+  // then had that silently clobbered back to 'completed' once the
+  // await resolved -- after the provider had already been paid.
+  // settleOnce claims 'completed' synchronously, before the await, so
+  // a concurrent cancelBooking now sees it immediately and is refused
+  // by its own existing guard; a failed settlement rolls the claim
+  // back, same as before.
+  await settleOnce(booking, { status: 'completed', completedAt: now, completionPhotoRef }, async () => {
+    if (!booking.isMeetAndGreet) {
+      await settleJob({
+        job: booking,
+        verticalId: PET_CARE_VERTICAL_ID,
+        total: booking.price,
+        label: 'petcare',
+        reference: bookingId,
+        settleFn,
+        now,
+      });
+    }
+  });
 
-  booking.status = 'completed';
-  booking.completedAt = now;
-  booking.completionPhotoRef = completionPhotoRef;
   return booking;
 }
 
