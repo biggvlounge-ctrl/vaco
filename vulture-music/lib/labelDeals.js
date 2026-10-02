@@ -129,13 +129,34 @@ async function signLabelDeal(store, options = {}) {
     throw new Error('signLabelDeal: a blanket deal must not specify a release');
   }
 
-  // The real, defining reversal from a personal-manager relationship:
-  // the label pays the artist a real advance immediately, up front.
-  await settleFn(
-    [{ fromUserId: labelId, toUserId: artistId, amount: advanceAmount, reason: `Label advance: ${dealType} deal` }],
-    { reason: `Label advance: ${dealType} deal` },
-  );
-
+  // **Reserved and pushed before the advance moves, not built and
+  // pushed only after settleFn resolves.** Two problems, one fix:
+  //
+  // 1. Exclusivity was only enforced by the synchronous checks above
+  //    reading `store.labelDeals` -- nothing claimed the slot before
+  //    the `await`. Two concurrent signLabelDeal calls for the same
+  //    artist (same blanket deal, or the same release) both passed
+  //    `findActiveBlanketDeal`/`findActiveDealForRelease` while no
+  //    deal existed yet, both paid a real advance, and both pushed a
+  //    deal record -- two simultaneously-"active" deals that were
+  //    supposed to be mutually exclusive. `getActiveLabelDealForRelease`
+  //    plain `.find()` then only ever recoups through whichever deal
+  //    comes first in array order, so the other label's advance could
+  //    never be recovered through this system's own recoupment
+  //    mechanism.
+  // 2. The settlement reason -- which doubles as V3's idempotency key,
+  //    see server.js's settleVCoin -- carried no per-deal scoping at
+  //    all (`Label advance: ${dealType} deal`, identical for every
+  //    blanket deal ever signed and every per-release deal ever
+  //    signed). The second deal of either type signed anywhere in the
+  //    store's lifetime, for any artist or label, collided with the
+  //    first's key and was refused by V3 outright.
+  //
+  // Pushing the deal (with its real id) before the await closes both:
+  // a concurrent sign attempt's own exclusivity check now sees this
+  // deal immediately and is refused, and the reason is unique per deal
+  // by construction. A failed advance removes the reservation so the
+  // slot is free to retry.
   const deal = {
     id: store.nextLabelDealId++,
     labelId,
@@ -152,6 +173,19 @@ async function signLabelDeal(store, options = {}) {
     terminationReason: null,
   };
   store.labelDeals.push(deal);
+
+  try {
+    // The real, defining reversal from a personal-manager relationship:
+    // the label pays the artist a real advance immediately, up front.
+    await settleFn(
+      [{ fromUserId: labelId, toUserId: artistId, amount: advanceAmount, reason: `Label advance: ${dealType} deal:${deal.id}` }],
+      { reason: `Label advance: ${dealType} deal:${deal.id}` },
+    );
+  } catch (err) {
+    store.labelDeals = store.labelDeals.filter((d) => d !== deal);
+    throw err;
+  }
+
   return deal;
 }
 
