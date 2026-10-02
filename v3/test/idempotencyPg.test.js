@@ -93,6 +93,18 @@ async function post(port, body, key) {
   return { status: res.status, body: await res.json() };
 }
 
+// Same request, but the key travels in the body instead of the
+// header -- the other half of the contract lib/idempotency.js's own
+// readKey() documents and every real caller is free to use.
+async function postWithBodyKey(port, body, key) {
+  const res = await fetch(`http://127.0.0.1:${port}/charge`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...body, idempotencyKey: key }),
+  });
+  return { status: res.status, body: await res.json() };
+}
+
 test('a repeated key replays the first answer without re-running the work', { skip: SKIP }, async (t) => {
   if (SKIP) return t.skip(SKIP);
   const s = await serve();
@@ -106,6 +118,29 @@ test('a repeated key replays the first answer without re-running the work', { sk
     assert.strictEqual(second.body.charged, 100);
     assert.strictEqual(second.body.idempotentReplay, true);
     assert.strictEqual(s.state.calls, 1, 'the handler ran twice for one idempotency key');
+  } finally { await s.close(); }
+});
+
+test('a key sent in the body, not the header, still deduplicates', { skip: SKIP }, async (t) => {
+  // This backend used to read only the `Idempotency-Key` header
+  // (`req.get('Idempotency-Key')`, with no fallback) while
+  // lib/idempotency.js's own documented contract -- and the
+  // convention every real caller follows -- treats the header and the
+  // `idempotencyKey` body field as equally valid. The moment
+  // DATABASE_URL was set, a caller using the body field got silently
+  // unprotected: a retry found no claimed key either time, both ran,
+  // and the payer was charged twice with no error.
+  if (SKIP) return t.skip(SKIP);
+  const s = await serve();
+  try {
+    const key = freshKey();
+    const first = await postWithBodyKey(s.port, { amount: 100 }, key);
+    const second = await postWithBodyKey(s.port, { amount: 100 }, key);
+
+    assert.strictEqual(first.status, 201);
+    assert.strictEqual(second.status, 201);
+    assert.strictEqual(second.body.idempotentReplay, true);
+    assert.strictEqual(s.state.calls, 1, 'a body-field key did not deduplicate a retried request');
   } finally { await s.close(); }
 });
 

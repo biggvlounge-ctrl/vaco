@@ -106,7 +106,20 @@ async function sweepExpired(pool) {
  */
 function idempotent(pool, routeName, { retentionHours = 24 } = {}) {
   return async (req, res, next) => {
-    const key = req.get('Idempotency-Key');
+    // Same contract as lib/idempotency.js's readKey(): the header OR
+    // the `idempotencyKey` body field, either one. This used to read
+    // only the header -- so a caller that (per this ledger's own
+    // documented contract, and the convention every caller follows)
+    // sends its key in the body instead got silently unprotected the
+    // moment DATABASE_URL was set: both branches of a retried request
+    // found no claimed key, both ran, and the payer was charged twice
+    // with no error anywhere.
+    const header = req.get('Idempotency-Key');
+    const bodyKey = (req.body || {}).idempotencyKey;
+    const key = header || bodyKey || null;
+    if (key !== null && (typeof key !== 'string' || key.trim() === '')) {
+      return res.status(400).json({ error: 'Idempotency-Key must be a non-empty string' });
+    }
     if (!key) return next();
 
     const print = fingerprint(routeName, req.body || {});
