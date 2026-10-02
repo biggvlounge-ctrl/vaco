@@ -118,6 +118,37 @@ for (const [label, hoursOut, expectedLegs] of [['refundable', 200, 1], ['late', 
   });
 }
 
+test('an experience settles once, however many callers ask to complete it', async () => {
+  // **The regression.** completeExperience checked `experience.status`
+  // with a plain if-guard, looped over every eligible booking with an
+  // `await settleFn` per booking, and only wrote `status: 'completed'`
+  // at the very end -- unlike bookExperience and cancelBooking above,
+  // which both claim their terminal state before the first await. Two
+  // concurrent completions for the same experience both passed the
+  // guard before either reached an await, and both ran the full
+  // settlement loop: every booking paid twice out of escrow that was
+  // only funded once.
+  const store = createVoidMagicStore();
+  const exp = experience(store, { capacity: 3, hoursOut: 1 });
+  for (const customerId of ['c1', 'c2', 'c3']) {
+    const booking = await bookings.bookExperience(store,
+      { experienceId: exp.id, customerId, settleFn: async () => {} });
+    bookings.checkIn(store, { bookingId: booking.id, providedCredential: booking.credential });
+  }
+
+  const fn = ledger();
+  const results = await Promise.allSettled(Array.from({ length: 5 },
+    () => bookings.completeExperience(store, { experienceId: exp.id, settleFn: fn })));
+
+  assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1,
+    'more than one caller was told it had completed the experience');
+  assert.equal(fn.legs.length, 6, '3 attended bookings x 2 legs each (host + platform), settled once');
+  assert.equal(fn.total(), 60, `${fn.total()} VCoin moved for 3 attended bookings at 20.00 each`);
+
+  const after = store.experiences.find((e) => e.id === exp.id);
+  assert.equal(after.status, 'completed');
+});
+
 test('a failed cancellation leaves the booking cancellable', async () => {
   const store = createVoidMagicStore();
   const exp = experience(store, { capacity: 5 });

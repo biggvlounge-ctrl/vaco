@@ -188,53 +188,69 @@ async function completeExperience(store, options = {}) {
   // Did the experience actually happen? One real attendee is the test.
   const anyoneAttended = eligibleBookings.some((b) => b.status === 'checked-in');
 
-  for (const booking of eligibleBookings) {
-    const attended = booking.status === 'checked-in';
+  // **Claimed before the settlement loop, not written after it.**
+  // Unlike `bookExperience` and `cancelBooking` just above and below
+  // this function, the guards here were a plain if-check, not a
+  // claim: `experience.status` stayed whatever it was until the very
+  // last line, after every booking's `await settleFn`. Two concurrent
+  // `completeExperience` calls for the same experience (a double-click
+  // on "complete", or a client retry) both passed the status guard
+  // before either reached its first await, both ran the full
+  // settlement loop over the identical eligible bookings, and both
+  // settled every booking a second time -- refunds paid twice, or the
+  // host and platform paid twice, out of escrow that was only funded
+  // once. settleOnce closes the same window here that it already
+  // closes for booking and cancelling: a concurrent second call now
+  // sees `status: 'completed'` immediately and is refused by the
+  // existing guard above, before it ever enters the loop.
+  await settleOnce(experience, { status: 'completed' }, async () => {
+    for (const booking of eligibleBookings) {
+      const attended = booking.status === 'checked-in';
 
-    if (booking.pricePaid > 0) {
-      if (typeof settleFn !== 'function') throw new Error('completeExperience requires a settleFn(legs, meta) to settle priced bookings');
+      if (booking.pricePaid > 0) {
+        if (typeof settleFn !== 'function') throw new Error('completeExperience requires a settleFn(legs, meta) to settle priced bookings');
 
-      if (!anyoneAttended) {
-        // The experience did not happen. Full refund, no platform fee
-        // -- there is no service to take a cut of.
-        await settleFn(
-          [{ fromUserId: VOID_MAGIC_ESCROW_ACCOUNT, toUserId: booking.customerId, amount: booking.pricePaid, reason: `voidmagic_unattended_experience_refund:${experienceId}` }],
-          { reason: `voidmagic_unattended_refund:${experienceId}:${booking.id}` },
-        );
-      } else {
-        const platformFee = round(booking.pricePaid * PLATFORM_TAKE_RATE);
-        const hostPayout = round(booking.pricePaid - platformFee);
-        // Both legs leave the same escrow, so split they could pay the
-        // host and then fail the fee because the host's leg drained it.
-        await settleFn([
-          { fromUserId: VOID_MAGIC_ESCROW_ACCOUNT, toUserId: experience.hostId, amount: hostPayout, reason: `voidmagic_host_settlement:${experienceId}` },
-          { fromUserId: VOID_MAGIC_ESCROW_ACCOUNT, toUserId: 'voidmagic-platform', amount: platformFee, reason: `voidmagic_platform_fee:${experienceId}` },
-        ], { reason: `voidmagic_experience_settlement:${experienceId}:${booking.id}` });
+        if (!anyoneAttended) {
+          // The experience did not happen. Full refund, no platform fee
+          // -- there is no service to take a cut of.
+          await settleFn(
+            [{ fromUserId: VOID_MAGIC_ESCROW_ACCOUNT, toUserId: booking.customerId, amount: booking.pricePaid, reason: `voidmagic_unattended_experience_refund:${experienceId}` }],
+            { reason: `voidmagic_unattended_refund:${experienceId}:${booking.id}` },
+          );
+        } else {
+          const platformFee = round(booking.pricePaid * PLATFORM_TAKE_RATE);
+          const hostPayout = round(booking.pricePaid - platformFee);
+          // Both legs leave the same escrow, so split they could pay the
+          // host and then fail the fee because the host's leg drained it.
+          await settleFn([
+            { fromUserId: VOID_MAGIC_ESCROW_ACCOUNT, toUserId: experience.hostId, amount: hostPayout, reason: `voidmagic_host_settlement:${experienceId}` },
+            { fromUserId: VOID_MAGIC_ESCROW_ACCOUNT, toUserId: 'voidmagic-platform', amount: platformFee, reason: `voidmagic_platform_fee:${experienceId}` },
+          ], { reason: `voidmagic_experience_settlement:${experienceId}:${booking.id}` });
+        }
       }
+
+      booking.status = anyoneAttended && !attended ? 'no-show' : 'completed';
+      booking.completedAt = now;
+
+      createNotification(store, {
+        recipientId: booking.customerId,
+        type: 'experience-ending',
+        subject: `Experience ended: ${experience.title}`,
+        message: `"${experience.title}" has ended. Thanks for joining.`,
+        relatedId: booking.id,
+        now,
+      });
+      createNotification(store, {
+        recipientId: booking.customerId,
+        type: 'post-event-follow-up',
+        subject: `How was "${experience.title}"?`,
+        message: 'Leave a rating, tip, or check out related experiences.',
+        relatedId: booking.id,
+        now,
+      });
     }
+  });
 
-    booking.status = anyoneAttended && !attended ? 'no-show' : 'completed';
-    booking.completedAt = now;
-
-    createNotification(store, {
-      recipientId: booking.customerId,
-      type: 'experience-ending',
-      subject: `Experience ended: ${experience.title}`,
-      message: `"${experience.title}" has ended. Thanks for joining.`,
-      relatedId: booking.id,
-      now,
-    });
-    createNotification(store, {
-      recipientId: booking.customerId,
-      type: 'post-event-follow-up',
-      subject: `How was "${experience.title}"?`,
-      message: 'Leave a rating, tip, or check out related experiences.',
-      relatedId: booking.id,
-      now,
-    });
-  }
-
-  experience.status = 'completed';
   return { experience, completedBookings: eligibleBookings };
 }
 
