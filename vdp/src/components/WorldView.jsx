@@ -3,6 +3,7 @@ import {
   VIEWPORT_WIDTH, VIEWPORT_HEIGHT, MOVE_STEP,
   DISTRICTS, createWorldState, movePlayer, getCurrentDistrict, getNearbyBuilding, enterBuilding, getCameraOffset,
 } from "../lib/world.js";
+import { createNpcWorld, advanceWorldTick, latestDecision, explainDecision } from "../lib/npcs.js";
 import DegvchiView from "./DegvchiView.jsx";
 import FoodDistrictView from "./FoodDistrictView.jsx";
 import StageView from "./StageView.jsx";
@@ -154,6 +155,22 @@ import VacoMerchView from "./VacoMerchView.jsx";
 
 const VENVS_URL = import.meta.env.VITE_VENVS_URL || "http://localhost:5173";
 
+// How often the NPCs' own needs/habits/decisions actually re-evaluate.
+// Positions still redraw on every animation frame for smooth movement
+// (see the rAF loop below) -- this only gates how often `advanceWorldTick`
+// itself runs, same cadence `npcs.js`'s own header describes.
+const NPC_TICK_INTERVAL_MS = 2000;
+
+const NPC_ACTION_COLORS = {
+  build: "#b48ee0",
+  trade: "#e08a6a",
+  socialize: "#6adfd4",
+  rest: "#9a9aa8",
+  pettySwipe: "#e0c23a",
+  fight: "#e04a4a",
+};
+const NPC_HOVER_RADIUS = 10;
+
 const DISTRICT_COLORS = {
   vex: "#4a6fa5",
   vado: "#a54a8f",
@@ -182,8 +199,18 @@ const DISTRICT_COLORS = {
 export default function WorldView({ session, degvchiStore, foodDistrictStore, onPurchase }) {
   const [worldState, setWorldState] = useState(() => createWorldState());
   const [enteredDistrict, setEnteredDistrict] = useState(null);
+  const [hoveredNpcId, setHoveredNpcId] = useState(null);
   const canvasRef = useRef(null);
   const worldStateRef = useRef(worldState);
+  // Created once per mount, mutated in place by advanceWorldTick --
+  // the same "ref holds the live object, React state only drives
+  // re-renders where something actually needs to react" split already
+  // used for worldStateRef above. NPC positions update every animation
+  // frame regardless of React's own render cycle.
+  const npcWorldRef = useRef(null);
+  if (!npcWorldRef.current) {
+    npcWorldRef.current = createNpcWorld();
+  }
 
   useEffect(() => {
     worldStateRef.current = worldState;
@@ -208,11 +235,18 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
 
-  useEffect(() => {
+  // One draw pass, reading the live refs rather than React state, so
+  // it can be called every animation frame without forcing a React
+  // re-render per frame. The player's own keyboard-driven movement
+  // still goes through `setWorldState` (so the position readout below
+  // the canvas stays correct), but the canvas itself is now painted
+  // exclusively by the rAF loop below -- NPCs move continuously
+  // whether or not the player is pressing anything.
+  const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
-    const camera = getCameraOffset(worldState);
+    const camera = getCameraOffset(worldStateRef.current);
 
     ctx.fillStyle = "#1a1a2e";
     ctx.fillRect(0, 0, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
@@ -234,16 +268,75 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
       ctx.fillText(d.name, sx + 6, sy + 16);
     }
 
-    const px = worldState.x - camera.x;
-    const py = worldState.y - camera.y;
+    for (const npc of npcWorldRef.current.npcs) {
+      const sx = npc.x - camera.x;
+      const sy = npc.y - camera.y;
+      if (sx < -10 || sx > VIEWPORT_WIDTH + 10 || sy < -10 || sy > VIEWPORT_HEIGHT + 10) continue;
+      ctx.fillStyle = NPC_ACTION_COLORS[npc.currentAction] || "#aaa";
+      ctx.beginPath();
+      ctx.arc(sx, sy, 5, 0, Math.PI * 2);
+      ctx.fill();
+      if (npc.id === hoveredNpcId) {
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+    }
+
+    const px = worldStateRef.current.x - camera.x;
+    const py = worldStateRef.current.y - camera.y;
     ctx.fillStyle = "#ffd700";
     ctx.beginPath();
     ctx.arc(px, py, 8, 0, Math.PI * 2);
     ctx.fill();
-  }, [worldState]);
+  }, [hoveredNpcId]);
+
+  // The one real game loop VDP has: previously every redraw was a
+  // direct reaction to a key press (see `handleKeyDown` above) and
+  // nothing moved on its own. This loop draws every animation frame
+  // (so NPC movement looks continuous) and calls `advanceWorldTick`
+  // at most once every `NPC_TICK_INTERVAL_MS` real milliseconds --
+  // `npcs.js`'s own rota slicing keeps each of those calls cheap
+  // regardless of population.
+  useEffect(() => {
+    let frameId;
+    let lastTick = performance.now();
+    const loop = (now) => {
+      if (now - lastTick >= NPC_TICK_INTERVAL_MS) {
+        advanceWorldTick(npcWorldRef.current);
+        lastTick = now;
+      }
+      draw();
+      frameId = requestAnimationFrame(loop);
+    };
+    frameId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(frameId);
+  }, [draw]);
+
+  const handleCanvasMouseMove = (e) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const camera = getCameraOffset(worldStateRef.current);
+    let closestId = null;
+    let closestDist = NPC_HOVER_RADIUS;
+    for (const npc of npcWorldRef.current.npcs) {
+      const dist = Math.hypot(mx - (npc.x - camera.x), my - (npc.y - camera.y));
+      if (dist <= closestDist) {
+        closestId = npc.id;
+        closestDist = dist;
+      }
+    }
+    setHoveredNpcId(closestId);
+  };
 
   const currentDistrict = getCurrentDistrict(worldState);
   const nearbyBuilding = getNearbyBuilding(worldState);
+  const hoveredNpc = hoveredNpcId != null
+    ? npcWorldRef.current.npcs.find((n) => n.id === hoveredNpcId) || null
+    : null;
 
   const handleEnter = () => {
     if (!nearbyBuilding) return;
@@ -263,8 +356,15 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
         width={VIEWPORT_WIDTH}
         height={VIEWPORT_HEIGHT}
         tabIndex={0}
+        onMouseMove={handleCanvasMouseMove}
+        onMouseLeave={() => setHoveredNpcId(null)}
         style={{ border: "1px solid #444", outline: "none" }}
       />
+      {hoveredNpc && (
+        <p style={{ fontSize: 12, color: "#9a7fd4", marginTop: 4, minHeight: 16 }}>
+          {explainDecision(latestDecision(hoveredNpc)) || `${hoveredNpc.name} hasn't decided anything yet.`}
+        </p>
+      )}
       {nearbyBuilding && (
         <div style={{ marginTop: 8 }}>
           <button onClick={handleEnter}>Enter {nearbyBuilding.name}</button>
