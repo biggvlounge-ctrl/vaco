@@ -75,13 +75,25 @@ async function completeExperienceBooking(store, options = {}) {
   const experience = getExperience(store, booking.experienceId);
   const platformFee = round(booking.price * (FEE_PERCENT / 100));
   const hostPayout = round(booking.price - platformFee);
-  // One settlement: both legs leave the same escrow, so a split can
-  // pay the host and fail the fee, leaving the booking uncompleted and
-  // a retry paying the host again.
-  await settleFn([
-    { fromUserId: VACAY_ESCROW_ACCOUNT, toUserId: experience.hostId, amount: hostPayout, reason: `vacay_experience_host_settlement:${bookingId}` },
-    { fromUserId: VACAY_ESCROW_ACCOUNT, toUserId: 'vacay-experiences-platform', amount: platformFee, reason: `vacay_experience_platform_fee:${bookingId}` },
-  ], { reason: `vacay_experience_settlement:${bookingId}` });
+
+  // Claimed synchronously, before the real settlement call --
+  // completeExperienceBooking and cancelExperienceBooking settle
+  // under different reasons, so a per-function idempotency key
+  // cannot catch the two racing each other on the same booking.
+  booking.status = 'settling';
+
+  try {
+    // One settlement: both legs leave the same escrow, so a split can
+    // pay the host and fail the fee, leaving the booking uncompleted
+    // and a retry paying the host again.
+    await settleFn([
+      { fromUserId: VACAY_ESCROW_ACCOUNT, toUserId: experience.hostId, amount: hostPayout, reason: `vacay_experience_host_settlement:${bookingId}` },
+      { fromUserId: VACAY_ESCROW_ACCOUNT, toUserId: 'vacay-experiences-platform', amount: platformFee, reason: `vacay_experience_platform_fee:${bookingId}` },
+    ], { reason: `vacay_experience_settlement:${bookingId}` });
+  } catch (err) {
+    booking.status = 'booked';
+    throw err;
+  }
 
   booking.hostPayout = hostPayout;
   booking.platformFee = platformFee;
@@ -108,24 +120,40 @@ async function cancelExperienceBooking(store, options = {}) {
   if (!booking) throw new Error(`cancelExperienceBooking: no experience booking with id ${bookingId}`);
   if (booking.status === 'cancelled') throw new Error(`cancelExperienceBooking: booking ${bookingId} is already cancelled`);
   if (booking.status === 'completed') throw new Error(`cancelExperienceBooking: booking ${bookingId} has already completed and can't be cancelled`);
+  // Refuses a booking completeExperienceBooking has already claimed
+  // -- see the claim both functions now make before their real
+  // settlement call.
+  if (booking.status === 'settling') throw new Error(`cancelExperienceBooking: booking ${bookingId} is currently being settled by another request`);
   if (typeof settleFn !== 'function') throw new Error('cancelExperienceBooking requires a settleFn(fromUserId, toUserId, amount, reason)');
 
   const experience = getExperience(store, booking.experienceId);
   const hoursUntilStart = (experience.scheduledAt - now) / 3600000;
   const refundEligible = hoursUntilStart >= CANCELLATION_CUTOFF_HOURS;
 
-  if (refundEligible) {
-    await settleFn(
-      [{ fromUserId: VACAY_ESCROW_ACCOUNT, toUserId: booking.guestId, amount: booking.price, reason: `vacay_experience_cancellation_refund:${bookingId}` }],
-      { reason: `vacay_experience_cancellation_refund:${bookingId}` },
-    );
-  } else {
-    const platformFee = round(booking.price * (FEE_PERCENT / 100));
-    const hostPayout = round(booking.price - platformFee);
-    await settleFn([
-      { fromUserId: VACAY_ESCROW_ACCOUNT, toUserId: experience.hostId, amount: hostPayout, reason: `vacay_experience_late_cancellation_host_settlement:${bookingId}` },
-      { fromUserId: VACAY_ESCROW_ACCOUNT, toUserId: 'vacay-experiences-platform', amount: platformFee, reason: `vacay_experience_late_cancellation_platform_fee:${bookingId}` },
-    ], { reason: `vacay_experience_late_cancellation:${bookingId}` });
+  booking.status = 'settling';
+  let hostPayout = null;
+  let platformFee = null;
+
+  try {
+    if (refundEligible) {
+      await settleFn(
+        [{ fromUserId: VACAY_ESCROW_ACCOUNT, toUserId: booking.guestId, amount: booking.price, reason: `vacay_experience_cancellation_refund:${bookingId}` }],
+        { reason: `vacay_experience_cancellation_refund:${bookingId}` },
+      );
+    } else {
+      platformFee = round(booking.price * (FEE_PERCENT / 100));
+      hostPayout = round(booking.price - platformFee);
+      await settleFn([
+        { fromUserId: VACAY_ESCROW_ACCOUNT, toUserId: experience.hostId, amount: hostPayout, reason: `vacay_experience_late_cancellation_host_settlement:${bookingId}` },
+        { fromUserId: VACAY_ESCROW_ACCOUNT, toUserId: 'vacay-experiences-platform', amount: platformFee, reason: `vacay_experience_late_cancellation_platform_fee:${bookingId}` },
+      ], { reason: `vacay_experience_late_cancellation:${bookingId}` });
+    }
+  } catch (err) {
+    booking.status = 'booked';
+    throw err;
+  }
+
+  if (!refundEligible) {
     booking.hostPayout = hostPayout;
     booking.platformFee = platformFee;
   }

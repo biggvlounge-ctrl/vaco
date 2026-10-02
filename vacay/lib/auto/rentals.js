@@ -104,14 +104,32 @@ async function completeRental(store, options = {}) {
   const ownerPayout = round(rental.totalPrice * rental.hostEarnPercent);
   const platformCommission = round(rental.totalPrice - ownerPayout);
 
-  // One settlement: the owner's payout and the platform's commission
-  // both leave the same escrow, and the rental's status is written
-  // afterwards -- so a split that failed between them would pay the
-  // owner and let a retry pay them again.
-  await settleFn([
-    { fromUserId: VACAY_AUTO_ESCROW_ACCOUNT, toUserId: vehicle.ownerId, amount: ownerPayout, reason: `vacay_auto_owner_settlement:${rentalId}` },
-    { fromUserId: VACAY_AUTO_ESCROW_ACCOUNT, toUserId: VACAY_AUTO_PLATFORM_ACCOUNT, amount: platformCommission, reason: `vacay_auto_platform_commission:${rentalId}` },
-  ], { reason: `vacay_auto_rental_settlement:${rentalId}` });
+  // Claimed synchronously, before the real settlement call.
+  // **completeRental and cancelRental settle under different
+  // reasons, so a per-function idempotency key cannot catch the two
+  // racing each other.** Both read `status === 'booked'` before
+  // either one's await resolves, both pay out of the same escrow
+  // under their own key, and V3 sees two unrelated charges rather
+  // than a retry of one -- a real double payout, not merely a
+  // duplicate. Claiming 'settling' here means whichever call reaches
+  // this line first locks the other out (completeRental's own
+  // `!== 'booked'` guard above, and cancelRental's explicit check
+  // below) before either one's real payout fires.
+  rental.status = 'settling';
+
+  try {
+    // One settlement: the owner's payout and the platform's commission
+    // both leave the same escrow, and the rental's final status is
+    // written afterwards -- so a split that failed between them would
+    // pay the owner and let a retry pay them again.
+    await settleFn([
+      { fromUserId: VACAY_AUTO_ESCROW_ACCOUNT, toUserId: vehicle.ownerId, amount: ownerPayout, reason: `vacay_auto_owner_settlement:${rentalId}` },
+      { fromUserId: VACAY_AUTO_ESCROW_ACCOUNT, toUserId: VACAY_AUTO_PLATFORM_ACCOUNT, amount: platformCommission, reason: `vacay_auto_platform_commission:${rentalId}` },
+    ], { reason: `vacay_auto_rental_settlement:${rentalId}` });
+  } catch (err) {
+    rental.status = 'booked';
+    throw err;
+  }
 
   rental.ownerPayout = ownerPayout;
   rental.platformCommission = platformCommission;
@@ -136,28 +154,44 @@ async function cancelRental(store, options = {}) {
   if (!rental) throw new Error(`cancelRental: no rental with id ${rentalId}`);
   if (rental.status === 'cancelled') throw new Error(`cancelRental: rental ${rentalId} is already cancelled`);
   if (rental.status === 'completed') throw new Error(`cancelRental: rental ${rentalId} has already completed and can't be cancelled`);
+  // Refuses a rental completeRental has already claimed -- see the
+  // claim this function and completeRental now both make before their
+  // real settlement call, and completeRental's own header comment for
+  // why a per-function idempotency key cannot substitute for it.
+  if (rental.status === 'settling') throw new Error(`cancelRental: rental ${rentalId} is currently being settled by another request`);
   if (typeof settleFn !== 'function') throw new Error('cancelRental requires a settleFn(fromUserId, toUserId, amount, reason)');
 
   const vehicle = getVehicle(store, rental.vehicleId);
   const hoursUntilStart = (rental.startDate - now) / 3600000;
   const refundEligible = hoursUntilStart >= CANCELLATION_CUTOFF_HOURS;
 
-  if (refundEligible) {
-    await settleFn(
-      [{ fromUserId: VACAY_AUTO_ESCROW_ACCOUNT, toUserId: rental.renterId, amount: rental.totalPrice, reason: `vacay_auto_cancellation_refund:${rentalId}` }],
-      { reason: `vacay_auto_cancellation_refund:${rentalId}` },
-    );
-  } else {
-    const ownerPayout = round(rental.totalPrice * rental.hostEarnPercent);
-    const platformCommission = round(rental.totalPrice - ownerPayout);
-    await settleFn([
-      { fromUserId: VACAY_AUTO_ESCROW_ACCOUNT, toUserId: vehicle.ownerId, amount: ownerPayout, reason: `vacay_auto_late_cancellation_owner_settlement:${rentalId}` },
-      { fromUserId: VACAY_AUTO_ESCROW_ACCOUNT, toUserId: VACAY_AUTO_PLATFORM_ACCOUNT, amount: platformCommission, reason: `vacay_auto_late_cancellation_platform_commission:${rentalId}` },
-    ], { reason: `vacay_auto_late_cancellation:${rentalId}` });
+  rental.status = 'settling';
+  let ownerPayout = null;
+  let platformCommission = null;
+
+  try {
+    if (refundEligible) {
+      await settleFn(
+        [{ fromUserId: VACAY_AUTO_ESCROW_ACCOUNT, toUserId: rental.renterId, amount: rental.totalPrice, reason: `vacay_auto_cancellation_refund:${rentalId}` }],
+        { reason: `vacay_auto_cancellation_refund:${rentalId}` },
+      );
+    } else {
+      ownerPayout = round(rental.totalPrice * rental.hostEarnPercent);
+      platformCommission = round(rental.totalPrice - ownerPayout);
+      await settleFn([
+        { fromUserId: VACAY_AUTO_ESCROW_ACCOUNT, toUserId: vehicle.ownerId, amount: ownerPayout, reason: `vacay_auto_late_cancellation_owner_settlement:${rentalId}` },
+        { fromUserId: VACAY_AUTO_ESCROW_ACCOUNT, toUserId: VACAY_AUTO_PLATFORM_ACCOUNT, amount: platformCommission, reason: `vacay_auto_late_cancellation_platform_commission:${rentalId}` },
+      ], { reason: `vacay_auto_late_cancellation:${rentalId}` });
+    }
+  } catch (err) {
+    rental.status = 'booked';
+    throw err;
+  }
+
+  if (!refundEligible) {
     rental.ownerPayout = ownerPayout;
     rental.platformCommission = platformCommission;
   }
-
   rental.status = 'cancelled';
   rental.cancelledAt = now;
   rental.refunded = refundEligible;

@@ -110,15 +110,32 @@ async function completeStay(store, options = {}) {
   const listing = getListing(store, booking.listingId);
   const platformFee = round(booking.totalPrice * (FEE_PERCENT / 100));
   const hostPayout = round(booking.totalPrice - platformFee);
-  // **One settlement, not two transfers.** Both legs leave the same
-  // escrow account, so the second can fail because the first just
-  // drained it -- and the status below is only set afterwards, so the
-  // booking stays `booked` and a retry pays the host out of escrow a
-  // second time.
-  await settleFn([
-    { fromUserId: VACAY_ESCROW_ACCOUNT, toUserId: listing.hostId, amount: hostPayout, reason: `vacay_host_settlement:${bookingId}` },
-    { fromUserId: VACAY_ESCROW_ACCOUNT, toUserId: 'vacay-platform', amount: platformFee, reason: `vacay_platform_fee:${bookingId}` },
-  ], { reason: `vacay_stay_settlement:${bookingId}` });
+
+  // Claimed synchronously, before the real settlement call.
+  // **completeStay and cancelBooking settle under different reasons,
+  // so a per-function idempotency key cannot catch the two racing
+  // each other on the same booking** -- each pays out of the same
+  // escrow under its own key, and V3 sees two unrelated charges
+  // rather than a retry of one. Claiming 'settling' here means
+  // whichever call reaches this line first locks the other out
+  // (this function's own `!== 'booked'` guard above, and
+  // cancelBooking's explicit check) before either one's real payout
+  // fires.
+  booking.status = 'settling';
+
+  try {
+    // **One settlement, not two transfers.** Both legs leave the same
+    // escrow account, so the second can fail because the first just
+    // drained it -- and the final status below is only set
+    // afterwards.
+    await settleFn([
+      { fromUserId: VACAY_ESCROW_ACCOUNT, toUserId: listing.hostId, amount: hostPayout, reason: `vacay_host_settlement:${bookingId}` },
+      { fromUserId: VACAY_ESCROW_ACCOUNT, toUserId: 'vacay-platform', amount: platformFee, reason: `vacay_platform_fee:${bookingId}` },
+    ], { reason: `vacay_stay_settlement:${bookingId}` });
+  } catch (err) {
+    booking.status = 'booked';
+    throw err;
+  }
 
   booking.hostPayout = hostPayout;
   booking.platformFee = platformFee;
@@ -147,28 +164,42 @@ async function cancelBooking(store, options = {}) {
   if (!booking) throw new Error(`cancelBooking: no booking with id ${bookingId}`);
   if (booking.status === 'cancelled') throw new Error(`cancelBooking: booking ${bookingId} is already cancelled`);
   if (booking.status === 'completed') throw new Error(`cancelBooking: booking ${bookingId} has already completed and can't be cancelled`);
+  // Refuses a booking completeStay has already claimed -- see the
+  // claim both functions now make before their real settlement call.
+  if (booking.status === 'settling') throw new Error(`cancelBooking: booking ${bookingId} is currently being settled by another request`);
   if (typeof settleFn !== 'function') throw new Error('cancelBooking requires a settleFn(fromUserId, toUserId, amount, reason)');
 
   const listing = getListing(store, booking.listingId);
   const hoursUntilCheckIn = (booking.checkIn - now) / 3600000;
   const refundEligible = hoursUntilCheckIn >= CANCELLATION_CUTOFF_HOURS;
 
-  if (refundEligible) {
-    await settleFn(
-      [{ fromUserId: VACAY_ESCROW_ACCOUNT, toUserId: booking.guestId, amount: booking.totalPrice, reason: `vacay_cancellation_refund:${bookingId}` }],
-      { reason: `vacay_cancellation_refund:${bookingId}` },
-    );
-  } else {
-    const platformFee = round(booking.totalPrice * (FEE_PERCENT / 100));
-    const hostPayout = round(booking.totalPrice - platformFee);
-    await settleFn([
-      { fromUserId: VACAY_ESCROW_ACCOUNT, toUserId: listing.hostId, amount: hostPayout, reason: `vacay_late_cancellation_host_settlement:${bookingId}` },
-      { fromUserId: VACAY_ESCROW_ACCOUNT, toUserId: 'vacay-platform', amount: platformFee, reason: `vacay_late_cancellation_platform_fee:${bookingId}` },
-    ], { reason: `vacay_late_cancellation:${bookingId}` });
+  booking.status = 'settling';
+  let hostPayout = null;
+  let platformFee = null;
+
+  try {
+    if (refundEligible) {
+      await settleFn(
+        [{ fromUserId: VACAY_ESCROW_ACCOUNT, toUserId: booking.guestId, amount: booking.totalPrice, reason: `vacay_cancellation_refund:${bookingId}` }],
+        { reason: `vacay_cancellation_refund:${bookingId}` },
+      );
+    } else {
+      platformFee = round(booking.totalPrice * (FEE_PERCENT / 100));
+      hostPayout = round(booking.totalPrice - platformFee);
+      await settleFn([
+        { fromUserId: VACAY_ESCROW_ACCOUNT, toUserId: listing.hostId, amount: hostPayout, reason: `vacay_late_cancellation_host_settlement:${bookingId}` },
+        { fromUserId: VACAY_ESCROW_ACCOUNT, toUserId: 'vacay-platform', amount: platformFee, reason: `vacay_late_cancellation_platform_fee:${bookingId}` },
+      ], { reason: `vacay_late_cancellation:${bookingId}` });
+    }
+  } catch (err) {
+    booking.status = 'booked';
+    throw err;
+  }
+
+  if (!refundEligible) {
     booking.hostPayout = hostPayout;
     booking.platformFee = platformFee;
   }
-
   booking.status = 'cancelled';
   booking.cancelledAt = now;
   booking.refunded = refundEligible;

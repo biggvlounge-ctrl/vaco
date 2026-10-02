@@ -134,13 +134,25 @@ async function completeFleetRental(store, options = {}) {
   if (rental.status !== 'booked') throw new Error(`completeFleetRental: fleet rental ${rentalId} is not awaiting completion (status: ${rental.status})`);
   if (typeof settleFn !== 'function') throw new Error('completeFleetRental requires a settleFn(fromUserId, toUserId, amount, reason)');
 
-  // The real, defining difference from Turo's own completeRental: one
-  // payout, the FULL price, no owner split -- VACAY owns the vehicle
-  // outright.
-  await settleFn(
-    [{ fromUserId: VACAY_AUTO_FLEET_ESCROW_ACCOUNT, toUserId: VACAY_AUTO_FLEET_REVENUE_ACCOUNT, amount: rental.totalPrice, reason: `vacay_auto_fleet_revenue:${rentalId}` }],
-    { reason: `vacay_auto_fleet_revenue:${rentalId}` },
-  );
+  // Claimed synchronously, before the real settlement call -- see
+  // rentals.js's completeRental for why: completeFleetRental and
+  // cancelFleetRental settle under different reasons, so a
+  // per-function idempotency key cannot catch the two racing each
+  // other on the same rental.
+  rental.status = 'settling';
+
+  try {
+    // The real, defining difference from Turo's own completeRental: one
+    // payout, the FULL price, no owner split -- VACAY owns the vehicle
+    // outright.
+    await settleFn(
+      [{ fromUserId: VACAY_AUTO_FLEET_ESCROW_ACCOUNT, toUserId: VACAY_AUTO_FLEET_REVENUE_ACCOUNT, amount: rental.totalPrice, reason: `vacay_auto_fleet_revenue:${rentalId}` }],
+      { reason: `vacay_auto_fleet_revenue:${rentalId}` },
+    );
+  } catch (err) {
+    rental.status = 'booked';
+    throw err;
+  }
 
   rental.fleetRevenue = rental.totalPrice;
   rental.status = 'completed';
@@ -161,24 +173,35 @@ async function cancelFleetRental(store, options = {}) {
   if (!rental) throw new Error(`cancelFleetRental: no fleet rental with id ${rentalId}`);
   if (rental.status === 'cancelled') throw new Error(`cancelFleetRental: rental ${rentalId} is already cancelled`);
   if (rental.status === 'completed') throw new Error(`cancelFleetRental: rental ${rentalId} has already completed and can't be cancelled`);
+  // Refuses a rental completeFleetRental has already claimed -- see
+  // the claim both functions now make before their real settlement
+  // call.
+  if (rental.status === 'settling') throw new Error(`cancelFleetRental: rental ${rentalId} is currently being settled by another request`);
   if (typeof settleFn !== 'function') throw new Error('cancelFleetRental requires a settleFn(fromUserId, toUserId, amount, reason)');
 
   const hoursUntilStart = (rental.startDate - now) / 3600000;
   const refundEligible = hoursUntilStart >= CANCELLATION_CUTOFF_HOURS;
 
-  if (refundEligible) {
-    await settleFn(
-      [{ fromUserId: VACAY_AUTO_FLEET_ESCROW_ACCOUNT, toUserId: rental.renterId, amount: rental.totalPrice, reason: `vacay_auto_fleet_cancellation_refund:${rentalId}` }],
-      { reason: `vacay_auto_fleet_cancellation_refund:${rentalId}` },
-    );
-  } else {
-    await settleFn(
-      [{ fromUserId: VACAY_AUTO_FLEET_ESCROW_ACCOUNT, toUserId: VACAY_AUTO_FLEET_REVENUE_ACCOUNT, amount: rental.totalPrice, reason: `vacay_auto_fleet_late_cancellation_revenue:${rentalId}` }],
-      { reason: `vacay_auto_fleet_late_cancellation_revenue:${rentalId}` },
-    );
-    rental.fleetRevenue = rental.totalPrice;
+  rental.status = 'settling';
+
+  try {
+    if (refundEligible) {
+      await settleFn(
+        [{ fromUserId: VACAY_AUTO_FLEET_ESCROW_ACCOUNT, toUserId: rental.renterId, amount: rental.totalPrice, reason: `vacay_auto_fleet_cancellation_refund:${rentalId}` }],
+        { reason: `vacay_auto_fleet_cancellation_refund:${rentalId}` },
+      );
+    } else {
+      await settleFn(
+        [{ fromUserId: VACAY_AUTO_FLEET_ESCROW_ACCOUNT, toUserId: VACAY_AUTO_FLEET_REVENUE_ACCOUNT, amount: rental.totalPrice, reason: `vacay_auto_fleet_late_cancellation_revenue:${rentalId}` }],
+        { reason: `vacay_auto_fleet_late_cancellation_revenue:${rentalId}` },
+      );
+    }
+  } catch (err) {
+    rental.status = 'booked';
+    throw err;
   }
 
+  if (!refundEligible) rental.fleetRevenue = rental.totalPrice;
   rental.status = 'cancelled';
   rental.cancelledAt = now;
   rental.refunded = refundEligible;

@@ -29,6 +29,9 @@ const listings = require('../lib/bookings/listings');
 const rentals = require('../lib/auto/rentals');
 const vehicles = require('../lib/auto/vehicles');
 const carListings = require('../lib/auto/carListings');
+const fleetRentals = require('../lib/auto/fleetRentals');
+const experiences = require('../lib/bookings/experiences');
+const experienceBookings = require('../lib/bookings/experienceBookings');
 const flightCatalog = require('../lib/flights/flights');
 const reservations = require('../lib/flights/reservations');
 const leads = require('../lib/home/leads');
@@ -318,6 +321,42 @@ test('a stay cannot be settled twice, and a completed stay cannot be cancelled',
   assert.ok(settleFn.isDrained(bookings.VACAY_ESCROW_ACCOUNT), 'escrow must be drained to the cent');
 });
 
+test('completeStay and cancelBooking cannot both settle the same booking', async () => {
+  // The race the status check alone cannot catch: completeStay and
+  // cancelBooking are two DIFFERENT functions, settling under two
+  // DIFFERENT reasons, so V3's own idempotency guard (one key, one
+  // fingerprint) cannot deduplicate across them the way it would
+  // catch a retry of the SAME function. Both read booking.status
+  // synchronously before either one's settleFn call resolves; without
+  // a synchronous claim before that call, both would pass and both
+  // would pay out of the same escrow.
+  const { store, listing } = stayFixture();
+  const settleFn = ledger({ sam: 1000 });
+
+  const booking = await bookings.createBooking(store, {
+    listingId: listing.id, guestId: 'sam',
+    checkIn: NOW + 10 * DAY, checkOut: NOW + 13 * DAY, settleFn, now: NOW,
+  });
+
+  // Inside the cancellation cutoff, so cancelBooking would also try to
+  // pay the host -- exactly the shape that double-pays if both race.
+  const checkIn = NOW + 10 * DAY;
+  const results = await Promise.allSettled([
+    bookings.completeStay(store, { bookingId: booking.id, settleFn, now: checkIn + 4 * DAY }),
+    bookings.cancelBooking(store, { bookingId: booking.id, settleFn, now: checkIn - 2 * 3600000 }),
+  ]);
+
+  const fulfilled = results.filter((r) => r.status === 'fulfilled');
+  assert.strictEqual(fulfilled.length, 1, 'only one of complete/cancel may succeed for one booking');
+
+  const settlementCalls = settleFn.calls.filter(
+    (c) => c.meta.reason?.startsWith('vacay_stay_settlement')
+      || c.meta.reason?.startsWith('vacay_late_cancellation'));
+  assert.strictEqual(settlementCalls.length, 1,
+    `the host was paid ${settlementCalls.length} times for one booking`);
+  assert.ok(settleFn.isDrained(bookings.VACAY_ESCROW_ACCOUNT), 'escrow must be drained to the cent, not overdrawn');
+});
+
 test('a booking without a settleFn is refused rather than recorded unpaid', async () => {
   const { store, listing } = stayFixture();
   await assert.rejects(() => bookings.createBooking(store, {
@@ -376,6 +415,37 @@ test('a rental escrows the renter’s money and settles it whole to the owner', 
   assert.ok(Math.abs(settleFn.drift()) < 0.01, 'no value may be created or destroyed');
 });
 
+test('completeRental and cancelRental cannot both settle the same rental', async () => {
+  // Same race as Stays', on the owner's own escrow: completeRental and
+  // cancelRental settle under different reasons, so a per-function
+  // idempotency key cannot catch the two racing on one rental.
+  const { store, vehicle } = autoFixture();
+  const settleFn = ledger({ dana: 1000 });
+
+  const startDate = NOW + 5 * DAY;
+  const rental = await rentals.bookRental(store, {
+    vehicleId: vehicle.id, renterId: 'dana',
+    startDate, endDate: NOW + 8 * DAY, settleFn, now: NOW,
+  });
+
+  // Inside the cancellation cutoff, so cancelRental also pays the
+  // owner -- the shape that double-pays if both race.
+  const results = await Promise.allSettled([
+    rentals.completeRental(store, { rentalId: rental.id, settleFn, now: startDate + 9 * DAY }),
+    rentals.cancelRental(store, { rentalId: rental.id, settleFn, now: startDate - 2 * 3600000 }),
+  ]);
+
+  const fulfilled = results.filter((r) => r.status === 'fulfilled');
+  assert.strictEqual(fulfilled.length, 1, 'only one of complete/cancel may succeed for one rental');
+
+  const settlementCalls = settleFn.calls.filter(
+    (c) => c.meta.reason?.startsWith('vacay_auto_rental_settlement')
+      || c.meta.reason?.startsWith('vacay_auto_late_cancellation'));
+  assert.strictEqual(settlementCalls.length, 1,
+    `the owner was paid ${settlementCalls.length} times for one rental`);
+  assert.ok(settleFn.isDrained(rentals.VACAY_AUTO_ESCROW_ACCOUNT), 'escrow must be drained to the cent, not overdrawn');
+});
+
 test('the same vehicle cannot be rented to two people at once', async () => {
   const { store, vehicle } = autoFixture();
   const settleFn = ledger({ dana: 1000, rio: 1000 });
@@ -389,6 +459,44 @@ test('the same vehicle cannot be rented to two people at once', async () => {
     startDate: NOW + 6 * DAY, endDate: NOW + 9 * DAY, settleFn, now: NOW,
   }), /.*/);
   assert.strictEqual(settleFn.of('rio'), 1000, 'the refused renter must not be charged');
+});
+
+function fleetFixture() {
+  const store = createVacayStore();
+  const vehicle = fleetRentals.addFleetVehicle(store.auto, {
+    type: 'car', make: 'Nissan', model: 'Altima', year: 2022,
+    dailyRate: 60, location: 'STL',
+  });
+  return { store: store.auto, vehicle };
+}
+
+test('completeFleetRental and cancelFleetRental cannot both settle the same rental', async () => {
+  // fleetRentals.js had zero test coverage of any kind before this.
+  // Same race as rentals.js's own peer-owner version, on VACAY's own
+  // fleet revenue account instead of a peer owner's payout.
+  const { store, vehicle } = fleetFixture();
+  const settleFn = ledger({ dana: 1000 });
+
+  const startDate = NOW + 5 * DAY;
+  const rental = await fleetRentals.bookFleetRental(store, {
+    vehicleId: vehicle.id, renterId: 'dana',
+    startDate, endDate: NOW + 8 * DAY, settleFn, now: NOW,
+  });
+
+  const results = await Promise.allSettled([
+    fleetRentals.completeFleetRental(store, { rentalId: rental.id, settleFn, now: startDate + 9 * DAY }),
+    fleetRentals.cancelFleetRental(store, { rentalId: rental.id, settleFn, now: startDate - 2 * 3600000 }),
+  ]);
+
+  const fulfilled = results.filter((r) => r.status === 'fulfilled');
+  assert.strictEqual(fulfilled.length, 1, 'only one of complete/cancel may succeed for one fleet rental');
+
+  const settlementCalls = settleFn.calls.filter(
+    (c) => c.meta.reason?.startsWith('vacay_auto_fleet_revenue')
+      || c.meta.reason?.startsWith('vacay_auto_fleet_late_cancellation_revenue'));
+  assert.strictEqual(settlementCalls.length, 1,
+    `VACAY's fleet revenue account was paid ${settlementCalls.length} times for one rental`);
+  assert.ok(settleFn.isDrained(fleetRentals.VACAY_AUTO_FLEET_ESCROW_ACCOUNT), 'escrow must be drained to the cent, not overdrawn');
 });
 
 test('a for-sale listing actually collects its flat fee — the bug this test closes', async () => {
@@ -518,6 +626,47 @@ test('a lead is charged to the agent once, at the documented flat fee', async ()
     /.*/);
   assert.strictEqual(settleFn.of('nora'), 1000 - leads.LEAD_FEE,
     'a lead must never be billed twice');
+});
+
+// -- Experiences ----------------------------------------------------------
+
+function experienceFixture() {
+  const store = createVacayStore();
+  const experience = experiences.createExperience(store.bookings, {
+    hostId: 'theo', description: 'Sunset kayak tour', durationHours: 2,
+    price: 90, capacity: 6, scheduledAt: NOW + 10 * DAY, now: NOW,
+  });
+  return { store: store.bookings, experience };
+}
+
+test('completeExperienceBooking and cancelExperienceBooking cannot both settle the same booking', async () => {
+  // experienceBookings.js had zero test coverage of any kind before
+  // this. Same race as Stays' and Auto's: the two functions settle
+  // under different reasons, so a per-function idempotency key cannot
+  // catch them racing on one booking.
+  const { store, experience } = experienceFixture();
+  const settleFn = ledger({ sam: 1000 });
+
+  const booking = await experienceBookings.bookExperience(store, {
+    experienceId: experience.id, guestId: 'sam', settleFn, now: NOW,
+  });
+
+  // Inside the cancellation cutoff, so cancelExperienceBooking also
+  // pays the host -- the shape that double-pays if both race.
+  const results = await Promise.allSettled([
+    experienceBookings.completeExperienceBooking(store, { bookingId: booking.id, settleFn, now: NOW + 11 * DAY }),
+    experienceBookings.cancelExperienceBooking(store, { bookingId: booking.id, settleFn, now: experience.scheduledAt - 2 * 3600000 }),
+  ]);
+
+  const fulfilled = results.filter((r) => r.status === 'fulfilled');
+  assert.strictEqual(fulfilled.length, 1, 'only one of complete/cancel may succeed for one experience booking');
+
+  const settlementCalls = settleFn.calls.filter(
+    (c) => c.meta.reason?.startsWith('vacay_experience_settlement')
+      || c.meta.reason?.startsWith('vacay_experience_late_cancellation'));
+  assert.strictEqual(settlementCalls.length, 1,
+    `the host was paid ${settlementCalls.length} times for one experience booking`);
+  assert.ok(settleFn.isDrained(experienceBookings.VACAY_ESCROW_ACCOUNT), 'escrow must be drained to the cent, not overdrawn');
 });
 
 // -- Cross-cutting ------------------------------------------------------
