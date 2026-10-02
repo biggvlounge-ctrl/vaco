@@ -13,6 +13,12 @@ function createVulturePodsStore() {
     nextListenEventId: 1,
     showSubscriptions: [],
     nextShowSubscriptionId: 1,
+    // A separate counter from nextShowSubscriptionId -- it advances on
+    // every charge attempt (a fresh subscribe AND every renewal/tier
+    // switch), not just on creating a new subscription record, so it
+    // can scope each charge's own settlement reason uniquely. See
+    // subscribeToShow's own comment.
+    nextShowSubscriptionChargeId: 1,
   };
 }
 

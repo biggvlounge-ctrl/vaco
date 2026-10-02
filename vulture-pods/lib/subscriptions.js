@@ -57,14 +57,25 @@ async function subscribeToShow(store, options = {}) {
   const platformCut = round(price * PLATFORM_TAKE_PERCENT);
   const creatorShare = round(price - platformCut);
 
-  // One settlement: both legs leave the subscriber and the
-  // subscription record is written afterwards, so a split that paid
-  // the creator and failed the platform cut would leave the subscriber
-  // charged with nothing to show for it and a retry paying again.
+  // **Scoped by its own charge event, not just by show:tier:user.**
+  // This reason doubles as V3's idempotency key (see server.js's
+  // settleVCoin). A subscriber calling subscribeToShow again --
+  // renewing, switching tiers, or simply re-subscribing after
+  // cancelling, the exact same real flow this file's own header
+  // describes -- used to produce the identical key every time, since
+  // nothing here varied between two calls for the same show/tier/user.
+  // V3 replays an identical-body key within its 24h retention window
+  // rather than charging again, so a user could cancel and
+  // re-subscribe to the same tier the same day and be granted a fresh
+  // 30-day active subscription for free -- subscribeToShow never
+  // inspected the settlement result, so it had no way to notice the
+  // charge never actually happened. Each call now reserves its own
+  // charge id, so no two charges can ever collide.
+  const chargeEventId = store.nextShowSubscriptionChargeId++;
   await settleFn([
-    { fromUserId: userId, toUserId: show.creatorId, amount: creatorShare, reason: `vulture_pods_show_subscription:${showId}:${tierId}` },
-    { fromUserId: userId, toUserId: VULTURE_PODS_PLATFORM_ACCOUNT, amount: platformCut, reason: `vulture_pods_platform_fee:${showId}:${tierId}` },
-  ], { reason: `vulture_pods_subscription:${showId}:${tierId}:${userId}` });
+    { fromUserId: userId, toUserId: show.creatorId, amount: creatorShare, reason: `vulture_pods_show_subscription:${showId}:${tierId}:${chargeEventId}` },
+    { fromUserId: userId, toUserId: VULTURE_PODS_PLATFORM_ACCOUNT, amount: platformCut, reason: `vulture_pods_platform_fee:${showId}:${tierId}:${chargeEventId}` },
+  ], { reason: `vulture_pods_subscription:${showId}:${tierId}:${userId}:${chargeEventId}` });
 
   let sub = store.showSubscriptions.find((s) => s.userId === userId && s.showId === showId);
   if (sub) {

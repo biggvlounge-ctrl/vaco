@@ -230,3 +230,61 @@ test('listSubscriptionsForUser returns only that user\'s subscriptions', async (
   assert.equal(settleFn.totalTo('creator-1'), 9);
   assert.equal(settleFn.totalTo('creator-2'), 18);
 });
+
+// -- The idempotency-key collision subscribeToShow used to have ---------
+//
+// subscribeToShow's settlement reason -- which doubles as V3's
+// idempotency key, see server.js's settleVCoin -- was scoped only by
+// showId:tierId:userId, with no per-charge-event component. Cancelling
+// and re-subscribing to the same tier the same day (an entirely
+// ordinary "changed my mind" flow) produced an identical key within
+// V3's 24h retention window: V3 silently replayed the first charge's
+// cached success with no new transfer, while subscribeToShow still
+// granted a fresh active subscription with renewsAt 30 days out, as if
+// payment had genuinely cleared again.
+//
+// `recorder()` above can't catch this -- it's a plain spy with no
+// model of V3's real idempotency fingerprinting. This one reproduces
+// it: a repeated key with an identical body replays (no new money); a
+// repeated key with a different body is refused, matching V3's own
+// behavior.
+function idempotentLedger() {
+  const seen = new Map();
+  const moves = [];
+  const fn = async (legs, meta = {}) => {
+    const fingerprint = JSON.stringify(legs);
+    if (meta.reason) {
+      const prior = seen.get(meta.reason);
+      if (prior !== undefined) {
+        if (prior !== fingerprint) {
+          throw new Error(`Idempotency-Key "settle:${meta.reason}" was already used for a different request.`);
+        }
+        return { ok: true, idempotentReplay: true };
+      }
+      seen.set(meta.reason, fingerprint);
+    }
+    moves.push(...legs);
+    return { ok: true };
+  };
+  fn.moves = moves;
+  fn.totalFrom = (who) => moves.filter((m) => m.fromUserId === who).reduce((n, m) => n + m.amount, 0);
+  return fn;
+}
+
+test('cancelling and re-subscribing to the same tier the same day charges again for real', async () => {
+  const store = createPodsStore();
+  const show = showWithTier(store, 50);
+  const settleFn = idempotentLedger();
+  const tierId = show.subscriptionTiers[0].id;
+
+  // Pre-fix, this is exactly the sequence that broke silently: both
+  // subscribe calls produce the identical showId:tierId:userId key and
+  // identical legs, so the second collides with the first's cached
+  // success and replays instead of actually charging.
+  await subscribeToShow(store, { userId: 'ada', showId: show.id, tierId, settleFn, now: 1000 });
+  cancelShowSubscription(store, { userId: 'ada', showId: show.id, now: 2000 });
+  await subscribeToShow(store, { userId: 'ada', showId: show.id, tierId, settleFn, now: 3000 });
+
+  assert.equal(settleFn.totalFrom('ada'), 100,
+    'a cancel-then-resubscribe within the same day must really charge twice, not replay the first charge for free');
+});
