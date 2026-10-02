@@ -13,7 +13,7 @@
 // same posture as vacon/server.js's own invokeViaV4Proxy). VENVM never
 // talks to Anthropic directly and never sees a key.
 
-const SCRIPT_STATUSES = ['requested', 'generated', 'failed'];
+const SCRIPT_STATUSES = ['requested', 'generating', 'generated', 'failed'];
 
 const JAKE_SYSTEM_PROMPT = "You are Jake, VENVM's real script-generation engine for the VACO ecosystem's AI production/marketing pipeline. Given a brief (what the video/ad is for, and optionally a target platform), write a real, usable short-form video script: a hook, the core beats, and a clear call to action. Keep it tight and platform-appropriate. Return only the script itself, no preamble.";
 
@@ -54,6 +54,19 @@ async function generateScript(store, options = {}) {
     throw new Error(`generateScript: request ${requestId} is "${request.status}", expected "requested"`);
   }
   if (typeof invokeFn !== 'function') throw new Error('generateScript requires an invokeFn(systemPrompt, messages)');
+
+  // **Claimed before the real, billed completion call, not written
+  // only after it resolves.** This checked status, awaited a real
+  // network call to v4-proxy/Anthropic, and only then wrote the
+  // terminal status -- so two concurrent generateScript calls for the
+  // same request (a retry on a slow response, or two callers racing)
+  // both passed the 'requested' guard and both triggered a real,
+  // billed completion for one logical request; whichever resolved
+  // last silently won the final write. Claiming 'generating'
+  // synchronously means a concurrent second call sees it immediately
+  // and is refused by the existing guard above, before it ever
+  // reaches invokeFn.
+  request.status = 'generating';
 
   const userMessage = request.platform
     ? `Brief: ${request.brief}\nTarget platform: ${request.platform}`
