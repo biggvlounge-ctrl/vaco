@@ -58,14 +58,43 @@ function requireString(value, field, action) {
 const SENSITIVE_KEY = /(token|secret|password|credential|authorization|apikey|api_key)/i;
 const MAX_INPUT_BYTES = 4096;
 
-function redact(value, depth = 0) {
-  if (depth > 6 || value === null || typeof value !== 'object') return value;
-  if (Array.isArray(value)) return value.map((v) => redact(v, depth + 1));
-  const out = {};
-  for (const [k, v] of Object.entries(value)) {
-    out[k] = SENSITIVE_KEY.test(k) ? '[redacted]' : redact(v, depth + 1);
+function redact(value, depth = 0, ancestors = new Set()) {
+  if (value === null || typeof value !== 'object') return value;
+
+  // A true cycle, checked before the depth cutoff below so a cycle
+  // inside the first 6 levels is still caught as a cycle rather than
+  // silently truncated. `recordDecision` must refuse this outright,
+  // the same "refused rather than silently accepted" rule
+  // `lib/persistence.js`'s own cycle guard uses for the same reason:
+  // a value that can't be written as JSON can't be redacted either.
+  if (ancestors.has(value)) {
+    throw new DecisionError('recordDecision: inputs contains a circular reference and cannot be stored');
   }
-  return out;
+
+  // Past this depth the subtree is replaced wholesale rather than
+  // walked and handed back untouched. The depth limit exists only to
+  // bound the walk (a stack-overflow guard against adversarial
+  // nesting) -- it must not double as a trapdoor past which an
+  // unexamined value, including a real secret, is written verbatim
+  // into a store that cannot be edited afterward. Previously this
+  // branch returned `value` as-is, which is exactly that trapdoor:
+  // `{ token: '...' }` nested 7 levels deep reached the log in the
+  // clear. (It also happened to be how a cycle was ever caught at
+  // all -- the untouched cycle survived to blow up `JSON.stringify`
+  // later. The explicit check above is what catches it now.)
+  if (depth > 6) return '[redacted: input nested too deep to inspect]';
+
+  ancestors.add(value);
+  try {
+    if (Array.isArray(value)) return value.map((v) => redact(v, depth + 1, ancestors));
+    const out = {};
+    for (const [k, v] of Object.entries(value)) {
+      out[k] = SENSITIVE_KEY.test(k) ? '[redacted]' : redact(v, depth + 1, ancestors);
+    }
+    return out;
+  } finally {
+    ancestors.delete(value);
+  }
 }
 
 function boundedInputs(inputs, action) {

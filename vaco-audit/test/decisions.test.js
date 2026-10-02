@@ -107,6 +107,21 @@ test('a credential in the inputs is redacted before it is stored', () => {
   assert.strictEqual(record.inputs.winningOutcomeId, 'home');
 });
 
+test('a credential nested past the redaction depth limit is still redacted', () => {
+  // redact() bails out of its own recursion past depth 6 -- a guard
+  // against adversarial nesting blowing the stack, not a license to
+  // hand back an unexamined subtree. A secret nested that deep used to
+  // reach the store exactly as given, bypassing SENSITIVE_KEY entirely.
+  const store = createAuditStore();
+  let deep = { token: 'sk_live_super_secret_12345' };
+  for (let i = 0; i < 7; i += 1) deep = { wrap: deep };
+
+  const record = recordDecision(store, settlement({ inputs: deep }));
+
+  const raw = JSON.stringify(store.decisions[0]);
+  assert.ok(!raw.includes('sk_live_super_secret_12345'), 'a deeply-nested secret reached the store');
+});
+
 test('oversized inputs are refused, not truncated', () => {
   const store = createAuditStore();
   // A truncated record reads as complete. Refusing is the honest
