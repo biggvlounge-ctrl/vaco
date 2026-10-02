@@ -28,6 +28,31 @@ test('getSession returns null for a token that was never issued', () => {
   assert.equal(getSession(store, 'shield_nobody_deadbeef'), null);
 });
 
+test('getSession refuses a token that names an inherited Object.prototype property', () => {
+  // store.sessions is a plain object used as a map, and `token` is a
+  // fully attacker-controlled string straight off the wire. For a
+  // token equal to an inherited member name, `store.sessions[token]`
+  // used to resolve to that inherited function/object rather than
+  // undefined -- truthy, with no expiresAt, so the old
+  // `!session || session.expiresAt < now` guard read `undefined <
+  // now` (false) and let it through. `Authorization: Bearer
+  // constructor` (or `__proto__`, `toString`, `hasOwnProperty`,
+  // `valueOf`) verified successfully against a session that was never
+  // issued -- a full authentication bypass for every route in the
+  // ecosystem gated by bare requireSession().
+  const store = createShieldStore();
+  for (const token of ['constructor', '__proto__', 'toString', 'hasOwnProperty', 'valueOf']) {
+    assert.equal(getSession(store, token), null, `"${token}" must not verify as a valid session`);
+  }
+});
+
+test('getSession refuses a non-string token outright', () => {
+  const store = createShieldStore();
+  for (const token of [null, undefined, 123, {}, []]) {
+    assert.equal(getSession(store, token), null);
+  }
+});
+
 test('getSession returns null once the real 24h expiry has passed', () => {
   const store = createShieldStore();
   const now = Date.now();

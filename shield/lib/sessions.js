@@ -47,6 +47,22 @@ function createSession(store, options = {}) {
 }
 
 function getSession(store, token, now = Date.now()) {
+  // **`store.sessions` is a plain object used as a map, and `token` is
+  // a fully attacker-controlled string** -- it arrives straight from
+  // the URL path / `Authorization: Bearer <token>` header, with no
+  // format check anywhere upstream (shared/shieldAuth.js's
+  // `verifySessionToken` forwards whatever was presented verbatim).
+  // `store.sessions[token]` for a token equal to an inherited
+  // `Object.prototype` member name -- `constructor`, `__proto__`,
+  // `toString`, `hasOwnProperty`, `valueOf` -- resolves to THAT
+  // function/object instead of `undefined`. It is truthy and has no
+  // `expiresAt`, so the guard below used to read `undefined < now`
+  // (false) and let it through: `Authorization: Bearer constructor`
+  // verified successfully against a session that was never issued,
+  // for ANY route in the ecosystem gated by bare `requireSession()`.
+  // An explicit own-property check closes it regardless of what name
+  // a caller presents.
+  if (typeof token !== 'string' || !Object.hasOwn(store.sessions, token)) return null;
   const session = store.sessions[token];
   if (!session || session.expiresAt < now) return null;
   return { valid: true, userId: session.userId, expiresAt: session.expiresAt };

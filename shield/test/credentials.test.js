@@ -44,6 +44,25 @@ test('verifyCredentials rejects a userId that was never registered', () => {
   assert.equal(verifyCredentials(store, { userId: 'nobody', password: 'anything' }), false);
 });
 
+test('a userId naming an inherited Object.prototype property is never falsely "already registered"', () => {
+  // Same object-as-map hazard as sessions.js's getSession: store
+  // .credentials[userId] for userId 'constructor' used to read the
+  // real Object constructor (truthy) rather than undefined, so the
+  // very first registration attempt for that exact username was
+  // wrongly refused as a duplicate.
+  const store = createShieldStore();
+  const result = registerCredentials(store, { userId: 'constructor', password: 'correcthorsebattery' });
+  assert.equal(result.userId, 'constructor');
+  assert.equal(verifyCredentials(store, { userId: 'constructor', password: 'correcthorsebattery' }), true);
+});
+
+test('verifyCredentials rejects an inherited-property userId that was never registered', () => {
+  const store = createShieldStore();
+  for (const userId of ['constructor', '__proto__', 'toString', 'hasOwnProperty', 'valueOf']) {
+    assert.equal(verifyCredentials(store, { userId, password: 'anything' }), false);
+  }
+});
+
 test('two real users get two independently-salted hashes for the same password', () => {
   const store = createShieldStore();
   registerCredentials(store, { userId: 'alice', password: 'samepassword123' });

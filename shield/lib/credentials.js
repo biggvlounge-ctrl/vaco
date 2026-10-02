@@ -52,7 +52,16 @@ function registerCredentials(store, options = {}) {
   if (!password || password.length < MIN_PASSWORD_LENGTH) {
     throw new Error(`registerCredentials requires a password of at least ${MIN_PASSWORD_LENGTH} characters`);
   }
-  if (store.credentials[userId]) {
+  // Same object-as-map hazard sessions.js's getSession had: `userId`
+  // is a caller-supplied string used as a raw property key on a plain
+  // object. A userId equal to an inherited Object.prototype member
+  // name (`constructor`, `toString`, ...) would read that function as
+  // though it were a real record -- here that is not a bypass (the
+  // next line would still overwrite it with a real own property), but
+  // it would wrongly refuse to ever register that exact username as
+  // "already registered." Checked with hasOwn so only a real,
+  // previously-registered record counts.
+  if (Object.hasOwn(store.credentials, userId)) {
     throw new Error(`registerCredentials: userId "${userId}" is already registered`);
   }
   store.credentials[userId] = { passwordHash: hashPassword(password), createdAt: now };
@@ -61,6 +70,7 @@ function registerCredentials(store, options = {}) {
 
 function verifyCredentials(store, options = {}) {
   const { userId, password } = options;
+  if (typeof userId !== 'string' || !Object.hasOwn(store.credentials, userId)) return false;
   const record = store.credentials[userId];
   if (!record || !password) return false;
   return verifyPassword(password, record.passwordHash);
