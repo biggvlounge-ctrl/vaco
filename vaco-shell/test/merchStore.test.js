@@ -377,3 +377,61 @@ test('a refused merch settlement creates no order and moves nothing', async () =
   assert.equal(store.merchOrders.length, before,
     'a refused settlement recorded an order');
 });
+
+// -- The idempotency-key collision placeOrder used to have -------------
+//
+// placeOrder's settlement reason -- which doubles as V3's idempotency
+// key, see v3Client.js's settleVCoin -- was scoped only by
+// productId:customerId, with no per-order component. There is no
+// one-per-customer entitlement check here (unlike appStore.js's
+// installs), so nothing stops the same customer ordering the same
+// product again -- an entirely ordinary "buy another one" purchase. A
+// repeat order at the same quantity fingerprinted identically to the
+// first: V3 silently replayed the first settlement's cached success
+// with no new VCoin moving, while placeOrder still pushed a brand-new
+// order and triggered manufacture as though it had been paid for.
+//
+// `recordingTransfers()` above can't catch this -- it's a plain spy
+// with no model of V3's real idempotency fingerprinting. This one
+// reproduces it: a repeated key with an identical body replays (no new
+// money); a repeated key with a different body is refused, matching
+// V3's own behavior.
+function idempotentTransfers() {
+  const seen = new Map();
+  const moves = [];
+  const fn = async (legs, meta = {}) => {
+    const fingerprint = JSON.stringify(legs);
+    if (meta.reason) {
+      const prior = seen.get(meta.reason);
+      if (prior !== undefined) {
+        if (prior !== fingerprint) {
+          throw new Error(`Idempotency-Key "settle:${meta.reason}" was already used for a different request.`);
+        }
+        return { ok: true, idempotentReplay: true };
+      }
+      seen.set(meta.reason, fingerprint);
+    }
+    moves.push(...legs);
+    return { ok: true };
+  };
+  fn.moves = moves;
+  fn.totalFrom = (who) => moves.filter((m) => m.fromUserId === who).reduce((n, m) => n + m.amount, 0);
+  return fn;
+}
+
+test('ordering the same product twice charges twice, not a free second shirt', async () => {
+  const store = storeWithProducts();
+  const settleFn = idempotentTransfers();
+
+  // Pre-fix, this is exactly the sequence that broke silently: both
+  // orders share the identical productId:customerId reason and
+  // identical legs (same quantity), so the second collides with the
+  // first's idempotency key and replays instead of actually charging.
+  const first = await placeOrder(store, { customerId: 'sam', productId: 'void-tee', settleFn });
+  const second = await placeOrder(store, { customerId: 'sam', productId: 'void-tee', settleFn });
+
+  assert.notEqual(first.id, second.id, 'two orders must be two distinct records');
+  assert.equal(settleFn.totalFrom('sam'), 60,
+    'a second identical order must really charge again, not replay the first order for free');
+  assert.equal(store.merchOrders.length, 2);
+});

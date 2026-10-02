@@ -247,10 +247,24 @@ export async function placeOrder(store, options = {}) {
       reason: `vaco_merch_platform_fee:${productId}`,
     });
   }
-  await settleFn(legs, { reason: `vaco_merch_order:${productId}:${customerId}` });
+  // **Reserved before settlement, not assigned after.** The reason
+  // above doubles as V3's idempotency key (see v3Client.js), and used
+  // to be scoped only by productId:customerId. placeOrder has no
+  // one-per-customer entitlement check -- nothing stops the same
+  // customer ordering the same product again -- so a repeat order with
+  // the same quantity fingerprinted identically to the first: V3
+  // silently replayed the first settlement's cached success with no
+  // new VCoin moving, while placeOrder still pushed a brand-new order
+  // and triggered manufacture as though it had been paid for. (A
+  // repeat order at a different quantity hit the opposite failure: a
+  // genuinely new order refused by V3 as a key collision.) Scoping by
+  // this order's own id makes every order's key unique by
+  // construction.
+  const orderId = store.nextMerchOrderId++;
+  await settleFn(legs, { reason: `vaco_merch_order:${productId}:${customerId}:${orderId}` });
 
   const order = {
-    id: store.nextMerchOrderId++,
+    id: orderId,
     customerId,
     productId,
     appBrandId: product.appBrandId,
