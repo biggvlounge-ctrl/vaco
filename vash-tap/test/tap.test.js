@@ -17,6 +17,7 @@ const {
   TAP_TYPES,
   createTapStore,
   registerTap,
+  resolveTapRegistrationSubject,
   linkDreamsScreen,
   unlinkDreamsScreen,
   assignTap,
@@ -117,6 +118,43 @@ test('every declared TAP_TYPES value is accepted', async () => {
     const tap = await registerTap(store, { tapType, ownerIdentityId: 'ada' });
     assert.strictEqual(tap.tapType, tapType);
   }
+});
+
+// -- resolveTapRegistrationSubject --------------------------------------------
+//
+// server.js's requireCrossAppBusinessOwner used to require a
+// businessId unconditionally, so POST /api/taps refused every
+// personal/wear/embed registration with a 400 before registerTap --
+// which fully supports them, see the two tests above -- was ever
+// reached. This is the pure decision the route guard now makes,
+// tested without a live Shield session or a spawned server.
+
+test('a body with a businessId is a business-tap subject', () => {
+  const subject = resolveTapRegistrationSubject({ businessId: 9001, tapType: 'business' });
+  assert.deepStrictEqual(subject, { kind: 'business', businessId: 9001 });
+});
+
+test('a body with no businessId but an ownerIdentityId is a personal-tap subject', () => {
+  // The exact shape the route used to refuse outright.
+  const subject = resolveTapRegistrationSubject({ ownerIdentityId: 'ada', tapType: 'personal' });
+  assert.deepStrictEqual(subject, { kind: 'personal', ownerIdentityId: 'ada' });
+});
+
+test('wear and embed taps resolve the same way as personal — none of them carry a businessId', () => {
+  for (const tapType of ['wear', 'embed']) {
+    const subject = resolveTapRegistrationSubject({ ownerIdentityId: 'ada', tapType });
+    assert.strictEqual(subject.kind, 'personal');
+  }
+});
+
+test('a body with neither id is "missing", not silently business', () => {
+  assert.deepStrictEqual(resolveTapRegistrationSubject({ tapType: 'business' }), { kind: 'missing' });
+  assert.deepStrictEqual(resolveTapRegistrationSubject({}), { kind: 'missing' });
+});
+
+test('businessId wins when a body somehow carries both', () => {
+  const subject = resolveTapRegistrationSubject({ businessId: 9001, ownerIdentityId: 'ada' });
+  assert.strictEqual(subject.kind, 'business');
 });
 
 // -- assignTap / currentAssignmentFor ---------------------------------------

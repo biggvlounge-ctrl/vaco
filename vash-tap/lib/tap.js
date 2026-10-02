@@ -55,6 +55,29 @@ function findTap(store, tapCode) {
   return store.taps.find((t) => t.tapCode === tapCode) || null;
 }
 
+// **Which authorization check a Tap registration needs, decided from
+// the body alone.** `registerTap` below accepts a business Tap OR a
+// personal/wear/embed Tap (`!businessId && !ownerIdentityId` is its
+// only refusal) -- but `server.js`'s `requireCrossAppBusinessOwner`
+// used to require `businessId` unconditionally, so every
+// personal/wear/embed registration was refused with a 400 before
+// `registerTap` was ever reached, regardless of this function's own
+// support for it. Pulled out as a pure function, rather than left
+// inline in the route guard, specifically so it can be unit-tested
+// without a live Shield session or a spawned server -- the gap that
+// let the route-level bug go unnoticed in the first place.
+function resolveTapRegistrationSubject(body = {}) {
+  const businessId = body.businessId;
+  if (businessId !== undefined && businessId !== null) {
+    return { kind: 'business', businessId };
+  }
+  const ownerIdentityId = body.ownerIdentityId;
+  if (ownerIdentityId !== undefined && ownerIdentityId !== null) {
+    return { kind: 'personal', ownerIdentityId };
+  }
+  return { kind: 'missing' };
+}
+
 // **Registration validates the business is real rather than trusting a
 // number.** `businessFetchFn` is HVNTZ's own `GET /api/business/:id` in
 // production and a stub in tests — the same injection pattern
@@ -443,6 +466,7 @@ module.exports = {
   unlinkDreamsScreen,
   assignTap,
   currentAssignmentFor,
+  resolveTapRegistrationSubject,
   resolveTap,
   payViaTap,
   freezeTap,

@@ -28,7 +28,7 @@ require('dotenv/config');
 const { attachStore } = require('./lib/storeBackend');
 const {
   TAP_TYPES, createTapStore, registerTap, linkDreamsScreen, unlinkDreamsScreen,
-  assignTap, resolveTap, payViaTap,
+  assignTap, resolveTapRegistrationSubject, resolveTap, payViaTap,
   freezeTap, unfreezeTap, transactionsForTap, spenderHistory, revenueByTap, reseedIds,
 } = require('./lib/tap');
 const { seedDemoData } = require('./lib/seedDemoData');
@@ -209,12 +209,31 @@ app.get('/api/health', (_req, res) => {
 // it — the same `requireBusinessOwner` shape HVNTZ's own server.js
 // uses, crossing the app boundary via `fetchHvntzBusiness` instead of
 // a local store lookup.
+//
+// **A Tap is not always a business Tap.** `registerTap`'s own
+// validation (`!businessId && !ownerIdentityId`) treats a personal,
+// wearable, or embedded Tap -- no business at all, just an
+// `ownerIdentityId` -- as an equally real registration. This guard
+// used to require `businessId` unconditionally, so the sole route
+// that creates a Tap refused every personal/wear/embed request with a
+// 400 before registerTap was ever called -- an entire class of Tap
+// the lib fully implements and unit-tests was unreachable over real
+// HTTP. Branching on which field the body actually supplies, and
+// requiring a personal Tap's owner to be the caller themselves
+// (mirroring the ownership check a business Tap already gets), closes
+// that without loosening either check.
 async function requireCrossAppBusinessOwner(req, res, next) {
-  const businessId = (req.body || {}).businessId;
-  if (businessId === undefined || businessId === null) {
-    return res.status(400).json({ error: 'this route must name the businessId it acts on' });
+  const subject = resolveTapRegistrationSubject(req.body || {});
+  if (subject.kind === 'missing') {
+    return res.status(400).json({ error: 'this route must name the businessId (business tap) or ownerIdentityId (personal tap) it acts on' });
   }
-  const business = await resolveHvntzBusiness(businessId, res);
+  if (subject.kind === 'personal') {
+    if (String(subject.ownerIdentityId) !== String(req.sessionUserId)) {
+      return res.status(403).json({ error: 'you may only register a personal tap for yourself' });
+    }
+    return next();
+  }
+  const business = await resolveHvntzBusiness(subject.businessId, res);
   if (!business) return undefined;
   if (String(business.ownerId) !== String(req.sessionUserId)) {
     return res.status(403).json({ error: 'only the owner of this business may act on it' });
