@@ -80,7 +80,10 @@ async function placeStake(store, options = {}) {
   );
 
   const isFlashStake = match.status === 'live';
-  const stake = { userId, backedPlayerId, amountVCoin, isFlashStake, at: Date.now() };
+  // A stable id, not just position-in-array coincidence -- needed
+  // below so each stake's payout gets its own settlement/idempotency
+  // key, since one user can stake on the same match more than once.
+  const stake = { id: match.stakes.length, userId, backedPlayerId, amountVCoin, isFlashStake, at: Date.now() };
   match.stakes.push(stake);
   return { match, stake };
 }
@@ -108,9 +111,16 @@ async function resolveEsportsMatch(store, options = {}) {
         const share = stake.amountVCoin / totalWinningAmount;
         const payout = round(totalPool * share);
         if (payout > 0) {
+          // Scoped by stake id, not just matchId -- see the identical
+          // note in sportsbook.js's settleSportsEvent. A match with
+          // more than one winning stake (or one user staking twice on
+          // the same winner) used to issue the same settlement reason
+          // for every payout, so the second one collided with the
+          // first on V3's idempotency key and the match could never
+          // finish resolving.
           await settleFn(
-            [{ fromUserId: VAGO_HOUSE_ACCOUNT, toUserId: stake.userId, amount: payout, reason: `vago_esports_payout:${matchId}` }],
-            { reason: `vago_esports_payout:${matchId}` },
+            [{ fromUserId: VAGO_HOUSE_ACCOUNT, toUserId: stake.userId, amount: payout, reason: `vago_esports_payout:${matchId}:${stake.id}` }],
+            { reason: `vago_esports_payout:${matchId}:${stake.id}` },
           );
           payouts.push({ userId: stake.userId, payout });
         }

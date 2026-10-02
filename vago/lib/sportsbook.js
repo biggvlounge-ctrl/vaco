@@ -180,9 +180,20 @@ async function settleSportsEvent(store, options = {}) {
   await settleOnce(event, { status: 'settled', winningOutcomeId }, async () => {
     for (const bet of eventBets) {
       if (bet.outcomeId === winningOutcomeId) {
+        // Scoped by bet id, not just eventId -- this reason doubles as
+        // V3's idempotency key (see server.js's settleVCoin). An event
+        // with more than one winning bet used to issue the same key
+        // for every one of them: the second winner's payout collided
+        // with the first's and V3 refused it outright (a different
+        // userId/amount fingerprints differently, so it isn't a safe
+        // replay -- it's a 422). That throw rolled the event's claimed
+        // status back to 'open' via settleOnce even though the first
+        // winner had already been paid, and every retry hit the same
+        // collision on the next unpaid winner -- an event with 2+
+        // winners could never finish settling.
         await settleFn(
-          [{ fromUserId: VAGO_HOUSE_ACCOUNT, toUserId: bet.userId, amount: bet.potentialPayout, reason: `vago_sports_payout:${eventId}` }],
-          { reason: `vago_sports_payout:${eventId}` },
+          [{ fromUserId: VAGO_HOUSE_ACCOUNT, toUserId: bet.userId, amount: bet.potentialPayout, reason: `vago_sports_payout:${eventId}:${bet.id}` }],
+          { reason: `vago_sports_payout:${eventId}:${bet.id}` },
         );
         bet.status = 'won';
       } else {

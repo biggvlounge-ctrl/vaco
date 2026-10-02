@@ -270,10 +270,19 @@ async function gradeFantasyEntry(store, options = {}) {
 
   // Claimed before the payout. Five concurrent gradings each paid the
   // full winning amount: 150.00 on a 10.00 stake, measured.
+  //
+  // The settlement reason below doubles as V3's idempotency key (see
+  // server.js's settleVCoin), and used to be the bare literal
+  // 'vago_fantasy_entry_payout' with no per-entry component at all --
+  // every entry ever graded, for every user, collided on the exact
+  // same key. The first entry graded in the store's lifetime settled
+  // fine; the very next one hit a 422 from V3 (a different
+  // userId/amount fingerprints differently, so it isn't a safe replay)
+  // and could never be graded.
   await settleOnce(entry, { status: 'won', payout }, async () => {
     await settleFn(
-      [{ fromUserId: VAGO_HOUSE_ACCOUNT, toUserId: entry.userId, amount: payout, reason: 'vago_fantasy_entry_payout' }],
-      { reason: 'vago_fantasy_entry_payout' },
+      [{ fromUserId: VAGO_HOUSE_ACCOUNT, toUserId: entry.userId, amount: payout, reason: `vago_fantasy_entry_payout:${entry.id}` }],
+      { reason: `vago_fantasy_entry_payout:${entry.id}` },
     );
   });
   return entry;

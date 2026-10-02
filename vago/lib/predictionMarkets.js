@@ -320,9 +320,17 @@ async function resolveMarket(store, options = {}) {
         const share = contract.quantity / totalWinningQuantity;
         const payout = round(totalPool * share);
         if (payout > 0) {
+          // Scoped by contract userId, not just marketId -- see the
+          // identical note in sportsbook.js's settleSportsEvent. A
+          // market with more than one winning holder used to issue the
+          // same settlement reason for every payout, colliding on V3's
+          // idempotency key after the first. userId alone is enough
+          // here: findContract merges repeat buys into one contract
+          // per (userId, side), and only one side's contracts are ever
+          // in this loop.
           await settleFn(
-            [{ fromUserId: VAGO_HOUSE_ACCOUNT, toUserId: contract.userId, amount: payout, reason: `vago_prediction_payout:${marketId}` }],
-            { reason: `vago_prediction_payout:${marketId}` },
+            [{ fromUserId: VAGO_HOUSE_ACCOUNT, toUserId: contract.userId, amount: payout, reason: `vago_prediction_payout:${marketId}:${contract.userId}` }],
+            { reason: `vago_prediction_payout:${marketId}:${contract.userId}` },
           );
           payouts.push({ userId: contract.userId, payout });
         }
