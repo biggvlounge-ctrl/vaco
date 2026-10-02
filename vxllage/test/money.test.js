@@ -288,3 +288,96 @@ test('only a village’s own owner can list a cosmetic there', async () => {
   }), /only village .* own owner/);
   assert.strictEqual(store.villageCosmeticItems.length, 0);
 });
+
+// -- The idempotency-key collision boostVillage/purchaseCosmetic used to have
+//
+// Both settlement reasons -- which double as V3's idempotency key, see
+// v3Client.js -- used to be scoped only by the resource's stable id
+// (villageId, itemId), with no per-contribution/per-buyer component.
+// boostVillage is explicitly meant to be called repeatedly against the
+// same village (see "boosts accumulate across contributors" above);
+// purchaseCosmetic's ownership guard only blocks the SAME buyer from
+// buying twice, not a second, different buyer. Against V3's real
+// idempotency store, a different contributor/buyer's (different-body)
+// settlement collided with the first's key and was refused outright;
+// the SAME contributor repeating the same amount instead replayed
+// silently with no new money moving while this module's own state
+// still advanced as though it had.
+//
+// `ledger()` above can't catch this -- it's a plain spy with no model
+// of V3's real idempotency fingerprinting. This one reproduces it: a
+// repeated key with an identical body replays (no new money); a
+// repeated key with a different body is refused, matching V3's own
+// behavior.
+function idempotentLedger() {
+  const seen = new Map();
+  const moves = [];
+  const fn = async (legs, meta = {}) => {
+    const fingerprint = JSON.stringify(legs);
+    if (meta.reason) {
+      const prior = seen.get(meta.reason);
+      if (prior !== undefined) {
+        if (prior !== fingerprint) {
+          throw new Error(`Idempotency-Key "settle:${meta.reason}" was already used for a different request.`);
+        }
+        return { ok: true, idempotentReplay: true };
+      }
+      seen.set(meta.reason, fingerprint);
+    }
+    moves.push(...legs);
+    return { ok: true };
+  };
+  fn.moves = moves;
+  fn.of = (a) => moves.filter((m) => m.toUserId === a).reduce((n, m) => n + m.amount, 0);
+  return fn;
+}
+
+test('two different boosters on the same village are each really charged', async () => {
+  const store = createVxllageStore();
+  const village = withVillage(store, 'ines');
+  const settleFn = idempotentLedger();
+
+  // Pre-fix: both boosts share the identical villageId-only reason, so
+  // ada's boost (a different fromUserId/amount) collides with sam's
+  // and is refused outright by V3.
+  await shop.boostVillage(store, { villageId: village.id, boosterId: 'sam', amountVCoin: 40, settleFn });
+  await shop.boostVillage(store, { villageId: village.id, boosterId: 'ada', amountVCoin: 60, settleFn });
+
+  assert.strictEqual(settleFn.of('ines'), 100,
+    'both boosters must really fund the village, not collide on the same settlement key');
+});
+
+test('the same booster boosting the same village twice is charged twice, not replayed for free', async () => {
+  const store = createVxllageStore();
+  const village = withVillage(store, 'ines');
+  const settleFn = idempotentLedger();
+
+  // Pre-fix: identical boosterId and amount means identical legs, so
+  // the second call replays the first's cached success with no new
+  // money moving, while still recording a second contribution and
+  // advancing totalBoostVCoin as though it had.
+  await shop.boostVillage(store, { villageId: village.id, boosterId: 'sam', amountVCoin: 50, settleFn });
+  await shop.boostVillage(store, { villageId: village.id, boosterId: 'sam', amountVCoin: 50, settleFn });
+
+  assert.strictEqual(settleFn.of('ines'), 100,
+    'a second, identical-looking boost must really charge again');
+});
+
+test('two different buyers of the same village cosmetic are each really charged', async () => {
+  const store = createVxllageStore();
+  const village = withVillage(store, 'ines');
+  const item = shop.createCosmeticItem(store, {
+    villageId: village.id, creatorId: 'ines', name: 'Runner badge', priceVCoin: 40,
+  });
+  const settleFn = idempotentLedger();
+
+  // Pre-fix: both purchases share the identical itemId-only reason, so
+  // ada's purchase (a different fromUserId) collides with sam's and is
+  // refused outright by V3 -- a second buyer of a reusable cosmetic
+  // could never actually buy it.
+  await shop.purchaseCosmetic(store, { itemId: item.id, buyerId: 'sam', settleFn });
+  await shop.purchaseCosmetic(store, { itemId: item.id, buyerId: 'ada', settleFn });
+
+  assert.strictEqual(settleFn.of('ines'), 80,
+    'both buyers must really pay for the cosmetic, not collide on the same settlement key');
+});

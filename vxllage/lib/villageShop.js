@@ -41,13 +41,27 @@ async function boostVillage(store, options = {}) {
   if (!Number.isFinite(amountVCoin) || amountVCoin <= 0) throw new Error('boostVillage requires a positive amountVCoin');
   if (typeof settleFn !== 'function') throw new Error('boostVillage requires a settleFn(legs, meta)');
 
+  // **Reserved before settlement, not assigned after.** The reason
+  // below doubles as V3's idempotency key (see v3Client.js). boostVillage
+  // is explicitly meant to be called repeatedly against the same
+  // village -- a community boost is funded by its members together --
+  // so scoping the key only by villageId meant every boost after the
+  // first fingerprinted identically to it: a different booster's
+  // (different-body) contribution collided with the first's key and
+  // was refused by V3 outright, breaking multi-contributor boosting
+  // entirely; the SAME booster boosting the same amount again instead
+  // replayed silently -- no new VCoin moved, while this function still
+  // recorded a brand-new contribution and advanced totalBoostVCoin/
+  // boostLevel as though it had. Scoping by this contribution's own id
+  // makes every boost's key unique by construction.
+  const contributionId = store.nextBoostContributionId++;
   await settleFn(
-    [{ fromUserId: boosterId, toUserId: village.ownerId, amount: amountVCoin, reason: `vxllage_village_boost:${villageId}` }],
-    { reason: `vxllage_village_boost:${villageId}` },
+    [{ fromUserId: boosterId, toUserId: village.ownerId, amount: amountVCoin, reason: `vxllage_village_boost:${villageId}:${contributionId}` }],
+    { reason: `vxllage_village_boost:${villageId}:${contributionId}` },
   );
 
   const contribution = {
-    id: store.nextBoostContributionId++, villageId, boosterId, amountVCoin, createdAt: Date.now(),
+    id: contributionId, villageId, boosterId, amountVCoin, createdAt: Date.now(),
   };
   store.villageBoostContributions.push(contribution);
 
@@ -110,9 +124,14 @@ async function purchaseCosmetic(store, options = {}) {
   }
 
   const village = getVillage(store, item.villageId);
+  // Scoped by buyerId too, not just itemId -- the ownership guard
+  // above only stops the SAME buyer from purchasing twice; it does
+  // nothing for a second, different buyer of the same reusable
+  // cosmetic, whose settlement used to collide on the first buyer's
+  // idempotency key and be refused by V3 outright.
   await settleFn(
-    [{ fromUserId: buyerId, toUserId: village.ownerId, amount: item.priceVCoin, reason: `vxllage_cosmetic_purchase:${itemId}` }],
-    { reason: `vxllage_cosmetic_purchase:${itemId}` },
+    [{ fromUserId: buyerId, toUserId: village.ownerId, amount: item.priceVCoin, reason: `vxllage_cosmetic_purchase:${itemId}:${buyerId}` }],
+    { reason: `vxllage_cosmetic_purchase:${itemId}:${buyerId}` },
   );
 
   const ownership = { id: store.nextCosmeticOwnershipId++, itemId, userId: buyerId, purchasedAt: Date.now() };
