@@ -119,12 +119,35 @@ async function recordReferral(store, options = {}) {
   let tierReached = null;
   const justCrossed = REFERRAL_TIERS.find((tier) => tier.threshold === record.referralCount);
   if (justCrossed && !record.tiersReached.includes(justCrossed.threshold)) {
+    // Claimed before the bonus moves, so a failed settlement must roll
+    // it back -- two problems this closes together:
+    //
+    // 1. The settlement reason used to omit referrerId entirely
+    //    (`vavlt_stvdios_referral_tier:${threshold}`, which doubles as
+    //    V3's idempotency key -- see server.js's settleVCoin). Every
+    //    referrer who ever reached the same tier shared the exact same
+    //    key. The next unrelated referrer to cross tier 5 within V3's
+    //    24h retention window collided with whoever got there first
+    //    (a different toUserId/amount fingerprints differently) and
+    //    was refused outright by V3.
+    // 2. That refusal used to throw straight out of this block AFTER
+    //    `tiersReached`/`spinsAvailable` had already been mutated,
+    //    with nothing to undo it -- the referrer was left permanently
+    //    "credited" for a tier whose bonus never arrived, and the
+    //    `!record.tiersReached.includes(...)` guard above meant no
+    //    retry could ever reach settleFn again for that tier.
     record.tiersReached.push(justCrossed.threshold);
     record.spinsAvailable += justCrossed.spinsAwarded;
-    await settleFn(
-      [{ fromUserId: VAVLT_STVDIOS_GROWTH_ACCOUNT, toUserId: referrerId, amount: justCrossed.bonusVCoin, reason: `vavlt_stvdios_referral_tier:${justCrossed.threshold}` }],
-      { reason: `vavlt_stvdios_referral_tier:${justCrossed.threshold}` },
-    );
+    try {
+      await settleFn(
+        [{ fromUserId: VAVLT_STVDIOS_GROWTH_ACCOUNT, toUserId: referrerId, amount: justCrossed.bonusVCoin, reason: `vavlt_stvdios_referral_tier:${referrerId}:${justCrossed.threshold}` }],
+        { reason: `vavlt_stvdios_referral_tier:${referrerId}:${justCrossed.threshold}` },
+      );
+    } catch (err) {
+      record.tiersReached = record.tiersReached.filter((t) => t !== justCrossed.threshold);
+      record.spinsAvailable -= justCrossed.spinsAwarded;
+      throw err;
+    }
     tierReached = justCrossed;
   }
 
