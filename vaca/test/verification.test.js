@@ -278,3 +278,33 @@ test('an unknown verification id is refused rather than silently ignored', () =>
     verificationId: 999, reviewedBy: 'reviewer-1', grade: 'A', now: NOW,
   }), /no verification with id 999/);
 });
+
+// -- subjectId type coercion at the HTTP boundary -----------------------
+//
+// POST /api/verifications hands its body straight to submitVerification,
+// so a numeric subjectId -- the natural JSON shape for a database id
+// like a VOKEN card's -- used to be stored as a real number. Every GET
+// route (verifications/subject/:subjectType/:subjectId,
+// authenticity-grade/:subjectType/:subjectId,
+// identity-status/:subjectType/:subjectId) reaches subjectId through an
+// Express URL param, which is always a string. `42 === "42"` is false,
+// so an approved claim on a numeric subject could never be found again
+// by any read route -- the exact "gate that silently stops gating"
+// failure this file's own header says VACA exists to prevent.
+
+test('a numeric subjectId still resolves through the string-keyed read path', () => {
+  const store = createVacaStore();
+  const claim = v.submitVerification(store, {
+    subjectType: 'voken-card', subjectId: 42, claimType: 'authenticity', evidence: 'cert', now: NOW,
+  });
+  v.approveVerification(store, {
+    verificationId: claim.id, reviewedBy: 'reviewer-1', grade: 'A', now: NOW,
+  });
+
+  // Simulates every real GET route, which always hands subjectId
+  // through as a string (req.params.subjectId).
+  assert.strictEqual(v.getAuthenticityGrade(store, 'voken-card', '42'), 'A',
+    'an approved grade on a numeric subject must still resolve through the string-keyed read path');
+  assert.strictEqual(v.listVerificationsForSubject(store, 'voken-card', '42').length, 1);
+  assert.strictEqual(typeof claim.subjectId, 'string', 'the stored subjectId must be normalized, not left as the number that arrived');
+});

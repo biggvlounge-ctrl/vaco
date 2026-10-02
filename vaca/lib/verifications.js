@@ -49,10 +49,22 @@ function submitVerification(store, options = {}) {
   if (!claimType) throw new Error('submitVerification requires a claimType');
   if (!evidence) throw new Error('submitVerification requires evidence');
 
+  // **Normalized to a string here, once, rather than trusting whatever
+  // type the caller's JSON body sent.** Every read of subjectId
+  // (listVerificationsForSubject, and getAuthenticityGrade/
+  // isIdentityVerified downstream of it) compares against
+  // `req.params.subjectId`, which Express always yields as a string --
+  // a POST body carrying `subjectId: 42` (the natural JSON shape for a
+  // numeric id like a VOKEN card's) would store `Number(42)`, and
+  // `42 === "42"` is false, so the record a reviewer just approved
+  // would never be found by any read route again. Same pattern
+  // vaco-audit/lib/decisions.js already uses for its own subjectId.
+  const normalizedSubjectId = String(subjectId);
+
   const verification = {
     id: store.nextVerificationId++,
     subjectType,
-    subjectId,
+    subjectId: normalizedSubjectId,
     claimType,
     evidence,
     status: 'pending',
