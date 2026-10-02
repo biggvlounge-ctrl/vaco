@@ -309,6 +309,30 @@ test('one account cannot report the same person twice', async () => {
   assert.equal(store.yapReports.length, 3);
 });
 
+test('two concurrent reports from the same reporter against the same subject — only one is accepted', async () => {
+  // The guard above ran its check, then awaited a real network call
+  // (profileFetchFn) before pushing the report. Two submissions fired
+  // before either had pushed — a double-click, a retried client — both
+  // passed the check while the store still held nothing for this
+  // reporter+subject pair, and both would have filed. That is exactly
+  // the count-inflation attack the single-submission test above is
+  // named for, just reached by two requests racing instead of one
+  // sequential retry.
+  const store = createYapStore();
+
+  const results = await Promise.allSettled([
+    file(store, { reporterId: 'ada' }),
+    file(store, { reporterId: 'ada' }),
+  ]);
+
+  const fulfilled = results.filter((r) => r.status === 'fulfilled');
+  const rejected = results.filter((r) => r.status === 'rejected');
+  assert.equal(fulfilled.length, 1, 'exactly one of the two concurrent reports may be accepted');
+  assert.equal(rejected.length, 1);
+  assert.match(String(rejected[0].reason?.message || ''), /has already reported rio/);
+  assert.equal(store.yapReports.length, 1, 'only one report may land in the store');
+});
+
 test('a pile-on is flagged for a human and nothing else', async () => {
   const store = createYapStore();
   const now = clock + 10_000;

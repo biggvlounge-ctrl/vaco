@@ -68,9 +68,13 @@ attachStore(app, {
 // here.
 async function fetchCvnvoProfile(userId) {
   const res = await fetch(`${CVNVO_API_URL}/api/profiles/${userId}`);
-  const body = await res.json();
-  if (!res.ok) throw new Error(body.error || `fetchCvnvoProfile failed (${res.status})`);
-  return body;
+  if (!res.ok) {
+    const text = await res.text();
+    let message = `fetchCvnvoProfile failed (${res.status})`;
+    try { message = JSON.parse(text).error || message; } catch { /* not JSON */ }
+    throw new Error(message);
+  }
+  return res.json();
 }
 
 // **The guard that decides who may publish a report about a person.**
@@ -145,9 +149,24 @@ app.get('/yap/moderation/queue', requireOperator('yap:moderate'), (req, res) => 
   }
 });
 
+// `moderatorId` is overridden with the credential `requireOperator`
+// just verified, not trusted from the request body. The route used to
+// spread `...req.body` straight through, so a client could name any
+// `moderatorId` it liked while a different, real operator's credential
+// was what actually authorized the call -- `operatorAuth.cjs`'s own
+// header says the entire point of attaching `req.operator` is so a
+// route can put a *verified* name in its own record
+// (`decidedBy: req.operator.operatorName`, the same pattern every
+// other app using this middleware already follows); this file never
+// read it. For a route whose own comment calls this "the guard that
+// decides who may publish a report about a person," recording the
+// wrong person as the one who decided defeats the accountability this
+// app exists to provide.
 app.post('/yap/moderation/:id/publish', requireOperator('yap:moderate'), (req, res) => {
   try {
-    res.json(publishReport(store, { ...req.body, reportId: Number(req.params.id) }));
+    res.json(publishReport(store, {
+      ...req.body, reportId: Number(req.params.id), moderatorId: req.operator.operatorName,
+    }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -155,7 +174,9 @@ app.post('/yap/moderation/:id/publish', requireOperator('yap:moderate'), (req, r
 
 app.post('/yap/moderation/:id/reject', requireOperator('yap:moderate'), (req, res) => {
   try {
-    res.json(rejectReport(store, { ...req.body, reportId: Number(req.params.id) }));
+    res.json(rejectReport(store, {
+      ...req.body, reportId: Number(req.params.id), moderatorId: req.operator.operatorName,
+    }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -163,7 +184,9 @@ app.post('/yap/moderation/:id/reject', requireOperator('yap:moderate'), (req, re
 
 app.post('/yap/moderation/:id/remove', requireOperator('yap:moderate'), (req, res) => {
   try {
-    res.json(removeReport(store, { ...req.body, reportId: Number(req.params.id) }));
+    res.json(removeReport(store, {
+      ...req.body, reportId: Number(req.params.id), moderatorId: req.operator.operatorName,
+    }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

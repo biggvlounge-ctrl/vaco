@@ -97,15 +97,19 @@ async function submitYapReport(store, options = {}) {
   // A rejected or removed report still occupies the slot. Letting a
   // refusal free it up would make the guard a speed bump -- file,
   // get refused, file again.
-  const already = store.yapReports.find(
+  const findDuplicate = () => store.yapReports.find(
     (r) => r.subjectId === subjectId && r.reporterId === reporterId,
   );
-  if (already) {
-    throw new Error(
-      `submitYapReport: ${reporterId} has already reported ${subjectId} `
-      + `(report ${already.id}, currently ${already.status}). One report per person per subject.`,
-    );
-  }
+  const refuseIfDuplicate = () => {
+    const duplicate = findDuplicate();
+    if (duplicate) {
+      throw new Error(
+        `submitYapReport: ${reporterId} has already reported ${subjectId} `
+        + `(report ${duplicate.id}, currently ${duplicate.status}). One report per person per subject.`,
+      );
+    }
+  };
+  refuseIfDuplicate();
 
   // The real Tea anti-abuse mechanic: only a genuinely verified
   // reporter's report is accepted at all -- not weighted differently,
@@ -121,6 +125,20 @@ async function submitYapReport(store, options = {}) {
   if (!reporterProfile.verifiedBadge) {
     throw new Error('submitYapReport: only verified users can submit a report, per Yap\'s real Tea-model anti-abuse requirement');
   }
+
+  // Re-checked here, synchronously, with nothing left to await before
+  // the push below. The first check above ran before `profileFetchFn`
+  // was awaited -- a real network call to CVNVO -- so two concurrent
+  // submissions from the same reporter against the same subject (a
+  // double-click, a retried client) could both pass it while neither
+  // had pushed yet, both reach here, and both file a report: exactly
+  // the count-inflation attack this guard exists to prevent ("one
+  // verified account files ten red flags... the summary reads as ten
+  // people agreeing"). With nothing async between this check and the
+  // push, whichever call reaches here first wins the slot and the
+  // other is refused by it, the same claim-synchronously shape used
+  // for every other check-then-act race fixed this session.
+  refuseIfDuplicate();
 
   const report = {
     id: store.nextYapReportId++,
