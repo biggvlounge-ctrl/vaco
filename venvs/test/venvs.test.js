@@ -282,6 +282,30 @@ test('a cart cannot be checked out twice', () => {
     });
 });
 
+test('a cart cannot be checked out twice at once', async () => {
+  // **The race.** checkout() used to check cart.status, await the
+  // buyer's charge and every seller's payout, and only then write
+  // 'completed' -- so two concurrent calls for the same cart both
+  // passed the status guard while it was still 'active'. Sequential
+  // calls (the test above) can never exercise this: by the time the
+  // second call starts, the first has already finished and written
+  // 'completed'. Promise.all starts both before either resolves.
+  const { m, p1 } = shopFixture();
+  const cart = createCart(m, { buyerId: 'buyer' });
+  addToCart(m, cart.id, p1.id, 1);
+  const transferFn = ledger();
+
+  const results = await Promise.allSettled([
+    checkout(m, { cartId: cart.id, transferFn, payoutFn: transferFn }),
+    checkout(m, { cartId: cart.id, transferFn, payoutFn: transferFn }),
+  ]);
+
+  const fulfilled = results.filter((r) => r.status === 'fulfilled');
+  assert.equal(fulfilled.length, 1, 'more than one concurrent checkout was told it succeeded');
+  assert.equal(transferFn.paidBy('buyer'), 40, 'the buyer was charged more than once for one cart');
+  assert.equal(m.orders.length, 1, 'more than one order was filed for one cart');
+});
+
 test('an empty cart and a missing transfer function are both refused', () => {
   const { m, p1 } = shopFixture();
   const empty = createCart(m, { buyerId: 'buyer' });

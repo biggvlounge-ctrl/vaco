@@ -216,42 +216,61 @@ export async function checkout(marketplace, options = {}) {
   // ecosystem spent a sweep removing.
   requirePayoutFn(payoutFn, 'checkout');
 
-  const total = cartTotal(marketplace, cart);
-  await transferFn(cart.buyerId, PLATFORM_USER_ID, total, `venvs_marketplace_checkout:${cart.id}`);
-
-  const bySeller = new Map();
-  for (const item of cart.items) {
-    const product = getProduct(marketplace, item.productId);
-    const lineTotal = product.price * item.quantity;
-    bySeller.set(product.sellerId, (bySeller.get(product.sellerId) || 0) + lineTotal);
-  }
-
-  const payouts = [];
-  for (const [sellerId, amount] of bySeller) {
-    const seller = getSeller(marketplace, sellerId);
-    const rounded = Math.round(amount * 100) / 100;
-    await payoutFn(PLATFORM_USER_ID, seller.ownerId, rounded, `venvs_marketplace_payout:${cart.id}:${sellerId}`);
-    payouts.push({ sellerId, amount: rounded });
-  }
-
+  // **The cart is claimed before any money moves, not written
+  // 'completed' only after every leg settles.** This checked
+  // cart.status, awaited the buyer's charge and every seller's
+  // payout, and only then wrote 'completed' -- so two concurrent
+  // checkout() calls for the same cart (a double-click before the
+  // button's disabled state re-renders, or a retried request) both
+  // passed the status guard while it was still 'active', both charged
+  // the buyer and paid every seller, and both produced a separate
+  // order. Measured directly: two concurrent checkouts of one $40 cart
+  // charged 80, paid out 80, and created 2 orders. Claiming
+  // 'completed' here means the second call sees it immediately and is
+  // refused by the guard above, before it ever reaches transferFn. A
+  // failure below restores 'active' so the cart stays retryable.
   cart.status = 'completed';
-  const order = {
-    id: marketplace.nextOrderId++,
-    cartId: cart.id,
-    buyerId: cart.buyerId,
-    total,
-    payouts,
-    // Real physical fulfillment, per VOID_SERVICE_VERTICALS_COMPARABLES.md's
-    // own FULFILLMENT section -- null until `requestFulfillment` below
-    // actually creates a real VOID courier job. Never optimistically
-    // set at checkout: an order with no real shipment must stay
-    // visibly unfulfilled.
-    voidShipmentId: null,
-    fulfillmentStatus: 'unfulfilled',
-    createdAt: Date.now(),
-  };
-  marketplace.orders.push(order);
-  return order;
+
+  const total = cartTotal(marketplace, cart);
+  try {
+    await transferFn(cart.buyerId, PLATFORM_USER_ID, total, `venvs_marketplace_checkout:${cart.id}`);
+
+    const bySeller = new Map();
+    for (const item of cart.items) {
+      const product = getProduct(marketplace, item.productId);
+      const lineTotal = product.price * item.quantity;
+      bySeller.set(product.sellerId, (bySeller.get(product.sellerId) || 0) + lineTotal);
+    }
+
+    const payouts = [];
+    for (const [sellerId, amount] of bySeller) {
+      const seller = getSeller(marketplace, sellerId);
+      const rounded = Math.round(amount * 100) / 100;
+      await payoutFn(PLATFORM_USER_ID, seller.ownerId, rounded, `venvs_marketplace_payout:${cart.id}:${sellerId}`);
+      payouts.push({ sellerId, amount: rounded });
+    }
+
+    const order = {
+      id: marketplace.nextOrderId++,
+      cartId: cart.id,
+      buyerId: cart.buyerId,
+      total,
+      payouts,
+      // Real physical fulfillment, per VOID_SERVICE_VERTICALS_COMPARABLES.md's
+      // own FULFILLMENT section -- null until `requestFulfillment` below
+      // actually creates a real VOID courier job. Never optimistically
+      // set at checkout: an order with no real shipment must stay
+      // visibly unfulfilled.
+      voidShipmentId: null,
+      fulfillmentStatus: 'unfulfilled',
+      createdAt: Date.now(),
+    };
+    marketplace.orders.push(order);
+    return order;
+  } catch (err) {
+    cart.status = 'active';
+    throw err;
+  }
 }
 
 export function getOrder(marketplace, orderId) {
