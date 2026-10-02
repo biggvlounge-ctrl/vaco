@@ -405,15 +405,24 @@ app.post('/api/play', (req, res) => {
   if (!verdict.ok) return res.status(403).json({ error: verdict.reason });
 
   const asset = getAsset(store, verdict.assetId);
-  const grant = store.grants.find((g) => g.assetId === verdict.assetId
-    && g.viewerId === verdict.viewerId && !g.revokedAt);
   try {
     res.json({
       assetId: asset.id, kind: asset.kind, durationSec: asset.durationSec,
       // The signed URL expires no later than the grant does, so a
       // revoked-early grant cannot outlive itself through an address
       // already handed out. The URL is the thing that leaks.
-      ...storage.playbackUrl(verdict, { expiresAt: grant ? grant.expiresAt : undefined }),
+      //
+      // `verdict.expiresAt` names the exact grant the presented
+      // credential matched. This used to re-derive "the" grant by
+      // (assetId, viewerId, not revoked) instead -- which, for a
+      // viewer holding more than one active grant on the same asset
+      // (a re-requested playback, a second device), could silently
+      // pick a *different* grant than the one actually verified. A
+      // short-lived grant's credential could come back with a longer-
+      // lived sibling grant's expiry, so revoking the grant that was
+      // actually presented did not shorten the URL it had already
+      // issued -- exactly the leak this comment claims to prevent.
+      ...storage.playbackUrl(verdict, { expiresAt: verdict.expiresAt }),
     });
   } catch (err) {
     res.status(503).json({ error: err.message });

@@ -260,7 +260,19 @@ function verifyPlaybackGrant(store, options = {}) {
     return { ok: false, reason: `that asset is "${asset ? asset.status : 'missing'}", not playable` };
   }
 
-  return { ok: true, assetId: grant.assetId, viewerId: grant.viewerId, storageKey: asset.storageKey };
+  // `grantId` and `expiresAt` name the exact grant the credential
+  // matched -- a viewer can hold more than one active grant for the
+  // same asset (a re-requested playback, a second device), and a
+  // caller re-deriving "the" grant afterward by (assetId, viewerId)
+  // alone has no way to tell which of several it should have gotten.
+  return {
+    ok: true,
+    assetId: grant.assetId,
+    viewerId: grant.viewerId,
+    storageKey: asset.storageKey,
+    grantId: grant.id,
+    expiresAt: grant.expiresAt,
+  };
 }
 
 function describeCatalogue(store, now = Date.now()) {
