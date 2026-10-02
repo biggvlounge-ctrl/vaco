@@ -80,6 +80,14 @@ function triggerEmergency(store, options = {}) {
   const checkIn = getSafetyCheckIn(store, checkInId);
   if (!checkIn) throw new Error(`triggerEmergency: no check-in with id ${checkInId}`);
   if (checkIn.status === 'confirmed-safe') throw new Error(`triggerEmergency: check-in ${checkInId} was already confirmed safe`);
+  // Closes the race server.js's route has: this runs synchronously and
+  // claims 'escalated' before the route's own `await escalate(checkIn)`
+  // ever starts. Without this guard, a retried or double-tapped panic
+  // request (or two concurrent requests) both passed the check above,
+  // both escalated, and both independently POSTed a real "critical"
+  // notification to vaco-notify -- which has no dedupe of its own -- so
+  // one real emergency paged every trusted contact twice.
+  if (checkIn.status === 'escalated') throw new Error(`triggerEmergency: check-in ${checkInId} was already escalated`);
 
   checkIn.status = 'escalated';
   checkIn.emergencyTriggered = true;

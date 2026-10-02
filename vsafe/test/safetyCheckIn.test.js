@@ -186,3 +186,39 @@ test('the panic trigger is refused on an already-confirmed check-in', () => {
 test('the three statuses are the only ones', () => {
   assert.deepStrictEqual([...CHECKIN_STATUSES].sort(), ['active', 'confirmed-safe', 'escalated']);
 });
+
+test('the panic trigger is refused on an already-escalated check-in', () => {
+  // The missing half of the guard above: triggerEmergency only checked
+  // for 'confirmed-safe'. server.js's route runs this synchronously and
+  // only then `await`s a real POST to vaco-notify with no idempotency
+  // key of its own -- so a retried or double-tapped panic request (or
+  // two concurrent ones) both passed the old guard, both escalated, and
+  // both would have paged every trusted contact for the same event.
+  const store = createVsafeStore();
+  makeCheckIn(store);
+  triggerEmergency(store, { checkInId: 1, now: NOW + MIN });
+  assert.throws(() => triggerEmergency(store, { checkInId: 1 }), /already escalated/);
+});
+
+test('two concurrent panic triggers for one check-in only escalate once', async () => {
+  const store = createVsafeStore();
+  makeCheckIn(store);
+
+  // Mirrors server.js's route shape: triggerEmergency runs synchronously
+  // (the real claim), then an async notification send is awaited. Only
+  // the call that actually flips the status should ever reach "send".
+  let sendCount = 0;
+  async function triggerAndNotify() {
+    const checkIn = triggerEmergency(store, { checkInId: 1, now: NOW + MIN });
+    sendCount += 1;
+    await Promise.resolve();
+    return checkIn;
+  }
+
+  const results = await Promise.allSettled([triggerAndNotify(), triggerAndNotify()]);
+  const fulfilled = results.filter((r) => r.status === 'fulfilled');
+
+  assert.strictEqual(sendCount, 1, `the real notification send ran ${sendCount} times for one escalation`);
+  assert.strictEqual(fulfilled.length, 1, 'more than one concurrent trigger was told it succeeded');
+  assert.strictEqual(getSafetyCheckIn(store, 1).status, 'escalated');
+});
