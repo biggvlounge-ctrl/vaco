@@ -537,6 +537,32 @@ test('ownership is recorded, read back, and rolled up into holdings', { skip: SK
   assert.equal(holdings.totalValue, 120000);
 });
 
+test('a string ownerEntityId is coerced, not stored verbatim — the property still shows up in holdings', { skip: SKIP }, async () => {
+  // Ordinary client JSON: `{"ownerEntityId": "42"}` is exactly how a
+  // browser form or another service would send this id. Every reader
+  // of owner_entity_id (holdings, net worth) compares against a real
+  // JS number, since every entity id in this engine is one — a string
+  // that was never coerced would make the property silently vanish
+  // from both.
+  const owner = await (await post('/npc/generate')).json();
+  const ownerId = owner.npc.id;
+  const home = await (await post('/properties', {
+    type: 'residential', value: 50000, lifecycleStage: 'operation',
+  })).json();
+
+  const res = await post(`/properties/${home.id}/ownership`, {
+    ownerEntityId: String(ownerId), ownerType: 'individual', method: 'purchased',
+  });
+  assert.equal(res.status, 201);
+  const record = await res.json();
+  assert.equal(record.owner_entity_id, ownerId, 'the stored id must be the real number, not the string that arrived');
+  assert.equal(typeof record.owner_entity_id, 'number');
+
+  const holdings = await (await get(`/entities/${ownerId}/holdings`)).json();
+  assert.equal(holdings.count, 1, 'the property must appear in the owner\'s holdings');
+  assert.equal(holdings.totalValue, 50000);
+});
+
 test('properties are filterable by owner, which is a read over history', { skip: SKIP }, async () => {
   const a = await (await post('/npc/generate')).json();
   const b = await (await post('/npc/generate')).json();

@@ -273,6 +273,22 @@ function recordOwnership(worldState, options = {}) {
   const { entityId, ownerEntityId, ownerType, acquiredMethod, tick } = options;
   if (entityId == null) throw new Error('recordOwnership requires options.entityId (the thing being owned).');
   if (ownerEntityId == null) throw new Error('recordOwnership requires options.ownerEntityId.');
+  // **Normalized to a real number here, once, rather than trusting
+  // whatever type the caller sent.** Every reader of `owner_entity_id`
+  // (getHoldings, getOwnershipHistory via getCurrentOwner,
+  // economy.ownedPropertyValue) compares it with a real JS number --
+  // every entity id in this engine is one. The one write path that
+  // skipped it is `POST /api/properties/:id/ownership`, whose body is
+  // ordinary client JSON: `{"ownerEntityId": "42", ...}` is a
+  // completely normal way for a string id to arrive. That record would
+  // store `owner_entity_id: "42"`, and `"42" === 42` is false, so the
+  // property silently vanished from that owner's holdings and net
+  // worth while `getCurrentOwner` -- keyed on the property's own id,
+  // not the owner's -- still correctly said who owned it.
+  const normalizedOwnerEntityId = Number(ownerEntityId);
+  if (!Number.isFinite(normalizedOwnerEntityId)) {
+    throw new Error(`recordOwnership: ownerEntityId must be a number, got ${JSON.stringify(ownerEntityId)}`);
+  }
   if (!ownerType) {
     throw new Error(`recordOwnership requires options.ownerType (one of: ${OWNER_TYPES.join(', ')}).`);
   }
@@ -293,7 +309,7 @@ function recordOwnership(worldState, options = {}) {
   const record = {
     id: nextOwnershipId++,
     entity_id: entityId,
-    owner_entity_id: ownerEntityId,
+    owner_entity_id: normalizedOwnerEntityId,
     owner_type: ownerType,
     acquired_method: acquiredMethod ?? null,
     acquired_tick: tick,
