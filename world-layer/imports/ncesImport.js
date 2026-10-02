@@ -143,10 +143,29 @@ function importNces(worldLayer, collection, records) {
     // A record can only attach to a location somebody has already
     // placed — this importer deepens an institution, it does not site
     // one. `hifldImport` and `gnisImport` put schools on the map.
-    const location = (worldLayer.locations || []).find(
-      (l) => l.buildingData?.ncesId === id
-        || (record?.name && l.name === record.name),
-    );
+    const locations = worldLayer.locations || [];
+    let location = locations.find((l) => l.buildingData?.ncesId === id);
+
+    // The id is the only field this importer can trust is unique. A
+    // name is not: `hifldImport` places every US public school/college
+    // nationwide, and common names ("Lincoln Elementary School")
+    // recur across many distinct cities. Falling back to the first
+    // name match, as this used to, silently attached one school's
+    // enrolment/teacher figures to a same-named school in a different
+    // city whenever more than one existed — picking whichever was
+    // earliest in the array, not whichever the record was actually
+    // about. So a name match is only trusted when it is unambiguous.
+    if (!location && record?.name) {
+      const byName = locations.filter((l) => l.name === record.name);
+      if (byName.length > 1) {
+        skipped.push({
+          id, name: record.name,
+          reason: `${byName.length} placed locations share this name -- refusing to guess which one`,
+        });
+        continue;
+      }
+      location = byName[0];
+    }
     if (!location) {
       skipped.push({ id, name: record?.name ?? null, reason: 'no matching placed location' });
       continue;

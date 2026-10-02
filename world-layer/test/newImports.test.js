@@ -384,6 +384,38 @@ test('a grade span maps to the rungs a school actually serves', () => {
   assert.equal(nces.levelsFor(undefined), null);
 });
 
+test('a name shared by two placed schools is refused, not resolved by array order', () => {
+  // hifldImport places every US public school/college nationwide, and
+  // common names recur across cities. importNces's id match is the
+  // only trustworthy one; a name fallback that silently picked the
+  // first same-named location attached one school's real enrolment
+  // and teacher counts to a different school in a different city.
+  const w = createWorldLayer();
+  const springfield = place(w, 'Lincoln Elementary School');
+  const portland = place(w, 'Lincoln Elementary School');
+
+  const { imported, skipped } = nces.importNces(w, 'ccd', [
+    { ncessch: '410001001234', name: 'Lincoln Elementary School', enrolment: 400, teachers: 20 },
+  ]);
+
+  assert.equal(imported.length, 0, 'an ambiguous name match must not attach to either location');
+  assert.equal(skipped.length, 1);
+  assert.match(skipped[0].reason, /2 placed locations share this name/);
+  assert.equal(springfield.buildingData, null);
+  assert.equal(portland.buildingData, null);
+});
+
+test('an unambiguous name match still attaches, same as before', () => {
+  const w = createWorldLayer();
+  const school = place(w, 'Unique Elementary');
+  const { imported, skipped } = nces.importNces(w, 'ccd', [
+    { ncessch: '1', name: 'Unique Elementary', enrolment: 400, teachers: 20 },
+  ]);
+  assert.equal(skipped.length, 0);
+  assert.equal(imported.length, 1);
+  assert.equal(imported[0].id, school.id);
+});
+
 test('nces coverage separates the head count from the ratio', () => {
   // A school placed with an enrolment and no staff figure still leaves
   // the ratio to a band, which is the number this import exists for.
