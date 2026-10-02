@@ -20,6 +20,8 @@ const path = require('path');
 require('dotenv/config');
 
 const { attachStore } = require('./lib/storeBackend');
+const { commit: commitFile } = require('./lib/persistence');
+const { commit: commitPg } = require('./lib/persistencePg');
 const {
   CHANNELS, UNIMPLEMENTED_CHANNELS, SEVERITIES, ATTEMPTS_BY_SEVERITY,
   createNotifyStore, subscribe, unsubscribe, listSubscriptions,
@@ -128,6 +130,25 @@ app.get('/api/health', (_req, res) => {
 app.post('/api/notify', async (req, res) => {
   try {
     const notification = await send(store, req.body || {});
+    // **Committed explicitly, not left to the generic durable() hook.**
+    // That hook (mounted by attachStore) only flushes synchronously on
+    // a 2xx response -- the right default everywhere else, where a
+    // non-2xx means nothing was written. Here it means the opposite:
+    // `send()` already pushed the real notification record regardless
+    // of delivery outcome, and this route deliberately answers 500 for
+    // an *undelivered* one so a caller can tell delivery failed. Left
+    // to the generic hook, that exact record -- an alert nobody was
+    // paged for, the one case `GET /api/health`'s undeliveredAlerts
+    // exists to surface -- would fall back to the ordinary 200ms
+    // debounce, and a crash in that window would lose it: a restart
+    // with `undeliveredAlerts` back to looking clean, which is the
+    // precise "green status page while nobody was paged" failure this
+    // service exists to prevent. Forced here regardless of outcome, the
+    // same way a successful transfer elsewhere is flushed before its
+    // 2xx. Exactly one of commitFile/commitPg owns `store`; the other
+    // is a documented no-op.
+    await commitPg(store);
+    commitFile(store);
     // 202 when it landed somewhere, 500 when nothing took it. A
     // caller escalating a safety event needs to be able to tell those
     // apart, and a uniform 202 is exactly the lie this service exists
