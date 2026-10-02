@@ -24,8 +24,9 @@ import {
 
 import {
   createDegvchi, registerWearable, getWearable, browseWearables,
-  ownsWearable, getOwnedWearables, purchaseWearable,
+  ownsWearable, getOwnedWearables, purchaseWearable, createCustomWearableFromPhoto,
   equipWearable, unequipWearable, getEquippedOutfit, WEARABLE_CATEGORIES,
+  VENVS_PLATFORM_ACCOUNT, CUSTOM_PHOTO_FEE,
 } from '../src/lib/degvchi.js';
 
 import {
@@ -233,6 +234,77 @@ test('a purchase needs a real payment function, not a promise to have one', () =
     () => purchaseWearable(store, { wearableId: item.id, buyerId: 'p1' }),
     /requires a transferFn/,
   );
+});
+
+// -- Photo-to-outfit -------------------------------------------------
+
+test('a photo-derived item is charged the flat fee, to the platform, and owned only by its creator', () => {
+  const store = createDegvchi();
+  const transferFn = ledger();
+  return createCustomWearableFromPhoto(store, {
+    buyerId: 'player-1', name: 'Rooftop Blazer', category: 'clothing',
+    dominantColor: 'charcoal', description: 'a tailored charcoal blazer', transferFn,
+  }).then((item) => {
+    assert.equal(transferFn.moves.length, 1);
+    assert.deepEqual(
+      { from: transferFn.moves[0].from, to: transferFn.moves[0].to, amount: transferFn.moves[0].amount },
+      { from: 'player-1', to: VENVS_PLATFORM_ACCOUNT, amount: CUSTOM_PHOTO_FEE },
+    );
+    assert.equal(item.custom, true);
+    assert.equal(item.sourcePhoto, true);
+    assert.ok(ownsWearable(store, 'player-1', item.id));
+    assert.equal(getOwnedWearables(store, 'nobody-else').length, 0, 'the item belongs only to its creator');
+  });
+});
+
+test('a photo-derived item is a brand-new wearable, not a duplicate of an existing one', () => {
+  // The whole point distinguishing this path from the ordinary
+  // catalog purchase above: two different players photographing
+  // different outfits must not collide into shared ownership of one
+  // catalog row the way buying the SAME registered wearable does.
+  const store = createDegvchi();
+  const transferFn = ledger();
+  return Promise.all([
+    createCustomWearableFromPhoto(store, {
+      buyerId: 'player-1', name: 'Rooftop Blazer', category: 'clothing', transferFn,
+    }),
+    createCustomWearableFromPhoto(store, {
+      buyerId: 'player-2', name: 'Street Jacket', category: 'clothing', transferFn,
+    }),
+  ]).then(([itemA, itemB]) => {
+    assert.notEqual(itemA.id, itemB.id);
+    assert.ok(ownsWearable(store, 'player-1', itemA.id));
+    assert.ok(ownsWearable(store, 'player-2', itemB.id));
+    assert.equal(ownsWearable(store, 'player-1', itemB.id), false);
+    assert.equal(ownsWearable(store, 'player-2', itemA.id), false);
+  });
+});
+
+test('a failed charge mints no item and grants no ownership for a photo-derived outfit', () => {
+  const store = createDegvchi();
+  const broke = async () => { throw new Error('insufficient funds'); };
+  return assert.rejects(
+    () => createCustomWearableFromPhoto(store, {
+      buyerId: 'player-1', name: 'Rooftop Blazer', category: 'clothing', transferFn: broke,
+    }),
+    /insufficient funds/,
+  ).then(() => {
+    assert.equal(store.wearables.length, 0, 'a declined charge must not leave a minted item behind');
+    assert.equal(store.ownership.length, 0);
+  });
+});
+
+test('createCustomWearableFromPhoto requires a real category from the analysis, not whatever string arrives', () => {
+  const store = createDegvchi();
+  const transferFn = ledger();
+  return assert.rejects(
+    () => createCustomWearableFromPhoto(store, {
+      buyerId: 'player-1', name: 'Rooftop Blazer', category: 'weaponry', transferFn,
+    }),
+    /invalid category/,
+  ).then(() => {
+    assert.equal(transferFn.moves.length, 0, 'a rejected category must never reach the charge');
+  });
 });
 
 test('you cannot equip what you do not own', () => {

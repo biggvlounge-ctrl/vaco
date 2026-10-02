@@ -21,6 +21,13 @@
 
 const WEARABLE_CATEGORIES = ['clothing', 'cosmetics', 'accessories'];
 
+// Same account chopz.js's own lease fee pays into -- there is no
+// named creator for a photo-derived item the way a catalog wearable
+// has one, so the flat fee is the platform's, the same posture every
+// other DEGVCHI-original (non-sponsored) item already has.
+const VENVS_PLATFORM_ACCOUNT = 'venvs-platform';
+const CUSTOM_PHOTO_FEE = 15;
+
 export function createDegvchi() {
   return {
     wearables: [],
@@ -126,6 +133,73 @@ export async function purchaseWearable(store, options = {}) {
   return wearable;
 }
 
+// A real photographed outfit, turned into a real closet item — not a
+// catalog purchase. `registerWearable` + `purchaseWearable` grant
+// ownership of ONE shared item every buyer can also own (a real
+// duplicate, by design — that's what a catalog is). This mints a
+// brand-new wearable that belongs to nobody else, flagged `custom` so
+// the UI and `browseWearables` can tell the two apart; the actual
+// vision analysis that produces `name`/`category`/`description` is
+// real and happens upstream, in `v4AgentClient.js`'s
+// `analyzeOutfitPhoto` — this function only charges for and records
+// the result, the same "no business logic in the client wrapper, only
+// here" split every money path in this module already follows.
+export async function createCustomWearableFromPhoto(store, options = {}) {
+  const {
+    buyerId, name, category, dominantColor = '', description = '', photoObjectUrl = null, transferFn,
+  } = options;
+  if (typeof transferFn !== 'function') {
+    throw new Error('createCustomWearableFromPhoto requires a transferFn(fromUserId, toUserId, amount, reason)');
+  }
+  if (!buyerId) {
+    throw new Error('createCustomWearableFromPhoto requires a buyerId');
+  }
+  if (!name) {
+    throw new Error('createCustomWearableFromPhoto requires a name');
+  }
+  if (!WEARABLE_CATEGORIES.includes(category)) {
+    throw new Error(
+      `createCustomWearableFromPhoto: invalid category "${category}" (expected one of ${WEARABLE_CATEGORIES.join(', ')})`
+    );
+  }
+
+  // Minted (claimed) before the charge, the same claim-before-pay
+  // shape purchaseWearable above uses, and for the same reason: a
+  // declined charge must not leave the buyer owning an item nobody
+  // paid for. Here the "claim" is creating the record and its
+  // ownership row together, synchronously, before the first await.
+  const wearable = {
+    id: store.nextWearableId++,
+    name,
+    category,
+    price: CUSTOM_PHOTO_FEE,
+    creatorId: buyerId,
+    sponsor: null,
+    custom: true,
+    sourcePhoto: true,
+    dominantColor,
+    description,
+    photoObjectUrl,
+    createdAt: Date.now(),
+  };
+  store.wearables.push(wearable);
+  const ownershipRow = { userId: buyerId, wearableId: wearable.id };
+  store.ownership.push(ownershipRow);
+
+  try {
+    await transferFn(buyerId, VENVS_PLATFORM_ACCOUNT, CUSTOM_PHOTO_FEE, `venvs_degvchi_custom_photo:${wearable.id}`);
+  } catch (err) {
+    store.wearables.splice(store.wearables.indexOf(wearable), 1);
+    const index = store.ownership.indexOf(ownershipRow);
+    if (index !== -1) {
+      store.ownership.splice(index, 1);
+    }
+    throw err;
+  }
+
+  return wearable;
+}
+
 // Real "one equipped item per category" mechanic -- equipping a new
 // clothing item replaces whatever clothing item was previously
 // equipped, same real avatar-customization behavior Roblox and every
@@ -166,4 +240,4 @@ export function getEquippedOutfit(store, userId) {
   return outfit;
 }
 
-export { WEARABLE_CATEGORIES };
+export { WEARABLE_CATEGORIES, VENVS_PLATFORM_ACCOUNT, CUSTOM_PHOTO_FEE };
