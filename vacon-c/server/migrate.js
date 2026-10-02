@@ -36,6 +36,7 @@
 const db = require('./db.js');
 const engine = require('./engine.js');
 const { TRAIT_DEFINITIONS } = require('./traitDefinitions.js');
+const { KEY_DEFINITIONS } = require('./keys.js');
 const infrastructure = require('./infrastructure.js');
 
 async function migrateWorldStateToPostgres(worldState) {
@@ -941,16 +942,45 @@ async function migrateWorldStateToPostgres(worldState) {
       summary.decision_log = worldState.decisionLog.length;
 
       // ---------------------------------------------------------------
-      // keys_log — after entities, same as decision_log above.
+      // key_definitions — the engine constant, same treatment as
+      // trait_definitions above and for the identical reason: a
+      // definition is a property of the engine rather than of a
+      // world, so every checkpoint re-seeds it rather than carrying it
+      // in WorldState.
       // ---------------------------------------------------------------
-      // **`key_definitions` is NOT migrated and that is deliberate.**
-      // `keys.KEY_DEFINITIONS` is a module constant, the same call
-      // `traitDefinitions.js` makes for traits: a definition is a
-      // property of the engine rather than of a world.
-      // `keys_log.key_id` references it by a stable 1-based id that
-      // does not depend on any world's history, so a restore into a
-      // different process resolves the same seven Keys.
-      //
+      // **GAP FOUND WHILE WRITING THIS, against a real database rather
+      // than by reading the code.** The comment that used to sit where
+      // this block now is said "`key_definitions` is NOT migrated and
+      // that is deliberate... a stable 1-based id that does not depend
+      // on any world's history" — true of `trait_definitions` and
+      // `TRAIT_DEFINITIONS`, which really is inserted a few dozen lines
+      // up. Nothing equivalent ever existed for `key_definitions`: the
+      // comment described the intended design, not the code beneath
+      // it. `checkpoint()` in persistence.js truncates every table in
+      // `public` (including this one) before every call into this
+      // function, so the moment any world resolved even one Key --
+      // which is most of what `server/keys.js` exists to do -- the
+      // very next checkpoint inserted a `keys_log` row whose `key_id`
+      // pointed at a table nothing had ever written a row into, and
+      // `keys_log_key_id_fkey` refused it. 876 passing tests, because
+      // none of them built a world that both ticked long enough to
+      // resolve a Key and round-tripped it through a real Postgres
+      // instance in the same run.
+      for (const def of KEY_DEFINITIONS) {
+        await client.query(
+          `INSERT INTO key_definitions (key_id, name, category, inputs, outputs, probability_curve, priority, dependencies)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+          [def.key_id, def.name, def.category, JSON.stringify(def.inputs),
+            JSON.stringify(def.outputs), def.probability_curve, def.priority,
+            JSON.stringify(def.dependencies)]
+        );
+      }
+      summary.key_definitions = KEY_DEFINITIONS.length;
+
+      // ---------------------------------------------------------------
+      // keys_log — after entities and after key_definitions above,
+      // which its own key_id FK now requires.
+      // ---------------------------------------------------------------
       // `context_json` is JSONB and is stringified like every other
       // JSONB column here. A null context is a resolution nobody
       // snapshotted, which `keysLog.verify` reports as unverifiable
@@ -1058,11 +1088,19 @@ async function migrateWorldStateToPostgres(worldState) {
       // reserved word in SQL, so the column is `values_held`.
       for (const c of worldState.cultures) {
         await client.query(
+          // **Second real defect found alongside key_definitions, same
+          // method.** This listed 20 columns against 23 `$n`
+          // placeholders -- `VALUES ($1,...,$23)` for a 20-column
+          // INSERT -- which Postgres refuses outright
+          // ("INSERT has more expressions than target columns") rather
+          // than silently misaligning. Every culture in every world
+          // this engine has generated would have failed its first real
+          // checkpoint.
           `INSERT INTO cultures (id, entity_id, name, era, trust_level, tradition, innovation,
                                  competition, cooperation, education, art, religion,
                                  communication_style, leadership_style, conflict_resolution,
                                  values_held, customs, language, cuisine, fashion)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)`,
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
           [c.id, c.entity_id, c.name, c.era, c.traits.trustLevel, c.traits.tradition,
             c.traits.innovation, c.traits.competition, c.traits.cooperation, c.traits.education,
             c.traits.art, c.traits.religion, c.communicationStyle, c.leadershipStyle,
