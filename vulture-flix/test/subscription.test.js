@@ -254,3 +254,81 @@ test('acquiring an exclusive title pays the creator real money', async () => {
   assert.ok(settleFn.moves.length >= 1);
   assert.strictEqual(title.creatorId, 'nova');
 });
+
+// -- The renewal/cancel race --------------------------------------------
+//
+// subscribe() used to await the real cross-service VCoin charge and
+// only *then* look up and overwrite the subscription record. A
+// cancelSubscription call landing while that charge was still in
+// flight read the record as still 'active', cancelled it, and then had
+// that cancellation silently clobbered back to 'active' once the
+// charge resolved -- after the renewal had already been paid for. A
+// settleFn whose promise only resolves when the test releases it
+// stands in for the real network latency that opens this window.
+
+function deferredLedger(initial = {}) {
+  const balances = { ...initial };
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  const fn = async (legs) => {
+    await gate;
+    for (const { fromUserId: from, toUserId: to, amount } of legs) {
+      balances[from] = (balances[from] || 0) - amount;
+      balances[to] = (balances[to] || 0) + amount;
+    }
+    return { ok: true };
+  };
+  fn.release = () => release();
+  fn.of = (a) => balances[a] || 0;
+  return fn;
+}
+
+test('a cancel landing during an in-flight renewal charge is refused, not silently clobbered', async () => {
+  const store = createVultureFlixStore();
+  const immediate = ledger({ sam: 1000 });
+  const sub = await subs.subscribe(store, { userId: 'sam', tier: 'standard', settleFn: immediate, now: NOW });
+
+  const deferred = deferredLedger({ sam: 1000 });
+  const renewal = subs.subscribe(store, {
+    userId: 'sam', tier: 'standard', settleFn: deferred, now: NOW + 40 * DAY,
+  });
+
+  // The renewal's charge is still in flight -- a cancel arriving now
+  // must not succeed and then be silently overwritten once the charge
+  // resolves. It must be refused outright, so the caller knows to
+  // retry rather than believing a cancellation that never really held.
+  assert.throws(() => subs.cancelSubscription(store, { userId: 'sam', now: NOW + 40 * DAY + 1 }),
+    /not active/);
+
+  deferred.release();
+  await renewal;
+
+  assert.strictEqual(sub.status, 'active', 'the renewal that was actually paid for must hold');
+  assert.strictEqual(sub.tier, 'standard');
+});
+
+test('a renewal whose charge fails restores the subscription exactly as it was', async () => {
+  const store = createVultureFlixStore();
+  const immediate = ledger({ sam: 1000 });
+  const sub = await subs.subscribe(store, { userId: 'sam', tier: 'standard', settleFn: immediate, now: NOW });
+  const renewsAtBefore = sub.renewsAt;
+
+  const failingFn = async () => { throw new Error('insufficient balance'); };
+  await assert.rejects(
+    () => subs.subscribe(store, { userId: 'sam', tier: 'premium', settleFn: failingFn, now: NOW + 40 * DAY }),
+  );
+
+  assert.strictEqual(sub.status, 'active', 'a failed renewal must not leave the record in a stuck sentinel state');
+  assert.strictEqual(sub.tier, 'standard', 'a failed renewal must not switch the tier it never paid for');
+  assert.strictEqual(sub.renewsAt, renewsAtBefore);
+});
+
+test("a brand-new subscriber whose first charge fails is left with no subscription at all", async () => {
+  const store = createVultureFlixStore();
+  const failingFn = async () => { throw new Error('insufficient balance'); };
+  await assert.rejects(
+    () => subs.subscribe(store, { userId: 'nobody-yet', tier: 'standard', settleFn: failingFn, now: NOW }),
+  );
+  assert.strictEqual(store.subscriptions.find((s) => s.userId === 'nobody-yet'), undefined,
+    'a failed first charge must not leave a half-created subscription behind');
+});

@@ -26,6 +26,8 @@
 // with a different `tier` is the same real, immediate action, just
 // switching which price and tier take effect from this renewal on.
 
+const { settleOnce } = require('./settleOnce');
+
 const VULTURE_FLIX_PLATFORM_ACCOUNT = 'vulture-flix-platform';
 
 const SUBSCRIPTION_TIERS = ['ad-supported', 'standard', 'premium'];
@@ -60,27 +62,54 @@ async function subscribe(store, options = {}) {
   }
 
   const fee = TIER_FEES[tier];
-  await settleFn(
-    [{ fromUserId: userId, toUserId: VULTURE_FLIX_PLATFORM_ACCOUNT, amount: fee, reason: `Vvltvre Flix ${tier} subscription` }],
-    { reason: `Vvltvre Flix ${tier} subscription` },
-  );
-
   let sub = store.subscriptions.find((s) => s.userId === userId);
-  if (sub) {
-    // Renewal (or a real, immediate tier switch effective from this
-    // renewal) -- extend from `now`, not stacked on the old renewsAt,
-    // matching how a real subscription renewal actually works (you
-    // pay now, you're covered for the next real period from now).
-    sub.status = 'active';
-    sub.tier = tier;
-    sub.renewsAt = now + RENEWAL_PERIOD_MS;
-    sub.lastRenewedAt = now;
-  } else {
+  const isNewSubscriber = !sub;
+  if (isNewSubscriber) {
     sub = {
       userId, tier, status: 'active', startedAt: now, renewsAt: now + RENEWAL_PERIOD_MS, lastRenewedAt: now,
     };
     store.subscriptions.push(sub);
   }
+
+  // Claimed as a sentinel status before the charge, not written as
+  // "active" only after. This used to await settleFn -- a real
+  // cross-service VCoin call -- and only then look up and overwrite
+  // the record, so a cancelSubscription call landing while a renewal's
+  // charge was in flight read the still-"active" record, cancelled it,
+  // and then had that cancellation silently clobbered back to "active"
+  // once the charge resolved -- after the renewal had already been
+  // paid for. `cancelSubscription`'s own guard requires
+  // `status === 'active'`; claiming a different sentinel here means a
+  // concurrent cancel reads that sentinel and is refused outright by
+  // its existing guard, rather than racing the final write.
+  try {
+    await settleOnce(
+      sub,
+      { status: 'renewing' },
+      () => settleFn(
+        [{ fromUserId: userId, toUserId: VULTURE_FLIX_PLATFORM_ACCOUNT, amount: fee, reason: `Vvltvre Flix ${tier} subscription` }],
+        { reason: `Vvltvre Flix ${tier} subscription` },
+      ),
+    );
+  } catch (err) {
+    // A brand-new subscriber whose very first charge failed must not
+    // be left behind as a half-created record -- the old behavior
+    // left no subscription at all in this case, and this preserves it.
+    if (isNewSubscriber) {
+      store.subscriptions = store.subscriptions.filter((s) => s !== sub);
+    }
+    throw err;
+  }
+
+  // Past this line the charge has genuinely settled. Renewal (or a
+  // real, immediate tier switch effective from this renewal) -- extend
+  // from `now`, not stacked on the old renewsAt, matching how a real
+  // subscription renewal actually works (you pay now, you're covered
+  // for the next real period from now).
+  sub.status = 'active';
+  sub.tier = tier;
+  sub.renewsAt = now + RENEWAL_PERIOD_MS;
+  sub.lastRenewedAt = now;
   return sub;
 }
 
