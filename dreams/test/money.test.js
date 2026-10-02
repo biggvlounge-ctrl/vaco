@@ -296,3 +296,64 @@ test('a deactivated screen stops earning', async () => {
   );
   assert.equal(store.screens.find((s) => s.id === screen.id).status, 'inactive');
 });
+
+// -- The idempotency-key collision recordImpression used to have -------
+//
+// recordImpression's settlement reason -- which doubles as V3's
+// idempotency key, see server.js's settleVCoin -- was scoped only by
+// campaignId:screenId, with no per-impression component. A live
+// campaign runs many impressions on the same screen by design, so
+// every same-cost impression after the first fingerprinted identically
+// to it: V3 silently replayed the first settlement's cached success,
+// while recordImpression still committed the budget decrement and
+// wrote a normal-looking impression record with a real payout figure
+// -- the screen owner and platform were stiffed from the second
+// same-cost impression onward, with nothing anywhere showing it.
+//
+// `recorder()` above can't catch this -- it is a plain spy with no
+// model of V3's real idempotency fingerprinting. This one reproduces
+// it: a repeated key with an identical body replays (no new money);
+// a repeated key with a different body is refused, matching V3's own
+// behavior.
+function idempotentLedger() {
+  const seen = new Map();
+  const moves = [];
+  const fn = async (legs, meta = {}) => {
+    const fingerprint = JSON.stringify(legs);
+    if (meta.reason) {
+      const prior = seen.get(meta.reason);
+      if (prior !== undefined) {
+        if (prior !== fingerprint) {
+          throw new Error(`Idempotency-Key "settle:${meta.reason}" was already used for a different request.`);
+        }
+        return { ok: true, idempotentReplay: true };
+      }
+      seen.set(meta.reason, fingerprint);
+    }
+    moves.push(...legs);
+    return { ok: true };
+  };
+  fn.moves = moves;
+  fn.totalTo = (who) => moves.filter((m) => m.toUserId === who).reduce((n, m) => n + m.amount, 0);
+  return fn;
+}
+
+test('three same-cost impressions on the same screen each really pay the owner', async () => {
+  const store = createDreamsStore();
+  const { campaign, screen } = liveCampaign(store, { budget: 1000 });
+  const settleFn = idempotentLedger();
+
+  // Pre-fix, this is exactly the sequence that broke silently: all
+  // three impressions share the identical campaignId:screenId reason
+  // and the identical cost, so the second and third collide with the
+  // first's idempotency key and replay instead of actually settling.
+  for (let i = 0; i < 3; i += 1) {
+    await recordImpression(store, {
+      campaignId: campaign.id, screenId: screen.id, costPerImpression: 10, settleFn,
+    });
+  }
+
+  assert.equal(settleFn.totalTo('owner-1'), 21,
+    'three same-cost impressions must each really pay the owner, not replay the first');
+  assert.equal(store.impressions.length, 3);
+});

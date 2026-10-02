@@ -204,12 +204,29 @@ async function recordImpression(store, options = {}) {
   //
   // Claiming the reduced budget first means the second impression sees
   // 0 remaining and is refused by the ordinary check above.
+  //
+  // **The impression id is reserved here, before settlement, and
+  // folded into the reason -- not assigned afterward.** The reason
+  // doubles as V3's idempotency key (see server.js's settleVCoin), and
+  // used to be scoped only by campaignId:screenId. A live campaign
+  // runs many impressions against the same screen by design, so every
+  // impression after the first with the same costPerImpression
+  // fingerprinted identically to it: V3 replayed the first
+  // settlement's cached success without moving any new money, while
+  // this function still committed the budget decrement and wrote a
+  // normal-looking impression record with a real payout figure -- the
+  // screen owner and platform were silently stiffed from the second
+  // same-cost impression onward. (A differently-priced impression hit
+  // the opposite failure: a genuinely fresh request refused by V3 as a
+  // key collision.) Scoping by this impression's own id makes every
+  // impression's key unique by construction.
+  const impressionId = store.nextImpressionId++;
   const remainingAfter = round(campaign.remainingBudget - costPerImpression);
   await settleOnce(campaign, { remainingBudget: remainingAfter }, async () => {
       await settleFn([
-      { fromUserId: campaign.advertiserId, toUserId: screen.screenOwnerId, amount: screenOwnerPayout, reason: `dreams_impression:${campaignId}:${screenId}` },
-      { fromUserId: campaign.advertiserId, toUserId: DREAMS_PLATFORM_ACCOUNT, amount: platformFee, reason: `dreams_impression_platform_fee:${campaignId}:${screenId}` },
-    ], { reason: `dreams_impression:${campaignId}:${screenId}` });
+      { fromUserId: campaign.advertiserId, toUserId: screen.screenOwnerId, amount: screenOwnerPayout, reason: `dreams_impression:${campaignId}:${screenId}:${impressionId}` },
+      { fromUserId: campaign.advertiserId, toUserId: DREAMS_PLATFORM_ACCOUNT, amount: platformFee, reason: `dreams_impression_platform_fee:${campaignId}:${screenId}:${impressionId}` },
+    ], { reason: `dreams_impression:${campaignId}:${screenId}:${impressionId}` });
   });
 
   if (campaign.remainingBudget <= 0) {
@@ -217,7 +234,7 @@ async function recordImpression(store, options = {}) {
   }
 
   const impression = {
-    id: store.nextImpressionId++,
+    id: impressionId,
     campaignId,
     screenId,
     advertiserId: campaign.advertiserId,
