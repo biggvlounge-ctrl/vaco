@@ -39,6 +39,7 @@
 const crypto = require('crypto');
 const { getProduct } = require('./products');
 const { getAffiliateLink, findAttributedLink } = require('./affiliateLinks');
+const { settleOnce } = require('./settleOnce');
 
 const CHOPZ_ESCROW_ACCOUNT = 'chopz-escrow';
 const CHOPZ_PLATFORM_ACCOUNT = 'chopz-platform';
@@ -179,9 +180,24 @@ async function requestFulfillment(store, options = {}) {
   if (!Number.isFinite(shippingCost) || shippingCost <= 0) throw new Error('requestFulfillment requires a positive shippingCost');
   if (typeof voidRequestFn !== 'function') throw new Error('requestFulfillment requires a voidRequestFn(sellerId, shippingCost)');
 
-  const job = await voidRequestFn(order.sellerId, shippingCost);
+  // Claimed before the VOID call, not after. This used to await
+  // voidRequestFn -- a real cross-app HTTP call to VOID's own job
+  // marketplace -- and only then write voidShipmentId/status, so two
+  // concurrent requestFulfillment calls for the same order both read
+  // voidShipmentId as still null, both called VOID, and VOID created
+  // two separate, real, billable shipment jobs for one order; whichever
+  // call's await resolved last silently won the final write and the
+  // other job's id was never recorded anywhere. settleOnce claims a
+  // sentinel synchronously before the await, so a concurrent call sees
+  // the order as already spoken for and is refused by the guard above,
+  // before it ever calls VOID. A failed VOID call restores the claim so
+  // the request can be retried.
+  const job = await settleOnce(
+    order,
+    { status: 'fulfillment-requested', voidShipmentId: 'pending' },
+    () => voidRequestFn(order.sellerId, shippingCost),
+  );
   order.voidShipmentId = String(job.id);
-  order.status = 'fulfillment-requested';
   return order;
 }
 

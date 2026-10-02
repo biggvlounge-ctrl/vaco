@@ -316,3 +316,62 @@ test('a name is stored trimmed, so the card never renders padding', () => {
   });
   assert.strictEqual(p.name, 'Reissue bundle');
 });
+
+// -- Fulfillment: the race requestFulfillment used to lose ------------
+//
+// requestFulfillment's guard (`order.voidShipmentId !== null`) used to
+// be checked before a real cross-app await to VOID, and only written
+// after. Two concurrent requests for the same order both passed the
+// guard while it was still null, both called VOID, and VOID created two
+// separate, real, billable shipment jobs for one order.
+
+function voidJobCreator() {
+  const calls = [];
+  let nextId = 1;
+  const fn = async (sellerId, shippingCost) => {
+    calls.push({ sellerId, shippingCost });
+    return { id: nextId++ };
+  };
+  fn.calls = calls;
+  return fn;
+}
+
+function placedOrder(store) {
+  const product = products.createProduct(store, {
+    sellerId: 'maker', name: 'Tote bag', price: 40, affiliateCommissionPercent: 0, category: 'general',
+  });
+  const settleFn = ledger({ sam: 100 });
+  return orders.createOrder(store, { buyerId: 'sam', productId: product.id, settleFn, now: NOW });
+}
+
+test('requesting fulfillment twice for the same order only ever creates one VOID shipment', async () => {
+  const store = createChopzShopStore();
+  const order = await placedOrder(store);
+  const voidRequestFn = voidJobCreator();
+
+  await orders.requestFulfillment(store, { orderId: order.id, shippingCost: 8, voidRequestFn });
+  await assert.rejects(
+    () => orders.requestFulfillment(store, { orderId: order.id, shippingCost: 8, voidRequestFn }),
+    /already has a VOID shipment/,
+  );
+
+  assert.strictEqual(voidRequestFn.calls.length, 1, 'a sequential retry must not call VOID again');
+  assert.strictEqual(order.voidShipmentId, '1');
+});
+
+test('two concurrent fulfillment requests for the same order create exactly one real VOID shipment', async () => {
+  const store = createChopzShopStore();
+  const order = await placedOrder(store);
+  const voidRequestFn = voidJobCreator();
+
+  const results = await Promise.allSettled([
+    orders.requestFulfillment(store, { orderId: order.id, shippingCost: 8, voidRequestFn }),
+    orders.requestFulfillment(store, { orderId: order.id, shippingCost: 8, voidRequestFn }),
+  ]);
+
+  const fulfilled = results.filter((r) => r.status === 'fulfilled');
+  assert.strictEqual(fulfilled.length, 1, 'exactly one of the two concurrent requests may win');
+  assert.strictEqual(voidRequestFn.calls.length, 1,
+    'VOID must receive exactly one real shipment request for one order, not two');
+  assert.strictEqual(order.voidShipmentId, '1', 'the order must track the one job VOID actually created');
+});
