@@ -332,3 +332,72 @@ test("a brand-new subscriber whose first charge fails is left with no subscripti
   assert.strictEqual(store.subscriptions.find((s) => s.userId === 'nobody-yet'), undefined,
     'a failed first charge must not leave a half-created subscription behind');
 });
+
+// -- The idempotency-key collision subscribe used to have ---------------
+//
+// subscribe's settlement reason -- which doubles as V3's idempotency
+// key, see server.js's settleVCoin -- used to be the bare string
+// `Vvltvre Flix ${tier} subscription`, identical for every charge on a
+// given tier forever. Two different subscribers on the same tier
+// collided outright (different legs, same key, refused by V3); the
+// SAME subscriber renewing or re-subscribing within V3's 24h retention
+// window collided silently (identical legs, same key, replayed with
+// no new transfer) while still being granted a fresh paid period.
+//
+// `ledger()` above can't catch either half of this -- it's a plain
+// spy with no model of V3's real idempotency fingerprinting. This one
+// reproduces it: a repeated key with an identical body replays (no new
+// money); a repeated key with a different body is refused, matching
+// V3's own behavior.
+function idempotentLedger() {
+  const seen = new Map();
+  const moves = [];
+  const fn = async (legs, meta = {}) => {
+    const fingerprint = JSON.stringify(legs);
+    if (meta.reason) {
+      const prior = seen.get(meta.reason);
+      if (prior !== undefined) {
+        if (prior !== fingerprint) {
+          throw new Error(`Idempotency-Key "settle:${meta.reason}" was already used for a different request.`);
+        }
+        return { ok: true, idempotentReplay: true };
+      }
+      seen.set(meta.reason, fingerprint);
+    }
+    moves.push(...legs);
+    return { ok: true };
+  };
+  fn.moves = moves;
+  fn.totalFrom = (who) => moves.filter((m) => m.fromUserId === who).reduce((n, m) => n + m.amount, 0);
+  return fn;
+}
+
+test('two different subscribers on the same tier are each really charged', async () => {
+  const store = createVultureFlixStore();
+  const settleFn = idempotentLedger();
+
+  // Pre-fix, this is exactly the sequence that broke: both subscribers
+  // share the identical "Vvltvre Flix standard subscription" reason,
+  // so bo's charge (a different fromUserId) collides with ada's and
+  // is refused outright by V3.
+  await subs.subscribe(store, { userId: 'ada', tier: 'standard', settleFn, now: NOW });
+  await subs.subscribe(store, { userId: 'bo', tier: 'standard', settleFn, now: NOW });
+
+  assert.strictEqual(settleFn.totalFrom('ada'), subs.TIER_FEES.standard);
+  assert.strictEqual(settleFn.totalFrom('bo'), subs.TIER_FEES.standard,
+    'a second subscriber on the same tier must not be refused as a key collision');
+});
+
+test('renewing within the same day charges again for real, not a free replay', async () => {
+  const store = createVultureFlixStore();
+  const settleFn = idempotentLedger();
+
+  // Pre-fix: both calls share the identical reason and identical legs
+  // (same user, same tier, same fee), so the renewal's settlement
+  // replays the first charge's cached success for free.
+  await subs.subscribe(store, { userId: 'ada', tier: 'standard', settleFn, now: NOW });
+  await subs.subscribe(store, { userId: 'ada', tier: 'standard', settleFn, now: NOW + 1 * DAY });
+
+  assert.strictEqual(settleFn.totalFrom('ada'), 2 * subs.TIER_FEES.standard,
+    'a same-day renewal must really charge again, not replay the first charge for free');
+});

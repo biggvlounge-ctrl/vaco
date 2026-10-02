@@ -82,13 +82,27 @@ async function subscribe(store, options = {}) {
   // `status === 'active'`; claiming a different sentinel here means a
   // concurrent cancel reads that sentinel and is refused outright by
   // its existing guard, rather than racing the final write.
+  // **Scoped by its own charge event, not by tier alone.** The reason
+  // below doubles as V3's idempotency key (see server.js's
+  // settleVCoin), and used to be the bare string
+  // `Vvltvre Flix ${tier} subscription` -- identical for every
+  // subscriber on a given tier, forever. Two different users
+  // subscribing to the same tier produced the same key with different
+  // legs, which V3 refuses outright as a collision; the same user
+  // renewing or re-subscribing within V3's 24h retention window
+  // produced the same key with identical legs, which V3 silently
+  // replays with no new transfer while this function still granted a
+  // fresh 30-day active period as if payment had genuinely cleared.
+  // Reserving a charge id before the settlement makes every charge's
+  // key unique by construction.
+  const chargeEventId = store.nextSubscriptionChargeId++;
   try {
     await settleOnce(
       sub,
       { status: 'renewing' },
       () => settleFn(
-        [{ fromUserId: userId, toUserId: VULTURE_FLIX_PLATFORM_ACCOUNT, amount: fee, reason: `Vvltvre Flix ${tier} subscription` }],
-        { reason: `Vvltvre Flix ${tier} subscription` },
+        [{ fromUserId: userId, toUserId: VULTURE_FLIX_PLATFORM_ACCOUNT, amount: fee, reason: `Vvltvre Flix ${tier} subscription:${chargeEventId}` }],
+        { reason: `Vvltvre Flix ${tier} subscription:${chargeEventId}` },
       ),
     );
   } catch (err) {

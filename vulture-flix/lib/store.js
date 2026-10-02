@@ -10,6 +10,11 @@ function createVultureFlixStore() {
     watchEvents: [],
     nextWatchEventId: 1,
     subscriptions: [],
+    // Advances on every charge attempt (a fresh subscribe AND every
+    // renewal/tier switch), separate from a subscription's own
+    // identity, so it can scope each charge's own settlement reason
+    // uniquely. See subscribe's own comment in lib/subscriptions.js.
+    nextSubscriptionChargeId: 1,
     streamSessions: [],
     nextStreamSessionId: 1,
   };
