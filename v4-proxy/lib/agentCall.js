@@ -99,6 +99,23 @@ export function placeCall(store, options = {}) {
     throw new Error('placeCall requires a positive ringTimeoutSeconds');
   }
 
+  // A retried request (an HTTP client timing out on ring setup and
+  // retrying, or a double-tapped "call" button) must not ring the same
+  // user from the same agent twice for one logical call -- there was
+  // no protection against this at all, unlike `lib/sessions.js`'s own
+  // `createSession`, which already returns an existing open session
+  // rather than a second one for exactly this reason ("two consumers
+  // racing on the same room -- or one retrying -- puts participants in
+  // two different rooms that each look correct"). A still-ringing or
+  // already-connected call between this agent and user is handed back
+  // as-is; once it ends, declines, or rings out, a new call is placed
+  // normally.
+  const existing = store.calls.find(
+    (c) => c.agentId === agentId && c.userId === userId
+      && (c.status === 'ringing' || c.status === 'connected'),
+  );
+  if (existing) return existing;
+
   const twin = getTwinProfile(agentId);
 
   //: A real refusal rather than a silent downgrade. An agent marked
