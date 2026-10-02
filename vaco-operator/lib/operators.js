@@ -165,7 +165,10 @@ function createOperator(store, options = {}) {
 
   const credential = options.credential || newCredential();
   const operator = {
-    id: store.nextOperatorId++,
+    // Accepts a pre-reserved id so a caller can record the decision
+    // (decisionLog.cjs's "record before deciding") before this function
+    // ever runs, naming the operator that is about to exist.
+    id: options.id ?? store.nextOperatorId++,
     name,
     credentialDigest: digest(credential),
     createdBy,

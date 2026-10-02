@@ -47,7 +47,18 @@ function readMode(env = process.env) {
   return raw;
 }
 
-class DecisionNotRecordedError extends Error {}
+// `class X extends Error {}` does NOT give instances `.name === 'X'` --
+// that property comes from `Error.prototype.name` ("Error") unless the
+// subclass sets its own, so every call site's `err.name ===
+// 'DecisionNotRecordedError'` check (the thing that turns this into a
+// 503 instead of a 400) was silently always false. Set explicitly here
+// once, for every app that throws this.
+class DecisionNotRecordedError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'DecisionNotRecordedError';
+  }
+}
 
 function createDecisionLog(options = {}) {
   const {

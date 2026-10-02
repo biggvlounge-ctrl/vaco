@@ -148,19 +148,33 @@ app.post('/api/verify', (req, res) => {
 
 app.post('/api/operators', requireGrantAuthority(), async (req, res) => {
   try {
-    const { operator, credential } = createOperator(store, {
-      name: (req.body || {}).name,
-      createdBy: String(req.operator.operatorId),
-    });
+    const name = (req.body || {}).name;
+    // Reserved before the record call, not read from createOperator's
+    // return value afterwards -- see the decisionLog ordering note
+    // below: the record has to name the operator that is about to
+    // exist, before it exists.
+    const operatorId = store.nextOperatorId++;
     await decisionLog.record({
       route: 'POST /api/operators',
       outcomeKind: 'credential',
       subjectType: 'operator',
-      subjectId: operator.id,
+      subjectId: operatorId,
       decidedBy: req.operator.operatorName,
       decidedByKind: 'operator',
-      inputs: { name: operator.name },
+      inputs: { name },
       reason: (req.body || {}).reason || null,
+    });
+    // decisionLog.cjs: "record before deciding, and refuse to decide if
+    // you cannot record." This used to call createOperator first and
+    // record after -- so a vaco-audit outage between the two left a
+    // real, usable operator credential minted with zero attribution,
+    // the exact state this module exists to prevent. Recording first
+    // means a failed record (caught below, 503) throws before this
+    // line, and no credential is ever minted for it.
+    const { operator, credential } = createOperator(store, {
+      name,
+      createdBy: String(req.operator.operatorId),
+      id: operatorId,
     });
     // The credential is returned exactly once, here. It is not
     // recoverable afterwards -- only its digest is stored.
@@ -198,20 +212,26 @@ app.get('/api/operators/:id', (req, res) => {
 
 app.post('/api/operators/:id/disable', requireGrantAuthority(), async (req, res) => {
   try {
-    const operator = disableOperator(store, {
-      operatorId: Number(req.params.id),
-      actingOperatorId: req.operator.operatorId,
-      disabledBy: String(req.operator.operatorId),
-    });
+    const operatorId = Number(req.params.id);
+    // Looked up (read-only) rather than mutated, so the record below
+    // can name the real operator before disableOperator runs -- see the
+    // decisionLog ordering note on POST /api/operators.
+    const existing = getOperator(store, operatorId);
+    if (!existing) return res.status(400).json({ error: `disableOperator: no operator with id ${operatorId}` });
     await decisionLog.record({
       route: 'POST /api/operators/:id/disable',
       outcomeKind: 'enforcement',
       subjectType: 'operator',
-      subjectId: operator.id,
+      subjectId: operatorId,
       decidedBy: req.operator.operatorName,
       decidedByKind: 'operator',
-      inputs: { name: operator.name },
+      inputs: { name: existing.name },
       reason: (req.body || {}).reason || null,
+    });
+    const operator = disableOperator(store, {
+      operatorId,
+      actingOperatorId: req.operator.operatorId,
+      disabledBy: String(req.operator.operatorId),
     });
     res.json(operator);
   } catch (err) {
@@ -223,23 +243,25 @@ app.post('/api/operators/:id/disable', requireGrantAuthority(), async (req, res)
 
 app.post('/api/operators/:id/grants', requireGrantAuthority(), async (req, res) => {
   try {
-    const grant = grantScope(store, {
-      operatorId: Number(req.params.id),
-      scope: (req.body || {}).scope,
-      // From the verified credential, never from the body. A caller
-      // that could name its own `grantedBy` could name someone else and
-      // walk straight past the self-grant refusal.
-      grantedBy: req.operator.operatorId,
-    });
+    const operatorId = Number(req.params.id);
+    const scope = (req.body || {}).scope;
     await decisionLog.record({
       route: 'POST /api/operators/:id/grants',
       outcomeKind: 'credential',
       subjectType: 'operator',
-      subjectId: grant.operatorId,
+      subjectId: operatorId,
       decidedBy: req.operator.operatorName,
       decidedByKind: 'operator',
-      inputs: { scope: grant.scope },
+      inputs: { scope },
       reason: (req.body || {}).reason || null,
+    });
+    const grant = grantScope(store, {
+      operatorId,
+      scope,
+      // From the verified credential, never from the body. A caller
+      // that could name its own `grantedBy` could name someone else and
+      // walk straight past the self-grant refusal.
+      grantedBy: req.operator.operatorId,
     });
     res.status(201).json(grant);
   } catch (err) {
@@ -249,20 +271,22 @@ app.post('/api/operators/:id/grants', requireGrantAuthority(), async (req, res) 
 
 app.post('/api/operators/:id/grants/revoke', requireGrantAuthority(), async (req, res) => {
   try {
-    const grant = revokeScope(store, {
-      operatorId: Number(req.params.id),
-      scope: (req.body || {}).scope,
-      revokedBy: req.operator.operatorId,
-    });
+    const operatorId = Number(req.params.id);
+    const scope = (req.body || {}).scope;
     await decisionLog.record({
       route: 'POST /api/operators/:id/grants/revoke',
       outcomeKind: 'credential',
       subjectType: 'operator',
-      subjectId: grant.operatorId,
+      subjectId: operatorId,
       decidedBy: req.operator.operatorName,
       decidedByKind: 'operator',
-      inputs: { scope: grant.scope, revoked: true },
+      inputs: { scope, revoked: true },
       reason: (req.body || {}).reason || null,
+    });
+    const grant = revokeScope(store, {
+      operatorId,
+      scope,
+      revokedBy: req.operator.operatorId,
     });
     res.json(grant);
   } catch (err) {
