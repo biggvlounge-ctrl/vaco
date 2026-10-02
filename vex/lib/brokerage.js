@@ -70,10 +70,27 @@ async function placeTradeOrder(store, options = {}) {
 
   const totalAmount = round(quantity * pricePerUnit);
 
+  // Reserved before settlement, not assigned after, so the settlement
+  // reason below can carry it. The reason doubles as V3's idempotency
+  // key (see server.js's settleVCoin) -- without a per-order component
+  // it was only `vex_buy:${cardId}` / `vex_sell:${cardId}`, so two
+  // genuinely distinct orders for the same card, direction, quantity
+  // and price (an ordinary repeat trade at a stable market price)
+  // fingerprinted identically. V3 replayed the first settlement's
+  // cached success for the second order without moving any new money,
+  // and this function doesn't look at the settlement result -- it
+  // mints editions (or releases them to the platform on a sell)
+  // unconditionally once settleFn resolves. A buyer could place the
+  // same-shaped buy order repeatedly and receive a free mint on every
+  // order after the first; the mirror sell gave away a real edition
+  // for a payout that was a stale replay. Scoping the reason by this
+  // order's own id makes every order's key unique by construction.
+  const orderId = store.nextTradeOrderId++;
+
   if (orderType === 'buy') {
     await settleFn(
-      [{ fromUserId: account.userId, toUserId: VEX_PLATFORM_ACCOUNT, amount: totalAmount, reason: `vex_buy:${cardId}` }],
-      { reason: `vex_buy:${cardId}` },
+      [{ fromUserId: account.userId, toUserId: VEX_PLATFORM_ACCOUNT, amount: totalAmount, reason: `vex_buy:${cardId}:${orderId}` }],
+      { reason: `vex_buy:${cardId}:${orderId}` },
     );
     for (let i = 0; i < quantity; i++) {
       await mintAdditionalEdition({ cardId, format: 'digital', ownerId: account.userId });
@@ -90,13 +107,13 @@ async function placeTradeOrder(store, options = {}) {
       });
     }
     await settleFn(
-      [{ fromUserId: VEX_PLATFORM_ACCOUNT, toUserId: account.userId, amount: totalAmount, reason: `vex_sell:${cardId}` }],
-      { reason: `vex_sell:${cardId}` },
+      [{ fromUserId: VEX_PLATFORM_ACCOUNT, toUserId: account.userId, amount: totalAmount, reason: `vex_sell:${cardId}:${orderId}` }],
+      { reason: `vex_sell:${cardId}:${orderId}` },
     );
   }
 
   const order = {
-    id: store.nextTradeOrderId++, accountId, cardId, orderType, quantity, pricePerUnit, totalAmount,
+    id: orderId, accountId, cardId, orderType, quantity, pricePerUnit, totalAmount,
     status: 'filled', createdAt: Date.now(),
   };
   store.tradeOrders.push(order);
