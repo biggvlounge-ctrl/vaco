@@ -158,10 +158,23 @@ const { seedDemoData } = require('./lib/seedDemoData');
 // result instead of charging again. It is deliberately a
 // parameter rather than something derived here -- see the note
 // at the call sites.
+//
+// **It was declared but never actually sent.** The fetch below used
+// to omit the header entirely, so every call -- whatever its callers
+// passed -- reached V3's `/api/vcoin/transfer` with no Idempotency-Key
+// at all. That route's own `idempotentFor` guard reads the header (or
+// an `idempotencyKey` body field) and, finding neither, calls `next()`
+// straight through with no dedup whatsoever: a double-tap or a client
+// retry charged real VCoin twice, despite this function's own comment
+// claiming protection existed.
 async function transferVCoin(fromUserId, toUserId, amount, reason, idempotencyKey) {
   const res = await fetch(`${V3_API_URL}/api/vcoin/transfer`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...serviceHeaders() },
+    headers: {
+      'Content-Type': 'application/json',
+      ...serviceHeaders(),
+      ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
+    },
     body: JSON.stringify({
       fromUserId, toUserId, amount, reason,
     }),

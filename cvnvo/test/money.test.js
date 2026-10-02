@@ -18,11 +18,12 @@ const { createCvnvoStore } = require('../lib/store');
 const {
   setGiftThreshold, getGiftThreshold, requestDateWithGift, getGiftRequestsForUser,
 } = require('../lib/giftDating');
+const { purchaseDateToken, DATE_TOKEN_PRICE_VCOIN } = require('../lib/blindDate');
 
 function recorder() {
   const moves = [];
-  const fn = async (fromUserId, toUserId, amount, reason) => {
-    moves.push({ fromUserId, toUserId, amount, reason });
+  const fn = async (fromUserId, toUserId, amount, reason, idempotencyKey) => {
+    moves.push({ fromUserId, toUserId, amount, reason, idempotencyKey });
     return { ok: true };
   };
   fn.moves = moves;
@@ -195,4 +196,55 @@ test('requests are listed for the recipient, not the requester', async () => {
   assert.equal(getGiftRequestsForUser(store, 'bo').length, 2);
   assert.equal(getGiftRequestsForUser(store, 'ada').length, 0);
   assert.equal(transferFn.totalTo('bo'), 30);
+});
+
+// -- The idempotency key transferVCoin used to drop entirely -----------
+//
+// transferVCoin declared an idempotencyKey parameter and its own
+// comment claimed V3 would use it to refuse a duplicate charge, but
+// the fetch call never actually sent it -- no header, no body field --
+// so every retry reached V3 with no idempotency protection at all.
+// requestDateWithGift never even passed a 5th argument, so there was
+// nothing to forward in the first place.
+
+test('a gift request passes a real, non-empty idempotency key', async () => {
+  const store = createCvnvoStore();
+  const transferFn = recorder();
+  await requestDateWithGift(store, { requesterId: 'ada', recipientId: 'bo', giftValueVCoin: 50, transferFn });
+
+  const [move] = transferFn.moves;
+  assert.ok(typeof move.idempotencyKey === 'string' && move.idempotencyKey.length > 0,
+    'requestDateWithGift must give transferFn a real idempotency key to forward to V3');
+});
+
+test('two separate gift requests between the same two users get two different idempotency keys', async () => {
+  const store = createCvnvoStore();
+  const transferFn = recorder();
+
+  // Pre-fix, neither call passed an idempotencyKey at all -- both were
+  // `undefined`, so this comparison could not have distinguished them.
+  // Each real gift request must carry its own key, or a real V3
+  // treating two logically distinct requests as a retry of one
+  // another (or vice versa) becomes a caller-side coin flip.
+  await requestDateWithGift(store, { requesterId: 'ada', recipientId: 'bo', giftValueVCoin: 50, transferFn });
+  await requestDateWithGift(store, { requesterId: 'ada', recipientId: 'bo', giftValueVCoin: 50, transferFn });
+
+  const [first, second] = transferFn.moves;
+  assert.notStrictEqual(first.idempotencyKey, second.idempotencyKey,
+    'two distinct gift requests must not share one idempotency key');
+});
+
+test('purchasing a blind-date token twice gets two different, real idempotency keys', async () => {
+  const store = createCvnvoStore();
+  const transferFn = recorder();
+
+  await purchaseDateToken(store, { userId: 'ada', transferFn });
+  await purchaseDateToken(store, { userId: 'ada', transferFn });
+
+  const [first, second] = transferFn.moves;
+  assert.ok(typeof first.idempotencyKey === 'string' && first.idempotencyKey.length > 0,
+    'purchaseDateToken must give transferFn a real idempotency key to forward to V3');
+  assert.notStrictEqual(first.idempotencyKey, second.idempotencyKey,
+    'two distinct token purchases must not share one idempotency key');
+  assert.strictEqual(transferFn.totalFrom('ada'), 2 * DATE_TOKEN_PRICE_VCOIN);
 });

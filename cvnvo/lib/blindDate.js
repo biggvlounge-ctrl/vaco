@@ -47,9 +47,21 @@ async function purchaseDateToken(store, options = {}) {
   if (!userId) throw new Error('purchaseDateToken requires a userId');
   if (typeof transferFn !== 'function') throw new Error('purchaseDateToken requires a transferFn(fromUserId, toUserId, amount, reason)');
 
-  await transferFn(userId, CVNVO_PLATFORM_ACCOUNT, DATE_TOKEN_PRICE_VCOIN, `cvnvo_blind_date_token:${userId}`);
+  // **Reserved before the transfer, not assigned after.** A user is
+  // meant to be able to buy more than one date token, but the reason
+  // string had no per-purchase component -- every token purchase for
+  // one user shared it -- and `transferFn` never received a real
+  // per-call idempotency key either, so nothing stopped a retried
+  // purchase from genuinely charging VCoin a second time for one
+  // logical buy.
+  const tokenId = store.nextBlindDateTokenId++;
+  await transferFn(
+    userId, CVNVO_PLATFORM_ACCOUNT, DATE_TOKEN_PRICE_VCOIN,
+    `cvnvo_blind_date_token:${userId}:${tokenId}`,
+    `cvnvo_blind_date_token:${tokenId}`,
+  );
   const token = {
-    id: store.nextBlindDateTokenId++, userId, purchasedAt: Date.now(), usedAt: null,
+    id: tokenId, userId, purchasedAt: Date.now(), usedAt: null,
   };
   store.blindDateTokens.push(token);
   return token;

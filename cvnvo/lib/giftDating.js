@@ -58,10 +58,24 @@ async function requestDateWithGift(store, options = {}) {
     throw new Error(`requestDateWithGift: ${recipientId} requires a minimum gift of ${minRequired} VCoin (received ${giftValueVCoin})`);
   }
 
-  await transferFn(requesterId, recipientId, giftValueVCoin, `cvnvo_gift_dating_request:${requesterId}:${recipientId}`);
+  // **Reserved before the transfer, not assigned after.** The reason
+  // string had no per-request component at all -- every gift request
+  // between the same two users shared it -- and `transferFn` (really
+  // `transferVCoin` in server.js) never received a real per-call
+  // idempotency key either, so nothing stopped a retried request (a
+  // double-tap on "send gift", a network retry) from genuinely
+  // charging the requester's VCoin a second time for one logical
+  // action. Reserving this request's id first gives both the reason
+  // and the idempotency key a value that is unique per attempt.
+  const requestId = store.nextGiftDateRequestId++;
+  await transferFn(
+    requesterId, recipientId, giftValueVCoin,
+    `cvnvo_gift_dating_request:${requesterId}:${recipientId}:${requestId}`,
+    `cvnvo_gift_dating_request:${requestId}`,
+  );
 
   const request = {
-    id: store.nextGiftDateRequestId++, requesterId, recipientId, giftValueVCoin, createdAt: now,
+    id: requestId, requesterId, recipientId, giftValueVCoin, createdAt: now,
   };
   store.giftDateRequests.push(request);
   return request;
