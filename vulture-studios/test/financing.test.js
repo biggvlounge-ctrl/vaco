@@ -294,3 +294,77 @@ test('a project with no investors cannot distribute revenue to nobody', async ()
     projectId: project.id, amount: 100, source: 'vulture-flix', settleFn, now: NOW,
   }), /no investors/);
 });
+
+// -- The idempotency-key collision investInProject used to have --------
+//
+// investInProject's settlement reason -- which doubles as V3's
+// idempotency key, see server.js's settleVCoin -- was scoped only by
+// projectId, with no per-investment component. investInProject is
+// explicitly meant to be called repeatedly against the same project --
+// a financing round takes multiple investors, and one investor can
+// invest more than once -- so every investment after the first
+// fingerprinted identically to it: a different investor's (different
+// body) investment collided with the first's key and was refused by
+// V3 outright, so no project could ever actually be funded by more
+// than one investor.
+//
+// `ledger()` above can't catch this -- it's a plain spy with no model
+// of V3's real idempotency fingerprinting. This one reproduces it: a
+// repeated key with an identical body replays (no new money); a
+// repeated key with a different body is refused, matching V3's own
+// behavior.
+function idempotentLedger() {
+  const seen = new Map();
+  const moves = [];
+  const fn = async (legs, meta = {}) => {
+    const fingerprint = JSON.stringify(legs);
+    if (meta.reason) {
+      const prior = seen.get(meta.reason);
+      if (prior !== undefined) {
+        if (prior !== fingerprint) {
+          throw new Error(`Idempotency-Key "settle:${meta.reason}" was already used for a different request.`);
+        }
+        return { ok: true, idempotentReplay: true };
+      }
+      seen.set(meta.reason, fingerprint);
+    }
+    moves.push(...legs);
+    return { ok: true };
+  };
+  fn.moves = moves;
+  fn.of = (a) => moves.filter((m) => m.toUserId === a).reduce((n, m) => n + m.amount, 0);
+  return fn;
+}
+
+test('two different investors in the same project are each really charged', async () => {
+  const store = createVultureStudiosStore();
+  const project = greenlit(store, 1000);
+  const settleFn = idempotentLedger();
+
+  // Pre-fix, this is exactly the sequence that broke: both investments
+  // share the identical "vulture_studios_investment:<id>" reason, so
+  // rio's investment (a different fromUserId/amount) collides with
+  // ada's and is refused outright by V3.
+  await projects.investInProject(store, { projectId: project.id, investorId: 'ada', amount: 400, settleFn, now: NOW });
+  await projects.investInProject(store, { projectId: project.id, investorId: 'rio', amount: 300, settleFn, now: NOW });
+
+  assert.equal(settleFn.of(projects.VULTURE_STUDIOS_PRODUCTION_ACCOUNT), 700,
+    'both investors must really fund the project, not collide on the same settlement key');
+  assert.equal(store.investments.length, 2);
+});
+
+test('the same investor investing twice is charged twice, not replayed for free', async () => {
+  const store = createVultureStudiosStore();
+  const project = greenlit(store, 1000);
+  const settleFn = idempotentLedger();
+
+  // Pre-fix: identical investorId and amount means identical legs, so
+  // the second call replays the first's cached success with no new
+  // money moving, while still recording a second investment and
+  // advancing amountRaised as though it had.
+  await projects.investInProject(store, { projectId: project.id, investorId: 'ada', amount: 200, settleFn, now: NOW });
+  await projects.investInProject(store, { projectId: project.id, investorId: 'ada', amount: 200, settleFn, now: NOW });
+
+  assert.equal(settleFn.of(projects.VULTURE_STUDIOS_PRODUCTION_ACCOUNT), 400,
+    'a second, identical-looking investment must really charge again');
+});

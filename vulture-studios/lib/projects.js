@@ -123,14 +123,28 @@ async function investInProject(store, options = {}) {
     claim.fundedAt = now;
   }
 
+  // **Reserved before settlement, not assigned after.** The reason
+  // below doubles as V3's idempotency key (see server.js's
+  // settleVCoin), and investInProject is explicitly meant to be
+  // called repeatedly against the same project -- a financing round
+  // takes multiple investors, and one investor can invest more than
+  // once. Scoped only by projectId, every investment after the first
+  // reused the identical key: a different investor's (different-body)
+  // investment collided and was refused by V3 outright, so a second
+  // round could never actually fund; the SAME investor investing the
+  // same amount again instead replayed silently -- no new VCoin moved,
+  // while this function still recorded a brand-new investment and
+  // advanced amountRaised/status as though it had. Scoping by this
+  // investment's own id makes every attempt's key unique.
+  const investmentId = store.nextInvestmentId++;
   let investment;
   await settleOnce(project, claim, async () => {
     await settleFn(
-      [{ fromUserId: investorId, toUserId: VULTURE_STUDIOS_PRODUCTION_ACCOUNT, amount: amount, reason: `vulture_studios_investment:${projectId}` }],
-      { reason: `vulture_studios_investment:${projectId}` },
+      [{ fromUserId: investorId, toUserId: VULTURE_STUDIOS_PRODUCTION_ACCOUNT, amount: amount, reason: `vulture_studios_investment:${projectId}:${investmentId}` }],
+      { reason: `vulture_studios_investment:${projectId}:${investmentId}` },
     );
     investment = {
-      id: store.nextInvestmentId++, projectId, investorId, amount: round(amount), investedAt: now,
+      id: investmentId, projectId, investorId, amount: round(amount), investedAt: now,
     };
     store.investments.push(investment);
   });
