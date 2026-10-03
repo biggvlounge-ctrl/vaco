@@ -42,6 +42,7 @@ const { createMessageSocketServer } = require('./lib/messageSocket.cjs');
 
 const PORT = process.env.PORT || 8827;
 const V3_API_URL = process.env.V3_API_URL || 'http://localhost:8811';
+const VOID_API_URL = process.env.VOID_API_URL || 'http://localhost:8793';
 // The shared ecosystem-wide convention every other real app's
 // server.js already uses (checked directly: voken/server.js,
 // voidmagic/server.js) -- one env var pair, not a per-app-named one.
@@ -73,6 +74,7 @@ function createVdpStore() {
     households: { households: [], nextHouseholdId: 1 },
     organizations: { organizations: [], nextOrganizationId: 1 },
     vavlt: { presence: {} },
+    voidHubs: { registered: false, stations: [] },
     relationships: {},
     npcWorld: null,
     news: { events: [], nextId: 1 },
@@ -98,6 +100,38 @@ async function transferVCoin({ fromUserId, toUserId, amount, reason }) {
   if (!res.ok) {
     const text = await res.text();
     let message = `transferVCoin failed (${res.status})`;
+    try { message = JSON.parse(text).error || message; } catch { /* not JSON */ }
+    throw new Error(message);
+  }
+  return res.json();
+}
+
+// VDP's own server-to-server VOID Hub Station registration -- same
+// auth posture as transferVCoin above (X-Service-Name/X-Service-Token,
+// no end-user session), because registering Meridian's own real
+// logistics infrastructure is VDP's server declaring its own
+// presence on VOID's network, not something any one player does.
+// VOID's own `registerStation` (void/lib/stations.js) rejects a bare
+// "hub" with no port capability outright, so every station VDP
+// registers is real `hub-and-port`, matching the real-world VOID Hub
+// Station model this is meant to mirror, per direct instruction ("the
+// void hub should be similar to how the void hub is used in real
+// life").
+async function registerVoidHub({ regionId, bayCount, temperatureControlled, lat, lng }) {
+  const res = await fetch(`${VOID_API_URL}/api/station`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Service-Name': VACO_SERVICE_NAME,
+      'X-Service-Token': VACO_SERVICE_TOKEN,
+    },
+    body: JSON.stringify({
+      regionId, stationType: 'hub-and-port', bayCount, supportsRelay: true, temperatureControlled, lat, lng,
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    let message = `registerVoidHub failed (${res.status})`;
     try { message = JSON.parse(text).error || message; } catch { /* not JSON */ }
     throw new Error(message);
   }
@@ -135,6 +169,46 @@ let store = createVdpStore();
     return store.players[userId];
   }
 
+  // Register Meridian's own real VOID Hub Stations once, idempotently
+  // -- guarded by the persisted `registered` flag so a server restart
+  // never re-registers duplicates. Two real stations, matching the
+  // user's own split ("locations for package distribution food
+  // distribution"): a general hub-and-port for package throughput, and
+  // VOID's own real temperature-controlled variant
+  // (VOID_FOOD_CAPABLE_STATIONS.md's "hot and cold section" hybrid)
+  // for food distribution. Coordinates are a flagged placeholder --
+  // Meridian is fictional, so this uses a real St. Charles, MO point
+  // (the first real-world reference this world's design pulled from)
+  // rather than an arbitrary lat/lng. Fails soft: VOID may not be
+  // running in every dev environment, and a missing hub must not take
+  // VDP's own server down.
+  //
+  // Runs from inside `onReady`, not right after `attachStore()`
+  // returns -- `attachStore` loads the persisted store asynchronously
+  // and calls `onReady` once it's actually ready; code placed after
+  // the `attachStore(...)` call itself runs immediately, against the
+  // stale pre-load `store` binding, before the real one is in place.
+  async function registerMeridianVoidHubsOnce() {
+    if (store.voidHubs.registered) return;
+    const MERIDIAN_REGION_ID = 'meridian';
+    const MERIDIAN_LAT = 38.7881;
+    const MERIDIAN_LNG = -90.4974;
+    try {
+      const packageHub = await registerVoidHub({
+        regionId: MERIDIAN_REGION_ID, bayCount: 2, temperatureControlled: false,
+        lat: MERIDIAN_LAT, lng: MERIDIAN_LNG,
+      });
+      const foodHub = await registerVoidHub({
+        regionId: MERIDIAN_REGION_ID, bayCount: 2, temperatureControlled: true,
+        lat: MERIDIAN_LAT, lng: MERIDIAN_LNG,
+      });
+      store.voidHubs = { registered: true, stations: [packageHub, foodHub] };
+      console.log(`VDP: registered ${store.voidHubs.stations.length} real VOID Hub Stations for Meridian.`);
+    } catch (err) {
+      console.warn(`VDP: could not register Meridian's VOID Hub Stations (VOID may not be running): ${err.message}`);
+    }
+  }
+
   attachStore(app, {
     appKey: 'vdp',
     createDefault: createVdpStore,
@@ -146,6 +220,8 @@ let store = createVdpStore();
       if (!store.households) store.households = householdsLib.createHouseholdsStore();
       if (!store.organizations) store.organizations = organizationsLib.createOrganizationsStore();
       if (!store.vavlt) store.vavlt = vavltLib.createVavltStore();
+      if (!store.voidHubs) store.voidHubs = { registered: false, stations: [] };
+      registerMeridianVoidHubsOnce();
     },
   });
 
@@ -166,6 +242,14 @@ let store = createVdpStore();
     const playerCount = Object.keys(store.players).length;
     const npcCount = store.npcWorld ? store.npcWorld.npcs.length : 0;
     res.json(populationLib.describePopulation(playerCount, npcCount));
+  });
+
+  // Meridian's own real VOID Hub Station registration -- a cached
+  // readout of what VOID itself returned (not re-derived here), so
+  // the client sees real registration status even if VOID is briefly
+  // unreachable at request time.
+  app.get('/api/void-hubs', (_req, res) => {
+    res.json(store.voidHubs);
   });
 
   // Live World News — a read-only feed of things that already

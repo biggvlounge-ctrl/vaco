@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  CITY_TIERS, AMENITY_CATEGORIES, AMENITY_SOURCES,
+  CITY_TIERS, AMENITY_CATEGORIES, AMENITY_SOURCES, WORLD_AESTHETIC,
   getTier, tierIsSatisfiedBy, classifyComplex, describeCoverage,
   needsRideshare, classifyMeridian,
 } from '../src/lib/cityTiers.js';
@@ -75,6 +75,33 @@ test('needsRideshare only flags a trip past the resident\'s own tier radius', ()
 
 test('needsRideshare refuses an unknown tier rather than guessing', () => {
   assert.throws(() => needsRideshare(100, 99), /no such tier/);
+});
+
+test('only the two largest tiers get farm distribution', () => {
+  const flags = CITY_TIERS.map((t) => t.hasFarmDistribution);
+  assert.deepEqual(flags, [false, false, false, true, true]);
+});
+
+test('only the largest tier gets real fishing spots', () => {
+  const flags = CITY_TIERS.map((t) => t.hasFishing);
+  assert.deepEqual(flags, [false, false, false, false, true]);
+});
+
+test('water features escalate, one real distinct feature per tier, ending in a fishing lagoon', () => {
+  const features = CITY_TIERS.map((t) => t.waterFeature);
+  assert.equal(new Set(features).size, 5, 'each tier should have its own distinct water feature');
+  assert.equal(features[4], 'Fishing Lagoon');
+});
+
+test('trail miles grow strictly with tier size, derived from the real radius', () => {
+  for (let i = 1; i < CITY_TIERS.length; i += 1) {
+    assert.ok(CITY_TIERS[i].trailMiles > CITY_TIERS[i - 1].trailMiles);
+  }
+});
+
+test('the world aesthetic is futuristic buildings over a natural landscape, for every tier', () => {
+  assert.equal(WORLD_AESTHETIC.buildingStyle, 'futuristic');
+  assert.match(WORLD_AESTHETIC.landscapeStyle, /natural/);
 });
 
 test('classifyMeridian reflects the real, currently-built feature set, not an assertion', () => {

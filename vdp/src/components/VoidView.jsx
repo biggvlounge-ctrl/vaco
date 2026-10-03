@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   requestJob, matchProvider, acceptJob, completeJob, rateJob,
 } from "../lib/voidClient.js";
@@ -10,13 +10,34 @@ import {
 // dual payout (provider payout + platform fee) comes back from VOID's
 // own server. Uses the Courier vertical -- a real, non-licensing-gated
 // one -- for the demo.
+//
+// **Void Hubs**: VDP's own server registers Meridian's real VOID Hub
+// Stations at boot (server.cjs, `registerMeridianVoidHubsOnce`) --
+// real package + food distribution infrastructure on VOID's actual
+// station network (void/lib/stations.js), not a second invented
+// system. Per direct instruction ("the void hub should be similar to
+// how the void hub is used in real life"), this mirrors VOID's real
+// Hub/Port model: `hub-and-port` stations, one real temperature-
+// controlled variant for food. This panel just reads back what VDP's
+// server already registered.
 
 const VOID_PROVIDER = "void-demo-provider";
+const VDP_API_URL = import.meta.env?.VITE_VDP_API_URL || "http://localhost:8827";
 
 export default function VoidView({ session }) {
   const [job, setJob] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [voidHubs, setVoidHubs] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${VDP_API_URL}/api/void-hubs`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => { if (!cancelled) setVoidHubs(data); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   const handleAction = async (action) => {
     setBusy(true);
@@ -80,6 +101,24 @@ export default function VoidView({ session }) {
       )}
 
       {error && <p style={{ color: "crimson" }}>Error: {error}</p>}
+
+      <div style={{ borderTop: "1px dashed #ccc", marginTop: 12, paddingTop: 8 }}>
+        <h3 style={{ fontSize: 13, margin: "0 0 4px 0" }}>Meridian's Void Hubs</h3>
+        {voidHubs && voidHubs.registered ? (
+          <ul style={{ fontSize: 12, color: "#666", margin: 0, paddingLeft: 16 }}>
+            {voidHubs.stations.map((station) => (
+              <li key={station.id}>
+                Station #{station.id} — {station.temperatureControlled ? "food distribution (temperature-controlled)" : "package distribution"},
+                {" "}{station.bayCount} bays, relay-enabled
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p style={{ fontSize: 12, color: "#888" }}>
+            {voidHubs ? "Not yet registered on VOID's network." : "Checking VOID's real station network…"}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

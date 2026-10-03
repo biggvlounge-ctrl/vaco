@@ -62,7 +62,7 @@ export const AMENITY_CATEGORIES = [
 // the real feature behind it instead of asserting the category blind.
 export const AMENITY_SOURCES = {
   residential: ['My Home panel (property.js)'],
-  shopping: ['CHOPZ Shorts (chopz-embed)', 'Fashion District'],
+  shopping: ['CHOPZ Shorts (chopz-embed)', 'Fashion District', 'CHOPZ District (chopz.js)'],
   dining: ['Food District'],
   screens: ['DREAMS Screens panel (dreamsClient.js)'],
   social: ['Village District (vxllage-embed)'],
@@ -82,6 +82,28 @@ export const AMENITY_SOURCES = {
 // headcount-size label: Hamlet/Village/Town/City/Metropolis), and
 // reusing it here for footprint-size would read as the same thing in
 // the UI when it isn't.
+//
+// **Landscape direction, per direct instruction**: "buildings
+// futuristic but... landscapes very natural trails lagoons... at the
+// largest we want fishing spots." `waterFeature` escalates by tier
+// (a plaza fountain at the smallest up to a real fishing lagoon at
+// the largest), and `trailMiles` is a real derived number -- a loop
+// roughly spanning the tier's own walkable radius (circumference
+// ≈ 2 × radius, converted to miles), not an arbitrary table. Honest
+// limit: VDP's current renderer is 2D canvas rectangles (`world.js`),
+// not terrain -- these are real design fields for the art/rendering
+// pass that direction implies, not yet something the canvas draws.
+//
+// **Farm distribution, per direct instruction**: only the two largest
+// tiers ("the fourth and fifth tier... a small farm distribution") --
+// a small local-agriculture component feeding the tier's own dining
+// amenity, not a full agricultural-economy system.
+const WATER_FEATURES = ['Plaza Fountain', 'Village Pond', 'Creek Trail', 'Lagoon', 'Fishing Lagoon'];
+
+function trailMilesForRadius(radiusMeters) {
+  return Math.round(((2 * radiusMeters) / 1609) * 10) / 10; // a loop roughly spanning the radius, in miles
+}
+
 export const CITY_TIERS = [
   {
     id: 1, minutes: 5, name: '5-Minute City',
@@ -89,6 +111,10 @@ export const CITY_TIERS = [
     requiredAmenities: ['residential', 'shopping', 'dining'],
     minSourcesPerAmenity: 1,
     populationCap: 50,
+    waterFeature: WATER_FEATURES[0],
+    hasFishing: false,
+    hasFarmDistribution: false,
+    trailMiles: trailMilesForRadius(5 * WALK_SPEED_METERS_PER_MINUTE),
   },
   {
     id: 2, minutes: 10, name: '10-Minute City',
@@ -96,6 +122,10 @@ export const CITY_TIERS = [
     requiredAmenities: ['residential', 'shopping', 'dining', 'screens'],
     minSourcesPerAmenity: 1,
     populationCap: 150,
+    waterFeature: WATER_FEATURES[1],
+    hasFishing: false,
+    hasFarmDistribution: false,
+    trailMiles: trailMilesForRadius(10 * WALK_SPEED_METERS_PER_MINUTE),
   },
   {
     id: 3, minutes: 15, name: '15-Minute City',
@@ -103,6 +133,10 @@ export const CITY_TIERS = [
     radiusMeters: 15 * WALK_SPEED_METERS_PER_MINUTE,
     minSourcesPerAmenity: 1,
     populationCap: 400,
+    waterFeature: WATER_FEATURES[2],
+    hasFishing: false,
+    hasFarmDistribution: false,
+    trailMiles: trailMilesForRadius(15 * WALK_SPEED_METERS_PER_MINUTE),
   },
   {
     id: 4, minutes: 20, name: '20-Minute City',
@@ -110,6 +144,10 @@ export const CITY_TIERS = [
     requiredAmenities: AMENITY_CATEGORIES,
     minSourcesPerAmenity: 1,
     populationCap: 900,
+    waterFeature: WATER_FEATURES[3],
+    hasFishing: false,
+    hasFarmDistribution: true,
+    trailMiles: trailMilesForRadius(20 * WALK_SPEED_METERS_PER_MINUTE),
   },
   {
     id: 5, minutes: 30, name: '30-Minute City',
@@ -117,8 +155,20 @@ export const CITY_TIERS = [
     requiredAmenities: AMENITY_CATEGORIES,
     minSourcesPerAmenity: 2,
     populationCap: 2000,
+    waterFeature: WATER_FEATURES[4],
+    hasFishing: true,
+    hasFarmDistribution: true,
+    trailMiles: trailMilesForRadius(30 * WALK_SPEED_METERS_PER_MINUTE),
   },
 ];
+
+// The shared buildings-vs-landscape policy every tier follows, per
+// direct instruction -- one constant, not a per-tier field, since it
+// doesn't vary by tier the way water/trails/farming do.
+export const WORLD_AESTHETIC = {
+  buildingStyle: 'futuristic',
+  landscapeStyle: 'natural (walking trails and water features scaling by tier; fishing at the largest)',
+};
 
 export function getTier(tierId) {
   return CITY_TIERS.find((t) => t.id === tierId) || null;
