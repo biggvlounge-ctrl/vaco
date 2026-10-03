@@ -5,6 +5,8 @@ import {
 } from "../lib/world.js";
 import { latestDecision, explainDecision } from "../lib/npcs.js";
 import { talkToNpc } from "../lib/v4AgentClient.js";
+import { getEquippedOutfit } from "../lib/degvchi.js";
+import { drawAvatar } from "../lib/avatarRender.js";
 import DegvchiView from "./DegvchiView.jsx";
 import FoodDistrictView from "./FoodDistrictView.jsx";
 import StageView from "./StageView.jsx";
@@ -405,13 +407,18 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
       ctx.fillText(userId, sx + 9, sy + 3);
     }
 
+    // The player's own real equipped outfit (degvchiStore is this
+    // browser's own closet) renders onto a real humanoid shape instead
+    // of a flat dot -- closing VDP's own longest-standing named gap:
+    // "the player is a rendered dot; equipped DEGVCHI wearables have
+    // nothing visual to render onto." Scoped to the local player only
+    // -- see avatarRender.js's own header for why another real
+    // player's outfit can't honestly be drawn here too.
     const px = worldStateRef.current.x - camera.x;
     const py = worldStateRef.current.y - camera.y;
-    ctx.fillStyle = "#ffd700";
-    ctx.beginPath();
-    ctx.arc(px, py, 8, 0, Math.PI * 2);
-    ctx.fill();
-  }, [hoveredNpcId, session]);
+    const outfit = session ? getEquippedOutfit(degvchiStore, session.userId) : {};
+    drawAvatar(ctx, px, py, { outfit, outlineColor: "#ffd700" });
+  }, [hoveredNpcId, session, degvchiStore]);
 
   // The render loop: draws every animation frame, so NPC and other-
   // player movement looks continuous. The NPCs themselves no longer
