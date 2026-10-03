@@ -241,9 +241,25 @@ let store = createVdpStore();
       });
       newsLib.recordEvent(store.news, {
         kind: 'property',
-        text: `${req.body.ownerId} bought a ${home.type} home`,
+        text: `${req.body.ownerId} bought a ${home.levelName}`,
       });
       res.status(201).json(home);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/property/upgrade', requireActor('ownerId'), async (req, res) => {
+    try {
+      const home = await propertyLib.upgradeHome(store.property, {
+        ownerId: req.body.ownerId,
+        transferFn: (args) => transferVCoin({ ...args, toUserId: 'vdp-property-office' }),
+      });
+      newsLib.recordEvent(store.news, {
+        kind: 'property',
+        text: `${req.body.ownerId} upgraded their home to ${home.levelName}`,
+      });
+      res.status(200).json(home);
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
@@ -273,6 +289,7 @@ let store = createVdpStore();
   const TOPIC_SKILL = {
     business: 'Business', crafting: 'Crafting', construction: 'Construction',
     communication: 'Communication', management: 'Management',
+    athletics: 'Athletics', art: 'Art',
   };
   const CONVERSATION_BELIEF_DELTA = 2; // smaller than a textbook's TEXTBOOK_BELIEF_SHIFT (8) -- a chat nudges, a book teaches
 

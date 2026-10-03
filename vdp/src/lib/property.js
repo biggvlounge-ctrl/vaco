@@ -12,6 +12,13 @@
 // proved: the ownership row is pushed before the transfer is awaited,
 // and rolled back if the transfer fails — so a declined charge never
 // leaves a home on the books with nobody having paid for it.
+//
+// Tower-style levels, not a second lifecycle: `lifecycleStage` is
+// still VACON-C's own real-estate stage (planning/operation/...), a
+// property management concept. `level` is a separate, VDP-only
+// progression -- a bigger, nicer home a player moves up into -- so
+// the two axes don't collide: a level-4 Estate can still be under
+// `renovation`.
 
 export const PROPERTY_TYPES = ['residential'];
 
@@ -23,7 +30,18 @@ export const LIFECYCLE = [
 
 export const OWNER_TYPES = ['individual'];
 
-export const HOME_PRICE = 500;
+export const PROPERTY_LEVELS = [
+  { level: 1, name: 'Studio', price: 500 },
+  { level: 2, name: 'Apartment', price: 1200 },
+  { level: 3, name: 'Townhouse', price: 2500 },
+  { level: 4, name: 'Estate', price: 5000 },
+];
+
+export const HOME_PRICE = PROPERTY_LEVELS[0].price;
+
+export function levelByNumber(level) {
+  return PROPERTY_LEVELS.find((l) => l.level === level) || null;
+}
 
 export function createPropertyStore() {
   return { properties: [], nextPropertyId: 1 };
@@ -53,6 +71,8 @@ export async function purchaseHome(store, { ownerId, transferFn, now = Date.now(
     ownerId,
     ownerType: 'individual',
     lifecycleStage: 'operation',
+    level: PROPERTY_LEVELS[0].level,
+    levelName: PROPERTY_LEVELS[0].name,
     purchasedAt: now,
   };
   // Claim before pay: the row exists the instant it's committed to,
@@ -66,6 +86,41 @@ export async function purchaseHome(store, { ownerId, transferFn, now = Date.now(
   } catch (err) {
     const idx = store.properties.indexOf(property);
     if (idx !== -1) store.properties.splice(idx, 1);
+    throw err;
+  }
+
+  return property;
+}
+
+// Moves a home up exactly one tower level, charging the real price
+// difference between the current and next level -- not the next
+// level's full price, since the player already paid for the level
+// they're standing in. Same claim-before-pay ordering as
+// `purchaseHome`: the level is bumped before the transfer is awaited,
+// rolled back on failure.
+export async function upgradeHome(store, { ownerId, transferFn, now = Date.now() } = {}) {
+  if (!ownerId) throw new Error('upgradeHome requires an ownerId');
+  const property = homeOwnedBy(store, ownerId);
+  if (!property) throw new Error(`upgradeHome: "${ownerId}" does not own a home`);
+  if (typeof transferFn !== 'function') throw new Error('upgradeHome requires a transferFn');
+
+  const current = levelByNumber(property.level);
+  const next = levelByNumber(property.level + 1);
+  if (!next) throw new Error(`upgradeHome: "${ownerId}"'s home is already at the top level (${current.name})`);
+
+  const cost = next.price - current.price;
+  const previousLevel = property.level;
+  const previousLevelName = property.levelName;
+  property.level = next.level;
+  property.levelName = next.name;
+  property.upgradedAt = now;
+
+  try {
+    await transferFn({ fromUserId: ownerId, amount: cost, reason: 'vdp-home-upgrade' });
+  } catch (err) {
+    property.level = previousLevel;
+    property.levelName = previousLevelName;
+    delete property.upgradedAt;
     throw err;
   }
 

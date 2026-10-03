@@ -100,7 +100,7 @@ export default function MyAssetsView({ session, degvchiStore }) {
         <section>
           <h3 style={{ fontSize: 13, margin: "0 0 4px 0" }}>Home</h3>
           {home
-            ? <p style={{ fontSize: 12 }}>{home.type} — {home.lifecycleStage}</p>
+            ? <p style={{ fontSize: 12 }}>{home.levelName} ({home.type}) — {home.lifecycleStage}</p>
             : <p style={{ fontSize: 12, color: "#888" }}>No home owned yet.</p>}
         </section>
 

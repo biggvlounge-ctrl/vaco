@@ -3,15 +3,18 @@
 // Real, fixed job slots tied to districts that already exist and
 // already have a real money path: Food District (`foodDistrict.js`,
 // a real order ledger), Venus Resort (`venusResort.js`'s `NPCS`
-// dealer role — a decorative staff slot a player can now fill), and a
-// Vulture Music gig (`vultureMusicClient.js`, a real `-embed` client).
-// `payShift` pays through V3 (`v3Client.js`'s `transferVCoin`) from a
-// named payroll account for that district — the same pattern this
-// repo already uses for non-player ledger accounts (DEGVCHI's brand
-// `sponsor`/`creatorId` fields) — with the claim-before-pay ordering
-// `degvchi.js`'s `purchaseWearable` proved: the shift is marked paid
-// before the transfer is awaited, rolled back on failure, so no
-// second place invents a payout.
+// dealer role — a decorative staff slot a player can now fill), a
+// Vulture Music gig (`vultureMusicClient.js`, a real `-embed` client),
+// the Combat Sports District, and the Fashion District (DEGVCHI) --
+// the latter two are `vdp-native` content in `world.js`'s own
+// `DISTRICTS`, same as Food, so a job there needs no second app's
+// cooperation. `payShift` pays through V3 (`v3Client.js`'s
+// `transferVCoin`) from a named payroll account for that district —
+// the same pattern this repo already uses for non-player ledger
+// accounts (DEGVCHI's brand `sponsor`/`creatorId` fields) — with the
+// claim-before-pay ordering `degvchi.js`'s `purchaseWearable` proved:
+// the shift is marked paid before the transfer is awaited, rolled
+// back on failure, so no second place invents a payout.
 
 export const JOBS = {
   'food-cashier': {
@@ -25,6 +28,14 @@ export const JOBS = {
   'music-gig': {
     title: 'Vulture Music Gig', districtId: 'vulture-music', skill: 'Crafting',
     payrollAccountId: 'vulture-music-payroll', payPerShift: 18,
+  },
+  'combat-trainer': {
+    title: 'Combat Sports Trainer', districtId: 'combat-sports', skill: 'Athletics',
+    payrollAccountId: 'combat-sports-payroll', payPerShift: 22,
+  },
+  'boutique-stylist': {
+    title: 'DEGVCHI Boutique Stylist', districtId: 'fashion', skill: 'Art',
+    payrollAccountId: 'fashion-district-payroll', payPerShift: 17,
   },
 };
 

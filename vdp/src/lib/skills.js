@@ -6,7 +6,11 @@
 // `npcs.js` already applies to VACON-C's needs/goals/habits. Each
 // subject below is the real §25 skill that occupation practises:
 // `Business` (trader), `Crafting` (cook), `Construction` (labourer/
-// carpenter), `Communication` (teacher/implied), `Management`.
+// carpenter), `Communication` (teacher/implied), `Management`,
+// `Athletics` (occupations.js tier 2: "organizations.type sports"),
+// `Art` (occupations.js tier 4, implied) -- the last two added
+// alongside the Combat Sports District and Fashion District jobs in
+// `jobs.js`, VDP-native districts that had no matching skill before.
 //
 // A skill rises from three places, each bounded so none of them can
 // alone max it out: working a matching job (small, passive, per
@@ -17,7 +21,7 @@
 // bump from one conversation doesn't read as permanent next to one
 // built from steady practice.
 
-export const SKILL_NAMES = ['Business', 'Crafting', 'Construction', 'Communication', 'Management'];
+export const SKILL_NAMES = ['Business', 'Crafting', 'Construction', 'Communication', 'Management', 'Athletics', 'Art'];
 
 export const JOB_SHIFT_GAIN = 1.5;
 export const TEXTBOOK_GAIN = 12;

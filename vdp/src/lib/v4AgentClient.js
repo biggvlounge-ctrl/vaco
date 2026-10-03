@@ -99,7 +99,7 @@ export async function analyzeOutfitPhoto(base64Image, mediaType) {
 // all: the server (`vdp/server.cjs`'s `POST /api/players/:id/talk`)
 // applies a small, bounded nudge keyed on that topic, never on
 // free-text the model could use to claim an arbitrarily large effect.
-const TALK_TOPICS = ['business', 'crafting', 'construction', 'communication', 'management', 'philosophical', 'religious', 'none'];
+const TALK_TOPICS = ['business', 'crafting', 'construction', 'communication', 'management', 'athletics', 'art', 'philosophical', 'religious', 'none'];
 
 function talkSystemPrompt(npc, npcExplainLine) {
   const traitSummary = Object.entries(npc.traits)
@@ -108,7 +108,7 @@ function talkSystemPrompt(npc, npcExplainLine) {
   return `You are ${npc.name}, a character in a small walkable-world game. Your personality traits (0-100 each): ${traitSummary}. ${npcExplainLine ? `Right now: ${npcExplainLine}` : "You haven't decided what to do next yet."}
 Reply to the player in character, 1-2 sentences, consistent with your own traits above. Respond with STRICT JSON only, no prose before or after, matching exactly this shape:
 {"reply": "<your in-character reply>", "topic": "<one of: ${TALK_TOPICS.join(', ')}>"}
-Use "topic" to name the one real subject your reply is actually about -- "business"/"crafting"/"construction"/"communication"/"management" for a practical skill, "philosophical" or "religious" for a belief or worldview exchange, "none" for small talk with no real subject.`;
+Use "topic" to name the one real subject your reply is actually about -- "business"/"crafting"/"construction"/"communication"/"management"/"athletics"/"art" for a practical skill, "philosophical" or "religious" for a belief or worldview exchange, "none" for small talk with no real subject.`;
 }
 
 export function parseTalkJson(text) {

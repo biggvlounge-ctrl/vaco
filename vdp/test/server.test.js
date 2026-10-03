@@ -104,7 +104,9 @@ test('a never-seen player auto-creates with the real needs/skills/beliefs shape'
   const body = await (await fetch(`${BASE}/api/players/brand-new-player/state`)).json();
   assert.ok(body.state.needs);
   assert.ok(body.state.traits);
-  assert.deepEqual(body.skills, { Business: 0, Crafting: 0, Construction: 0, Communication: 0, Management: 0 });
+  assert.deepEqual(body.skills, {
+    Business: 0, Crafting: 0, Construction: 0, Communication: 0, Management: 0, Athletics: 0, Art: 0,
+  });
   assert.deepEqual(body.beliefs, {});
 });
 
