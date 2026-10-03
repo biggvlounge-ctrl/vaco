@@ -56,6 +56,7 @@
 export const APPS = [
   // -- Consumer-facing apps --
   { id: 'vdp', name: 'VDP', description: 'The walkable digital layer -- avatar economy, districts, Vavlt Stvdios Stage.', url: 'http://localhost:5174', category: 'consumer', parent: 'VDP', bundle: 'Gamified & Simulation' },
+  { id: 'vdp-server', name: 'VDP Server', description: "VDP's own backend -- player needs/goals, jobs, skills, relationships, property, and the shared world over WebSocket. No UI of its own; the `vdp` entry above is what a person actually opens.", url: 'http://localhost:8827', category: 'infra', parent: 'VDP', bundle: 'Gamified & Simulation' },
   { id: 'venvs', name: 'VENVS', description: 'Analog commerce -- Shop, Marketplace, Publishing.', url: 'http://localhost:5173', category: 'consumer', parent: 'VENVS', bundle: 'Commerce & Marketplace' },
   { id: 'hvntz', name: 'HVNTZ', description: 'Revenue stack, hunts, and the Explore Page.', url: 'http://localhost:8792', category: 'consumer', parent: 'HVNTZ', bundle: 'Social & Discovery' },
   { id: 'void', name: 'VOID', description: 'Real-world logistics, drones, workforce, and station network.', url: 'http://localhost:8793', category: 'consumer', parent: 'VOID', bundle: 'Operations & Infrastructure' },

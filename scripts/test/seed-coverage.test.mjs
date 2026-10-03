@@ -55,6 +55,7 @@ const NO_CONTENT_BY_DESIGN = {
   vago: 'wagering and prediction markets stay closed pending compliance review; not seeded to make a demo look fuller',
   yap: 'accepts reports only from an operator-verified reporter; seeding one would mean auto-approving an identity claim, which is the guard Yap exists to enforce',
   vdp: 'a Vite frontend that seeds itself in the browser (src/lib/seedDemoData.js)',
+  'vdp-server': "VDP's own backend — no UI of its own (the `vdp` entry above is what opens), and its content (player state, jobs worked, skills, property) is produced by real player actions through that frontend, not pre-seeded catalog data",
   venvs: 'a Vite frontend using browser storage',
   vaca: 'seeded as far as a machine may take it — claims are submitted, approval needs a human operator',
 };
