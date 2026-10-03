@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   createChopz, getAvailableUnits, leaseUnit, runShift,
-  staffWithAIEmployee, getPendingEarnings, collectEarnings, TIER_LEASE_COST, TIER_NAMES,
+  staffWithAIEmployee, getPendingEarnings, collectEarnings, LEASE_COST,
 } from "../lib/chopz.js";
 import { transferVCoin } from "../lib/v3Client.js";
 
@@ -69,13 +69,13 @@ export default function ChopzView({ session, onPurchase }) {
         return (
           <div key={unit.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", borderTop: "1px solid #eee" }}>
             <span>
-              #{unit.id} {unit.category} <span style={{ color: "#888" }}>({TIER_NAMES[unit.tier]}, tier {unit.tier})</span>{" "}
+              #{unit.id} {unit.category}{" "}
               {unit.ownerId ? (
                 <span style={{ color: "#888" }}>
                   — leased, {unit.mode === "ai_employee" ? `staffed by ${unit.employeeName} (pending: ${pending} VCoin)` : "self-run"}
                 </span>
               ) : (
-                <span style={{ color: "#888" }}>— available (${TIER_LEASE_COST[unit.tier]} to lease)</span>
+                <span style={{ color: "#888" }}>— available (${LEASE_COST} to lease)</span>
               )}
             </span>
             {!unit.ownerId && (
