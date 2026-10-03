@@ -221,6 +221,7 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
   // or received by this session.
   const [otherPlayerIds, setOtherPlayerIds] = useState([]);
   const [wsStatus, setWsStatus] = useState("connecting");
+  const [population, setPopulation] = useState(null);
   const [chatTarget, setChatTarget] = useState("");
   const [chatInput, setChatInput] = useState("");
   const [chatLog, setChatLog] = useState([]);
@@ -316,6 +317,30 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
       wsRef.current?.close();
     };
   }, [session?.userId]);
+
+  // A real, server-computed population tier (population.js) -- not
+  // gated on login, same "the world is alive regardless" posture the
+  // NPC/position data already takes. Polled rather than pushed over
+  // the WebSocket: it changes far less often than a position update,
+  // and a dedicated channel for it would be a lot of new plumbing for
+  // a number that moves once in a while.
+  useEffect(() => {
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const res = await fetch(`${VDP_API_URL}/api/population`);
+        if (!res.ok || cancelled) return;
+        setPopulation(await res.json());
+      } catch {
+        // VDP's server being briefly unreachable is not worth a UI error
+        // over a background population readout -- it just stays stale
+        // until the next successful poll.
+      }
+    };
+    poll();
+    const interval = setInterval(poll, 10000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, []);
 
   const handleKeyDown = useCallback((e) => {
     let dx = 0;
@@ -515,6 +540,11 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
         <span style={{ color: wsStatus === "open" ? "#6adfd4" : "#e0c23a" }}>
           {wsStatus === "open" ? "● shared world live" : wsStatus === "reconnecting" ? "● reconnecting…" : "● connecting…"}
         </span>
+        {population && (
+          <span style={{ color: "#888" }}>
+            {" "}· {population.tier} ({population.population} — {population.players} real, {population.npcs} NPC)
+          </span>
+        )}
       </p>
       <canvas
         ref={canvasRef}

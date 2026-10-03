@@ -113,6 +113,7 @@ let store = createVdpStore();
   const propertyLib = await import('./src/lib/property.js');
   const jobsLib = await import('./src/lib/jobs.js');
   const libraryLib = await import('./src/lib/library.js');
+  const populationLib = await import('./src/lib/population.js');
 
   function ensurePlayer(userId) {
     if (!store.players[userId]) {
@@ -144,6 +145,15 @@ let store = createVdpStore();
       players: Object.keys(store.players).length,
       npcs: store.npcWorld ? store.npcWorld.npcs.length : 0,
     });
+  });
+
+  // A real headcount, not a simulated one -- see population.js's own
+  // header for why this is deliberately not worldExpansion.js's
+  // backdrop-city population signal.
+  app.get('/api/population', (_req, res) => {
+    const playerCount = Object.keys(store.players).length;
+    const npcCount = store.npcWorld ? store.npcWorld.npcs.length : 0;
+    res.json(populationLib.describePopulation(playerCount, npcCount));
   });
 
   // --- Player needs/goals (reuses npcs.js's own engine) --------------
