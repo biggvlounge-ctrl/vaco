@@ -63,6 +63,9 @@ export default function ChopzView({ session, onPurchase }) {
   return (
     <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16, marginTop: 12 }}>
       <h2 style={{ fontSize: 16, margin: "0 0 8px 0" }}>CHOPZ District</h2>
+      <p style={{ fontSize: 12, color: "#888", margin: "0 0 8px 0" }}>
+        Leasable storefronts themed around CHOPZ's real seller niches (beauty, apparel, gadgets, home, toys) plus screen-based DTC shops.
+      </p>
 
       {store.units.map((unit) => {
         const pending = unit.mode === "ai_employee" ? getPendingEarnings(store, unit.id, Date.now()) : null;

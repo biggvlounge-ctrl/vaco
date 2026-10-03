@@ -16,14 +16,31 @@
 // API. The real video app now has its own real walkable district too
 // (`world.js`'s `chopz` entry, `ChopzShortsView.jsx` -- deliberately
 // named "Shorts" to keep the two apart in code and on screen). Both
-// are real, both are kept, per no instruction to remove either.
+// are real, both are kept, per direct instruction: this district is
+// "ok, we just will center it around chopz shop sellers and screen dtc
+// shops" -- its mechanics (lease, self-run shift, AI employee) stay
+// exactly as they were; only its categories were re-themed to actually
+// match the real CHOPZ brand instead of the generic retail names this
+// module started with.
 //
-// No source doc specifies category names, lease cost, shift payout,
-// cooldown length, or AI-employee earn rate -- every constant below
-// is invented and flagged as interpretive, same posture as Phase 5's
-// world constants. The 8-units-across-7-categories split (one
-// category gets 2 units) is also an interpretive choice; no doc says
-// which category gets the extra slot.
+// **Categories now mirror the real CHOPZ (TikTok Shop) seller niches**
+// -- real top-selling categories on that model (beauty & personal
+// care, apparel, electronics/gadgets, home & kitchen, toys & hobbies),
+// not invented ones -- plus a second group, screen-based DTC
+// storefronts, the same direct-to-consumer-advertising concept DREAMS
+// (`dreamsClient.js`) already monetizes elsewhere in VDP. This module
+// does not call DREAMS' real API (same "entirely client-side, no
+// duplicated ledger" posture already established above) -- a
+// `screen_dtc_shop` unit here is a themed kiosk slot, not a second
+// screen registry.
+//
+// No source doc specifies lease cost, shift payout, cooldown length,
+// or AI-employee earn rate -- every constant below is invented and
+// flagged as interpretive, same posture as Phase 5's world constants.
+// CLAUDE.md §4's original "7 business categories" is now 6 (beauty,
+// apparel, gadgets, home, toys, screen-DTC) after the re-theme above;
+// the 8-units split (two categories get 2 units each) is interpretive,
+// same as it always was.
 //
 // leaseUnit/runShift/collectEarnings reuse the same injected
 // transferFn pattern as every previous phase's real-money functions,
@@ -31,24 +48,23 @@
 // v3Client.js's Vite-only import.meta.env).
 
 const CATEGORIES = [
-  'food_stand',
-  'clothing_boutique',
-  'hardware_kiosk',
-  'music_stall',
-  'bookshop',
-  'salon',
-  'repair_shop',
+  'beauty_seller',
+  'apparel_seller',
+  'gadgets_seller',
+  'home_seller',
+  'toys_seller',
+  'screen_dtc_shop',
 ];
 
 const UNIT_TEMPLATE = [
-  { category: 'food_stand' },
-  { category: 'food_stand' }, // the one category with 2 of the 8 units
-  { category: 'clothing_boutique' },
-  { category: 'hardware_kiosk' },
-  { category: 'music_stall' },
-  { category: 'bookshop' },
-  { category: 'salon' },
-  { category: 'repair_shop' },
+  { category: 'beauty_seller' },
+  { category: 'beauty_seller' }, // beauty & personal care is CHOPZ's single largest real seller niche, the one category with 2 of the 8 units
+  { category: 'apparel_seller' },
+  { category: 'gadgets_seller' },
+  { category: 'home_seller' },
+  { category: 'toys_seller' },
+  { category: 'screen_dtc_shop' },
+  { category: 'screen_dtc_shop' },
 ];
 
 const LEASE_COST = 50;
