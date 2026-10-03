@@ -314,6 +314,14 @@ export const DISTRICTS = [
   {
     id: 'combat-sports', name: 'Combat Sports District', x: 300, y: 1980, width: 260, height: 260, contentType: 'vdp-native',
   },
+  // The Vavlt -- VDP's own nightclub district. Fills the third slot of
+  // the 8th row. `vdp-native`, same reason as Combat Sports: no
+  // separate "Vavlt" nightlife app exists to link out to (Vavlt
+  // Stvdios is a different, real, already-built app -- live
+  // streaming/screen-sessions -- deliberately not this).
+  {
+    id: 'vavlt', name: 'The Vavlt', x: 580, y: 1980, width: 260, height: 260, contentType: 'vdp-native',
+  },
 ];
 
 function buildingCenter(district) {

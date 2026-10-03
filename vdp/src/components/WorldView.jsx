@@ -16,6 +16,7 @@ import VexView from "./VexView.jsx";
 import VadoView from "./VadoView.jsx";
 import VenusResortView from "./VenusResortView.jsx";
 import CombatSportsView from "./CombatSportsView.jsx";
+import VavltView from "./VavltView.jsx";
 import VacayView from "./VacayView.jsx";
 import HvntzView from "./HvntzView.jsx";
 import VoidView from "./VoidView.jsx";
@@ -664,6 +665,9 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
           )}
           {enteredDistrict.contentType === 'vdp-native' && enteredDistrict.id === 'combat-sports' && (
             <CombatSportsView session={session} />
+          )}
+          {enteredDistrict.contentType === 'vdp-native' && enteredDistrict.id === 'vavlt' && (
+            <VavltView session={session} />
           )}
           {enteredDistrict.contentType === 'vacay-embed' && enteredDistrict.id === 'vacay' && (
             <VacayView session={session} />

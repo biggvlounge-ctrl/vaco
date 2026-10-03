@@ -72,6 +72,7 @@ function createVdpStore() {
     property: { properties: [], nextPropertyId: 1 },
     households: { households: [], nextHouseholdId: 1 },
     organizations: { organizations: [], nextOrganizationId: 1 },
+    vavlt: { presence: {} },
     relationships: {},
     npcWorld: null,
     news: { events: [], nextId: 1 },
@@ -116,6 +117,7 @@ let store = createVdpStore();
   const propertyLib = await import('./src/lib/property.js');
   const householdsLib = await import('./src/lib/households.js');
   const organizationsLib = await import('./src/lib/organizations.js');
+  const vavltLib = await import('./src/lib/vavlt.js');
   const jobsLib = await import('./src/lib/jobs.js');
   const libraryLib = await import('./src/lib/library.js');
   const populationLib = await import('./src/lib/population.js');
@@ -143,6 +145,7 @@ let store = createVdpStore();
       if (!store.news) store.news = newsLib.createNewsLog();
       if (!store.households) store.households = householdsLib.createHouseholdsStore();
       if (!store.organizations) store.organizations = organizationsLib.createOrganizationsStore();
+      if (!store.vavlt) store.vavlt = vavltLib.createVavltStore();
     },
   });
 
@@ -399,6 +402,36 @@ let store = createVdpStore();
       const updated = organizationsLib.removeMember(store.organizations, { organizationId, memberId });
       newsLib.recordEvent(store.news, { kind: 'organization', text: `${memberId} left ${updated.name}` });
       res.status(200).json(updated);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // --- The Vavlt: VDP's nightclub district --------------------------------
+  app.get('/api/vavlt/present', (_req, res) => {
+    res.json({ venue: vavltLib.VENUE_NAME, present: vavltLib.listPresent(store.vavlt) });
+  });
+
+  app.post('/api/vavlt/checkin', requireActor('ownerId'), async (req, res) => {
+    try {
+      const result = await vavltLib.checkIn(store.vavlt, {
+        ownerId: req.body.ownerId,
+        transferFn: (args) => transferVCoin({ ...args, toUserId: vavltLib.VENUE_ACCOUNT_ID }),
+      });
+      newsLib.recordEvent(store.news, {
+        kind: 'vavlt',
+        text: `${req.body.ownerId} paid cover and walked into ${result.venue}`,
+      });
+      res.status(201).json(result);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/vavlt/checkout', requireActor('ownerId'), (req, res) => {
+    try {
+      vavltLib.checkOut(store.vavlt, { ownerId: req.body.ownerId });
+      res.status(200).json({ present: vavltLib.listPresent(store.vavlt) });
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
