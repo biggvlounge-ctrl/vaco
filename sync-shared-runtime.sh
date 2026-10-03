@@ -50,7 +50,7 @@ cd "$REPO_ROOT"
 
 # Apps that guard a user-facing route with Shield.
 SHIELD_TARGETS=(
-  chopz chopz/chopz-shop cvnvo dreams hvntz v3 v4-proxy vaca vacay vaco-audit vaco-shell vacon-c vaco-notify vaco-passport vago vash-tap vavlt-stvdios venvm void vex voidmagic voken
+  chopz chopz/chopz-shop cvnvo dreams hvntz v3 v4-proxy vaca vacay vaco-audit vaco-shell vacon-c vaco-notify vaco-passport vago vash-tap vavlt-stvdios vdp venvm void vex voidmagic voken
   vsafe vulture-flix vulture-music vulture-pods vulture-studios vxllage vaco-media
   vaco-analytics
 )
@@ -94,9 +94,25 @@ DECISION_LOG_TARGETS=(
 #   vaco-shell   — a `"type": "module"` package, so its copy is real
 #                  ESM (`export function`) rather than a stale fork. It
 #                  carries the same three exports and uses durable().
-#   vdp, venvs   — Vite frontends. Their persistence is browser storage
+#   venvs        — a Vite frontend. Its persistence is browser storage
 #                  and shares only the name, the same documented split
-#                  as their shieldAuth clients.
+#                  as its shieldAuth client.
+#   vdp          — NOT the same case as venvs since its own real
+#                  backend (`server.cjs`) landed: `vdp/lib/persistence.cjs`
+#                  and `persistencePg.cjs` are real, current copies
+#                  (hand-verified byte-identical to shared/, modulo the
+#                  same `.cjs`-for-ESM-package rename SHIELD/SERVICE/
+#                  TRACING_TARGETS use). Still excluded from the sync
+#                  pair above on a different, narrower ground:
+#                  `persistencePg.cjs` requires `./persistence` with no
+#                  extension, which only resolves because the `.cjs`
+#                  suffix was added by hand; `sync_one`'s plain `cp`
+#                  does not rewrite require paths, so running it here
+#                  would silently strip that suffix and crash vdp's
+#                  Postgres-mode boot on the next sync. Re-diff by hand
+#                  against shared/persistence*.js when either changes,
+#                  rather than wiring an autosync this script cannot
+#                  yet do safely.
 # The unmanaged check below excludes all three on module identity
 # rather than filename, so none of them produces a false positive.
 PERSISTENCE_TARGETS=(
@@ -162,7 +178,7 @@ OPERATOR_TARGETS=(
 TRACING_TARGETS=(
   chopz chopz/chopz-shop cvnvo cvnvo/yap dreams hvntz shield v3 v4-proxy v4-search
   vaca vacay vaco-analytics vaco-audit vaco-media vaco-notify vaco-operator vaco-passport vaco-shell
-  vacon vacon-c vago vash-tap vavlt-stvdios venvm venvs-mock-backend vex vex-trading
+  vacon vacon-c vago vash-tap vavlt-stvdios vdp venvm venvs-mock-backend vex vex-trading
   void voidmagic voken vsafe vulture-flix vulture-music vulture-pods vulture-studios vxllage
   vaco-mcp
 )
@@ -171,7 +187,7 @@ TRACING_TARGETS=(
 # discovered, because "this app is written to by other apps" is a real
 # architectural fact per app, not something to infer from a directory.
 SERVICE_TARGETS=(
-  v3 v4-proxy vaca vacay vacon vaco-analytics vaco-audit vaco-notify vaco-passport vsafe cvnvo voken vago vash-tap hvntz dreams venvm void voidmagic vavlt-stvdios vulture-music vulture-flix vulture-pods vulture-studios vaco-shell vaco-operator vex vacon-c vaco-media
+  v3 v4-proxy vaca vacay vacon vaco-analytics vaco-audit vaco-notify vaco-passport vsafe cvnvo voken vago vash-tap hvntz dreams venvm vdp void voidmagic vavlt-stvdios vulture-music vulture-flix vulture-pods vulture-studios vaco-shell vaco-operator vex vacon-c vaco-media
 )
 
 CHECK=0
