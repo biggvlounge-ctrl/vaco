@@ -7,6 +7,8 @@ import { createFoodDistrict } from "./lib/foodDistrict.js";
 import { seedDemoData } from "./lib/seedDemoData.js";
 import WorldView from "./components/WorldView.jsx";
 import ChopzView from "./components/ChopzView.jsx";
+import MyStatusView from "./components/MyStatusView.jsx";
+import JobsView from "./components/JobsView.jsx";
 import MyAssetsView from "./components/MyAssetsView.jsx";
 import MyHomeView from "./components/MyHomeView.jsx";
 import NewsTicker from "./components/NewsTicker.jsx";
@@ -265,6 +267,8 @@ export default function App() {
               </div>
 
               <WorldView session={session} degvchiStore={degvchiStore} foodDistrictStore={foodDistrictStore} onPurchase={notifyStateChange} />
+              <MyStatusView session={session} refreshSignal={tick} />
+              <JobsView session={session} onChange={notifyStateChange} />
               <ChopzView session={session} onPurchase={notifyStateChange} />
               <MyHomeView session={session} onChange={notifyStateChange} />
               <MyAssetsView session={session} degvchiStore={degvchiStore} refreshSignal={tick} />
