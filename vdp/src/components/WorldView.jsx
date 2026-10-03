@@ -4,6 +4,8 @@ import {
   DISTRICTS, createWorldState, movePlayer, getCurrentDistrict, getNearbyBuilding, enterBuilding, getCameraOffset,
 } from "../lib/world.js";
 import { latestDecision, explainDecision } from "../lib/npcs.js";
+import { classifyMeridian } from "../lib/cityTiers.js";
+import { TOWN_NAME } from "../lib/town.js";
 import { talkToNpc } from "../lib/v4AgentClient.js";
 import { getEquippedOutfit } from "../lib/degvchi.js";
 import { drawAvatar } from "../lib/avatarRender.js";
@@ -226,6 +228,10 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
   const [chatTarget, setChatTarget] = useState("");
   const [chatInput, setChatInput] = useState("");
   const [chatLog, setChatLog] = useState([]);
+  // Pure/static given the current real feature set -- recomputed on
+  // every render rather than memoized, since AMENITY_SOURCES never
+  // changes within a session.
+  const cityTier = classifyMeridian();
   const canvasRef = useRef(null);
   const worldStateRef = useRef(worldState);
   // Server-pushed, not locally simulated: `npcsRef` holds the last
@@ -546,6 +552,11 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
             {" "}· {population.tier} ({population.population} — {population.players} real, {population.npcs} NPC)
           </span>
         )}
+      </p>
+      <p style={{ fontSize: 11, color: "#aaa", margin: "0 0 8px 0" }}>
+        {TOWN_NAME} is a real {cityTier ? cityTier.name : "unclassified"}
+        {cityTier && ` (${cityTier.minutes}-minute walk, radius ~${Math.round(cityTier.radiusMeters)}m)`}
+        {" — "}everything within walking distance; VOID provides rideshare beyond it.
       </p>
       <canvas
         ref={canvasRef}
