@@ -17,8 +17,18 @@
 // still VACON-C's own real-estate stage (planning/operation/...), a
 // property management concept. `level` is a separate, VDP-only
 // progression -- a bigger, nicer home a player moves up into -- so
-// the two axes don't collide: a level-4 Estate can still be under
+// the two axes don't collide: a level-5 Penthouse can still be under
 // `renovation`.
+//
+// **The entry-level tiers are VXLLAGE's own complex**, per explicit
+// naming instruction: a new player's first real home is a unit inside
+// a real, named development ("VXLLAGE Studio/Flat at <town.js's
+// TOWN_NAME>"), not a generic "Studio." Tiers 3+ are a player's own
+// independent property, outside that one complex, so they drop the
+// VXLLAGE name the same way a real person moves out of their first
+// apartment complex into a house they own outright.
+
+import { TOWN_NAME } from './town.js';
 
 export const PROPERTY_TYPES = ['residential'];
 
@@ -31,10 +41,11 @@ export const LIFECYCLE = [
 export const OWNER_TYPES = ['individual'];
 
 export const PROPERTY_LEVELS = [
-  { level: 1, name: 'Studio', price: 500 },
-  { level: 2, name: 'Apartment', price: 1200 },
+  { level: 1, name: `VXLLAGE Studio at ${TOWN_NAME}`, price: 500 },
+  { level: 2, name: `VXLLAGE Flat at ${TOWN_NAME}`, price: 1200 },
   { level: 3, name: 'Townhouse', price: 2500 },
   { level: 4, name: 'Estate', price: 5000 },
+  { level: 5, name: 'Penthouse', price: 9000 },
 ];
 
 export const HOME_PRICE = PROPERTY_LEVELS[0].price;

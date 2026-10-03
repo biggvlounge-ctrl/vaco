@@ -7,6 +7,7 @@ import {
   createPropertyStore, purchaseHome, homeOwnedBy, advanceLifecycle, upgradeHome,
   rentHome, buyRentedHome, HOME_PRICE, RENT_PRICE, LIFECYCLE, PROPERTY_LEVELS,
 } from '../src/lib/property.js';
+import { TOWN_NAME } from '../src/lib/town.js';
 
 function fakeTransfer(calls, { shouldFail = false } = {}) {
   return async (args) => {
@@ -49,6 +50,14 @@ test('advanceLifecycle moves one real stage at a time and stops at the end', () 
   const property = { lifecycleStage: LIFECYCLE[0] };
   for (let i = 0; i < LIFECYCLE.length + 3; i += 1) advanceLifecycle(property);
   assert.equal(property.lifecycleStage, LIFECYCLE[LIFECYCLE.length - 1], 'lifecycle must not run past its last real stage');
+});
+
+test('there are 5 tower levels, and the entry-level ones carry the VXLLAGE/town brand', () => {
+  assert.equal(PROPERTY_LEVELS.length, 5);
+  assert.ok(PROPERTY_LEVELS[0].name.includes('VXLLAGE'));
+  assert.ok(PROPERTY_LEVELS[0].name.includes(TOWN_NAME));
+  assert.ok(PROPERTY_LEVELS[1].name.includes('VXLLAGE'));
+  assert.ok(!PROPERTY_LEVELS[2].name.includes('VXLLAGE'), 'tier 3+ moves out of the VXLLAGE complex');
 });
 
 test('a purchased home starts at the first tower level', async () => {
