@@ -71,6 +71,7 @@ function createVdpStore() {
     jobs: { assignments: {}, shifts: [], nextShiftId: 1 },
     property: { properties: [], nextPropertyId: 1 },
     households: { households: [], nextHouseholdId: 1 },
+    organizations: { organizations: [], nextOrganizationId: 1 },
     relationships: {},
     npcWorld: null,
     news: { events: [], nextId: 1 },
@@ -114,6 +115,7 @@ let store = createVdpStore();
   const relationshipsLib = await import('./src/lib/relationships.js');
   const propertyLib = await import('./src/lib/property.js');
   const householdsLib = await import('./src/lib/households.js');
+  const organizationsLib = await import('./src/lib/organizations.js');
   const jobsLib = await import('./src/lib/jobs.js');
   const libraryLib = await import('./src/lib/library.js');
   const populationLib = await import('./src/lib/population.js');
@@ -140,6 +142,7 @@ let store = createVdpStore();
       if (!store.npcWorld) store.npcWorld = npcs.createNpcWorld();
       if (!store.news) store.news = newsLib.createNewsLog();
       if (!store.households) store.households = householdsLib.createHouseholdsStore();
+      if (!store.organizations) store.organizations = organizationsLib.createOrganizationsStore();
     },
   });
 
@@ -341,6 +344,66 @@ let store = createVdpStore();
     }
   });
 
+  // --- Organizations: family, tribe, cult (NPC + player mix) ------------
+  app.get('/api/organizations/:id', (req, res) => {
+    res.json({ organization: organizationsLib.getOrganization(store.organizations, Number(req.params.id)) });
+  });
+
+  app.get('/api/players/:id/organization', (req, res) => {
+    res.json({ organization: organizationsLib.organizationOf(store.organizations, req.params.id) });
+  });
+
+  app.post('/api/organizations', requireActor('founderId'), (req, res) => {
+    const { name, type, founderId } = req.body || {};
+    try {
+      const org = organizationsLib.foundOrganization(store.organizations, { name, type, founderId });
+      newsLib.recordEvent(store.news, {
+        kind: 'organization',
+        text: `${founderId} founded the ${org.type} "${org.name}"`,
+      });
+      res.status(201).json(org);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // Only a current member can invite someone (player or `npc-<id>`)
+  // onto their own organization -- same checked-not-claimed shape
+  // `/api/households/invite` already uses.
+  app.post('/api/organizations/:id/invite', requireActor('inviterId'), (req, res) => {
+    const organizationId = Number(req.params.id);
+    const { inviterId, memberId } = req.body || {};
+    const org = organizationsLib.getOrganization(store.organizations, organizationId);
+    if (!org || !org.memberIds.includes(inviterId)) {
+      return res.status(403).json({ error: `invite: "${inviterId}" does not belong to organization ${organizationId}` });
+    }
+    try {
+      const updated = organizationsLib.addMember(store.organizations, { organizationId, memberId });
+      if (!memberId.startsWith('npc-')) {
+        relationshipsLib.recordConversation(store.relationships, inviterId, memberId, { positive: true });
+      }
+      newsLib.recordEvent(store.news, {
+        kind: 'organization',
+        text: `${memberId} joined ${org.name}`,
+      });
+      res.status(200).json(updated);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/organizations/:id/leave', requireActor('memberId'), (req, res) => {
+    const organizationId = Number(req.params.id);
+    const { memberId } = req.body || {};
+    try {
+      const updated = organizationsLib.removeMember(store.organizations, { organizationId, memberId });
+      newsLib.recordEvent(store.news, { kind: 'organization', text: `${memberId} left ${updated.name}` });
+      res.status(200).json(updated);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
   // --- Relationships -----------------------------------------------------
   app.get('/api/relationships/:id', (req, res) => {
     res.json({ relationships: relationshipsLib.listRelationshipsFor(store.relationships, req.params.id) });
@@ -386,6 +449,12 @@ let store = createVdpStore();
     }
 
     const relationship = relationshipsLib.recordConversation(store.relationships, playerId, `npc-${npc.id}`);
+
+    const org = organizationsLib.organizationOf(store.organizations, playerId);
+    if (org && org.memberIds.includes(`npc-${npc.id}`)) {
+      organizationsLib.recordActivity(store.organizations, org.id);
+    }
+
     res.json({ effect, relationship });
   });
 
@@ -456,6 +525,15 @@ let store = createVdpStore();
           kind: 'chat',
           text: `${msg.fromUserId} to ${msg.toUserId}: "${text.length > 80 ? `${text.slice(0, 80)}…` : text}"`,
         });
+        // Cohesion is earned, not held: two people who actually talk,
+        // and happen to share an organization, nudge it -- the same
+        // "real activity, not a standing score" discipline
+        // organizations.js's own header commits to.
+        const orgA = organizationsLib.organizationOf(store.organizations, msg.fromUserId);
+        const orgB = organizationsLib.organizationOf(store.organizations, msg.toUserId);
+        if (orgA && orgB && orgA.id === orgB.id) {
+          organizationsLib.recordActivity(store.organizations, orgA.id);
+        }
       }
     },
   });
@@ -484,6 +562,7 @@ let store = createVdpStore();
     for (const player of Object.values(store.players)) {
       skillsLib.fadeSkills(player.skills);
     }
+    organizationsLib.fadeCohesion(store.organizations);
     broadcast({ type: 'npcs', npcs: store.npcWorld.npcs, tick: store.npcWorld.tick });
   }, NPC_TICK_INTERVAL_MS).unref();
 

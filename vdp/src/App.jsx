@@ -9,6 +9,7 @@ import WorldView from "./components/WorldView.jsx";
 import ChopzView from "./components/ChopzView.jsx";
 import MyStatusView from "./components/MyStatusView.jsx";
 import JobsView from "./components/JobsView.jsx";
+import OrganizationsView from "./components/OrganizationsView.jsx";
 import MyAssetsView from "./components/MyAssetsView.jsx";
 import MyHomeView from "./components/MyHomeView.jsx";
 import NewsTicker from "./components/NewsTicker.jsx";
@@ -271,6 +272,7 @@ export default function App() {
               <JobsView session={session} onChange={notifyStateChange} />
               <ChopzView session={session} onPurchase={notifyStateChange} />
               <MyHomeView session={session} onChange={notifyStateChange} />
+              <OrganizationsView session={session} onChange={notifyStateChange} />
               <MyAssetsView session={session} degvchiStore={degvchiStore} refreshSignal={tick} />
               <NewsTicker />
             </div>
