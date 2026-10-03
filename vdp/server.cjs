@@ -201,6 +201,16 @@ let store = createVdpStore();
     }
   });
 
+  // A player's own real job history -- current assignment plus every
+  // real, paid shift, for the My Assets dashboard. Nothing new is
+  // computed here; jobsLib already tracks both.
+  app.get('/api/players/:id/jobs', (req, res) => {
+    res.json({
+      assignment: jobsLib.currentAssignment(store.jobs, req.params.id),
+      shifts: jobsLib.shiftsFor(store.jobs, req.params.id),
+    });
+  });
+
   // --- Property / housing ----------------------------------------------
   app.get('/api/property/:ownerId', (req, res) => {
     res.json({ home: propertyLib.homeOwnedBy(store.property, req.params.ownerId) });
