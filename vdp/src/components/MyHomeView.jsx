@@ -12,6 +12,8 @@ const VDP_API_URL = import.meta.env?.VITE_VDP_API_URL || "http://localhost:8827"
 
 export default function MyHomeView({ session, onChange }) {
   const [home, setHome] = useState(null);
+  const [household, setHousehold] = useState(null);
+  const [inviteId, setInviteId] = useState("");
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -23,6 +25,13 @@ export default function MyHomeView({ session, onChange }) {
       const res = await fetch(`${VDP_API_URL}/api/property/${encodeURIComponent(session.userId)}`);
       const body = await res.json();
       setHome(body.home);
+      if (body.home) {
+        const hRes = await fetch(`${VDP_API_URL}/api/households/${body.home.id}`);
+        const hBody = await hRes.json();
+        setHousehold(hBody.household);
+      } else {
+        setHousehold(null);
+      }
     } catch {
       // Transient fetch failure -- the next refresh tries again.
     } finally {
@@ -46,6 +55,28 @@ export default function MyHomeView({ session, onChange }) {
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || `${path} failed (${res.status})`);
       setHome(body);
+      if (onChange) await onChange();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleInvite = async () => {
+    if (!inviteId.trim() || !home) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`${VDP_API_URL}/api/households/invite`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.sessionToken}` },
+        body: JSON.stringify({ propertyId: home.id, inviterId: session.userId, memberId: inviteId.trim() }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || `invite failed (${res.status})`);
+      setHousehold(body);
+      setInviteId("");
       if (onChange) await onChange();
     } catch (err) {
       setError(err.message);
@@ -96,6 +127,29 @@ export default function MyHomeView({ session, onChange }) {
 
           {home.ownershipType === "owned" && !nextLevel && (
             <p style={{ fontSize: 12, color: "#888" }}>Already at the top tier.</p>
+          )}
+
+          {household && (
+            <div style={{ marginTop: 12 }}>
+              <h3 style={{ fontSize: 13, margin: "0 0 4px 0" }}>
+                Household ({household.memberIds.length})
+              </h3>
+              <ul style={{ fontSize: 12, margin: "0 0 8px 0", paddingLeft: 18 }}>
+                {household.memberIds.map((id) => <li key={id}>{id}</li>)}
+              </ul>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  type="text"
+                  placeholder="userId to invite"
+                  value={inviteId}
+                  onChange={(e) => setInviteId(e.target.value)}
+                  style={{ fontSize: 12 }}
+                />
+                <button onClick={handleInvite} disabled={busy || !inviteId.trim()}>
+                  {busy ? "…" : "Invite roommate"}
+                </button>
+              </div>
+            </div>
           )}
         </div>
       )}

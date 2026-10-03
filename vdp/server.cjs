@@ -70,6 +70,7 @@ function createVdpStore() {
     players: {},
     jobs: { assignments: {}, shifts: [], nextShiftId: 1 },
     property: { properties: [], nextPropertyId: 1 },
+    households: { households: [], nextHouseholdId: 1 },
     relationships: {},
     npcWorld: null,
     news: { events: [], nextId: 1 },
@@ -112,6 +113,7 @@ let store = createVdpStore();
   const beliefsLib = await import('./src/lib/beliefs.js');
   const relationshipsLib = await import('./src/lib/relationships.js');
   const propertyLib = await import('./src/lib/property.js');
+  const householdsLib = await import('./src/lib/households.js');
   const jobsLib = await import('./src/lib/jobs.js');
   const libraryLib = await import('./src/lib/library.js');
   const populationLib = await import('./src/lib/population.js');
@@ -137,6 +139,7 @@ let store = createVdpStore();
       store = loaded;
       if (!store.npcWorld) store.npcWorld = npcs.createNpcWorld();
       if (!store.news) store.news = newsLib.createNewsLog();
+      if (!store.households) store.households = householdsLib.createHouseholdsStore();
     },
   });
 
@@ -239,6 +242,7 @@ let store = createVdpStore();
         ownerId: req.body.ownerId,
         transferFn: (args) => transferVCoin({ ...args, toUserId: 'vdp-property-office' }),
       });
+      householdsLib.ensureHousehold(store.households, { propertyId: home.id, ownerId: req.body.ownerId });
       newsLib.recordEvent(store.news, {
         kind: 'property',
         text: `${req.body.ownerId} bought a ${home.levelName}`,
@@ -271,6 +275,7 @@ let store = createVdpStore();
         ownerId: req.body.ownerId,
         transferFn: (args) => transferVCoin({ ...args, toUserId: 'vdp-property-office' }),
       });
+      householdsLib.ensureHousehold(store.households, { propertyId: home.id, ownerId: req.body.ownerId });
       newsLib.recordEvent(store.news, {
         kind: 'property',
         text: `${req.body.ownerId} rented a ${home.levelName}`,
@@ -292,6 +297,45 @@ let store = createVdpStore();
         text: `${req.body.ownerId} bought the home they were renting`,
       });
       res.status(200).json(home);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // --- Households: who actually lives together -------------------------
+  app.get('/api/households/:propertyId', (req, res) => {
+    res.json({ household: householdsLib.householdFor(store.households, Number(req.params.propertyId)) });
+  });
+
+  // Only a current resident can invite someone else onto their own
+  // property -- `requireActor('inviterId')` proves the caller really
+  // is `inviterId`; this checks that `inviterId` is actually one of
+  // the household's own members before letting them add a roommate.
+  app.post('/api/households/invite', requireActor('inviterId'), (req, res) => {
+    const { propertyId, inviterId, memberId } = req.body || {};
+    const household = householdsLib.householdFor(store.households, Number(propertyId));
+    if (!household || !household.memberIds.includes(inviterId)) {
+      return res.status(403).json({ error: `invite: "${inviterId}" does not live at property ${propertyId}` });
+    }
+    try {
+      const updated = householdsLib.addMember(store.households, { propertyId: Number(propertyId), memberId });
+      relationshipsLib.recordConversation(store.relationships, inviterId, memberId, { positive: true });
+      newsLib.recordEvent(store.news, {
+        kind: 'household',
+        text: `${memberId} moved in with ${inviterId}`,
+      });
+      res.status(200).json(updated);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/households/leave', requireActor('memberId'), (req, res) => {
+    const { propertyId, memberId } = req.body || {};
+    try {
+      const updated = householdsLib.removeMember(store.households, { propertyId: Number(propertyId), memberId });
+      newsLib.recordEvent(store.news, { kind: 'household', text: `${memberId} moved out` });
+      res.status(200).json(updated);
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
