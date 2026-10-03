@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { login, getCurrentSession, logout, adoptToken } from "./lib/shieldAuth.js";
+import { register, loginWithPassword, getCurrentSession, logout, adoptToken } from "./lib/shieldAuth.js";
 import { getVCoinBalance, cashOutToVash, getVashBalance } from "./lib/v3Client.js";
 import { createDegvchi, registerWearable } from "./lib/degvchi.js";
 import { seedSvmikoDegvchiWearables } from "./lib/svmikoDegvchiWearables.js";
@@ -47,6 +47,14 @@ export default function App() {
   const [vashBalance, setVashBalance] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  // Real multi-user login, replacing the single `login("demo-user")`
+  // button: a username + password form against Shield's own real
+  // `/api/shield/register` and `/api/shield/login` routes, so two
+  // different real people are now two different real sessions -- the
+  // one thing that makes "multiplayer" mean something.
+  const [authMode, setAuthMode] = useState("login");
+  const [authUserId, setAuthUserId] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
   const [degvchiStore] = useState(() => SEED_DEGVCHI(createDegvchi()));
   // Food District's own menu data is static (FLAGSHIP_BRANDS), not
   // seeded into the store the way DEGVCHI's wearables are -- only real
@@ -118,12 +126,15 @@ export default function App() {
     });
   }, [refreshBalances]);
 
-  const handleLogin = async () => {
+  const handleAuthSubmit = async (e) => {
+    e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      const newSession = await login("demo-user");
+      const authFn = authMode === "register" ? register : loginWithPassword;
+      const newSession = await authFn(authUserId, authPassword);
       setSession(newSession);
+      setAuthPassword("");
       await refreshBalances(newSession.userId);
     } catch (err) {
       setError(err.message);
@@ -193,11 +204,43 @@ export default function App() {
           </p>
 
           {!session && (
-            <div className="vaco-row">
-              <button className="vaco-btn vaco-btn-primary" onClick={handleLogin} disabled={busy}>
-                {busy ? "Logging in…" : "Log in (Shield session)"}
+            <form className="vaco-stack-sm" onSubmit={handleAuthSubmit} style={{ maxWidth: "28ch" }}>
+              <div className="vaco-row-tight">
+                <button
+                  type="button"
+                  className={`vaco-btn vaco-btn-sm ${authMode === "login" ? "vaco-btn-primary" : "vaco-btn-ghost"}`}
+                  onClick={() => setAuthMode("login")}
+                >
+                  Log in
+                </button>
+                <button
+                  type="button"
+                  className={`vaco-btn vaco-btn-sm ${authMode === "register" ? "vaco-btn-primary" : "vaco-btn-ghost"}`}
+                  onClick={() => setAuthMode("register")}
+                >
+                  Register
+                </button>
+              </div>
+              <input
+                className="vaco-input"
+                type="text"
+                placeholder="username"
+                value={authUserId}
+                onChange={(e) => setAuthUserId(e.target.value)}
+                autoComplete="username"
+              />
+              <input
+                className="vaco-input"
+                type="password"
+                placeholder="password"
+                value={authPassword}
+                onChange={(e) => setAuthPassword(e.target.value)}
+                autoComplete={authMode === "register" ? "new-password" : "current-password"}
+              />
+              <button className="vaco-btn vaco-btn-primary" type="submit" disabled={busy}>
+                {busy ? "…" : authMode === "register" ? "Create account" : "Log in"}
               </button>
-            </div>
+            </form>
           )}
 
           {session && (

@@ -50,6 +50,53 @@ export async function login(userId) {
   return session;
 }
 
+// Real credential auth — Shield's own `/api/shield/register` and
+// `/api/shield/login` (`shield/lib/credentials.js`, `shield/server.js`)
+// already exist and are real, standard scrypt-hashed password auth.
+// This is the client half VDP was missing: the only login VDP ever
+// had was the single `login("demo-user")` button above, a claimed-
+// userId session with no password behind it. Multiple real people can
+// now be multiple real sessions, which is what makes "two players in
+// the same world" mean something.
+export async function register(userId, password) {
+  if (!userId || !password) {
+    throw new Error("register requires a userId and a password");
+  }
+  const res = await fetch(`${SHIELD_API_URL}/api/shield/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId, password }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `register failed (${res.status})`);
+  }
+  // Shield's own comment: "Registering logs you in immediately (mints
+  // a real session)" -- the response IS a session, same shape login()
+  // returns, so it's stored the same way.
+  const session = await res.json();
+  localStorage.setItem(SESSION_STORAGE_KEY, session.sessionToken);
+  return session;
+}
+
+export async function loginWithPassword(userId, password) {
+  if (!userId || !password) {
+    throw new Error("loginWithPassword requires a userId and a password");
+  }
+  const res = await fetch(`${SHIELD_API_URL}/api/shield/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId, password }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `login failed (${res.status})`);
+  }
+  const session = await res.json();
+  localStorage.setItem(SESSION_STORAGE_KEY, session.sessionToken);
+  return session;
+}
+
 // Real validation of a token that arrived from somewhere else (the
 // Shell's own handoff link), not one this origin minted itself --
 // same real Shield check as `getCurrentSession`, just against a

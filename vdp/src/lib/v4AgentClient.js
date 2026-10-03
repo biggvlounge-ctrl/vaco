@@ -86,3 +86,66 @@ export async function analyzeOutfitPhoto(base64Image, mediaType) {
 
   return parseOutfitJson(body.text || '');
 }
+
+// Real conversation with a specific NPC, grounded in that NPC's own
+// actual state (`npcs.js`'s real traits + its latest decision-log
+// entry, rendered the same way `explainDecision` already renders it
+// for the hover tooltip) rather than a generic chatbot persona — the
+// same "real analysis, not a stand-in" posture `analyzeOutfitPhoto`
+// above already takes with a photo.
+//
+// The model is asked to tag its own reply with ONE topic from a fixed
+// list, which is how a conversation gets to move a trait/skill at
+// all: the server (`vdp/server.cjs`'s `POST /api/players/:id/talk`)
+// applies a small, bounded nudge keyed on that topic, never on
+// free-text the model could use to claim an arbitrarily large effect.
+const TALK_TOPICS = ['business', 'crafting', 'construction', 'communication', 'management', 'philosophical', 'religious', 'none'];
+
+function talkSystemPrompt(npc, npcExplainLine) {
+  const traitSummary = Object.entries(npc.traits)
+    .map(([name, value]) => `${name} ${value}`)
+    .join(', ');
+  return `You are ${npc.name}, a character in a small walkable-world game. Your personality traits (0-100 each): ${traitSummary}. ${npcExplainLine ? `Right now: ${npcExplainLine}` : "You haven't decided what to do next yet."}
+Reply to the player in character, 1-2 sentences, consistent with your own traits above. Respond with STRICT JSON only, no prose before or after, matching exactly this shape:
+{"reply": "<your in-character reply>", "topic": "<one of: ${TALK_TOPICS.join(', ')}>"}
+Use "topic" to name the one real subject your reply is actually about -- "business"/"crafting"/"construction"/"communication"/"management" for a practical skill, "philosophical" or "religious" for a belief or worldview exchange, "none" for small talk with no real subject.`;
+}
+
+export function parseTalkJson(text) {
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) {
+    throw new Error('talkToNpc: the model did not return recognizable JSON');
+  }
+  const parsed = JSON.parse(match[0]);
+  const { reply, topic } = parsed;
+  if (typeof reply !== 'string' || !reply.trim()) {
+    throw new Error('talkToNpc: the model response is missing a reply');
+  }
+  if (!TALK_TOPICS.includes(topic)) {
+    throw new Error(`talkToNpc: the model returned an unrecognized topic "${topic}"`);
+  }
+  return { reply: reply.trim(), topic };
+}
+
+// `npc` is a real NPC object from `npcs.js`'s own shape (as broadcast
+// by the server's WebSocket layer). `latestDecisionEntry`/`explainFn`
+// let the caller pass `latestDecision(npc)`/`explainDecision` from
+// `npcs.js` without this module importing React-side state.
+export async function talkToNpc(npc, playerMessage, { latestDecisionEntry = null, explainFn = null } = {}) {
+  if (!npc) throw new Error('talkToNpc requires an npc');
+  if (typeof playerMessage !== 'string' || !playerMessage.trim()) {
+    throw new Error('talkToNpc requires a playerMessage');
+  }
+  const explainLine = explainFn ? explainFn(latestDecisionEntry) : '';
+
+  const body = await requestJson('/api/agent', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...sessionHeaders() },
+    body: JSON.stringify({
+      system: talkSystemPrompt(npc, explainLine),
+      messages: [{ role: 'user', content: playerMessage.trim() }],
+    }),
+  });
+
+  return parseTalkJson(body.text || '');
+}

@@ -127,11 +127,14 @@ function frictionKey(aId, bId) {
   return aId < bId ? `${aId}:${bId}` : `${bId}:${aId}`;
 }
 
-function mostPressingNeed(npc) {
+// Exported (not just NPC-internal) because the player-needs system
+// reuses it on a player record of the same `{needs}` shape — see
+// `createPlayerState` below.
+export function mostPressingNeed(npc) {
   return NEED_NAMES.reduce((worst, n) => (npc.needs[n] < npc.needs[worst] ? n : worst), NEED_NAMES[0]);
 }
 
-function topTrait(npc) {
+export function topTrait(npc) {
   return TRAIT_NAMES.reduce((best, t) => (npc.traits[t] > npc.traits[best] ? t : best), TRAIT_NAMES[0]);
 }
 
@@ -180,6 +183,33 @@ export function createNpc(id, home, rng = Math.random) {
   };
 }
 
+// The same needs/habits/traits shape `createNpc` builds, minus the
+// NPC-only fields (position, rotaSlot, decision log) a player record
+// has no use for — `vdp/server.js` owns the player's actual position
+// and tick scheduling. `stepNeeds`/`updateGoal`/`reinforceHabit`/
+// `fadeHabits` above all operate on this shape unchanged.
+export function createPlayerState(rng = Math.random) {
+  const traits = {};
+  for (const t of TRAIT_NAMES) {
+    traits[t] = randomInt(rng, 101);
+  }
+  const needs = {};
+  for (const n of NEED_NAMES) {
+    needs[n] = clamp(50 + Math.round((rng() - 0.5) * 40), 0, 100);
+  }
+  const habits = {};
+  for (const h of HABIT_NAMES) {
+    habits[h] = randomInt(rng, 31);
+  }
+  return {
+    traits,
+    needs,
+    habits,
+    currentGoal: null,
+    lastActionTick: {},
+  };
+}
+
 export function createNpcWorld(options = {}) {
   const { count = 14, rng = Math.random } = options;
   const anchors = HOME_DISTRICT_IDS.map(districtCenter);
@@ -211,7 +241,13 @@ export function explainDecision(entry) {
   return `${entry.name}${because} and values ${capitalize(entry.topTrait)} — ${entry.name} is ${ACTION_SENTENCE[entry.chosenAction]}.`;
 }
 
-function stepNeeds(npc, tick) {
+// Exported: the player-needs system (`vdp/server.js`) steps a player
+// record through the identical need/goal/habit math an NPC uses, on
+// the same `{needs, lastActionTick, currentGoal, traits, habits}`
+// shape `createPlayerState` below produces — one engine for both, so
+// a goal panel reads the same way whether it's describing an NPC or
+// the person playing.
+export function stepNeeds(npc, tick) {
   for (const need of NEED_NAMES) {
     const action = NEED_ACTION[need];
     const lastTick = npc.lastActionTick[action];
@@ -225,7 +261,7 @@ function stepNeeds(npc, tick) {
   }
 }
 
-function updateGoal(npc) {
+export function updateGoal(npc) {
   if (npc.currentGoal) {
     if (npc.needs[npc.currentGoal.need] >= GOAL_CLOSE_THRESHOLD) {
       npc.currentGoal = null;
@@ -241,13 +277,13 @@ function updateGoal(npc) {
   }
 }
 
-function reinforceHabit(npc, habitName) {
+export function reinforceHabit(npc, habitName) {
   if (!(habitName in npc.habits)) return;
   const room = 100 - npc.habits[habitName];
   npc.habits[habitName] = clamp(npc.habits[habitName] + room * HABIT_GAIN_FRACTION, 0, 100);
 }
 
-function fadeHabits(npc) {
+export function fadeHabits(npc) {
   for (const h of Object.keys(npc.habits)) {
     npc.habits[h] = clamp(npc.habits[h] - HABIT_FADE, 0, 100);
   }

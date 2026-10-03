@@ -36,6 +36,13 @@ export function createCatalog() {
   };
 }
 
+// VDP's own real belief-type enum (`vdp/src/lib/beliefs.js`, itself
+// reused verbatim from VACON-C's `server/beliefs.js`) -- duplicated as
+// a literal here rather than imported, since this module is
+// deliberately plain-Node-loadable (no Vite import.meta.env) and VDP
+// is a separate app/origin, not a shared dependency.
+const BELIEF_TYPES = ['religious', 'philosophical', 'political', 'scientific', 'cultural', 'personal'];
+
 export function publishBook(catalog, options = {}) {
   const {
     title,
@@ -48,6 +55,14 @@ export function publishBook(catalog, options = {}) {
     printingCost,
     narrationType,
     narratorRoyaltyRate,
+    // VDP tap-in (additive, optional): a practical textbook names the
+    // one real skill it teaches; an influence/philosophy book names
+    // the belief it moves. Never both -- a book either teaches a
+    // trade or nudges a conviction, see `vdp/src/lib/library.js`'s
+    // own header for why that stays one effect per purchase.
+    skillSubject,
+    beliefTopic,
+    beliefType,
   } = options;
 
   if (!title) {
@@ -64,6 +79,15 @@ export function publishBook(catalog, options = {}) {
   }
   if (!Number.isFinite(listPrice) || listPrice <= 0) {
     throw new Error('publishBook requires a positive listPrice');
+  }
+  if (skillSubject && (beliefTopic || beliefType)) {
+    throw new Error('publishBook: a book names either skillSubject or beliefTopic/beliefType, never both');
+  }
+  if ((beliefTopic && !beliefType) || (beliefType && !beliefTopic)) {
+    throw new Error('publishBook: beliefTopic and beliefType must be given together');
+  }
+  if (beliefType && !BELIEF_TYPES.includes(beliefType)) {
+    throw new Error(`publishBook: invalid beliefType "${beliefType}" (expected one of ${BELIEF_TYPES.join(', ')})`);
   }
 
   // Ingram-sourced titles are wholesale catalog access, not a
@@ -91,6 +115,9 @@ export function publishBook(catalog, options = {}) {
     listPrice,
     source,
     royalty,
+    skillSubject: skillSubject || null,
+    beliefTopic: beliefTopic || null,
+    beliefType: beliefType || null,
     createdAt: Date.now(),
   };
   catalog.books.push(book);
@@ -140,7 +167,7 @@ function requirePayoutFn(payoutFn, operation) {
 const PLATFORM_USER_ID = 'venvs-platform';
 
 export async function purchaseBook(catalog, options = {}) {
-  const { bookId, buyerId, transferFn, payoutFn } = options;
+  const { bookId, buyerId, transferFn, payoutFn, libraryRecordFn } = options;
   if (typeof transferFn !== 'function') {
     throw new Error('purchaseBook requires a transferFn(fromUserId, toUserId, amount, reason)');
   }
@@ -200,7 +227,33 @@ export async function purchaseBook(catalog, options = {}) {
   };
   catalog.orders.push(order);
 
-  return { book, order, pricePaid: book.listPrice, royaltyPaid };
+  // **The one real effect a book has, applied AFTER the purchase is
+  // already recorded, and never able to undo it.** VENVS stays the
+  // only place this sale is paid for; VDP (`vdp/src/lib/library.js`,
+  // behind `POST /api/library/record`) stays the only place the
+  // narrative effect lands. This is a signal, not money -- if VDP is
+  // unreachable or refuses it, the purchase the buyer already paid
+  // for must still stand, the same "fail soft on signals, hard on
+  // money" line this ecosystem draws everywhere else. The failure is
+  // returned, not thrown, so a caller can tell the buyer their book
+  // arrived even if its effect didn't land yet.
+  let libraryEffectError = null;
+  if (typeof libraryRecordFn === 'function' && (book.skillSubject || book.beliefTopic)) {
+    try {
+      await libraryRecordFn({
+        orderId: order.id,
+        buyerId,
+        title: book.title,
+        skillSubject: book.skillSubject,
+        beliefTopic: book.beliefTopic,
+        beliefType: book.beliefType,
+      });
+    } catch (err) {
+      libraryEffectError = err.message;
+    }
+  }
+
+  return { book, order, pricePaid: book.listPrice, royaltyPaid, libraryEffectError };
 }
 
 export function getBookOrder(catalog, orderId) {

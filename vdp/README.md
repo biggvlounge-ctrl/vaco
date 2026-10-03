@@ -172,13 +172,15 @@ district and view are deliberately named "CHOPZ Shorts"/
 `lib/chopz.js`'s own header for the full detail.
 
 ## Run
-Fourteen processes (only `vdp` itself and V3/Shield are strictly
-required to boot; the rest are needed one-for-one to reach a specific
+Fifteen processes (V3, Shield, and **VDP's own server.cjs** are now
+strictly required — the server phase gave VDP a real backend of its
+own, see below; the rest are needed one-for-one to reach a specific
 district without a real fetch error):
 ```
 cd ../v3 && npm install && npm start                     # localhost:8811 (VCoin/VASH ledger)
 cd ../shield && npm install && npm start                 # localhost:8812 (session layer)
-cd ../venvs && npm install && npm run dev                # localhost:5173 (needed for the Publisher embed)
+cd vdp && npm install && node server.cjs                 # localhost:8827 (VDP's OWN backend -- player state, jobs, skills, shared world over WebSocket)
+cd ../venvs && npm install && npm run dev                # localhost:5173 (needed for the Publisher embed, and for VDP's library effect after a real book purchase)
 cd ../voken && npm install && npm start                  # localhost:8794 (needed for the VEX/VADO districts)
 cd ../vavlt-stvdios && npm install && npm start           # localhost:8808 (needed for VENVS Stage)
 cd ../vxllage && npm install && npm start                 # localhost:8796 (needed for the Village District)
@@ -655,12 +657,35 @@ VOKEN's real `/api/brand` endpoint — not hardcoded text.
   DEGVCHI wearables have nothing visual to render onto.
 - ~~CHOPZ isn't placed in the walkable world's district grid~~ —
   closed in Phase 12 (CHOPZ Shorts, see above).
-- Digital Twin Levels (1→2→3), DREAMS billboards, Residential Towers,
-  Jobs/Careers, Daily Quests/HVNTZ Hunt, Skills, Population tiers,
-  living NPCs (real conversation via Shield's agent layer), My Assets
-  dashboard, Live World News, multiplayer/shared-world state — all
-  real, named scope from VENVS's original `CLAUDE.md` §4 this project
+- Digital Twin Levels (1→2→3), DREAMS billboards, Daily Quests/HVNTZ
+  Hunt, Population tiers, My Assets dashboard, Live World News — real,
+  named scope from VENVS's original `CLAUDE.md` §4 this project
   doesn't cover yet.
+- ~~Jobs/Careers, Skills, living/conversational NPCs, multiplayer/
+  shared-world state, Residential Towers~~ — closed in the server
+  phase (see below): VDP has its own real backend now
+  (`server.cjs`) — three fixed jobs tied to districts that already
+  have real money paths (`jobs.js`), five real skills that rise from
+  working, reading, or conversation (`skills.js`), one real
+  residential-home type (`property.js`), NPCs a player can actually
+  talk to via a real Claude call grounded in that NPC's own traits/
+  decision log (`v4AgentClient.js#talkToNpc`), and a genuinely shared
+  world over WebSocket — the server ticks one canonical NPC world and
+  broadcasts every connected player's position, so two real logged-in
+  people (real Shield register/login now, not the old hardcoded
+  `demo-user`) see the same NPCs doing the same things and each
+  other's avatar moving. "Residential Towers" is still just one plain
+  home type, not towers with levels — flagged, not silently promoted.
+  Population tiers, My Assets dashboard and Live World News remain
+  genuinely open (listed above).
+- Real, named books (*The Secret*, *The Bible*, practical skill
+  textbooks) purchased through VENVS's own real Publishing arm now
+  move a player's VDP skill or belief exactly once per real purchase
+  (`library.js`, `POST /api/library/record`) — VENVS stays the only
+  place a book is paid for, VDP stays the only place the effect
+  lands. Player needs/goals now exist for the player too, reusing
+  the same engine NPCs already used (`createPlayerState` in
+  `npcs.js`), not just for NPCs.
 - ~~Real cross-origin Shield SSO for the embedded-iframe case~~ —
   closed in Phase 10 (see above). Both the direct-visit handoff from
   `vaco-shell` and the embedded-iframe handoff into VENVS are now real.

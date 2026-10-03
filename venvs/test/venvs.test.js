@@ -451,6 +451,81 @@ test('a book purchase is refused before any money moves', () => {
     .then(() => assert.equal(transferFn.moves.length, 0));
 });
 
+// ===========================================================================
+// VDP library tap-in: a book names one real effect (skill or belief),
+// never both, and that effect is attempted after the sale, never
+// allowed to block or undo it.
+// ===========================================================================
+
+test('a book names either skillSubject or beliefTopic/beliefType, never both, and never half a belief pair', () => {
+  const catalog = createCatalog();
+  assert.throws(
+    () => publishBook(catalog, {
+      title: 'X', authorId: 'a', format: 'ebook', listPrice: 5,
+      skillSubject: 'Crafting', beliefTopic: 'faith', beliefType: 'religious',
+    }),
+    /never both/,
+  );
+  assert.throws(
+    () => publishBook(catalog, { title: 'Y', authorId: 'a', format: 'ebook', listPrice: 5, beliefTopic: 'faith' }),
+    /given together/,
+  );
+  assert.throws(
+    () => publishBook(catalog, {
+      title: 'Z', authorId: 'a', format: 'ebook', listPrice: 5, beliefTopic: 'x', beliefType: 'not-a-real-type',
+    }),
+    /invalid beliefType/,
+  );
+});
+
+test('purchaseBook calls libraryRecordFn with the real order id and the book\'s own tag, after the sale', () => {
+  const catalog = createCatalog();
+  const book = publishBook(catalog, {
+    title: 'The Complete Home Cook', authorId: 'ingram-catalog', format: 'ebook',
+    listPrice: 12.99, source: 'ingram', skillSubject: 'Crafting',
+  });
+  const transferFn = ledger();
+  const calls = [];
+  const libraryRecordFn = async (payload) => { calls.push(payload); };
+
+  return purchaseBook(catalog, { bookId: book.id, buyerId: 'reader', transferFn, libraryRecordFn }).then((out) => {
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].orderId, out.order.id);
+    assert.equal(calls[0].buyerId, 'reader');
+    assert.equal(calls[0].skillSubject, 'Crafting');
+    assert.equal(calls[0].beliefTopic, null);
+    assert.equal(out.libraryEffectError, null);
+  });
+});
+
+test('a library effect that fails does not undo or block the purchase the buyer already paid for', () => {
+  const catalog = createCatalog();
+  const book = publishBook(catalog, {
+    title: 'The Secret', authorId: 'ingram-catalog', format: 'ebook',
+    listPrice: 9.99, source: 'ingram', beliefTopic: 'positive-thinking', beliefType: 'philosophical',
+  });
+  const transferFn = ledger();
+  const libraryRecordFn = async () => { throw new Error('VDP unreachable'); };
+
+  return purchaseBook(catalog, { bookId: book.id, buyerId: 'reader', transferFn, libraryRecordFn }).then((out) => {
+    assert.equal(transferFn.paidBy('reader'), 9.99, 'the buyer was still charged -- a signal failure is not a money failure');
+    assert.ok(out.order.id, 'the order still exists');
+    assert.equal(out.libraryEffectError, 'VDP unreachable');
+  });
+});
+
+test('a book with no skill/belief tag never calls libraryRecordFn at all', () => {
+  const catalog = createCatalog();
+  const book = publishBook(catalog, { title: 'Untagged', authorId: 'a', format: 'ebook', listPrice: 5, source: 'ingram' });
+  const transferFn = ledger();
+  let called = false;
+  const libraryRecordFn = async () => { called = true; };
+
+  return purchaseBook(catalog, { bookId: book.id, buyerId: 'reader', transferFn, libraryRecordFn }).then(() => {
+    assert.equal(called, false);
+  });
+});
+
 test('the catalogue filters by format and by source', () => {
   const catalog = createCatalog();
   publishBook(catalog, { title: 'E', authorId: 'a', format: 'ebook', listPrice: 5 });

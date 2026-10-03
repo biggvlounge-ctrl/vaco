@@ -1,48 +1,38 @@
-// VDP — V4 agent client's own parsing logic, the one piece that isn't
-// a thin fetch wrapper. The fetch wrapper itself (`analyzeOutfitPhoto`'s
-// network call) is deliberately uncovered here, same convention
-// `commerce.test.js`'s own header states for every `*Client.js` module
-// — testing it would be testing `fetch`. What IS tested is the real
-// failure mode a model response actually has: it is not a parser, and
-// "strict JSON" is a request, not a guarantee.
+// VDP — talkToNpc's own pure parsing logic. `*Client.js` wrappers are
+// deliberately uncovered for the network call itself (this project's
+// own stated convention, see `library.js`'s header), but the strict-
+// JSON parsing a real model's text has to pass through is pure logic
+// worth asserting on, same treatment `parseOutfitJson` already got.
 
 'use strict';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { parseOutfitJson } from '../src/lib/v4AgentClient.js';
+import { parseTalkJson } from '../src/lib/v4AgentClient.js';
 
-test('a clean strict-JSON response parses into the expected shape', () => {
-  const text = '{"name": "Rooftop Blazer", "category": "clothing", "dominantColor": "charcoal", "description": "a tailored blazer"}';
-  const result = parseOutfitJson(text);
-  assert.deepEqual(result, {
-    name: 'Rooftop Blazer', category: 'clothing', dominantColor: 'charcoal', description: 'a tailored blazer',
-  });
+test('a clean strict-JSON reply parses to {reply, topic}', () => {
+  const result = parseTalkJson('{"reply": "Nice to meet you!", "topic": "communication"}');
+  assert.equal(result.reply, 'Nice to meet you!');
+  assert.equal(result.topic, 'communication');
 });
 
-test('JSON wrapped in a stray code fence or prose is still extracted', () => {
-  const text = 'Sure, here is the catalogue entry:\n```json\n{"name": "Street Jacket", "category": "accessories"}\n```\nHope that helps!';
-  const result = parseOutfitJson(text);
-  assert.equal(result.name, 'Street Jacket');
-  assert.equal(result.category, 'accessories');
+test('a reply wrapped in a stray code fence still parses', () => {
+  const result = parseTalkJson('```json\n{"reply": "Hey there.", "topic": "none"}\n```');
+  assert.equal(result.reply, 'Hey there.');
 });
 
-test('missing dominantColor/description default to empty strings, not undefined', () => {
-  const result = parseOutfitJson('{"name": "Plain Tee", "category": "clothing"}');
-  assert.equal(result.dominantColor, '');
-  assert.equal(result.description, '');
+test('an unrecognized topic is refused rather than silently applying an unbounded effect', () => {
+  assert.throws(
+    () => parseTalkJson('{"reply": "hi", "topic": "literally anything I want"}'),
+    /unrecognized topic/,
+  );
 });
 
-test('a response with no JSON object at all is refused, not silently empty', () => {
-  assert.throws(() => parseOutfitJson('I cannot help with that.'), /did not return recognizable JSON/);
+test('a missing reply is refused', () => {
+  assert.throws(() => parseTalkJson('{"topic": "none"}'), /missing a reply/);
 });
 
-test('a response missing a usable name is refused', () => {
-  assert.throws(() => parseOutfitJson('{"category": "clothing"}'), /missing a name/);
-  assert.throws(() => parseOutfitJson('{"name": "", "category": "clothing"}'), /missing a name/);
-});
-
-test('a response with an invented category is refused, not forwarded as real', () => {
-  assert.throws(() => parseOutfitJson('{"name": "X", "category": "weaponry"}'), /unrecognized category/);
+test('non-JSON text is refused rather than crashing with a raw parse error', () => {
+  assert.throws(() => parseTalkJson('I am not JSON at all'), /did not return recognizable JSON/);
 });

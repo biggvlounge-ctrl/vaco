@@ -3,7 +3,8 @@ import {
   VIEWPORT_WIDTH, VIEWPORT_HEIGHT, MOVE_STEP,
   DISTRICTS, createWorldState, movePlayer, getCurrentDistrict, getNearbyBuilding, enterBuilding, getCameraOffset,
 } from "../lib/world.js";
-import { createNpcWorld, advanceWorldTick, latestDecision, explainDecision } from "../lib/npcs.js";
+import { latestDecision, explainDecision } from "../lib/npcs.js";
+import { talkToNpc } from "../lib/v4AgentClient.js";
 import DegvchiView from "./DegvchiView.jsx";
 import FoodDistrictView from "./FoodDistrictView.jsx";
 import StageView from "./StageView.jsx";
@@ -155,11 +156,16 @@ import VacoMerchView from "./VacoMerchView.jsx";
 
 const VENVS_URL = import.meta.env.VITE_VENVS_URL || "http://localhost:5173";
 
-// How often the NPCs' own needs/habits/decisions actually re-evaluate.
-// Positions still redraw on every animation frame for smooth movement
-// (see the rAF loop below) -- this only gates how often `advanceWorldTick`
-// itself runs, same cadence `npcs.js`'s own header describes.
-const NPC_TICK_INTERVAL_MS = 2000;
+// VDP's own new backend (see `vdp/server.cjs`) -- the NPC world now
+// ticks server-side so every connected player sees the SAME NPCs
+// doing the SAME things, which a client-local `createNpcWorld()`
+// could never do once there was more than one real player. This
+// client is now a consumer of the server's broadcasts, not a second
+// place running its own, disagreeing copy of the simulation.
+const VDP_WS_URL = import.meta.env?.VITE_VDP_WS_URL || "ws://localhost:8827";
+const VDP_API_URL = import.meta.env?.VITE_VDP_API_URL || "http://localhost:8827";
+
+const OTHER_PLAYER_COLOR = "#6adfff";
 
 const NPC_ACTION_COLORS = {
   build: "#b48ee0",
@@ -200,21 +206,67 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
   const [worldState, setWorldState] = useState(() => createWorldState());
   const [enteredDistrict, setEnteredDistrict] = useState(null);
   const [hoveredNpcId, setHoveredNpcId] = useState(null);
+  // NPC conversation UI state. Kept small on purpose: one message in,
+  // one real reply back, the effect it triggered shown plainly rather
+  // than hidden in a silent stat change.
+  const [npcChatInput, setNpcChatInput] = useState("");
+  const [npcChatReply, setNpcChatReply] = useState(null);
+  const [npcChatBusy, setNpcChatBusy] = useState(false);
+  const [npcChatError, setNpcChatError] = useState(null);
+  // Player-to-player chat: `otherPlayerIds` is real React state (unlike
+  // positionsRef) because the player-picker list needs to re-render
+  // when someone joins or leaves; `chatLog` holds messages either sent
+  // or received by this session.
+  const [otherPlayerIds, setOtherPlayerIds] = useState([]);
+  const [chatTarget, setChatTarget] = useState("");
+  const [chatInput, setChatInput] = useState("");
+  const [chatLog, setChatLog] = useState([]);
   const canvasRef = useRef(null);
   const worldStateRef = useRef(worldState);
-  // Created once per mount, mutated in place by advanceWorldTick --
-  // the same "ref holds the live object, React state only drives
-  // re-renders where something actually needs to react" split already
-  // used for worldStateRef above. NPC positions update every animation
-  // frame regardless of React's own render cycle.
-  const npcWorldRef = useRef(null);
-  if (!npcWorldRef.current) {
-    npcWorldRef.current = createNpcWorld();
-  }
+  // Server-pushed, not locally simulated: `npcsRef` holds the last
+  // `npcs` array the server broadcast, `positionsRef` the last known
+  // {userId: {x,y}} map of every OTHER connected player. Refs, not
+  // React state, for the same reason `worldStateRef` already is --
+  // these update on every WebSocket message and the canvas reads them
+  // every animation frame; routing that through React state would be
+  // a re-render per message for no visual benefit.
+  const npcsRef = useRef([]);
+  const positionsRef = useRef({});
+  const wsRef = useRef(null);
 
   useEffect(() => {
     worldStateRef.current = worldState;
   }, [worldState]);
+
+  // One shared-world connection per mount. Not gated on `session`:
+  // the NPCs and other players' positions are worth seeing before
+  // logging in (the same "the world is alive regardless" posture the
+  // old client-local NPC loop already had) -- only SENDING this
+  // player's own position (below, in handleKeyDown) needs a real
+  // userId to be worth anything.
+  useEffect(() => {
+    const ws = new WebSocket(`${VDP_WS_URL}/ws/world`);
+    wsRef.current = ws;
+    ws.onmessage = (event) => {
+      let msg;
+      try {
+        msg = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+      if (msg.type === "snapshot" || msg.type === "npcs") {
+        npcsRef.current = msg.npcs;
+      }
+      if (msg.type === "snapshot" || msg.type === "positions") {
+        positionsRef.current = msg.positions || {};
+        setOtherPlayerIds(Object.keys(positionsRef.current).filter((id) => id !== session?.userId));
+      }
+      if (msg.type === "chat" && session?.userId && (msg.fromUserId === session.userId || msg.toUserId === session.userId)) {
+        setChatLog((log) => [...log.slice(-19), msg]);
+      }
+    };
+    return () => ws.close();
+  }, [session?.userId]);
 
   const handleKeyDown = useCallback((e) => {
     let dx = 0;
@@ -228,7 +280,14 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
     const next = { ...worldStateRef.current };
     movePlayer(next, dx, dy);
     setWorldState(next);
-  }, []);
+    // Broadcast this player's own position so every other connected
+    // client's `positions` map includes it -- a logged-out visitor
+    // still walks around locally, but has no real userId worth
+    // telling anyone else about.
+    if (session?.userId && wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: "move", userId: session.userId, x: next.x, y: next.y }));
+    }
+  }, [session]);
 
   useEffect(() => {
     window.addEventListener("keydown", handleKeyDown);
@@ -268,7 +327,7 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
       ctx.fillText(d.name, sx + 6, sy + 16);
     }
 
-    for (const npc of npcWorldRef.current.npcs) {
+    for (const npc of npcsRef.current) {
       const sx = npc.x - camera.x;
       const sy = npc.y - camera.y;
       if (sx < -10 || sx > VIEWPORT_WIDTH + 10 || sy < -10 || sy > VIEWPORT_HEIGHT + 10) continue;
@@ -283,29 +342,38 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
       }
     }
 
+    // Every OTHER real, currently-connected player -- excludes this
+    // session's own userId, since the gold dot below is this player.
+    for (const [userId, pos] of Object.entries(positionsRef.current)) {
+      if (userId === session?.userId) continue;
+      const sx = pos.x - camera.x;
+      const sy = pos.y - camera.y;
+      if (sx < -10 || sx > VIEWPORT_WIDTH + 10 || sy < -10 || sy > VIEWPORT_HEIGHT + 10) continue;
+      ctx.fillStyle = OTHER_PLAYER_COLOR;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.font = "10px sans-serif";
+      ctx.fillText(userId, sx + 9, sy + 3);
+    }
+
     const px = worldStateRef.current.x - camera.x;
     const py = worldStateRef.current.y - camera.y;
     ctx.fillStyle = "#ffd700";
     ctx.beginPath();
     ctx.arc(px, py, 8, 0, Math.PI * 2);
     ctx.fill();
-  }, [hoveredNpcId]);
+  }, [hoveredNpcId, session]);
 
-  // The one real game loop VDP has: previously every redraw was a
-  // direct reaction to a key press (see `handleKeyDown` above) and
-  // nothing moved on its own. This loop draws every animation frame
-  // (so NPC movement looks continuous) and calls `advanceWorldTick`
-  // at most once every `NPC_TICK_INTERVAL_MS` real milliseconds --
-  // `npcs.js`'s own rota slicing keeps each of those calls cheap
-  // regardless of population.
+  // The render loop: draws every animation frame, so NPC and other-
+  // player movement looks continuous. The NPCs themselves no longer
+  // tick here -- the server advances `npcWorld` on its own 2s
+  // interval and pushes the result over the WebSocket above; this
+  // loop's only job now is painting whatever the refs hold.
   useEffect(() => {
     let frameId;
-    let lastTick = performance.now();
-    const loop = (now) => {
-      if (now - lastTick >= NPC_TICK_INTERVAL_MS) {
-        advanceWorldTick(npcWorldRef.current);
-        lastTick = now;
-      }
+    const loop = () => {
       draw();
       frameId = requestAnimationFrame(loop);
     };
@@ -322,7 +390,7 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
     const camera = getCameraOffset(worldStateRef.current);
     let closestId = null;
     let closestDist = NPC_HOVER_RADIUS;
-    for (const npc of npcWorldRef.current.npcs) {
+    for (const npc of npcsRef.current) {
       const dist = Math.hypot(mx - (npc.x - camera.x), my - (npc.y - camera.y));
       if (dist <= closestDist) {
         closestId = npc.id;
@@ -335,13 +403,52 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
   const currentDistrict = getCurrentDistrict(worldState);
   const nearbyBuilding = getNearbyBuilding(worldState);
   const hoveredNpc = hoveredNpcId != null
-    ? npcWorldRef.current.npcs.find((n) => n.id === hoveredNpcId) || null
+    ? npcsRef.current.find((n) => n.id === hoveredNpcId) || null
     : null;
 
   const handleEnter = () => {
     if (!nearbyBuilding) return;
     const result = enterBuilding(worldState, nearbyBuilding.id);
     setEnteredDistrict(result.district);
+  };
+
+  // Real conversation: a real Claude call via `talkToNpc` (grounded in
+  // this specific NPC's own traits/decision log), then a real, bounded
+  // effect applied server-side via `/api/players/:id/talk`, keyed on
+  // the topic the model itself returned -- never on the free-text
+  // reply, which the model could otherwise use to claim anything.
+  const handleTalkToNpc = async () => {
+    if (!hoveredNpc || !npcChatInput.trim() || !session?.userId) return;
+    setNpcChatBusy(true);
+    setNpcChatError(null);
+    try {
+      const { reply, topic } = await talkToNpc(hoveredNpc, npcChatInput, {
+        latestDecisionEntry: latestDecision(hoveredNpc),
+        explainFn: explainDecision,
+      });
+      const res = await fetch(`${VDP_API_URL}/api/players/${encodeURIComponent(session.userId)}/talk`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.sessionToken}` },
+        body: JSON.stringify({ npcId: hoveredNpc.id, topic }),
+      });
+      const body = await res.json().catch(() => ({}));
+      setNpcChatReply({ reply, effect: res.ok ? body.effect : null });
+      setNpcChatInput("");
+    } catch (err) {
+      setNpcChatError(err.message);
+    } finally {
+      setNpcChatBusy(false);
+    }
+  };
+
+  // Player-to-player chat rides the same WebSocket the positions/NPCs
+  // already use -- no Claude call, no separate connection.
+  const handleSendChat = () => {
+    if (!session?.userId || !chatTarget || !chatInput.trim() || wsRef.current?.readyState !== WebSocket.OPEN) return;
+    wsRef.current.send(JSON.stringify({
+      type: "chat", fromUserId: session.userId, toUserId: chatTarget, text: chatInput.trim(),
+    }));
+    setChatInput("");
   };
 
   return (
@@ -361,9 +468,70 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
         style={{ border: "1px solid #444", outline: "none" }}
       />
       {hoveredNpc && (
-        <p style={{ fontSize: 12, color: "#9a7fd4", marginTop: 4, minHeight: 16 }}>
-          {explainDecision(latestDecision(hoveredNpc)) || `${hoveredNpc.name} hasn't decided anything yet.`}
-        </p>
+        <div style={{ marginTop: 4 }}>
+          <p style={{ fontSize: 12, color: "#9a7fd4", minHeight: 16 }}>
+            {explainDecision(latestDecision(hoveredNpc)) || `${hoveredNpc.name} hasn't decided anything yet.`}
+          </p>
+          {session && (
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <input
+                type="text"
+                placeholder={`Say something to ${hoveredNpc.name}…`}
+                value={npcChatInput}
+                onChange={(e) => setNpcChatInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleTalkToNpc(); }}
+                style={{ flex: 1, fontSize: 12 }}
+              />
+              <button onClick={handleTalkToNpc} disabled={npcChatBusy || !npcChatInput.trim()}>
+                {npcChatBusy ? "…" : "Talk"}
+              </button>
+            </div>
+          )}
+          {npcChatReply && (
+            <p style={{ fontSize: 12, color: "#ffd700", marginTop: 4 }}>
+              "{npcChatReply.reply}"
+              {npcChatReply.effect && (
+                <span style={{ color: "#6adfd4" }}>
+                  {" "}({npcChatReply.effect.kind === "skill"
+                    ? `${npcChatReply.effect.skill} +`
+                    : `${npcChatReply.effect.beliefType} belief moved`})
+                </span>
+              )}
+            </p>
+          )}
+          {npcChatError && <p style={{ fontSize: 12, color: "#e04a4a" }}>{npcChatError}</p>}
+        </div>
+      )}
+      {session && otherPlayerIds.length > 0 && (
+        <div style={{ marginTop: 10, borderTop: "1px dashed #ccc", paddingTop: 8 }}>
+          <p style={{ fontSize: 12, color: "#666", margin: "0 0 4px 0" }}>
+            Other real players here: {otherPlayerIds.join(", ")}
+          </p>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <select value={chatTarget} onChange={(e) => setChatTarget(e.target.value)} style={{ fontSize: 12 }}>
+              <option value="">pick a player…</option>
+              {otherPlayerIds.map((id) => <option key={id} value={id}>{id}</option>)}
+            </select>
+            <input
+              type="text"
+              placeholder="message"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleSendChat(); }}
+              style={{ flex: 1, fontSize: 12 }}
+            />
+            <button onClick={handleSendChat} disabled={!chatTarget || !chatInput.trim()}>Send</button>
+          </div>
+          {chatLog.length > 0 && (
+            <div style={{ fontSize: 12, marginTop: 4, maxHeight: 80, overflowY: "auto" }}>
+              {chatLog.map((m, i) => (
+                <p key={i} style={{ margin: "2px 0", color: m.fromUserId === session.userId ? "#6adfd4" : "#fff" }}>
+                  <strong>{m.fromUserId}</strong> → {m.toUserId}: {m.text}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
       )}
       {nearbyBuilding && (
         <div style={{ marginTop: 8 }}>
