@@ -218,6 +218,7 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
   // when someone joins or leaves; `chatLog` holds messages either sent
   // or received by this session.
   const [otherPlayerIds, setOtherPlayerIds] = useState([]);
+  const [wsStatus, setWsStatus] = useState("connecting");
   const [chatTarget, setChatTarget] = useState("");
   const [chatInput, setChatInput] = useState("");
   const [chatLog, setChatLog] = useState([]);
@@ -238,34 +239,80 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
     worldStateRef.current = worldState;
   }, [worldState]);
 
-  // One shared-world connection per mount. Not gated on `session`:
-  // the NPCs and other players' positions are worth seeing before
-  // logging in (the same "the world is alive regardless" posture the
-  // old client-local NPC loop already had) -- only SENDING this
-  // player's own position (below, in handleKeyDown) needs a real
-  // userId to be worth anything.
+  // One shared-world connection per mount, with real reconnect. Not
+  // gated on `session`: the NPCs and other players' positions are
+  // worth seeing before logging in (the same "the world is alive
+  // regardless" posture the old client-local NPC loop already had) --
+  // only SENDING this player's own position (below, in handleKeyDown)
+  // needs a real userId to be worth anything.
+  //
+  // **Why reconnect matters here specifically.** Every other real-time
+  // client in this ecosystem (CVNVO's own `messageSocket.js` consumer)
+  // reconnects a dropped match socket; this one didn't, so a laptop
+  // sleeping, a flaky network, or the server restarting left a
+  // player's view of the shared world frozen -- other avatars stopped
+  // moving, this player's own moves stopped reaching anyone else --
+  // with no visible sign anything was wrong. Capped exponential
+  // backoff (1s, 2s, 4s, 8s, capped at 10s) matches the cadence
+  // `persistencePg.cjs`'s own retry/backoff reasoning uses elsewhere
+  // in this repo: fast enough to recover from a blip, not a hot loop
+  // against a server that is genuinely down.
   useEffect(() => {
-    const ws = new WebSocket(`${VDP_WS_URL}/ws/world`);
-    wsRef.current = ws;
-    ws.onmessage = (event) => {
-      let msg;
-      try {
-        msg = JSON.parse(event.data);
-      } catch {
-        return;
-      }
-      if (msg.type === "snapshot" || msg.type === "npcs") {
-        npcsRef.current = msg.npcs;
-      }
-      if (msg.type === "snapshot" || msg.type === "positions") {
-        positionsRef.current = msg.positions || {};
-        setOtherPlayerIds(Object.keys(positionsRef.current).filter((id) => id !== session?.userId));
-      }
-      if (msg.type === "chat" && session?.userId && (msg.fromUserId === session.userId || msg.toUserId === session.userId)) {
-        setChatLog((log) => [...log.slice(-19), msg]);
-      }
+    let cancelled = false;
+    let reconnectTimer = null;
+    let attempt = 0;
+
+    const connect = () => {
+      if (cancelled) return;
+      setWsStatus(attempt === 0 ? "connecting" : "reconnecting");
+      const ws = new WebSocket(`${VDP_WS_URL}/ws/world`);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        attempt = 0;
+        setWsStatus("open");
+      };
+
+      ws.onmessage = (event) => {
+        let msg;
+        try {
+          msg = JSON.parse(event.data);
+        } catch {
+          return;
+        }
+        if (msg.type === "snapshot" || msg.type === "npcs") {
+          npcsRef.current = msg.npcs;
+        }
+        if (msg.type === "snapshot" || msg.type === "positions") {
+          positionsRef.current = msg.positions || {};
+          setOtherPlayerIds(Object.keys(positionsRef.current).filter((id) => id !== session?.userId));
+        }
+        if (msg.type === "chat" && session?.userId && (msg.fromUserId === session.userId || msg.toUserId === session.userId)) {
+          setChatLog((log) => [...log.slice(-19), msg]);
+        }
+      };
+
+      ws.onclose = () => {
+        if (cancelled) return;
+        setWsStatus("reconnecting");
+        const delayMs = Math.min(1000 * 2 ** attempt, 10000);
+        attempt += 1;
+        reconnectTimer = setTimeout(connect, delayMs);
+      };
+
+      // A real network error also fires `close` right after in every
+      // browser that matters here, so `onclose` alone is the one real
+      // reconnect trigger -- a second one on `onerror` would just
+      // schedule two races against the same backoff.
+      ws.onerror = () => {};
     };
-    return () => ws.close();
+
+    connect();
+    return () => {
+      cancelled = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      wsRef.current?.close();
+    };
   }, [session?.userId]);
 
   const handleKeyDown = useCallback((e) => {
@@ -457,6 +504,10 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
       <p style={{ fontSize: 12, color: "#666" }}>
         Click the map, then use arrow keys or WASD. Position: ({Math.round(worldState.x)},{" "}
         {Math.round(worldState.y)}). {currentDistrict ? `In: ${currentDistrict.name}` : "Neutral ground"}.
+        {" "}
+        <span style={{ color: wsStatus === "open" ? "#6adfd4" : "#e0c23a" }}>
+          {wsStatus === "open" ? "● shared world live" : wsStatus === "reconnecting" ? "● reconnecting…" : "● connecting…"}
+        </span>
       </p>
       <canvas
         ref={canvasRef}

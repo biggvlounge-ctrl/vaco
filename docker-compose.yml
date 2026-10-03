@@ -1072,6 +1072,36 @@ services:
     depends_on:
       - v3
       - shield
+  vdp-server:
+    build:
+      context: ./vdp
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8827
+    container_name: vdp-server
+    environment:
+      PORT: 8827
+      SHIELD_API_URL: "http://shield:8812"
+      V3_API_URL: "http://v3:8811"
+      VACO_OPERATOR_URL: "http://vaco-operator:8820"
+      VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
+      VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
+      VACO_SERVICE_NAME: vdp
+      VACO_SERVICE_TOKEN: "${VACO_TOKEN_VDP:?Set a V3 service token for vdp in .env}"
+      VACO_OPERATOR_MODE: "${VACO_OPERATOR_MODE:-enforce}"
+      DATABASE_URL: "postgres://vacancy:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/vacancy"
+    ports:
+      - "8827:8827"
+    networks:
+      - vaco
+    restart: unless-stopped
+    volumes:
+      - "vdp_server_data:/app/data"
+    depends_on:
+      - v3
+      - shield
+      - vaco-operator
+      - postgres
   nginx:
     image: "nginx:alpine"
     container_name: vaco-nginx
@@ -1153,6 +1183,7 @@ volumes:
   vaco_media_data:
   vash_tap_data:
   vaco_passport_data:
+  vdp_server_data:
   vacon-c-pgdata:
 
 networks:

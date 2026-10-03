@@ -42,8 +42,15 @@ const { createMessageSocketServer } = require('./lib/messageSocket.cjs');
 
 const PORT = process.env.PORT || 8827;
 const V3_API_URL = process.env.V3_API_URL || 'http://localhost:8811';
-const VDP_SERVICE_NAME = process.env.VDP_SERVICE_NAME || 'vdp';
-const VDP_SERVICE_TOKEN = process.env.VDP_SERVICE_TOKEN || '';
+// The shared ecosystem-wide convention every other real app's
+// server.js already uses (checked directly: voken/server.js,
+// voidmagic/server.js) -- one env var pair, not a per-app-named one.
+// `start-ecosystem.sh` generates a single `VACO_SERVICE_TOKEN` and
+// exports it for every child process; each app supplies its OWN name
+// by defaulting to its own literal name when the env var is unset,
+// same as this line.
+const VACO_SERVICE_NAME = process.env.VACO_SERVICE_NAME || 'vdp';
+const VACO_SERVICE_TOKEN = process.env.VACO_SERVICE_TOKEN || '';
 
 const app = express();
 const server = http.createServer(app);
@@ -79,8 +86,8 @@ async function transferVCoin({ fromUserId, toUserId, amount, reason }) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Service-Name': VDP_SERVICE_NAME,
-      'X-Service-Token': VDP_SERVICE_TOKEN,
+      'X-Service-Name': VACO_SERVICE_NAME,
+      'X-Service-Token': VACO_SERVICE_TOKEN,
     },
     body: JSON.stringify({ fromUserId, toUserId, amount, reason }),
   });

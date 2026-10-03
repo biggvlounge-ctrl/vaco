@@ -36,6 +36,51 @@ const apps = lines.map((l) => {
   return { name, appPath, cmd, port: Number(port) };
 });
 
+// The caller identity V3's allowlist actually knows for a directory --
+// the first manifest entry at that `appPath`, same dedupe
+// `scripts/generate-service-tokens.mjs` applies for the identical
+// reason. VDP is the only app where this differs from `app.name`
+// itself: its backend entry (`vdp-server`) shares a directory with its
+// Vite entry (`vdp`), and `server.cjs` defaults its own
+// `VACO_SERVICE_NAME` to `vdp` -- the directory's first/primary name,
+// not its own manifest entry name. Without this, the generated
+// container would present a caller name V3 was never given a token
+// for, and 401 on every real transfer despite looking correctly
+// configured.
+function canonicalCallerName(app) {
+  return apps.find((a) => a.appPath === app.appPath).name;
+}
+
+// `server.cjs` counts too, not just `server.js` -- a `"type": "module"`
+// package.json forces a CommonJS entry point onto the `.cjs` extension
+// (VDP's own `server.cjs` is the first real case of this in the
+// manifest). Every read below used to try `server.js` alone and
+// silently fall into its own `catch` on anything else, which does not
+// throw -- it just means `serverSrc` stays empty and this generator
+// writes vdp-server's Compose service with no V3_API_URL rewrite, no
+// service credential, and no persisted volume, while looking like a
+// clean run. Same fix `scripts/generate-service-tokens.mjs` needed for
+// the same reason.
+function readServerSrc(app) {
+  // A Vite dev server never executes a sibling server.js/.cjs that
+  // happens to live in the same directory -- VDP is the first app
+  // where both exist side by side (its own Vite frontend and its own
+  // real backend, `vdp-server`, sharing one directory). Without this
+  // check the frontend's generated service would wrongly inherit the
+  // backend's V3_API_URL rewrite, service credential, DATABASE_URL and
+  // persisted volume -- a correctness fix on `vdp-server`'s behalf
+  // that would otherwise misfire onto `vdp` itself.
+  if (app.cmd === "npm run dev") return "";
+  for (const name of ["server.js", "server.cjs"]) {
+    try {
+      return fs.readFileSync(path.join(ROOT, app.appPath, name), "utf8");
+    } catch {
+      // try the next candidate
+    }
+  }
+  return "";
+}
+
 // Real, grep-verified cross-app HTTP call targets -- every
 // `process.env.<VAR>_URL` this repo's own server.js files actually
 // read, mapped to the Compose service name that owns it. Kept as an
@@ -107,10 +152,10 @@ const PERSISTED_APPS = new Set(
         // with nothing persisted under it and lost their store on every
         // restart. Caught by deploy-readme.test.mjs's volume count
         // dropping from 30 to 8.
-        return /createPersistentStore|attachStore/
-          .test(fs.readFileSync(path.join(ROOT, app.appPath, "server.js"), "utf8"));
+        const src = readServerSrc(app);
+        if (!src) return false; // A Vite frontend has no server entry point and no store.
+        return /createPersistentStore|attachStore/.test(src);
       } catch {
-        // A Vite frontend has no server.js and no store.
         return false;
       }
     })
@@ -137,15 +182,10 @@ for (const app of apps) {
 
   const environment = { PORT: String(app.port) };
   // Real, per-app scoping -- only sets a cross-app URL var if this
-  // app's own server.js actually reads it (checked directly against
-  // the real file on disk), not every var blasted into every service.
-  let serverSrc = "";
-  try {
-    serverSrc = fs.readFileSync(path.join(ROOT, app.appPath, "server.js"), "utf8");
-  } catch {
-    // no server.js (shouldn't happen for an `npm start`/`npm run dev`
-    // entry in the manifest) -- leave environment at just PORT.
-  }
+  // app's own server entry point actually reads it (checked directly
+  // against the real file on disk), not every var blasted into every
+  // service. Empty for a Vite frontend, which has neither.
+  let serverSrc = readServerSrc(app);
   // ...plus lib/, because not every cross-app call lives in server.js.
   // `vaco-shell` and `vxllage` both reach V3 through their own
   // `lib/v3Client.js`, so scanning server.js alone would have shipped
@@ -162,15 +202,24 @@ for (const app of apps) {
   // shipped seven containers pointing their decision log at
   // `localhost:8819`, which in a container is *itself*. In enforce mode
   // that is every group-2 route 503ing on a service that is up.
-  try {
-    const libDir = path.join(ROOT, app.appPath, "lib");
-    for (const file of fs.readdirSync(libDir)) {
-      if (file.endsWith(".js") || file.endsWith(".cjs")) {
-        serverSrc += fs.readFileSync(path.join(libDir, file), "utf8");
+  // Same Vite guard as `readServerSrc`: a Vite dev server never
+  // executes anything under its own `lib/` either. VDP's `lib/` (the
+  // backend's boilerplate copies, new this phase) and its `src/lib/`
+  // (the real game logic, loaded by both Vite and the backend) are
+  // different directories -- the frontend entry would otherwise
+  // inherit the backend's service credential by way of a directory it
+  // never actually imports from.
+  if (app.cmd !== "npm run dev") {
+    try {
+      const libDir = path.join(ROOT, app.appPath, "lib");
+      for (const file of fs.readdirSync(libDir)) {
+        if (file.endsWith(".js") || file.endsWith(".cjs")) {
+          serverSrc += fs.readFileSync(path.join(libDir, file), "utf8");
+        }
       }
+    } catch {
+      // no lib/ -- fine, plenty of apps keep everything in server.js.
     }
-  } catch {
-    // no lib/ -- fine, plenty of apps keep everything in server.js.
   }
   for (const [envVar, serviceName] of Object.entries(ENV_VAR_TO_SERVICE)) {
     if (!serverSrc.includes(`process.env.${envVar}`)) continue;
@@ -221,9 +270,10 @@ for (const app of apps) {
     environment.VACO_SERVICE_AUTH_MODE = "${VACO_SERVICE_AUTH_MODE:-enforce}";
   }
   if (isCaller) {
-    environment.VACO_SERVICE_NAME = app.name;
+    const callerName = canonicalCallerName(app);
+    environment.VACO_SERVICE_NAME = callerName;
     environment.VACO_SERVICE_TOKEN =
-      `\${VACO_TOKEN_${app.name.toUpperCase().replace(/-/g, "_")}:?Set a V3 service token for ${app.name} in .env}`;
+      `\${VACO_TOKEN_${callerName.toUpperCase().replace(/-/g, "_")}:?Set a V3 service token for ${callerName} in .env}`;
   }
 
   // The decision log's mode, for the apps that record decisions. Left
@@ -479,14 +529,7 @@ volumes["vacon-c-pgdata"] = null;
 // volume is what makes that fall-back survive a restart rather than
 // silently losing a store.
 const PG_STORE_APPS = apps
-  .filter((app) => {
-    try {
-      return /attachStore/.test(
-        fs.readFileSync(path.join(ROOT, app.appPath, "server.js"), "utf8"));
-    } catch {
-      return false;
-    }
-  })
+  .filter((app) => /attachStore/.test(readServerSrc(app)))
   .map((app) => app.name);
 
 const VACO_DATABASE_URL =

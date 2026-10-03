@@ -73,7 +73,9 @@ const apps = lines
   // string were fixed when the manifest changed; this was the seventh
   // and it was missed because nothing re-ran it.
   .filter((a) => a.name !== "vaco-shell"
-    && fs.existsSync(path.join(ROOT, a.appPath, "server.js"))); // shell is the root, handled separately
+    && a.cmd !== "npm run dev" // a Vite entry never executes a sibling server.js/.cjs
+    && (fs.existsSync(path.join(ROOT, a.appPath, "server.js"))
+      || fs.existsSync(path.join(ROOT, a.appPath, "server.cjs")))); // .cjs: VDP's own backend, see generate-service-tokens.mjs's identical fix
 
 // An nginx config with no routes is a working config that serves
 // nothing, which is why the generator has to refuse rather than write

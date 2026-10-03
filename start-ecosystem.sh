@@ -188,6 +188,17 @@ APPS=(
   "vaco-passport:vaco-passport:node server.js:8826:/api/health"
   "venvs:venvs:npm run dev:5173:/"
   "vdp:vdp:npm run dev:5174:/"
+  # VDP's own real backend (server.cjs) -- player state, jobs, skills,
+  # the shared world over WebSocket. Same directory as the vdp Vite
+  # entry above (this app has two real servers in one directory, the
+  # first in this manifest) -- listed right after it on purpose, so
+  # generate-service-tokens.mjs's own appPath-dedupe keeps the vdp
+  # entry's name as the V3 caller, matching server.cjs's own
+  # VACO_SERVICE_NAME default. No double quotes in this comment block:
+  # the manifest parser's regex matches any quoted substring in this
+  # whole array, comments included, and a stray pair would be read as
+  # a malformed entry (that mistake is exactly why this note exists).
+  "vdp-server:vdp:node server.cjs:8827:/api/health"
 )
 
 if [ "$WITH_MOCK" = "1" ]; then

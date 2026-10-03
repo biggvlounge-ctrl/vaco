@@ -10,7 +10,7 @@
 // stops matching that manifest, which is how six apps that had quietly
 // dropped out of the pm2 deployment were found.
 //
-// 36 real Express backends. The 2 Vite frontends (venvs, vdp)
+// 37 real Express backends. The 2 Vite frontends (venvs, vdp)
 // are deliberately NOT pm2-managed here -- they get a real production
 // build (npm run build) and are served as static files by nginx
 // instead, since the Vite dev server used by start-ecosystem.sh (for
@@ -311,6 +311,14 @@ module.exports = {
       cwd: "./vaco-passport",
       script: "server.js",
       env: { PORT: "8826", NODE_ENV: "production" },
+      max_restarts: 10,
+      min_uptime: "10s",
+    },
+    {
+      name: "vdp-server",
+      cwd: "./vdp",
+      script: "server.cjs",
+      env: { PORT: "8827", NODE_ENV: "production" },
       max_restarts: 10,
       min_uptime: "10s",
     },

@@ -77,36 +77,39 @@ const apps = lines.map((l) => {
 // pm2 config with no processes in it -- generated successfully, with
 // no error, because an empty filter is not a failure.
 //
-// The real distinction is what the app IS: a Node service with a
-// server.js, or a Vite dev server. Ask that, and a future change to
+// The real distinction is what the app IS: a Node service with a real
+// entry point, or a Vite dev server. Ask that, and a future change to
 // how the command is spelled cannot silently invert the answer.
-const backends = apps.filter((a) => fs.existsSync(path.join(ROOT, a.appPath, "server.js")));
-const frontends = apps.filter((a) => !fs.existsSync(path.join(ROOT, a.appPath, "server.js")));
+//
+// `server.cjs` counts too, not just `server.js` -- VDP's own backend
+// (`vdp-server`) is the first in this manifest with a `.cjs` entry
+// point (forced by its `"type": "module"` package.json), and this
+// generator used to test for `server.js` alone. That did not throw --
+// it put `vdp-server` in `frontends`, excluded it from pm2 entirely,
+// and the header comment above it then claimed `vdp-server` was a
+// "Vite frontend," which it is not and has no Vite config to prove it.
+function serverEntryFile(app) {
+  // A Vite dev server entry is never a backend, even when a sibling
+  // entry's real server.cjs happens to live in the same directory --
+  // VDP's `vdp` (Vite) and `vdp-server` (its own backend) are exactly
+  // that shape, the first in this manifest. Without this, `vdp` would
+  // be pm2-managed as if it were `vdp-server` under a different name:
+  // same script, wrong port, and the real Vite production build never
+  // actually served.
+  if (app.cmd === "npm run dev") return null;
+  for (const name of ["server.js", "server.cjs"]) {
+    if (fs.existsSync(path.join(ROOT, app.appPath, name))) return name;
+  }
+  return null;
+}
+
+const backends = apps.filter((a) => serverEntryFile(a) !== null);
+const frontends = apps.filter((a) => serverEntryFile(a) === null);
 
 if (backends.length === 0) {
   throw new Error(
-    "generate-ecosystem-config: no app in the manifest has a server.js. A pm2 config with no "
-    + "processes generates cleanly and starts nothing, so this refuses rather than writing it.",
-  );
-}
-
-// pm2's `script` is resolved relative to `cwd`. Every backend in the
-// manifest is a plain Express app whose entry point is `server.js`;
-// assert it rather than assume it, because a missing file here is a
-// process pm2 restarts ten times and then gives up on, at 3am, on
-// somebody else's server.
-// Kept, though `backends` is now defined BY having a server.js, so
-// this can no longer fire. That is the point: the assertion moved from
-// runtime into the definition, which is strictly better than checking
-// it afterwards. Left as an explicit statement of the invariant rather
-// than deleted, so the next person to loosen the filter above finds
-// out here.
-const missing = backends.filter((a) => !fs.existsSync(path.join(ROOT, a.appPath, "server.js")));
-if (missing.length > 0) {
-  throw new Error(
-    `generate-ecosystem-config: ${missing.map((a) => `${a.name} (${a.appPath}/server.js)`).join(", ")} `
-    + "has no server.js. Either the manifest path is wrong or the app has a different entry point -- "
-    + "this generator assumes server.js for every `npm start` app.",
+    "generate-ecosystem-config: no app in the manifest has a server entry point. A pm2 config with "
+    + "no processes generates cleanly and starts nothing, so this refuses rather than writing it.",
   );
 }
 
@@ -141,7 +144,7 @@ const header = `// VACO -- pm2 process list for production deployment.
 const entries = backends.map((a) => `    {
       name: "${a.name}",
       cwd: "./${a.appPath}",
-      script: "server.js",
+      script: "${serverEntryFile(a)}",
       env: { PORT: "${a.port}", NODE_ENV: "production" },
       max_restarts: 10,
       min_uptime: "10s",

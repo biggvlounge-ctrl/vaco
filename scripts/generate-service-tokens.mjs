@@ -31,7 +31,15 @@ function appsFromManifest() {
   const manifest = fs.readFileSync(path.join(REPO_ROOT, 'start-ecosystem.sh'), 'utf8');
   const block = manifest.match(/^APPS=\(([\s\S]*?)^\)/m);
   if (!block) throw new Error('could not find the APPS array in start-ecosystem.sh');
-  return [...block[1].matchAll(/"([^"]+)"/g)]
+  // Only lines that are actually an array element -- `  "name:path:cmd:port:health"`,
+  // optionally trailing whitespace -- not every quoted substring in the
+  // block. The array holds real prose comments (this file's own VDP
+  // entry added one), and a comment that happens to quote a single word
+  // matches `/"([^"]+)"/g` with no colon in it, producing a one-element
+  // split where `appPath` is `undefined` and every downstream `path.join`
+  // throws. Anchoring on a line that starts (after indentation) with a
+  // quoted colon-separated entry is what a comment line never satisfies.
+  return [...block[1].matchAll(/^\s*"([^"]+:[^"]+)"\s*$/gm)]
     .map((m) => m[1].split(':'))
     .map(([name, appPath, command]) => ({ name, appPath, command }));
 }
@@ -51,8 +59,24 @@ function appsFromManifest() {
 //   VACO_SERVICE_TOKENS -- the *allowlist* a verifier reads -- so every
 //   app that merely checks credentials was being issued a caller token
 //   it never presents.
+// `server.cjs` at the app root counts too, not just `server.js` --
+// the same "`.cjs` counts" rule this file already applies to `lib/`,
+// now true at the root as well. VDP is the first app whose entry
+// point is `server.cjs` rather than `server.js` (a `"type": "module"`
+// package.json means a CommonJS entry point has to carry the `.cjs`
+// extension), and without this a real V3 caller would silently read
+// as having no server at all.
+function serverEntryPoint(app) {
+  for (const name of ['server.js', 'server.cjs']) {
+    const candidate = path.join(REPO_ROOT, app.appPath, name);
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
 function reachesV3(app) {
-  const roots = [path.join(REPO_ROOT, app.appPath, 'server.js')];
+  const entry = serverEntryPoint(app);
+  const roots = entry ? [entry] : [];
   const libDir = path.join(REPO_ROOT, app.appPath, 'lib');
   try {
     for (const file of fs.readdirSync(libDir)) {
@@ -79,8 +103,22 @@ const envVarName = (appName) => `VACO_TOKEN_${appName.toUpperCase().replace(/-/g
 // wrong." — and that guard is the reason this was a two-minute fix
 // rather than eight apps silently getting 403 from V3 on every call,
 // which is exactly what happened the last time this list was wrong.
+// **Dedupe by appPath before scanning.** VDP is the first app with two
+// manifest entries pointing at the same directory (its Vite dev
+// server and its own real backend, `vdp-server`) -- both would
+// otherwise pass the same `reachesV3` check against the same files
+// and mint two tokens for one real caller, one of them never
+// presented by anything. Keeping only the first entry per directory
+// is the general fix; a future app with the same two-entries-one-
+// directory shape gets it for free.
+const seenAppPaths = new Set();
 const callers = appsFromManifest()
-  .filter((app) => fs.existsSync(path.join(REPO_ROOT, app.appPath, 'server.js')))
+  .filter((app) => {
+    if (seenAppPaths.has(app.appPath)) return false;
+    seenAppPaths.add(app.appPath);
+    return true;
+  })
+  .filter((app) => serverEntryPoint(app) !== null)
   .filter((app) => app.name !== 'v3')
   .filter(reachesV3)
   .map((app) => app.name)

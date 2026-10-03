@@ -91,6 +91,17 @@ function manifestApps() {
     });
 }
 
+// A backend's entry point is `server.js`, or `server.cjs` for an app
+// whose `"type": "module"` package.json forces a CommonJS entry point
+// onto that extension (VDP's own `vdp-server` is the first). A Vite
+// entry's `npm run dev` never executes either, even if one happens to
+// exist in the same directory as a sibling backend.
+function isBackend(app) {
+  if (app.cmd === 'npm run dev') return false;
+  return fs.existsSync(path.join(REPO_ROOT, app.appPath, 'server.js'))
+    || fs.existsSync(path.join(REPO_ROOT, app.appPath, 'server.cjs'));
+}
+
 test('the README states the real number of Compose services', () => {
   // Everything under `services:`, which is app services plus nginx and
   // livekit — the two that come from images rather than a build.
@@ -179,8 +190,7 @@ test('every backend in the manifest is in the pm2 process list', () => {
   // spelled — the manifest's `npm start` became `node server.js` and a
   // literal match would silently yield an empty set here, making both
   // of these tests pass over nothing.
-  const backends = manifestApps().filter((a) => fs.existsSync(
-    path.join(REPO_ROOT, a.appPath, 'server.js')));
+  const backends = manifestApps().filter(isBackend);
   assert.ok(backends.length > 20, `only ${backends.length} backends parsed — the filter is broken`);
   const listed = [...ecosystem.matchAll(/name:\s*["']([^"']+)/g)].map((m) => m[1]);
 
@@ -211,8 +221,7 @@ test('every backend in the manifest has an nginx location block', () => {
   // spelled — the manifest's `npm start` became `node server.js` and a
   // literal match would silently yield an empty set here, making both
   // of these tests pass over nothing.
-  const backends = manifestApps().filter((a) => fs.existsSync(
-    path.join(REPO_ROOT, a.appPath, 'server.js')));
+  const backends = manifestApps().filter(isBackend);
   assert.ok(backends.length > 20, `only ${backends.length} backends parsed — the filter is broken`);
   for (const file of [{ src: nginx, name: 'nginx-docker.conf' },
     { src: nginxExample, name: 'nginx-vaco.conf.example' }]) {
