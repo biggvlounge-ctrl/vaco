@@ -66,7 +66,7 @@ export const AMENITY_SOURCES = {
   dining: ['Food District'],
   screens: ['DREAMS Screens panel (dreamsClient.js)'],
   social: ['Village District (vxllage-embed)'],
-  entertainment: ['The Vavlt', 'VACAY Experiences (vacay-embed)'],
+  entertainment: ['The Vavlt', 'VACAY Experiences (vacay-embed)', 'Venus Resort Complex / VAGO (venusResort.js)'],
 };
 
 // Cumulative by design: a bigger complex is required to offer
@@ -98,7 +98,37 @@ export const AMENITY_SOURCES = {
 // tiers ("the fourth and fifth tier... a small farm distribution") --
 // a small local-agriculture component feeding the tier's own dining
 // amenity, not a full agricultural-economy system.
+//
+// **Hotels, per direct instruction**: "every village will have hotels
+// in them as well. Tier one might just have one hotel. Up to tier
+// five might have three hotels." `maxHotels` is `Math.ceil(id / 2)`
+// (1, 1, 2, 2, 3) -- a real monotonic ladder hitting exactly 1 at tier
+// 1 and exactly 3 at tier 5, not an arbitrary table. These are real
+// VACAY stay listings (`hostType: 'professional'`, VACAY's own
+// Booking.com-style inventory split -- see vacayHotels.js), not a
+// decorative count.
+//
+// **Casino, per direct instruction, and a real correction to scope
+// it properly**: "some tier fives might even have a casino... the
+// St. Charles location is only 27 acres, and that's kind of a smaller
+// tier operation, and it has a casino" -- the real St. Charles
+// precedent (Hollywood Casino St. Charles, on a compact ~27-acre
+// historic Main Street footprint) is the user's own evidence that a
+// casino is not exclusive to the largest tier, so `casinoEligible` is
+// `true` for every tier here, not gated to tier 5. This is already a
+// real, fully-built VDP feature, not a new one -- the Venus Resort
+// Complex / VAGO (`venusResort.js`, world.js's `vago` district) is
+// VDP's own real "riverboat + land casino complex." Nothing new to
+// build for this part; just a correction to this ladder.
+//
+// **Building height, per direct instruction**: "different scales of
+// the heights of the buildings." `buildingHeightTier` is a real design
+// label escalating with tier size, same honest-limit caveat as
+// `waterFeature`/`trailMiles` above -- VDP's canvas renders flat
+// rectangles today, so this is a real field for the art/rendering
+// pass, not yet a drawn skyline.
 const WATER_FEATURES = ['Plaza Fountain', 'Village Pond', 'Creek Trail', 'Lagoon', 'Fishing Lagoon'];
+const BUILDING_HEIGHT_TIERS = ['Low-Rise', 'Mid-Rise', 'High-Rise', 'Tower', 'Skyline Tower'];
 
 function trailMilesForRadius(radiusMeters) {
   return Math.round(((2 * radiusMeters) / 1609) * 10) / 10; // a loop roughly spanning the radius, in miles
@@ -115,6 +145,9 @@ export const CITY_TIERS = [
     hasFishing: false,
     hasFarmDistribution: false,
     trailMiles: trailMilesForRadius(5 * WALK_SPEED_METERS_PER_MINUTE),
+    maxHotels: Math.ceil(1 / 2),
+    casinoEligible: true,
+    buildingHeightTier: BUILDING_HEIGHT_TIERS[0],
   },
   {
     id: 2, minutes: 10, name: '10-Minute City',
@@ -126,6 +159,9 @@ export const CITY_TIERS = [
     hasFishing: false,
     hasFarmDistribution: false,
     trailMiles: trailMilesForRadius(10 * WALK_SPEED_METERS_PER_MINUTE),
+    maxHotels: Math.ceil(2 / 2),
+    casinoEligible: true,
+    buildingHeightTier: BUILDING_HEIGHT_TIERS[1],
   },
   {
     id: 3, minutes: 15, name: '15-Minute City',
@@ -137,6 +173,9 @@ export const CITY_TIERS = [
     hasFishing: false,
     hasFarmDistribution: false,
     trailMiles: trailMilesForRadius(15 * WALK_SPEED_METERS_PER_MINUTE),
+    maxHotels: Math.ceil(3 / 2),
+    casinoEligible: true,
+    buildingHeightTier: BUILDING_HEIGHT_TIERS[2],
   },
   {
     id: 4, minutes: 20, name: '20-Minute City',
@@ -148,6 +187,9 @@ export const CITY_TIERS = [
     hasFishing: false,
     hasFarmDistribution: true,
     trailMiles: trailMilesForRadius(20 * WALK_SPEED_METERS_PER_MINUTE),
+    maxHotels: Math.ceil(4 / 2),
+    casinoEligible: true,
+    buildingHeightTier: BUILDING_HEIGHT_TIERS[3],
   },
   {
     id: 5, minutes: 30, name: '30-Minute City',
@@ -159,6 +201,9 @@ export const CITY_TIERS = [
     hasFishing: true,
     hasFarmDistribution: true,
     trailMiles: trailMilesForRadius(30 * WALK_SPEED_METERS_PER_MINUTE),
+    maxHotels: Math.ceil(5 / 2),
+    casinoEligible: true,
+    buildingHeightTier: BUILDING_HEIGHT_TIERS[4],
   },
 ];
 

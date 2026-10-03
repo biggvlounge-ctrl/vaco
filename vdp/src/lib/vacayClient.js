@@ -1,12 +1,22 @@
 // VDP's real, thin client for VACAY's own separate API -- same posture
 // as `vokenClient.js`/`vagoClient.js`: no booking logic lives here,
 // every real mutation and every real number comes back from VACAY's
-// own server. Used by `VacayView.jsx`, VDP's new district for VACAY's
-// Experiences (Airbnb Experiences model) -- deliberately scoped to
-// Experiences rather than Stays, since Experiences is the one real
-// route in VACAY's bookings router that supports listing everything
-// (`GET /api/bookings/experiences`); Stays only exposes single-listing
-// lookup by a known id, no browse-all route exists to embed here.
+// own server. Used by `VacayView.jsx`, VDP's district for VACAY's
+// Experiences (Airbnb Experiences model) and, per direct instruction
+// ("every village will have hotels in them"), VACAY's Stay listings
+// too.
+//
+// **Correction to an earlier limitation note**: this file used to say
+// Stays had no browse-all route, only single-listing lookup by a
+// known id -- checked directly against VACAY's current
+// `lib/bookings/routes.js`, that's no longer true. `GET
+// /api/bookings/listings` is real now (its own comment there: "They
+// could be created and fetched by id, but never enumerated -- so a
+// guest had no way to browse," since fixed). `listStays`/`createStay`
+// below use it. A VACAY "hotel" is a real Stay listing with
+// `hostType: 'professional'` -- VACAY's own Booking.com-style
+// inventory split within the one real Airbnb-shaped booking flow, not
+// a second system.
 
 import { sessionHeaders } from "./shieldAuth.js";
 
@@ -50,4 +60,19 @@ export async function bookExperience({ experienceId, guestId }) {
 
 export async function cancelExperienceBooking(bookingId) {
   return postJson(`/api/bookings/experience-bookings/${bookingId}/cancel`, {});
+}
+
+export async function listStays() {
+  const body = await requestJson("/api/bookings/listings");
+  return body.listings;
+}
+
+export async function getStay(listingId) {
+  return requestJson(`/api/bookings/listings/${listingId}`);
+}
+
+export async function createStay({ hostId, title, pricePerNight, hostType = "professional" }) {
+  return postJson("/api/bookings/listings", {
+    hostId, title, pricePerNight, hostType,
+  });
 }

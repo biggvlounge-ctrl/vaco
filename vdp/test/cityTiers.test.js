@@ -104,6 +104,26 @@ test('the world aesthetic is futuristic buildings over a natural landscape, for 
   assert.match(WORLD_AESTHETIC.landscapeStyle, /natural/);
 });
 
+test('hotel count scales from exactly 1 at the smallest tier to exactly 3 at the largest', () => {
+  const counts = CITY_TIERS.map((t) => t.maxHotels);
+  assert.equal(counts[0], 1);
+  assert.equal(counts[4], 3);
+  for (let i = 1; i < counts.length; i += 1) {
+    assert.ok(counts[i] >= counts[i - 1], 'hotel cap must never shrink going up a tier');
+  }
+});
+
+test('casino eligibility is not gated to the largest tier -- the real St. Charles precedent is a small complex', () => {
+  assert.ok(CITY_TIERS.every((t) => t.casinoEligible === true));
+});
+
+test('building height escalates, one distinct real label per tier', () => {
+  const heights = CITY_TIERS.map((t) => t.buildingHeightTier);
+  assert.equal(new Set(heights).size, 5);
+  assert.equal(heights[0], 'Low-Rise');
+  assert.equal(heights[4], 'Skyline Tower');
+});
+
 test('classifyMeridian reflects the real, currently-built feature set, not an assertion', () => {
   const tier = classifyMeridian();
   assert.ok(tier, 'Meridian must classify into a real tier given AMENITY_SOURCES');

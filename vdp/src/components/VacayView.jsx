@@ -1,13 +1,22 @@
 import { useState, useCallback, useEffect } from "react";
-import { listOpenExperiences, createExperience, bookExperience, cancelExperienceBooking } from "../lib/vacayClient.js";
+import {
+  listOpenExperiences, createExperience, bookExperience, cancelExperienceBooking,
+  createStay, getStay,
+} from "../lib/vacayClient.js";
+import { sessionHeaders } from "../lib/shieldAuth.js";
 
-// VDP's real VACAY district -- a live client of VACAY's own
-// Experiences (Airbnb Experiences) API. Same real-cross-app-fetch
-// shape as VADO/VAGO ('voken-embed'-style embed): no booking logic
-// here, every real experience, booking, and cancellation comes back
-// from VACAY's own server. Scoped to Experiences rather than Stays --
-// see vacayClient.js's own header for why (Stays has no browse-all
-// route to embed).
+// VDP's real VACAY district -- a live client of VACAY's own real API:
+// Experiences (Airbnb Experiences) and, per direct instruction
+// ("every village will have hotels in them... tier one might just
+// have one hotel, up to tier five might have three"), Stay listings
+// too (VACAY's own real Booking.com-style `hostType: 'professional'`
+// inventory -- see vacayClient.js's header). No booking logic here,
+// every real experience/stay/booking comes back from VACAY's own
+// server; VDP's own server (`GET`/`POST /api/vacay-hotels`) only
+// tracks which real listing ids count as Meridian's, since VACAY's
+// Listing has no location field to filter by.
+
+const VDP_API_URL = import.meta.env?.VITE_VDP_API_URL || "http://localhost:8827";
 
 export default function VacayView({ session }) {
   const [experiences, setExperiences] = useState(null);
@@ -15,12 +24,54 @@ export default function VacayView({ session }) {
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState(null);
   const [bookings, setBookings] = useState({});
+  const [hotelCap, setHotelCap] = useState(null);
+  const [hotels, setHotels] = useState([]);
+  const [hotelError, setHotelError] = useState(null);
+
+  const refreshHotels = useCallback(async () => {
+    try {
+      const res = await fetch(`${VDP_API_URL}/api/vacay-hotels`);
+      const body = await res.json();
+      setHotelCap(body);
+      const listings = await Promise.all(body.listingIds.map((id) => getStay(id).catch(() => null)));
+      setHotels(listings.filter(Boolean));
+    } catch (err) {
+      setHotelError(err.message);
+    }
+  }, []);
+
+  const handleListHotel = async () => {
+    setBusy(true);
+    setHotelError(null);
+    try {
+      const listing = await createStay({
+        hostId: session.userId,
+        title: `${session.userId}'s Meridian Hotel`,
+        pricePerNight: 120,
+        hostType: "professional",
+      });
+      const res = await fetch(`${VDP_API_URL}/api/vacay-hotels/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...sessionHeaders() },
+        body: JSON.stringify({ listingId: listing.id, registeredBy: session.userId }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `register failed (${res.status})`);
+      }
+      await refreshHotels();
+    } catch (err) {
+      setHotelError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const refresh = useCallback(() => {
     listOpenExperiences().then(setExperiences).catch((err) => setLoadError(err.message));
   }, []);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => { refresh(); refreshHotels(); }, [refresh, refreshHotels]);
 
   const handleHostExperience = async () => {
     setBusy(true);
@@ -114,6 +165,24 @@ export default function VacayView({ session }) {
       })}
 
       {actionError && <p style={{ color: "crimson" }}>Error: {actionError}</p>}
+
+      <div style={{ borderTop: "1px dashed #ccc", marginTop: 12, paddingTop: 8 }}>
+        <h3 style={{ fontSize: 13, margin: "0 0 4px 0" }}>Meridian's Hotels</h3>
+        <p style={{ fontSize: 11, color: "#888", margin: "0 0 8px" }}>
+          {hotelCap
+            ? `${hotels.length}/${hotelCap.maxHotels} hotel slots used (${hotelCap.tierName})`
+            : "Checking Meridian's real hotel cap…"}
+        </p>
+        {hotels.map((h) => (
+          <p key={h.id} style={{ fontSize: 12, color: "#666", margin: "0 0 4px" }}>
+            {h.title} — {h.pricePerNight} VCoin/night ({h.hostType})
+          </p>
+        ))}
+        {hotelCap && hotels.length < hotelCap.maxHotels && (
+          <button onClick={handleListHotel} disabled={busy}>List a hotel in Meridian</button>
+        )}
+        {hotelError && <p style={{ color: "crimson" }}>Error: {hotelError}</p>}
+      </div>
     </div>
   );
 }

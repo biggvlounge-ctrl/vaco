@@ -43,6 +43,7 @@ const { createMessageSocketServer } = require('./lib/messageSocket.cjs');
 const PORT = process.env.PORT || 8827;
 const V3_API_URL = process.env.V3_API_URL || 'http://localhost:8811';
 const VOID_API_URL = process.env.VOID_API_URL || 'http://localhost:8793';
+const VACAY_API_URL = process.env.VACAY_API_URL || 'http://localhost:8803';
 // The shared ecosystem-wide convention every other real app's
 // server.js already uses (checked directly: voken/server.js,
 // voidmagic/server.js) -- one env var pair, not a per-app-named one.
@@ -75,6 +76,7 @@ function createVdpStore() {
     organizations: { organizations: [], nextOrganizationId: 1 },
     vavlt: { presence: {} },
     voidHubs: { registered: false, stations: [] },
+    vacayHotels: { listingIds: [] },
     relationships: {},
     npcWorld: null,
     news: { events: [], nextId: 1 },
@@ -156,6 +158,7 @@ let store = createVdpStore();
   const libraryLib = await import('./src/lib/library.js');
   const populationLib = await import('./src/lib/population.js');
   const newsLib = await import('./src/lib/news.js');
+  const cityTiersLib = await import('./src/lib/cityTiers.js');
 
   function ensurePlayer(userId) {
     if (!store.players[userId]) {
@@ -221,6 +224,7 @@ let store = createVdpStore();
       if (!store.organizations) store.organizations = organizationsLib.createOrganizationsStore();
       if (!store.vavlt) store.vavlt = vavltLib.createVavltStore();
       if (!store.voidHubs) store.voidHubs = { registered: false, stations: [] };
+      if (!store.vacayHotels) store.vacayHotels = { listingIds: [] };
       registerMeridianVoidHubsOnce();
     },
   });
@@ -250,6 +254,66 @@ let store = createVdpStore();
   // unreachable at request time.
   app.get('/api/void-hubs', (_req, res) => {
     res.json(store.voidHubs);
+  });
+
+  // Meridian's own real VACAY hotels -- per direct instruction
+  // ("every village will have hotels in them... tier one might just
+  // have one hotel, up to tier five might have three"). A VACAY
+  // "hotel" is a real Stay listing with `hostType: 'professional'`
+  // (VACAY's own Booking.com-style inventory split), created by a
+  // real logged-in player through VACAY's own real, actor-gated
+  // `POST /api/bookings/listings` (`requireActor('hostId')` demands a
+  // genuine Shield session matching the host -- there is no
+  // service-credential path for it the way VOID's station route has,
+  // so VDP's server cannot register these itself the way it does Void
+  // Hubs). This endpoint is VDP's own bookkeeping layer on top of that
+  // real listing: VACAY's `Listing` record has no location field at
+  // all, so there is no way to ask VACAY "which listings are
+  // Meridian's" -- VDP tracks that itself, and enforces the real
+  // per-tier cap from `cityTiers.js`.
+  app.get('/api/vacay-hotels', (_req, res) => {
+    const tier = cityTiersLib.classifyMeridian();
+    res.json({
+      listingIds: store.vacayHotels.listingIds,
+      maxHotels: tier ? tier.maxHotels : 0,
+      tierName: tier ? tier.name : null,
+    });
+  });
+
+  // Registers an already-created VACAY Stay listing as one of
+  // Meridian's hotels. Two real checks, not just a client-trusted
+  // claim: (1) the tier cap from cityTiers.js is not exceeded, (2) the
+  // listing genuinely exists on VACAY's own server and its real
+  // `hostId` matches the session registering it -- a player cannot
+  // claim someone else's listing as "theirs."
+  app.post('/api/vacay-hotels/register', requireActor('registeredBy'), async (req, res) => {
+    const { listingId, registeredBy } = req.body || {};
+    if (!Number.isInteger(listingId)) {
+      return res.status(400).json({ error: 'register requires an integer listingId' });
+    }
+    if (store.vacayHotels.listingIds.includes(listingId)) {
+      return res.status(409).json({ error: `listing ${listingId} is already registered as a Meridian hotel` });
+    }
+    const tier = cityTiersLib.classifyMeridian();
+    const cap = tier ? tier.maxHotels : 0;
+    if (store.vacayHotels.listingIds.length >= cap) {
+      return res.status(409).json({
+        error: `Meridian (${tier ? tier.name : 'unclassified'}) already has its real cap of ${cap} hotel(s)`,
+      });
+    }
+    let listing;
+    try {
+      const vacayRes = await fetch(`${VACAY_API_URL}/api/bookings/listings/${listingId}`);
+      if (!vacayRes.ok) throw new Error(`VACAY answered ${vacayRes.status}`);
+      listing = await vacayRes.json();
+    } catch (err) {
+      return res.status(502).json({ error: `could not verify listing ${listingId} with VACAY: ${err.message}` });
+    }
+    if (listing.hostId !== registeredBy) {
+      return res.status(403).json({ error: 'register: the registering session does not own this VACAY listing' });
+    }
+    store.vacayHotels.listingIds.push(listingId);
+    res.status(201).json({ listingIds: store.vacayHotels.listingIds, maxHotels: cap });
   });
 
   // Live World News — a read-only feed of things that already
