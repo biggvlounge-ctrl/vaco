@@ -72,6 +72,7 @@ function createVdpStore() {
     property: { properties: [], nextPropertyId: 1 },
     relationships: {},
     npcWorld: null,
+    news: { events: [], nextId: 1 },
   };
 }
 
@@ -114,6 +115,7 @@ let store = createVdpStore();
   const jobsLib = await import('./src/lib/jobs.js');
   const libraryLib = await import('./src/lib/library.js');
   const populationLib = await import('./src/lib/population.js');
+  const newsLib = await import('./src/lib/news.js');
 
   function ensurePlayer(userId) {
     if (!store.players[userId]) {
@@ -134,6 +136,7 @@ let store = createVdpStore();
     onReady: (loaded) => {
       store = loaded;
       if (!store.npcWorld) store.npcWorld = npcs.createNpcWorld();
+      if (!store.news) store.news = newsLib.createNewsLog();
     },
   });
 
@@ -154,6 +157,15 @@ let store = createVdpStore();
     const playerCount = Object.keys(store.players).length;
     const npcCount = store.npcWorld ? store.npcWorld.npcs.length : 0;
     res.json(populationLib.describePopulation(playerCount, npcCount));
+  });
+
+  // Live World News — a read-only feed of things that already
+  // happened elsewhere (job payouts, property purchases, book
+  // effects, notable NPC decisions, chat). ?limit caps how many of
+  // the most recent events come back; newsLib clamps it.
+  app.get('/api/news', (req, res) => {
+    const limit = Number(req.query.limit) || 30;
+    res.json({ events: newsLib.listNews(store.news, limit) });
   });
 
   // --- Player needs/goals (reuses npcs.js's own engine) --------------
@@ -195,6 +207,11 @@ let store = createVdpStore();
       const shift = await jobsLib.clockOutAndPay(store.jobs, { workerId, transferFn: transferVCoin });
       const player = ensurePlayer(workerId);
       skillsLib.gainFromShift(player.skills, shift.skill);
+      const job = jobsLib.getJob(shift.jobId);
+      newsLib.recordEvent(store.news, {
+        kind: 'job',
+        text: `${workerId} finished a shift as ${job ? job.title : shift.jobId} and earned ${shift.pay} VCoin`,
+      });
       res.status(200).json(shift);
     } catch (err) {
       res.status(400).json({ error: err.message });
@@ -221,6 +238,10 @@ let store = createVdpStore();
       const home = await propertyLib.purchaseHome(store.property, {
         ownerId: req.body.ownerId,
         transferFn: (args) => transferVCoin({ ...args, toUserId: 'vdp-property-office' }),
+      });
+      newsLib.recordEvent(store.news, {
+        kind: 'property',
+        text: `${req.body.ownerId} bought a ${home.type} home`,
       });
       res.status(201).json(home);
     } catch (err) {
@@ -295,6 +316,15 @@ let store = createVdpStore();
       const result = libraryLib.applyBookEffect(player.library, player, {
         orderId, title, skillSubject, beliefTopic, beliefType,
       });
+      if (result.applied) {
+        const effectText = result.effect.kind === 'skill'
+          ? `improved their ${result.effect.skill} skill`
+          : `shifted their ${result.effect.beliefType} belief`;
+        newsLib.recordEvent(store.news, {
+          kind: 'library',
+          text: `${buyerId} read "${title}" and ${effectText}`,
+        });
+      }
       res.status(result.applied ? 201 : 200).json(result);
     } catch (err) {
       res.status(400).json({ error: err.message });
@@ -326,15 +356,33 @@ let store = createVdpStore();
       // conversation gets -- a real exchange between two real people
       // is at least as real as one with an NPC.
       if (msg.type === 'chat' && msg.fromUserId && msg.toUserId && typeof msg.text === 'string' && msg.text.trim()) {
-        broadcast({ type: 'chat', fromUserId: msg.fromUserId, toUserId: msg.toUserId, text: msg.text.trim(), at: Date.now() });
+        const text = msg.text.trim();
+        broadcast({ type: 'chat', fromUserId: msg.fromUserId, toUserId: msg.toUserId, text, at: Date.now() });
         relationshipsLib.recordConversation(store.relationships, msg.fromUserId, msg.toUserId);
+        newsLib.recordEvent(store.news, {
+          kind: 'chat',
+          text: `${msg.fromUserId} to ${msg.toUserId}: "${text.length > 80 ? `${text.slice(0, 80)}…` : text}"`,
+        });
       }
     },
   });
 
+  // Only the rare flavor actions (see npcs.js's own `pickAction`
+  // comment) are news-worthy -- logging every routine need-driven
+  // decision for 14+ NPCs every 2s would drown the feed in noise.
+  const NOTABLE_NPC_ACTIONS = {
+    fight: (npc) => `${npc.name} got into a fight`,
+    pettySwipe: (npc) => `${npc.name} swiped something that wasn't theirs`,
+  };
+
   const NPC_TICK_INTERVAL_MS = 2000;
   setInterval(() => {
-    npcs.advanceWorldTick(store.npcWorld);
+    const decidedIds = npcs.advanceWorldTick(store.npcWorld);
+    for (const npcId of decidedIds) {
+      const npc = npcs.getNpc(store.npcWorld, npcId);
+      const describe = npc && NOTABLE_NPC_ACTIONS[npc.currentAction];
+      if (describe) newsLib.recordEvent(store.news, { kind: 'npc', text: describe(npc) });
+    }
     for (const player of Object.values(store.players)) {
       npcs.stepNeeds(player.state, store.npcWorld.tick);
       npcs.fadeHabits(player.state);

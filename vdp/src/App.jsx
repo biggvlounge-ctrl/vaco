@@ -8,6 +8,7 @@ import { seedDemoData } from "./lib/seedDemoData.js";
 import WorldView from "./components/WorldView.jsx";
 import ChopzView from "./components/ChopzView.jsx";
 import MyAssetsView from "./components/MyAssetsView.jsx";
+import NewsTicker from "./components/NewsTicker.jsx";
 
 // Where "exit VDP" goes. Same target as every other app's masthead
 // brand link -- see the note at the render site below.
@@ -265,6 +266,7 @@ export default function App() {
               <WorldView session={session} degvchiStore={degvchiStore} foodDistrictStore={foodDistrictStore} onPurchase={notifyStateChange} />
               <ChopzView session={session} onPurchase={notifyStateChange} />
               <MyAssetsView session={session} degvchiStore={degvchiStore} />
+              <NewsTicker />
             </div>
           )}
 
