@@ -2,12 +2,15 @@ import { useState, useEffect, useCallback } from "react";
 import { registerScreen, listScreens, getScreenRevenue } from "../lib/dreamsClient.js";
 import { TOWN_NAME } from "../lib/town.js";
 
-// The "screen living spaces" city tier: a real ad/DOOH screen a player
-// registers in DREAMS' own real network (dreams/server.js), placed
-// somewhere in Meridian. DREAMS stays the only place a screen earns
-// from an advertiser's campaign; this panel only registers a screen
-// under the player's own id and shows DREAMS' own real revenue number
-// back -- no revenue logic duplicated here.
+// Screens: a real income source of their own, parallel to residential
+// rent and commercial shifts -- not a kind of housing. A real ad/DOOH
+// screen a player registers in DREAMS' own real network
+// (dreams/server.js), placed somewhere in Meridian, earning real
+// VCoin from DREAMS' own direct-to-consumer advertising/marketing
+// network. DREAMS stays the only place a screen earns from an
+// advertiser's campaign; this panel only registers a screen under the
+// player's own id and shows DREAMS' own real revenue number back --
+// no revenue logic duplicated here.
 
 export default function DreamsScreensView({ session }) {
   const [screens, setScreens] = useState([]);

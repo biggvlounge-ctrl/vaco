@@ -3,9 +3,14 @@
 // here, every real number comes back from DREAMS' own server. DREAMS
 // is the ecosystem's real ad/screen network (dreams/server.js) --
 // real screen registration, a real self-serve advertiser flow, real
-// per-screen revenue tracking. This is the "screen living spaces"
-// city tier: a player-owned ad screen placed somewhere in VDP's
-// world, not housing.
+// per-screen revenue tracking.
+//
+// Screens are their own real income category, parallel to (not a kind
+// of) residential and commercial property -- a player registers a
+// screen somewhere in Meridian and earns real VCoin from DREAMS' own
+// direct-to-consumer advertising/marketing network, the same way
+// residential earns through rent and commercial earns through a
+// CHOPZ unit's shifts. Not housing, and not a housing tier.
 
 import { sessionHeaders } from "./shieldAuth.js";
 
