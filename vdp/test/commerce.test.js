@@ -19,7 +19,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  FOOD_CATEGORIES, FLAGSHIP_BRANDS,
+  FOOD_CATEGORIES, FLAGSHIP_BRANDS, DRONE_DELIVERY_RADIUS_MILES,
   getBrand, listBrands, brandOwnerId, createFoodDistrict,
   orderMenuItem, getOrderHistory,
 } from '../src/lib/foodDistrict.js';
@@ -196,6 +196,54 @@ test('an order that cannot be paid for is not recorded', () => {
   ).then(() => {
     assert.equal(store.orders.length, 0);
     assert.deepEqual(getOrderHistory(store, 'p'), []);
+  });
+});
+
+test('the real drone-delivery service radius is the real 5-10 mile range, not a single invented figure', () => {
+  assert.equal(DRONE_DELIVERY_RADIUS_MILES.min, 5);
+  assert.equal(DRONE_DELIVERY_RADIUS_MILES.max, 10);
+});
+
+test('an order with no requestDeliveryFn is recorded with no delivery -- unchanged default behavior', () => {
+  const store = createFoodDistrict();
+  const brand = FLAGSHIP_BRANDS[0];
+  const transferFn = ledger();
+
+  return orderMenuItem(store, {
+    brandSlug: brand.slug, itemName: brand.menu[0].item, buyerId: 'p', transferFn,
+  }).then((order) => {
+    assert.equal(order.delivery, null);
+  });
+});
+
+test('a successful requestDeliveryFn records the real VOID job id on the order', () => {
+  const store = createFoodDistrict();
+  const brand = FLAGSHIP_BRANDS[0];
+  const transferFn = ledger();
+  const requestDeliveryFn = async (order) => {
+    assert.equal(order.brandSlug, brand.slug, 'the delivery request gets the real order, not a stub');
+    return { id: 42, status: 'requested' };
+  };
+
+  return orderMenuItem(store, {
+    brandSlug: brand.slug, itemName: brand.menu[0].item, buyerId: 'p', transferFn, requestDeliveryFn,
+  }).then((order) => {
+    assert.deepEqual(order.delivery, { status: 'requested', voidJobId: 42 });
+  });
+});
+
+test('a failed drone-delivery request does not unwind the real payment -- fail soft on the signal, not the money', () => {
+  const store = createFoodDistrict();
+  const brand = FLAGSHIP_BRANDS[0];
+  const transferFn = ledger();
+  const requestDeliveryFn = async () => { throw new Error('VOID unreachable'); };
+
+  return orderMenuItem(store, {
+    brandSlug: brand.slug, itemName: brand.menu[0].item, buyerId: 'p', transferFn, requestDeliveryFn,
+  }).then((order) => {
+    assert.equal(transferFn.moves.length, 1, 'the buyer was still charged -- the order is real');
+    assert.equal(store.orders.length, 1, 'and still recorded, not rolled back');
+    assert.deepEqual(order.delivery, { status: 'failed', error: 'VOID unreachable' });
   });
 });
 

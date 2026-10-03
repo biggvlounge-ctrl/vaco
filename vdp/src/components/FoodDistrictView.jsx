@@ -1,12 +1,22 @@
 import { useState } from "react";
-import { FLAGSHIP_BRANDS, orderMenuItem, getOrderHistory } from "../lib/foodDistrict.js";
+import { FLAGSHIP_BRANDS, DRONE_DELIVERY_RADIUS_MILES, orderMenuItem, getOrderHistory } from "../lib/foodDistrict.js";
 import { transferVCoin } from "../lib/v3Client.js";
+import { requestJob } from "../lib/voidClient.js";
 
 // Real, instant purchase per menu item -- no "equip" step the way
 // DEGVCHI's wearables have, since ordering food isn't wearing it.
 // `onPurchase` fires the same real, established re-render fix
 // (App.jsx's `tick` counter) every other purchase action in this app
 // already relies on.
+//
+// Ghost-kitchen fulfillment, per direct instruction: each order also
+// requests a real drone delivery through VOID's own `foodDelivery`
+// vertical (not licensing-gated) -- the same real request->match->
+// accept->complete->pay->rate loop VoidView.jsx's courier demo already
+// uses, not a second invented delivery system. `requestDeliveryFn` is
+// the player's own session requesting it (`requireActor('customerId')`
+// on VOID's side), same real-actor posture as every other cross-app
+// write in this app.
 
 export default function FoodDistrictView({ session, store, onPurchase }) {
   const [busy, setBusy] = useState(null);
@@ -15,11 +25,17 @@ export default function FoodDistrictView({ session, store, onPurchase }) {
   const transferFn = (from, to, amount, reason) =>
     transferVCoin({ fromUserId: from, toUserId: to, amount, reason });
 
+  const requestDeliveryFn = (order) => requestJob({
+    verticalId: "foodDelivery", customerId: session.userId, quantity: 1, unitPrice: order.price,
+  });
+
   const handleOrder = async (brandSlug, itemName) => {
     setBusy(`${brandSlug}:${itemName}`);
     setError(null);
     try {
-      await orderMenuItem(store, { brandSlug, itemName, buyerId: session.userId, transferFn });
+      await orderMenuItem(store, {
+        brandSlug, itemName, buyerId: session.userId, transferFn, requestDeliveryFn,
+      });
       await onPurchase();
     } catch (err) {
       setError(err.message);
@@ -32,7 +48,10 @@ export default function FoodDistrictView({ session, store, onPurchase }) {
 
   return (
     <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16, marginTop: 12 }}>
-      <h2 style={{ fontSize: 16, margin: "0 0 8px 0" }}>Food District — Flagship Restaurants</h2>
+      <h2 style={{ fontSize: 16, margin: "0 0 4px 0" }}>Food District — Flagship Restaurants</h2>
+      <p style={{ fontSize: 11, color: "#888", margin: "0 0 8px" }}>
+        Ghost kitchens, drone-delivered via VOID's real network — serving a {DRONE_DELIVERY_RADIUS_MILES.min}-{DRONE_DELIVERY_RADIUS_MILES.max} mile radius around Meridian.
+      </p>
 
       {FLAGSHIP_BRANDS.map((brand) => (
         <div key={brand.slug} style={{ marginTop: 12, borderTop: "1px solid #eee", paddingTop: 8 }}>
@@ -65,6 +84,12 @@ export default function FoodDistrictView({ session, store, onPurchase }) {
         {history.map((o) => (
           <p key={o.id} style={{ fontSize: 12, margin: "2px 0" }}>
             {o.brandName} — {o.itemName} (${o.price.toFixed(2)})
+            {o.delivery && o.delivery.status === "requested" && (
+              <span style={{ color: "#1a7d3c" }}> — drone delivery requested (VOID job #{o.delivery.voidJobId})</span>
+            )}
+            {o.delivery && o.delivery.status === "failed" && (
+              <span style={{ color: "#c60" }}> — delivery request failed ({o.delivery.error})</span>
+            )}
           </p>
         ))}
       </div>

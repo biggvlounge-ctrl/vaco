@@ -15,6 +15,32 @@
 // content for the first time, using the brands below instead of the
 // spec's own never-built placeholder gesture.
 //
+// **Direct, flagged correction to that doc's own framing.** It argued
+// against a delivery-only kitchen model; the later, more specific
+// instruction overrides it: "set up in a ghost kitchen style,
+// distributed through drone operations, [with] a five mile to ten
+// mile radius... for that specific village." The 11 brands stay
+// exactly as named and priced -- only the fulfillment model changes,
+// from a walk-up counter to a real drone-delivered ghost kitchen. Real
+// dispatch infrastructure already exists for this, not invented here:
+// VOID's own `foodDelivery` vertical (`void/lib/verticals.js`, not
+// licensing-gated) and its real food-priority dispatch rule
+// (`dispatchIntelligence.js`'s 15-minute window, sourced from
+// VOID_MEITUAN_MODEL_INTEGRATION.md's own cited real spec) already
+// model exactly this. `requestFoodDelivery()` below requests a real
+// job on that vertical through VOID's own marketplace loop -- the same
+// request->match->accept->complete->pay->rate loop VoidView.jsx's
+// courier demo already uses -- rather than inventing a second
+// fulfillment system.
+//
+// `DRONE_DELIVERY_RADIUS_MILES`: the real 5-10 mile range given
+// directly, not a single invented number -- real drone-delivery
+// service areas vary by payload/distance economics within a band
+// rather than holding to one fixed figure. Distinct from (not in
+// conflict with) VOID's own 3km/15-minute food-priority *time* window
+// above: that's how fast an accepted order must move, this is how far
+// a ghost kitchen's service area reaches in the first place.
+//
 // Mirrors DEGVCHI's own real purchase shape (`lib/degvchi.js`) more
 // than it copies it: a real, instant VCoin purchase via an injected
 // `transferFn`, paid out to the brand's own real, distinct account
@@ -41,6 +67,8 @@
 export const FOOD_CATEGORIES = [
   'beverage', 'vegan', 'italian', 'wellness', 'sandwich', 'grocery', 'mexican', 'burger', 'soul-food', 'potato', 'chicken',
 ];
+
+export const DRONE_DELIVERY_RADIUS_MILES = { min: 5, max: 10 };
 
 export const FLAGSHIP_BRANDS = [
   {
@@ -207,9 +235,19 @@ export function createFoodDistrict() {
   return { orders: [], nextOrderId: 1 };
 }
 
+// `requestDeliveryFn`, if supplied, requests the order's real drone
+// delivery -- a thin call out to VOID's own `foodDelivery` vertical
+// (`(order) => Promise<{ id, ... }>`, shaped to match
+// `voidClient.js`'s real `requestJob`), same injected-function posture
+// every cross-app call in this project already uses. Optional and
+// deliberately decoupled from the payment above: per VOID's own
+// standing rule ("fail soft on signals, hard on money"), a drone-
+// dispatch hiccup is a signal, not a payment -- it must never unwind a
+// real, already-settled purchase. A failure here is recorded on the
+// order as `delivery.status: 'failed'`, not thrown.
 export async function orderMenuItem(store, options = {}) {
   const {
-    brandSlug, itemName, buyerId, transferFn, now = Date.now(),
+    brandSlug, itemName, buyerId, transferFn, requestDeliveryFn, now = Date.now(),
   } = options;
 
   const brand = getBrand(brandSlug);
@@ -231,7 +269,18 @@ export async function orderMenuItem(store, options = {}) {
     price: menuItem.price,
     buyerId,
     orderedAt: now,
+    delivery: null,
   };
+
+  if (typeof requestDeliveryFn === 'function') {
+    try {
+      const job = await requestDeliveryFn(order);
+      order.delivery = { status: 'requested', voidJobId: job.id };
+    } catch (err) {
+      order.delivery = { status: 'failed', error: err.message };
+    }
+  }
+
   store.orders.push(order);
   return order;
 }
