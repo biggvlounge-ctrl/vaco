@@ -4,7 +4,7 @@ import {
   DISTRICTS, createWorldState, movePlayer, getCurrentDistrict, getNearbyBuilding, enterBuilding, getCameraOffset,
 } from "../lib/world.js";
 import { latestDecision, explainDecision } from "../lib/npcs.js";
-import { classifyMeridian } from "../lib/cityTiers.js";
+import { classifyMeridian, CITY_TIERS } from "../lib/cityTiers.js";
 import { TOWN_NAME } from "../lib/town.js";
 import { talkToNpc } from "../lib/v4AgentClient.js";
 import { getEquippedOutfit } from "../lib/degvchi.js";
@@ -19,6 +19,7 @@ import VadoView from "./VadoView.jsx";
 import VenusResortView from "./VenusResortView.jsx";
 import CombatSportsView from "./CombatSportsView.jsx";
 import VavltView from "./VavltView.jsx";
+import CommonsView from "./CommonsView.jsx";
 import VacayView from "./VacayView.jsx";
 import HvntzView from "./HvntzView.jsx";
 import VoidView from "./VoidView.jsx";
@@ -205,7 +206,52 @@ const DISTRICT_COLORS = {
   "vulture-studios": "#4a5f93",
   vacancy: "#5f7a4a",
   "vaco-merch": "#93564a",
+  commons: "#3a6b3a",
 };
+
+// Meridian Commons' real landscape scene, read from cityTiers.js's
+// own tier data (not hardcoded): a grass base, a lagoon sized up for
+// real fishing spots at the largest tier, a dashed trail loop labeled
+// with the tier's own real trailMiles figure, and (tiers 4-5 only) a
+// small farm patch. Honest about what a flat 2D canvas can show --
+// this is a schematic landscape, not a rendered 3D scene.
+function drawCommonsLandscape(ctx, sx, sy, w, h, tier) {
+  ctx.fillStyle = "#2f5233"; // grass
+  ctx.fillRect(sx, sy, w, h);
+
+  const cx = sx + w / 2;
+  const cy = sy + h / 2 + 10;
+  const lagoonRadius = tier.hasFishing ? 48 : 32;
+  ctx.fillStyle = "#2a6f8f";
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, lagoonRadius, lagoonRadius * 0.65, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#cfe8f0";
+  ctx.font = "10px sans-serif";
+  ctx.fillText(tier.waterFeature, sx + 8, sy + h - 34);
+  if (tier.hasFishing) {
+    ctx.fillText("real fishing spots", sx + 8, sy + h - 22);
+  }
+
+  ctx.strokeStyle = "#d8c78a";
+  ctx.setLineDash([4, 4]);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, lagoonRadius + 18, lagoonRadius * 0.65 + 18, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = "#d8c78a";
+  ctx.fillText(`${tier.trailMiles} mi trail`, sx + 8, sy + h - 10);
+
+  if (tier.hasFarmDistribution) {
+    ctx.fillStyle = "#8a6d3a";
+    ctx.fillRect(sx + w - 44, sy + h - 44, 32, 32);
+    ctx.fillStyle = "#c9b36a";
+    for (let row = 0; row < 3; row += 1) {
+      ctx.fillRect(sx + w - 42, sy + h - 42 + row * 10, 28, 4);
+    }
+  }
+}
 
 export default function WorldView({ session, degvchiStore, foodDistrictStore, onPurchase }) {
   const [worldState, setWorldState] = useState(() => createWorldState());
@@ -391,13 +437,33 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
     ctx.fillStyle = "#1a1a2e";
     ctx.fillRect(0, 0, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
 
+    // Meridian's own real tier, read live -- drives both the Commons
+    // landscape scene below and the building-height shadow every
+    // other district gets. A top-down 2D canvas has no real z-axis, so
+    // "different scales of the heights of the buildings" (direct
+    // instruction) is honestly represented as a drop-shadow depth, not
+    // a literal 3D skyline -- CITY_TIERS' own buildingHeightTier index
+    // (0 Low-Rise .. 4 Skyline Tower) scales it, real data driving a
+    // real (if modest) visual, not a hardcoded look.
+    const meridianTier = classifyMeridian();
+    const heightIndex = meridianTier ? CITY_TIERS.findIndex((t) => t.id === meridianTier.id) : 0;
+    const shadowDepth = 2 + heightIndex * 2; // 2px (Low-Rise) up to 10px (Skyline Tower)
+
     for (const d of DISTRICTS) {
       const sx = d.x - camera.x;
       const sy = d.y - camera.y;
       if (sx + d.width < 0 || sx > VIEWPORT_WIDTH || sy + d.height < 0 || sy > VIEWPORT_HEIGHT) continue;
       const hasView = d.contentType !== 'none';
-      ctx.fillStyle = DISTRICT_COLORS[d.id] || "#555";
-      ctx.fillRect(sx, sy, d.width, d.height);
+
+      if (d.id === 'commons' && meridianTier) {
+        drawCommonsLandscape(ctx, sx, sy, d.width, d.height, meridianTier);
+      } else {
+        ctx.fillStyle = "rgba(0,0,0,0.35)";
+        ctx.fillRect(sx + shadowDepth, sy + shadowDepth, d.width, d.height);
+        ctx.fillStyle = DISTRICT_COLORS[d.id] || "#555";
+        ctx.fillRect(sx, sy, d.width, d.height);
+      }
+
       ctx.strokeStyle = hasView ? "#fff" : "#888";
       ctx.lineWidth = hasView ? 3 : 1;
       ctx.setLineDash(hasView ? [] : [6, 4]);
@@ -679,6 +745,9 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
           )}
           {enteredDistrict.contentType === 'vdp-native' && enteredDistrict.id === 'vavlt' && (
             <VavltView session={session} />
+          )}
+          {enteredDistrict.contentType === 'vdp-native' && enteredDistrict.id === 'commons' && (
+            <CommonsView />
           )}
           {enteredDistrict.contentType === 'vacay-embed' && enteredDistrict.id === 'vacay' && (
             <VacayView session={session} />

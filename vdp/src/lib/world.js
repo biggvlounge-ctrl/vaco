@@ -168,8 +168,9 @@ export const WORLD_WIDTH = 860;
 // earlier 580->860 growth for the Village District row (see below).
 // Grown once more to 2260 for an 8th row: the 7th filled up exactly
 // (Beat Marketplace / Vvltvre Studios / VACON-C), leaving nowhere to
-// put VACO Merch.
-export const WORLD_HEIGHT = 2260;
+// put VACO Merch. Grown once more to 2520 for a 9th row: Meridian
+// Commons, the real landscape cityTiers.js describes made walkable.
+export const WORLD_HEIGHT = 2520;
 export const VIEWPORT_WIDTH = 400;
 export const VIEWPORT_HEIGHT = 300;
 export const MOVE_STEP = 16;
@@ -321,6 +322,15 @@ export const DISTRICTS = [
   // streaming/screen-sessions -- deliberately not this).
   {
     id: 'vavlt', name: 'The Vavlt', x: 580, y: 1980, width: 260, height: 260, contentType: 'vdp-native',
+  },
+  // Meridian Commons -- the real landscape `cityTiers.js` describes
+  // (water feature, nature trails, farm distribution at the top two
+  // tiers) made walkable, a 9th row. `vdp-native`: this is VDP's own
+  // ground, not a doorway into another app. Read live from
+  // `classifyMeridian()` (CommonsView.jsx), not hardcoded here --
+  // Meridian's own tier changes as its real amenity coverage does.
+  {
+    id: 'commons', name: 'Meridian Commons', x: 20, y: 2260, width: 260, height: 260, contentType: 'vdp-native',
   },
 ];
 
