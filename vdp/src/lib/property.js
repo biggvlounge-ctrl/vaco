@@ -39,6 +39,14 @@ export const PROPERTY_LEVELS = [
 
 export const HOME_PRICE = PROPERTY_LEVELS[0].price;
 
+// Renting is the cheap, non-committal way in: a fifth of buying
+// outright, always a Studio (no tower levels while renting -- the
+// level ladder is an owner's progression), and converting to
+// ownership later credits the rent already paid rather than charging
+// the full price again.
+export const RENT_FRACTION = 0.2;
+export const RENT_PRICE = Math.round(PROPERTY_LEVELS[0].price * RENT_FRACTION);
+
 export function levelByNumber(level) {
   return PROPERTY_LEVELS.find((l) => l.level === level) || null;
 }
@@ -70,6 +78,7 @@ export async function purchaseHome(store, { ownerId, transferFn, now = Date.now(
     type: 'residential',
     ownerId,
     ownerType: 'individual',
+    ownershipType: 'owned',
     lifecycleStage: 'operation',
     level: PROPERTY_LEVELS[0].level,
     levelName: PROPERTY_LEVELS[0].name,
@@ -92,6 +101,67 @@ export async function purchaseHome(store, { ownerId, transferFn, now = Date.now(
   return property;
 }
 
+// The cheap, non-committal path in: always a Studio, no tower levels
+// until the renter converts to ownership (see `buyRentedHome`). Same
+// claim-before-pay/rollback ordering as `purchaseHome`.
+export async function rentHome(store, { ownerId, transferFn, now = Date.now() } = {}) {
+  if (!ownerId) throw new Error('rentHome requires an ownerId');
+  if (homeOwnedBy(store, ownerId)) {
+    throw new Error(`rentHome: "${ownerId}" already has a home`);
+  }
+  if (typeof transferFn !== 'function') throw new Error('rentHome requires a transferFn');
+
+  const property = {
+    id: store.nextPropertyId++,
+    type: 'residential',
+    ownerId,
+    ownerType: 'individual',
+    ownershipType: 'rented',
+    lifecycleStage: 'operation',
+    level: PROPERTY_LEVELS[0].level,
+    levelName: PROPERTY_LEVELS[0].name,
+    purchasedAt: now,
+  };
+  store.properties.push(property);
+
+  try {
+    await transferFn({ fromUserId: ownerId, amount: RENT_PRICE, reason: 'vdp-home-rent' });
+  } catch (err) {
+    const idx = store.properties.indexOf(property);
+    if (idx !== -1) store.properties.splice(idx, 1);
+    throw err;
+  }
+
+  return property;
+}
+
+// Converts a rented Studio into an owned one. Charges the real
+// remainder -- the full purchase price minus the rent already paid --
+// not the full price again, the same "don't charge twice for the same
+// level" discipline `upgradeHome` applies between tower levels.
+export async function buyRentedHome(store, { ownerId, transferFn, now = Date.now() } = {}) {
+  if (!ownerId) throw new Error('buyRentedHome requires an ownerId');
+  const property = homeOwnedBy(store, ownerId);
+  if (!property) throw new Error(`buyRentedHome: "${ownerId}" does not have a home`);
+  if (property.ownershipType === 'owned') {
+    throw new Error(`buyRentedHome: "${ownerId}" already owns their home`);
+  }
+  if (typeof transferFn !== 'function') throw new Error('buyRentedHome requires a transferFn');
+
+  const cost = HOME_PRICE - RENT_PRICE;
+  property.ownershipType = 'owned';
+  property.purchasedAt = now;
+
+  try {
+    await transferFn({ fromUserId: ownerId, amount: cost, reason: 'vdp-home-rent-to-own' });
+  } catch (err) {
+    property.ownershipType = 'rented';
+    throw err;
+  }
+
+  return property;
+}
+
 // Moves a home up exactly one tower level, charging the real price
 // difference between the current and next level -- not the next
 // level's full price, since the player already paid for the level
@@ -102,6 +172,9 @@ export async function upgradeHome(store, { ownerId, transferFn, now = Date.now()
   if (!ownerId) throw new Error('upgradeHome requires an ownerId');
   const property = homeOwnedBy(store, ownerId);
   if (!property) throw new Error(`upgradeHome: "${ownerId}" does not own a home`);
+  if (property.ownershipType === 'rented') {
+    throw new Error(`upgradeHome: "${ownerId}" is renting, not owning -- buy the home first (buyRentedHome)`);
+  }
   if (typeof transferFn !== 'function') throw new Error('upgradeHome requires a transferFn');
 
   const current = levelByNumber(property.level);

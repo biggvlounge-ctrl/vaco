@@ -265,6 +265,38 @@ let store = createVdpStore();
     }
   });
 
+  app.post('/api/property/rent', requireActor('ownerId'), async (req, res) => {
+    try {
+      const home = await propertyLib.rentHome(store.property, {
+        ownerId: req.body.ownerId,
+        transferFn: (args) => transferVCoin({ ...args, toUserId: 'vdp-property-office' }),
+      });
+      newsLib.recordEvent(store.news, {
+        kind: 'property',
+        text: `${req.body.ownerId} rented a ${home.levelName}`,
+      });
+      res.status(201).json(home);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/property/buy-rented', requireActor('ownerId'), async (req, res) => {
+    try {
+      const home = await propertyLib.buyRentedHome(store.property, {
+        ownerId: req.body.ownerId,
+        transferFn: (args) => transferVCoin({ ...args, toUserId: 'vdp-property-office' }),
+      });
+      newsLib.recordEvent(store.news, {
+        kind: 'property',
+        text: `${req.body.ownerId} bought the home they were renting`,
+      });
+      res.status(200).json(home);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
   // --- Relationships -----------------------------------------------------
   app.get('/api/relationships/:id', (req, res) => {
     res.json({ relationships: relationshipsLib.listRelationshipsFor(store.relationships, req.params.id) });

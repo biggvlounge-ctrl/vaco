@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 
 import {
   createPropertyStore, purchaseHome, homeOwnedBy, advanceLifecycle, upgradeHome,
-  HOME_PRICE, LIFECYCLE, PROPERTY_LEVELS,
+  rentHome, buyRentedHome, HOME_PRICE, RENT_PRICE, LIFECYCLE, PROPERTY_LEVELS,
 } from '../src/lib/property.js';
 
 function fakeTransfer(calls, { shouldFail = false } = {}) {
@@ -92,5 +92,67 @@ test('upgradeHome refuses someone with no home, and refuses past the top level',
   await assert.rejects(
     upgradeHome(store, { ownerId: 'bob', transferFn: fakeTransfer([]) }),
     /already at the top level/,
+  );
+});
+
+test('rentHome charges the cheap rent price, not the full purchase price, and always starts at a Studio', async () => {
+  const store = createPropertyStore();
+  const calls = [];
+  const home = await rentHome(store, { ownerId: 'alice', transferFn: fakeTransfer(calls) });
+
+  assert.equal(calls[0].amount, RENT_PRICE);
+  assert.ok(RENT_PRICE < HOME_PRICE, 'renting must be cheaper than buying outright');
+  assert.equal(home.ownershipType, 'rented');
+  assert.equal(home.level, PROPERTY_LEVELS[0].level);
+});
+
+test('rentHome is refused for someone who already has a home, owned or rented', async () => {
+  const store = createPropertyStore();
+  await purchaseHome(store, { ownerId: 'alice', transferFn: fakeTransfer([]) });
+  await assert.rejects(
+    rentHome(store, { ownerId: 'alice', transferFn: fakeTransfer([]) }),
+    /already has a home/,
+  );
+});
+
+test('upgradeHome refuses a rented home -- renting has no tower levels', async () => {
+  const store = createPropertyStore();
+  await rentHome(store, { ownerId: 'alice', transferFn: fakeTransfer([]) });
+  await assert.rejects(
+    upgradeHome(store, { ownerId: 'alice', transferFn: fakeTransfer([]) }),
+    /renting, not owning/,
+  );
+});
+
+test('buyRentedHome charges only the real remainder, crediting the rent already paid', async () => {
+  const store = createPropertyStore();
+  await rentHome(store, { ownerId: 'alice', transferFn: fakeTransfer([]) });
+  const calls = [];
+  const home = await buyRentedHome(store, { ownerId: 'alice', transferFn: fakeTransfer(calls) });
+
+  assert.equal(calls[0].amount, HOME_PRICE - RENT_PRICE);
+  assert.equal(home.ownershipType, 'owned');
+});
+
+test('a failed buyRentedHome rolls back to rented', async () => {
+  const store = createPropertyStore();
+  await rentHome(store, { ownerId: 'alice', transferFn: fakeTransfer([]) });
+  await assert.rejects(
+    buyRentedHome(store, { ownerId: 'alice', transferFn: fakeTransfer([], { shouldFail: true }) }),
+  );
+  assert.equal(homeOwnedBy(store, 'alice').ownershipType, 'rented');
+});
+
+test('buyRentedHome refuses someone with no home and someone who already owns', async () => {
+  const store = createPropertyStore();
+  await assert.rejects(
+    buyRentedHome(store, { ownerId: 'alice', transferFn: fakeTransfer([]) }),
+    /does not have a home/,
+  );
+
+  await purchaseHome(store, { ownerId: 'bob', transferFn: fakeTransfer([]) });
+  await assert.rejects(
+    buyRentedHome(store, { ownerId: 'bob', transferFn: fakeTransfer([]) }),
+    /already owns their home/,
   );
 });

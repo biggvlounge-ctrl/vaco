@@ -17,7 +17,7 @@ async function getJson(path) {
   return res.json();
 }
 
-export default function MyAssetsView({ session, degvchiStore }) {
+export default function MyAssetsView({ session, degvchiStore, refreshSignal }) {
   const [state, setState] = useState(null);
   const [library, setLibrary] = useState([]);
   const [home, setHome] = useState(null);
@@ -53,7 +53,8 @@ export default function MyAssetsView({ session, degvchiStore }) {
 
   useEffect(() => {
     refresh();
-  }, [refresh]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refresh, refreshSignal]);
 
   if (!session) return null;
 
