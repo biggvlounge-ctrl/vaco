@@ -40,21 +40,37 @@ const CATEGORIES = [
   'repair_shop',
 ];
 
+// Five real size tiers, the same "tier 1 is the smallest, tier 5 is
+// the largest" ladder `property.js`'s own PROPERTY_LEVELS uses for
+// residential -- commercial gets the same shape, per explicit
+// instruction. Assigned across the existing 8 units (no new units,
+// no combinatorial growth against CATEGORIES) rather than inventing a
+// second, parallel unit roster.
 const UNIT_TEMPLATE = [
-  { category: 'food_stand' },
-  { category: 'food_stand' }, // the one category with 2 of the 8 units
-  { category: 'clothing_boutique' },
-  { category: 'hardware_kiosk' },
-  { category: 'music_stall' },
-  { category: 'bookshop' },
-  { category: 'salon' },
-  { category: 'repair_shop' },
+  { category: 'food_stand', tier: 1 },
+  { category: 'food_stand', tier: 1 }, // the one category with 2 of the 8 units
+  { category: 'clothing_boutique', tier: 2 },
+  { category: 'hardware_kiosk', tier: 2 },
+  { category: 'music_stall', tier: 3 },
+  { category: 'bookshop', tier: 4 },
+  { category: 'salon', tier: 4 },
+  { category: 'repair_shop', tier: 5 },
 ];
 
-const LEASE_COST = 50;
-const SHIFT_PAYOUT = 15;
+export const TIER_NAMES = { 1: 'Kiosk', 2: 'Shop', 3: 'Storefront', 4: 'Flagship', 5: 'Mega-Flagship' };
+
+// Roughly doubling per tier, the same shape PROPERTY_LEVELS' own price
+// ladder uses. Tier 1 is unchanged from this module's original flat
+// $50/$15/$3 rates, so every existing test (which all lease the first
+// available unit -- tier 1) keeps passing untouched.
+const TIER_LEASE_COST = { 1: 50, 2: 110, 3: 230, 4: 460, 5: 900 };
+const TIER_SHIFT_PAYOUT = { 1: 15, 2: 30, 3: 55, 4: 100, 5: 180 };
+const TIER_AI_EMPLOYEE_RATE_PER_HOUR = { 1: 3, 2: 6, 3: 11, 4: 20, 5: 36 };
+
+const LEASE_COST = TIER_LEASE_COST[1];
+const SHIFT_PAYOUT = TIER_SHIFT_PAYOUT[1];
 const SHIFT_COOLDOWN_MS = 4 * 60 * 60 * 1000; // 4 hours
-const AI_EMPLOYEE_RATE_PER_HOUR = 3;
+const AI_EMPLOYEE_RATE_PER_HOUR = TIER_AI_EMPLOYEE_RATE_PER_HOUR[1];
 const PLATFORM_USER_ID = 'venvs-platform';
 
 // **Why platform-funded legs take a separate function, and why the
@@ -100,6 +116,7 @@ export function createChopz() {
     units: UNIT_TEMPLATE.map((u, i) => ({
       id: i + 1,
       category: u.category,
+      tier: u.tier,
       ownerId: null,
       mode: null, // 'self_run' | 'ai_employee', null until leased
       employeeName: null,
@@ -137,7 +154,7 @@ export async function leaseUnit(store, options = {}) {
     throw new Error('leaseUnit requires an ownerId');
   }
 
-  await transferFn(ownerId, PLATFORM_USER_ID, LEASE_COST, `venvs_chopz_lease:${unitId}`);
+  await transferFn(ownerId, PLATFORM_USER_ID, TIER_LEASE_COST[unit.tier], `venvs_chopz_lease:${unitId}`);
   unit.ownerId = ownerId;
   unit.mode = 'self_run';
   return unit;
@@ -159,9 +176,10 @@ export async function runShift(store, options = {}) {
     throw new Error(`runShift: unit ${unitId} is on cooldown for ${Math.ceil(remainingMs / 60000)} more minute(s)`);
   }
 
-  await payoutFn(PLATFORM_USER_ID, unit.ownerId, SHIFT_PAYOUT, `venvs_chopz_shift:${unitId}`);
+  const payout = TIER_SHIFT_PAYOUT[unit.tier];
+  await payoutFn(PLATFORM_USER_ID, unit.ownerId, payout, `venvs_chopz_shift:${unitId}`);
   unit.lastShiftAt = now;
-  return { unitId, payout: SHIFT_PAYOUT, nextAvailableAt: now + SHIFT_COOLDOWN_MS };
+  return { unitId, payout, nextAvailableAt: now + SHIFT_COOLDOWN_MS };
 }
 
 export function staffWithAIEmployee(store, unitId, employeeName, now = Date.now()) {
@@ -198,7 +216,7 @@ export function getPendingEarnings(store, unitId, now = Date.now()) {
     throw new Error(`getPendingEarnings: unit ${unitId} is not staffed with an AI employee`);
   }
   const elapsedHours = (now - unit.lastCollectedAt) / (60 * 60 * 1000);
-  return Math.max(0, Math.round(elapsedHours * AI_EMPLOYEE_RATE_PER_HOUR * 100) / 100);
+  return Math.max(0, Math.round(elapsedHours * TIER_AI_EMPLOYEE_RATE_PER_HOUR[unit.tier] * 100) / 100);
 }
 
 export async function collectEarnings(store, options = {}) {
@@ -219,4 +237,7 @@ export async function collectEarnings(store, options = {}) {
   return { unitId, collected: pending };
 }
 
-export { CATEGORIES, LEASE_COST, SHIFT_PAYOUT, SHIFT_COOLDOWN_MS, AI_EMPLOYEE_RATE_PER_HOUR, PLATFORM_USER_ID };
+export {
+  CATEGORIES, LEASE_COST, SHIFT_PAYOUT, SHIFT_COOLDOWN_MS, AI_EMPLOYEE_RATE_PER_HOUR, PLATFORM_USER_ID,
+  TIER_LEASE_COST, TIER_SHIFT_PAYOUT, TIER_AI_EMPLOYEE_RATE_PER_HOUR,
+};
