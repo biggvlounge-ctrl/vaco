@@ -159,6 +159,7 @@ let store = createVdpStore();
   const populationLib = await import('./src/lib/population.js');
   const newsLib = await import('./src/lib/news.js');
   const cityTiersLib = await import('./src/lib/cityTiers.js');
+  const foodDistrictLib = await import('./src/lib/foodDistrict.js');
 
   function ensurePlayer(userId) {
     if (!store.players[userId]) {
@@ -383,6 +384,34 @@ let store = createVdpStore();
       assignment: jobsLib.currentAssignment(store.jobs, req.params.id),
       shifts: jobsLib.shiftsFor(store.jobs, req.params.id),
     });
+  });
+
+  // Food District's own real production payout. `foodDistrict.js`'s
+  // `cookBatch` pays a platform-funded leg (the brand's own payroll ->
+  // the cook) -- per this project's own standing rule (see
+  // `transferVCoin` above), that must come from a backend holding a
+  // service credential, never a browser calling V3 directly as if it
+  // were `food-district-payroll`. This route is that backend: the
+  // client's own `foodDistrict.js` store (client-side, like CHOPZ's)
+  // stays the source of truth for inventory; this route only performs
+  // the one leg a browser must not instruct itself, and the client
+  // applies the real inventory bump once this confirms the payout.
+  app.post('/api/food-district/cook-payout', requireActor('cookId'), async (req, res) => {
+    const { cookId, brandSlug } = req.body || {};
+    try {
+      if (!foodDistrictLib.getBrand(brandSlug)) {
+        throw new Error(`no brand with slug "${brandSlug}"`);
+      }
+      const result = await transferVCoin({
+        fromUserId: foodDistrictLib.PAYROLL_ACCOUNT_ID,
+        toUserId: cookId,
+        amount: foodDistrictLib.COOK_PAY_PER_BATCH,
+        reason: `vdp_food_district_cook:${brandSlug}`,
+      });
+      res.status(201).json({ ok: true, amount: foodDistrictLib.COOK_PAY_PER_BATCH, batchSize: foodDistrictLib.COOK_BATCH_SIZE, transfer: result });
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
   });
 
   // --- Property / housing ----------------------------------------------

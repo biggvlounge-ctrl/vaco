@@ -151,6 +151,16 @@ test('registering a Meridian hotel with a real bearer token asks Shield -- real 
   assert.equal(res.status, 502, 'requireActor must ask Shield before ever checking the tier cap or calling VACAY');
 });
 
+test('requesting a cook payout with no credential is refused WITHOUT reaching Shield', { skip: SKIP }, async () => {
+  const res = await post('/api/food-district/cook-payout', { cookId: 'alice', brandSlug: 'vive' });
+  assert.equal(res.status, 401);
+});
+
+test('requesting a cook payout with a real bearer token asks Shield -- real 502 when it is unreachable', { skip: SKIP }, async () => {
+  const res = await post('/api/food-district/cook-payout', { cookId: 'alice', brandSlug: 'vive' }, { Authorization: 'Bearer some-token' });
+  assert.equal(res.status, 502, 'requireActor must ask Shield before ever reaching V3');
+});
+
 // -- the one real success path this suite can prove without Shield/V3 -----
 
 test('library/record succeeds end-to-end with a real trusted-service credential, no Shield needed', { skip: SKIP }, async () => {

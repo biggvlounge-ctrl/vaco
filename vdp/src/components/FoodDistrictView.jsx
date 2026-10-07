@@ -1,7 +1,10 @@
 import { useState } from "react";
-import { FLAGSHIP_BRANDS, DRONE_DELIVERY_RADIUS_MILES, orderMenuItem, getOrderHistory } from "../lib/foodDistrict.js";
+import {
+  FLAGSHIP_BRANDS, DRONE_DELIVERY_RADIUS_MILES, orderMenuItem, getOrderHistory, getInventory, cookBatch,
+} from "../lib/foodDistrict.js";
 import { transferVCoin } from "../lib/v3Client.js";
 import { requestJob } from "../lib/voidClient.js";
+import { sessionHeaders } from "../lib/shieldAuth.js";
 
 // Real, instant purchase per menu item -- no "equip" step the way
 // DEGVCHI's wearables have, since ordering food isn't wearing it.
@@ -17,6 +20,18 @@ import { requestJob } from "../lib/voidClient.js";
 // the player's own session requesting it (`requireActor('customerId')`
 // on VOID's side), same real-actor posture as every other cross-app
 // write in this app.
+//
+// Creation before distribution, per direct instruction: a brand's
+// stock is real and finite (`foodDistrict.js`'s own inventory), so
+// "Cook a batch" is a real production action, not flavor text. Its
+// payout is a platform-funded leg (the brand's payroll pays the cook)
+// -- per this project's standing rule, that must run through VDP's
+// own server (`POST /api/food-district/cook-payout`), never straight
+// from this browser to V3 as if it were the payroll account itself.
+// The real inventory bump only happens client-side after the server
+// confirms the real payout.
+
+const VDP_API_URL = import.meta.env?.VITE_VDP_API_URL || "http://localhost:8827";
 
 export default function FoodDistrictView({ session, store, onPurchase }) {
   const [busy, setBusy] = useState(null);
@@ -44,6 +59,32 @@ export default function FoodDistrictView({ session, store, onPurchase }) {
     }
   };
 
+  const handleCook = async (brandSlug) => {
+    const key = `cook:${brandSlug}`;
+    setBusy(key);
+    setError(null);
+    try {
+      const payoutFn = async (from, to, amount, reason) => {
+        const res = await fetch(`${VDP_API_URL}/api/food-district/cook-payout`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...sessionHeaders() },
+          body: JSON.stringify({ cookId: to, brandSlug }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || `cook-payout failed (${res.status})`);
+        }
+        return { from, to, amount, reason };
+      };
+      await cookBatch(store, { brandSlug, cookId: session.userId, payoutFn });
+      await onPurchase();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const history = getOrderHistory(store, session.userId);
 
   return (
@@ -61,7 +102,17 @@ export default function FoodDistrictView({ session, store, onPurchase }) {
               <span style={{ fontWeight: "normal", color: "#c60", fontSize: 12 }}> (name not yet finalized)</span>
             )}
           </p>
-          <p style={{ margin: "2px 0 6px 0", fontSize: 12, color: "#888" }}>{brand.tagline}</p>
+          <p style={{ margin: "2px 0 6px 0", fontSize: 12, color: "#888" }}>
+            {brand.tagline}
+            {" — "}
+            <span style={{ color: getInventory(store, brand.slug) > 0 ? "#1a7d3c" : "#c60" }}>
+              {getInventory(store, brand.slug)} prepared
+            </span>
+            {" "}
+            <button onClick={() => handleCook(brand.slug)} disabled={busy === `cook:${brand.slug}`} style={{ fontSize: 11 }}>
+              {busy === `cook:${brand.slug}` ? "Cooking…" : "Cook a batch"}
+            </button>
+          </p>
           {brand.menu.map((m) => {
             const key = `${brand.slug}:${m.item}`;
             return (
@@ -69,7 +120,7 @@ export default function FoodDistrictView({ session, store, onPurchase }) {
                 <span>
                   {m.item} <span style={{ color: "#888" }}>(${m.price.toFixed(2)})</span>
                 </span>
-                <button onClick={() => handleOrder(brand.slug, m.item)} disabled={busy === key}>
+                <button onClick={() => handleOrder(brand.slug, m.item)} disabled={busy === key || getInventory(store, brand.slug) <= 0}>
                   {busy === key ? "Ordering…" : "Order"}
                 </button>
               </div>

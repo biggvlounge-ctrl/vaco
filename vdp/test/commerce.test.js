@@ -19,9 +19,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  FOOD_CATEGORIES, FLAGSHIP_BRANDS, DRONE_DELIVERY_RADIUS_MILES,
+  FOOD_CATEGORIES, FLAGSHIP_BRANDS, DRONE_DELIVERY_RADIUS_MILES, PAYROLL_ACCOUNT_ID,
   getBrand, listBrands, brandOwnerId, createFoodDistrict,
-  orderMenuItem, getOrderHistory,
+  orderMenuItem, getOrderHistory, getInventory, cookBatch,
 } from '../src/lib/foodDistrict.js';
 
 import { STAGE_CAMERAS, STAGE_OWNER_ID, operatorIdForChannel } from '../src/lib/stage.js';
@@ -245,6 +245,93 @@ test('a failed drone-delivery request does not unwind the real payment -- fail s
     assert.equal(store.orders.length, 1, 'and still recorded, not rolled back');
     assert.deepEqual(order.delivery, { status: 'failed', error: 'VOID unreachable' });
   });
+});
+
+// ===========================================================================
+// Food District — creation before distribution
+// ===========================================================================
+
+test('a new district seeds every brand with a real, finite starting stock, not an unlimited supply', () => {
+  const store = createFoodDistrict();
+  for (const brand of FLAGSHIP_BRANDS) {
+    assert.ok(getInventory(store, brand.slug) > 0, `${brand.slug} should start with real stock`);
+  }
+});
+
+test('ordering consumes real stock, one unit per order', () => {
+  const store = createFoodDistrict();
+  const brand = FLAGSHIP_BRANDS[0];
+  const before = getInventory(store, brand.slug);
+  const transferFn = ledger();
+
+  return orderMenuItem(store, {
+    brandSlug: brand.slug, itemName: brand.menu[0].item, buyerId: 'p', transferFn,
+  }).then(() => {
+    assert.equal(getInventory(store, brand.slug), before - 1);
+  });
+});
+
+test('an order is refused once a brand sells out, and the buyer is never charged for it', () => {
+  const store = createFoodDistrict();
+  const brand = FLAGSHIP_BRANDS[0];
+  const transferFn = ledger();
+  store.inventory[brand.slug] = 0;
+
+  return assert.rejects(
+    () => orderMenuItem(store, {
+      brandSlug: brand.slug, itemName: brand.menu[0].item, buyerId: 'p', transferFn,
+    }),
+    /nothing prepared right now/,
+  ).then(() => {
+    assert.equal(transferFn.moves.length, 0, 'refused before charging, not after');
+    assert.equal(store.orders.length, 0);
+  });
+});
+
+test('cookBatch pays a real cook from the brand\'s payroll and replenishes real stock', () => {
+  const store = createFoodDistrict();
+  const brand = FLAGSHIP_BRANDS[0];
+  store.inventory[brand.slug] = 0;
+  const payoutFn = ledger();
+
+  return cookBatch(store, { brandSlug: brand.slug, cookId: 'cook-1', payoutFn }).then((result) => {
+    assert.ok(result.batchSize > 0);
+    assert.equal(getInventory(store, brand.slug), result.batchSize);
+    assert.deepEqual(
+      { from: payoutFn.moves[0].from, to: payoutFn.moves[0].to },
+      { from: PAYROLL_ACCOUNT_ID, to: 'cook-1' },
+    );
+  });
+});
+
+test('a sold-out brand can be ordered from again once a cook replenishes it', () => {
+  const store = createFoodDistrict();
+  const brand = FLAGSHIP_BRANDS[0];
+  store.inventory[brand.slug] = 0;
+  const payoutFn = ledger();
+  const transferFn = ledger();
+
+  return cookBatch(store, { brandSlug: brand.slug, cookId: 'cook-1', payoutFn })
+    .then(() => orderMenuItem(store, {
+      brandSlug: brand.slug, itemName: brand.menu[0].item, buyerId: 'p', transferFn,
+    }))
+    .then((order) => {
+      assert.equal(order.brandSlug, brand.slug);
+      assert.equal(transferFn.moves.length, 1, 'the real purchase went through once stock existed');
+    });
+});
+
+test('cookBatch requires a real brand, cookId, and payoutFn', () => {
+  const store = createFoodDistrict();
+  return assert.rejects(() => cookBatch(store, { cookId: 'c', payoutFn: ledger() }), /no brand with slug/)
+    .then(() => assert.rejects(
+      () => cookBatch(store, { brandSlug: FLAGSHIP_BRANDS[0].slug, payoutFn: ledger() }),
+      /requires a cookId/,
+    ))
+    .then(() => assert.rejects(
+      () => cookBatch(store, { brandSlug: FLAGSHIP_BRANDS[0].slug, cookId: 'c' }),
+      /requires a payoutFn/,
+    ));
 });
 
 test('order history is per buyer and newest first', () => {

@@ -70,6 +70,29 @@ export const FOOD_CATEGORIES = [
 
 export const DRONE_DELIVERY_RADIUS_MILES = { min: 5, max: 10 };
 
+// **Creation before distribution, per direct instruction**: "everything
+// that has distribution must also have a creation process... people
+// have to create those things." A ghost kitchen's food doesn't exist
+// until a real cook prepares it -- `cookBatch()` is that real
+// production step, and `orderMenuItem()` below now refuses an order
+// once a brand's prepared stock hits zero, rather than conjuring food
+// from nothing on every payment. `STARTING_INVENTORY_PER_BRAND` seeds
+// each of the 11 brands with a modest real buffer -- read as "the
+// founding cooks already prepared an opening batch" (the same growing-
+// world framing the instruction itself invokes), not an unlimited
+// supply; it runs out, same as a real kitchen's prep.
+//
+// `cookBatch` pays the real cook from the same `PAYROLL_ACCOUNT_ID`
+// jobs.js's own `food-cashier` job already pays shifts from (literal
+// value duplicated, not imported -- jobs.js is deliberately generic
+// across districts and doesn't know about per-brand inventory, same
+// "per-module duplication over cross-module coupling" posture this
+// repo already uses for shared infrastructure like persistence.cjs).
+export const PAYROLL_ACCOUNT_ID = 'food-district-payroll';
+const STARTING_INVENTORY_PER_BRAND = 10;
+export const COOK_BATCH_SIZE = 5;
+export const COOK_PAY_PER_BATCH = 12;
+
 export const FLAGSHIP_BRANDS = [
   {
     slug: 'vive',
@@ -232,7 +255,36 @@ export function brandOwnerId(slug) {
 }
 
 export function createFoodDistrict() {
-  return { orders: [], nextOrderId: 1 };
+  const inventory = {};
+  for (const brand of FLAGSHIP_BRANDS) {
+    inventory[brand.slug] = STARTING_INVENTORY_PER_BRAND;
+  }
+  return { orders: [], nextOrderId: 1, inventory };
+}
+
+export function getInventory(store, brandSlug) {
+  return store.inventory[brandSlug] ?? 0;
+}
+
+// The real production step a distributed order depends on. `payoutFn`
+// moves real money from the brand's own payroll to the cook -- a
+// platform-funded leg, so (same posture as every other payoutFn in
+// this project) it must come from a backend holding a service
+// credential, never a browser instructing its own payout.
+export async function cookBatch(store, options = {}) {
+  const { brandSlug, cookId, payoutFn, now = Date.now() } = options;
+
+  const brand = getBrand(brandSlug);
+  if (!brand) throw new Error(`cookBatch: no brand with slug "${brandSlug}"`);
+  if (!cookId) throw new Error('cookBatch requires a cookId');
+  if (typeof payoutFn !== 'function') {
+    throw new Error('cookBatch requires a payoutFn(fromUserId, toUserId, amount, reason)');
+  }
+
+  await payoutFn(PAYROLL_ACCOUNT_ID, cookId, COOK_PAY_PER_BATCH, `vdp_food_district_cook:${brand.slug}`);
+
+  store.inventory[brand.slug] = (store.inventory[brand.slug] ?? 0) + COOK_BATCH_SIZE;
+  return { brandSlug: brand.slug, batchSize: COOK_BATCH_SIZE, inventory: store.inventory[brand.slug], cookedAt: now };
 }
 
 // `requestDeliveryFn`, if supplied, requests the order's real drone
@@ -258,8 +310,15 @@ export async function orderMenuItem(store, options = {}) {
   if (typeof transferFn !== 'function') {
     throw new Error('orderMenuItem requires a transferFn(fromUserId, toUserId, amount, reason)');
   }
+  // Distribution requires creation: refuse before charging, not after
+  // -- a buyer is never billed for food nobody has cooked.
+  if (getInventory(store, brand.slug) <= 0) {
+    throw new Error(`orderMenuItem: ${brand.name} has nothing prepared right now -- a real cook needs to prepare a batch first`);
+  }
 
   await transferFn(buyerId, brandOwnerId(brand.slug), menuItem.price, `vdp_food_district_order:${brand.slug}`);
+
+  store.inventory[brand.slug] -= 1;
 
   const order = {
     id: store.nextOrderId++,
