@@ -46,6 +46,21 @@
 // transferFn pattern as every previous phase's real-money functions,
 // for the same reason (plain-Node testability, decoupled from
 // v3Client.js's Vite-only import.meta.env).
+//
+// **Creation before distribution, per direct instruction**: "everything
+// that has distribution must also have a creation process... people
+// have to create those things." Every unit here used to pay out on
+// every shift/AI-employee collection with nothing ever created or
+// sourced -- the same gap Food District had before its own real
+// inventory pass. Each unit now carries real `stock`: a self-run shift
+// or an AI-employee collection both require `stock > 0` and consume
+// one real unit of it, refusing (before any payout) once a unit sells
+// out. `restockUnit()` is the real sourcing step -- per CHOPZ's own
+// real data model (`vxllage/VXLLAGE_CHOPZ_VACAY_ARCHITECTURE.md`'s
+// `Product { id, sellerId, name, price, ... }`), a CHOPZ seller
+// sources/lists their own product, so this is a user-funded leg (the
+// owner pays, like `leaseUnit`'s own rent), not a platform-funded one
+// -- no new payoutFn-shaped route needed.
 
 const CATEGORIES = [
   'beauty_seller',
@@ -72,6 +87,10 @@ const SHIFT_PAYOUT = 15;
 const SHIFT_COOLDOWN_MS = 4 * 60 * 60 * 1000; // 4 hours
 const AI_EMPLOYEE_RATE_PER_HOUR = 3;
 const PLATFORM_USER_ID = 'venvs-platform';
+
+const STARTING_STOCK = 5;
+const RESTOCK_BATCH_SIZE = 5;
+const RESTOCK_COST = 20;
 
 // **Why platform-funded legs take a separate function, and why the
 // browser never gets one.**
@@ -121,8 +140,38 @@ export function createChopz() {
       employeeName: null,
       lastShiftAt: null,
       lastCollectedAt: null,
+      stock: STARTING_STOCK,
     })),
   };
+}
+
+export function getStock(store, unitId) {
+  const unit = getUnit(store, unitId);
+  return unit ? unit.stock : 0;
+}
+
+// The real sourcing step a distributed sale depends on -- a CHOPZ
+// seller lists/sources their own product (per CHOPZ's own real
+// `Product` model), so the owner pays for it, same direction as
+// `leaseUnit`'s own rent, not a platform-funded leg.
+export async function restockUnit(store, options = {}) {
+  const { unitId, ownerId, transferFn, now = Date.now() } = options;
+
+  const unit = getUnit(store, unitId);
+  if (!unit || unit.ownerId === null) {
+    throw new Error(`restockUnit: no leased unit with id ${unitId}`);
+  }
+  if (unit.ownerId !== ownerId) {
+    throw new Error(`restockUnit: unit ${unitId} is not leased by "${ownerId}"`);
+  }
+  if (typeof transferFn !== 'function') {
+    throw new Error('restockUnit requires a transferFn(fromUserId, toUserId, amount, reason)');
+  }
+
+  await transferFn(ownerId, PLATFORM_USER_ID, RESTOCK_COST, `venvs_chopz_restock:${unitId}`);
+
+  unit.stock += RESTOCK_BATCH_SIZE;
+  return { unitId, batchSize: RESTOCK_BATCH_SIZE, stock: unit.stock, restockedAt: now };
 }
 
 export function getUnit(store, unitId) {
@@ -174,10 +223,14 @@ export async function runShift(store, options = {}) {
     const remainingMs = SHIFT_COOLDOWN_MS - (now - unit.lastShiftAt);
     throw new Error(`runShift: unit ${unitId} is on cooldown for ${Math.ceil(remainingMs / 60000)} more minute(s)`);
   }
+  if (unit.stock <= 0) {
+    throw new Error(`runShift: unit ${unitId} has nothing left to sell -- restock first`);
+  }
 
   await payoutFn(PLATFORM_USER_ID, unit.ownerId, SHIFT_PAYOUT, `venvs_chopz_shift:${unitId}`);
   unit.lastShiftAt = now;
-  return { unitId, payout: SHIFT_PAYOUT, nextAvailableAt: now + SHIFT_COOLDOWN_MS };
+  unit.stock -= 1;
+  return { unitId, payout: SHIFT_PAYOUT, nextAvailableAt: now + SHIFT_COOLDOWN_MS, stock: unit.stock };
 }
 
 export function staffWithAIEmployee(store, unitId, employeeName, now = Date.now()) {
@@ -229,10 +282,17 @@ export async function collectEarnings(store, options = {}) {
   if (pending <= 0) {
     throw new Error(`collectEarnings: unit ${unitId} has no pending earnings yet`);
   }
+  if (unit.stock <= 0) {
+    throw new Error(`collectEarnings: unit ${unitId} has nothing left to sell -- restock first`);
+  }
 
   await payoutFn(PLATFORM_USER_ID, unit.ownerId, pending, `venvs_chopz_ai_income:${unitId}`);
   unit.lastCollectedAt = now;
-  return { unitId, collected: pending };
+  unit.stock -= 1;
+  return { unitId, collected: pending, stock: unit.stock };
 }
 
-export { CATEGORIES, LEASE_COST, SHIFT_PAYOUT, SHIFT_COOLDOWN_MS, AI_EMPLOYEE_RATE_PER_HOUR, PLATFORM_USER_ID };
+export {
+  CATEGORIES, LEASE_COST, SHIFT_PAYOUT, SHIFT_COOLDOWN_MS, AI_EMPLOYEE_RATE_PER_HOUR, PLATFORM_USER_ID,
+  STARTING_STOCK, RESTOCK_BATCH_SIZE, RESTOCK_COST,
+};

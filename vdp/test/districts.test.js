@@ -32,8 +32,9 @@ import {
 import {
   createChopz, getUnit, getAvailableUnits, getOwnedUnits,
   leaseUnit, runShift, staffWithAIEmployee, switchToSelfRun,
-  getPendingEarnings, collectEarnings,
+  getPendingEarnings, collectEarnings, getStock, restockUnit,
   LEASE_COST, SHIFT_PAYOUT, SHIFT_COOLDOWN_MS, AI_EMPLOYEE_RATE_PER_HOUR, PLATFORM_USER_ID,
+  STARTING_STOCK, RESTOCK_BATCH_SIZE, RESTOCK_COST,
 } from '../src/lib/chopz.js';
 
 // A transferFn that records every move instead of calling V3, so a test
@@ -611,5 +612,116 @@ test('a browser cannot pay itself from the platform account', () => {
       // backend-driven shift later is still the first one.
       const unit = getUnit(store, id);
       assert.equal(unit.lastShiftAt, null, 'a refused shift advanced the cooldown');
+    });
+});
+
+// ===========================================================================
+// CHOPZ — creation before distribution
+// ===========================================================================
+
+test('a new unit starts with real, finite stock, not an unlimited supply', () => {
+  const store = createChopz();
+  for (const unit of store.units) {
+    assert.equal(getStock(store, unit.id), STARTING_STOCK);
+  }
+});
+
+test('a self-run shift consumes one real unit of stock', () => {
+  const store = createChopz();
+  const id = getAvailableUnits(store)[0].id;
+  const transferFn = async () => {};
+  const payoutFn = async () => {};
+
+  return leaseUnit(store, { unitId: id, ownerId: 'p1', transferFn })
+    .then(() => runShift(store, { unitId: id, payoutFn, now: 1000 }))
+    .then(() => {
+      assert.equal(getStock(store, id), STARTING_STOCK - 1);
+    });
+});
+
+test('a shift is refused once a unit sells out, and the owner is never paid for it', () => {
+  const store = createChopz();
+  const id = getAvailableUnits(store)[0].id;
+  const transferFn = async () => {};
+  const payoutMoves = [];
+  const payoutFn = async (from, to, amount, reason) => { payoutMoves.push({ from, to, amount, reason }); };
+
+  return leaseUnit(store, { unitId: id, ownerId: 'p1', transferFn })
+    .then(() => { getUnit(store, id).stock = 0; })
+    .then(() => assert.rejects(
+      () => runShift(store, { unitId: id, payoutFn, now: 1000 }),
+      /nothing left to sell/,
+    ))
+    .then(() => {
+      assert.equal(payoutMoves.length, 0, 'refused before paying out, not after');
+    });
+});
+
+test('restockUnit charges the real owner, not the platform, and replenishes real stock', () => {
+  const store = createChopz();
+  const id = getAvailableUnits(store)[0].id;
+  const leaseFn = ledger();
+
+  return leaseUnit(store, { unitId: id, ownerId: 'p1', transferFn: leaseFn })
+    .then(() => { getUnit(store, id).stock = 0; })
+    .then(() => restockUnit(store, { unitId: id, ownerId: 'p1', transferFn: leaseFn }))
+    .then((result) => {
+      assert.equal(result.batchSize, RESTOCK_BATCH_SIZE);
+      assert.equal(getStock(store, id), RESTOCK_BATCH_SIZE);
+      const restockMove = leaseFn.moves[1]; // moves[0] was the lease itself
+      assert.deepEqual(
+        { from: restockMove.from, to: restockMove.to, amount: restockMove.amount },
+        { from: 'p1', to: PLATFORM_USER_ID, amount: RESTOCK_COST },
+      );
+    });
+});
+
+test('restockUnit refuses an owner who does not actually lease the unit', () => {
+  const store = createChopz();
+  const id = getAvailableUnits(store)[0].id;
+  const transferFn = async () => {};
+
+  return leaseUnit(store, { unitId: id, ownerId: 'p1', transferFn })
+    .then(() => assert.rejects(
+      () => restockUnit(store, { unitId: id, ownerId: 'impostor', transferFn }),
+      /is not leased by/,
+    ));
+});
+
+test('a sold-out unit can be worked again once restocked', () => {
+  const store = createChopz();
+  const id = getAvailableUnits(store)[0].id;
+  const transferFn = async () => {};
+  const payoutFn = async () => {};
+
+  return leaseUnit(store, { unitId: id, ownerId: 'p1', transferFn })
+    .then(() => { getUnit(store, id).stock = 0; })
+    .then(() => restockUnit(store, { unitId: id, ownerId: 'p1', transferFn }))
+    .then(() => runShift(store, { unitId: id, payoutFn, now: 1000 }))
+    .then((result) => {
+      assert.equal(result.stock, RESTOCK_BATCH_SIZE - 1);
+    });
+});
+
+test('an AI employee cannot collect once stock runs out, and restocking lets it collect again', () => {
+  const store = createChopz();
+  const id = getAvailableUnits(store)[0].id;
+  const transferFn = async () => {};
+  const payoutFn = async () => {};
+
+  return leaseUnit(store, { unitId: id, ownerId: 'p1', transferFn })
+    .then(() => {
+      staffWithAIEmployee(store, id, 'Marcus (AI)', 0);
+      getUnit(store, id).stock = 0;
+    })
+    .then(() => assert.rejects(
+      () => collectEarnings(store, { unitId: id, payoutFn, now: 2 * 60 * 60 * 1000 }),
+      /nothing left to sell/,
+    ))
+    .then(() => restockUnit(store, { unitId: id, ownerId: 'p1', transferFn }))
+    .then(() => collectEarnings(store, { unitId: id, payoutFn, now: 2 * 60 * 60 * 1000 }))
+    .then((result) => {
+      assert.ok(result.collected > 0);
+      assert.equal(result.stock, RESTOCK_BATCH_SIZE - 1);
     });
 });

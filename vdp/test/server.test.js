@@ -161,6 +161,16 @@ test('requesting a cook payout with a real bearer token asks Shield -- real 502 
   assert.equal(res.status, 502, 'requireActor must ask Shield before ever reaching V3');
 });
 
+test('requesting a CHOPZ shift payout with no credential is refused WITHOUT reaching Shield', { skip: SKIP }, async () => {
+  const res = await post('/api/chopz/shift-payout', { ownerId: 'alice', unitId: 1 });
+  assert.equal(res.status, 401);
+});
+
+test('requesting a CHOPZ shift payout with a real bearer token asks Shield -- real 502 when it is unreachable', { skip: SKIP }, async () => {
+  const res = await post('/api/chopz/shift-payout', { ownerId: 'alice', unitId: 1 }, { Authorization: 'Bearer some-token' });
+  assert.equal(res.status, 502, 'requireActor must ask Shield before ever reaching V3');
+});
+
 // -- the one real success path this suite can prove without Shield/V3 -----
 
 test('library/record succeeds end-to-end with a real trusted-service credential, no Shield needed', { skip: SKIP }, async () => {

@@ -160,6 +160,7 @@ let store = createVdpStore();
   const newsLib = await import('./src/lib/news.js');
   const cityTiersLib = await import('./src/lib/cityTiers.js');
   const foodDistrictLib = await import('./src/lib/foodDistrict.js');
+  const chopzLib = await import('./src/lib/chopz.js');
 
   function ensurePlayer(userId) {
     if (!store.players[userId]) {
@@ -409,6 +410,29 @@ let store = createVdpStore();
         reason: `vdp_food_district_cook:${brandSlug}`,
       });
       res.status(201).json({ ok: true, amount: foodDistrictLib.COOK_PAY_PER_BATCH, batchSize: foodDistrictLib.COOK_BATCH_SIZE, transfer: result });
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // CHOPZ District's own real shift payout. `chopz.js`'s `runShift` pays a
+  // platform-funded leg (the platform account -> the unit's owner) -- same
+  // rule as Food District's cook-payout above, so this route holds the real
+  // service credential and performs that one leg; the client's own
+  // entirely-client-side CHOPZ store stays the source of truth for stock
+  // and cooldowns, applying the real stock decrement once this confirms
+  // the payout. `SHIFT_PAYOUT` is a flat, server-known constant (not a
+  // client-supplied amount), so it is safe to trust here.
+  app.post('/api/chopz/shift-payout', requireActor('ownerId'), async (req, res) => {
+    const { ownerId, unitId } = req.body || {};
+    try {
+      const result = await transferVCoin({
+        fromUserId: chopzLib.PLATFORM_USER_ID,
+        toUserId: ownerId,
+        amount: chopzLib.SHIFT_PAYOUT,
+        reason: `venvs_chopz_shift:${unitId}`,
+      });
+      res.status(201).json({ ok: true, amount: chopzLib.SHIFT_PAYOUT, transfer: result });
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
