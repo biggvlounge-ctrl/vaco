@@ -51,6 +51,36 @@
 //
 // **It does not create a family.** An heir has to already be somebody's
 // relation; `family_memberships` is where that lives.
+//
+// ---------------------------------------------------------------------
+// Players
+//
+// **A sixth thing was dangling, found by reading
+// `PLAYER_DEATH_GENERATIONAL_CONTINUITY.md` against this file rather
+// than against the engine.** That document describes a full
+// "generational continuity" mechanic -- a player's linked NPC dies, a
+// successor inherits the role, grief carries into the next life -- and
+// presents it as composed from systems already built here. None of it
+// was: `players.linked_entity_id` pointed at a corpse forever, and
+// `getCitizenDashboard` (server/players.js) could only ever throw "no
+// longer exists" for the rest of the world's life. The nineteenth
+// standing rule's shape exactly -- a document says a mechanic composes
+// systems already built, and the real content turns out to be the one
+// piece nobody wrote.
+//
+// What is built, no more: this file already computes `heirFor` for the
+// estate, and a player bound to a dead citizen is exactly the same
+// question `family.head_npc_id` answers two sections below -- so a
+// player follows the SAME heir, not a second, invented selection. No
+// grief score, no narrative text: nothing here names a feeling that no
+// document specifies a number for, same restraint `orgArchetypes.js`
+// takes with real political bodies.
+//
+// `heirless` is an in-memory field, not a schema column -- `players`
+// has exactly `id`/`mode`/`linked_entity_id`, and this is the same
+// treatment `organization.archetype` already gets for the same reason:
+// a fact worth exposing to a reader that the schema was never asked to
+// hold.
 
 'use strict';
 
@@ -128,6 +158,7 @@ function settleEstate(worldState, options = {}) {
     itemsLost: 0,
     postsVacated: [],
     generationAdvanced: false,
+    playerSuccession: null,
   };
 
   // ---- employment ----------------------------------------------------
@@ -270,6 +301,29 @@ function settleEstate(worldState, options = {}) {
       report.postsVacated.push({ kind: 'family', id: family.id });
     }
     family.updatedTick = tick;
+  }
+
+  // ---- the player (generational continuity) --------------------------
+  // The same heir the estate, the leadership post and the family head
+  // above all follow — a player bound to this citizen inherits the SAME
+  // succession, not a second one picked by a different rule.
+  const player = (worldState.players || []).find((p) => p.linked_entity_id === entityId);
+  if (player) {
+    if (heir) {
+      player.linked_entity_id = heir.id;
+      player.heirless = false;
+      report.playerSuccession = { playerId: player.id, previousEntityId: entityId, newEntityId: heir.id };
+    } else {
+      // No living relation to hand the role to. Left pointing at the
+      // dead citizen's id rather than nulled out — `historical_records`
+      // and this report both still name who it was — and flagged with
+      // `heirless` so a reader (getCitizenDashboard, a client) can tell
+      // "this player's story ended" apart from "this player was never
+      // given anybody to inherit", which look identical from a bare
+      // `linked_entity_id` that no longer resolves.
+      player.heirless = true;
+      report.playerSuccession = { playerId: player.id, previousEntityId: entityId, newEntityId: null };
+    }
   }
 
   // Membership rosters are released by `membership.releaseDeceased`,

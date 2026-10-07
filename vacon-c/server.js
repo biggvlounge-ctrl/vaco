@@ -176,6 +176,8 @@ app.post('/api/mission', (req, res) => {
 
 const keys = require('./server/keys.js');
 const worldStore = require('./server/worldStore.js');
+const orgArchetypes = require('./server/orgArchetypes.js');
+const decisions = require('./server/decisions.js');
 
 // The seven, by the id the API map uses in POST /api/keys/:keyId/resolve.
 const KEY_RESOLVERS = {
@@ -379,6 +381,25 @@ app.get('/api/organizations/:id', (req, res) => {
 app.post('/api/organizations', (req, res) => {
   try {
     const body = req.body || {};
+    // `orgArchetypes.js`'s own header is explicit: "nothing in worldgen
+    // founds an archetype... this is a vocabulary with no caller in
+    // generation, on purpose." That stays true here -- a scenario opts
+    // into a kind of organization by naming `body.archetype`, this
+    // route never picks one on its own, and the ordinary path below is
+    // completely unchanged when `archetype` is absent. Without this
+    // branch the vocabulary had no caller anywhere outside its own test
+    // file, so a scenario author had no way to actually use it.
+    if (body.archetype) {
+      const org = orgArchetypes.found(engine.WorldState, {
+        archetype: body.archetype,
+        name: body.name,
+        seed: engine.WorldState.seed ?? 'world',
+        key: engine.WorldState.organizations.length,
+        generateOrganization: engine.generateOrganization,
+        generateFaction: engine.generateFaction,
+      });
+      return res.status(201).json(org);
+    }
     // Faction is an Organization subtype, not a root entity -- standing
     // rule 4. One route, and `isFaction` picks the generator.
     const org = body.isFaction ? engine.generateFaction(body) : engine.generateOrganization(body);
@@ -1257,6 +1278,54 @@ app.get('/api/analytics/:tick', (req, res) => {
     return;
   }
   res.json({ snapshot });
+});
+
+// GET /api/historical-records -- "searchable history, filterable by
+// entity/location/tick range", per the API map's cross-cutting section,
+// literally. The map documented this and `/api/decision-log/:entityId`
+// below as built; neither route existed anywhere in this file even
+// though both tables are written every tick (`worldStore.
+// addHistoricalRecord`, `decisions.record`) and persisted through
+// migrate/restore -- the data was real and there was no way to read it
+// back over HTTP. `who` is an array of entity ids on every row (a
+// death, for instance, names the victim and an optional killer), so
+// `entityId` matches by inclusion, not equality.
+app.get('/api/historical-records', (req, res) => {
+  const { entityId, locationId, sinceTick, untilTick } = req.query;
+  let records = engine.WorldState.historicalRecords || [];
+  if (entityId !== undefined) {
+    const id = Number(entityId);
+    records = records.filter((r) => (r.who || []).includes(id));
+  }
+  if (locationId !== undefined) {
+    records = records.filter((r) => r.where_location_id === Number(locationId));
+  }
+  if (sinceTick !== undefined) {
+    records = records.filter((r) => r.when_tick >= Number(sinceTick));
+  }
+  if (untilTick !== undefined) {
+    records = records.filter((r) => r.when_tick <= Number(untilTick));
+  }
+  res.json({ records, total: records.length });
+});
+
+// GET /api/decision-log/:entityId -- "decision audit trail for one
+// entity", per the API map, built on `decisions.js`'s own `decisionsBy`
+// and `explain` (already real and tested; this route is the only part
+// that was missing). `explain` turns each row's `?explain=1` reader
+// into the plain-language account `decisions.js`'s header says the
+// table exists for.
+app.get('/api/decision-log/:entityId', (req, res) => {
+  const entityId = Number(req.params.entityId);
+  const { sinceTick, key } = req.query;
+  const rows = decisions.decisionsBy(engine.WorldState, entityId, {
+    sinceTick: sinceTick !== undefined ? Number(sinceTick) : null,
+    key: key || null,
+  });
+  const decisionsOut = req.query.explain
+    ? rows.map((row) => ({ ...row, explanation: decisions.explain(engine.WorldState, row.id) }))
+    : rows;
+  res.json({ entityId, decisions: decisionsOut, total: decisionsOut.length });
 });
 
 // -- events and missions ----------------------------------------------------

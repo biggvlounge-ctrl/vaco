@@ -20,6 +20,7 @@ const assert = require('node:assert/strict');
 const economy = require('../server/economy.js');
 const inventory = require('../server/inventory.js');
 const mortality = require('../server/mortality.js');
+const players = require('../server/players.js');
 const property = require('../server/property.js');
 const succession = require('../server/succession.js');
 const territory = require('../server/territory.js');
@@ -52,6 +53,8 @@ function world({ tick = 36500 } = {}) {
     ownershipRecords: [],
     resources: [],
     marketListings: [],
+    players: [],
+    events: [],
     nextEntityId: 1,
   };
   economy.reseedIds(worldState);
@@ -292,6 +295,66 @@ test('a family with nobody left has no head and does not advance', () => {
   assert.equal(line.head_npc_id, null);
   assert.equal(line.generation, 1, 'a family with no members advanced a generation');
   assert.ok(death.estate.postsVacated.some((p) => p.kind === 'family'));
+});
+
+// -- generational continuity: a player follows the same heir ------------
+
+test('a player bound to a citizen who dies is reassigned to the same heir', () => {
+  const w = world();
+  const citizen = person(w, { age: 80 });
+  const heir = person(w, { age: 50 });
+  family(w, [{ npc: citizen, role: 'parent' }, { npc: heir, role: 'child' }]);
+  const player = { id: 1, mode: 'citizen', linked_entity_id: citizen.id };
+  w.players.push(player);
+
+  const death = mortality.recordDeath(w, { entityId: citizen.id, cause: 'age' });
+
+  assert.equal(player.linked_entity_id, heir.id, 'the player now plays the same heir the estate passed to');
+  assert.equal(player.heirless, false);
+  assert.deepEqual(death.estate.playerSuccession, {
+    playerId: player.id, previousEntityId: citizen.id, newEntityId: heir.id,
+  });
+
+  // The whole point: the player can keep playing, as the heir, without
+  // getCitizenDashboard throwing "no longer exists" the way it always
+  // did before this existed.
+  const dashboard = players.getCitizenDashboard(w, player.id);
+  assert.equal(dashboard.npc.id, heir.id);
+});
+
+test('a player whose citizen dies with no heir is flagged heirless, not silently broken', () => {
+  const w = world();
+  const citizen = person(w, { age: 90 });
+  const player = { id: 1, mode: 'citizen', linked_entity_id: citizen.id };
+  w.players.push(player);
+
+  const death = mortality.recordDeath(w, { entityId: citizen.id, cause: 'age' });
+
+  assert.equal(player.linked_entity_id, citizen.id, 'left naming who it was, not nulled out');
+  assert.equal(player.heirless, true);
+  assert.deepEqual(death.estate.playerSuccession, {
+    playerId: player.id, previousEntityId: citizen.id, newEntityId: null,
+  });
+});
+
+test('a heirless player\'s dashboard names the real reason, not a generic "no longer exists"', () => {
+  const w = world();
+  const citizen = person(w, { age: 90 });
+  const player = { id: 1, mode: 'citizen', linked_entity_id: citizen.id };
+  w.players.push(player);
+  mortality.recordDeath(w, { entityId: citizen.id, cause: 'age' });
+
+  assert.throws(
+    () => players.getCitizenDashboard(w, player.id),
+    /died with no living heir/,
+  );
+});
+
+test('a death with no bound player leaves playerSuccession null rather than guessing one', () => {
+  const w = world();
+  const citizen = person(w, { age: 80 });
+  const death = mortality.recordDeath(w, { entityId: citizen.id, cause: 'age' });
+  assert.equal(death.estate.playerSuccession, null);
 });
 
 // -- it runs from the one choke point -----------------------------------

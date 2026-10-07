@@ -533,7 +533,7 @@ late.** **Play the world.** Not a fixture, not a 200-tick measurement —
 build a world, run it four hundred ticks, and print what a PLAYER would
 see: how many jobs there are, whether anyone finished school, whether
 any two neighbourhoods differ, what the event log is actually full of.
-The first time that was done (`/scratchpad/playtest.mjs`, 17 Sep 2026)
+The first time that was done (`vacon-c/scripts/playtest.mjs`, 17 Sep 2026)
 it found, in one run:
 
 - **The tick threw and the world stopped.** `justice.answerByGroup`

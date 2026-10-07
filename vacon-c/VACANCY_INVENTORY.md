@@ -20,7 +20,10 @@ There is a working simulation — traits across four tiers, seven Key
 resolvers, family, economy, territory, tick, players, artifacts and
 missions, plus Property, Culture DNA, Named Flow Templates, contest
 resolution and the Behavior Engine — and its HTTP surface is real:
-**92 routes**, up from 8 before any of this.
+**94 routes**, up from 8 before any of this -- 92 plus the two
+cross-cutting reads (`/api/historical-records`,
+`/api/decision-log/:entityId`) a later audit found documented in
+`VACANCY_API_ENDPOINT_MAP.md` as built and missing from `server.js`.
 
 Since then, and not in the phase plan because nothing anticipated them:
 world generation, the uniform statistics catalogue, crime and policing,
@@ -138,6 +141,26 @@ read off disk, not recalled.
 | `db.js` | 2,017 | Postgres connection and `query()` helper. | Built, see §4 |
 | `seeded.js` | 2,016 | **§88 determinism** — `hashSeed`, `seededUnit`, `seededDraw`. Seed on position, never on identity. | Built |
 | `nextAfter.js` | 1,004 | The next value after a given one in a sequence. | Built |
+
+### Shared middleware — `vacon-c/lib/`
+
+Four files, invisible in this document and in CLAUDE.md until now even
+though `server.js` requires all four directly and they gate or trace
+**every** real HTTP route — `requireActor`/`requireOperator` are what
+make `requireOperator('vacon-c:key-resolve')` and the rest of the
+per-route guards in server.js possible at all. Found the same way the
+twenty-first standing rule describes: synced copies of ecosystem-wide
+middleware (the same files `vaco-notify`, `vdp` and others each carry
+their own copy of), present and load-bearing, never mentioned because
+nobody asked whether a shared file had made it into a document whose
+job is to list what's here.
+
+| File | Size | What it holds |
+|---|---|---|
+| `shieldAuth.cjs` | 12,686 | `requireActor` / `requireSession` — Shield-session auth for routes that act as a named real user. |
+| `serviceAuth.cjs` | 9,475 | `createServiceAuth` — the `X-Service-Name`/`X-Service-Token` floor for server-to-server calls. |
+| `operatorAuth.cjs` | 5,806 | `createOperatorAuth` / `requireOperator` — the operator-only gate on routes like `/api/tick` and `/api/keys/:keyId/resolve`. |
+| `tracing.cjs` | 6,022 | `traceMiddleware` — request tracing, mounted ahead of every route. |
 
 ## 2. Handoff documents — `vacon-c/`
 

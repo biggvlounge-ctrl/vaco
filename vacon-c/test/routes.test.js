@@ -229,6 +229,41 @@ test('an organization must declare a type', { skip: SKIP }, async () => {
   assert.match((await res.json()).error, /type/);
 });
 
+// `orgArchetypes.js`'s own header says a scenario opts into a kind of
+// organization by name and nothing in worldgen founds one on its own.
+// Before this, `found()` had no caller anywhere outside its own test
+// file -- this is the opt-in path a scenario actually uses.
+test('a scenario can found an organization of a named archetype via the ordinary route', { skip: SKIP }, async () => {
+  const org = await (await post('/organizations', {
+    archetype: 'intelligence service', name: 'The Listening Room',
+  })).json();
+  assert.equal(org.type, 'government');
+  assert.equal(org.archetype, 'intelligence service');
+
+  const militia = await (await post('/organizations', {
+    archetype: 'militia', name: 'The Eastside Watch',
+  })).json();
+  assert.equal(militia.archetype, 'militia');
+
+  const { factions } = await (await get('/factions')).json();
+  assert.ok(
+    factions.map((f) => f.id).includes(militia.id),
+    'militia is an archetype that holds territory, so it must come back as a faction too',
+  );
+});
+
+test('founding an archetype still requires a name -- the vocabulary names nothing itself', { skip: SKIP }, async () => {
+  const res = await post('/organizations', { archetype: 'militia' });
+  assert.equal(res.status, 400);
+  assert.match((await res.json()).error, /requires a name/);
+});
+
+test('an unknown archetype is refused rather than silently falling through to a plain organization', { skip: SKIP }, async () => {
+  const res = await post('/organizations', { archetype: 'not-a-real-archetype', name: 'Nope' });
+  assert.equal(res.status, 400);
+  assert.match((await res.json()).error, /not an archetype/);
+});
+
 test('faction territory is listable even when empty', { skip: SKIP }, async () => {
   const faction = await (await post('/organizations', {
     type: 'gang', name: 'The Wrens', isFaction: true,
@@ -305,6 +340,47 @@ test('GET /api/analytics/:tick answers a real reading, and 404s rather than gues
   assert.equal(snapshot.tick, state.tick);
   assert.equal(snapshot.gdp, null, 'no mechanism computes a monetary aggregate — see server/snapshots.js');
   assert.equal(typeof snapshot.population, 'number');
+});
+
+// `/api/historical-records` and `/api/decision-log/:entityId` were
+// documented in VACANCY_API_ENDPOINT_MAP.md's cross-cutting section as
+// built, and neither route existed in server.js -- both tables were
+// written every tick and persisted, with no way to read them back over
+// HTTP. These prove the wiring, not the underlying tables (already
+// covered by decisions.test.js and the mortality/history suites).
+test('GET /api/historical-records answers filterable history, not just an unfiltered dump', { skip: SKIP }, async () => {
+  const res = await fetch(`${OPEN}/historical-records`);
+  assert.equal(res.status, 200);
+  const { records, total } = await res.json();
+  assert.equal(total, records.length);
+
+  // A filter that cannot possibly match narrows to zero rather than
+  // erroring or being silently ignored.
+  const filtered = await (await fetch(`${OPEN}/historical-records?entityId=999999999`)).json();
+  assert.deepEqual(filtered.records, []);
+
+  const byTick = await (await fetch(`${OPEN}/historical-records?sinceTick=999999&untilTick=0`)).json();
+  assert.deepEqual(byTick.records, [], 'sinceTick above untilTick is an empty range, not an error');
+});
+
+test('GET /api/decision-log/:entityId reads back a real decision written by resolving a Key', { skip: SKIP }, async () => {
+  const { npc } = await (await openPost('/npc/generate', {})).json();
+
+  const empty = await (await fetch(`${OPEN}/decision-log/${npc.id}`)).json();
+  assert.deepEqual(empty.decisions, [], 'nobody has resolved a Key for this entity yet');
+
+  const resolveRes = await openPost(`/keys/resilience/resolve`, { entityId: npc.id });
+  assert.equal(resolveRes.status, 200);
+
+  const after = await (await fetch(`${OPEN}/decision-log/${npc.id}`)).json();
+  assert.equal(after.total, 1);
+  assert.equal(after.decisions[0].entity_id, npc.id);
+  assert.equal(after.decisions[0].explanation, undefined, 'explain is opt-in via ?explain=1');
+
+  const explained = await (await fetch(`${OPEN}/decision-log/${npc.id}?explain=1`)).json();
+  const { explanation } = explained.decisions[0];
+  assert.equal(explanation.entityId, npc.id);
+  assert.equal(explanation.through, 'Resilience');
 });
 
 test('family wealth follows its members\' finances', { skip: SKIP }, async () => {

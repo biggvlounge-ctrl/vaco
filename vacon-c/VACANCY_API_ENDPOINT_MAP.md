@@ -125,6 +125,11 @@ GET  /api/rankings/:tier                  — leaderboards (individual|family|or
 
 ## Cross-cutting endpoints (all phases)
 
+All three built. The first two were documented here as built for some
+time while neither existed in `server.js` — the backing tables
+(`historical_records`, `decision_log`) were real, written every tick
+and persisted, with no way to read them back over HTTP until now.
+
 ```
 GET  /api/historical-records               — searchable history, filterable by entity/location/tick range
 GET  /api/analytics/:tick                  — analytics_snapshots for a given tick

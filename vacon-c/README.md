@@ -101,6 +101,20 @@ across Phases 1-5 (entities, keys, families, organizations, economy,
 properties, communities, cities, players, multiplayer, and more) are
 real, separate, much larger future scope — not attempted in this pass.
 
+**That stopped being true and this section was never updated past its
+Phase 11 snapshot** — checked directly rather than assumed, the same
+failure CLAUDE.md keeps finding (and found drifting on its own stated
+figure too: it says 79, `test/inventory.test.js` counts every real
+`app.get`/`app.post`/.../`app.delete` in `server.js` against the
+number `VACANCY_INVENTORY.md` states and currently holds both to 94).
+`server.js` covers most of Phases 1-3 of the endpoint map —
+organizations, families, economy, properties, communities, cities,
+keys, politics, culture, flows and more, built across the phases
+`dev-docs/` holds a folder for. `VACANCY_API_ENDPOINT_MAP.md` and
+`VACANCY_INVENTORY.md` are the live, checked contracts; this paragraph
+is kept as the historical record of what Phase 11 actually shipped,
+not as a current count.
+
 ## Run
 ```
 npm install

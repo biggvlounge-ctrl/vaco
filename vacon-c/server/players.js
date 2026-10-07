@@ -91,6 +91,14 @@ function getCitizenDashboard(worldState, playerId) {
   const npcId = player.linked_entity_id;
   const live = getLiveEntity(worldState, npcId);
   if (!live) {
+    // `succession.settleEstate` reassigns a player to their citizen's
+    // heir on death -- this is only reached when that citizen died with
+    // no living relation to hand the role to (`player.heirless`), which
+    // is a real, different outcome from the generic "no longer exists"
+    // this threw before generational continuity existed.
+    if (player.heirless) {
+      throw new Error(`getCitizenDashboard: player ${playerId}'s citizen (entity ${npcId}) died with no living heir -- this player has no one left to inherit the role.`);
+    }
     throw new Error(`getCitizenDashboard: player ${playerId}'s linked NPC ${npcId} no longer exists`);
   }
 
