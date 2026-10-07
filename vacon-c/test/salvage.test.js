@@ -65,6 +65,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const salvage = require('../server/salvage.js');
+const produce = require('../server/produce.js');
 const items = require('../server/items.js');
 const inventory = require('../server/inventory.js');
 const occupations = require('../server/occupations.js');
@@ -217,13 +218,23 @@ test('every recipe yields a product the catalogue defines, and vice versa', () =
   );
 });
 
-test('every ingredient in every alternative is a real material', () => {
+test('every ingredient in every alternative is a real material or a real primary-harvest item', () => {
+  // `produce.js` is the real second source an ingredient can come
+  // from, added by direct instruction: a crafted good like bread is
+  // made from wheat, and wheat is grown, not salvaged -- so it is
+  // registered in `produce.PRIMARY_PRODUCE`, not `salvage.MATERIALS`.
+  // `canMake`/`make` already check inventory by name regardless of
+  // which file registered it; this guard follows the same rule rather
+  // than a narrower one.
   for (const [product, recipe] of Object.entries(salvage.RECIPES)) {
     assert.ok(Array.isArray(recipe.from), `${product}.from must be a list of alternatives`);
     assert.ok(recipe.from.length > 0, `${product} has no way to be made`);
     for (const ingredients of recipe.from) {
       for (const material of Object.keys(ingredients)) {
-        assert.ok(salvage.MATERIALS[material], `${product} asks for "${material}"`);
+        assert.ok(
+          salvage.MATERIALS[material] || produce.PRIMARY_PRODUCE[material],
+          `${product} asks for "${material}"`,
+        );
       }
     }
   }

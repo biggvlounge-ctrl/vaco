@@ -32,8 +32,36 @@
 // data, a world can override or extend them with no code change, and
 // what the package specified stays distinguishable from what somebody
 // added later.
+//
+// ---------------------------------------------------------------------
+// ORIGIN — imported remnant, or made here
+// ---------------------------------------------------------------------
+// Per direct instruction: a post-collapse world "will only be
+// importing and exporting so much from the old world, and anything
+// else will have to be created or made or manufactured." Nothing in
+// this catalogue previously said which was which -- an item either had
+// a `Base_Value` or it did not, with no sense of WHERE it came from.
+//
+// `'remnant'` -- pre-collapse stock. Found through discovery or salvage
+// (`server/discovery.js`, `server/salvage.js`'s teardown tables), or
+// quoted here from §27. Finite: nothing in the engine replenishes it,
+// because nobody alive can forge a platinum ingot or cut a diamond
+// with Tier 1-2 improvised tools. That absence is the point, not an
+// oversight -- it is what makes a remnant actually scarce.
+//
+// `'producible'` -- this civilization can make, grow, raise, catch or
+// gather more of it today. Either a `salvage.js` `RECIPES` entry (a
+// real skill + materials a person already holds), or primary produce
+// grown/raised/caught through an existing, named occupation
+// (`occupations.js`'s `farmer`/`fisher`/`hunter`/`tailor`) -- never a
+// new production-quantity mechanic invented here. How MUCH a farmer
+// grows in a tick is `economy.js`'s question (its own header already
+// draws that line); this file only says WHETHER a thing can be
+// replaced at all.
 
 'use strict';
+
+const ORIGINS = ['remnant', 'producible'];
 
 // §26, verbatim and in its order.
 const TRADE_CATEGORIES = [
@@ -67,24 +95,33 @@ const BARTER_KEY_FIELDS = [
 //: without categories, and it is flagged rather than presented as
 //: sourced. `Rarity` is NOT in the spec for these items and is left
 //: null rather than invented; `barterScore` treats a null rarity as 1.
+//:
+//: **Every one of these is `origin: 'remnant'`.** A refined ingot, a
+//: cut gem, a forged hand tool, a struck coin, a built musical
+//: instrument -- none of it is Tier 1-2 improvisation (`salvage.js`'s
+//: `SKILL_PER_TIER`), so nobody alive in this setting makes a fresh
+//: one. `Sand` and `Gravel` are the two exceptions by rights -- loose
+//: ground cover is trivially gathered -- but §27 quotes them as priced
+//: items rather than as this file's own catalogue, so the `Base_Value`
+//: stays exactly as sourced and only the origin tag is added to each.
 const SOURCED_ITEMS = [
-  { name: 'Gold Ingot', category: 'metals', baseValue: 100 },
-  { name: 'Silver Ingot', category: 'metals', baseValue: 50 },
-  { name: 'Platinum Ingot', category: 'metals', baseValue: 120 },
-  { name: 'Copper Ingot', category: 'metals', baseValue: 20 },
-  { name: 'Palladium', category: 'metals', baseValue: 110 },
-  { name: 'Diamond', category: 'gems', baseValue: 200 },
-  { name: 'Sapphire', category: 'gems', baseValue: 150 },
-  { name: 'Ruby', category: 'gems', baseValue: 150 },
-  { name: 'Emerald', category: 'gems', baseValue: 150 },
-  { name: 'Amethyst', category: 'gems', baseValue: 60 },
-  { name: 'Sand', category: 'materials', baseValue: 5 },
-  { name: 'Gravel', category: 'materials', baseValue: 7 },
-  { name: 'Hammer', category: 'tools', baseValue: 8 },
-  { name: 'Saw', category: 'tools', baseValue: 10 },
-  { name: 'Gold Bar', category: 'metals', baseValue: 1800 },
-  { name: 'Silver Coin', category: 'metals', baseValue: 25 },
-  { name: 'Rare Musical Instrument', category: 'luxury goods', baseValue: 2000 },
+  { name: 'Gold Ingot', category: 'metals', baseValue: 100, origin: 'remnant' },
+  { name: 'Silver Ingot', category: 'metals', baseValue: 50, origin: 'remnant' },
+  { name: 'Platinum Ingot', category: 'metals', baseValue: 120, origin: 'remnant' },
+  { name: 'Copper Ingot', category: 'metals', baseValue: 20, origin: 'remnant' },
+  { name: 'Palladium', category: 'metals', baseValue: 110, origin: 'remnant' },
+  { name: 'Diamond', category: 'gems', baseValue: 200, origin: 'remnant' },
+  { name: 'Sapphire', category: 'gems', baseValue: 150, origin: 'remnant' },
+  { name: 'Ruby', category: 'gems', baseValue: 150, origin: 'remnant' },
+  { name: 'Emerald', category: 'gems', baseValue: 150, origin: 'remnant' },
+  { name: 'Amethyst', category: 'gems', baseValue: 60, origin: 'remnant' },
+  { name: 'Sand', category: 'materials', baseValue: 5, origin: 'producible' },
+  { name: 'Gravel', category: 'materials', baseValue: 7, origin: 'producible' },
+  { name: 'Hammer', category: 'tools', baseValue: 8, origin: 'remnant' },
+  { name: 'Saw', category: 'tools', baseValue: 10, origin: 'remnant' },
+  { name: 'Gold Bar', category: 'metals', baseValue: 1800, origin: 'remnant' },
+  { name: 'Silver Coin', category: 'metals', baseValue: 25, origin: 'remnant' },
+  { name: 'Rare Musical Instrument', category: 'luxury goods', baseValue: 2000, origin: 'remnant' },
 ];
 
 // -- the catalogue ------------------------------------------------------
@@ -106,12 +143,21 @@ function findItem(worldState, name) {
   return itemsFor(worldState).find((i) => i.name === name) || null;
 }
 
+// `null` for an item this world does not define at all, or for one
+// that genuinely has not said -- unknown is not a default, same rule
+// every unobserved-value check in this engine already follows.
+function originOf(worldState, name) {
+  const item = findItem(worldState, name);
+  return item?.origin ?? null;
+}
 
 module.exports = {
   TRADE_CATEGORIES,
   RESOURCE_TYPES,
   BARTER_KEY_FIELDS,
+  ORIGINS,
   SOURCED_ITEMS,
   itemsFor,
   findItem,
+  originOf,
 };

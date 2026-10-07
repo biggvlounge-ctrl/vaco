@@ -98,6 +98,7 @@ const occupations = require('./occupations.js');
 const knowledge = require('./knowledge.js');
 const landmarks = require('./landmarks.js');
 const salvage = require('./salvage.js');
+const produce = require('./produce.js');
 const landmarkPacks = require('./landmarkPacks.js');
 const merchandise = require('./merchandise.js');
 const worldStore = require('./worldStore.js');
@@ -1608,6 +1609,12 @@ function generateWorld(options = {}) {
   // before `inventory.give` will hand anybody a piece of it, and
   // `describeSalvage` measures the catalogue rather than the holdings.
   summary.salvageItems = salvage.registerItems(w);
+  // **The primary-harvest and old-world-remnant catalogue** (wheat,
+  // raw fish, raw meat, raw fiber, salt, clean water; canned food,
+  // bottled water, antibiotics, an old coat, preserved spices) —
+  // registered the same way and for the same reason: `produce.harvest`
+  // refuses a name `items.findItem` does not know, same as `make` does.
+  summary.produceItems = produce.registerItems(w);
   // **The goods the retail Key locations actually sell.** Registered
   // for the same reason and handed out the same way — not at all:
   // merchandise reaches a tribe by taking the shop it is in.

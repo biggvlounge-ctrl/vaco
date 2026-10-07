@@ -122,6 +122,22 @@ test('exactly the seventeen sourced values, none invented, each matching the spe
   }
 });
 
+test('every sourced item names a real origin -- imported remnant, or made here', () => {
+  // Per direct instruction: a post-collapse world "will only be
+  // importing and exporting so much from the old world, and anything
+  // else will have to be created or made or manufactured." None of
+  // the seventeen sourced values are Tier 1-2 improvisation
+  // (`salvage.js`'s own `SKILL_PER_TIER`), so all but the two loose
+  // ground-cover materials are old-world remnant stock.
+  const items = require('../server/items.js');
+  for (const item of barter.SOURCED_ITEMS) {
+    assert.ok(items.ORIGINS.includes(item.origin), `"${item.name}" has no real origin`);
+  }
+  assert.equal(items.originOf(world(), 'Gold Ingot'), 'remnant');
+  assert.equal(items.originOf(world(), 'Sand'), 'producible');
+  assert.equal(items.originOf(world(), 'not-a-real-item'), null);
+});
+
 test('a world can add items, and a sourced one is still marked as sourced', () => {
   // Same precedent flows.js set: definitions are data, a world extends
   // them with no code change, and what the package specified stays

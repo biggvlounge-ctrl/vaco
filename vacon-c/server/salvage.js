@@ -76,21 +76,31 @@ const occupations = require('./occupations.js');
 //: **`category` is the constraint that keeps this honest.** Every value
 //: below is one of §26's twenty, checked by the test — so this list can
 //: grow without growing a vocabulary.
+//:
+//: **Every one of these is `origin: 'remnant'`.** The only mechanism
+//: that actually yields any of them, anywhere in this engine, is
+//: `CATEGORY_TEARDOWNS`/`BUILDING_TEARDOWNS` — taking an old-world
+//: thing apart. `timber` and `stone` read as renewable (cut from a
+//: tree, quarried fresh) and are not tagged that way, on purpose:
+//: nothing in this file or in `produce.js` actually models logging or
+//: quarrying, so claiming `producible` for them would be exactly the
+//: "a document says X is built and it is not" failure this project
+//: keeps finding, aimed at itself.
 const MATERIALS = {
-  glass: { category: 'materials' },
-  paper: { category: 'materials' },
-  timber: { category: 'materials' },
-  scrap_metal: { category: 'metals' },
-  wire: { category: 'metals' },
-  cloth: { category: 'textiles' },
-  rubber: { category: 'materials' },
-  stone: { category: 'materials' },
-  plastic: { category: 'materials' },
+  glass: { category: 'materials', origin: 'remnant' },
+  paper: { category: 'materials', origin: 'remnant' },
+  timber: { category: 'materials', origin: 'remnant' },
+  scrap_metal: { category: 'metals', origin: 'remnant' },
+  wire: { category: 'metals', origin: 'remnant' },
+  cloth: { category: 'textiles', origin: 'remnant' },
+  rubber: { category: 'materials', origin: 'remnant' },
+  stone: { category: 'materials', origin: 'remnant' },
+  plastic: { category: 'materials', origin: 'remnant' },
   // Not a material anybody makes anything from — it is what is left
   // when a thing yields nothing useful, and it exists so that
   // `salvageOf` never has to return an empty hand. Junk is the honest
   // answer for a ruined thing, and it is still a §26 category.
-  junk: { category: 'materials' },
+  junk: { category: 'materials', origin: 'remnant' },
 };
 
 const MATERIAL_NAMES = Object.keys(MATERIALS);
@@ -100,19 +110,37 @@ const MATERIAL_NAMES = Object.keys(MATERIALS);
 // ---------------------------------------------------------------------
 //: The request's own list — "from a piece of glass for weapon to paper,
 //: furniture, tools" — plus what those imply. Each carries the §26
-//: category it trades as.
+//: category it trades as. **Every product is `origin: 'producible'`
+//: by definition** — it has a real `RECIPES` entry below, which is
+//: what "this civilization can still make it" means in this file.
 const PRODUCTS = {
-  blade: { category: 'protection' },
-  club: { category: 'protection' },
-  shield: { category: 'protection' },
-  hand_tool: { category: 'tools' },
-  furniture: { category: 'materials' },
-  container: { category: 'tools' },
-  bandage: { category: 'medicine' },
+  blade: { category: 'protection', origin: 'producible' },
+  club: { category: 'protection', origin: 'producible' },
+  shield: { category: 'protection', origin: 'producible' },
+  hand_tool: { category: 'tools', origin: 'producible' },
+  furniture: { category: 'materials', origin: 'producible' },
+  container: { category: 'tools', origin: 'producible' },
+  bandage: { category: 'medicine', origin: 'producible' },
   // §26 has `knowledge` as a category and `knowledge.js` already builds
   // its items there. Blank paper bound into something somebody can
   // write in is the one product that crosses into that system.
-  notebook: { category: 'knowledge' },
+  notebook: { category: 'knowledge', origin: 'producible' },
+  // ---------------------------------------------------------------
+  // The rest close a real gap found by direct instruction: eight of
+  // §26's twenty categories (food, water, clothing, livestock, fish,
+  // crops, spices, repair) had not one concrete item anywhere in this
+  // catalogue — only a `CATEGORY_TEARDOWNS` entry saying what they
+  // yield when broken down, which is backwards when nothing produces
+  // one to break down in the first place. Each of these is crafted
+  // from `produce.js`'s primary harvest, through the same real
+  // occupations that already exist.
+  bread: { category: 'food', origin: 'producible' },
+  dried_meat: { category: 'food', origin: 'producible' },
+  smoked_fish: { category: 'food', origin: 'producible' },
+  preserved_vegetables: { category: 'food', origin: 'producible' },
+  woven_garment: { category: 'clothing', origin: 'producible' },
+  sewing_kit: { category: 'repair', origin: 'producible' },
+  repair_kit: { category: 'repair', origin: 'producible' },
 };
 
 const PRODUCT_NAMES = Object.keys(PRODUCTS);
@@ -178,6 +206,57 @@ const RECIPES = {
     from: [{ paper: 3, cloth: 1 }, { paper: 4 }],
     skill: 'Crafting',
     tier: 2,
+  },
+  // ---------------------------------------------------------------
+  // The eight-category gap's recipes. Ingredients are `produce.js`'s
+  // primary harvest (wheat, vegetables, raw_fish, raw_meat, raw_fiber)
+  // or this file's own existing materials — `canMake`/`make` read
+  // inventory by name and do not care which file registered an
+  // ingredient, so nothing else here had to change. Skills and tiers
+  // are read straight off the real occupation that does this work —
+  // `cook`/`preserver`/`tailor`/`mechanic` in `occupations.js` — not a
+  // second, disagreeing opinion invented for this table.
+  bread: {
+    from: [{ wheat: 3 }],
+    skill: 'Crafting',
+    tier: 1,
+    note: 'cook, Tier 1 — occupations.js',
+  },
+  preserved_vegetables: {
+    from: [{ vegetables: 3 }, { vegetables: 2, salt: 1 }],
+    skill: 'Crafting',
+    tier: 3,
+    note: 'preserver, Tier 3 — occupations.js',
+  },
+  dried_meat: {
+    from: [{ raw_meat: 2, salt: 1 }, { raw_meat: 3 }],
+    skill: 'Crafting',
+    tier: 3,
+    note: 'preserver, Tier 3 — occupations.js',
+  },
+  smoked_fish: {
+    from: [{ raw_fish: 2, salt: 1 }, { raw_fish: 3 }],
+    skill: 'Crafting',
+    tier: 3,
+    note: 'preserver, Tier 3 — occupations.js',
+  },
+  woven_garment: {
+    from: [{ raw_fiber: 3 }, { cloth: 2 }],
+    skill: 'Crafting',
+    tier: 2,
+    note: 'tailor, Tier 2 — occupations.js',
+  },
+  sewing_kit: {
+    from: [{ cloth: 1, wire: 1 }, { raw_fiber: 2, wire: 1 }],
+    skill: 'Crafting',
+    tier: 2,
+    note: 'tailor, Tier 2 — occupations.js',
+  },
+  repair_kit: {
+    from: [{ scrap_metal: 2, wire: 1 }],
+    skill: 'Technology',
+    tier: 3,
+    note: 'mechanic, Tier 3 — occupations.js',
   },
 };
 
@@ -305,10 +384,10 @@ const AREA_PER_YIELD = 500;
 function itemDefinitions() {
   const out = [];
   for (const [name, definition] of Object.entries(MATERIALS)) {
-    out.push({ name, category: definition.category, material: true });
+    out.push({ name, category: definition.category, origin: definition.origin, material: true });
   }
   for (const [name, definition] of Object.entries(PRODUCTS)) {
-    out.push({ name, category: definition.category, product: true });
+    out.push({ name, category: definition.category, origin: definition.origin, product: true });
   }
   return out;
 }
@@ -807,6 +886,23 @@ function describeSalvage(worldState) {
   // what hid the glass.
   const buildingTypes = new Set((worldState.properties || []).map((p) => p.type));
   for (const type of buildingTypes) credit(BUILDING_TEARDOWNS[type]);
+
+  // `produce.js`'s primary harvest (wheat, raw_fish, raw_meat, ...) is
+  // real and reachable through a real occupation, not through
+  // teardown — crediting it here is not the same mistake the thirteenth
+  // standing rule caught (a check vouching for itself): a material's
+  // OWN entry under this file's own MATERIALS never self-credits (see
+  // the exclusion two lines up), but `produce.js`'s items are a
+  // DIFFERENT file's catalogue, reached by a DIFFERENT, real mechanism
+  // (`produce.canHarvest`/`harvest`) this file does not model the
+  // quantity of. Lazy-required: `produce.js` requires this file for
+  // `skillFloorFor`/`skillOf`, so a top-level require here would be the
+  // cycle that already bit `barter.js`/`items.js` once.
+  // eslint-disable-next-line global-require
+  const produce = require('./produce.js');
+  for (const name of produce.PRIMARY_PRODUCE_NAMES) {
+    yieldsByMaterial[name] = (yieldsByMaterial[name] ?? 0) + 1;
+  }
 
   const unreachable = MATERIAL_NAMES.filter((m) => !yieldsByMaterial[m]);
   const consumed = new Set();

@@ -50,7 +50,7 @@ the Postgres schema that already exists.
 
 ## 1. Server code — `vacon-c/server/`
 
-All 77 files present on disk, all committed, largest first.
+All 78 files present on disk, all committed, largest first.
 
 **`test/inventory.test.js` now fails when this table and `server/` disagree**, which is the guard this document has needed through three separate drifts (see the note below). The count and the file list are checked against the tree rather than typed.
 
@@ -70,7 +70,7 @@ read off disk, not recalled.
 | `engine.js` | 45,291 | The simulation core. Re-exports the whole subsystem surface, and holds `WorldState`. | Built |
 | `worldgen.js` | 47,288 | **Assembles a whole world** by calling the generators that already existed. The eleventh standing rule's answer: before this, every world was a crowd of people standing in an empty field. | Built |
 | `control.js` | 37,243 | **The takeover key** — `COMPOSITION_REQUIREMENTS_TRIBE_COHESION.md`'s `ControlKeyComposition` and `TakeoverAttemptResolution`, across six scales from a one-bedroom apartment to a country. The 5:10:1 composition is the document's, used as a ratio against however many people hold the target now. | Built |
-| `salvage.js` | 38,308 | **Everything has value, because everything can become something.** Ten materials, eight products, eight recipes with alternatives, and a teardown for every one of §26's twenty categories so any item ever added is salvageable without this file knowing the catalogue. Buildings are the real supply — a house has curtains and windows in it — and `stripProperty` costs condition, so it is finite. Nothing here is priced: what a thing is worth is what it can become. Three player verbs and one pass in the Economy phase. | Built |
+| `salvage.js` | 43,867 | **Everything has value, because everything can become something.** Ten materials, fifteen products, fifteen recipes with alternatives, and a teardown for every one of §26's twenty categories so any item ever added is salvageable without this file knowing the catalogue. Buildings are the real supply — a house has curtains and windows in it — and `stripProperty` costs condition, so it is finite. Nothing here is priced: what a thing is worth is what it can become. Three player verbs and one pass in the Economy phase. Every material and product now carries `items.js`'s real `origin` tag. | Built |
 | `tribeMissions.js` | 18,481 | **Tribe Growth & Mission Unlock — the document's own mechanic.** `TRIBE_GROWTH_MISSION_UNLOCK_SYSTEM.md` says a tribe recruiting somebody whose occupation matches a nearby location's specialist requirement is itself the trigger for a new mission, and the nineteenth standing rule says to check all three systems it cites before scoping that as wiring. Checked: this time all three are real. A mission belongs to a PLACE, not to a tribe — two tribes qualifying for one hospital is one mission — and the mission's own existence is the memory that makes the unlock a crossing rather than a condition. Closes playtest finding 2: `generateMission` had exactly one caller, in `worldgen`, at tick 0, so no world had ever had a fourth mission. | Built |
 | `discovery.js` | 18,689 | **What is actually inside a landmark.** The thirty-three discovery pools `KEY_LOCATION_DISCOVERY_WORD_OF_MOUTH_SYSTEM.md` and `COMPREHENSIVE_RETAIL_KEY_LOCATIONS.md` specify — hospitals hold medical books, libraries hold knowledge across every field, churches hold relics, caves hold lost technology — turned from prose `landmarks.js` already carried and nothing read into real books, artifacts and items. A place runs out. Woke `artifacts.location_id`, a column no caller had ever passed. | Built |
 | `merchandise.js` | 11,061 | **What is on the shelves, and who gets it when the place is taken.** `COMPREHENSIVE_RETAIL_KEY_LOCATIONS.md`'s `merchandiseAccessGranted: true` — stated as confirmed, and `grep -rn merchandise server/` returned nothing, so taking a hardware store gave you a hardware store and not one hammer. The stockroom IS the discovery pool, so there is no second table. Emptied once per location; goods go to the tribe's members, which is what `control.materielOf` already sums. | Built |
@@ -123,17 +123,18 @@ read off disk, not recalled.
 | `demographics.js` | 11,514 | Languages, religion, education and ethnicity — composition and diversity. **Counts, never decides**; see `test/ethnicity.test.js`. | Built |
 | `tierTraits.js` | 10,950 | The CITY and CIVILIZATION tier sheets, and **the reconciliation**: all thirty-three named dimensions against the column, rollup, system or deferral that already answers twenty-eight of them. | Built |
 | `actions.js` | 10,805 | **The player action dispatcher** — a registry over verbs that already exist. The actor is always the player's own linked entity, never a request field. | Built |
+| `produce.js` | 10,484 | **Primary production — grown, raised, caught or gathered, not crafted.** Per direct instruction, "importing and exporting so much from the old world, anything else has to be created or made or manufactured." `items.js`'s new `origin` tag names which half a thing is in; this is the half `salvage.js`'s `RECIPES` (combining held materials) does not model — wheat, fish, meat, fiber, salt, clean water, gated by the real occupation and skill `occupations.js`/`economy.js` already have, plus old-world-only remnant goods no recipe can ever reach. | Built |
 | `households.js` | 10,386 | **Who actually lives together.** Before this, homes were handed out one per person and nobody had ever lived with anybody. | Built |
 | `membership.js` | 10,165 | Organization membership and gang membership rates. | Built |
 | `missions.js` | 9,545 | Artifacts and missions, with a real available → accepted → completed/failed/abandoned state machine. | Built |
 | `players.js` | 9,311 | Player generation, citizen dashboard — including mood, habits and routine. | Built |
 | `beliefs.js` | 8,674 | What an entity holds to be true, and how confidently. | Built |
 | `persistence.js` | 8,638 | Loads the world before `app.listen` and checkpoints every 10 ticks. | Built, see §4 |
+| `items.js` | 7,973 | Item and resource type vocabularies, from §28's canonical list, plus the real `origin` tag ('remnant' \| 'producible') every item in the catalogue now carries. | Built |
 | `worldStore.js` | 7,035 | Memory, relationships, knowledge — the write-back layer the contract requires. | Built |
 | `entityTraits.js` | 6,562 | Per-entity trait rows, trait sheets, Key modifiers, live entity resolution (`getLiveEntity`, the ninth standing rule's answer). | Built |
 | `decisions.js` | 6,365 | `decision_log` — why an NPC did anything, in its own words. | Built |
 | `traits.js` | 5,346 | Trait families, random trait values, sheet generation. | Built |
-| `items.js` | 5,177 | Item and resource type vocabularies, from §28's canonical list. | Built |
 | `perception.js` | 4,782 | **Where the `special` family lives** — how confidently each person ends up holding a broadcast fact, which `keys.knowledgeCharge` already read. | Built |
 | `traitDefinitions.js` | 4,562 | Individual / organization / family definitions, id and definition lookup. | Built |
 | `idSequences.js` | 3,678 | Id sequence state, so a restored world does not reissue ids. | Built |
