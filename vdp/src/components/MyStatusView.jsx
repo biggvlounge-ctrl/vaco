@@ -1,11 +1,19 @@
 import { useState, useEffect, useCallback } from "react";
-import { NEED_NAMES, TRAIT_NAMES, mostPressingNeed, topTrait } from "../lib/npcs.js";
+import { NEED_NAMES, TRAIT_NAMES, HABIT_NAMES, mostPressingNeed, topTrait } from "../lib/npcs.js";
 
 // The player needs/goals engine (vdp/server.cjs reusing npcs.js's own
 // stepNeeds/updateGoal, the same tick that steps NPCs) has been real
 // and server-ticked since Foundation, but nothing ever displayed it --
 // a player had no way to see what they need or what their own current
 // goal is, the one thing that should be telling them what to do next.
+//
+// **The habit buttons below closed a second, real gap found the same
+// way**: `POST /api/players/:id/actions` (server.cjs) reinforces a
+// habit via the exact function an NPC's own `applyAction` already
+// uses, and nothing anywhere in `src/` ever called it -- a route with
+// real logic and no caller, same shape as every other unwired-route
+// finding this session kept turning up. A player could see their own
+// needs drifting and had no verb to do anything about it.
 
 const VDP_API_URL = import.meta.env?.VITE_VDP_API_URL || "http://localhost:8827";
 const POLL_INTERVAL_MS = 10000;
@@ -23,6 +31,7 @@ function needBar(value) {
 export default function MyStatusView({ session, refreshSignal }) {
   const [state, setState] = useState(null);
   const [error, setError] = useState(null);
+  const [busyAction, setBusyAction] = useState(null);
 
   const refresh = useCallback(async () => {
     if (!session?.userId) return;
@@ -43,6 +52,28 @@ export default function MyStatusView({ session, refreshSignal }) {
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refresh, refreshSignal]);
+
+  const doAction = async (action) => {
+    if (!session?.userId) return;
+    setBusyAction(action);
+    setError(null);
+    try {
+      const res = await fetch(`${VDP_API_URL}/api/players/${encodeURIComponent(session.userId)}/actions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.sessionToken}` },
+        body: JSON.stringify({ action }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `actions failed (${res.status})`);
+      }
+      await refresh();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyAction(null);
+    }
+  };
 
   if (!session || !state) return null;
 
@@ -88,6 +119,19 @@ export default function MyStatusView({ session, refreshSignal }) {
             ))}
           </ul>
         </div>
+      </div>
+
+      <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
+        {HABIT_NAMES.map((action) => (
+          <button
+            key={action}
+            onClick={() => doAction(action)}
+            disabled={busyAction !== null}
+            style={{ fontSize: 11 }}
+          >
+            {busyAction === action ? "…" : action}
+          </button>
+        ))}
       </div>
     </div>
   );

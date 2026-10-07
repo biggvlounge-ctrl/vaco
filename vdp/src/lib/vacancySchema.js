@@ -25,12 +25,16 @@
 //
 // **So this is the half that can be true now.** Every VDP world object
 // declares which existing VACANCY table it belongs to, and
-// `scripts/test/vacancy-schema-alignment.test.mjs` fails if any of
-// those names is not a real `CREATE TABLE` in the schema file. Nothing
-// here creates a table or a parallel model. When the engine's Postgres
-// conversion lands, the mapping is already stated and checked, and the
-// casino's venues become `properties` rows rather than a second
-// VDP-specific design somebody has to reconcile.
+// `vdp/test/vacancySchema.test.js` fails if any of those names is not
+// a real `CREATE TABLE` in the schema file. (That test did not exist
+// until a later audit found this header describing it and nothing on
+// disk answering to the name -- the same "a document says X is built
+// and it is not" pattern this whole module exists to guard against,
+// caught here on itself.) Nothing here creates a table or a parallel
+// model. When the engine's Postgres conversion lands, the mapping is
+// already stated and checked, and the casino's venues become
+// `properties` rows rather than a second VDP-specific design somebody
+// has to reconcile.
 //
 // The cost argument in the source document is the reason this matters:
 // the schema, API, trait system and Key framework get built once. A

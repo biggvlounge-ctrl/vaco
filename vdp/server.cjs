@@ -537,6 +537,15 @@ let store = createVdpStore();
     }
   });
 
+  // A roommate who does not own the property has no `/api/property/:id`
+  // row of their own to look their household up through -- `householdOf`
+  // (households.js) already exists for exactly this and had no route.
+  // Without it, an invited member could never see their own household
+  // from their own session, only the owner could.
+  app.get('/api/households/member/:memberId', (req, res) => {
+    res.json({ household: householdsLib.householdOf(store.households, req.params.memberId) });
+  });
+
   app.post('/api/households/leave', requireActor('memberId'), (req, res) => {
     const { propertyId, memberId } = req.body || {};
     try {

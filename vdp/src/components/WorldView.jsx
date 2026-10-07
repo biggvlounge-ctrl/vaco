@@ -10,6 +10,7 @@ import { TOWN_NAME } from "../lib/town.js";
 import { talkToNpc } from "../lib/v4AgentClient.js";
 import { getEquippedOutfit } from "../lib/degvchi.js";
 import { drawAvatar } from "../lib/avatarRender.js";
+import { getLocalState, setLocalState } from "../lib/persistence.js";
 import DegvchiView from "./DegvchiView.jsx";
 import FoodDistrictView from "./FoodDistrictView.jsx";
 import StageView from "./StageView.jsx";
@@ -255,7 +256,16 @@ function drawCommonsLandscape(ctx, sx, sy, w, h, tier) {
 }
 
 export default function WorldView({ session, degvchiStore, foodDistrictStore, onPurchase }) {
-  const [worldState, setWorldState] = useState(() => createWorldState());
+  // Real purely-client-local UI state (where the player was standing,
+  // not anything server-synced) -- `persistence.js` existed for exactly
+  // this and had no caller anywhere in the app until now, so a reload
+  // used to always drop the player back in the neutral corridor.
+  const [worldState, setWorldState] = useState(() => {
+    const saved = getLocalState("worldPosition");
+    return (saved && typeof saved.x === "number" && typeof saved.y === "number")
+      ? saved
+      : createWorldState();
+  });
   const [enteredDistrict, setEnteredDistrict] = useState(null);
   const [hoveredNpcId, setHoveredNpcId] = useState(null);
   // NPC conversation UI state. Kept small on purpose: one message in,
@@ -294,6 +304,7 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
 
   useEffect(() => {
     worldStateRef.current = worldState;
+    setLocalState("worldPosition", { x: worldState.x, y: worldState.y });
   }, [worldState]);
 
   // One shared-world connection per mount, with real reconnect. Not
@@ -617,6 +628,27 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
     setChatInput("");
   };
 
+  // Every exchanged message already nudges affinity server-side (the
+  // WebSocket chat handler calls `recordConversation` on each one, with
+  // no stated sentiment). `POST /api/relationships/conversation` is a
+  // separate, real route that takes an explicit `positive` -- built,
+  // tested, and with no caller anywhere in `src/` until this: a player
+  // explicitly rating how a conversation with the selected player went,
+  // distinct from the passive per-message nudge every message already
+  // gets.
+  const rateConversation = async (positive) => {
+    if (!session?.userId || !chatTarget) return;
+    try {
+      await fetch(`${VDP_API_URL}/api/relationships/conversation`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.sessionToken}` },
+        body: JSON.stringify({ aId: session.userId, bId: chatTarget, positive }),
+      });
+    } catch {
+      // Best-effort -- a failed rating is not worth surfacing an error for.
+    }
+  };
+
   return (
     <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16, marginTop: 12 }}>
       <h2 style={{ fontSize: 16, margin: "0 0 8px 0" }}>VDP — Walkable World</h2>
@@ -702,6 +734,13 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
             />
             <button onClick={handleSendChat} disabled={!chatTarget || !chatInput.trim()}>Send</button>
           </div>
+          {chatTarget && (
+            <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+              <span style={{ fontSize: 11, color: "#888" }}>Rate conversation with {chatTarget}:</span>
+              <button onClick={() => rateConversation(true)} style={{ fontSize: 11 }}>Good chat</button>
+              <button onClick={() => rateConversation(false)} style={{ fontSize: 11 }}>Bad chat</button>
+            </div>
+          )}
           {chatLog.length > 0 && (
             <div style={{ fontSize: 12, marginTop: 4, maxHeight: 80, overflowY: "auto" }}>
               {chatLog.map((m, i) => (

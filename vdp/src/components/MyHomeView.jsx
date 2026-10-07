@@ -30,7 +30,14 @@ export default function MyHomeView({ session, onChange }) {
         const hBody = await hRes.json();
         setHousehold(hBody.household);
       } else {
-        setHousehold(null);
+        // Not an owner or renter of record -- but an invited roommate
+        // has no property of their own to look a household up through.
+        // `householdOf` (households.js) already existed for exactly
+        // this; it just had no route, so an invited member could never
+        // see the household they joined from their own session.
+        const mRes = await fetch(`${VDP_API_URL}/api/households/member/${encodeURIComponent(session.userId)}`);
+        const mBody = await mRes.json();
+        setHousehold(mBody.household);
       }
     } catch {
       // Transient fetch failure -- the next refresh tries again.
@@ -55,6 +62,27 @@ export default function MyHomeView({ session, onChange }) {
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || `${path} failed (${res.status})`);
       setHome(body);
+      if (onChange) await onChange();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleLeave = async () => {
+    if (!household) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`${VDP_API_URL}/api/households/leave`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.sessionToken}` },
+        body: JSON.stringify({ propertyId: household.propertyId, memberId: session.userId }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || `leave failed (${res.status})`);
+      setHousehold(null);
       if (onChange) await onChange();
     } catch (err) {
       setError(err.message);
@@ -96,13 +124,30 @@ export default function MyHomeView({ session, onChange }) {
       {error && <p style={{ fontSize: 12, color: "#e04a4a" }}>{error}</p>}
       {loading && !home && <p style={{ fontSize: 12, color: "#888" }}>Loading…</p>}
 
-      {!loading && !home && (
+      {!loading && !home && !household && (
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={act("/api/property/purchase")} disabled={busy}>
             {busy ? "…" : `Buy a ${PROPERTY_LEVELS[0].name} (${HOME_PRICE} VCoin)`}
           </button>
           <button onClick={act("/api/property/rent")} disabled={busy}>
             {busy ? "…" : `Rent a ${PROPERTY_LEVELS[0].name} (${RENT_PRICE} VCoin)`}
+          </button>
+        </div>
+      )}
+
+      {!loading && !home && household && (
+        <div>
+          <p style={{ fontSize: 12, color: "#888" }}>
+            You don't own or rent this home -- you're living here as a roommate.
+          </p>
+          <h3 style={{ fontSize: 13, margin: "8px 0 4px 0" }}>
+            Household ({household.memberIds.length})
+          </h3>
+          <ul style={{ fontSize: 12, margin: "0 0 8px 0", paddingLeft: 18 }}>
+            {household.memberIds.map((id) => <li key={id}>{id}</li>)}
+          </ul>
+          <button onClick={handleLeave} disabled={busy}>
+            {busy ? "…" : "Leave household"}
           </button>
         </div>
       )}

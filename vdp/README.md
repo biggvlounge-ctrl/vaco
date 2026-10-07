@@ -373,6 +373,62 @@ ecosystem (this app included) with one command.
 - `src/App.jsx` — the app shell: real Shield login, real V3 balances,
   `WorldView` + `ChopzView`.
 
+**This section stopped at roughly Phase 9 and was never updated past
+it** — found the same way this project keeps finding doc drift: by
+cross-checking what's written here against what's actually in
+`src/lib/`/`src/components/`. Everything below is real, tested code
+with its own top-level `VDP_*.md` spec doc, not a gap:
+
+- `src/lib/hvntzClient.js` / `src/components/HvntzView.jsx` — a real,
+  thin client into HVNTZ's own separate server for its scavenger-hunt
+  mechanic (real businesses/locations/hunts/checkpoints, real VCoin
+  bounty payouts). No hunt logic lives in VDP.
+- `src/lib/voidClient.js` / `src/components/VoidView.jsx` — a real,
+  thin client into VOID's own request → match → accept → complete →
+  pay → rate loop (the same loop every one of VOID's 18+ verticals
+  runs through), including the real dual payout (provider + platform
+  fee). Food District's drone-delivery dispatch reuses this same
+  client.
+- `src/lib/chopzShopClient.js` / `src/components/ChopzShortsView.jsx`
+  — the Chopz Shorts district: a shoppable-video demo spanning CHOPZ's
+  video app and CHOPZ SHOP's product API, both real, thin clients with
+  no commerce logic in VDP. Deliberately a different real system from
+  `chopz.js`'s own CHOPZ District retail kiosks (see that file's own
+  header on the naming collision).
+- `src/lib/venvmClient.js` / `src/components/VenvmView.jsx` and
+  `src/lib/vacoAnalyticsClient.js` / `src/components/VacoAnalyticsView.jsx`
+  — real, thin clients into VENVM's script/production pipeline and
+  VACO Analytics' own metrics server. No generation or metrics logic
+  lives in VDP.
+- `src/lib/beatMarketplaceClient.js` / `src/components/BeatMarketplaceView.jsx`
+  — Vvltvre Music's own beat marketplace (real license types, real
+  100%-to-producer transfers), a real, thin client, same server as
+  `vultureMusicClient.js`.
+- `src/lib/vultureStudiosClient.js`, `vultureFlixClient.js`,
+  `vultureMusicClient.js`, `vulturePodsClient.js` and their four
+  matching Views — real, thin clients into the four Vvltvre apps
+  (financing/production, film/TV, music distribution, podcasts), each
+  with its own real payouts and cross-app hand-offs happening on those
+  apps' own servers, not duplicated here.
+- `src/lib/vacancyClient.js` / `src/components/VacancyView.jsx` — the
+  Vacancy District: a real, thin client into VACON-C's own simulation
+  server (real tick/NPC/property/culture numbers), extended 29 Aug 2026
+  once VACON-C grew past its original 5-endpoint contract.
+- `src/lib/venusResort.js` / `src/components/VenusResortView.jsx` —
+  the Venus Resort Complex, the casino as a real walkable place per
+  `VDP_CASINO_FIRST_STARTER_WORLD.md`; VDP owns the walkable card and
+  staffing, VAGO's own embed stays the real casino-game backend.
+- `src/lib/combatSports.js` / `src/components/CombatSportsView.jsx` —
+  the Combat Sports District per `VDP_COMBAT_SPORTS_DISTRICT.md`:
+  every real match format and skill level, VDP owning the card (who's
+  fighting, format, tier) the same split as the Venus Resort.
+- `src/lib/worldExpansion.js` — backdrop population/economy growth and
+  the trigger that decides where a human-artist visual build-out is
+  worth spending on, per `VDP_DESIGNER_AND_VACANCY_GLOBAL_COST.md`.
+  **Flagged, not "Built" the way its own spec doc still calls it**:
+  nothing outside its own test file calls it — no component, no
+  server route. The logic is real and tested; it has no caller yet.
+
 ## Verified
 Live in a real browser (Playwright + this environment's pre-installed
 Chromium), run against all three real servers (VENVS, VDP, and the
