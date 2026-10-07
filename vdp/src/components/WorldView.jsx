@@ -5,6 +5,7 @@ import {
 } from "../lib/world.js";
 import { latestDecision, explainDecision } from "../lib/npcs.js";
 import { classifyMeridian, CITY_TIERS } from "../lib/cityTiers.js";
+import { isDistrictUnlocked } from "../lib/settlement.js";
 import { TOWN_NAME } from "../lib/town.js";
 import { talkToNpc } from "../lib/v4AgentClient.js";
 import { getEquippedOutfit } from "../lib/degvchi.js";
@@ -449,14 +450,27 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
     const heightIndex = meridianTier ? CITY_TIERS.findIndex((t) => t.id === meridianTier.id) : 0;
     const shadowDepth = 2 + heightIndex * 2; // 2px (Low-Rise) up to 10px (Skyline Tower)
 
+    // Meridian starts as one inhabited district and grows -- per
+    // direct instruction ("the rest of the area will be inhabited...
+    // this is how the game will grow"), a district the real population
+    // hasn't settled yet still physically exists (walkable, enterable)
+    // but renders dim and unmarked rather than its real content, same
+    // honest "the building is here, nobody has moved in" framing the
+    // entered-district panel below uses.
+    const realPopulation = population?.population ?? 0;
+
     for (const d of DISTRICTS) {
       const sx = d.x - camera.x;
       const sy = d.y - camera.y;
       if (sx + d.width < 0 || sx > VIEWPORT_WIDTH || sy + d.height < 0 || sy > VIEWPORT_HEIGHT) continue;
       const hasView = d.contentType !== 'none';
+      const settled = isDistrictUnlocked(d.id, realPopulation);
 
       if (d.id === 'commons' && meridianTier) {
         drawCommonsLandscape(ctx, sx, sy, d.width, d.height, meridianTier);
+      } else if (!settled) {
+        ctx.fillStyle = "#2a2a35";
+        ctx.fillRect(sx, sy, d.width, d.height);
       } else {
         ctx.fillStyle = "rgba(0,0,0,0.35)";
         ctx.fillRect(sx + shadowDepth, sy + shadowDepth, d.width, d.height);
@@ -464,14 +478,14 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
         ctx.fillRect(sx, sy, d.width, d.height);
       }
 
-      ctx.strokeStyle = hasView ? "#fff" : "#888";
-      ctx.lineWidth = hasView ? 3 : 1;
-      ctx.setLineDash(hasView ? [] : [6, 4]);
+      ctx.strokeStyle = !settled ? "#555" : hasView ? "#fff" : "#888";
+      ctx.lineWidth = hasView && settled ? 3 : 1;
+      ctx.setLineDash(hasView && settled ? [] : [6, 4]);
       ctx.strokeRect(sx, sy, d.width, d.height);
       ctx.setLineDash([]);
-      ctx.fillStyle = "#fff";
+      ctx.fillStyle = !settled ? "#777" : "#fff";
       ctx.font = "12px sans-serif";
-      ctx.fillText(d.name, sx + 6, sy + 16);
+      ctx.fillText(settled ? d.name : `${d.name} (unsettled)`, sx + 6, sy + 16);
     }
 
     for (const npc of npcsRef.current) {
@@ -516,7 +530,7 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
     const py = worldStateRef.current.y - camera.y;
     const outfit = session ? getEquippedOutfit(degvchiStore, session.userId) : {};
     drawAvatar(ctx, px, py, { outfit, outlineColor: "#ffd700" });
-  }, [hoveredNpcId, session, degvchiStore]);
+  }, [hoveredNpcId, session, degvchiStore, population]);
 
   // The render loop: draws every animation frame, so NPC and other-
   // player movement looks continuous. The NPCs themselves no longer
@@ -709,6 +723,12 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
           <p style={{ fontSize: 13 }}>
             Entered <strong>{enteredDistrict.name}</strong>.
           </p>
+          {!isDistrictUnlocked(enteredDistrict.id, population?.population ?? 0) ? (
+            <p style={{ fontSize: 12, color: "#c60" }}>
+              Not yet settled — Meridian needs more real residents before {enteredDistrict.name} opens. The building is here; nobody has moved in yet.
+            </p>
+          ) : (
+            <>
           {enteredDistrict.contentType === 'venvs-embed' && (
             <iframe
               title={`VENVS — ${enteredDistrict.name}`}
@@ -790,6 +810,8 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
           )}
           {enteredDistrict.contentType === 'none' && (
             <p style={{ fontSize: 12, color: "#888" }}>No view built for this district yet.</p>
+          )}
+            </>
           )}
         </div>
       )}
