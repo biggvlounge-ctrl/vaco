@@ -130,6 +130,19 @@ test('an illegal crossing applies for no citizenship type at all', () => {
   assert.equal(arrival.expiresAt, null);
 });
 
+test('admitWithPassport and crossIllegally both default to a non-dissident arrival', () => {
+  const store = createImmigrationStore();
+  assert.equal(admitWithPassport(store, { personId: 'eve' }).dissident, false);
+  assert.equal(crossIllegally(store, { personId: 'frank' }).dissident, false);
+});
+
+test('a dissident can still be a fully legal citizen -- opposing the government is not the same as entering unlawfully', () => {
+  const store = createImmigrationStore();
+  const arrival = admitWithPassport(store, { personId: 'gail', dissident: true });
+  assert.equal(arrival.legal, true);
+  assert.equal(arrival.dissident, true);
+});
+
 test('isPassportExpired refuses an unknown person', () => {
   const store = createImmigrationStore();
   assert.throws(() => isPassportExpired(store, 'ghost'), /no arrival recorded/);
@@ -169,15 +182,35 @@ test('generateMigrationWave sizes a real wave off a real survivor count, and cre
 test('generateMigrationWave splits legal and illegal by the real fraction given', () => {
   const store = createImmigrationStore();
   let nextId = 1;
-  // legalFraction 0.5: rng()=0.3 (< 0.5) is legal, rng()=0.7 (>= 0.5) is illegal.
+  // Per migrant, rng() is drawn twice: the dissident check, then the
+  // legal check. dissidentFraction: 0 makes the dissident draw a
+  // no-op regardless of value, so [0, 0.3] then [0, 0.7] isolates the
+  // legal/illegal split: 0.3 (< 0.5) is legal, 0.7 (>= 0.5) is illegal.
   const result = generateMigrationWave(store, {
-    survivorPopulation: 10, waveFraction: 0.2, legalFraction: 0.5,
+    survivorPopulation: 10, waveFraction: 0.2, legalFraction: 0.5, dissidentFraction: 0,
     onNewMigrant: () => `npc-${nextId++}`,
-    rng: fixedRng(0.3, 0.7),
+    rng: fixedRng(0, 0.3, 0, 0.7),
   });
   assert.equal(result.waveSize, 2);
   assert.equal(result.legalCount, 1);
   assert.equal(result.illegalCount, 1);
+  assert.equal(result.dissidentCount, 0);
+});
+
+test('generateMigrationWave marks a real fraction of arrivals as dissident, legal or not', () => {
+  const store = createImmigrationStore();
+  let nextId = 1;
+  // dissidentFraction 0.5: rng()=0.3 (< 0.5) is dissident, rng()=0.7
+  // (>= 0.5) is not. legalFraction: 1 keeps every arrival legal so the
+  // dissident signal is isolated from the legal/illegal one.
+  const result = generateMigrationWave(store, {
+    survivorPopulation: 10, waveFraction: 0.2, legalFraction: 1, dissidentFraction: 0.5,
+    onNewMigrant: () => `npc-${nextId++}`,
+    rng: fixedRng(0.3, 0, 0.7, 0),
+  });
+  assert.equal(result.dissidentCount, 1);
+  assert.equal(result.arrivals[0].dissident, true);
+  assert.equal(result.arrivals[1].dissident, false);
 });
 
 test('generateMigrationWave requires a real survivor count and a real onNewMigrant callback', () => {

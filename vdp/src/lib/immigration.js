@@ -26,6 +26,19 @@
 // a smuggled car is explicitly contraband, not a second legitimate
 // vehicle this world is supposed to have.
 //
+// **"Books will be the most important thing that will be smuggled
+// in"** (8 Oct 2026, same instruction) names the real, specific
+// weight a `smuggledGoods` entry of `'books'` carries here, above
+// guns/cars/drugs -- not a separate field, the same free-text list,
+// read by whoever reads it (`GovernmentView.jsx`'s security panel,
+// `MyStatusView.jsx`'s citations) with that real emphasis in mind.
+// "We will gradually insert more books into rotation into the
+// universe" is VENVS Publishing's own real catalog
+// (`venvs/src/lib/catalog.js`) growing over time -- a real, ongoing
+// process in a separate app, not a single action this module can
+// finish; recorded as open in `VDP_FOUNDING.md` rather than guessed
+// at with an invented book list here.
+//
 // `oldWorldSkills`/`oldWorldBeliefs` are optional, recorded verbatim on
 // the arrival rather than applied here -- carrying stats across is a
 // player-seeding decision (`server.cjs`'s `ensurePlayer`), this module
@@ -81,7 +94,7 @@ function requireNoExistingArrival(store, personId, fnName) {
 // spelled out); choosing `'temporary'` sets a real `expiresAt`.
 export function admitWithPassport(store, {
   personId, originRegion, religion, oldWorldSkills, oldWorldBeliefs,
-  citizenshipType = 'citizenship', now = Date.now(),
+  citizenshipType = 'citizenship', dissident = false, now = Date.now(),
 } = {}) {
   if (!personId) throw new Error('admitWithPassport requires a personId');
   requireNoExistingArrival(store, personId, 'admitWithPassport');
@@ -101,6 +114,13 @@ export function admitWithPassport(store, {
     smuggledGoods: [],
     oldWorldSkills: oldWorldSkills || null,
     oldWorldBeliefs: oldWorldBeliefs || null,
+    // "Multiple people... will try to revolt against the technology
+    // being the government" (8 Oct 2026) -- a real, named stance an
+    // arrival can carry, distinct from `legal`/`caught`: opposing the
+    // government is not the same fact as entering it unlawfully.
+    // `dissent.js`'s `organizeRevolt` is the real, organized ACT this
+    // only marks someone as predisposed toward.
+    dissident,
     caught: false,
     arrivedAt: now,
   };
@@ -134,7 +154,8 @@ export function isPassportExpired(store, personId, now = Date.now()) {
 // "People find other ways to get across the ice wall as well" -- the
 // same real arrival record, flagged `legal: false`.
 export function crossIllegally(store, {
-  personId, originRegion, religion, smuggledGoods = [], oldWorldSkills, oldWorldBeliefs, now = Date.now(),
+  personId, originRegion, religion, smuggledGoods = [], oldWorldSkills, oldWorldBeliefs,
+  dissident = false, now = Date.now(),
 } = {}) {
   if (!personId) throw new Error('crossIllegally requires a personId');
   requireNoExistingArrival(store, personId, 'crossIllegally');
@@ -154,6 +175,7 @@ export function crossIllegally(store, {
     smuggledGoods: [...smuggledGoods],
     oldWorldSkills: oldWorldSkills || null,
     oldWorldBeliefs: oldWorldBeliefs || null,
+    dissident,
     caught: false,
     arrivedAt: now,
   };
@@ -276,6 +298,11 @@ export function listActiveIllegalSettlements(store) {
 export const DEFAULT_WAVE_FRACTION = 0.05;
 export const DEFAULT_LEGAL_FRACTION = 0.7;
 export const DEFAULT_SMUGGLING_FRACTION = 0.3;
+// "Multiple people... will try to revolt against the technology being
+// the government" (8 Oct 2026) -- a flagged interpretive fraction,
+// same footing every other unspecified rate in this function already
+// stands on.
+export const DEFAULT_DISSIDENT_FRACTION = 0.1;
 
 function pickFrom(pool, rng) {
   return pool.length ? pool[Math.floor(rng() * pool.length)] : null;
@@ -283,6 +310,7 @@ function pickFrom(pool, rng) {
 
 export function generateMigrationWave(store, {
   survivorPopulation, waveFraction = DEFAULT_WAVE_FRACTION, legalFraction = DEFAULT_LEGAL_FRACTION,
+  dissidentFraction = DEFAULT_DISSIDENT_FRACTION,
   originRegions = [], religions = [], smuggledGoodsPool = [],
   onNewMigrant, rng = Math.random, now = Date.now(),
 } = {}) {
@@ -299,13 +327,14 @@ export function generateMigrationWave(store, {
     const personId = onNewMigrant(i);
     const originRegion = pickFrom(originRegions, rng);
     const religion = pickFrom(religions, rng);
+    const dissident = rng() < dissidentFraction;
     if (rng() < legalFraction) {
-      arrivals.push(admitWithPassport(store, { personId, originRegion, religion, now }));
+      arrivals.push(admitWithPassport(store, { personId, originRegion, religion, dissident, now }));
     } else {
       const smuggledGoods = smuggledGoodsPool.length && rng() < DEFAULT_SMUGGLING_FRACTION
         ? [pickFrom(smuggledGoodsPool, rng)]
         : [];
-      arrivals.push(crossIllegally(store, { personId, originRegion, religion, smuggledGoods, now }));
+      arrivals.push(crossIllegally(store, { personId, originRegion, religion, smuggledGoods, dissident, now }));
     }
   }
 
@@ -314,5 +343,6 @@ export function generateMigrationWave(store, {
     arrivals,
     legalCount: arrivals.filter((a) => a.legal).length,
     illegalCount: arrivals.filter((a) => !a.legal).length,
+    dissidentCount: arrivals.filter((a) => a.dissident).length,
   };
 }

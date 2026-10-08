@@ -407,6 +407,46 @@ futuristic, but with nature. Future like Dubai, nature like Japan."
   a schedule. What the border itself actually looks like at the ice
   wall is not yet rendered anywhere and is recorded as open below.
 
+## Security scales with real crime, the government builds through real contracts, and real people revolt against it (8 Oct 2026)
+
+Three more pieces of "the tech is the government," per direct
+instruction:
+
+- **"Everything will be camera secured... at the beginning there will
+  just be basic security features and then it will increase as crime
+  increases... the robots will increase for policing."** New
+  `security.js`: a real tier (`Basic → Elevated → High Alert →
+  Maximum Security`) derived from this world's own real crime count
+  (`justice.js`'s tickets and detentions, `immigration.js`'s illegal
+  arrivals and active illegal settlements, `property.js`'s
+  unauthorized structures) -- never a separate, invented crime-rate
+  simulation. Each tier names a real camera count and a real robot
+  count, both flagged interpretive numbers on the same footing every
+  other unspecified figure in this document already stands on.
+  `GovernmentView.jsx` shows the real, current tier.
+- **"The government, which is the AI, will send out contracts to
+  different builders to continuously build the world as needed."**
+  New `contracts.js`: the AI posts a real contract (free-text
+  description -- what specifically gets built is not specified, so
+  nothing is invented here), a real builder accepts it, spends real
+  materials if the contract names any, and is paid real VCoin by the
+  governors on completion. Posting is a real, scheduler-style world
+  event guarded the same way `generateMigrationWave` already is
+  (`requireCallingService`, no single player actor) -- the AI's own
+  act, never a player's.
+- **"Multiple people who, as they come in the world, will try to
+  revolt against the technology being the government."** New
+  `dissent.js`: a real, named collective action
+  (`organizeRevolt`/`suppressRevolt`), and `immigration.js`'s arrivals
+  now carry a real `dissident` flag -- set per-arrival or across a
+  real fraction of a migration wave (`generateMigrationWave`'s
+  `dissidentFraction`). Being a dissident is explicitly not the same
+  fact as being illegal -- a fully legal citizen can still oppose the
+  government, the same way `justice.js`'s detention is open to a
+  citizen too. VACON-C's own `server/politics.js` already owns
+  revolutions at civilization scale; this is VDP's own small, real
+  record of its own small world, not a second implementation of it.
+
 ## What is still open
 
 - The area's own name — nothing has been given yet (the product name,
@@ -444,6 +484,15 @@ futuristic, but with nature. Future like Dubai, nature like Japan."
   more like an open area" — and what the ice wall's own real border
   looks like. Both are real visual-design questions, not mechanics;
   `justice.js`/`worldExpansion.js` are built either way.
+- "We will gradually insert more books into rotation into the
+  universe" — VENVS Publishing's own real catalog
+  (`venvs/src/lib/catalog.js`) is the real place this happens, and it
+  has not happened yet; this document records the instruction, not an
+  invented title list standing in for it.
+- The real consequence, if any, of being suppressed
+  (`dissent.js`'s `suppressRevolt`) or of a government contract going
+  unfinished — both record the real fact of what happened, with no
+  further invented penalty attached.
 
 This document records what has been confirmed and leaves the rest for
 whenever more of the story is given, the same discipline `town.js`

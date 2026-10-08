@@ -88,6 +88,8 @@ function createVdpStore() {
       illegalSettlements: [], nextSettlementId: 1,
     },
     justice: { tickets: [], nextTicketId: 1, detentions: [], nextDetentionId: 1 },
+    contracts: { contracts: [], nextContractId: 1 },
+    dissent: { revolts: [], nextRevoltId: 1 },
   };
 }
 
@@ -172,6 +174,9 @@ let store = createVdpStore();
   const chopzLib = await import('./src/lib/chopz.js');
   const immigrationLib = await import('./src/lib/immigration.js');
   const justiceLib = await import('./src/lib/justice.js');
+  const securityLib = await import('./src/lib/security.js');
+  const contractsLib = await import('./src/lib/contracts.js');
+  const dissentLib = await import('./src/lib/dissent.js');
 
   // A migrant's real old-world background carries over if one was
   // recorded (`immigration.js`'s `admitWithPassport`/`crossIllegally`,
@@ -671,6 +676,7 @@ let store = createVdpStore();
         oldWorldSkills: req.body.oldWorldSkills,
         oldWorldBeliefs: req.body.oldWorldBeliefs,
         citizenshipType: req.body.citizenshipType,
+        dissident: req.body.dissident,
       });
       newsLib.recordEvent(store.news, { kind: 'immigration', text: `${req.body.personId} arrived through passport control` });
       res.status(201).json(arrival);
@@ -723,6 +729,7 @@ let store = createVdpStore();
         smuggledGoods: req.body.smuggledGoods,
         oldWorldSkills: req.body.oldWorldSkills,
         oldWorldBeliefs: req.body.oldWorldBeliefs,
+        dissident: req.body.dissident,
       });
       newsLib.recordEvent(store.news, { kind: 'immigration', text: `an unrecorded crossing beyond the ice wall was made` });
       res.status(201).json(arrival);
@@ -815,6 +822,7 @@ let store = createVdpStore();
         survivorPopulation: req.body.survivorPopulation,
         waveFraction: req.body.waveFraction,
         legalFraction: req.body.legalFraction,
+        dissidentFraction: req.body.dissidentFraction,
         originRegions: req.body.originRegions,
         religions: req.body.religions,
         smuggledGoodsPool: req.body.smuggledGoodsPool,
@@ -826,7 +834,7 @@ let store = createVdpStore();
       });
       newsLib.recordEvent(store.news, {
         kind: 'immigration',
-        text: `a new wave of ${result.waveSize} settlers arrived (${result.legalCount} by passport, ${result.illegalCount} across the ice wall)`,
+        text: `a new wave of ${result.waveSize} settlers arrived (${result.legalCount} by passport, ${result.illegalCount} across the ice wall, ${result.dissidentCount} already opposed to the government)`,
       });
       res.status(201).json({ ...result, npcsCreated: created });
     } catch (err) {
@@ -906,6 +914,111 @@ let store = createVdpStore();
       });
       newsLib.recordEvent(store.news, { kind: 'justice', text: `${detention.personId} was released` });
       res.status(200).json(detention);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // --- Security: real crime-scaled cameras and robot patrols --------
+  // "Everything will be camera secured... at the beginning there
+  // will just be basic security features and then it will increase
+  // as crime increases." A real tier derived from this world's own
+  // real records, never a second invented crime simulation.
+  app.get('/api/security/status', (_req, res) => {
+    const crimeCount = securityLib.measureCrime({
+      ticketCount: store.justice.tickets.length,
+      detentionCount: store.justice.detentions.length,
+      illegalArrivalCount: immigrationLib.listIllegalArrivals(store.immigration).length,
+      illegalSettlementCount: immigrationLib.listActiveIllegalSettlements(store.immigration).length,
+      unauthorizedStructureCount: propertyLib.listUnauthorized(store.property).length,
+    });
+    res.json(securityLib.securityTierFor(crimeCount));
+  });
+
+  // --- Government Contracts: the AI builds the world through real
+  // builders -------------------------------------------------------------
+  app.get('/api/contracts/open', (_req, res) => {
+    res.json({ open: contractsLib.listOpenContracts(store.contracts) });
+  });
+
+  app.get('/api/contracts/mine/:builderId', (req, res) => {
+    res.json({ contracts: contractsLib.contractsFor(store.contracts, req.params.builderId) });
+  });
+
+  // The AI government's own act, not a player's -- a real,
+  // scheduler-style world event, the same posture
+  // `/api/immigration/migration-wave` already uses.
+  app.post('/api/contracts/post', requireCallingService(), (req, res) => {
+    try {
+      const contract = contractsLib.postContract(store.contracts, {
+        description: req.body.description,
+        materialsRequired: req.body.materialsRequired,
+        vcoinReward: req.body.vcoinReward,
+      });
+      newsLib.recordEvent(store.news, { kind: 'contracts', text: `the government posted a new contract: ${contract.description}` });
+      res.status(201).json(contract);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/contracts/:id/accept', requireActor('builderId'), (req, res) => {
+    try {
+      const contract = contractsLib.acceptContract(store.contracts, Number(req.params.id), {
+        builderId: req.body.builderId,
+      });
+      res.status(200).json(contract);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/contracts/:id/complete', requireActor('builderId'), async (req, res) => {
+    try {
+      const contract = store.contracts.contracts.find((c) => c.id === Number(req.params.id));
+      if (!contract) return res.status(404).json({ error: `no contract #${req.params.id}` });
+      if (contract.builderId !== req.body.builderId) {
+        return res.status(403).json({ error: 'complete: this contract is not accepted by the acting user' });
+      }
+      const completed = await contractsLib.completeContract(store.contracts, contract.id, {
+        transferFn: (args) => transferVCoin({ ...args, fromUserId: jobsLib.PLANETARY_GOVERNORS_PAYROLL }),
+        resourcesStore: store.resources,
+        spendMaterialsFn: resourcesLib.spendMaterials,
+        undoSpendFn: resourcesLib.undoSpend,
+      });
+      newsLib.recordEvent(store.news, { kind: 'contracts', text: `${req.body.builderId} completed a government contract: ${contract.description}` });
+      res.status(200).json(completed);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // --- Dissent: real opposition to the AI government --------------------
+  app.get('/api/dissent/active', (_req, res) => {
+    res.json({ active: dissentLib.listActiveRevolts(store.dissent) });
+  });
+
+  app.post('/api/dissent/organize', requireActor('leaderId'), (req, res) => {
+    try {
+      const revolt = dissentLib.organizeRevolt(store.dissent, {
+        leaderId: req.body.leaderId,
+        participantIds: req.body.participantIds,
+        reason: req.body.reason,
+      });
+      newsLib.recordEvent(store.news, { kind: 'dissent', text: `${req.body.leaderId} organized a revolt: ${req.body.reason}` });
+      res.status(201).json(revolt);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/dissent/:id/suppress', requireActor('suppressedBy'), (req, res) => {
+    try {
+      const revolt = dissentLib.suppressRevolt(store.dissent, Number(req.params.id), {
+        suppressedBy: req.body.suppressedBy,
+      });
+      newsLib.recordEvent(store.news, { kind: 'dissent', text: `a revolt led by ${revolt.leaderId} was suppressed` });
+      res.status(200).json(revolt);
     } catch (err) {
       res.status(400).json({ error: err.message });
     }

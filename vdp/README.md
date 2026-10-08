@@ -975,6 +975,50 @@ panel in `MyHomeView.jsx`.
 15 new tests (`justice.test.js` new, `property.test.js`). Full suite:
 400 passing, up from 385, 0 failing, clean `npm run build`.
 
+**Phase 27 — camera-scaled security, government contracts, and real
+revolts** (8 Oct 2026, direct instruction). Three more pieces of "the
+tech is the government":
+
+"Everything will be camera secured... at the beginning there will
+just be basic security features and then it will increase as crime
+increases... the robots will increase for policing." New
+`security.js`: `measureCrime` sums real counts already recorded
+elsewhere (`justice.js`'s tickets/detentions, `immigration.js`'s
+illegal arrivals/active illegal settlements, `property.js`'s
+unauthorized structures), and `securityTierFor` derives a real tier
+(`Basic → Elevated → High Alert → Maximum Security`), each with a
+flagged camera/robot count, the same `population.js`-tier shape this
+app already uses. New `GET /api/security/status`.
+
+"The government, which is the AI, will send out contracts to
+different builders to continuously build the world as needed." New
+`contracts.js`: `postContract` (AI-only, guarded by
+`requireCallingService` same as `generateMigrationWave`) /
+`acceptContract` / `completeContract` (claim-before-pay, spends real
+materials first when the contract names any). What gets built is the
+caller's own real text -- no building target is invented. New
+`GET/POST /api/contracts/*` routes.
+
+"Multiple people who, as they come in the world, will try to revolt
+against the technology being the government." New `dissent.js`:
+`organizeRevolt`/`suppressRevolt`, a real, named collective action.
+`immigration.js`'s arrivals (and `generateMigrationWave`) gained a
+real `dissident` flag, explicitly independent of `legal` -- a fully
+legal citizen can organize a revolt too. New `GET/POST /api/dissent/*`
+routes.
+
+Also: "books will be the most important thing that will be
+smuggled in" is now named directly in `immigration.js`'s own header;
+"we will gradually insert more books into rotation" is recorded as
+open in `VDP_FOUNDING.md` (VENVS Publishing's own real catalog, not
+yet touched). New `GovernmentView.jsx` surfaces all three systems
+above with real actions -- accept/complete a contract, organize/
+suppress a revolt, read the live security tier.
+
+25 new tests (`security.test.js`, `contracts.test.js`, `dissent.test.js`
+all new; `immigration.test.js`). Full suite: 425 passing, up from 400,
+0 failing, clean `npm run build`.
+
 **Phase 2 (SVMIKO DEGVCHI Avatar Wearables)**: 20 plain-Node checks
 (13 unique real pieces, real category assignment, the luxury-vs-
 streetwear tier proven at VDP's own real price scale, a real purchase
