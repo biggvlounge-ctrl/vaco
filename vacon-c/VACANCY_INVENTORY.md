@@ -50,7 +50,7 @@ the Postgres schema that already exists.
 
 ## 1. Server code — `vacon-c/server/`
 
-All 80 files present on disk, all committed, largest first.
+All 81 files present on disk, all committed, largest first.
 
 **`test/inventory.test.js` now fails when this table and `server/` disagree**, which is the guard this document has needed through three separate drifts (see the note below). The count and the file list are checked against the tree rather than typed.
 
@@ -134,6 +134,7 @@ read off disk, not recalled.
 | `investments.js` | 8,531 | **`investments` — genuinely unbuilt rather than deferred, closed 8 Oct 2026.** Real money moved from an investor's own savings into a target's capital (an organization's real `assets`); a real, bounded dividend paid back each tick, proportional to stake, out of the organization's own standing — never minted, never more than it has. A person-held investment (education, healthcare) pays no dividend, on purpose. | Built |
 | `items.js` | 7,973 | Item and resource type vocabularies, from §28's canonical list, plus the real `origin` tag ('remnant' \| 'producible') every item in the catalogue now carries. | Built |
 | `worldStore.js` | 7,035 | Memory, relationships, knowledge — the write-back layer the contract requires. | Built |
+| `construction.js` | 7,027 | **§7 system 30, Construction — a first mover for a lifecycle that already runs, closed 8 Oct 2026.** `property.ACQUIRED_METHODS` has named `built` since the Property Engine shipped, called by nobody. A person who owns nowhere yet, and can afford to, builds a `residential` property out of their own savings at the identical cost range `worldgen` already draws one from; `property.advancePropertyLifecycle` (already built, already running) does the rest — planning to construction to operation on its own timer. | Built |
 | `entityTraits.js` | 6,562 | Per-entity trait rows, trait sheets, Key modifiers, live entity resolution (`getLiveEntity`, the ninth standing rule's answer). | Built |
 | `decisions.js` | 6,365 | `decision_log` — why an NPC did anything, in its own words. | Built |
 | `traits.js` | 5,346 | Trait families, random trait values, sheet generation. | Built |

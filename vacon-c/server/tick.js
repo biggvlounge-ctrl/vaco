@@ -54,6 +54,7 @@ const worldStore = require('./worldStore.js');
 const economy = require('./economy.js');
 const investments = require('./investments.js');
 const businesses = require('./businesses.js');
+const construction = require('./construction.js');
 const politics = require('./politics.js');
 const technology = require('./technology.js');
 const mortality = require('./mortality.js');
@@ -910,6 +911,16 @@ function runOrganizationPhase(worldState, options = {}) {
     events.push(...formed.events);
   }
   events.push(...businesses.advanceBusinessLifecycle(worldState, worldState.tick));
+
+  // **§7 system 30, Construction: a first mover for a lifecycle that
+  // already runs.** `property.advancePropertyLifecycle` (Environment
+  // phase) has always walked planning -> construction -> operation on
+  // its own timer; nothing ever put a property into `planning` after
+  // worldgen. `runConstruction` does, financed from the builder's own
+  // savings, and does not need `generateOrganization` — a person
+  // building their own home is not founding an organization.
+  const builtHomes = construction.runConstruction(worldState, worldState.tick);
+  events.push(...builtHomes.events);
 
   return events;
 }

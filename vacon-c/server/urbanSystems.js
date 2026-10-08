@@ -640,19 +640,27 @@ const SYSTEMS = [
   {
     n: 30,
     name: 'Construction',
-    level: 'partial',
-    functions: ['advancePropertyLifecycle', 'stripProperty'],
-    note: 'Condition advances over time. **Nothing is built by anyone — but as of 18 Sep 2026 '
-      + 'something is deliberately UNbuilt.** `salvage.stripProperty` is the first thing in the '
-      + 'engine that changes a building\'s condition by somebody\'s decision rather than by the '
-      + 'calendar: an empty building is where glass, timber, cloth and stone come from, and a '
-      + 'trip costs it 10 condition and refuses once there is nothing left. Deliberately NOT '
-      + 'raised to modelled on the strength of that, because demolition is half a construction '
-      + 'system and the half that matters less: no property is ever founded, and '
-      + '`lifecycle_stage` still walks its stages on a timer nobody influences. Measured '
-      + 'against a world with salvage switched off, over 200 ticks: 96 properties at zero '
-      + 'condition without it, 101 with — the collapse of the housing stock is the '
-      + 'pre-existing decay, not this.',
+    level: 'modelled',
+    phases: ['runOrganizationPhase'],
+    functions: ['advancePropertyLifecycle', 'stripProperty', 'constructResidentialProperty',
+      'runConstruction'],
+    note: 'Condition advances over time, and `salvage.stripProperty` (18 Sep 2026) was the '
+      + 'first thing to change a building\'s condition by somebody\'s decision rather than by '
+      + 'the calendar. **The other half closed 8 Oct 2026.** `property.ACQUIRED_METHODS` has '
+      + 'named `built` since the Property Engine shipped, with no caller anywhere — "no '
+      + 'property is ever founded" was literally true, and `lifecycle_stage` walked its stages '
+      + 'on a timer with nothing for the timer to start from after worldgen. `server/'
+      + 'construction.js` is the first mover the existing lifecycle was missing: a person who '
+      + 'owns nowhere yet, and can afford to, builds a `residential` property out of their own '
+      + 'savings — the same `individual_finances` ledger `businesses.js` and `investments.js` '
+      + 'already move real money through — at the identical cost range `worldgen` already '
+      + 'draws a residential property\'s value from, so a house built mid-world costs what the '
+      + 'same house would have cost at generation. `property.advancePropertyLifecycle` (built '
+      + 'already, running every tick) does everything after that: planning -> construction -> '
+      + 'operation on its own timer, then condition and upkeep, exactly as it already does for '
+      + 'a worldgen-built home. Only residential, and only for an individual — an organization '
+      + 'constructing its own premises is a different decision this file does not make for it, '
+      + 'which is additive scope rather than a correction.',
   },
   {
     n: 31,

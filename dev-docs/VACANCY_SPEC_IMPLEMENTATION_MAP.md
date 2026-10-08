@@ -209,12 +209,12 @@ from memory with nothing in the repo to check it against. The forty are
 now data in `vacon-c/server/urbanSystems.js`, every citation verified
 by `vacon-c/test/urban-systems.test.js`, and the real breakdown is:
 
-**21 modelled, 16 partial, 3 slot-only, 0 absent**
+**22 modelled, 15 partial, 3 slot-only, 0 absent**
 
 | Level | Means | Systems |
 |---|---|---|
-| **modelled** (21) | Real mechanics; something advances or decides on it each tick | Population, Housing, Economy, **Employment**, **Health**, Infrastructure, **Water**, **Energy**, **Law Enforcement**, **Crime**, **Court**, **Political**, **Media**, Cultural, Community Organizations, Real Estate, Environmental, **Technology**, **Migration**, AI Decision, **Business** |
-| **partial** (16) | A trait family or a live table with little driving it, or one phase covering two systems | Education, Food Supply, **Waste**, Gang, Organized Crime, **Prison**, **Government Services**, Communication, **Social Media**, **Religion**, Construction, Weather, Disaster, **Military/National Guard**, **Tourism**, Reputation |
+| **modelled** (22) | Real mechanics; something advances or decides on it each tick | Population, Housing, Economy, **Employment**, **Health**, Infrastructure, **Water**, **Energy**, **Law Enforcement**, **Crime**, **Court**, **Political**, **Media**, Cultural, Community Organizations, Real Estate, Environmental, **Technology**, **Migration**, AI Decision, **Business**, **Construction** |
+| **partial** (15) | A trait family or a live table with little driving it, or one phase covering two systems | Education, Food Supply, **Waste**, Gang, Organized Crime, **Prison**, **Government Services**, Communication, **Social Media**, **Religion**, Weather, Disaster, **Military/National Guard**, **Tourism**, Reputation |
 | **slot** (3) | Storage exists and nothing reads it | Transportation, Fire & Emergency, Supply Chain |
 
 **Energy moved again, 24 Sep 2026.** The 17 Sep pass above gave it a
