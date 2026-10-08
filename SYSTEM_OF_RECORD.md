@@ -982,7 +982,7 @@ trusted:
 
 The simulation engine is the one app in this repo whose "done" is not a
 list of routes, so it carries a measured completeness score rather than
-a criteria tally. **92.1%**, from
+a criteria tally. **92.2%**, from
 `vacon-c/dev-docs/GAME_COMPLETENESS.md`, which
 `vacon-c/scripts/completeness.mjs` regenerates and
 `vacon-c/test/completeness.test.js` fails on if stale — including a
@@ -990,12 +990,24 @@ check that the percent in THIS file matches the one the code measures.
 
 | axis | complete | what it measures |
 |---|---|---|
-| systems | 76.1% | the forty urban systems §7 names, at `urbanSystems.js`'s own four levels |
+| systems | 77.4% | the forty urban systems §7 names, at `urbanSystems.js`'s own four levels |
 | tables | 94.7% | schema tables a built world actually fills |
 | statistics | 88.2% | statistics a world can answer about itself |
 | traits | 100% | traits something under `server/` reads |
 | traitDepth | 85.7% | trait columns a life actually changes |
 | habits | 100% | whether habits and routines carry information |
+
+**92.1% -> 92.2% on 8 Oct 2026, systems axis.** §7 system 16 Organized
+Crime moved `partial` -> `modelled`, the same pass that gave Gang its
+hierarchy. "Not distinguished from Gang" was true because neither the
+schema nor any document gives a separate `organized_crime`
+organization type or crime category — §6 names it only in prose. The
+real distinction available is a command structure:
+`membership.isOrganized` reads the §14 tiers `gangTierFor` already
+assigns and asks whether a `leader` AND at least one `shot_caller` or
+`lieutenant` are actually filled, rather than every member sitting at
+soldier, associate or juvenile with nobody between them and the top.
+No second, invented signal.
 
 **91.9% -> 92.1% on 8 Oct 2026, systems axis.** §7 system 15 Gang
 moved `partial` -> `modelled`. §14 GANG / ORGANIZATION STRUCTURE names

@@ -167,7 +167,7 @@ test('presence is defined by resident members, because organizations have no add
   const presence = membership.organizationPresence(w, c.id);
   assert.equal(presence.length, 2);
   assert.deepEqual(presence[0], {
-    organizationId: gang.id, type: 'gang', members: 3, isGang: true, influence: 40,
+    organizationId: gang.id, type: 'gang', members: 3, isGang: true, organized: false, influence: 40,
   });
   assert.equal(presence[1].members, 1, 'only the shop member who lives here');
 });
@@ -339,4 +339,80 @@ test('a faction (isFaction, not type gang) gets the same real hierarchy', () => 
   assert.ok(membership.isGang(faction));
   membership.assignGangTiers(w, faction.id, w.tick);
   assert.equal(membership.findMembership(w, npc.id, faction.id).role_in_org, 'soldier');
+});
+
+// ---------------------------------------------------------------------
+// §7 system 16, Organized Crime — distinguished from Gang by a real
+// command structure, not a second invented signal
+// ---------------------------------------------------------------------
+
+test('a gang with a leader and nobody below shot_caller/lieutenant is not organized', () => {
+  const w = world();
+  const gang = org(w, { type: 'gang' });
+  const leaderNpc = person(w);
+  leaderNpc.createdTick = w.tick - 40 * 365;
+  gang.leader_id = leaderNpc.id;
+  membership.joinOrganization(w, { entityId: leaderNpc.id, organizationId: gang.id, role: 'member' });
+
+  const soldier = person(w);
+  soldier.createdTick = w.tick - 25 * 365;
+  givenFactionTraits(w, soldier.id, { 'Territorial Instinct': 90 });
+  membership.joinOrganization(w, { entityId: soldier.id, organizationId: gang.id, role: 'member' });
+
+  membership.assignGangTiers(w, gang.id, w.tick);
+  assert.equal(membership.isOrganized(w, gang.id), false);
+});
+
+test('a gang with a real command structure — leader plus a lieutenant — is organized', () => {
+  const w = world();
+  const gang = org(w, { type: 'gang' });
+  const leaderNpc = person(w);
+  leaderNpc.createdTick = w.tick - 40 * 365;
+  gang.leader_id = leaderNpc.id;
+  membership.joinOrganization(w, { entityId: leaderNpc.id, organizationId: gang.id, role: 'member' });
+
+  const lieutenant = person(w);
+  lieutenant.createdTick = w.tick - 30 * 365;
+  givenFactionTraits(w, lieutenant.id, { 'Ideological Alignment': 90 });
+  membership.joinOrganization(w, { entityId: lieutenant.id, organizationId: gang.id, role: 'member' });
+
+  membership.assignGangTiers(w, gang.id, w.tick);
+  assert.equal(membership.isOrganized(w, gang.id), true);
+});
+
+test('a gang with no leader at all is not organized, whatever else it has', () => {
+  const w = world();
+  const gang = org(w, { type: 'gang' });
+  const lieutenant = person(w);
+  lieutenant.createdTick = w.tick - 30 * 365;
+  givenFactionTraits(w, lieutenant.id, { 'Ideological Alignment': 90 });
+  membership.joinOrganization(w, { entityId: lieutenant.id, organizationId: gang.id, role: 'member' });
+
+  membership.assignGangTiers(w, gang.id, w.tick);
+  assert.equal(membership.isOrganized(w, gang.id), false);
+});
+
+test('organizationPresence reports organized for gang/faction rows and null for anything else', () => {
+  const w = world();
+  const c = territory.generateCommunity(w, {});
+  const gang = org(w, { type: 'gang' });
+  const shop = org(w, { type: 'business' });
+
+  const leaderNpc = person(w, c.id);
+  leaderNpc.createdTick = w.tick - 40 * 365;
+  gang.leader_id = leaderNpc.id;
+  membership.joinOrganization(w, { entityId: leaderNpc.id, organizationId: gang.id, role: 'member' });
+  const lieutenant = person(w, c.id);
+  lieutenant.createdTick = w.tick - 30 * 365;
+  givenFactionTraits(w, lieutenant.id, { 'Ideological Alignment': 90 });
+  membership.joinOrganization(w, { entityId: lieutenant.id, organizationId: gang.id, role: 'member' });
+  membership.assignGangTiers(w, gang.id, w.tick);
+
+  membership.joinOrganization(w, { entityId: person(w, c.id).id, organizationId: shop.id, role: 'employee' });
+
+  const presence = membership.organizationPresence(w, c.id);
+  const gangRow = presence.find((r) => r.organizationId === gang.id);
+  const shopRow = presence.find((r) => r.organizationId === shop.id);
+  assert.equal(gangRow.organized, true);
+  assert.equal(shopRow.organized, null, 'a business does not answer "is this organized crime" either way');
 });

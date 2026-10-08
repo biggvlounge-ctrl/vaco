@@ -246,6 +246,21 @@ function isGang(organization) {
   return organization.type === 'gang' || organization.isFaction === true;
 }
 
+// §7 system 16, Organized Crime: "not distinguished from Gang in the
+// model." The distinction is a command structure — §14's own named
+// tiers — not a second, invented signal: an organized operation has a
+// `leader` AND at least one `shot_caller` or `lieutenant` actually
+// filled by a real member; a loose street gang is `leader`-less, or a
+// leader with nobody but soldiers, associates and juveniles under
+// them. Read straight off the tiers `gangTierFor`/`assignGangTiers`
+// already assign, never a second classification.
+function isOrganized(worldState, organizationId) {
+  const roles = new Set((worldState.entityOrganizationMemberships || [])
+    .filter((m) => m.organization_id === organizationId)
+    .map((m) => m.role_in_org));
+  return roles.has('leader') && (roles.has('shot_caller') || roles.has('lieutenant'));
+}
+
 // -- the per-area statistics this exists for ----------------------------
 
 // Every organization with at least one resident member in this
@@ -273,6 +288,11 @@ function organizationPresence(worldState, communityId) {
       type: organization?.type ?? null,
       members,
       isGang: isGang(organization),
+      // §7 system 16, Organized Crime: null for anything that is not a
+      // gang/faction in the first place, because "is this an organized
+      // criminal operation" is not a question a hospital or a business
+      // answers either way.
+      organized: isGang(organization) ? isOrganized(worldState, organizationId) : null,
       // `influence` is a real organization column with a real value,
       // unlike `members`. Reported as-is rather than scaled by local
       // headcount, which would be inventing a model of local influence
@@ -313,6 +333,7 @@ module.exports = {
   memberCount,
   describeMemberDrift,
   isGang,
+  isOrganized,
   organizationPresence,
   gangMembershipRate,
   GANG_HIERARCHY,

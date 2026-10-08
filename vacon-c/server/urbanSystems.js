@@ -384,10 +384,21 @@ const SYSTEMS = [
   {
     n: 16,
     name: 'Organized Crime',
-    level: 'partial',
+    level: 'modelled',
     tables: ['factions'],
     traitFamilies: ['criminal', 'faction'],
-    note: 'Not distinguished from Gang in the model.',
+    functions: ['isOrganized'],
+    note: '**Closed 8 Oct 2026, the same pass that gave Gang its real hierarchy.** "Not '
+      + 'distinguished from Gang in the model" was true because nothing in the schema names a '
+      + 'separate `organized_crime` organization type or crime category to distinguish — '
+      + '`organizations.type`\'s enumeration has `gang` and nothing else in this family, and '
+      + '`crime.CATEGORIES` has no `organized_crime` entry either; §6 names it as a kind of '
+      + 'crime in prose, not as a schema value. The real distinction available is a command '
+      + 'structure: `membership.isOrganized` reads the §14 tiers `gangTierFor` already '
+      + 'assigns and asks whether a `leader` AND at least one `shot_caller` or `lieutenant` '
+      + 'are actually filled by real members, rather than every member sitting at soldier, '
+      + 'associate or juvenile with nobody in between. No second, invented signal — the same '
+      + 'tiers, read for what they already say about a gang\'s own structure.',
   },
   {
     n: 17,
