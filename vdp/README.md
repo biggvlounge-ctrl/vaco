@@ -947,10 +947,11 @@ VOKEN's real `/api/brand` endpoint — not hardcoded text.
   extensions (Speed Dating, Long-Distance Mode, Blind Date, Group
   Dating, Gift Dating, Snap Map location sharing, Hunts Dates) exist as
   real CVNVO APIs but have no VDP-district surface of their own yet.
-  VDP's own hardcoded single-user login (`"demo-user"`) means two real
-  distinct players can't currently be tested inside the same live
-  browser pass; multiplayer/shared-world state generally remains
-  unbuilt (see above).
+  ~~VDP's own hardcoded single-user login meant two real distinct
+  players couldn't be tested together~~ — stale: real Shield register/
+  login and the shared WebSocket world (see "Jobs/Careers..." above)
+  already close this, so two real logged-in people CAN be tested
+  together live; this bullet just never got updated when they shipped.
 
 ## The design system, the CSS half only (25 Sep 2026)
 
