@@ -656,6 +656,23 @@ so every existing job and test that omits them is unaffected.
 6 new jobs.js tests, 3 new resources.js tests. Full suite: 340
 passing, up from 332, 0 failing.
 
+**And the raw material found its first real product, same day.**
+`foodDistrict.js`'s `cookBatch` — already the real production step a
+distributed order depends on, already paying a real cook from the
+brand's own payroll — now also spends a real `crop` ingredient from
+the cook's own materials before paying out, via the same optional
+`resourcesStore`/`spendMaterialsFn`/`undoSpendFn` wiring `property.js`
+uses. One unit per batch, uniform across all 11 flagship brands —
+deliberately NOT a claim about what any specific named brand's dishes
+actually contain (this file's own header already refuses to invent
+menu specifics past what the source doc gives); only that real cooking
+draws on a real, finite, produced ingredient instead of a batch
+materializing from payment alone. `POST /api/food-district/cook-payout`
+spends the ingredient server-side (Food District's own `inventory` is
+client-side, like CHOPZ's, so this is where the server-held
+`resources.js` leg belongs), undone if the VCoin payout then fails.
+4 new commerce.test.js tests. Full suite: 344 passing, up from 340.
+
 **Phase 2 (SVMIKO DEGVCHI Avatar Wearables)**: 20 plain-Node checks
 (13 unique real pieces, real category assignment, the luxury-vs-
 streetwear tier proven at VDP's own real price scale, a real purchase

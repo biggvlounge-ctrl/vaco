@@ -93,6 +93,20 @@ const STARTING_INVENTORY_PER_BRAND = 10;
 export const COOK_BATCH_SIZE = 5;
 export const COOK_PAY_PER_BATCH = 12;
 
+// "This will lead to product as well" (8 Oct 2026, direct
+// instruction): the frontier's real farmed `crop` (jobs.js's
+// `farmer`/`resources.js`) is the real ingredient a batch is cooked
+// FROM, same uniform-across-every-brand footing `COOK_BATCH_SIZE`/
+// `COOK_PAY_PER_BATCH` already stand on — this is not a claim about
+// what any one of the 11 named brands' specific dishes contains (this
+// file's own header already refuses to pad those out past what the
+// source doc gives), only that real cooking draws on a real, finite
+// produced ingredient rather than conjuring a batch from payment
+// alone. Optional/injected, same as everywhere else this session wires
+// resources.js in — omit `resourcesStore` and cooking still works
+// exactly as before.
+export const COOK_CROP_PER_BATCH = 1;
+
 export const FLAGSHIP_BRANDS = [
   {
     slug: 'vive',
@@ -272,7 +286,9 @@ export function getInventory(store, brandSlug) {
 // this project) it must come from a backend holding a service
 // credential, never a browser instructing its own payout.
 export async function cookBatch(store, options = {}) {
-  const { brandSlug, cookId, payoutFn, now = Date.now() } = options;
+  const {
+    brandSlug, cookId, payoutFn, now = Date.now(), resourcesStore, spendMaterialsFn, undoSpendFn,
+  } = options;
 
   const brand = getBrand(brandSlug);
   if (!brand) throw new Error(`cookBatch: no brand with slug "${brandSlug}"`);
@@ -280,11 +296,30 @@ export async function cookBatch(store, options = {}) {
   if (typeof payoutFn !== 'function') {
     throw new Error('cookBatch requires a payoutFn(fromUserId, toUserId, amount, reason)');
   }
+  if (resourcesStore && (typeof spendMaterialsFn !== 'function' || typeof undoSpendFn !== 'function')) {
+    throw new Error('cookBatch: resourcesStore requires both spendMaterialsFn and undoSpendFn');
+  }
 
-  await payoutFn(PAYROLL_ACCOUNT_ID, cookId, COOK_PAY_PER_BATCH, `vdp_food_district_cook:${brand.slug}`);
+  // Ingredients before pay, same ordering `property.js`'s `upgradeHome`
+  // already uses: a cook with no real crop on hand must never still
+  // get paid for a batch that was never actually made.
+  let spendResult = null;
+  if (resourcesStore) {
+    spendResult = spendMaterialsFn(resourcesStore, cookId, { crop: COOK_CROP_PER_BATCH });
+  }
+
+  try {
+    await payoutFn(PAYROLL_ACCOUNT_ID, cookId, COOK_PAY_PER_BATCH, `vdp_food_district_cook:${brand.slug}`);
+  } catch (err) {
+    if (resourcesStore) undoSpendFn(resourcesStore, cookId, spendResult);
+    throw err;
+  }
 
   store.inventory[brand.slug] = (store.inventory[brand.slug] ?? 0) + COOK_BATCH_SIZE;
-  return { brandSlug: brand.slug, batchSize: COOK_BATCH_SIZE, inventory: store.inventory[brand.slug], cookedAt: now };
+  return {
+    brandSlug: brand.slug, batchSize: COOK_BATCH_SIZE, inventory: store.inventory[brand.slug], cookedAt: now,
+    ...(spendResult ? { ingredientsUsed: spendResult.spent } : {}),
+  };
 }
 
 // `requestDeliveryFn`, if supplied, requests the order's real drone

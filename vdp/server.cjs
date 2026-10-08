@@ -410,13 +410,31 @@ let store = createVdpStore();
       if (!foodDistrictLib.getBrand(brandSlug)) {
         throw new Error(`no brand with slug "${brandSlug}"`);
       }
-      const result = await transferVCoin({
-        fromUserId: foodDistrictLib.PAYROLL_ACCOUNT_ID,
-        toUserId: cookId,
-        amount: foodDistrictLib.COOK_PAY_PER_BATCH,
-        reason: `vdp_food_district_cook:${brandSlug}`,
+      // The real crop ingredient, spent here rather than in
+      // foodDistrict.js's own cookBatch -- that function takes the
+      // FULL inventory store, which is client-side here (see header
+      // above); resources.js's materials are real and server-side
+      // regardless, so the ingredient leg belongs on this side of the
+      // split, same as the VCoin leg already is.
+      const spendResult = resourcesLib.spendMaterials(
+        store.resources, cookId, { crop: foodDistrictLib.COOK_CROP_PER_BATCH },
+      );
+      let result;
+      try {
+        result = await transferVCoin({
+          fromUserId: foodDistrictLib.PAYROLL_ACCOUNT_ID,
+          toUserId: cookId,
+          amount: foodDistrictLib.COOK_PAY_PER_BATCH,
+          reason: `vdp_food_district_cook:${brandSlug}`,
+        });
+      } catch (err) {
+        resourcesLib.undoSpend(store.resources, cookId, spendResult);
+        throw err;
+      }
+      res.status(201).json({
+        ok: true, amount: foodDistrictLib.COOK_PAY_PER_BATCH, batchSize: foodDistrictLib.COOK_BATCH_SIZE,
+        transfer: result, ingredientsUsed: spendResult.spent,
       });
-      res.status(201).json({ ok: true, amount: foodDistrictLib.COOK_PAY_PER_BATCH, batchSize: foodDistrictLib.COOK_BATCH_SIZE, transfer: result });
     } catch (err) {
       res.status(400).json({ error: err.message });
     }

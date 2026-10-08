@@ -20,9 +20,13 @@ import assert from 'node:assert/strict';
 
 import {
   FOOD_CATEGORIES, FLAGSHIP_BRANDS, DRONE_DELIVERY_RADIUS_MILES, PAYROLL_ACCOUNT_ID,
+  COOK_CROP_PER_BATCH,
   getBrand, listBrands, brandOwnerId, createFoodDistrict,
   orderMenuItem, getOrderHistory, getInventory, cookBatch,
 } from '../src/lib/foodDistrict.js';
+import {
+  createResourcesStore, spendMaterials, undoSpend, materialsFor, grantMaterials,
+} from '../src/lib/resources.js';
 
 import { STAGE_CAMERAS, STAGE_OWNER_ID, operatorIdForChannel } from '../src/lib/stage.js';
 
@@ -332,6 +336,66 @@ test('cookBatch requires a real brand, cookId, and payoutFn', () => {
       () => cookBatch(store, { brandSlug: FLAGSHIP_BRANDS[0].slug, cookId: 'c' }),
       /requires a payoutFn/,
     ));
+});
+
+test('cookBatch spends a real crop ingredient before paying, when wired to a resources store', async () => {
+  const store = createFoodDistrict();
+  const brand = FLAGSHIP_BRANDS[0];
+  const resourcesStore = createResourcesStore();
+  grantMaterials(resourcesStore, 'cook-1', { crop: 5 });
+  const payoutFn = ledger();
+
+  const result = await cookBatch(store, {
+    brandSlug: brand.slug, cookId: 'cook-1', payoutFn, resourcesStore,
+    spendMaterialsFn: spendMaterials, undoSpendFn: undoSpend,
+  });
+
+  assert.equal(materialsFor(resourcesStore, 'cook-1').crop, 5 - COOK_CROP_PER_BATCH);
+  assert.deepEqual(result.ingredientsUsed, { crop: COOK_CROP_PER_BATCH });
+  assert.equal(payoutFn.moves.length, 1, 'a cook who has the ingredient still gets paid');
+});
+
+test('cookBatch refuses a batch nobody has the crop for, and pays no cook for it', async () => {
+  const store = createFoodDistrict();
+  const brand = FLAGSHIP_BRANDS[0];
+  const inventoryBefore = getInventory(store, brand.slug);
+  const resourcesStore = createResourcesStore();
+  resourcesStore.oldWorldStock = 0;
+  const payoutFn = ledger();
+
+  await assert.rejects(
+    cookBatch(store, {
+      brandSlug: brand.slug, cookId: 'cook-1', payoutFn, resourcesStore,
+      spendMaterialsFn: spendMaterials, undoSpendFn: undoSpend,
+    }),
+    /short/,
+  );
+  assert.equal(payoutFn.moves.length, 0, 'no ingredient must mean no payout, not a batch cooked from nothing');
+  assert.equal(getInventory(store, brand.slug), inventoryBefore, 'a refused batch must not add real inventory from nothing');
+});
+
+test('cookBatch undoes a real ingredient spend when the payout then fails', async () => {
+  const store = createFoodDistrict();
+  const brand = FLAGSHIP_BRANDS[0];
+  const resourcesStore = createResourcesStore();
+  grantMaterials(resourcesStore, 'cook-1', { crop: 5 });
+  const failingPayout = async () => { throw new Error('payout failed'); };
+
+  await assert.rejects(
+    cookBatch(store, {
+      brandSlug: brand.slug, cookId: 'cook-1', payoutFn: failingPayout, resourcesStore,
+      spendMaterialsFn: spendMaterials, undoSpendFn: undoSpend,
+    }),
+  );
+  assert.equal(materialsFor(resourcesStore, 'cook-1').crop, 5, 'a failed payout must not leave the ingredient spent for a batch that was never cooked');
+});
+
+test('cookBatch still works with no resources wiring at all — the ingredient stays optional', async () => {
+  const store = createFoodDistrict();
+  const brand = FLAGSHIP_BRANDS[0];
+  const result = await cookBatch(store, { brandSlug: brand.slug, cookId: 'cook-1', payoutFn: ledger() });
+  assert.equal(result.ingredientsUsed, undefined);
+  assert.ok(result.batchSize > 0);
 });
 
 test('order history is per buyer and newest first', () => {
