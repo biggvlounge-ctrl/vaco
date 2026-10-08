@@ -107,6 +107,15 @@ loud.
   (irrigation), so the chain actually reads water → crop → a real
   cooked product (`foodDistrict.js`), which is the instruction's own
   "a process from water" traced through code rather than asserted.
+- **Hunting's real yield found a real home the same day.** `game` had
+  no consumer anywhere once `crop` got one at the 11 real, sourced
+  flagship brands — and assigning it to any of those 11 would have
+  meant deciding which specific brand's dish "contains meat," a
+  factual claim about already-sourced content this project refuses to
+  invent. The resolution: a new, explicitly-not-sourced stall, the
+  Frontier Grill (`foodDistrict.js`'s `FRONTIER_STALLS`), governors-run
+  like the frontier jobs above, kept visibly apart from the 11 real
+  brands rather than folded into them.
 
 ## What is still open
 

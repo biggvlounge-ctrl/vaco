@@ -19,8 +19,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  FOOD_CATEGORIES, FLAGSHIP_BRANDS, DRONE_DELIVERY_RADIUS_MILES, PAYROLL_ACCOUNT_ID,
-  COOK_CROP_PER_BATCH,
+  FOOD_CATEGORIES, FLAGSHIP_BRANDS, FRONTIER_STALLS, DRONE_DELIVERY_RADIUS_MILES, PAYROLL_ACCOUNT_ID,
+  FRONTIER_PAYROLL_ACCOUNT_ID, COOK_CROP_PER_BATCH, COOK_GAME_PER_BATCH,
   getBrand, listBrands, brandOwnerId, createFoodDistrict,
   orderMenuItem, getOrderHistory, getInventory, cookBatch,
 } from '../src/lib/foodDistrict.js';
@@ -100,10 +100,23 @@ test('brands are findable by slug and filterable by category', () => {
   assert.equal(getBrand(first.slug).name, first.name);
   assert.equal(getBrand('no-such-brand'), null, 'an unknown slug is null, not undefined');
 
-  assert.equal(listBrands().length, FLAGSHIP_BRANDS.length, 'no filter means every brand');
+  assert.equal(
+    listBrands().length, FLAGSHIP_BRANDS.length + FRONTIER_STALLS.length,
+    'no filter means every brand, flagship and frontier alike',
+  );
   const filtered = listBrands({ category: first.category });
   assert.ok(filtered.length > 0);
   assert.ok(filtered.every((b) => b.category === first.category));
+});
+
+test('the Frontier Grill is findable too, and is kept visibly apart from the sourced 11', () => {
+  const stall = FRONTIER_STALLS[0];
+  assert.equal(getBrand(stall.slug).name, stall.name);
+  assert.equal(stall.nameConfirmed, false, 'invented content must not claim a confirmed real name');
+  assert.ok(
+    !FLAGSHIP_BRANDS.some((b) => b.slug === stall.slug),
+    'the frontier stall must not be folded into the 11 real sourced brands',
+  );
 });
 
 // ===========================================================================
@@ -396,6 +409,47 @@ test('cookBatch still works with no resources wiring at all — the ingredient s
   const result = await cookBatch(store, { brandSlug: brand.slug, cookId: 'cook-1', payoutFn: ledger() });
   assert.equal(result.ingredientsUsed, undefined);
   assert.ok(result.batchSize > 0);
+});
+
+test('the Frontier Grill starts with nothing prepared, unlike the 11 founding-stocked flagship brands', () => {
+  const store = createFoodDistrict();
+  assert.equal(getInventory(store, FLAGSHIP_BRANDS[0].slug) > 0, true, 'a flagship brand starts with a real founding buffer');
+  assert.equal(getInventory(store, FRONTIER_STALLS[0].slug), 0, 'nobody has cooked at the frontier grill yet');
+});
+
+test('cooking at the Frontier Grill spends real game, not crop, and pays from the governors\' account', async () => {
+  const store = createFoodDistrict();
+  const stall = FRONTIER_STALLS[0];
+  const resourcesStore = createResourcesStore();
+  grantMaterials(resourcesStore, 'cook-1', { game: 5 });
+  const payoutFn = ledger();
+
+  const result = await cookBatch(store, {
+    brandSlug: stall.slug, cookId: 'cook-1', payoutFn, resourcesStore,
+    spendMaterialsFn: spendMaterials, undoSpendFn: undoSpend,
+  });
+
+  assert.deepEqual(result.ingredientsUsed, { game: COOK_GAME_PER_BATCH });
+  assert.equal(materialsFor(resourcesStore, 'cook-1').game, 5 - COOK_GAME_PER_BATCH);
+  assert.equal(materialsFor(resourcesStore, 'cook-1').crop, 0, 'cooking game must never touch a cook\'s crop');
+  assert.equal(payoutFn.moves[0].from, FRONTIER_PAYROLL_ACCOUNT_ID, 'the Frontier Grill is governors-run, not a Food District business');
+});
+
+test('the Frontier Grill is refused for a cook with no real game, same as any other ingredient shortfall', async () => {
+  const store = createFoodDistrict();
+  const stall = FRONTIER_STALLS[0];
+  const resourcesStore = createResourcesStore();
+  resourcesStore.oldWorldStock = 0;
+  const payoutFn = ledger();
+
+  await assert.rejects(
+    cookBatch(store, {
+      brandSlug: stall.slug, cookId: 'cook-1', payoutFn, resourcesStore,
+      spendMaterialsFn: spendMaterials, undoSpendFn: undoSpend,
+    }),
+    /short/,
+  );
+  assert.equal(payoutFn.moves.length, 0);
 });
 
 test('order history is per buyer and newest first', () => {

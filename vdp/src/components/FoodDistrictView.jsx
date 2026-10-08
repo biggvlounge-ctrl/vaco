@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  FLAGSHIP_BRANDS, DRONE_DELIVERY_RADIUS_MILES, orderMenuItem, getOrderHistory, getInventory, cookBatch,
+  FLAGSHIP_BRANDS, FRONTIER_STALLS, DRONE_DELIVERY_RADIUS_MILES, orderMenuItem, getOrderHistory, getInventory, cookBatch,
 } from "../lib/foodDistrict.js";
 import { transferVCoin } from "../lib/v3Client.js";
 import { requestJob } from "../lib/voidClient.js";
@@ -87,6 +87,41 @@ export default function FoodDistrictView({ session, store, onPurchase }) {
 
   const history = getOrderHistory(store, session.userId);
 
+  const renderBrandCard = (brand) => (
+    <div key={brand.slug} style={{ marginTop: 12, borderTop: "1px solid #eee", paddingTop: 8 }}>
+      <p style={{ margin: 0, fontWeight: "bold" }}>
+        {brand.name}
+        {!brand.nameConfirmed && (
+          <span style={{ fontWeight: "normal", color: "#c60", fontSize: 12 }}> (name not yet finalized)</span>
+        )}
+      </p>
+      <p style={{ margin: "2px 0 6px 0", fontSize: 12, color: "#888" }}>
+        {brand.tagline}
+        {" — "}
+        <span style={{ color: getInventory(store, brand.slug) > 0 ? "#1a7d3c" : "#c60" }}>
+          {getInventory(store, brand.slug)} prepared
+        </span>
+        {" "}
+        <button onClick={() => handleCook(brand.slug)} disabled={busy === `cook:${brand.slug}`} style={{ fontSize: 11 }}>
+          {busy === `cook:${brand.slug}` ? "Cooking…" : "Cook a batch"}
+        </button>
+      </p>
+      {brand.menu.map((m) => {
+        const key = `${brand.slug}:${m.item}`;
+        return (
+          <div key={key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "3px 0" }}>
+            <span>
+              {m.item} <span style={{ color: "#888" }}>(${m.price.toFixed(2)})</span>
+            </span>
+            <button onClick={() => handleOrder(brand.slug, m.item)} disabled={busy === key || getInventory(store, brand.slug) <= 0}>
+              {busy === key ? "Ordering…" : "Order"}
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+
   return (
     <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16, marginTop: 12 }}>
       <h2 style={{ fontSize: 16, margin: "0 0 4px 0" }}>Food District — Flagship Restaurants</h2>
@@ -94,40 +129,15 @@ export default function FoodDistrictView({ session, store, onPurchase }) {
         Ghost kitchens, drone-delivered via VOID's real network — serving a {DRONE_DELIVERY_RADIUS_MILES.min}-{DRONE_DELIVERY_RADIUS_MILES.max} mile radius around Meridian.
       </p>
 
-      {FLAGSHIP_BRANDS.map((brand) => (
-        <div key={brand.slug} style={{ marginTop: 12, borderTop: "1px solid #eee", paddingTop: 8 }}>
-          <p style={{ margin: 0, fontWeight: "bold" }}>
-            {brand.name}
-            {!brand.nameConfirmed && (
-              <span style={{ fontWeight: "normal", color: "#c60", fontSize: 12 }}> (name not yet finalized)</span>
-            )}
-          </p>
-          <p style={{ margin: "2px 0 6px 0", fontSize: 12, color: "#888" }}>
-            {brand.tagline}
-            {" — "}
-            <span style={{ color: getInventory(store, brand.slug) > 0 ? "#1a7d3c" : "#c60" }}>
-              {getInventory(store, brand.slug)} prepared
-            </span>
-            {" "}
-            <button onClick={() => handleCook(brand.slug)} disabled={busy === `cook:${brand.slug}`} style={{ fontSize: 11 }}>
-              {busy === `cook:${brand.slug}` ? "Cooking…" : "Cook a batch"}
-            </button>
-          </p>
-          {brand.menu.map((m) => {
-            const key = `${brand.slug}:${m.item}`;
-            return (
-              <div key={key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "3px 0" }}>
-                <span>
-                  {m.item} <span style={{ color: "#888" }}>(${m.price.toFixed(2)})</span>
-                </span>
-                <button onClick={() => handleOrder(brand.slug, m.item)} disabled={busy === key || getInventory(store, brand.slug) <= 0}>
-                  {busy === key ? "Ordering…" : "Order"}
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      ))}
+      {FLAGSHIP_BRANDS.map(renderBrandCard)}
+
+      <div style={{ marginTop: 16, borderTop: "2px dashed #c60", paddingTop: 8 }}>
+        <h3 style={{ fontSize: 13, margin: "0 0 4px 0", color: "#c60" }}>Frontier Grill — governors-run, not a flagship brand</h3>
+        <p style={{ fontSize: 11, color: "#888", margin: "0 0 4px" }}>
+          Built for the frontier's own real hunted game — not one of the 11 sourced flagship restaurants above.
+        </p>
+        {FRONTIER_STALLS.map(renderBrandCard)}
+      </div>
 
       <div style={{ marginTop: 12, borderTop: "1px dashed #ccc", paddingTop: 8 }}>
         <p style={{ fontSize: 13, fontWeight: "bold" }}>My orders</p>

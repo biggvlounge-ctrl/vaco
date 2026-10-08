@@ -700,6 +700,35 @@ cooked product, traced through code rather than asserted.
 
 8 new jobs.js tests. Full suite: 348 passing, up from 344, 0 failing.
 
+**Phase 19 — the Frontier Grill: a real home for hunted game** (same
+day). Hunting's real yield, `game`, had no consumer anywhere once
+`crop` got one — assigning it to any of the 11 real, sourced flagship
+brands would mean deciding which specific brand's dish "contains meat,"
+a factual claim about already-sourced content this project has refused
+to invent since `foodDistrict.js` was written. The resolution, by
+direct instruction: a NEW stall, `FRONTIER_STALLS`, kept in its own
+array rather than folded into `FLAGSHIP_BRANDS` — that array stays the
+11 brands this file sources from `VACO_FOOD_WELLNESS_BRANDS.md`, and
+mixing invented content into it would undo the whole point of keeping
+sourced and invented content visibly apart. `nameConfirmed: false`,
+the same honest flag `chicken-tbd` already carries.
+
+Governors-run (`FRONTIER_PAYROLL_ACCOUNT_ID`, `jobs.
+PLANETARY_GOVERNORS_PAYROLL`'s own literal value, duplicated per this
+directory's existing cross-module convention), starting with nothing
+prepared — unlike the 11 flagship brands' founding-cooks buffer, nobody
+has cooked at this one yet. `cookBatch` now reads its ingredient and
+payroll account per-brand (`brand.ingredient`/`brand.payrollAccountId`,
+falling back to the uniform crop/Food-District-payroll default for
+every flagship brand unchanged) rather than a single hardcoded pair,
+so the Frontier Grill draws on real game without touching any of the
+11 real brands' own behavior. `FoodDistrictView.jsx` renders it in its
+own visibly separate section, labeled as governors-run and explicitly
+not a flagship brand.
+
+4 new commerce.test.js tests. Full suite: 352 passing, up from 348,
+0 failing.
+
 **Phase 2 (SVMIKO DEGVCHI Avatar Wearables)**: 20 plain-Node checks
 (13 unique real pieces, real category assignment, the luxury-vs-
 streetwear tier proven at VDP's own real price scale, a real purchase

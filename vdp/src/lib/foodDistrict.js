@@ -251,13 +251,55 @@ export const FLAGSHIP_BRANDS = [
   },
 ];
 
+// **The Frontier Grill — NEW content, not from `VACO_FOOD_WELLNESS_
+// BRANDS.md`, built 9 Oct 2026 for one real reason: hunting's real
+// yield (`game`, `jobs.js`'s `hunter`) had no consumer anywhere.**
+// Assigning game to any of the 11 brands above would mean deciding
+// which of them "contains meat" — a factual claim about already-
+// sourced content this file has refused to invent past what the
+// source doc gives since it was written. Kept in its own array rather
+// than folded into `FLAGSHIP_BRANDS` for exactly that reason: that
+// array is the 11 brands this file sources from a real document, and
+// mixing invented content into it would undo the whole point of
+// keeping sourced and invented content visibly apart. `nameConfirmed:
+// false`, same honest flag `chicken-tbd` already carries — nothing
+// names this stall, this file does.
+//
+// Governors-run, not a district business — `FRONTIER_PAYROLL_ACCOUNT_
+// ID` is `jobs.PLANETARY_GOVERNORS_PAYROLL`'s own literal value,
+// duplicated rather than imported, the same "per-module duplication
+// over cross-module coupling" posture `PAYROLL_ACCOUNT_ID`'s own
+// comment above already explains for `food-cashier`. Starts with
+// nothing prepared (0, not `STARTING_INVENTORY_PER_BRAND`) — the
+// founding-cooks framing that gives the 11 real brands an opening
+// buffer does not apply to a stall nobody has cooked at yet.
+export const FRONTIER_PAYROLL_ACCOUNT_ID = 'planetary-governors-payroll';
+export const COOK_GAME_PER_BATCH = 1;
+
+export const FRONTIER_STALLS = [
+  {
+    slug: 'frontier-grill',
+    name: 'Frontier Grill',
+    category: 'game',
+    tagline: 'Real Hunted Game, Cooked Fresh',
+    nameConfirmed: false,
+    payrollAccountId: FRONTIER_PAYROLL_ACCOUNT_ID,
+    ingredient: { type: 'game', amount: COOK_GAME_PER_BATCH },
+    menu: [
+      { item: 'Game Stew', price: 11 },
+    ],
+  },
+];
+
+const ALL_STALLS = [...FLAGSHIP_BRANDS, ...FRONTIER_STALLS];
+
 export function getBrand(slug) {
-  return FLAGSHIP_BRANDS.find((b) => b.slug === slug) || null;
+  return ALL_STALLS.find((b) => b.slug === slug) || null;
 }
 
 export function listBrands(options = {}) {
   const { category } = options;
-  return FLAGSHIP_BRANDS.filter((b) => (category ? b.category === category : true));
+  return ALL_STALLS.filter((b) => (category ? b.category === category : true));
 }
 
 // The real payout account for a brand's own orders -- deterministic,
@@ -272,6 +314,9 @@ export function createFoodDistrict() {
   const inventory = {};
   for (const brand of FLAGSHIP_BRANDS) {
     inventory[brand.slug] = STARTING_INVENTORY_PER_BRAND;
+  }
+  for (const stall of FRONTIER_STALLS) {
+    inventory[stall.slug] = 0;
   }
   return { orders: [], nextOrderId: 1, inventory };
 }
@@ -301,15 +346,22 @@ export async function cookBatch(store, options = {}) {
   }
 
   // Ingredients before pay, same ordering `property.js`'s `upgradeHome`
-  // already uses: a cook with no real crop on hand must never still
-  // get paid for a batch that was never actually made.
+  // already uses: a cook with no real ingredient on hand must never
+  // still get paid for a batch that was never actually made. The
+  // ingredient is per-brand (`brand.ingredient`, only `FRONTIER_STALLS`
+  // sets it) so the Frontier Grill draws on real game while the 11
+  // flagship brands keep the uniform crop requirement -- never a guess
+  // about which flagship brand's dish actually contains meat.
+  const ingredient = brand.ingredient || { type: 'crop', amount: COOK_CROP_PER_BATCH };
+  const payrollAccountId = brand.payrollAccountId || PAYROLL_ACCOUNT_ID;
+
   let spendResult = null;
   if (resourcesStore) {
-    spendResult = spendMaterialsFn(resourcesStore, cookId, { crop: COOK_CROP_PER_BATCH });
+    spendResult = spendMaterialsFn(resourcesStore, cookId, { [ingredient.type]: ingredient.amount });
   }
 
   try {
-    await payoutFn(PAYROLL_ACCOUNT_ID, cookId, COOK_PAY_PER_BATCH, `vdp_food_district_cook:${brand.slug}`);
+    await payoutFn(payrollAccountId, cookId, COOK_PAY_PER_BATCH, `vdp_food_district_cook:${brand.slug}`);
   } catch (err) {
     if (resourcesStore) undoSpendFn(resourcesStore, cookId, spendResult);
     throw err;
