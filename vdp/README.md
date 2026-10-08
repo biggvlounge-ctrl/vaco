@@ -756,10 +756,22 @@ VOKEN's real `/api/brand` endpoint — not hardcoded text.
   DEGVCHI wearables have nothing visual to render onto.
 - ~~CHOPZ isn't placed in the walkable world's district grid~~ —
   closed in Phase 12 (CHOPZ Shorts, see above).
-- Digital Twin Levels (1→2→3), DREAMS billboards, Daily Quests/HVNTZ
-  Hunt, Population tiers, My Assets dashboard, Live World News — real,
+- Digital Twin Levels (1→2→3), DREAMS billboards, Daily Quests — real,
   named scope from VENVS's original `CLAUDE.md` §4 this project
-  doesn't cover yet.
+  doesn't cover yet. ~~HVNTZ Hunt~~ is real and wired
+  (`HvntzView.jsx` — real sponsor budget, real checkpoints, real VCoin
+  bounties against HVNTZ's own server) — only the DAILY-cadence part of
+  "Daily Quests/HVNTZ Hunt" is still open, not the hunt mechanic
+  itself; this bullet had conflated the two. ~~Population tiers, My
+  Assets dashboard, Live World News~~ are also real — this list had
+  gone stale (the same "a declared gap can go stale" rule
+  VACON-C's own `CLAUDE.md` names): `population.js`'s real,
+  server-computed tier is polled and shown in `WorldView.jsx`,
+  `MyAssetsView.jsx`'s own header says it directly ("Closes VDP's own
+  named 'My Assets dashboard' gap"), and `NewsTicker.jsx` polls
+  `GET /api/news` and is mounted in `App.jsx`. Found and corrected
+  8 Oct 2026 — the stale copy below (which this same bullet
+  contradicted) is fixed in the same pass.
 - ~~Jobs/Careers, Skills, living/conversational NPCs, multiplayer/
   shared-world state, Residential Towers~~ — closed in the server
   phase (see below): VDP has its own real backend now
@@ -775,8 +787,6 @@ VOKEN's real `/api/brand` endpoint — not hardcoded text.
   `demo-user`) see the same NPCs doing the same things and each
   other's avatar moving. "Residential Towers" is still just one plain
   home type, not towers with levels — flagged, not silently promoted.
-  Population tiers, My Assets dashboard and Live World News remain
-  genuinely open (listed above).
 - Real, named books (*The Secret*, *The Bible*, practical skill
   textbooks) purchased through VENVS's own real Publishing arm now
   move a player's VDP skill or belief exactly once per real purchase
