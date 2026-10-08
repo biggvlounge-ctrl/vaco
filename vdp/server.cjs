@@ -72,6 +72,7 @@ function createVdpStore() {
     players: {},
     jobs: { assignments: {}, shifts: [], nextShiftId: 1 },
     property: { properties: [], nextPropertyId: 1 },
+    resources: null, // set in onReady, from resourcesLib's own starting-stock constant
     households: { households: [], nextHouseholdId: 1 },
     organizations: { organizations: [], nextOrganizationId: 1 },
     vavlt: { presence: {} },
@@ -151,6 +152,7 @@ let store = createVdpStore();
   const beliefsLib = await import('./src/lib/beliefs.js');
   const relationshipsLib = await import('./src/lib/relationships.js');
   const propertyLib = await import('./src/lib/property.js');
+  const resourcesLib = await import('./src/lib/resources.js');
   const householdsLib = await import('./src/lib/households.js');
   const organizationsLib = await import('./src/lib/organizations.js');
   const vavltLib = await import('./src/lib/vavlt.js');
@@ -227,6 +229,7 @@ let store = createVdpStore();
       if (!store.vavlt) store.vavlt = vavltLib.createVavltStore();
       if (!store.voidHubs) store.voidHubs = { registered: false, stations: [] };
       if (!store.vacayHotels) store.vacayHotels = { listingIds: [] };
+      if (!store.resources) store.resources = resourcesLib.createResourcesStore();
       registerMeridianVoidHubsOnce();
     },
   });
@@ -504,6 +507,28 @@ let store = createVdpStore();
         text: `${req.body.ownerId} bought the home they were renting`,
       });
       res.status(200).json(home);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // --- Resources: local materials and the old-world import stock -------
+  app.get('/api/resources/:id', (req, res) => {
+    res.json({
+      materials: resourcesLib.materialsFor(store.resources, req.params.id),
+      canDig: resourcesLib.canDig(store.resources, req.params.id),
+      oldWorldStock: store.resources.oldWorldStock,
+    });
+  });
+
+  app.post('/api/resources/:id/dig', requireParamActor('id'), (req, res) => {
+    try {
+      const result = resourcesLib.digForResources(store.resources, { entityId: req.params.id });
+      newsLib.recordEvent(store.news, {
+        kind: 'resources',
+        text: `${req.params.id} dug up ${result.amount} ${result.type}`,
+      });
+      res.status(200).json(result);
     } catch (err) {
       res.status(400).json({ error: err.message });
     }

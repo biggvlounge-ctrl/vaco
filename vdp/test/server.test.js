@@ -123,6 +123,13 @@ test('GET /api/vacay-hotels reports Meridian\'s real tier cap, not a hardcoded n
   assert.ok(body.tierName);
 });
 
+test('GET /api/resources/:id reports real zero materials and a real old-world stock for a never-seen player', { skip: SKIP }, async () => {
+  const body = await (await fetch(`${BASE}/api/resources/never-seen-player`)).json();
+  assert.deepEqual(body.materials, { wood: 0, stone: 0, clay: 0, ore: 0 });
+  assert.equal(body.canDig, true);
+  assert.ok(Number.isFinite(body.oldWorldStock) && body.oldWorldStock > 0);
+});
+
 // -- actor-gated routes: refusal behavior, no live Shield ------------------
 
 test('a mutating route with no credential at all is refused by serviceAuth WITHOUT reaching Shield', { skip: SKIP }, async () => {
@@ -149,6 +156,18 @@ test('registering a Meridian hotel with no credential is refused WITHOUT reachin
 test('registering a Meridian hotel with a real bearer token asks Shield -- real 502 when it is unreachable', { skip: SKIP }, async () => {
   const res = await post('/api/vacay-hotels/register', { listingId: 1, registeredBy: 'alice' }, { Authorization: 'Bearer some-token' });
   assert.equal(res.status, 502, 'requireActor must ask Shield before ever checking the tier cap or calling VACAY');
+});
+
+test('digging with no credential at all is refused WITHOUT reaching Shield', { skip: SKIP }, async () => {
+  const res = await post('/api/resources/alice/dig', {});
+  assert.equal(res.status, 401);
+  const body = await res.json();
+  assert.match(body.error, /serviceAuth/);
+});
+
+test('digging with a real bearer token asks Shield -- real 502 when it is unreachable', { skip: SKIP }, async () => {
+  const res = await post('/api/resources/alice/dig', {}, { Authorization: 'Bearer some-token' });
+  assert.equal(res.status, 502, 'requireParamActor must ask Shield before ever touching the resources store');
 });
 
 test('requesting a cook payout with no credential is refused WITHOUT reaching Shield', { skip: SKIP }, async () => {

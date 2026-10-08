@@ -580,6 +580,28 @@ closed on Vvltvre Studios' own side, not here):
    configured in this environment — aside).
 7. Zero browser console/page errors across the entire pass.
 
+**Phase 16 — local materials and the old-world import stock**
+(`src/lib/resources.js`, 8 Oct 2026), per direct instruction: Meridian's
+settlers brought a limited stock of goods from the world they migrated
+from, and the settlement should rely increasingly on what this world
+actually has — wood and other materials found in the area, discovered
+by digging — as it builds and grows, rather than drawing down the
+import indefinitely. Two distinct stocks rather than one scale, because
+they are not the same kind of thing: `oldWorldStock` is a shared,
+settlement-wide, one-time figure that only ever goes down; a player's
+own dug `materials` (wood, stone, clay, ore) are a real, repeatable
+yield of the land, gated by a real cooldown (`DIG_COOLDOWN_MS`) so
+digging is not a free, infinite tap. `spendMaterials` draws a player's
+own dug materials first and only falls back to the shared import stock
+for the real shortfall — "limit import" is a shrinking fallback a
+build can still fail to find, not a second currency. `POST /api/
+resources/:id/dig` and `GET /api/resources/:id` are the new routes
+(`test/server.test.js`), plus a full unit suite
+(`test/resources.test.js`, 8 passing). Not yet wired into a real build
+cost (`property.js`'s `purchaseHome`/`upgradeHome` still charge VCoin
+only) — that conversion rate is a real design decision nothing has
+specified yet, flagged rather than guessed.
+
 **Phase 2 (SVMIKO DEGVCHI Avatar Wearables)**: 20 plain-Node checks
 (13 unique real pieces, real category assignment, the luxury-vs-
 streetwear tier proven at VDP's own real price scale, a real purchase
@@ -742,6 +764,11 @@ VOKEN's real `/api/brand` endpoint — not hardcoded text.
   lands. Player needs/goals now exist for the player too, reusing
   the same engine NPCs already used (`createPlayerState` in
   `npcs.js`), not just for NPCs.
+- Local materials (`resources.js`, Phase 16) are real and diggable, but
+  not yet a real building cost — `property.js`'s home purchase/upgrade
+  still charges VCoin only. Wiring `spendMaterials` into it needs a
+  real VCoin/materials split nothing has specified yet; guessing one
+  would be exactly the kind of invented number this project avoids.
 - ~~Real cross-origin Shield SSO for the embedded-iframe case~~ —
   closed in Phase 10 (see above). Both the direct-visit handoff from
   `vaco-shell` and the embedded-iframe handoff into VENVS are now real.
