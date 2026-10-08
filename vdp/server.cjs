@@ -746,6 +746,35 @@ let store = createVdpStore();
     }
   });
 
+  // "There will be an exotic value of things that are least accessible
+  // -- those things will be more valuable until they increase in this
+  // new world." A real readout of today's scarcity price, per type.
+  app.get('/api/resources/exotic-values', (_req, res) => {
+    const values = {};
+    for (const type of resourcesLib.RESOURCE_TYPES) {
+      values[type] = resourcesLib.exoticValueFor(store.resources, type);
+    }
+    res.json({ values, totalProduced: store.resources.totalProduced });
+  });
+
+  app.post('/api/resources/:id/sell', requireParamActor('id'), async (req, res) => {
+    try {
+      const result = await resourcesLib.sellMaterials(store.resources, {
+        entityId: req.params.id,
+        type: req.body.type,
+        amount: req.body.amount,
+        transferFn: (args) => transferVCoin(args),
+      });
+      newsLib.recordEvent(store.news, {
+        kind: 'resources',
+        text: `${req.params.id} sold ${result.amount} ${result.type} for ${result.payout} VCoin`,
+      });
+      res.status(200).json(result);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
   // --- Households: who actually lives together -------------------------
   app.get('/api/households/:propertyId', (req, res) => {
     res.json({ household: householdsLib.householdFor(store.households, Number(req.params.propertyId)) });

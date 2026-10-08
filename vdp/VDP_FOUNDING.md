@@ -217,6 +217,43 @@ seam, not a perfectly sealed one:
   or clearing a settlement is VDP's own small, real record of its own
   small world, not a second justice system.
 
+## Exotic value: scarcity pricing (8 Oct 2026)
+
+Per direct instruction: "there will be an exotic value of things that
+are least accessible — those things will be more valuable until they
+increase in this new world." A real, deterministic scarcity-price
+formula (`resources.js`'s `exoticValueFor`), not a second invented
+rarity system: a resource's value is the inverse of how much of it
+this world has actually produced so far
+(`totalProduced[type]`, cumulative, settlement-wide, never
+decremented) — worth the full flagged base value
+(`BASE_EXOTIC_VALUE`) the instant before anyone has ever produced a
+unit of it, and measurably less exotic with every real unit anyone
+anywhere produces after that. "Until they increase" is read literally:
+value only falls as the world's own accumulated production rises, the
+same direction the instruction names, never a random walk. A real
+`sellMaterials` lets a player convert local stock back to VCoin at
+today's real exotic value, through a named `RESOURCE_EXCHANGE_ACCOUNT`
+— the resource counterpart to `property.js`'s own `'vdp-property-office'`.
+
+## Who is really here: NPCs first, then real people (confirmed 8 Oct 2026)
+
+Per direct instruction: "this world will be contingent on NPCs and
+real people entering the VDP environment — real people who enter the
+simulation are the people. Before that, NPCs. Starter NPCs." This is a
+confirmation of what this document and the code it describes already
+say, not a new mechanic: `npcs.createNpcWorld()`'s real founding
+population (`count: 14`, "the certain amount of people just to
+establish the world," above) exists before a single real login ever
+happens. `population.js`'s own `describePopulation(playerCount,
+npcCount)` already keeps the two counts separate rather than one
+blended figure, and `settlement.js`'s own header already says the part
+this instruction restates plainly: growth past the earliest tier
+depends on real players joining — "NPCs alone settling the world would
+make 'people started to integrate to it' meaningless." Named here
+because the instruction asked for it to be, not because the code
+needed to change to make it true.
+
 ## What is still open
 
 - The area's own name — nothing has been given yet (the product name,

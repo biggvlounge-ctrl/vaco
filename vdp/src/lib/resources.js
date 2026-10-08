@@ -78,7 +78,81 @@ export function createResourcesStore() {
     // drew from the same one shipment, same as a real founding party
     // would have. Only ever goes down; nothing in this module adds to it.
     oldWorldStock: STARTING_OLD_WORLD_STOCK,
+    // Cumulative, settlement-wide, across every type — see
+    // "Exotic value" below. Only ever goes up; it is the real history
+    // of how much of each resource this world has ever produced, not a
+    // current-stock figure (selling one back does not un-produce it).
+    totalProduced: zeroMaterials(),
   };
+}
+
+// **Exotic value (8 Oct 2026), per direct instruction**: "there will be
+// an exotic value of things that are least accessible -- those things
+// will be more valuable until they increase in this new world." A
+// real, deterministic scarcity-price formula, not an invented
+// probability or threshold -- the inverse relationship between supply
+// and value is the real economic principle the instruction names, and
+// `totalProduced` is the real, running count of how accessible each
+// resource has actually become so far, not a guessed-at rarity tier.
+// `BASE_EXOTIC_VALUE` is a flagged interpretive number, the same
+// footing `STARTING_OLD_WORLD_STOCK` and every other unspecified
+// constant in this file already stands on -- no document gives VDP a
+// real resource price schedule.
+//
+// A resource nobody has produced yet (`totalProduced[type] === 0`) is
+// worth the full base value; every real unit anyone anywhere produces
+// of that type nudges its value down for everyone, permanently -- "until
+// they increase" is read literally: the value only ever falls as the
+// world's own accumulated production of that thing rises, it never
+// recovers on its own the way a per-player stock could.
+export const BASE_EXOTIC_VALUE = 50;
+
+export function exoticValueFor(store, type) {
+  const produced = (store.totalProduced && store.totalProduced[type]) || 0;
+  return BASE_EXOTIC_VALUE / (1 + produced);
+}
+
+// The real counterpart account to `property.js`'s `'vdp-property-office'`
+// -- the governors' own real buyer of last resort for a resource
+// someone wants to convert back to VCoin, at today's real exotic value.
+export const RESOURCE_EXCHANGE_ACCOUNT = 'vdp-resource-exchange';
+
+// Sells only real, already-held LOCAL materials -- deliberately not
+// `spendMaterials`' shared-old-world-stock fallback: there is nothing
+// to sell if a player's own stock is short, old-world import or not.
+// Same claim-before-pay/rollback ordering as every other paid action in
+// this directory: the materials are deducted before the transfer is
+// attempted, and restored if it fails.
+export async function sellMaterials(store, { entityId, type, amount, transferFn, now = Date.now() } = {}) {
+  if (!entityId) throw new Error('sellMaterials requires an entityId');
+  if (!RESOURCE_TYPES.includes(type)) {
+    throw new Error(`sellMaterials: "${type}" is not a known resource type (expected one of ${RESOURCE_TYPES.join(', ')})`);
+  }
+  if (!Number.isInteger(amount) || amount <= 0) {
+    throw new Error('sellMaterials requires a positive integer amount');
+  }
+  if (typeof transferFn !== 'function') throw new Error('sellMaterials requires a transferFn');
+
+  const have = (store.materials[entityId] || {})[type] || 0;
+  if (have < amount) {
+    throw new Error(`sellMaterials: "${entityId}" only has ${have} ${type} on hand, not ${amount}`);
+  }
+
+  const unitValue = exoticValueFor(store, type);
+  const payout = Math.round(unitValue * amount);
+
+  store.materials[entityId][type] -= amount;
+
+  try {
+    await transferFn({
+      fromUserId: RESOURCE_EXCHANGE_ACCOUNT, toUserId: entityId, amount: payout, reason: `vdp-sell-${type}`,
+    });
+  } catch (err) {
+    store.materials[entityId][type] += amount;
+    throw err;
+  }
+
+  return { type, amount, unitValue, payout, materials: materialsFor(store, entityId), soldAt: now };
 }
 
 export function materialsFor(store, entityId) {
@@ -92,10 +166,12 @@ export function materialsFor(store, entityId) {
 // shared import stock carries the one-way invariant.
 export function grantMaterials(store, entityId, requested = {}) {
   if (!store.materials[entityId]) store.materials[entityId] = zeroMaterials();
+  if (!store.totalProduced) store.totalProduced = zeroMaterials();
   for (const type of RESOURCE_TYPES) {
     const amount = requested[type] || 0;
     if (amount === 0) continue;
     store.materials[entityId][type] = (store.materials[entityId][type] || 0) + amount;
+    store.totalProduced[type] = (store.totalProduced[type] || 0) + amount;
   }
   return materialsFor(store, entityId);
 }
@@ -122,7 +198,9 @@ export function digForResources(store, { entityId, now = Date.now(), rng = Math.
   const amount = picked.min + Math.floor(rng() * (picked.max - picked.min + 1));
 
   if (!store.materials[entityId]) store.materials[entityId] = zeroMaterials();
+  if (!store.totalProduced) store.totalProduced = zeroMaterials();
   store.materials[entityId][picked.type] += amount;
+  store.totalProduced[picked.type] = (store.totalProduced[picked.type] || 0) + amount;
   store.lastDigAt[entityId] = now;
 
   return { type: picked.type, amount, materials: materialsFor(store, entityId) };

@@ -785,6 +785,31 @@ identity `requireActor` checks on an enforcement route.
 21 new tests across `immigration.test.js` (new), `property.test.js`,
 and `skills.test.js`. Full suite: 368 passing, up from 352, 0 failing.
 
+**Phase 21 — exotic value: real scarcity pricing** (8 Oct 2026, direct
+instruction): "there will be an exotic value of things that are least
+accessible -- those things will be more valuable until they increase
+in this new world." `resources.js` gained `totalProduced` (cumulative,
+settlement-wide, incremented by both `grantMaterials` and
+`digForResources`, never decremented) and `exoticValueFor`, a real
+deterministic inverse-scarcity formula against a flagged
+`BASE_EXOTIC_VALUE` -- not a second invented rarity tier, the real
+economic principle the instruction names. `sellMaterials` lets a
+player convert their own local stock back to VCoin at today's real
+value through a new `RESOURCE_EXCHANGE_ACCOUNT`, same claim-before-pay/
+rollback ordering as every other paid action in this directory. New
+`GET /api/resources/exotic-values` and `POST /api/resources/:id/sell`
+in `server.cjs`.
+
+Also confirmed, not changed: "this world will be contingent on NPCs
+and real people entering the VDP environment... before that, NPCs,
+starter NPCs" already describes `npcs.createNpcWorld()`'s real
+founding population and `settlement.js`/`population.js`'s own
+real-players-vs-NPCs split, both already built. Recorded in
+`VDP_FOUNDING.md`'s new "Who is really here" section.
+
+6 new `resources.test.js` tests. Full suite: 374 passing, up from 368,
+0 failing.
+
 **Phase 2 (SVMIKO DEGVCHI Avatar Wearables)**: 20 plain-Node checks
 (13 unique real pieces, real category assignment, the luxury-vs-
 streetwear tier proven at VDP's own real price scale, a real purchase

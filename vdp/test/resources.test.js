@@ -8,12 +8,20 @@ import assert from 'node:assert/strict';
 import {
   RESOURCE_TYPES, DIG_COOLDOWN_MS, STARTING_OLD_WORLD_STOCK,
   createResourcesStore, materialsFor, canDig, digForResources, spendMaterials, undoSpend,
-  grantMaterials,
+  grantMaterials, exoticValueFor, sellMaterials, BASE_EXOTIC_VALUE, RESOURCE_EXCHANGE_ACCOUNT,
 } from '../src/lib/resources.js';
 
 function fixedRng(...values) {
   let i = 0;
   return () => values[Math.min(i++, values.length - 1)];
+}
+
+function fakeTransfer(calls, { shouldFail = false } = {}) {
+  return async (args) => {
+    calls.push(args);
+    if (shouldFail) throw new Error('transfer failed');
+    return { ok: true };
+  };
 }
 
 test('digForResources yields a real resource type and amount, and records the inventory', () => {
@@ -138,5 +146,71 @@ test('game, crop and water are real resource types a dig never turns up', () => 
   assert.ok(
     !seenTypes.has('game') && !seenTypes.has('crop') && !seenTypes.has('water'),
     'digging is earth and stone, not a hunt, a harvest, or clean water from a real plant',
+  );
+});
+
+test('exoticValueFor starts a never-produced resource at the full base value', () => {
+  const store = createResourcesStore();
+  for (const type of RESOURCE_TYPES) {
+    assert.equal(exoticValueFor(store, type), BASE_EXOTIC_VALUE);
+  }
+});
+
+test('exoticValueFor falls as real production of that type rises, and only that type', () => {
+  const store = createResourcesStore();
+  grantMaterials(store, 'alice', { wood: 9 });
+  assert.equal(exoticValueFor(store, 'wood'), BASE_EXOTIC_VALUE / 10);
+  assert.equal(exoticValueFor(store, 'stone'), BASE_EXOTIC_VALUE, 'an untouched type keeps its full value');
+
+  grantMaterials(store, 'bob', { wood: 10 });
+  assert.equal(exoticValueFor(store, 'wood'), BASE_EXOTIC_VALUE / 20, 'production from any entity counts toward the same world total');
+});
+
+test('digForResources also counts toward the real world total, same as a granted yield', () => {
+  const store = createResourcesStore();
+  const before = exoticValueFor(store, 'wood');
+  digForResources(store, { entityId: 'alice', now: 1000, rng: fixedRng(0) }); // lands on wood, see the pinned test above
+  assert.ok(exoticValueFor(store, 'wood') < before, 'digging up wood makes wood real, measurably less exotic');
+});
+
+test('sellMaterials pays the real current exotic value for only the local stock sold', async () => {
+  const store = createResourcesStore();
+  grantMaterials(store, 'alice', { wood: 10 });
+  const calls = [];
+  const result = await sellMaterials(store, {
+    entityId: 'alice', type: 'wood', amount: 4, transferFn: fakeTransfer(calls),
+  });
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].fromUserId, RESOURCE_EXCHANGE_ACCOUNT);
+  assert.equal(calls[0].toUserId, 'alice');
+  assert.equal(result.unitValue, exoticValueFor(store, 'wood'));
+  assert.equal(calls[0].amount, result.payout);
+  assert.equal(materialsFor(store, 'alice').wood, 6);
+});
+
+test('a failed sellMaterials rolls the deduction back -- the materials are not lost', async () => {
+  const store = createResourcesStore();
+  grantMaterials(store, 'alice', { wood: 10 });
+  await assert.rejects(
+    sellMaterials(store, { entityId: 'alice', type: 'wood', amount: 4, transferFn: fakeTransfer([], { shouldFail: true }) }),
+  );
+  assert.equal(materialsFor(store, 'alice').wood, 10);
+});
+
+test('sellMaterials refuses to sell more than is really on hand, an unknown type, or a non-positive amount', async () => {
+  const store = createResourcesStore();
+  grantMaterials(store, 'alice', { wood: 2 });
+  await assert.rejects(
+    sellMaterials(store, { entityId: 'alice', type: 'wood', amount: 3, transferFn: fakeTransfer([]) }),
+    /only has 2 wood/,
+  );
+  await assert.rejects(
+    sellMaterials(store, { entityId: 'alice', type: 'diamonds', amount: 1, transferFn: fakeTransfer([]) }),
+    /not a known resource type/,
+  );
+  await assert.rejects(
+    sellMaterials(store, { entityId: 'alice', type: 'wood', amount: 0, transferFn: fakeTransfer([]) }),
+    /positive integer amount/,
   );
 });
