@@ -8,6 +8,12 @@ one blended app wearing two modes. Same identity, same wallet (VCoin)
 as VENVS — both are real, separate clients of the same shared V3/
 Shield infrastructure.
 
+**The story this is actually set in**: a newly-discovered planet,
+founded by the Vaco elite tech team, who are actively inviting people
+into a new tech society built from the ground up — with every district
+inside it a real, operating business, not a façade. See
+`VDP_FOUNDING.md`.
+
 **Read `../venvs/README.md`'s own split note first** for the full
 rationale and what moved where. Short version: `world.js`, `chopz.js`,
 `degvchi.js` and their view components used to live inside VENVS's
