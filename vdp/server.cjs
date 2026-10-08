@@ -87,6 +87,7 @@ function createVdpStore() {
       arrivals: [], nextArrivalId: 1, smugglingSpots: [], nextSpotId: 1,
       illegalSettlements: [], nextSettlementId: 1,
     },
+    justice: { tickets: [], nextTicketId: 1, detentions: [], nextDetentionId: 1 },
   };
 }
 
@@ -170,6 +171,7 @@ let store = createVdpStore();
   const foodDistrictLib = await import('./src/lib/foodDistrict.js');
   const chopzLib = await import('./src/lib/chopz.js');
   const immigrationLib = await import('./src/lib/immigration.js');
+  const justiceLib = await import('./src/lib/justice.js');
 
   // A migrant's real old-world background carries over if one was
   // recorded (`immigration.js`'s `admitWithPassport`/`crossIllegally`,
@@ -570,6 +572,39 @@ let store = createVdpStore();
     }
   });
 
+  // "We will start off with just a village, commercial, residential,
+  // and dreams screen mix" -- a real, independent business slot
+  // alongside a home, not a second home.
+  app.get('/api/property/commercial/:ownerId', (req, res) => {
+    res.json({ shop: propertyLib.commercialOwnedBy(store.property, req.params.ownerId) });
+  });
+
+  app.post('/api/property/purchase-commercial', requireActor('ownerId'), async (req, res) => {
+    try {
+      const shop = await propertyLib.purchaseCommercial(store.property, {
+        ownerId: req.body.ownerId,
+        transferFn: (args) => transferVCoin({ ...args, toUserId: 'vdp-property-office' }),
+      });
+      newsLib.recordEvent(store.news, { kind: 'property', text: `${req.body.ownerId} opened a ${shop.levelName}` });
+      res.status(201).json(shop);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/property/upgrade-commercial', requireActor('ownerId'), async (req, res) => {
+    try {
+      const shop = await propertyLib.upgradeCommercial(store.property, {
+        ownerId: req.body.ownerId,
+        transferFn: (args) => transferVCoin({ ...args, toUserId: 'vdp-property-office' }),
+      });
+      newsLib.recordEvent(store.news, { kind: 'property', text: `${req.body.ownerId} upgraded their business to ${shop.levelName}` });
+      res.status(200).json(shop);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
   app.get('/api/property/unauthorized', (_req, res) => {
     res.json({ unauthorized: propertyLib.listUnauthorized(store.property) });
   });
@@ -794,6 +829,83 @@ let store = createVdpStore();
         text: `a new wave of ${result.waveSize} settlers arrived (${result.legalCount} by passport, ${result.illegalCount} across the ice wall)`,
       });
       res.status(201).json({ ...result, npcsCreated: created });
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // --- Justice: citations and detention ---------------------------------
+  // "People can get ticketed. They will be sent directly to their
+  // profile." A real citation lands on the person's own record,
+  // readable the same way `MyStatusView.jsx` already reads a player's
+  // own state.
+  app.get('/api/justice/tickets/:personId', (req, res) => {
+    res.json({ tickets: justiceLib.ticketsFor(store.justice, req.params.personId) });
+  });
+
+  app.post('/api/justice/tickets/issue', requireActor('issuedBy'), (req, res) => {
+    try {
+      const ticket = justiceLib.issueTicket(store.justice, {
+        personId: req.body.personId,
+        reason: req.body.reason,
+        issuedBy: req.body.issuedBy,
+      });
+      newsLib.recordEvent(store.news, { kind: 'justice', text: `${req.body.personId} was ticketed: ${req.body.reason}` });
+      res.status(201).json(ticket);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // The ticketed person is the one who pays their own fine -- the
+  // session must really be `personId`, and that must really match the
+  // real ticket's own owner, checked before `payTicket` ever touches
+  // the ledger.
+  app.post('/api/justice/tickets/:ticketId/pay', requireActor('personId'), async (req, res) => {
+    try {
+      const ticket = store.justice.tickets.find((t) => t.id === Number(req.params.ticketId));
+      if (!ticket) return res.status(404).json({ error: `no ticket #${req.params.ticketId}` });
+      if (ticket.personId !== req.body.personId) {
+        return res.status(403).json({ error: 'pay: this ticket does not belong to the acting user' });
+      }
+      const paid = await justiceLib.payTicket(store.justice, ticket.id, {
+        transferFn: (args) => transferVCoin({ ...args, toUserId: jobsLib.PLANETARY_GOVERNORS_PAYROLL }),
+      });
+      res.status(200).json(paid);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/justice/detentions', (_req, res) => {
+    res.json({ active: justiceLib.listActiveDetentions(store.justice) });
+  });
+
+  app.get('/api/justice/detained/:personId', (req, res) => {
+    res.json({ detention: justiceLib.activeDetentionFor(store.justice, req.params.personId) });
+  });
+
+  app.post('/api/justice/detain', requireActor('detainedBy'), (req, res) => {
+    try {
+      const detention = justiceLib.detainPerson(store.justice, {
+        personId: req.body.personId,
+        reason: req.body.reason,
+        detainedBy: req.body.detainedBy,
+      });
+      newsLib.recordEvent(store.news, { kind: 'justice', text: `${req.body.personId} was detained: ${req.body.reason}` });
+      res.status(201).json(detention);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/justice/detentions/:detentionId/release', requireActor('releasedBy'), (req, res) => {
+    try {
+      const detention = justiceLib.releasePerson(store.justice, Number(req.params.detentionId), {
+        releasedBy: req.body.releasedBy,
+      });
+      newsLib.recordEvent(store.news, { kind: 'justice', text: `${detention.personId} was released` });
+      res.status(200).json(detention);
     } catch (err) {
       res.status(400).json({ error: err.message });
     }

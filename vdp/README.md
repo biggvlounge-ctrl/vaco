@@ -937,6 +937,44 @@ name, not a renamed label over something else. Recorded in
 No new tests (wiring + a comment update) -- full suite 385 passing,
 0 failing, clean `npm run build`.
 
+**Phase 26 — the tech is the government, real citations and
+detention, and the real starting mix** (8 Oct 2026, direct
+instruction). Three pieces:
+
+"V4, our AI system, all the systems we use will become basically the
+governing world of this new world... the tech is the government."
+Confirmed, not rebuilt: `jobs.js`'s `PLANETARY_GOVERNORS_PAYROLL` and
+`v4AgentClient.js`'s real `talkToNpc` call were already the real
+mechanics this names in words. Recorded in `VDP_FOUNDING.md`'s new
+"The tech is the government" section.
+
+"People can get ticketed. They will be sent directly to their
+profile," and "people can get locked up... some type of futuristic
+glowing jail system, or would be more like an open area." New
+`justice.js`: `issueTicket`/`payTicket` (a real citation with a
+flagged VCoin fine, claim-before-pay/rollback same as every other paid
+action here) and `detainPerson`/`releasePerson` (a real, named
+detention, open to any real enforcement identity against any real
+person). Deliberately no `cellType`/visual field -- which of the two
+real alternatives floated is not decided, so nothing is guessed at.
+New `GET/POST /api/justice/*` routes in `server.cjs`. `MyStatusView.jsx`
+gained a real "Citations & Detention" panel -- the real "sent directly
+to their profile" the instruction asked for -- and `ImmigrationView.jsx`
+gained issue/detain/release actions.
+
+"We will start off with just a village, commercial, residential, and
+dreams screen mix." Three of the four were already real; `commercial`
+was the one genuine gap -- this file's own header had named exactly
+why. `property.js` gained a real, independent `commercial` property
+slot (`'commercial'` is VACON-C's own real `PROPERTY_TYPES` literal),
+with its own 3-tier price ladder and upgrade path, never blocking or
+blocked by owning a home. New `/api/property/{commercial,
+purchase-commercial,upgrade-commercial}` routes and a "My Business"
+panel in `MyHomeView.jsx`.
+
+15 new tests (`justice.test.js` new, `property.test.js`). Full suite:
+400 passing, up from 385, 0 failing, clean `npm run build`.
+
 **Phase 2 (SVMIKO DEGVCHI Avatar Wearables)**: 20 plain-Node checks
 (13 unique real pieces, real category assignment, the luxury-vs-
 streetwear tier proven at VDP's own real price scale, a real purchase

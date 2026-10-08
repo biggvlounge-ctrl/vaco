@@ -340,6 +340,73 @@ anything new -- three of the four pieces named were already real:
   car is explicitly contraband, not a second legitimate vehicle this
   world is supposed to have.
 
+## The tech is the government (8 Oct 2026)
+
+Per direct instruction: "V4, our AI system, all the systems we use
+will become basically the governing world of this new world... the
+tech is the government. And that is the futuristic part of it." This
+names, in so many words, what every "governors" reference in this
+document already is in the code: `jobs.js`'s
+`PLANETARY_GOVERNORS_PAYROLL` funds the frontier and enforcement jobs
+(`lumberjack`, `farmer`, `hunter`, `water-treatment-worker`,
+`robot-patrol-officer`), and the real intelligence behind an NPC a
+player actually talks to is `v4AgentClient.js`'s `talkToNpc` -- a real
+call to V4's own agent proxy, grounded in that NPC's own real traits
+and decision log. The governors were never a human bureaucracy with
+nothing behind it; this instruction says plainly what this document
+can now say plainly too: V4 is the government, and the "governors"
+payroll is that government's own treasury.
+
+## Citations and detention: real consequences for real enforcement (8 Oct 2026)
+
+Covered in full where the open question it answers already lived --
+see "What is still open," below, for what the instruction resolved
+and what it explicitly left for later (the detention's own visual
+treatment). The real mechanic, `justice.js`, is summarized here:
+`issueTicket`/`payTicket` for a real citation that lands on a real
+person's own profile (`MyStatusView.jsx`'s new "Citations & Detention"
+panel) with a real, flagged-interpretive VCoin fine; `detainPerson`/
+`releasePerson` for a real, named detention any real enforcement
+identity can place on any real person -- citizen or not, the same way
+a real jail isn't reserved for people with the wrong papers.
+
+## Starting mix and the futuristic-with-nature look (8 Oct 2026)
+
+Per direct instruction: "we will start off with just a village,
+commercial, residential, and dreams screen mix... everything will be
+futuristic, but with nature. Future like Dubai, nature like Japan."
+
+- **The starting mix is now real, not three-quarters built.**
+  `village` (the Village District, already Hamlet-tier) and `dreams`
+  screens (`dreamsClient.js`'s real ad-screen network, already
+  mounted) were already real. `residential` (`property.js`'s 5-tier
+  VXLLAGE ladder) was already real too. `commercial` was the one
+  genuinely missing piece -- this file's own header literally named
+  "VDP has no commercial... districts" as the reason it didn't exist
+  yet. `property.js` now carries a real, independent `commercial`
+  slot (`'commercial'` is VACON-C's own real `PROPERTY_TYPES` literal,
+  reused verbatim) -- a player can run a business and own a home at
+  once, two real claims, not one slot fought over.
+- **"Towers, some bigger, some smaller, we'll use a mix"** was already
+  true of `PROPERTY_LEVELS`'s own 5-tier tower ladder (Studio →
+  Penthouse) -- confirmed, not rebuilt.
+- **"Futuristic, but with nature. Future like Dubai, nature like
+  Japan"** is a real aesthetic direction for whenever this world's
+  visuals get their own design pass -- recorded here as flavor
+  guidance, not a mechanic. Nothing in this codebase renders
+  architecture in enough detail yet to act on it (canvas districts are
+  flat colored rectangles, `drawAvatar`'s own humanoid is the only
+  real character art). Flagged for that future pass rather than
+  guessed at in code today.
+- **"Our border will be futuristic and shown right at the ice wall...
+  we will expand the world as needed."** `worldExpansion.js`'s own
+  real backdrop-to-built-district promotion machinery
+  (`isVisuallyPlayable`/`realGrowthSignal`) is already the real
+  mechanism for "expand as needed" -- a backdrop area becomes a real,
+  built part of this world only once it measurably earns it, never on
+  a schedule. What the border itself actually looks like at the ice
+  wall is not yet rendered anywhere and is recorded as open below.
+
 ## What is still open
 
 - The area's own name — nothing has been given yet (the product name,
@@ -353,10 +420,17 @@ anything new -- three of the four pieces named were already real:
 - The specific content of what gets put out "into the algorithm"
   (social media, AI, TV) announcing the new world — real as a premise,
   not yet a built mechanic anywhere in VDP.
-- What, if anything, happens to someone a robot patrol actually
-  catches — caught and recorded is real (`catchIllegalArrival`); any
-  consequence beyond the record (detention, deportation, a fine) is
-  not specified and not invented here.
+- **Partially answered 8 Oct 2026**: a robot patrol catching someone
+  can now issue a real citation (`justice.js`'s `issueTicket`) or
+  detain them (`detainPerson`) — direct instruction confirmed both are
+  real possible consequences. Deportation remains unspecified. **What
+  the detention itself actually looks like is explicitly still open
+  in the instruction's own words** — "some type of futuristic glowing
+  jail system, or would be more like an open area" was floated as two
+  real alternatives, not decided between. `justice.js` records the
+  real fact of detention (who, why, since when) and deliberately
+  carries no `cellType`/visual field — that choice is for whenever it
+  is actually made, not guessed at here.
 - The real survivor-population figure — how many people actually made
   it through VACANCY's reset. `generateMigrationWave` is built to
   scale a real migration wave off this number the instant it is
@@ -365,6 +439,12 @@ anything new -- three of the four pieces named were already real:
 - What happens to a passport at the moment it actually expires, beyond
   `isPassportExpired` recording the fact — not specified and not
   invented here.
+- Which of detention's two real alternatives this world actually
+  uses — "some type of futuristic glowing jail system, or would be
+  more like an open area" — and what the ice wall's own real border
+  looks like. Both are real visual-design questions, not mechanics;
+  `justice.js`/`worldExpansion.js` are built either way.
+
 This document records what has been confirmed and leaves the rest for
 whenever more of the story is given, the same discipline `town.js`
 already applies to Meridian's own name.

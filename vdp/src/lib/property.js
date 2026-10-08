@@ -47,9 +47,31 @@
 // enforcement action -- a robot patrol (`jobs.js`'s
 // `robot-patrol-officer`) tearing an unsanctioned structure down.
 
+// **Commercial property (8 Oct 2026), per direct instruction**: "we
+// will start off with just a village, commercial, residential, and
+// dreams screen mix." This file's own header above had named exactly
+// this as the reason only `residential` existed -- "VDP has no
+// commercial... districts to attach [VACON-C's `commercial`] to" --
+// closed now that the instruction says commercial belongs in the
+// STARTING mix, not a later one. `'commercial'` is VACON-C's own real
+// literal `PROPERTY_TYPES` value, reused verbatim, the same borrowing
+// this file already does for `LIFECYCLE`/`OWNER_TYPES`.
+//
+// Kept as its own independent ownership slot, deliberately NOT folded
+// into `homeOwnedBy`'s one-residence check -- a business and a home
+// are not the same claim, and a player operating a storefront should
+// still be able to buy or rent a home. `homeOwnedBy` itself is scoped
+// to exclude `commercial` for exactly this reason. `COMMERCIAL_LEVELS`
+// is a flagged interpretive ladder, the same footing `PROPERTY_LEVELS`
+// already stands on -- no document gives VDP a real commercial price
+// schedule, and no materials cost is charged here (unlike
+// `upgradeHome`) to keep this first pass scoped to the real ask:
+// commercial belongs in the starting mix, not yet a second materials
+// economy.
+
 import { TOWN_NAME } from './town.js';
 
-export const PROPERTY_TYPES = ['residential', 'land'];
+export const PROPERTY_TYPES = ['residential', 'land', 'commercial'];
 
 // Verbatim from vacon-c/server/property.js's own LIFECYCLE list.
 export const LIFECYCLE = [
@@ -68,6 +90,19 @@ export const PROPERTY_LEVELS = [
 ];
 
 export const HOME_PRICE = PROPERTY_LEVELS[0].price;
+
+// A real, separate ladder for the commercial slot (see header) --
+// smaller than residential's 5 tiers, since nothing specifies a
+// bigger one and a business starting small is the honest default.
+export const COMMERCIAL_LEVELS = [
+  { level: 1, name: 'Market Kiosk', price: 800 },
+  { level: 2, name: 'Storefront', price: 2200 },
+  { level: 3, name: 'Showroom', price: 5000 },
+];
+
+export function commercialLevelByNumber(level) {
+  return COMMERCIAL_LEVELS.find((l) => l.level === level) || null;
+}
 
 // Renting is the cheap, non-committal way in: a fifth of buying
 // outright, always a Studio (no tower levels while renting -- the
@@ -118,8 +153,11 @@ export function listHomes(store) {
   return store.properties;
 }
 
+// Excludes `commercial` on purpose -- a business is its own
+// independent slot (`commercialOwnedBy`), not a second claim on the
+// same "one home" check every function below already enforces.
 export function homeOwnedBy(store, ownerId) {
-  return store.properties.find((p) => p.ownerId === ownerId) || null;
+  return store.properties.find((p) => p.ownerId === ownerId && p.type !== 'commercial') || null;
 }
 
 // `transferFn` is injected, the same decoupling `catalog.js`'s
@@ -380,4 +418,72 @@ export function demolishUnauthorized(store, propertyId, { demolishedBy, now = Da
     demolishedBy: demolishedBy || null,
     demolishedAt: now,
   };
+}
+
+// Independent of `homeOwnedBy` -- see the commercial header above.
+export function commercialOwnedBy(store, ownerId) {
+  return store.properties.find((p) => p.ownerId === ownerId && p.type === 'commercial') || null;
+}
+
+export async function purchaseCommercial(store, { ownerId, transferFn, now = Date.now() } = {}) {
+  if (!ownerId) throw new Error('purchaseCommercial requires an ownerId');
+  if (commercialOwnedBy(store, ownerId)) {
+    throw new Error(`purchaseCommercial: "${ownerId}" already owns a commercial property`);
+  }
+  if (typeof transferFn !== 'function') throw new Error('purchaseCommercial requires a transferFn');
+
+  const property = {
+    id: store.nextPropertyId++,
+    type: 'commercial',
+    ownerId,
+    ownerType: 'individual',
+    ownershipType: 'owned',
+    lifecycleStage: 'operation',
+    level: COMMERCIAL_LEVELS[0].level,
+    levelName: COMMERCIAL_LEVELS[0].name,
+    authorized: true,
+    purchasedAt: now,
+  };
+  store.properties.push(property);
+
+  try {
+    await transferFn({ fromUserId: ownerId, amount: COMMERCIAL_LEVELS[0].price, reason: 'vdp-commercial-purchase' });
+  } catch (err) {
+    const idx = store.properties.indexOf(property);
+    if (idx !== -1) store.properties.splice(idx, 1);
+    throw err;
+  }
+
+  return property;
+}
+
+// Same claim-before-pay ordering as `upgradeHome`, charging the real
+// price difference between levels, not the next level's full price.
+export async function upgradeCommercial(store, { ownerId, transferFn, now = Date.now() } = {}) {
+  if (!ownerId) throw new Error('upgradeCommercial requires an ownerId');
+  const property = commercialOwnedBy(store, ownerId);
+  if (!property) throw new Error(`upgradeCommercial: "${ownerId}" does not own a commercial property`);
+  if (typeof transferFn !== 'function') throw new Error('upgradeCommercial requires a transferFn');
+
+  const current = commercialLevelByNumber(property.level);
+  const next = commercialLevelByNumber(property.level + 1);
+  if (!next) throw new Error(`upgradeCommercial: "${ownerId}"'s commercial property is already at the top level (${current.name})`);
+
+  const cost = next.price - current.price;
+  const previousLevel = property.level;
+  const previousLevelName = property.levelName;
+  property.level = next.level;
+  property.levelName = next.name;
+  property.upgradedAt = now;
+
+  try {
+    await transferFn({ fromUserId: ownerId, amount: cost, reason: 'vdp-commercial-upgrade' });
+  } catch (err) {
+    property.level = previousLevel;
+    property.levelName = previousLevelName;
+    delete property.upgradedAt;
+    throw err;
+  }
+
+  return property;
 }

@@ -33,9 +33,14 @@ export default function ImmigrationView({ session, onChange }) {
   const [openSpots, setOpenSpots] = useState([]);
   const [activeSettlements, setActiveSettlements] = useState([]);
   const [unauthorized, setUnauthorized] = useState([]);
+  const [activeDetentions, setActiveDetentions] = useState([]);
   const [spotLabel, setSpotLabel] = useState("");
   const [settlementLabel, setSettlementLabel] = useState("");
   const [structureLabel, setStructureLabel] = useState("");
+  const [ticketTargetId, setTicketTargetId] = useState("");
+  const [ticketReason, setTicketReason] = useState("");
+  const [detainTargetId, setDetainTargetId] = useState("");
+  const [detainReason, setDetainReason] = useState("");
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState(null);
 
@@ -43,16 +48,18 @@ export default function ImmigrationView({ session, onChange }) {
     if (!session?.userId) return;
     try {
       const userId = encodeURIComponent(session.userId);
-      const [arrivalRes, spotsRes, settlementsRes, unauthorizedRes] = await Promise.all([
+      const [arrivalRes, spotsRes, settlementsRes, unauthorizedRes, detentionsRes] = await Promise.all([
         fetch(`${VDP_API_URL}/api/immigration/arrivals/${userId}`),
         fetch(`${VDP_API_URL}/api/immigration/smuggling-spots`),
         fetch(`${VDP_API_URL}/api/immigration/illegal-settlements`),
         fetch(`${VDP_API_URL}/api/property/unauthorized`),
+        fetch(`${VDP_API_URL}/api/justice/detentions`),
       ]);
       setArrival((await arrivalRes.json()).arrival);
       setOpenSpots((await spotsRes.json()).open);
       setActiveSettlements((await settlementsRes.json()).active);
       setUnauthorized((await unauthorizedRes.json()).unauthorized);
+      setActiveDetentions((await detentionsRes.json()).active);
       setError(null);
     } catch (err) {
       setError(err.message);
@@ -222,6 +229,63 @@ export default function ImmigrationView({ session, onChange }) {
             disabled={busy === "build-unauthorized" || !structureLabel.trim()}
           >
             {busy === "build-unauthorized" ? "…" : "Build without authorization"}
+          </button>
+        </div>
+      </div>
+
+      <div style={{ borderTop: "1px solid #eee", paddingTop: 8, marginTop: 12 }}>
+        <p style={{ fontSize: 13, fontWeight: "bold" }}>
+          Citations &amp; detention ({activeDetentions.length} currently detained)
+        </p>
+        <ul style={{ fontSize: 12, margin: "0 0 8px 0", paddingLeft: 18 }}>
+          {activeDetentions.map((d) => (
+            <li key={d.id} style={{ marginBottom: 4 }}>
+              {d.personId} — {d.reason}{" "}
+              <button
+                onClick={run(`release-${d.id}`, () => post(`/api/justice/detentions/${d.id}/release`, { releasedBy: session.userId }))}
+                disabled={busy === `release-${d.id}`}
+                style={{ fontSize: 11 }}
+              >
+                {busy === `release-${d.id}` ? "…" : "Release"}
+              </button>
+            </li>
+          ))}
+          {activeDetentions.length === 0 && <li style={{ color: "#888" }}>Nobody detained right now.</li>}
+        </ul>
+        <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+          <input
+            type="text" placeholder="who? (userId or npc-N)" value={ticketTargetId}
+            onChange={(e) => setTicketTargetId(e.target.value)} style={{ fontSize: 12, width: 140 }}
+          />
+          <input
+            type="text" placeholder="reason" value={ticketReason}
+            onChange={(e) => setTicketReason(e.target.value)} style={{ fontSize: 12, flex: 1 }}
+          />
+          <button
+            onClick={run("issue-ticket", () => post("/api/justice/tickets/issue", {
+              issuedBy: session.userId, personId: ticketTargetId, reason: ticketReason,
+            }).then(() => { setTicketTargetId(""); setTicketReason(""); }))}
+            disabled={busy === "issue-ticket" || !ticketTargetId.trim() || !ticketReason.trim()}
+          >
+            {busy === "issue-ticket" ? "…" : "Issue ticket"}
+          </button>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input
+            type="text" placeholder="who? (userId or npc-N)" value={detainTargetId}
+            onChange={(e) => setDetainTargetId(e.target.value)} style={{ fontSize: 12, width: 140 }}
+          />
+          <input
+            type="text" placeholder="reason" value={detainReason}
+            onChange={(e) => setDetainReason(e.target.value)} style={{ fontSize: 12, flex: 1 }}
+          />
+          <button
+            onClick={run("detain", () => post("/api/justice/detain", {
+              detainedBy: session.userId, personId: detainTargetId, reason: detainReason,
+            }).then(() => { setDetainTargetId(""); setDetainReason(""); }))}
+            disabled={busy === "detain" || !detainTargetId.trim() || !detainReason.trim()}
+          >
+            {busy === "detain" ? "…" : "Detain"}
           </button>
         </div>
       </div>

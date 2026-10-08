@@ -14,6 +14,12 @@ import { NEED_NAMES, TRAIT_NAMES, HABIT_NAMES, mostPressingNeed, topTrait } from
 // real logic and no caller, same shape as every other unwired-route
 // finding this session kept turning up. A player could see their own
 // needs drifting and had no verb to do anything about it.
+//
+// **Citations and detention (8 Oct 2026), per direct instruction**:
+// "people can get ticketed. They will be sent directly to their
+// profile." This is that profile -- the real, honest place a real
+// citation (`justice.js`) lands, with a real "pay it" action, and the
+// real fact of whether this player is currently detained.
 
 const VDP_API_URL = import.meta.env?.VITE_VDP_API_URL || "http://localhost:8827";
 const POLL_INTERVAL_MS = 10000;
@@ -30,21 +36,50 @@ function needBar(value) {
 
 export default function MyStatusView({ session, refreshSignal }) {
   const [state, setState] = useState(null);
+  const [tickets, setTickets] = useState([]);
+  const [detention, setDetention] = useState(null);
   const [error, setError] = useState(null);
   const [busyAction, setBusyAction] = useState(null);
+  const [payingTicketId, setPayingTicketId] = useState(null);
 
   const refresh = useCallback(async () => {
     if (!session?.userId) return;
     try {
-      const res = await fetch(`${VDP_API_URL}/api/players/${encodeURIComponent(session.userId)}/state`);
+      const userId = encodeURIComponent(session.userId);
+      const [res, ticketsRes, detainedRes] = await Promise.all([
+        fetch(`${VDP_API_URL}/api/players/${userId}/state`),
+        fetch(`${VDP_API_URL}/api/justice/tickets/${userId}`),
+        fetch(`${VDP_API_URL}/api/justice/detained/${userId}`),
+      ]);
       if (!res.ok) throw new Error(`state failed (${res.status})`);
       const body = await res.json();
       setState(body.state);
+      setTickets((await ticketsRes.json()).tickets || []);
+      setDetention((await detainedRes.json()).detention);
       setError(null);
     } catch (err) {
       setError(err.message);
     }
   }, [session?.userId]);
+
+  const handlePayTicket = async (ticketId) => {
+    setPayingTicketId(ticketId);
+    setError(null);
+    try {
+      const res = await fetch(`${VDP_API_URL}/api/justice/tickets/${ticketId}/pay`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.sessionToken}` },
+        body: JSON.stringify({ personId: session.userId }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || `pay failed (${res.status})`);
+      await refresh();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setPayingTicketId(null);
+    }
+  };
 
   useEffect(() => {
     refresh();
@@ -131,6 +166,26 @@ export default function MyStatusView({ session, refreshSignal }) {
           >
             {busyAction === action ? "…" : action}
           </button>
+        ))}
+      </div>
+
+      <div style={{ marginTop: 12, borderTop: "1px dashed #ccc", paddingTop: 8 }}>
+        <h3 style={{ fontSize: 12, margin: "0 0 6px 0", color: "#888" }}>CITATIONS &amp; DETENTION</h3>
+        {detention && (
+          <p style={{ fontSize: 12, color: "crimson", margin: "0 0 6px" }}>
+            Currently detained: {detention.reason}
+          </p>
+        )}
+        {tickets.filter((t) => !t.paid).length === 0 && !detention && (
+          <p style={{ fontSize: 12, color: "#888" }}>No open citations.</p>
+        )}
+        {tickets.filter((t) => !t.paid).map((t) => (
+          <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, padding: "2px 0" }}>
+            <span>{t.reason} — {t.amountOwed} VCoin</span>
+            <button onClick={() => handlePayTicket(t.id)} disabled={payingTicketId === t.id} style={{ fontSize: 11 }}>
+              {payingTicketId === t.id ? "…" : "Pay"}
+            </button>
+          </div>
         ))}
       </div>
     </div>

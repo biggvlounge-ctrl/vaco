@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   PROPERTY_LEVELS, HOME_PRICE, RENT_PRICE, LAND_PRICE, levelByNumber, materialsDeltaFor,
+  COMMERCIAL_LEVELS, commercialLevelByNumber,
 } from "../lib/property.js";
 
 // Real actions against vdp/server.cjs's property routes -- buy, rent,
@@ -20,6 +21,7 @@ function materialsCostLabel(fromLevel, toLevel) {
 
 export default function MyHomeView({ session, onChange }) {
   const [home, setHome] = useState(null);
+  const [shop, setShop] = useState(null);
   const [household, setHousehold] = useState(null);
   const [inviteId, setInviteId] = useState("");
   const [loading, setLoading] = useState(false);
@@ -30,9 +32,14 @@ export default function MyHomeView({ session, onChange }) {
     if (!session?.userId) return;
     setLoading(true);
     try {
-      const res = await fetch(`${VDP_API_URL}/api/property/${encodeURIComponent(session.userId)}`);
+      const userId = encodeURIComponent(session.userId);
+      const [res, shopRes] = await Promise.all([
+        fetch(`${VDP_API_URL}/api/property/${userId}`),
+        fetch(`${VDP_API_URL}/api/property/commercial/${userId}`),
+      ]);
       const body = await res.json();
       setHome(body.home);
+      setShop((await shopRes.json()).shop);
       if (body.home) {
         const hRes = await fetch(`${VDP_API_URL}/api/households/${body.home.id}`);
         const hBody = await hRes.json();
@@ -70,6 +77,26 @@ export default function MyHomeView({ session, onChange }) {
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || `${path} failed (${res.status})`);
       setHome(body);
+      if (onChange) await onChange();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const commercialAct = (path) => async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`${VDP_API_URL}${path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.sessionToken}` },
+        body: JSON.stringify({ ownerId: session.userId }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || `${path} failed (${res.status})`);
+      setShop(body);
       if (onChange) await onChange();
     } catch (err) {
       setError(err.message);
@@ -125,6 +152,8 @@ export default function MyHomeView({ session, onChange }) {
 
   const nextLevel = home ? levelByNumber(home.level + 1) : null;
   const currentLevel = home ? levelByNumber(home.level) : null;
+  const nextShopLevel = shop ? commercialLevelByNumber(shop.level + 1) : null;
+  const currentShopLevel = shop ? commercialLevelByNumber(shop.level) : null;
 
   return (
     <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16, marginTop: 12 }}>
@@ -215,6 +244,30 @@ export default function MyHomeView({ session, onChange }) {
           )}
         </div>
       )}
+
+      <div style={{ marginTop: 12, borderTop: "1px dashed #ccc", paddingTop: 8 }}>
+        <p style={{ fontSize: 13, fontWeight: "bold" }}>My Business</p>
+        <p style={{ fontSize: 11, color: "#888", margin: "0 0 6px" }}>
+          A real, independent slot -- owning a home never blocks this, and this never blocks owning a home.
+        </p>
+        {!shop && (
+          <button onClick={commercialAct("/api/property/purchase-commercial")} disabled={busy}>
+            {busy ? "…" : `Open a ${COMMERCIAL_LEVELS[0].name} (${COMMERCIAL_LEVELS[0].price} VCoin)`}
+          </button>
+        )}
+        {shop && (
+          <div>
+            <p style={{ fontSize: 12 }}>{shop.levelName} — {shop.lifecycleStage}</p>
+            {nextShopLevel ? (
+              <button onClick={commercialAct("/api/property/upgrade-commercial")} disabled={busy}>
+                {busy ? "…" : `Upgrade to ${nextShopLevel.name} (${nextShopLevel.price - currentShopLevel.price} VCoin)`}
+              </button>
+            ) : (
+              <p style={{ fontSize: 12, color: "#888" }}>Already at the top tier.</p>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

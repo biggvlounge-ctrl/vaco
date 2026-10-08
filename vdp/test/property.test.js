@@ -7,7 +7,8 @@ import {
   createPropertyStore, purchaseHome, homeOwnedBy, advanceLifecycle, upgradeHome,
   rentHome, buyRentedHome, HOME_PRICE, RENT_PRICE, LIFECYCLE, PROPERTY_LEVELS,
   MATERIALS_REQUIRED, materialsDeltaFor, purchaseLand, LAND_PRICE, buildUnauthorized,
-  demolishUnauthorized, listUnauthorized,
+  demolishUnauthorized, listUnauthorized, commercialOwnedBy, purchaseCommercial,
+  upgradeCommercial, COMMERCIAL_LEVELS,
 } from '../src/lib/property.js';
 import {
   createResourcesStore, spendMaterials, undoSpend, materialsFor, STARTING_OLD_WORLD_STOCK,
@@ -305,4 +306,65 @@ test('demolishUnauthorized refuses an authorized property and an unknown one', a
   const home = await purchaseHome(store, { ownerId: 'frank', transferFn: fakeTransfer([]) });
   assert.throws(() => demolishUnauthorized(store, home.id), /is authorized/);
   assert.throws(() => demolishUnauthorized(store, 9999), /no property/);
+});
+
+test('purchaseCommercial is a real, independent slot -- owning a home does not block it', async () => {
+  const store = createPropertyStore();
+  await purchaseHome(store, { ownerId: 'gail', transferFn: fakeTransfer([]) });
+  const calls = [];
+  const shop = await purchaseCommercial(store, { ownerId: 'gail', transferFn: fakeTransfer(calls) });
+  assert.equal(calls[0].amount, COMMERCIAL_LEVELS[0].price);
+  assert.equal(shop.type, 'commercial');
+  assert.equal(commercialOwnedBy(store, 'gail').id, shop.id);
+  assert.ok(homeOwnedBy(store, 'gail'), 'owning a commercial property must not hide the real home');
+});
+
+test('owning a commercial property does not block buying a home', async () => {
+  const store = createPropertyStore();
+  await purchaseCommercial(store, { ownerId: 'hank', transferFn: fakeTransfer([]) });
+  const home = await purchaseHome(store, { ownerId: 'hank', transferFn: fakeTransfer([]) });
+  assert.equal(home.ownerId, 'hank');
+});
+
+test('a failed purchaseCommercial rolls back -- no shop left on the books', async () => {
+  const store = createPropertyStore();
+  await assert.rejects(
+    purchaseCommercial(store, { ownerId: 'gail', transferFn: fakeTransfer([], { shouldFail: true }) }),
+  );
+  assert.equal(commercialOwnedBy(store, 'gail'), null);
+});
+
+test('purchaseCommercial refuses a second commercial property for the same owner', async () => {
+  const store = createPropertyStore();
+  await purchaseCommercial(store, { ownerId: 'gail', transferFn: fakeTransfer([]) });
+  await assert.rejects(
+    purchaseCommercial(store, { ownerId: 'gail', transferFn: fakeTransfer([]) }),
+    /already owns a commercial property/,
+  );
+});
+
+test('upgradeCommercial charges the real price delta and moves up exactly one level', async () => {
+  const store = createPropertyStore();
+  await purchaseCommercial(store, { ownerId: 'gail', transferFn: fakeTransfer([]) });
+  const calls = [];
+  const shop = await upgradeCommercial(store, { ownerId: 'gail', transferFn: fakeTransfer(calls) });
+  assert.equal(calls[0].amount, COMMERCIAL_LEVELS[1].price - COMMERCIAL_LEVELS[0].price);
+  assert.equal(shop.level, 2);
+  assert.equal(shop.levelName, COMMERCIAL_LEVELS[1].name);
+});
+
+test('upgradeCommercial refuses someone with no commercial property and the top level', async () => {
+  const store = createPropertyStore();
+  await assert.rejects(
+    upgradeCommercial(store, { ownerId: 'gail', transferFn: fakeTransfer([]) }),
+    /does not own a commercial property/,
+  );
+  await purchaseCommercial(store, { ownerId: 'gail', transferFn: fakeTransfer([]) });
+  for (let i = 1; i < COMMERCIAL_LEVELS.length; i += 1) {
+    await upgradeCommercial(store, { ownerId: 'gail', transferFn: fakeTransfer([]) });
+  }
+  await assert.rejects(
+    upgradeCommercial(store, { ownerId: 'gail', transferFn: fakeTransfer([]) }),
+    /already at the top level/,
+  );
 });
