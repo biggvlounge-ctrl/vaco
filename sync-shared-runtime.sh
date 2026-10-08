@@ -90,10 +90,14 @@ DECISION_LOG_TARGETS=(
 # for no gain. Checked rather than assumed — the target list is derived
 # from the apps whose package.json has no `"type": "module"`.
 #
-# **Three copies are deliberately NOT here**:
+# **Four copies are deliberately NOT here**:
 #   vaco-shell   — a `"type": "module"` package, so its copy is real
 #                  ESM (`export function`) rather than a stale fork. It
 #                  carries the same three exports and uses durable().
+#   vaco-analytics — the same case as vaco-shell: a `"type": "module"`
+#                  package with its own hand-maintained ESM port,
+#                  including the `commit`/`durable` pair added when it
+#                  converted to the shared Postgres backend.
 #   venvs        — a Vite frontend. Its persistence is browser storage
 #                  and shares only the name, the same documented split
 #                  as its shieldAuth client.
@@ -113,7 +117,7 @@ DECISION_LOG_TARGETS=(
 #                  against shared/persistence*.js when either changes,
 #                  rather than wiring an autosync this script cannot
 #                  yet do safely.
-# The unmanaged check below excludes all three on module identity
+# The unmanaged check below excludes all four on module identity
 # rather than filename, so none of them produces a false positive.
 PERSISTENCE_TARGETS=(
   chopz chopz/chopz-shop cvnvo cvnvo/yap dreams hvntz shield v3 vaca vacay
@@ -124,15 +128,17 @@ PERSISTENCE_TARGETS=(
 
 # -- persistencePg.js --------------------------------------------------
 #
-# The same store, in Postgres instead of a JSON file. **One app so far.**
+# The same store, in Postgres instead of a JSON file. **Every file-backed
+# app has converted** -- 30 CommonJS apps here, plus `vaco-shell` and
+# `vaco-analytics`'s own ESM ports (`lib/persistencePg.js` for the
+# former, `persistencePg.js` at the app root for the latter, matching
+# where each app already kept `persistence.js`), for 32 in total plus
+# VACON-C on its own schema.
 #
-# This list is short on purpose and is the honest record of how far the
-# conversion has got: every app not named here still keeps its state in
-# a file and still must not be run in more than one container. Adding a
-# name here is the act of converting an app, and it is not free -- the
-# Postgres backend is asynchronous, so the app's store must be awaited
-# before it listens and its `durable()` must delay the response. See
-# shared/persistencePg.js for what that costs.
+# Adding a name here is the act of converting an app, and it is not
+# free -- the Postgres backend is asynchronous, so the app's store must
+# be awaited before it listens and its `durable()` must delay the
+# response. See shared/persistencePg.js for what that costs.
 PERSISTENCE_PG_TARGETS=(
   chopz chopz/chopz-shop cvnvo cvnvo/yap dreams hvntz shield v3 vaca
   vacay vaco-audit vaco-media vaco-notify vaco-operator vaco-passport vacon vago vash-tap

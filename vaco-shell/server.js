@@ -40,8 +40,8 @@ import {
 import tracingModule from './lib/tracing.cjs';
 const { traceMiddleware } = tracingModule;
 import { getInsightCard } from './lib/insight.js';
-import { createPersistentShellStore } from './lib/store.js';
-import { durable } from './lib/persistence.js';
+import { createShellStore } from './lib/store.js';
+import { attachStore } from './lib/storeBackend.js';
 import { settleVCoin, V3_API_URL } from './lib/v3Client.js';
 import shieldAuth from './lib/shieldAuth.cjs';
 import serviceAuthModule from './lib/serviceAuth.cjs';
@@ -73,12 +73,29 @@ app.use(traceMiddleware());
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-const store = createPersistentShellStore();
-// Money moves through these routes, so an acknowledged purchase is
-// flushed to disk before the response goes out. Same posture as the
-// other 24 apps.
-app.use(durable(store));
-seedStore(store);
+// -- The store, and which backend holds it ----------------------------
+//
+// `let`, not `const`: with DATABASE_URL set this app's store lives in
+// Postgres, which cannot be built synchronously. `attachStore` mounts
+// a gate ahead of the routes so no request runs before the store has
+// loaded, and installs the commit-before-responding hook that
+// `app.use(durable(store))` used to provide directly — money moves
+// through these routes, so an acknowledged purchase is still flushed
+// before the response goes out, Postgres or file alike. The route
+// handlers close over this binding rather than a value, so they see
+// the real store the moment it is installed.
+//
+// `seedStore` runs from `onReady` rather than right after this call,
+// for the same reason: it must run against the REAL store, and with
+// Postgres that store does not exist yet the instant `attachStore`
+// returns.
+let store = createShellStore();
+attachStore(app, {
+  appKey: 'vaco-shell',
+  createDefault: createShellStore,
+  filePath: path.join(__dirname, 'data', 'store.json'),
+  onReady: (loaded) => { store = loaded; seedStore(store); },
+});
 
 const PORT = process.env.PORT || 8789;
 const SHIELD_API_URL = process.env.SHIELD_API_URL || 'http://localhost:8812';

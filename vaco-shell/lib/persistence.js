@@ -21,7 +21,8 @@ import path from 'node:path';
 
 const FLUSHERS = new WeakMap();
 
-function reactive(value, onChange) {
+// Exported so persistencePg.js can reuse it rather than duplicating it a third time.
+export function reactive(value, onChange) {
   if (value === null || typeof value !== 'object') return value;
   for (const key of Object.keys(value)) {
     value[key] = reactive(value[key], onChange);

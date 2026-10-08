@@ -28,7 +28,7 @@ import {
   getEcosystemSnapshot,
 } from "./metricsStore.js";
 import { evaluateMetric, getAlerts } from "./intelligence.js";
-import { createPersistentStore } from "./persistence.js";
+import { attachStore } from "./storeBackend.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -68,7 +68,20 @@ app.use(serviceAuth.middleware);
 app.use(express.static(path.join(__dirname, "public")));
 
 const PORT = process.env.PORT || 8790;
-const store = createPersistentStore(path.join(__dirname, "data", "store.json"), createMetricsStore);
+
+// `let`, not `const`: with DATABASE_URL set this store lives in
+// Postgres, which cannot be built synchronously. `attachStore` mounts
+// a gate ahead of the routes so no request runs before the store has
+// loaded, plus a commit-before-responding hook -- every route below
+// closes over this binding rather than a value, so it sees the real
+// store the moment it is installed.
+let store = createMetricsStore();
+attachStore(app, {
+  appKey: 'vaco-analytics',
+  createDefault: createMetricsStore,
+  filePath: path.join(__dirname, "data", "store.json"),
+  onReady: (loaded) => { store = loaded; },
+});
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, apps: getApps(store) });

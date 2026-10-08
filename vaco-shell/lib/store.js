@@ -6,15 +6,11 @@
 // features that do, and both hold state that outliving a restart is
 // the whole point of — what a user owns, and what has been ordered.
 //
-// `createShellStore` is exported separately from the persistent one so
-// tests can run the same modules against a plain object with no file
-// on disk. That is the pattern every other app here uses.
-
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { createPersistentStore } from './persistence.js';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// `createShellStore` is the plain factory, run against a plain object
+// with no file on disk in tests. `server.js` builds the real,
+// persistent one through `lib/storeBackend.js`'s `attachStore` now —
+// whichever backend DATABASE_URL selects — rather than through a
+// second, file-only wrapper here.
 
 export function createShellStore() {
   return {
@@ -29,11 +25,4 @@ export function createShellStore() {
     merchOrders: [],
     nextMerchOrderId: 1,
   };
-}
-
-export function createPersistentShellStore() {
-  return createPersistentStore(
-    path.join(__dirname, '..', 'data', 'store.json'),
-    createShellStore,
-  );
 }

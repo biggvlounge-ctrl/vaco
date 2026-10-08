@@ -119,7 +119,7 @@ hand, both optional:
 | Variable | What it is for | Needed? |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | Brings `v4-proxy` up. | Optional — without it that one app stays DOWN. |
-| `DATABASE_URL` | Puts 31 of the 36 backends on Postgres instead of files. | Set for you automatically when you attach Replit's PostgreSQL. |
+| `DATABASE_URL` | Puts 33 of the 36 backends on Postgres instead of files. | Set for you automatically when you attach Replit's PostgreSQL. |
 
 They go in Replit's **Secrets** pane, never in `.replit` — that file is
 committed to a public repository.
@@ -130,21 +130,23 @@ DOWN in the boot output with the reason in `logs/<app>.log`. `v4-proxy`
 without `ANTHROPIC_API_KEY` is the worked example, and it is the "1
 down" in the expected `35 up, 1 down` line above.
 
-## The database is optional, and 29 apps will use it if it is there
+## The database is optional, and 33 apps will use it if it is there
 
 **Attach Replit's built-in PostgreSQL.** It sets `DATABASE_URL`, and
 that one variable is the whole configuration — nothing else to set, and
 nothing to run by hand.
 
-With it, 31 of the 36 backends keep their state in Postgres instead of
-a file: `vacon-c` loads its own 63-table world schema, and 30 others
+With it, 33 of the 36 backends keep their state in Postgres instead of
+a file: `vacon-c` loads its own 63-table world schema, and 32 others
 keep a document each in a `vaco.stores` table.
 
-The other 5 are not all waiting their turn. **2 apps keep state in JSON
-files** — `vaco-shell` and `vaco-analytics`. The remaining 3 keep no
-state across a restart at all and are not meant to: `v4-proxy` holds
-live call sessions in memory on purpose, and `v4-search` and
-`vex-trading` are stateless query layers over other apps' records.
+**0 apps keep state in JSON files** now. `vaco-shell` and
+`vaco-analytics` were the last two file-backed apps and moved to the
+shared Postgres store backend on 8 Oct 2026, the same way the other 28
+already had. The remaining 3 keep no state across a restart at all and
+are not meant to: `v4-proxy` holds live call sessions in memory on
+purpose, and `v4-search` and `vex-trading` are stateless query layers
+over other apps' records.
 
 Without it, everything still boots and every app falls back to its
 file, which Replit's filesystem keeps between runs. That is fine for a
@@ -199,14 +201,16 @@ database.
 
 **With it, exactly one app is safe to run twice.** V3 keeps balances
 and transactions as real rows and takes its locks in a fixed order, so
-two V3 containers can both write. The other 28 keep a whole document
+two V3 containers can both write. The other 31 keep a whole document
 per app behind an optimistic version check: a concurrent write is
 *refused* rather than silently lost, which makes divergence loud but
 does not make two writers work. **Do not scale those past one
 container.**
 
-**2 apps keep state in JSON files on disk** — `vaco-shell` and
-`vaco-analytics`. Same rule, for the older reason.
+**0 apps keep state in JSON files on disk any more.** `vaco-shell` and
+`vaco-analytics` were the last two; same "do not run twice" rule used
+to apply to them for the older, file-based reason, and now applies for
+the newer, document-store reason instead.
 
 VACON-C is on Postgres and still must not be scaled past one container,
 for a third reason: its working set is one process's memory, so two

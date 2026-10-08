@@ -20,11 +20,12 @@
 # real gap -- until the gateway existed, seeing this thing run meant
 # cloning the repo and booting 36 servers.
 #
-# Not good for: production -- though the reason narrowed on 11 Sep
-# 2026, and this comment carried the old, wider claim for a day: it
-# asserted that all of them were file-backed. 31 of the 36 backends are
-# on Postgres when DATABASE_URL is set; 2 keep JSON files (vaco-shell,
-# vaco-analytics) and 3 keep no state at all.
+# Not good for: production -- though the reason narrowed further on
+# 11 Sep 2026 and again on 8 Oct 2026, and this comment carried the
+# old, wider claim for a day: it asserted that all of them were
+# file-backed. 33 of the 36 backends are on Postgres when DATABASE_URL
+# is set; 0 keep JSON files any more (vaco-shell and vaco-analytics
+# were the last two) and 3 keep no state at all.
 #
 # The old sentence is described rather than quoted on purpose.
 # `scripts/test/storage-backends.test.mjs` bans that phrasing outright,
@@ -38,7 +39,7 @@
 #
 # With the database attached, exactly one app is safe to run twice: V3
 # keeps balances as real rows and takes its locks in a fixed order. The
-# other 28 hold one document each behind an optimistic version check,
+# other 31 hold one document each behind an optimistic version check,
 # which makes a concurrent write loud rather than lost, and still does
 # not make two writers work.
 #
@@ -85,20 +86,22 @@ PORT = "8080"
 # that one variable is the whole configuration -- nothing else to set,
 # nothing to run by hand.
 #
-# 31 of the 36 backends use it: `vacon-c` loads its own 63-table world
-# schema into an empty database on first boot, and 30 others keep a
+# 33 of the 36 backends use it: `vacon-c` loads its own 63-table world
+# schema into an empty database on first boot, and 32 others keep a
 # document each in a `vaco.stores` table. V3 goes further -- balances
 # and transactions are real rows.
 #
 # This section named only `vacon-c` until 11 Sep 2026, which was true
-# when written and stopped being true the day 28 more apps converted.
+# when written and stopped being true the day 28 more apps converted --
+# and stopped being true again on 8 Oct 2026, when `vaco-shell` and
+# `vaco-analytics`, the last two file-backed apps, converted too.
 # `scripts/test/storage-backends.test.mjs` now reads this file too, so
 # the next time that number moves, the suite says so.
 #
 # Without a database everything still boots and falls back to a JSON
 # file per app, which Replit's filesystem keeps between runs. Two things
 # behave differently when a database is attached but unreachable, and
-# the difference is deliberate: the 28 converted apps REFUSE to start
+# the difference is deliberate: the 32 converted apps REFUSE to start
 # and say why, while `vacon-c` starts an EMPTY world, says so in full on
 # stderr, and never saves. A simulation that can regenerate its state is
 # still a working demo; a ledger reading every balance as zero is not.

@@ -2,11 +2,13 @@
 
 Real production-deployment tooling for the VACO ecosystem's 37 Express
 backends + 2 Vite frontends, plus nginx, the LiveKit SFU and a Postgres
-for VACON-C — 42 Compose services and 33 named volumes. (The Postgres
-is not a general ecosystem database: every other app persists through
-`createPersistentStore` to a JSON store. VACON-C is a tick simulation
-whose durable record is Postgres, and it is the only service that uses
-it — see "VACON-C's Postgres" below.) (`venvs-mock-backend` is the
+for VACON-C — 42 Compose services and 34 named volumes. (The same
+Postgres server now holds two different things: 32 apps keep a
+document or real rows in `vaco.stores`/V3's own tables through
+`createPersistentStore`'s Postgres-backed sibling, and VACON-C keeps
+its own locked 63-table schema alongside them — see "VACON-C's
+Postgres" below. Without `DATABASE_URL`, every one of those 32 falls
+back to its own JSON store instead.) (`venvs-mock-backend` is the
 one server in the repo that is deliberately *not* deployed: the apps
 were cut over to standalone V3 and Shield, and it stays for local
 development only.) Every file here is *generated* from the
@@ -115,13 +117,14 @@ ephemeral and a second instance means a second, divergent ledger — the
 exact failure this repo spent the settlement-atomicity sweep
 eliminating everywhere else.
 
-With `DATABASE_URL` set, 29 of the 34 backends are on Postgres, and
-2 apps keep state in JSON files — `vaco-shell` and `vaco-analytics`.
-The other 3 keep nothing across a restart by design. That is enough for V3,
-whose balances are real rows, to run in two containers. It is not
-enough for the other 28, which hold one document each behind an
-optimistic version check — divergence is refused rather than lost, but
-two writers still do not work.
+With `DATABASE_URL` set, 33 of the 36 backends are on Postgres, and
+0 apps keep state in JSON files any more — `vaco-shell` and
+`vaco-analytics` were the last two. The other 3 keep nothing across a
+restart by design. That is enough for V3, whose balances are real
+rows, to run in two containers. It is not enough for the other 31,
+which hold one document each behind an optimistic version check —
+divergence is refused rather than lost, but two writers still do not
+work.
 
 Use this to *show* the ecosystem at a URL. Use Compose or pm2+nginx to
 run it.
@@ -219,17 +222,24 @@ confirmed cross-app URLs resolve to the correct real service name +
 port per app (spot-checked `vulture-studios` → `shield`/`v3`/
 `vaco-analytics`/`vaco-audit`/`vaco-operator`/`vulture-flix`/
 `vulture-music`, all seven real, all correctly scoped — no unrelated
-var leaked in); confirmed exactly 33 named volumes, each declared once
+var leaked in); confirmed exactly 34 named volumes, each declared once
 and mounted by exactly one service, matching the real persisted-app
 list.
 
 (That pass counted 29 volumes and 29 required vars. Both became 30 on
 2026-09-10, when VACON-C's Postgres was added — one `vacon-c-pgdata`
-volume and `POSTGRES_PASSWORD`. The generator was re-run and
-`scripts/test/deploy-readme.test.mjs` re-checks every count in this
-paragraph against the real files on each run, which is what caught the
-stale numbers here. The rest of the checks above were not re-run for
-the new service.) `deploy/nginx-docker.conf`'s braces balance (43 open, 43 close)
+volume and `POSTGRES_PASSWORD`. The volume count became 34 on
+2026-10-08, when `vaco-shell` and `vaco-analytics` converted to the
+shared Postgres backend: `vaco-shell`'s `server.js` had never matched
+the generator's own `createPersistentStore|attachStore` detector (it
+called a differently-named `createPersistentShellStore`), so it had
+silently never gotten a persisted volume at all; `attachStore` does
+match, closing that gap as a side effect of the conversion rather than
+a separate fix. `vaco-analytics` already matched and already had one.
+The generator was re-run and `scripts/test/deploy-readme.test.mjs`
+re-checks every count in this paragraph against the real files on each
+run, which is what caught the stale numbers here. The rest of the
+checks above were not re-run for the new service.) `deploy/nginx-docker.conf`'s braces balance (43 open, 43 close)
 and all 39 expected `location` blocks appear exactly once, no
 duplicates. **Not verified**: an actual `docker compose up --build` —
 no image has ever been built here, for any service. Run
@@ -409,16 +419,19 @@ domain.
 
 One service in `docker-compose.yml` that is not an app: `postgres`.
 **It was used by `vacon-c` alone when this section was written; 28
-other apps joined it on 11 Sep 2026.** That is the whole reason this
-heading now needs the paragraph below rather than just the one after
-it.
+other apps joined it on 11 Sep 2026, and the last 2 — `vaco-shell` and
+`vaco-analytics` — joined on 8 Oct 2026.** That is the whole reason
+this heading now needs the paragraph below rather than just the one
+after it.
 
-Those 28 share one mechanism: `shared/persistencePg.js` keeps a JSONB
-document per app in a `vaco.stores` table, behind the same
-three-function interface `createPersistentStore` already had. V3 goes
-further — its balances and transactions are real rows, not a document.
-Without `DATABASE_URL` all of them fall back to a JSON file under a
-named volume, which is what every app did before.
+Those 30 share one mechanism: `shared/persistencePg.js` (or, for
+`vaco-shell` and `vaco-analytics`'s `"type": "module"` packages, each
+app's own hand-maintained ESM port of it) keeps a JSONB document per
+app in a `vaco.stores` table, behind the same three-function interface
+`createPersistentStore` already had. V3 goes further — its balances
+and transactions are real rows, not a document. Without `DATABASE_URL`
+all of them fall back to a JSON file under a named volume, which is
+what every app did before.
 
 VACON-C is on the same server for a completely different reason, and
 the two must not be blurred together: it is not a document store at

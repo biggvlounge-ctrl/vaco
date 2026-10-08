@@ -32,17 +32,19 @@
 #
 # VACON-C and its database
 #
-# **31 of the 36 backends use Postgres when it is there**, as of 11 Sep
-# 2026 -- this said "one app" until then. Attach Replit's built-in
-# PostgreSQL and DATABASE_URL is set for you; nothing else to configure.
+# **33 of the 36 backends use Postgres when it is there**, as of 8 Oct
+# 2026 -- this said "one app" until 11 Sep 2026, when 28 converted, and
+# 31 until vaco-shell and vaco-analytics -- the last two file-backed
+# apps -- converted too. Attach Replit's built-in PostgreSQL and
+# DATABASE_URL is set for you; nothing else to configure.
 #
-# vacon-c loads its own 63-table world schema. The other 28 keep a
+# vacon-c loads its own 63-table world schema. The other 32 keep a
 # document each in a vaco.stores table, and V3's ledger goes further
 # still: balances and transactions are real rows, so two V3 containers
 # can both write.
 #
 # Without a database everything falls back to a JSON file per app and
-# still boots. With one attached but unreachable, the 28 converted apps
+# still boots. With one attached but unreachable, the 32 converted apps
 # refuse to start and say why, while vacon-c starts an empty world and
 # says so -- a simulation that can regenerate its state is a working
 # demo, and a ledger reading every balance as zero is not.

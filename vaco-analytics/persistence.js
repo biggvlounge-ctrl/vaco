@@ -12,7 +12,10 @@
 import fs from "node:fs";
 import path from "node:path";
 
-function reactive(value, onChange) {
+const FLUSHERS = new WeakMap();
+
+// Exported so persistencePg.js can reuse it rather than duplicating it a third time.
+export function reactive(value, onChange) {
   if (value === null || typeof value !== "object") return value;
   for (const key of Object.keys(value)) {
     value[key] = reactive(value[key], onChange);
@@ -74,5 +77,27 @@ export function createPersistentStore(filePath, createDefault, { debounceMs = 20
   process.on("SIGTERM", () => { flush(); process.exit(0); });
   process.on("SIGINT", () => { flush(); process.exit(0); });
 
+  FLUSHERS.set(store, flush);
   return store;
+}
+
+export function commit(store) {
+  const flush = FLUSHERS.get(store);
+  if (!flush) return false;
+  flush();
+  return true;
+}
+
+const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+export function durable(store) {
+  return (req, res, next) => {
+    if (!MUTATING_METHODS.has(req.method)) return next();
+    const originalJson = res.json.bind(res);
+    res.json = (body) => {
+      if (res.statusCode >= 200 && res.statusCode < 300) commit(store);
+      return originalJson(body);
+    };
+    return next();
+  };
 }

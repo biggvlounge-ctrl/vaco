@@ -1433,27 +1433,36 @@ are what stand between this and a real deployment.**
 - **No TLS, no domain.** `deploy/nginx-docker.conf` terminates plain
   HTTP on :80. A real deployment needs certificates and a hostname, and
   Shield's session cookies should be `Secure` once there is one.
-- **2 apps keep state in JSON files** — `vaco-shell` and
-  `vaco-analytics`, the two that were never converted. Writes are
-  atomic (temp + rename) and `durable(store)` commits before
-  responding, which is genuinely safe for one process per service. It
-  is *not* safe for two replicas of the same service, so **do not scale
-  either of those two past one container** until that changes. §6 has
+- **0 apps keep state in JSON files any more.** `vaco-shell` and
+  `vaco-analytics` were the last two file-backed apps; both converted
+  to the shared Postgres store backend on 8 Oct 2026, the same way the
+  other 28 already had. Writes to the store were atomic (temp +
+  rename) and `durable(store)` committed before responding while they
+  were file-backed, which was genuinely safe for one process per
+  service but *not* safe for two replicas of the same service — the
+  same "do not scale past one container" rule now applies to them for
+  the Postgres-document reason the other 31 are already under. §6 has
   the full posture.
 
-  The other 32 backends divide as **29 on Postgres** — 28 through the
-  shared store backend plus VACON-C on its own schema — and **3 that
-  keep no state across a restart at all**: `v4-proxy` (call sessions,
-  deliberately in-memory — a `ringing` call restored from disk is
-  ringing at nobody), `v4-search` and `vex-trading` (both stateless
-  query layers over other apps' records).
+  The 36 backends divide as **33 on Postgres** — 32 through the shared
+  store backend (one of them V3, on its own decomposed row-level
+  ledger rather than the plain document store) plus VACON-C on its own
+  schema — and **3 that keep no state across a restart at all**:
+  `v4-proxy` (call sessions, deliberately in-memory — a `ringing` call
+  restored from disk is ringing at nobody), `v4-search` and
+  `vex-trading` (both stateless query layers over other apps' records).
 
-  **All 28 file-backed apps moved to the shared Postgres store backend on 11 Sep 2026 — 31 of the 36 backends on Postgres once VACON-C is counted.** `shared/persistencePg.js` is the same three-function
+  **All 30 once-file-backed apps have now moved to the shared Postgres store backend — 11 Sep 2026 for the first 28, 8 Oct 2026 for the last two, `vaco-shell` and `vaco-analytics`.** `shared/persistencePg.js` is the same three-function
   interface the other apps already use, over a `vaco.stores` table
   holding one JSONB document per app. An app converts by changing how
   its store is built; its libs, routes and guards do not move.
-  `sync-shared-runtime.sh`'s `PERSISTENCE_PG_TARGETS` is the honest
-  record of how far this has got — 28 names in it today.
+  `vaco-shell` and `vaco-analytics` are `"type": "module"` packages, so
+  each carries its own hand-maintained ESM port of `persistencePg.js`
+  and `storeBackend.js` rather than a copy `sync-shared-runtime.sh`
+  manages — the same split that app already used for `persistence.js`
+  itself. `sync-shared-runtime.sh`'s `PERSISTENCE_PG_TARGETS` is the
+  honest record of how far the CommonJS side has got — 30 names in it
+  today (V3 among them).
 
   **These counts are held by `scripts/test/storage-backends.test.mjs`,
   and that test exists because they drifted.** When the conversion

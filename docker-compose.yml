@@ -29,16 +29,20 @@ services:
       VACO_SERVICE_TOKEN: "${VACO_TOKEN_VACO_SHELL:?Set a V3 service token for vaco-shell in .env}"
       VACO_AUDIT_MODE: "${VACO_AUDIT_MODE:-enforce}"
       VACO_OPERATOR_MODE: "${VACO_OPERATOR_MODE:-enforce}"
+      DATABASE_URL: "postgres://vacancy:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/vacancy"
     ports:
       - "8789:8789"
     networks:
       - vaco
     restart: unless-stopped
+    volumes:
+      - "vaco_shell_data:/app/data"
     depends_on:
       - v3
       - shield
       - vaco-audit
       - vaco-operator
+      - postgres
   v4-proxy:
     build:
       context: ./v4-proxy
@@ -612,6 +616,7 @@ services:
       VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
       VACO_SERVICE_NAME: vaco-analytics
       VACO_SERVICE_TOKEN: "${VACO_TOKEN_VACO_ANALYTICS:?Set a V3 service token for vaco-analytics in .env}"
+      DATABASE_URL: "postgres://vacancy:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/vacancy"
     ports:
       - "8790:8790"
     networks:
@@ -622,6 +627,7 @@ services:
     depends_on:
       - v3
       - shield
+      - postgres
   vulture-music:
     build:
       context: ./vulture-music
@@ -1083,6 +1089,7 @@ services:
       PORT: 8827
       SHIELD_API_URL: "http://shield:8812"
       V3_API_URL: "http://v3:8811"
+      VOID_API_URL: "http://void:8793"
       VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
       VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
       VACO_SERVICE_NAME: vdp
@@ -1149,6 +1156,7 @@ services:
     restart: unless-stopped
 
 volumes:
+  vaco_shell_data:
   vacon_data:
   hvntz_data:
   void_data:

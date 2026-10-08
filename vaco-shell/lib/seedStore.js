@@ -86,6 +86,11 @@ const FREE_LISTINGS = {
   'vaco-notify': 'infrastructure',
   'vash-tap': 'infrastructure',
   'vaco-passport': 'infrastructure',
+  // Same shape as v3/shield/v4-proxy above: no UI of its own
+  // (`registry.js`'s own description says so), a service the `vdp`
+  // listing's own client calls, not a second thing to sell alongside
+  // it.
+  'vdp-server': 'infrastructure',
 };
 
 //: Flagged interpretive: the publisher of every first-party app. In
