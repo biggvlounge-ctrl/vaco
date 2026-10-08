@@ -770,11 +770,13 @@ VOKEN's real `/api/brand` endpoint — not hardcoded text.
   lands. Player needs/goals now exist for the player too, reusing
   the same engine NPCs already used (`createPlayerState` in
   `npcs.js`), not just for NPCs.
-- Local materials (`resources.js`, Phase 16) are real and diggable, but
-  not yet a real building cost — `property.js`'s home purchase/upgrade
-  still charges VCoin only. Wiring `spendMaterials` into it needs a
-  real VCoin/materials split nothing has specified yet; guessing one
-  would be exactly the kind of invented number this project avoids.
+- Local materials (`resources.js`, Phase 16) are real, diggable, and
+  now have a real button (`MaterialsView.jsx`, same pattern as
+  `JobsView.jsx`'s clock-in button) — but still not a real building
+  cost. `property.js`'s home purchase/upgrade still charges VCoin
+  only. Wiring `spendMaterials` into it needs a real VCoin/materials
+  split nothing has specified yet; guessing one would be exactly the
+  kind of invented number this project avoids.
 - ~~Real cross-origin Shield SSO for the embedded-iframe case~~ —
   closed in Phase 10 (see above). Both the direct-visit handoff from
   `vaco-shell` and the embedded-iframe handoff into VENVS are now real.
