@@ -34,7 +34,14 @@ export function createJusticeStore() {
 // "Sent directly to their profile" -- a real record keyed to the
 // person it's about, read back by `ticketsFor` the same way a
 // player's own profile reads it (`server.cjs`/`MyStatusView.jsx`).
-export function issueTicket(store, { personId, reason, issuedBy, now = Date.now() } = {}) {
+//
+// `locationLabel` is optional, free text -- "aspects of the area have
+// more criminal activity than others in the New World" (8 Oct 2026,
+// direct instruction): a real per-area breakdown needs a real place
+// name on the record itself, the same open convention
+// `immigration.js`'s own `locationLabel` fields already use.
+// `security.js`'s `crimeByLocation` is what actually reads this back.
+export function issueTicket(store, { personId, reason, issuedBy, locationLabel, now = Date.now() } = {}) {
   if (!personId) throw new Error('issueTicket requires a personId');
   if (!reason) throw new Error('issueTicket requires a reason');
   const ticket = {
@@ -42,6 +49,7 @@ export function issueTicket(store, { personId, reason, issuedBy, now = Date.now(
     personId,
     reason,
     issuedBy: issuedBy || null,
+    locationLabel: locationLabel || null,
     amountOwed: TICKET_FINE,
     paid: false,
     issuedAt: now,
@@ -87,7 +95,7 @@ export async function payTicket(store, ticketId, { transferFn, now = Date.now() 
 // enforcement identity can take against any real person, legal
 // standing or not -- a citizen can be detained too, the same way a
 // real jail isn't only for people who crossed illegally.
-export function detainPerson(store, { personId, reason, detainedBy, now = Date.now() } = {}) {
+export function detainPerson(store, { personId, reason, detainedBy, locationLabel, now = Date.now() } = {}) {
   if (!personId) throw new Error('detainPerson requires a personId');
   if (!reason) throw new Error('detainPerson requires a reason');
   if (store.detentions.some((d) => d.personId === personId && !d.releasedAt)) {
@@ -98,6 +106,7 @@ export function detainPerson(store, { personId, reason, detainedBy, now = Date.n
     personId,
     reason,
     detainedBy: detainedBy || null,
+    locationLabel: locationLabel || null,
     detainedAt: now,
     releasedAt: null,
   };

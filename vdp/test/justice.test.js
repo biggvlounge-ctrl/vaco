@@ -22,8 +22,17 @@ test('issueTicket lands a real citation on the person it is about', () => {
   assert.equal(ticket.personId, 'alice');
   assert.equal(ticket.amountOwed, TICKET_FINE);
   assert.equal(ticket.paid, false);
+  assert.equal(ticket.locationLabel, null);
   assert.deepEqual(ticketsFor(store, 'alice'), [ticket]);
   assert.deepEqual(unpaidTicketsFor(store, 'alice'), [ticket]);
+});
+
+test('issueTicket and detainPerson both carry a real, optional locationLabel', () => {
+  const store = createJusticeStore();
+  const ticket = issueTicket(store, { personId: 'alice', reason: 'x', locationLabel: 'Meridian Commons' });
+  assert.equal(ticket.locationLabel, 'Meridian Commons');
+  const detention = detainPerson(store, { personId: 'bob', reason: 'x', locationLabel: 'the frontier ridge' });
+  assert.equal(detention.locationLabel, 'the frontier ridge');
 });
 
 test('issueTicket requires a personId and a reason', () => {

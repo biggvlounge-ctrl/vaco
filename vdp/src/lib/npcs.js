@@ -240,6 +240,17 @@ export function addNpcToWorld(world, { home, rng = Math.random } = {}) {
   return npc;
 }
 
+// Removes a real NPC outright -- the inverse of `addNpcToWorld`. Real
+// use: deportation (`immigration.js`'s `deportPerson`) removing an NPC
+// migrant from the live, server-ticked population, not just marking
+// their own arrival record.
+export function removeNpcFromWorld(world, npcId) {
+  const idx = world.npcs.findIndex((n) => n.id === npcId);
+  if (idx === -1) throw new Error(`removeNpcFromWorld: no NPC #${npcId}`);
+  const [removed] = world.npcs.splice(idx, 1);
+  return removed;
+}
+
 export function getNpc(world, npcId) {
   return world.npcs.find((n) => n.id === npcId) || null;
 }

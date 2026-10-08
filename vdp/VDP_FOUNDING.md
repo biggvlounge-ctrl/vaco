@@ -447,6 +447,74 @@ instruction:
   revolutions at civilization scale; this is VDP's own small, real
   record of its own small world, not a second implementation of it.
 
+## Crime varies by area, the government builds continuously, and the map grows with the population (8 Oct 2026)
+
+- **"Aspects of the area have more criminal activity than others in
+  the New World, depending on the NPCs."** Real now, not just stated:
+  `justice.js`'s `issueTicket`/`detainPerson` carry an optional, real
+  `locationLabel`, and `security.js`'s new `crimeByLocation` breaks
+  the settlement's own real crime records down by the real place each
+  one happened -- `GovernmentView.jsx`'s Security panel shows it. No
+  area boundaries are invented; a record's own real location is the
+  only input.
+- **"Operations will be started similar to the operations that are in
+  the vacancy game... those things will gradually increase as the
+  world increases."** Already the real shape this whole session has
+  built toward: `jobs.js`'s payroll jobs, `organizations.js`'s
+  families/tribes/cults, `property.js`'s residential/commercial
+  slots, and now `contracts.js`'s AI-posted construction work are
+  VDP's own small-scale real analogs of VACON-C's real operational
+  economy (jobs, organizations, property, takeovers) -- the same
+  "borrow the shape, not the scale" discipline this document already
+  names for `npcs.js`/`skills.js`. "Gradually increase as the world
+  increases" is `generateMigrationWave`'s and `contracts.js`'s own
+  real growth already built, not a new mechanic.
+- **"A ticker of... how many people are in the world, how much money
+  is generated... a map of the charter territory that's already been
+  conquered... more places will be inserted on the map as the
+  population grows."** The population ticker was already real
+  (`WorldView.jsx`'s own header, `population.js`). New:
+  `GET /api/analytics/status`'s real `totalVCoinGenerated` -- a
+  named, bounded figure (real governors-funded payouts: job shifts,
+  completed contracts, resource sales -- not literally every VCoin
+  this ecosystem has ever moved, which this server has no way to
+  see) -- and a real territory map in `GovernmentView.jsx`, built
+  from `world.js`'s own real `DISTRICTS` and `settlement.js`'s own
+  real population-gated unlock tiers, not a second invented map.
+- **"Some areas... will be off the grid until the government finds
+  out... different places can be migrated at different times and the
+  government not know."** Real now: `immigration.js`'s illegal
+  settlements start `discovered: false` -- active and real the
+  instant they're founded, but not counted toward `security.js`'s
+  measured crime until a real `discoverSettlement` act happens.
+  "Underground places" are the same real mechanic under a different
+  real `locationLabel` ("underground," or whatever a founder actually
+  names it) -- not a second system.
+- **"Depending on the type of NPCs, the traits, where they're from...
+  we need different populations of people migrating... to grow
+  gradually."** Already real: `generateMigrationWave`'s
+  `originRegions`/`religions` pools, supplied by the caller, were
+  built for exactly this the same day migration waves shipped.
+- **"NPCs start to build... a continuous world that's being built as
+  people go into it. But with real currency, real businesses, and
+  real people and avatars."** `contracts.js`'s `builderId` is any real
+  person string, `npc-<id>` included -- an NPC accepting and
+  completing a government contract needs no new code. "Real
+  currency, real businesses, real people and avatars" is VCoin,
+  every real district, Shield accounts, and `avatarRender.js` --
+  confirmed, not rebuilt.
+- **"People can also be set for jail, ticketing, fine. They could
+  avoid the fines and ticketing... or even face deportation back to
+  the old world."** "Avoid" needed no new code: nothing in
+  `justice.js` ever forced payment, so an unpaid ticket already is the
+  real "avoided" case. Deportation is new and closes this document's
+  own earlier "deportation remains unspecified" item:
+  `immigration.js`'s `deportPerson` marks a real arrival deported
+  (never deleted -- the real history stays), and when the deportee is
+  a real NPC, `npcs.removeNpcFromWorld` actually removes them from
+  the live, server-ticked population -- the real "back to the old
+  world" for an NPC specifically.
+
 ## What is still open
 
 - The area's own name — nothing has been given yet (the product name,
@@ -493,6 +561,12 @@ instruction:
   (`dissent.js`'s `suppressRevolt`) or of a government contract going
   unfinished — both record the real fact of what happened, with no
   further invented penalty attached.
+- What deportation actually does to a real logged-in player, beyond
+  the real record (`deportPerson`'s `deported: true`). An NPC is
+  really removed from the live population; this server does not
+  forcibly end a real person's own session, and nothing says it
+  should — left as a real, visible fact on their own record rather
+  than an invented account-level consequence.
 
 This document records what has been confirmed and leaves the rest for
 whenever more of the story is given, the same discipline `town.js`

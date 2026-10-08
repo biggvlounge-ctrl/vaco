@@ -6,9 +6,10 @@ import assert from 'node:assert/strict';
 import {
   createImmigrationStore, admitWithPassport, crossIllegally, arrivalFor, listArrivals,
   listIllegalArrivals, catchIllegalArrival, reportSmugglingSpot, sealSmugglingSpot,
-  listOpenSmugglingSpots, foundIllegalSettlement, clearIllegalSettlement,
-  listActiveIllegalSettlements, applyForCitizenship, applyForTemporaryPassport,
-  isPassportExpired, TEMPORARY_PASSPORT_DURATION_MS, generateMigrationWave,
+  listOpenSmugglingSpots, foundIllegalSettlement, discoverSettlement, clearIllegalSettlement,
+  listActiveIllegalSettlements, listKnownIllegalSettlements, applyForCitizenship,
+  applyForTemporaryPassport, isPassportExpired, TEMPORARY_PASSPORT_DURATION_MS,
+  generateMigrationWave, deportPerson, isDeported,
 } from '../src/lib/immigration.js';
 
 test('admitWithPassport records a real, legal arrival with the old-world background given', () => {
@@ -85,16 +86,65 @@ test('sealSmugglingSpot refuses an unknown spot', () => {
   assert.throws(() => sealSmugglingSpot(store, 999), /no smuggling spot/);
 });
 
-test('foundIllegalSettlement and clearIllegalSettlement track a real standing claim', () => {
+test('foundIllegalSettlement starts off the grid -- real and active, but not yet known', () => {
   const store = createImmigrationStore();
   const settlement = foundIllegalSettlement(store, { founderId: 'carol', locationLabel: 'the frontier ridge' });
   assert.equal(settlement.clearedAt, null);
+  assert.equal(settlement.discovered, false);
   assert.deepEqual(listActiveIllegalSettlements(store), [settlement]);
+  assert.deepEqual(listKnownIllegalSettlements(store), [], 'the government does not know about it yet');
+});
+
+test('clearIllegalSettlement refuses to clear a settlement the government has not discovered', () => {
+  const store = createImmigrationStore();
+  const settlement = foundIllegalSettlement(store, { founderId: 'carol', locationLabel: 'the frontier ridge' });
+  assert.throws(() => clearIllegalSettlement(store, settlement.id), /has not been discovered yet/);
+});
+
+test('discoverSettlement is the real, separate act that makes the government aware, once', () => {
+  const store = createImmigrationStore();
+  const settlement = foundIllegalSettlement(store, { founderId: 'carol', locationLabel: 'the frontier ridge' });
+  const discovered = discoverSettlement(store, settlement.id, { discoveredBy: 'patrol-1' });
+  assert.equal(discovered.discovered, true);
+  assert.deepEqual(listKnownIllegalSettlements(store), [discovered]);
+  assert.throws(() => discoverSettlement(store, settlement.id), /already discovered/);
+});
+
+test('discoverSettlement refuses an unknown settlement', () => {
+  const store = createImmigrationStore();
+  assert.throws(() => discoverSettlement(store, 9999), /no illegal settlement/);
+});
+
+test('foundIllegalSettlement and clearIllegalSettlement track a real standing claim, once discovered', () => {
+  const store = createImmigrationStore();
+  const settlement = foundIllegalSettlement(store, { founderId: 'carol', locationLabel: 'the frontier ridge' });
+  discoverSettlement(store, settlement.id, { discoveredBy: 'patrol-1' });
 
   const cleared = clearIllegalSettlement(store, settlement.id, { clearedBy: 'patrol-1' });
   assert.ok(cleared.clearedAt);
   assert.equal(listActiveIllegalSettlements(store).length, 0);
+  assert.equal(listKnownIllegalSettlements(store).length, 0);
   assert.throws(() => clearIllegalSettlement(store, settlement.id), /already cleared/);
+});
+
+test('deportPerson marks a real arrival deported, once, and keeps the real arrival history', () => {
+  const store = createImmigrationStore();
+  crossIllegally(store, { personId: 'dave' });
+  assert.equal(isDeported(store, 'dave'), false);
+  const deported = deportPerson(store, 'dave', { deportedBy: 'patrol-1', reason: 'illegal crossing' });
+  assert.equal(deported.deported, true);
+  assert.equal(deported.deportedBy, 'patrol-1');
+  assert.equal(isDeported(store, 'dave'), true);
+  assert.equal(arrivalFor(store, 'dave').id, deported.id, 'the arrival record is marked, never deleted');
+  assert.throws(() => deportPerson(store, 'dave'), /already been deported/);
+});
+
+test('deportPerson refuses an unknown person, and a legal citizen can be deported too', () => {
+  const store = createImmigrationStore();
+  assert.throws(() => deportPerson(store, 'ghost'), /no arrival recorded/);
+  admitWithPassport(store, { personId: 'erin' });
+  const deported = deportPerson(store, 'erin', { reason: 'tax evasion' });
+  assert.equal(deported.deported, true);
 });
 
 test('applyForCitizenship grants a real, permanent passport -- no expiry', () => {

@@ -122,6 +122,7 @@ export function admitWithPassport(store, {
     // only marks someone as predisposed toward.
     dissident,
     caught: false,
+    deported: false,
     arrivedAt: now,
   };
   store.arrivals.push(arrival);
@@ -177,6 +178,7 @@ export function crossIllegally(store, {
     oldWorldBeliefs: oldWorldBeliefs || null,
     dissident,
     caught: false,
+    deported: false,
     arrivedAt: now,
   };
   store.arrivals.push(arrival);
@@ -211,6 +213,38 @@ export function catchIllegalArrival(store, personId, { caughtBy, now = Date.now(
   return arrival;
 }
 
+// "People can also be set for jail, ticketing, fine. They could
+// avoid the fines and ticketing... or even face deportation back to
+// the old world" (8 Oct 2026, direct instruction) -- closes this
+// document's own earlier "deportation remains unspecified" open
+// item. The arrival record is marked, never deleted -- the real
+// history that someone arrived, and was then removed, is worth
+// keeping. "Avoiding" a ticket needs no code of its own: nothing in
+// `justice.js` ever forced payment, so an unpaid ticket already IS
+// the real "avoided" case, recorded as unpaid rather than specially
+// flagged.
+//
+// What actually happens to an NPC specifically (removed from the
+// real, server-ticked population) is the caller's own real side
+// effect (`server.cjs`, via `npcs.removeNpcFromWorld`) -- this
+// module does not import `npcs.js`, the same decoupled-by-injection
+// shape `generateMigrationWave`'s `onNewMigrant` already uses.
+export function deportPerson(store, personId, { deportedBy, reason, now = Date.now() } = {}) {
+  const arrival = arrivalFor(store, personId);
+  if (!arrival) throw new Error(`deportPerson: no arrival recorded for "${personId}"`);
+  if (arrival.deported) throw new Error(`deportPerson: "${personId}" has already been deported`);
+  arrival.deported = true;
+  arrival.deportedBy = deportedBy || null;
+  arrival.deportedReason = reason || null;
+  arrival.deportedAt = now;
+  return arrival;
+}
+
+export function isDeported(store, personId) {
+  const arrival = arrivalFor(store, personId);
+  return Boolean(arrival && arrival.deported);
+}
+
 // "A new spot found where people are sneaking in" -- a real, named
 // discovery. Starts open; sealing it is a separate real act, so
 // "found" and "closed" are two events, not one guessed-at moment.
@@ -243,6 +277,16 @@ export function listOpenSmugglingSpots(store) {
 
 // "People will start illegal settlements" -- a standing claim to live
 // somewhere outside the governors' own controlled footprint.
+//
+// **"Some areas will be off the grid until the government finds
+// out... the government not know that are off the grid"** (8 Oct
+// 2026, direct instruction): a settlement starts `discovered: false`
+// -- real and active the instant it's founded, but not yet known to
+// the government. `discoverSettlement` is the separate, real act
+// that changes that (the same "found vs. closed are two real events"
+// shape `reportSmugglingSpot`/`sealSmugglingSpot` already use) --
+// `clearIllegalSettlement` requires discovery first, because the
+// government cannot clear a settlement it does not know exists.
 export function foundIllegalSettlement(store, { founderId, locationLabel, now = Date.now() } = {}) {
   if (!founderId) throw new Error('foundIllegalSettlement requires a founderId');
   if (!locationLabel) throw new Error('foundIllegalSettlement requires a locationLabel');
@@ -250,6 +294,9 @@ export function foundIllegalSettlement(store, { founderId, locationLabel, now = 
     id: store.nextSettlementId++,
     founderId,
     locationLabel,
+    discovered: false,
+    discoveredBy: null,
+    discoveredAt: null,
     clearedAt: null,
     foundedAt: now,
   };
@@ -257,17 +304,39 @@ export function foundIllegalSettlement(store, { founderId, locationLabel, now = 
   return settlement;
 }
 
+export function discoverSettlement(store, settlementId, { discoveredBy, now = Date.now() } = {}) {
+  const settlement = store.illegalSettlements.find((s) => s.id === settlementId);
+  if (!settlement) throw new Error(`discoverSettlement: no illegal settlement #${settlementId}`);
+  if (settlement.discovered) throw new Error(`discoverSettlement: settlement #${settlementId} is already discovered`);
+  settlement.discovered = true;
+  settlement.discoveredBy = discoveredBy || null;
+  settlement.discoveredAt = now;
+  return settlement;
+}
+
 export function clearIllegalSettlement(store, settlementId, { clearedBy, now = Date.now() } = {}) {
   const settlement = store.illegalSettlements.find((s) => s.id === settlementId);
   if (!settlement) throw new Error(`clearIllegalSettlement: no illegal settlement #${settlementId}`);
+  if (!settlement.discovered) throw new Error(`clearIllegalSettlement: settlement #${settlementId} has not been discovered yet`);
   if (settlement.clearedAt) throw new Error(`clearIllegalSettlement: settlement #${settlementId} is already cleared`);
   settlement.clearedAt = now;
   settlement.clearedBy = clearedBy || null;
   return settlement;
 }
 
+// Every real active settlement, discovered or not -- the honest, full
+// list (used by this module's own callers who are allowed to know
+// everything, e.g. tests and any future narrator view).
 export function listActiveIllegalSettlements(store) {
   return store.illegalSettlements.filter((s) => !s.clearedAt);
+}
+
+// What the government itself actually knows about -- discovered and
+// still active. `security.js`'s crime measurement reads this one, not
+// the full list above, so an undiscovered settlement genuinely does
+// not raise the alarm it hasn't triggered yet.
+export function listKnownIllegalSettlements(store) {
+  return store.illegalSettlements.filter((s) => !s.clearedAt && s.discovered);
 }
 
 // **Migration waves (8 Oct 2026), per direct instruction**: "NPCs will

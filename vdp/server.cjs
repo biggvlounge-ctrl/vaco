@@ -90,6 +90,13 @@ function createVdpStore() {
     justice: { tickets: [], nextTicketId: 1, detentions: [], nextDetentionId: 1 },
     contracts: { contracts: [], nextContractId: 1 },
     dissent: { revolts: [], nextRevoltId: 1 },
+    // "How much money is generated" (8 Oct 2026) -- a real, running
+    // total of real VCoin the governors/AI have paid out into this
+    // world's own economy (job shifts, completed contracts, resource
+    // sales) -- not every VCoin transfer in the whole ecosystem,
+    // which this server has no way to see; a named, bounded scope
+    // rather than an invented precision it doesn't have.
+    analytics: { totalVCoinGenerated: 0 },
   };
 }
 
@@ -275,6 +282,19 @@ let store = createVdpStore();
     res.json(populationLib.describePopulation(playerCount, npcCount));
   });
 
+  // "A ticker of how many people are in... how much money is
+  // generated" (8 Oct 2026) -- real population (same figure
+  // `/api/population` already serves) alongside the real, running
+  // VCoin-generated total above.
+  app.get('/api/analytics/status', (_req, res) => {
+    const playerCount = Object.keys(store.players).length;
+    const npcCount = store.npcWorld ? store.npcWorld.npcs.length : 0;
+    res.json({
+      population: populationLib.describePopulation(playerCount, npcCount),
+      totalVCoinGenerated: store.analytics.totalVCoinGenerated,
+    });
+  });
+
   // Meridian's own real VOID Hub Station registration -- a cached
   // readout of what VOID itself returned (not re-derived here), so
   // the client sees real registration status even if VOID is briefly
@@ -395,6 +415,7 @@ let store = createVdpStore();
       });
       const player = ensurePlayer(workerId);
       skillsLib.gainFromShift(player.skills, shift.skill);
+      if (shift.paid) store.analytics.totalVCoinGenerated += shift.pay;
       const job = jobsLib.getJob(shift.jobId);
       const yieldText = shift.yielded ? `, and gathered ${shift.yielded.amount} ${shift.yielded.type}` : '';
       const consumedText = shift.consumed ? ` (used ${shift.consumed.amount} ${shift.consumed.type})` : '';
@@ -796,6 +817,21 @@ let store = createVdpStore();
     }
   });
 
+  // "Off the grid until the government finds out" -- a real, separate
+  // discovery act, the same found/closed shape `reportSmugglingSpot`/
+  // `sealSmugglingSpot` already use.
+  app.post('/api/immigration/illegal-settlements/:settlementId/discover', requireActor('discoveredBy'), (req, res) => {
+    try {
+      const settlement = immigrationLib.discoverSettlement(store.immigration, Number(req.params.settlementId), {
+        discoveredBy: req.body.discoveredBy,
+      });
+      newsLib.recordEvent(store.news, { kind: 'immigration', text: `the government discovered an off-the-grid settlement` });
+      res.status(200).json(settlement);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
   app.post('/api/immigration/illegal-settlements/:settlementId/clear', requireActor('clearedBy'), (req, res) => {
     try {
       const settlement = immigrationLib.clearIllegalSettlement(store.immigration, Number(req.params.settlementId), {
@@ -803,6 +839,28 @@ let store = createVdpStore();
       });
       newsLib.recordEvent(store.news, { kind: 'immigration', text: `a robot patrol cleared an illegal settlement` });
       res.status(200).json(settlement);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // "People can also be set for jail, ticketing, fine... or even face
+  // deportation back to the old world" (8 Oct 2026). The arrival
+  // record is marked, never deleted; a deported NPC (`npc-<id>`) is
+  // also actually removed from the real, server-ticked population --
+  // the real "back to the old world" for an NPC specifically.
+  app.post('/api/immigration/deport', requireActor('deportedBy'), (req, res) => {
+    try {
+      const arrival = immigrationLib.deportPerson(store.immigration, req.body.personId, {
+        deportedBy: req.body.deportedBy,
+        reason: req.body.reason,
+      });
+      const npcMatch = /^npc-(\d+)$/.exec(req.body.personId);
+      if (npcMatch && store.npcWorld) {
+        try { npcs.removeNpcFromWorld(store.npcWorld, Number(npcMatch[1])); } catch { /* already gone */ }
+      }
+      newsLib.recordEvent(store.news, { kind: 'immigration', text: `${req.body.personId} was deported back to the old world` });
+      res.status(200).json(arrival);
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
@@ -857,6 +915,7 @@ let store = createVdpStore();
         personId: req.body.personId,
         reason: req.body.reason,
         issuedBy: req.body.issuedBy,
+        locationLabel: req.body.locationLabel,
       });
       newsLib.recordEvent(store.news, { kind: 'justice', text: `${req.body.personId} was ticketed: ${req.body.reason}` });
       res.status(201).json(ticket);
@@ -899,6 +958,7 @@ let store = createVdpStore();
         personId: req.body.personId,
         reason: req.body.reason,
         detainedBy: req.body.detainedBy,
+        locationLabel: req.body.locationLabel,
       });
       newsLib.recordEvent(store.news, { kind: 'justice', text: `${req.body.personId} was detained: ${req.body.reason}` });
       res.status(201).json(detention);
@@ -929,10 +989,26 @@ let store = createVdpStore();
       ticketCount: store.justice.tickets.length,
       detentionCount: store.justice.detentions.length,
       illegalArrivalCount: immigrationLib.listIllegalArrivals(store.immigration).length,
-      illegalSettlementCount: immigrationLib.listActiveIllegalSettlements(store.immigration).length,
+      // Only settlements the government actually KNOWS about raise
+      // the alarm -- an off-the-grid settlement genuinely does not
+      // count until it's discovered. See immigration.js's own header.
+      illegalSettlementCount: immigrationLib.listKnownIllegalSettlements(store.immigration).length,
       unauthorizedStructureCount: propertyLib.listUnauthorized(store.property).length,
     });
     res.json(securityLib.securityTierFor(crimeCount));
+  });
+
+  // "Aspects of the area have more criminal activity than others" --
+  // a real per-location breakdown across every real record that
+  // carries a locationLabel.
+  app.get('/api/security/by-location', (_req, res) => {
+    const records = [
+      ...store.justice.tickets,
+      ...store.justice.detentions,
+      ...propertyLib.listUnauthorized(store.property),
+      ...immigrationLib.listKnownIllegalSettlements(store.immigration),
+    ];
+    res.json({ crimeByLocation: securityLib.crimeByLocation(records) });
   });
 
   // --- Government Contracts: the AI builds the world through real
@@ -986,6 +1062,7 @@ let store = createVdpStore();
         spendMaterialsFn: resourcesLib.spendMaterials,
         undoSpendFn: resourcesLib.undoSpend,
       });
+      store.analytics.totalVCoinGenerated += completed.vcoinReward;
       newsLib.recordEvent(store.news, { kind: 'contracts', text: `${req.body.builderId} completed a government contract: ${contract.description}` });
       res.status(200).json(completed);
     } catch (err) {
@@ -1065,6 +1142,7 @@ let store = createVdpStore();
         amount: req.body.amount,
         transferFn: (args) => transferVCoin(args),
       });
+      store.analytics.totalVCoinGenerated += result.payout;
       newsLib.recordEvent(store.news, {
         kind: 'resources',
         text: `${req.params.id} sold ${result.amount} ${result.type} for ${result.payout} VCoin`,

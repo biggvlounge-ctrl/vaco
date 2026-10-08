@@ -11,8 +11,8 @@ import assert from 'node:assert/strict';
 
 import {
   TRAIT_NAMES, NEED_NAMES, HABIT_NAMES,
-  createNpc, createNpcWorld, addNpcToWorld, getNpc, listNpcs, latestDecision, explainDecision,
-  pickAction, advanceWorldTick,
+  createNpc, createNpcWorld, addNpcToWorld, removeNpcFromWorld, getNpc, listNpcs, latestDecision,
+  explainDecision, pickAction, advanceWorldTick,
 } from '../src/lib/npcs.js';
 
 const HOME = { x: 100, y: 100 };
@@ -60,6 +60,19 @@ test('addNpcToWorld never reuses an id, even after the world has grown several t
   const third = addNpcToWorld(world, { rng: fixedRng(0.5) });
   assert.equal(third.id, 6);
   assert.equal(new Set(listNpcs(world).map((n) => n.id)).size, 6, 'every id in the world must be distinct');
+});
+
+test('removeNpcFromWorld removes exactly one real NPC, the inverse of addNpcToWorld', () => {
+  const world = createNpcWorld({ count: 3, rng: fixedRng(0.5) });
+  const removed = removeNpcFromWorld(world, 2);
+  assert.equal(removed.id, 2);
+  assert.equal(listNpcs(world).length, 2);
+  assert.equal(getNpc(world, 2), null);
+});
+
+test('removeNpcFromWorld refuses an unknown NPC id', () => {
+  const world = createNpcWorld({ count: 3, rng: fixedRng(0.5) });
+  assert.throws(() => removeNpcFromWorld(world, 999), /no NPC/);
 });
 
 // -- Needs ------------------------------------------------------------------

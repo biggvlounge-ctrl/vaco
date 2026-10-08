@@ -57,3 +57,22 @@ export function securityTierFor(crimeCount, tiers = DEFAULT_SECURITY_TIERS) {
   const tier = sorted.find((t) => crimeCount >= t.min) || sorted[sorted.length - 1];
   return { ...tier, crimeCount };
 }
+
+// "Aspects of the area have more criminal activity than others in
+// the New World, depending on the NPCs" (8 Oct 2026, direct
+// instruction) -- a real per-location breakdown, built from the same
+// real records `measureCrime` already sums globally. `records` is
+// the caller's own real, flattened list of items that already carry a
+// real `locationLabel` (`justice.js`'s tickets/detentions,
+// `property.js`'s unauthorized structures, `immigration.js`'s illegal
+// settlements) -- this module invents no area boundaries of its own,
+// and a record with no real location on it is counted as `'unknown'`
+// rather than silently dropped.
+export function crimeByLocation(records) {
+  const counts = {};
+  for (const record of records) {
+    const label = record.locationLabel || 'unknown';
+    counts[label] = (counts[label] || 0) + 1;
+  }
+  return counts;
+}

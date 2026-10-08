@@ -18,6 +18,7 @@ const VDP_API_URL = import.meta.env?.VITE_VDP_API_URL || "http://localhost:8827"
 
 function describeArrival(arrival) {
   if (!arrival) return "Not on record -- no passport, and no crossing either.";
+  if (arrival.deported) return "Deported back to the old world.";
   if (!arrival.legal) {
     return `Crossed illegally${arrival.caught ? " -- caught" : ""}.`;
   }
@@ -41,6 +42,8 @@ export default function ImmigrationView({ session, onChange }) {
   const [ticketReason, setTicketReason] = useState("");
   const [detainTargetId, setDetainTargetId] = useState("");
   const [detainReason, setDetainReason] = useState("");
+  const [deportTargetId, setDeportTargetId] = useState("");
+  const [deportReason, setDeportReason] = useState("");
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState(null);
 
@@ -168,14 +171,26 @@ export default function ImmigrationView({ session, onChange }) {
         <ul style={{ fontSize: 12, margin: "0 0 8px 0", paddingLeft: 18 }}>
           {activeSettlements.map((s) => (
             <li key={s.id} style={{ marginBottom: 4 }}>
-              {s.locationLabel} (founded by {s.founderId}){" "}
-              <button
-                onClick={run(`clear-${s.id}`, () => post(`/api/immigration/illegal-settlements/${s.id}/clear`, { clearedBy: session.userId }))}
-                disabled={busy === `clear-${s.id}`}
-                style={{ fontSize: 11 }}
-              >
-                {busy === `clear-${s.id}` ? "…" : "Clear it"}
-              </button>
+              {s.locationLabel} (founded by {s.founderId})
+              {!s.discovered && <span style={{ color: "#c60" }}> — off the grid</span>}
+              {" "}
+              {!s.discovered ? (
+                <button
+                  onClick={run(`discover-${s.id}`, () => post(`/api/immigration/illegal-settlements/${s.id}/discover`, { discoveredBy: session.userId }))}
+                  disabled={busy === `discover-${s.id}`}
+                  style={{ fontSize: 11 }}
+                >
+                  {busy === `discover-${s.id}` ? "…" : "Discover it"}
+                </button>
+              ) : (
+                <button
+                  onClick={run(`clear-${s.id}`, () => post(`/api/immigration/illegal-settlements/${s.id}/clear`, { clearedBy: session.userId }))}
+                  disabled={busy === `clear-${s.id}`}
+                  style={{ fontSize: 11 }}
+                >
+                  {busy === `clear-${s.id}` ? "…" : "Clear it"}
+                </button>
+              )}
             </li>
           ))}
           {activeSettlements.length === 0 && <li style={{ color: "#888" }}>None active.</li>}
@@ -286,6 +301,24 @@ export default function ImmigrationView({ session, onChange }) {
             disabled={busy === "detain" || !detainTargetId.trim() || !detainReason.trim()}
           >
             {busy === "detain" ? "…" : "Detain"}
+          </button>
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+          <input
+            type="text" placeholder="who? (userId or npc-N)" value={deportTargetId}
+            onChange={(e) => setDeportTargetId(e.target.value)} style={{ fontSize: 12, width: 140 }}
+          />
+          <input
+            type="text" placeholder="reason" value={deportReason}
+            onChange={(e) => setDeportReason(e.target.value)} style={{ fontSize: 12, flex: 1 }}
+          />
+          <button
+            onClick={run("deport", () => post("/api/immigration/deport", {
+              deportedBy: session.userId, personId: deportTargetId, reason: deportReason,
+            }).then(() => { setDeportTargetId(""); setDeportReason(""); }))}
+            disabled={busy === "deport" || !deportTargetId.trim()}
+          >
+            {busy === "deport" ? "…" : "Deport back to the old world"}
           </button>
         </div>
       </div>

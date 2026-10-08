@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { measureCrime, securityTierFor, DEFAULT_SECURITY_TIERS } from '../src/lib/security.js';
+import { measureCrime, securityTierFor, crimeByLocation, DEFAULT_SECURITY_TIERS } from '../src/lib/security.js';
 
 test('measureCrime sums every real named count, defaulting unnamed ones to zero', () => {
   assert.equal(measureCrime({ ticketCount: 3, detentionCount: 1 }), 4);
@@ -52,4 +52,22 @@ test('thresholds are overridable per call without editing the module', () => {
   const customTiers = [{ name: 'Locked Down', min: 0, cameraCount: 1, robotCount: 1 }];
   const tier = securityTierFor(50, customTiers);
   assert.equal(tier.name, 'Locked Down');
+});
+
+test('crimeByLocation groups real records by their own real locationLabel', () => {
+  const records = [
+    { locationLabel: 'the frontier ridge' },
+    { locationLabel: 'the frontier ridge' },
+    { locationLabel: 'Meridian Commons' },
+  ];
+  assert.deepEqual(crimeByLocation(records), { 'the frontier ridge': 2, 'Meridian Commons': 1 });
+});
+
+test('crimeByLocation counts a record with no real location as "unknown" rather than dropping it', () => {
+  const records = [{ locationLabel: null }, {}];
+  assert.deepEqual(crimeByLocation(records), { unknown: 2 });
+});
+
+test('crimeByLocation returns an empty breakdown for no records', () => {
+  assert.deepEqual(crimeByLocation([]), {});
 });

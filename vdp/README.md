@@ -1019,6 +1019,53 @@ suppress a revolt, read the live security tier.
 all new; `immigration.test.js`). Full suite: 425 passing, up from 400,
 0 failing, clean `npm run build`.
 
+**Phase 28 — crime by area, real analytics, the territory map, and
+deportation** (8 Oct 2026, direct instruction). Five more pieces:
+
+"Aspects of the area have more criminal activity than others... depending
+on the NPCs." `justice.js`'s `issueTicket`/`detainPerson` gained a real,
+optional `locationLabel`; `security.js`'s new `crimeByLocation` groups
+real crime records by it. New `GET /api/security/by-location`.
+
+"A ticker of... how many people are in the world, how much money is
+generated... a map of the charter territory... more places will be
+inserted on the map as the population grows." The population ticker
+was already real. New `GET /api/analytics/status` adds a real,
+named-scope `totalVCoinGenerated` (governors-funded payouts: job
+shifts, contracts, resource sales -- not every VCoin this ecosystem
+has ever moved). `GovernmentView.jsx` gained an Analytics panel and a
+real territory map built from `world.js`'s `DISTRICTS` and
+`settlement.js`'s own population-gated unlock tiers.
+
+"Some areas will be off the grid until the government finds out."
+`immigration.js`'s illegal settlements now start `discovered: false`
+-- real and active immediately, but not counted toward measured crime
+until a real `discoverSettlement` act. `clearIllegalSettlement` now
+requires discovery first. New `POST /api/immigration/illegal-
+settlements/:id/discover`; `ImmigrationView.jsx`'s settlement list
+shows "off the grid" and a Discover action.
+
+"People can also be set for jail, ticketing, fine. They could avoid
+the fines and ticketing... or even face deportation back to the old
+world." "Avoiding" needed no new code (nothing ever forced payment).
+New `immigration.js`'s `deportPerson` marks a real arrival deported,
+never deleting the record; a deported NPC is actually removed from
+the live population via `npcs.js`'s new `removeNpcFromWorld`. New
+`POST /api/immigration/deport`; `ImmigrationView.jsx` gained a Deport
+action.
+
+Also confirmed, not rebuilt: "operations similar to the operations in
+the vacancy game" (VDP's own jobs/organizations/property/contracts are
+already that real analog), "different populations... depending on
+the type of NPCs" (`generateMigrationWave`'s existing region/religion
+pools), and "NPCs start to build... real currency, real businesses,
+real people and avatars" (any `contracts.js` builder id, VCoin, real
+districts, Shield accounts, `avatarRender.js`).
+
+12 new tests (`security.test.js`, `justice.test.js`, `npcs.test.js`,
+`immigration.test.js`). Full suite: 437 passing, up from 425, 0
+failing, clean `npm run build`.
+
 **Phase 2 (SVMIKO DEGVCHI Avatar Wearables)**: 20 plain-Node checks
 (13 unique real pieces, real category assignment, the luxury-vs-
 streetwear tier proven at VDP's own real price scale, a real purchase
