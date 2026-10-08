@@ -9,7 +9,7 @@ const VDP_API_URL = import.meta.env?.VITE_VDP_API_URL || "http://localhost:8827"
 
 const RESOURCE_LABELS = {
   wood: "Wood", stone: "Stone", clay: "Clay", ore: "Ore",
-  game: "Game (hunted)", crop: "Crop (farmed)",
+  game: "Game (hunted)", crop: "Crop (farmed)", water: "Clean Water (treated)",
 };
 
 export default function MaterialsView({ session, onChange }) {

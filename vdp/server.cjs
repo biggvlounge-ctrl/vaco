@@ -369,14 +369,16 @@ let store = createVdpStore();
       const shift = await jobsLib.clockOutAndPay(store.jobs, {
         workerId, transferFn: transferVCoin,
         resourcesStore: store.resources, grantMaterialsFn: resourcesLib.grantMaterials,
+        spendMaterialsFn: resourcesLib.spendMaterials, undoSpendFn: resourcesLib.undoSpend,
       });
       const player = ensurePlayer(workerId);
       skillsLib.gainFromShift(player.skills, shift.skill);
       const job = jobsLib.getJob(shift.jobId);
       const yieldText = shift.yielded ? `, and gathered ${shift.yielded.amount} ${shift.yielded.type}` : '';
+      const consumedText = shift.consumed ? ` (used ${shift.consumed.amount} ${shift.consumed.type})` : '';
       newsLib.recordEvent(store.news, {
         kind: 'job',
-        text: `${workerId} finished a shift as ${job ? job.title : shift.jobId} and earned ${shift.pay} VCoin${yieldText}`,
+        text: `${workerId} finished a shift as ${job ? job.title : shift.jobId} and earned ${shift.pay} VCoin${yieldText}${consumedText}`,
       });
       res.status(200).json(shift);
     } catch (err) {

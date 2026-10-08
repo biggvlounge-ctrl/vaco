@@ -39,6 +39,30 @@
 // from day one, the same payroll-is-the-employer pattern every other
 // job here already uses, just with the founders as that employer
 // instead of a district's own business.
+//
+// **The water treatment job, same day.** Per direct instruction: "the
+// government will establish a clean water process," and "everything
+// is actually done through a process from water." `water_systems:
+// 'plumber'` is `occupations.js`'s own real link from the
+// infrastructure type to the occupation that runs it, `plumber` is
+// `skill: 'Engineering', source: 'plumbing'`, verbatim — the schema
+// has no operator column for infrastructure at all, which is that
+// file's own stated reason the link has to be stated somewhere.
+// `districtId: 'government'` is deliberately its own value, distinct
+// from `'frontier'` above: this is the founding team operating real
+// infrastructure, not land being worked. No `consumes` of its own —
+// it is the one resource with no job that merely finds it, the real
+// base of the chain the instruction describes, not itself produced
+// from something else.
+//
+// `consumes` is new, the input-side mirror of `yields`: `farmer` now
+// needs real water on hand to complete a shift — irrigation, the one
+// water-to-food link universal enough not to be a guess about any
+// specific process, unlike trying to assign water/game/crop to what a
+// named Food District dish actually contains. `clockOutAndPay` spends
+// it BEFORE attempting pay (the same "check the thing that costs
+// nothing to check first" ordering `property.js`'s `upgradeHome`
+// already uses), and undoes the spend if the payout then fails.
 
 export const PLANETARY_GOVERNORS_PAYROLL = 'planetary-governors-payroll';
 
@@ -71,12 +95,18 @@ export const JOBS = {
   farmer: {
     title: 'Frontier Farmer', districtId: 'frontier', skill: 'Agriculture',
     payrollAccountId: PLANETARY_GOVERNORS_PAYROLL, payPerShift: 14,
+    consumes: { type: 'water', amount: 3 },
     yields: { type: 'crop', amount: 8 },
   },
   hunter: {
     title: 'Frontier Hunter', districtId: 'frontier', skill: 'Combat',
     payrollAccountId: PLANETARY_GOVERNORS_PAYROLL, payPerShift: 16,
     yields: { type: 'game', amount: 5 },
+  },
+  'water-treatment-worker': {
+    title: 'Water Treatment Plumber', districtId: 'government', skill: 'Engineering',
+    payrollAccountId: PLANETARY_GOVERNORS_PAYROLL, payPerShift: 15,
+    yields: { type: 'water', amount: 10 },
   },
 };
 
@@ -106,25 +136,36 @@ export function clockIn(store, { workerId, jobId, now = Date.now() } = {}) {
 
 // `transferFn` is injected, same decoupling as every other
 // money-moving pure-logic module in this directory. `resourcesStore`/
-// `grantMaterialsFn` are optional and injected the same way
-// `property.js`'s `upgradeHome` takes its own materials wiring — omit
-// both and only VCoin is paid, which is what every job without a real
-// `yields` entry, and every existing caller/test, still does. When
-// given, a real yield is granted strictly AFTER the VCoin transfer
-// succeeds: it is a produced bonus, not a payment FROM the worker, so
-// there is nothing to roll back on its own, and a failed payout must
-// not also hand out a yield for a shift that never completed.
+// `grantMaterialsFn`/`spendMaterialsFn`/`undoSpendFn` are optional and
+// injected the same way `property.js`'s `upgradeHome` takes its own
+// materials wiring — omit them and only VCoin is paid, which is what
+// every job without a real `yields`/`consumes` entry, and every
+// existing caller/test, still does.
+//
+// Order matters for a job with both halves (`farmer`): the real input
+// is spent FIRST, before pay is even attempted — a worker with no
+// water on hand must never still get paid for a shift that could not
+// actually happen. The yield is granted strictly AFTER the VCoin
+// transfer succeeds: it is a produced bonus, not a payment FROM the
+// worker, so there is nothing to roll back on its own, and a failed
+// payout must not also hand one out for a shift that never completed.
+// If pay fails after a real input was already spent, that spend is
+// undone — two payments for one shift, and neither may survive the
+// other's failure alone, the same shape `upgradeHome` already proved.
 export async function clockOutAndPay(store, {
-  workerId, transferFn, now = Date.now(), resourcesStore, grantMaterialsFn,
+  workerId, transferFn, now = Date.now(), resourcesStore, grantMaterialsFn, spendMaterialsFn, undoSpendFn,
 } = {}) {
   const assignment = store.assignments[workerId];
   if (!assignment) throw new Error(`clockOutAndPay: "${workerId}" is not clocked in`);
   if (typeof transferFn !== 'function') throw new Error('clockOutAndPay requires a transferFn');
-  if (resourcesStore && typeof grantMaterialsFn !== 'function') {
-    throw new Error('clockOutAndPay: resourcesStore requires a grantMaterialsFn');
+  const job = getJob(assignment.jobId);
+  if (resourcesStore && job.yields && typeof grantMaterialsFn !== 'function') {
+    throw new Error('clockOutAndPay: a job with real yields requires a grantMaterialsFn');
+  }
+  if (resourcesStore && job.consumes && (typeof spendMaterialsFn !== 'function' || typeof undoSpendFn !== 'function')) {
+    throw new Error('clockOutAndPay: a job with real consumes requires spendMaterialsFn and undoSpendFn');
   }
 
-  const job = getJob(assignment.jobId);
   // Deleted before the transfer is attempted (same claim-before-pay
   // ordering as the shift record below) but restored on failure —
   // a worker whose payout fails is still clocked in, not quietly
@@ -146,6 +187,17 @@ export async function clockOutAndPay(store, {
   // real, visible "owed" record rather than nothing at all.
   store.shifts.push(shift);
 
+  let consumeResult = null;
+  if (resourcesStore && job.consumes) {
+    try {
+      consumeResult = spendMaterialsFn(resourcesStore, workerId, { [job.consumes.type]: job.consumes.amount });
+    } catch (err) {
+      store.shifts.splice(store.shifts.indexOf(shift), 1);
+      store.assignments[workerId] = assignment;
+      throw err;
+    }
+  }
+
   try {
     await transferFn({
       fromUserId: job.payrollAccountId,
@@ -155,10 +207,13 @@ export async function clockOutAndPay(store, {
     });
     shift.paid = true;
   } catch (err) {
+    if (consumeResult) undoSpendFn(resourcesStore, workerId, consumeResult);
     store.shifts.splice(store.shifts.indexOf(shift), 1);
     store.assignments[workerId] = assignment;
     throw err;
   }
+
+  if (consumeResult) shift.consumed = { type: job.consumes.type, amount: job.consumes.amount };
 
   if (resourcesStore && job.yields) {
     const granted = grantMaterialsFn(resourcesStore, workerId, { [job.yields.type]: job.yields.amount });

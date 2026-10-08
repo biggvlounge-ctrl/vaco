@@ -11,7 +11,9 @@ import {
   listJobs, getJob, createJobsStore, clockIn, clockOutAndPay, currentAssignment, shiftsFor,
   PLANETARY_GOVERNORS_PAYROLL,
 } from '../src/lib/jobs.js';
-import { createResourcesStore, grantMaterials, materialsFor } from '../src/lib/resources.js';
+import {
+  createResourcesStore, grantMaterials, materialsFor, spendMaterials, undoSpend,
+} from '../src/lib/resources.js';
 
 function fakeTransfer(calls, { shouldFail = false } = {}) {
   return async (args) => {
@@ -90,7 +92,7 @@ test('a job with no real yields grants nothing, even when wired to a resources s
   });
 
   assert.equal(shift.yielded, undefined);
-  assert.deepEqual(materialsFor(resourcesStore, 'alice'), { wood: 0, stone: 0, clay: 0, ore: 0, game: 0, crop: 0 });
+  assert.deepEqual(materialsFor(resourcesStore, 'alice'), { wood: 0, stone: 0, clay: 0, ore: 0, game: 0, crop: 0, water: 0 });
 });
 
 test('a failed payout grants no yield for a shift that never completed', async () => {
@@ -111,4 +113,63 @@ test('a frontier shift still works with no resources wiring at all — yields st
   const shift = await clockOutAndPay(store, { workerId: 'alice', transferFn: fakeTransfer([]) });
   assert.equal(shift.paid, true);
   assert.equal(shift.yielded, undefined);
+});
+
+test('the water treatment job is government-run and has no input of its own — it is the base of the chain', () => {
+  const job = getJob('water-treatment-worker');
+  assert.equal(job.payrollAccountId, PLANETARY_GOVERNORS_PAYROLL);
+  assert.equal(job.districtId, 'government', 'water treatment is founding-team infrastructure, not land being worked');
+  assert.equal(job.consumes, undefined, 'nothing produces the water treatment job\'s own input -- it is the root');
+  assert.deepEqual(job.yields, { type: 'water', amount: 10 });
+});
+
+test('a farmer spends real water before being paid, when wired to a resources store', async () => {
+  const store = createJobsStore();
+  const resourcesStore = createResourcesStore();
+  grantMaterials(resourcesStore, 'alice', { water: 10 });
+  clockIn(store, { workerId: 'alice', jobId: 'farmer' });
+  const calls = [];
+  const shift = await clockOutAndPay(store, {
+    workerId: 'alice', transferFn: fakeTransfer(calls), resourcesStore,
+    grantMaterialsFn: grantMaterials, spendMaterialsFn: spendMaterials, undoSpendFn: undoSpend,
+  });
+
+  assert.deepEqual(shift.consumed, { type: 'water', amount: 3 });
+  assert.deepEqual(shift.yielded, { type: 'crop', amount: 8 });
+  assert.equal(materialsFor(resourcesStore, 'alice').water, 7);
+  assert.equal(materialsFor(resourcesStore, 'alice').crop, 8);
+  assert.equal(calls.length, 1, 'a farmer who has real water on hand still gets paid');
+});
+
+test('a farmer with no real water is refused, and paid nothing for it', async () => {
+  const store = createJobsStore();
+  const resourcesStore = createResourcesStore();
+  resourcesStore.oldWorldStock = 0;
+  clockIn(store, { workerId: 'alice', jobId: 'farmer' });
+  const calls = [];
+
+  await assert.rejects(
+    clockOutAndPay(store, {
+      workerId: 'alice', transferFn: fakeTransfer(calls), resourcesStore,
+      grantMaterialsFn: grantMaterials, spendMaterialsFn: spendMaterials, undoSpendFn: undoSpend,
+    }),
+    /short/,
+  );
+  assert.equal(calls.length, 0, 'no water must mean no pay, not a harvest from nothing');
+  assert.ok(currentAssignment(store, 'alice'), 'alice must still be clocked in -- the shift never actually happened');
+});
+
+test('a failed payout undoes a farmer\'s real water spend, not just the shift record', async () => {
+  const store = createJobsStore();
+  const resourcesStore = createResourcesStore();
+  grantMaterials(resourcesStore, 'alice', { water: 10 });
+  clockIn(store, { workerId: 'alice', jobId: 'farmer' });
+
+  await assert.rejects(
+    clockOutAndPay(store, {
+      workerId: 'alice', transferFn: fakeTransfer([], { shouldFail: true }), resourcesStore,
+      grantMaterialsFn: grantMaterials, spendMaterialsFn: spendMaterials, undoSpendFn: undoSpend,
+    }),
+  );
+  assert.equal(materialsFor(resourcesStore, 'alice').water, 10, 'a declined payout must not leave the water spent for a harvest that never happened');
 });

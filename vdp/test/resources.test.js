@@ -125,14 +125,18 @@ test('grantMaterials adds to, rather than replaces, what a player already holds'
   assert.equal(materialsFor(store, 'alice').game, 7);
 });
 
-test('game and crop are real resource types a dig never turns up', () => {
+test('game, crop and water are real resource types a dig never turns up', () => {
   assert.ok(RESOURCE_TYPES.includes('game'));
   assert.ok(RESOURCE_TYPES.includes('crop'));
+  assert.ok(RESOURCE_TYPES.includes('water'));
   const store = createResourcesStore();
   const seenTypes = new Set();
   for (let i = 0; i < 50; i += 1) {
     const result = digForResources(store, { entityId: 'alice', now: i * DIG_COOLDOWN_MS, rng: fixedRng(i / 50) });
     seenTypes.add(result.type);
   }
-  assert.ok(!seenTypes.has('game') && !seenTypes.has('crop'), 'digging is earth and stone, not a hunt or a harvest');
+  assert.ok(
+    !seenTypes.has('game') && !seenTypes.has('crop') && !seenTypes.has('water'),
+    'digging is earth and stone, not a hunt, a harvest, or clean water from a real plant',
+  );
 });

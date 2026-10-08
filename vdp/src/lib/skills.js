@@ -14,7 +14,13 @@
 // `Agriculture` and `Combat` joined 8 Oct 2026 the same way, for the
 // frontier jobs occupations.js already names exactly: `farmer` is
 // `skill: 'Agriculture', source: 'farming'`, `hunter` is
-// `skill: 'Combat', source: 'hunting'`, verbatim.
+// `skill: 'Combat', source: 'hunting'`, verbatim. `Engineering` joined
+// the same day for the water treatment job -- occupations.js's own
+// `INFRASTRUCTURE_POST` names the real link: `water_systems:
+// 'plumber'`, and `plumber` is `skill: 'Engineering', source:
+// 'plumbing'`. The schema has no operator column for infrastructure at
+// all, which is this project's own comment for exactly why that link
+// has to be stated somewhere rather than assumed.
 //
 // A skill rises from three places, each bounded so none of them can
 // alone max it out: working a matching job (small, passive, per
@@ -27,7 +33,7 @@
 
 export const SKILL_NAMES = [
   'Business', 'Crafting', 'Construction', 'Communication', 'Management', 'Athletics', 'Art',
-  'Agriculture', 'Combat',
+  'Agriculture', 'Combat', 'Engineering',
 ];
 
 export const JOB_SHIFT_GAIN = 1.5;

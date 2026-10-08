@@ -69,6 +69,17 @@ loud.
   own business usually would. A player steps into these jobs the same
   way they clock in anywhere else — this is the founding team's own
   operation, open to be worked, not a separate system.
+- **"The government will establish a clean water process through
+  water... everything is actually done through a process from water"**
+  (8 Oct 2026, direct instruction) names water as the real base of the
+  whole chain, not one more raw material among equals. The governors'
+  own `water-treatment-worker` job — the real occupation
+  `occupations.js` already links to a water system, a plumber — has no
+  input of its own; it is the one resource with no job that merely
+  finds it. `farmer` now needs real water on hand to complete a shift
+  (irrigation), so the chain actually reads water → crop → a real
+  cooked product (`foodDistrict.js`), which is the instruction's own
+  "a process from water" traced through code rather than asserted.
 
 ## What is still open
 

@@ -673,6 +673,32 @@ client-side, like CHOPZ's, so this is where the server-held
 `resources.js` leg belongs), undone if the VCoin payout then fails.
 4 new commerce.test.js tests. Full suite: 344 passing, up from 340.
 
+**Phase 18 — water, the real base of the chain** (`jobs.js`,
+`resources.js`, 8 Oct 2026), per direct instruction: "the government
+will establish a clean water process through water... everything is
+actually done through a process from water." A fourth founder-run job,
+`water-treatment-worker` — `occupations.js`'s own real link,
+`water_systems: 'plumber'`, `plumber: skill: 'Engineering'` — joins the
+other three, with `districtId: 'government'` rather than `'frontier'`:
+this is the founding team running real infrastructure, not land being
+worked. It has no `consumes` of its own; it is the one resource with
+no job that merely finds it, the real root the instruction describes.
+
+`jobs.js` gained the input-side mirror of `yields`: `consumes`.
+`farmer` now needs real water on hand to complete a shift (irrigation)
+— the one water-to-food link universal enough not to be a guess about
+any specific process, the same restraint `foodDistrict.js`'s crop
+ingredient already showed about not inventing per-brand recipes.
+`clockOutAndPay` spends the input strictly BEFORE pay is attempted (a
+worker with no water must never still get paid for a shift that could
+not happen), and undoes the spend if the payout then fails — the same
+two-payments-for-one-shift shape `property.js`'s `upgradeHome` already
+proved. `Engineering` joined `skills.js` as a fifth new real skill for
+exactly this job. The chain now actually reads water → crop → a real
+cooked product, traced through code rather than asserted.
+
+8 new jobs.js tests. Full suite: 348 passing, up from 344, 0 failing.
+
 **Phase 2 (SVMIKO DEGVCHI Avatar Wearables)**: 20 plain-Node checks
 (13 unique real pieces, real category assignment, the luxury-vs-
 streetwear tier proven at VDP's own real price scale, a real purchase

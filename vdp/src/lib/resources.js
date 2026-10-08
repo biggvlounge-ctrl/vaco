@@ -30,7 +30,19 @@
 // turns up. Digging is earth and stone; a hunt or a harvest is a
 // different real activity with its own job, so `YIELD_TABLE` below
 // deliberately stays digging-only rather than growing to match.
-export const RESOURCE_TYPES = ['wood', 'stone', 'clay', 'ore', 'game', 'crop'];
+//
+// `water` joined the same day, per direct instruction: "the government
+// will establish a clean water process," and "everything is actually
+// done through a process from water." It is the one resource with no
+// job that merely FINDS it — nobody digs or hunts for clean water, a
+// real `water-treatment-worker` shift (`jobs.js`) produces it, the
+// real plumber's work `occupations.js`'s own `INFRASTRUCTURE_POST`
+// already names (`water_systems: 'plumber'`). It is also the one
+// resource other jobs can require as a real INPUT rather than only
+// ever yield — see `jobs.js`'s `consumes`, starting with `farmer`
+// (irrigation), the one link universal enough not to be a guess about
+// any specific process.
+export const RESOURCE_TYPES = ['wood', 'stone', 'clay', 'ore', 'game', 'crop', 'water'];
 
 // Wood is the one material the instruction named directly, so it is
 // the common case; the rest are "different materials... in the area",
