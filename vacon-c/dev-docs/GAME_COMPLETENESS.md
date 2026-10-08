@@ -13,15 +13,15 @@ three places, a spec section's "roughly 25 of the 40", a catalogue of 67
 statistics that a real world answered 36 of, and seven trait families generated
 on every NPC and read by nothing.
 
-## 91.9% complete
+## 92.1% complete
 
 ```
-██████████████████░░  91.9%   325.45 of 354
+██████████████████░░  92.1%   325.95 of 354
 ```
 
 | axis | complete | score | what it measures |
 |---|---|---|---|
-| systems | **74.9%** | 29.95/40 | urban systems with mechanics |
+| systems | **76.1%** | 30.45/40 | urban systems with mechanics |
 | tables | **94.7%** | 62.5/66 | schema tables a built world fills |
 | statistics | **88.2%** | 105/119 | statistics a world can answer |
 | traits | **100%** | 114/114 | traits something reads |
@@ -40,7 +40,7 @@ reader can weight them differently and say so.
 Everything below is a measured gap, grouped by axis and named exactly as the
 measurement names it. This is the work list.
 
-### systems — 18 open
+### systems — 17 open
 
 The forty systems §7 names, at `server/urbanSystems.js`'s own four levels (modelled 1, partial 0.5, slot 0.15, absent 0).
 
@@ -50,7 +50,6 @@ The forty systems §7 names, at `server/urbanSystems.js`'s own four levels (mode
 | `7. Transportation` *(deferred by scope)* | slot | +0.85 |
 | `10. Food Supply` | partial | +0.5 |
 | `12. Waste` | partial | +0.5 |
-| `15. Gang` | partial | +0.5 |
 | `16. Organized Crime` | partial | +0.5 |
 | `18. Prison` | partial | +0.5 |
 | `20. Government Services` | partial | +0.5 |

@@ -59,12 +59,92 @@
 
 'use strict';
 
-// The roles the schema's own comment does not enumerate —
-// `role_in_org` is open TEXT with no comment at all, unlike most
-// columns in that file. So this validates nothing and stores what it
-// is given; inventing a role enum here would be inventing design.
-// The one rule enforced is that a membership is unique per pair, which
-// the schema itself states: PRIMARY KEY (entity_id, organization_id).
+const { getLiveEntity } = require('./entityTraits.js');
+
+// `role_in_org` is open TEXT with no comment at all in the schema, and
+// this file's own first version said "inventing a role enum here would
+// be inventing design." **That was wrong — a document does name one.**
+// `VACANCY_CONSOLIDATED_MASTER_SPEC.md` §14 GANG / ORGANIZATION
+// STRUCTURE: "roles can include shot callers, leaders, lieutenants,
+// enforcers, recruiters, soldiers, associates, juveniles" — verbatim,
+// the same miss `server/urbanSystems.js`'s Gang entry independently
+// made ("no document names the tiers"). Any OTHER organization's
+// membership still stores whatever role its own caller passes — this
+// enum applies only where §14 says it does, a gang or a faction.
+const GANG_HIERARCHY = [
+  'leader', 'shot_caller', 'lieutenant', 'enforcer', 'recruiter',
+  'soldier', 'associate', 'juvenile',
+];
+
+// Which §14 tier a real gang member actually fits — from facts this
+// engine already has about them, never a guess:
+//
+//   leader    - `organizations.leader_id`, the schema's own column.
+//   juvenile  - real age under 18. Age comes from `createdTick`
+//               directly rather than through `mortality.ageInYears`,
+//               because `mortality.js` already requires this file —
+//               requiring it back would close a cycle.
+//   enforcer  - already on this org's payroll in that position
+//               (`employment_records.position`, written at hire —
+//               see worldgen.js's "a faction pays somebody").
+//
+// Below that, whichever of the four `faction` trait-family dimensions
+// this PERSON actually carries most strongly decides their tier —
+// Ideological Alignment (lieutenant), Recruitment Draw (recruiter),
+// Territorial Instinct (soldier), or the inverse of Defection Risk
+// (shot_caller, the rank most trusted with command). **No threshold is
+// chosen here**: the comparison is relative, among traits every NPC
+// already carries, so there is nothing to tune and nothing to defend
+// as a cutoff. `associate` is the floor — nobody who stands out on none
+// of the four.
+function gangTierFor(worldState, organizationId, entityId, tick = worldState.tick ?? 0) {
+  const organization = (worldState.organizations || []).find((o) => o.id === organizationId);
+  if (organization?.leader_id === entityId) return 'leader';
+
+  const npc = (worldState.npcs || []).find((n) => n.id === entityId);
+  if (npc) {
+    const age = (tick - (npc.createdTick ?? 0)) / 365;
+    if (age < 18) return 'juvenile';
+  }
+
+  const employed = (worldState.employmentRecords || []).some(
+    (r) => r.status === 'active' && r.entity_id === entityId
+      && r.employer_organization_id === organizationId && r.position === 'enforcer',
+  );
+  if (employed) return 'enforcer';
+
+  const faction = getLiveEntity(worldState, entityId)?.traits?.faction ?? {};
+  const scores = {
+    lieutenant: Number(faction['Ideological Alignment']) || 0,
+    recruiter: Number(faction['Recruitment Draw']) || 0,
+    soldier: Number(faction['Territorial Instinct']) || 0,
+    shot_caller: 100 - (Number(faction['Defection Risk']) || 100),
+  };
+  // A strict max, not just the highest seen — a tie (every member
+  // starts all four at the same neutral draw until drift moves them
+  // apart) must not single one tier out by accident of key order.
+  let tier = 'associate';
+  let best = -Infinity;
+  let tied = 0;
+  for (const [candidate, score] of Object.entries(scores)) {
+    if (score > best) { best = score; tier = candidate; tied = 1; } else if (score === best) tied += 1;
+  }
+  return tied === 1 ? tier : 'associate';
+}
+
+// Re-derives every current member's tier for one gang or faction.
+// Idempotent by construction — `gangTierFor` reads live facts and
+// writes nothing itself, so running this twice on an unchanged world
+// assigns the same tiers both times (standing rule 15).
+function assignGangTiers(worldState, organizationId, tick = worldState.tick ?? 0) {
+  const assigned = [];
+  for (const m of worldState.entityOrganizationMemberships || []) {
+    if (m.organization_id !== organizationId) continue;
+    m.role_in_org = gangTierFor(worldState, organizationId, m.entity_id, tick);
+    assigned.push(m);
+  }
+  return assigned;
+}
 
 function findMembership(worldState, entityId, organizationId) {
   return (worldState.entityOrganizationMemberships || []).find(
@@ -235,4 +315,7 @@ module.exports = {
   isGang,
   organizationPresence,
   gangMembershipRate,
+  GANG_HIERARCHY,
+  gangTierFor,
+  assignGangTiers,
 };

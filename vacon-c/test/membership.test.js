@@ -190,3 +190,153 @@ test('organizations.members is a stored placeholder and nothing writes it back',
 test('the WorldState the engine ships carries the membership array', () => {
   assert.ok(Array.isArray(engine.WorldState.entityOrganizationMemberships));
 });
+
+// ---------------------------------------------------------------------
+// §7 system 15, Gang — §14's own named hierarchy
+// ---------------------------------------------------------------------
+
+const { generateEntityTraits } = require('../server/entityTraits.js');
+const { INDIVIDUAL_DEFINITIONS } = require('../server/traitDefinitions.js');
+
+// Every `faction` dimension neutral except the one override — so a
+// test asserting on one tier is not accidentally helped by another.
+function givenFactionTraits(w, entityId, overrides = {}) {
+  w.entityTraits.push(...generateEntityTraits(entityId, w.tick, INDIVIDUAL_DEFINITIONS, (def) => {
+    if (def.family === 'faction' && overrides[def.name] !== undefined) return overrides[def.name];
+    return 50;
+  }));
+}
+
+test('GANG_HIERARCHY is §14\'s own eight tiers, verbatim', () => {
+  assert.deepEqual(membership.GANG_HIERARCHY, [
+    'leader', 'shot_caller', 'lieutenant', 'enforcer', 'recruiter',
+    'soldier', 'associate', 'juvenile',
+  ]);
+});
+
+test('the organization\'s leader is tiered leader before anything else is even read', () => {
+  const w = world();
+  const gang = org(w, { type: 'gang' });
+  const leaderNpc = person(w);
+  leaderNpc.createdTick = w.tick - 40 * 365; // an adult
+  gang.leader_id = leaderNpc.id;
+  membership.joinOrganization(w, { entityId: leaderNpc.id, organizationId: gang.id, role: 'member' });
+
+  assert.equal(membership.gangTierFor(w, gang.id, leaderNpc.id), 'leader');
+});
+
+test('a real minor is tiered juvenile', () => {
+  const w = world();
+  const gang = org(w, { type: 'gang' });
+  const kid = person(w);
+  kid.createdTick = w.tick - 10 * 365; // 10 years old
+  membership.joinOrganization(w, { entityId: kid.id, organizationId: gang.id, role: 'member' });
+
+  assert.equal(membership.gangTierFor(w, gang.id, kid.id), 'juvenile');
+});
+
+test('whoever is actually on the payroll as an enforcer is tiered enforcer', () => {
+  const w = world();
+  const gang = org(w, { type: 'gang' });
+  const npc = person(w);
+  npc.createdTick = w.tick - 30 * 365;
+  w.employmentRecords = [{
+    id: 1, entity_id: npc.id, employer_organization_id: gang.id,
+    position: 'enforcer', status: 'active', wage: 20,
+  }];
+  membership.joinOrganization(w, { entityId: npc.id, organizationId: gang.id, role: 'member' });
+
+  assert.equal(membership.gangTierFor(w, gang.id, npc.id), 'enforcer');
+});
+
+test('an ordinary adult member with no standout trait is tiered associate', () => {
+  const w = world();
+  const gang = org(w, { type: 'gang' });
+  const npc = person(w);
+  npc.createdTick = w.tick - 30 * 365;
+  givenFactionTraits(w, npc.id, {});
+  membership.joinOrganization(w, { entityId: npc.id, organizationId: gang.id, role: 'member' });
+
+  assert.equal(membership.gangTierFor(w, gang.id, npc.id), 'associate');
+});
+
+test('each of the four faction trait dimensions picks a different real tier, with no threshold to tune', () => {
+  const w = world();
+  const gang = org(w, { type: 'gang' });
+  const cases = [
+    ['Ideological Alignment', 90, 'lieutenant'],
+    ['Recruitment Draw', 90, 'recruiter'],
+    ['Territorial Instinct', 90, 'soldier'],
+  ];
+  for (const [traitName, value, expectedTier] of cases) {
+    const npc = person(w);
+    npc.createdTick = w.tick - 30 * 365;
+    givenFactionTraits(w, npc.id, { [traitName]: value });
+    membership.joinOrganization(w, { entityId: npc.id, organizationId: gang.id, role: 'member' });
+    assert.equal(membership.gangTierFor(w, gang.id, npc.id), expectedTier,
+      `a standout ${traitName} should tier as ${expectedTier}`);
+  }
+
+  // Defection Risk runs the other way — LOW, not high, is the signal.
+  const loyal = person(w);
+  loyal.createdTick = w.tick - 30 * 365;
+  givenFactionTraits(w, loyal.id, { 'Defection Risk': 5 });
+  membership.joinOrganization(w, { entityId: loyal.id, organizationId: gang.id, role: 'member' });
+  assert.equal(membership.gangTierFor(w, gang.id, loyal.id), 'shot_caller');
+});
+
+test('assignGangTiers writes real tiers onto every current member, and only touches gang/faction rows', () => {
+  const w = world();
+  const gang = org(w, { type: 'gang' });
+  const other = org(w, { type: 'business' });
+
+  const leaderNpc = person(w);
+  leaderNpc.createdTick = w.tick - 40 * 365;
+  gang.leader_id = leaderNpc.id;
+  membership.joinOrganization(w, { entityId: leaderNpc.id, organizationId: gang.id, role: 'member' });
+
+  const kid = person(w);
+  kid.createdTick = w.tick - 12 * 365;
+  membership.joinOrganization(w, { entityId: kid.id, organizationId: gang.id, role: 'member' });
+
+  const employee = person(w);
+  employee.createdTick = w.tick - 30 * 365;
+  membership.joinOrganization(w, { entityId: employee.id, organizationId: other.id, role: 'employee' });
+
+  membership.assignGangTiers(w, gang.id, w.tick);
+
+  assert.equal(membership.findMembership(w, leaderNpc.id, gang.id).role_in_org, 'leader');
+  assert.equal(membership.findMembership(w, kid.id, gang.id).role_in_org, 'juvenile');
+  assert.equal(membership.findMembership(w, employee.id, other.id).role_in_org, 'employee',
+    'a non-gang organization\'s role is untouched by the gang hierarchy pass');
+});
+
+test('assignGangTiers is idempotent — the same world, run twice, ends up identical (standing rule 15)', () => {
+  const w = world();
+  const gang = org(w, { type: 'gang' });
+  const npc = person(w);
+  npc.createdTick = w.tick - 30 * 365;
+  givenFactionTraits(w, npc.id, { 'Recruitment Draw': 95 });
+  membership.joinOrganization(w, { entityId: npc.id, organizationId: gang.id, role: 'member' });
+
+  membership.assignGangTiers(w, gang.id, w.tick);
+  const once = membership.findMembership(w, npc.id, gang.id).role_in_org;
+  membership.assignGangTiers(w, gang.id, w.tick);
+  const twice = membership.findMembership(w, npc.id, gang.id).role_in_org;
+
+  assert.equal(once, 'recruiter');
+  assert.equal(twice, once);
+});
+
+test('a faction (isFaction, not type gang) gets the same real hierarchy', () => {
+  const w = world();
+  const faction = org(w, { type: 'club', isFaction: true });
+  const npc = person(w);
+  npc.createdTick = w.tick - 30 * 365;
+  givenFactionTraits(w, npc.id, { 'Territorial Instinct': 88 });
+  membership.joinOrganization(w, { entityId: npc.id, organizationId: faction.id, role: 'member' });
+
+  assert.ok(membership.isGang(faction));
+  membership.assignGangTiers(w, faction.id, w.tick);
+  assert.equal(membership.findMembership(w, npc.id, faction.id).role_in_org, 'soldier');
+});

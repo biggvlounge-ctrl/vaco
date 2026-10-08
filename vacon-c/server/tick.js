@@ -55,6 +55,7 @@ const economy = require('./economy.js');
 const investments = require('./investments.js');
 const businesses = require('./businesses.js');
 const construction = require('./construction.js');
+const membership = require('./membership.js');
 const politics = require('./politics.js');
 const technology = require('./technology.js');
 const mortality = require('./mortality.js');
@@ -921,6 +922,19 @@ function runOrganizationPhase(worldState, options = {}) {
   // building their own home is not founding an organization.
   const builtHomes = construction.runConstruction(worldState, worldState.tick);
   events.push(...builtHomes.events);
+
+  // **§7 system 15, Gang: §14's own named hierarchy.** `role_in_org`
+  // has been open TEXT with no reader deciding it since the schema
+  // shipped — `membership.gangTierFor` is the real tiers (shot callers
+  // through juveniles), re-derived every tick from facts that can
+  // change (age crossing 18, who is on the payroll as an enforcer, who
+  // leads), not written once and left to go stale. Only gang and
+  // faction memberships are touched; every other organization's role
+  // is unaffected.
+  for (const organization of worldState.organizations || []) {
+    if (!membership.isGang(organization)) continue;
+    membership.assignGangTiers(worldState, organization.id, worldState.tick);
+  }
 
   return events;
 }

@@ -357,17 +357,28 @@ const SYSTEMS = [
   {
     n: 15,
     name: 'Gang',
-    level: 'partial',
+    level: 'modelled',
+    phases: ['runOrganizationPhase'],
     tables: ['factions', 'organizations', 'entity_organization_memberships'],
     traitFamilies: ['faction'],
-    note: 'Factions are real and carry a full trait sheet, and membership is now a live '
-      + 'table rather than a schema-only one — so gang membership PER AREA is derivable '
-      + '(membership.gangMembershipRate), not just faction control of a block. The '
-      + 'hierarchy of §14 (shot callers through juveniles) is still not enumerated: '
-      + 'role_in_org is open TEXT and no document names the tiers. **A faction now pays '
-      + 'an enforcer**, which is a different fact from membership — `worldgen` gives each '
-      + 'one a founding hire, so `occupations.OCCUPATIONS.enforcer` has an employer and '
-      + 'the takeover key\'s composition requirement, which is written in enforcers, can '
+    functions: ['gangTierFor', 'assignGangTiers'],
+    note: 'Factions are real and carry a full trait sheet, and membership is a live table '
+      + 'rather than a schema-only one — so gang membership PER AREA is derivable '
+      + '(membership.gangMembershipRate), not just faction control of a block. **The '
+      + 'hierarchy of §14 closed 8 Oct 2026, and the reason it had not was wrong — this '
+      + 'entry and membership.js\'s own header both said "no document names the tiers", '
+      + 'and `VACANCY_CONSOLIDATED_MASTER_SPEC.md` §14 names them verbatim.** '
+      + '`membership.gangTierFor` assigns the real eight — leader from `organizations.'
+      + 'leader_id`, juvenile from real age under 18, enforcer from the actual payroll '
+      + 'position `worldgen` already hires, and the rest from whichever of the four '
+      + '`faction` trait-family dimensions a member carries most strongly (Ideological '
+      + 'Alignment, Recruitment Draw, Territorial Instinct, or the inverse of Defection '
+      + 'Risk), with no invented threshold — the comparison is relative among traits every '
+      + 'NPC already has, so there is nothing to tune. Re-derived every tick rather than set '
+      + 'once, so a juvenile who turns 18 or an enforcer who changes does not go stale. **A '
+      + 'faction also pays an enforcer**, a different fact from membership — `worldgen` '
+      + 'gives each one a founding hire, so `occupations.OCCUPATIONS.enforcer` has an '
+      + 'employer and the takeover key\'s composition requirement, written in enforcers, can '
       + 'actually be met (server/control.js).',
   },
   {

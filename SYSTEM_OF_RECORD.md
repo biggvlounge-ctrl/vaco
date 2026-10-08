@@ -982,7 +982,7 @@ trusted:
 
 The simulation engine is the one app in this repo whose "done" is not a
 list of routes, so it carries a measured completeness score rather than
-a criteria tally. **91.9%**, from
+a criteria tally. **92.1%**, from
 `vacon-c/dev-docs/GAME_COMPLETENESS.md`, which
 `vacon-c/scripts/completeness.mjs` regenerates and
 `vacon-c/test/completeness.test.js` fails on if stale — including a
@@ -990,12 +990,27 @@ check that the percent in THIS file matches the one the code measures.
 
 | axis | complete | what it measures |
 |---|---|---|
-| systems | 74.9% | the forty urban systems §7 names, at `urbanSystems.js`'s own four levels |
+| systems | 76.1% | the forty urban systems §7 names, at `urbanSystems.js`'s own four levels |
 | tables | 94.7% | schema tables a built world actually fills |
 | statistics | 88.2% | statistics a world can answer about itself |
 | traits | 100% | traits something under `server/` reads |
 | traitDepth | 85.7% | trait columns a life actually changes |
 | habits | 100% | whether habits and routines carry information |
+
+**91.9% -> 92.1% on 8 Oct 2026, systems axis.** §7 system 15 Gang
+moved `partial` -> `modelled`. §14 GANG / ORGANIZATION STRUCTURE names
+eight real tiers verbatim — "shot callers, leaders, lieutenants,
+enforcers, recruiters, soldiers, associates, juveniles" — and both
+this report and `membership.js`'s own header had independently said
+"no document names the tiers." It does
+(`VACANCY_CONSOLIDATED_MASTER_SPEC.md` §14), and
+`membership.gangTierFor` assigns the real eight from facts the engine
+already has: `organizations.leader_id` for leader, real age under 18
+for juvenile, the actual enforcer hire `worldgen` already makes for
+enforcer, and for the rest, whichever of the four `faction` trait
+dimensions a member carries most strongly — with no invented
+threshold, since the comparison is relative among traits every NPC
+already has. Re-derived every tick rather than set once.
 
 **91.8% -> 91.9% on 8 Oct 2026, systems axis.** §7 system 30
 Construction moved `partial` -> `modelled`. `property.
