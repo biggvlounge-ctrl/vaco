@@ -6,7 +6,11 @@ import assert from 'node:assert/strict';
 import {
   createPropertyStore, purchaseHome, homeOwnedBy, advanceLifecycle, upgradeHome,
   rentHome, buyRentedHome, HOME_PRICE, RENT_PRICE, LIFECYCLE, PROPERTY_LEVELS,
+  MATERIALS_REQUIRED, materialsDeltaFor,
 } from '../src/lib/property.js';
+import {
+  createResourcesStore, spendMaterials, undoSpend, materialsFor, STARTING_OLD_WORLD_STOCK,
+} from '../src/lib/resources.js';
 import { TOWN_NAME } from '../src/lib/town.js';
 
 function fakeTransfer(calls, { shouldFail = false } = {}) {
@@ -85,6 +89,89 @@ test('a failed upgrade rolls the level back', async () => {
     upgradeHome(store, { ownerId: 'alice', transferFn: fakeTransfer([], { shouldFail: true }) }),
   );
   assert.equal(homeOwnedBy(store, 'alice').level, PROPERTY_LEVELS[0].level, 'a declined charge must not leave the home upgraded');
+});
+
+test('materialsDeltaFor charges only the real difference, and level 1 costs nothing to move into', () => {
+  assert.deepEqual(MATERIALS_REQUIRED[1], { wood: 0, stone: 0, clay: 0, ore: 0 });
+  assert.deepEqual(materialsDeltaFor(1, 2), MATERIALS_REQUIRED[2]);
+  assert.deepEqual(
+    materialsDeltaFor(2, 3),
+    {
+      wood: MATERIALS_REQUIRED[3].wood - MATERIALS_REQUIRED[2].wood,
+      stone: MATERIALS_REQUIRED[3].stone - MATERIALS_REQUIRED[2].stone,
+      clay: MATERIALS_REQUIRED[3].clay - MATERIALS_REQUIRED[2].clay,
+      ore: MATERIALS_REQUIRED[3].ore - MATERIALS_REQUIRED[2].ore,
+    },
+  );
+});
+
+test('upgradeHome spends real materials before charging VCoin, when wired to a resources store', async () => {
+  const store = createPropertyStore();
+  const resourcesStore = createResourcesStore();
+  resourcesStore.materials.alice = { wood: 100, stone: 100, clay: 100, ore: 100 };
+  await purchaseHome(store, { ownerId: 'alice', transferFn: fakeTransfer([]) });
+
+  const calls = [];
+  const home = await upgradeHome(store, {
+    ownerId: 'alice', transferFn: fakeTransfer(calls), resourcesStore,
+    spendMaterialsFn: spendMaterials, undoSpendFn: undoSpend,
+  });
+
+  assert.equal(home.level, PROPERTY_LEVELS[1].level);
+  const delta = materialsDeltaFor(1, 2);
+  assert.equal(materialsFor(resourcesStore, 'alice').wood, 100 - delta.wood);
+  assert.equal(materialsFor(resourcesStore, 'alice').stone, 100 - delta.stone);
+  // No local shortfall at these quantities, so the import stock must
+  // not have moved at all.
+  assert.equal(resourcesStore.oldWorldStock, STARTING_OLD_WORLD_STOCK);
+});
+
+test('upgradeHome refuses an upgrade nobody has the materials for, and charges no VCoin for it', async () => {
+  const store = createPropertyStore();
+  const resourcesStore = createResourcesStore();
+  resourcesStore.oldWorldStock = 0;
+  resourcesStore.materials.alice = { wood: 0, stone: 0, clay: 0, ore: 0 };
+  await purchaseHome(store, { ownerId: 'alice', transferFn: fakeTransfer([]) });
+
+  const calls = [];
+  await assert.rejects(
+    upgradeHome(store, {
+      ownerId: 'alice', transferFn: fakeTransfer(calls), resourcesStore,
+      spendMaterialsFn: spendMaterials, undoSpendFn: undoSpend,
+    }),
+    /short/,
+  );
+  assert.equal(calls.length, 0, 'insufficient materials must refuse before VCoin is ever charged');
+  assert.equal(homeOwnedBy(store, 'alice').level, PROPERTY_LEVELS[0].level, 'a refused upgrade must not leave the level bumped');
+});
+
+test('upgradeHome undoes a real materials spend when the VCoin transfer then fails', async () => {
+  const store = createPropertyStore();
+  const resourcesStore = createResourcesStore();
+  resourcesStore.materials.alice = { wood: 100, stone: 100, clay: 100, ore: 100 };
+  await purchaseHome(store, { ownerId: 'alice', transferFn: fakeTransfer([]) });
+
+  await assert.rejects(
+    upgradeHome(store, {
+      ownerId: 'alice', transferFn: fakeTransfer([], { shouldFail: true }), resourcesStore,
+      spendMaterialsFn: spendMaterials, undoSpendFn: undoSpend,
+    }),
+  );
+
+  assert.deepEqual(
+    materialsFor(resourcesStore, 'alice'),
+    { wood: 100, stone: 100, clay: 100, ore: 100 },
+    'a declined VCoin charge must not leave materials spent for an upgrade that never happened',
+  );
+  assert.equal(resourcesStore.oldWorldStock, STARTING_OLD_WORLD_STOCK);
+  assert.equal(homeOwnedBy(store, 'alice').level, PROPERTY_LEVELS[0].level);
+});
+
+test('upgradeHome still works with no resources wiring at all — materials stay optional', async () => {
+  const store = createPropertyStore();
+  await purchaseHome(store, { ownerId: 'alice', transferFn: fakeTransfer([]) });
+  const home = await upgradeHome(store, { ownerId: 'alice', transferFn: fakeTransfer([]) });
+  assert.equal(home.level, PROPERTY_LEVELS[1].level);
 });
 
 test('upgradeHome refuses someone with no home, and refuses past the top level', async () => {

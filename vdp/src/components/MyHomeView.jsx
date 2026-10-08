@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { PROPERTY_LEVELS, HOME_PRICE, RENT_PRICE, levelByNumber } from "../lib/property.js";
+import { PROPERTY_LEVELS, HOME_PRICE, RENT_PRICE, levelByNumber, materialsDeltaFor } from "../lib/property.js";
 
 // Real actions against vdp/server.cjs's property routes -- buy, rent,
 // upgrade, buy-the-home-you're-renting. `property.js`'s functions
@@ -9,6 +9,12 @@ import { PROPERTY_LEVELS, HOME_PRICE, RENT_PRICE, levelByNumber } from "../lib/p
 // MyAssetsView.jsx already does with other lib modules.
 
 const VDP_API_URL = import.meta.env?.VITE_VDP_API_URL || "http://localhost:8827";
+
+function materialsCostLabel(fromLevel, toLevel) {
+  const delta = materialsDeltaFor(fromLevel, toLevel);
+  const parts = Object.entries(delta).filter(([, amount]) => amount > 0).map(([type, amount]) => `${amount} ${type}`);
+  return parts.length > 0 ? parts.join(", ") : "no materials";
+}
 
 export default function MyHomeView({ session, onChange }) {
   const [home, setHome] = useState(null);
@@ -166,7 +172,7 @@ export default function MyHomeView({ session, onChange }) {
 
           {home.ownershipType === "owned" && nextLevel && (
             <button onClick={act("/api/property/upgrade")} disabled={busy}>
-              {busy ? "…" : `Upgrade to ${nextLevel.name} (${nextLevel.price - currentLevel.price} VCoin)`}
+              {busy ? "…" : `Upgrade to ${nextLevel.name} (${nextLevel.price - currentLevel.price} VCoin + ${materialsCostLabel(home.level, nextLevel.level)})`}
             </button>
           )}
 

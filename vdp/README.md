@@ -603,10 +603,25 @@ for the real shortfall — "limit import" is a shrinking fallback a
 build can still fail to find, not a second currency. `POST /api/
 resources/:id/dig` and `GET /api/resources/:id` are the new routes
 (`test/server.test.js`), plus a full unit suite
-(`test/resources.test.js`, 8 passing). Not yet wired into a real build
-cost (`property.js`'s `purchaseHome`/`upgradeHome` still charge VCoin
-only) — that conversion rate is a real design decision nothing has
-specified yet, flagged rather than guessed.
+(`test/resources.test.js`, 9 passing). A real button followed
+(`MaterialsView.jsx`, same pattern as `JobsView.jsx`'s clock-in).
+
+**And wired into a real building cost, same day.** `property.js`'s
+`MATERIALS_REQUIRED` is a flagged, interpretive ladder — the same
+footing `PROPERTY_LEVELS`' own prices already stand on, since no
+document specifies a real materials cost either — scaled against that
+same price ladder. Level 1 costs none, because it is a unit inside the
+already-built VXLLAGE complex, not something a player constructs; only
+moving UP a tower level is real new building, so `upgradeHome` is the
+only place materials are charged, never `purchaseHome` or `rentHome`.
+Two payments for one upgrade, and neither may survive the other's
+failure alone: materials are spent before VCoin is even attempted
+(insufficient materials must never cost VCoin first), and
+`resources.undoSpend` — rollback-only, restoring exactly what a
+specific spend took, never a general top-up — reverses the spend if
+the VCoin transfer then fails. `MyHomeView.jsx`'s upgrade button now
+shows the real materials cost alongside the VCoin price. 332 tests
+passing across the whole app, up from 326.
 
 **Phase 2 (SVMIKO DEGVCHI Avatar Wearables)**: 20 plain-Node checks
 (13 unique real pieces, real category assignment, the luxury-vs-
@@ -770,13 +785,9 @@ VOKEN's real `/api/brand` endpoint — not hardcoded text.
   lands. Player needs/goals now exist for the player too, reusing
   the same engine NPCs already used (`createPlayerState` in
   `npcs.js`), not just for NPCs.
-- Local materials (`resources.js`, Phase 16) are real, diggable, and
-  now have a real button (`MaterialsView.jsx`, same pattern as
-  `JobsView.jsx`'s clock-in button) — but still not a real building
-  cost. `property.js`'s home purchase/upgrade still charges VCoin
-  only. Wiring `spendMaterials` into it needs a real VCoin/materials
-  split nothing has specified yet; guessing one would be exactly the
-  kind of invented number this project avoids.
+- ~~Local materials not wired into a real building cost~~ — closed,
+  8 Oct 2026. `upgradeHome` now charges real materials
+  (`MATERIALS_REQUIRED`) alongside VCoin; see Phase 16 above.
 - ~~Real cross-origin Shield SSO for the embedded-iframe case~~ —
   closed in Phase 10 (see above). Both the direct-visit handoff from
   `vaco-shell` and the embedded-iframe handoff into VENVS are now real.

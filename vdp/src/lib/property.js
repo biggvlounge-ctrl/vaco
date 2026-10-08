@@ -58,8 +58,37 @@ export const HOME_PRICE = PROPERTY_LEVELS[0].price;
 export const RENT_FRACTION = 0.2;
 export const RENT_PRICE = Math.round(PROPERTY_LEVELS[0].price * RENT_FRACTION);
 
+// **A flagged interpretive ladder, the same footing `PROPERTY_LEVELS`'
+// own prices already stand on** — no document specifies a real
+// materials cost, so this is chosen, not derived, scaled against the
+// same price ladder. Level 1 costs none: it is a unit inside the
+// already-built VXLLAGE complex, not something a player constructs —
+// only moving UP a tower level represents real new building, which is
+// why `upgradeHome` is the only place this is charged, never
+// `purchaseHome` or `rentHome`.
+export const MATERIALS_REQUIRED = {
+  1: { wood: 0, stone: 0, clay: 0, ore: 0 },
+  2: { wood: 20, stone: 5, clay: 0, ore: 0 },
+  3: { wood: 45, stone: 20, clay: 5, ore: 0 },
+  4: { wood: 80, stone: 40, clay: 15, ore: 5 },
+  5: { wood: 130, stone: 65, clay: 30, ore: 15 },
+};
+
 export function levelByNumber(level) {
   return PROPERTY_LEVELS.find((l) => l.level === level) || null;
+}
+
+// The real per-type difference between two levels' requirements —
+// never the next level's full requirement, the same "don't charge
+// twice" rule the VCoin price delta already follows.
+export function materialsDeltaFor(fromLevel, toLevel) {
+  const from = MATERIALS_REQUIRED[fromLevel] || {};
+  const to = MATERIALS_REQUIRED[toLevel] || {};
+  const delta = {};
+  for (const type of Object.keys(to)) {
+    delta[type] = Math.max(0, (to[type] || 0) - (from[type] || 0));
+  }
+  return delta;
 }
 
 export function createPropertyStore() {
@@ -179,7 +208,19 @@ export async function buyRentedHome(store, { ownerId, transferFn, now = Date.now
 // they're standing in. Same claim-before-pay ordering as
 // `purchaseHome`: the level is bumped before the transfer is awaited,
 // rolled back on failure.
-export async function upgradeHome(store, { ownerId, transferFn, now = Date.now() } = {}) {
+//
+// `resourcesStore`/`spendMaterialsFn`/`undoSpendFn` are optional and
+// injected, the same decoupling `transferFn` already uses -- this
+// file has no import of `resources.js` and does not need one. Omit
+// all three and only VCoin is charged, which is what every existing
+// caller and test still does. When given, materials are spent BEFORE
+// the VCoin transfer is attempted (insufficient materials should
+// never cost VCoin first) and undone if the transfer then fails --
+// two payments for one upgrade, and neither may survive the other's
+// failure alone.
+export async function upgradeHome(store, {
+  ownerId, transferFn, now = Date.now(), resourcesStore, spendMaterialsFn, undoSpendFn,
+} = {}) {
   if (!ownerId) throw new Error('upgradeHome requires an ownerId');
   const property = homeOwnedBy(store, ownerId);
   if (!property) throw new Error(`upgradeHome: "${ownerId}" does not own a home`);
@@ -187,6 +228,9 @@ export async function upgradeHome(store, { ownerId, transferFn, now = Date.now()
     throw new Error(`upgradeHome: "${ownerId}" is renting, not owning -- buy the home first (buyRentedHome)`);
   }
   if (typeof transferFn !== 'function') throw new Error('upgradeHome requires a transferFn');
+  if (resourcesStore && (typeof spendMaterialsFn !== 'function' || typeof undoSpendFn !== 'function')) {
+    throw new Error('upgradeHome: resourcesStore requires both spendMaterialsFn and undoSpendFn');
+  }
 
   const current = levelByNumber(property.level);
   const next = levelByNumber(property.level + 1);
@@ -199,9 +243,22 @@ export async function upgradeHome(store, { ownerId, transferFn, now = Date.now()
   property.levelName = next.name;
   property.upgradedAt = now;
 
+  let spendResult = null;
+  if (resourcesStore) {
+    try {
+      spendResult = spendMaterialsFn(resourcesStore, ownerId, materialsDeltaFor(previousLevel, next.level));
+    } catch (err) {
+      property.level = previousLevel;
+      property.levelName = previousLevelName;
+      delete property.upgradedAt;
+      throw err;
+    }
+  }
+
   try {
     await transferFn({ fromUserId: ownerId, amount: cost, reason: 'vdp-home-upgrade' });
   } catch (err) {
+    if (resourcesStore) undoSpendFn(resourcesStore, ownerId, spendResult);
     property.level = previousLevel;
     property.levelName = previousLevelName;
     delete property.upgradedAt;

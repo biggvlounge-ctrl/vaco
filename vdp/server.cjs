@@ -468,6 +468,9 @@ let store = createVdpStore();
       const home = await propertyLib.upgradeHome(store.property, {
         ownerId: req.body.ownerId,
         transferFn: (args) => transferVCoin({ ...args, toUserId: 'vdp-property-office' }),
+        resourcesStore: store.resources,
+        spendMaterialsFn: resourcesLib.spendMaterials,
+        undoSpendFn: resourcesLib.undoSpend,
       });
       newsLib.recordEvent(store.news, {
         kind: 'property',

@@ -101,6 +101,12 @@ export function digForResources(store, { entityId, now = Date.now(), rng = Math.
 // while that stock has anything left. "Limit import" means the import
 // is a shrinking fallback a build can still fail to find, not a
 // second currency nothing ever runs out of.
+//
+// `perType` records exactly where each unit came from, local vs.
+// old-world — not for the caller to read in the ordinary case, but so
+// a paired payment that fails afterward (property.js's `upgradeHome`,
+// which charges VCoin for the same upgrade) can undo precisely this
+// spend via `undoSpend` rather than guessing at a refund.
 export function spendMaterials(store, entityId, requested = {}) {
   const have = store.materials[entityId] || zeroMaterials();
   let totalShortfall = 0;
@@ -117,16 +123,39 @@ export function spendMaterials(store, entityId, requested = {}) {
   }
 
   if (!store.materials[entityId]) store.materials[entityId] = zeroMaterials();
+  const perType = {};
   for (const type of RESOURCE_TYPES) {
     const need = requested[type] || 0;
     if (need === 0) continue;
-    store.materials[entityId][type] -= Math.min(need, store.materials[entityId][type] || 0);
+    const fromLocal = Math.min(need, store.materials[entityId][type] || 0);
+    store.materials[entityId][type] -= fromLocal;
+    perType[type] = { fromLocal, fromOldWorld: need - fromLocal };
   }
   store.oldWorldStock -= totalShortfall;
 
   return {
     spent: requested,
+    perType,
     fromOldWorldStock: totalShortfall,
     oldWorldStockRemaining: store.oldWorldStock,
   };
+}
+
+// **Rollback only — undoes exactly the spend `spendMaterials` just
+// returned, never a top-up.** The only real caller is a transaction
+// whose other half failed after this spend already committed
+// (`property.js`'s `upgradeHome`, which also charges VCoin for the
+// same upgrade): the spend must not survive a payment that never went
+// through. This is precise because `perType` already recorded exactly
+// where each unit came from — it restores local materials and the
+// shared old-world stock to exactly what they were, never inventing a
+// top-up `oldWorldStock` did not actually have.
+export function undoSpend(store, entityId, spendResult) {
+  if (!store.materials[entityId]) store.materials[entityId] = zeroMaterials();
+  let restoredFromOldWorld = 0;
+  for (const [type, { fromLocal, fromOldWorld }] of Object.entries(spendResult.perType || {})) {
+    store.materials[entityId][type] = (store.materials[entityId][type] || 0) + fromLocal;
+    restoredFromOldWorld += fromOldWorld;
+  }
+  store.oldWorldStock += restoredFromOldWorld;
 }

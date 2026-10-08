@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 
 import {
   RESOURCE_TYPES, DIG_COOLDOWN_MS, STARTING_OLD_WORLD_STOCK,
-  createResourcesStore, materialsFor, canDig, digForResources, spendMaterials,
+  createResourcesStore, materialsFor, canDig, digForResources, spendMaterials, undoSpend,
 } from '../src/lib/resources.js';
 
 function fixedRng(...values) {
@@ -72,6 +72,21 @@ test('spendMaterials falls back to the old-world stock only for the real shortfa
   assert.equal(result.fromOldWorldStock, 3, 'only the real shortfall (5 - 2) should draw from the import stock');
   assert.equal(store.oldWorldStock, STARTING_OLD_WORLD_STOCK - 3);
 });
+
+test('undoSpend restores exactly what spendMaterials took, local and old-world both', () => {
+  const store = createResourcesStore();
+  store.materials.alice = { wood: 2, stone: 4, clay: 0, ore: 0 };
+  const result = spendMaterials(store, 'alice', { wood: 5, stone: 1 });
+  assert.equal(materialsFor(store, 'alice').wood, 0);
+  assert.equal(materialsFor(store, 'alice').stone, 3);
+  assert.equal(result.fromOldWorldStock, 3);
+
+  undoSpend(store, 'alice', result);
+
+  assert.deepEqual(materialsFor(store, 'alice'), { wood: 2, stone: 4, clay: 0, ore: 0 });
+  assert.equal(store.oldWorldStock, STARTING_OLD_WORLD_STOCK, 'undoSpend must restore the old-world stock exactly, not leave it short or over-credit it');
+});
+
 
 test('spendMaterials refuses a request the import stock cannot cover, and changes nothing', () => {
   const store = createResourcesStore();
