@@ -16,19 +16,26 @@ export default function MaterialsView({ session, onChange }) {
   const [materials, setMaterials] = useState(null);
   const [canDig, setCanDig] = useState(true);
   const [oldWorldStock, setOldWorldStock] = useState(null);
+  const [exoticValues, setExoticValues] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [sellBusyType, setSellBusyType] = useState(null);
   const [error, setError] = useState(null);
   const [lastDig, setLastDig] = useState(null);
+  const [lastSale, setLastSale] = useState(null);
 
   const refresh = useCallback(async () => {
     if (!session?.userId) return;
     try {
       const userId = encodeURIComponent(session.userId);
-      const res = await fetch(`${VDP_API_URL}/api/resources/${userId}`);
+      const [res, exoticRes] = await Promise.all([
+        fetch(`${VDP_API_URL}/api/resources/${userId}`),
+        fetch(`${VDP_API_URL}/api/resources/exotic-values`),
+      ]);
       const body = await res.json();
       setMaterials(body.materials);
       setCanDig(body.canDig);
       setOldWorldStock(body.oldWorldStock);
+      setExoticValues((await exoticRes.json()).values);
       setError(null);
     } catch (err) {
       setError(err.message);
@@ -61,6 +68,28 @@ export default function MaterialsView({ session, onChange }) {
     }
   };
 
+  const handleSell = async (type) => {
+    setSellBusyType(type);
+    setError(null);
+    try {
+      const userId = encodeURIComponent(session.userId);
+      const res = await fetch(`${VDP_API_URL}/api/resources/${userId}/sell`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.sessionToken}` },
+        body: JSON.stringify({ type, amount: 1 }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || `sell failed (${res.status})`);
+      setLastSale(`Sold 1 ${RESOURCE_LABELS[type] || type} for ${body.payout} VCoin.`);
+      await refresh();
+      if (onChange) await onChange();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSellBusyType(null);
+    }
+  };
+
   if (!session) return null;
 
   return (
@@ -68,13 +97,28 @@ export default function MaterialsView({ session, onChange }) {
       <h2 style={{ fontSize: 16, margin: "0 0 8px 0" }}>Materials</h2>
       {error && <p style={{ fontSize: 12, color: "#e04a4a" }}>{error}</p>}
       {lastDig && <p style={{ fontSize: 12, color: "#3a9d6f" }}>{lastDig}</p>}
+      {lastSale && <p style={{ fontSize: 12, color: "#3a9d6f" }}>{lastSale}</p>}
 
       {materials && (
         <ul style={{ fontSize: 13, margin: "0 0 12px 0", paddingLeft: 0, listStyle: "none" }}>
           {Object.entries(materials).map(([type, amount]) => (
-            <li key={type} style={{ display: "flex", justifyContent: "space-between", padding: "2px 0" }}>
+            <li key={type} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "2px 0" }}>
               <span>{RESOURCE_LABELS[type] || type}</span>
-              <span>{amount}</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                {exoticValues && (
+                  <span style={{ fontSize: 11, color: "#888" }}>
+                    {exoticValues[type]?.toFixed(1)} VCoin/unit
+                  </span>
+                )}
+                <span>{amount}</span>
+                <button
+                  onClick={() => handleSell(type)}
+                  disabled={sellBusyType === type || amount <= 0}
+                  style={{ fontSize: 11 }}
+                >
+                  {sellBusyType === type ? "…" : "Sell 1"}
+                </button>
+              </span>
             </li>
           ))}
         </ul>

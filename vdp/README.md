@@ -851,6 +851,34 @@ New routes: `POST /api/immigration/apply-citizenship`,
 11 new tests (9 `immigration.test.js`, 2 `npcs.test.js`). Full suite:
 385 passing, up from 374, 0 failing.
 
+**Phase 23 — real UI for immigration, land, and scarcity pricing.**
+Phases 20-22 above shipped real, tested server routes with no button
+anywhere -- every verification went through a direct request with a
+bearer token, the same gap `MaterialsView.jsx`'s own header already
+named for digging before that component existed. This phase closes it
+for the newer routes the same way.
+
+New `ImmigrationView.jsx`: a player's own entry status (citizenship,
+temporary passport with its real expiry, or an illegal crossing), the
+two real applications, and three governance lists any logged-in player
+can act on (the real check is identity, not a job assignment nobody
+enforces client-side either) -- open smuggling spots (report/seal),
+active illegal settlements (found/clear), and unauthorized structures
+(build/demolish).
+
+`MyHomeView.jsx` gained a "buy a vacant plot of land" option alongside
+buy/rent, and renders a land purchase as what it actually is (nothing
+built on it yet) rather than crashing on a home shape with no
+`levelName`. `MaterialsView.jsx` now shows each resource's real,
+live exotic value per unit and a real "Sell 1" action per row, reading
+`GET /api/resources/exotic-values` and posting to the new
+`POST /api/resources/:id/sell`. `server.cjs` gained the one missing
+read route this needed, `GET /api/immigration/arrivals/:personId`.
+
+No new pure-logic tests (this phase is wiring, not new rules) -- full
+suite still 385 passing, 0 failing, plus a clean production build
+(`npm run build`) confirming the new JSX compiles.
+
 **Phase 2 (SVMIKO DEGVCHI Avatar Wearables)**: 20 plain-Node checks
 (13 unique real pieces, real category assignment, the luxury-vs-
 streetwear tier proven at VDP's own real price scale, a real purchase

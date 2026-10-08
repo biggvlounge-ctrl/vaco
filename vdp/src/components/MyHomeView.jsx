@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
-import { PROPERTY_LEVELS, HOME_PRICE, RENT_PRICE, levelByNumber, materialsDeltaFor } from "../lib/property.js";
+import {
+  PROPERTY_LEVELS, HOME_PRICE, RENT_PRICE, LAND_PRICE, levelByNumber, materialsDeltaFor,
+} from "../lib/property.js";
 
 // Real actions against vdp/server.cjs's property routes -- buy, rent,
 // upgrade, buy-the-home-you're-renting. `property.js`'s functions
@@ -131,12 +133,15 @@ export default function MyHomeView({ session, onChange }) {
       {loading && !home && <p style={{ fontSize: 12, color: "#888" }}>Loading…</p>}
 
       {!loading && !home && !household && (
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button onClick={act("/api/property/purchase")} disabled={busy}>
             {busy ? "…" : `Buy a ${PROPERTY_LEVELS[0].name} (${HOME_PRICE} VCoin)`}
           </button>
           <button onClick={act("/api/property/rent")} disabled={busy}>
             {busy ? "…" : `Rent a ${PROPERTY_LEVELS[0].name} (${RENT_PRICE} VCoin)`}
+          </button>
+          <button onClick={act("/api/property/buy-land")} disabled={busy}>
+            {busy ? "…" : `Buy a vacant plot of land (${LAND_PRICE} VCoin)`}
           </button>
         </div>
       )}
@@ -158,7 +163,13 @@ export default function MyHomeView({ session, onChange }) {
         </div>
       )}
 
-      {home && (
+      {home && home.type === "land" && (
+        <p style={{ fontSize: 12 }}>
+          A vacant plot of land ({home.ownershipType}) — {home.lifecycleStage}. Nothing built on it yet.
+        </p>
+      )}
+
+      {home && home.type !== "land" && (
         <div>
           <p style={{ fontSize: 12 }}>
             {home.levelName} ({home.ownershipType}) — {home.lifecycleStage}

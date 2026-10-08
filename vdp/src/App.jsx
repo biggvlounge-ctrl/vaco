@@ -14,6 +14,7 @@ import OrganizationsView from "./components/OrganizationsView.jsx";
 import DreamsScreensView from "./components/DreamsScreensView.jsx";
 import MyAssetsView from "./components/MyAssetsView.jsx";
 import MyHomeView from "./components/MyHomeView.jsx";
+import ImmigrationView from "./components/ImmigrationView.jsx";
 import NewsTicker from "./components/NewsTicker.jsx";
 
 // Where "exit VDP" goes. Same target as every other app's masthead
@@ -275,6 +276,7 @@ export default function App() {
               <MaterialsView session={session} onChange={notifyStateChange} />
               <ChopzView session={session} onPurchase={notifyStateChange} />
               <MyHomeView session={session} onChange={notifyStateChange} />
+              <ImmigrationView session={session} onChange={notifyStateChange} />
               <OrganizationsView session={session} onChange={notifyStateChange} />
               <DreamsScreensView session={session} />
               <MyAssetsView session={session} degvchiStore={degvchiStore} refreshSignal={tick} />

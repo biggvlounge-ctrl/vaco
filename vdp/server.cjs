@@ -619,6 +619,10 @@ let store = createVdpStore();
     res.json({ arrivals: immigrationLib.listArrivals(store.immigration) });
   });
 
+  app.get('/api/immigration/arrivals/:personId', (req, res) => {
+    res.json({ arrival: immigrationLib.arrivalFor(store.immigration, req.params.personId) });
+  });
+
   app.get('/api/immigration/illegal', (_req, res) => {
     res.json({ illegal: immigrationLib.listIllegalArrivals(store.immigration) });
   });
