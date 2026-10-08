@@ -55,6 +55,24 @@
 // base of the chain the instruction describes, not itself produced
 // from something else.
 //
+// **Robot Patrol Officer (8 Oct 2026), per direct instruction**: "we
+// also will have robots doing a lot of the policing in the new
+// world." `occupations.js` has no literal "police" entry; `officer`
+// (tier 5, `skill: 'Combat', source: 'military tactics', employers:
+// ['military', 'government']`) is the nearest real occupation --
+// government-employed, Combat-skilled, the same shape this file
+// already borrows for every job with no exact literal match
+// (lumberjack borrows carpenter's Construction the same way). The lore
+// is that the patrol itself is robot-staffed; every job in this file
+// is a slot a PLAYER clocks into, so a player's own shift here is
+// supervising/directing that patrol, not the player literally being a
+// robot -- flagged the same way this project flags any interpretive
+// bridge between an instruction and a player-facing mechanic. No
+// `yields` of its own: the real output of this job is the enforcement
+// actions its holder performs directly (`immigration.js`'s
+// `catchIllegalArrival`/`sealSmugglingSpot`/`clearIllegalSettlement`,
+// `property.js`'s `demolishUnauthorized`), not a produced resource.
+//
 // `consumes` is new, the input-side mirror of `yields`: `farmer` now
 // needs real water on hand to complete a shift — irrigation, the one
 // water-to-food link universal enough not to be a guess about any
@@ -107,6 +125,10 @@ export const JOBS = {
     title: 'Water Treatment Plumber', districtId: 'government', skill: 'Engineering',
     payrollAccountId: PLANETARY_GOVERNORS_PAYROLL, payPerShift: 15,
     yields: { type: 'water', amount: 10 },
+  },
+  'robot-patrol-officer': {
+    title: 'Robot Patrol Officer', districtId: 'government', skill: 'Combat',
+    payrollAccountId: PLANETARY_GOVERNORS_PAYROLL, payPerShift: 18,
   },
 };
 

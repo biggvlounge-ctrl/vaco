@@ -28,9 +28,28 @@
 // VXLLAGE name the same way a real person moves out of their first
 // apartment complex into a house they own outright.
 
+// **Land and unauthorized building (8 Oct 2026), per direct
+// instruction.** "People can also have the option to buy land as
+// well" is a real, separate purchase from a finished home -- vacant
+// `land` is its own `PROPERTY_TYPES` entry, priced below the cheapest
+// built unit (unbuilt land is worth less than VXLLAGE's own finished
+// Studio), a flagged interpretive number on the same footing as every
+// other price in this file, not derived from a document.
+//
+// "People doing unauthorized buildings. We will be restricted, and we
+// will try to keep everything [controlled]" is the same instruction's
+// other half: `authorized` is a real field on every property this file
+// creates (true for everything above), and `buildUnauthorized` is the
+// one path that sets it false on purpose -- a real structure on the
+// books as not sanctioned, distinct from `immigration.js`'s
+// `foundIllegalSettlement` (a standing claim to a place, not a single
+// structure). `demolishUnauthorized` is the governors' own real
+// enforcement action -- a robot patrol (`jobs.js`'s
+// `robot-patrol-officer`) tearing an unsanctioned structure down.
+
 import { TOWN_NAME } from './town.js';
 
-export const PROPERTY_TYPES = ['residential'];
+export const PROPERTY_TYPES = ['residential', 'land'];
 
 // Verbatim from vacon-c/server/property.js's own LIFECYCLE list.
 export const LIFECYCLE = [
@@ -122,6 +141,7 @@ export async function purchaseHome(store, { ownerId, transferFn, now = Date.now(
     lifecycleStage: 'operation',
     level: PROPERTY_LEVELS[0].level,
     levelName: PROPERTY_LEVELS[0].name,
+    authorized: true,
     purchasedAt: now,
   };
   // Claim before pay: the row exists the instant it's committed to,
@@ -160,6 +180,7 @@ export async function rentHome(store, { ownerId, transferFn, now = Date.now() } 
     lifecycleStage: 'operation',
     level: PROPERTY_LEVELS[0].level,
     levelName: PROPERTY_LEVELS[0].name,
+    authorized: true,
     purchasedAt: now,
   };
   store.properties.push(property);
@@ -273,4 +294,90 @@ export function advanceLifecycle(property) {
   if (idx === -1 || idx === LIFECYCLE.length - 1) return property;
   property.lifecycleStage = LIFECYCLE[idx + 1];
   return property;
+}
+
+// Vacant land -- a real, separate purchase from a finished home. Same
+// one-property-per-owner constraint (`homeOwnedBy`) every function
+// above already enforces, and the same claim-before-pay/rollback
+// ordering as `purchaseHome`.
+export const LAND_PRICE = Math.round(PROPERTY_LEVELS[0].price * 0.4);
+
+export async function purchaseLand(store, { ownerId, transferFn, now = Date.now() } = {}) {
+  if (!ownerId) throw new Error('purchaseLand requires an ownerId');
+  if (homeOwnedBy(store, ownerId)) {
+    throw new Error(`purchaseLand: "${ownerId}" already owns a home or plot`);
+  }
+  if (typeof transferFn !== 'function') throw new Error('purchaseLand requires a transferFn');
+
+  const property = {
+    id: store.nextPropertyId++,
+    type: 'land',
+    ownerId,
+    ownerType: 'individual',
+    ownershipType: 'owned',
+    lifecycleStage: 'planning',
+    authorized: true,
+    purchasedAt: now,
+  };
+  store.properties.push(property);
+
+  try {
+    await transferFn({ fromUserId: ownerId, amount: LAND_PRICE, reason: 'vdp-land-purchase' });
+  } catch (err) {
+    const idx = store.properties.indexOf(property);
+    if (idx !== -1) store.properties.splice(idx, 1);
+    throw err;
+  }
+
+  return property;
+}
+
+// "People doing unauthorized buildings" -- a real structure that
+// exists on the books as not sanctioned, built with no purchase at
+// all (an unauthorized builder did not go through the governors'
+// office), which is why this takes no `transferFn` -- there is no real
+// payment to roll back, the structure itself is the thing that is
+// not legitimate.
+export function buildUnauthorized(store, { ownerId, locationLabel, now = Date.now() } = {}) {
+  if (!ownerId) throw new Error('buildUnauthorized requires an ownerId');
+  if (!locationLabel) throw new Error('buildUnauthorized requires a locationLabel');
+
+  const property = {
+    id: store.nextPropertyId++,
+    type: 'residential',
+    ownerId,
+    ownerType: 'individual',
+    ownershipType: 'owned',
+    lifecycleStage: 'construction',
+    authorized: false,
+    locationLabel,
+    builtAt: now,
+  };
+  store.properties.push(property);
+  return property;
+}
+
+export function listUnauthorized(store) {
+  return store.properties.filter((p) => p.authorized === false);
+}
+
+// The governors' own real enforcement action -- a robot patrol
+// (`jobs.js`'s `robot-patrol-officer`) tearing down a structure that
+// was never authorized. Removes the row outright rather than flagging
+// it cleared, the real distinction `immigration.js`'s
+// `clearIllegalSettlement` draws for a whole settlement instead of one
+// structure.
+export function demolishUnauthorized(store, propertyId, { demolishedBy, now = Date.now() } = {}) {
+  const property = store.properties.find((p) => p.id === propertyId);
+  if (!property) throw new Error(`demolishUnauthorized: no property #${propertyId}`);
+  if (property.authorized) throw new Error(`demolishUnauthorized: property #${propertyId} is authorized`);
+
+  const idx = store.properties.indexOf(property);
+  store.properties.splice(idx, 1);
+  return {
+    demolishedPropertyId: propertyId,
+    ownerId: property.ownerId,
+    demolishedBy: demolishedBy || null,
+    demolishedAt: now,
+  };
 }

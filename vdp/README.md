@@ -729,6 +729,62 @@ not a flagship brand.
 4 new commerce.test.js tests. Full suite: 352 passing, up from 348,
 0 failing.
 
+**Phase 20 — immigration: passports, illegal crossings, robot
+patrols, unauthorized building, and buying land** (8 Oct 2026, direct
+instruction). The founding story now names its own trigger: the old
+world's chaos was VACANCY's own reset (`VDP_FOUNDING.md`'s "The
+old-world event, named"), and migration to the new world has a real,
+controlled gate with a real seam in it.
+
+New `src/lib/immigration.js`: one real `arrivals` list covers both
+`admitWithPassport` (legal, `originRegion`/`religion` kept as open free
+text -- "all different type of religions, people from everywhere" is
+never flattened into an invented fixed list) and `crossIllegally`
+(`smuggledGoods` free text too -- "guns, things like that" is the
+instruction's own example, not expanded into a catalog this file
+invents the rest of). `reportSmugglingSpot`/`sealSmugglingSpot` are two
+real, separate events, never one hidden detection roll standing in for
+both -- the same standing rule against inventing a simulation
+threshold this project already holds itself to everywhere else.
+`foundIllegalSettlement`/`clearIllegalSettlement` track a real standing
+claim to a place, kept distinct from a single structure.
+
+`property.js` gained `purchaseLand` (a real, separate, cheaper plot
+purchase -- "people can also have the option to buy land as well"),
+and `buildUnauthorized`/`demolishUnauthorized`/`listUnauthorized` for
+"people doing unauthorized buildings... we will be restricted." Every
+property this file creates now carries a real `authorized` field;
+`buildUnauthorized` is the one path that sets it false on purpose, with
+no payment attached since an unauthorized builder went around the
+governors' office by definition.
+
+`jobs.js` gained `robot-patrol-officer` -- "we also will have robots
+doing a lot of the policing in the new world." `occupations.js` has no
+literal "police" entry; `officer` (tier 5, Combat, "military tactics,"
+government-employed) is the nearest real occupation, the same
+nearest-match discipline `lumberjack` already uses for carpenter's
+Construction. A player clocked into this slot directs that robot
+patrol rather than playing a robot themselves -- flagged the same way
+every other gap between an instruction and a mechanic in this document
+already is.
+
+`skills.js`'s `createSkills` takes an optional seed, backward
+compatible (every existing caller still gets the all-zero start) --
+"people are bringing the chaos from the old world to the new world.
+You have all your different characteristics, statistics" now has a
+real path: an arrival's `oldWorldSkills` seeds a new player's skill
+sheet in `server.cjs`'s `ensurePlayer`, when one was recorded for them.
+
+`server.cjs` gained a real `store.immigration` slot and the matching
+routes (`/api/immigration/*`, plus `/api/property/buy-land`,
+`/build-unauthorized`, `/demolish-unauthorized`, `/unauthorized`),
+guarded the same way every other actor route in this file already is
+-- the acting patrol officer, not the person being acted on, is the
+identity `requireActor` checks on an enforcement route.
+
+21 new tests across `immigration.test.js` (new), `property.test.js`,
+and `skills.test.js`. Full suite: 368 passing, up from 352, 0 failing.
+
 **Phase 2 (SVMIKO DEGVCHI Avatar Wearables)**: 20 plain-Node checks
 (13 unique real pieces, real category assignment, the luxury-vs-
 streetwear tier proven at VDP's own real price scale, a real purchase

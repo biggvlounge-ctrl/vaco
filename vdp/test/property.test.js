@@ -6,7 +6,8 @@ import assert from 'node:assert/strict';
 import {
   createPropertyStore, purchaseHome, homeOwnedBy, advanceLifecycle, upgradeHome,
   rentHome, buyRentedHome, HOME_PRICE, RENT_PRICE, LIFECYCLE, PROPERTY_LEVELS,
-  MATERIALS_REQUIRED, materialsDeltaFor,
+  MATERIALS_REQUIRED, materialsDeltaFor, purchaseLand, LAND_PRICE, buildUnauthorized,
+  demolishUnauthorized, listUnauthorized,
 } from '../src/lib/property.js';
 import {
   createResourcesStore, spendMaterials, undoSpend, materialsFor, STARTING_OLD_WORLD_STOCK,
@@ -251,4 +252,57 @@ test('buyRentedHome refuses someone with no home and someone who already owns', 
     buyRentedHome(store, { ownerId: 'bob', transferFn: fakeTransfer([]) }),
     /already owns their home/,
   );
+});
+
+test('purchaseLand claims a real vacant plot, priced below the cheapest home', async () => {
+  const store = createPropertyStore();
+  const calls = [];
+  const plot = await purchaseLand(store, { ownerId: 'dana', transferFn: fakeTransfer(calls) });
+  assert.equal(calls[0].amount, LAND_PRICE);
+  assert.ok(LAND_PRICE < HOME_PRICE);
+  assert.equal(plot.type, 'land');
+  assert.equal(plot.authorized, true);
+  assert.equal(homeOwnedBy(store, 'dana').id, plot.id);
+});
+
+test('a failed purchaseLand rolls back -- no plot left on the books', async () => {
+  const store = createPropertyStore();
+  await assert.rejects(
+    purchaseLand(store, { ownerId: 'dana', transferFn: fakeTransfer([], { shouldFail: true }) }),
+  );
+  assert.equal(homeOwnedBy(store, 'dana'), null);
+});
+
+test('purchaseLand refuses someone who already owns a home or plot', async () => {
+  const store = createPropertyStore();
+  await purchaseHome(store, { ownerId: 'dana', transferFn: fakeTransfer([]) });
+  await assert.rejects(
+    purchaseLand(store, { ownerId: 'dana', transferFn: fakeTransfer([]) }),
+    /already owns a home or plot/,
+  );
+});
+
+test('buildUnauthorized creates a real structure flagged not sanctioned, with no payment', () => {
+  const store = createPropertyStore();
+  const shack = buildUnauthorized(store, { ownerId: 'eve', locationLabel: 'past the tree line' });
+  assert.equal(shack.authorized, false);
+  assert.equal(shack.ownerId, 'eve');
+  assert.deepEqual(listUnauthorized(store), [shack]);
+});
+
+test('demolishUnauthorized removes a real unauthorized structure outright', () => {
+  const store = createPropertyStore();
+  const shack = buildUnauthorized(store, { ownerId: 'eve', locationLabel: 'past the tree line' });
+  const result = demolishUnauthorized(store, shack.id, { demolishedBy: 'patrol-1' });
+  assert.equal(result.ownerId, 'eve');
+  assert.equal(result.demolishedBy, 'patrol-1');
+  assert.equal(listUnauthorized(store).length, 0);
+  assert.equal(store.properties.length, 0);
+});
+
+test('demolishUnauthorized refuses an authorized property and an unknown one', async () => {
+  const store = createPropertyStore();
+  const home = await purchaseHome(store, { ownerId: 'frank', transferFn: fakeTransfer([]) });
+  assert.throws(() => demolishUnauthorized(store, home.id), /is authorized/);
+  assert.throws(() => demolishUnauthorized(store, 9999), /no property/);
 });

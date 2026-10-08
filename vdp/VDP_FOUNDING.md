@@ -46,10 +46,11 @@ loud.
 - **Migration has a real cause, not a constant trickle.** People leave
   the old world because of real issues there, and the instruction is
   explicit that the heavier migration wave starts only once something
-  real happens back in the old world — not specified yet, and not
-  invented here (see "What is still open"). Until then, the settlement
-  grows from the small founding population below, the same slow,
-  measured growth `settlement.js` already models.
+  real happens back in the old world. **Named below, not still open**
+  (corrected 8 Oct 2026 — see "The old-world event, named"): it is
+  VACANCY's own reset. Until that wave, the settlement grows from the
+  small founding population below, the same slow, measured growth
+  `settlement.js` already models.
 
 ## What this reframes, concretely
 
@@ -117,6 +118,105 @@ loud.
   like the frontier jobs above, kept visibly apart from the 11 real
   brands rather than folded into them.
 
+## The old-world event, named (8 Oct 2026)
+
+**A correction to this document's own second open item above.** This
+document previously left "the real event in the old world that starts
+the heavier migration wave" unspecified. It is now named by direct
+instruction: **VACANCY** — the real civilization-simulation game this
+whole repository already builds (`vacon-c/`, whose own schema and docs
+are literally named `VACANCY_*`: `VACANCY_POSTGRESQL_SCHEMA.sql`,
+`VACANCY_SEED.md`, and the rest) — is "the game" the old world was
+playing when a reset inside it threw the real old world into
+"craziness." VDP is the real extension founded on the other side of
+that chaos: people migrated not out of a vague old-world hardship, but
+specifically away from the fallout of VACANCY's own reset, into the
+new, controlled, slowly-opening world beyond the ice wall this
+document already describes.
+
+This is a real, checkable claim about this repository, not a new
+invented backstory: `vdp/src/lib/vacancyClient.js` and
+`vdp/src/lib/vacancySchema.js` already read VACANCY's own live API and
+map VDP's world objects onto its real tables (`vacancySchema.test.js`
+fails if that mapping ever drifts from a real `CREATE TABLE`) — VDP was
+already built as the thing standing next to VACANCY before this
+document said why. What "the reset" specifically was inside VACANCY's
+own simulation, and what in the old world's reaction to it actually
+broke, are not specified by the instruction and are not invented here
+— named as the trigger, not yet detailed as an event.
+
+## Illegal migration, and the chaos people bring with them (8 Oct 2026)
+
+Per direct instruction, the controlled gate above has a real, working
+seam, not a perfectly sealed one:
+
+- **People find other ways across the ice wall besides the passport
+  line** — a real illegal crossing, alongside the legal one, both
+  landing in the same real arrival record (`immigration.js`'s
+  `arrivals`, `method: 'passport'` vs `'illegal_crossing'`) rather than
+  two separate, incompatible systems.
+- **Some of them bring things from the old world with them** — guns,
+  named as the instruction's own example, "things like that" left
+  genuinely open rather than expanded into an invented catalog of
+  contraband (`immigration.js`'s `smuggledGoods`, free text).
+- **A robot patrol can find a new, specific spot where people are
+  sneaking in** — a real, named discovery (`reportSmugglingSpot`), and
+  closing it a separate, later, equally real act (`sealSmugglingSpot`)
+  — two real events, never one invented detection roll standing in for
+  both, the same standing rule against inventing a simulation
+  threshold this whole project already holds itself to.
+- **"People are bringing the chaos from the old world to the new
+  world. You have all your different characteristics, statistics, and
+  things like that"** — a migrant's real stats carry over rather than
+  starting at zero. `immigration.js`'s arrival record can carry real
+  `oldWorldSkills`/`oldWorldBeliefs`, and `server.cjs`'s `ensurePlayer`
+  now seeds a new player's `skills.js` sheet from exactly that record
+  when one exists for them (`skills.js`'s `createSkills(seed)`) —
+  falling back to the same all-zero start every existing player and
+  test already has when no arrival was ever recorded for them.
+- **People start illegal settlements** — a real, standing claim to a
+  place outside the governors' own controlled footprint
+  (`immigration.js`'s `foundIllegalSettlement`/`clearIllegalSettlement`),
+  kept distinct from a single unauthorized structure below.
+
+## Keeping a controlled atmosphere: robots, unauthorized building, land, and who gets in (8 Oct 2026)
+
+- **"We also will have robots doing a lot of the policing in the new
+  world."** `occupations.js` has no literal "police" entry; `officer`
+  (tier 5, Combat, "military tactics," employed by `military`/
+  `government`) is the nearest real occupation, the same
+  nearest-real-match discipline `lumberjack` already uses for
+  carpenter's Construction. `jobs.js`'s `robot-patrol-officer` is that
+  slot, governors-paid like every other frontier/government job above
+  — a player clocked into it is directing that robot patrol, not
+  playing a robot themselves, a flagged interpretive bridge the same
+  way every other gap between an instruction and a mechanic in this
+  document is flagged rather than silently assumed.
+- **"People doing unauthorized buildings. We will be restricted, and
+  we will try to keep everything [controlled]."** `property.js`'s
+  `authorized` field is true on every real home/plot above; the one
+  new path, `buildUnauthorized`, sets it false on purpose — a real
+  structure on the books as not sanctioned, no payment attached
+  because an unauthorized builder went around the governors' office by
+  definition. `demolishUnauthorized` is the robot patrol's own real
+  enforcement action on it.
+- **"People can also have the option to buy land as well."**
+  `property.js`'s `purchaseLand` — a real, separate, cheaper purchase
+  than a finished VXLLAGE home, land with nothing built on it yet.
+- **"We will also try to keep a controlled atmosphere of passports
+  coming into this new world. All different type of religions, people
+  from everywhere."** `immigration.js`'s `admitWithPassport` records
+  wherever a migrant really came from and whatever they really believe
+  as open, free-text fields (`originRegion`, `religion`) — never a
+  fixed invented list of real-world regions or faiths, the same
+  discipline `beliefs.js`'s own `beliefType` enum already stops short
+  of naming specific real creeds.
+- **VACON-C's own `server/justice.js` stays the one real
+  arrest/court/prison system at civilization scale.** `immigration.js`
+  does not reimplement it in miniature — catching an illegal arrival
+  or clearing a settlement is VDP's own small, real record of its own
+  small world, not a second justice system.
+
 ## What is still open
 
 - The area's own name — nothing has been given yet (the product name,
@@ -124,13 +224,16 @@ loud.
 - Exactly how the tech team found a way past the ice wall, and what
   (if anything) was already there when they arrived — not specified;
   not invented here either.
-- The real event in the old world that starts the heavier migration
-  wave — named as real and load-bearing by direct instruction, but not
-  itself specified yet. Until it is, the settlement's growth stays the
-  slow, small-founding-population story already in the code.
+- What VACANCY's own "reset" specifically was, and what in the old
+  world's reaction to it actually broke — named as the real trigger
+  above, not itself detailed yet.
 - The specific content of what gets put out "into the algorithm"
   (social media, AI, TV) announcing the new world — real as a premise,
   not yet a built mechanic anywhere in VDP.
+- What, if anything, happens to someone a robot patrol actually
+  catches — caught and recorded is real (`catchIllegalArrival`); any
+  consequence beyond the record (detention, deportation, a fine) is
+  not specified and not invented here.
 
 This document records what has been confirmed and leaves the rest for
 whenever more of the story is given, the same discipline `town.js`

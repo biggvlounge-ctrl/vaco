@@ -81,6 +81,10 @@ function createVdpStore() {
     relationships: {},
     npcWorld: null,
     news: { events: [], nextId: 1 },
+    immigration: {
+      arrivals: [], nextArrivalId: 1, smugglingSpots: [], nextSpotId: 1,
+      illegalSettlements: [], nextSettlementId: 1,
+    },
   };
 }
 
@@ -163,12 +167,21 @@ let store = createVdpStore();
   const cityTiersLib = await import('./src/lib/cityTiers.js');
   const foodDistrictLib = await import('./src/lib/foodDistrict.js');
   const chopzLib = await import('./src/lib/chopz.js');
+  const immigrationLib = await import('./src/lib/immigration.js');
 
+  // A migrant's real old-world background carries over if one was
+  // recorded (`immigration.js`'s `admitWithPassport`/`crossIllegally`,
+  // called before a player's first login) -- "people are bringing the
+  // chaos from the old world to the new world. You have all your
+  // different characteristics, statistics" (8 Oct 2026, direct
+  // instruction). No arrival on record (every existing player/test)
+  // falls back to `createSkills()`'s own default of zero, unchanged.
   function ensurePlayer(userId) {
     if (!store.players[userId]) {
+      const arrival = immigrationLib.arrivalFor(store.immigration, userId);
       store.players[userId] = {
         state: npcs.createPlayerState(),
-        skills: skillsLib.createSkills(),
+        skills: skillsLib.createSkills(arrival?.oldWorldSkills || {}),
         beliefs: beliefsLib.createBeliefs(),
         library: libraryLib.createLibrary(),
       };
@@ -534,6 +547,178 @@ let store = createVdpStore();
         text: `${req.body.ownerId} bought the home they were renting`,
       });
       res.status(200).json(home);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // "People can also have the option to buy land as well" -- a real,
+  // separate purchase, same claim-before-pay ordering as every other
+  // route in this section.
+  app.post('/api/property/buy-land', requireActor('ownerId'), async (req, res) => {
+    try {
+      const plot = await propertyLib.purchaseLand(store.property, {
+        ownerId: req.body.ownerId,
+        transferFn: (args) => transferVCoin({ ...args, toUserId: 'vdp-property-office' }),
+      });
+      newsLib.recordEvent(store.news, { kind: 'property', text: `${req.body.ownerId} bought a plot of land` });
+      res.status(201).json(plot);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/property/unauthorized', (_req, res) => {
+    res.json({ unauthorized: propertyLib.listUnauthorized(store.property) });
+  });
+
+  // "People doing unauthorized buildings" -- no transferFn, no actor
+  // guard against a specific owner identity: an unauthorized builder
+  // went around the governors' office by definition, so this is a
+  // real record of what happened, not a legitimate purchase.
+  app.post('/api/property/build-unauthorized', requireActor('ownerId'), (req, res) => {
+    try {
+      const shack = propertyLib.buildUnauthorized(store.property, {
+        ownerId: req.body.ownerId,
+        locationLabel: req.body.locationLabel,
+      });
+      newsLib.recordEvent(store.news, {
+        kind: 'property',
+        text: `an unauthorized structure went up near ${req.body.locationLabel || 'Meridian'}`,
+      });
+      res.status(201).json(shack);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // The governors' own real enforcement action -- a robot patrol
+  // (`jobs.js`'s `robot-patrol-officer`) tearing an unsanctioned
+  // structure down. `demolishedBy` is the patrol officer's own id,
+  // the actor this route checks -- not the structure's owner.
+  app.post('/api/property/demolish-unauthorized', requireActor('demolishedBy'), (req, res) => {
+    try {
+      const result = propertyLib.demolishUnauthorized(store.property, req.body.propertyId, {
+        demolishedBy: req.body.demolishedBy,
+      });
+      newsLib.recordEvent(store.news, {
+        kind: 'property',
+        text: `a robot patrol demolished an unauthorized structure (owner: ${result.ownerId})`,
+      });
+      res.status(200).json(result);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // --- Immigration: passports, illegal crossings, and the chaos that
+  // comes with them -----------------------------------------------------
+  app.get('/api/immigration/arrivals', (_req, res) => {
+    res.json({ arrivals: immigrationLib.listArrivals(store.immigration) });
+  });
+
+  app.get('/api/immigration/illegal', (_req, res) => {
+    res.json({ illegal: immigrationLib.listIllegalArrivals(store.immigration) });
+  });
+
+  app.post('/api/immigration/admit', requireActor('personId'), (req, res) => {
+    try {
+      const arrival = immigrationLib.admitWithPassport(store.immigration, {
+        personId: req.body.personId,
+        originRegion: req.body.originRegion,
+        religion: req.body.religion,
+        oldWorldSkills: req.body.oldWorldSkills,
+        oldWorldBeliefs: req.body.oldWorldBeliefs,
+      });
+      newsLib.recordEvent(store.news, { kind: 'immigration', text: `${req.body.personId} arrived through passport control` });
+      res.status(201).json(arrival);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/immigration/cross-illegally', requireActor('personId'), (req, res) => {
+    try {
+      const arrival = immigrationLib.crossIllegally(store.immigration, {
+        personId: req.body.personId,
+        originRegion: req.body.originRegion,
+        religion: req.body.religion,
+        smuggledGoods: req.body.smuggledGoods,
+        oldWorldSkills: req.body.oldWorldSkills,
+        oldWorldBeliefs: req.body.oldWorldBeliefs,
+      });
+      newsLib.recordEvent(store.news, { kind: 'immigration', text: `an unrecorded crossing beyond the ice wall was made` });
+      res.status(201).json(arrival);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/immigration/catch', requireActor('caughtBy'), (req, res) => {
+    try {
+      const arrival = immigrationLib.catchIllegalArrival(store.immigration, req.body.personId, {
+        caughtBy: req.body.caughtBy,
+      });
+      newsLib.recordEvent(store.news, { kind: 'immigration', text: `a robot patrol caught an illegal arrival` });
+      res.status(200).json(arrival);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/immigration/smuggling-spots', (_req, res) => {
+    res.json({ open: immigrationLib.listOpenSmugglingSpots(store.immigration) });
+  });
+
+  app.post('/api/immigration/smuggling-spots/report', requireActor('reportedBy'), (req, res) => {
+    try {
+      const spot = immigrationLib.reportSmugglingSpot(store.immigration, {
+        locationLabel: req.body.locationLabel,
+        reportedBy: req.body.reportedBy,
+      });
+      newsLib.recordEvent(store.news, { kind: 'immigration', text: `a new smuggling spot was found: ${req.body.locationLabel}` });
+      res.status(201).json(spot);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/immigration/smuggling-spots/:spotId/seal', requireActor('sealedBy'), (req, res) => {
+    try {
+      const spot = immigrationLib.sealSmugglingSpot(store.immigration, Number(req.params.spotId), {
+        sealedBy: req.body.sealedBy,
+      });
+      newsLib.recordEvent(store.news, { kind: 'immigration', text: `a smuggling spot was sealed by a robot patrol` });
+      res.status(200).json(spot);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/immigration/illegal-settlements', (_req, res) => {
+    res.json({ active: immigrationLib.listActiveIllegalSettlements(store.immigration) });
+  });
+
+  app.post('/api/immigration/illegal-settlements/found', requireActor('founderId'), (req, res) => {
+    try {
+      const settlement = immigrationLib.foundIllegalSettlement(store.immigration, {
+        founderId: req.body.founderId,
+        locationLabel: req.body.locationLabel,
+      });
+      newsLib.recordEvent(store.news, { kind: 'immigration', text: `an illegal settlement appeared near ${req.body.locationLabel}` });
+      res.status(201).json(settlement);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/immigration/illegal-settlements/:settlementId/clear', requireActor('clearedBy'), (req, res) => {
+    try {
+      const settlement = immigrationLib.clearIllegalSettlement(store.immigration, Number(req.params.settlementId), {
+        clearedBy: req.body.clearedBy,
+      });
+      newsLib.recordEvent(store.news, { kind: 'immigration', text: `a robot patrol cleared an illegal settlement` });
+      res.status(200).json(settlement);
     } catch (err) {
       res.status(400).json({ error: err.message });
     }

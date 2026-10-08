@@ -45,9 +45,17 @@ function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
 
-export function createSkills() {
+// `seed` is optional -- "people are bringing the chaos from the old
+// world to the new world. You have all your different characteristics,
+// statistics, and things like that" (8 Oct 2026, direct instruction):
+// a migrant's `immigration.js` arrival record can carry real
+// `oldWorldSkills`, and whoever seeds a player (`server.cjs`'s
+// `ensurePlayer`) passes them through here rather than starting every
+// arrival at zero. Omitting `seed` is exactly what every existing
+// caller and test already does, unchanged.
+export function createSkills(seed = {}) {
   const skills = {};
-  for (const s of SKILL_NAMES) skills[s] = 0;
+  for (const s of SKILL_NAMES) skills[s] = clamp(seed[s] || 0, 0, 100);
   return skills;
 }
 

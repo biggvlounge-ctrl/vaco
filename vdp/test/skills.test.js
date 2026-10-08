@@ -33,6 +33,13 @@ test('an unknown skill name throws rather than silently creating a new field', (
   assert.throws(() => gainFromShift(skills, 'Charisma'), /not a known skill/);
 });
 
+test('createSkills seeds real old-world characteristics when given, and clamps them', () => {
+  const skills = createSkills({ Combat: 35, Agriculture: 999 });
+  assert.equal(skills.Combat, 35);
+  assert.equal(skills.Agriculture, 100, 'a seeded value is clamped the same as any other gain');
+  assert.equal(skills.Business, 0, 'an unseeded skill still starts at zero');
+});
+
 test('fadeSkills moves every skill toward zero, not just the touched one', () => {
   const skills = createSkills();
   gainFromTextbook(skills, 'Crafting');
