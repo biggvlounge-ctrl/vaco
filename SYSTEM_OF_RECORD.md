@@ -982,7 +982,7 @@ trusted:
 
 The simulation engine is the one app in this repo whose "done" is not a
 list of routes, so it carries a measured completeness score rather than
-a criteria tally. **91.8%**, from
+a criteria tally. **91.9%**, from
 `vacon-c/dev-docs/GAME_COMPLETENESS.md`, which
 `vacon-c/scripts/completeness.mjs` regenerates and
 `vacon-c/test/completeness.test.js` fails on if stale — including a
@@ -990,12 +990,24 @@ check that the percent in THIS file matches the one the code measures.
 
 | axis | complete | what it measures |
 |---|---|---|
-| systems | 73.6% | the forty urban systems §7 names, at `urbanSystems.js`'s own four levels |
+| systems | 74.9% | the forty urban systems §7 names, at `urbanSystems.js`'s own four levels |
 | tables | 94.7% | schema tables a built world actually fills |
 | statistics | 88.2% | statistics a world can answer about itself |
 | traits | 100% | traits something under `server/` reads |
 | traitDepth | 85.7% | trait columns a life actually changes |
 | habits | 100% | whether habits and routines carry information |
+
+**91.8% -> 91.9% on 8 Oct 2026, systems axis.** §7 system 30
+Construction moved `partial` -> `modelled`. `property.
+ACQUIRED_METHODS` had named `built` since the Property Engine
+shipped, with no caller anywhere — no property was ever founded in a
+running world, only at worldgen. `server/construction.js`: a person
+who owns nowhere yet, and can afford to, builds a `residential`
+property out of their own savings, at the identical cost range
+`worldgen` already draws a residential property's value from.
+`property.advancePropertyLifecycle` — already built, already running
+every tick — does the rest: planning -> construction -> operation on
+its own timer.
 
 **91.7% -> 91.8% on 8 Oct 2026, systems axis.** §7 system 28 Business
 moved `partial` -> `modelled`. `server/businesses.js`: a person founds

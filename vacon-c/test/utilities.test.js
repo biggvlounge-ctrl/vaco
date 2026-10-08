@@ -366,7 +366,13 @@ test('the four systems this was for are levelled to what the code does', () => {
   const consumers = require('node:fs').readdirSync(
     require('node:path').join(__dirname, '..', 'server'),
   ).filter((f) => f.endsWith('.js'))
-    .filter((f) => !['worldgen.js', 'items.js', 'infrastructure.js', 'urbanSystems.js'].includes(f))
+    // `investments.js` carries `'energy'` too — one of its nine
+    // `CATEGORIES`, an investment SECTOR a person can put money into,
+    // not a reader of `resources.resource_type = 'energy'`. A different
+    // "energy" sharing the same word, the same reason `worldgen.js` and
+    // the others below are already excluded.
+    .filter((f) => !['worldgen.js', 'items.js', 'infrastructure.js', 'urbanSystems.js',
+      'investments.js'].includes(f))
     .filter((f) => /'energy'/.test(require('node:fs').readFileSync(
       require('node:path').join(__dirname, '..', 'server', f), 'utf8',
     ).replace(/^\s*\/\/.*$/gm, '')));
