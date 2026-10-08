@@ -253,6 +253,10 @@ async function restoreWorldStateFromPostgres(worldState) {
     nums(f, ['entity_id', 'income', 'savings', 'debt', 'assets', 'tick']));
   summary.individual_finances = worldState.individualFinances.length;
 
+  worldState.investments = (await q('SELECT * FROM investments ORDER BY id')).map((inv) =>
+    nums(inv, ['id', 'investor_entity_id', 'target_entity_id', 'amount', 'tick']));
+  summary.investments = worldState.investments.length;
+
   // **Every numeric column named, including the ids.** Postgres returns
   // BIGINT and NUMERIC as strings, and a missed conversion here does
   // not throw — it produces a world that looks restored and is wrong.

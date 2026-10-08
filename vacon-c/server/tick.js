@@ -52,6 +52,7 @@ const { hashSeed } = require('./seeded.js');
 const { getEntityTraitsForEntity, applyKeyModifier, getLiveEntity, traitsToSheet } = require('./entityTraits.js');
 const worldStore = require('./worldStore.js');
 const economy = require('./economy.js');
+const investments = require('./investments.js');
 const politics = require('./politics.js');
 const technology = require('./technology.js');
 const mortality = require('./mortality.js');
@@ -336,6 +337,13 @@ function runEconomyPhase(worldState) {
 
   const payroll = economy.runPayroll(worldState, worldState.tick);
   events.push(...payroll.events);
+
+  // Dividends, same slot as payroll and for the same reason: both pay
+  // out of this tick's own standing, after production has run.
+  // `investments.js` — real money an entity already put into an
+  // organization's capital, real money paid back out of it.
+  const dividends = investments.runDividends(worldState, worldState.tick);
+  events.push(...dividends.events);
 
   // **The labour market, and it is the half that was missing.**
   // `hireEntity` was called exactly once in the whole engine — by

@@ -295,6 +295,22 @@ const ACTIONS = {
     ),
   },
 
+  // **`investments` — genuinely unbuilt rather than deferred until
+  // this.** Real money the actor already holds, moved into a named
+  // target's own capital. `category` is the schema's own enum
+  // (`investments.js.CATEGORIES`); an organization target grows its
+  // real `assets` and starts paying a real, bounded dividend back
+  // each tick, proportional to the actor's own stake.
+  invest: {
+    summary: 'Put money you hold into a business, a person\'s education, or another real target.',
+    modes: ['citizen'],
+    requires: ['targetEntityId', 'category', 'amount'],
+    verbs: ['investInTarget'],
+    run: (verbs, actorId, body) => verbs.investInTarget(actorId, {
+      targetEntityId: body.targetEntityId, category: body.category, amount: body.amount,
+    }),
+  },
+
   'enter-contest': {
     summary: 'Compete against a named opponent.',
     modes: ['citizen'],

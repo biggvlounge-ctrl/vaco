@@ -61,6 +61,7 @@ const {
   applyKeyModifier: applyKeyModifierTo, getLiveEntity: getLiveEntityFrom,
 } = require('./entityTraits.js');
 const economy = require('./economy.js');
+const investments = require('./investments.js');
 const tick = require('./tick.js');
 const players = require('./players.js');
 const territory = require('./territory.js');
@@ -107,6 +108,11 @@ const WorldState = {
   resources: [],
   marketListings: [],
   individualFinances: [],
+  // `investments` — genuinely unbuilt rather than deferred (see
+  // economy.js's own header and investments.js). Real money an
+  // entity puts into another, growing an organization's real assets
+  // and paying a real, bounded dividend back.
+  investments: [],
   // Employment, added 12 Sep 2026 when `employment_records` stopped
   // being a table nothing touched. Payroll runs inside the Economy
   // phase — the pipeline stays at eleven.
@@ -892,6 +898,7 @@ const ACTION_VERBS = {
   studySource: (...args) => studySource(...args),
   quoteTrade: (...args) => quoteTrade(...args),
   tradeWith: (...args) => tradeWith(...args),
+  investInTarget: (...args) => investInTarget(...args),
 };
 
 function dispatchAction(playerId, body) {
@@ -1138,6 +1145,16 @@ function repurposeProperty(entityId, options = {}) {
 // which is the invariant `actions.assertVerbsPresent` was written to
 // protect after calling a module directly made a completed mission pay
 // nothing.
+
+function investInTarget(entityId, options = {}) {
+  return investments.invest(WorldState, {
+    investorEntityId: entityId,
+    targetEntityId: Number(options.targetEntityId),
+    category: options.category,
+    amount: Number(options.amount),
+    tick: WorldState.tick,
+  });
+}
 
 function breakDownItem(entityId, options = {}) {
   return salvage.breakDown(WorldState, entityId, options.itemName, {
@@ -1510,6 +1527,7 @@ module.exports = {
   studySourcesFor,
   quoteTrade,
   tradeWith,
+  investInTarget,
   survivalStatusFor,
   seedTutorialStart,
   tutorialProgressFor,

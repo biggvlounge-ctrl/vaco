@@ -13,16 +13,16 @@ three places, a spec section's "roughly 25 of the 40", a catalogue of 67
 statistics that a real world answered 36 of, and seven trait families generated
 on every NPC and read by nothing.
 
-## 91.4% complete
+## 91.7% complete
 
 ```
-██████████████████░░  91.4%   323.45 of 354
+██████████████████░░  91.7%   324.45 of 354
 ```
 
 | axis | complete | score | what it measures |
 |---|---|---|---|
 | systems | **72.4%** | 28.95/40 | urban systems with mechanics |
-| tables | **93.2%** | 61.5/66 | schema tables a built world fills |
+| tables | **94.7%** | 62.5/66 | schema tables a built world fills |
 | statistics | **88.2%** | 105/119 | statistics a world can answer |
 | traits | **100%** | 114/114 | traits something reads |
 | traitDepth | **85.7%** | 6/7 | trait columns a life actually changes |
@@ -67,14 +67,13 @@ The forty systems §7 names, at `server/urbanSystems.js`'s own four levels (mode
 | `36. Tourism` | partial | +0.5 |
 | `39. Reputation` | partial | +0.5 |
 
-### tables — 6 open
+### tables — 5 open
 
 Every `CREATE TABLE` in the schema and its extensions. A table a built world fills scores 1; one the engine writes but no world has ever used scores 0.5; one with no store at all scores 0.
 
 | item | state | worth |
 |---|---|---|
 | `revolutions` | written, but unreached — assessRevolutions runs every tick; no generated world has fallen below approval 35 with 25% of the population informed | +0.5 |
-| `investments` | no store — Genuinely unbuilt rather than deferred — economy.js names it alongside trade_routes and is explicit that only trade_routes is closed by the Transportation deferral. No mechanism anywhere creates, values or settles one. | +1 |
 | `trade_routes` *(deferred by scope)* | no store — Transportation is on CLAUDE.md's explicit do-not-touch list, and economy.js records this table as closed scope rather than a gap for that reason. | +1 |
 | `migration_events` | written, but unreached — migration.relocate() writes a row and runMigrationPhase calls it every tick. PULL_MARGIN (0.15) sits above the 99th percentile of the gaps it filters on this seed, so almost every push finds no acceptable destination — measured, not an uncalled generator (CLAUDE.md's twenty-sixth standing rule: about 2 moves in 600 ticks since the seededUnit fix made MOVE_CHANCE gate for real). Re-tuning the threshold would be the exact "inflate a constant to look consequential" trap the seventeenth standing rule names. | +0.5 |
 | `vault_studios_links` *(deferred by scope)* | no store — CLAUDE.md defers this twice — the fifth standing rule says ecosystem apps (Vavlt Stvdios among them) are linked to, never rebuilt, and the explicit do-not-touch list names subscription tiers and ecosystem link-outs. Its three columns are a creator id and a tier, which is the link-out and the tier verbatim. Building it would break scope in two places at once. | +1 |

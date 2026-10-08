@@ -50,7 +50,7 @@ the Postgres schema that already exists.
 
 ## 1. Server code — `vacon-c/server/`
 
-All 78 files present on disk, all committed, largest first.
+All 79 files present on disk, all committed, largest first.
 
 **`test/inventory.test.js` now fails when this table and `server/` disagree**, which is the guard this document has needed through three separate drifts (see the note below). The count and the file list are checked against the tree rather than typed.
 
@@ -130,6 +130,7 @@ read off disk, not recalled.
 | `players.js` | 9,311 | Player generation, citizen dashboard — including mood, habits and routine. | Built |
 | `beliefs.js` | 8,674 | What an entity holds to be true, and how confidently. | Built |
 | `persistence.js` | 8,638 | Loads the world before `app.listen` and checkpoints every 10 ticks. | Built, see §4 |
+| `investments.js` | 8,531 | **`investments` — genuinely unbuilt rather than deferred, closed 8 Oct 2026.** Real money moved from an investor's own savings into a target's capital (an organization's real `assets`); a real, bounded dividend paid back each tick, proportional to stake, out of the organization's own standing — never minted, never more than it has. A person-held investment (education, healthcare) pays no dividend, on purpose. | Built |
 | `items.js` | 7,973 | Item and resource type vocabularies, from §28's canonical list, plus the real `origin` tag ('remnant' \| 'producible') every item in the catalogue now carries. | Built |
 | `worldStore.js` | 7,035 | Memory, relationships, knowledge — the write-back layer the contract requires. | Built |
 | `entityTraits.js` | 6,562 | Per-entity trait rows, trait sheets, Key modifiers, live entity resolution (`getLiveEntity`, the ninth standing rule's answer). | Built |

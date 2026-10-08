@@ -73,6 +73,7 @@ const areaStats = require('./areaStats.js');
 const crime = require('./crime.js');
 const demographics = require('./demographics.js');
 const economy = require('./economy.js');
+const investments = require('./investments.js');
 const infrastructure = require('./infrastructure.js');
 const membership = require('./membership.js');
 const mortality = require('./mortality.js');
@@ -147,6 +148,11 @@ const DEFAULTS = {
   cultureShare: 0.6,
   // Listings per city, drawn from the real trade catalogue in items.js.
   marketListings: 6,
+  // `investments` — genuinely unbuilt rather than deferred until this
+  // (see economy.js and investments.js). A handful of real residents
+  // with savings to spare put some into a local business, per city.
+  startingInvestmentsPerCity: 2,
+  startingInvestmentAmount: 150,
   artifacts: 3,
   // Each artifact gets one mission, which is what generateMission asks
   // for — a mission is always generated FROM a real artifact.
@@ -1540,6 +1546,36 @@ function generateWorld(options = {}) {
         tick,
       });
       summary.marketListings += 1;
+    }
+  }
+
+  // ---- investments --------------------------------------------------------
+  // `investments` was empty in every world this engine has ever
+  // generated — genuinely unbuilt rather than deferred, per
+  // economy.js's own header. A real resident with savings to spare
+  // puts some into a real local business; `investments.invest` moves
+  // the money for real (their savings down, the business's assets up)
+  // and the Economy phase's own `runDividends` starts paying a real,
+  // bounded return back from it every tick after.
+  summary.investments = 0;
+  for (const cityId of summary.cities) {
+    const businesses = w.organizations.filter((o) => o.type === 'business');
+    if (businesses.length === 0) continue;
+
+    for (let i = 0; i < config.startingInvestmentsPerCity; i += 1) {
+      const investor = random.pick(made.people, 'investor', cityId, i);
+      const finances = economy.getLatestFinances(w, investor.id);
+      if (!finances || Number(finances.savings) < config.startingInvestmentAmount) continue;
+
+      const business = random.pick(businesses, 'investment-target', cityId, i);
+      investments.invest(w, {
+        investorEntityId: investor.id,
+        targetEntityId: business.id,
+        category: 'businesses',
+        amount: config.startingInvestmentAmount,
+        tick,
+      });
+      summary.investments += 1;
     }
   }
 

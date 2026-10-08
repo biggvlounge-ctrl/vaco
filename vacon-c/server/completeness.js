@@ -219,11 +219,9 @@ const TABLE_NO_STORE_REASON = {
     note: 'Transportation is on CLAUDE.md\'s explicit do-not-touch list, and economy.js '
       + 'records this table as closed scope rather than a gap for that reason.',
   },
-  investments: {
-    note: 'Genuinely unbuilt rather than deferred — economy.js names it alongside '
-      + 'trade_routes and is explicit that only trade_routes is closed by the '
-      + 'Transportation deferral. No mechanism anywhere creates, values or settles one.',
-  },
+  // `investments` closed 8 Oct 2026 — see `investments.js`. No entry
+  // here any more: `worldState.investments` is a real array now, and
+  // this map only applies to a table with no store at all.
 };
 
 const TABLE_TO_ARRAY = (table) => table.replace(/_([a-z])/g, (_, c) => c.toUpperCase());

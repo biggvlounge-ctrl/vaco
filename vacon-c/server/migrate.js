@@ -587,6 +587,19 @@ async function migrateWorldStateToPostgres(worldState) {
       }
       summary.individual_finances = worldState.individualFinances.length;
 
+      // `investments` — genuinely unbuilt rather than deferred until
+      // investments.js. Both FKs (investor_entity_id, target_entity_id)
+      // reference entities(id), already migrated by this point same as
+      // individual_finances just above.
+      for (const inv of worldState.investments || []) {
+        await client.query(
+          `INSERT INTO investments (id, investor_entity_id, target_entity_id, category, amount, tick)
+           VALUES ($1,$2,$3,$4,$5,$6)`,
+          [inv.id, inv.investor_entity_id, inv.target_entity_id, inv.category, inv.amount, inv.tick]
+        );
+      }
+      summary.investments = (worldState.investments || []).length;
+
       // employment_records. **Written before nothing and after
       // organizations**, which is the FK that matters:
       // employer_organization_id references organizations(id), and two
