@@ -18,7 +18,13 @@
 // world religions/regions here would be exactly the kind of fact this
 // project refuses to assert about anything real. `smuggledGoods` is
 // the same: free text, "guns, things like that" is the instruction's
-// own example, not a catalog this module invents the rest of.
+// own example, not a catalog this module invents the rest of --
+// widened the same way 8 Oct 2026, same day, with two more of the
+// instruction's own real examples: "people trying to smuggle cars in,
+// drugs in, things of that nature." Cars specifically matter here --
+// `voidClient.js`'s autonomous vans are Meridian's only real ride, so
+// a smuggled car is explicitly contraband, not a second legitimate
+// vehicle this world is supposed to have.
 //
 // `oldWorldSkills`/`oldWorldBeliefs` are optional, recorded verbatim on
 // the arrival rather than applied here -- carrying stats across is a

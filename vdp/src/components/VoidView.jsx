@@ -20,12 +20,27 @@ import {
 // Hub/Port model: `hub-and-port` stations, one real temperature-
 // controlled variant for food. This panel just reads back what VDP's
 // server already registered.
+//
+// **Autonomous vans (8 Oct 2026), per direct instruction**: "we will
+// have autonomous vans that will drive. We won't have any cars." VDP
+// never had a car concept to remove (checked directly -- no `car`/
+// `vehicle` reference anywhere in this app's own source before this
+// comment, Venus Resort's water taxi is a boat, not a car). The real
+// replacement is VOID's own `transportation` vertical (per-trip,
+// non-licensing-gated) -- the same real request→match→accept→
+// complete→pay→rate loop the Courier demo below already proves, not a
+// second invented ride system. `TRANSPORTATION_FARE` is a flagged
+// interpretive VCoin price, the same footing every other unspecified
+// number in this app already stands on.
 
 const VOID_PROVIDER = "void-demo-provider";
+const COURIER_FARE = 12;
+const TRANSPORTATION_FARE = 8;
 const VDP_API_URL = import.meta.env?.VITE_VDP_API_URL || "http://localhost:8827";
 
 export default function VoidView({ session }) {
   const [job, setJob] = useState(null);
+  const [requestedVertical, setRequestedVertical] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [voidHubs, setVoidHubs] = useState(null);
@@ -39,16 +54,26 @@ export default function VoidView({ session }) {
     return () => { cancelled = true; };
   }, []);
 
+  const handleRequest = async (verticalId, unitPrice) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await requestJob({ verticalId, customerId: session.userId, quantity: 1, unitPrice });
+      setRequestedVertical(verticalId);
+      setJob(updated);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleAction = async (action) => {
     setBusy(true);
     setError(null);
     try {
       let updated;
-      if (action === "request") {
-        updated = await requestJob({
-          verticalId: "courier", customerId: session.userId, quantity: 1, unitPrice: 12,
-        });
-      } else if (action === "match") {
+      if (action === "match") {
         updated = await matchProvider({ jobId: job.id, providerId: VOID_PROVIDER });
       } else if (action === "accept") {
         updated = await acceptJob(job.id);
@@ -74,19 +99,27 @@ export default function VoidView({ session }) {
 
   return (
     <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16, marginTop: 12 }}>
-      <h2 style={{ fontSize: 16, margin: "0 0 4px 0" }}>VOID — real courier job</h2>
+      <h2 style={{ fontSize: 16, margin: "0 0 4px 0" }}>VOID — real logistics jobs</h2>
       <p style={{ fontSize: 11, color: "#888", margin: "0 0 8px" }}>
         Same real request→match→accept→complete→pay→rate loop every VOID vertical runs through.
+        No cars in Meridian -- every ride is an autonomous van.
       </p>
 
       {!job && (
-        <button onClick={() => handleAction("request")} disabled={busy}>Request a courier delivery (12 VCoin)</button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => handleRequest("courier", COURIER_FARE)} disabled={busy}>
+            Request a courier delivery ({COURIER_FARE} VCoin)
+          </button>
+          <button onClick={() => handleRequest("transportation", TRANSPORTATION_FARE)} disabled={busy}>
+            Call an autonomous van ({TRANSPORTATION_FARE} VCoin)
+          </button>
+        </div>
       )}
 
       {job && (
         <div style={{ borderTop: "1px dashed #ccc", paddingTop: 8 }}>
           <p style={{ fontSize: 13, margin: "0 0 4px" }}>
-            Job #{job.id} — {job.status} — total {job.totalPrice} VCoin
+            {requestedVertical === "transportation" ? "Autonomous van" : "Courier"} job #{job.id} — {job.status} — total {job.totalPrice} VCoin
           </p>
           {job.providerPayout != null && (
             <p style={{ fontSize: 12, color: "#666", margin: "0 0 8px" }}>

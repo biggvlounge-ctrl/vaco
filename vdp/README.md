@@ -904,6 +904,38 @@ No new tests (both are thin client wiring, the same convention every
 other `*Client.js` in this directory already follows) -- full suite
 385 passing, 0 failing, clean `npm run build`.
 
+**Phase 25 — new-world technology: autonomous vans, no cars** (8 Oct
+2026, direct instruction: "everything will be new technology... we
+will have autonomous vans that will drive. We won't have any cars").
+Checked first, same as every lore pass this session: ghost-kitchen
+drone delivery, drone package delivery, and fully autonomous banking
+(V3's VCoin ledger has no human teller anywhere in it) were all
+already real and unchanged -- `VDP_FOUNDING.md`'s new "New-world
+technology" section records why each one needed no new code.
+
+The one real gap: VDP never had a car concept, so there was nothing
+to remove, but it also had no replacement ride yet. `VoidView.jsx`
+now offers VOID's own real `transportation` vertical (per-trip,
+non-licensing-gated) alongside its existing Courier demo, branded
+"Call an autonomous van" -- the same real request→match→accept→
+complete→pay→rate loop every VOID vertical already runs through.
+`immigration.js`'s `smuggledGoods` free-text field (already real)
+gained two more of the instruction's own named examples in its header
+comment -- cars and drugs, alongside the existing guns example --
+with cars flagged as contraband precisely because the autonomous van
+is this world's only legitimate ride.
+
+**"Bitcoin will be the currency of this new world" is deliberately
+not acted on.** Every real transfer across this entire ecosystem,
+not just VDP, settles through V3's VCoin ledger; there is no real
+Bitcoin/blockchain integration anywhere in this repository, and
+replacing V3 would be a change far outside VDP's own scope. Flagged in
+`VDP_FOUNDING.md`'s "What is still open" and asked back to the
+instruction's author rather than guessed at.
+
+No new tests (wiring + a comment update) -- full suite 385 passing,
+0 failing, clean `npm run build`.
+
 **Phase 2 (SVMIKO DEGVCHI Avatar Wearables)**: 20 plain-Node checks
 (13 unique real pieces, real category assignment, the luxury-vs-
 streetwear tier proven at VDP's own real price scale, a real purchase

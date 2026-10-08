@@ -295,6 +295,45 @@ constant background trickle:
   other channel (a push alert, a direct message) is not specified and
   not built.
 
+## New-world technology: drones, autonomous vans, automated banking (8 Oct 2026)
+
+Per direct instruction: "everything will be new technology... we will
+basically bring our whole operation from the technology world over to
+this world." Checked against what already exists before adding
+anything new -- three of the four pieces named were already real:
+
+- **"Even the initial restaurants we will have will all be ghost
+  kitchens and delivered by drone."** Already true, unchanged:
+  `foodDistrict.js`/`FoodDistrictView.jsx`'s own header has said
+  "ghost-kitchen fulfillment" and "real drone delivery through VOID's
+  own `foodDelivery` vertical" since that phase shipped.
+- **"All packages will be delivered by drone."** Already true,
+  unchanged: `server.cjs`'s `registerMeridianVoidHubsOnce` registers
+  Meridian's real VOID Hub Stations (package + temperature-controlled
+  food distribution) on VOID's actual station network at boot.
+- **"We'll handle the banking. It will all be autonomous."** Already
+  true of the ledger this whole ecosystem already runs on: V3's VCoin
+  ledger has no human teller anywhere in it -- every transfer in VDP
+  (`jobs.js` payroll, `property.js` purchases, `resources.js`'s
+  `sellMaterials`, every district's commerce) already moves through
+  real, automated settlement code, not a person approving it.
+- **"We will have autonomous vans that will drive. We won't have any
+  cars."** The one genuinely new piece. VDP never had a car concept to
+  remove -- checked directly, no `car`/`vehicle` reference anywhere in
+  this app before this phase (Venus Resort's water taxi is a boat).
+  `VoidView.jsx` now offers VOID's own real `transportation` vertical
+  (per-trip, non-licensing-gated) alongside its Courier demo, branded
+  as "Call an autonomous van" -- the same real request→match→accept→
+  complete→pay→rate loop every VOID vertical already runs through, not
+  a second invented ride system.
+- **"People trying to smuggle cars in, drugs in, things of that
+  nature."** `immigration.js`'s `smuggledGoods` was already real, free
+  text (`crossIllegally`) -- widened with the instruction's own new
+  examples in that module's header. Cars specifically matter here:
+  since the autonomous van is Meridian's only real ride, a smuggled
+  car is explicitly contraband, not a second legitimate vehicle this
+  world is supposed to have.
+
 ## What is still open
 
 - The area's own name — nothing has been given yet (the product name,
@@ -320,6 +359,16 @@ constant background trickle:
 - What happens to a passport at the moment it actually expires, beyond
   `isPassportExpired` recording the fact — not specified and not
   invented here.
+- **"Bitcoin will be the currency of this new world"** (8 Oct 2026,
+  direct instruction) — flagged, not acted on. Every real transfer in
+  VDP and the rest of this ecosystem settles through V3's real VCoin
+  ledger; there is no real Bitcoin/blockchain integration anywhere in
+  this repository to move this world's money onto instead, and
+  replacing V3 with one would be a change far outside VDP alone (V3 is
+  shared ledger infrastructure for every app in this ecosystem, not a
+  VDP-owned file). Asked back to the instruction's own author rather
+  than guessed at or silently left as VCoin -- see the open question
+  this document raised the same day this bullet was written.
 
 This document records what has been confirmed and leaves the rest for
 whenever more of the story is given, the same discipline `town.js`
