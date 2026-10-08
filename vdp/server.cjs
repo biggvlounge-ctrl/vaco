@@ -97,6 +97,11 @@ function createVdpStore() {
     // which this server has no way to see; a named, bounded scope
     // rather than an invented precision it doesn't have.
     analytics: { totalVCoinGenerated: 0 },
+    // "The economy can go up and down depending on how people are
+    // spending inside of it" (8 Oct 2026) -- a real, separate log from
+    // `analytics.totalVCoinGenerated` (which is only the governors'
+    // own payouts): this one sums every real purchase a player makes.
+    economy: { spendingLog: [], index: 100 },
   };
 }
 
@@ -184,6 +189,7 @@ let store = createVdpStore();
   const securityLib = await import('./src/lib/security.js');
   const contractsLib = await import('./src/lib/contracts.js');
   const dissentLib = await import('./src/lib/dissent.js');
+  const economyLib = await import('./src/lib/economy.js');
 
   // A migrant's real old-world background carries over if one was
   // recorded (`immigration.js`'s `admitWithPassport`/`crossIllegally`,
@@ -292,6 +298,8 @@ let store = createVdpStore();
     res.json({
       population: populationLib.describePopulation(playerCount, npcCount),
       totalVCoinGenerated: store.analytics.totalVCoinGenerated,
+      economyIndex: economyLib.updateEconomyIndex(store.economy),
+      recentSpending: economyLib.recentSpending(store.economy),
     });
   });
 
@@ -520,6 +528,7 @@ let store = createVdpStore();
         transferFn: (args) => transferVCoin({ ...args, toUserId: 'vdp-property-office' }),
       });
       householdsLib.ensureHousehold(store.households, { propertyId: home.id, ownerId: req.body.ownerId });
+      economyLib.recordSpending(store.economy, propertyLib.HOME_PRICE);
       newsLib.recordEvent(store.news, {
         kind: 'property',
         text: `${req.body.ownerId} bought a ${home.levelName}`,
@@ -539,6 +548,8 @@ let store = createVdpStore();
         spendMaterialsFn: resourcesLib.spendMaterials,
         undoSpendFn: resourcesLib.undoSpend,
       });
+      const cost = propertyLib.levelByNumber(home.level).price - propertyLib.levelByNumber(home.level - 1).price;
+      economyLib.recordSpending(store.economy, cost);
       newsLib.recordEvent(store.news, {
         kind: 'property',
         text: `${req.body.ownerId} upgraded their home to ${home.levelName}`,
@@ -556,6 +567,7 @@ let store = createVdpStore();
         transferFn: (args) => transferVCoin({ ...args, toUserId: 'vdp-property-office' }),
       });
       householdsLib.ensureHousehold(store.households, { propertyId: home.id, ownerId: req.body.ownerId });
+      economyLib.recordSpending(store.economy, propertyLib.RENT_PRICE);
       newsLib.recordEvent(store.news, {
         kind: 'property',
         text: `${req.body.ownerId} rented a ${home.levelName}`,
@@ -572,6 +584,7 @@ let store = createVdpStore();
         ownerId: req.body.ownerId,
         transferFn: (args) => transferVCoin({ ...args, toUserId: 'vdp-property-office' }),
       });
+      economyLib.recordSpending(store.economy, propertyLib.HOME_PRICE - propertyLib.RENT_PRICE);
       newsLib.recordEvent(store.news, {
         kind: 'property',
         text: `${req.body.ownerId} bought the home they were renting`,
@@ -591,6 +604,7 @@ let store = createVdpStore();
         ownerId: req.body.ownerId,
         transferFn: (args) => transferVCoin({ ...args, toUserId: 'vdp-property-office' }),
       });
+      economyLib.recordSpending(store.economy, propertyLib.LAND_PRICE);
       newsLib.recordEvent(store.news, { kind: 'property', text: `${req.body.ownerId} bought a plot of land` });
       res.status(201).json(plot);
     } catch (err) {
@@ -611,6 +625,7 @@ let store = createVdpStore();
         ownerId: req.body.ownerId,
         transferFn: (args) => transferVCoin({ ...args, toUserId: 'vdp-property-office' }),
       });
+      economyLib.recordSpending(store.economy, propertyLib.COMMERCIAL_LEVELS[0].price);
       newsLib.recordEvent(store.news, { kind: 'property', text: `${req.body.ownerId} opened a ${shop.levelName}` });
       res.status(201).json(shop);
     } catch (err) {
@@ -620,12 +635,42 @@ let store = createVdpStore();
 
   app.post('/api/property/upgrade-commercial', requireActor('ownerId'), async (req, res) => {
     try {
+      const before = propertyLib.commercialOwnedBy(store.property, req.body.ownerId);
+      const previousLevel = before ? before.level : null;
       const shop = await propertyLib.upgradeCommercial(store.property, {
         ownerId: req.body.ownerId,
         transferFn: (args) => transferVCoin({ ...args, toUserId: 'vdp-property-office' }),
       });
+      if (previousLevel) {
+        const cost = propertyLib.commercialLevelByNumber(shop.level).price
+          - propertyLib.commercialLevelByNumber(previousLevel).price;
+        economyLib.recordSpending(store.economy, cost);
+      }
       newsLib.recordEvent(store.news, { kind: 'property', text: `${req.body.ownerId} upgraded their business to ${shop.levelName}` });
       res.status(200).json(shop);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // "The economy should continue to thrive as far as the owners of
+  // the businesses" (8 Oct 2026) -- the real, opposite flow of the
+  // two routes above: a business owner's own property actually
+  // earning, scaled by the real `economy.js` index this world's own
+  // spending already moves.
+  app.post('/api/property/operate-business', requireActor('ownerId'), async (req, res) => {
+    try {
+      const index = economyLib.updateEconomyIndex(store.economy);
+      const result = await propertyLib.operateBusiness(store.property, {
+        ownerId: req.body.ownerId,
+        transferFn: (args) => transferVCoin(args),
+        economyMultiplier: economyLib.economyMultiplierFor(index),
+      });
+      newsLib.recordEvent(store.news, {
+        kind: 'property',
+        text: `${req.body.ownerId}'s ${result.property.levelName} earned ${result.revenue} VCoin`,
+      });
+      res.status(200).json({ ...result, economyIndex: index });
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
@@ -938,6 +983,7 @@ let store = createVdpStore();
       const paid = await justiceLib.payTicket(store.justice, ticket.id, {
         transferFn: (args) => transferVCoin({ ...args, toUserId: jobsLib.PLANETARY_GOVERNORS_PAYROLL }),
       });
+      economyLib.recordSpending(store.economy, justiceLib.TICKET_FINE);
       res.status(200).json(paid);
     } catch (err) {
       res.status(400).json({ error: err.message });
@@ -983,8 +1029,11 @@ let store = createVdpStore();
   // "Everything will be camera secured... at the beginning there
   // will just be basic security features and then it will increase
   // as crime increases." A real tier derived from this world's own
-  // real records, never a second invented crime simulation.
-  app.get('/api/security/status', (_req, res) => {
+  // real records, never a second invented crime simulation. Factored
+  // out so `/api/dissent/:id/uprising` (below) measures a revolt
+  // against this exact same real tier, not a second computation of
+  // its own.
+  function currentSecurityTier() {
     const crimeCount = securityLib.measureCrime({
       ticketCount: store.justice.tickets.length,
       detentionCount: store.justice.detentions.length,
@@ -995,7 +1044,11 @@ let store = createVdpStore();
       illegalSettlementCount: immigrationLib.listKnownIllegalSettlements(store.immigration).length,
       unauthorizedStructureCount: propertyLib.listUnauthorized(store.property).length,
     });
-    res.json(securityLib.securityTierFor(crimeCount));
+    return securityLib.securityTierFor(crimeCount);
+  }
+
+  app.get('/api/security/status', (_req, res) => {
+    res.json(currentSecurityTier());
   });
 
   // "Aspects of the area have more criminal activity than others" --
@@ -1096,6 +1149,33 @@ let store = createVdpStore();
       });
       newsLib.recordEvent(store.news, { kind: 'dissent', text: `a revolt led by ${revolt.leaderId} was suppressed` });
       res.status(200).json(revolt);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // "Certain people will fight against [the robots] if they have a
+  // big enough tribe group organization" (8 Oct 2026) -- the real
+  // leader's real organization (`organizations.js`) measured against
+  // the world's real current security tier, never an invented combat
+  // roll.
+  app.post('/api/dissent/:id/uprising', requireActor('leaderId'), (req, res) => {
+    try {
+      const revolt = store.dissent.revolts.find((r) => r.id === Number(req.params.id));
+      if (!revolt) return res.status(404).json({ error: `no revolt #${req.params.id}` });
+      if (revolt.leaderId !== req.body.leaderId) {
+        return res.status(403).json({ error: 'uprising: this revolt is not led by the acting user' });
+      }
+      const organization = organizationsLib.organizationOf(store.organizations, revolt.leaderId);
+      const result = dissentLib.attemptUprising(store.dissent, revolt.id, {
+        organization,
+        security: currentSecurityTier(),
+      });
+      newsLib.recordEvent(store.news, {
+        kind: 'dissent',
+        text: `${revolt.leaderId}'s revolt overpowered the government's robots`,
+      });
+      res.status(200).json(result);
     } catch (err) {
       res.status(400).json({ error: err.message });
     }

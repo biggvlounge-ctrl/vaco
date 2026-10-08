@@ -515,6 +515,38 @@ instruction:
   the live, server-ticked population -- the real "back to the old
   world" for an NPC specifically.
 
+## The economy rotates, and a real revolt can fight the robots (8 Oct 2026)
+
+- **"This way people get, it can be involved in the economy
+  rotation... the economy should continue to thrive as far as the
+  owners of the businesses and things like that... the economy can go
+  up and down depending on how people are spending inside of it."**
+  New: `economy.js`, a real, moving index built from every real
+  purchase `server.cjs` already charges (homes, land, commercial
+  property, upgrades, ticket fines all call its `recordSpending`).
+  `property.js`'s new `operateBusiness` is the real opposite flow a
+  commercial owner now has -- their property actually earns, scaled
+  by the real economy index (`economyMultiplierFor`), not a fixed
+  number regardless of how the world is doing. `GET /api/analytics/
+  status` now reports the real index alongside the population ticker
+  and `totalVCoinGenerated` it already carried.
+- **"Some people can also be involved in moving... creating new areas
+  or migrating until they are noticed by the AI."** Already real and
+  confirmed, not rebuilt: `immigration.js`'s illegal settlements
+  (undiscovered until a real `discoverSettlement` act) and
+  `foundIllegalSettlement` are exactly this -- a real area existing,
+  unnoticed, until the government finds it.
+- **"Certain people will fight against [the robots] if they have a
+  big enough tribe group organization."** New: `dissent.js`'s
+  `attemptUprising`, measuring a revolt leader's own real
+  `organizations.js` group (`memberIds.length`) against
+  `security.js`'s own real current `robotCount` -- never an invented
+  combat stat. Big enough, and the revolt's own record is marked
+  `overpoweredAt`; from then on `suppressRevolt` refuses it (the
+  robots that would suppress it are the real ones it just pushed
+  back). `GovernmentView.jsx`'s "Fight the robots" button is this
+  action, shown only to the real revolt's own leader.
+
 ## What is still open
 
 - The area's own name — nothing has been given yet (the product name,
@@ -560,7 +592,11 @@ instruction:
 - The real consequence, if any, of being suppressed
   (`dissent.js`'s `suppressRevolt`) or of a government contract going
   unfinished — both record the real fact of what happened, with no
-  further invented penalty attached.
+  further invented penalty attached. **Partially answered 8 Oct
+  2026**: a big enough real organization now has a real alternative
+  to being suppressed — `attemptUprising` — but what overpowering
+  security actually changes about that area going forward, beyond the
+  one revolt's own record, is not specified and not invented here.
 - What deportation actually does to a real logged-in player, beyond
   the real record (`deportPerson`'s `deported: true`). An NPC is
   really removed from the live population; this server does not

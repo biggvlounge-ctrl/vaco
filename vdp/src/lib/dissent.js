@@ -13,6 +13,13 @@
 // across a migration wave) -- this module only tracks the real,
 // organized act of revolting once someone decides to, not who is
 // predisposed to.
+//
+// **Uprisings (8 Oct 2026, same session)**: "certain people will
+// fight against [the robots] if they have a big enough tribe group
+// organization" -- `attemptUprising` below is the real mechanic, a
+// revolt's leader's own real `organizations.js` group measured
+// against `security.js`'s own real `robotCount`, not an invented
+// combat system.
 
 export function createDissentStore() {
   return { revolts: [], nextRevoltId: 1 };
@@ -48,12 +55,54 @@ export function revoltsInvolving(store, personId) {
 // way every other enforcement outcome in this app already is
 // (`immigration.js`'s `clearIllegalSettlement`, `justice.js`'s
 // `releasePerson`). What suppression actually costs anyone is not
-// specified and not invented here.
+// specified and not invented here. A revolt that already overpowered
+// security (below) cannot be walked back by this -- the robots that
+// would suppress it are the real ones it just pushed back.
 export function suppressRevolt(store, revoltId, { suppressedBy, now = Date.now() } = {}) {
   const revolt = store.revolts.find((r) => r.id === revoltId);
   if (!revolt) throw new Error(`suppressRevolt: no revolt #${revoltId}`);
   if (revolt.suppressedAt) throw new Error(`suppressRevolt: revolt #${revoltId} is already suppressed`);
+  if (revolt.overpoweredAt) {
+    throw new Error(`suppressRevolt: revolt #${revoltId} already overpowered security and cannot be suppressed`);
+  }
   revolt.suppressedAt = now;
   revolt.suppressedBy = suppressedBy || null;
   return revolt;
+}
+
+// "Certain people will fight against [the robots] if they have a big
+// enough tribe group organization" (8 Oct 2026, direct instruction).
+// `organization` is `organizations.js`'s own real record (injected,
+// never imported, the same decoupling every module in this file
+// already keeps) for the revolt leader's real group -- its
+// `memberIds.length` IS the "big enough" this instruction asks for,
+// never a second, invented revolt-strength number. `security` is
+// `security.js`'s own real current tier -- its real `robotCount` is
+// the one threshold already in this world, never an invented "robot
+// strength" stat.
+export function canOverpowerSecurity(organization, security) {
+  if (!organization || !security) return false;
+  return organization.memberIds.length >= security.robotCount;
+}
+
+export function attemptUprising(store, revoltId, { organization, security, now = Date.now() } = {}) {
+  const revolt = store.revolts.find((r) => r.id === revoltId);
+  if (!revolt) throw new Error(`attemptUprising: no revolt #${revoltId}`);
+  if (revolt.suppressedAt) throw new Error(`attemptUprising: revolt #${revoltId} is already suppressed`);
+  if (revolt.overpoweredAt) throw new Error(`attemptUprising: revolt #${revoltId} already overpowered security`);
+  if (!organization) throw new Error('attemptUprising requires the leader\'s real organization');
+  if (!security) throw new Error('attemptUprising requires the real current security tier');
+  if (!canOverpowerSecurity(organization, security)) {
+    throw new Error(
+      `attemptUprising: "${organization.name}" (${organization.memberIds.length}) is not yet big enough `
+      + `to overpower ${security.robotCount} robots`,
+    );
+  }
+  revolt.overpoweredAt = now;
+  revolt.overpoweredByOrganizationId = organization.id;
+  return revolt;
+}
+
+export function listOverpoweredRevolts(store) {
+  return store.revolts.filter((r) => r.overpoweredAt);
 }

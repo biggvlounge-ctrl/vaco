@@ -487,3 +487,56 @@ export async function upgradeCommercial(store, { ownerId, transferFn, now = Date
 
   return property;
 }
+
+// "People get, it can be involved in the economy rotation... the
+// economy should continue to thrive as far as the owners of the
+// businesses" (8 Oct 2026, direct instruction) -- until now a
+// commercial property was something a player only ever paid INTO
+// (`purchaseCommercial`/`upgradeCommercial`); this is the real,
+// opposite flow, an owner's own business actually earning. Gated by
+// `OPERATE_COOLDOWN_MS`, the same shape `resources.js`'s
+// `DIG_COOLDOWN_MS` already uses, so running a business is a real,
+// repeatable action rather than a one-time payout. `economyMultiplier`
+// is injected (from `economy.js`'s `economyMultiplierFor`) rather than
+// imported, the same decoupling every other cross-module number in
+// this file already uses -- a thriving world (real spending elsewhere)
+// is the real reason a business earns more, not a second invented
+// number this function would otherwise have to make up on its own.
+export const BASE_COMMERCIAL_REVENUE = 30;
+export const BUSINESS_REVENUE_ACCOUNT = 'vdp-business-customers';
+export const OPERATE_COOLDOWN_MS = 5 * 60 * 1000;
+
+export function canOperateBusiness(property, now = Date.now()) {
+  if (!property || property.type !== 'commercial') return false;
+  if (!property.lastOperatedAt) return true;
+  return now - property.lastOperatedAt >= OPERATE_COOLDOWN_MS;
+}
+
+export async function operateBusiness(store, {
+  ownerId, transferFn, economyMultiplier = 1, now = Date.now(),
+} = {}) {
+  if (!ownerId) throw new Error('operateBusiness requires an ownerId');
+  const property = commercialOwnedBy(store, ownerId);
+  if (!property) throw new Error(`operateBusiness: "${ownerId}" does not own a commercial property`);
+  if (!canOperateBusiness(property, now)) {
+    throw new Error(`operateBusiness: "${ownerId}"'s business is still restocking -- try again later`);
+  }
+  if (typeof transferFn !== 'function') throw new Error('operateBusiness requires a transferFn');
+
+  const level = commercialLevelByNumber(property.level);
+  const revenue = Math.max(0, Math.round(level.level * BASE_COMMERCIAL_REVENUE * economyMultiplier));
+
+  const previousOperatedAt = property.lastOperatedAt || null;
+  property.lastOperatedAt = now;
+
+  try {
+    await transferFn({
+      fromUserId: BUSINESS_REVENUE_ACCOUNT, toUserId: ownerId, amount: revenue, reason: 'vdp-business-revenue',
+    });
+  } catch (err) {
+    property.lastOperatedAt = previousOperatedAt;
+    throw err;
+  }
+
+  return { property, revenue };
+}

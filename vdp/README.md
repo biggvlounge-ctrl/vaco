@@ -1066,6 +1066,40 @@ districts, Shield accounts, `avatarRender.js`).
 `immigration.test.js`). Full suite: 437 passing, up from 425, 0
 failing, clean `npm run build`.
 
+**Phase 29 — the economy rotates, and a real revolt can fight the
+robots** (8 Oct 2026, direct instruction). "The economy should
+continue to thrive as far as the owners of the businesses... the
+economy can go up and down depending on how people are spending
+inside of it." New `economy.js`: a real, moving index built from
+every real purchase `server.cjs` already charges through (home/land/
+commercial purchases and upgrades, ticket fines now all call its
+`recordSpending`), clamped so one huge purchase can't swing the whole
+world. New `property.js` function `operateBusiness` is the real
+opposite flow a commercial owner now has: their business actually
+earns, scaled by the real index (`economyMultiplierFor`), paid from a
+named customer account, gated by a real cooldown. `GET /api/
+analytics/status` now reports `economyIndex`/`recentSpending`
+alongside the population ticker and `totalVCoinGenerated` it already
+had; `MyHomeView.jsx` gained an "Open for business" action.
+
+"Certain people will fight against [the robots] if they have a big
+enough tribe group organization." New `dissent.js` functions
+`canOverpowerSecurity`/`attemptUprising`: a revolt's own leader's real
+`organizations.js` group (`memberIds.length`) measured against
+`security.js`'s own real current `robotCount` -- never an invented
+combat stat. Big enough, and the revolt is marked `overpoweredAt`;
+`suppressRevolt` now refuses an already-overpowered revolt. New
+`POST /api/dissent/:id/uprising`; `GovernmentView.jsx` gained a "Fight
+the robots" action, shown only to that revolt's own real leader.
+
+Also confirmed, not rebuilt: "moving... creating new areas or
+migrating until they are noticed by the AI" is already
+`immigration.js`'s real undiscovered-illegal-settlement mechanic from
+Phase 28.
+
+17 new tests (`economy.test.js`, `property.test.js`, `dissent.test.js`).
+Full suite: 454 passing, up from 437, 0 failing, clean `npm run build`.
+
 **Phase 2 (SVMIKO DEGVCHI Avatar Wearables)**: 20 plain-Node checks
 (13 unique real pieces, real category assignment, the luxury-vs-
 streetwear tier proven at VDP's own real price scale, a real purchase

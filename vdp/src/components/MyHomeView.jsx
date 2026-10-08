@@ -27,6 +27,7 @@ export default function MyHomeView({ session, onChange }) {
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [lastRevenue, setLastRevenue] = useState(null);
 
   const refresh = useCallback(async () => {
     if (!session?.userId) return;
@@ -97,6 +98,32 @@ export default function MyHomeView({ session, onChange }) {
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || `${path} failed (${res.status})`);
       setShop(body);
+      if (onChange) await onChange();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // "The economy should continue to thrive as far as the owners of
+  // the businesses" (8 Oct 2026) -- the real, opposite flow of
+  // `commercialAct`: the business earns, scaled by the real,
+  // world-wide economy index `server.cjs`'s own `/api/property/
+  // operate-business` reads.
+  const handleOperate = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`${VDP_API_URL}/api/property/operate-business`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.sessionToken}` },
+        body: JSON.stringify({ ownerId: session.userId }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || `operate-business failed (${res.status})`);
+      setShop(body.property);
+      setLastRevenue({ amount: body.revenue, economyIndex: body.economyIndex });
       if (onChange) await onChange();
     } catch (err) {
       setError(err.message);
@@ -258,12 +285,22 @@ export default function MyHomeView({ session, onChange }) {
         {shop && (
           <div>
             <p style={{ fontSize: 12 }}>{shop.levelName} — {shop.lifecycleStage}</p>
-            {nextShopLevel ? (
-              <button onClick={commercialAct("/api/property/upgrade-commercial")} disabled={busy}>
-                {busy ? "…" : `Upgrade to ${nextShopLevel.name} (${nextShopLevel.price - currentShopLevel.price} VCoin)`}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
+              {nextShopLevel ? (
+                <button onClick={commercialAct("/api/property/upgrade-commercial")} disabled={busy}>
+                  {busy ? "…" : `Upgrade to ${nextShopLevel.name} (${nextShopLevel.price - currentShopLevel.price} VCoin)`}
+                </button>
+              ) : (
+                <p style={{ fontSize: 12, color: "#888" }}>Already at the top tier.</p>
+              )}
+              <button onClick={handleOperate} disabled={busy}>
+                {busy ? "…" : "Open for business"}
               </button>
-            ) : (
-              <p style={{ fontSize: 12, color: "#888" }}>Already at the top tier.</p>
+            </div>
+            {lastRevenue && (
+              <p style={{ fontSize: 11, color: "#888" }}>
+                Earned {lastRevenue.amount} VCoin (the world's economy is at {lastRevenue.economyIndex}).
+              </p>
             )}
           </div>
         )}

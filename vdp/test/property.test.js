@@ -8,7 +8,8 @@ import {
   rentHome, buyRentedHome, HOME_PRICE, RENT_PRICE, LIFECYCLE, PROPERTY_LEVELS,
   MATERIALS_REQUIRED, materialsDeltaFor, purchaseLand, LAND_PRICE, buildUnauthorized,
   demolishUnauthorized, listUnauthorized, commercialOwnedBy, purchaseCommercial,
-  upgradeCommercial, COMMERCIAL_LEVELS,
+  upgradeCommercial, COMMERCIAL_LEVELS, operateBusiness, canOperateBusiness,
+  BASE_COMMERCIAL_REVENUE, BUSINESS_REVENUE_ACCOUNT, OPERATE_COOLDOWN_MS,
 } from '../src/lib/property.js';
 import {
   createResourcesStore, spendMaterials, undoSpend, materialsFor, STARTING_OLD_WORLD_STOCK,
@@ -367,4 +368,59 @@ test('upgradeCommercial refuses someone with no commercial property and the top 
     upgradeCommercial(store, { ownerId: 'gail', transferFn: fakeTransfer([]) }),
     /already at the top level/,
   );
+});
+
+test('operateBusiness pays real revenue from the customer account to the owner', async () => {
+  const store = createPropertyStore();
+  await purchaseCommercial(store, { ownerId: 'gail', transferFn: fakeTransfer([]) });
+  const calls = [];
+  const { property, revenue } = await operateBusiness(store, {
+    ownerId: 'gail', transferFn: fakeTransfer(calls), economyMultiplier: 1,
+  });
+  assert.equal(revenue, COMMERCIAL_LEVELS[0].level * BASE_COMMERCIAL_REVENUE);
+  assert.equal(calls[0].fromUserId, BUSINESS_REVENUE_ACCOUNT);
+  assert.equal(calls[0].toUserId, 'gail');
+  assert.equal(calls[0].amount, revenue);
+  assert.ok(property.lastOperatedAt);
+});
+
+test('operateBusiness scales real revenue by the real economy multiplier', async () => {
+  const store = createPropertyStore();
+  await purchaseCommercial(store, { ownerId: 'gail', transferFn: fakeTransfer([]) });
+  const { revenue } = await operateBusiness(store, {
+    ownerId: 'gail', transferFn: fakeTransfer([]), economyMultiplier: 2,
+  });
+  assert.equal(revenue, COMMERCIAL_LEVELS[0].level * BASE_COMMERCIAL_REVENUE * 2);
+});
+
+test('operateBusiness refuses someone with no commercial property', async () => {
+  const store = createPropertyStore();
+  await assert.rejects(
+    operateBusiness(store, { ownerId: 'gail', transferFn: fakeTransfer([]) }),
+    /does not own a commercial property/,
+  );
+});
+
+test('operateBusiness refuses a second run before the real cooldown elapses', async () => {
+  const store = createPropertyStore();
+  await purchaseCommercial(store, { ownerId: 'gail', transferFn: fakeTransfer([]) });
+  await operateBusiness(store, { ownerId: 'gail', transferFn: fakeTransfer([]), now: 1000 });
+  assert.equal(canOperateBusiness(commercialOwnedBy(store, 'gail'), 1000 + OPERATE_COOLDOWN_MS - 1), false);
+  await assert.rejects(
+    operateBusiness(store, { ownerId: 'gail', transferFn: fakeTransfer([]), now: 1000 + OPERATE_COOLDOWN_MS - 1 }),
+    /still restocking/,
+  );
+  const { revenue } = await operateBusiness(store, {
+    ownerId: 'gail', transferFn: fakeTransfer([]), now: 1000 + OPERATE_COOLDOWN_MS,
+  });
+  assert.ok(revenue > 0);
+});
+
+test('a failed operateBusiness transfer rolls back the real lastOperatedAt claim', async () => {
+  const store = createPropertyStore();
+  await purchaseCommercial(store, { ownerId: 'gail', transferFn: fakeTransfer([]) });
+  await assert.rejects(
+    operateBusiness(store, { ownerId: 'gail', transferFn: fakeTransfer([], { shouldFail: true }), now: 1000 }),
+  );
+  assert.equal(commercialOwnedBy(store, 'gail').lastOperatedAt, null);
 });
