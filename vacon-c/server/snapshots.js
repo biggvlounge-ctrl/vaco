@@ -23,15 +23,21 @@
 // row for `npc`/`organization`/`family` only (see
 // `completeness.js`'s `BY_DESIGN.entities`), never for a city or a
 // civilization, so there is no id an FK to `entities` could hold for
-// either tier. This scopes to individual and family: both are real
-// entities with a real, LIVE wealth figure already wired
-// (`economy.getNetWorth`, and the same sum `engine.js#getFamilyWealth`
-// already does). Business is left out on purpose —
-// `businesses.revenue`/`.profit` are schema-only columns nothing has
-// ever written (system #28 Business stays `partial` for exactly this
-// reason), so a business's `vcoin` would snapshot a constant zero
-// forever, which is worse than not snapshotting it: the same call
-// `computeApproval` makes returning `null` over a fabricated zero.
+// either tier. This scopes to individual, family and business: all
+// three are real entities with a real, LIVE wealth figure to snapshot
+// — `economy.getNetWorth` for a person, the same sum
+// `engine.js#getFamilyWealth` already does for a family, and
+// `organizations.assets` for a business, real and moving every tick it
+// has staff (`economy.runProduction`/`.runPayroll` write it). **Business
+// joined 8 Oct 2026**, once `server/businesses.js` closed the reason
+// this scope used to stop at two: `businesses.revenue`/`.profit` had
+// been schema-only columns nothing had ever written, so either one
+// snapshotted as a constant zero forever, the same call
+// `computeApproval` makes returning `null` over a fabricated zero —
+// and `organizations.assets` was the whole time a real STOCK sitting
+// one column over, which is the closer match for a NET WORTH snapshot
+// in any case (assets+savings-debt is a stock; revenue and profit are
+// flows).
 // Resource-market columns (`resource_type`/`supply`/`demand`/`price`)
 // stay null on every row this file writes, for the same reason —
 // `market_listings` is generated once at worldgen and never refreshed,
@@ -48,13 +54,21 @@
 // ---------------------------------------------------------------------
 // `analytics_snapshots.gdp` stays null
 // ---------------------------------------------------------------------
-// No mechanism anywhere in this engine computes a monetary output
-// aggregate, and the columns a real GDP would sum
-// (`businesses.revenue`/`.profit`) are unwritten. Substituting
-// something else — total wages paid, say — would silently redefine
-// GDP as a different quantity and call it GDP, which is a worse
-// mistake than an honest gap: `unknown is not zero`, and it is not a
-// different number either.
+// Not for lack of the columns any more — `businesses.js` computes
+// `revenueOf`/`profitOf` from `organizations.income`/`.expenses`, which
+// are real. What is still missing is the PERIOD: `income`/`expenses`
+// are lifetime accumulators ("Accumulated, because `expenses` is" —
+// `economy.runProduction`'s own comment), so summing them gives total
+// historical revenue, a number that only ever grows, not output for
+// this quarter. Differencing it against the previous snapshot would
+// work and is deliberately not built here: this file runs once per
+// `isSnapshotDay`, has no record of its own last read, and improvising
+// one would be a second, narrower snapshot history sitting next to the
+// one this table already is. Substituting the lifetime total in
+// directly — calling the ever-growing number GDP — would silently
+// redefine GDP as a different quantity and call it GDP, which is a
+// worse mistake than an honest gap: `unknown is not zero`, and it is
+// not a different number either.
 //
 // ---------------------------------------------------------------------
 // Everything else reuses an existing formula rather than inventing one
@@ -216,6 +230,19 @@ function snapshotEconomy(worldState, tick) {
   }
   for (const family of worldState.families || []) {
     written.push(pushEconomySnapshot(worldState, family.id, tick, familyWealth(worldState, family.id)));
+  }
+  // Business joined 8 Oct 2026, once `server/businesses.js` closed the
+  // reason this was left out — `businesses.revenue`/`.profit` were
+  // schema-only columns nothing had ever written, so either one
+  // snapshotted as a constant zero forever. `organizations.assets` was
+  // real and moving the whole time (`economy.runProduction`/
+  // `.runPayroll` write it every tick a business has staff), and it is
+  // the closer parallel to net worth besides: assets+savings-debt is a
+  // STOCK, and a business's stock is what it holds, not what it took in
+  // or spent this period.
+  for (const org of worldState.organizations || []) {
+    if (org.type !== 'business') continue;
+    written.push(pushEconomySnapshot(worldState, org.id, tick, Number(org.assets) || 0));
   }
   return written;
 }

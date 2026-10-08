@@ -50,7 +50,7 @@ the Postgres schema that already exists.
 
 ## 1. Server code — `vacon-c/server/`
 
-All 79 files present on disk, all committed, largest first.
+All 80 files present on disk, all committed, largest first.
 
 **`test/inventory.test.js` now fails when this table and `server/` disagree**, which is the guard this document has needed through three separate drifts (see the note below). The count and the file list are checked against the tree rather than typed.
 
@@ -106,6 +106,7 @@ read off disk, not recalled.
 | `contest.js` | 15,668 | **Contest resolution** — rates entities from their live `combat`/`sports` traits and resolves a bout deterministically from a seeded draw. Called by `server/competition.js` from the cross-cutting slot — for a long time nothing called it at all. | Built |
 | `infrastructure.js` | 27,862 | City infrastructure: capacity, condition, failure risk, service level. | Built |
 | `property.js` | 17,227 | **Property Engine (Phase 2)** — generation, derived value, append-only ownership, lifecycle. | Built |
+| `businesses.js` | 17,595 | **§7 system 28, Business — formation, failure and its inverse, closed 8 Oct 2026.** A person founds one with real capital out of their own savings, quitting whatever job they held, and hires themselves — measured: requiring an unemployed founder first left this nearly unreachable (100 of 103 working-age people already hold a job by tick 50), because `runLabour`'s hiring pass only considers an employer who already has somebody. Losing every employee already made a business permanently unstaffable in `runLabour` with no name or event; this file names it (`decline`, then `legacy` after a month unable to hire) and gives it the inverse — one rescue hire a tick for as long as it can still afford the going wage. `revenue`/`profit`/`market_share` computed at migrate time from the organization's own real `income`/`expenses`, never stored twice. | Built |
 | `areaStats.js` | 14,182 | Residents of an area, and the world poverty line. | Built |
 | `technology.js` | 14,892 | Civilizations, eras, and what an era makes possible. | Built |
 | `environment.js` | 13,372 | Weather, climate and where a drought lives — `environment_state`, one row per city, and severe weather through the existing condition channel. | Built |

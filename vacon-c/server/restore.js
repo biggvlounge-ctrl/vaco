@@ -173,6 +173,20 @@ async function restoreWorldStateFromPostgres(worldState) {
     factions.set(Number(f.organization_id), nums(f, ['morale']));
   }
 
+  // A businesses row's `lifecycle_stage` is the one field this file
+  // reads back — `revenue`/`profit`/`market_share`/`industry` are
+  // derived at migrate time from the organization's own real
+  // `income`/`expenses`/employment history (businesses.js), so they are
+  // recomputed from THOSE restored fields rather than read a second
+  // time from this table (standing rule 3). `lifecycle_stage` has no
+  // such source: it is a real decision (`decline`/`legacy` in
+  // particular) that a restored world must not quietly forget, which
+  // would let a closed business look open again.
+  const businessStages = new Map();
+  for (const b of await q('SELECT organization_id, lifecycle_stage FROM businesses')) {
+    businessStages.set(Number(b.organization_id), b.lifecycle_stage);
+  }
+
   worldState.organizations = (await q('SELECT * FROM organizations')).map((o) => {
     const e = entities.get(Number(o.id)) || {};
     const faction = factions.get(Number(o.id));
@@ -190,6 +204,13 @@ async function restoreWorldStateFromPostgres(worldState) {
       org.morale = faction.morale;
       org.factionStatus = faction.status;
       org.isFaction = true;
+    }
+    if (org.type === 'business') {
+      org.lifecycleStage = businessStages.get(Number(o.id)) || 'startup';
+      // `vacantSinceTick` is set below, once `worldState.tick` is a
+      // real restored value rather than whatever this object happened
+      // to hold before restore ran.
+      org.vacantSinceTick = null;
     }
     return org;
   });
@@ -694,6 +715,20 @@ async function restoreWorldStateFromPostgres(worldState) {
   }
   worldState.tick = tick;
   summary.tick = tick;
+
+  // A `decline` business gets a fresh LEGACY_AFTER_TICKS countdown
+  // rather than one computed from the exact tick it went vacant —
+  // `employment_records` has no `end_tick` (economy.js's own
+  // `endEmployment` explains why: the schema has no column for one and
+  // nothing reads it), so the precise moment is gone. Starting the
+  // countdown now is later than the original moment, never earlier, so
+  // a restore cannot close a business that was still being given its
+  // chance to recover.
+  for (const org of worldState.organizations) {
+    if (org.type === 'business' && org.lifecycleStage === 'decline') {
+      org.vacantSinceTick = tick;
+    }
+  }
 
   // nextEntityId lives ON WorldState, so unlike the other sixteen it
   // survives a structured clone — but not a process restart, and a

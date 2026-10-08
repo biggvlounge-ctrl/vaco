@@ -120,8 +120,7 @@ const SYSTEMS = [
     name: 'Economy',
     level: 'modelled',
     tables: ['market_listings', 'individual_finances', 'resources', 'economy_snapshots',
-      'analytics_snapshots'],
-    schemaOnly: ['investments'],
+      'analytics_snapshots', 'investments'],
     phases: ['runEconomyPhase'],
     traitFamilies: ['economic'],
     functions: ['resolveMarketPrice', 'getScarcity', 'getNetWorth', 'runSnapshots'],
@@ -132,12 +131,17 @@ const SYSTEMS = [
       + 'activity in the trailing year, mean education, unlocked eras); `economy_snapshots` '
       + 'rows for every living individual and family on `statecraft.BUDGET_INTERVAL_TICKS` (a '
       + 'quarter, reused rather than a new interval invented for the same question). Scoped to '
-      + 'individual/family only — `entities` rows exist for npc/organization/family, never for '
-      + 'a city or a civilization (`completeness.js`), so the schema comment\'s wider '
-      + '"community/city/region/civ" tier list has no id an FK could hold. `gdp` stays null: no '
-      + 'mechanism computes a monetary output aggregate, and `businesses.revenue`/`.profit` — '
-      + 'the columns a real one would sum — are unwritten, so a substitute would silently '
-      + 'redefine GDP as something else. Unknown is not zero.',
+      + 'individual/family only until `businesses.js` added business, 8 Oct 2026 — `entities` '
+      + 'rows exist for npc/organization/family, never for a city or a civilization '
+      + '(`completeness.js`), so the schema comment\'s wider "community/city/region/civ" tier '
+      + 'list has no id an FK could hold. `gdp` stays null: `businesses.revenueOf`/`.profitOf` — '
+      + 'the figures a real one would sum — are real now, but `organizations.income`/`.expenses` '
+      + 'are lifetime accumulators, not a figure for one period, so summing them would be total '
+      + 'historical revenue wearing GDP\'s name rather than GDP. Unknown is not zero, and it is '
+      + 'not a different number either. **`investments` closed 8 Oct 2026** too — '
+      + '`server/investments.js`, the one schema-only table in this system that had no caller '
+      + 'anywhere: real money now moves investor savings into a target\'s assets and a bounded '
+      + 'dividend pays back out of what the target actually has.',
   },
   {
     n: 4,
@@ -582,16 +586,33 @@ const SYSTEMS = [
   {
     n: 28,
     name: 'Business',
-    level: 'partial',
+    level: 'modelled',
     tables: ['businesses', 'market_listings'],
-    functions: ['runLabour'],
+    functions: ['runLabour', 'foundBusiness', 'runBusinessFormation', 'advanceBusinessLifecycle'],
     note: 'Businesses are entities that trade, they hire and lay off through `runLabour`, and '
-      + 'their takings and wage bill move real money. **Still partial, and for the reason this '
-      + 'entry always gave: formation, growth and failure are not driven.** No business is '
-      + 'ever founded or wound up in a running world — `worldgen` makes them all and the set '
-      + 'never changes. Note what did NOT close this: `server/trade.js` reached '
-      + '`barter.exchange` for the first time in any generated world, but that is trade '
-      + 'between PEOPLE. A business is not a party to it.',
+      + 'their takings and wage bill move real money. **Built 8 Oct 2026, closing the reason '
+      + 'this entry always gave: formation, growth and failure are not driven.** '
+      + '`server/businesses.js` founds one — a person puts up real capital out of their own '
+      + 'savings (`investments.invest`\'s own ledger), quitting whatever job they held, and '
+      + 'hires themselves at their own company — measured, requiring an UNemployed founder '
+      + 'first left this nearly unreachable, since 100 of 103 working-age people already hold '
+      + 'a job by tick 50 on a fresh world. `runLabour`\'s hiring pass only considers an '
+      + 'employer who already has somebody. And it '
+      + 'ends one: losing every employee already made a business permanently unstaffable in '
+      + '`runLabour` with no name and no event; this file names it (`decline`, then `legacy` '
+      + 'after a month with nobody and not enough to hire anyone) and gives it the inverse '
+      + 'standing rule 13 asks for — a staffless business that can still afford the going wage '
+      + 'gets one rescue hire a tick, the same test `runLabour` applies to one that already has '
+      + 'staff. `revenue`/`profit`/`market_share` are computed from the organization\'s own real '
+      + '`income`/`expenses` at migrate time (standing rule 3), closing the gap '
+      + '`economy_snapshots` named for leaving Business out of GDP. **Still not every stage**: '
+      + '`lifecycle_stage`\'s growth/expansion/maturity/transformation are size and strategy '
+      + 'judgments nothing here measures, left unwired rather than given invented coefficients '
+      + '(system 36\'s CITY DNA gets the same treatment for its other seven dimensions), and '
+      + '`brand_value` stays null — no mechanism moves a "brand", and `reputation` is a frozen '
+      + 'generation-time value standing rule 9 already warns against substituting in. Note what '
+      + 'did NOT close this: `server/trade.js` reached `barter.exchange` for the first time in '
+      + 'any generated world, but that is trade between PEOPLE. A business is not a party to it.',
   },
   {
     n: 29,

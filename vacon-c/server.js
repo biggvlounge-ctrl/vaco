@@ -29,6 +29,7 @@ const cors = require('cors');
 require('dotenv/config');
 
 const engine = require('./server/engine.js');
+const businesses = require('./server/businesses.js');
 const persistence = require('./server/persistence.js');
 
 const { requireActor } = require('./lib/shieldAuth.cjs');
@@ -413,9 +414,22 @@ app.post('/api/organizations', (req, res) => {
 // subtype, so this is a filtered read over organizations -- not a
 // separate root entity with its own array.
 app.get('/api/businesses', (_req, res) => {
-  const businesses = (engine.WorldState.organizations || [])
-    .filter((o) => o.type === 'business');
-  res.json({ businesses, total: businesses.length });
+  const w = engine.WorldState;
+  // `revenue`/`profit`/`market_share`/`industry` are the `businesses`
+  // subtype's own columns, computed here the same way `migrate.js`
+  // computes them for the row it writes — real figures derived from
+  // the organization's own income/expenses/employment history, not a
+  // second place those numbers live (standing rule 3).
+  const rows = (w.organizations || [])
+    .filter((o) => o.type === 'business')
+    .map((o) => ({
+      ...o,
+      revenue: businesses.revenueOf(o),
+      profit: businesses.profitOf(o),
+      market_share: businesses.marketShareOf(w, o.id),
+      industry: businesses.industryOf(w, o.id),
+    }));
+  res.json({ businesses: rows, total: rows.length });
 });
 
 app.get('/api/factions', (_req, res) => {

@@ -982,7 +982,7 @@ trusted:
 
 The simulation engine is the one app in this repo whose "done" is not a
 list of routes, so it carries a measured completeness score rather than
-a criteria tally. **91.4%**, from
+a criteria tally. **91.8%**, from
 `vacon-c/dev-docs/GAME_COMPLETENESS.md`, which
 `vacon-c/scripts/completeness.mjs` regenerates and
 `vacon-c/test/completeness.test.js` fails on if stale — including a
@@ -990,12 +990,38 @@ check that the percent in THIS file matches the one the code measures.
 
 | axis | complete | what it measures |
 |---|---|---|
-| systems | 72.4% | the forty urban systems §7 names, at `urbanSystems.js`'s own four levels |
-| tables | 93.2% | schema tables a built world actually fills |
+| systems | 73.6% | the forty urban systems §7 names, at `urbanSystems.js`'s own four levels |
+| tables | 94.7% | schema tables a built world actually fills |
 | statistics | 88.2% | statistics a world can answer about itself |
 | traits | 100% | traits something under `server/` reads |
 | traitDepth | 85.7% | trait columns a life actually changes |
 | habits | 100% | whether habits and routines carry information |
+
+**91.7% -> 91.8% on 8 Oct 2026, systems axis.** §7 system 28 Business
+moved `partial` -> `modelled`. `server/businesses.js`: a person founds
+one with real capital out of their own savings and hires themselves —
+quitting whatever job they held first, because requiring an UNemployed
+founder (the first version) left this nearly unreachable (measured:
+100 of 103 working-age people already hold a job by tick 50 on a fresh
+world). Losing every employee already made a business permanently
+unstaffable in `economy.runLabour`, with no name and no event; this
+file names it (`decline`, then `legacy` after a month unable to hire)
+and gives it the inverse CLAUDE.md's thirteenth standing rule asks for
+— a staffless business that can still afford the going wage gets one
+rescue hire a tick. `revenue`/`profit`/`market_share` are computed at
+migrate time from the organization's own real `income`/`expenses`
+(standing rule 3), closing the reason `snapshots.js` left Business out
+of `economy_snapshots` and out of a real `gdp` figure (`gdp` still
+stays null: `income`/`expenses` are lifetime accumulators, not a
+period total, so summing them would be total historical revenue
+wearing GDP's name rather than GDP).
+
+**91.4% -> 91.7% on 8 Oct 2026, tables axis.** `investments` — the one
+schema-only table in the Economy
+system with no caller anywhere — closed: `server/investments.js` moves
+real money from an investor's own savings into a target's assets and
+pays a bounded dividend back out of what the target actually has, each
+tick, proportional to stake, never more than the organization holds.
 
 **90.8% -> 91.4% on 24 Sep 2026, on the tables axis instead of systems.**
 `economy_snapshots` and `analytics_snapshots` were the tables axis's

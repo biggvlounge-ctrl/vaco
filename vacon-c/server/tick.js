@@ -53,6 +53,7 @@ const { getEntityTraitsForEntity, applyKeyModifier, getLiveEntity, traitsToSheet
 const worldStore = require('./worldStore.js');
 const economy = require('./economy.js');
 const investments = require('./investments.js');
+const businesses = require('./businesses.js');
 const politics = require('./politics.js');
 const technology = require('./technology.js');
 const mortality = require('./mortality.js');
@@ -818,7 +819,7 @@ function runMigrationPhase(worldState) {
 // fortified based on the controlling faction's LIVE organization-tier
 // traits. See dev-docs/territory-community/plan.md.
 // ---------------------------------------------------------------------------
-function runOrganizationPhase(worldState) {
+function runOrganizationPhase(worldState, options = {}) {
   const events = [];
 
   // **Politics, inside this phase rather than as a twelfth.** A
@@ -894,6 +895,21 @@ function runOrganizationPhase(worldState) {
   // there and had nothing pushing current through it. See
   // server/knowledge.js.
   events.push(...knowledge.runStudy(worldState, worldState.tick));
+
+  // **§7 system 28, Business: formation, then the lifecycle it drives.**
+  // Formation first, so a business founded this tick is already staffed
+  // by the time the lifecycle pass looks at it and is never mistaken for
+  // one that opened empty. `generateOrganization` comes in through
+  // `options` rather than a require of `engine.js`, which requires this
+  // file and would close a cycle — the same reason `orgArchetypes.found`
+  // and `missions.resolveMission`'s `payReward` take it as a parameter.
+  if (typeof options.generateOrganization === 'function') {
+    const formed = businesses.runBusinessFormation(worldState, worldState.tick, {
+      generateOrganization: options.generateOrganization,
+    });
+    events.push(...formed.events);
+  }
+  events.push(...businesses.advanceBusinessLifecycle(worldState, worldState.tick));
 
   return events;
 }
@@ -1301,7 +1317,7 @@ function runReemergencePhase(worldState) {
 // ---------------------------------------------------------------------------
 // advanceTick() — runs all 11 phases in order, one simulation tick.
 // ---------------------------------------------------------------------------
-function advanceTick(worldState) {
+function advanceTick(worldState, options = {}) {
   worldState.tick += 1;
 
   const candidateEvents = [];
@@ -1329,7 +1345,7 @@ function advanceTick(worldState) {
   candidateEvents.push(...runSocialPhase(worldState));          // 4
   candidateEvents.push(...runDecisionPhase(worldState));       // 5
   candidateEvents.push(...runMigrationPhase(worldState));      // 6
-  candidateEvents.push(...runOrganizationPhase(worldState));   // 7
+  candidateEvents.push(...runOrganizationPhase(worldState, options));   // 7
   candidateEvents.push(...runSecurityPhase(worldState));       // 8
 
   // Named Flow Templates. NOT a twelfth phase -- the pipeline is locked

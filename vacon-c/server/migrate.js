@@ -38,6 +38,7 @@ const engine = require('./engine.js');
 const { TRAIT_DEFINITIONS } = require('./traitDefinitions.js');
 const { KEY_DEFINITIONS } = require('./keys.js');
 const infrastructure = require('./infrastructure.js');
+const businesses = require('./businesses.js');
 
 async function migrateWorldStateToPostgres(worldState) {
   const summary = {};
@@ -210,6 +211,38 @@ async function migrateWorldStateToPostgres(worldState) {
         factionCount++;
       }
       summary.factions = factionCount;
+
+      // ---------------------------------------------------------------
+      // businesses — the other organizations subtype (standing rule 4),
+      // same pattern as factions above. `revenue`/`profit`/`market_share`
+      // are computed here rather than read off a stored field, same
+      // reason `families.wealth` is: they are a subtype VIEW of the
+      // organization's own real `income`/`expenses`, not a second place
+      // those numbers live. `brand_value` and a business with no
+      // employment history's `industry` stay null — no mechanism in
+      // this engine moves either, and a number stood in for them would
+      // be a fabricated answer where an honest gap belongs (see
+      // businesses.js's header).
+      // ---------------------------------------------------------------
+      let businessCount = 0;
+      for (const org of worldState.organizations) {
+        if (org.type !== 'business') continue;
+        await client.query(
+          `INSERT INTO businesses (organization_id, industry, revenue, profit, market_share, brand_value, lifecycle_stage)
+           VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+          [
+            org.id,
+            businesses.industryOf(worldState, org.id),
+            businesses.revenueOf(org),
+            businesses.profitOf(org),
+            businesses.marketShareOf(worldState, org.id),
+            null,
+            org.lifecycleStage || 'startup',
+          ],
+        );
+        businessCount++;
+      }
+      summary.businesses = businessCount;
 
       // ---------------------------------------------------------------
       // families — wealth is computed (engine.js#getFamilyWealth()),

@@ -1,8 +1,9 @@
 // economy_snapshots / analytics_snapshots — the history standing rule 3
 // does not forbid. See server/snapshots.js's header for the shape: one
 // analytics_snapshots row every tick (world-level, cheap), economy_
-// snapshots rows for every living individual and family on a quarterly
-// cadence, gdp always null, resource-market columns always null.
+// snapshots rows for every living individual, family and business on a
+// quarterly cadence, gdp always null, resource-market columns always
+// null.
 
 'use strict';
 
@@ -169,13 +170,20 @@ test('a generated world accumulates real history over real ticks', () => {
   const economyTicks = new Set(w.economySnapshots.map((r) => r.tick));
   assert.deepEqual([...economyTicks], [snapshots.SNAPSHOT_INTERVAL_TICKS]);
 
-  const atQuarter = w.economySnapshots.filter((r) => r.tick === snapshots.SNAPSHOT_INTERVAL_TICKS);
-  assert.equal(atQuarter.length, w.npcs.length + w.families.length,
-    'a row for every living individual and every family, no more and no fewer');
+  const day = snapshots.SNAPSHOT_INTERVAL_TICKS;
+  // As of the snapshot day, not as of the end of the run — `businesses.js`'s
+  // own `runBusinessFormation` can found a new one on any later tick, and
+  // this count has to match what existed at the moment the snapshot was
+  // actually taken.
+  const businesses = w.organizations.filter((o) => o.type === 'business' && o.createdTick <= day);
+  const atQuarter = w.economySnapshots.filter((r) => r.tick === day);
+  assert.equal(atQuarter.length, w.npcs.length + w.families.length + businesses.length,
+    'a row for every living individual, every family and every business, no more and no fewer');
 
   const validEntityIds = new Set([
     ...w.npcs.map((n) => n.id),
     ...w.families.map((f) => f.id),
+    ...businesses.map((b) => b.id),
   ]);
   for (const row of atQuarter) {
     assert.ok(validEntityIds.has(row.entity_id), `economy_snapshots row references entity ${row.entity_id}, which is not a living npc or a family`);
