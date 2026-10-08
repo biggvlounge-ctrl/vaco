@@ -93,3 +93,57 @@ export async function postMessage(channelId, userId, text) {
     body: JSON.stringify({ userId, text }),
   });
 }
+
+// -- Village Shop: boost + the cross-village avatar cosmetic shop --
+// VXLLAGE's own real endpoints (`server.js`'s "Village Shop: boost +
+// cosmetics" section) -- closes VDP's own README gap ("Village boost/
+// cosmetics purchases... aren't exposed inside this district's own
+// UI"), the same real-number-not-invented discipline every other
+// client function in this file already follows: every price/level
+// threshold below comes back from VXLLAGE's own response, never
+// guessed at here.
+
+export async function boostVillage(villageId, boosterId, amountVCoin) {
+  return requestJson(`/api/villages/${villageId}/boost`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...sessionHeaders() },
+    body: JSON.stringify({ boosterId, amountVCoin }),
+  });
+}
+
+export async function getBoostStatus(villageId) {
+  return requestJson(`/api/villages/${villageId}/boost`);
+}
+
+export async function getAvatarCosmeticCatalog() {
+  const body = await requestJson("/api/avatar-cosmetics/catalog");
+  return body.catalog;
+}
+
+export async function purchaseAvatarCosmetic(userId, itemId) {
+  return requestJson("/api/avatar-cosmetics/purchase", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...sessionHeaders() },
+    body: JSON.stringify({ userId, itemId }),
+  });
+}
+
+export async function equipAvatarCosmetic(userId, itemId) {
+  return requestJson("/api/avatar-cosmetics/equip", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...sessionHeaders() },
+    body: JSON.stringify({ userId, itemId }),
+  });
+}
+
+export async function unequipAvatarCosmetic(userId) {
+  return requestJson("/api/avatar-cosmetics/unequip", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...sessionHeaders() },
+    body: JSON.stringify({ userId }),
+  });
+}
+
+export async function getAvatarProfile(userId) {
+  return requestJson(`/api/users/${encodeURIComponent(userId)}/avatar-profile`);
+}

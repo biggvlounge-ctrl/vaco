@@ -879,6 +879,31 @@ No new pure-logic tests (this phase is wiring, not new rules) -- full
 suite still 385 passing, 0 failing, plus a clean production build
 (`npm run build`) confirming the new JSX compiles.
 
+**Phase 24 — self-audit: one stale "not yet built" claim, one real
+gap closed.** Following this document's own "a declared gap can go
+stale" rule (already caught twice before), the "player is a rendered
+dot" bullet was checked directly against the code and found false:
+`avatarRender.js` -- a real procedural humanoid colored from the
+player's own equipped DEGVCHI outfit -- already closed it, wired into
+`WorldView.jsx` and covered by 6 passing tests, with no update to this
+list when it shipped. Corrected in place rather than left to mislead
+the next reader.
+
+Separately, the "Village boost/cosmetics purchases... aren't exposed"
+bullet was real and is now closed: `vxllageClient.js` gained
+`boostVillage`/`getBoostStatus` and the cross-village avatar cosmetic
+shop client functions, all against VXLLAGE's own real, already-built
+routes (`server.js`'s "Village Shop: boost + cosmetics" section) --
+every price and level threshold shown comes back from VXLLAGE's own
+response, nothing guessed at in VDP. `VillageDistrictView.jsx` renders
+both as real panels: a boost amount input against the real 3-tier
+level scale, and the 3-item avatar cosmetic catalog with real buy/
+equip/unequip actions.
+
+No new tests (both are thin client wiring, the same convention every
+other `*Client.js` in this directory already follows) -- full suite
+385 passing, 0 failing, clean `npm run build`.
+
 **Phase 2 (SVMIKO DEGVCHI Avatar Wearables)**: 20 plain-Node checks
 (13 unique real pieces, real category assignment, the luxury-vs-
 streetwear tier proven at VDP's own real price scale, a real purchase
@@ -1008,8 +1033,19 @@ VADO render "Part of CVLTVRE, powered by VOKEN," fetched live from
 VOKEN's real `/api/brand` endpoint — not hardcoded text.
 
 ## Not yet built
-- Avatar/character art — the player is a rendered dot; equipped
-  DEGVCHI wearables have nothing visual to render onto.
+- ~~Avatar/character art — the player is a rendered dot; equipped
+  DEGVCHI wearables have nothing visual to render onto~~ — closed. A
+  real `avatarRender.js` draws a small procedural humanoid (head +
+  body) whose colors come from the player's own real equipped outfit
+  (`degvchi.js#getEquippedOutfit`), wired into `WorldView.jsx` and
+  covered by `avatarRender.test.js` (6 tests). Deliberately scoped to
+  the local player only -- DEGVCHI's closet is a client-local store
+  and VDP's multiplayer layer only ever broadcasts `{x, y}`, never
+  outfits, so another real player still renders as a plain dot rather
+  than this module inventing an outfit nobody's browser actually
+  holds. Found stale and corrected 8 Oct 2026, the same "a declared
+  gap can go stale" pattern this document has already caught on itself
+  twice before.
 - ~~CHOPZ isn't placed in the walkable world's district grid~~ —
   closed in Phase 12 (CHOPZ Shorts, see above).
 - Digital Twin Levels (1→2→3), DREAMS billboards, Daily Quests — real,
@@ -1088,10 +1124,16 @@ VOKEN's real `/api/brand` endpoint — not hardcoded text.
   same posture as Vavlt Stvdios' own Stage. QVAN's own confirmed
   security/anti-bot mandate (no-bots scoring, behavioral detection) —
   named in the source doc but not implemented anywhere in this
-  ecosystem. Village boost/cosmetics purchases (real in VXLLAGE's own
-  API) aren't exposed inside this district's own UI. Only one real
-  village is wired in (VDP's own, auto-created); a player can't browse
-  or join a *different*, pre-existing VXLLAGE village from inside VDP.
+  ecosystem. ~~Village boost/cosmetics purchases (real in VXLLAGE's own
+  API) aren't exposed inside this district's own UI~~ — closed, 8 Oct
+  2026 (Phase 24, see above): `vxllageClient.js` now carries
+  `boostVillage`/`getBoostStatus` and the cross-village avatar
+  cosmetic shop (`getAvatarCosmeticCatalog`/`purchaseAvatarCosmetic`/
+  `equipAvatarCosmetic`/`unequipAvatarCosmetic`/`getAvatarProfile`),
+  and `VillageDistrictView.jsx` renders both as real panels. Only one
+  real village is wired in (VDP's own, auto-created); a player can't
+  browse or join a *different*, pre-existing VXLLAGE village from
+  inside VDP.
 - Dating Village: only real Happn-style proximity crossings and
   FlashNotes are wired in — the other seven CVNVO dating-format
   extensions (Speed Dating, Long-Distance Mode, Blind Date, Group

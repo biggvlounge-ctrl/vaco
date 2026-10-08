@@ -4,7 +4,10 @@ import {
   getNearbyRoom, getInteriorCameraOffset, ROOMS_LAYOUT,
   INTERIOR_VIEWPORT_WIDTH, INTERIOR_VIEWPORT_HEIGHT, INTERIOR_MOVE_STEP,
 } from "../lib/villageDistrict.js";
-import { joinRoom, leaveRoom, getMessages, postMessage } from "../lib/vxllageClient.js";
+import {
+  joinRoom, leaveRoom, getMessages, postMessage, boostVillage, getBoostStatus,
+  getAvatarCosmeticCatalog, purchaseAvatarCosmetic, equipAvatarCosmetic, unequipAvatarCosmetic, getAvatarProfile,
+} from "../lib/vxllageClient.js";
 
 // VXLLAGE's real Village District, inhabited inside VDP -- a real,
 // small interior map (see `villageDistrict.js`'s own header for why
@@ -24,6 +27,11 @@ export default function VillageDistrictView({ session }) {
   const [chatText, setChatText] = useState("");
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState(null);
+  const [boostStatus, setBoostStatus] = useState(null);
+  const [boostAmount, setBoostAmount] = useState("25");
+  const [catalog, setCatalog] = useState([]);
+  const [avatarProfile, setAvatarProfile] = useState(null);
+  const [cosmeticBusyId, setCosmeticBusyId] = useState(null);
   const canvasRef = useRef(null);
   const interiorStateRef = useRef(interiorState);
 
@@ -44,6 +52,79 @@ export default function VillageDistrictView({ session }) {
       cancelled = true;
     };
   }, [session.userId]);
+
+  const refreshShop = useCallback(async (villageId) => {
+    try {
+      const [boost, avatarCatalog, profile] = await Promise.all([
+        getBoostStatus(villageId),
+        getAvatarCosmeticCatalog(),
+        getAvatarProfile(session.userId),
+      ]);
+      setBoostStatus(boost);
+      setCatalog(avatarCatalog);
+      setAvatarProfile(profile);
+    } catch (err) {
+      setActionError(err.message);
+    }
+  }, [session.userId]);
+
+  useEffect(() => {
+    if (district) refreshShop(district.village.id);
+  }, [district, refreshShop]);
+
+  const handleBoost = async () => {
+    const amountVCoin = Number(boostAmount);
+    if (!Number.isFinite(amountVCoin) || amountVCoin <= 0) return;
+    setBusy(true);
+    setActionError(null);
+    try {
+      await boostVillage(district.village.id, session.userId, amountVCoin);
+      await refreshShop(district.village.id);
+    } catch (err) {
+      setActionError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handlePurchaseCosmetic = async (itemId) => {
+    setCosmeticBusyId(itemId);
+    setActionError(null);
+    try {
+      await purchaseAvatarCosmetic(session.userId, itemId);
+      await refreshShop(district.village.id);
+    } catch (err) {
+      setActionError(err.message);
+    } finally {
+      setCosmeticBusyId(null);
+    }
+  };
+
+  const handleEquipCosmetic = async (itemId) => {
+    setCosmeticBusyId(itemId);
+    setActionError(null);
+    try {
+      await equipAvatarCosmetic(session.userId, itemId);
+      await refreshShop(district.village.id);
+    } catch (err) {
+      setActionError(err.message);
+    } finally {
+      setCosmeticBusyId(null);
+    }
+  };
+
+  const handleUnequipCosmetic = async () => {
+    setCosmeticBusyId("unequip");
+    setActionError(null);
+    try {
+      await unequipAvatarCosmetic(session.userId);
+      await refreshShop(district.village.id);
+    } catch (err) {
+      setActionError(err.message);
+    } finally {
+      setCosmeticBusyId(null);
+    }
+  };
 
   const handleKeyDown = useCallback((e) => {
     let dx = 0;
@@ -197,6 +278,60 @@ export default function VillageDistrictView({ session }) {
           </div>
         </div>
       )}
+
+      <div style={{ marginTop: 12, borderTop: "1px dashed #ccc", paddingTop: 8 }}>
+        <p style={{ fontSize: 13, fontWeight: "bold" }}>Community Boosting</p>
+        {boostStatus && (
+          <p style={{ fontSize: 12, color: "#666" }}>
+            Level {boostStatus.boostLevel} — {boostStatus.totalBoostVCoin} VCoin contributed so far
+            {boostStatus.nextLevelAt != null
+              ? ` (${boostStatus.vCoinToNextLevel} more to level ${boostStatus.boostLevel + 1})`
+              : " (top level reached)"}
+          </p>
+        )}
+        <div style={{ display: "flex", gap: 4 }}>
+          <input
+            type="number" min="1" value={boostAmount} onChange={(e) => setBoostAmount(e.target.value)}
+            style={{ width: 80 }}
+          />
+          <button onClick={handleBoost} disabled={busy}>Boost (VCoin)</button>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 12, borderTop: "1px dashed #ccc", paddingTop: 8 }}>
+        <p style={{ fontSize: 13, fontWeight: "bold" }}>Avatar Cosmetics</p>
+        {avatarProfile && (
+          <p style={{ fontSize: 12, color: "#666" }}>
+            Equipped: {avatarProfile.equippedItemId
+              ? catalog.find((c) => c.id === avatarProfile.equippedItemId)?.name || avatarProfile.equippedItemId
+              : "none"}
+            {avatarProfile.equippedItemId && (
+              <button onClick={handleUnequipCosmetic} disabled={cosmeticBusyId === "unequip"} style={{ marginLeft: 8, fontSize: 11 }}>
+                Unequip
+              </button>
+            )}
+          </p>
+        )}
+        {catalog.map((item) => {
+          const owned = avatarProfile?.ownedCosmetics?.some((o) => o.id === item.id);
+          const equipped = avatarProfile?.equippedItemId === item.id;
+          return (
+            <div key={item.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "3px 0", fontSize: 12 }}>
+              <span>{item.name} ({item.priceVCoin} VCoin){owned && !equipped ? " — owned" : ""}{equipped ? " — equipped" : ""}</span>
+              {!owned && (
+                <button onClick={() => handlePurchaseCosmetic(item.id)} disabled={cosmeticBusyId === item.id} style={{ fontSize: 11 }}>
+                  Buy
+                </button>
+              )}
+              {owned && !equipped && (
+                <button onClick={() => handleEquipCosmetic(item.id)} disabled={cosmeticBusyId === item.id} style={{ fontSize: 11 }}>
+                  Equip
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
 
       {actionError && <p style={{ color: "crimson" }}>Error: {actionError}</p>}
     </div>
