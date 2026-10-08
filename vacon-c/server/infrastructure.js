@@ -142,6 +142,10 @@ function generateInfrastructure(worldState, options = {}) {
     // Computed on read — see the header. Present on the object only so
     // the row shape matches the table; never assigned.
     failure_risk: null,
+    // Real, carried stock of unprocessed refuse — only ever moved by
+    // `advanceInfrastructure`, and only meaningful on a `waste_management`
+    // row. Zero at generation: a freshly built system starts caught up.
+    waste_backlog: options.wasteBacklog ?? 0,
   };
   worldState.infrastructure.push(row);
   return row;
@@ -176,6 +180,21 @@ function capacityOf(worldState, cityId, type) {
   if (rows.length === 0) return null;      // nothing of this type exists
   if (stated.length === 0) return null;    // it exists and nobody said how big
   return stated.reduce((a, b) => a + b, 0);
+}
+
+// Every living resident of a city, by the same `communityId` join
+// `engine.cityOfEntity` does for one entity at a time — a city has no
+// `npcs` of its own, only communities, which have the npcs. Used below
+// to turn `DESIGN_CAPACITY_PER_1K` into a real per-tick quantity
+// instead of the per-capita RATIO `serviceLevel` already computes.
+function residentsOfCity(worldState, cityId) {
+  const communityIds = new Set(
+    (worldState.communities || [])
+      .filter((c) => c.city_id === cityId)
+      .map((c) => c.id),
+  );
+  if (communityIds.size === 0) return 0;
+  return (worldState.npcs || []).filter((n) => communityIds.has(n.communityId)).length;
 }
 
 // 0..1. Condition dominates, age contributes, maintenance offsets both.
@@ -243,6 +262,25 @@ const DESIGN_CAPACITY_PER_1K = {
   public_safety: 25,
   waste_management: 900,
 };
+
+//: **§7 Waste: "there is no waste VOLUME: nothing produces refuse."**
+//: Derived from `DESIGN_CAPACITY_PER_1K.waste_management` itself
+//: (900 per 1,000 residents) rather than a second, invented number —
+//: a city whose built `capacity` exactly meets the design baseline
+//: produces exactly what it processes, so `serviceLevel`'s own 0..1
+//: reading is already the real answer to "is this city keeping up",
+//: and `advanceInfrastructure` below only has to turn that ratio into
+//: an actual stock that accumulates when it is not.
+const WASTE_PER_RESIDENT = DESIGN_CAPACITY_PER_1K.waste_management / 1000;
+
+//: How many days of unprocessed backlog reach the same 1.4 mortality
+//: multiplier `OUTAGE_EFFECTS.waste_management` already uses for an
+//: outright failure — the existing number, not a new one, so a slow
+//: accumulation and a sudden failure top out at the same severity
+//: instead of disagreeing about how bad "as bad as it gets" is. The
+//: 30-day span itself is flagged interpretive: no document gives a
+//: real backlog-to-illness curve.
+const WASTE_BACKLOG_DAYS_FOR_MAX_PRESSURE = 30;
 
 // How well a city is served for one type, 0..1, against the design
 // baseline above. Null — not zero — when nothing is built or nothing
@@ -330,6 +368,67 @@ function advanceInfrastructure(worldState, tick = worldState.tick ?? 0) {
     // display precision has to accumulate at full precision and be
     // rounded on READ, which `cityCondition` does.
     row.condition = clamp(priorCondition - decay);
+
+    // **§7 Waste: real volume, flowing through the system that already
+    // exists rather than a second one.** Every resident of this row's
+    // own city produces `WASTE_PER_RESIDENT` a tick; this one row
+    // processes up to its own stated `capacity` (zero while failed —
+    // an outage does not quietly keep collecting), and whatever
+    // production outruns capacity by is a real, carried stock rather
+    // than a discarded excess. The city-has-at-most-one-row-per-type
+    // fact `advanceInfrastructure`'s own failure draw already relies
+    // on is what makes "this row's capacity" the same thing as "this
+    // city's capacity" without calling the summing `capacityOf`.
+    if (row.type === 'waste_management') {
+      const priorBacklog = Number(row.waste_backlog) || 0;
+      const produced = residentsOfCity(worldState, row.city_id) * WASTE_PER_RESIDENT;
+      const processed = isFailed(row) ? 0 : (Number(row.capacity) || 0);
+      row.waste_backlog = Math.max(0, priorBacklog + produced - processed);
+
+      if (priorBacklog === 0 && row.waste_backlog > 0) {
+        events.push({
+          type: 'waste_backlog_forming',
+          severity: 'moderate',
+          note: `waste is backing up in city ${row.city_id} -- processing capacity is below what residents produce`,
+          tick,
+          affected_entity_ids: [],
+          global_effects: { infrastructureId: row.id, cityId: row.city_id },
+        });
+      } else if (priorBacklog > 0 && row.waste_backlog === 0) {
+        events.push({
+          type: 'waste_backlog_cleared',
+          severity: 'low',
+          note: `city ${row.city_id} has cleared its waste backlog`,
+          tick,
+          affected_entity_ids: [],
+          global_effects: { infrastructureId: row.id, cityId: row.city_id },
+        });
+      }
+
+      // The real, continuous pressure a standing backlog puts on
+      // health — scaled by how many days of production it represents,
+      // topping out at the SAME multiplier an outright outage already
+      // uses (see `WASTE_BACKLOG_DAYS_FOR_MAX_PRESSURE`). Pushed fresh
+      // every tick with `ticksRemaining: 1`: the environment phase's
+      // own decrement-and-filter sweep (`tick.js`) always removes last
+      // tick's entry before this one runs, so at most one of these
+      // exists per city at any read and it always reflects THIS tick's
+      // real backlog, not an accumulating pile of identical rows.
+      if (produced > 0 && row.waste_backlog > 0) {
+        const backlogDays = row.waste_backlog / produced;
+        const severity = Math.min(1, backlogDays / WASTE_BACKLOG_DAYS_FOR_MAX_PRESSURE);
+        const maxMultiplier = OUTAGE_EFFECTS.waste_management.mortalityMultiplier;
+        // Required lazily, same one-way dependency `failInfrastructure` keeps.
+        const mortality = require('./mortality.js');
+        mortality.addDiseaseOutbreak(worldState, {
+          name: 'waste backlog',
+          mortalityMultiplier: 1 + (maxMultiplier - 1) * severity,
+          ticksRemaining: 1,
+          cityId: row.city_id,
+          tick,
+        });
+      }
+    }
 
     // **A crossing, not a condition** — standing rule 7. Emitting on
     // "risk is high" would put an identical row in the event log every
@@ -621,4 +720,7 @@ module.exports = {
   cityCondition,
   describeCityDrift,
   advanceInfrastructure,
+  residentsOfCity,
+  WASTE_PER_RESIDENT,
+  WASTE_BACKLOG_DAYS_FOR_MAX_PRESSURE,
 };

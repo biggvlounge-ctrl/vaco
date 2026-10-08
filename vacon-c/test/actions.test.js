@@ -78,8 +78,8 @@ test('every verb an action names is one the engine actually supplies', () => {
     actions.REQUIRED_VERBS,
     ['acceptMission', 'addScheduleEvent', 'assessTakeover', 'attemptTakeover',
       'breakDownItem', 'canMakeThing', 'holdMeeting', 'investInTarget', 'makeThing', 'quoteTrade',
-      'reinforceHabit', 'repurposeProperty', 'resolveContest', 'searchLocation', 'stripBuilding',
-      'resolveMission', 'studySource', 'tradeWith'].sort(),
+      'reinforceHabit', 'repurposeProperty', 'resolveContest', 'searchLocation', 'sendMessage',
+      'stripBuilding', 'resolveMission', 'studySource', 'tradeWith'].sort(),
   );
 });
 

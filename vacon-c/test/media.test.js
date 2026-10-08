@@ -462,3 +462,155 @@ test('describeMedia says why a shut channel is shut', () => {
   assert.equal(description.best, 'word_of_mouth');
   assert.equal(description.outlets, 0);
 });
+
+// ---------------------------------------------------------------------
+// §22 Communication, closed: a directed message has an addressee
+// ---------------------------------------------------------------------
+//
+// "A fact told outside a meeting still has no addressee — it spreads
+// to whoever you speak to rather than to whoever you meant to tell."
+// `sendMessage` is the real fix: one named recipient, regardless of
+// distance, through the same two eras `bulletin`/`radio` already gate
+// on.
+
+test('bestDirectedChannel climbs the same era ladder bulletin and radio use', () => {
+  assert.equal(media.bestDirectedChannel(mediaWorld({ eras: ['stone_tools'] })), null);
+  assert.equal(media.bestDirectedChannel(mediaWorld({ eras: ['writing'] })), 'letter');
+  assert.equal(
+    media.bestDirectedChannel(mediaWorld({ eras: ['writing', 'electricity'] })),
+    'telephone',
+    'telephone is strictly more advanced and should win once both are reached',
+  );
+});
+
+test('sendMessage refuses a message with no real sender, recipient, or self-address', () => {
+  const w = mediaWorld({ eras: ['writing'] });
+  assert.throws(() => media.sendMessage(w, { toEntityId: 1001 }), /requires fromEntityId/);
+  assert.throws(() => media.sendMessage(w, { fromEntityId: 1000 }), /requires toEntityId/);
+  assert.throws(
+    () => media.sendMessage(w, { fromEntityId: 1000, toEntityId: 1000 }),
+    /cannot send a message to yourself/,
+  );
+});
+
+test('sendMessage refuses an unknown or dead recipient, the same guard meetings.hold applies', () => {
+  const w = mediaWorld({ eras: ['writing'] });
+  const [sender] = w.npcs;
+  w.entityKnowledge.push({
+    entity_id: sender.id, subject_entity_id: null, fact_type: 'known',
+    fact_content: 'news:flood', confidence_level: 0.8,
+    source_entity_id: null, spread_rate: null, distortion_level: null, acquired_tick: 1,
+  });
+  assert.throws(
+    () => media.sendMessage(w, { fromEntityId: sender.id, toEntityId: 999999 }),
+    /is not a real, living entity/,
+  );
+  const dead = w.npcs[1];
+  dead.status = 'deceased';
+  assert.throws(
+    () => media.sendMessage(w, { fromEntityId: sender.id, toEntityId: dead.id }),
+    /is not a real, living entity/,
+  );
+});
+
+test('sendMessage returns null rather than inventing a channel no era supports', () => {
+  const w = mediaWorld({ eras: ['stone_tools'] });
+  w.entityKnowledge.push({
+    entity_id: 1000, subject_entity_id: 1001, fact_type: 'reputation',
+    fact_content: 'reputation:1001:notorious', confidence_level: 0.9,
+    source_entity_id: null, spread_rate: null, distortion_level: null, acquired_tick: 1,
+  });
+  const result = media.sendMessage(w, { fromEntityId: 1000, toEntityId: 1001 });
+  assert.equal(result, null);
+  assert.equal(w.entityKnowledge.filter((k) => k.entity_id === 1001).length, 0);
+});
+
+test('sendMessage refuses to invent content the sender does not actually hold', () => {
+  const w = mediaWorld({ eras: ['writing'] });
+  assert.throws(
+    () => media.sendMessage(w, { fromEntityId: 1000, toEntityId: 1001 }),
+    /has nothing to tell/,
+  );
+});
+
+test('sendMessage reaches the one named recipient, degraded by the real channel distortion', () => {
+  const w = mediaWorld({ eras: ['writing'], communities: 2, perCommunity: 5 });
+  // Different communities (and, per the fixture, both still city 1 --
+  // the real point is that this function does not read location at
+  // all, unlike every broadcast channel above it).
+  const [sender] = w.npcs;
+  const recipient = w.npcs.find((n) => n.communityId !== sender.communityId);
+  w.entityKnowledge.push({
+    entity_id: sender.id, subject_entity_id: 9999, fact_type: 'reputation',
+    fact_content: 'reputation:9999:trustworthy', confidence_level: 0.9,
+    source_entity_id: null, spread_rate: null, distortion_level: null, acquired_tick: 1,
+  });
+
+  const result = media.sendMessage(w, {
+    fromEntityId: sender.id, toEntityId: recipient.id, tick: 50,
+  });
+  assert.ok(result);
+  assert.equal(result.entity_id, recipient.id);
+  assert.equal(result.subject_entity_id, 9999);
+  assert.equal(result.fact_content, 'reputation:9999:trustworthy');
+  assert.equal(result.source_entity_id, sender.id);
+  assert.equal(result.distortion_level, media.CHANNELS.bulletin.distortion);
+  assert.equal(result.spread_rate, null, 'an addressed letter does not spread on its own');
+  assert.equal(result.confidence_level, 0.9 * (1 - media.CHANNELS.bulletin.distortion));
+  assert.equal(result.acquired_tick, 50);
+});
+
+test('telephone is chosen over letter once both eras are reached, and carries radio\'s own distortion', () => {
+  const w = mediaWorld({ eras: ['writing', 'electricity'] });
+  const [sender, recipient] = w.npcs;
+  w.entityKnowledge.push({
+    entity_id: sender.id, subject_entity_id: null, fact_type: 'known',
+    fact_content: 'news:flood', confidence_level: 0.8,
+    source_entity_id: null, spread_rate: null, distortion_level: null, acquired_tick: 1,
+  });
+  const result = media.sendMessage(w, { fromEntityId: sender.id, toEntityId: recipient.id });
+  assert.equal(result.distortion_level, media.CHANNELS.radio.distortion);
+});
+
+test('sendMessage is a real no-op for a recipient who was already told', () => {
+  const w = mediaWorld({ eras: ['writing'] });
+  const [sender, recipient] = w.npcs;
+  w.entityKnowledge.push({
+    entity_id: sender.id, subject_entity_id: null, fact_type: 'known',
+    fact_content: 'news:flood', confidence_level: 0.8,
+    source_entity_id: null, spread_rate: null, distortion_level: null, acquired_tick: 1,
+  });
+  w.entityKnowledge.push({
+    entity_id: recipient.id, subject_entity_id: null, fact_type: 'known',
+    fact_content: 'news:flood', confidence_level: 0.5,
+    source_entity_id: null, spread_rate: null, distortion_level: null, acquired_tick: 1,
+  });
+  const before = w.entityKnowledge.length;
+  const result = media.sendMessage(w, { fromEntityId: sender.id, toEntityId: recipient.id });
+  assert.equal(result, null);
+  assert.equal(w.entityKnowledge.length, before);
+});
+
+test('sendMessage picks the most confident fact about the named subject, not just the latest', () => {
+  const w = mediaWorld({ eras: ['writing'] });
+  const [sender, recipient] = w.npcs;
+  w.entityKnowledge.push({
+    entity_id: sender.id, subject_entity_id: 7, fact_type: 'reputation',
+    fact_content: 'reputation:7:weak-claim', confidence_level: 0.2,
+    source_entity_id: null, spread_rate: null, distortion_level: null, acquired_tick: 1,
+  });
+  w.entityKnowledge.push({
+    entity_id: sender.id, subject_entity_id: 7, fact_type: 'reputation',
+    fact_content: 'reputation:7:strong-claim', confidence_level: 0.95,
+    source_entity_id: null, spread_rate: null, distortion_level: null, acquired_tick: 2,
+  });
+  const result = media.sendMessage(w, {
+    fromEntityId: sender.id, toEntityId: recipient.id, subjectEntityId: 7,
+  });
+  assert.equal(result.fact_content, 'reputation:7:strong-claim');
+});
+
+test('§22 Communication is levelled to what the code does', () => {
+  const level = (n) => urbanSystems.SYSTEMS.find((s) => s.n === n).level;
+  assert.equal(level(22), 'modelled');
+});

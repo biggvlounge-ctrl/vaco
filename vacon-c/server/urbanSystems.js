@@ -323,16 +323,21 @@ const SYSTEMS = [
   {
     n: 12,
     name: 'Waste',
-    level: 'partial',
+    level: 'modelled',
     infrastructureTypes: ['waste_management'],
-    functions: ['failInfrastructure', 'addDiseaseOutbreak'],
-    note: 'Was `slot`. Sanitation failing is the oldest epidemic there is, and it goes through '
-      + 'the channel that already exists — `mortality.addDiseaseOutbreak`, whose '
-      + '`mortalityMultiplier` `diseasePressure` reads — so a waste system going down actually '
-      + 'kills people rather than emitting an event. Measured: disease pressure 1.0 to 1.4 '
-      + 'while the system is down. Partial rather than modelled because there is no waste '
-      + 'VOLUME: nothing produces refuse, so the system has a condition and a failure and '
-      + 'nothing flowing through it.',
+    functions: ['advanceInfrastructure', 'residentsOfCity', 'addDiseaseOutbreak'],
+    note: 'Was `slot`, then `partial` once sanitation failing went through the channel that '
+      + 'already exists — `mortality.addDiseaseOutbreak`, whose `mortalityMultiplier` '
+      + '`diseasePressure` reads — so a waste system going down actually kills people rather '
+      + 'than emitting an event. **Closed to `modelled` 8 Oct 2026**, on the one thing that '
+      + 'note said was missing: a waste VOLUME. `advanceInfrastructure` now gives every '
+      + 'waste_management row a real, carried `waste_backlog` — residents produce it every '
+      + 'tick (`WASTE_PER_RESIDENT`, derived from `DESIGN_CAPACITY_PER_1K.waste_management` '
+      + 'itself rather than a second invented number) and the row\'s own `capacity` processes '
+      + 'it, zero while failed. What outruns capacity is a real stock, not a discarded excess, '
+      + 'and the backlog now scales `diseasePressure` continuously — days of backlog against '
+      + 'the same 1.4 ceiling an outright outage already used — rather than the system only '
+      + 'ever being off or on. Persisted as `infrastructure.waste_backlog`.',
   },
   {
     n: 13,
@@ -511,11 +516,11 @@ const SYSTEMS = [
   {
     n: 22,
     name: 'Communication',
-    level: 'partial',
+    level: 'modelled',
     tables: ['entity_knowledge'],
     infrastructureTypes: ['internet'],
     phases: ['runSocialPhase'],
-    functions: ['addKnowledge', 'getKnowledge', 'runWordOfMouth'],
+    functions: ['addKnowledge', 'getKnowledge', 'runWordOfMouth', 'sendMessage', 'bestDirectedChannel'],
     note: 'The genuine word-of-mouth layer: per-entity facts with confidence_level, '
       + 'spread_rate, distortion_level and a source. **This entry used to end "radio and '
       + 'networks are not modelled", and two of those four columns had never been written by '
@@ -532,9 +537,14 @@ const SYSTEMS = [
       + 'from a broadcast. Facts about the people in the room are deliberately excluded: a '
       + 'meeting is not an interrogation, and "everybody now knows everything about everybody '
       + 'present" is the total-information sweep that made `computeApproval`\'s spread a '
-      + 'constant 1.0. Still partial: there is no telephone, no post and no letter, and a fact '
-      + 'told outside a meeting still has no addressee — it spreads to whoever you speak to '
-      + 'rather than to whoever you meant to tell.',
+      + 'constant 1.0. **Closed to `modelled` 8 Oct 2026**: the one thing this note said was '
+      + 'still missing was an addressee — "a fact told outside a meeting still has no '
+      + 'addressee... it spreads to whoever you speak to rather than to whoever you meant to '
+      + 'tell." `media.sendMessage` is that addressee: one named recipient, regardless of '
+      + 'distance, through a real letter (writing era) or telephone (electricity era) — the '
+      + 'SAME two eras `bulletin` and `radio` already gate on, and the SAME two distortion '
+      + 'figures, so the addressed channel and its broadcast twin do not disagree about how '
+      + 'faithfully each carries a fact. Exposed as the `send-message` player verb.',
   },
   {
     n: 23,

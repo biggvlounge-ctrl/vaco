@@ -982,7 +982,7 @@ trusted:
 
 The simulation engine is the one app in this repo whose "done" is not a
 list of routes, so it carries a measured completeness score rather than
-a criteria tally. **92.4%**, from
+a criteria tally. **92.6%**, from
 `vacon-c/dev-docs/GAME_COMPLETENESS.md`, which
 `vacon-c/scripts/completeness.mjs` regenerates and
 `vacon-c/test/completeness.test.js` fails on if stale — including a
@@ -990,12 +990,39 @@ check that the percent in THIS file matches the one the code measures.
 
 | axis | complete | what it measures |
 |---|---|---|
-| systems | 78.6% | the forty urban systems §7 names, at `urbanSystems.js`'s own four levels |
+| systems | 81.1% | the forty urban systems §7 names, at `urbanSystems.js`'s own four levels |
 | tables | 94.7% | schema tables a built world actually fills |
 | statistics | 88.2% | statistics a world can answer about itself |
 | traits | 100% | traits something under `server/` reads |
 | traitDepth | 85.7% | trait columns a life actually changes |
 | habits | 100% | whether habits and routines carry information |
+
+**92.5% -> 92.6% on 8 Oct 2026, systems axis.** §7 system 22
+Communication moved `partial` -> `modelled`. The one gap this entry
+still named after word-of-mouth, meetings and the era-gated broadcast
+channels were all real: "a fact told outside a meeting still has no
+addressee — it spreads to whoever you speak to rather than to whoever
+you meant to tell." `media.sendMessage` is the addressee: one named
+recipient, regardless of distance, through a real letter (`writing`
+era) or telephone (`electricity` era) — the SAME two eras `bulletin`
+and `radio` already gate on and the SAME two distortion figures, so
+the addressed channel and its broadcast twin do not disagree about how
+faithfully each carries a fact. Exposed as the `send-message` player
+verb.
+
+**92.4% -> 92.5% on 8 Oct 2026, systems axis.** §7 system 12 Waste
+moved `partial` -> `modelled`. The gap this entry named was specific:
+"there is no waste VOLUME: nothing produces refuse, so the system has
+a condition and a failure and nothing flowing through it."
+`infrastructure.advanceInfrastructure` now gives every
+`waste_management` row a real, carried `waste_backlog` — residents
+produce it every tick (derived from `DESIGN_CAPACITY_PER_1K.waste_
+management` itself, not a second invented number) and the row's own
+`capacity` processes it, zero while failed. What outruns capacity is a
+real stock, not a discarded excess, and the backlog now scales
+`mortality.diseasePressure` continuously — days of backlog against the
+same 1.4 ceiling an outright outage already used — rather than the
+system only ever being off or on.
 
 **92.2% -> 92.4% on 8 Oct 2026, systems axis.** §7 system 5 Education
 moved `partial` -> `modelled`. `statecraft.runSchooling` already walked

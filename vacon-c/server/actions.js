@@ -144,6 +144,22 @@ const ACTIONS = {
     }),
   },
 
+  // **§22 Communication's own missing half.** A meeting needs everyone
+  // in the same room; this reaches one named person wherever they
+  // actually are, through `media.js`'s real letter/telephone channels
+  // — refused rather than silently falling back to a meeting's shape
+  // when a world has climbed to neither era yet.
+  'send-message': {
+    summary: 'Tell one specific person something you know — by letter or by phone, however far away they are.',
+    modes: ['citizen'],
+    requires: ['toEntityId'],
+    verbs: ['sendMessage'],
+    run: (verbs, actorId, body) => verbs.sendMessage(actorId, {
+      toEntityId: Number(body.toEntityId),
+      subjectEntityId: body.subjectEntityId ?? null,
+    }),
+  },
+
   // **A building's past does not fix its future.** Take the Arch and
   // make it a fortress. Only an owner may — which is what gives the
   // takeover key a consequence beyond a line in the history.

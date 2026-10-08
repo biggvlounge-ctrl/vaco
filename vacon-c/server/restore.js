@@ -590,7 +590,7 @@ async function restoreWorldStateFromPostgres(worldState) {
     // world. Standing rule 10, in the place it costs most.
     const row = nums(i, ['id', 'city_id', 'age', 'condition', 'capacity',
       'maintenance_level', 'funding', 'latitude', 'longitude',
-      'failed_since_tick', 'repair_ticks']);
+      'failed_since_tick', 'repair_ticks', 'waste_backlog']);
     row.failure_risk = null;
     return row;
   });

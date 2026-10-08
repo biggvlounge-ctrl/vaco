@@ -371,6 +371,126 @@ function broadcast(worldState, options = {}) {
 }
 
 // ---------------------------------------------------------------------
+// A directed message — §22's own missing half
+// ---------------------------------------------------------------------
+//
+// **"A fact told outside a meeting still has no addressee — it
+// spreads to whoever you speak to rather than to whoever you meant to
+// tell."** Every channel above is a broadcast: one sender, a whole
+// audience scored by `reach`. A letter or a call is the opposite
+// shape — one sender, one named recipient, regardless of how far
+// apart they are — and retrofitting that into `audienceFor`'s
+// community/city/world ladder would force a "reach" onto something
+// that has none. This is its own, smaller function instead.
+//
+// Era-gated on the SAME two thresholds `bulletin` and `radio` already
+// use — a civilization that can post a bulletin can address one
+// letter to one person, and one that can broadcast on radio can place
+// a call, not a second, invented technology ladder. Distortion reuses
+// `bulletin`'s and `radio`'s own figures for the same reason: a
+// letter is a written channel like a bulletin, a call is an electric
+// one like radio, and giving the addressed version of each a
+// different number from its broadcast twin would be asserting a
+// difference nobody measured.
+const DIRECTED_CHANNELS = {
+  telephone: { era: 'electricity', distortion: CHANNELS.radio.distortion },
+  letter: { era: 'writing', distortion: CHANNELS.bulletin.distortion },
+};
+
+(function assertDirectedErasExist() {
+  for (const [name, channel] of Object.entries(DIRECTED_CHANNELS)) {
+    if (!technology.ERA_NAMES.includes(channel.era)) {
+      throw new Error(
+        `media.js: directed channel "${name}" requires era "${channel.era}", which is not one `
+        + `of technology.ERA_NAMES (${technology.ERA_NAMES.join(', ')}).`,
+      );
+    }
+  }
+}());
+
+// The most advanced addressed channel this world can use, or null —
+// which means "nothing but speaking in person," the same floor
+// `bestChannel` rests on. `sendMessage` refuses rather than inventing
+// a channel with no requirement at all.
+function bestDirectedChannel(worldState) {
+  if (eraReached(worldState, DIRECTED_CHANNELS.telephone.era)) return 'telephone';
+  if (eraReached(worldState, DIRECTED_CHANNELS.letter.era)) return 'letter';
+  return null;
+}
+
+// Sends ONE fact `fromEntityId` already holds to ONE named
+// `toEntityId`, regardless of distance — the real difference from
+// every channel above, all of which reach whoever is nearby rather
+// than whoever was meant. The same "forward what you already heard"
+// shape `meetings.shareAround` uses for a shared room, addressed
+// instead of broadcast, and degraded by the channel's own distortion
+// exactly as a retelling already is.
+function sendMessage(worldState, options = {}) {
+  const {
+    fromEntityId, toEntityId, subjectEntityId = null, tick = worldState.tick ?? 0,
+  } = options;
+  if (fromEntityId === undefined || fromEntityId === null) {
+    throw new Error('media.sendMessage requires fromEntityId');
+  }
+  if (toEntityId === undefined || toEntityId === null) {
+    throw new Error('media.sendMessage requires toEntityId');
+  }
+  if (fromEntityId === toEntityId) {
+    throw new Error('media.sendMessage: cannot send a message to yourself');
+  }
+  // The same "a meeting needs people who can actually attend" check
+  // `meetings.hold`'s `livingAttendees` applies — a letter addressed to
+  // somebody who does not exist, or who has died, is not a real letter.
+  const npcs = worldState.npcs || [];
+  if (!npcs.some((n) => n.id === fromEntityId && n.status !== 'deceased')) {
+    throw new Error(`media.sendMessage: "${fromEntityId}" is not a real, living entity`);
+  }
+  if (!npcs.some((n) => n.id === toEntityId && n.status !== 'deceased')) {
+    throw new Error(`media.sendMessage: "${toEntityId}" is not a real, living entity`);
+  }
+
+  const channelName = bestDirectedChannel(worldState);
+  if (channelName === null) return null;
+  const channel = DIRECTED_CHANNELS[channelName];
+
+  // The most confident thing the sender holds on the subject, the same
+  // "one real opinion per person" rule `computeApproval` already
+  // applies — two rows for one person are two tellings of the same
+  // subject, not two things to pick between.
+  const known = (worldState.entityKnowledge || [])
+    .filter((k) => k.entity_id === fromEntityId
+      && (subjectEntityId === null || k.subject_entity_id === subjectEntityId))
+    .sort((a, b) => (Number(b.confidence_level) || 0) - (Number(a.confidence_level) || 0))[0];
+  if (!known) {
+    throw new Error(`media.sendMessage: "${fromEntityId}" has nothing to tell "${toEntityId}"`);
+  }
+
+  // Already told — the same de-duplication `shareAround` applies, so
+  // writing to the same person twice is a real no-op, not a second row
+  // multiplying their confidence.
+  const already = (worldState.entityKnowledge || []).some(
+    (k) => k.entity_id === toEntityId && k.fact_content === known.fact_content,
+  );
+  if (already) return null;
+
+  return worldStore.addKnowledge(worldState, {
+    entityId: toEntityId,
+    subjectEntityId: known.subject_entity_id,
+    factType: known.fact_type,
+    factContent: known.fact_content,
+    confidenceLevel: clamp01(Number(known.confidence_level ?? 0.5) * (1 - channel.distortion)),
+    sourceEntityId: fromEntityId,
+    // Addressed, not spreading further on its own — `spread_rate` is
+    // what lets `runWordOfMouth` retell a fact along a relationship,
+    // and a letter you sent is not a rumour your recipient is now
+    // obliged to pass on.
+    spreadRate: null,
+    distortionLevel: channel.distortion,
+    tick,
+  });
+}
+
+// ---------------------------------------------------------------------
 // Word of mouth — the channel that travels by being retold
 // ---------------------------------------------------------------------
 //
@@ -566,4 +686,7 @@ module.exports = {
   runWordOfMouth,
   awarenessOf,
   describeMedia,
+  DIRECTED_CHANNELS,
+  bestDirectedChannel,
+  sendMessage,
 };

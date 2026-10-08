@@ -606,3 +606,35 @@ ALTER TABLE communities ADD COLUMN IF NOT EXISTS name TEXT;
 -- than a place. A mission must name one or the other and
 -- `generateMission` enforces exactly that.
 ALTER TABLE missions ADD COLUMN IF NOT EXISTS location_property_id BIGINT REFERENCES properties(id);
+
+
+-- ---------------------------------------------------------------------
+-- infrastructure.waste_backlog
+-- ---------------------------------------------------------------------
+-- §7 Waste stopped at `partial` on a named reason: "there is no waste
+-- VOLUME: nothing produces refuse, so the system has a condition and
+-- a failure and nothing flowing through it." Every other utility in
+-- this table (water, electricity) is felt through a resource; waste
+-- has no resource to be felt through, because residents PRODUCE it
+-- rather than consuming it.
+--
+-- This is the real, carried stock: `advanceInfrastructure` adds what a
+-- city's residents produce (`infrastructure.WASTE_PER_RESIDENT`, itself
+-- derived from `DESIGN_CAPACITY_PER_1K.waste_management` rather than a
+-- second invented number) and subtracts what the row's own `capacity`
+-- actually processes that tick, floored at zero. A city whose capacity
+-- matches the design baseline never accumulates one; a city whose
+-- waste_management has fallen behind, or failed outright, does, and
+-- the real backlog is what now scales the mortality pressure
+-- `mortality.addDiseaseOutbreak` applies — continuously, not as a
+-- second binary failure flag.
+--
+-- Clears this file's bar: `advanceInfrastructure` reads
+-- `waste_backlog` every tick as the PRIOR stock before adding this
+-- tick's production, so a restore that dropped it would reset every
+-- city's accumulated backlog to zero and silently clear a sanitation
+-- crisis that was still real the tick before the snapshot was taken.
+--
+-- Zero for a freshly generated row — a newly built system starts
+-- caught up, which is `generateInfrastructure`'s own default.
+ALTER TABLE infrastructure ADD COLUMN IF NOT EXISTS waste_backlog NUMERIC DEFAULT 0;

@@ -84,6 +84,7 @@ const tutorialMissions = require('./tutorialMissions.js');
 const behavior = require('./behavior.js');
 const actions = require('./actions.js');
 const politics = require('./politics.js');
+const media = require('./media.js');
 
 // ---------------------------------------------------------------------------
 // In-memory WorldState
@@ -889,6 +890,7 @@ const ACTION_VERBS = {
   assessTakeover: (...args) => assessTakeover(...args),
   attemptTakeover: (...args) => attemptTakeover(...args),
   holdMeeting: (...args) => holdMeeting(...args),
+  sendMessage: (...args) => sendMessage(...args),
   repurposeProperty: (...args) => repurposeProperty(...args),
   breakDownItem: (...args) => breakDownItem(...args),
   stripBuilding: (...args) => stripBuilding(...args),
@@ -1089,6 +1091,26 @@ function holdMeeting(entityId, options = {}) {
     tick: WorldState.tick,
   });
   return { ...result, events: tick.recordEvents(WorldState, result.events) };
+}
+
+// ---------------------------------------------------------------------------
+// A directed message — the one thing a meeting cannot do
+// ---------------------------------------------------------------------------
+// **§22 Communication's own note:** "a fact told outside a meeting
+// still has no addressee — it spreads to whoever you speak to rather
+// than to whoever you meant to tell." `holdMeeting` above needs
+// everybody in the same room; this is the opposite case, one named
+// recipient regardless of distance, through `media.js`'s own real
+// letter/telephone channels.
+function sendMessage(entityId, options = {}) {
+  const knowledge = media.sendMessage(WorldState, {
+    fromEntityId: entityId,
+    toEntityId: Number(options.toEntityId),
+    subjectEntityId: options.subjectEntityId === undefined || options.subjectEntityId === null
+      ? null : Number(options.subjectEntityId),
+    tick: WorldState.tick,
+  });
+  return { knowledge };
 }
 
 // ---------------------------------------------------------------------------
@@ -1552,6 +1574,7 @@ module.exports = {
   verifyContest,
   assessTakeover,
   holdMeeting,
+  sendMessage,
   repurposeProperty,
   attemptTakeover,
   acceptMission,

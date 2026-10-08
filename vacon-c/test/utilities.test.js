@@ -153,6 +153,146 @@ test('an outbreak in one city does not sicken another', () => {
   assert.equal(mortality.diseasePressure(w, 2), 1, 'city 2 has no outbreak of its own');
 });
 
+// -- §7 Waste, closed: a real volume now flows through it -----------------
+//
+// The note this entry carried for weeks: "there is no waste VOLUME:
+// nothing produces refuse, so the system has a condition and a failure
+// and nothing flowing through it." These are the tests for the volume
+// itself — `advanceInfrastructure`'s own `waste_backlog` accounting —
+// as distinct from the binary outage tests above, which predate it and
+// still pass unchanged.
+
+function cityWorldWithResidents(residents) {
+  const w = cityWorld();
+  w.communities = [{ id: 10, city_id: 1 }];
+  w.npcs = Array.from({ length: residents }, (_, i) => ({ id: i + 1, communityId: 10 }));
+  return w;
+}
+
+test('residentsOfCity counts through the community join, not a city-level list', () => {
+  const w = cityWorldWithResidents(7);
+  w.cities.push({ id: 2 });
+  w.communities.push({ id: 11, city_id: 2 });
+  w.npcs.push({ id: 100, communityId: 11 });
+  assert.equal(infrastructure.residentsOfCity(w, 1), 7);
+  assert.equal(infrastructure.residentsOfCity(w, 2), 1);
+  assert.equal(infrastructure.residentsOfCity(w, 999), 0, 'an unknown city has no residents');
+});
+
+test('a waste system under capacity carries a real, growing backlog', () => {
+  const w = cityWorldWithResidents(100);
+  const waste = infrastructure.generateInfrastructure(w, {
+    cityId: 1, type: 'waste_management', condition: 100, capacity: 50, maintenanceLevel: 100,
+  });
+  assert.equal(waste.waste_backlog, 0, 'a freshly built system starts caught up');
+
+  // 100 residents at WASTE_PER_RESIDENT against a capacity of 50 nets
+  // a real, positive carry every tick.
+  const produced = 100 * infrastructure.WASTE_PER_RESIDENT;
+  assert.ok(produced > 50, 'test is not exercising the over-capacity case');
+
+  infrastructure.advanceInfrastructure(w, 1);
+  assert.equal(waste.waste_backlog, produced - 50);
+
+  infrastructure.advanceInfrastructure(w, 2);
+  assert.equal(waste.waste_backlog, (produced - 50) * 2,
+    'the backlog is a real carried stock, not recomputed from scratch each tick');
+});
+
+test('a waste system at or above capacity never carries a backlog', () => {
+  const w = cityWorldWithResidents(10);
+  const waste = infrastructure.generateInfrastructure(w, {
+    cityId: 1, type: 'waste_management', condition: 100, capacity: 1000, maintenanceLevel: 100,
+  });
+  for (let t = 1; t <= 5; t += 1) infrastructure.advanceInfrastructure(w, t);
+  assert.equal(waste.waste_backlog, 0);
+});
+
+test('a standing backlog scales disease pressure continuously, not as a second on/off flag', () => {
+  const w = cityWorldWithResidents(100);
+  infrastructure.generateInfrastructure(w, {
+    cityId: 1, type: 'waste_management', condition: 100, capacity: 50, maintenanceLevel: 100,
+  });
+
+  assert.equal(mortality.diseasePressure(w, 1), 1, 'no backlog yet, no pressure yet');
+  for (let t = 1; t <= 10; t += 1) {
+    // The real environment phase strips last tick's `ticksRemaining: 1`
+    // condition before this tick pushes its own; reproduced by hand here
+    // since the test calls `advanceInfrastructure` directly to avoid the
+    // unrelated seeded weather/failure draws `runEnvironmentPhase` also
+    // makes.
+    w.activeConditions = w.activeConditions.filter((c) => c.name !== 'waste backlog');
+    infrastructure.advanceInfrastructure(w, t);
+  }
+  const pressure = mortality.diseasePressure(w, 1);
+  assert.ok(pressure > 1, 'a real backlog is standing and nobody is worse for it');
+  assert.ok(pressure < 1.4, 'a partial backlog already reads as bad as an outright outage');
+});
+
+test('disease pressure from backlog tops out at the same ceiling an outright outage uses', () => {
+  const w = cityWorldWithResidents(100);
+  const waste = infrastructure.generateInfrastructure(w, {
+    cityId: 1, type: 'waste_management', condition: 100, capacity: 50, maintenanceLevel: 100,
+  });
+  // A backlog many times the days-for-max-pressure span, engineered
+  // directly rather than accumulated tick by tick -- this is a test of
+  // the CLAMP, not of how long accumulation takes.
+  waste.waste_backlog = 100 * infrastructure.WASTE_PER_RESIDENT
+    * infrastructure.WASTE_BACKLOG_DAYS_FOR_MAX_PRESSURE * 10;
+  infrastructure.advanceInfrastructure(w, 1);
+  assert.equal(
+    mortality.diseasePressure(w, 1),
+    infrastructure.OUTAGE_EFFECTS.waste_management.mortalityMultiplier,
+  );
+});
+
+test('only one waste-backlog condition for a city exists at any read, not one per tick', () => {
+  const w = cityWorldWithResidents(100);
+  infrastructure.generateInfrastructure(w, {
+    cityId: 1, type: 'waste_management', condition: 100, capacity: 50, maintenanceLevel: 100,
+  });
+  for (let t = 1; t <= 5; t += 1) {
+    w.tick = t;
+    tick.runEnvironmentPhase(w);
+  }
+  const backlogConditions = w.activeConditions.filter((c) => c.name === 'waste backlog');
+  assert.equal(backlogConditions.length, 1,
+    `expected exactly one standing waste-backlog condition, found ${backlogConditions.length}`);
+});
+
+test('an outage stops processing entirely -- backlog grows even faster while failed', () => {
+  const w = cityWorldWithResidents(100);
+  const waste = infrastructure.generateInfrastructure(w, {
+    cityId: 1, type: 'waste_management', condition: 100, capacity: 1000, maintenanceLevel: 100,
+  });
+  infrastructure.failInfrastructure(w, waste, { tick: 1 });
+  infrastructure.advanceInfrastructure(w, 2);
+  assert.equal(waste.waste_backlog, 100 * infrastructure.WASTE_PER_RESIDENT,
+    'a failed system has zero real processing capacity, even though its stated capacity is 1000');
+});
+
+test('waste_backlog_forming and waste_backlog_cleared are crossings, not conditions', () => {
+  const w = cityWorldWithResidents(100);
+  infrastructure.generateInfrastructure(w, {
+    cityId: 1, type: 'waste_management', condition: 100, capacity: 50, maintenanceLevel: 100,
+  });
+
+  const events1 = infrastructure.advanceInfrastructure(w, 1);
+  assert.ok(events1.some((e) => e.type === 'waste_backlog_forming'));
+
+  // Standing-up, not forming again, for as long as the backlog holds.
+  const events2 = infrastructure.advanceInfrastructure(w, 2);
+  assert.ok(!events2.some((e) => e.type === 'waste_backlog_forming'));
+
+  // Draining the backlog to zero in one tick fires the clear crossing
+  // exactly once.
+  w.infrastructure[0].capacity = 1_000_000;
+  const events3 = infrastructure.advanceInfrastructure(w, 3);
+  assert.ok(events3.some((e) => e.type === 'waste_backlog_cleared'));
+  const events4 = infrastructure.advanceInfrastructure(w, 4);
+  assert.ok(!events4.some((e) => e.type === 'waste_backlog_cleared'));
+});
+
 test('a type nothing consumes fails quietly, and says so', () => {
   // `roads` has no outage effect because Transportation is on
   // CLAUDE.md's do-not-touch list. The failure still happens — it just
@@ -380,8 +520,9 @@ test('the four systems this was for are levelled to what the code does', () => {
     `energy is read by [${consumers.join(', ')}], not exactly economy.js as expected — `
     + 'a new or missing consumer means this system\'s level needs re-checking');
 
-  // Waste: a real consequence, no volume flowing through it.
-  assert.equal(level(12), 'partial');
+  // Waste: closed to modelled 8 Oct 2026 -- a real volume now flows
+  // through it (see the backlog tests above).
+  assert.equal(level(12), 'modelled');
 
   // Fire & Emergency stays slot, and the note has to say why — it
   // shares the public_safety row and the schema's ten types do not
