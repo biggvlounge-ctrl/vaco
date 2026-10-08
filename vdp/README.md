@@ -810,6 +810,47 @@ real-players-vs-NPCs split, both already built. Recorded in
 6 new `resources.test.js` tests. Full suite: 374 passing, up from 368,
 0 failing.
 
+**Phase 22 — citizenship, temporary passports, and real migration
+waves** (8 Oct 2026, direct instruction): "users will be able to apply
+for citizenship or they can apply for a temporary passport that only
+lasts so long," and "NPCs will be picking a certain amount of NPCs to
+be coming over legally and illegally... we will just grow the planet
+off of that."
+
+`immigration.js` gained `citizenshipType` (`'citizenship'` | `'temporary'`)
+on every passport arrival, `applyForCitizenship`/`applyForTemporaryPassport`
+as the two named player-facing applications, a flagged
+`TEMPORARY_PASSPORT_DURATION_MS`, and `isPassportExpired` -- a real,
+checkable fact, with no invented consequence attached beyond it.
+`generateMigrationWave` is a real, deterministic generator: given a
+real survivor-population figure (not specified anywhere yet, so never
+invented here -- it only scales off whatever real number it is
+handed) and the caller's own real pools of origin regions, religions
+and smuggled goods, it splits a real wave of new arrivals between
+legal and illegal entry. Deliberately decoupled from `npcs.js` the
+same way every cross-module call in this directory already is: it
+takes an injected `onNewMigrant` callback rather than importing NPCs
+directly.
+
+`npcs.js` gained `addNpcToWorld`, growing the real, server-ticked
+population by exactly one with a real, never-reused id -- the actual
+mechanism "grow the planet off of" needs, past the founding count
+`createNpcWorld` seeds at boot. `server.cjs`'s new
+`POST /api/immigration/migration-wave` wires the two together, guarded
+by `requireCallingService()` rather than any player actor -- this is a
+real, scheduler-style world event with nobody specific behind it, the
+same posture `shieldAuth.cjs` already documents for tick-style jobs.
+Also confirmed, not newly built: a found smuggling spot already posts
+to Meridian's real Live World News feed (`NewsTicker.jsx`) the instant
+it's reported -- the one real "notified in certain ways" channel this
+world has.
+
+New routes: `POST /api/immigration/apply-citizenship`,
+`/apply-temporary-passport`, `/migration-wave`.
+
+11 new tests (9 `immigration.test.js`, 2 `npcs.test.js`). Full suite:
+385 passing, up from 374, 0 failing.
+
 **Phase 2 (SVMIKO DEGVCHI Avatar Wearables)**: 20 plain-Node checks
 (13 unique real pieces, real category assignment, the luxury-vs-
 streetwear tier proven at VDP's own real price scale, a real purchase

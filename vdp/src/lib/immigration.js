@@ -40,6 +40,17 @@
 // this module's `foundIllegalSettlement` are siblings, not one
 // function wearing two names.
 
+// **Citizenship vs. temporary passport (8 Oct 2026), per direct
+// instruction**: "users will be able to apply for citizenship or they
+// can apply for a temporary passport that only lasts so long." Both
+// are the same real `admitWithPassport` gate -- `citizenshipType` is
+// the one new field that tells them apart, not a second shape.
+// `TEMPORARY_PASSPORT_DURATION_MS` is a flagged interpretive number,
+// same footing `resources.js`'s `DIG_COOLDOWN_MS` already stands on --
+// no document gives VDP a real visa length.
+export const CITIZENSHIP_TYPES = ['citizenship', 'temporary'];
+export const TEMPORARY_PASSPORT_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
+
 export function createImmigrationStore() {
   return {
     arrivals: [],
@@ -58,18 +69,27 @@ function requireNoExistingArrival(store, personId, fnName) {
 }
 
 // The controlled gate: a real passport record, carrying whatever real
-// old-world background the migrant brings with them.
+// old-world background the migrant brings with them. `citizenshipType`
+// defaults to permanent citizenship, same as every caller before this
+// field existed got (`applyForCitizenship` below is the same default,
+// spelled out); choosing `'temporary'` sets a real `expiresAt`.
 export function admitWithPassport(store, {
-  personId, originRegion, religion, oldWorldSkills, oldWorldBeliefs, now = Date.now(),
+  personId, originRegion, religion, oldWorldSkills, oldWorldBeliefs,
+  citizenshipType = 'citizenship', now = Date.now(),
 } = {}) {
   if (!personId) throw new Error('admitWithPassport requires a personId');
   requireNoExistingArrival(store, personId, 'admitWithPassport');
+  if (!CITIZENSHIP_TYPES.includes(citizenshipType)) {
+    throw new Error(`admitWithPassport: "${citizenshipType}" is not a known citizenship type (expected one of ${CITIZENSHIP_TYPES.join(', ')})`);
+  }
 
   const arrival = {
     id: store.nextArrivalId++,
     personId,
     method: 'passport',
     legal: true,
+    citizenshipType,
+    expiresAt: citizenshipType === 'temporary' ? now + TEMPORARY_PASSPORT_DURATION_MS : null,
     originRegion: originRegion || null,
     religion: religion || null,
     smuggledGoods: [],
@@ -80,6 +100,29 @@ export function admitWithPassport(store, {
   };
   store.arrivals.push(arrival);
   return arrival;
+}
+
+// Two named, player-facing applications, per the instruction's own
+// words -- both are exactly `admitWithPassport` with the matching
+// `citizenshipType` already chosen, not a second real gate.
+export function applyForCitizenship(store, options = {}) {
+  return admitWithPassport(store, { ...options, citizenshipType: 'citizenship' });
+}
+
+export function applyForTemporaryPassport(store, options = {}) {
+  return admitWithPassport(store, { ...options, citizenshipType: 'temporary' });
+}
+
+// A temporary passport "only lasts so long" -- a real, checkable fact
+// about an existing arrival, not a status this module enforces on its
+// own (no document says what happens on expiry; that consequence is
+// not specified and not invented here, same discipline the founding
+// document already applies to what happens to someone a robot patrol
+// catches).
+export function isPassportExpired(store, personId, now = Date.now()) {
+  const arrival = arrivalFor(store, personId);
+  if (!arrival) throw new Error(`isPassportExpired: no arrival recorded for "${personId}"`);
+  return arrival.expiresAt !== null && arrival.expiresAt !== undefined && now >= arrival.expiresAt;
 }
 
 // "People find other ways to get across the ice wall as well" -- the
@@ -95,6 +138,11 @@ export function crossIllegally(store, {
     personId,
     method: 'illegal_crossing',
     legal: false,
+    // An illegal crossing applies for nothing -- no citizenship type,
+    // no expiry, the same uniform shape `admitWithPassport` returns so
+    // a caller never has to branch on `method` just to read a field.
+    citizenshipType: null,
+    expiresAt: null,
     originRegion: originRegion || null,
     religion: religion || null,
     smuggledGoods: [...smuggledGoods],
@@ -192,4 +240,73 @@ export function clearIllegalSettlement(store, settlementId, { clearedBy, now = D
 
 export function listActiveIllegalSettlements(store) {
   return store.illegalSettlements.filter((s) => !s.clearedAt);
+}
+
+// **Migration waves (8 Oct 2026), per direct instruction**: "NPCs will
+// be picking a certain amount of NPCs to be coming over legally and
+// illegally... we will just grow the planet off of that, just a
+// mixture of different parts of the world coming into this new
+// planet... however you choose to mix it, that makes it a good blend
+// based on population, type of person, and how many people survived
+// in that reset." Three real inputs, not one invented number:
+// `survivorPopulation` is the caller's own real figure for how many
+// people survived VACANCY's reset (`VDP_FOUNDING.md`'s "The old-world
+// event, named") -- not specified anywhere yet, so this module never
+// invents it, only scales off whatever real number it is given.
+// `waveFraction`/`legalFraction` are flagged interpretive numbers, the
+// same footing every other unspecified constant in this directory
+// already stands on. `originRegions`/`religions`/`smuggledGoodsPool`
+// are the caller's own real pools -- "a good blend" is chosen by
+// whoever calls this with real data, never a closed list this module
+// invents on its own.
+//
+// This module creates no NPC of its own and does not import
+// `npcs.js` -- the same decoupled-by-injection shape every other
+// cross-module call in this directory already uses (`transferFn`,
+// `grantMaterialsFn`, ...). `onNewMigrant(index)` is the caller's own
+// real side effect (through `server.cjs`: `npcs.addNpcToWorld`) that
+// actually grows the server-ticked population and returns the new
+// arrival's real personId.
+export const DEFAULT_WAVE_FRACTION = 0.05;
+export const DEFAULT_LEGAL_FRACTION = 0.7;
+export const DEFAULT_SMUGGLING_FRACTION = 0.3;
+
+function pickFrom(pool, rng) {
+  return pool.length ? pool[Math.floor(rng() * pool.length)] : null;
+}
+
+export function generateMigrationWave(store, {
+  survivorPopulation, waveFraction = DEFAULT_WAVE_FRACTION, legalFraction = DEFAULT_LEGAL_FRACTION,
+  originRegions = [], religions = [], smuggledGoodsPool = [],
+  onNewMigrant, rng = Math.random, now = Date.now(),
+} = {}) {
+  if (!Number.isInteger(survivorPopulation) || survivorPopulation < 0) {
+    throw new Error('generateMigrationWave requires a non-negative integer survivorPopulation');
+  }
+  if (typeof onNewMigrant !== 'function') {
+    throw new Error('generateMigrationWave requires an onNewMigrant(index) => personId callback -- this module creates no NPC of its own');
+  }
+
+  const waveSize = Math.round(survivorPopulation * waveFraction);
+  const arrivals = [];
+  for (let i = 0; i < waveSize; i += 1) {
+    const personId = onNewMigrant(i);
+    const originRegion = pickFrom(originRegions, rng);
+    const religion = pickFrom(religions, rng);
+    if (rng() < legalFraction) {
+      arrivals.push(admitWithPassport(store, { personId, originRegion, religion, now }));
+    } else {
+      const smuggledGoods = smuggledGoodsPool.length && rng() < DEFAULT_SMUGGLING_FRACTION
+        ? [pickFrom(smuggledGoodsPool, rng)]
+        : [];
+      arrivals.push(crossIllegally(store, { personId, originRegion, religion, smuggledGoods, now }));
+    }
+  }
+
+  return {
+    waveSize,
+    arrivals,
+    legalCount: arrivals.filter((a) => a.legal).length,
+    illegalCount: arrivals.filter((a) => !a.legal).length,
+  };
 }

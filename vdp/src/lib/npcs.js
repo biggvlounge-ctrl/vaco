@@ -220,6 +220,26 @@ export function createNpcWorld(options = {}) {
   return { npcs, tick: 0, friction: {} };
 }
 
+// Grows the real, server-ticked population by exactly one NPC, past
+// the founding count `createNpcWorld` seeds at boot -- the real hook
+// "we will just grow the planet off of [migration]" needs (8 Oct
+// 2026, direct instruction). `immigration.js`'s `generateMigrationWave`
+// calls this once per new real NPC arrival, through whichever server
+// wires the two together (`server.cjs`) -- this file does not import
+// `immigration.js`, nor the reverse, the same decoupled-by-injection
+// shape every cross-module money/state call in this directory already
+// uses. The new id is real and never reused: one past the highest id
+// already in the world, not a count that could collide after NPCs are
+// later removed.
+export function addNpcToWorld(world, { home, rng = Math.random } = {}) {
+  const nextId = world.npcs.length ? Math.max(...world.npcs.map((n) => n.id)) + 1 : 1;
+  const anchors = HOME_DISTRICT_IDS.map(districtCenter);
+  const anchor = home || anchors[(nextId - 1) % anchors.length];
+  const npc = createNpc(nextId, anchor, rng);
+  world.npcs.push(npc);
+  return npc;
+}
+
 export function getNpc(world, npcId) {
   return world.npcs.find((n) => n.id === npcId) || null;
 }

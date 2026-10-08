@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 
 import {
   TRAIT_NAMES, NEED_NAMES, HABIT_NAMES,
-  createNpc, createNpcWorld, getNpc, listNpcs, latestDecision, explainDecision,
+  createNpc, createNpcWorld, addNpcToWorld, getNpc, listNpcs, latestDecision, explainDecision,
   pickAction, advanceWorldTick,
 } from '../src/lib/npcs.js';
 
@@ -43,6 +43,23 @@ test('createNpcWorld spawns the requested count, each with a distinct rota slot 
   assert.equal(listNpcs(world).length, 14);
   assert.equal(getNpc(world, 1).id, 1);
   assert.equal(getNpc(world, 999), null);
+});
+
+test('addNpcToWorld grows the real population by exactly one, with a real new id', () => {
+  const world = createNpcWorld({ count: 14, rng: fixedRng(0.5) });
+  const migrant = addNpcToWorld(world, { rng: fixedRng(0.5) });
+  assert.equal(listNpcs(world).length, 15);
+  assert.equal(migrant.id, 15);
+  assert.equal(getNpc(world, 15).id, 15);
+});
+
+test('addNpcToWorld never reuses an id, even after the world has grown several times', () => {
+  const world = createNpcWorld({ count: 3, rng: fixedRng(0.5) });
+  addNpcToWorld(world, { rng: fixedRng(0.5) });
+  addNpcToWorld(world, { rng: fixedRng(0.5) });
+  const third = addNpcToWorld(world, { rng: fixedRng(0.5) });
+  assert.equal(third.id, 6);
+  assert.equal(new Set(listNpcs(world).map((n) => n.id)).size, 6, 'every id in the world must be distinct');
 });
 
 // -- Needs ------------------------------------------------------------------

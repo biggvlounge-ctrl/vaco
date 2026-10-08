@@ -7,7 +7,8 @@ import {
   createImmigrationStore, admitWithPassport, crossIllegally, arrivalFor, listArrivals,
   listIllegalArrivals, catchIllegalArrival, reportSmugglingSpot, sealSmugglingSpot,
   listOpenSmugglingSpots, foundIllegalSettlement, clearIllegalSettlement,
-  listActiveIllegalSettlements,
+  listActiveIllegalSettlements, applyForCitizenship, applyForTemporaryPassport,
+  isPassportExpired, TEMPORARY_PASSPORT_DURATION_MS, generateMigrationWave,
 } from '../src/lib/immigration.js';
 
 test('admitWithPassport records a real, legal arrival with the old-world background given', () => {
@@ -94,4 +95,99 @@ test('foundIllegalSettlement and clearIllegalSettlement track a real standing cl
   assert.ok(cleared.clearedAt);
   assert.equal(listActiveIllegalSettlements(store).length, 0);
   assert.throws(() => clearIllegalSettlement(store, settlement.id), /already cleared/);
+});
+
+test('applyForCitizenship grants a real, permanent passport -- no expiry', () => {
+  const store = createImmigrationStore();
+  const arrival = applyForCitizenship(store, { personId: 'alice' });
+  assert.equal(arrival.citizenshipType, 'citizenship');
+  assert.equal(arrival.expiresAt, null);
+  assert.equal(isPassportExpired(store, 'alice', Date.now() + 1000 * 365 * 24 * 60 * 60 * 1000), false);
+});
+
+test('applyForTemporaryPassport grants a real passport that only lasts so long', () => {
+  const store = createImmigrationStore();
+  const now = 1_000_000;
+  const arrival = applyForTemporaryPassport(store, { personId: 'bob', now });
+  assert.equal(arrival.citizenshipType, 'temporary');
+  assert.equal(arrival.expiresAt, now + TEMPORARY_PASSPORT_DURATION_MS);
+  assert.equal(isPassportExpired(store, 'bob', now), false);
+  assert.equal(isPassportExpired(store, 'bob', now + TEMPORARY_PASSPORT_DURATION_MS), true);
+  assert.equal(isPassportExpired(store, 'bob', now + TEMPORARY_PASSPORT_DURATION_MS - 1), false);
+});
+
+test('admitWithPassport defaults to citizenship, same as every caller before the field existed', () => {
+  const store = createImmigrationStore();
+  const arrival = admitWithPassport(store, { personId: 'carol' });
+  assert.equal(arrival.citizenshipType, 'citizenship');
+  assert.equal(arrival.expiresAt, null);
+});
+
+test('an illegal crossing applies for no citizenship type at all', () => {
+  const store = createImmigrationStore();
+  const arrival = crossIllegally(store, { personId: 'dave' });
+  assert.equal(arrival.citizenshipType, null);
+  assert.equal(arrival.expiresAt, null);
+});
+
+test('isPassportExpired refuses an unknown person', () => {
+  const store = createImmigrationStore();
+  assert.throws(() => isPassportExpired(store, 'ghost'), /no arrival recorded/);
+});
+
+test('admitWithPassport refuses an unknown citizenship type', () => {
+  const store = createImmigrationStore();
+  assert.throws(
+    () => admitWithPassport(store, { personId: 'erin', citizenshipType: 'honorary' }),
+    /not a known citizenship type/,
+  );
+});
+
+function fixedRng(...values) {
+  let i = 0;
+  return () => values[Math.min(i++, values.length - 1)];
+}
+
+test('generateMigrationWave sizes a real wave off a real survivor count, and creates one real migrant per onNewMigrant call', () => {
+  const store = createImmigrationStore();
+  let nextId = 1;
+  const result = generateMigrationWave(store, {
+    survivorPopulation: 100, waveFraction: 0.1, legalFraction: 1, // every migrant legal, so the count is deterministic
+    originRegions: ['east'], religions: ['none'],
+    onNewMigrant: () => `npc-${nextId++}`,
+    rng: fixedRng(0.5),
+  });
+  assert.equal(result.waveSize, 10);
+  assert.equal(result.arrivals.length, 10);
+  assert.equal(result.legalCount, 10);
+  assert.equal(result.illegalCount, 0);
+  assert.equal(listArrivals(store).length, 10);
+  assert.equal(result.arrivals[0].originRegion, 'east');
+  assert.equal(result.arrivals[0].religion, 'none');
+});
+
+test('generateMigrationWave splits legal and illegal by the real fraction given', () => {
+  const store = createImmigrationStore();
+  let nextId = 1;
+  // legalFraction 0.5: rng()=0.3 (< 0.5) is legal, rng()=0.7 (>= 0.5) is illegal.
+  const result = generateMigrationWave(store, {
+    survivorPopulation: 10, waveFraction: 0.2, legalFraction: 0.5,
+    onNewMigrant: () => `npc-${nextId++}`,
+    rng: fixedRng(0.3, 0.7),
+  });
+  assert.equal(result.waveSize, 2);
+  assert.equal(result.legalCount, 1);
+  assert.equal(result.illegalCount, 1);
+});
+
+test('generateMigrationWave requires a real survivor count and a real onNewMigrant callback', () => {
+  const store = createImmigrationStore();
+  assert.throws(
+    () => generateMigrationWave(store, { survivorPopulation: -1, onNewMigrant: () => 'x' }),
+    /non-negative integer survivorPopulation/,
+  );
+  assert.throws(
+    () => generateMigrationWave(store, { survivorPopulation: 10 }),
+    /onNewMigrant/,
+  );
 });

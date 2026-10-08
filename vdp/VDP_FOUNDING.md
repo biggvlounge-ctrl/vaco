@@ -254,6 +254,47 @@ make 'people started to integrate to it' meaningless." Named here
 because the instruction asked for it to be, not because the code
 needed to change to make it true.
 
+## Citizenship, temporary passports, and real migration waves (8 Oct 2026)
+
+Per direct instruction, the controlled gate above has two real doors,
+and the world grows through a real, named process rather than a
+constant background trickle:
+
+- **"Users will be able to apply for citizenship or they can apply
+  for a temporary passport that only lasts so long."** The same real
+  `admitWithPassport` gate, with one new field telling the two apart
+  (`citizenshipType`): `applyForCitizenship` is permanent, no expiry;
+  `applyForTemporaryPassport` sets a real `expiresAt`
+  (`TEMPORARY_PASSPORT_DURATION_MS`, a flagged interpretive length —
+  no document gives VDP a real visa duration). `isPassportExpired` is a
+  real, checkable fact about an existing arrival. What happens at
+  expiry beyond that fact is not specified and not invented here, the
+  same restraint this document already applies to what happens to
+  someone a robot patrol catches.
+- **"NPCs will be picking a certain amount of NPCs to be coming over
+  legally and illegally... we will just grow the planet off of
+  that."** `immigration.js`'s `generateMigrationWave` is a real,
+  deterministic generator: given a real survivor-population figure (how
+  many people actually made it through VACANCY's reset — not specified
+  anywhere yet, so this function never invents that number, only scales
+  off whatever real figure it is handed) and real pools of origin
+  regions/religions/smuggled goods (the caller's own data, never a
+  closed list this function invents), it produces a real wave of new
+  arrivals split between legal and illegal entry, and — per "we will
+  just grow the planet off of that" — each one is a real new NPC
+  (`npcs.addNpcToWorld`), not a database row with nobody behind it.
+  "However you choose to mix it, that makes it a good blend based on
+  population, type of person" is read as: the blend is whatever real
+  data the caller supplies, not a fixed recipe this module bakes in.
+- **"When a new spot is found to get through the ice wall, we will be
+  notified in certain ways."** Already real as of the immigration
+  phase above: `reportSmugglingSpot` posts straight to Meridian's own
+  Live World News feed (`NewsTicker.jsx`, reading `newsLib`'s real
+  event log) the instant a robot patrol finds one. That is the one
+  real, in-world notification channel this document can point to; any
+  other channel (a push alert, a direct message) is not specified and
+  not built.
+
 ## What is still open
 
 - The area's own name — nothing has been given yet (the product name,
@@ -271,6 +312,14 @@ needed to change to make it true.
   catches — caught and recorded is real (`catchIllegalArrival`); any
   consequence beyond the record (detention, deportation, a fine) is
   not specified and not invented here.
+- The real survivor-population figure — how many people actually made
+  it through VACANCY's reset. `generateMigrationWave` is built to
+  scale a real migration wave off this number the instant it is
+  given; until then, no wave fires on its own, and no number is
+  guessed at to make one up.
+- What happens to a passport at the moment it actually expires, beyond
+  `isPassportExpired` recording the fact — not specified and not
+  invented here.
 
 This document records what has been confirmed and leaves the rest for
 whenever more of the story is given, the same discipline `town.js`

@@ -36,7 +36,9 @@ require('dotenv/config');
 // `vaco-notify`'s `/api/notify`, nothing here needs to bypass it.
 const { attachStore } = require('./lib/storeBackend.cjs');
 const { createServiceAuth } = require('./lib/serviceAuth.cjs');
-const { requireActor, requireParamActor, actorOrService } = require('./lib/shieldAuth.cjs');
+const {
+  requireActor, requireParamActor, actorOrService, requireCallingService,
+} = require('./lib/shieldAuth.cjs');
 const { traceMiddleware } = require('./lib/tracing.cjs');
 const { createMessageSocketServer } = require('./lib/messageSocket.cjs');
 
@@ -629,8 +631,44 @@ let store = createVdpStore();
         religion: req.body.religion,
         oldWorldSkills: req.body.oldWorldSkills,
         oldWorldBeliefs: req.body.oldWorldBeliefs,
+        citizenshipType: req.body.citizenshipType,
       });
       newsLib.recordEvent(store.news, { kind: 'immigration', text: `${req.body.personId} arrived through passport control` });
+      res.status(201).json(arrival);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // Two named, player-facing applications, matching the instruction's
+  // own words -- both land on the same real gate as `/admit` above,
+  // with the matching `citizenshipType` already chosen.
+  app.post('/api/immigration/apply-citizenship', requireActor('personId'), (req, res) => {
+    try {
+      const arrival = immigrationLib.applyForCitizenship(store.immigration, {
+        personId: req.body.personId,
+        originRegion: req.body.originRegion,
+        religion: req.body.religion,
+        oldWorldSkills: req.body.oldWorldSkills,
+        oldWorldBeliefs: req.body.oldWorldBeliefs,
+      });
+      newsLib.recordEvent(store.news, { kind: 'immigration', text: `${req.body.personId} was granted citizenship` });
+      res.status(201).json(arrival);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/immigration/apply-temporary-passport', requireActor('personId'), (req, res) => {
+    try {
+      const arrival = immigrationLib.applyForTemporaryPassport(store.immigration, {
+        personId: req.body.personId,
+        originRegion: req.body.originRegion,
+        religion: req.body.religion,
+        oldWorldSkills: req.body.oldWorldSkills,
+        oldWorldBeliefs: req.body.oldWorldBeliefs,
+      });
+      newsLib.recordEvent(store.news, { kind: 'immigration', text: `${req.body.personId} was granted a temporary passport` });
       res.status(201).json(arrival);
     } catch (err) {
       res.status(400).json({ error: err.message });
@@ -719,6 +757,39 @@ let store = createVdpStore();
       });
       newsLib.recordEvent(store.news, { kind: 'immigration', text: `a robot patrol cleared an illegal settlement` });
       res.status(200).json(settlement);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // "We will just grow the planet off of that" -- a real,
+  // scheduler-style world event, not any one player's action, so this
+  // is the one immigration route guarded by `requireCallingService()`
+  // rather than `requireActor`: there is no single acting user to
+  // check, the same posture `shieldAuth.cjs` already documents for
+  // tick-style jobs. Each new migrant is a real NPC
+  // (`npcs.addNpcToWorld`), not a database row with nobody behind it.
+  app.post('/api/immigration/migration-wave', requireCallingService(), (req, res) => {
+    try {
+      let created = 0;
+      const result = immigrationLib.generateMigrationWave(store.immigration, {
+        survivorPopulation: req.body.survivorPopulation,
+        waveFraction: req.body.waveFraction,
+        legalFraction: req.body.legalFraction,
+        originRegions: req.body.originRegions,
+        religions: req.body.religions,
+        smuggledGoodsPool: req.body.smuggledGoodsPool,
+        onNewMigrant: () => {
+          const npc = npcs.addNpcToWorld(store.npcWorld);
+          created += 1;
+          return `npc-${npc.id}`;
+        },
+      });
+      newsLib.recordEvent(store.news, {
+        kind: 'immigration',
+        text: `a new wave of ${result.waveSize} settlers arrived (${result.legalCount} by passport, ${result.illegalCount} across the ice wall)`,
+      });
+      res.status(201).json({ ...result, npcsCreated: created });
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
