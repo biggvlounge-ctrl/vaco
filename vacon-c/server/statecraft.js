@@ -515,21 +515,61 @@ function runSchooling(worldState, tick) {
   }
 
   const advanced = [];
+  // **The enrolment roll, and what there now is to drop out OF.**
+  // `npc.schoolEnrolled` is an in-memory-only field — no document names
+  // an enrolment table, and this is the same treatment `orgArchetypes.
+  // found` gives `organization.archetype`: a real fact the engine needs
+  // to detect a CROSSING with, not a schema addition. Before this,
+  // eligibility was recomputed fresh every tick with no memory of it,
+  // so a person could be "eligible" for 400 ticks running and nothing
+  // would ever have said they attended, left, or finished — the exact
+  // gap this entry named: "no enrolment roll and nobody to drop out
+  // OF."
+  const enrollmentChanges = [];
   for (const npc of worldState.npcs || []) {
     const cityId = cityOf.get(npc.communityId);
-    if (cityId === null || cityId === undefined) continue;
-    const provision = byCity.get(cityId);
-    if (!provision || !provision.open || provision.funding === null) continue;
-    if (provision.funding <= 0) continue;
+    const provision = cityId === null || cityId === undefined ? null : byCity.get(cityId);
+    const serviced = Boolean(provision && provision.open && provision.funding !== null
+      && provision.funding > 0);
 
     const at = levels.indexOf(npc.education);
     // **`indexOf` is -1 for a person whose education nobody recorded,
     // and -1 is not rung zero.** An unknown attainment is unknown;
     // starting them at `none` would invent a fact about them.
-    if (at < 0 || at >= top) continue;
+    const hasRoom = at >= 0 && at < top;
 
     const age = mortality.ageInYears(worldState, npc, tick);
-    if (age === null || age < SCHOOL_AGE_MIN || age > SCHOOL_AGE_MAX) continue;
+    const ageEligible = age !== null && age >= SCHOOL_AGE_MIN && age <= SCHOOL_AGE_MAX;
+
+    const eligible = serviced && hasRoom && ageEligible;
+    const wasEnrolled = npc.schoolEnrolled === true;
+
+    if (!eligible) {
+      if (wasEnrolled) {
+        npc.schoolEnrolled = false;
+        // Three real reasons to stop, not one undifferentiated
+        // "dropped out": reaching the top rung is `education_completed`
+        // already (below) and is not a dropout; running out of the age
+        // window having never reached it is `aged_out`, not a failure
+        // of provision; losing access while still in the window and
+        // still short of the top — unfunded or failed schools — is the
+        // real `dropped_out`.
+        if (at >= top) {
+          // Already announced as `education_completed` on the tick it
+          // happened; nothing further to log here.
+        } else if (age !== null && age > SCHOOL_AGE_MAX) {
+          enrollmentChanges.push({ entityId: npc.id, type: 'aged_out', cityId });
+        } else {
+          enrollmentChanges.push({ entityId: npc.id, type: 'dropped_out', cityId });
+        }
+      }
+      continue;
+    }
+
+    if (!wasEnrolled) {
+      npc.schoolEnrolled = true;
+      enrollmentChanges.push({ entityId: npc.id, type: 'enrolled', cityId });
+    }
 
     const chance = (provision.funding / 100) / (SCHOOL_YEARS_PER_LEVEL * TICKS_PER_YEAR);
     // Seeded on the person and the tick — reproducible under §88, and
@@ -540,7 +580,7 @@ function runSchooling(worldState, tick) {
     npc.education = levels[at + 1];
     advanced.push({ entityId: npc.id, from: levels[at], to: npc.education, cityId });
   }
-  return advanced;
+  return { advanced, enrollmentChanges };
 }
 
 // ---------------------------------------------------------------------
@@ -631,7 +671,7 @@ function runStatecraft(worldState, tick) {
   for (const city of worldState.cities || []) driftTourism(worldState, city);
 
   // School runs every day, on last quarter's money.
-  const advanced = runSchooling(worldState, tick);
+  const { advanced, enrollmentChanges } = runSchooling(worldState, tick);
   for (const step of advanced) {
     // **A crossing, and only the one that matters.** Every rung is a
     // crossing, but a log line per rung per person would bury the tick
@@ -646,6 +686,20 @@ function runStatecraft(worldState, tick) {
       tick,
       affected_entity_ids: [step.entityId],
       global_effects: { cityId: step.cityId, from: step.from, to: step.to },
+    });
+  }
+
+  // The enrolment roll's own crossings — each one real and rare per
+  // person (nobody enrols, ages out or is forced out twice), so none
+  // of this floods the log the way a per-tick condition would.
+  for (const change of enrollmentChanges) {
+    events.push({
+      type: `school_${change.type}`,
+      severity: 'low',
+      note: `Entity ${change.entityId} ${change.type.replace('_', ' ')} of school`,
+      tick,
+      affected_entity_ids: [change.entityId],
+      global_effects: { cityId: change.cityId },
     });
   }
 

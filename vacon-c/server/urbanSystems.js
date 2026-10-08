@@ -181,11 +181,11 @@ const SYSTEMS = [
   {
     n: 5,
     name: 'Education',
-    level: 'partial',
+    level: 'modelled',
     tables: ['infrastructure'],
     traitFamilies: ['educational'],
     infrastructureTypes: ['schools'],
-    functions: ['runSchooling'],
+    functions: ['runSchooling', 'runStatecraft'],
     note: 'Schools exist as infrastructure with a capacity and a condition that decays, '
       + 'educational ATTAINMENT is a real per-area statistic (npcs.education, via '
       + 'demographics.compositionOf), and **attainment now moves** — `statecraft.runSchooling` '
@@ -208,7 +208,18 @@ const SYSTEMS = [
       + 'one is the gap that mattered: `runSchooling` refuses anybody outside 5-30 or in a '
       + 'city whose schools are unfunded, so an adult in a collapsed settlement could never '
       + 'learn anything again for the rest of their life however many books were lying '
-      + 'around. Still partial: no enrolment roll and nobody to drop out OF.',
+      + 'around. **And the last gap is closed, 8 Oct 2026**: `runSchooling` now tracks '
+      + '`npc.schoolEnrolled` — an in-memory-only field, the same treatment this file already '
+      + 'gives `organization.archetype` and `organization.lifecycleStage` — and detects the '
+      + 'real crossing rather than recomputing eligibility fresh every tick with no memory of '
+      + 'it. Three distinct, real transitions, not one undifferentiated "stopped attending": '
+      + '`enrolled` when a person first becomes eligible, `aged_out` when they leave the 5-30 '
+      + 'window short of the top rung, and `dropped_out` when their city\'s schools stop being '
+      + 'funded or fail while they are still in the window. Reaching the top rung is still '
+      + 'reported once, by the pre-existing `education_completed`, not again as a dropout. '
+      + '`runStatecraft` surfaces all of it as real events (`school_enrolled`, `school_aged_out`, '
+      + '`school_dropped_out`) — each one rare and per-person, so none of it floods the log the '
+      + 'way a per-tick condition would (standing rule 7).',
   },
   {
     n: 6,

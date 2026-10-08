@@ -982,7 +982,7 @@ trusted:
 
 The simulation engine is the one app in this repo whose "done" is not a
 list of routes, so it carries a measured completeness score rather than
-a criteria tally. **92.2%**, from
+a criteria tally. **92.4%**, from
 `vacon-c/dev-docs/GAME_COMPLETENESS.md`, which
 `vacon-c/scripts/completeness.mjs` regenerates and
 `vacon-c/test/completeness.test.js` fails on if stale — including a
@@ -990,12 +990,30 @@ check that the percent in THIS file matches the one the code measures.
 
 | axis | complete | what it measures |
 |---|---|---|
-| systems | 77.4% | the forty urban systems §7 names, at `urbanSystems.js`'s own four levels |
+| systems | 78.6% | the forty urban systems §7 names, at `urbanSystems.js`'s own four levels |
 | tables | 94.7% | schema tables a built world actually fills |
 | statistics | 88.2% | statistics a world can answer about itself |
 | traits | 100% | traits something under `server/` reads |
 | traitDepth | 85.7% | trait columns a life actually changes |
 | habits | 100% | whether habits and routines carry information |
+
+**92.2% -> 92.4% on 8 Oct 2026, systems axis.** §7 system 5 Education
+moved `partial` -> `modelled`. `statecraft.runSchooling` already walked
+attainment up `demographics.EDUCATION_LEVELS` at a rate the city's
+school funding set, but had no memory of WHO was actually attending —
+eligibility was recomputed fresh every tick with nothing recording that
+a person had enrolled, aged out, or been forced out, which is the exact
+gap this entry named: "no enrolment roll and nobody to drop out OF."
+`npc.schoolEnrolled` is a new in-memory-only field — the same treatment
+this file already gives `organization.archetype` and `.lifecycleStage`
+— and three distinct, real transitions replace one undifferentiated
+"stopped attending": `enrolled` on first eligibility, `aged_out` on
+leaving the 5-30 window short of the top rung, `dropped_out` when a
+city's schools stop being funded or fail while a student is still in
+the window. Reaching the top rung stays `education_completed`, not a
+fourth, redundant event. `runStatecraft` surfaces all three as real,
+per-person, rare events (standing rule 7) rather than a per-tick
+condition.
 
 **92.1% -> 92.2% on 8 Oct 2026, systems axis.** §7 system 16 Organized
 Crime moved `partial` -> `modelled`, the same pass that gave Gang its

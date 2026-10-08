@@ -410,7 +410,7 @@ test('attainment moves, and it moves only where a funded school is open', () => 
     let moved = 0;
     for (let t = 0; t < 2000; t += 1) {
       w.tick = 100 + t;
-      moved += statecraft.runSchooling(w, w.tick).length;
+      moved += statecraft.runSchooling(w, w.tick).advanced.length;
     }
     return moved;
   };
@@ -441,7 +441,7 @@ test('the world seed reaches the draw — §88, and it did not before', () => {
     const moved = [];
     for (let t = 0; t < 1500; t += 1) {
       w.tick = 100 + t;
-      for (const step of statecraft.runSchooling(w, w.tick)) {
+      for (const step of statecraft.runSchooling(w, w.tick).advanced) {
         moved.push(`${step.entityId}@${w.tick}`);
       }
     }
@@ -473,6 +473,89 @@ test('schooling never invents a fact about somebody', () => {
   assert.equal(w.npcs[0].education, null);
   assert.equal(w.npcs[1].education, 'advanced');
   assert.equal(w.npcs[2].education, 'basic');
+});
+
+test('a newly-eligible student is enrolled, once, as a real transition', () => {
+  // **"No enrolment roll and nobody to drop out OF."** Before this,
+  // `runSchooling` moved `education` in place with nothing marking
+  // whether a person was actually attending — the rung advanced but
+  // no event, no field, recorded the attendance itself.
+  const { w } = stateWorld({ students: 10 });
+  for (const row of w.infrastructure) if (row.type === 'schools') row.funding = 100;
+
+  w.tick = 100;
+  const first = statecraft.runSchooling(w, w.tick);
+  const enrolled = first.enrollmentChanges.filter((c) => c.type === 'enrolled');
+  assert.equal(enrolled.length, 10, 'every age-eligible student with a funded school should enrol');
+  for (const npc of w.npcs) assert.equal(npc.schoolEnrolled, true);
+
+  // Once enrolled, staying eligible is not a fresh transition every
+  // tick — rule 7, a crossing, not a condition.
+  w.tick = 101;
+  const second = statecraft.runSchooling(w, w.tick);
+  assert.equal(second.enrollmentChanges.length, 0, 'an unchanged eligibility should log nothing');
+});
+
+test('aging out of the window is a real transition, distinct from dropping out', () => {
+  const { w } = stateWorld({ students: 1 });
+  for (const row of w.infrastructure) if (row.type === 'schools') row.funding = 100;
+  // Young enough to start, old enough to cross SCHOOL_AGE_MAX soon.
+  w.npcs[0].createdTick = w.tick - Math.round((statecraft.SCHOOL_AGE_MAX - 0.5) * 365);
+
+  w.tick += 1;
+  statecraft.runSchooling(w, w.tick);
+  assert.equal(w.npcs[0].schoolEnrolled, true);
+
+  w.tick += 365; // now past SCHOOL_AGE_MAX
+  const result = statecraft.runSchooling(w, w.tick);
+  assert.deepEqual(
+    result.enrollmentChanges.map((c) => c.type),
+    ['aged_out'],
+  );
+  assert.equal(w.npcs[0].schoolEnrolled, false);
+});
+
+test('a school that stops being funded drops its students out, not aged-out', () => {
+  const { w } = stateWorld({ students: 1 });
+  for (const row of w.infrastructure) if (row.type === 'schools') row.funding = 100;
+
+  w.tick += 1;
+  statecraft.runSchooling(w, w.tick);
+  assert.equal(w.npcs[0].schoolEnrolled, true);
+
+  for (const row of w.infrastructure) if (row.type === 'schools') row.funding = 0;
+  w.tick += 1;
+  const result = statecraft.runSchooling(w, w.tick);
+  assert.deepEqual(
+    result.enrollmentChanges.map((c) => c.type),
+    ['dropped_out'],
+  );
+  assert.equal(w.npcs[0].schoolEnrolled, false);
+});
+
+test('reaching the top rung is reported once, by education_completed, and not again as a dropout', () => {
+  const { w } = stateWorld({ students: 1 });
+  for (const row of w.infrastructure) if (row.type === 'schools') row.funding = 100;
+  const top = demographics.EDUCATION_LEVELS[demographics.EDUCATION_LEVELS.length - 1];
+  w.npcs[0].education = demographics.EDUCATION_LEVELS[demographics.EDUCATION_LEVELS.length - 2];
+  w.npcs[0].schoolEnrolled = true;
+
+  w.tick += 1;
+  w.npcs[0].education = top; // simulate the advance having already landed
+  const result = statecraft.runSchooling(w, w.tick);
+  assert.equal(result.enrollmentChanges.length, 0, 'graduation is covered by education_completed, not a dropout');
+  assert.equal(w.npcs[0].schoolEnrolled, false);
+});
+
+test('runStatecraft logs enrollment transitions as real, inspectable events', () => {
+  const { w } = stateWorld({ students: 1 });
+  for (const row of w.infrastructure) if (row.type === 'schools') row.funding = 100;
+
+  w.tick += 1;
+  const events = statecraft.runStatecraft(w, w.tick);
+  const enrolledEvent = events.find((e) => e.type === 'school_enrolled');
+  assert.ok(enrolledEvent, 'runStatecraft should surface the enrolled transition as an event');
+  assert.deepEqual(enrolledEvent.affected_entity_ids, [w.npcs[0].id]);
 });
 
 // ---------------------------------------------------------------------
