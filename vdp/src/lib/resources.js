@@ -25,7 +25,12 @@
 // convention and introducing a second randomness discipline in one
 // file would be its own kind of inconsistency.
 
-export const RESOURCE_TYPES = ['wood', 'stone', 'clay', 'ore'];
+// `game` and `crop` joined 8 Oct 2026, for `jobs.js`'s frontier
+// hunter/farmer shifts — real yields, not something `digForResources`
+// turns up. Digging is earth and stone; a hunt or a harvest is a
+// different real activity with its own job, so `YIELD_TABLE` below
+// deliberately stays digging-only rather than growing to match.
+export const RESOURCE_TYPES = ['wood', 'stone', 'clay', 'ore', 'game', 'crop'];
 
 // Wood is the one material the instruction named directly, so it is
 // the common case; the rest are "different materials... in the area",
@@ -66,6 +71,21 @@ export function createResourcesStore() {
 
 export function materialsFor(store, entityId) {
   return { ...(store.materials[entityId] || zeroMaterials()) };
+}
+
+// A real, produced yield -- `jobs.js`'s lumberjack/farmer/hunter
+// shifts call this on a successful payout, the inverse of
+// `spendMaterials`' local half. Unlike `oldWorldStock`, a player's own
+// `materials` legitimately goes up this way (and by digging); only the
+// shared import stock carries the one-way invariant.
+export function grantMaterials(store, entityId, requested = {}) {
+  if (!store.materials[entityId]) store.materials[entityId] = zeroMaterials();
+  for (const type of RESOURCE_TYPES) {
+    const amount = requested[type] || 0;
+    if (amount === 0) continue;
+    store.materials[entityId][type] = (store.materials[entityId][type] || 0) + amount;
+  }
+  return materialsFor(store, entityId);
 }
 
 export function canDig(store, entityId, now = Date.now()) {

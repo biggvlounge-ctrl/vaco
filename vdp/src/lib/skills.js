@@ -11,6 +11,10 @@
 // `Art` (occupations.js tier 4, implied) -- the last two added
 // alongside the Combat Sports District and Fashion District jobs in
 // `jobs.js`, VDP-native districts that had no matching skill before.
+// `Agriculture` and `Combat` joined 8 Oct 2026 the same way, for the
+// frontier jobs occupations.js already names exactly: `farmer` is
+// `skill: 'Agriculture', source: 'farming'`, `hunter` is
+// `skill: 'Combat', source: 'hunting'`, verbatim.
 //
 // A skill rises from three places, each bounded so none of them can
 // alone max it out: working a matching job (small, passive, per
@@ -21,7 +25,10 @@
 // bump from one conversation doesn't read as permanent next to one
 // built from steady practice.
 
-export const SKILL_NAMES = ['Business', 'Crafting', 'Construction', 'Communication', 'Management', 'Athletics', 'Art'];
+export const SKILL_NAMES = [
+  'Business', 'Crafting', 'Construction', 'Communication', 'Management', 'Athletics', 'Art',
+  'Agriculture', 'Combat',
+];
 
 export const JOB_SHIFT_GAIN = 1.5;
 export const TEXTBOOK_GAIN = 12;

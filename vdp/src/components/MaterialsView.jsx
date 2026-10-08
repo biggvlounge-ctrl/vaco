@@ -7,7 +7,10 @@ import { useState, useEffect, useCallback } from "react";
 
 const VDP_API_URL = import.meta.env?.VITE_VDP_API_URL || "http://localhost:8827";
 
-const RESOURCE_LABELS = { wood: "Wood", stone: "Stone", clay: "Clay", ore: "Ore" };
+const RESOURCE_LABELS = {
+  wood: "Wood", stone: "Stone", clay: "Clay", ore: "Ore",
+  game: "Game (hunted)", crop: "Crop (farmed)",
+};
 
 export default function MaterialsView({ session, onChange }) {
   const [materials, setMaterials] = useState(null);

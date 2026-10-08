@@ -56,6 +56,19 @@ loud.
   `organizations.js`, `property.js`) actually operates on this planet
   — not a theme-park façade over VACO's real ecosystem apps, the real
   thing simply located somewhere new.
+- **"All the initial operations will be done by us, the governors of
+  the new planet"** (8 Oct 2026, direct instruction) is now a real
+  payroll account, not just a line in this document:
+  `jobs.PLANETARY_GOVERNORS_PAYROLL` funds the three frontier jobs
+  (`lumberjack`, `farmer`, `hunter`) — hunting, lumberjacking and
+  farming the undeveloped land around Meridian, the real work a brand
+  new settlement needs before it has businesses of its own to employ
+  anybody. The founding team is that settlement's first real employer,
+  the same payroll-is-the-employer shape every other job in `jobs.js`
+  already uses, just with the governors standing where a district's
+  own business usually would. A player steps into these jobs the same
+  way they clock in anywhere else — this is the founding team's own
+  operation, open to be worked, not a separate system.
 
 ## What is still open
 

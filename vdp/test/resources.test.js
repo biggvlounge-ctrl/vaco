@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import {
   RESOURCE_TYPES, DIG_COOLDOWN_MS, STARTING_OLD_WORLD_STOCK,
   createResourcesStore, materialsFor, canDig, digForResources, spendMaterials, undoSpend,
+  grantMaterials,
 } from '../src/lib/resources.js';
 
 function fixedRng(...values) {
@@ -105,4 +106,33 @@ test('the old-world stock never goes up — nothing in this module replenishes i
   const after1 = store.oldWorldStock;
   digForResources(store, { entityId: 'alice', now: Date.now(), rng: fixedRng(0) });
   assert.ok(store.oldWorldStock <= after1, 'digging must never raise the old-world stock');
+});
+
+test('grantMaterials is a real, produced yield, and never touches the old-world stock', () => {
+  const store = createResourcesStore();
+  const result = grantMaterials(store, 'alice', { game: 5, crop: 3 });
+
+  assert.equal(result.game, 5);
+  assert.equal(result.crop, 3);
+  assert.equal(materialsFor(store, 'alice').game, 5);
+  assert.equal(store.oldWorldStock, STARTING_OLD_WORLD_STOCK);
+});
+
+test('grantMaterials adds to, rather than replaces, what a player already holds', () => {
+  const store = createResourcesStore();
+  store.materials.alice = { wood: 0, stone: 0, clay: 0, ore: 0, game: 2, crop: 0 };
+  grantMaterials(store, 'alice', { game: 5 });
+  assert.equal(materialsFor(store, 'alice').game, 7);
+});
+
+test('game and crop are real resource types a dig never turns up', () => {
+  assert.ok(RESOURCE_TYPES.includes('game'));
+  assert.ok(RESOURCE_TYPES.includes('crop'));
+  const store = createResourcesStore();
+  const seenTypes = new Set();
+  for (let i = 0; i < 50; i += 1) {
+    const result = digForResources(store, { entityId: 'alice', now: i * DIG_COOLDOWN_MS, rng: fixedRng(i / 50) });
+    seenTypes.add(result.type);
+  }
+  assert.ok(!seenTypes.has('game') && !seenTypes.has('crop'), 'digging is earth and stone, not a hunt or a harvest');
 });

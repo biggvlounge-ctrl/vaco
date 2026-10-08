@@ -7,7 +7,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { listJobs, getJob, createJobsStore, clockIn, clockOutAndPay, currentAssignment, shiftsFor } from '../src/lib/jobs.js';
+import {
+  listJobs, getJob, createJobsStore, clockIn, clockOutAndPay, currentAssignment, shiftsFor,
+  PLANETARY_GOVERNORS_PAYROLL,
+} from '../src/lib/jobs.js';
+import { createResourcesStore, grantMaterials, materialsFor } from '../src/lib/resources.js';
 
 function fakeTransfer(calls, { shouldFail = false } = {}) {
   return async (args) => {
@@ -54,4 +58,57 @@ test('listJobs/getJob agree on every job id', () => {
   for (const job of listJobs()) {
     assert.equal(getJob(job.id).title, job.title);
   }
+});
+
+test('the three frontier jobs are founder-run, with the planetary governors as payroll', () => {
+  for (const jobId of ['lumberjack', 'farmer', 'hunter']) {
+    assert.equal(getJob(jobId).payrollAccountId, PLANETARY_GOVERNORS_PAYROLL);
+    assert.equal(getJob(jobId).districtId, 'frontier', `${jobId} must not claim a real world.js district`);
+  }
+});
+
+test('a frontier shift pays VCoin AND grants a real, produced yield, when wired to a resources store', async () => {
+  const store = createJobsStore();
+  const resourcesStore = createResourcesStore();
+  clockIn(store, { workerId: 'alice', jobId: 'lumberjack' });
+  const calls = [];
+  const shift = await clockOutAndPay(store, {
+    workerId: 'alice', transferFn: fakeTransfer(calls), resourcesStore, grantMaterialsFn: grantMaterials,
+  });
+
+  assert.equal(calls[0].amount, getJob('lumberjack').payPerShift);
+  assert.deepEqual(shift.yielded, { type: 'wood', amount: 8 });
+  assert.equal(materialsFor(resourcesStore, 'alice').wood, 8);
+});
+
+test('a job with no real yields grants nothing, even when wired to a resources store', async () => {
+  const store = createJobsStore();
+  const resourcesStore = createResourcesStore();
+  clockIn(store, { workerId: 'alice', jobId: 'food-cashier' });
+  const shift = await clockOutAndPay(store, {
+    workerId: 'alice', transferFn: fakeTransfer([]), resourcesStore, grantMaterialsFn: grantMaterials,
+  });
+
+  assert.equal(shift.yielded, undefined);
+  assert.deepEqual(materialsFor(resourcesStore, 'alice'), { wood: 0, stone: 0, clay: 0, ore: 0, game: 0, crop: 0 });
+});
+
+test('a failed payout grants no yield for a shift that never completed', async () => {
+  const store = createJobsStore();
+  const resourcesStore = createResourcesStore();
+  clockIn(store, { workerId: 'alice', jobId: 'hunter' });
+  await assert.rejects(
+    clockOutAndPay(store, {
+      workerId: 'alice', transferFn: fakeTransfer([], { shouldFail: true }), resourcesStore, grantMaterialsFn: grantMaterials,
+    }),
+  );
+  assert.equal(materialsFor(resourcesStore, 'alice').game, 0, 'a declined payout must not also hand out the yield');
+});
+
+test('a frontier shift still works with no resources wiring at all — yields stay optional', async () => {
+  const store = createJobsStore();
+  clockIn(store, { workerId: 'alice', jobId: 'farmer' });
+  const shift = await clockOutAndPay(store, { workerId: 'alice', transferFn: fakeTransfer([]) });
+  assert.equal(shift.paid, true);
+  assert.equal(shift.yielded, undefined);
 });

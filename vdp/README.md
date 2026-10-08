@@ -623,6 +623,39 @@ the VCoin transfer then fails. `MyHomeView.jsx`'s upgrade button now
 shows the real materials cost alongside the VCoin price. 332 tests
 passing across the whole app, up from 326.
 
+**Phase 17 — the frontier: hunting, lumberjacking, farming, and the
+planetary governors as employer** (`src/lib/jobs.js`, `resources.js`,
+8 Oct 2026), per direct instruction: the settlement needs real work in
+the undeveloped land around Meridian, not just its built districts —
+and "all the initial operations will be done by us, the governors of
+the new planet." Three new jobs, each `occupations.js`'s own real §25
+skill verbatim (`farmer`: Agriculture, `hunter`: Combat; lumberjack
+takes `carpenter`'s Construction, the nearest real entry) and each
+founder-run from a new named payroll account,
+`jobs.PLANETARY_GOVERNORS_PAYROLL`, rather than a district's own
+business — the same payroll-is-the-employer shape every other job here
+already uses. `districtId: 'frontier'` is deliberately not one of
+`world.js`'s real districts, unlike every job before it: the frontier
+is `worldExpansion.js`'s own real backdrop-vs-built distinction, and
+hunting specifically belongs there by the instruction's own words.
+
+A shift now pays real VCoin AND grants a real, produced yield —
+"this will lead to product as well," starting with the raw material
+each job actually produces: `resources.js` gained `game` and `crop`
+alongside wood/stone/clay/ore, and a new `grantMaterials` (the
+produced inverse of `spendMaterials`, never touching the one-way
+`oldWorldStock`). `clockOutAndPay` grants the yield strictly AFTER a
+successful VCoin transfer — a produced bonus has nothing to roll back
+on its own, and a declined payout must not also hand one out. `Skills`
+grew by two real entries (`Agriculture`, `Combat`) for exactly these
+jobs, same growth discipline VACON-C's own `CLAUDE.md` argues for
+("grow the catalogue alongside the systems that consume it"). Both
+wirings stay optional/injected (`resourcesStore`/`grantMaterialsFn`),
+so every existing job and test that omits them is unaffected.
+
+6 new jobs.js tests, 3 new resources.js tests. Full suite: 340
+passing, up from 332, 0 failing.
+
 **Phase 2 (SVMIKO DEGVCHI Avatar Wearables)**: 20 plain-Node checks
 (13 unique real pieces, real category assignment, the luxury-vs-
 streetwear tier proven at VDP's own real price scale, a real purchase

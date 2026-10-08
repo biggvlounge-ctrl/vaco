@@ -366,13 +366,17 @@ let store = createVdpStore();
   app.post('/api/jobs/clock-out', requireActor('workerId'), async (req, res) => {
     const { workerId } = req.body;
     try {
-      const shift = await jobsLib.clockOutAndPay(store.jobs, { workerId, transferFn: transferVCoin });
+      const shift = await jobsLib.clockOutAndPay(store.jobs, {
+        workerId, transferFn: transferVCoin,
+        resourcesStore: store.resources, grantMaterialsFn: resourcesLib.grantMaterials,
+      });
       const player = ensurePlayer(workerId);
       skillsLib.gainFromShift(player.skills, shift.skill);
       const job = jobsLib.getJob(shift.jobId);
+      const yieldText = shift.yielded ? `, and gathered ${shift.yielded.amount} ${shift.yielded.type}` : '';
       newsLib.recordEvent(store.news, {
         kind: 'job',
-        text: `${workerId} finished a shift as ${job ? job.title : shift.jobId} and earned ${shift.pay} VCoin`,
+        text: `${workerId} finished a shift as ${job ? job.title : shift.jobId} and earned ${shift.pay} VCoin${yieldText}`,
       });
       res.status(200).json(shift);
     } catch (err) {

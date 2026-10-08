@@ -70,7 +70,8 @@ export default function JobsView({ session, onChange }) {
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || `clock-out failed (${res.status})`);
-      setLastPay(`Shift complete: earned ${body.pay} VCoin as ${body.jobId}.`);
+      const yieldText = body.yielded ? `, gathered ${body.yielded.amount} ${body.yielded.type}` : "";
+      setLastPay(`Shift complete: earned ${body.pay} VCoin as ${body.jobId}${yieldText}.`);
       await refresh();
       if (onChange) await onChange();
     } catch (err) {
@@ -103,7 +104,10 @@ export default function JobsView({ session, onChange }) {
         <ul style={{ fontSize: 13, margin: "0 0 12px 0", paddingLeft: 0, listStyle: "none" }}>
           {jobs.map((job) => (
             <li key={job.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
-              <span>{job.title} — {job.skill}, {job.payPerShift} VCoin/shift</span>
+              <span>
+                {job.title} — {job.skill}, {job.payPerShift} VCoin/shift
+                {job.yields ? ` + ${job.yields.amount} ${job.yields.type}` : ""}
+              </span>
               <button onClick={handleClockIn(job.id)} disabled={busy}>
                 {busy ? "…" : "Clock in"}
               </button>

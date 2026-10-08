@@ -106,6 +106,7 @@ test('a never-seen player auto-creates with the real needs/skills/beliefs shape'
   assert.ok(body.state.traits);
   assert.deepEqual(body.skills, {
     Business: 0, Crafting: 0, Construction: 0, Communication: 0, Management: 0, Athletics: 0, Art: 0,
+    Agriculture: 0, Combat: 0,
   });
   assert.deepEqual(body.beliefs, {});
 });
@@ -125,7 +126,7 @@ test('GET /api/vacay-hotels reports Meridian\'s real tier cap, not a hardcoded n
 
 test('GET /api/resources/:id reports real zero materials and a real old-world stock for a never-seen player', { skip: SKIP }, async () => {
   const body = await (await fetch(`${BASE}/api/resources/never-seen-player`)).json();
-  assert.deepEqual(body.materials, { wood: 0, stone: 0, clay: 0, ore: 0 });
+  assert.deepEqual(body.materials, { wood: 0, stone: 0, clay: 0, ore: 0, game: 0, crop: 0 });
   assert.equal(body.canDig, true);
   assert.ok(Number.isFinite(body.oldWorldStock) && body.oldWorldStock > 0);
 });
