@@ -982,7 +982,7 @@ trusted:
 
 The simulation engine is the one app in this repo whose "done" is not a
 list of routes, so it carries a measured completeness score rather than
-a criteria tally. **92.6%**, from
+a criteria tally. **92.7%**, from
 `vacon-c/dev-docs/GAME_COMPLETENESS.md`, which
 `vacon-c/scripts/completeness.mjs` regenerates and
 `vacon-c/test/completeness.test.js` fails on if stale — including a
@@ -992,10 +992,40 @@ check that the percent in THIS file matches the one the code measures.
 |---|---|---|
 | systems | 81.1% | the forty urban systems §7 names, at `urbanSystems.js`'s own four levels |
 | tables | 94.7% | schema tables a built world actually fills |
-| statistics | 88.2% | statistics a world can answer about itself |
+| statistics | 88.5% | statistics a world can answer about itself |
 | traits | 100% | traits something under `server/` reads |
 | traitDepth | 85.7% | trait columns a life actually changes |
 | habits | 100% | whether habits and routines carry information |
+
+**92.6% -> 92.7% on 8 Oct 2026, statistics axis.** Weather and climate
+had been real, per-city, seeded data in `environment_state` since the
+table was built, and zero statistics ever read it — the catalogue's own
+`environment` category answered scarcity, disease pressure and the
+active-condition count, and nothing about weather. Three new entries
+close it: `severe_weather` (city-scoped, wired straight to the already-
+existing `environment.harshnessIn`), and `climate_diversity` /
+`dominant_climate_share` (world-scoped, the same Simpson-diversity
+pattern `linguistic_diversity`/`dominant_language_share` already use,
+over `environmentState[].climate` instead of a resident attribute).
+
+The same pass fixed what climate was computed FROM. Every generated
+city's climate was a uniform pick across four names with no geography
+behind it, because every generated city sat within 40km of the same
+point (`geo.SYNTHETIC_ORIGIN`) regardless of where in the world it was
+meant to be — `geo.js` had stored a real EPSG:4326 position for every
+city since the geo-reference work landed, and `environment.js` never
+read it. `geo.globalCityPosition` now draws each generated city's
+position independently across a believable span of real latitudes
+(`geo.GENERATED_LAT_RANGE`, -55 to 70) instead of scattering a whole
+world from one fixed point, and `environment.climateForLatitude`
+weights the climate draw by latitude band, modelled on the real
+latitudinal pattern Köppen-Geiger classification describes — the
+subtropical desert belt, the temperate mid-latitudes, the cold belt
+beyond roughly 55-60 degrees. Longitude, coastline and elevation stay
+unmodelled (this engine has no terrain data at all; `statistics.
+terrain_and_water` is still declared unavailable for exactly that
+reason), and the four-climate vocabulary itself did not grow — this is
+a better draw over the names that already existed, not a new one.
 
 **92.5% -> 92.6% on 8 Oct 2026, systems axis.** §7 system 22
 Communication moved `partial` -> `modelled`. The one gap this entry

@@ -346,10 +346,21 @@ function generateWorld(options = {}) {
     // `real_world_geo_ref` that was null in every world ever built.
     //
     // Synthetic and flagged as such: the tokens are not Census GEOIDs
-    // and the coordinates are not anywhere. `geo.fromCensusBlock` is
+    // and the coordinates are not real places. `geo.fromCensusBlock` is
     // the adapter a real import comes through, and it overwrites both.
+    //
+    // `geo.globalCityPosition`, not `geo.scatter` from
+    // `geo.SYNTHETIC_ORIGIN`: a city's GLOBAL position is drawn
+    // independently across a believable span of real latitudes, which
+    // is what lets `environment.climateForLatitude` below give it a
+    // climate that actually corresponds to where it is rather than a
+    // uniform coin flip. See `geo.js`'s own header on
+    // `GENERATED_LAT_RANGE` for why this is a different, much smaller
+    // risk than the one `SYNTHETIC_ORIGIN` guards against. `scatter`
+    // around THIS position is still exactly right for everything
+    // inside the city — sites and communities below.
     const cityRef = geo.refOf({ region: 'R1', city: `C${c + 1}` });
-    const cityPosition = geo.scatter(geo.SYNTHETIC_ORIGIN, geo.CITY_SPREAD_M, [config.seed, 'city', c]);
+    const cityPosition = geo.globalCityPosition([config.seed, 'city', c]);
     const city = territory.generateCity(w, {
       name: `City ${c + 1}`,
       economy: Math.round(random.range(35, 70, 'city', c, 'economy')),
@@ -371,12 +382,16 @@ function generateWorld(options = {}) {
     });
     summary.cities.push(city.id);
 
-    // Every city gets weather. Seeded on the city's position in the
+    // Every city gets weather, and now a climate drawn from where it
+    // actually sits (`environment.climateForLatitude`) rather than a
+    // uniform pick blind to geography — `cityPosition.lat` is a real
+    // computed fact about this city, for the first time since `geo.js`
+    // started storing one. Still seeded on the city's position in the
     // loop rather than its id (§88), so the same seed always produces
     // the same climate.
     environment.generateEnvironmentState(w, {
       cityId: city.id,
-      climate: random.pick(environment.CLIMATE_NAMES, 'climate', c),
+      climate: environment.climateForLatitude(cityPosition.lat, config.seed, c),
       tick,
     });
 

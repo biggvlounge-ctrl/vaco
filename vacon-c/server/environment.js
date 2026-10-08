@@ -34,6 +34,25 @@
 // inventing a measurement and calling a gap fixed.
 //
 // ---------------------------------------------------------------------
+// Climate was a stored string nothing read as geography
+//
+// Every generated city sat within 40 metres-scale of the same point
+// (`geo.SYNTHETIC_ORIGIN`), so `climate` was drawn uniformly across
+// the four names with no geographic fact behind the draw at all — a
+// city "in" `arid` or `continental` by coin flip, regardless of where
+// it actually was. `geo.js` has stored a real EPSG:4326 position for
+// every generated city since the geo-reference work landed, and
+// nothing here had ever read it.
+//
+// `climateForLatitude` closes that: `worldgen.js` now draws each
+// city's GLOBAL position independently (`geo.globalCityPosition`,
+// across a believable span of real latitudes rather than clustered at
+// one point) and weights its climate draw by `LATITUDE_BANDS`, modelled
+// on the real latitudinal pattern Köppen-Geiger classification
+// describes. See the function's own header for what is and is not
+// modelled.
+//
+// ---------------------------------------------------------------------
 // Weather turns; climate does not
 //
 // The distinction is the whole reason the schema has both columns.
@@ -95,6 +114,57 @@ const CLIMATES = {
 };
 
 const CLIMATE_NAMES = Object.keys(CLIMATES);
+
+//: Which climate a given latitude tends toward — modelled on the real
+//: latitudinal pattern the Köppen-Geiger classification describes: a
+//: wet equatorial belt, the subtropical high-pressure desert belt
+//: that is why the Sahara, Arabian, Kalahari, Sonoran and Australian
+//: deserts all sit within roughly 10-35 degrees of the equator, a
+//: temperate mid-latitude belt, and a cold belt beyond roughly 55-60
+//: degrees.
+//:
+//: **Longitude, coastline and elevation are not modelled.** This
+//: engine has no coastline or terrain data at all —
+//: `statistics.terrain_and_water` is declared unavailable for exactly
+//: that reason — so "coastal" stays a stored category name here, not
+//: a real proximity-to-water computation. Latitude is the one
+//: geographic fact this engine actually has: `geo.js` stores a real
+//: EPSG:4326 position for every generated city, so it is the only one
+//: honest to weight a climate on.
+//:
+//: Each band weights toward the climates real geography favours there
+//: and still gives the others some real share — nowhere on Earth has
+//: exactly one climate at exactly one latitude, and a hard cutoff
+//: would trade one kind of fake precision for another.
+const LATITUDE_BANDS = [
+  { max: 10, weights: { coastal: 5, temperate: 2, arid: 2, continental: 0 } },
+  { max: 35, weights: { arid: 5, coastal: 2, temperate: 2, continental: 0 } },
+  { max: 55, weights: { temperate: 4, continental: 3, coastal: 2, arid: 1 } },
+  { max: Infinity, weights: { continental: 5, temperate: 2, coastal: 1, arid: 0 } },
+];
+
+// The climate a city at this latitude draws, weighted by
+// `LATITUDE_BANDS` rather than picked uniformly. §88: seeded on
+// POSITION — `cityId` here is the caller's loop index, never a
+// counter-assigned id.
+function climateForLatitude(latitudeDeg, seed, cityId) {
+  const abs = Math.abs(Number(latitudeDeg) || 0);
+  const band = LATITUDE_BANDS.find((b) => abs <= b.max) ?? LATITUDE_BANDS[LATITUDE_BANDS.length - 1];
+  const names = CLIMATE_NAMES.filter((n) => (band.weights[n] ?? 0) > 0);
+  const weights = names.map((n) => band.weights[n]);
+  const total = weights.reduce((a, b2) => a + b2, 0);
+  if (total <= 0) return CLIMATE_NAMES[0];
+
+  // `seededDraw` takes ONE array of parts — see this file's own
+  // post-mortem on `drawWeather` below for what calling it any other
+  // way costs.
+  let roll = seededDraw([seed, 'climate-band', cityId]) * total;
+  for (let i = 0; i < names.length; i += 1) {
+    roll -= weights[i];
+    if (roll <= 0) return names[i];
+  }
+  return names[names.length - 1];
+}
 
 //: Which weathers are severe enough to do something, and what they do
 //: to which resource. The deltas are per tick while the condition runs,
@@ -309,6 +379,8 @@ module.exports = {
   WEATHER,
   CLIMATES,
   CLIMATE_NAMES,
+  LATITUDE_BANDS,
+  climateForLatitude,
   SEVERE,
   SPELL_TICKS,
   stateOf,

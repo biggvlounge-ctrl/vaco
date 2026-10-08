@@ -103,6 +103,49 @@ test('climate decides what a city tends to get', () => {
   assert.ok(arid.filter((w) => w === 'drought').length > 20, 'an arid city never had a drought');
 });
 
+// -- climate now reads a real geographic fact -----------------------------
+
+test('climate is deterministic in latitude, seed and city', () => {
+  for (const lat of [0, 20, 45, 65]) {
+    assert.equal(
+      environment.climateForLatitude(lat, 'wx', 1),
+      environment.climateForLatitude(lat, 'wx', 1),
+    );
+  }
+  // Different cities at the SAME latitude are not forced identical —
+  // the band weights, it does not dictate.
+  const atOneLatitude = new Set(
+    Array.from({ length: 30 }, (_, c) => environment.climateForLatitude(20, 'wx', c)),
+  );
+  assert.ok(atOneLatitude.size > 1,
+    'every city at the same latitude drew the exact same climate — the band is not weighting, it is deciding');
+});
+
+test('a polar city never reads as arid, and an equatorial city never reads as continental', () => {
+  // The two hard zeros `LATITUDE_BANDS` sets, measured over many
+  // independent draws rather than trusted from one — §23's own lesson,
+  // applied here: assert the DISTRIBUTION, not a single lucky draw.
+  const farNorth = Array.from({ length: 200 }, (_, c) => environment.climateForLatitude(68, 'wx', c));
+  assert.equal(farNorth.includes('arid'), false, 'a city at 68° latitude drew arid');
+  assert.ok(farNorth.filter((c) => c === 'continental').length > farNorth.length / 2,
+    'a city beyond the cold belt is not mostly continental');
+
+  const equator = Array.from({ length: 200 }, (_, c) => environment.climateForLatitude(2, 'wx', c));
+  assert.equal(equator.includes('continental'), false, 'a city at 2° latitude drew continental');
+
+  const desertBelt = Array.from({ length: 200 }, (_, c) => environment.climateForLatitude(22, 'wx', c));
+  assert.equal(desertBelt.includes('continental'), false, 'a city at 22° latitude drew continental');
+  assert.ok(desertBelt.filter((c) => c === 'arid').length > desertBelt.length / 2,
+    'a city in the subtropical desert belt is not mostly arid');
+});
+
+test('latitude is read from the sign, not assumed positive', () => {
+  // The southern hemisphere is exactly as real as the northern one.
+  const south = Array.from({ length: 200 }, (_, c) => environment.climateForLatitude(-68, 'wx', c));
+  assert.equal(south.includes('arid'), false, 'a city at -68° latitude drew arid');
+  assert.ok(south.filter((c) => c === 'continental').length > south.length / 2);
+});
+
 // -- state ---------------------------------------------------------------
 
 test('one row per city, and generating twice does not make two', () => {
@@ -243,4 +286,37 @@ test('the world can describe its weather', () => {
   // Unknown is not mild.
   assert.equal(environment.describeEnvironment(w, 99999), null);
   assert.equal(environment.harshnessIn(w, 99999), null);
+});
+
+test('a generated world places cities across real latitudes, and their climate follows', () => {
+  // The actual pipeline, not a fixture: `worldgen` now draws a city's
+  // GLOBAL position (`geo.globalCityPosition`) before handing its
+  // latitude to `climateForLatitude`. Last in the file on purpose: it
+  // reads the shared `engine.WorldState` other tests above have
+  // already grown, and nothing after this one depends on its count
+  // staying small — the same ordering concern `geo.test.js`'s own
+  // generated-world tests are built around.
+  const w = engine.WorldState;
+  const before = w.cities.length;
+  worldgen.generateWorld({
+    cities: 24, communitiesPerCity: 1, populationPerCommunity: 4, seed: 'climate-geo',
+  });
+
+  const rows = w.cities.slice(before).map((city) => ({
+    lat: city.latitude,
+    climate: w.environmentState.find((e) => e.city_id === city.id).climate,
+  }));
+
+  assert.ok(new Set(rows.map((r) => r.lat)).size > 12,
+    'cities read as clustered at a handful of latitudes, not drawn independently');
+
+  for (const row of rows) {
+    const abs = Math.abs(row.lat);
+    if (abs > 55) {
+      assert.notEqual(row.climate, 'arid', `a city at ${row.lat}° latitude is arid`);
+    }
+    if (abs <= 35) {
+      assert.notEqual(row.climate, 'continental', `a city at ${row.lat}° latitude is continental`);
+    }
+  }
 });

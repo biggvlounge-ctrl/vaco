@@ -98,6 +98,7 @@ const competition = require('./competition.js');
 const justice = require('./justice.js');
 const authority = require('./authority.js');
 const geo = require('./geo.js');
+const environment = require('./environment.js');
 const motivation = require('./motivation.js');
 const membership = require('./membership.js');
 const infrastructure = require('./infrastructure.js');
@@ -1421,6 +1422,44 @@ const CATALOGUE = [
   {
     key: 'active_conditions', category: 'environment', unit: 'count', scope: 'world',
     compute: (ctx) => (ctx.worldState.activeConditions || []).length,
+  },
+  // **A column `environment.js` has carried since the weather table was
+  // built, read by zero statistics.** `environment_state.weather` and
+  // `.climate` are real, per-city, and were simply never wired into
+  // this catalogue — the eleventh standing rule's exact shape: a
+  // mechanism that works and nothing downstream of it reads.
+  {
+    // `environment.harshnessIn` already existed and already answers
+    // this (1 when the city's current weather is in `SEVERE`, 0
+    // otherwise, null when the city has no weather yet) — wiring it in
+    // rather than re-deriving it a second way.
+    key: 'severe_weather', category: 'environment', unit: 'share', scope: 'city',
+    compute: (ctx) => {
+      if (ctx.cityId === null) return null;
+      return round(environment.harshnessIn(ctx.worldState, ctx.cityId));
+    },
+  },
+  {
+    // Same shape as `linguistic_diversity`/`dominant_language_share`:
+    // a distribution cannot be z-scored, so it contributes two
+    // comparable scalars via the same Simpson-diversity helper, over
+    // `environmentState[].climate` instead of a resident attribute.
+    // World-scoped because climate is a per-CITY fact here, not a
+    // per-resident one — there is no community-level breakdown to take.
+    key: 'climate_diversity', category: 'environment', unit: 'share', scope: 'world',
+    compute: (ctx) => {
+      const states = ctx.worldState.environmentState || [];
+      if (states.length === 0) return null;
+      return demographics.diversityOf(demographics.distributionOf(states, (e) => e.climate));
+    },
+  },
+  {
+    key: 'dominant_climate_share', category: 'environment', unit: 'share', scope: 'world',
+    compute: (ctx) => {
+      const states = ctx.worldState.environmentState || [];
+      if (states.length === 0) return null;
+      return demographics.dominantShareOf(demographics.distributionOf(states, (e) => e.climate));
+    },
   },
   {
     key: 'pollution', category: 'environment', unit: 'index', scope: 'community',

@@ -132,6 +132,43 @@ test('distance is metres by haversine, and nothing here measures an area', () =>
   assert.equal(geo.distanceMetres(a, a), 0);
 });
 
+// -- a generated city's GLOBAL position, not a cluster -------------------
+
+test('a generated city is drawn independently across the globe, not scattered from one point', () => {
+  // The whole reason `globalCityPosition` exists rather than
+  // `scatter(SYNTHETIC_ORIGIN, CITY_SPREAD_M, ...)`: that call put
+  // every city within 40km of the same point, so a climate drawn from
+  // latitude would have read the same latitude for the whole world.
+  const positions = [];
+  for (let c = 0; c < 30; c += 1) positions.push(geo.globalCityPosition(['globe', 'city', c]));
+
+  for (const p of positions) {
+    assert.ok(geo.isPosition(p), `${JSON.stringify(p)} is not a valid EPSG:4326 position`);
+    assert.ok(p.lat >= geo.GENERATED_LAT_RANGE[0] && p.lat <= geo.GENERATED_LAT_RANGE[1],
+      `latitude ${p.lat} is outside GENERATED_LAT_RANGE`);
+    assert.ok(p.lon >= -180 && p.lon <= 180, `longitude ${p.lon} is out of range`);
+  }
+
+  // Thirty independent draws spanning the whole band read nothing like
+  // thirty points within 40km of each other.
+  const lats = positions.map((p) => p.lat);
+  assert.ok(Math.max(...lats) - Math.min(...lats) > 30,
+    `30 cities' latitudes spanned only ${Math.max(...lats) - Math.min(...lats)} degrees`);
+  assert.ok(new Set(lats).size > 20, 'latitudes repeated far more than independent draws should');
+});
+
+test('the same parts always place the same city, and different parts place differently', () => {
+  // §88, same guarantee `scatter` already gives.
+  assert.deepEqual(
+    geo.globalCityPosition(['s', 'city', 3]),
+    geo.globalCityPosition(['s', 'city', 3]),
+  );
+  assert.notDeepEqual(
+    geo.globalCityPosition(['s', 'city', 3]),
+    geo.globalCityPosition(['s', 'city', 4]),
+  );
+});
+
 test('an unplaced thing is not at distance zero', () => {
   // The one wrong answer that would look like the right one: a null
   // position arithmetics straight into "right here".

@@ -334,6 +334,55 @@ function scatter(origin, spread, parts) {
   return offsetPosition(origin, Math.cos(angle) * radius, Math.sin(angle) * radius);
 }
 
+//: Where a generated world's CITIES sit on the globe — the scale at
+//: which climate actually differs. `SYNTHETIC_ORIGIN` and
+//: `CITY_SPREAD_M` above are still the right choice for everything
+//: WITHIN a city (`scatter`'s jitter for a community or an
+//: infrastructure site against its own city's position): those stay a
+//: few kilometres apart because that is the scale "distance to the
+//: station" means something at. A climate does not vary across 40km.
+//: It varies across the tens of degrees of latitude Earth's real
+//: climate belts span — the subtropical desert belt, the temperate
+//: mid-latitudes, the cold belt beyond roughly 55-60 degrees — and
+//: nothing in this engine ever produced that variation: every
+//: generated city sat within `CITY_SPREAD_M` of the same point, so
+//: `environment.js`'s climate draw never had a real geographic fact
+//: to read.
+//:
+//: So each generated city's own GLOBAL position is drawn
+//: independently, across the band almost all of Earth's population
+//: and named cities actually sit within, and the full span of
+//: longitude — not scattered from one fixed origin. Still flagged
+//: `geoSource: 'synthetic'`: these are not real places. An independent
+//: draw across the whole globe is a different risk from the one
+//: `SYNTHETIC_ORIGIN` guards against — landing within recognisable
+//: range of one specific named landmark by chance is a
+//: near-zero-probability event over the whole surface of the Earth,
+//: where clustering an entire generated world inside one FIXED small
+//: circle would have risked landing it on top of one every time, had
+//: that circle been chosen badly.
+const GENERATED_LAT_RANGE = [-55, 70];
+
+// A generated city's position: drawn directly in EPSG:4326 degrees,
+// not offset in metres from an origin. `offsetPosition`'s flat-metres
+// approximation is only valid at the small scale it is used for
+// elsewhere in this file (a few kilometres); reusing it to span tens
+// of degrees of latitude would be exactly the "computing an area in
+// degrees" class of error this file's header warns about, worn as a
+// conversion instead of a measurement.
+//
+// §88: seeded on POSITION — `parts` is the caller's loop index, never
+// an id.
+function globalCityPosition(parts) {
+  const [latMin, latMax] = GENERATED_LAT_RANGE;
+  const lat = latMin + seededDraw([...parts, 'lat']) * (latMax - latMin);
+  const lon = -180 + seededDraw([...parts, 'lon']) * 360;
+  return {
+    lat: Math.round(lat * 1e6) / 1e6,
+    lon: Math.round(lon * 1e6) / 1e6,
+  };
+}
+
 // ---------------------------------------------------------------------
 // Reading a world
 // ---------------------------------------------------------------------
@@ -404,6 +453,7 @@ module.exports = {
   SYNTHETIC_ORIGIN,
   CITY_SPREAD_M,
   COMMUNITY_SPREAD_M,
+  GENERATED_LAT_RANGE,
   EARTH_RADIUS_M,
   parseRef,
   isRef,
@@ -417,6 +467,7 @@ module.exports = {
   positionOf,
   offsetPosition,
   scatter,
+  globalCityPosition,
   nearestInfrastructure,
   withinMetres,
   describeGeo,

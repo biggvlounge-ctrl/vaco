@@ -23,6 +23,7 @@ const statistics = require('../server/statistics.js');
 const areaStats = require('../server/areaStats.js');
 const crime = require('../server/crime.js');
 const economy = require('../server/economy.js');
+const environment = require('../server/environment.js');
 const infrastructure = require('../server/infrastructure.js');
 const membership = require('../server/membership.js');
 const mortality = require('../server/mortality.js');
@@ -570,6 +571,63 @@ test('a community with no city reports what it can and null for the rest', () =>
   assert.equal(env.realWorldGeoRef, null);
   assert.deepEqual(env.resources, []);
   assert.equal(statistics.profileFor(w, orphan.id).statistics.resource_scarcity.value, null);
+});
+
+// -- weather and climate, a column read by zero statistics before -------
+
+test('severe_weather reads the city\'s own weather, not a world-wide guess', () => {
+  const w = world();
+  const calmCity = territory.generateCity(w, { name: 'Calm City' });
+  const stormyCity = territory.generateCity(w, { name: 'Stormy City' });
+  const calmCommunity = territory.generateCommunity(w, { cityId: calmCity.id });
+  const stormyCommunity = territory.generateCommunity(w, { cityId: stormyCity.id });
+  person(w, { communityId: calmCommunity.id });
+  person(w, { communityId: stormyCommunity.id });
+
+  environment.generateEnvironmentState(w, { cityId: calmCity.id, climate: 'temperate', weather: 'clear' });
+  environment.generateEnvironmentState(w, { cityId: stormyCity.id, climate: 'arid', weather: 'drought' });
+
+  const calmProfile = statistics.profileFor(w, calmCommunity.id);
+  const stormyProfile = statistics.profileFor(w, stormyCommunity.id);
+  assert.equal(calmProfile.statistics.severe_weather.value, 0);
+  assert.equal(stormyProfile.statistics.severe_weather.value, 1,
+    'a city in drought did not read as severe weather');
+});
+
+test('severe_weather is null for a community whose city has no weather yet', () => {
+  const w = world();
+  const orphan = territory.generateCommunity(w, {});
+  person(w, { communityId: orphan.id });
+  assert.equal(statistics.profileFor(w, orphan.id).statistics.severe_weather.known, false);
+});
+
+test('climate_diversity and dominant_climate_share read the whole world\'s cities, not one', () => {
+  const w = world();
+  const community = territory.generateCommunity(w, {});
+  person(w, { communityId: community.id });
+
+  // Four cities, three climates: one 50% majority and two singles.
+  // World-scoped, so these do not need to be the community's own city
+  // — the statistic is reading the whole world's climate mix.
+  for (const [cityId, climate] of [[101, 'arid'], [102, 'arid'], [103, 'coastal'], [104, 'continental']]) {
+    environment.generateEnvironmentState(w, { cityId, climate });
+  }
+
+  const profile = statistics.profileFor(w, community.id);
+  assert.equal(profile.statistics.dominant_climate_share.value, 0.5,
+    'two of four cities share a climate — the dominant share should read 0.5');
+  assert.ok(profile.statistics.climate_diversity.value > 0,
+    'three different climates across four cities measured as zero diversity');
+  assert.ok(profile.statistics.climate_diversity.value < 1);
+});
+
+test('a world with no weather yet reports climate statistics as unknown, not zero', () => {
+  const w = world();
+  const community = territory.generateCommunity(w, {});
+  person(w, { communityId: community.id });
+  const profile = statistics.profileFor(w, community.id);
+  assert.equal(profile.statistics.climate_diversity.known, false);
+  assert.equal(profile.statistics.dominant_climate_share.known, false);
 });
 
 // -- the whole world at once --------------------------------------------
