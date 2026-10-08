@@ -317,6 +317,12 @@ anything new -- three of the four pieces named were already real:
   (`jobs.js` payroll, `property.js` purchases, `resources.js`'s
   `sellMaterials`, every district's commerce) already moves through
   real, automated settlement code, not a person approving it.
+  **The currency question this raised was asked back directly and
+  answered the same day**: "Bitcoin will be the currency of this new
+  world" was floated, then settled as "VCoin not Bitcoin" on direct
+  confirmation -- VCoin stays the real name, not just the technical
+  implementation under a renamed label. Nothing to build; this is the
+  autonomous bank's own real currency, unchanged.
 - **"We will have autonomous vans that will drive. We won't have any
   cars."** The one genuinely new piece. VDP never had a car concept to
   remove -- checked directly, no `car`/`vehicle` reference anywhere in
@@ -359,17 +365,6 @@ anything new -- three of the four pieces named were already real:
 - What happens to a passport at the moment it actually expires, beyond
   `isPassportExpired` recording the fact — not specified and not
   invented here.
-- **"Bitcoin will be the currency of this new world"** (8 Oct 2026,
-  direct instruction) — flagged, not acted on. Every real transfer in
-  VDP and the rest of this ecosystem settles through V3's real VCoin
-  ledger; there is no real Bitcoin/blockchain integration anywhere in
-  this repository to move this world's money onto instead, and
-  replacing V3 with one would be a change far outside VDP alone (V3 is
-  shared ledger infrastructure for every app in this ecosystem, not a
-  VDP-owned file). Asked back to the instruction's own author rather
-  than guessed at or silently left as VCoin -- see the open question
-  this document raised the same day this bullet was written.
-
 This document records what has been confirmed and leaves the rest for
 whenever more of the story is given, the same discipline `town.js`
 already applies to Meridian's own name.

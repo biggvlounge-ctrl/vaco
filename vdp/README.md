@@ -925,13 +925,14 @@ comment -- cars and drugs, alongside the existing guns example --
 with cars flagged as contraband precisely because the autonomous van
 is this world's only legitimate ride.
 
-**"Bitcoin will be the currency of this new world" is deliberately
-not acted on.** Every real transfer across this entire ecosystem,
-not just VDP, settles through V3's VCoin ledger; there is no real
-Bitcoin/blockchain integration anywhere in this repository, and
-replacing V3 would be a change far outside VDP's own scope. Flagged in
-`VDP_FOUNDING.md`'s "What is still open" and asked back to the
-instruction's author rather than guessed at.
+**"Bitcoin will be the currency of this new world" was asked back
+directly rather than guessed at, and answered the same day: "VCoin not
+Bitcoin."** Every real transfer across this entire ecosystem, not
+just VDP, settles through V3's VCoin ledger; there is no real Bitcoin/
+blockchain integration anywhere in this repository, and the confirmed
+answer keeps it that way -- VCoin is this world's own real currency
+name, not a renamed label over something else. Recorded in
+`VDP_FOUNDING.md`'s "banking" bullet rather than left open.
 
 No new tests (wiring + a comment update) -- full suite 385 passing,
 0 failing, clean `npm run build`.
