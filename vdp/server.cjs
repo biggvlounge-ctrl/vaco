@@ -401,6 +401,43 @@ let store = createVdpStore();
     res.json({ state: player.state });
   });
 
+  // "There's an AI that works with the users to show them things to
+  // get further in the game... we want this to be a little more
+  // natural and build natural. Since it's one big world that
+  // everybody's involved in." (8 Oct 2026, direct instruction) -- the
+  // real facts V4 actually has about this one resident AND the shared
+  // world, assembled server-side from every real store this server
+  // already keeps (never invented). `v4AgentClient.js`'s
+  // `suggestNextStep` is the real model call that turns this into one
+  // natural, in-character suggestion -- this route only gathers the
+  // real inputs, the same separation `talkToNpc` already keeps between
+  // real state and the real model call.
+  app.get('/api/guide/facts/:id', (req, res) => {
+    const userId = req.params.id;
+    const player = ensurePlayer(userId);
+    const home = propertyLib.homeOwnedBy(store.property, userId);
+    const shop = propertyLib.commercialOwnedBy(store.property, userId);
+    const assignment = jobsLib.currentAssignment(store.jobs, userId);
+    const organization = organizationsLib.organizationOf(store.organizations, userId);
+    const topSkillEntry = Object.entries(player.skills).sort((a, b) => b[1] - a[1])[0];
+    const playerCount = Object.keys(store.players).length;
+    const npcCount = store.npcWorld ? store.npcWorld.npcs.length : 0;
+
+    res.json({
+      need: npcs.mostPressingNeed(player.state),
+      goal: player.state.currentGoal,
+      topTrait: npcs.topTrait(player.state),
+      topSkill: topSkillEntry && topSkillEntry[1] > 0 ? { subject: topSkillEntry[0], value: topSkillEntry[1] } : null,
+      home: home ? home.levelName : null,
+      business: shop ? shop.levelName : null,
+      job: assignment ? jobsLib.JOBS[assignment.jobId]?.title || null : null,
+      organization: organization ? { name: organization.name, type: organization.type } : null,
+      economyIndex: economyLib.updateEconomyIndex(store.economy),
+      population: populationLib.describePopulation(playerCount, npcCount).population,
+      openContracts: contractsLib.listOpenContracts(store.contracts).length,
+    });
+  });
+
   // --- Jobs ------------------------------------------------------------
   app.get('/api/jobs', (_req, res) => res.json({ jobs: jobsLib.listJobs() }));
 
@@ -689,10 +726,13 @@ let store = createVdpStore();
       const shack = propertyLib.buildUnauthorized(store.property, {
         ownerId: req.body.ownerId,
         locationLabel: req.body.locationLabel,
+        type: req.body.type,
       });
       newsLib.recordEvent(store.news, {
         kind: 'property',
-        text: `an unauthorized structure went up near ${req.body.locationLabel || 'Meridian'}`,
+        text: shack.type === 'commercial'
+          ? `an unsecured ${shack.levelName} opened near ${req.body.locationLabel || 'Meridian'}`
+          : `an unauthorized structure went up near ${req.body.locationLabel || 'Meridian'}`,
       });
       res.status(201).json(shack);
     } catch (err) {

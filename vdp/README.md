@@ -1100,6 +1100,33 @@ Phase 28.
 17 new tests (`economy.test.js`, `property.test.js`, `dissent.test.js`).
 Full suite: 454 passing, up from 437, 0 failing, clean `npm run build`.
 
+**Phase 30 — unsecured-community businesses, and V4 as a natural
+guide** (8 Oct 2026, direct instruction). "Other certain communities
+that haven't been secured by the government also can have businesses
+there... existing business, or NPC built businesses." `property.js`'s
+`buildUnauthorized` now also accepts `type: 'commercial'` -- a real
+business that never went through the governors' office, seeded at
+the real Market Kiosk level so `operateBusiness` works on it exactly
+like a sanctioned one, `npc-<id>` ownership included. The same
+one-business-per-owner rule `purchaseCommercial` already enforces
+applies here too. `ImmigrationView.jsx`'s build form gained a type
+choice; `MyHomeView.jsx` marks an unsecured business as such.
+
+"There's an AI that works with the users to show them things to get
+further in the game, similar to how vacancy works, but we want this
+to be a little more natural and build natural. Since it's one big
+world that everybody's involved in." New `v4AgentClient.js` function
+`suggestNextStep`: a real call to V4 grounded in the real facts
+`GET /api/guide/facts/:id` assembles -- this resident's own real
+need/goal/trait/skill/job/property/organization, and the real shared
+world (population, the real economy index, open government
+contracts) -- never a scripted, numbered quest list, which is what
+the instruction explicitly asked this not to feel like.
+`MyStatusView.jsx` gained an "Ask V4 what's next" action.
+
+9 new tests (`property.test.js`, `v4AgentClient.test.js`). Full suite:
+463 passing, up from 454, 0 failing, clean `npm run build`.
+
 **Phase 2 (SVMIKO DEGVCHI Avatar Wearables)**: 20 plain-Node checks
 (13 unique real pieces, real category assignment, the luxury-vs-
 streetwear tier proven at VDP's own real price scale, a real purchase

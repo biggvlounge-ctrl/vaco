@@ -149,3 +149,56 @@ export async function talkToNpc(npc, playerMessage, { latestDecisionEntry = null
 
   return parseTalkJson(body.text || '');
 }
+
+// "There's an AI that works with the users to show them things to
+// get further in the game... we want this to be a little more
+// natural and build natural" (8 Oct 2026, direct instruction). V4 --
+// the same AI persona `GovernmentView.jsx` already presents as this
+// world's government -- speaks directly to one real resident, using
+// only the real facts `server.cjs`'s `GET /api/guide/facts/:id`
+// assembled about them and the shared world (never a scripted,
+// numbered quest list, the thing the instruction explicitly asked
+// this NOT to feel like).
+function guideSystemPrompt(facts) {
+  return `You are V4, the AI that governs Meridian, a small futuristic colony everyone shares. You are given real, current facts about one resident and about the shared world right now. Based ONLY on these real facts, give this resident ONE natural, conversational suggestion for something they could do next in Meridian. Never invent a fact about them or the world that isn't given below. Speak like a government AI who genuinely knows this person's own situation -- not a quest log: no numbered steps, no "objective," just 1-3 natural sentences.
+
+Real facts right now:
+${facts}
+
+Respond with STRICT JSON only, no prose before or after, matching exactly this shape:
+{"suggestion": "<your natural, in-character suggestion, 1-3 sentences>"}`;
+}
+
+export function parseGuidanceJson(text) {
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) {
+    throw new Error('suggestNextStep: the model did not return recognizable JSON');
+  }
+  const parsed = JSON.parse(match[0]);
+  const { suggestion } = parsed;
+  if (typeof suggestion !== 'string' || !suggestion.trim()) {
+    throw new Error('suggestNextStep: the model response is missing a suggestion');
+  }
+  return { suggestion: suggestion.trim() };
+}
+
+// `facts` is a plain-text summary the caller builds from real data it
+// already has (the shape `GET /api/guide/facts/:id` returns) -- this
+// module stays decoupled from any one way of formatting it, the same
+// posture `talkToNpc` already keeps toward `npcs.js`.
+export async function suggestNextStep(facts) {
+  if (typeof facts !== 'string' || !facts.trim()) {
+    throw new Error('suggestNextStep requires a real facts summary');
+  }
+
+  const body = await requestJson('/api/agent', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...sessionHeaders() },
+    body: JSON.stringify({
+      system: guideSystemPrompt(facts),
+      messages: [{ role: 'user', content: 'What should I do next in Meridian?' }],
+    }),
+  });
+
+  return parseGuidanceJson(body.text || '');
+}

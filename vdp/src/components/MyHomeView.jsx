@@ -284,7 +284,12 @@ export default function MyHomeView({ session, onChange }) {
         )}
         {shop && (
           <div>
-            <p style={{ fontSize: 12 }}>{shop.levelName} — {shop.lifecycleStage}</p>
+            <p style={{ fontSize: 12 }}>
+              {shop.levelName} — {shop.lifecycleStage}
+              {shop.authorized === false && (
+                <span style={{ color: "#d9a441" }}> (unsecured -- never registered with the governors)</span>
+              )}
+            </p>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
               {nextShopLevel ? (
                 <button onClick={commercialAct("/api/property/upgrade-commercial")} disabled={busy}>

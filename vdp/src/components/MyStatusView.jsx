@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { NEED_NAMES, TRAIT_NAMES, HABIT_NAMES, mostPressingNeed, topTrait } from "../lib/npcs.js";
+import { suggestNextStep } from "../lib/v4AgentClient.js";
 
 // The player needs/goals engine (vdp/server.cjs reusing npcs.js's own
 // stepNeeds/updateGoal, the same tick that steps NPCs) has been real
@@ -41,6 +42,8 @@ export default function MyStatusView({ session, refreshSignal }) {
   const [error, setError] = useState(null);
   const [busyAction, setBusyAction] = useState(null);
   const [payingTicketId, setPayingTicketId] = useState(null);
+  const [guidance, setGuidance] = useState(null);
+  const [guideBusy, setGuideBusy] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!session?.userId) return;
@@ -87,6 +90,43 @@ export default function MyStatusView({ session, refreshSignal }) {
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refresh, refreshSignal]);
+
+  // "An AI that works with the users to show them things to get
+  // further in the game... a little more natural... since it's one
+  // big world that everybody's involved in" (8 Oct 2026, direct
+  // instruction) -- V4 speaking from the real facts
+  // `GET /api/guide/facts/:id` assembles, both about this player and
+  // the shared world, rather than a scripted quest arrow. An explicit
+  // action (not a silent background fetch), the same posture
+  // `talkToNpc` already takes toward a real model call.
+  const handleAskV4 = async () => {
+    if (!session?.userId) return;
+    setGuideBusy(true);
+    setError(null);
+    try {
+      const userId = encodeURIComponent(session.userId);
+      const res = await fetch(`${VDP_API_URL}/api/guide/facts/${userId}`);
+      if (!res.ok) throw new Error(`guide facts failed (${res.status})`);
+      const facts = await res.json();
+      const lines = [
+        `most pressing need: ${facts.need}`,
+        facts.goal ? `current goal: ${facts.goal.description}` : `current goal: none right now`,
+        `strongest trait: ${facts.topTrait}`,
+        facts.topSkill ? `best skill: ${facts.topSkill.subject} (${facts.topSkill.value}/100)` : `no real skill practiced yet`,
+        facts.home ? `home: ${facts.home}` : `no home yet`,
+        facts.business ? `business: ${facts.business}` : `no business yet`,
+        facts.job ? `job: ${facts.job}` : `no job right now`,
+        facts.organization ? `organization: ${facts.organization.name} (${facts.organization.type})` : `belongs to no organization`,
+        `the shared world: ${facts.population} people, the economy is at ${facts.economyIndex}, ${facts.openContracts} open government contracts`,
+      ];
+      const { suggestion } = await suggestNextStep(lines.join("\n"));
+      setGuidance(suggestion);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setGuideBusy(false);
+    }
+  };
 
   const doAction = async (action) => {
     if (!session?.userId) return;
@@ -187,6 +227,16 @@ export default function MyStatusView({ session, refreshSignal }) {
             </button>
           </div>
         ))}
+      </div>
+
+      <div style={{ marginTop: 12, borderTop: "1px dashed #ccc", paddingTop: 8 }}>
+        <h3 style={{ fontSize: 12, margin: "0 0 6px 0", color: "#888" }}>V4</h3>
+        <button onClick={handleAskV4} disabled={guideBusy} style={{ fontSize: 12 }}>
+          {guideBusy ? "…" : "Ask V4 what's next"}
+        </button>
+        {guidance && (
+          <p style={{ fontSize: 12, margin: "8px 0 0", fontStyle: "italic" }}>{guidance}</p>
+        )}
       </div>
     </div>
   );

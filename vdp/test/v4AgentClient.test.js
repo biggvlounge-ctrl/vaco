@@ -9,7 +9,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { parseTalkJson } from '../src/lib/v4AgentClient.js';
+import { parseTalkJson, parseGuidanceJson } from '../src/lib/v4AgentClient.js';
 
 test('a clean strict-JSON reply parses to {reply, topic}', () => {
   const result = parseTalkJson('{"reply": "Nice to meet you!", "topic": "communication"}');
@@ -35,4 +35,22 @@ test('a missing reply is refused', () => {
 
 test('non-JSON text is refused rather than crashing with a raw parse error', () => {
   assert.throws(() => parseTalkJson('I am not JSON at all'), /did not return recognizable JSON/);
+});
+
+test('a clean strict-JSON guidance reply parses to {suggestion}', () => {
+  const result = parseGuidanceJson('{"suggestion": "Maybe visit the Food District -- you have not eaten in a while."}');
+  assert.equal(result.suggestion, 'Maybe visit the Food District -- you have not eaten in a while.');
+});
+
+test('a guidance reply wrapped in a stray code fence still parses', () => {
+  const result = parseGuidanceJson('```json\n{"suggestion": "Try working a shift."}\n```');
+  assert.equal(result.suggestion, 'Try working a shift.');
+});
+
+test('a missing suggestion is refused', () => {
+  assert.throws(() => parseGuidanceJson('{}'), /missing a suggestion/);
+});
+
+test('non-JSON guidance text is refused rather than crashing with a raw parse error', () => {
+  assert.throws(() => parseGuidanceJson('not json'), /did not return recognizable JSON/);
 });

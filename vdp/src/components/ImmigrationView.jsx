@@ -13,6 +13,15 @@ import { useState, useEffect, useCallback } from "react";
 // this app. A player narrating themselves as the patrol is the same
 // posture this app already takes everywhere else: the real check is
 // identity, not a job assignment nobody enforces client-side either.
+//
+// **Unsecured-community businesses (8 Oct 2026, direct instruction)**:
+// "other certain communities that haven't been secured by the
+// government also can have businesses there... existing business, or
+// NPC built businesses." The build form below now also builds a real
+// business (`property.js`'s `buildUnauthorized` with
+// `type: 'commercial'`) that `operateBusiness` works on exactly like
+// a government-sanctioned one -- it just never went through the
+// governors' office.
 
 const VDP_API_URL = import.meta.env?.VITE_VDP_API_URL || "http://localhost:8827";
 
@@ -38,6 +47,7 @@ export default function ImmigrationView({ session, onChange }) {
   const [spotLabel, setSpotLabel] = useState("");
   const [settlementLabel, setSettlementLabel] = useState("");
   const [structureLabel, setStructureLabel] = useState("");
+  const [structureType, setStructureType] = useState("residential");
   const [ticketTargetId, setTicketTargetId] = useState("");
   const [ticketReason, setTicketReason] = useState("");
   const [detainTargetId, setDetainTargetId] = useState("");
@@ -215,10 +225,16 @@ export default function ImmigrationView({ session, onChange }) {
         <p style={{ fontSize: 13, fontWeight: "bold", margin: "0 0 4px 0" }}>
           Unauthorized structures ({unauthorized.length})
         </p>
+        <p style={{ fontSize: 11, color: "#888", margin: "0 0 4px" }}>
+          Communities the government hasn't secured yet still have real
+          businesses -- existing, player-built, or NPC-built -- not
+          just homes.
+        </p>
         <ul style={{ fontSize: 12, margin: "0 0 8px 0", paddingLeft: 18 }}>
           {unauthorized.map((u) => (
             <li key={u.id} style={{ marginBottom: 4 }}>
-              {u.locationLabel} (owner: {u.ownerId}){" "}
+              {u.locationLabel} (owner: {u.ownerId})
+              {u.type === "commercial" ? ` -- ${u.levelName}` : ""}{" "}
               <button
                 onClick={run(`demolish-${u.id}`, () => post("/api/property/demolish-unauthorized", {
                   demolishedBy: session.userId, propertyId: u.id,
@@ -237,9 +253,13 @@ export default function ImmigrationView({ session, onChange }) {
             type="text" placeholder="where?" value={structureLabel}
             onChange={(e) => setStructureLabel(e.target.value)} style={{ fontSize: 12, flex: 1 }}
           />
+          <select value={structureType} onChange={(e) => setStructureType(e.target.value)} style={{ fontSize: 12 }}>
+            <option value="residential">a shack to live in</option>
+            <option value="commercial">a real business</option>
+          </select>
           <button
             onClick={run("build-unauthorized", () => post("/api/property/build-unauthorized", {
-              ownerId: session.userId, locationLabel: structureLabel,
+              ownerId: session.userId, locationLabel: structureLabel, type: structureType,
             }).then(() => setStructureLabel("")))}
             disabled={busy === "build-unauthorized" || !structureLabel.trim()}
           >

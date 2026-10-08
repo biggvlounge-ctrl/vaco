@@ -547,6 +547,35 @@ instruction:
   back). `GovernmentView.jsx`'s "Fight the robots" button is this
   action, shown only to the real revolt's own leader.
 
+## Unsecured businesses, and V4 as a natural guide (8 Oct 2026)
+
+- **"Other certain communities that haven't been secured by the
+  government also can have businesses there that are existing
+  business, real businesses, or NPC built businesses."** New:
+  `property.js`'s `buildUnauthorized` now accepts `type: 'commercial'`
+  alongside its existing residential default -- a real business that
+  never went through the governors' office, seeded at the real Market
+  Kiosk level so `operateBusiness` works on it exactly like a
+  sanctioned one. `ownerId` is any real string, `npc-<id>` included --
+  an NPC-built business needs no new code, the same way
+  `contracts.js`'s `builderId` already allows one. The same
+  one-business-per-owner rule `purchaseCommercial` enforces applies
+  here too. `ImmigrationView.jsx`'s build form gained a type choice;
+  `MyHomeView.jsx` marks an unsecured business as such.
+- **"There's an AI that works with the users to show them things to
+  get further in the game, similar to how vacancy works, but we want
+  this to be a little more natural... since it's one big world that
+  everybody's involved in."** New: `v4AgentClient.js`'s
+  `suggestNextStep`, a real call to V4 (the same AI persona
+  `GovernmentView.jsx` already presents as this world's government)
+  grounded in the real facts `GET /api/guide/facts/:id` assembles --
+  this one resident's own real need/goal/trait/skill/job/property/
+  organization, AND the real shared world (population, the real
+  economy index, open government contracts) -- never a scripted,
+  numbered quest list, which the instruction explicitly asked this
+  not to feel like. `MyStatusView.jsx`'s "Ask V4 what's next" is this
+  action.
+
 ## What is still open
 
 - The area's own name — nothing has been given yet (the product name,

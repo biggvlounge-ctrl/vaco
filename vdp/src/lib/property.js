@@ -376,20 +376,43 @@ export async function purchaseLand(store, { ownerId, transferFn, now = Date.now(
 // office), which is why this takes no `transferFn` -- there is no real
 // payment to roll back, the structure itself is the thing that is
 // not legitimate.
-export function buildUnauthorized(store, { ownerId, locationLabel, now = Date.now() } = {}) {
+//
+// **Unsecured-community businesses (8 Oct 2026, direct instruction)**:
+// "other certain communities that haven't been secured by the
+// government also can have businesses there... existing business, or
+// NPC built businesses." `type` defaults to `'residential'` (every
+// existing caller, unchanged) but now also accepts `'commercial'` --
+// a real business that exists entirely outside the governors' office,
+// never purchased through `purchaseCommercial`, seeded at the same
+// real Market Kiosk level so `operateBusiness` (which only cares
+// whether a property is `commercial`, never whether it is
+// `authorized`) works on it identically to a sanctioned one.
+// `ownerId` is any real string, `npc-<id>` included -- an NPC-built
+// business needs no new code, the same way `contracts.js`'s
+// `builderId` already allows one. The same one-business-per-owner
+// rule `purchaseCommercial` enforces applies here too: going around
+// the governors' office does not grant a second business slot.
+export function buildUnauthorized(store, { ownerId, locationLabel, type = 'residential', now = Date.now() } = {}) {
   if (!ownerId) throw new Error('buildUnauthorized requires an ownerId');
   if (!locationLabel) throw new Error('buildUnauthorized requires a locationLabel');
+  if (!['residential', 'commercial'].includes(type)) {
+    throw new Error(`buildUnauthorized: "${type}" is not a real type (expected residential or commercial)`);
+  }
+  if (type === 'commercial' && commercialOwnedBy(store, ownerId)) {
+    throw new Error(`buildUnauthorized: "${ownerId}" already owns a commercial property`);
+  }
 
   const property = {
     id: store.nextPropertyId++,
-    type: 'residential',
+    type,
     ownerId,
     ownerType: 'individual',
     ownershipType: 'owned',
-    lifecycleStage: 'construction',
+    lifecycleStage: type === 'commercial' ? 'operation' : 'construction',
     authorized: false,
     locationLabel,
     builtAt: now,
+    ...(type === 'commercial' ? { level: COMMERCIAL_LEVELS[0].level, levelName: COMMERCIAL_LEVELS[0].name } : {}),
   };
   store.properties.push(property);
   return property;

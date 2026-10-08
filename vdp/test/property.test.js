@@ -309,6 +309,49 @@ test('demolishUnauthorized refuses an authorized property and an unknown one', a
   assert.throws(() => demolishUnauthorized(store, 9999), /no property/);
 });
 
+test('buildUnauthorized can build a real, unsecured business, not just a home', () => {
+  const store = createPropertyStore();
+  const shop = buildUnauthorized(store, { ownerId: 'eve', locationLabel: 'past the tree line', type: 'commercial' });
+  assert.equal(shop.type, 'commercial');
+  assert.equal(shop.authorized, false);
+  assert.equal(shop.level, COMMERCIAL_LEVELS[0].level);
+  assert.equal(shop.levelName, COMMERCIAL_LEVELS[0].name);
+  assert.equal(commercialOwnedBy(store, 'eve').id, shop.id);
+});
+
+test('buildUnauthorized lets an NPC own a real unsecured business', () => {
+  const store = createPropertyStore();
+  const shop = buildUnauthorized(store, { ownerId: 'npc-42', locationLabel: 'the old quarter', type: 'commercial' });
+  assert.equal(shop.ownerId, 'npc-42');
+  assert.equal(commercialOwnedBy(store, 'npc-42').id, shop.id);
+});
+
+test('buildUnauthorized refuses a second business for an owner who already has one', async () => {
+  const store = createPropertyStore();
+  await purchaseCommercial(store, { ownerId: 'eve', transferFn: fakeTransfer([]) });
+  assert.throws(
+    () => buildUnauthorized(store, { ownerId: 'eve', locationLabel: 'past the tree line', type: 'commercial' }),
+    /already owns a commercial property/,
+  );
+});
+
+test('buildUnauthorized refuses an unrecognized type', () => {
+  const store = createPropertyStore();
+  assert.throws(
+    () => buildUnauthorized(store, { ownerId: 'eve', locationLabel: 'x', type: 'industrial' }),
+    /not a real type/,
+  );
+});
+
+test('an unsecured business can still operate and earn, exactly like a sanctioned one', async () => {
+  const store = createPropertyStore();
+  buildUnauthorized(store, { ownerId: 'eve', locationLabel: 'past the tree line', type: 'commercial' });
+  const calls = [];
+  const { revenue } = await operateBusiness(store, { ownerId: 'eve', transferFn: fakeTransfer(calls) });
+  assert.ok(revenue > 0);
+  assert.equal(calls[0].toUserId, 'eve');
+});
+
 test('purchaseCommercial is a real, independent slot -- owning a home does not block it', async () => {
   const store = createPropertyStore();
   await purchaseHome(store, { ownerId: 'gail', transferFn: fakeTransfer([]) });
