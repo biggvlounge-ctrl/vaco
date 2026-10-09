@@ -14,12 +14,15 @@
 // considered fully "in order."
 //
 // Verified against VACANCY_TRAIT_DATABASE_ATTACHMENT.md (Document 7,
-// full handoff): this file's TRAIT_FAMILIES is byte-identical to that
-// doc's literal object, including skills — 20 families, 114 traits.
-// The "18 families, 92 traits" / "19 families, 98 traits" language
-// elsewhere (including in that same doc's own prose) undercounts its
-// own listed array by one family; that's a pre-existing off-by-one in
-// the docs' summary text, not a data mismatch — the literal data was
+// full handoff): this file's TRAIT_FAMILIES WAS byte-identical to that
+// doc's literal object, including skills — 20 families, 114 traits,
+// before the real `efficiency` family (21st, 8 traits, 122 total) was
+// added on top per direct instruction — see that family's own comment
+// for why and `economy.productivityOf` for its real reader. The "18
+// families, 92 traits" / "19 families, 98 traits" language elsewhere
+// in that doc's own prose undercounts its own listed array by one
+// family; that's a pre-existing off-by-one in the docs' summary text,
+// not a data mismatch — the literal data was
 // correct here all along.
 
 'use strict';
@@ -71,6 +74,19 @@ const TRAIT_FAMILIES = {
            'Science', 'Technology', 'Art', 'Music', 'Business', 'Agriculture',
            'Construction', 'Combat', 'Athletics', 'Crafting', 'Research',
            'Management'],
+  // Family #21, added per direct instruction ("add any traits... that
+  // would make it more efficient"). A real, missing dimension, checked
+  // for first rather than assumed absent: no existing family or
+  // individual trait name anywhere in this sheet covers how well
+  // someone converts effort into results, distinct from raw skill
+  // (what they know how to do) or Discipline/Focus (whether they apply
+  // themselves) -- this is about the METHOD, not the capability or the
+  // will. Given a real reader on the day it was added
+  // (`economy.productivityOf`'s own new modulator term, see its
+  // header) rather than left to sit as an eleventh-rule risk.
+  efficiency: ['Time Management', 'Resourcefulness', 'Process Optimization',
+               'Follow-Through', 'Multitasking', 'Delegation Skill',
+               'Waste Reduction', 'Prioritization'],
 };
 
 // ---------------------------------------------------------------------------

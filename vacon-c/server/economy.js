@@ -662,6 +662,19 @@ function productivityOf(worldState, entityId) {
   const health = Number(live.traits?.health?.['Immune Response'] ?? 50);
   const focus = Number(live.traits?.mental?.Focus ?? 50);
 
+  // A third real modulator, added alongside `efficiency`'s own family
+  // (`traits.js`) -- the same mean-of-family read `skill` above
+  // already uses for `skills`, defaulting to the neutral midpoint when
+  // absent (a world generated before this family existed, or a
+  // fixture that never set it) so this is additive and never changes
+  // an existing caller's number by default.
+  const efficiencyTraits = Object.values(live.traits?.efficiency || {})
+    .map(Number)
+    .filter((v) => Number.isFinite(v));
+  const efficiency = efficiencyTraits.length
+    ? efficiencyTraits.reduce((a, b) => a + b, 0) / efficiencyTraits.length
+    : 50;
+
   // **Modulators, not gates, and the band matters more than it looks.**
   // At 0.5..1.5 each the two of them swing output by 9x end to end,
   // which overturns a 4.5x skill gap — so a barely-skilled person in
@@ -670,9 +683,10 @@ function productivityOf(worldState, entityId) {
   // it by asserting exactly that comparison.
   //
   // 0.75..1.25 keeps 1.0 at average, still halves the output of
-  // somebody seriously ill, and leaves skill the dominant term.
+  // somebody seriously ill, and leaves skill the dominant term. The
+  // new efficiency term is held to the same band, for the same reason.
   return Math.max(0, skill * (0.75 + health / 200) * (0.75 + focus / 200)
-    * energyFactor(worldState, entityId));
+    * (0.75 + efficiency / 200) * energyFactor(worldState, entityId));
 }
 
 // One tick of work, for everybody holding an active contract.

@@ -84,14 +84,45 @@ test('an average worker scores exactly 1.0, which is the whole model', () => {
 
   const skilled = worker(w, 100);
   const poor = worker(w, 10);
-  // 100 skills is 2x average, and both modulators sit at their 1.25
-  // ceiling: 2 * 1.25 * 1.25.
-  assert.equal(economy.productivityOf(w, skilled.id), 3.125);
+  // 100 skills is 2x average, and all three modulators (health,
+  // focus, and the real `efficiency` family added alongside this
+  // test) sit at their 1.25 ceiling: 2 * 1.25 * 1.25 * 1.25.
+  assert.equal(economy.productivityOf(w, skilled.id), 3.90625);
   assert.ok(economy.productivityOf(w, poor.id) < 0.2);
 
   // Somebody who does not exist produces nothing rather than throwing
   // or silently averaging.
   assert.equal(economy.productivityOf(w, 999999), 0);
+});
+
+test('efficiency modulates productivity, and an ordinary (50) person is unaffected', () => {
+  // Same proof shape this family's siblings already use: build the
+  // same world twice, differing only in the one family under test,
+  // and assert both that the outcome moves and that an ordinary
+  // person's does not -- the standing discipline `trait-families
+  // .test.js`'s own header states at length, for the same reason: a
+  // reader centred away from the average person recalibrates the
+  // whole world the day it starts being read.
+  const w = world();
+  const average = worker(w, 50);
+  assert.equal(economy.productivityOf(w, average.id), 1,
+    'a perfectly average efficiency sheet must be neutral, same as every other modulator');
+
+  const efficient = worker(w, 50);
+  const inefficient = worker(w, 50);
+  for (const row of w.entityTraits) {
+    const def = INDIVIDUAL_DEFINITIONS.find((d) => d.trait_id === row.trait_id);
+    if (!def || def.family !== 'efficiency') continue;
+    if (row.entity_id === efficient.id) row.current_value = 100;
+    if (row.entity_id === inefficient.id) row.current_value = 0;
+  }
+  assert.ok(
+    economy.productivityOf(w, efficient.id) > economy.productivityOf(w, inefficient.id),
+    'equal skill, health and focus -- efficiency alone must still move the real output',
+  );
+  // 1.25 ceiling / 0.75 floor, same band as every other modulator.
+  assert.ok(economy.productivityOf(w, efficient.id) <= 1.25 + 1e-9);
+  assert.ok(economy.productivityOf(w, inefficient.id) >= 0.75 - 1e-9);
 });
 
 test('health and focus modulate rather than gate', () => {
