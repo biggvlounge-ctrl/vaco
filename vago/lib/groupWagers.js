@@ -32,12 +32,28 @@
 // as distinct types would be inventing categories the underlying
 // access-control logic does not actually need).
 //
-// **Not built: tournaments, leagues, side wagers, team roles, a
-// leaderboard, or QVAN-based group-risk monitoring.** Each of those
-// needs a subsystem invented from nothing -- a bracket/standings
-// engine, a wager-to-wager relationship, a real risk-analysis layer --
+// **Side Wagers (§8) and named Team roles (§4), added 8 Oct 2026.**
+// Side Wagers needed no new engine -- a side wager IS a Group Wager,
+// with a `parentGroupWagerId` pointing at the one it is attached to.
+// §26's Wager Graph ("Group -> Event -> Parent Wager -> Participants
+// -> Individual Positions -> Side Wagers -> Threads -> Evidence ->
+// Resolution -> Settlement") already exists at every node except this
+// one edge -- participants, positions, threads and resolution are all
+// real fields this file already carries per group wager. Team roles
+// needed even less: `predictionMarkets.js`'s `yes`/`no` sides already
+// hold any number of backers each, which IS a team in every sense this
+// freeze's binary-only group wager can support -- `teamNames` below is
+// a display label over that existing mechanic, not a new one.
+//
+// **Still not built: tournaments, leagues, BLIND, Before-the-Answer,
+// or QVAN-based group-risk monitoring.** Each of those needs a
+// subsystem invented from nothing -- a bracket/standings engine, a
+// shared-proposition pooling mechanic, a real risk-analysis layer --
 // which is the gap this session's own audits keep finding and keep
-// refusing to paper over.
+// refusing to paper over. (The leaderboard this header used to list
+// here is built too, in `groupWagerLeaderboard.js` — a pure
+// recomputation over data this file and `predictionMarkets.js` already
+// carry, never a second copy of standings.)
 //
 // **The invitation state machine, added 25 Sep 2026, is different.**
 // It needs no external subsystem -- only a richer status on data this
@@ -184,6 +200,7 @@ async function createGroupWager(store, options = {}) {
     creatorId, name, description = null, visibility = 'open',
     maxParticipants = null, entryDeadline, invitedUserIds = [],
     question, category, source, openingYesPrice, now = Date.now(),
+    parentGroupWagerId = null, teamNames = null,
   } = options;
 
   if (!creatorId) throw new Error('createGroupWager requires a creatorId');
@@ -199,6 +216,22 @@ async function createGroupWager(store, options = {}) {
   }
   if (visibility === 'private' && invitedUserIds.length === 0) {
     throw new Error('createGroupWager: a private group wager needs at least one invited user');
+  }
+  // §8's Side Wager -- a Group Wager that names the parent it hangs
+  // off. Checked for existence only, not for being open: "which player
+  // scores first" can resolve on its own schedule, independent of
+  // "who wins tonight."  A self-reference would make the Wager Graph
+  // a cycle of one, which is not a graph a caller could ever walk.
+  if (parentGroupWagerId !== null) {
+    const parent = findGroupWager(store, parentGroupWagerId);
+    if (!parent) throw new Error(`createGroupWager: no parent group wager ${parentGroupWagerId}`);
+  }
+  // §4 TEAM GROUP WAGER's display labels over the real yes/no sides.
+  // Validated, not required: most group wagers stay plain yes/no.
+  if (teamNames !== null) {
+    if (typeof teamNames !== 'object' || !teamNames.yes || !teamNames.no) {
+      throw new Error('createGroupWager: teamNames must be { yes, no }, both named');
+    }
   }
 
   // The market IS the group's stake/odds/escrow — §29's own rule.
@@ -216,6 +249,8 @@ async function createGroupWager(store, options = {}) {
     invitedUserIds: visibility === 'private' ? [...invitedUserIds] : [],
     threadPostId: null,
     status: 'open', // open -> settled (there is no separate stored "locked": see isGroupWagerLocked)
+    parentGroupWagerId,
+    teamNames: teamNames ? { yes: teamNames.yes, no: teamNames.no } : null,
     createdAt: now,
   };
   store.groupWagers.push(groupWager);
@@ -313,6 +348,14 @@ function groupWagerView(store, groupWagerId, options = {}) {
   };
 }
 
+// §26's Wager Graph, the one edge: every side wager attached to a
+// parent, in creation order. The reverse lookup — a side wager's own
+// parent — is just `findGroupWager(store, sideWager.parentGroupWagerId)`,
+// needing no helper of its own.
+function sideWagersOf(store, parentGroupWagerId) {
+  return store.groupWagers.filter((g) => g.parentGroupWagerId === parentGroupWagerId);
+}
+
 function reseedIds(store) {
   const maxOf = (rows) => rows.reduce((max, r) => (r.id > max ? r.id : max), 0);
   store.nextGroupWagerId = maxOf(store.groupWagers) + 1;
@@ -326,6 +369,7 @@ module.exports = {
   findGroupWager,
   isGroupWagerLocked,
   createGroupWager,
+  sideWagersOf,
   joinGroupWager,
   linkGroupWagerThread,
   resolveGroupWager,

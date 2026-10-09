@@ -28,6 +28,10 @@ function createVagoStore() {
     nextGroupWagerId: 1,
     groupWagerInvitations: [],
     nextGroupWagerInvitationId: 1,
+    competitions: [],
+    nextCompetitionId: 1,
+    blindRounds: [],
+    nextBlindRoundId: 1,
   };
 }
 

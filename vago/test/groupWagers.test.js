@@ -91,6 +91,69 @@ test('maxParticipants must be an integer of at least 2, or omitted', async () =>
   assert.equal(groupWager.maxParticipants, null);
 });
 
+// -- Side Wagers (§8) -----------------------------------------------------
+
+test('a side wager links to its real parent through the Wager Graph', async () => {
+  const store = createVagoStore();
+  const parent = await createGroupWager(store, baseOptions({ name: '20 people bet on tonight\'s game' }));
+  const side = await createGroupWager(store, baseOptions({
+    name: 'Which player scores first?', parentGroupWagerId: parent.id,
+  }));
+  assert.equal(side.parentGroupWagerId, parent.id);
+  const { sideWagersOf } = require('../lib/groupWagers');
+  const sides = sideWagersOf(store, parent.id);
+  assert.equal(sides.length, 1);
+  assert.equal(sides[0].id, side.id);
+});
+
+test('a side wager naming a parent that does not exist is refused', async () => {
+  const store = createVagoStore();
+  await assert.rejects(
+    createGroupWager(store, baseOptions({ parentGroupWagerId: 9999 })),
+    /no parent group wager 9999/,
+  );
+});
+
+test('an ordinary group wager has no side wagers', async () => {
+  const store = createVagoStore();
+  const groupWager = await createGroupWager(store, baseOptions());
+  const { sideWagersOf } = require('../lib/groupWagers');
+  assert.deepEqual(sideWagersOf(store, groupWager.id), []);
+  assert.equal(groupWager.parentGroupWagerId, null);
+});
+
+// -- Team roles (§4 TEAM GROUP WAGER) --------------------------------------
+
+test('teamNames label the real yes/no sides without inventing a third mechanic', async () => {
+  const store = createVagoStore();
+  const groupWager = await createGroupWager(store, baseOptions({
+    teamNames: { yes: 'Team Red', no: 'Team Blue' },
+  }));
+  assert.deepEqual(groupWager.teamNames, { yes: 'Team Red', no: 'Team Blue' });
+
+  // Still the same binary market underneath — joining "Team Red" is
+  // joining `side: 'yes'`, nothing new to settle.
+  const settleFn = ledger();
+  const result = await joinGroupWager(store, {
+    groupWagerId: groupWager.id, userId: 'bob', side: 'yes', quantity: 5, settleFn,
+  });
+  assert.equal(result.contract.side, 'yes');
+});
+
+test('an unnamed group wager carries no team labels', async () => {
+  const store = createVagoStore();
+  const groupWager = await createGroupWager(store, baseOptions());
+  assert.equal(groupWager.teamNames, null);
+});
+
+test('teamNames must name both sides, not just one', async () => {
+  const store = createVagoStore();
+  await assert.rejects(
+    createGroupWager(store, baseOptions({ teamNames: { yes: 'Team Red' } })),
+    /teamNames must be \{ yes, no \}/,
+  );
+});
+
 // -- joinGroupWager (JOIN -> FUND -> CONFIRM -> LOCK) ---------------------------
 
 test('joinGroupWager funds atomically through the real ledger — §5 JOIN+FUND in one step', async () => {

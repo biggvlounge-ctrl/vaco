@@ -14,7 +14,7 @@ somebody's memory of it, which is the failure this repo keeps finding.
 | document | status | parked |
 |---|---|---|
 | `VACO_VERIFIED_BUSINESS_NETWORK_FREEZE.md` | frozen, **§30 audit complete 25 Sep 2026** — see below; Levels 1-3 built and shipped as `vaco-passport` | 17 Sep 2026 |
-| `VAGO_GROUP_WAGERS_FREEZE.md` | frozen, **audit complete 25 Sep 2026** — see below; narrowest slice built, plus §13's invitation state machine (`vago/lib/groupWagers.js`) added 25 Sep 2026 | 17 Sep 2026 |
+| `VAGO_GROUP_WAGERS_FREEZE.md` | frozen, **audit complete 25 Sep 2026** — see below; narrowest slice + §13's invitation state machine built 25 Sep 2026; **§8 Side Wagers, §4 Team roles, §10 Leaderboard, §11 Tournaments, §12 Leagues, §17 BLIND and §18 Before-the-Answer all built 9 Oct 2026** (`vago/lib/groupWagers.js`'s own `parentGroupWagerId`/`teamNames`, `vago/lib/groupWagerLeaderboard.js`, `vago/lib/groupWagerCompetitions.js`, `vago/lib/blindPredictions.js`) — see those files' own headers for what each still does not cover (a seeded 1-vs-1 bracket, QVAN-based group-risk monitoring, and §6's negotiated/tiered/ranked payout shapes beyond winner-take-all) | 17 Sep 2026 |
 | `HVNTZ_CONNECTED_NETWORK_FREEZE.md` | frozen, **§40 audit complete 25 Sep 2026** — see below; §47 Phases 1-3 built (Network/Node/invite-accept-decline, Vault Studios stream link, Hunt checkpoint↔Network, §3/§39 screen-session link) plus §15-18's core revenue-sharing engine and growth analytics in `hvntz/lib/networkConnections.js`, `hvntz/lib/hunts.js`, `hvntz/lib/revenueShareAgreements.js` and `hvntz/lib/networkAnalytics.js` | 23 Sep 2026 |
 | `VASH_TAP_FREEZE.md` | frozen, **§1/§55 audit complete 25 Sep 2026** — see below; narrowest demo built and shipped | 23 Sep 2026 |
 

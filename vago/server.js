@@ -52,10 +52,19 @@ const {
 } = require('./lib/fantasy');
 const {
   VISIBILITIES: GROUP_WAGER_VISIBILITIES, INVITATION_STATUSES: GROUP_WAGER_INVITATION_STATUSES,
-  createGroupWager, joinGroupWager,
+  createGroupWager, joinGroupWager, sideWagersOf,
   linkGroupWagerThread, resolveGroupWager, groupWagerView,
   invitationsForGroupWager, inviteToGroupWager, markInvitationViewed, invitationView,
 } = require('./lib/groupWagers');
+const { leaderboardFor, allSettledGroupWagerIds } = require('./lib/groupWagerLeaderboard');
+const {
+  FORMATS: COMPETITION_FORMATS,
+  createCompetition, addLeg, advanceRound, finishCompetition, competitionView,
+} = require('./lib/groupWagerCompetitions');
+const {
+  FORMATS: BLIND_FORMATS, ANSWER_TYPES: BLIND_ANSWER_TYPES,
+  createBlindRound, submitAnswer, resolveBlindRound, blindRoundView,
+} = require('./lib/blindPredictions');
 
 const app = express();
 app.use(cors());
@@ -264,6 +273,9 @@ app.get('/api/health', (_req, res) => {
     fantasyFlexPayoutTable: FLEX_PAYOUT_TABLE,
     groupWagerVisibilities: GROUP_WAGER_VISIBILITIES,
     groupWagerInvitationStatuses: GROUP_WAGER_INVITATION_STATUSES,
+    competitionFormats: COMPETITION_FORMATS,
+    blindRoundFormats: BLIND_FORMATS,
+    blindRoundAnswerTypes: BLIND_ANSWER_TYPES,
   });
 });
 
@@ -662,6 +674,163 @@ app.get('/api/group-wagers/:id/invitations/:userId', requireSession(), (req, res
   const view = invitationView(store, Number(req.params.id), req.params.userId);
   if (!view) return res.status(404).json({ error: `no invitation for ${req.params.userId} on group wager ${req.params.id}` });
   res.json(view);
+});
+
+// §8's Side Wagers -- every Group Wager naming this one as its parent.
+// A public read: a side wager is exactly as visible as any other group
+// wager, `GET /api/group-wagers/:id` above included.
+app.get('/api/group-wagers/:id/side-wagers', (req, res) => {
+  res.json({ sideWagers: sideWagersOf(store, Number(req.params.id)) });
+});
+
+// §10's Group Leaderboard. `ids` is a comma-separated list of group
+// wager ids to rank across; omitted means every group wager that has
+// ever settled, platform-wide. A creator's own series or one
+// competition's legs are just a narrower `ids` list from the caller.
+app.get('/api/group-wagers/leaderboard', (req, res) => {
+  const ids = req.query.ids
+    ? String(req.query.ids).split(',').map(Number).filter(Number.isFinite)
+    : allSettledGroupWagerIds(store);
+  res.json({ leaderboard: leaderboardFor(store, ids) });
+});
+
+// -- Group Wager Competitions: Leagues (§12) and Tournaments (§11) ---------
+
+app.post('/api/competitions', requireActor('creatorId'), (req, res) => {
+  try {
+    res.status(201).json(createCompetition(store, req.body || {}));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/competitions/:id', (req, res) => {
+  const view = competitionView(store, Number(req.params.id));
+  if (!view) return res.status(404).json({ error: `no competition with id ${req.params.id}` });
+  res.json(view);
+});
+
+// Creator-only: adding a leg decides nothing about the wager itself
+// (that is still settled through `/api/group-wagers/:id/resolve`), so
+// this needs no operator gate, the same reasoning `createGroupWager`'s
+// own route already documents.
+app.post('/api/competitions/:id/legs', requireSession(), (req, res) => {
+  const competitionId = Number(req.params.id);
+  const existing = competitionView(store, competitionId);
+  if (!existing) return res.status(404).json({ error: `no competition with id ${competitionId}` });
+  if (String(existing.creatorId) !== String(req.sessionUserId)) {
+    return res.status(403).json({ error: 'only the creator may add a leg to this competition' });
+  }
+  try {
+    res.status(201).json(addLeg(store, { ...req.body, competitionId }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Operator-gated and decision-logged: eliminating real participants
+// from a tournament is exactly the "decision with a loser" shape every
+// other VAGO settlement route already requires sign-off for.
+app.post('/api/competitions/:id/advance', requireOperator('vago:settle'), async (req, res) => {
+  try {
+    await decisionLog.record({
+      route: 'POST /api/competitions/:id/advance',
+      outcomeKind: 'settlement',
+      subjectType: 'competition',
+      subjectId: req.params.id,
+      decidedBy: req.operator.operatorName,
+      decidedByKind: 'operator',
+      inputs: req.body || {},
+      reason: (req.body || {}).reason || null,
+    });
+  } catch (err) {
+    return res.status(503).json({ error: err.message });
+  }
+  try {
+    res.json(advanceRound(store, { ...req.body, competitionId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/competitions/:id/finish', requireOperator('vago:settle'), async (req, res) => {
+  try {
+    await decisionLog.record({
+      route: 'POST /api/competitions/:id/finish',
+      outcomeKind: 'settlement',
+      subjectType: 'competition',
+      subjectId: req.params.id,
+      decidedBy: req.operator.operatorName,
+      decidedByKind: 'operator',
+      inputs: req.body || {},
+      reason: (req.body || {}).reason || null,
+    });
+  } catch (err) {
+    return res.status(503).json({ error: err.message });
+  }
+  try {
+    res.json(finishCompetition(store, { ...req.body, competitionId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// -- BLIND (§17) and Before-the-Answer (§18) --------------------------------
+
+app.get('/api/blind-rounds/formats', (_req, res) => {
+  res.json({ formats: BLIND_FORMATS, answerTypes: BLIND_ANSWER_TYPES });
+});
+
+app.post('/api/blind-rounds', requireActor('creatorId'), (req, res) => {
+  try {
+    res.status(201).json(createBlindRound(store, req.body || {}));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/blind-rounds/:id', (req, res) => {
+  const view = blindRoundView(store, Number(req.params.id));
+  if (!view) return res.status(404).json({ error: `no blind round with id ${req.params.id}` });
+  res.json(view);
+});
+
+app.post('/api/blind-rounds/:id/answers', requireActor('userId'), async (req, res) => {
+  try {
+    res.status(201).json(await submitAnswer(store, {
+      ...req.body, blindRoundId: Number(req.params.id), settleFn: settleVCoin,
+    }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Operator-gated and decision-logged, same reasoning as every other
+// VAGO resolve route — and here specifically the one real guard §18's
+// "the AI must not alter the answer based on the participants' bets"
+// gets: a real name attached to who supplied `realAnswer` and when.
+app.post('/api/blind-rounds/:id/resolve', requireOperator('vago:settle'), async (req, res) => {
+  try {
+    await decisionLog.record({
+      route: 'POST /api/blind-rounds/:id/resolve',
+      outcomeKind: 'settlement',
+      subjectType: 'blindRound',
+      subjectId: req.params.id,
+      decidedBy: req.operator.operatorName,
+      decidedByKind: 'operator',
+      inputs: req.body || {},
+      reason: (req.body || {}).reason || null,
+    });
+  } catch (err) {
+    return res.status(503).json({ error: err.message });
+  }
+  try {
+    res.json(await resolveBlindRound(store, {
+      ...req.body, blindRoundId: Number(req.params.id), settleFn: settleVCoin,
+    }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 app.get('/api/sports/events', (_req, res) => {
