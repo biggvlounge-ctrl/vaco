@@ -152,6 +152,72 @@ test('tagsFor derives Manipulative from high Persuasion + high Deception, distin
   assert.ok(!tags.includes('Diplomatic'), 'Manipulative and Diplomatic read different real traits and must not be conflated');
 });
 
+test('tagsFor derives Timid and Shy from low Confidence, each paired with a different real trait so they stay distinct', () => {
+  const shy = generateTraitSheet(fixedRng(0));
+  shy.social.Charisma = LOW;
+  shy.personality.Confidence = LOW;
+  shy.behavioral.Recklessness = HIGH; // Timid's own second condition stays closed
+  let tags = tagsFor(shy).map((t) => t.name);
+  assert.ok(tags.includes('Shy'));
+  assert.ok(!tags.includes('Timid'));
+
+  const timid = generateTraitSheet(fixedRng(0));
+  timid.personality.Confidence = LOW;
+  timid.behavioral.Recklessness = LOW;
+  timid.social.Charisma = HIGH; // Shy's own first condition stays closed
+  tags = tagsFor(timid).map((t) => t.name);
+  assert.ok(tags.includes('Timid'));
+  assert.ok(!tags.includes('Shy'));
+});
+
+test('tagsFor derives Naive from low Trust Threshold + low Risk Assessment -- the opposite direction from Paranoid', () => {
+  const sheet = generateTraitSheet(fixedRng(0));
+  sheet.psychological['Trust Threshold'] = LOW;
+  sheet.mental['Risk Assessment'] = LOW;
+  const tags = tagsFor(sheet).map((t) => t.name);
+  assert.ok(tags.includes('Naive'));
+  assert.ok(!tags.includes('Paranoid'), 'Naive and Paranoid read Trust Threshold in opposite directions');
+});
+
+test('tagsFor derives Devoted ("too loyal") from Group Loyalty + Conformity, distinct from Community Focused', () => {
+  const sheet = generateTraitSheet(fixedRng(0));
+  sheet.social['Group Loyalty'] = HIGH;
+  sheet.behavioral.Conformity = HIGH;
+  sheet.emotional.Empathy = LOW; // Community Focused's own second condition stays closed
+  const tags = tagsFor(sheet).map((t) => t.name);
+  assert.ok(tags.includes('Devoted'));
+  assert.ok(!tags.includes('Community Focused'));
+});
+
+test('tagsFor derives Hot-Tempered ("anger") from Aggression + Volatility, richer than the plain Aggressive tag', () => {
+  const sheet = generateTraitSheet(fixedRng(0));
+  sheet.behavioral.Aggression = HIGH;
+  sheet.emotional.Volatility = HIGH;
+  const tags = tagsFor(sheet).map((t) => t.name);
+  assert.ok(tags.includes('Hot-Tempered'));
+  assert.ok(tags.includes('Aggressive'), 'Aggressive is single-trait and should still fire alongside it');
+});
+
+test('tagsFor derives Delusional from Delusion Susceptibility alone -- the honest stand-in, not a literal clinical label', () => {
+  const sheet = generateTraitSheet(fixedRng(0));
+  sheet.psychological['Delusion Susceptibility'] = HIGH;
+  const tags = tagsFor(sheet).map((t) => t.name);
+  assert.ok(tags.includes('Delusional'));
+});
+
+test('citedTraits now covers every real individual trait except the four health traits, which hospital.js reads instead', () => {
+  const allTraits = [];
+  for (const [family, names] of Object.entries(TRAIT_FAMILIES)) {
+    for (const name of names) allTraits.push(`${family}.${name}`);
+  }
+  const cited = new Set(citedTraits().map(([family, name]) => `${family}.${name}`));
+  const uncited = allTraits.filter((key) => !cited.has(key));
+  assert.deepEqual(
+    uncited.sort(),
+    ['health.Chronic Conditions', 'health.Immune Response', 'health.Nutrition Status', 'health.Sleep Quality'].sort(),
+  );
+});
+
 test('tagsFor derives nothing for a perfectly neutral sheet -- every gate stays closed at the midpoint', () => {
   const sheet = {};
   for (const [family, names] of Object.entries(TRAIT_FAMILIES)) {

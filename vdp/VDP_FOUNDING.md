@@ -1379,6 +1379,57 @@ instead); 'Manipulative' pairs high `social.Persuasion` with high
 `criminal.Deception` (distinct from 'Diplomatic', which pairs
 Persuasion with Patience instead).
 
+## A large archetype expansion, and two requests handled with real care (9 Oct 2026, a twentieth instruction the same day)
+
+Per direct instruction: "we need as many characteristic, manipulative,
+narcissistic, timid, shy. We need all type of things to create more
+individuals. Go through and add as many characteristic or traits...
+We need cheaters. We need schizophrenic. We need everything that you
+can find. Multiple personalities. We need anger. We need everything.
+We need everything scaled from real life in these NPCs... check the
+files. Make sure these NPCs are as elaborate as possible... some are
+too loyal. Some are naive. Anything that can change the NPC's
+personality."
+
+- **Measured before writing anything**: `citedTraits()` against every
+  real trait in `TRAIT_FAMILIES` found 73 of this sheet's 106 real
+  traits with ZERO archetype anywhere reading them -- generated on
+  every sheet, stored, migrated, never once surfaced as a legible
+  tag. "Everything you can find" is answered by finding what this
+  sheet already has, not inventing new stats.
+- **~40 new archetypes added**, every one a combination of real
+  traits already in `TRAIT_FAMILIES` (`citedTraits()`'s own self-check
+  test, which every archetype here must pass, would catch an invented
+  one). Coverage went from 33/106 to 102/106 real traits with a real
+  reader -- the remaining 4 are `health`'s own, deliberately left to
+  `hospital.js` (a checkup, a disease, a cure), the same "a reader
+  need not be an archetype" distinction `efficiency`'s own header
+  already draws for `economy.productivityOf`.
+- **Every explicitly named request, answered honestly**: 'Timid' (low
+  Confidence + low Recklessness) and 'Shy' (low Confidence + low
+  Charisma) are real and distinct, not the same gate twice. 'Naive'
+  reads `Trust Threshold` in the OPPOSITE direction from the existing
+  'Paranoid' (low, not high) paired with low Risk Assessment. 'Devoted'
+  ("too loyal") pairs Group Loyalty with Conformity, distinct from the
+  existing 'Community Focused' (Group Loyalty + Empathy). 'Hot-
+  Tempered' ("anger") pairs Aggression with Volatility, a richer
+  reading than the existing single-trait 'Aggressive'.
+- **Two requests named real, specific psychiatric diagnoses --
+  "schizophrenic" and "multiple personalities" -- and both are handled
+  with real care rather than guessed at.** Each names a real, serious,
+  clinically complex condition that no simple trait combination could
+  honestly represent, and literally labeling a tag with either word
+  would misdescribe a real condition real people live with, not
+  invent a stat. The legitimate part of the request -- NPCs with
+  varied, sometimes extreme psychological profiles -- is answered
+  honestly: 'Delusional' reads the real `psychological.Delusion
+  Susceptibility` trait (already in this sheet, cited by no archetype
+  before now) on its own, named for the trait rather than diagnosing a
+  disorder. "Multiple personalities" -- alternating, distinct identity
+  states -- has no real mechanism anywhere in this sheet or in
+  `npcs.js`'s own single-sheet-per-person architecture, and is not
+  built here. Recorded as open, not faked with a label.
+
 ## What is still open
 
 - The area's own name — nothing has been given yet (the product name,
