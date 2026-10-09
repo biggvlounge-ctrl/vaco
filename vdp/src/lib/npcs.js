@@ -13,17 +13,26 @@
 // into behavior, and a log that can explain WHY an NPC did something,
 // not just that it did.
 //
-// **Deliberately smaller than VACON-C in every dimension**: 6 traits
-// (not 20 families of 114), 4 needs (not 15), one simple pairwise
-// friction counter (not a full relationship system), and exactly two
-// rare flavor actions borrowed from VACON-C's own two real crime
-// triggers (a tiny-probability deprivation draw, and grudge
-// escalation) — `pettySwipe` ("simple home break-ins") and `fight`
-// ("simple fights"). Both are narrative-only: a logged decision-log
-// entry and nothing else. There is no stolen item, no justice system,
-// no policing — VACON-C's own audit of its own crime module says those
-// two triggers are "the parts worth borrowing for flavor; policing and
-// justice are not," and this module takes that advice literally.
+// **Deliberately smaller than VACON-C in every other dimension**: 4
+// needs (not 15), one simple pairwise friction counter (not a full
+// relationship system), and exactly two rare flavor actions borrowed
+// from VACON-C's own two real crime triggers (a tiny-probability
+// deprivation draw, and grudge escalation) — `pettySwipe` ("simple home
+// break-ins") and `fight` ("simple fights"). Both are narrative-only: a
+// logged decision-log entry and nothing else. There is no stolen item,
+// no justice system, no policing — VACON-C's own audit of its own
+// crime module says those two triggers are "the parts worth borrowing
+// for flavor; policing and justice are not," and this module takes
+// that advice literally.
+//
+// **Traits are no longer the exception.** Per direct instruction (9
+// Oct 2026, "bring in all the traits... all the things we have from
+// vacancy"), `./traits.js` carries VACON-C's own real 19-family,
+// 98-trait sheet (its 20th family, Skills, is deliberately excluded —
+// see that file's header) plus its real derived-archetype layer
+// (Natural Leader, Entrepreneur, ...), verbatim where VACON-C gives a
+// name and flagged wherever this file had to choose a threshold or
+// adapt one VACON-C reading to a family VDP doesn't carry.
 //
 // **No real money moves here.** An NPC's "trade"/"build" actions are
 // cosmetic and narrative — they walk to a themed district and a
@@ -39,8 +48,8 @@
 
 import { DISTRICTS } from './world.js';
 import { drawDemographics } from './demographics.js';
+import { generateTraitSheet, readTrait, bumpTrait, topIndividualTrait, tagsFor } from './traits.js';
 
-export const TRAIT_NAMES = ['ambition', 'diligence', 'creativity', 'sociability', 'frugality', 'boldness'];
 export const NEED_NAMES = ['income', 'purpose', 'social', 'rest'];
 export const HABIT_NAMES = ['build', 'trade', 'socialize', 'rest'];
 export const FLAVOR_HABIT_NAMES = ['pettySwipe'];
@@ -135,8 +144,22 @@ export function mostPressingNeed(npc) {
   return NEED_NAMES.reduce((worst, n) => (npc.needs[n] < npc.needs[worst] ? n : worst), NEED_NAMES[0]);
 }
 
+// The single highest-valued individual trait across the whole real
+// sheet -- e.g. "Command Presence", not a family name. Kept as a flat
+// string (not `{family, name, value}`) because every existing caller
+// (decision-log flavor text, the V4 guide facts route, My Status) only
+// ever wanted the name.
 export function topTrait(npc) {
-  return TRAIT_NAMES.reduce((best, t) => (npc.traits[t] > npc.traits[best] ? t : best), TRAIT_NAMES[0]);
+  return topIndividualTrait(npc.traits).name;
+}
+
+// The real, derived archetype tags this NPC or player currently earns
+// -- a read, never stored, same discipline `traits.js`'s own `tagsFor`
+// documents. Exported so `WorldView.jsx`/`MyStatusView.jsx` can show
+// "Natural Leader", "Entrepreneur", "Sneaky", etc. without either
+// component re-deriving the thresholds itself.
+export function npcArchetypes(npc) {
+  return tagsFor(npc.traits).map((tag) => tag.name);
 }
 
 function randomInt(rng, max) {
@@ -152,10 +175,7 @@ function randomInt(rng, max) {
 // the same `seed`-overrides-the-draw convention `skills.js`'s
 // `createSkills(seed)` already uses for the same reason.
 export function createNpc(id, home, rng = Math.random, demographics = {}) {
-  const traits = {};
-  for (const t of TRAIT_NAMES) {
-    traits[t] = randomInt(rng, 101);
-  }
+  const traits = generateTraitSheet(rng);
   const needs = {};
   for (const n of NEED_NAMES) {
     needs[n] = clamp(50 + Math.round((rng() - 0.5) * 40), 0, 100);
@@ -199,10 +219,7 @@ export function createNpc(id, home, rng = Math.random, demographics = {}) {
 // and tick scheduling. `stepNeeds`/`updateGoal`/`reinforceHabit`/
 // `fadeHabits` above all operate on this shape unchanged.
 export function createPlayerState(rng = Math.random, demographics = {}) {
-  const traits = {};
-  for (const t of TRAIT_NAMES) {
-    traits[t] = randomInt(rng, 101);
-  }
+  const traits = generateTraitSheet(rng);
   const needs = {};
   for (const n of NEED_NAMES) {
     needs[n] = clamp(50 + Math.round((rng() - 0.5) * 40), 0, 100);
@@ -291,9 +308,11 @@ export const GOVERNMENT_LIAISON_ROLE = 'government-liaison';
 // Flagged interpretive bump, same footing every other unspecified
 // figure in this module already stands on (e.g. `PETTY_SWIPE_BASE_CHANCE`)
 // -- no document gives VDP a real founding-professional stat table.
-// A liaison is who the founders actually sent to do real setup work,
-// so diligence/ambition skew up from the same random draw every NPC
-// gets, rather than being a second, separately-invented stat block.
+// A liaison is who the founders actually sent to do real setup work --
+// `behavioral.Discipline` ("diligence") and `leadership.Command
+// Presence` ("ambition," in the sense of taking charge) skew up from
+// the same random draw every NPC gets, rather than being a second,
+// separately-invented stat block.
 const LIAISON_TRAIT_BUMP = 20;
 
 // Idempotent and additive: a district that already has a liaison
@@ -313,8 +332,8 @@ export function seedGovernmentLiaisons(world, { districts = DISTRICTS, rng = Mat
     liaison.role = GOVERNMENT_LIAISON_ROLE;
     liaison.districtId = district.id;
     liaison.bio = `${liaison.name} came over with the founding team to help establish ${district.name}.`;
-    liaison.traits.diligence = clamp(liaison.traits.diligence + LIAISON_TRAIT_BUMP, 0, 100);
-    liaison.traits.ambition = clamp(liaison.traits.ambition + LIAISON_TRAIT_BUMP, 0, 100);
+    bumpTrait(liaison.traits, 'behavioral', 'Discipline', LIAISON_TRAIT_BUMP);
+    bumpTrait(liaison.traits, 'leadership', 'Command Presence', LIAISON_TRAIT_BUMP);
     added.push(liaison);
   }
   return added;
@@ -400,7 +419,10 @@ export function fadeHabits(npc) {
 // majority of NPCs, who are never this bold and this broke at once.
 function pettySwipeChance(npc) {
   if (npc.needs.income >= PETTY_SWIPE_INCOME_CEILING) return 0;
-  if (npc.traits.boldness < 60 || npc.traits.frugality > 40) return 0;
+  // "Boldness" -> `behavioral.Recklessness`; "frugality" -> the real,
+  // literally-named `economic.Frugality` -- no mapping needed there.
+  if (readTrait(npc.traits, 'behavioral', 'Recklessness') < 60
+    || readTrait(npc.traits, 'economic', 'Frugality') > 40) return 0;
   return PETTY_SWIPE_BASE_CHANCE * (1 + npc.habits.pettySwipe / 100);
 }
 
@@ -410,7 +432,9 @@ function pettySwipeChance(npc) {
 // grudge/escalation shape flattened to a single counter instead of a
 // full relationship model.
 function buildFriction(world, a, b) {
-  const prickly = (npc) => npc.traits.boldness >= 55 && npc.traits.sociability <= 45;
+  // "Boldness" -> `behavioral.Recklessness`; "sociability" -> `social.Charisma`.
+  const prickly = (npc) => readTrait(npc.traits, 'behavioral', 'Recklessness') >= 55
+    && readTrait(npc.traits, 'social', 'Charisma') <= 45;
   if (!prickly(a) || !prickly(b)) return;
   const key = frictionKey(a.id, b.id);
   world.friction[key] = (world.friction[key] || 0) + FIGHT_FRICTION_GAIN;

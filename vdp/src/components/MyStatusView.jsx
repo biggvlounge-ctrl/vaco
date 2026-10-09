@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { NEED_NAMES, TRAIT_NAMES, HABIT_NAMES, mostPressingNeed, topTrait } from "../lib/npcs.js";
+import { NEED_NAMES, HABIT_NAMES, mostPressingNeed, topTrait, npcArchetypes } from "../lib/npcs.js";
 import { suggestNextStep } from "../lib/v4AgentClient.js";
 
 // The player needs/goals engine (vdp/server.cjs reusing npcs.js's own
@@ -112,6 +112,7 @@ export default function MyStatusView({ session, refreshSignal }) {
         `most pressing need: ${facts.need}`,
         facts.goal ? `current goal: ${facts.goal.description}` : `current goal: none right now`,
         `strongest trait: ${facts.topTrait}`,
+        facts.archetypes?.length ? `archetype: ${facts.archetypes.join(", ")}` : `no archetype earned yet`,
         facts.topSkill ? `best skill: ${facts.topSkill.subject} (${facts.topSkill.value}/100)` : `no real skill practiced yet`,
         facts.home ? `home: ${facts.home}` : `no home yet`,
         facts.business ? `business: ${facts.business}` : `no business yet`,
@@ -154,6 +155,7 @@ export default function MyStatusView({ session, refreshSignal }) {
 
   const pressing = mostPressingNeed(state);
   const dominant = topTrait(state);
+  const archetypes = npcArchetypes(state);
 
   return (
     <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16, marginTop: 12 }}>
@@ -185,14 +187,18 @@ export default function MyStatusView({ session, refreshSignal }) {
 
         <div>
           <h3 style={{ fontSize: 12, margin: "0 0 6px 0", color: "#888" }}>TRAITS</h3>
-          <ul style={{ fontSize: 11, margin: 0, paddingLeft: 16 }}>
-            {TRAIT_NAMES.map((name) => (
-              <li key={name}>
-                {name}: {state.traits[name]}
-                {name === dominant && <strong> (dominant)</strong>}
-              </li>
-            ))}
-          </ul>
+          <p style={{ fontSize: 11, margin: "0 0 6px" }}>
+            Dominant: <strong>{dominant}</strong>
+          </p>
+          {archetypes.length > 0 ? (
+            <ul style={{ fontSize: 11, margin: 0, paddingLeft: 16 }}>
+              {archetypes.map((tag) => <li key={tag}>{tag}</li>)}
+            </ul>
+          ) : (
+            <p style={{ fontSize: 11, color: "#888", margin: 0 }}>
+              No archetype currently earned -- a real read off 98 individual traits, not stored.
+            </p>
+          )}
         </div>
       </div>
 

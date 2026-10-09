@@ -895,13 +895,84 @@ panel in `VacayView.jsx`, read-only since a real sale or lease settles
 outside VCoin.
 
 Still carried into this document's own "what is still open" section
-rather than guessed at: real-time media and native mobile push
-(explicitly requested, not yet started), VENVS's VACON-C-derived
+rather than guessed at: native mobile push and VENVS's VACON-C-derived
 business/corporation migration path ("hunts" and "the Venus" -- read as
 VENVS's own real marketplace, not VAGO's Venus Resort, on "sellers and
-buyers" language), and pulling VACON-C's own full trait taxonomy
-("entrepreneurship, sneakiness") into this app's six-trait `npcs.js`
-set.
+buyers" language). Real-time media and the full trait taxonomy are
+both resolved below, the same day.
+
+## The real 19-family, 98-trait sheet, and real-time voice/video (9 Oct 2026, a fifth instruction the same day)
+
+Per direct instruction -- "make sure you bring in all the traits,
+entrepreneurship, sneakiness, all the things we have from vacancy,"
+and "make sure to finish any rendering media that is possible":
+
+- **The real count, checked rather than assumed.** VACON-C's own
+  `server/traits.js` is 20 families and 114 traits, not "hundreds or
+  thousands" -- stated plainly before building anything, the same
+  honesty this document already owes every other borrowed number.
+  New `src/lib/traits.js` carries 19 of those 20 families (98 traits)
+  copied verbatim, plus VACON-C's own real, derived-archetype layer
+  (23 tags -- Natural Leader, Entrepreneur, Risk Taker, ...), a read
+  computed fresh every call and never stored, exactly as VACON-C's own
+  `archetypes.js` insists an archetype must be.
+- **One family deliberately not ported: Skills.** VACON-C's own
+  `skills` family is a static roll at generation; VDP already has a
+  real, separate, PRACTISED skill system (`skills.js`) for nearly the
+  same named subjects, rising through real work/reading/conversation
+  rather than a birth draw. Carrying both would put two numbers named
+  "Business" on the same person meaning two different things -- the
+  "two disagreeing answers to the same question" failure VACON-C's own
+  CLAUDE.md names as a standing rule. `Entrepreneur`'s own `when`
+  clause is re-pointed at `economic.Risk Appetite` + `economic.Barter
+  Skill` rather than the excluded family, carrying the same intent.
+- **"Sneakiness," answered in the game itself, not just in
+  conversation.** There is no single trait by that name in VACON-C's
+  own list -- the honest answer, given directly, is that it maps to
+  the real `criminal.Stealth`/`criminal.Deception` traits. A new,
+  clearly-marked VDP-only archetype, `Sneaky` (both HIGH), makes that
+  answer a real, legible tag rather than leaving it only in this
+  document.
+- `npcs.js`'s old, invented 6-name set (`ambition`/`diligence`/
+  `creativity`/`sociability`/`frugality`/`boldness`) is gone --
+  `createNpc`/`createPlayerState` now generate the real sheet.
+  Everywhere the old names drove behavior (the petty-swipe gate, the
+  friction/fight gate, the government-liaison trait bump), each is
+  re-pointed at the single closest real trait (`behavioral
+  .Recklessness` for "boldness," `economic.Frugality` for
+  "frugality," `social.Charisma` for "sociability," `behavioral
+  .Discipline` + `leadership.Command Presence` for a liaison's
+  diligence/ambition) rather than guessing a new mapping sight unseen.
+  `topTrait` now names the single highest of the real 98 rather than
+  the highest of 6; `v4AgentClient.js`'s own NPC-conversation prompt is
+  bounded to the top 5 plus any earned archetype tags, since dumping
+  all 98 into a system prompt would bury what's actually distinctive
+  about one NPC under 93 near-neutral numbers.
+
+- **Real-time media, finished as far as it honestly can be without a
+  deployed SFU.** `vaco-media` (this ecosystem's own shared session/
+  grant control plane, built in an earlier session but never wired
+  into VDP) is now a real VDP dependency: `server.cjs`'s WebSocket
+  layer gained `call-invite`/`call-end`, opening a real vaco-media
+  session and issuing one real, revocable join grant per side the
+  moment two real, connected players want to talk -- VDP's server
+  never sees or carries a byte of audio/video, only the session and
+  the grants, the same control-plane-only split every other real
+  consumer of vaco-media (CVNVO's speed dates, V4 agent calls) already
+  uses. `src/lib/mediaRuntime.js` + `CallPanel.jsx` are the real client
+  half: `resolveJoin` calls vaco-media's own public `/api/join`
+  directly (the credential is the authorization, by that route's own
+  design) and `connectCall` actually connects with `livekit-client`
+  when a real SFU is configured (`VACO_MEDIA_TRANSPORT=livekit`) --
+  and, per `vaco-media`'s own explicit rule ("do not add a `<video>`
+  tag pointing at a placeholder file to make a demo look complete"),
+  shows the control plane's own honest note instead of a fake video
+  element when it is not, which is the real, current state of this
+  whole ecosystem: no app anywhere in `deploy/` runs an SFU yet. Live-
+  verified end to end: a real session opened, two real distinct join
+  credentials issued, `POST /api/join` honestly resolving
+  `mediaPlane: "none"` with its own real explanatory note, and a real
+  hang-up ending the session for both sides.
 
 ## What is still open
 

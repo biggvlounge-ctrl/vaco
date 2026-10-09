@@ -10,12 +10,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  TRAIT_NAMES, NEED_NAMES, HABIT_NAMES,
+  NEED_NAMES, HABIT_NAMES,
   createNpc, createNpcWorld, addNpcToWorld, removeNpcFromWorld, getNpc, listNpcs, latestDecision,
-  explainDecision, pickAction, advanceWorldTick, createPlayerState,
+  explainDecision, pickAction, advanceWorldTick, createPlayerState, topTrait, npcArchetypes,
   GOVERNMENT_LIAISON_ROLE, seedGovernmentLiaisons, listGovernmentLiaisons,
 } from '../src/lib/npcs.js';
 import { DISTRICTS } from '../src/lib/world.js';
+import { TRAIT_FAMILIES } from '../src/lib/traits.js';
 
 const HOME = { x: 100, y: 100 };
 
@@ -25,11 +26,15 @@ function fixedRng(value) {
 
 // -- Shape ----------------------------------------------------------------
 
-test('a fresh NPC carries every trait, need and ordinary habit, all in range', () => {
+test('a fresh NPC carries every real trait family and trait, need and ordinary habit, all in range', () => {
   const npc = createNpc(1, HOME, fixedRng(0.5));
-  for (const t of TRAIT_NAMES) {
-    assert.ok(npc.traits[t] >= 0 && npc.traits[t] <= 100, `${t} out of range`);
+  for (const [family, names] of Object.entries(TRAIT_FAMILIES)) {
+    for (const name of names) {
+      const value = npc.traits[family][name];
+      assert.ok(value >= 0 && value <= 100, `${family}.${name} out of range`);
+    }
   }
+  assert.equal(npc.traits.skills, undefined, 'the Skills family is deliberately excluded -- VDP has its own dynamic skills.js');
   for (const n of NEED_NAMES) {
     assert.ok(npc.needs[n] >= 0 && npc.needs[n] <= 100, `${n} out of range`);
   }
@@ -38,6 +43,24 @@ test('a fresh NPC carries every trait, need and ordinary habit, all in range', (
   }
   assert.equal(npc.habits.pettySwipe, 0, 'the flavor habit starts at zero, never seeded');
   assert.deepEqual([npc.x, npc.y], [HOME.x, HOME.y]);
+});
+
+test('topTrait names a real individual trait, and npcArchetypes reads real, derived tags -- never stored', () => {
+  const npc = createNpc(1, HOME, fixedRng(0.5));
+  const allTraitNames = Object.values(TRAIT_FAMILIES).flat();
+  assert.ok(allTraitNames.includes(topTrait(npc)), 'topTrait must name a real trait from traits.js');
+
+  // Force a known archetype open: Natural Leader = high Command
+  // Presence + high Charisma.
+  npc.traits.leadership['Command Presence'] = 90;
+  npc.traits.social.Charisma = 90;
+  assert.ok(npcArchetypes(npc).includes('Natural Leader'));
+  assert.equal(npc.archetypes, undefined, 'archetypes must be a read, never a field stored on the NPC');
+
+  // And VDP's own addition, named directly after the user's own word.
+  npc.traits.criminal.Stealth = 95;
+  npc.traits.criminal.Deception = 95;
+  assert.ok(npcArchetypes(npc).includes('Sneaky'));
 });
 
 test('every NPC carries a real demographic draw -- origin, income, and a real Hawkins consciousness state', () => {
@@ -240,11 +263,11 @@ test('habits fade on every decision turn, even an idle one', () => {
 
 // -- The resolver ---------------------------------------------------------
 
-test('pickAction never returns pettySwipe for an NPC with healthy income or low boldness', () => {
+test('pickAction never returns pettySwipe for an NPC with healthy income or low Recklessness', () => {
   const comfortable = createNpc(1, HOME, fixedRng(0.5));
   comfortable.needs.income = 90;
-  comfortable.traits.boldness = 90;
-  comfortable.traits.frugality = 10;
+  comfortable.traits.behavioral.Recklessness = 90;
+  comfortable.traits.economic.Frugality = 10;
   for (let i = 0; i < 500; i += 1) {
     const { action } = pickAction(comfortable, {}, fixedRng(0.0001));
     assert.notEqual(action, 'pettySwipe', 'healthy income must gate the flavor habit off entirely');
@@ -252,19 +275,19 @@ test('pickAction never returns pettySwipe for an NPC with healthy income or low 
 
   const timid = createNpc(2, HOME, fixedRng(0.5));
   timid.needs.income = 5;
-  timid.traits.boldness = 10;
-  timid.traits.frugality = 10;
+  timid.traits.behavioral.Recklessness = 10;
+  timid.traits.economic.Frugality = 10;
   for (let i = 0; i < 500; i += 1) {
     const { action } = pickAction(timid, {}, fixedRng(0.0001));
-    assert.notEqual(action, 'pettySwipe', 'low boldness must gate the flavor habit off entirely');
+    assert.notEqual(action, 'pettySwipe', 'low Recklessness must gate the flavor habit off entirely');
   }
 });
 
 test('pickAction can return pettySwipe only when every gate is open, and only rarely even then', () => {
   const desperate = createNpc(1, HOME, fixedRng(0.5));
   desperate.needs.income = 5;
-  desperate.traits.boldness = 90;
-  desperate.traits.frugality = 5;
+  desperate.traits.behavioral.Recklessness = 90;
+  desperate.traits.economic.Frugality = 5;
 
   // A near-zero rng roll beats even this tiny probability -- the gate
   // being open is necessary, not sufficient by itself to fire on every

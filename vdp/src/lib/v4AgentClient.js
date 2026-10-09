@@ -12,6 +12,7 @@
 // item, which is what buying a wearable the ordinary way grants.
 
 import { sessionHeaders } from './shieldAuth.js';
+import { TRAIT_FAMILIES, tagsFor } from './traits.js';
 
 const V4_API_URL = import.meta.env?.VITE_V4_API_URL || 'http://localhost:8787';
 
@@ -101,11 +102,25 @@ export async function analyzeOutfitPhoto(base64Image, mediaType) {
 // free-text the model could use to claim an arbitrarily large effect.
 const TALK_TOPICS = ['business', 'crafting', 'construction', 'communication', 'management', 'athletics', 'art', 'philosophical', 'religious', 'none'];
 
+// Bounded on purpose -- `npc.traits` now carries VACON-C's real
+// 19-family, 98-trait sheet (`traits.js`), and dumping all 98 into a
+// system prompt would bury what's actually distinctive about this one
+// NPC under 93 near-neutral numbers. The top 5 individual traits plus
+// any real, derived archetype tags (`tagsFor`) is what a reader would
+// actually notice about this person.
+function topTraitsSummary(traits, count = 5) {
+  const flat = [];
+  for (const [family, names] of Object.entries(TRAIT_FAMILIES)) {
+    for (const name of names) flat.push({ name, value: traits?.[family]?.[name] ?? 50 });
+  }
+  return flat.sort((a, b) => b.value - a.value).slice(0, count).map((t) => `${t.name} ${t.value}`).join(', ');
+}
+
 function talkSystemPrompt(npc, npcExplainLine) {
-  const traitSummary = Object.entries(npc.traits)
-    .map(([name, value]) => `${name} ${value}`)
-    .join(', ');
-  return `You are ${npc.name}, a character in a small walkable-world game. Your personality traits (0-100 each): ${traitSummary}. ${npcExplainLine ? `Right now: ${npcExplainLine}` : "You haven't decided what to do next yet."}
+  const traitSummary = topTraitsSummary(npc.traits);
+  const archetypes = tagsFor(npc.traits).map((tag) => tag.name);
+  const archetypeLine = archetypes.length ? ` You are known for being: ${archetypes.join(', ')}.` : '';
+  return `You are ${npc.name}, a character in a small walkable-world game. Your strongest personality traits (0-100 each): ${traitSummary}.${archetypeLine} ${npcExplainLine ? `Right now: ${npcExplainLine}` : "You haven't decided what to do next yet."}
 Reply to the player in character, 1-2 sentences, consistent with your own traits above. Respond with STRICT JSON only, no prose before or after, matching exactly this shape:
 {"reply": "<your in-character reply>", "topic": "<one of: ${TALK_TOPICS.join(', ')}>"}
 Use "topic" to name the one real subject your reply is actually about -- "business"/"crafting"/"construction"/"communication"/"management"/"athletics"/"art" for a practical skill, "philosophical" or "religious" for a belief or worldview exchange, "none" for small talk with no real subject.`;

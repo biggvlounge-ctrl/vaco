@@ -165,7 +165,7 @@ SETTLE_ONCE_TARGETS=(
 )
 
 MEDIA_TARGETS=(
-  vxllage cvnvo vavlt-stvdios v4-proxy vulture-flix vulture-pods chopz
+  vxllage cvnvo vavlt-stvdios v4-proxy vulture-flix vulture-pods chopz vdp
 )
 
 OPERATOR_TARGETS=(

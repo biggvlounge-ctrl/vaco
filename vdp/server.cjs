@@ -41,6 +41,7 @@ const {
 } = require('./lib/shieldAuth.cjs');
 const { traceMiddleware } = require('./lib/tracing.cjs');
 const { createMessageSocketServer } = require('./lib/messageSocket.cjs');
+const { createMediaClient } = require('./lib/mediaClient.cjs');
 
 const PORT = process.env.PORT || 8827;
 const V3_API_URL = process.env.V3_API_URL || 'http://localhost:8811';
@@ -60,6 +61,17 @@ const VACO_SERVICE_TOKEN = process.env.VACO_SERVICE_TOKEN || '';
 const app = express();
 const server = http.createServer(app);
 const livePositions = {}; // userId -> {x, y}, broadcast to every connected client
+
+// "Everybody who comes into the world... can do the real-time media"
+// (9 Oct 2026, finishing the real-time media gap) -- VDP's real,
+// control-plane-only client to vaco-media (the shared, ecosystem-wide
+// session/grant service). This never carries a byte of audio/video
+// itself: it opens a real session and issues real, revocable join
+// grants, and fails soft (returns null) if vaco-media is unreachable
+// -- a call is a feature, never a hard dependency for the rest of the
+// game, the same posture `shared/mediaClient.js`'s own header argues
+// for and CVNVO's speed-dating integration already relies on.
+const media = createMediaClient({ app: 'vdp' });
 
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
@@ -91,6 +103,10 @@ function createVdpStore() {
     justice: { tickets: [], nextTicketId: 1, detentions: [], nextDetentionId: 1 },
     contracts: { contracts: [], nextContractId: 1 },
     dissent: { revolts: [], nextRevoltId: 1 },
+    // Scoped externalId counter for vaco-media's own `openSession` --
+    // see `media` above. VDP keeps no other state about a call; the
+    // real session/grant/lifecycle record lives in vaco-media itself.
+    calls: { nextCallId: 1 },
     // "How much money is generated" (8 Oct 2026) -- a real, running
     // total of real VCoin the governors/AI have paid out into this
     // world's own economy (job shifts, completed contracts, resource
@@ -373,6 +389,7 @@ let store = createVdpStore();
       service: 'vdp',
       players: Object.keys(store.players).length,
       npcs: store.npcWorld ? store.npcWorld.npcs.length : 0,
+      media: media.describe(),
     });
   });
 
@@ -524,6 +541,7 @@ let store = createVdpStore();
       need: npcs.mostPressingNeed(player.state),
       goal: player.state.currentGoal,
       topTrait: npcs.topTrait(player.state),
+      archetypes: npcs.npcArchetypes(player.state),
       topSkill: topSkillEntry && topSkillEntry[1] > 0 ? { subject: topSkillEntry[0], value: topSkillEntry[1] } : null,
       home: home ? home.levelName : null,
       business: shop ? shop.levelName : null,
@@ -1832,6 +1850,56 @@ let store = createVdpStore();
         if (orgA && orgB && orgA.id === orgB.id) {
           organizationsLib.recordActivity(store.organizations, orgA.id);
         }
+      }
+
+      // Real-time media: "everybody who comes into the world" can
+      // start a real voice/video call with another real, connected
+      // player -- vaco-media's own control plane (session + one real,
+      // revocable join grant per side), finishing the real-time media
+      // gap this ecosystem had open. VDP's server never sees or
+      // carries a byte of audio/video; it only opens the session and
+      // hands each side their own grant. `onMessage` is not awaited by
+      // `messageSocket.cjs`, so this runs as a real async handler with
+      // its own `.catch` -- a vaco-media hiccup must never crash the
+      // shared world's WebSocket loop.
+      if (msg.type === 'call-invite' && msg.fromUserId && msg.toUserId) {
+        (async () => {
+          const callId = store.calls.nextCallId++;
+          const session = await media.openSession(callId, 'call', { maxParticipants: 2 });
+          if (!session) {
+            broadcast({
+              type: 'call-unavailable', forUserId: msg.fromUserId, toUserId: msg.toUserId,
+              reason: 'vaco-media did not answer; voice/video is not available right now',
+            });
+            return;
+          }
+          const inviteCaller = await media.inviteParticipant(session.id, msg.fromUserId);
+          const inviteCallee = await media.inviteParticipant(session.id, msg.toUserId);
+          if (!inviteCaller || !inviteCallee) {
+            broadcast({
+              type: 'call-unavailable', forUserId: msg.fromUserId, toUserId: msg.toUserId,
+              reason: 'vaco-media could not issue a join grant for this call',
+            });
+            return;
+          }
+          // One frame per leg -- each names who it's FOR
+          // (`forUserId`), the same filter-on-the-client idiom `chat`
+          // already uses, since this channel has no targeted send.
+          broadcast({
+            type: 'call-invite', forUserId: msg.fromUserId, fromUserId: msg.fromUserId, toUserId: msg.toUserId,
+            callId, sessionId: session.id, credential: inviteCaller.credential,
+          });
+          broadcast({
+            type: 'call-invite', forUserId: msg.toUserId, fromUserId: msg.fromUserId, toUserId: msg.toUserId,
+            callId, sessionId: session.id, credential: inviteCallee.credential,
+          });
+        })().catch((err) => console.warn(`VDP: call-invite failed for ${msg.fromUserId} -> ${msg.toUserId}:`, err.message));
+      }
+
+      if (msg.type === 'call-end' && msg.sessionId) {
+        media.endSession(msg.sessionId).then(() => {
+          broadcast({ type: 'call-ended', callId: msg.callId, sessionId: msg.sessionId });
+        }).catch((err) => console.warn(`VDP: call-end failed for session ${msg.sessionId}:`, err.message));
       }
     },
   });

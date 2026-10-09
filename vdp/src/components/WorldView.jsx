@@ -11,6 +11,7 @@ import { talkToNpc } from "../lib/v4AgentClient.js";
 import { getEquippedOutfit } from "../lib/degvchi.js";
 import { drawAvatar } from "../lib/avatarRender.js";
 import { getLocalState, setLocalState } from "../lib/persistence.js";
+import CallPanel from "./CallPanel.jsx";
 import DegvchiView from "./DegvchiView.jsx";
 import FoodDistrictView from "./FoodDistrictView.jsx";
 import StageView from "./StageView.jsx";
@@ -285,6 +286,12 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
   const [chatTarget, setChatTarget] = useState("");
   const [chatInput, setChatInput] = useState("");
   const [chatLog, setChatLog] = useState([]);
+  // Real-time media: an incoming/active call's own join info, carried
+  // by the `call-invite` WebSocket frame `server.cjs` broadcasts once
+  // it has actually opened a real vaco-media session -- see
+  // `CallPanel.jsx` for what happens with it.
+  const [activeCall, setActiveCall] = useState(null);
+  const [callUnavailable, setCallUnavailable] = useState(null);
   // Pure/static given the current real feature set -- recomputed on
   // every render rather than memoized, since AMENITY_SOURCES never
   // changes within a session.
@@ -357,6 +364,27 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
         }
         if (msg.type === "chat" && session?.userId && (msg.fromUserId === session.userId || msg.toUserId === session.userId)) {
           setChatLog((log) => [...log.slice(-19), msg]);
+        }
+        // Real-time media: this client's own leg of a real call --
+        // `forUserId` is how a channel with no targeted send lets each
+        // client pick out just its own credential (the same idiom
+        // `chat`'s own fromUserId/toUserId filter already uses).
+        if (msg.type === "call-invite" && msg.forUserId === session?.userId) {
+          setCallUnavailable(null);
+          setActiveCall(msg);
+        }
+        if (msg.type === "call-unavailable" && session?.userId
+          && (msg.fromUserId === session.userId || msg.toUserId === session.userId)) {
+          setCallUnavailable(msg.reason);
+          setActiveCall(null);
+        }
+        // The state-updater form, not a direct read of `activeCall`,
+        // because this closure is created once when the effect mounts
+        // (it depends only on `[session?.userId]`) and would otherwise
+        // always compare against whatever `activeCall` was at that
+        // moment -- stale by the time a real call actually ends.
+        if (msg.type === "call-ended") {
+          setActiveCall((current) => (current && current.callId === msg.callId ? null : current));
         }
       };
 
@@ -628,6 +656,30 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
     setChatInput("");
   };
 
+  // Real-time media: asks `server.cjs` to open a real vaco-media
+  // session for a call with the selected player. The actual
+  // credential/join info comes back as a `call-invite` WebSocket
+  // frame (handled above), not from this call directly -- opening the
+  // session is genuinely asynchronous and broadcast to both sides at
+  // once, same reasoning `handleSendChat` already rides this one
+  // shared channel for.
+  const handleStartCall = () => {
+    if (!session?.userId || !chatTarget || wsRef.current?.readyState !== WebSocket.OPEN) return;
+    setCallUnavailable(null);
+    wsRef.current.send(JSON.stringify({
+      type: "call-invite", fromUserId: session.userId, toUserId: chatTarget,
+    }));
+  };
+
+  const handleEndCall = () => {
+    if (activeCall && wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: "call-end", callId: activeCall.callId, sessionId: activeCall.sessionId,
+      }));
+    }
+    setActiveCall(null);
+  };
+
   // Every exchanged message already nudges affinity server-side (the
   // WebSocket chat handler calls `recordConversation` on each one, with
   // no stated sentiment). `POST /api/relationships/conversation` is a
@@ -733,7 +785,11 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
               style={{ flex: 1, fontSize: 12 }}
             />
             <button onClick={handleSendChat} disabled={!chatTarget || !chatInput.trim()}>Send</button>
+            <button onClick={handleStartCall} disabled={!chatTarget || !!activeCall}>Call</button>
           </div>
+          {callUnavailable && (
+            <p style={{ fontSize: 11, color: "#e0c23a", margin: "4px 0 0" }}>{callUnavailable}</p>
+          )}
           {chatTarget && (
             <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
               <span style={{ fontSize: 11, color: "#888" }}>Rate conversation with {chatTarget}:</span>
@@ -853,6 +909,13 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
             </>
           )}
         </div>
+      )}
+      {activeCall && session && (
+        <CallPanel
+          callInfo={activeCall}
+          otherUserId={activeCall.fromUserId === session.userId ? activeCall.toUserId : activeCall.fromUserId}
+          onEnd={handleEndCall}
+        />
       )}
     </div>
   );
