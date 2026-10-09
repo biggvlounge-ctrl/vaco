@@ -17,7 +17,16 @@
 // shape `skills.js`/`npcs.js`'s habits already use, not a scoreboard
 // an inactive group can win by sitting still.
 
-export const ORG_TYPES = ['family', 'tribe', 'cult'];
+// `religious-institution` joined 9 Oct 2026, per direct instruction:
+// "the government will not set up religious institutions. This is
+// something that will be set up as more NPCs come over as well." The
+// existing gate already fits exactly -- `foundOrganization` takes any
+// real `founderId`, NPC included, and nothing in this module lets the
+// government (`jobs.js`'s `PLANETARY_GOVERNORS_PAYROLL`, a payroll
+// account, not an actor with a userId) call it at all. No new code
+// enforces "the government will not" as a rule; it is simply already
+// true that nothing here can act as the government.
+export const ORG_TYPES = ['family', 'tribe', 'cult', 'religious-institution'];
 
 export const STARTING_COHESION = 50;
 export const COHESION_GAIN = 3;

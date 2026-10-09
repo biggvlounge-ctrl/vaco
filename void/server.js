@@ -100,7 +100,7 @@ const {
 } = require('./lib/taas');
 
 const {
-  requireActor, requireParamActor, requireSession, requireCallingService,
+  requireActor, requireParamActor, requireSession, requireCallingService, actorOrService,
 } = require('./lib/shieldAuth.cjs');
 const { createServiceAuth } = require('./lib/serviceAuth.cjs');
 const { createDecisionLog } = require('./lib/decisionLog.cjs');
@@ -1276,7 +1276,15 @@ app.post('/api/regulated-box/:id/verify-recipient', requireOperator('void:vettin
   }
 });
 
-app.post('/api/staffing-position', requireSession(), (req, res) => {
+// `actorOrService` (9 Oct 2026) -- a real posting business is normally
+// a logged-in session, but VDP's own planetary-governors payroll has
+// no human session to present when it posts a real government job
+// opening onto this real marketplace ("people will look on the void
+// app for different jobs that are available for the government").
+// `postStaffingPosition` itself is unchanged; this only widens who may
+// call it, the same dual-auth shape `vdp/server.cjs`'s own
+// `/api/library/record` already uses for the identical reason.
+app.post('/api/staffing-position', actorOrService(requireSession()), (req, res) => {
   try {
     res.status(201).json(postStaffingPosition(store, req.body || {}));
   } catch (err) {

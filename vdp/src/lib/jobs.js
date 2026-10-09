@@ -174,8 +174,16 @@ export function clockIn(store, { workerId, jobId, now = Date.now() } = {}) {
 // If pay fails after a real input was already spent, that spend is
 // undone — two payments for one shift, and neither may survive the
 // other's failure alone, the same shape `upgradeHome` already proved.
+// `regulateYieldFn`/`taxRate`/`treasuryAccountId` are new, both
+// optional and both additive -- see `animals.js`'s own header for the
+// regulation half ("certain people will take advantage... too much
+// killing... everything will get regulated") and `taxes.js`'s for the
+// tax half ("there also be taxes involved"). Neither module is
+// imported here -- the same decoupled-by-injection shape every other
+// cross-module call in this file already uses.
 export async function clockOutAndPay(store, {
   workerId, transferFn, now = Date.now(), resourcesStore, grantMaterialsFn, spendMaterialsFn, undoSpendFn,
+  regulateYieldFn, taxRate = 0, treasuryAccountId,
 } = {}) {
   const assignment = store.assignments[workerId];
   if (!assignment) throw new Error(`clockOutAndPay: "${workerId}" is not clocked in`);
@@ -194,6 +202,14 @@ export async function clockOutAndPay(store, {
   // un-assigned with no pay and no shift to show for it.
   delete store.assignments[workerId];
 
+  // A real income tax, same footing every other unspecified rate in
+  // this file already stands on -- `taxRate` of 0 (the default, and
+  // what every existing caller/test still passes) leaves `netPay`
+  // identical to the full `job.payPerShift`, so nothing below changes
+  // behavior unless a real caller actually opts in.
+  const taxAmount = taxRate > 0 ? Math.round(job.payPerShift * taxRate) : 0;
+  const netPay = job.payPerShift - taxAmount;
+
   const shift = {
     id: store.nextShiftId++,
     workerId,
@@ -201,7 +217,10 @@ export async function clockOutAndPay(store, {
     skill: job.skill,
     startedAt: assignment.startedAt,
     endedAt: now,
-    pay: job.payPerShift,
+    pay: netPay,
+    grossPay: job.payPerShift,
+    taxAmount,
+    taxCollected: false,
     paid: false,
   };
   // Claim before pay: the shift record exists, unpaid, before the
@@ -224,7 +243,7 @@ export async function clockOutAndPay(store, {
     await transferFn({
       fromUserId: job.payrollAccountId,
       toUserId: workerId,
-      amount: job.payPerShift,
+      amount: netPay,
       reason: `vdp-shift-${job.title}`,
     });
     shift.paid = true;
@@ -237,9 +256,31 @@ export async function clockOutAndPay(store, {
 
   if (consumeResult) shift.consumed = { type: job.consumes.type, amount: job.consumes.amount };
 
+  // The worker is already real-paid by this point. A tax-collection
+  // failure here does not undo that -- recorded honestly as
+  // uncollected (`taxCollected` stays `false`) rather than inventing
+  // an atomicity this ledger does not actually have.
+  if (taxAmount > 0 && treasuryAccountId) {
+    try {
+      await transferFn({
+        fromUserId: job.payrollAccountId, toUserId: treasuryAccountId, amount: taxAmount, reason: `vdp-income-tax-${job.title}`,
+      });
+      shift.taxCollected = true;
+    } catch {
+      // real, honest no-op -- see comment above.
+    }
+  }
+
   if (resourcesStore && job.yields) {
-    const granted = grantMaterialsFn(resourcesStore, workerId, { [job.yields.type]: job.yields.amount });
-    shift.yielded = { type: job.yields.type, amount: job.yields.amount };
+    // "Certain people will take advantage of that and do too much
+    // killing... everything will get regulated" -- `regulateYieldFn`
+    // (see `animals.js`) can reduce the real yield amount; omitted,
+    // this is exactly `job.yields.amount`, unchanged.
+    const yieldAmount = typeof regulateYieldFn === 'function'
+      ? regulateYieldFn(resourcesStore, job, assignment.jobId)
+      : job.yields.amount;
+    const granted = grantMaterialsFn(resourcesStore, workerId, { [job.yields.type]: yieldAmount });
+    shift.yielded = { type: job.yields.type, amount: yieldAmount };
     shift.materialsAfter = granted;
   }
 

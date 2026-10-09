@@ -722,6 +722,73 @@ Five more pieces of the same world, per a further direct instruction:
   new code: `property.js`'s `buildUnauthorized`/`purchaseCommercial`
   already accept any real owner id, `npc-<id>` included.
 
+## Imported and discovered animals, real taxes, barter, and the starter world (9 Oct 2026, a third instruction the same day)
+
+Per direct instruction:
+
+- **"People will be importing animals from the old world... breeding
+  and start to grow and breed new things. Also there will be
+  different animals... discovered in the new world as well."** New
+  `animals.js`: `importAnimal` (real, already-adult, one-way from the
+  old world) and `discoverNativeAnimal` (a real, unowned wild find,
+  claimed later) are the two real sources, one real record, the same
+  "two methods, one shape" discipline `immigration.js` already uses.
+  `breedAnimals` requires two real adult same-species parents the
+  breeder actually owns; `growUp` matures a real juvenile after a
+  flagged interpretive real duration.
+- **"Certain people will take advantage of that and do too much
+  killing... everything will get regulated."** `animals.js`'s
+  `regulatedHuntYield` reads `resources.js`'s own already-real
+  `totalProduced.game` -- once this settlement's real cumulative
+  hunting yield crosses a real threshold, `jobs.js`'s `hunter` shift
+  yields less, via a new, optional `regulateYieldFn` hook
+  (`clockOutAndPay`) rather than either module importing the other.
+- **"The currency and the income, there also be taxes involved."** New
+  `taxes.js`: every real shift now withholds a real 10% income tax
+  into a real `GOVERNMENT_TREASURY_ACCOUNT`, as a second real transfer
+  after the worker is already paid -- a tax-collection failure never
+  undoes the worker's own real pay, recorded honestly as uncollected
+  rather than inventing an atomicity this ledger does not have.
+- **"We need the track of how much the government has, how much the
+  government is making through taxes, so we can see when the
+  government will order more import, more robots... or finding a
+  cheaper way to do it... the government is trying to be efficient...
+  because it's ran by AI."** `taxes.js`'s `recommendDeploymentSource`
+  compares the real treasury balance (read live from V3) against a
+  robot type's own real `importCost`/`domesticCost` (`robots.js`) --
+  a real, named rule, not a second invented AI agent.
+- **"This is also where the barter system comes into play... people
+  will also want things from the old world that are exotic, that are
+  being smuggled in. So we need to do an inventory."** New `barter.js`:
+  a real, separate item-for-item ledger (never VCoin), with
+  `seedFromSmuggledGoods` reading `immigration.js`'s own real
+  `smuggledGoods` list rather than inventing a second catalog.
+- **"The government will not set up religious institutions. This is
+  something that will be set up as more NPCs come over."**
+  `organizations.js`'s `ORG_TYPES` now includes
+  `'religious-institution'` -- the existing `foundOrganization` gate
+  already takes any real founder, NPC included, and nothing lets the
+  government (an account, not an actor) call it at all.
+- **"As things grow, people will look on the void app for different
+  jobs that are available for the government."** `server.cjs`'s new
+  `postGovernmentJobsToVoidOnce` posts every real
+  `PLANETARY_GOVERNORS_PAYROLL` job onto VOID's own real staffing
+  marketplace (`void/lib/staffing.js`'s `postStaffingPosition`) at
+  boot. VOID's own `POST /api/staffing-position` gained one real,
+  narrow widening to make this possible: `actorOrService(requireSession())`
+  in place of a bare `requireSession()`, since a government job
+  posting has no human session to present -- the same dual-auth shape
+  this app's own `/api/library/record` already uses.
+- **"Make sure we have how the world is going to be set up and where
+  we need to start... get down the population... how big the world
+  needs to be... a starter world and then a second stage."** Answered
+  in full in the new `VDP_STARTER_WORLD.md` -- Stage 1's real current
+  numbers (39 real NPCs at boot, 25 built districts, 10 real jobs, a
+  500-unit old-world stock, no pre-built housing stock yet) and Stage
+  2's real, scoped next step (a finite starter housing pool, a real
+  mall/village/commons cluster in `world.js`'s own grid), rather than
+  restated here.
+
 ## What is still open
 
 - The area's own name — nothing has been given yet (the product name,

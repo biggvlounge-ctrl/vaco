@@ -32,8 +32,15 @@ test("foundOrganization refuses an unknown type, a missing name, and a second or
   );
 });
 
-test("ORG_TYPES is exactly family, tribe, cult", () => {
-  assert.deepEqual(ORG_TYPES, ["family", "tribe", "cult"]);
+test("ORG_TYPES is exactly family, tribe, cult, religious-institution", () => {
+  assert.deepEqual(ORG_TYPES, ["family", "tribe", "cult", "religious-institution"]);
+});
+
+test('foundOrganization lets a real NPC found a religious institution, never the government', () => {
+  const store = createOrganizationsStore();
+  const org = foundOrganization(store, { name: 'The Lantern Circle', type: 'religious-institution', founderId: 'npc-7' });
+  assert.equal(org.type, 'religious-institution');
+  assert.equal(org.founderId, 'npc-7');
 });
 
 test("addMember mixes a real player and an NPC id freely, and organizationOf finds either", () => {

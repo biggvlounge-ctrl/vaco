@@ -47,30 +47,43 @@
 // robot themselves."
 
 export const ROBOT_TYPES = {
+  // `importCost`/`domesticCost` are flagged interpretive numbers, read
+  // by `taxes.js`'s `recommendDeploymentSource` -- see that module's
+  // own header. Domestic costs more than import across the board right
+  // now: "we will be using the most modern technology that we will be
+  // importing in from the old world" (9 Oct 2026) is read as the
+  // settlement having no real domestic manufacturing base yet, not a
+  // permanent fact -- nothing stops `domesticCost` being revised down
+  // once a real local production path exists.
   'patrol-drone': {
     name: 'Patrol Drone', tier: 1, role: 'basic-patrol',
     description: 'Roams and performs basic patrol tasks -- the weakest real enforcement type, deployed at the Basic security tier.',
     overpowerStrength: 1, canDetain: true, canSeal: true,
+    importCost: 200, domesticCost: 350,
   },
   'household-robot': {
     name: 'Household Robot', tier: 1, role: 'domestic',
     description: 'A domestic assistant robot, not an enforcement machine.',
     overpowerStrength: 1, canDetain: false, canSeal: false,
+    importCost: 150, domesticCost: 300,
   },
   'security-robot': {
     name: 'Security Robot', tier: 2, role: 'enforcement',
     description: 'Basic enforcement: can detain and seal.',
     overpowerStrength: 2, canDetain: true, canSeal: true,
+    importCost: 600, domesticCost: 950,
   },
   'combat-robot': {
     name: 'Combat Robot', tier: 3, role: 'enforcement',
     description: 'Heavier enforcement hardware.',
     overpowerStrength: 4, canDetain: true, canSeal: true,
+    importCost: 1500, domesticCost: 2300,
   },
   'military-robot': {
     name: 'Military Robot', tier: 4, role: 'enforcement',
     description: 'The government\'s top-tier enforcement hardware.',
     overpowerStrength: 8, canDetain: true, canSeal: true,
+    importCost: 4000, domesticCost: 6500,
   },
 };
 

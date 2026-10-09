@@ -12,6 +12,7 @@ import {
   generateMigrationWave, deportPerson, isDeported, ILLEGAL_CROSSING_TERRAIN,
   findUndergroundWorldSpot, sponsorFamilyMembers, WEALTH_TIERS, DEFAULT_FAMILY_ADMISSION_FRACTION,
 } from '../src/lib/immigration.js';
+import { FRONTIER_ZONES, UNDERGROUND_ZONES } from '../src/lib/zones.js';
 
 test('admitWithPassport records a real, legal arrival with the old-world background given', () => {
   const store = createImmigrationStore();
@@ -105,6 +106,17 @@ test('reportSmugglingSpot defaults leadsToUndergroundWorld to false; findUndergr
 
   const passage = reportSmugglingSpot(store, { locationLabel: 'the deep vent', leadsToUndergroundWorld: true });
   assert.equal(findUndergroundWorldSpot(store), passage);
+});
+
+test('reportSmugglingSpot draws its real zone from the frontier list, or the underground list when it leads there', () => {
+  const store = createImmigrationStore();
+  const frontierSpot = reportSmugglingSpot(store, { locationLabel: 'the old quarry trail', rng: () => 0 });
+  assert.equal(frontierSpot.zone, FRONTIER_ZONES[0].name);
+
+  const undergroundSpot = reportSmugglingSpot(store, {
+    locationLabel: 'the deep vent', leadsToUndergroundWorld: true, rng: () => 0,
+  });
+  assert.equal(undergroundSpot.zone, UNDERGROUND_ZONES[0].name);
 });
 
 test('foundIllegalSettlement records real, free-text red-zone activities, defaulting to none', () => {

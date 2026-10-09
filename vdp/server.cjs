@@ -141,6 +141,41 @@ async function transferVCoin({ fromUserId, toUserId, amount, reason }) {
 // Station model this is meant to mirror, per direct instruction ("the
 // void hub should be similar to how the void hub is used in real
 // life").
+// "As things grow, people will look on the void app for different
+// jobs that are available for the government" (9 Oct 2026) -- VDP's
+// own server-to-server posting of a real government job opening onto
+// VOID's own real staffing marketplace (`void/lib/staffing.js`'s
+// `postStaffingPosition`), same auth posture as `registerVoidHub`
+// above. `businessId` is the planetary governors' own payroll account
+// (`jobs.PLANETARY_GOVERNORS_PAYROLL`) -- the real, named employer
+// behind every frontier/government job, the same id `clockOutAndPay`
+// already pays out of. `employmentType: 'on-demand'` is the closest
+// real fit VOID's own fixed list has to a job a player clocks into and
+// out of freely -- VOID has no literal "gig" category of its own.
+async function postGovernmentJobToVoid({ businessId, positionType, hourlyRate }) {
+  const res = await fetch(`${VOID_API_URL}/api/staffing-position`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Service-Name': VACO_SERVICE_NAME,
+      'X-Service-Token': VACO_SERVICE_TOKEN,
+    },
+    body: JSON.stringify({
+      businessId,
+      positionType,
+      employmentType: 'on-demand',
+      hourlyRate,
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    let message = `postGovernmentJobToVoid failed (${res.status})`;
+    try { message = JSON.parse(text).error || message; } catch { /* not JSON */ }
+    throw new Error(message);
+  }
+  return res.json();
+}
+
 async function registerVoidHub({ regionId, bayCount, temperatureControlled, lat, lng }) {
   const res = await fetch(`${VOID_API_URL}/api/station`, {
     method: 'POST',
@@ -191,6 +226,9 @@ let store = createVdpStore();
   const dissentLib = await import('./src/lib/dissent.js');
   const economyLib = await import('./src/lib/economy.js');
   const robotsLib = await import('./src/lib/robots.js');
+  const animalsLib = await import('./src/lib/animals.js');
+  const taxesLib = await import('./src/lib/taxes.js');
+  const barterLib = await import('./src/lib/barter.js');
 
   // A migrant's real old-world background carries over if one was
   // recorded (`immigration.js`'s `admitWithPassport`/`crossIllegally`,
@@ -252,6 +290,22 @@ let store = createVdpStore();
     }
   }
 
+  async function postGovernmentJobsToVoidOnce() {
+    if (store.governmentJobsPostedToVoid) return;
+    try {
+      const governmentJobs = jobsLib.listJobs().filter((j) => j.payrollAccountId === jobsLib.PLANETARY_GOVERNORS_PAYROLL);
+      for (const job of governmentJobs) {
+        await postGovernmentJobToVoid({
+          businessId: jobsLib.PLANETARY_GOVERNORS_PAYROLL, positionType: job.title, hourlyRate: job.payPerShift,
+        });
+      }
+      store.governmentJobsPostedToVoid = true;
+      console.log(`VDP: posted ${governmentJobs.length} real government job openings to VOID's staffing marketplace.`);
+    } catch (err) {
+      console.warn(`VDP: could not post government jobs to VOID (VOID may not be running): ${err.message}`);
+    }
+  }
+
   attachStore(app, {
     appKey: 'vdp',
     createDefault: createVdpStore,
@@ -271,7 +325,11 @@ let store = createVdpStore();
       if (!store.vacayHotels) store.vacayHotels = { listingIds: [] };
       if (!store.resources) store.resources = resourcesLib.createResourcesStore();
       if (!store.robots) store.robots = robotsLib.createRobotsStore();
+      if (!store.animals) store.animals = animalsLib.createAnimalsStore();
+      if (!store.taxes) store.taxes = taxesLib.createTaxesStore();
+      if (!store.barter) store.barter = barterLib.createBarterStore();
       registerMeridianVoidHubsOnce();
+      postGovernmentJobsToVoidOnce();
     },
   });
 
@@ -463,7 +521,25 @@ let store = createVdpStore();
         workerId, transferFn: transferVCoin,
         resourcesStore: store.resources, grantMaterialsFn: resourcesLib.grantMaterials,
         spendMaterialsFn: resourcesLib.spendMaterials, undoSpendFn: resourcesLib.undoSpend,
+        // "There also be taxes involved" (9 Oct 2026) -- a real cut of
+        // every real shift's pay, withheld into the real government
+        // treasury account. "Certain people will take advantage...
+        // too much killing... everything will get regulated" (same
+        // day) -- the hunter's own real yield is reduced once this
+        // settlement's real cumulative hunting output crosses
+        // `animals.js`'s own real threshold; every other job's yield
+        // is untouched.
+        taxRate: taxesLib.DEFAULT_INCOME_TAX_RATE,
+        treasuryAccountId: taxesLib.GOVERNMENT_TREASURY_ACCOUNT,
+        regulateYieldFn: (resourcesStore, job, jobId) => (
+          jobId === 'hunter'
+            ? animalsLib.regulatedHuntYield(resourcesStore.totalProduced.game, job.yields.amount)
+            : job.yields.amount
+        ),
       });
+      if (shift.taxCollected) {
+        taxesLib.recordTaxCollection(store.taxes, { amount: shift.taxAmount, source: shift.jobId });
+      }
       const player = ensurePlayer(workerId);
       skillsLib.gainFromShift(player.skills, shift.skill);
       if (shift.paid) store.analytics.totalVCoinGenerated += shift.pay;
@@ -1324,6 +1400,132 @@ let store = createVdpStore();
         text: `${req.params.id} sold ${result.amount} ${result.type} for ${result.payout} VCoin`,
       });
       res.status(200).json(result);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // --- Animals: imported livestock, native discoveries, breeding -------
+  app.get('/api/animals/owned-by/:ownerId', (req, res) => {
+    res.json({ animals: animalsLib.listAnimalsOwnedBy(store.animals, req.params.ownerId) });
+  });
+
+  app.get('/api/animals/wild', (_req, res) => {
+    res.json({ animals: animalsLib.listWildAnimals(store.animals) });
+  });
+
+  app.post('/api/animals/import', requireActor('ownerId'), (req, res) => {
+    try {
+      res.status(201).json(animalsLib.importAnimal(store.animals, {
+        species: req.body.species, ownerId: req.body.ownerId,
+      }));
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // The AI government's own act, same posture as
+  // `/api/immigration/migration-wave` -- a new native species being
+  // found is a world event, never one player's own claim.
+  app.post('/api/animals/discover', requireCallingService(), (req, res) => {
+    try {
+      res.status(201).json(animalsLib.discoverNativeAnimal(store.animals, {
+        species: req.body.species, discoveredBy: req.body.discoveredBy,
+      }));
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/animals/:id/claim', requireActor('ownerId'), (req, res) => {
+    try {
+      res.status(200).json(animalsLib.claimNativeAnimal(store.animals, Number(req.params.id), {
+        ownerId: req.body.ownerId,
+      }));
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/animals/breed', requireActor('ownerId'), (req, res) => {
+    try {
+      const offspring = animalsLib.breedAnimals(store.animals, {
+        parentAId: Number(req.body.parentAId), parentBId: Number(req.body.parentBId), ownerId: req.body.ownerId,
+      });
+      newsLib.recordEvent(store.news, { kind: 'animals', text: `${req.body.ownerId} bred a new ${offspring.species}` });
+      res.status(201).json(offspring);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/animals/:id/grow-up', (req, res) => {
+    try {
+      res.status(200).json(animalsLib.growUp(store.animals, Number(req.params.id)));
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // --- Taxes: real government revenue, and import-vs-domestic -----------
+  app.get('/api/taxes/total', (_req, res) => {
+    res.json({ totalTaxRevenue: taxesLib.totalTaxRevenue(store.taxes), treasuryAccount: taxesLib.GOVERNMENT_TREASURY_ACCOUNT });
+  });
+
+  // "We need the track of how much the government has, how much the
+  // government is making through taxes, so we can see when the
+  // government will order more import, more robots... or finding a
+  // cheaper way to do it" (9 Oct 2026) -- the real treasury balance,
+  // read live from V3's own ledger, never a second duplicated number.
+  app.get('/api/taxes/efficiency/:robotTypeId', async (req, res) => {
+    try {
+      const balanceRes = await fetch(`${V3_API_URL}/api/vcoin/balance/${encodeURIComponent(taxesLib.GOVERNMENT_TREASURY_ACCOUNT)}`, {
+        headers: { 'X-Service-Name': VACO_SERVICE_NAME, 'X-Service-Token': VACO_SERVICE_TOKEN },
+      });
+      const balanceBody = await balanceRes.json();
+      if (!balanceRes.ok) throw new Error(balanceBody.error || `treasury balance lookup failed (${balanceRes.status})`);
+      const robotType = robotsLib.getRobotType(req.params.robotTypeId);
+      res.json(taxesLib.recommendDeploymentSource(balanceBody.balance, robotType));
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // --- Barter: direct trade of exotic, smuggled old-world goods ---------
+  app.get('/api/barter/inventory/:entityId', (req, res) => {
+    res.json({ inventory: barterLib.inventoryFor(store.barter, req.params.entityId) });
+  });
+
+  app.get('/api/barter/open', (_req, res) => {
+    res.json({ trades: barterLib.listOpenTrades(store.barter) });
+  });
+
+  app.get('/api/barter/mine/:entityId', (req, res) => {
+    res.json({ trades: barterLib.tradesInvolving(store.barter, req.params.entityId) });
+  });
+
+  app.post('/api/barter/propose', requireActor('fromId'), (req, res) => {
+    try {
+      const trade = barterLib.proposeTrade(store.barter, {
+        fromId: req.body.fromId, toId: req.body.toId, offer: req.body.offer, request: req.body.request,
+      });
+      res.status(201).json(trade);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/barter/:id/accept', (req, res) => {
+    try {
+      res.status(200).json(barterLib.acceptTrade(store.barter, Number(req.params.id)));
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/barter/:id/cancel', (req, res) => {
+    try {
+      res.status(200).json(barterLib.cancelTrade(store.barter, Number(req.params.id)));
     } catch (err) {
       res.status(400).json({ error: err.message });
     }

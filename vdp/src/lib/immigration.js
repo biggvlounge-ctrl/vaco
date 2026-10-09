@@ -1,4 +1,11 @@
+import { FRONTIER_ZONES, UNDERGROUND_ZONES, pickZone } from './zones.js';
+
 // VDP — Immigration: legal and illegal entry to the settlement.
+//
+// `zones.js` is imported directly above, not injected -- it is a
+// plain, side-effect-free constants module (see its own header), the
+// same footing `world.js`'s `DISTRICTS` already stands on for other
+// modules in this directory that read it the same way.
 //
 // Direct instruction (8 Oct 2026): the settlement stays open but
 // controlled -- "we will also try to keep a controlled atmosphere of
@@ -80,6 +87,7 @@
 // `TEMPORARY_PASSPORT_DURATION_MS` is a flagged interpretive number,
 // same footing `resources.js`'s `DIG_COOLDOWN_MS` already stands on --
 // no document gives VDP a real visa length.
+
 export const CITIZENSHIP_TYPES = ['citizenship', 'temporary'];
 export const TEMPORARY_PASSPORT_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -372,15 +380,25 @@ export function isDeported(store, personId) {
 // "A new spot found where people are sneaking in" -- a real, named
 // discovery. Starts open; sealing it is a separate real act, so
 // "found" and "closed" are two events, not one guessed-at moment.
+// **"Make the woods and the underground worlds... full of life, make
+// them different, different areas, different places"** (9 Oct 2026):
+// `zone` names which real, distinct area (`zones.js`) a found spot is
+// actually in -- a frontier zone unless the spot itself leads to the
+// underground world, in which case it draws from that real, separate
+// list instead. `rng` is injectable the same way every other
+// real-but-flagged pick in this file (`generateMigrationWave`'s own
+// `pickFrom`) already is, so a test can make this deterministic.
 export function reportSmugglingSpot(store, {
-  locationLabel, reportedBy, leadsToUndergroundWorld = false, now = Date.now(),
+  locationLabel, reportedBy, leadsToUndergroundWorld = false, rng = Math.random, now = Date.now(),
 } = {}) {
   if (!locationLabel) throw new Error('reportSmugglingSpot requires a locationLabel');
+  const zone = pickZone(leadsToUndergroundWorld ? UNDERGROUND_ZONES : FRONTIER_ZONES, rng);
   const spot = {
     id: store.nextSpotId++,
     locationLabel,
     terrain: ILLEGAL_CROSSING_TERRAIN,
     leadsToUndergroundWorld,
+    zone: zone.name,
     reportedBy: reportedBy || null,
     sealed: false,
     reportedAt: now,

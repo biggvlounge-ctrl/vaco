@@ -115,6 +115,83 @@ test('a frontier shift still works with no resources wiring at all — yields st
   assert.equal(shift.yielded, undefined);
 });
 
+// -- real income tax (9 Oct 2026) ---------------------------------------
+
+test('with no taxRate given, pay is exactly job.payPerShift -- the original behavior, unchanged', async () => {
+  const store = createJobsStore();
+  clockIn(store, { workerId: 'alice', jobId: 'food-cashier' });
+  const calls = [];
+  const shift = await clockOutAndPay(store, { workerId: 'alice', transferFn: fakeTransfer(calls) });
+  assert.equal(shift.pay, getJob('food-cashier').payPerShift);
+  assert.equal(shift.taxAmount, 0);
+  assert.equal(shift.taxCollected, false);
+  assert.equal(calls.length, 1, 'no tax transfer should be attempted at all');
+});
+
+test('a real taxRate withholds a real cut into the real treasury account, paid as a second transfer', async () => {
+  const store = createJobsStore();
+  clockIn(store, { workerId: 'alice', jobId: 'food-cashier' });
+  const calls = [];
+  const grossPay = getJob('food-cashier').payPerShift;
+  const shift = await clockOutAndPay(store, {
+    workerId: 'alice', transferFn: fakeTransfer(calls), taxRate: 0.1, treasuryAccountId: 'vdp-government-treasury',
+  });
+  const expectedTax = Math.round(grossPay * 0.1);
+  assert.equal(shift.grossPay, grossPay);
+  assert.equal(shift.taxAmount, expectedTax);
+  assert.equal(shift.pay, grossPay - expectedTax);
+  assert.equal(shift.taxCollected, true);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].amount, grossPay - expectedTax);
+  assert.equal(calls[0].toUserId, 'alice');
+  assert.equal(calls[1].amount, expectedTax);
+  assert.equal(calls[1].toUserId, 'vdp-government-treasury');
+});
+
+test('the worker is still paid even if the real tax transfer itself fails -- recorded honestly as uncollected', async () => {
+  const store = createJobsStore();
+  clockIn(store, { workerId: 'alice', jobId: 'food-cashier' });
+  let call = 0;
+  const transferFn = async (args) => {
+    call += 1;
+    if (call === 2) throw new Error('treasury transfer failed');
+    return { ok: true };
+  };
+  const shift = await clockOutAndPay(store, {
+    workerId: 'alice', transferFn, taxRate: 0.1, treasuryAccountId: 'vdp-government-treasury',
+  });
+  assert.equal(shift.paid, true, 'the worker\'s own real pay must not be undone by a tax-collection failure');
+  assert.equal(shift.taxCollected, false);
+});
+
+// -- real overhunting regulation (9 Oct 2026) ---------------------------
+
+test('regulateYieldFn, when given, overrides the real granted yield amount', async () => {
+  const store = createJobsStore();
+  const resourcesStore = createResourcesStore();
+  clockIn(store, { workerId: 'alice', jobId: 'hunter' });
+  const regulateYieldFn = (resStore, job, jobId) => {
+    assert.equal(jobId, 'hunter');
+    assert.equal(job.yields.amount, 5);
+    return 2; // a regulated-down real yield
+  };
+  const shift = await clockOutAndPay(store, {
+    workerId: 'alice', transferFn: fakeTransfer([]), resourcesStore, grantMaterialsFn: grantMaterials, regulateYieldFn,
+  });
+  assert.deepEqual(shift.yielded, { type: 'game', amount: 2 });
+  assert.equal(materialsFor(resourcesStore, 'alice').game, 2);
+});
+
+test('with no regulateYieldFn given, the yield is exactly job.yields.amount -- the original behavior, unchanged', async () => {
+  const store = createJobsStore();
+  const resourcesStore = createResourcesStore();
+  clockIn(store, { workerId: 'alice', jobId: 'hunter' });
+  const shift = await clockOutAndPay(store, {
+    workerId: 'alice', transferFn: fakeTransfer([]), resourcesStore, grantMaterialsFn: grantMaterials,
+  });
+  assert.deepEqual(shift.yielded, { type: 'game', amount: 5 });
+});
+
 test('the water treatment job is government-run and has no input of its own — it is the base of the chain', () => {
   const job = getJob('water-treatment-worker');
   assert.equal(job.payrollAccountId, PLANETARY_GOVERNORS_PAYROLL);
