@@ -57,7 +57,24 @@
 // uses to fight the government -- a shadow-government organization is
 // simply another real organization whose leader can use it, the same
 // way a large-enough tribe already could.
-export const ORG_TYPES = ['family', 'tribe', 'cult', 'religious-institution', 'gang', 'shadow-government'];
+//
+// `extremist-organization` and `cartel` joined the same day, a later
+// instruction: "also need to add in extremist organizations, make
+// sure you do all the gangs... also add in, like I said, gang
+// leaders, cartels." `cartel` is deliberately its own real type, not
+// folded into `gang` -- the instruction names both words, and a
+// cartel (large-scale, hierarchical, cross-border trafficking) is a
+// real, different shape of organization than a street-level gang,
+// the same real-world distinction `smugglingSpots`/`barter.js`'s own
+// goods-trafficking economy already gives a cartel something real to
+// run. "Gang leaders" needs no new field: `founderId` already names
+// who leads any organization here, gang or cartel included -- the
+// existing gate already fits, the same treatment `religious-
+// institution`/`shadow-government` already got above.
+export const ORG_TYPES = [
+  'family', 'tribe', 'cult', 'religious-institution', 'gang', 'shadow-government',
+  'extremist-organization', 'cartel',
+];
 
 export const STARTING_COHESION = 50;
 export const COHESION_GAIN = 3;

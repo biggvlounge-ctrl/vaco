@@ -32,8 +32,19 @@ test("foundOrganization refuses an unknown type, a missing name, and a second or
   );
 });
 
-test("ORG_TYPES is exactly family, tribe, cult, religious-institution, gang, shadow-government", () => {
-  assert.deepEqual(ORG_TYPES, ["family", "tribe", "cult", "religious-institution", "gang", "shadow-government"]);
+test("ORG_TYPES is exactly family, tribe, cult, religious-institution, gang, shadow-government, extremist-organization, cartel", () => {
+  assert.deepEqual(ORG_TYPES, [
+    "family", "tribe", "cult", "religious-institution", "gang", "shadow-government",
+    "extremist-organization", "cartel",
+  ]);
+});
+
+test("extremist-organization and cartel use the same open gate every other organization type already does", () => {
+  const store = createOrganizationsStore();
+  const extremist = foundOrganization(store, { name: "The Red Hand", type: "extremist-organization", founderId: "alice" });
+  assert.equal(extremist.type, "extremist-organization");
+  const cartel = foundOrganization(store, { name: "The Serpent Cartel", type: "cartel", founderId: "bob" });
+  assert.equal(cartel.type, "cartel");
 });
 
 test('foundOrganization lets a real NPC found a religious institution, never the government', () => {

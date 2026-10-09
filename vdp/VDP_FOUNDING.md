@@ -1430,6 +1430,67 @@ personality."
   `npcs.js`'s own single-sheet-per-person architecture, and is not
   built here. Recorded as open, not faked with a label.
 
+## Real old-world occupations, old-world organizations, and two more organization types (9 Oct 2026, a twenty-first instruction the same day)
+
+Per direct instruction: "also need to add in extremist organizations,
+make sure you do all the gangs... make sure you also do what type of
+jobs, use some type of statistic to do all jobs in the old world from
+vacancy, and how those will be the skills of the people that come
+over, depending on their location and where they're from... also add
+in, like I said, gang leaders, cartels. Make sure you bring over all
+the factions of everything from the old world to the new world."
+
+- **`organizations.js` gained two more real, gated types**:
+  `extremist-organization` and `cartel`. `cartel` is deliberately its
+  own type, not folded into `gang` -- the instruction names both
+  words, and a cartel (large-scale, cross-border trafficking) is a
+  real, different shape than a street-level gang, one `barter.js`'s
+  own smuggled-goods economy already gives something real to run.
+  "Gang leaders" needed no new field: `founderId` already names who
+  leads any organization here.
+- **A new `occupations.js`, a real statistic, not an invented one.**
+  VACON-C's own `server/occupations.js` is a real, named taxonomy (its
+  own header: "the taxonomy is the spec's, not an invented one") --
+  seven real tiers with real counts (41 occupations total). VDP's own
+  `occupations.js` carries the real 27-occupation subset whose `skill`
+  is one of VDP's own 11 real skills (the same scoping `skills.js`
+  itself already applies) -- tier/skill/source ported verbatim, not
+  re-invented.
+- **"Depending on their location and where they're from" is
+  deliberately NOT modeled by region.** Checked directly: VACON-C's
+  occupations.js has no per-region weighting at all -- "the old
+  world's regions" is VDP's own `demographics.js` invention, for
+  migration flavor only, with no real tie to occupation anywhere.
+  Inventing one here would be exactly the guessed-at fact this project
+  refuses to assert. `pickOldWorldOccupation({wealthTier})` biases its
+  real tier range by the one real economic signal that DOES already
+  vary per arrival -- `immigration.js`'s own `wealthTier` ("the people
+  who are most affluent... come first"): affluent arrivals draw from
+  the top two real tiers, general arrivals from the bottom three,
+  flagged interpretive for the exact cutoffs since no document ties a
+  wealth tier to a numbered occupation tier. `oldWorldSkillsFor` is
+  the real seed this produces for `server.cjs`'s own admission
+  routes, used only when the request doesn't already supply its own
+  `oldWorldSkills` -- a real arrival's own stated skills are never
+  overridden.
+- **Old-world factions, recorded, not auto-applied.** "Bring over all
+  the factions of everything from the old world to the new world."
+  `admitWithPassport` gained `oldWorldOrganization` (free text, same
+  discipline as `oldWorldSkills`/`oldWorldBeliefs`) -- recorded
+  verbatim on the arrival. Deliberately NOT auto-founding or auto-
+  joining a real `organizations.js` group: a free-text name alone
+  doesn't say whether it was a family, a gang, a cartel, or an
+  extremist organization, and guessing a type would be an invented
+  fact. The real record exists; applying it is a real, later decision
+  a player or the game's own logic makes, the same split
+  `oldWorldSkills` already drew with `ensurePlayer`.
+- **Fixed a pre-existing gap while wiring this.** `wealthTier`/
+  `sponsorId` had never actually been forwarded from any admission
+  route into `admitWithPassport`/`applyForCitizenship`/
+  `applyForTemporaryPassport` -- confirmed by direct grep, not
+  assumed. Both are now real, live reads: `wealthTier` is what the new
+  occupation draw above actually needs to do anything at all.
+
 ## What is still open
 
 - The area's own name — nothing has been given yet (the product name,

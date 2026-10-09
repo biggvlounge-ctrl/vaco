@@ -32,6 +32,15 @@ test('admitWithPassport records a real, legal arrival with the old-world backgro
   assert.equal(listArrivals(store).length, 1);
 });
 
+test('admitWithPassport defaults to no real old-world organization, and records one verbatim when given', () => {
+  const store = createImmigrationStore();
+  const plain = admitWithPassport(store, { personId: 'alice' });
+  assert.equal(plain.oldWorldOrganization, null);
+
+  const withOrg = admitWithPassport(store, { personId: 'bob', oldWorldOrganization: 'The Red Hand' });
+  assert.equal(withOrg.oldWorldOrganization, 'The Red Hand');
+});
+
 test('admitWithPassport refuses a second arrival for the same person', () => {
   const store = createImmigrationStore();
   admitWithPassport(store, { personId: 'alice' });

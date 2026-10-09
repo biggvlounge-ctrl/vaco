@@ -285,6 +285,7 @@ let store = createVdpStore();
   const taxesLib = await import('./src/lib/taxes.js');
   const barterLib = await import('./src/lib/barter.js');
   const diseasesLib = await import('./src/lib/diseases.js');
+  const occupationsLib = await import('./src/lib/occupations.js');
   const socialClassLib = await import('./src/lib/socialClass.js');
   const eliteLib = await import('./src/lib/elite.js');
   const hospitalLib = await import('./src/lib/hospital.js');
@@ -1061,6 +1062,19 @@ let store = createVdpStore();
     });
   }
 
+  // "Use some type of statistic to do all jobs in the old world from
+  // vacancy, and how those will be the skills of the people that come
+  // over" (9 Oct 2026, a later direct instruction). A real arrival who
+  // already names their own `oldWorldSkills` keeps it exactly as
+  // given, unchanged -- this only fills the gap for an arrival who
+  // didn't, drawing one real occupation (`occupations.js`'s own real
+  // VACON-C-ported taxonomy) biased by the real `wealthTier` already
+  // on the request.
+  function resolveOldWorldSkills(req) {
+    if (req.body.oldWorldSkills) return req.body.oldWorldSkills;
+    return occupationsLib.oldWorldSkillsFor({ wealthTier: req.body.wealthTier }).skills;
+  }
+
   app.post('/api/immigration/admit', requireActor('personId'), (req, res) => {
     if (!requireCitizenshipEligibility(req, res)) return;
     try {
@@ -1068,13 +1082,16 @@ let store = createVdpStore();
         personId: req.body.personId,
         originRegion: req.body.originRegion,
         religion: req.body.religion,
-        oldWorldSkills: req.body.oldWorldSkills,
+        oldWorldSkills: resolveOldWorldSkills(req),
         oldWorldBeliefs: req.body.oldWorldBeliefs,
+        oldWorldOrganization: req.body.oldWorldOrganization,
         citizenshipType: req.body.citizenshipType,
         dissident: req.body.dissident,
         seekingAsylum: req.body.seekingAsylum,
         eliteSponsorship: req.body.eliteSponsorship,
         isBusinessOwner: req.body.isBusinessOwner,
+        wealthTier: req.body.wealthTier,
+        sponsorId: req.body.sponsorId,
       });
       newsLib.recordEvent(store.news, { kind: 'immigration', text: `${req.body.personId} arrived through passport control` });
       const housingAssignment = maybeAssignAsylumHousing(arrival);
@@ -1095,11 +1112,14 @@ let store = createVdpStore();
         personId: req.body.personId,
         originRegion: req.body.originRegion,
         religion: req.body.religion,
-        oldWorldSkills: req.body.oldWorldSkills,
+        oldWorldSkills: resolveOldWorldSkills(req),
         oldWorldBeliefs: req.body.oldWorldBeliefs,
+        oldWorldOrganization: req.body.oldWorldOrganization,
         seekingAsylum: req.body.seekingAsylum,
         eliteSponsorship: req.body.eliteSponsorship,
         isBusinessOwner: req.body.isBusinessOwner,
+        wealthTier: req.body.wealthTier,
+        sponsorId: req.body.sponsorId,
       });
       newsLib.recordEvent(store.news, { kind: 'immigration', text: `${req.body.personId} was granted citizenship` });
       const housingAssignment = maybeAssignAsylumHousing(arrival);
@@ -1116,10 +1136,13 @@ let store = createVdpStore();
         personId: req.body.personId,
         originRegion: req.body.originRegion,
         religion: req.body.religion,
-        oldWorldSkills: req.body.oldWorldSkills,
+        oldWorldSkills: resolveOldWorldSkills(req),
         oldWorldBeliefs: req.body.oldWorldBeliefs,
+        oldWorldOrganization: req.body.oldWorldOrganization,
         seekingAsylum: req.body.seekingAsylum,
         eliteSponsorship: req.body.eliteSponsorship,
+        wealthTier: req.body.wealthTier,
+        sponsorId: req.body.sponsorId,
       });
       newsLib.recordEvent(store.news, { kind: 'immigration', text: `${req.body.personId} was granted a temporary passport` });
       const housingAssignment = maybeAssignAsylumHousing(arrival);

@@ -51,6 +51,20 @@ import { FRONTIER_ZONES, UNDERGROUND_ZONES, pickZone } from './zones.js';
 // player-seeding decision (`server.cjs`'s `ensurePlayer`), this module
 // only keeps the real record of what a migrant said they brought.
 //
+// `oldWorldOrganization` joined 9 Oct 2026, a later direct
+// instruction: "make sure you bring over all the factions of
+// everything from the old world to the new world." Same discipline
+// exactly as its two siblings above -- free text (an old-world
+// faction/gang/cartel name is an open, real-world-shaped set this
+// module refuses to invent a closed enum for), recorded verbatim, not
+// auto-founding or auto-joining a real `organizations.js` group here.
+// This module has no real `type` for whatever the migrant names (a
+// free-text name alone doesn't say whether it was a family, a gang, a
+// cartel, or an extremist organization), so guessing one would be
+// exactly the kind of invented fact this project refuses to assert --
+// `server.cjs`/a player reads this real field and makes that real
+// call themselves, the same way `oldWorldSkills` already works.
+//
 // No hidden detection roll anywhere below -- this project's own
 // standing rule against inventing a simulation threshold applies here
 // the same as everywhere else. "A new spot found" and "someone caught"
@@ -244,7 +258,7 @@ function requireNoExistingArrival(store, personId, fnName) {
 // field existed got (`applyForCitizenship` below is the same default,
 // spelled out); choosing `'temporary'` sets a real `expiresAt`.
 export function admitWithPassport(store, {
-  personId, originRegion, religion, oldWorldSkills, oldWorldBeliefs,
+  personId, originRegion, religion, oldWorldSkills, oldWorldBeliefs, oldWorldOrganization,
   citizenshipType = 'citizenship', dissident = false,
   wealthTier = 'general', sponsorId = null, familyImportCapacity = null,
   seekingAsylum = false, eliteSponsorship = null, isBusinessOwner = false,
@@ -282,6 +296,7 @@ export function admitWithPassport(store, {
     smuggledGoods: [],
     oldWorldSkills: oldWorldSkills || null,
     oldWorldBeliefs: oldWorldBeliefs || null,
+    oldWorldOrganization: oldWorldOrganization || null,
     wealthTier,
     sponsorId,
     familyImportCapacity: familyImportCapacity ?? null,
