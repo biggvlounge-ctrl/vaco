@@ -438,6 +438,46 @@ test('operateBusiness scales real revenue by the real economy multiplier', async
   assert.equal(revenue, COMMERCIAL_LEVELS[0].level * BASE_COMMERCIAL_REVENUE * 2);
 });
 
+test('operateBusiness withholds a real income tax when a real rate and treasury are given', async () => {
+  const store = createPropertyStore();
+  await purchaseCommercial(store, { ownerId: 'gail', transferFn: fakeTransfer([]) });
+  const calls = [];
+  const grossRevenue = COMMERCIAL_LEVELS[0].level * BASE_COMMERCIAL_REVENUE;
+  const taxAmount = Math.round(grossRevenue * 0.1);
+  const result = await operateBusiness(store, {
+    ownerId: 'gail', transferFn: fakeTransfer(calls), taxRate: 0.1, treasuryAccountId: 'vdp-government-treasury',
+  });
+  assert.equal(result.grossRevenue, grossRevenue);
+  assert.equal(result.taxAmount, taxAmount);
+  assert.equal(result.revenue, grossRevenue - taxAmount);
+  assert.equal(result.taxCollected, true);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].amount, grossRevenue - taxAmount);
+  assert.deepEqual(calls[1], {
+    fromUserId: BUSINESS_REVENUE_ACCOUNT, toUserId: 'vdp-government-treasury', amount: taxAmount, reason: 'vdp-business-income-tax',
+  });
+});
+
+test('operateBusiness omitting taxRate leaves revenue exactly as before -- every existing caller unchanged', async () => {
+  const store = createPropertyStore();
+  await purchaseCommercial(store, { ownerId: 'gail', transferFn: fakeTransfer([]) });
+  const result = await operateBusiness(store, { ownerId: 'gail', transferFn: fakeTransfer([]) });
+  assert.equal(result.taxAmount, 0);
+  assert.equal(result.taxCollected, false);
+  assert.equal(result.revenue, result.grossRevenue);
+});
+
+test('operateBusiness taxes an unauthorized business exactly the same as a sanctioned one', async () => {
+  const store = createPropertyStore();
+  buildUnauthorized(store, { ownerId: 'nia', locationLabel: 'the back alley', type: 'commercial' });
+  const calls = [];
+  const result = await operateBusiness(store, {
+    ownerId: 'nia', transferFn: fakeTransfer(calls), taxRate: 0.1, treasuryAccountId: 'vdp-government-treasury',
+  });
+  assert.ok(result.taxAmount > 0);
+  assert.equal(result.taxCollected, true);
+});
+
 test('operateBusiness refuses someone with no commercial property', async () => {
   const store = createPropertyStore();
   await assert.rejects(

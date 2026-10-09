@@ -284,6 +284,7 @@ let store = createVdpStore();
   const animalsLib = await import('./src/lib/animals.js');
   const taxesLib = await import('./src/lib/taxes.js');
   const barterLib = await import('./src/lib/barter.js');
+  const diseasesLib = await import('./src/lib/diseases.js');
   const socialClassLib = await import('./src/lib/socialClass.js');
   const eliteLib = await import('./src/lib/elite.js');
   const hospitalLib = await import('./src/lib/hospital.js');
@@ -471,6 +472,7 @@ let store = createVdpStore();
       if (!store.animals) store.animals = animalsLib.createAnimalsStore();
       if (!store.taxes) store.taxes = taxesLib.createTaxesStore();
       if (!store.barter) store.barter = barterLib.createBarterStore();
+      if (!store.diseases) store.diseases = diseasesLib.createDiseaseStore();
       registerMeridianVoidHubsOnce();
       postGovernmentJobsToVoidOnce();
     },
@@ -934,10 +936,15 @@ let store = createVdpStore();
         ownerId: req.body.ownerId,
         transferFn: (args) => transferVCoin(args),
         economyMultiplier: economyLib.economyMultiplierFor(index),
+        taxRate: taxesLib.DEFAULT_INCOME_TAX_RATE,
+        treasuryAccountId: taxesLib.GOVERNMENT_TREASURY_ACCOUNT,
       });
+      if (result.taxCollected) {
+        taxesLib.recordTaxCollection(store.taxes, { amount: result.taxAmount, source: `business-${result.property.id}` });
+      }
       newsLib.recordEvent(store.news, {
         kind: 'property',
-        text: `${req.body.ownerId}'s ${result.property.levelName} earned ${result.revenue} VCoin`,
+        text: `${req.body.ownerId}'s ${result.property.levelName} earned ${result.revenue} VCoin (after tax)`,
       });
       res.status(200).json({ ...result, economyIndex: index });
     } catch (err) {
@@ -1117,6 +1124,24 @@ let store = createVdpStore();
       newsLib.recordEvent(store.news, { kind: 'immigration', text: `${req.body.personId} was granted a temporary passport` });
       const housingAssignment = maybeAssignAsylumHousing(arrival);
       res.status(201).json({ ...arrival, housingAssignment });
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // "You also can be a worker and get permanent citizenship as well,
+  // depending on your contribution" (9 Oct 2026, a later direct
+  // instruction) -- `shiftsWorked` is computed here from the real,
+  // already-existing shift record (`jobs.js`'s own `shiftsFor`), the
+  // one real measurable contribution this world already tracks.
+  app.post('/api/immigration/naturalize', requireActor('personId'), (req, res) => {
+    try {
+      const shiftsWorked = jobsLib.shiftsFor(store.jobs, req.body.personId).filter((s) => s.paid).length;
+      const arrival = immigrationLib.naturalize(store.immigration, req.body.personId, { shiftsWorked });
+      newsLib.recordEvent(store.news, {
+        kind: 'immigration', text: `${req.body.personId} was naturalized after ${shiftsWorked} real shifts worked`,
+      });
+      res.status(200).json(arrival);
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
@@ -1463,7 +1488,42 @@ let store = createVdpStore();
       });
       economyLib.recordSpending(store.economy, hospitalLib.TREATMENT_COST);
       newsLib.recordEvent(store.news, { kind: 'hospital', text: `${req.body.patientId} was treated at the starter hospital` });
-      res.status(201).json(treatment);
+      // A checkup also cures a real, active disease, if the patient
+      // has one -- `diseases.js` owns the cure itself (its own real,
+      // exact inverse of the penalty); this is only the real place
+      // that cure actually gets triggered from.
+      let cured = null;
+      if (diseasesLib.activeDiseaseFor(store.diseases, req.body.patientId)) {
+        cured = diseasesLib.cureDisease(store.diseases, req.body.patientId, { traits: patient.state.traits });
+      }
+      res.status(201).json({ ...treatment, cured });
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // --- Diseases ---------------------------------------------------------
+  app.get('/api/diseases/:personId', (req, res) => {
+    res.json({
+      cases: diseasesLib.casesFor(store.diseases, req.params.personId),
+      active: diseasesLib.activeDiseaseFor(store.diseases, req.params.personId),
+    });
+  });
+
+  // "Make sure you add in diseases" -- a real, named illness a person
+  // can contract. No real document names what causes one, so this
+  // route exists for the same reason `/api/justice/tickets/issue`
+  // does: a real, named actor (a robot patrol, an NPC encounter, a
+  // future environmental system) reports it happening, rather than
+  // this server silently rolling for it on its own.
+  app.post('/api/diseases/contract', requireActor('reportedBy'), (req, res) => {
+    try {
+      const person = ensurePlayer(req.body.personId);
+      const caseRecord = diseasesLib.contractDisease(store.diseases, {
+        personId: req.body.personId, name: req.body.name, traits: person.state.traits,
+      });
+      newsLib.recordEvent(store.news, { kind: 'disease', text: `${req.body.personId} came down with ${req.body.name}` });
+      res.status(201).json(caseRecord);
     } catch (err) {
       res.status(400).json({ error: err.message });
     }

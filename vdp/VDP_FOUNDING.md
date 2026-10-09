@@ -1307,6 +1307,65 @@ Five more real pieces per direct instruction, all the same day:
   the government -- a shadow-government organization is simply
   another real organization whose leader can use it.
 
+## Worker naturalization, taxed businesses, underground economies, diseases, and a trait audit (9 Oct 2026, a sixteenth through nineteenth instruction the same day)
+
+Four more real pieces, all the same day:
+
+- **A worker's own path to citizenship.** "You also can be a worker
+  and get permanent citizenship as well, depending on your
+  contribution." `immigration.js`'s `canRequestCitizenship` widened to
+  accept `shiftsWorked`, and a new `naturalize(store, personId,
+  {shiftsWorked})` upgrades an EXISTING temporary arrival's record in
+  place once they cross a real, flagged-interpretive threshold
+  (`CITIZENSHIP_SHIFT_THRESHOLD`, 10). Not decidable at arrival --
+  contribution has to accumulate first -- so `admitWithPassport`
+  itself is untouched; `server.cjs`'s new `/api/immigration/naturalize`
+  route computes `shiftsWorked` from `jobs.js`'s own real, paid-shift
+  record.
+- **Businesses are taxed too, and that's exactly why barter exists.**
+  "The government is basically involved in these businesses because
+  they want to collect taxes from the workers and the businesses...
+  people will find out how to use bartering and building their own
+  payment systems to keep these underground systems growing." Only
+  WORKERS (`jobs.js`'s own income tax) were ever taxed -- a real,
+  confirmed gap, checked directly rather than assumed. `property.js`'s
+  `operateBusiness` gained the identical real income-tax shape
+  (`taxRate`/`treasuryAccountId`, both optional, every existing
+  caller/test unaffected), applied regardless of `authorized` -- "the
+  businesses," full stop. `barter.js` itself needed no change at all:
+  staying untaxed is precisely what already makes it the real
+  alternative an underground operator reaches for, not a gap to close.
+- **Diseases, a real, confirmed gap.** "Make sure you add in
+  diseases." VACON-C already has disease, at population/city scale
+  (`mortality.js`'s own `addDiseaseOutbreak`/`diseasePressure`); VDP
+  had none at any scale, individual included -- checked directly, not
+  assumed. New `diseases.js`: `contractDisease` lowers every real
+  `health` trait by a flagged-interpretive penalty
+  (`DISEASE_HEALTH_PENALTY`, 15), and `cureDisease` is its exact real
+  inverse -- VACON-C's own standing rule, "a mechanism with no inverse
+  has no equilibrium." Wired into the starter hospital: a checkup
+  (`hospital.js`'s `treatPatient`) now also cures an active disease,
+  if the patient has one.
+- **A trait/characteristic audit, not a guess.** "Make sure you have
+  in all the characteristics... tricksters, mental health... diseases...
+  personality traits... everything is inserted." Checked directly:
+  `mental` and `psychological` (mental-health-adjacent: Paranoia,
+  Impulsivity, Narcissism, Trust Threshold, Delusion Susceptibility,
+  Compulsiveness) are both already here, byte-identical to VACON-C's
+  own. `personality` (Confidence, Teaching Ability) is also already
+  here and is NOT missing anything relative to VACON-C's own real
+  source, which has exactly these same two traits. VDP's `traits.js`
+  already carries the full real 21-family individual sheet (20 named
+  families plus `efficiency`), minus only the `skills` family this
+  file's own header already explains excluding on purpose -- nothing
+  here was actually missing except diseases (closed above) and one
+  named archetype: `Trickster` (`criminal.Deception` + `mental.
+  Creativity`, both HIGH), distinct from the existing `Sneaky`
+  (Stealth + Deception -- concealment, not cleverness). "Time men"
+  is recorded as unresolved -- unclear what it names, and nothing in
+  either app's real trait/mortality code matches it closely enough to
+  guess at safely.
+
 ## What is still open
 
 - The area's own name — nothing has been given yet (the product name,

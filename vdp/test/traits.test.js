@@ -115,6 +115,16 @@ test('tagsFor derives VDP\'s own Efficient tag from the new efficiency family', 
   assert.ok(tags.includes('Efficient'));
 });
 
+test('tagsFor derives VDP\'s own Trickster tag from Deception + Creativity, distinct from Sneaky', () => {
+  const sheet = generateTraitSheet(fixedRng(0));
+  sheet.criminal.Deception = HIGH;
+  sheet.mental.Creativity = HIGH;
+  sheet.criminal.Stealth = LOW; // Sneaky's own second condition stays closed
+  const tags = tagsFor(sheet).map((t) => t.name);
+  assert.ok(tags.includes('Trickster'));
+  assert.ok(!tags.includes('Sneaky'), 'Trickster and Sneaky read different real traits and must not be conflated');
+});
+
 test('tagsFor derives nothing for a perfectly neutral sheet -- every gate stays closed at the midpoint', () => {
   const sheet = {};
   for (const [family, names] of Object.entries(TRAIT_FAMILIES)) {

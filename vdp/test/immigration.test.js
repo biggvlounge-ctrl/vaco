@@ -14,6 +14,7 @@ import {
   spreadWordOfMouth, knownByWordOfMouth, shouldAssignAsylumHousing, ELITE_ASYLUM_HOUSING_CHANCE,
   claimSmugglingRoute, negotiateRouteTransfer, canRequestCitizenship,
   closeBorder, isBorderOpen, RANDOM_ADMISSION_CHANCE,
+  naturalize, CITIZENSHIP_SHIFT_THRESHOLD,
 } from '../src/lib/immigration.js';
 import { FRONTIER_ZONES, UNDERGROUND_ZONES } from '../src/lib/zones.js';
 
@@ -85,10 +86,45 @@ test('closeBorder never blocks a real political arrival -- their connections are
   assert.equal(politician.eliteSponsorship, 'political');
 });
 
-test('canRequestCitizenship is true only for a real business owner', () => {
+test('canRequestCitizenship is true for a real business owner, or a worker who has crossed the real contribution threshold', () => {
   assert.equal(canRequestCitizenship({ isBusinessOwner: true }), true);
   assert.equal(canRequestCitizenship({ isBusinessOwner: false }), false);
-  assert.equal(canRequestCitizenship({}), false, 'omitting isBusinessOwner must default to refused, not granted');
+  assert.equal(canRequestCitizenship({}), false, 'omitting both must default to refused, not granted');
+  assert.equal(canRequestCitizenship({ shiftsWorked: CITIZENSHIP_SHIFT_THRESHOLD }), true);
+  assert.equal(canRequestCitizenship({ shiftsWorked: CITIZENSHIP_SHIFT_THRESHOLD - 1 }), false);
+});
+
+// -- naturalize: a worker's real, later upgrade from temporary to citizenship
+
+test('naturalize refuses a worker who has not yet made enough real contribution', () => {
+  const store = createImmigrationStore();
+  applyForTemporaryPassport(store, { personId: 'worker-1' });
+  assert.throws(
+    () => naturalize(store, 'worker-1', { shiftsWorked: CITIZENSHIP_SHIFT_THRESHOLD - 1 }),
+    /has not yet made enough real contribution/,
+  );
+});
+
+test('naturalize upgrades a real temporary worker to citizenship once they qualify', () => {
+  const store = createImmigrationStore();
+  applyForTemporaryPassport(store, { personId: 'worker-1' });
+  const upgraded = naturalize(store, 'worker-1', { shiftsWorked: CITIZENSHIP_SHIFT_THRESHOLD });
+  assert.equal(upgraded.citizenshipType, 'citizenship');
+  assert.equal(upgraded.expiresAt, null);
+  assert.ok(upgraded.naturalizedAt);
+});
+
+test('naturalize refuses someone already a real citizen, and someone with no real arrival at all', () => {
+  const store = createImmigrationStore();
+  applyForCitizenship(store, { personId: 'owner-1', isBusinessOwner: true });
+  assert.throws(
+    () => naturalize(store, 'owner-1', { shiftsWorked: CITIZENSHIP_SHIFT_THRESHOLD }),
+    /already has real citizenship/,
+  );
+  assert.throws(
+    () => naturalize(store, 'never-arrived', { shiftsWorked: CITIZENSHIP_SHIFT_THRESHOLD }),
+    /no arrival recorded/,
+  );
 });
 
 test('admitWithPassport records a real asylum-seeking arrival with its elite sponsorship, if any', () => {

@@ -79,6 +79,36 @@
 // `efficiency` family. Adding both as real, derived tags makes those
 // answers legible in
 // the game itself instead of only in a conversation.
+//
+// **A third, same day, same treatment**: 'Trickster' (9 Oct 2026,
+// direct instruction: "make sure you have in all the
+// characteristics... tricksters"). Distinct from 'Sneaky' on purpose
+// -- Sneaky is about CONCEALMENT (Stealth + Deception, staying
+// unseen); a trickster is about CLEVER MANIPULATION, seen or not, so
+// this reads `criminal.Deception` (HIGH) against `mental.Creativity`
+// (HIGH) instead of Stealth -- the same deceiver, a different real
+// skill paired with it.
+
+// **An audit, the same day, for the rest of that instruction**:
+// "mental health... personality traits... make sure everything is
+// inserted." Checked directly rather than assumed: `mental` AND
+// `psychological` (Paranoia, Impulsivity, Narcissism, Trust
+// Threshold, Delusion Susceptibility, Compulsiveness -- real
+// mental-health-adjacent traits) are both already here, byte-
+// identical to VACON-C's own. `personality` (Confidence, Teaching
+// Ability) is also already here, and is NOT missing anything relative
+// to its own real source -- VACON-C's own `personality` family has
+// exactly these same two traits and no more; this file already
+// carries the full real 21-family individual sheet (20 named families
+// plus `efficiency`), minus only the `skills` family this file's own
+// header already explains excluding on purpose. "Diseases" was the
+// one genuinely confirmed gap -- VACON-C has disease at
+// population/city scale (`mortality.js`'s own `addDiseaseOutbreak`/
+// `diseasePressure`), VDP had none at any scale, individual included;
+// see the new `diseases.js` for the real, individual-scale sibling
+// this instruction asked for. "Time men" is not resolved here --
+// unclear what it names, and nothing in VACON-C's own trait/mortality
+// code matches it closely enough to guess at safely.
 
 export const HIGH = 70;
 export const LOW = 30;
@@ -214,6 +244,7 @@ const INDIVIDUAL_ARCHETYPES = [
   // VDP's own additions -- not one of VACON-C's original 23.
   { name: 'Sneaky', when: (t) => t('criminal', 'Stealth') >= HIGH && t('criminal', 'Deception') >= HIGH },
   { name: 'Efficient', when: (t) => t('efficiency', 'Process Optimization') >= HIGH && t('efficiency', 'Time Management') >= HIGH },
+  { name: 'Trickster', when: (t) => t('criminal', 'Deception') >= HIGH && t('mental', 'Creativity') >= HIGH },
 ];
 
 // Every family/trait pair an archetype predicate reads, parsed out of

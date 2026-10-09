@@ -576,8 +576,24 @@ export function canOperateBusiness(property, now = Date.now()) {
   return now - property.lastOperatedAt >= OPERATE_COOLDOWN_MS;
 }
 
+// "The government is basically involved in these businesses because
+// they want to collect taxes from the workers and the businesses" (9
+// Oct 2026, a later direct instruction) -- `taxRate`/`treasuryAccountId`
+// are new, both optional and additive (`taxRate` of 0, the default
+// and what every existing caller/test still passes, leaves `revenue`
+// identical to `grossRevenue`), the exact same real income-tax shape
+// `jobs.js`'s own `clockOutAndPay` already uses for a worker's pay --
+// withheld from `BUSINESS_REVENUE_ACCOUNT` before the owner is paid,
+// never taken back out of the owner's own pocket after the fact.
+// Applies regardless of `authorized` -- "the businesses," full stop,
+// is exactly why an owner who actually wants to dodge this reaches
+// for `barter.js` instead (deliberately untaxed, see that module's
+// own header): that choice, not an exemption written in here, is the
+// real reason "people will find out how to use bartering... to keep
+// these underground systems growing."
 export async function operateBusiness(store, {
   ownerId, transferFn, economyMultiplier = 1, now = Date.now(),
+  taxRate = 0, treasuryAccountId,
 } = {}) {
   if (!ownerId) throw new Error('operateBusiness requires an ownerId');
   const property = commercialOwnedBy(store, ownerId);
@@ -588,7 +604,9 @@ export async function operateBusiness(store, {
   if (typeof transferFn !== 'function') throw new Error('operateBusiness requires a transferFn');
 
   const level = commercialLevelByNumber(property.level);
-  const revenue = Math.max(0, Math.round(level.level * BASE_COMMERCIAL_REVENUE * economyMultiplier));
+  const grossRevenue = Math.max(0, Math.round(level.level * BASE_COMMERCIAL_REVENUE * economyMultiplier));
+  const taxAmount = taxRate > 0 ? Math.round(grossRevenue * taxRate) : 0;
+  const revenue = grossRevenue - taxAmount;
 
   const previousOperatedAt = property.lastOperatedAt || null;
   property.lastOperatedAt = now;
@@ -602,7 +620,22 @@ export async function operateBusiness(store, {
     throw err;
   }
 
-  return { property, revenue };
+  // The owner is already real-paid by this point -- a tax-collection
+  // failure here does not undo that, same honest-no-op posture
+  // `clockOutAndPay` already takes.
+  let taxCollected = false;
+  if (taxAmount > 0 && treasuryAccountId) {
+    try {
+      await transferFn({
+        fromUserId: BUSINESS_REVENUE_ACCOUNT, toUserId: treasuryAccountId, amount: taxAmount, reason: 'vdp-business-income-tax',
+      });
+      taxCollected = true;
+    } catch {
+      // real, honest no-op -- see comment above.
+    }
+  }
+
+  return { property, revenue, grossRevenue, taxAmount, taxCollected };
 }
 
 // **Public housing (9 Oct 2026), per direct instruction**: "they will

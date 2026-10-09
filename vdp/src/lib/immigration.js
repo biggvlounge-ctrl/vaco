@@ -327,8 +327,47 @@ export function applyForTemporaryPassport(store, options = {}) {
 // enforcement point is `server.cjs`'s own `/admit`/`/apply-
 // citizenship` routes, the actual admission endpoints this policy is
 // about.
-export function canRequestCitizenship({ isBusinessOwner = false } = {}) {
-  return Boolean(isBusinessOwner);
+//
+// **A worker's own path to citizenship (9 Oct 2026, a later same-day
+// instruction)**: "you also can be a worker and get permanent
+// citizenship as well, depending on your contribution." Not
+// decidable AT arrival -- a brand-new worker has made no real
+// contribution yet -- so `shiftsWorked` is the one real, measurable
+// signal this world already tracks (`jobs.js`'s own `shiftsFor`,
+// counted by whoever calls this) that a temporary worker can
+// accumulate over time. `CITIZENSHIP_SHIFT_THRESHOLD` is flagged
+// interpretive, same footing every other unspecified number in this
+// file already stands on. See `naturalize` below for the real,
+// later UPGRADE this makes possible -- `admitWithPassport` itself
+// still only ever sees `shiftsWorked: 0` for a brand-new arrival.
+export const CITIZENSHIP_SHIFT_THRESHOLD = 10;
+
+export function canRequestCitizenship({ isBusinessOwner = false, shiftsWorked = 0 } = {}) {
+  return Boolean(isBusinessOwner) || shiftsWorked >= CITIZENSHIP_SHIFT_THRESHOLD;
+}
+
+// The real, later upgrade a temporary worker earns by real
+// contribution -- mutates the EXISTING arrival record in place, the
+// same "a real fact changes on a real record" shape `deportPerson`/
+// `catchIllegalArrival` above already use, rather than a second
+// parallel citizenship record. Clears `expiresAt`: a temporary
+// passport's own real expiry no longer applies once naturalized.
+export function naturalize(store, personId, { shiftsWorked = 0, now = Date.now() } = {}) {
+  const arrival = arrivalFor(store, personId);
+  if (!arrival) throw new Error(`naturalize: no arrival recorded for "${personId}"`);
+  if (arrival.citizenshipType === 'citizenship') {
+    throw new Error(`naturalize: "${personId}" already has real citizenship`);
+  }
+  if (!canRequestCitizenship({ isBusinessOwner: arrival.isBusinessOwner, shiftsWorked })) {
+    throw new Error(
+      `naturalize: "${personId}" has not yet made enough real contribution `
+      + `(${shiftsWorked} shift(s), needs ${CITIZENSHIP_SHIFT_THRESHOLD})`,
+    );
+  }
+  arrival.citizenshipType = 'citizenship';
+  arrival.expiresAt = null;
+  arrival.naturalizedAt = now;
+  return arrival;
 }
 
 // "They send for their family members, and only a portion of those
