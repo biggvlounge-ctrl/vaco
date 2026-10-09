@@ -161,6 +161,7 @@ STORE_BACKEND_TARGETS=("${PERSISTENCE_PG_TARGETS[@]}")
 # bottom of this script exists to catch.
 SETTLE_ONCE_TARGETS=(
   vago dreams vulture-studios voken voidmagic vulture-music void chopz/chopz-shop vulture-flix
+  vaco-passport
 )
 
 MEDIA_TARGETS=(

@@ -33,6 +33,10 @@ const {
   NETWORK_LEVELS, createPassportStore, findPassport, registerPassport,
   verifyPassport, assessNetworkActivity, reseedIds,
 } = require('./lib/passport');
+const {
+  HOLD_STATUSES, findEscrowHold, escrowHoldsForBusiness, openEscrowHold,
+  releaseEscrowHold, refundEscrowHold, reseedIds: reseedEscrowIds,
+} = require('./lib/escrow');
 const { seedDemoData } = require('./lib/seedDemoData');
 const { requireSession } = require('./lib/shieldAuth.cjs');
 const { createServiceAuth } = require('./lib/serviceAuth.cjs');
@@ -105,13 +109,32 @@ async function fetchVacaIdentityStatus(subjectType, subjectId) {
 }
 
 // §4's own rule: read V3's real transaction history, never a second
-// copy of it. This app never calls /api/vcoin/transfer — it has no
-// route that moves money, only ones that read what V3 already recorded.
+// copy of it.
 async function fetchV3Transactions(userId) {
   const res = await fetch(`${V3_API_URL}/api/vcoin/transactions/${encodeURIComponent(userId)}`, { headers: serviceHeaders() });
   const body = await res.json();
   if (!res.ok) throw new Error(body.error || `fetchV3Transactions failed (${res.status})`);
   return body.transactions || [];
+}
+
+// Escrow (lib/escrow.js, Level 3 only) is the one place this app
+// actually moves money -- the same single-transfer `settleVCoin`
+// shape `vago/server.js` and `hvntz/server.js` already use, posting
+// to V3's real `/api/vcoin/settle` with the reason doubling as the
+// idempotency key.
+async function settleVCoin(legs, meta = {}) {
+  const res = await fetch(`${V3_API_URL}/api/vcoin/settle`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...serviceHeaders(),
+      ...(meta.reason ? { 'Idempotency-Key': `settle:${meta.reason}` } : {}),
+    },
+    body: JSON.stringify({ legs, reason: meta.reason ?? null }),
+  });
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error || `settleVCoin failed (${res.status})`);
+  return body;
 }
 
 // -- the store -----------------------------------------------------------
@@ -123,7 +146,10 @@ attachStore(app, {
   filePath: path.join(__dirname, 'data', 'store.json'),
   onReady: (loaded) => {
     store = loaded;
+    if (!Array.isArray(store.escrowHolds)) store.escrowHolds = [];
+    if (!Number.isFinite(store.nextEscrowHoldId)) store.nextEscrowHoldId = 1;
     reseedIds(store);
+    reseedEscrowIds(store);
   },
 });
 
@@ -133,6 +159,8 @@ app.get('/api/health', (_req, res) => {
     service: 'vaco-passport',
     networkLevels: NETWORK_LEVELS,
     passports: store.passports.length,
+    escrowHoldStatuses: HOLD_STATUSES,
+    escrowHolds: store.escrowHolds.length,
     serviceAuth: serviceAuth.describe(),
   });
 });
@@ -205,6 +233,67 @@ app.post('/api/passports/:businessId/network-activity', requireSession(), requir
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+});
+
+// -- escrow (Level 3 only) ------------------------------------------------
+//
+// The proven-three-times pattern (voidmagic/lib/bookings.js,
+// vago/lib/predictionMarkets.js, VOKEN's fractional pool), generalized
+// per the §30 audit -- see lib/escrow.js's own header for the full
+// reasoning. Open/release/refund all reuse the exact same
+// `requireParamBusinessOwner` ownership check `verify` and
+// `network-activity` already use above: only the business's real
+// HVNTZ owner may act on its own escrow.
+
+app.post('/api/passports/:businessId/escrow', requireSession(), requireParamBusinessOwner(), async (req, res) => {
+  try {
+    const hold = await openEscrowHold(store, {
+      ...req.body,
+      businessId: Number(req.params.businessId),
+      settleFn: settleVCoin,
+    });
+    res.status(201).json(hold);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/passports/:businessId/escrow', async (req, res) => {
+  res.json({ escrowHolds: escrowHoldsForBusiness(store, Number(req.params.businessId)) });
+});
+
+app.get('/api/escrow/:id', (req, res) => {
+  const hold = findEscrowHold(store, Number(req.params.id));
+  if (!hold) return res.status(404).json({ error: `no escrow hold with id ${req.params.id}` });
+  res.json(hold);
+});
+
+// Release/refund act on a hold rather than a businessId in the URL, so
+// ownership is checked against the hold's own `businessId` instead of
+// a route param -- the same indirection `requireBodyBusinessOwner`
+// already uses for `POST /api/passports`.
+app.post('/api/escrow/:id/release', requireSession(), async (req, res) => {
+  const hold = findEscrowHold(store, Number(req.params.id));
+  if (!hold) return res.status(404).json({ error: `no escrow hold with id ${req.params.id}` });
+  return requireBusinessOwner(hold.businessId, req, res, async () => {
+    try {
+      res.json(await releaseEscrowHold(store, { holdId: hold.id, settleFn: settleVCoin }));
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+});
+
+app.post('/api/escrow/:id/refund', requireSession(), async (req, res) => {
+  const hold = findEscrowHold(store, Number(req.params.id));
+  if (!hold) return res.status(404).json({ error: `no escrow hold with id ${req.params.id}` });
+  return requireBusinessOwner(hold.businessId, req, res, async () => {
+    try {
+      res.json(await refundEscrowHold(store, { holdId: hold.id, settleFn: settleVCoin }));
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
 });
 
 // §46-equivalent demo, narrowed the same way VASH TAP's was: a single

@@ -13,7 +13,7 @@ somebody's memory of it, which is the failure this repo keeps finding.
 
 | document | status | parked |
 |---|---|---|
-| `VACO_VERIFIED_BUSINESS_NETWORK_FREEZE.md` | frozen, **§30 audit complete 25 Sep 2026** — see below; Levels 1-3 built and shipped as `vaco-passport` | 17 Sep 2026 |
+| `VACO_VERIFIED_BUSINESS_NETWORK_FREEZE.md` | frozen, **§30 audit complete 25 Sep 2026** — see below; Levels 1-2 built and shipped as `vaco-passport`; **Level 3's escrow generalized 9 Oct 2026** (`vaco-passport/lib/escrow.js`, gated to `passport.level === 'network'`, reusing the proven voidmagic/VAGO/VOKEN escrow-account pattern and the shared `settleOnce` primitive) — see that file's own header for what is still out of scope (contested-dispute arbitration) | 17 Sep 2026 |
 | `VAGO_GROUP_WAGERS_FREEZE.md` | frozen, **audit complete 25 Sep 2026** — see below; narrowest slice + §13's invitation state machine built 25 Sep 2026; **§8 Side Wagers, §4 Team roles, §10 Leaderboard, §11 Tournaments, §12 Leagues, §17 BLIND and §18 Before-the-Answer all built 9 Oct 2026** (`vago/lib/groupWagers.js`'s own `parentGroupWagerId`/`teamNames`, `vago/lib/groupWagerLeaderboard.js`, `vago/lib/groupWagerCompetitions.js`, `vago/lib/blindPredictions.js`) — see those files' own headers for what each still does not cover (a seeded 1-vs-1 bracket, QVAN-based group-risk monitoring, and §6's negotiated/tiered/ranked payout shapes beyond winner-take-all) | 17 Sep 2026 |
 | `HVNTZ_CONNECTED_NETWORK_FREEZE.md` | frozen, **§40 audit complete 25 Sep 2026** — see below; §47 Phases 1-3 built (Network/Node/invite-accept-decline, Vault Studios stream link, Hunt checkpoint↔Network, §3/§39 screen-session link) plus §15-18's core revenue-sharing engine and growth analytics in `hvntz/lib/networkConnections.js`, `hvntz/lib/hunts.js`, `hvntz/lib/revenueShareAgreements.js` and `hvntz/lib/networkAnalytics.js` | 23 Sep 2026 |
 | `VASH_TAP_FREEZE.md` | frozen, **§1/§55 audit complete 25 Sep 2026** — see below; narrowest demo built and shipped | 23 Sep 2026 |
@@ -367,6 +367,24 @@ would be exactly the "plan tokenisation without the rule that
 tokenisation is a graduation" failure this folder's own history
 already records happening once, from working off a document instead of
 the codebase.
+
+**Level 3 built, 9 Oct 2026.** `vaco-passport/lib/escrow.js` generalizes
+the proven-three-times pattern this audit found: `openEscrowHold`/
+`releaseEscrowHold`/`refundEscrowHold`, gated by a new
+`requireNetworkLevelBusiness` check so only a Passport already at
+`'network'` (Level 3, per `assessNetworkActivity`'s own real V3-activity
+gate) may hold a customer's money in trust. `ESCROW_ACCOUNT` is an
+ordinary V3 userId moved only through the injected `settleFn`, same as
+`VOID_MAGIC_ESCROW_ACCOUNT`/`VAGO_HOUSE_ACCOUNT`/`VOKEN_FRACTIONAL_POOL`
+— no second ledger. Release/refund are the business's own decision
+(reusing the existing `requireParamBusinessOwner` ownership check),
+matching how all three real precedents resolve on a business-side
+trigger rather than neutral arbitration; `settleOnce` protects against
+a double release/refund racing each other. **Not built, and named
+rather than silently assumed away: a contested-dispute arbitration
+layer** — the payer and the business disagreeing about what happened
+has no resolution path here, closer to VAGO's operator-gated `resolve`
+shape than to anything this file does.
 
 **A correction to the note below: resolved, not still open.** The
 "partial audit" section beneath this one flags "VACA is blockchain app

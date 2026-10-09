@@ -43,6 +43,12 @@ function createPassportStore() {
   return {
     passports: [],
     nextPassportId: 1,
+    // Level 3 escrow holds -- see lib/escrow.js. Kept on this same
+    // store object (one attachStore-persisted file/table, not a
+    // second one) the same way every other app in this ecosystem
+    // keeps all of its state in one store.
+    escrowHolds: [],
+    nextEscrowHoldId: 1,
   };
 }
 
