@@ -32,8 +32,8 @@ test("foundOrganization refuses an unknown type, a missing name, and a second or
   );
 });
 
-test("ORG_TYPES is exactly family, tribe, cult, religious-institution, gang", () => {
-  assert.deepEqual(ORG_TYPES, ["family", "tribe", "cult", "religious-institution", "gang"]);
+test("ORG_TYPES is exactly family, tribe, cult, religious-institution, gang, shadow-government", () => {
+  assert.deepEqual(ORG_TYPES, ["family", "tribe", "cult", "religious-institution", "gang", "shadow-government"]);
 });
 
 test('foundOrganization lets a real NPC found a religious institution, never the government', () => {
@@ -41,6 +41,29 @@ test('foundOrganization lets a real NPC found a religious institution, never the
   const org = foundOrganization(store, { name: 'The Lantern Circle', type: 'religious-institution', founderId: 'npc-7' });
   assert.equal(org.type, 'religious-institution');
   assert.equal(org.founderId, 'npc-7');
+});
+
+test('foundOrganization refuses a shadow-government for anyone not real and politically connected', () => {
+  const store = createOrganizationsStore();
+  assert.throws(
+    () => foundOrganization(store, { name: 'The Quiet Room', type: 'shadow-government', founderId: 'senator-1' }),
+    /politically-connected/,
+  );
+  assert.throws(
+    () => foundOrganization(store, {
+      name: 'The Quiet Room', type: 'shadow-government', founderId: 'senator-1', isPoliticallyConnected: false,
+    }),
+    /politically-connected/,
+  );
+});
+
+test('foundOrganization lets a real, politically-connected arrival found a shadow-government', () => {
+  const store = createOrganizationsStore();
+  const org = foundOrganization(store, {
+    name: 'The Quiet Room', type: 'shadow-government', founderId: 'senator-1', isPoliticallyConnected: true,
+  });
+  assert.equal(org.type, 'shadow-government');
+  assert.equal(org.founderId, 'senator-1');
 });
 
 test("addMember mixes a real player and an NPC id freely, and organizationOf finds either", () => {

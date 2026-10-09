@@ -480,6 +480,47 @@ export async function purchaseCommercial(store, { ownerId, transferFn, now = Dat
   return property;
 }
 
+// **Founding business owners (9 Oct 2026, a later direct
+// instruction)**: "the initial people who come into the world will
+// be business owners, and they will be the owners of the initial
+// businesses that... will be running the initial new world, from
+// restaurants to construction to all the different things we need,
+// farming, clothing, all those things." A real GRANT, not a
+// purchase -- no `transferFn` at all, the same no-payment shape
+// `assignPublicHousing` already uses, because these arrivals are
+// being recognized as already owning the business they brought with
+// them, not buying one from the governors on arrival. `category` is
+// free text, same discipline `immigration.js`'s own `originRegion`/
+// `smuggledGoods` already use for an open-ended list -- "restaurant,"
+// "construction," "farming," "clothing" are the instruction's own
+// named examples (exported below as reference only), not a closed
+// enum this module would otherwise refuse to invent.
+export const FOUNDING_BUSINESS_CATEGORIES = ['restaurant', 'construction', 'farming', 'clothing'];
+
+export function grantFoundingBusiness(store, { ownerId, category, now = Date.now() } = {}) {
+  if (!ownerId) throw new Error('grantFoundingBusiness requires an ownerId');
+  if (!category) throw new Error('grantFoundingBusiness requires a category');
+  if (commercialOwnedBy(store, ownerId)) {
+    throw new Error(`grantFoundingBusiness: "${ownerId}" already owns a commercial property`);
+  }
+
+  const property = {
+    id: store.nextPropertyId++,
+    type: 'commercial',
+    ownerId,
+    ownerType: 'individual',
+    ownershipType: 'owned',
+    lifecycleStage: 'operation',
+    level: COMMERCIAL_LEVELS[0].level,
+    levelName: COMMERCIAL_LEVELS[0].name,
+    authorized: true,
+    category,
+    grantedAt: now,
+  };
+  store.properties.push(property);
+  return property;
+}
+
 // Same claim-before-pay ordering as `upgradeHome`, charging the real
 // price difference between levels, not the next level's full price.
 export async function upgradeCommercial(store, { ownerId, transferFn, now = Date.now() } = {}) {

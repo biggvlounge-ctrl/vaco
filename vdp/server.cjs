@@ -1005,7 +1005,57 @@ let store = createVdpStore();
     res.json({ illegal: immigrationLib.listIllegalArrivals(store.immigration) });
   });
 
+  app.get('/api/immigration/border-status', (_req, res) => {
+    res.json({ open: immigrationLib.isBorderOpen(store.immigration) });
+  });
+
+  // "The border will be cut off" -- a real, one-way governors' action
+  // (no real document says it ever reopens, so no reopen route is
+  // built here either).
+  app.post('/api/immigration/close-border', requireActor('closedBy'), (req, res) => {
+    immigrationLib.closeBorder(store.immigration);
+    newsLib.recordEvent(store.news, { kind: 'immigration', text: 'the border was cut off -- only a few will be let in now, randomly' });
+    res.status(200).json({ open: false });
+  });
+
+  // "The business owners and the sellers who are migrating into the
+  // world... either coming in... to just get a temporary passport, or
+  // if a business owner they can come in as a citizen" (9 Oct 2026, a
+  // later direct instruction) -- the real enforcement point for
+  // `immigrationLib.canRequestCitizenship`, checked here rather than
+  // inside `admitWithPassport` itself (see that function's own
+  // header). Citizenship is the real default `citizenshipType` every
+  // existing caller of the raw lib function already relies on, so
+  // this only refuses the REQUEST when the body explicitly asks for
+  // citizenship -- an omitted `citizenshipType` still means
+  // citizenship by default, and still gets checked.
+  function requireCitizenshipEligibility(req, res) {
+    const citizenshipType = req.body.citizenshipType || 'citizenship';
+    if (citizenshipType === 'citizenship' && !immigrationLib.canRequestCitizenship({ isBusinessOwner: req.body.isBusinessOwner })) {
+      res.status(403).json({ error: 'admit: only a real business owner may be admitted as a citizen -- everyone else gets a temporary passport' });
+      return false;
+    }
+    return true;
+  }
+
+  // "The initial people who come into the world will be business
+  // owners, and they will be the owners of the initial businesses...
+  // from restaurants to construction... farming, clothing" (9 Oct
+  // 2026, a later direct instruction). A real GRANT
+  // (`propertyLib.grantFoundingBusiness`), applied right after a real
+  // admission succeeds, for anyone admitted with both
+  // `isBusinessOwner` and a real `businessCategory` -- omitting
+  // either leaves an admission exactly as it already worked, no
+  // business granted.
+  function maybeGrantFoundingBusiness(req) {
+    if (!req.body.isBusinessOwner || !req.body.businessCategory) return null;
+    return propertyLib.grantFoundingBusiness(store.property, {
+      ownerId: req.body.personId, category: req.body.businessCategory,
+    });
+  }
+
   app.post('/api/immigration/admit', requireActor('personId'), (req, res) => {
+    if (!requireCitizenshipEligibility(req, res)) return;
     try {
       const arrival = immigrationLib.admitWithPassport(store.immigration, {
         personId: req.body.personId,
@@ -1017,10 +1067,12 @@ let store = createVdpStore();
         dissident: req.body.dissident,
         seekingAsylum: req.body.seekingAsylum,
         eliteSponsorship: req.body.eliteSponsorship,
+        isBusinessOwner: req.body.isBusinessOwner,
       });
       newsLib.recordEvent(store.news, { kind: 'immigration', text: `${req.body.personId} arrived through passport control` });
       const housingAssignment = maybeAssignAsylumHousing(arrival);
-      res.status(201).json({ ...arrival, housingAssignment });
+      const foundingBusiness = maybeGrantFoundingBusiness(req);
+      res.status(201).json({ ...arrival, housingAssignment, foundingBusiness });
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
@@ -1030,6 +1082,7 @@ let store = createVdpStore();
   // own words -- both land on the same real gate as `/admit` above,
   // with the matching `citizenshipType` already chosen.
   app.post('/api/immigration/apply-citizenship', requireActor('personId'), (req, res) => {
+    if (!requireCitizenshipEligibility({ body: { ...req.body, citizenshipType: 'citizenship' } }, res)) return;
     try {
       const arrival = immigrationLib.applyForCitizenship(store.immigration, {
         personId: req.body.personId,
@@ -1039,10 +1092,12 @@ let store = createVdpStore();
         oldWorldBeliefs: req.body.oldWorldBeliefs,
         seekingAsylum: req.body.seekingAsylum,
         eliteSponsorship: req.body.eliteSponsorship,
+        isBusinessOwner: req.body.isBusinessOwner,
       });
       newsLib.recordEvent(store.news, { kind: 'immigration', text: `${req.body.personId} was granted citizenship` });
       const housingAssignment = maybeAssignAsylumHousing(arrival);
-      res.status(201).json({ ...arrival, housingAssignment });
+      const foundingBusiness = maybeGrantFoundingBusiness(req);
+      res.status(201).json({ ...arrival, housingAssignment, foundingBusiness });
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
@@ -1878,7 +1933,17 @@ let store = createVdpStore();
   app.post('/api/organizations', requireActor('founderId'), (req, res) => {
     const { name, type, founderId } = req.body || {};
     try {
-      const org = organizationsLib.foundOrganization(store.organizations, { name, type, founderId });
+      // "They will try to establish their own governments inside of
+      // the government" -- the real gate lives here, not inside
+      // `foundOrganization` itself (that function has no way to see
+      // `store.immigration`): a real `eliteSponsorship: 'political'`
+      // on the founder's own real arrival is what "politically
+      // connected" means in this world.
+      const arrival = immigrationLib.arrivalFor(store.immigration, founderId);
+      const isPoliticallyConnected = arrival?.eliteSponsorship === 'political';
+      const org = organizationsLib.foundOrganization(store.organizations, {
+        name, type, founderId, isPoliticallyConnected,
+      });
       newsLib.recordEvent(store.news, {
         kind: 'organization',
         text: `${founderId} founded the ${org.type} "${org.name}"`,

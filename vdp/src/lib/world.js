@@ -171,9 +171,20 @@ export const WORLD_WIDTH = 860;
 // put VACO Merch. Grown once more to 2520 for a 9th row: Meridian
 // Commons, the real landscape cityTiers.js describes made walkable.
 // Grown once more to 2800 for a 10th row -- the 9th had two open
-// slots left (filled by The Towers and the Starter Hospital below),
-// and School/Daycare needed a fresh row.
-export const WORLD_HEIGHT = 2800;
+// slots left (filled by Hospital, School/Daycare needed a fresh row).
+// Grown once more to 3480, per direct instruction (9 Oct 2026, a
+// later same-day instruction): "the public housing or towers should
+// be... in an isolated area, maybe across the river or on another
+// side of the woods... isolated area away from the main land."
+// `world.js` has no literal river/terrain-feature entity anywhere --
+// isolation is represented the only way this file's own geometry
+// already can: a real, deliberately larger gap (420px, versus the
+// usual 280px row-to-row increment) between the last ordinary row and
+// The Towers' own new 11th row, below it, moved out of the 9th row it
+// used to share with Hospital. That old slot (x:300, y:2260) is left
+// open, the same "a row need not be fully packed" precedent row 9
+// itself already set before Hospital/Towers filled two of its slots.
+export const WORLD_HEIGHT = 3480;
 export const VIEWPORT_WIDTH = 400;
 export const VIEWPORT_HEIGHT = 300;
 export const MOVE_STEP = 16;
@@ -335,21 +346,17 @@ export const DISTRICTS = [
   {
     id: 'commons', name: 'Meridian Commons', x: 20, y: 2260, width: 260, height: 260, contentType: 'vdp-native',
   },
-  // **Public housing, the starter hospital, school, and daycare (9 Oct
-  // 2026), per direct instruction**: "once more people start to enter
-  // the economy... they will be moved out to... a project style,
-  // public housing style environment... We also will need a hospital,
-  // a starter hospital... we need to set up some type of schooling
-  // program. We need some type of new technological daycare."
-  //
-  // All four are `vdp-native`: no separate standalone app exists for
-  // any of them to link out to, same reasoning Combat Sports/The
-  // Vavlt already settled this file's own general rule with. Fills
-  // the 9th row's two remaining open slots (The Towers/Hospital), then
-  // a new 10th row for School/Daycare.
-  {
-    id: 'towers', name: 'The Towers', x: 300, y: 2260, width: 260, height: 260, contentType: 'vdp-native',
-  },
+  // **The starter hospital, school, and daycare (9 Oct 2026), per
+  // direct instruction**: "we also will need a hospital, a starter
+  // hospital... we need to set up some type of schooling program. We
+  // need some type of new technological daycare." All `vdp-native`:
+  // no separate standalone app exists for any of them to link out to,
+  // same reasoning Combat Sports/The Vavlt already settled this
+  // file's own general rule with. Fills one of the 9th row's two
+  // remaining open slots (Hospital), then a new 10th row for
+  // School/Daycare. (The Towers, originally this row's other open
+  // slot, moved out to its own isolated row below -- see that
+  // district's own comment and `WORLD_HEIGHT`'s.)
   {
     id: 'hospital', name: 'Meridian Starter Hospital', x: 580, y: 2260, width: 260, height: 260, contentType: 'vdp-native',
   },
@@ -358,6 +365,29 @@ export const DISTRICTS = [
   },
   {
     id: 'daycare', name: 'Meridian Technological Daycare', x: 300, y: 2540, width: 260, height: 260, contentType: 'vdp-native',
+  },
+  // **The Towers, isolated (9 Oct 2026, a later direct instruction)**:
+  // "the public housing or towers should be... in an isolated area,
+  // maybe across the river or on another side of the woods... so it's
+  // an isolated area away from the main land, but still heavily,
+  // heavily cameraed and surveilled." Its own new 11th row, set apart
+  // by a real, deliberately larger gap than any other row-to-row
+  // increment in this file (see `WORLD_HEIGHT`'s own comment) --
+  // the honest stand-in for a river/woods crossing this file has no
+  // literal terrain entity to represent otherwise. `isolated` and
+  // `surveillanceLevel` are real, named, inspectable facts rather
+  // than only a comment -- flagged interpretive (no document gives a
+  // real surveillance scale), same footing every other unspecified
+  // fact in this project already stands on. "Outside of that, there
+  // will be unauthorized civilizations... with economies as well,
+  // stores" needs no new mechanic at all: `property.js`'s own
+  // `buildUnauthorized` already supports `type: 'commercial'`, seeded
+  // real and operable (`operateBusiness` only checks `type`, never
+  // `authorized`) -- already true before this instruction, just
+  // never named here until now.
+  {
+    id: 'towers', name: 'The Towers', x: 300, y: 3220, width: 260, height: 260, contentType: 'vdp-native',
+    isolated: true, surveillanceLevel: 'heavy',
   },
 ];
 

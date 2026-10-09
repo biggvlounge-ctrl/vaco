@@ -37,7 +37,27 @@
 // takes any real `organizationId`, gang included, with no separate
 // gate -- the same "the existing gate already fits" treatment
 // `religious-institution` got above.
-export const ORG_TYPES = ['family', 'tribe', 'cult', 'religious-institution', 'gang'];
+//
+// `shadow-government` joined the same day, a later instruction: "as
+// other powerful individuals and other government officials and
+// government jobs, CIA, FBI, Mossad, all these other organizations
+// come over, they will try to establish their own governments inside
+// of the government, which will cause conflict between the New World
+// government and old world politicians, powerful people coming
+// together." Real and gated, unlike every other type above --
+// `foundOrganization`'s own `isPoliticallyConnected` check below
+// refuses this one type to anyone not already real and politically
+// connected (`immigration.js`'s own `eliteSponsorship: 'political'`,
+// checked by the caller -- this module still does not import
+// `immigration.js`, the same decoupled-by-injection shape every
+// cross-module reference in this directory already uses). "Cause
+// conflict with the New World government" needs no new conflict
+// engine: `dissent.js`'s own real `organizeRevolt`/`attemptUprising`
+// already IS the real mechanism a big-enough organization's leader
+// uses to fight the government -- a shadow-government organization is
+// simply another real organization whose leader can use it, the same
+// way a large-enough tribe already could.
+export const ORG_TYPES = ['family', 'tribe', 'cult', 'religious-institution', 'gang', 'shadow-government'];
 
 export const STARTING_COHESION = 50;
 export const COHESION_GAIN = 3;
@@ -65,10 +85,15 @@ export function organizationOf(store, memberId) {
   return store.organizations.find((o) => o.memberIds.includes(memberId)) || null;
 }
 
-export function foundOrganization(store, { name, type, founderId, now = Date.now() } = {}) {
+export function foundOrganization(store, {
+  name, type, founderId, isPoliticallyConnected = false, now = Date.now(),
+} = {}) {
   if (!name || !name.trim()) throw new Error('foundOrganization requires a name');
   if (!ORG_TYPES.includes(type)) {
     throw new Error(`foundOrganization: "${type}" is not a known type (expected one of ${ORG_TYPES.join(', ')})`);
+  }
+  if (type === 'shadow-government' && !isPoliticallyConnected) {
+    throw new Error('foundOrganization: a "shadow-government" organization can only be founded by a real, politically-connected arrival');
   }
   if (!founderId) throw new Error('foundOrganization requires a founderId');
   if (organizationOf(store, founderId)) {

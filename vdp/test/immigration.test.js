@@ -12,7 +12,8 @@ import {
   generateMigrationWave, deportPerson, isDeported, ILLEGAL_CROSSING_TERRAIN,
   findUndergroundWorldSpot, sponsorFamilyMembers, WEALTH_TIERS, DEFAULT_FAMILY_ADMISSION_FRACTION,
   spreadWordOfMouth, knownByWordOfMouth, shouldAssignAsylumHousing, ELITE_ASYLUM_HOUSING_CHANCE,
-  claimSmugglingRoute, negotiateRouteTransfer,
+  claimSmugglingRoute, negotiateRouteTransfer, canRequestCitizenship,
+  closeBorder, isBorderOpen, RANDOM_ADMISSION_CHANCE,
 } from '../src/lib/immigration.js';
 import { FRONTIER_ZONES, UNDERGROUND_ZONES } from '../src/lib/zones.js';
 
@@ -41,6 +42,53 @@ test('admitWithPassport defaults to not seeking asylum and no elite sponsorship'
   const arrival = admitWithPassport(store, { personId: 'alice' });
   assert.equal(arrival.seekingAsylum, false);
   assert.equal(arrival.eliteSponsorship, null);
+});
+
+test('admitWithPassport defaults to not being a real business owner, and records it when given', () => {
+  const store = createImmigrationStore();
+  const worker = admitWithPassport(store, { personId: 'alice' });
+  assert.equal(worker.isBusinessOwner, false);
+
+  const owner = admitWithPassport(store, { personId: 'bob', isBusinessOwner: true });
+  assert.equal(owner.isBusinessOwner, true);
+});
+
+// -- the border closes: a real throttle with one real exemption
+
+test('the border starts open -- every existing arrival still works exactly as before', () => {
+  const store = createImmigrationStore();
+  assert.equal(isBorderOpen(store), true);
+  const arrival = admitWithPassport(store, { personId: 'alice', rng: () => 0.99 });
+  assert.ok(arrival);
+});
+
+test('closeBorder refuses an ordinary admission unless the real random roll clears it', () => {
+  const store = createImmigrationStore();
+  closeBorder(store);
+  assert.equal(isBorderOpen(store), false);
+
+  assert.throws(
+    () => admitWithPassport(store, { personId: 'alice', rng: () => 0.99 }),
+    /the border is closed/,
+  );
+  const lucky = admitWithPassport(store, { personId: 'bob', rng: () => RANDOM_ADMISSION_CHANCE - 0.001 });
+  assert.ok(lucky);
+});
+
+test('closeBorder never blocks a real political arrival -- their connections are their buy-in', () => {
+  const store = createImmigrationStore();
+  closeBorder(store);
+  const politician = admitWithPassport(store, {
+    personId: 'senator-1', eliteSponsorship: 'political', rng: () => 0.99,
+  });
+  assert.ok(politician);
+  assert.equal(politician.eliteSponsorship, 'political');
+});
+
+test('canRequestCitizenship is true only for a real business owner', () => {
+  assert.equal(canRequestCitizenship({ isBusinessOwner: true }), true);
+  assert.equal(canRequestCitizenship({ isBusinessOwner: false }), false);
+  assert.equal(canRequestCitizenship({}), false, 'omitting isBusinessOwner must default to refused, not granted');
 });
 
 test('admitWithPassport records a real asylum-seeking arrival with its elite sponsorship, if any', () => {

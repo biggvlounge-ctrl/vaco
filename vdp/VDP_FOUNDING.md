@@ -1240,6 +1240,73 @@ for smuggling routes."
   group benefiting from one of its members' real smuggling run, not
   a replacement for the individual's own stake.
 
+## Towers isolation, business-owner citizenship, founding owners, political admission, the closed border, and shadow governments (9 Oct 2026, an eleventh through fifteenth instruction the same day)
+
+Five more real pieces per direct instruction, all the same day:
+
+- **The Towers, physically isolated**: "the public housing or towers
+  should be... in an isolated area, maybe across the river or on
+  another side of the woods... so it's an isolated area away from the
+  main land, but still heavily, heavily cameraed and surveilled." No
+  literal river/terrain entity exists in `world.js` -- isolation is a
+  real, deliberately larger gap (420px vs. the usual 280px row
+  increment) to The Towers' own new 11th row, plus two real, named,
+  flagged-interpretive fields (`isolated: true`,
+  `surveillanceLevel: 'heavy'`). "Unauthorized civilizations... with
+  economies as well, stores" needed NO new mechanic at all --
+  `property.js`'s own `buildUnauthorized(type: 'commercial')` already
+  supports exactly this, seeded real and operable regardless of
+  `authorized`, confirmed by direct read rather than assumed.
+- **Citizenship requires being a real business owner.** "The business
+  owners and the sellers who are migrating into the world... either
+  coming in... to just get a temporary passport, or if a business
+  owner they can come in as a citizen." `immigration.js`'s own
+  `canRequestCitizenship({isBusinessOwner})` is the pure decision,
+  deliberately NOT enforced inside `admitWithPassport` itself (which
+  still defaults to citizenship, unchanged, for the ~20 existing tests
+  that use it as a plain fixture for unrelated mechanics) -- the real
+  enforcement lives in `server.cjs`'s own `/admit`/`/apply-citizenship`
+  routes, the actual admission endpoints this policy is about.
+- **The founding business-owner wave.** "The initial people who come
+  into the world will be business owners, and they will be the owners
+  of the initial businesses... from restaurants to construction...
+  farming, clothing." `property.js`'s new `grantFoundingBusiness` is a
+  real GRANT, not a purchase (no `transferFn`, same no-payment shape
+  `assignPublicHousing` already uses) -- these arrivals are recognized
+  as already owning the business they brought, not buying one from the
+  governors. Wired into `/admit`/`/apply-citizenship`: giving both
+  `isBusinessOwner` and a real `businessCategory` grants the business
+  in the same request.
+- **Political admission and the closed border.** "The politicians and
+  the world leaders that will handle import, export... their
+  connections will be their part of the new world, and that will be
+  their buy-in. Other than that, the border will be cut off and only
+  letting a few people in from different places randomly." The
+  "buy-in" is the already-real `eliteSponsorship: 'political'` field
+  (9 Oct 2026, earlier the same day) -- no new field needed.
+  `immigration.js` gained a real `borderOpen` state (`true` by
+  default, every existing arrival unaffected) and `closeBorder`;
+  once closed, `admitWithPassport` refuses an ordinary admission
+  unless a real, flagged-interpretive roll (`RANDOM_ADMISSION_CHANCE`,
+  0.1) clears it -- EXCEPT a real political arrival, who is never
+  blocked by the closure at all. One-way: no document says the
+  border ever reopens, so no reopen route exists.
+- **Shadow governments.** "As other powerful individuals and other
+  government officials and government jobs, CIA, FBI, Mossad, all
+  these other organizations come over, they will try to establish
+  their own governments inside of the government, which will cause
+  conflict between the New World government and old world
+  politicians, powerful people coming together." `organizations.js`
+  gained a real, gated `shadow-government` type -- `foundOrganization`
+  refuses it to anyone not real and politically connected
+  (`isPoliticallyConnected`, checked server-side against the same
+  `eliteSponsorship: 'political'` fact). "Cause conflict with the New
+  World government" needed no new conflict engine at all:
+  `dissent.js`'s own real `organizeRevolt`/`attemptUprising` already
+  IS the mechanism a big-enough organization's leader uses to fight
+  the government -- a shadow-government organization is simply
+  another real organization whose leader can use it.
+
 ## What is still open
 
 - The area's own name — nothing has been given yet (the product name,

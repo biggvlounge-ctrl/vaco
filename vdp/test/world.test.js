@@ -102,6 +102,19 @@ test('the world is not wastefully larger than the districts in it', () => {
   );
 });
 
+test('The Towers is real, isolated, and surveilled, per direct instruction', () => {
+  const towers = DISTRICTS.find((d) => d.id === 'towers');
+  assert.ok(towers, 'The Towers district is missing');
+  assert.equal(towers.isolated, true);
+  assert.equal(towers.surveillanceLevel, 'heavy');
+
+  // Isolated means a real, larger-than-usual gap from the rest of the
+  // grid -- not merely a flag with no geometric backing.
+  const others = DISTRICTS.filter((d) => d.id !== 'towers');
+  const nearestGap = Math.min(...others.map((d) => Math.abs(d.y - towers.y)));
+  assert.ok(nearestGap > 280, `The Towers is only ${nearestGap}px from its nearest neighbor -- not meaningfully isolated`);
+});
+
 // ---------------------------------------------------------------------------
 // Every district is reachable, and rendersomething
 // ---------------------------------------------------------------------------

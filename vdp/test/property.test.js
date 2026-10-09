@@ -11,6 +11,7 @@ import {
   upgradeCommercial, COMMERCIAL_LEVELS, operateBusiness, canOperateBusiness,
   BASE_COMMERCIAL_REVENUE, BUSINESS_REVENUE_ACCOUNT, OPERATE_COOLDOWN_MS,
   PUBLIC_HOUSING_NAME, assignPublicHousing, isInPublicHousing, vacatePublicHousing,
+  grantFoundingBusiness, FOUNDING_BUSINESS_CATEGORIES,
 } from '../src/lib/property.js';
 import {
   createResourcesStore, spendMaterials, undoSpend, materialsFor, STARTING_OLD_WORLD_STOCK,
@@ -528,4 +529,41 @@ test('isInPublicHousing is false for an ordinary owned home', async () => {
   const store = createPropertyStore();
   await purchaseHome(store, { ownerId: 'theo', transferFn: fakeTransfer([]) });
   assert.ok(!isInPublicHousing(store, 'theo'));
+});
+
+test('grantFoundingBusiness gives a real, authorized, unpaid starter business', () => {
+  const store = createPropertyStore();
+  const business = grantFoundingBusiness(store, { ownerId: 'founder-1', category: 'restaurant' });
+  assert.equal(business.type, 'commercial');
+  assert.equal(business.authorized, true);
+  assert.equal(business.category, 'restaurant');
+  assert.equal(business.level, COMMERCIAL_LEVELS[0].level);
+  assert.equal(commercialOwnedBy(store, 'founder-1').id, business.id);
+});
+
+test('grantFoundingBusiness requires an ownerId and a real category', () => {
+  const store = createPropertyStore();
+  assert.throws(() => grantFoundingBusiness(store, { category: 'restaurant' }), /ownerId/);
+  assert.throws(() => grantFoundingBusiness(store, { ownerId: 'founder-1' }), /category/);
+});
+
+test('grantFoundingBusiness refuses a second business for the same real owner', () => {
+  const store = createPropertyStore();
+  grantFoundingBusiness(store, { ownerId: 'founder-1', category: 'farming' });
+  assert.throws(
+    () => grantFoundingBusiness(store, { ownerId: 'founder-1', category: 'clothing' }),
+    /already owns a commercial property/,
+  );
+});
+
+test('a granted founding business can operate for real revenue just like a purchased one', async () => {
+  const store = createPropertyStore();
+  grantFoundingBusiness(store, { ownerId: 'founder-1', category: 'restaurant' });
+  assert.ok(canOperateBusiness(commercialOwnedBy(store, 'founder-1')));
+  const result = await operateBusiness(store, { ownerId: 'founder-1', transferFn: fakeTransfer([]) });
+  assert.ok(result.revenue > 0);
+});
+
+test('FOUNDING_BUSINESS_CATEGORIES names the instruction\'s own real examples', () => {
+  assert.deepEqual(FOUNDING_BUSINESS_CATEGORIES, ['restaurant', 'construction', 'farming', 'clothing']);
 });

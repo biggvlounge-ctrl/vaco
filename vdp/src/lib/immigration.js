@@ -206,8 +206,31 @@ export function createImmigrationStore() {
     nextSpotId: 1,
     illegalSettlements: [],
     nextSettlementId: 1,
+    // **The border closes (9 Oct 2026, a later direct
+    // instruction)**: "the politicians and the world leaders that
+    // will handle import, export... their connections will be their
+    // part of the new world, and that will be their buy-in. Other
+    // than that, the border will be cut off and only letting a few
+    // people in from different places randomly." `true` (open) by
+    // default -- every existing caller/test runs the founding wave
+    // this way, unchanged. See `closeBorder`/`RANDOM_ADMISSION_CHANCE`
+    // below for the real gate this flips on.
+    borderOpen: true,
   };
 }
+
+export function closeBorder(store, { now = Date.now() } = {}) {
+  store.borderOpen = false;
+  store.borderClosedAt = now;
+}
+
+export function isBorderOpen(store) {
+  return store.borderOpen !== false;
+}
+
+// "Only letting a few people in... randomly" -- flagged interpretive,
+// no document gives a real admission rate once the border closes.
+export const RANDOM_ADMISSION_CHANCE = 0.1;
 
 function requireNoExistingArrival(store, personId, fnName) {
   if (store.arrivals.some((a) => a.personId === personId)) {
@@ -224,7 +247,8 @@ export function admitWithPassport(store, {
   personId, originRegion, religion, oldWorldSkills, oldWorldBeliefs,
   citizenshipType = 'citizenship', dissident = false,
   wealthTier = 'general', sponsorId = null, familyImportCapacity = null,
-  seekingAsylum = false, eliteSponsorship = null, now = Date.now(),
+  seekingAsylum = false, eliteSponsorship = null, isBusinessOwner = false,
+  rng = Math.random, now = Date.now(),
 } = {}) {
   if (!personId) throw new Error('admitWithPassport requires a personId');
   requireNoExistingArrival(store, personId, 'admitWithPassport');
@@ -236,6 +260,14 @@ export function admitWithPassport(store, {
   }
   if (wealthTier === 'family-sponsored' && !sponsorId) {
     throw new Error('admitWithPassport: a "family-sponsored" arrival requires a real sponsorId');
+  }
+  // "Their connections will be their part of the new world, and that
+  // will be their buy-in" -- a real, political `eliteSponsorship` is
+  // the one real exemption from the closed border below, the same
+  // real privilege the instruction names for politicians/world
+  // leaders specifically, not for every wealthy arrival.
+  if (store.borderOpen === false && eliteSponsorship !== 'political' && rng() >= RANDOM_ADMISSION_CHANCE) {
+    throw new Error(`admitWithPassport: the border is closed -- "${personId}" was not one of the few randomly let in`);
   }
 
   const arrival = {
@@ -255,6 +287,7 @@ export function admitWithPassport(store, {
     familyImportCapacity: familyImportCapacity ?? null,
     seekingAsylum,
     eliteSponsorship: eliteSponsorship || null,
+    isBusinessOwner,
     // "Multiple people... will try to revolt against the technology
     // being the government" (8 Oct 2026) -- a real, named stance an
     // arrival can carry, distinct from `legal`/`caught`: opposing the
@@ -279,6 +312,23 @@ export function applyForCitizenship(store, options = {}) {
 
 export function applyForTemporaryPassport(store, options = {}) {
   return admitWithPassport(store, { ...options, citizenshipType: 'temporary' });
+}
+
+// "The business owners and the sellers who are migrating into the
+// world... either coming in... to just get a temporary passport, or
+// if a business owner they can come in as a citizen" (9 Oct 2026, a
+// later direct instruction) -- confirmed: only a real business owner
+// may be admitted as a citizen; everyone else is capped to a
+// temporary passport. A pure decision, deliberately NOT enforced
+// inside `admitWithPassport` itself -- that one shared gate already
+// builds an arrival for every other real mechanic in this file
+// (deportation, dissident tracking, wealth tiers, sponsorship...),
+// most of which have nothing to do with business ownership. The real
+// enforcement point is `server.cjs`'s own `/admit`/`/apply-
+// citizenship` routes, the actual admission endpoints this policy is
+// about.
+export function canRequestCitizenship({ isBusinessOwner = false } = {}) {
+  return Boolean(isBusinessOwner);
 }
 
 // "They send for their family members, and only a portion of those
