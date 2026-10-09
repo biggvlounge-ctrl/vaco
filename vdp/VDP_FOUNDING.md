@@ -974,6 +974,60 @@ and "make sure to finish any rendering media that is possible":
   `mediaPlane: "none"` with its own real explanatory note, and a real
   hang-up ending the session for both sides.
 
+## The real 2,100-trait target, fact-checked, and a real 21st family (9 Oct 2026, a sixth instruction the same day)
+
+Per direct instruction: "add any traits or characteristics that could
+be added to vdp or vacon c that would make it more efficient... I
+thought we had 2100 verifiable traits."
+
+- **The 2,100 figure is real, checked against the actual source
+  document rather than taken on memory.** `vacon-c/VACANCY_TRAIT_
+  DATABASE_ATTACHMENT.md` really does say "Full spec target: 2,100+
+  traits." It is not misremembered. But it is a planning document's
+  rough, additive-data-entry STARTING ALLOCATION across six tiers
+  (individual ~1,400, family ~150, organization ~200, city ~150,
+  civilization ~150, culture ~50) -- its own prose says twice that
+  "the literal 2,100-entry catalogue does not exist in this material
+  and must be generated." The real, current, implemented total in
+  `vacon-c/server/` is far smaller: 122 individual traits (21
+  families, after this instruction) plus a handful of real, single-
+  scalar dimensions per tier-level entity (family/organization/city/
+  civilization), most of which the real code already resolves to
+  existing schema columns or computed rollups rather than new rows --
+  checked directly in `familyTraits.js`/`organizationTraits.js`/
+  `tierTraits.js`, not assumed from the stale planning doc.
+- **Why tier-level expansion toward 2,100 is not attempted here.**
+  The individual tier genuinely scales by adding named traits per
+  family, which is what the addition below is an instance of. The
+  other five tiers are each a single flat dimension per name (one
+  `wealth` scalar, not fifty wealth-related sub-traits), and most of
+  the spec's naively-listed tier-level dimensions already have a real
+  home. Inventing dozens of new named sub-dimensions under e.g.
+  "wealth" purely to chase 2,100 would be the exact "two disagreeing
+  answers to the same question" failure VACON-C's own CLAUDE.md names
+  as a standing rule -- not real progress, a second guess.
+- **A real, new 21st individual family: `efficiency`** (Time
+  Management, Resourcefulness, Process Optimization, Follow-Through,
+  Multitasking, Delegation Skill, Waste Reduction, Prioritization) --
+  genuinely missing from VACON-C's existing 20 families/114 traits
+  (checked directly: no existing trait anywhere covers how well
+  someone converts effort into results, distinct from raw skill or
+  Discipline/Focus). Added to VACON-C's own `server/traits.js` first,
+  then ported here verbatim, matching every other family's "pulled in
+  from VACON-C" treatment. Given a real reader on the day it was
+  added, in both apps: VACON-C's `economy.productivityOf` gained a
+  third real modulator term (same 0.75-1.25 band as its existing
+  health/focus terms), and this app's own `traits.js` gained a new
+  derived archetype, `Efficient` (Process Optimization + Time
+  Management, both HIGH) -- VDP's own addition, same footing as
+  `Sneaky`.
+- **Not done, flagged rather than silently skipped**: VDP's own
+  `jobs.js` pays a flat per-shift wage with no skill/trait-based
+  productivity scaling at all -- wiring `efficiency` (or any other
+  trait) into VDP's own pay would mean building that scaling from
+  nothing, which is a real, separate, larger piece of work than
+  "bring in a trait," and is not done here.
+
 ## What is still open
 
 - The area's own name — nothing has been given yet (the product name,

@@ -16,12 +16,13 @@ function fixedRng(value) {
   return () => value;
 }
 
-test('TRAIT_FAMILIES carries the real 19 families, 98 traits -- VACON-C\'s 20/114 minus Skills', () => {
+test('TRAIT_FAMILIES carries the real 20 families, 106 traits -- VACON-C\'s 21/122 minus Skills', () => {
   const families = Object.keys(TRAIT_FAMILIES);
-  assert.equal(families.length, 19);
+  assert.equal(families.length, 20);
   assert.ok(!families.includes('skills'), 'Skills is deliberately excluded -- see this module\'s header');
+  assert.ok(families.includes('efficiency'), 'VACON-C\'s real 21st family, ported');
   const total = Object.values(TRAIT_FAMILIES).reduce((n, names) => n + names.length, 0);
-  assert.equal(total, 98);
+  assert.equal(total, 106);
 });
 
 test('generateTraitSheet produces every real trait, in range, for an injected rng', () => {
@@ -104,6 +105,14 @@ test('tagsFor derives VDP\'s own Sneaky tag from Stealth + Deception -- the dire
   sheet.criminal.Deception = HIGH;
   const tags = tagsFor(sheet).map((t) => t.name);
   assert.ok(tags.includes('Sneaky'));
+});
+
+test('tagsFor derives VDP\'s own Efficient tag from the new efficiency family', () => {
+  const sheet = generateTraitSheet(fixedRng(0));
+  sheet.efficiency['Process Optimization'] = HIGH;
+  sheet.efficiency['Time Management'] = HIGH;
+  const tags = tagsFor(sheet).map((t) => t.name);
+  assert.ok(tags.includes('Efficient'));
 });
 
 test('tagsFor derives nothing for a perfectly neutral sheet -- every gate stays closed at the midpoint', () => {

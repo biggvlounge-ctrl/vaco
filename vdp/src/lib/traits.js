@@ -3,11 +3,33 @@
 // entrepreneurship, sneakiness, all the things we have from vacancy."
 //
 // **The real count, checked directly rather than guessed.** VACON-C's
-// own `server/traits.js` is 20 families and 114 individual traits, not
+// own `server/traits.js` was 20 families and 114 individual traits, not
 // "hundreds or thousands" — its own header is explicit: "this file's
 // TRAIT_FAMILIES is byte-identical to [the source doc], 20 families,
-// 114 traits." `TRAIT_FAMILIES` below is copied verbatim from there,
-// with one deliberate exclusion:
+// 114 traits." It has since grown a real 21st family, `efficiency` (8
+// traits, 9 Oct 2026) -- see that family's own comment below.
+// `TRAIT_FAMILIES` below is copied verbatim from VACON-C's current
+// state, with one deliberate exclusion:
+//
+// **The real 2,100-trait target, checked against the actual source
+// docs rather than taken on memory.** `VACANCY_TRAIT_DATABASE_
+// ATTACHMENT.md` (VACON-C's own trait spec) really does name "2,100+
+// traits" as the full spec's target -- that is not a misremembered
+// number. But it is a planning doc's rough, additive-data-entry
+// STARTING ALLOCATION across six tiers (individual, family,
+// organization, city, civilization, culture), not an implemented
+// catalogue: its own prose says so twice ("the literal 2,100-entry
+// catalogue does not exist in this material and must be generated").
+// The individual tier is the one that genuinely scales by adding more
+// named traits per family, which is what `efficiency` is an instance
+// of. The other five tiers are each a SINGLE flat dimension per name
+// (one `wealth` scalar, not fifty wealth-related traits) and in
+// VACON-C's real, current code most of the spec's naively-listed
+// tier-level dimensions already resolve to real existing columns or
+// computed rollups -- inventing dozens of new named sub-dimensions
+// under e.g. "wealth" to chase the 2,100 figure would be exactly the
+// "two disagreeing answers to the same question" failure VACON-C's
+// own CLAUDE.md names as a standing rule, not real progress toward it.
 //
 // **The `skills` family (16 traits) is NOT ported.** In VACON-C it is
 // a static roll at generation — an innate aptitude, never practised up.
@@ -31,8 +53,8 @@
 //
 // **Archetypes are a read, never stored, same as VACON-C's own
 // `archetypes.js`**: `tagsFor` computes tags live from a trait sheet
-// every time it's asked. The 23 named tags below are copied verbatim
-// from VACON-C's own list (its own header: "the tags are the
+// every time it's asked. 23 of the 25 named tags below are copied
+// verbatim from VACON-C's own list (its own header: "the tags are the
 // document's; the thresholds are not" — HIGH=70/LOW=30 are its
 // existing flagged-interpretive choice, kept here for the same reason
 // VDP keeps its own flagged-interpretive numbers everywhere else: two
@@ -47,12 +69,15 @@
 // and good at striking deals) without inventing a value for a family
 // VDP deliberately excluded.
 //
-// **One real addition, clearly marked as VDP's own**: 'Sneaky'
+// **Two real additions, clearly marked as VDP's own**: 'Sneaky'
 // (`criminal.Stealth` + `criminal.Deception`, both HIGH) is not one of
 // VACON-C's 23 — the direct instruction named "sneakiness" by word, and
 // the honest answer (given earlier, in chat) is that it maps to these
 // two real criminal-family traits rather than being its own invented
-// stat. Adding it as a real, derived tag makes that answer legible in
+// stat. 'Efficient' (`efficiency.Process Optimization` + `efficiency
+// .Time Management`, both HIGH) is the same move for the new
+// `efficiency` family. Adding both as real, derived tags makes those
+// answers legible in
 // the game itself instead of only in a conversation.
 
 export const HIGH = 70;
@@ -95,6 +120,21 @@ export const TRAIT_FAMILIES = {
             'Territorial Instinct'],
   special: ['Artifact Sensitivity', 'Signal Perception', 'Anomaly Resistance'],
   personality: ['Confidence', 'Teaching Ability'],
+  // VACON-C's own 21st family (added 9 Oct 2026, same instruction as
+  // this file's: "add any traits... that would make it more
+  // efficient"), ported verbatim -- see VACON-C's own `traits.js` for
+  // why it's real and not filler: it has a real reader
+  // (`economy.productivityOf`'s own efficiency modulator). VDP's own
+  // skill-practice path (`skills.js`) and job payout (`jobs.js`) don't
+  // yet read it -- flagged, not silently wired, since VDP's jobs
+  // currently pay a flat per-shift wage with no skill/trait-based
+  // scaling at all, and giving efficiency a real effect here would
+  // mean building that scaling for every trait at once, not just this
+  // one family. `tagsFor`'s own archetype layer already reads it
+  // honestly: a perfectly neutral sheet earns no tag either way.
+  efficiency: ['Time Management', 'Resourcefulness', 'Process Optimization',
+               'Follow-Through', 'Multitasking', 'Delegation Skill',
+               'Waste Reduction', 'Prioritization'],
 };
 
 // Same ~N(50, small variance) shape as VACON-C's own `randomTraitValue`
@@ -171,8 +211,9 @@ const INDIVIDUAL_ARCHETYPES = [
   { name: 'Fearless', when: (t) => t('combat', 'Composure Under Fire') >= HIGH && t('psychological', 'Paranoia') <= LOW },
   { name: 'Paranoid', when: (t) => t('psychological', 'Paranoia') >= HIGH && t('psychological', 'Trust Threshold') >= HIGH },
   { name: 'Community Focused', when: (t) => t('social', 'Group Loyalty') >= HIGH && t('emotional', 'Empathy') >= HIGH },
-  // VDP's own addition (see header) -- not one of VACON-C's 23.
+  // VDP's own additions -- not one of VACON-C's original 23.
   { name: 'Sneaky', when: (t) => t('criminal', 'Stealth') >= HIGH && t('criminal', 'Deception') >= HIGH },
+  { name: 'Efficient', when: (t) => t('efficiency', 'Process Optimization') >= HIGH && t('efficiency', 'Time Management') >= HIGH },
 ];
 
 // Every family/trait pair an archetype predicate reads, parsed out of
