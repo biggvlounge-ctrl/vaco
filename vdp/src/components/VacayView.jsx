@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import {
   listOpenExperiences, createExperience, bookExperience, cancelExperienceBooking,
-  createStay, getStay,
+  createStay, getStay, listHomeListings,
 } from "../lib/vacayClient.js";
 import { sessionHeaders } from "../lib/shieldAuth.js";
 
@@ -27,6 +27,8 @@ export default function VacayView({ session }) {
   const [hotelCap, setHotelCap] = useState(null);
   const [hotels, setHotels] = useState([]);
   const [hotelError, setHotelError] = useState(null);
+  const [homeListings, setHomeListings] = useState(null);
+  const [homeError, setHomeError] = useState(null);
 
   const refreshHotels = useCallback(async () => {
     try {
@@ -71,7 +73,11 @@ export default function VacayView({ session }) {
     listOpenExperiences().then(setExperiences).catch((err) => setLoadError(err.message));
   }, []);
 
-  useEffect(() => { refresh(); refreshHotels(); }, [refresh, refreshHotels]);
+  const refreshHomeListings = useCallback(() => {
+    listHomeListings().then(setHomeListings).catch((err) => setHomeError(err.message));
+  }, []);
+
+  useEffect(() => { refresh(); refreshHotels(); refreshHomeListings(); }, [refresh, refreshHotels, refreshHomeListings]);
 
   const handleHostExperience = async () => {
     setBusy(true);
@@ -182,6 +188,41 @@ export default function VacayView({ session }) {
           <button onClick={handleListHotel} disabled={busy}>List a hotel in Meridian</button>
         )}
         {hotelError && <p style={{ color: "crimson" }}>Error: {hotelError}</p>}
+      </div>
+
+      <div style={{ borderTop: "1px dashed #ccc", marginTop: 12, paddingTop: 8 }}>
+        <h3 style={{ fontSize: 13, margin: "0 0 4px 0" }}>VACAY Homes — real estate</h3>
+        <p style={{ fontSize: 11, color: "#888", margin: "0 0 8px" }}>
+          Browse real homes for sale and rentals (Zillow's model). A sale or long-term
+          lease settles outside VCoin, same as the real world — browsing only here.
+        </p>
+        {homeError && <p style={{ color: "crimson" }}>Error: {homeError}</p>}
+        {homeListings === null && !homeError && (
+          <p style={{ fontSize: 12, color: "#888" }}>Loading VACAY Homes listings…</p>
+        )}
+        {homeListings && homeListings.length === 0 && (
+          <p style={{ fontSize: 12, color: "#888" }}>No active listings yet.</p>
+        )}
+        {homeListings && homeListings.length > 0 && (
+          <>
+            <p style={{ fontSize: 11, color: "#888", margin: "0 0 4px" }}>For sale:</p>
+            {homeListings.filter((l) => l.purpose === "for-sale").map((l) => (
+              <p key={l.id} style={{ fontSize: 12, color: "#666", margin: "0 0 4px" }}>
+                {l.address} — {l.price} VCoin — {l.bedrooms}bd/{l.bathrooms}ba, {l.sqft} sqft
+              </p>
+            ))}
+            <p style={{ fontSize: 11, color: "#888", margin: "8px 0 4px" }}>For rent:</p>
+            {homeListings.filter((l) => l.purpose === "for-rent").map((l) => (
+              <p key={l.id} style={{ fontSize: 12, color: "#666", margin: "0 0 4px" }}>
+                {l.address} — {l.price} VCoin/mo — {l.bedrooms}bd/{l.bathrooms}ba, {l.sqft} sqft
+                {l.bedrooms === 0 ? " (commercial)" : ""}
+              </p>
+            ))}
+          </>
+        )}
+        <button onClick={refreshHomeListings} disabled={busy} style={{ marginTop: 8 }}>
+          Refresh listings
+        </button>
       </div>
     </div>
   );

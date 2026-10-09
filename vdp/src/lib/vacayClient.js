@@ -76,3 +76,20 @@ export async function createStay({ hostId, title, pricePerNight, hostType = "pro
     hostId, title, pricePerNight, hostType,
   });
 }
+
+// VACAY Homes (Zillow's real estate model) -- per direct instruction,
+// "they also will look at the vacay app for rental properties,
+// commercial rental properties, homes for sale." Real estate sales
+// and long-term leases settle outside any app's own payment rails
+// (`vacay/lib/home/listings.js`'s own header), so this is a real,
+// read-only browse client -- no VCoin transfer belongs here, the same
+// honest split VACAY's own Home router already draws between
+// `listings.js` (browse) and `leads.js` (the real money, agent-side).
+export async function listHomeListings() {
+  const body = await requestJson("/api/home/listings");
+  return body.listings;
+}
+
+export async function getHomeListing(listingId) {
+  return requestJson(`/api/home/listings/${listingId}`);
+}

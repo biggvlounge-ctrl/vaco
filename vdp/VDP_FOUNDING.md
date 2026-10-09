@@ -879,16 +879,29 @@ Per direct instruction:
   created in `ensurePlayer`, since a first-time arrival has no live
   browser session of their own yet for VASH TAP to check.
 
-What this instruction also raised but does not yet have real code
-behind, carried into this document's own "what is still open" section
-rather than guessed at here: real-time media and native mobile push
-(explicitly requested, not yet started), DREAMS' per-business
-screen-purchase scaling and its emergency broadcast override, VENVS's
-VACON-C-derived business/corporation migration path ("hunts" and "the
-Venus" -- read as VENVS's own real marketplace, not VAGO's Venus Resort,
-on "sellers and buyers" language), and pulling VACON-C's own full trait
-taxonomy ("entrepreneurship, sneakiness") into this app's six-trait
-`npcs.js` set.
+What this instruction also raised, resolved afterward (9 Oct 2026,
+later the same day): DREAMS' per-business screen-purchase scaling was
+confirmed already real (`selectScreens` never had a cap), and DREAMS
+gained a real, service-credential-only government emergency broadcast
+(`lib/emergencyBroadcast.js`) -- not yet wired to a real VDP-side
+trigger, since no app in this ecosystem has a real "wanted criminal"
+or "missing person" game event yet to call it from. **Also resolved**:
+"they also will look at the vacay app for rental properties, commercial
+rental properties, homes for sale" -- VACAY Homes' own real listings
+browse (`vacay/lib/home/listings.js`, confirmed already real, no new
+VACAY code needed) now has a real VDP-side client
+(`vacayClient.js`'s `listHomeListings`/`getHomeListing`) and a browse
+panel in `VacayView.jsx`, read-only since a real sale or lease settles
+outside VCoin.
+
+Still carried into this document's own "what is still open" section
+rather than guessed at: real-time media and native mobile push
+(explicitly requested, not yet started), VENVS's VACON-C-derived
+business/corporation migration path ("hunts" and "the Venus" -- read as
+VENVS's own real marketplace, not VAGO's Venus Resort, on "sellers and
+buyers" language), and pulling VACON-C's own full trait taxonomy
+("entrepreneurship, sneakiness") into this app's six-trait `npcs.js`
+set.
 
 ## What is still open
 
