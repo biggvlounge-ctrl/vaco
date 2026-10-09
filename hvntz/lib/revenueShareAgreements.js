@@ -23,20 +23,34 @@
 // `predictionMarkets.js` and HVNTZ's own `recordRevenueEvent` already
 // hold).
 //
-// **Scoped deliberately narrow.** §17 names nine split shapes (fixed
-// percentages, fixed amounts, tiered percentages, performance bonuses,
-// event-specific splits, Hunt-specific splits, creator-specific
-// splits, sponsor-funded rewards, time-limited agreements). This
-// builds `percentage` and `fixed-amount` — the two concrete shapes
-// §17's own worked example actually uses — plus time-limited
-// agreements (an optional `expiresAt`; `distributeRevenue` refuses to
-// distribute through an expired one, the same "computed live, never
-// trusted from a cached field" discipline VASH TAP's
-// `currentAssignmentFor` and VAGO's `isGroupWagerLocked` already
-// hold). The remaining six are each their own undertaking with no
-// substrate to extend, same as every other gap this session's audits
-// have found — not a silent scope-narrowing, an explicit one (see the
-// app's own README).
+// **Scoped deliberately narrow, and widened once, on purpose.** §17
+// names nine split shapes (fixed percentages, fixed amounts, tiered
+// percentages, performance bonuses, event-specific splits,
+// Hunt-specific splits, creator-specific splits, sponsor-funded
+// rewards, time-limited agreements). This builds `percentage` and
+// `fixed-amount` — the two concrete shapes §17's own worked example
+// actually uses — plus time-limited agreements (an optional
+// `expiresAt`; `distributeRevenue` refuses to distribute through an
+// expired one, the same "computed live, never trusted from a cached
+// field" discipline VASH TAP's `currentAssignmentFor` and VAGO's
+// `isGroupWagerLocked` already hold), plus, added 9 Oct 2026,
+// `tiered-percentage` — a real revenue BAND (§17's own words: "do not
+// hard-code one universal percentage"), one set of percentages applied
+// to the whole amount depending which band it falls in, not a
+// marginal bracket split nobody asked for.
+//
+// Event-specific, Hunt-specific and creator-specific splits need no
+// new split TYPE — `distributeRevenue`'s existing `sourceType`/
+// `sourceId` already let an agreement be created and invoked per
+// event/Hunt/creator context, which is the real content of those three
+// names. Performance bonuses and sponsor-funded rewards are still
+// genuinely unbuilt: a bonus leg needs a real metric to trigger on
+// (nothing in this app computes one against a threshold yet), and
+// sponsor funding needs a real decision about who besides a business's
+// own owner may ever be `distributeRevenue`'s `payerId` — both their
+// own undertaking, not a detail of this file, same as every other gap
+// this session's audits have found — not a silent scope-narrowing, an
+// explicit one (see the app's own README).
 //
 // **An Agreement belongs to a Network, not a floating global config**
 // — §17's own worked example is literally "A business can establish:
@@ -50,7 +64,7 @@
 
 const { findNetwork } = require('./networkConnections');
 
-const SPLIT_TYPES = ['percentage', 'fixed-amount'];
+const SPLIT_TYPES = ['percentage', 'fixed-amount', 'tiered-percentage'];
 const AGREEMENT_STATUSES = ['active', 'archived'];
 
 function findRevenueShareAgreement(store, agreementId) {
@@ -61,9 +75,64 @@ function round2(n) {
   return Math.round(n * 100) / 100;
 }
 
+function validateShares(shares, label, { requirePercentTotal } = {}) {
+  if (!Array.isArray(shares) || shares.length === 0) {
+    throw new Error(`createRevenueShareAgreement: ${label} requires at least one share`);
+  }
+  for (const [i, share] of shares.entries()) {
+    if (!share || !share.role) throw new Error(`createRevenueShareAgreement: ${label}[${i}] requires a role`);
+    if (!share.payeeId) throw new Error(`createRevenueShareAgreement: ${label}[${i}] requires a payeeId`);
+    if (!Number.isFinite(share.value) || share.value <= 0) {
+      throw new Error(`createRevenueShareAgreement: ${label}[${i}] requires a positive value`);
+    }
+  }
+  if (requirePercentTotal) {
+    const totalPercent = round2(shares.reduce((sum, s) => sum + s.value, 0));
+    if (totalPercent !== 100) {
+      throw new Error(`createRevenueShareAgreement: ${label} percentage shares must sum to exactly 100 (got ${totalPercent})`);
+    }
+  }
+  return shares.map((s) => ({ role: s.role, payeeId: s.payeeId, value: s.value }));
+}
+
+// §17's "tiered percentages" -- a real revenue BAND shape ("under
+// $1,000/month this split, $1,000 and up that split"), not marginal
+// tax-bracket math. `computeSplit` applies ONE tier's percentages to
+// the WHOLE `totalAmount`, whichever tier it falls in -- the shape
+// every real tiered-commission agreement this file's own worked
+// example is modeled on (§17) actually uses, and simpler and more
+// legible than splitting one payment across brackets for a benefit
+// nobody asked for.
+//
+// Exactly one tier is unbounded (`upTo: null`) -- the top band -- and
+// it is sorted to the end regardless of the order a caller supplied
+// the tiers in, so `computeSplit` can always just walk ascending and
+// stop at the first tier the amount fits inside.
+function validateAndSortTiers(tiers) {
+  if (!Array.isArray(tiers) || tiers.length === 0) {
+    throw new Error('createRevenueShareAgreement: tiered-percentage requires at least one tier');
+  }
+  const unbounded = tiers.filter((t) => t.upTo === null || t.upTo === undefined);
+  if (unbounded.length !== 1) {
+    throw new Error('createRevenueShareAgreement: tiered-percentage requires exactly one unbounded top tier (upTo: null)');
+  }
+  const bounded = tiers.filter((t) => t.upTo !== null && t.upTo !== undefined);
+  for (const [i, tier] of bounded.entries()) {
+    if (!Number.isFinite(tier.upTo) || tier.upTo <= 0) {
+      throw new Error(`createRevenueShareAgreement: tiers[${i}].upTo must be a positive number, or null for the top tier`);
+    }
+  }
+  const sortedBounded = [...bounded].sort((a, b) => a.upTo - b.upTo);
+  const allTiers = [...sortedBounded, unbounded[0]];
+  return allTiers.map((tier, i) => ({
+    upTo: tier.upTo ?? null,
+    shares: validateShares(tier.shares, `tiers[${i}].shares`, { requirePercentTotal: true }),
+  }));
+}
+
 function createRevenueShareAgreement(store, options = {}) {
   const {
-    networkId, name, splitType, shares, expiresAt = null, now = Date.now(),
+    networkId, name, splitType, shares, tiers, expiresAt = null, now = Date.now(),
   } = options;
 
   const network = findNetwork(store, networkId);
@@ -71,22 +140,6 @@ function createRevenueShareAgreement(store, options = {}) {
   if (!name) throw new Error('createRevenueShareAgreement requires a name');
   if (!SPLIT_TYPES.includes(splitType)) {
     throw new Error(`createRevenueShareAgreement requires a splitType of ${SPLIT_TYPES.join(', ')}`);
-  }
-  if (!Array.isArray(shares) || shares.length === 0) {
-    throw new Error('createRevenueShareAgreement requires at least one share');
-  }
-  for (const [i, share] of shares.entries()) {
-    if (!share || !share.role) throw new Error(`createRevenueShareAgreement: shares[${i}] requires a role`);
-    if (!share.payeeId) throw new Error(`createRevenueShareAgreement: shares[${i}] requires a payeeId`);
-    if (!Number.isFinite(share.value) || share.value <= 0) {
-      throw new Error(`createRevenueShareAgreement: shares[${i}] requires a positive value`);
-    }
-  }
-  if (splitType === 'percentage') {
-    const totalPercent = round2(shares.reduce((sum, s) => sum + s.value, 0));
-    if (totalPercent !== 100) {
-      throw new Error(`createRevenueShareAgreement: percentage shares must sum to exactly 100 (got ${totalPercent})`);
-    }
   }
   if (expiresAt !== null) {
     if (!Number.isFinite(expiresAt) || expiresAt <= now) {
@@ -99,11 +152,17 @@ function createRevenueShareAgreement(store, options = {}) {
     networkId,
     name,
     splitType,
-    shares: shares.map((s) => ({ role: s.role, payeeId: s.payeeId, value: s.value })),
     status: 'active',
     expiresAt,
     createdAt: now,
   };
+
+  if (splitType === 'tiered-percentage') {
+    agreement.tiers = validateAndSortTiers(tiers);
+  } else {
+    agreement.shares = validateShares(shares, 'shares', { requirePercentTotal: splitType === 'percentage' });
+  }
+
   store.revenueShareAgreements.push(agreement);
   return agreement;
 }
@@ -133,6 +192,25 @@ function archiveRevenueShareAgreement(store, options = {}) {
 // its own two-party split, generalized to N parties. The sum of the
 // returned legs always equals `totalAmount` to the cent; no money is
 // ever invented or lost to rounding.
+function splitByPercentage(shares, totalAmount) {
+  let allocated = 0;
+  return shares.map((s, i) => {
+    if (i === shares.length - 1) {
+      return { role: s.role, payeeId: s.payeeId, amount: round2(totalAmount - allocated) };
+    }
+    const amount = round2((totalAmount * s.value) / 100);
+    allocated = round2(allocated + amount);
+    return { role: s.role, payeeId: s.payeeId, amount };
+  });
+}
+
+// The band this `totalAmount` falls in, by the same `upTo` ordering
+// `validateAndSortTiers` already sorted ascending — first tier whose
+// ceiling the amount does not exceed, or the unbounded one at the end.
+function tierFor(agreement, totalAmount) {
+  return agreement.tiers.find((tier) => tier.upTo === null || totalAmount <= tier.upTo);
+}
+
 function computeSplit(agreement, totalAmount) {
   if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
     throw new Error('computeSplit requires a positive totalAmount');
@@ -147,17 +225,18 @@ function computeSplit(agreement, totalAmount) {
     return shares.map((s) => ({ role: s.role, payeeId: s.payeeId, amount: round2(s.value) }));
   }
 
+  if (splitType === 'tiered-percentage') {
+    const tier = tierFor(agreement, totalAmount);
+    // Unreachable given `validateAndSortTiers` always keeps exactly one
+    // unbounded tier — every amount matches something — but a split
+    // function that could silently return nothing for a real payment
+    // is worse than one more line of defence.
+    if (!tier) throw new Error(`computeSplit: no tier of agreement ${agreement.id} covers amount ${totalAmount}`);
+    return splitByPercentage(tier.shares, totalAmount);
+  }
+
   // percentage
-  let allocated = 0;
-  const legs = shares.map((s, i) => {
-    if (i === shares.length - 1) {
-      return { role: s.role, payeeId: s.payeeId, amount: round2(totalAmount - allocated) };
-    }
-    const amount = round2((totalAmount * s.value) / 100);
-    allocated = round2(allocated + amount);
-    return { role: s.role, payeeId: s.payeeId, amount };
-  });
-  return legs;
+  return splitByPercentage(shares, totalAmount);
 }
 
 // §16's own attribution ask, kept generic rather than enumerating all

@@ -90,7 +90,7 @@ test('createRevenueShareAgreement verifies the network is real rather than trust
 });
 
 test('every declared SPLIT_TYPES value is accepted', () => {
-  assert.deepStrictEqual(SPLIT_TYPES, ['percentage', 'fixed-amount']);
+  assert.deepStrictEqual(SPLIT_TYPES, ['percentage', 'fixed-amount', 'tiered-percentage']);
 });
 
 test('createRevenueShareAgreement refuses percentage shares that do not sum to exactly 100', async () => {
@@ -160,6 +160,101 @@ test('computeSplit refuses a fixed-amount agreement whose shares do not sum to t
     shares: [{ role: 'dj', payeeId: 'dj-marcus', value: 200 }, { role: 'platform', payeeId: 'vaco-platform', value: 50 }],
   });
   assert.throws(() => computeSplit(agreement, 1000), /must sum to exactly totalAmount/);
+});
+
+// -- tiered-percentage: a real revenue BAND, not a bracket split ------------
+
+function tieredAgreementOptions(overrides = {}) {
+  return {
+    name: 'Tiered split',
+    splitType: 'tiered-percentage',
+    tiers: [
+      { upTo: 1000, shares: [{ role: 'business', payeeId: 'owner-1', value: 90 }, { role: 'platform', payeeId: 'vaco-platform', value: 10 }] },
+      { upTo: null, shares: [{ role: 'business', payeeId: 'owner-1', value: 80 }, { role: 'platform', payeeId: 'vaco-platform', value: 20 }] },
+    ],
+    ...overrides,
+  };
+}
+
+test('createRevenueShareAgreement requires exactly one unbounded top tier', async () => {
+  const store = createHvntzStore();
+  const { network } = hubNetwork(store);
+  assert.throws(
+    () => createRevenueShareAgreement(store, {
+      networkId: network.id,
+      ...tieredAgreementOptions({ tiers: [{ upTo: 1000, shares: [{ role: 'a', payeeId: 'x', value: 100 }] }] }),
+    }),
+    /requires exactly one unbounded top tier/,
+  );
+});
+
+test('createRevenueShareAgreement refuses a tier whose own percentages do not sum to 100', async () => {
+  const store = createHvntzStore();
+  const { network } = hubNetwork(store);
+  assert.throws(
+    () => createRevenueShareAgreement(store, {
+      networkId: network.id,
+      ...tieredAgreementOptions({
+        tiers: [{ upTo: null, shares: [{ role: 'business', payeeId: 'owner-1', value: 60 }] }],
+      }),
+    }),
+    /percentage shares must sum to exactly 100 \(got 60\)/,
+  );
+});
+
+test('createRevenueShareAgreement sorts tiers ascending regardless of input order, unbounded last', async () => {
+  const store = createHvntzStore();
+  const { network } = hubNetwork(store);
+  const agreement = createRevenueShareAgreement(store, {
+    networkId: network.id,
+    name: 'Out of order tiers',
+    splitType: 'tiered-percentage',
+    tiers: [
+      { upTo: null, shares: [{ role: 'business', payeeId: 'owner-1', value: 80 }, { role: 'platform', payeeId: 'vaco-platform', value: 20 }] },
+      { upTo: 500, shares: [{ role: 'business', payeeId: 'owner-1', value: 95 }, { role: 'platform', payeeId: 'vaco-platform', value: 5 }] },
+      { upTo: 1000, shares: [{ role: 'business', payeeId: 'owner-1', value: 90 }, { role: 'platform', payeeId: 'vaco-platform', value: 10 }] },
+    ],
+  });
+  assert.deepStrictEqual(agreement.tiers.map((t) => t.upTo), [500, 1000, null]);
+});
+
+test('computeSplit applies the WHOLE amount at the band it falls in, not a marginal bracket split', async () => {
+  const store = createHvntzStore();
+  const { network } = hubNetwork(store);
+  const agreement = createRevenueShareAgreement(store, { networkId: network.id, ...tieredAgreementOptions() });
+
+  // Falls inside the first band (<= 1000): 90/10 on the WHOLE 800.
+  const underLegs = computeSplit(agreement, 800);
+  assert.strictEqual(underLegs.find((l) => l.role === 'business').amount, 720);
+  assert.strictEqual(underLegs.find((l) => l.role === 'platform').amount, 80);
+
+  // Above the first band: 80/20 on the WHOLE 2000 -- not 90/10 on the
+  // first 1000 and 80/20 on the remainder, which would be a different
+  // (marginal) shape this file deliberately does not build.
+  const overLegs = computeSplit(agreement, 2000);
+  assert.strictEqual(overLegs.find((l) => l.role === 'business').amount, 1600);
+  assert.strictEqual(overLegs.find((l) => l.role === 'platform').amount, 400);
+});
+
+test('computeSplit on a tiered-percentage agreement is still solvent to the cent', async () => {
+  const store = createHvntzStore();
+  const { network } = hubNetwork(store);
+  const agreement = createRevenueShareAgreement(store, { networkId: network.id, ...tieredAgreementOptions() });
+  const legs = computeSplit(agreement, 333.33);
+  const sum = Math.round(legs.reduce((n, l) => n + l.amount, 0) * 100) / 100;
+  assert.strictEqual(sum, 333.33);
+});
+
+test('distributeRevenue moves real money through a tiered-percentage agreement', async () => {
+  const store = createHvntzStore();
+  const { network } = hubNetwork(store);
+  const agreement = createRevenueShareAgreement(store, { networkId: network.id, ...tieredAgreementOptions() });
+  const settleFn = recorder();
+  await distributeRevenue(store, {
+    agreementId: agreement.id, totalAmount: 2000, payerId: 'owner-1', idempotencyKey: 'dist-1', settleFn,
+  });
+  assert.strictEqual(settleFn.totalTo('owner-1'), 1600);
+  assert.strictEqual(settleFn.totalTo('vaco-platform'), 400);
 });
 
 // -- distributeRevenue -- never recorded before the ledger confirms it ------------
