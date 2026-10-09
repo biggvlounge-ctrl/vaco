@@ -23,6 +23,14 @@ const CAMPAIGN_STATUSES = ['draft', 'live', 'completed'];
 const SCREEN_OWNER_SHARE = 0.7;
 const DREAMS_PLATFORM_ACCOUNT = 'dreams-platform';
 
+//: Flagged interpretive: no source doc names these three exactly --
+//: "a coupon, a percent off" is the direct instruction, and "coupon"
+//: is kept open-ended (a fixed-amount discount, a free item, any
+//: redeemable code) rather than narrowed to percent-off alone, since
+//: the same instruction's own examples already span both a
+//: percentage and a generic "something."
+const INCENTIVE_TYPES = ['percent-off', 'amount-off', 'coupon'];
+
 function round(n) {
   return Math.round(n * 100) / 100;
 }
@@ -43,6 +51,7 @@ function createCampaign(store, options = {}) {
     creativeText: null,
     budget: null,
     remainingBudget: null,
+    incentive: null,
     status: 'draft',
     createdAt: now,
     launchedAt: null,
@@ -70,6 +79,14 @@ function requireDraft(store, campaignId, action) {
 
 // Real "pick locations" step -- every screenId must be a real,
 // currently active registered screen.
+//
+// **Confirmed real, not a new build**: "as businesses grow, they can
+// have the option of using as many screens that are available for
+// purchase... this will encourage people to sell." There is, and was,
+// no cap here -- `screenIds` accepts any number of real active
+// screens, so a growing advertiser's only real limit is how many
+// screens currently exist and how large a budget (`setBudget`) they
+// set to actually run impressions across them.
 function selectScreens(store, options = {}) {
   const { campaignId, screenIds } = options;
   const campaign = requireDraft(store, campaignId, 'selectScreens');
@@ -128,6 +145,37 @@ async function generateCreativeText(store, options = {}) {
   return campaign;
 }
 
+// Real "give something away" step -- per direct instruction,
+// "everything has to be used to give away something, a coupon, a
+// percentage off, even if it's a large corporation. The whole goal is
+// to get businesses and corporations to start to migrate." Required
+// before launch (see `launchCampaign` below) rather than left
+// optional, so a campaign can never go live as a plain, giveaway-free
+// ad the instruction explicitly rules out -- no exception carved out
+// for size of advertiser.
+function setIncentive(store, options = {}) {
+  const { campaignId, type, value = null, code = null } = options;
+  const campaign = requireDraft(store, campaignId, 'setIncentive');
+  if (!INCENTIVE_TYPES.includes(type)) {
+    throw new Error(`setIncentive: type must be one of ${INCENTIVE_TYPES.join(', ')}`);
+  }
+  if (type === 'percent-off') {
+    if (!Number.isFinite(value) || value <= 0 || value > 100) {
+      throw new Error('setIncentive: a percent-off incentive requires a value between 0 and 100');
+    }
+  }
+  if (type === 'amount-off') {
+    if (!Number.isFinite(value) || value <= 0) {
+      throw new Error('setIncentive: an amount-off incentive requires a positive value');
+    }
+  }
+  if (type === 'coupon' && !code) {
+    throw new Error('setIncentive: a coupon incentive requires a code');
+  }
+  campaign.incentive = { type, value, code };
+  return campaign;
+}
+
 function setBudget(store, options = {}) {
   const { campaignId, budget } = options;
   const campaign = requireDraft(store, campaignId, 'setBudget');
@@ -147,6 +195,9 @@ function launchCampaign(store, options = {}) {
   if (campaign.screenIds.length === 0) throw new Error('launchCampaign: campaign has no screens selected');
   if (!campaign.budget || campaign.budget <= 0) throw new Error('launchCampaign: campaign has no budget set');
   if (!campaign.creativeUrl && !campaign.creativeText) throw new Error('launchCampaign: campaign has no creative');
+  if (!campaign.incentive) {
+    throw new Error('launchCampaign: campaign has no incentive -- every DREAMS ad must give something away (a coupon or a percent/amount off), even for a large corporation');
+  }
 
   campaign.status = 'live';
   campaign.launchedAt = now;
@@ -251,6 +302,7 @@ module.exports = {
   CAMPAIGN_STATUSES,
   SCREEN_OWNER_SHARE,
   DREAMS_PLATFORM_ACCOUNT,
+  INCENTIVE_TYPES,
   createCampaign,
   getCampaign,
   listCampaignsForAdvertiser,
@@ -258,6 +310,7 @@ module.exports = {
   setCreative,
   generateCreativeText,
   setBudget,
+  setIncentive,
   launchCampaign,
   recordImpression,
 };

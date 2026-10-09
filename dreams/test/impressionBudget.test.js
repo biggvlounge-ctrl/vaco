@@ -49,6 +49,7 @@ function liveCampaign(store, { budget = 10 } = {}) {
   campaigns.selectScreens(store, { campaignId: campaign.id, screenIds: [screen.id] });
   campaigns.setCreative(store, { campaignId: campaign.id, creativeText: 'Buy this' });
   campaigns.setBudget(store, { campaignId: campaign.id, budget });
+  campaigns.setIncentive(store, { campaignId: campaign.id, type: 'percent-off', value: 10 });
   campaigns.launchCampaign(store, { campaignId: campaign.id });
   return { campaign, screen };
 }

@@ -14,6 +14,9 @@ function createDreamsStore() {
     nextCampaignId: 1,
     impressions: [],
     nextImpressionId: 1,
+    emergencyBroadcasts: [],
+    nextEmergencyBroadcastId: 1,
+    activeEmergencyBroadcastId: null,
   };
 }
 

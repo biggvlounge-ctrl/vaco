@@ -37,9 +37,13 @@ const {
 } = require('./lib/screens');
 const { signUpAdvertiser, getAdvertiser } = require('./lib/advertisers');
 const {
-  CAMPAIGN_STATUSES, createCampaign, getCampaign, listCampaignsForAdvertiser,
-  selectScreens, setCreative, generateCreativeText, setBudget, launchCampaign, recordImpression,
+  CAMPAIGN_STATUSES, INCENTIVE_TYPES, createCampaign, getCampaign, listCampaignsForAdvertiser,
+  selectScreens, setCreative, generateCreativeText, setBudget, setIncentive, launchCampaign, recordImpression,
 } = require('./lib/campaigns');
+const {
+  EMERGENCY_BROADCAST_TYPES, pushEmergencyBroadcast, getActiveEmergencyBroadcast,
+  clearEmergencyBroadcast, listEmergencyBroadcasts, resolveScreenContent,
+} = require('./lib/emergencyBroadcast');
 
 const { createServiceAuth } = require('./lib/serviceAuth.cjs');
 const { traceMiddleware, traceHeaders } = require('./lib/tracing.cjs');const app = express();
@@ -218,6 +222,7 @@ function requireScreenOwner() {
 app.get('/api/health', (_req, res) => {
   res.json({
     ok: true, service: 'dreams', screenStatuses: SCREEN_STATUSES, campaignStatuses: CAMPAIGN_STATUSES,
+    incentiveTypes: INCENTIVE_TYPES, emergencyBroadcastTypes: EMERGENCY_BROADCAST_TYPES,
   });
 });
 
@@ -326,6 +331,14 @@ app.post('/api/campaigns/:id/budget', requireCampaignAdvertiser(), (req, res) =>
   }
 });
 
+app.post('/api/campaigns/:id/incentive', requireCampaignAdvertiser(), (req, res) => {
+  try {
+    res.json(setIncentive(store, { ...req.body, campaignId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.post('/api/campaigns/:id/launch', requireCampaignAdvertiser(), (req, res) => {
   try {
     res.json(launchCampaign(store, { campaignId: Number(req.params.id) }));
@@ -347,17 +360,21 @@ app.post('/api/campaigns/:id/launch', requireCampaignAdvertiser(), (req, res) =>
 // a webhook is slow would be the wrong trade. Same posture as
 // `pushMetric` below.
 //
-// Severity is `alert`, never `critical`. Critical is reserved for
-// safety, and a pager that fires for ad budgets gets muted — after
-// which the real one is missed too.
+// Severity defaults to `alert`, never `critical`, for the two events
+// described above. Critical is reserved for safety, and a pager that
+// fires for ad budgets gets muted — after which the real one is
+// missed too. A real safety event (the government's own emergency
+// broadcast, below) is the one call site that passes `critical`
+// explicitly, because it genuinely is the thing this paragraph
+// reserves that severity for.
 const VACO_NOTIFY_URL = process.env.VACO_NOTIFY_URL || 'http://localhost:8818';
 
-async function notify(title, body, context) {
+async function notify(title, body, context, severity = 'alert') {
   try {
     await fetch(`${VACO_NOTIFY_URL}/api/notify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...serviceHeaders(), },
-      body: JSON.stringify({ app: 'dreams', severity: 'alert', title, body, context }),
+      body: JSON.stringify({ app: 'dreams', severity, title, body, context }),
     });
   } catch {
     // Honest no-op. vaco-notify records its own undelivered count; a
@@ -424,6 +441,54 @@ app.get('/api/offline-plays', (req, res) => {
   res.json({ plays: getOfflinePlays(store, {
     screenId: screenId ? Number(screenId) : undefined, campaignId,
   }) });
+});
+
+// -- Government emergency broadcast override -----------------------------
+//
+// "These screens can all be controlled as once by the government to
+// give out one message" -- weather, a wanted/missing-person alert, an
+// off-grid search. No end-user session can author this (the AI-run
+// government has none to present), so it is service-credential-only,
+// the same posture VOID's own government job postings already use.
+app.post('/api/emergency-broadcast', requireCallingService(), async (req, res) => {
+  try {
+    const broadcast = pushEmergencyBroadcast(store, { ...req.body, issuedBy: req.callingService });
+    // A real, safety-class event -- this is exactly what `critical`
+    // is reserved for elsewhere in this file, unlike an ad budget
+    // running out.
+    await notify(
+      `Emergency broadcast: ${broadcast.type}`,
+      broadcast.message,
+      { broadcastId: broadcast.id, type: broadcast.type, issuedBy: broadcast.issuedBy },
+      'critical',
+    );
+    res.status(201).json(broadcast);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/emergency-broadcast/clear', requireCallingService(), (req, res) => {
+  try {
+    res.json(clearEmergencyBroadcast(store, { ...req.body, clearedBy: req.callingService }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/emergency-broadcast', (_req, res) => {
+  res.json({ active: getActiveEmergencyBroadcast(store), history: listEmergencyBroadcasts(store) });
+});
+
+// The one real, universal "what should this screen show right now"
+// question -- an active emergency broadcast overrides every screen at
+// once; otherwise this defers to the existing offline-fallback
+// resolver (see emergencyBroadcast.js's own header for why it stops
+// there rather than inventing a live ad-rotation decision this app
+// does not otherwise make).
+app.get('/api/screens/:id/content', (req, res) => {
+  try { res.json(resolveScreenContent(store, { screenId: Number(req.params.id) })); }
+  catch (err) { res.status(404).json({ error: err.message }); }
 });
 
 app.listen(PORT, () => {

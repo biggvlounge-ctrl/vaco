@@ -20,7 +20,7 @@ const { signUpAdvertiser } = require('../lib/advertisers');
 const { registerScreen, getScreenRevenue, deactivateScreen } = require('../lib/screens');
 const {
   SCREEN_OWNER_SHARE, DREAMS_PLATFORM_ACCOUNT,
-  createCampaign, selectScreens, setCreative, setBudget, launchCampaign, recordImpression,
+  createCampaign, selectScreens, setCreative, setBudget, setIncentive, launchCampaign, recordImpression,
 } = require('../lib/campaigns');
 
 // Records every transfer rather than performing one, so a test can ask
@@ -58,6 +58,7 @@ function liveCampaign(store, { budget = 100 } = {}) {
   selectScreens(store, { campaignId: campaign.id, screenIds: [screen.id] });
   setCreative(store, { campaignId: campaign.id, creativeUrl: 'https://example.test/a.mp4' });
   setBudget(store, { campaignId: campaign.id, budget });
+  setIncentive(store, { campaignId: campaign.id, type: 'percent-off', value: 15 });
   launchCampaign(store, { campaignId: campaign.id });
   return { campaign, screen };
 }

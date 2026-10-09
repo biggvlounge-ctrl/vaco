@@ -67,6 +67,33 @@ curl -X POST http://localhost:8814/api/campaigns -H "Content-Type: application/j
   run).
 - `server.js` — the real Express API tying all three together, plus
   the real `pushMetric` call to VACO Analytics on every impression.
+- **Required real incentive, per direct instruction (9 Oct 2026)**:
+  "everything has to be used to give away something, a coupon, a
+  percentage off, even if it's a large corporation." `setIncentive`
+  (`percent-off`, `amount-off`, or `coupon`) is now required before
+  `launchCampaign` will let a campaign go live — no exception for
+  advertiser size.
+- **Screen-purchase scaling, confirmed already real (9 Oct 2026)**:
+  "as businesses grow, they can have the option of using as many
+  screens that are available for purchase." `selectScreens` already
+  had no cap on screen count — a growing advertiser's only real limit
+  is how many active screens exist and the budget they set.
+- **Government emergency broadcast, new (9 Oct 2026)**:
+  `lib/emergencyBroadcast.js` -- "these screens can all be controlled
+  as once by the government to give out one message" for a real
+  weather emergency, a wanted/missing-person alert, or an off-grid
+  search. Service-credential-only (`requireCallingService`), since the
+  AI-run government has no end-user session to present. Exactly one
+  active broadcast at a time, by design -- a second push replaces the
+  first. `GET /api/screens/:id/content` is the one real, universal
+  "what should this screen show right now" resolver: an active
+  broadcast overrides every real screen; otherwise it defers to the
+  existing offline-cache fallback. **Not yet wired to a real caller**:
+  no app in this ecosystem currently has a real "wanted criminal still
+  at large" or "missing person" game event to trigger this from, so
+  VDP (the natural caller, as the world's own AI-run government) does
+  not call it yet -- the receiving mechanism is real and tested; the
+  trigger is real, later work, not invented here to fill the gap.
 
 ## The real revenue-split decision
 No exact DREAMS revenue-share percentage is given anywhere in any
