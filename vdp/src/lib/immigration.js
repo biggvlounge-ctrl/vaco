@@ -58,6 +58,19 @@
 // concern (a thing built). `property.js`'s `buildUnauthorized` and
 // this module's `foundIllegalSettlement` are siblings, not one
 // function wearing two names.
+//
+// **Where the other ways across actually are (9 Oct 2026), per direct
+// instruction**: "the place where they're migrating in illegally --
+// make those spots... uncharted territory, wooded area, places away
+// from the technology." The passport line is the one real, controlled,
+// tech-equipped checkpoint (`admitWithPassport`); every real spot a
+// robot patrol finds is the opposite of that by definition, not a
+// per-report choice -- the same way `jobs.js`'s frontier jobs already
+// work "the undeveloped land around Meridian... that aren't developed
+// yet." `ILLEGAL_CROSSING_TERRAIN` names that fixed world-fact on the
+// record, alongside `locationLabel`'s own free text for the specific
+// spot (a named place IS in that kind of terrain; it does not choose
+// to be).
 
 // **Citizenship vs. temporary passport (8 Oct 2026), per direct
 // instruction**: "users will be able to apply for citizenship or they
@@ -69,6 +82,12 @@
 // no document gives VDP a real visa length.
 export const CITIZENSHIP_TYPES = ['citizenship', 'temporary'];
 export const TEMPORARY_PASSPORT_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
+
+// Flagged, same footing as every other unspecified-but-fixed fact in
+// this file: no document names the terrain in these exact words, this
+// is the instruction's own description, carried verbatim rather than
+// paraphrased into something narrower.
+export const ILLEGAL_CROSSING_TERRAIN = "uncharted, wooded territory, away from the settlement's tech core";
 
 export function createImmigrationStore() {
   return {
@@ -253,6 +272,7 @@ export function reportSmugglingSpot(store, { locationLabel, reportedBy, now = Da
   const spot = {
     id: store.nextSpotId++,
     locationLabel,
+    terrain: ILLEGAL_CROSSING_TERRAIN,
     reportedBy: reportedBy || null,
     sealed: false,
     reportedAt: now,

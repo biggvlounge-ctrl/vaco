@@ -13,7 +13,9 @@ import {
   TRAIT_NAMES, NEED_NAMES, HABIT_NAMES,
   createNpc, createNpcWorld, addNpcToWorld, removeNpcFromWorld, getNpc, listNpcs, latestDecision,
   explainDecision, pickAction, advanceWorldTick,
+  GOVERNMENT_LIAISON_ROLE, seedGovernmentLiaisons, listGovernmentLiaisons,
 } from '../src/lib/npcs.js';
+import { DISTRICTS } from '../src/lib/world.js';
 
 const HOME = { x: 100, y: 100 };
 
@@ -68,6 +70,55 @@ test('removeNpcFromWorld removes exactly one real NPC, the inverse of addNpcToWo
   assert.equal(removed.id, 2);
   assert.equal(listNpcs(world).length, 2);
   assert.equal(getNpc(world, 2), null);
+});
+
+// -- Government liaisons -------------------------------------------------
+
+test('seedGovernmentLiaisons adds exactly one real liaison per real world.js district', () => {
+  const world = createNpcWorld({ count: 3, rng: fixedRng(0.5) });
+  const added = seedGovernmentLiaisons(world, { rng: fixedRng(0.5) });
+  assert.equal(added.length, DISTRICTS.length);
+  assert.equal(listNpcs(world).length, 3 + DISTRICTS.length);
+  const liaisons = listGovernmentLiaisons(world);
+  assert.equal(liaisons.length, DISTRICTS.length);
+  assert.deepEqual(
+    new Set(liaisons.map((l) => l.districtId)),
+    new Set(DISTRICTS.map((d) => d.id)),
+    'every real district must get exactly one liaison, no more, no fewer',
+  );
+  for (const liaison of liaisons) {
+    assert.equal(liaison.role, GOVERNMENT_LIAISON_ROLE);
+    assert.ok(liaison.bio.includes('founding team'), 'a liaison\'s bio must say why they are there');
+  }
+});
+
+test('seedGovernmentLiaisons is idempotent -- running it again adds nothing new', () => {
+  const world = createNpcWorld({ count: 3, rng: fixedRng(0.5) });
+  seedGovernmentLiaisons(world, { rng: fixedRng(0.5) });
+  const countAfterFirst = listNpcs(world).length;
+  const secondRun = seedGovernmentLiaisons(world, { rng: fixedRng(0.5) });
+  assert.equal(secondRun.length, 0, 'every district already has a liaison, so nothing new should be added');
+  assert.equal(listNpcs(world).length, countAfterFirst);
+});
+
+test('seedGovernmentLiaisons catches up a newly-added district without duplicating existing liaisons', () => {
+  const world = createNpcWorld({ count: 3, rng: fixedRng(0.5) });
+  seedGovernmentLiaisons(world, { districts: DISTRICTS.slice(0, 2), rng: fixedRng(0.5) });
+  assert.equal(listGovernmentLiaisons(world).length, 2);
+  seedGovernmentLiaisons(world, { rng: fixedRng(0.5) }); // the full real list now
+  assert.equal(listGovernmentLiaisons(world).length, DISTRICTS.length);
+});
+
+test('a government liaison never represents a founder -- no NPC this module creates carries a founder-tagged role', () => {
+  // Per direct instruction: "the initial people who come over are
+  // never seen. They hide behind the computer." Ordinary NPCs carry no
+  // `role` at all; a liaison's role is always the one real, named
+  // constant, never anything implying it IS the founding team.
+  const world = createNpcWorld({ count: 3, rng: fixedRng(0.5) });
+  seedGovernmentLiaisons(world, { rng: fixedRng(0.5) });
+  for (const npc of listNpcs(world)) {
+    assert.notEqual(npc.role, 'founder', 'no NPC may be tagged as a founder -- founders are never a character');
+  }
 });
 
 test('removeNpcFromWorld refuses an unknown NPC id', () => {

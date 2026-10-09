@@ -251,6 +251,68 @@ export function removeNpcFromWorld(world, npcId) {
   return removed;
 }
 
+// **Government liaisons (9 Oct 2026), per direct instruction**: "every
+// area and section will have NPCs who are attached to the government,
+// who are professionals that came over and helped create the starter
+// environment." One real, named liaison per real `world.js` district
+// -- "every area and section" read literally from the actual district
+// list, not a count this module invents. Distinct from the ordinary
+// randomized population above in one deliberate way: which district a
+// liaison belongs to and why they're there are fixed facts about that
+// specific place, not drawn traits -- `role`/`districtId`/`bio` are
+// never set on an ordinary NPC (`createNpc` above sets none of them),
+// so a liaison is the only NPC shape this module marks this way.
+//
+// **The founders themselves are never one of these, or any other
+// NPC.** Per the same instruction: "the initial people who come over
+// are never seen. They hide behind the computer." The founding Vaco
+// elite tech team (`VDP_FOUNDING.md`'s own premise) stays exactly what
+// `jobs.js`'s `PLANETARY_GOVERNORS_PAYROLL` already models them as --
+// an abstract payroll account, never a character a player can see or
+// walk up to, and this module creates no NPC that represents them.
+// A liaison is a different, real fact: a professional the founders
+// brought over who DOES appear, because they did the visible,
+// on-the-ground work of standing up one specific area, while whoever
+// actually runs the government (`v4AgentClient.js`'s own real "the
+// tech is the government," per `VDP_FOUNDING.md`) stays off-screen.
+export const GOVERNMENT_LIAISON_ROLE = 'government-liaison';
+
+// Flagged interpretive bump, same footing every other unspecified
+// figure in this module already stands on (e.g. `PETTY_SWIPE_BASE_CHANCE`)
+// -- no document gives VDP a real founding-professional stat table.
+// A liaison is who the founders actually sent to do real setup work,
+// so diligence/ambition skew up from the same random draw every NPC
+// gets, rather than being a second, separately-invented stat block.
+const LIAISON_TRAIT_BUMP = 20;
+
+// Idempotent and additive: a district that already has a liaison
+// (matched by `districtId`, not position, since ids never shift) is
+// skipped, so this can run again after `world.js` grows a new
+// district without duplicating every liaison that already exists --
+// the same "found vs. already real" discipline `immigration.js`'s own
+// `requireNoExistingArrival` uses for a different real record.
+export function seedGovernmentLiaisons(world, { districts = DISTRICTS, rng = Math.random } = {}) {
+  const already = new Set(
+    world.npcs.filter((n) => n.role === GOVERNMENT_LIAISON_ROLE).map((n) => n.districtId),
+  );
+  const added = [];
+  for (const district of districts) {
+    if (already.has(district.id)) continue;
+    const liaison = addNpcToWorld(world, { home: districtCenter(district.id), rng });
+    liaison.role = GOVERNMENT_LIAISON_ROLE;
+    liaison.districtId = district.id;
+    liaison.bio = `${liaison.name} came over with the founding team to help establish ${district.name}.`;
+    liaison.traits.diligence = clamp(liaison.traits.diligence + LIAISON_TRAIT_BUMP, 0, 100);
+    liaison.traits.ambition = clamp(liaison.traits.ambition + LIAISON_TRAIT_BUMP, 0, 100);
+    added.push(liaison);
+  }
+  return added;
+}
+
+export function listGovernmentLiaisons(world) {
+  return world.npcs.filter((n) => n.role === GOVERNMENT_LIAISON_ROLE);
+}
+
 export function getNpc(world, npcId) {
   return world.npcs.find((n) => n.id === npcId) || null;
 }

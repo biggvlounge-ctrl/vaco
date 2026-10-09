@@ -24,6 +24,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { DISTRICTS } from '../src/lib/world.js';
+
+// createNpcWorld's own default founding population (14), plus one real
+// government liaison per real district (see npcs.js's own
+// seedGovernmentLiaisons, wired into this server's boot sequence) --
+// not two separate counts a test should guess between.
+const EXPECTED_BOOT_NPC_COUNT = 14 + DISTRICTS.length;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const APP_DIR = path.join(__dirname, '..');
@@ -97,7 +104,7 @@ test('the server starts, serves health, and ticks a real NPC world', { skip: SKI
   const health = await (await fetch(`${BASE}/api/health`)).json();
   assert.equal(health.ok, true);
   assert.equal(health.service, 'vdp');
-  assert.equal(health.npcs, 14, 'createNpcWorld\'s own default population');
+  assert.equal(health.npcs, EXPECTED_BOOT_NPC_COUNT, 'createNpcWorld\'s own default population plus one government liaison per real district');
 });
 
 test('a never-seen player auto-creates with the real needs/skills/beliefs shape', { skip: SKIP }, async () => {
@@ -241,6 +248,6 @@ test('connecting to /ws/world sends a real snapshot with the live npc population
     });
     ws.on('error', reject);
   });
-  assert.equal(snapshot.npcs.length, 14);
+  assert.equal(snapshot.npcs.length, EXPECTED_BOOT_NPC_COUNT);
   ws.close();
 });

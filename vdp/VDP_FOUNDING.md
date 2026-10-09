@@ -576,6 +576,67 @@ instruction:
   not to feel like. `MyStatusView.jsx`'s "Ask V4 what's next" is this
   action.
 
+## Where the other ways across actually are, imported technology, frontier farms, and who is visible (9 Oct 2026)
+
+Per direct instruction, four more pieces of the same world this whole
+document already describes:
+
+- **"The place where they're migrating in illegally... make those
+  spots be... uncharted territory, wooded area, places away from the
+  technology."** Real now: `immigration.js`'s `reportSmugglingSpot`
+  stamps every real spot a robot patrol finds with a fixed
+  `ILLEGAL_CROSSING_TERRAIN` fact — the opposite of the one real,
+  controlled, tech-equipped passport checkpoint, by definition, not a
+  per-report choice. `locationLabel` still names the specific place (a
+  real crevasse, a real ridge); `terrain` now says what kind of place
+  every one of them actually is.
+- **"We will be using the most modern technology that we will be
+  importing in from the old world, from places like China and things
+  like that — but yes, we will have the highest technology of
+  things."** Confirmed, not rebuilt: `resources.js`'s `oldWorldStock`
+  already IS this — a one-way, finite shipment of what the founding
+  team and every arriving settler actually brought with them, spent
+  down as the settlement builds (see "`resources.js`'s 'old world'"
+  above). "China and things like that" is the instruction's own real,
+  specific example of where that shipment's technology actually came
+  from — recorded here as flavor, the same open-free-text discipline
+  `originRegion` already uses for a migrant's own background, rather
+  than a new enum this document invents to pin it down further. No
+  real manifest exists naming what, specifically, was imported, so
+  nothing beyond this flavor note is built for it.
+- **"We will have farms, they will be closer to the uncharted
+  territory type of area, but still ran through tech."** Confirmed,
+  not rebuilt, and already exactly right: `jobs.js`'s `farmer` is
+  already one of the three frontier jobs, `districtId: 'frontier'` —
+  deliberately not a real `world.js` district, the same backdrop-beyond-
+  what's-been-hand-built land the hunter and lumberjack already work.
+  "Still ran through tech" is the real water chain already in place:
+  `farmer` requires real water on hand to complete a shift
+  (irrigation), produced by the governors' own `water-treatment-worker`
+  — a frontier farm, worked by hand on undeveloped land, run through a
+  real technological process regardless.
+- **"Every area and section will have NPCs who are attached to the
+  government, who are professionals that came over and helped create
+  the starter environment. But the initial people who come over are
+  never seen. They hide behind the computer."** New:
+  `npcs.js`'s `seedGovernmentLiaisons` adds one real, named liaison per
+  real `world.js` district — "every area and section" read literally
+  from the actual district list — tagged `role: 'government-liaison'`,
+  with a real bio naming which area they came over to help establish.
+  Wired into `server.cjs`'s boot sequence, idempotent against a
+  restart or a `world.js` that later grows a new district. **The
+  founders themselves stay exactly what they already were**: per the
+  instruction's own words, they are never one of these, or any other
+  NPC — `jobs.js`'s `PLANETARY_GOVERNORS_PAYROLL` (an abstract payroll
+  account) and `v4AgentClient.js`'s real AI government (see "The tech
+  is the government," above) were already the honest answer to "who
+  is actually running this," and this instruction confirms that in so
+  many words rather than asking for a visible founder character this
+  document would otherwise need to invent. A liaison is the real,
+  different fact: a professional who DOES appear, because standing up
+  one specific area was visible, on-the-ground work, while whoever
+  actually runs the government stays off-screen.
+
 ## What is still open
 
 - The area's own name — nothing has been given yet (the product name,

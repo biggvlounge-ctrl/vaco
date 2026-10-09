@@ -9,7 +9,7 @@ import {
   listOpenSmugglingSpots, foundIllegalSettlement, discoverSettlement, clearIllegalSettlement,
   listActiveIllegalSettlements, listKnownIllegalSettlements, applyForCitizenship,
   applyForTemporaryPassport, isPassportExpired, TEMPORARY_PASSPORT_DURATION_MS,
-  generateMigrationWave, deportPerson, isDeported,
+  generateMigrationWave, deportPerson, isDeported, ILLEGAL_CROSSING_TERRAIN,
 } from '../src/lib/immigration.js';
 
 test('admitWithPassport records a real, legal arrival with the old-world background given', () => {
@@ -84,6 +84,16 @@ test('reportSmugglingSpot and sealSmugglingSpot are two real, separate events', 
 test('sealSmugglingSpot refuses an unknown spot', () => {
   const store = createImmigrationStore();
   assert.throws(() => sealSmugglingSpot(store, 999), /no smuggling spot/);
+});
+
+test('reportSmugglingSpot always lands in the uncharted, away-from-tech terrain -- a world fact, not a per-report choice', () => {
+  const store = createImmigrationStore();
+  const spot = reportSmugglingSpot(store, { locationLabel: 'the northern ice shelf gap', reportedBy: 'patrol-2' });
+  assert.equal(spot.terrain, ILLEGAL_CROSSING_TERRAIN);
+  // A second, differently-named spot gets the same fixed terrain fact
+  // -- the specific place varies, the kind of place it is does not.
+  const other = reportSmugglingSpot(store, { locationLabel: 'the old quarry trail' });
+  assert.equal(other.terrain, ILLEGAL_CROSSING_TERRAIN);
 });
 
 test('foundIllegalSettlement starts off the grid -- real and active, but not yet known', () => {

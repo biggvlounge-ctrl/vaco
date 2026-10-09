@@ -258,6 +258,10 @@ let store = createVdpStore();
     onReady: (loaded) => {
       store = loaded;
       if (!store.npcWorld) store.npcWorld = npcs.createNpcWorld();
+      // Idempotent (see npcs.js's own header) -- also catches up any
+      // district world.js grows later, on a restart with an existing
+      // store.json that pre-dates this.
+      npcs.seedGovernmentLiaisons(store.npcWorld);
       if (!store.news) store.news = newsLib.createNewsLog();
       if (!store.households) store.households = householdsLib.createHouseholdsStore();
       if (!store.organizations) store.organizations = organizationsLib.createOrganizationsStore();
