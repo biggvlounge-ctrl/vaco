@@ -49,6 +49,40 @@ export function shareBackground(demoA, demoB) {
   );
 }
 
+// **Cultural bias/racism (9 Oct 2026, a later direct instruction)**:
+// "as people are put into the towers, you'll have all different type
+// of people from all over the globe. They have their own culture, so
+// some people will have bias, racism, cultural bias, cultural
+// differences." The honest, named counterpart to
+// `SHARED_BACKGROUND_MULTIPLIER` above -- that comment's own
+// parenthetical ("not built yet, but not precluded") is exactly this.
+// A DIFFERENT background amplifies a hostile exchange the same way a
+// shared one amplifies a warm one -- real friction, not flavor text.
+// Not scoped to The Towers specifically: the instruction names Towers
+// as WHY this matters most (forced-proximity housing mixes the most
+// different backgrounds, the same relocation mechanism that fills it
+// doesn't filter by culture at all), but the mechanic itself is
+// general, the same way `shareBackground` already is.
+//
+// "Some people" (not everyone, every time) is why this is a real,
+// flagged-interpretive CHANCE rolled per hostile exchange between two
+// people of different backgrounds, not a deterministic penalty on
+// every one -- the same "a real tendency, not an absolute rule" shape
+// `immigration.js`'s own `ELITE_ASYLUM_HOUSING_CHANCE` already uses
+// for the same reason. `rollBiasIncident` is pure, decided once by
+// the caller before `recordConversation` is called, the same way
+// `shareBackground` itself already is -- not a game-design constant
+// leaked into every call site.
+export const DIFFERENT_BACKGROUND_BIAS_MULTIPLIER = 1.5;
+export const BIAS_INCIDENT_CHANCE = 0.3; // interpretive -- no document gives a real rate
+
+export function rollBiasIncident({ demoA, demoB, positive = true, rng = Math.random } = {}) {
+  if (positive) return false; // bias shows up in HOSTILE exchanges, not warm ones
+  if (!demoA || !demoB) return false;
+  if (shareBackground(demoA, demoB)) return false;
+  return rng() < BIAS_INCIDENT_CHANCE;
+}
+
 function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
@@ -85,13 +119,24 @@ function adjust(relationships, aId, bId, delta) {
 
 // A conversation moves affinity more than passive shared activity
 // does — talking to someone is a deliberate act, standing in the same
-// district is not. `positive` lets a hostile exchange (not built yet,
-// but not precluded) subtract instead of add. `sharedBackground`
-// (optional, default `false` -- every existing caller's behavior is
-// unchanged) scales the real delta by `SHARED_BACKGROUND_MULTIPLIER`.
-export function recordConversation(relationships, aId, bId, { positive = true, sharedBackground = false } = {}) {
+// district is not. `positive` lets a hostile exchange subtract
+// instead of add. `sharedBackground` (optional, default `false` --
+// every existing caller's behavior is unchanged) scales the real
+// delta by `SHARED_BACKGROUND_MULTIPLIER`. `biasIncident` is its
+// honest opposite -- the caller decides it via `rollBiasIncident`
+// above, same as `sharedBackground` is decided via `shareBackground`
+// -- and scales a hostile exchange by `DIFFERENT_BACKGROUND_BIAS_
+// MULTIPLIER` instead. The two are mutually exclusive by construction
+// (`rollBiasIncident` already returns `false` whenever `shareBackground`
+// is true), so only one multiplier ever actually applies.
+export function recordConversation(relationships, aId, bId, {
+  positive = true, sharedBackground = false, biasIncident = false,
+} = {}) {
   const base = positive ? CONVERSATION_AFFINITY_DELTA : -CONVERSATION_AFFINITY_DELTA;
-  return adjust(relationships, aId, bId, sharedBackground ? base * SHARED_BACKGROUND_MULTIPLIER : base);
+  let multiplier = 1;
+  if (sharedBackground) multiplier = SHARED_BACKGROUND_MULTIPLIER;
+  else if (biasIncident) multiplier = DIFFERENT_BACKGROUND_BIAS_MULTIPLIER;
+  return { ...adjust(relationships, aId, bId, base * multiplier), biasIncident };
 }
 
 export function recordSharedActivity(relationships, aId, bId, { sharedBackground = false } = {}) {

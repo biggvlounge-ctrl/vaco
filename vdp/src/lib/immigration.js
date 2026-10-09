@@ -446,9 +446,67 @@ export function reportSmugglingSpot(store, {
     zone: zone.name,
     reportedBy: reportedBy || null,
     sealed: false,
+    // "Once trade routes are found and migration routes are found
+    // through the ice wall, different groups... will start to make
+    // deals and negotiate with each other for smuggling routes" (9
+    // Oct 2026, a later direct instruction) -- `controllingOrgId`
+    // starts unclaimed. `organizationId` is recorded as given, not
+    // cross-validated against `organizations.js` (this module does
+    // not import it, the same decoupled-by-injection shape every
+    // cross-module reference in this file already uses for
+    // `sponsorId`/`reportedBy`).
+    controllingOrgId: null,
     reportedAt: now,
   };
   store.smugglingSpots.push(spot);
+  return spot;
+}
+
+function requireSmugglingSpot(store, spotId, fnName) {
+  const spot = store.smugglingSpots.find((s) => s.id === spotId);
+  if (!spot) throw new Error(`${fnName}: no smuggling spot #${spotId}`);
+  return spot;
+}
+
+// First claim wins -- "different groups... will start to import
+// things and smuggle things across the border" reads as whichever
+// real organization gets there first effectively controls the route,
+// not a free-for-all every group can use at once. Refuses to
+// overwrite an existing claim outright; `negotiateRouteTransfer`
+// below is the one real way control changes hands after that.
+export function claimSmugglingRoute(store, spotId, { organizationId, now = Date.now() } = {}) {
+  if (!organizationId) throw new Error('claimSmugglingRoute requires an organizationId');
+  const spot = requireSmugglingSpot(store, spotId, 'claimSmugglingRoute');
+  if (spot.controllingOrgId) {
+    throw new Error(`claimSmugglingRoute: spot #${spotId} is already controlled by "${spot.controllingOrgId}"`);
+  }
+  spot.controllingOrgId = organizationId;
+  spot.controlClaimedAt = now;
+  return spot;
+}
+
+// The real, recorded OUTCOME of a deal between two real organizations
+// -- "certain groups... will start to make deals and negotiate with
+// each other for smuggling routes." Like `sponsorFamilyMembers`
+// above, this compresses a whole real social process (the actual
+// back-and-forth of negotiating) into the one fact that matters for
+// the world's own state: control changed hands, by real agreement,
+// not by force (`catchIllegalArrival`/`sealSmugglingSpot` are the
+// real, separate enforcement actions, untouched by this). Checked
+// against who REALLY holds the route right now, not merely asserted
+// by whoever calls this -- a deal proposed against stale control
+// information is refused, the same "re-check at the moment it
+// matters" discipline `acceptTrade` (`barter.js`) already applies to
+// a trade whose inventory may have changed since it was proposed.
+export function negotiateRouteTransfer(store, spotId, { fromOrgId, toOrgId, now = Date.now() } = {}) {
+  if (!fromOrgId) throw new Error('negotiateRouteTransfer requires a fromOrgId');
+  if (!toOrgId) throw new Error('negotiateRouteTransfer requires a toOrgId');
+  const spot = requireSmugglingSpot(store, spotId, 'negotiateRouteTransfer');
+  if (spot.controllingOrgId !== fromOrgId) {
+    throw new Error(`negotiateRouteTransfer: "${fromOrgId}" does not currently control spot #${spotId}`);
+  }
+  spot.controllingOrgId = toOrgId;
+  spot.controlTransferredAt = now;
   return spot;
 }
 

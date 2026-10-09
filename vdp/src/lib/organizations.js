@@ -26,7 +26,18 @@
 // account, not an actor with a userId) call it at all. No new code
 // enforces "the government will not" as a rule; it is simply already
 // true that nothing here can act as the government.
-export const ORG_TYPES = ['family', 'tribe', 'cult', 'religious-institution'];
+// `gang` joined 9 Oct 2026, per direct instruction: "different groups
+// of people religions gangs organizations cultures will start to
+// import things and smuggle things across the border and then
+// certain groups families organizations tribes gangs will start to
+// make deals and negotiate with each other for smuggling routes."
+// The word is named twice, explicitly, alongside the types already
+// here -- the real smuggling-route control this instruction asks for
+// (`immigration.js`'s own `claimSmugglingRoute`/`negotiateRouteTransfer`)
+// takes any real `organizationId`, gang included, with no separate
+// gate -- the same "the existing gate already fits" treatment
+// `religious-institution` got above.
+export const ORG_TYPES = ['family', 'tribe', 'cult', 'religious-institution', 'gang'];
 
 export const STARTING_COHESION = 50;
 export const COHESION_GAIN = 3;

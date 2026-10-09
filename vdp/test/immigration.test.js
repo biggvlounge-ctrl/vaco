@@ -12,6 +12,7 @@ import {
   generateMigrationWave, deportPerson, isDeported, ILLEGAL_CROSSING_TERRAIN,
   findUndergroundWorldSpot, sponsorFamilyMembers, WEALTH_TIERS, DEFAULT_FAMILY_ADMISSION_FRACTION,
   spreadWordOfMouth, knownByWordOfMouth, shouldAssignAsylumHousing, ELITE_ASYLUM_HOUSING_CHANCE,
+  claimSmugglingRoute, negotiateRouteTransfer,
 } from '../src/lib/immigration.js';
 import { FRONTIER_ZONES, UNDERGROUND_ZONES } from '../src/lib/zones.js';
 
@@ -133,6 +134,52 @@ test('reportSmugglingSpot and sealSmugglingSpot are two real, separate events', 
 test('sealSmugglingSpot refuses an unknown spot', () => {
   const store = createImmigrationStore();
   assert.throws(() => sealSmugglingSpot(store, 999), /no smuggling spot/);
+});
+
+// -- claimSmugglingRoute / negotiateRouteTransfer: group control over a found route
+
+test('a reported smuggling spot starts with no real controlling organization', () => {
+  const store = createImmigrationStore();
+  const spot = reportSmugglingSpot(store, { locationLabel: 'the eastern crevasse' });
+  assert.equal(spot.controllingOrgId, null);
+});
+
+test('claimSmugglingRoute requires a real organizationId and a real spot', () => {
+  const store = createImmigrationStore();
+  const spot = reportSmugglingSpot(store, { locationLabel: 'the eastern crevasse' });
+  assert.throws(() => claimSmugglingRoute(store, spot.id, {}), /organizationId/);
+  assert.throws(() => claimSmugglingRoute(store, 999, { organizationId: 1 }), /no smuggling spot/);
+});
+
+test('claimSmugglingRoute is first-come, first-claimed -- a second claim on an already-controlled route is refused', () => {
+  const store = createImmigrationStore();
+  const spot = reportSmugglingSpot(store, { locationLabel: 'the eastern crevasse' });
+  claimSmugglingRoute(store, spot.id, { organizationId: 1 });
+  assert.equal(spot.controllingOrgId, 1);
+  assert.throws(() => claimSmugglingRoute(store, spot.id, { organizationId: 2 }), /already controlled/);
+});
+
+test('negotiateRouteTransfer refuses a deal proposed against stale control information', () => {
+  const store = createImmigrationStore();
+  const spot = reportSmugglingSpot(store, { locationLabel: 'the eastern crevasse' });
+  claimSmugglingRoute(store, spot.id, { organizationId: 1 });
+  assert.throws(
+    () => negotiateRouteTransfer(store, spot.id, { fromOrgId: 2, toOrgId: 3 }),
+    /does not currently control/,
+  );
+  assert.equal(spot.controllingOrgId, 1, 'a refused deal must never change who actually controls the route');
+});
+
+test('negotiateRouteTransfer records the real outcome of a deal between two real organizations', () => {
+  const store = createImmigrationStore();
+  const spot = reportSmugglingSpot(store, { locationLabel: 'the eastern crevasse' });
+  claimSmugglingRoute(store, spot.id, { organizationId: 1 });
+  const result = negotiateRouteTransfer(store, spot.id, { fromOrgId: 1, toOrgId: 2 });
+  assert.equal(result.controllingOrgId, 2);
+  assert.ok(result.controlTransferredAt);
+  // The new controller can now itself make a further real deal.
+  negotiateRouteTransfer(store, spot.id, { fromOrgId: 2, toOrgId: 3 });
+  assert.equal(spot.controllingOrgId, 3);
 });
 
 test('reportSmugglingSpot always lands in the uncharted, away-from-tech terrain -- a world fact, not a per-report choice', () => {

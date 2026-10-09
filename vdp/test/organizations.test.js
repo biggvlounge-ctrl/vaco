@@ -32,8 +32,8 @@ test("foundOrganization refuses an unknown type, a missing name, and a second or
   );
 });
 
-test("ORG_TYPES is exactly family, tribe, cult, religious-institution", () => {
-  assert.deepEqual(ORG_TYPES, ["family", "tribe", "cult", "religious-institution"]);
+test("ORG_TYPES is exactly family, tribe, cult, religious-institution, gang", () => {
+  assert.deepEqual(ORG_TYPES, ["family", "tribe", "cult", "religious-institution", "gang"]);
 });
 
 test('foundOrganization lets a real NPC found a religious institution, never the government', () => {

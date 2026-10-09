@@ -334,6 +334,21 @@ let store = createVdpStore();
     });
   }
 
+  // Resolves any real person's own demographics, player or NPC alike
+  // -- `npc-<id>` is the one real convention `/talk`'s own
+  // `recordConversation` call already uses for an NPC's relationship
+  // key, so a bare numeric NPC id never has to be guessed at here.
+  // Returns `null` for an id this server has no real record of
+  // (`shareBackground`/`rollBiasIncident` already treat a missing
+  // side as "no real match," not an error).
+  function demographicsFor(personId) {
+    if (typeof personId === 'string' && personId.startsWith('npc-')) {
+      const npc = npcs.getNpc(store.npcWorld, Number(personId.slice(4)));
+      return npc?.demographics || null;
+    }
+    return store.players[personId]?.state?.demographics || null;
+  }
+
   // "Once more people start to enter the economy, people that start
   // to accumulate tickets, crime... they will be moved out to... a
   // project style, public housing style environment... Towers" (9 Oct
@@ -1064,6 +1079,21 @@ let store = createVdpStore();
         dissident: req.body.dissident,
       });
       newsLib.recordEvent(store.news, { kind: 'immigration', text: `an unrecorded crossing beyond the ice wall was made` });
+      // "Different groups of people, religions, gangs, organizations,
+      // cultures will start to import things and smuggle things
+      // across the border" (9 Oct 2026, a later direct instruction) --
+      // the individual's own real smuggled goods (already real, via
+      // `barter.js`'s own `seedFromSmuggledGoods`, previously never
+      // actually called from here) now also credit their real
+      // organization's shared inventory, if they belong to one --
+      // additive, not a split: the individual keeps their own stake,
+      // and the group they smuggled on behalf of gets the same goods
+      // too.
+      if (arrival.smuggledGoods.length > 0) {
+        barterLib.seedFromSmuggledGoods(store.barter, req.body.personId, arrival.smuggledGoods);
+        const org = organizationsLib.organizationOf(store.organizations, req.body.personId);
+        if (org) barterLib.seedFromSmuggledGoods(store.barter, `org-${org.id}`, arrival.smuggledGoods);
+      }
       res.status(201).json(arrival);
     } catch (err) {
       res.status(400).json({ error: err.message });
@@ -1105,6 +1135,54 @@ let store = createVdpStore();
         sealedBy: req.body.sealedBy,
       });
       newsLib.recordEvent(store.news, { kind: 'immigration', text: `a smuggling spot was sealed by a robot patrol` });
+      res.status(200).json(spot);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // "Certain groups, families, organizations, tribes, gangs will
+  // start to make deals and negotiate with each other for smuggling
+  // routes" (9 Oct 2026, a later direct instruction). The acting user
+  // must be a real member of the claiming organization -- the same
+  // "the session must really match the real owner" check `justice.js`'s
+  // own ticket-pay route already applies, here against organization
+  // membership rather than a ticket's own `personId`.
+  app.post('/api/immigration/smuggling-spots/:spotId/claim-route', requireActor('actorId'), (req, res) => {
+    try {
+      const org = organizationsLib.getOrganization(store.organizations, req.body.organizationId);
+      if (!org) return res.status(404).json({ error: `no organization ${req.body.organizationId}` });
+      if (!org.memberIds.includes(req.body.actorId)) {
+        return res.status(403).json({ error: 'claim-route: the acting user does not belong to this organization' });
+      }
+      const spot = immigrationLib.claimSmugglingRoute(store.immigration, Number(req.params.spotId), {
+        organizationId: req.body.organizationId,
+      });
+      newsLib.recordEvent(store.news, { kind: 'immigration', text: `${org.name} claimed control of a real smuggling route` });
+      res.status(200).json(spot);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // The real, recorded outcome of a deal -- the acting user must
+  // belong to one of the two real organizations actually striking it,
+  // not an unrelated third party.
+  app.post('/api/immigration/smuggling-spots/:spotId/negotiate-route', requireActor('actorId'), (req, res) => {
+    try {
+      const fromOrg = organizationsLib.getOrganization(store.organizations, req.body.fromOrgId);
+      if (!fromOrg) return res.status(404).json({ error: `no organization ${req.body.fromOrgId}` });
+      const toOrg = organizationsLib.getOrganization(store.organizations, req.body.toOrgId);
+      if (!toOrg) return res.status(404).json({ error: `no organization ${req.body.toOrgId}` });
+      if (!fromOrg.memberIds.includes(req.body.actorId) && !toOrg.memberIds.includes(req.body.actorId)) {
+        return res.status(403).json({ error: 'negotiate-route: the acting user belongs to neither organization in this deal' });
+      }
+      const spot = immigrationLib.negotiateRouteTransfer(store.immigration, Number(req.params.spotId), {
+        fromOrgId: req.body.fromOrgId, toOrgId: req.body.toOrgId,
+      });
+      newsLib.recordEvent(store.news, {
+        kind: 'immigration', text: `${fromOrg.name} and ${toOrg.name} struck a real deal over a smuggling route`,
+      });
       res.status(200).json(spot);
     } catch (err) {
       res.status(400).json({ error: err.message });
@@ -1886,7 +1964,13 @@ let store = createVdpStore();
   app.post('/api/relationships/conversation', requireActor('aId'), (req, res) => {
     const { aId, bId, positive } = req.body || {};
     if (!bId) return res.status(400).json({ error: 'conversation requires bId' });
-    const result = relationshipsLib.recordConversation(store.relationships, aId, bId, { positive });
+    const demoA = demographicsFor(aId);
+    const demoB = demographicsFor(bId);
+    const sharedBackground = relationshipsLib.shareBackground(demoA, demoB);
+    const biasIncident = sharedBackground ? false : relationshipsLib.rollBiasIncident({ demoA, demoB, positive });
+    const result = relationshipsLib.recordConversation(store.relationships, aId, bId, {
+      positive, sharedBackground, biasIncident,
+    });
     res.json(result);
   });
 
@@ -1922,7 +2006,13 @@ let store = createVdpStore();
       effect = { kind: 'belief', topic: 'conversation', beliefType: topic, strength };
     }
 
-    const relationship = relationshipsLib.recordConversation(store.relationships, playerId, `npc-${npc.id}`);
+    const demoA = player.state.demographics;
+    const demoB = npc.demographics;
+    const sharedBackground = relationshipsLib.shareBackground(demoA, demoB);
+    const biasIncident = sharedBackground ? false : relationshipsLib.rollBiasIncident({ demoA, demoB, positive: true });
+    const relationship = relationshipsLib.recordConversation(store.relationships, playerId, `npc-${npc.id}`, {
+      sharedBackground, biasIncident,
+    });
 
     const org = organizationsLib.organizationOf(store.organizations, playerId);
     if (org && org.memberIds.includes(`npc-${npc.id}`)) {
@@ -1994,7 +2084,10 @@ let store = createVdpStore();
       if (msg.type === 'chat' && msg.fromUserId && msg.toUserId && typeof msg.text === 'string' && msg.text.trim()) {
         const text = msg.text.trim();
         broadcast({ type: 'chat', fromUserId: msg.fromUserId, toUserId: msg.toUserId, text, at: Date.now() });
-        relationshipsLib.recordConversation(store.relationships, msg.fromUserId, msg.toUserId);
+        const demoA = demographicsFor(msg.fromUserId);
+        const demoB = demographicsFor(msg.toUserId);
+        const sharedBackground = relationshipsLib.shareBackground(demoA, demoB);
+        relationshipsLib.recordConversation(store.relationships, msg.fromUserId, msg.toUserId, { sharedBackground });
         newsLib.recordEvent(store.news, {
           kind: 'chat',
           text: `${msg.fromUserId} to ${msg.toUserId}: "${text.length > 80 ? `${text.slice(0, 80)}…` : text}"`,

@@ -1174,6 +1174,72 @@ over there too."
   real-player guard here -- the arriving person is exactly who this
   is about, not an unrelated id a ticket happened to name.
 
+## Cultural bias in The Towers, and gangs negotiating over smuggling routes (9 Oct 2026, a ninth and tenth instruction the same day)
+
+Per direct instruction: "as people are put into the towers, you'll
+have all different type of people from all over the globe. They have
+their own culture, so some people will have bias, racism, cultural
+bias, cultural differences, and things of that nature." And,
+separately: "once trade routes are found and migration routes are
+found through the ice wall different groups of people religions gangs
+organizations cultures will start to import things and smuggle things
+across the border and then certain groups families organizations
+tribes gangs will start to make deals and negotiate with each other
+for smuggling routes."
+
+- **Cultural bias is the honest, named counterpart to the already-
+  real shared-background bonus** (`relationships.js`'s own
+  `SHARED_BACKGROUND_MULTIPLIER` -- that comment's own "not built
+  yet, but not precluded" parenthetical is exactly this). A
+  DIFFERENT background amplifies a HOSTILE exchange
+  (`DIFFERENT_BACKGROUND_BIAS_MULTIPLIER`, 1.5) the same way a shared
+  one amplifies a warm one. "Some people" (not everyone, every time)
+  is why `rollBiasIncident` rolls a real, flagged-interpretive chance
+  (`BIAS_INCIDENT_CHANCE`, 0.3 -- no document gives a real rate)
+  rather than applying a deterministic penalty on every hostile
+  exchange across different backgrounds.
+- **Not scoped to The Towers specifically, on purpose.** The
+  instruction names Towers as WHY this matters most -- the same
+  relocation mechanism that fills it (`socialClass.js`) doesn't
+  filter by culture at all, so it's the one place the most different
+  backgrounds end up forced into proximity -- but the mechanic itself
+  is general, the same way `shareBackground` already is, so it
+  applies everywhere two people actually talk.
+- **Wiring fixed two pre-existing gaps along the way.** Neither
+  `shareBackground` (task #166, built 9 Oct 2026 earlier the same day)
+  nor `seedFromSmuggledGoods` (built with `barter.js` itself) had ever
+  actually been called from `server.cjs` -- both are now real, live
+  reads: a new `demographicsFor(personId)` helper resolves any real
+  player OR NPC (`npc-<id>`) to their real demographics for
+  `/api/relationships/conversation`, `/api/players/:id/talk`, and the
+  WebSocket player-to-player chat handler; `/api/immigration/cross-
+  illegally` now actually seeds the smuggler's own real barter
+  inventory.
+- **`organizations.js` gained a real `gang` type** -- named twice,
+  explicitly, in the instruction. No new gate needed: the existing
+  `foundOrganization`/`addMember` machinery and the new route-control
+  functions below already take any real `organizationId`.
+- **Smuggling spots now carry real `controllingOrgId`** (`immigration.js`).
+  `claimSmugglingRoute` is first-come-first-claimed -- whichever real
+  organization gets there first controls it, refusing to silently
+  overwrite an existing claim. `negotiateRouteTransfer` is the real,
+  recorded OUTCOME of a deal between two organizations -- like
+  `sponsorFamilyMembers` above, this compresses a whole real social
+  process (the actual back-and-forth of negotiating, which this
+  module does not simulate turn-by-turn) into the one fact that
+  matters for the world's own state: control changed hands, by real
+  agreement. Checked against who REALLY controls the route right now,
+  not merely asserted by the caller -- the same "re-check at the
+  moment it matters" discipline `barter.js`'s own `acceptTrade`
+  already applies. `server.cjs`'s new `claim-route`/`negotiate-route`
+  routes require the acting user to be a real member of a real
+  organization actually party to the deal.
+- Smuggled goods now also credit the smuggler's real organization's
+  shared inventory (if they belong to one), additive to their own --
+  "different groups... will start to import things" reads as the
+  group benefiting from one of its members' real smuggling run, not
+  a replacement for the individual's own stake.
+
 ## What is still open
 
 - The area's own name — nothing has been given yet (the product name,
