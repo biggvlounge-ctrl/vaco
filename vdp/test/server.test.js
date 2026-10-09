@@ -113,7 +113,7 @@ test('a never-seen player auto-creates with the real needs/skills/beliefs shape'
   assert.ok(body.state.traits);
   assert.deepEqual(body.skills, {
     Business: 0, Crafting: 0, Construction: 0, Communication: 0, Management: 0, Athletics: 0, Art: 0,
-    Agriculture: 0, Combat: 0, Engineering: 0,
+    Agriculture: 0, Combat: 0, Engineering: 0, Medicine: 0,
   });
   assert.deepEqual(body.beliefs, {});
 });
@@ -196,6 +196,58 @@ test('requesting a CHOPZ shift payout with no credential is refused WITHOUT reac
 test('requesting a CHOPZ shift payout with a real bearer token asks Shield -- real 502 when it is unreachable', { skip: SKIP }, async () => {
   const res = await post('/api/chopz/shift-payout', { ownerId: 'alice', unitId: 1 }, { Authorization: 'Bearer some-token' });
   assert.equal(res.status, 502, 'requireActor must ask Shield before ever reaching V3');
+});
+
+// -- social class / relocation, hospital, school, daycare (9 Oct 2026) -----
+
+test('a never-seen player gets a real social class, derived live, not stored', { skip: SKIP }, async () => {
+  const body = await (await fetch(`${BASE}/api/players/social-class-reader/social-class`)).json();
+  assert.ok(['elite', 'stable', 'at-risk'].includes(body.socialClass));
+});
+
+test('requesting hospital treatment with no credential is refused WITHOUT reaching Shield', { skip: SKIP }, async () => {
+  const res = await post('/api/hospital/treat', { patientId: 'alice' });
+  assert.equal(res.status, 401);
+});
+
+test('requesting hospital treatment with a real bearer token asks Shield -- real 502 when it is unreachable', { skip: SKIP }, async () => {
+  const res = await post('/api/hospital/treat', { patientId: 'alice' }, { Authorization: 'Bearer some-token' });
+  assert.equal(res.status, 502, 'requireActor must ask Shield before ever reaching V3');
+});
+
+test('GET /api/hospital/treatments/:patientId lists a real, empty-by-default array', { skip: SKIP }, async () => {
+  const body = await (await fetch(`${BASE}/api/hospital/treatments/never-treated`)).json();
+  assert.deepEqual(body.treatments, []);
+});
+
+test('attending school with no credential is refused WITHOUT reaching Shield', { skip: SKIP }, async () => {
+  const res = await post('/api/school/attend', { studentId: 'alice' });
+  assert.equal(res.status, 401);
+});
+
+test('attending school with a real bearer token asks Shield -- real 502 when it is unreachable', { skip: SKIP }, async () => {
+  const res = await post('/api/school/attend', { studentId: 'alice' }, { Authorization: 'Bearer some-token' });
+  assert.equal(res.status, 502, 'requireActor must ask Shield even for a free action');
+});
+
+test('GET /api/school/attendances/:studentId lists a real, empty-by-default array', { skip: SKIP }, async () => {
+  const body = await (await fetch(`${BASE}/api/school/attendances/never-attended`)).json();
+  assert.deepEqual(body.attendances, []);
+});
+
+test('enrolling in daycare with no credential is refused WITHOUT reaching Shield', { skip: SKIP }, async () => {
+  const res = await post('/api/daycare/enroll', { guardianId: 'alice' });
+  assert.equal(res.status, 401);
+});
+
+test('enrolling in daycare with a real bearer token asks Shield -- real 502 when it is unreachable', { skip: SKIP }, async () => {
+  const res = await post('/api/daycare/enroll', { guardianId: 'alice' }, { Authorization: 'Bearer some-token' });
+  assert.equal(res.status, 502, 'requireActor must ask Shield before ever reaching V3');
+});
+
+test('GET /api/daycare/enrollments/:guardianId lists a real, empty-by-default array', { skip: SKIP }, async () => {
+  const body = await (await fetch(`${BASE}/api/daycare/enrollments/never-enrolled`)).json();
+  assert.deepEqual(body.enrollments, []);
 });
 
 // -- the one real success path this suite can prove without Shield/V3 -----

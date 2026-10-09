@@ -22,6 +22,15 @@
 // all, which is this project's own comment for exactly why that link
 // has to be stated somewhere rather than assumed.
 //
+// `Medicine` joined 9 Oct 2026 for the starter hospital job -- VACON-C's
+// own `occupations.js` real tier-4 `physician` entry is literally
+// `skill: 'Medicine', source: 'medicine', employers: ['hospital', ...]`,
+// the same exact-match treatment `hunter`/`farmer` already got, not a
+// borrowed near-match. (Its own tier-3 `teacher` entry, `skill:
+// 'Communication', employers: ['school']`, is the real reason School's
+// own job below reuses the already-real `Communication` skill rather
+// than adding a new one.)
+//
 // A skill rises from three places, each bounded so none of them can
 // alone max it out: working a matching job (small, passive, per
 // shift — see `jobs.js`), reading a matching real textbook (one real
@@ -33,7 +42,7 @@
 
 export const SKILL_NAMES = [
   'Business', 'Crafting', 'Construction', 'Communication', 'Management', 'Athletics', 'Art',
-  'Agriculture', 'Combat', 'Engineering',
+  'Agriculture', 'Combat', 'Engineering', 'Medicine',
 ];
 
 export const JOB_SHIFT_GAIN = 1.5;

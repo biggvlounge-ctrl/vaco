@@ -46,12 +46,30 @@ export const DISTRICT_UNLOCK_TIER = {
   fashion: 'Village',
   'dating-village': 'Village',
   vago: 'Village',
+  // Hospital and School, 9 Oct 2026 per direct instruction ("a
+  // starter hospital, where we'll start off small", "we will need
+  // also school") -- unlocked the same tier as `food`, the earliest
+  // real daily-needs cluster: a settlement big enough to need
+  // feeding is big enough to need treating and teaching, and "start
+  // off small" reads as small scale, not late arrival.
+  hospital: 'Village',
+  school: 'Village',
 
   vacay: 'Town',
   void: 'Town',
   vavlt: 'Town',
   'combat-sports': 'Town',
   commons: 'Town',
+  // The Towers and Daycare, same day. Public-housing relocation (see
+  // `property.js`'s `assignPublicHousing`) only has anyone to serve
+  // once a real population has had time to accumulate tickets/crime,
+  // and Daycare's own real benefit ("freed-up caregiver time to
+  // work") only matters once a real jobs economy exists for that
+  // freed time to go toward -- both wait for `Town`, same as the
+  // other specialized civic districts above, not `Village`'s
+  // immediate daily needs.
+  towers: 'Town',
+  daycare: 'Town',
 
   chopz: 'City',
   stage: 'City',

@@ -101,6 +101,15 @@ function createVdpStore() {
       illegalSettlements: [], nextSettlementId: 1,
     },
     justice: { tickets: [], nextTicketId: 1, detentions: [], nextDetentionId: 1 },
+    // Social class/relocation (9 Oct 2026), the starter hospital,
+    // school and the technological daycare -- see `socialClass.js`,
+    // `hospital.js`, `school.js`, `daycare.js` for why each shape is
+    // this plain, matching the literal-inline convention `justice`
+    // above already uses for a store with no imported create-function
+    // dependency at boot.
+    hospital: { treatments: [], nextTreatmentId: 1 },
+    school: { lastAttendedAt: {}, attendances: [], nextAttendanceId: 1 },
+    daycare: { enrollments: [], nextEnrollmentId: 1 },
     contracts: { contracts: [], nextContractId: 1 },
     dissent: { revolts: [], nextRevoltId: 1 },
     // Scoped externalId counter for vaco-media's own `openSession` --
@@ -275,6 +284,11 @@ let store = createVdpStore();
   const animalsLib = await import('./src/lib/animals.js');
   const taxesLib = await import('./src/lib/taxes.js');
   const barterLib = await import('./src/lib/barter.js');
+  const socialClassLib = await import('./src/lib/socialClass.js');
+  const eliteLib = await import('./src/lib/elite.js');
+  const hospitalLib = await import('./src/lib/hospital.js');
+  const schoolLib = await import('./src/lib/school.js');
+  const daycareLib = await import('./src/lib/daycare.js');
 
   // A migrant's real old-world background carries over if one was
   // recorded (`immigration.js`'s `admitWithPassport`/`crossIllegally`,
@@ -297,6 +311,51 @@ let store = createVdpStore();
       });
     }
     return store.players[userId];
+  }
+
+  // Social class (9 Oct 2026, direct instruction: "I guess we need
+  // some type of class level") -- a pure, derived READ, never a
+  // stored field (see `socialClass.js`'s own header for why: a stored
+  // value could go stale the instant a ticket is paid off). Combines
+  // four already-real signals: `elite.js`'s own `isElite` (reserved
+  // top-residential-tier wealth), `demographics.js`'s drawn income
+  // level (carried on every player's own `state.demographics`),
+  // and `justice.js`'s real unpaid-ticket count / active-detention
+  // status.
+  function computeSocialClass(personId) {
+    const player = store.players[personId];
+    const incomeLevelName = player?.state?.demographics?.incomeLevel || null;
+    const home = propertyLib.homeOwnedBy(store.property, personId);
+    return socialClassLib.classify({
+      isElite: eliteLib.isElite({ ownedPropertyLevel: home?.level }),
+      incomeLevelName,
+      unpaidTicketCount: justiceLib.unpaidTicketsFor(store.justice, personId).length,
+      isDetained: justiceLib.isDetained(store.justice, personId),
+    });
+  }
+
+  // "Once more people start to enter the economy, people that start
+  // to accumulate tickets, crime... they will be moved out to... a
+  // project style, public housing style environment... Towers" (9 Oct
+  // 2026, direct instruction). Called after a real ticket/detention is
+  // recorded -- guarded to only ever act on a real PLAYER id
+  // (`store.players[personId]` must already exist) so an NPC's own
+  // id, which is never a key in `store.players`, can never be
+  // mistaken for one and relocated. Free (no `transferFn`) --
+  // `property.js`'s own `assignPublicHousing` is a reassignment, not
+  // a purchase, matching "deployed to" rather than "sold to."
+  function maybeRelocateToProjectHousing(personId) {
+    if (!store.players[personId]) return null;
+    const socialClass = computeSocialClass(personId);
+    if (!socialClassLib.shouldRelocateToProjectHousing(socialClass)) return null;
+    if (propertyLib.isInPublicHousing(store.property, personId)) return null;
+    const assigned = propertyLib.assignPublicHousing(store.property, {
+      ownerId: personId, reason: `social class: ${socialClass}`,
+    });
+    newsLib.recordEvent(store.news, {
+      kind: 'relocation', text: `${personId} was relocated to ${propertyLib.PUBLIC_HOUSING_NAME}`,
+    });
+    return assigned;
   }
 
   // Register Meridian's own real VOID Hub Stations once, idempotently
@@ -498,6 +557,11 @@ let store = createVdpStore();
   app.get('/api/players/:id/state', (req, res) => {
     const player = ensurePlayer(req.params.id);
     res.json({ state: player.state, skills: player.skills, beliefs: player.beliefs });
+  });
+
+  app.get('/api/players/:id/social-class', (req, res) => {
+    ensurePlayer(req.params.id);
+    res.json({ socialClass: computeSocialClass(req.params.id) });
   });
 
   // A player "doing" a need-satisfying action (visiting a district,
@@ -1136,7 +1200,8 @@ let store = createVdpStore();
         locationLabel: req.body.locationLabel,
       });
       newsLib.recordEvent(store.news, { kind: 'justice', text: `${req.body.personId} was ticketed: ${req.body.reason}` });
-      res.status(201).json(ticket);
+      const relocation = maybeRelocateToProjectHousing(req.body.personId);
+      res.status(201).json({ ...ticket, relocation });
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
@@ -1180,7 +1245,8 @@ let store = createVdpStore();
         locationLabel: req.body.locationLabel,
       });
       newsLib.recordEvent(store.news, { kind: 'justice', text: `${req.body.personId} was detained: ${req.body.reason}` });
-      res.status(201).json(detention);
+      const relocation = maybeRelocateToProjectHousing(req.body.personId);
+      res.status(201).json({ ...detention, relocation });
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
@@ -1219,6 +1285,69 @@ let store = createVdpStore();
     });
     return securityLib.securityTierFor(crimeCount);
   }
+
+  // --- Hospital -------------------------------------------------------
+  app.get('/api/hospital/treatments/:patientId', (req, res) => {
+    res.json({ treatments: hospitalLib.treatmentsFor(store.hospital, req.params.patientId) });
+  });
+
+  app.post('/api/hospital/treat', requireActor('patientId'), async (req, res) => {
+    try {
+      const patient = ensurePlayer(req.body.patientId);
+      const treatment = await hospitalLib.treatPatient(store.hospital, {
+        patientId: req.body.patientId,
+        traits: patient.state.traits,
+        transferFn: (args) => transferVCoin(args),
+      });
+      economyLib.recordSpending(store.economy, hospitalLib.TREATMENT_COST);
+      newsLib.recordEvent(store.news, { kind: 'hospital', text: `${req.body.patientId} was treated at the starter hospital` });
+      res.status(201).json(treatment);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // --- School ---------------------------------------------------------
+  app.get('/api/school/attendances/:studentId', (req, res) => {
+    res.json({ attendances: schoolLib.attendancesFor(store.school, req.params.studentId) });
+  });
+
+  // Free -- "mostly online school," no transferFn at all (see
+  // school.js's own header).
+  app.post('/api/school/attend', requireActor('studentId'), (req, res) => {
+    try {
+      const student = ensurePlayer(req.body.studentId);
+      const attendance = schoolLib.attendSchool(store.school, {
+        studentId: req.body.studentId,
+        traits: student.state.traits,
+      });
+      newsLib.recordEvent(store.news, { kind: 'school', text: `${req.body.studentId} attended school` });
+      res.status(201).json(attendance);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // --- Daycare ----------------------------------------------------------
+  app.get('/api/daycare/enrollments/:guardianId', (req, res) => {
+    res.json({ enrollments: daycareLib.enrollmentsFor(store.daycare, req.params.guardianId) });
+  });
+
+  app.post('/api/daycare/enroll', requireActor('guardianId'), async (req, res) => {
+    try {
+      const guardian = ensurePlayer(req.body.guardianId);
+      const enrollment = await daycareLib.enrollInDaycare(store.daycare, {
+        guardianId: req.body.guardianId,
+        needs: guardian.state.needs,
+        transferFn: (args) => transferVCoin(args),
+      });
+      economyLib.recordSpending(store.economy, daycareLib.ENROLLMENT_FEE);
+      newsLib.recordEvent(store.news, { kind: 'daycare', text: `${req.body.guardianId} enrolled at the technological daycare` });
+      res.status(201).json(enrollment);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
 
   app.get('/api/security/status', (_req, res) => {
     res.json(currentSecurityTier());

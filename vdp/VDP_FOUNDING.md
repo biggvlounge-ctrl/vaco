@@ -1028,6 +1028,100 @@ thought we had 2100 verifiable traits."
   nothing, which is a real, separate, larger piece of work than
   "bring in a trait," and is not done here.
 
+## Social class, The Towers, a starter hospital, school and a technological daycare (9 Oct 2026, a seventh instruction the same day)
+
+Per direct instruction: "once more people start to enter the
+economy, people that start to accumulate tickets, crime, or face
+deportation, or have a certain social class level, I guess we need
+some type of class level, they will be moved out to a not
+unauthorized area, but an area where people are deployed to for
+criminal activity, living standards. They're moved to a project
+style, public housing style environment, like a tower, towers, a
+non-luxury version, but nice, of the of the village, but more of a
+poor version, like a project version. This will also be, will turn
+into like the red zones. We also will need a hospital, a starter
+hospital, where we'll start off small. Then we will need also
+school. We will do mostly online school, but we need to set up some
+type of schooling program. We need some type of new technological
+daycare."
+
+- **Social class (`socialClass.js`) is a pure, derived READ, never a
+  stored field** -- combining four already-real signals: `elite.js`'s
+  own `isElite`, `demographics.js`'s drawn income level (carried on
+  every player's own `state.demographics`), and `justice.js`'s real
+  unpaid-ticket count and active-detention status. A stored class
+  value could go stale the instant a ticket is paid off -- exactly
+  the "two disagreeing answers to the same question" failure this
+  whole ecosystem's own standing rules warn against, so it is
+  computed fresh on every read (`GET /api/players/:id/social-class`)
+  instead.
+- **The Towers (`property.js`'s new `public-housing` type,
+  `PUBLIC_HOUSING_NAME`) is a real, separate, non-luxury residential
+  type, reassigned rather than sold** -- `assignPublicHousing` takes
+  no `transferFn` at all, matching "deployed to" rather than "sold
+  to." Relocation itself is automatic and server-side
+  (`server.cjs`'s own `maybeRelocateToProjectHousing`), fired after a
+  real `/api/justice/tickets/issue` or `/api/justice/detain` call,
+  guarded to only ever act on a real player id
+  (`store.players[personId]` must already exist) so an NPC's own id
+  is never mistaken for one.
+- **"Will turn into like the red zones" needed no new mechanic.**
+  `security.js`'s own real `crimeByLocation` already derives per-
+  location crime concentration purely from each ticket/detention's
+  own `locationLabel` field -- giving The Towers a consistent, real
+  `locationLabel` (`PUBLIC_HOUSING_NAME`) and letting ordinary future
+  citations accumulate there makes it "turn into like a red zone"
+  through the EXISTING mechanism. No second, parallel red-zone
+  tracker was built.
+- **Distinct from `immigration.js`'s `deportPerson`, on purpose.**
+  Deportation only operates on a tracked illegal `arrival` record and
+  throws if none exists -- necessarily narrower and more severe. The
+  new relocation mechanic is broader: available to ANY resident,
+  citizen or migrant, once their derived class drops to `at-risk`.
+  The two are not chained together.
+- **A starter hospital (`hospital.js`), real and intentionally
+  small**: one flat-fee checkup (`TREATMENT_COST`, flagged
+  interpretive) that bumps every real `health` trait
+  (`traits.js`'s own Immune Response, Nutrition Status, Chronic
+  Conditions, Sleep Quality -- a family that had zero readers
+  anywhere in VDP until now). A `physician` job (see below) staffs
+  it, government-run from day one via `PLANETARY_GOVERNORS_PAYROLL`,
+  same framing as the water-treatment job -- "start off small" reads
+  as scale, not a later arrival.
+- **A school (`school.js`), real and mostly free**: "mostly online
+  school" is why `attendSchool` takes no `transferFn` and no
+  district-presence check at all -- it bumps the real `educational`
+  trait family (Literacy, Technical Knowledge, Historical Knowledge,
+  Self-Taught Aptitude -- the one trait family with zero readers
+  anywhere in VDP before this), once per real school day
+  (`ATTEND_COOLDOWN_MS`, flagged interpretive). A `teacher` job
+  reuses VACON-C's own real tier-3 occupation entry (`skill:
+  'Communication', employers: ['school']`) exactly -- no new skill
+  added.
+- **A technological daycare (`daycare.js`), honestly scoped.** VDP
+  has no children/births/dependent-modeling system anywhere (checked
+  directly: no such record in `households.js` or `immigration.js`),
+  so this does NOT pretend to model literal child care or
+  development. It models the real, bounded benefit the instruction's
+  own framing implies: a guardian who enrolls gets a real, flagged-
+  interpretive boost (`REST_BOOST_AMOUNT`) to their own `rest` need
+  (`npcs.js`'s own need set) -- read as freed-up caregiver time, not
+  invented child-development stats. A `daycare-technician` job
+  (`Engineering` skill, reading "technological" as monitoring/robot-
+  assisted care) is VDP's own flagged-interpretive choice -- no
+  "daycare"/"childcare" entry exists in VACON-C's `occupations.js` at
+  all, the same real gap `robot-patrol-officer` hit for "police."
+- **`Medicine` joined VDP's own `skills.js`**, an exact match to
+  VACON-C's real tier-4 `physician` entry (`skill: 'Medicine',
+  source: 'medicine'`), the same treatment `hunter`/`farmer`/
+  `plumber` already got.
+- Four new districts in `world.js` (`towers`, `hospital`, `school`,
+  `daycare`), each with a real settlement-tier assignment in
+  `settlement.js`: Hospital and School unlock at `Village` (the
+  earliest daily-needs cluster, alongside `food`), The Towers and
+  Daycare at `Town` (specialized civic infrastructure that only has
+  anyone to serve once a real population exists).
+
 ## What is still open
 
 - The area's own name — nothing has been given yet (the product name,

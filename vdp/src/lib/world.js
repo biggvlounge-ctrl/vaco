@@ -170,7 +170,10 @@ export const WORLD_WIDTH = 860;
 // (Beat Marketplace / Vvltvre Studios / VACON-C), leaving nowhere to
 // put VACO Merch. Grown once more to 2520 for a 9th row: Meridian
 // Commons, the real landscape cityTiers.js describes made walkable.
-export const WORLD_HEIGHT = 2520;
+// Grown once more to 2800 for a 10th row -- the 9th had two open
+// slots left (filled by The Towers and the Starter Hospital below),
+// and School/Daycare needed a fresh row.
+export const WORLD_HEIGHT = 2800;
 export const VIEWPORT_WIDTH = 400;
 export const VIEWPORT_HEIGHT = 300;
 export const MOVE_STEP = 16;
@@ -331,6 +334,30 @@ export const DISTRICTS = [
   // Meridian's own tier changes as its real amenity coverage does.
   {
     id: 'commons', name: 'Meridian Commons', x: 20, y: 2260, width: 260, height: 260, contentType: 'vdp-native',
+  },
+  // **Public housing, the starter hospital, school, and daycare (9 Oct
+  // 2026), per direct instruction**: "once more people start to enter
+  // the economy... they will be moved out to... a project style,
+  // public housing style environment... We also will need a hospital,
+  // a starter hospital... we need to set up some type of schooling
+  // program. We need some type of new technological daycare."
+  //
+  // All four are `vdp-native`: no separate standalone app exists for
+  // any of them to link out to, same reasoning Combat Sports/The
+  // Vavlt already settled this file's own general rule with. Fills
+  // the 9th row's two remaining open slots (The Towers/Hospital), then
+  // a new 10th row for School/Daycare.
+  {
+    id: 'towers', name: 'The Towers', x: 300, y: 2260, width: 260, height: 260, contentType: 'vdp-native',
+  },
+  {
+    id: 'hospital', name: 'Meridian Starter Hospital', x: 580, y: 2260, width: 260, height: 260, contentType: 'vdp-native',
+  },
+  {
+    id: 'school', name: 'Meridian School', x: 20, y: 2540, width: 260, height: 260, contentType: 'vdp-native',
+  },
+  {
+    id: 'daycare', name: 'Meridian Technological Daycare', x: 300, y: 2540, width: 260, height: 260, contentType: 'vdp-native',
   },
 ];
 

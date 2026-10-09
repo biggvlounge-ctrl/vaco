@@ -71,7 +71,7 @@
 
 import { TOWN_NAME } from './town.js';
 
-export const PROPERTY_TYPES = ['residential', 'land', 'commercial'];
+export const PROPERTY_TYPES = ['residential', 'land', 'commercial', 'public-housing'];
 
 // Verbatim from vacon-c/server/property.js's own LIFECYCLE list.
 export const LIFECYCLE = [
@@ -562,4 +562,83 @@ export async function operateBusiness(store, {
   }
 
   return { property, revenue };
+}
+
+// **Public housing (9 Oct 2026), per direct instruction**: "they will
+// be moved out... not an unauthorized area, but an area where people
+// are deployed to for criminal activity, living standards... a
+// project style, public housing style environment... a non-luxury
+// version... of the village, but more of a poor version." A real,
+// government-assigned residential type -- `socialClass.js`'s own
+// `shouldRelocateToProjectHousing` is the real gate this is built for,
+// never called from here directly (the same decoupled-by-injection
+// shape every other cross-module trigger in this app already uses).
+//
+// **Never purchased, so no `transferFn`.** Nobody pays their way into
+// public housing and nobody pays their way out -- it is assigned, the
+// real, honest shape of the thing, same as `buildUnauthorized` taking
+// no payment because the structure it records was never legitimately
+// bought either.
+//
+// **"This will also turn into like the red zones."** Already real,
+// not a second mechanic: `security.js`'s own `crimeByLocation` reads
+// whatever `locationLabel` a ticket or detention already carries, so
+// once residents here keep accumulating real citations tagged with
+// this real place's name, it reads as a real concentration of crime
+// through the exact same function every other area's crime reading
+// already goes through -- nothing new to wire, just a real place for
+// real future citations to accumulate against.
+export const PUBLIC_HOUSING_NAME = `The Towers at ${TOWN_NAME}`;
+
+// Any existing home (owned or rented, any type except the independent
+// `commercial` slot) is vacated first -- a real relocation replaces
+// wherever someone was living, it does not add a second residence.
+// The vacated property is removed outright, the same "gone, not
+// flagged" treatment `demolishUnauthorized` already gives a torn-down
+// structure, since nobody is still paying for or living in it.
+export function assignPublicHousing(store, { ownerId, reason, now = Date.now() } = {}) {
+  if (!ownerId) throw new Error('assignPublicHousing requires an ownerId');
+
+  const existing = homeOwnedBy(store, ownerId);
+  if (existing) {
+    const idx = store.properties.indexOf(existing);
+    store.properties.splice(idx, 1);
+  }
+
+  const property = {
+    id: store.nextPropertyId++,
+    type: 'public-housing',
+    ownerId,
+    ownerType: 'individual',
+    ownershipType: 'assigned',
+    lifecycleStage: 'operation',
+    levelName: PUBLIC_HOUSING_NAME,
+    authorized: true,
+    locationLabel: PUBLIC_HOUSING_NAME,
+    reason: reason || null,
+    assignedAt: now,
+    relocatedFrom: existing ? existing.levelName || existing.type : null,
+  };
+  store.properties.push(property);
+  return property;
+}
+
+export function isInPublicHousing(store, ownerId) {
+  const home = homeOwnedBy(store, ownerId);
+  return Boolean(home && home.type === 'public-housing');
+}
+
+// The real way back out -- real standing has to improve first
+// (`socialClass.js`'s own read), and this only clears the assignment
+// so `purchaseHome`/`rentHome` have an empty slot to work with again.
+// It does not hand anyone a home; moving back into the open market is
+// its own real, separate, paid act.
+export function vacatePublicHousing(store, ownerId, { now = Date.now() } = {}) {
+  const home = homeOwnedBy(store, ownerId);
+  if (!home || home.type !== 'public-housing') {
+    throw new Error(`vacatePublicHousing: "${ownerId}" is not in public housing`);
+  }
+  const idx = store.properties.indexOf(home);
+  store.properties.splice(idx, 1);
+  return { ownerId, vacatedAt: now };
 }

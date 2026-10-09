@@ -10,6 +10,7 @@ import {
   demolishUnauthorized, listUnauthorized, commercialOwnedBy, purchaseCommercial,
   upgradeCommercial, COMMERCIAL_LEVELS, operateBusiness, canOperateBusiness,
   BASE_COMMERCIAL_REVENUE, BUSINESS_REVENUE_ACCOUNT, OPERATE_COOLDOWN_MS,
+  PUBLIC_HOUSING_NAME, assignPublicHousing, isInPublicHousing, vacatePublicHousing,
 } from '../src/lib/property.js';
 import {
   createResourcesStore, spendMaterials, undoSpend, materialsFor, STARTING_OLD_WORLD_STOCK,
@@ -466,4 +467,65 @@ test('a failed operateBusiness transfer rolls back the real lastOperatedAt claim
     operateBusiness(store, { ownerId: 'gail', transferFn: fakeTransfer([], { shouldFail: true }), now: 1000 }),
   );
   assert.equal(commercialOwnedBy(store, 'gail').lastOperatedAt, null);
+});
+
+// -- Public housing -------------------------------------------------------
+
+test('assignPublicHousing gives a real, assigned, unpaid home', () => {
+  const store = createPropertyStore();
+  const property = assignPublicHousing(store, { ownerId: 'nia', reason: 'at-risk' });
+  assert.equal(property.type, 'public-housing');
+  assert.equal(property.ownershipType, 'assigned');
+  assert.equal(property.levelName, PUBLIC_HOUSING_NAME);
+  assert.equal(property.locationLabel, PUBLIC_HOUSING_NAME);
+  assert.equal(property.reason, 'at-risk');
+  assert.equal(homeOwnedBy(store, 'nia'), property);
+  assert.ok(isInPublicHousing(store, 'nia'));
+});
+
+test('assignPublicHousing vacates any real existing home first -- a relocation, not a second residence', async () => {
+  const store = createPropertyStore();
+  const calls = [];
+  await purchaseHome(store, { ownerId: 'nia', transferFn: fakeTransfer(calls) });
+  const before = homeOwnedBy(store, 'nia');
+  assert.equal(before.type, 'residential');
+
+  const relocated = assignPublicHousing(store, { ownerId: 'nia' });
+  assert.equal(relocated.relocatedFrom, PROPERTY_LEVELS[0].name);
+  assert.equal(homeOwnedBy(store, 'nia'), relocated);
+  assert.equal(store.properties.filter((p) => p.ownerId === 'nia').length, 1,
+    'the old residential row must be gone, not kept alongside the new assignment');
+});
+
+test('assignPublicHousing never charges anyone -- it is assigned, not purchased', () => {
+  const store = createPropertyStore();
+  assignPublicHousing(store, { ownerId: 'nia' });
+  // No transferFn was even passed -- if the function tried to charge
+  // anyone it would throw calling undefined, which this call not
+  // throwing already proves.
+  assert.ok(homeOwnedBy(store, 'nia'));
+});
+
+test('a public-housing resident cannot also buy or rent on the open market -- one residence, same as everyone else', async () => {
+  const store = createPropertyStore();
+  assignPublicHousing(store, { ownerId: 'nia' });
+  await assert.rejects(purchaseHome(store, { ownerId: 'nia', transferFn: fakeTransfer([]) }), /already owns a home/);
+  await assert.rejects(rentHome(store, { ownerId: 'nia', transferFn: fakeTransfer([]) }), /already has a home/);
+});
+
+test('vacatePublicHousing clears the assignment, and refuses someone who was never in it', () => {
+  const store = createPropertyStore();
+  assignPublicHousing(store, { ownerId: 'nia' });
+  const result = vacatePublicHousing(store, 'nia');
+  assert.equal(result.ownerId, 'nia');
+  assert.equal(homeOwnedBy(store, 'nia'), null);
+  assert.ok(!isInPublicHousing(store, 'nia'));
+
+  assert.throws(() => vacatePublicHousing(store, 'never-assigned'), /is not in public housing/);
+});
+
+test('isInPublicHousing is false for an ordinary owned home', async () => {
+  const store = createPropertyStore();
+  await purchaseHome(store, { ownerId: 'theo', transferFn: fakeTransfer([]) });
+  assert.ok(!isInPublicHousing(store, 'theo'));
 });

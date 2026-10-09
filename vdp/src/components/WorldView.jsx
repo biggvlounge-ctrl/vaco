@@ -23,6 +23,10 @@ import VenusResortView from "./VenusResortView.jsx";
 import CombatSportsView from "./CombatSportsView.jsx";
 import VavltView from "./VavltView.jsx";
 import CommonsView from "./CommonsView.jsx";
+import TowersView from "./TowersView.jsx";
+import HospitalView from "./HospitalView.jsx";
+import SchoolView from "./SchoolView.jsx";
+import DaycareView from "./DaycareView.jsx";
 import VacayView from "./VacayView.jsx";
 import HvntzView from "./HvntzView.jsx";
 import VoidView from "./VoidView.jsx";
@@ -863,6 +867,18 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
           )}
           {enteredDistrict.contentType === 'vdp-native' && enteredDistrict.id === 'commons' && (
             <CommonsView />
+          )}
+          {enteredDistrict.contentType === 'vdp-native' && enteredDistrict.id === 'towers' && (
+            <TowersView session={session} />
+          )}
+          {enteredDistrict.contentType === 'vdp-native' && enteredDistrict.id === 'hospital' && (
+            <HospitalView session={session} />
+          )}
+          {enteredDistrict.contentType === 'vdp-native' && enteredDistrict.id === 'school' && (
+            <SchoolView session={session} />
+          )}
+          {enteredDistrict.contentType === 'vdp-native' && enteredDistrict.id === 'daycare' && (
+            <DaycareView session={session} />
           )}
           {enteredDistrict.contentType === 'vacay-embed' && enteredDistrict.id === 'vacay' && (
             <VacayView session={session} />

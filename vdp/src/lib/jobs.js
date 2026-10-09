@@ -81,6 +81,19 @@
 // it BEFORE attempting pay (the same "check the thing that costs
 // nothing to check first" ordering `property.js`'s `upgradeHome`
 // already uses), and undoes the spend if the payout then fails.
+//
+// **Physician (9 Oct 2026), per direct instruction**: "we also will
+// need a hospital, a starter hospital, where we'll start off small."
+// `skill: 'Medicine'` is `occupations.js`'s own real tier-4
+// `physician` entry, exact-match (`source: 'medicine',
+// employers: ['hospital', ...]`), the same treatment `hunter`/
+// `farmer`/`plumber` already got. Government-run from day one, same
+// `PLANETARY_GOVERNORS_PAYROLL` pattern as the water-treatment job --
+// "start off small" reads as the founders staffing it directly before
+// any private hospital business exists. No `yields`/`consumes`: the
+// real output of this job is `hospital.js`'s own `treatPatient`, a
+// patient-paid action a physician enables by being on shift, not a
+// produced resource this job itself grants.
 
 export const PLANETARY_GOVERNORS_PAYROLL = 'planetary-governors-payroll';
 
@@ -129,6 +142,31 @@ export const JOBS = {
   'robot-patrol-officer': {
     title: 'Robot Patrol Officer', districtId: 'government', skill: 'Combat',
     payrollAccountId: PLANETARY_GOVERNORS_PAYROLL, payPerShift: 18,
+  },
+  physician: {
+    title: 'Starter Hospital Physician', districtId: 'hospital', skill: 'Medicine',
+    payrollAccountId: PLANETARY_GOVERNORS_PAYROLL, payPerShift: 20,
+  },
+  // **Teacher, same day.** `occupations.js`'s own real tier-3
+  // `teacher` entry, exact-match (`skill: 'Communication', source:
+  // 'implied', employers: ['school']`) -- reuses the already-real
+  // `Communication` skill rather than adding a new one, since "mostly
+  // online school" (see `school.js`) is the free self-serve path and
+  // this is the in-person staffing role for players who want one.
+  teacher: {
+    title: 'Meridian School Teacher', districtId: 'school', skill: 'Communication',
+    payrollAccountId: PLANETARY_GOVERNORS_PAYROLL, payPerShift: 18,
+  },
+  // **Daycare Technician, same day.** No "daycare"/"childcare" entry
+  // exists in `occupations.js` at all (checked directly) -- the same
+  // real gap `robot-patrol-officer` hit for "police." `Engineering`
+  // is VDP's own flagged-interpretive choice, reading "technological
+  // daycare" as monitoring-systems/robot-assisted care (see
+  // `daycare.js`'s own header for the full reasoning), not a borrowed
+  // near-match to any real occupations.js entry.
+  'daycare-technician': {
+    title: 'Daycare Technician', districtId: 'daycare', skill: 'Engineering',
+    payrollAccountId: PLANETARY_GOVERNORS_PAYROLL, payPerShift: 16,
   },
 };
 
