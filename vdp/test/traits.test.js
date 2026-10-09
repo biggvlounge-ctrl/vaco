@@ -125,6 +125,33 @@ test('tagsFor derives VDP\'s own Trickster tag from Deception + Creativity, dist
   assert.ok(!tags.includes('Sneaky'), 'Trickster and Sneaky read different real traits and must not be conflated');
 });
 
+test('tagsFor derives Narcissistic from Narcissism alone, the same single-trait shape as Aggressive/Creative', () => {
+  const sheet = generateTraitSheet(fixedRng(0));
+  sheet.psychological.Narcissism = HIGH;
+  const tags = tagsFor(sheet).map((t) => t.name);
+  assert.ok(tags.includes('Narcissistic'));
+});
+
+test('tagsFor derives Cheater from low Honesty + high Deception, distinct from Unreliable', () => {
+  const sheet = generateTraitSheet(fixedRng(0));
+  sheet.behavioral.Honesty = LOW;
+  sheet.criminal.Deception = HIGH;
+  sheet.behavioral.Discipline = HIGH; // Unreliable's own second condition stays closed
+  const tags = tagsFor(sheet).map((t) => t.name);
+  assert.ok(tags.includes('Cheater'));
+  assert.ok(!tags.includes('Unreliable'), 'Cheater and Unreliable read different real traits and must not be conflated');
+});
+
+test('tagsFor derives Manipulative from high Persuasion + high Deception, distinct from Diplomatic', () => {
+  const sheet = generateTraitSheet(fixedRng(0));
+  sheet.social.Persuasion = HIGH;
+  sheet.criminal.Deception = HIGH;
+  sheet.behavioral.Patience = LOW; // Diplomatic's own second condition stays closed
+  const tags = tagsFor(sheet).map((t) => t.name);
+  assert.ok(tags.includes('Manipulative'));
+  assert.ok(!tags.includes('Diplomatic'), 'Manipulative and Diplomatic read different real traits and must not be conflated');
+});
+
 test('tagsFor derives nothing for a perfectly neutral sheet -- every gate stays closed at the midpoint', () => {
   const sheet = {};
   for (const [family, names] of Object.entries(TRAIT_FAMILIES)) {

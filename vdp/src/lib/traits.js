@@ -245,6 +245,22 @@ const INDIVIDUAL_ARCHETYPES = [
   { name: 'Sneaky', when: (t) => t('criminal', 'Stealth') >= HIGH && t('criminal', 'Deception') >= HIGH },
   { name: 'Efficient', when: (t) => t('efficiency', 'Process Optimization') >= HIGH && t('efficiency', 'Time Management') >= HIGH },
   { name: 'Trickster', when: (t) => t('criminal', 'Deception') >= HIGH && t('mental', 'Creativity') >= HIGH },
+  // Three more, same day, per direct instruction: "need to add in all
+  // those things. Narcissistic, cheaters, sneaky, manipulative."
+  // 'Sneaky' is already above (same instruction, earlier the same
+  // day) -- restated here, not missing. 'Narcissistic' reads
+  // `psychological.Narcissism` alone, the same single-trait shape
+  // 'Aggressive'/'Creative' already use above -- the real trait is
+  // already named exactly this word, so no second trait is needed to
+  // justify the tag. 'Cheater' (dishonest AND deceptive -- distinct
+  // from 'Unreliable', which pairs low Honesty with low Discipline
+  // instead) and 'Manipulative' (persuasive AND deceptive -- distinct
+  // from 'Diplomatic', which pairs Persuasion with Patience instead)
+  // are both real, two-trait combinations already in this sheet, not
+  // invented stats.
+  { name: 'Narcissistic', when: (t) => t('psychological', 'Narcissism') >= HIGH },
+  { name: 'Cheater', when: (t) => t('behavioral', 'Honesty') <= LOW && t('criminal', 'Deception') >= HIGH },
+  { name: 'Manipulative', when: (t) => t('social', 'Persuasion') >= HIGH && t('criminal', 'Deception') >= HIGH },
 ];
 
 // Every family/trait pair an archetype predicate reads, parsed out of

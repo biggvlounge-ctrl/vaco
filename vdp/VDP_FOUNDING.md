@@ -1366,6 +1366,19 @@ Four more real pieces, all the same day:
   either app's real trait/mortality code matches it closely enough to
   guess at safely.
 
+**A follow-up the same day**: "need to add in all those things.
+Narcissistic, cheaters, sneaky, manipulative." 'Sneaky' was already
+real (added earlier the same day); the other three are new, real
+archetypes, each a combination of traits already in the sheet, not
+invented stats: 'Narcissistic' reads `psychological.Narcissism` alone
+(the same single-trait shape 'Aggressive'/'Creative' already use --
+the real trait is already named exactly this word); 'Cheater' pairs
+low `behavioral.Honesty` with high `criminal.Deception` (distinct
+from 'Unreliable', which pairs low Honesty with low Discipline
+instead); 'Manipulative' pairs high `social.Persuasion` with high
+`criminal.Deception` (distinct from 'Diplomatic', which pairs
+Persuasion with Patience instead).
+
 ## What is still open
 
 - The area's own name — nothing has been given yet (the product name,
