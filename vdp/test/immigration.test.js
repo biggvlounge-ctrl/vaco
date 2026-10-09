@@ -10,6 +10,7 @@ import {
   listActiveIllegalSettlements, listKnownIllegalSettlements, applyForCitizenship,
   applyForTemporaryPassport, isPassportExpired, TEMPORARY_PASSPORT_DURATION_MS,
   generateMigrationWave, deportPerson, isDeported, ILLEGAL_CROSSING_TERRAIN,
+  findUndergroundWorldSpot, sponsorFamilyMembers, WEALTH_TIERS, DEFAULT_FAMILY_ADMISSION_FRACTION,
 } from '../src/lib/immigration.js';
 
 test('admitWithPassport records a real, legal arrival with the old-world background given', () => {
@@ -94,6 +95,100 @@ test('reportSmugglingSpot always lands in the uncharted, away-from-tech terrain 
   // -- the specific place varies, the kind of place it is does not.
   const other = reportSmugglingSpot(store, { locationLabel: 'the old quarry trail' });
   assert.equal(other.terrain, ILLEGAL_CROSSING_TERRAIN);
+});
+
+test('reportSmugglingSpot defaults leadsToUndergroundWorld to false; findUndergroundWorldSpot finds the one real spot that is true', () => {
+  const store = createImmigrationStore();
+  const ordinary = reportSmugglingSpot(store, { locationLabel: 'the eastern crevasse' });
+  assert.equal(ordinary.leadsToUndergroundWorld, false);
+  assert.equal(findUndergroundWorldSpot(store), null);
+
+  const passage = reportSmugglingSpot(store, { locationLabel: 'the deep vent', leadsToUndergroundWorld: true });
+  assert.equal(findUndergroundWorldSpot(store), passage);
+});
+
+test('foundIllegalSettlement records real, free-text red-zone activities, defaulting to none', () => {
+  const store = createImmigrationStore();
+  const plain = foundIllegalSettlement(store, { founderId: 'carol', locationLabel: 'the frontier ridge' });
+  assert.deepEqual(plain.activities, []);
+
+  const redZone = foundIllegalSettlement(store, {
+    founderId: 'dave', locationLabel: 'the sunken block', activities: ['illegal gambling', 'drugs', 'a club'],
+  });
+  assert.deepEqual(redZone.activities, ['illegal gambling', 'drugs', 'a club']);
+});
+
+test('admitWithPassport defaults to the general wealth tier, same as every pre-existing caller', () => {
+  const store = createImmigrationStore();
+  const arrival = admitWithPassport(store, { personId: 'erin' });
+  assert.equal(arrival.wealthTier, 'general');
+  assert.equal(arrival.sponsorId, null);
+  assert.equal(arrival.familyImportCapacity, null);
+  assert.deepEqual(WEALTH_TIERS, ['affluent', 'family-sponsored', 'general']);
+});
+
+test('admitWithPassport records a real affluent arrival\'s own family import capacity, without touching resources.js at all', () => {
+  const store = createImmigrationStore();
+  const arrival = admitWithPassport(store, {
+    personId: 'frank', wealthTier: 'affluent', familyImportCapacity: 500,
+  });
+  assert.equal(arrival.wealthTier, 'affluent');
+  assert.equal(arrival.familyImportCapacity, 500);
+});
+
+test('admitWithPassport refuses a "family-sponsored" arrival with no real sponsorId', () => {
+  const store = createImmigrationStore();
+  assert.throws(
+    () => admitWithPassport(store, { personId: 'gina', wealthTier: 'family-sponsored' }),
+    /requires a real sponsorId/,
+  );
+});
+
+test('admitWithPassport refuses an unknown wealth tier', () => {
+  const store = createImmigrationStore();
+  assert.throws(
+    () => admitWithPassport(store, { personId: 'hank', wealthTier: 'royalty' }),
+    /not a known wealth tier/,
+  );
+});
+
+test('sponsorFamilyMembers only admits a real portion of the candidates, never all or nothing', () => {
+  const store = createImmigrationStore();
+  const sponsor = admitWithPassport(store, { personId: 'affluent-ida', wealthTier: 'affluent', originRegion: 'coastal region' });
+  const candidates = ['cousin-1', 'cousin-2', 'cousin-3', 'cousin-4'];
+  // Deterministic rng: 0.5 admits whenever admissionFraction > 0.5.
+  const result = sponsorFamilyMembers(store, {
+    sponsorId: sponsor.personId, candidateIds: candidates, admissionFraction: 0.6, rng: () => 0.5,
+  });
+  assert.equal(result.admitted.length, 4, 'rng() = 0.5 is below the 0.6 admission fraction for every candidate');
+  assert.equal(result.turnedAway.length, 0);
+  for (const admitted of result.admitted) {
+    assert.equal(admitted.wealthTier, 'family-sponsored');
+    assert.equal(admitted.sponsorId, sponsor.personId);
+    assert.equal(admitted.originRegion, 'coastal region', 'a sponsored arrival carries the sponsor\'s real origin');
+  }
+});
+
+test('sponsorFamilyMembers turns away exactly the candidates the real admission fraction rejects', () => {
+  const store = createImmigrationStore();
+  const sponsor = admitWithPassport(store, { personId: 'affluent-jack', wealthTier: 'affluent' });
+  const result = sponsorFamilyMembers(store, {
+    sponsorId: sponsor.personId, candidateIds: ['kid-1', 'kid-2'], admissionFraction: 0.5, rng: () => 0.9,
+  });
+  assert.equal(result.admitted.length, 0, 'rng() = 0.9 is above the 0.5 admission fraction');
+  assert.deepEqual(result.turnedAway, ['kid-1', 'kid-2']);
+});
+
+test('sponsorFamilyMembers refuses a sponsor with no real arrival on record', () => {
+  const store = createImmigrationStore();
+  assert.throws(
+    () => sponsorFamilyMembers(store, { sponsorId: 'nobody', candidateIds: ['x'] }),
+    /no real arrival recorded for sponsor/,
+  );
+});
+
+test('DEFAULT_FAMILY_ADMISSION_FRACTION is a real fraction between 0 and 1', () => {
+  assert.ok(DEFAULT_FAMILY_ADMISSION_FRACTION > 0 && DEFAULT_FAMILY_ADMISSION_FRACTION < 1);
 });
 
 test('foundIllegalSettlement starts off the grid -- real and active, but not yet known', () => {

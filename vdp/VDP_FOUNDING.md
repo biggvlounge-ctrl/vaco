@@ -637,6 +637,91 @@ document already describes:
   one specific area was visible, on-the-ground work, while whoever
   actually runs the government stays off-screen.
 
+## A second migrant source, real robot types, red zones, and who comes first (9 Oct 2026, later the same day)
+
+Five more pieces of the same world, per a further direct instruction:
+
+- **"I would like one of the spots on the ice wall to lead directly to
+  the underground world where people will start to migrate from."**
+  New: `immigration.js`'s `reportSmugglingSpot` carries a real
+  `leadsToUndergroundWorld` flag, and `findUndergroundWorldSpot` finds
+  the one real passage once it exists. A migrant who actually comes
+  through it is recorded the same way any illegal crossing already is
+  -- `originRegion: 'the underground world'` is simply what the caller
+  names, the same already-open free-text field every other origin
+  uses. What the underground world actually is remains unspecified,
+  same restraint this document already applies elsewhere.
+- **"There also will be stages of robots, from your basic robot that
+  just roams around and does basic things, to your household robot,
+  all the way up to your military style robot, and variations in
+  between."** New `robots.js`: a real five-type ladder (Patrol Drone →
+  Household Robot → Security Robot → Combat Robot → Military Robot),
+  the first real robot TYPES this app has ever had -- before this,
+  "robot" was only ever a number (`security.js`'s own `robotCount`).
+  `SECURITY_TIER_ROBOT_TYPE` names which real type the government
+  actually deploys at each real security tier (Basic gets the weakest,
+  Maximum Security the strongest); the Household Robot is the real
+  "variation in between" that is deliberately never enforcement-
+  capable and never deployed for policing at all -- a domestic fact
+  about this world's technology, not a second security tier.
+- **"It takes a lot of people to overpower certain robots, and
+  depending on what type of robot and how many people and what type of
+  people -- it does stand for athletics and the strategy to go against
+  the robot."** `dissent.js`'s `attemptUprising` now takes the real
+  robot type being resisted (scaling how much combined strength is
+  needed, via that type's own `overpowerStrength`) and each real
+  participant's own real Athletics skill (`skills.js`) where one is on
+  record, so a smaller, more athletic group can do what a larger,
+  ordinary one cannot -- both strictly additive over the 8 Oct
+  mechanic, which still behaves exactly as before when neither is
+  supplied. "Strategy" is named by the instruction but not built as a
+  second stat or roll -- Athletics is the one real number this world
+  already tracks that the instruction names by name; nothing else is
+  invented to stand in for "strategy."
+- **"There also will be humans or NPCs that will be basically in
+  control of the robots."** `robots.js`'s `deployRobot` records a real
+  `controlledBy` -- any real id, a player or an `npc-<id>`, the same
+  open convention `contracts.js`'s `builderId` already uses. A
+  deployed robot has no AI of its own in this module; its real actions
+  are whatever its controller actually does through `immigration.js`'s
+  own enforcement functions, the same way `jobs.js`'s
+  `robot-patrol-officer` already documents a player directing a patrol
+  rather than being one.
+- **"This will lead to illegal areas, red zones, illegal gambling,
+  drugs, clubs, and things of that nature... this is also how certain
+  items will make it through."** `immigration.js`'s
+  `foundIllegalSettlement` now carries a real, free-text `activities`
+  list -- "and things of that nature" is read the same open way
+  `smuggledGoods` already is. This is explicitly the unregulated,
+  off-the-books kind of gambling/nightlife a settlement the government
+  has not sanctioned would actually have -- a real, different fact
+  from VAGO's own regulated, VCoin-settled Venus Resort, never a second
+  instance of it.
+- **"The people who start to come early are the people who are most
+  affluent... they come first, and then they send for their family
+  members, and only a portion of those will get in, and then also
+  other people will get in, and those are the NPCs that start the
+  businesses, and then the import-export depends on the family in the
+  old world as well."** `immigration.js`'s `admitWithPassport` gains a
+  real, closed `WEALTH_TIERS` ordering (`affluent` → `family-sponsored`
+  → `general`, the one real structure this instruction itself names,
+  unlike the deliberately open `originRegion`/`religion`), a real
+  `sponsorId` linking a sponsored arrival back to the affluent arrival
+  who sent for them, and a real `familyImportCapacity` fact recorded
+  per arrival. The new `sponsorFamilyMembers` is the one function that
+  actually turns some candidates away rather than admitting a whole
+  list -- "only a portion... will get in" is a real, inspectable
+  `admitted`/`turnedAway` split, never silently all-or-nothing.
+  `familyImportCapacity` is deliberately NOT wired into
+  `resources.js`'s shared `oldWorldStock` -- that module's own header
+  is explicit that stock "is only ever going down... everybody drew
+  from the same one shipment." A richer family does not top up the
+  whole settlement's shared import; this is only the honest record of
+  how capable that one family is, in case a future real import path
+  reads it. "Those are the NPCs that start the businesses" needed no
+  new code: `property.js`'s `buildUnauthorized`/`purchaseCommercial`
+  already accept any real owner id, `npc-<id>` included.
+
 ## What is still open
 
 - The area's own name — nothing has been given yet (the product name,

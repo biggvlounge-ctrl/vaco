@@ -190,6 +190,7 @@ let store = createVdpStore();
   const contractsLib = await import('./src/lib/contracts.js');
   const dissentLib = await import('./src/lib/dissent.js');
   const economyLib = await import('./src/lib/economy.js');
+  const robotsLib = await import('./src/lib/robots.js');
 
   // A migrant's real old-world background carries over if one was
   // recorded (`immigration.js`'s `admitWithPassport`/`crossIllegally`,
@@ -269,6 +270,7 @@ let store = createVdpStore();
       if (!store.voidHubs) store.voidHubs = { registered: false, stations: [] };
       if (!store.vacayHotels) store.vacayHotels = { listingIds: [] };
       if (!store.resources) store.resources = resourcesLib.createResourcesStore();
+      if (!store.robots) store.robots = robotsLib.createRobotsStore();
       registerMeridianVoidHubsOnce();
     },
   });
@@ -1108,6 +1110,39 @@ let store = createVdpStore();
     res.json({ crimeByLocation: securityLib.crimeByLocation(records) });
   });
 
+  // --- Robots: real machine types, and who is sent out to enforce ------
+  app.get('/api/robots/types', (_req, res) => {
+    res.json({ types: robotsLib.ROBOT_TYPES });
+  });
+
+  app.get('/api/robots/active', (_req, res) => {
+    res.json({ robots: robotsLib.listActiveRobots(store.robots) });
+  });
+
+  app.get('/api/robots/controlled-by/:controllerId', (req, res) => {
+    res.json({ robots: robotsLib.robotsControlledBy(store.robots, req.params.controllerId) });
+  });
+
+  // The AI government's own act, same posture as
+  // `/api/contracts/post` and `/api/immigration/migration-wave` --
+  // no single player actor deploys a government robot.
+  app.post('/api/robots/deploy', requireCallingService(), (req, res) => {
+    try {
+      const robot = robotsLib.deployRobot(store.robots, {
+        typeId: req.body.typeId,
+        districtId: req.body.districtId,
+        controlledBy: req.body.controlledBy,
+      });
+      newsLib.recordEvent(store.news, {
+        kind: 'security',
+        text: `the government deployed a real ${robotsLib.getRobotType(req.body.typeId).name}`,
+      });
+      res.status(201).json(robot);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
   // --- Government Contracts: the AI builds the world through real
   // builders -------------------------------------------------------------
   app.get('/api/contracts/open', (_req, res) => {
@@ -1211,13 +1246,30 @@ let store = createVdpStore();
         return res.status(403).json({ error: 'uprising: this revolt is not led by the acting user' });
       }
       const organization = organizationsLib.organizationOf(store.organizations, revolt.leaderId);
+      const security = currentSecurityTier();
+      // "Depending on what type of robot" (9 Oct 2026) -- the real
+      // robot type the government actually deploys at this real
+      // security tier, read from robots.js rather than assumed.
+      const robotType = robotsLib.robotTypeForSecurityTier(security.name);
+      // "What type of people -- it does stand for athletics" -- each
+      // real member's real Athletics skill, for whichever members
+      // already have a real player record. A member who has never
+      // logged in (an NPC, or a player who never triggered
+      // `ensurePlayer`) has no real score to read, so they are simply
+      // left out of `athleticsScores` -- `combinedStrength` already
+      // counts an unscored member as exactly one person, never zero.
+      const athleticsScores = (organization ? organization.memberIds : [])
+        .filter((id) => store.players[id])
+        .map((id) => store.players[id].skills.Athletics);
       const result = dissentLib.attemptUprising(store.dissent, revolt.id, {
         organization,
-        security: currentSecurityTier(),
+        security,
+        robotType,
+        athleticsScores,
       });
       newsLib.recordEvent(store.news, {
         kind: 'dissent',
-        text: `${revolt.leaderId}'s revolt overpowered the government's robots`,
+        text: `${revolt.leaderId}'s revolt overpowered the government's ${robotType ? robotType.name.toLowerCase() : 'robots'}`,
       });
       res.status(200).json(result);
     } catch (err) {

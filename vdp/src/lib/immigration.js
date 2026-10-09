@@ -89,6 +89,65 @@ export const TEMPORARY_PASSPORT_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 // paraphrased into something narrower.
 export const ILLEGAL_CROSSING_TERRAIN = "uncharted, wooded territory, away from the settlement's tech core";
 
+// **A second real migrant source, same day**, per direct instruction:
+// "I would like one of the spots on the ice wall to lead directly to
+// the underground world where people will start to migrate from."
+// `leadsToUndergroundWorld` is a real, fixed fact about ONE specific
+// found spot -- the government's/narrator's own real choice of which
+// one, set at report time, never a second kind of spot this module
+// invents a parallel pipeline for. A migrant who actually comes
+// through it is recorded exactly like any other illegal crossing
+// (`crossIllegally`) -- the caller names `originRegion: 'the
+// underground world'` directly, the same already-open free-text field
+// `originRegion` has always been, so no new arrival shape is needed to
+// carry this. What the underground world actually is, and what (if
+// anything) is down there besides people, is not specified by the
+// instruction and not invented here.
+//
+// **Who actually comes through the passport line, in order (9 Oct
+// 2026), per direct instruction**: "the people who start to come
+// early are the people who are most affluent around the country in
+// the old world. They come first, and then they send for their
+// family members, and only a portion of those will get in, and then
+// also other people will get in, and those are the NPCs that start
+// the businesses." Unlike `originRegion`/`religion` above, this IS a
+// real, closed, ordered structure the instruction itself names --
+// three real tiers, in this real order, not an open list this module
+// would otherwise refuse to invent:
+//   - `affluent`         -- the real first wave, admitted the
+//                            ordinary way (`admitWithPassport`).
+//   - `family-sponsored` -- sent for by an already-admitted affluent
+//                            arrival; "only a portion... will get in"
+//                            is real, not asserted -- `sponsorFamilyMembers`
+//                            below is the one function that actually
+//                            turns some candidates away rather than
+//                            admitting every name on a list.
+//   - `general`          -- "other people... those are the NPCs that
+//                            start the businesses" -- the ordinary
+//                            default every existing caller already
+//                            gets, unchanged; which of them actually
+//                            becomes an NPC business owner is
+//                            `property.js`'s own real concern
+//                            (`buildUnauthorized`/`purchaseCommercial`
+//                            already accept any real owner id,
+//                            `npc-<id>` included), not this module's.
+// `familyImportCapacity` is a real, recorded fact about a specific
+// family's own old-world connections -- per "the import-export
+// depends on the family in the old world as well" -- never wired into
+// `resources.js`'s own `oldWorldStock`, which that module's own header
+// is explicit is "only ever goes down... everybody drew from the same
+// one shipment." A richer family does not top up the whole
+// settlement's shared stock; this is only the honest record of how
+// capable that one family specifically is, in case a future real
+// import path wants to read it. What that path would actually be is
+// not specified and not invented here.
+export const WEALTH_TIERS = ['affluent', 'family-sponsored', 'general'];
+
+// Flagged interpretive fraction, same footing every other unspecified
+// number in this file already stands on -- no document gives VDP a
+// real family-reunification admission rate.
+export const DEFAULT_FAMILY_ADMISSION_FRACTION = 0.6;
+
 export function createImmigrationStore() {
   return {
     arrivals: [],
@@ -113,12 +172,19 @@ function requireNoExistingArrival(store, personId, fnName) {
 // spelled out); choosing `'temporary'` sets a real `expiresAt`.
 export function admitWithPassport(store, {
   personId, originRegion, religion, oldWorldSkills, oldWorldBeliefs,
-  citizenshipType = 'citizenship', dissident = false, now = Date.now(),
+  citizenshipType = 'citizenship', dissident = false,
+  wealthTier = 'general', sponsorId = null, familyImportCapacity = null, now = Date.now(),
 } = {}) {
   if (!personId) throw new Error('admitWithPassport requires a personId');
   requireNoExistingArrival(store, personId, 'admitWithPassport');
   if (!CITIZENSHIP_TYPES.includes(citizenshipType)) {
     throw new Error(`admitWithPassport: "${citizenshipType}" is not a known citizenship type (expected one of ${CITIZENSHIP_TYPES.join(', ')})`);
+  }
+  if (!WEALTH_TIERS.includes(wealthTier)) {
+    throw new Error(`admitWithPassport: "${wealthTier}" is not a known wealth tier (expected one of ${WEALTH_TIERS.join(', ')})`);
+  }
+  if (wealthTier === 'family-sponsored' && !sponsorId) {
+    throw new Error('admitWithPassport: a "family-sponsored" arrival requires a real sponsorId');
   }
 
   const arrival = {
@@ -133,6 +199,9 @@ export function admitWithPassport(store, {
     smuggledGoods: [],
     oldWorldSkills: oldWorldSkills || null,
     oldWorldBeliefs: oldWorldBeliefs || null,
+    wealthTier,
+    sponsorId,
+    familyImportCapacity: familyImportCapacity ?? null,
     // "Multiple people... will try to revolt against the technology
     // being the government" (8 Oct 2026) -- a real, named stance an
     // arrival can carry, distinct from `legal`/`caught`: opposing the
@@ -157,6 +226,42 @@ export function applyForCitizenship(store, options = {}) {
 
 export function applyForTemporaryPassport(store, options = {}) {
   return admitWithPassport(store, { ...options, citizenshipType: 'temporary' });
+}
+
+// "They send for their family members, and only a portion of those
+// will get in" -- the one real function that actually turns some
+// candidates away, rather than admitting every name handed to it. The
+// sponsor must be a real, already-admitted arrival (the "affluent"
+// wave that came first); each candidate is drawn independently against
+// `admissionFraction`, so "a portion" is a real, inspectable outcome
+// (`admitted`/`turnedAway`), never silently all-or-nothing. Reuses
+// `admitWithPassport` as the one real gate -- a sponsored arrival is
+// not a second kind of admission, just one with `wealthTier:
+// 'family-sponsored'` and a real `sponsorId` recorded on it.
+export function sponsorFamilyMembers(store, {
+  sponsorId, candidateIds = [], admissionFraction = DEFAULT_FAMILY_ADMISSION_FRACTION,
+  rng = Math.random, now = Date.now(),
+} = {}) {
+  const sponsor = arrivalFor(store, sponsorId);
+  if (!sponsor) throw new Error(`sponsorFamilyMembers: no real arrival recorded for sponsor "${sponsorId}"`);
+
+  const admitted = [];
+  const turnedAway = [];
+  for (const personId of candidateIds) {
+    if (rng() < admissionFraction) {
+      admitted.push(admitWithPassport(store, {
+        personId,
+        originRegion: sponsor.originRegion,
+        religion: sponsor.religion,
+        wealthTier: 'family-sponsored',
+        sponsorId,
+        now,
+      }));
+    } else {
+      turnedAway.push(personId);
+    }
+  }
+  return { sponsorId, admitted, turnedAway };
 }
 
 // A temporary passport "only lasts so long" -- a real, checkable fact
@@ -267,18 +372,28 @@ export function isDeported(store, personId) {
 // "A new spot found where people are sneaking in" -- a real, named
 // discovery. Starts open; sealing it is a separate real act, so
 // "found" and "closed" are two events, not one guessed-at moment.
-export function reportSmugglingSpot(store, { locationLabel, reportedBy, now = Date.now() } = {}) {
+export function reportSmugglingSpot(store, {
+  locationLabel, reportedBy, leadsToUndergroundWorld = false, now = Date.now(),
+} = {}) {
   if (!locationLabel) throw new Error('reportSmugglingSpot requires a locationLabel');
   const spot = {
     id: store.nextSpotId++,
     locationLabel,
     terrain: ILLEGAL_CROSSING_TERRAIN,
+    leadsToUndergroundWorld,
     reportedBy: reportedBy || null,
     sealed: false,
     reportedAt: now,
   };
   store.smugglingSpots.push(spot);
   return spot;
+}
+
+// The real, single passage the instruction names ("one of the
+// spots") -- `null` if it has not been found/reported yet, never
+// invented in its absence.
+export function findUndergroundWorldSpot(store) {
+  return store.smugglingSpots.find((s) => s.leadsToUndergroundWorld) || null;
 }
 
 export function sealSmugglingSpot(store, spotId, { sealedBy, now = Date.now() } = {}) {
@@ -307,13 +422,26 @@ export function listOpenSmugglingSpots(store) {
 // shape `reportSmugglingSpot`/`sealSmugglingSpot` already use) --
 // `clearIllegalSettlement` requires discovery first, because the
 // government cannot clear a settlement it does not know exists.
-export function foundIllegalSettlement(store, { founderId, locationLabel, now = Date.now() } = {}) {
+// **Red zones (9 Oct 2026), per direct instruction**: "this will lead
+// to illegal areas, red zones, illegal gambling, drugs, clubs, and
+// things of that nature." `activities` is free text, same discipline
+// as `smuggledGoods` -- "and things of that nature" is the
+// instruction's own open phrasing, not a closed catalog this module
+// invents the rest of. Naming VAGO's own real, regulated,
+// VCoin-settled casino here would be wrong on its face: an illegal
+// settlement's "gambling" is explicitly the unregulated, off-the-books
+// kind the government has not sanctioned, a real different fact from
+// VAGO's own Venus Resort, not a second instance of it.
+export function foundIllegalSettlement(store, {
+  founderId, locationLabel, activities = [], now = Date.now(),
+} = {}) {
   if (!founderId) throw new Error('foundIllegalSettlement requires a founderId');
   if (!locationLabel) throw new Error('foundIllegalSettlement requires a locationLabel');
   const settlement = {
     id: store.nextSettlementId++,
     founderId,
     locationLabel,
+    activities: [...activities],
     discovered: false,
     discoveredBy: null,
     discoveredAt: null,

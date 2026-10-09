@@ -20,6 +20,68 @@
 // revolt's leader's own real `organizations.js` group measured
 // against `security.js`'s own real `robotCount`, not an invented
 // combat system.
+//
+// **Robot type and "what type of people" (9 Oct 2026), per direct
+// instruction**: "it takes a lot of people to overpower certain
+// robots, and depending on what type of robot and how many people and
+// what type of people -- it does stand for athletics and the strategy
+// to go against the robot." Two real, optional refinements over the
+// plain headcount-vs-robotCount check above, both strictly additive --
+// omitting either one leaves the original 8 Oct behavior exactly
+// unchanged, which is what every existing caller/test still does:
+//   - `robotType` (`robots.js`'s own real type, e.g. via
+//     `robotTypeForSecurityTier`) scales how much strength is needed
+//     to overpower EACH robot in the count, via its own real
+//     `overpowerStrength` -- a Maximum Security tier's military
+//     robots take real, meaningfully more to overpower than a Basic
+//     tier's patrol drones, not the same flat `robotCount` regardless
+//     of type.
+//   - `athleticsScores` (the real `skills.js` Athletics value for as
+//     many of the organization's real members as the caller can
+//     supply) turns "what type of people" into real combined strength
+//     rather than a head being a head: a member with a real, high
+//     Athletics score counts for more than one. "Strategy" is named
+//     by the instruction but not specified as any further real stat or
+//     roll anywhere in this app -- not invented here; Athletics is the
+//     one real number this world already tracks that the instruction
+//     names by name.
+// `OVERPOWER_ATHLETICS_BONUS_CAP` is a flagged interpretive number,
+// same footing `overpowerStrength` in `robots.js` already stands on.
+
+const OVERPOWER_ATHLETICS_BONUS_CAP = 1; // up to one extra "effective person" at Athletics 100
+
+function clampAthletics(score) {
+  return Math.max(0, Math.min(100, score));
+}
+
+// Real combined strength: every member with a real Athletics score on
+// record contributes 1 (just being there) plus up to
+// `OVERPOWER_ATHLETICS_BONUS_CAP` more, scaled by how high that real
+// score is; a member with no score supplied still counts as exactly
+// one person, never zero or guessed at. With no `athleticsScores` at
+// all, this is exactly `organization.memberIds.length` -- the original
+// 8 Oct behavior, unchanged.
+export function combinedStrength(organization, { athleticsScores } = {}) {
+  if (!organization) return 0;
+  if (!athleticsScores || athleticsScores.length === 0) return organization.memberIds.length;
+  const scored = athleticsScores.reduce(
+    (sum, score) => sum + 1 + (clampAthletics(score) / 100) * OVERPOWER_ATHLETICS_BONUS_CAP,
+    0,
+  );
+  const unscored = Math.max(0, organization.memberIds.length - athleticsScores.length);
+  return scored + unscored;
+}
+
+// Real strength required: `security.robotCount` real robots, each
+// needing `robotType.overpowerStrength` combined strength to overpower
+// -- with no `robotType` given, that multiplier is 1, so this is
+// exactly `security.robotCount` -- the original 8 Oct behavior,
+// unchanged.
+export function requiredStrength(security, { robotType } = {}) {
+  if (!security) return 0;
+  const multiplier = robotType ? robotType.overpowerStrength : 1;
+  return security.robotCount * multiplier;
+}
 
 export function createDissentStore() {
   return { revolts: [], nextRevoltId: 1 };
@@ -80,26 +142,31 @@ export function suppressRevolt(store, revoltId, { suppressedBy, now = Date.now()
 // `security.js`'s own real current tier -- its real `robotCount` is
 // the one threshold already in this world, never an invented "robot
 // strength" stat.
-export function canOverpowerSecurity(organization, security) {
+export function canOverpowerSecurity(organization, security, options = {}) {
   if (!organization || !security) return false;
-  return organization.memberIds.length >= security.robotCount;
+  return combinedStrength(organization, options) >= requiredStrength(security, options);
 }
 
-export function attemptUprising(store, revoltId, { organization, security, now = Date.now() } = {}) {
+export function attemptUprising(store, revoltId, {
+  organization, security, robotType, athleticsScores, now = Date.now(),
+} = {}) {
   const revolt = store.revolts.find((r) => r.id === revoltId);
   if (!revolt) throw new Error(`attemptUprising: no revolt #${revoltId}`);
   if (revolt.suppressedAt) throw new Error(`attemptUprising: revolt #${revoltId} is already suppressed`);
   if (revolt.overpoweredAt) throw new Error(`attemptUprising: revolt #${revoltId} already overpowered security`);
   if (!organization) throw new Error('attemptUprising requires the leader\'s real organization');
   if (!security) throw new Error('attemptUprising requires the real current security tier');
-  if (!canOverpowerSecurity(organization, security)) {
+  const options = { robotType, athleticsScores };
+  if (!canOverpowerSecurity(organization, security, options)) {
     throw new Error(
-      `attemptUprising: "${organization.name}" (${organization.memberIds.length}) is not yet big enough `
-      + `to overpower ${security.robotCount} robots`,
+      `attemptUprising: "${organization.name}" (strength ${combinedStrength(organization, options)}) is not yet big `
+      + `enough to overpower ${security.robotCount} ${robotType ? robotType.name : 'robot'}(s) `
+      + `(needs ${requiredStrength(security, options)})`,
     );
   }
   revolt.overpoweredAt = now;
   revolt.overpoweredByOrganizationId = organization.id;
+  revolt.overpoweredRobotTypeId = robotType ? robotType.id || null : null;
   return revolt;
 }
 
