@@ -205,6 +205,99 @@ test('a webhook subscription without a target is refused', () => {
   assert.throws(() => notify.subscribe(s, { name: 'nowhere', channel: 'webhook' }), /requires a target URL/);
 });
 
+// -- webpush: real, added 9 Oct 2026 ---------------------------------------
+
+function pushSubscription(overrides = {}) {
+  return {
+    endpoint: 'https://fcm.googleapis.com/fcm/send/abc123',
+    keys: { p256dh: 'p256dh-key-value', auth: 'auth-key-value' },
+    ...overrides,
+  };
+}
+
+test('webpush is real now, not refused like native push', () => {
+  assert.ok(notify.CHANNELS.includes('webpush'));
+  assert.ok(!notify.UNIMPLEMENTED_CHANNELS.includes('webpush'));
+  // Native app push (APNs/FCM) is a different, still-unbuilt channel —
+  // webpush closing does not silently close it too.
+  assert.ok(notify.UNIMPLEMENTED_CHANNELS.includes('push'));
+});
+
+test('a webpush subscription requires a real browser PushSubscription shape', () => {
+  const s = store();
+  assert.throws(
+    () => notify.subscribe(s, { name: 'no-target', channel: 'webpush' }),
+    /requires a target that is a real browser PushSubscription/,
+  );
+  assert.throws(
+    () => notify.subscribe(s, { name: 'url-not-object', channel: 'webpush', target: 'https://example.invalid' }),
+    /requires a target that is a real browser PushSubscription/,
+  );
+  assert.throws(
+    () => notify.subscribe(s, { name: 'missing-keys', channel: 'webpush', target: { endpoint: 'https://x' } }),
+    /requires a target that is a real browser PushSubscription/,
+  );
+});
+
+test('a valid PushSubscription is accepted', () => {
+  const s = store();
+  const sub = notify.subscribe(s, { name: 'my-phone', channel: 'webpush', target: pushSubscription() });
+  assert.strictEqual(sub.channel, 'webpush');
+});
+
+function fakeWebPush() {
+  const calls = { setVapidDetails: [], sendNotification: [] };
+  return {
+    calls,
+    setVapidDetails: (...args) => calls.setVapidDetails.push(args),
+    sendNotification: async (subscription, payload) => {
+      calls.sendNotification.push({ subscription, payload });
+      return { statusCode: 201 };
+    },
+  };
+}
+
+test('createAdapters wires the real VAPID details into the real web-push library', () => {
+  const webpush = fakeWebPush();
+  notify.createAdapters({
+    webpush, vapidDetails: { subject: 'mailto:ops@vaco.example', publicKey: 'pub', privateKey: 'priv' },
+  });
+  assert.deepStrictEqual(webpush.calls.setVapidDetails, [['mailto:ops@vaco.example', 'pub', 'priv']]);
+});
+
+test('the webpush adapter actually calls sendNotification with the real subscription and a real JSON payload', async () => {
+  const s = store();
+  notify.subscribe(s, { name: 'my-phone', channel: 'webpush', target: pushSubscription(), minSeverity: 'alert' });
+  const webpush = fakeWebPush();
+  const result = await notify.send(s, {
+    app: 'vsafe', severity: 'critical', title: 'Missed check-in', body: 'Ada has not checked in',
+    adapters: notify.createAdapters({ webpush, vapidDetails: { subject: 'mailto:a@b.c', publicKey: 'pub', privateKey: 'priv' } }),
+  });
+
+  assert.strictEqual(result.status, 'delivered');
+  assert.strictEqual(webpush.calls.sendNotification.length, 1);
+  const [{ subscription, payload }] = webpush.calls.sendNotification;
+  assert.deepStrictEqual(subscription, pushSubscription());
+  const parsed = JSON.parse(payload);
+  assert.strictEqual(parsed.title, 'vsafe: Missed check-in');
+  assert.strictEqual(parsed.body, 'Ada has not checked in');
+  assert.strictEqual(parsed.severity, 'critical');
+});
+
+test('webpush fails loudly rather than silently dropping the message when no VAPID keys are configured', async () => {
+  const s = store();
+  notify.subscribe(s, { name: 'my-phone', channel: 'webpush', target: pushSubscription(), minSeverity: 'alert' });
+  const webpush = fakeWebPush();
+  const result = await notify.send(s, {
+    app: 'vsafe', severity: 'critical', title: 'Missed check-in',
+    adapters: notify.createAdapters({ webpush, vapidDetails: { subject: null, publicKey: null, privateKey: null } }),
+  });
+
+  assert.strictEqual(result.status, 'undelivered');
+  assert.match(result.deliveries[0].error, /no VAPID key pair configured/);
+  assert.strictEqual(webpush.calls.sendNotification.length, 0, 'a misconfigured deployment must not even try to send');
+});
+
 test('duplicate subscription names are refused', () => {
   const s = store();
   notify.subscribe(s, { name: 'oncall', channel: 'console' });

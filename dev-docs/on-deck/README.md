@@ -154,11 +154,19 @@ either reuses a real system below or has to be built from zero.
 **Named in the freeze, and confirmed NOT to exist — the real work is
 here, not in wiring:**
 
-- **Push notifications.** `vaco-notify` explicitly lists `push` in
-  `UNIMPLEMENTED_CHANNELS` and throws rather than silently accepting
-  one. No APNs/FCM/web-push/service-worker/VAPID anywhere in the repo.
-  §8's "immediate phone alert" is new infrastructure, not a call into
-  something that exists.
+- **Push notifications — partially closed 9 Oct 2026.** `vaco-notify`
+  still lists `push` (native APNs/FCM) in `UNIMPLEMENTED_CHANNELS` and
+  throws rather than silently accepting one — a real iOS/Android push
+  still needs an Apple developer account or a Google Cloud project,
+  neither of which exists here. But `webpush` (the browser
+  `Notification`/`PushManager` API, RFC 8030/8291) is now real: a
+  VAPID key pair (`npm run generate-vapid-keys` in `vaco-notify`, no
+  account, no cost), the `web-push` library for the actual
+  ECDH/HKDF/aes128gcm protocol, and `GET /api/webpush/public-key` for
+  a client to subscribe against. §8's "immediate phone alert" still
+  needs new infrastructure for a NATIVE mobile app specifically; for a
+  browser tab or installed PWA, the alert channel itself is no longer
+  the gap — a service worker calling `pushManager.subscribe()` is.
 - **General messaging/DMs.** The only real person-to-person message
   store is `cvnvo/lib/messages.js`, and it is hard-scoped to an active
   dating match (`sendMessage` throws once `match.expiresAt` passes) —

@@ -42,12 +42,40 @@
 // PagerDuty, and Opsgenie all work right now through their incoming-
 // webhook endpoints — no SDK, no key management, no per-vendor code.
 //
-// SMS, email and push are **deliberately not stubbed**. A stub that
-// accepts a message and drops it is exactly the failure this service
-// was built to end. Requesting one returns a clear error naming what is
-// missing, so `sms` fails loudly instead of pretending.
+// SMS, email and voice call are **deliberately not stubbed**. A stub
+// that accepts a message and drops it is exactly the failure this
+// service was built to end. Requesting one returns a clear error
+// naming what is missing, so `sms` fails loudly instead of pretending.
+//
+// **`webpush`, added 9 Oct 2026, is real and needed no vendor
+// account.** That is the one thing that made it buildable where
+// `sms`/native `push` (APNs/FCM) are not: APNs needs an Apple developer
+// account and a signing certificate, FCM needs a Google Cloud project
+// and a service-account key, SMS needs a numbered sender a vendor
+// issues — all real, external, paid-or-gated setup this environment
+// cannot do on a caller's behalf. Web Push (RFC 8030/8291, the
+// `Notification`/`PushManager` browser API) needs only a VAPID keypair,
+// which is generated locally with no account and no cost
+// (`scripts/generate-vapid-keys.js`). `web-push` (npm, MIT) implements
+// the real protocol — ECDH key agreement, HKDF, aes128gcm payload
+// encryption, and the VAPID JWT the push service itself checks — so
+// this does not hand-roll cryptography; it is a protocol library, not
+// a vendor SDK, the same distinction `serviceAuth`'s JWT handling
+// draws elsewhere in this ecosystem.
+//
+// What is still real work for whoever deploys this: `VAPID_PUBLIC_KEY`
+// and `VAPID_PRIVATE_KEY` must be set (`npm run generate-vapid-keys`
+// prints a pair), and a browser client has to register a service
+// worker and call `pushManager.subscribe()` with the public key — this
+// module never collects a subscription itself, the same way `webhook`
+// never creates the Slack channel it posts to.
 
-const CHANNELS = ['console', 'file', 'webhook'];
+const CHANNELS = ['console', 'file', 'webhook', 'webpush'];
+// `push` here means NATIVE app push (APNs/FCM) specifically, distinct
+// from `webpush` above — a real iOS/Android app push still needs an
+// Apple developer account + signing certificate or a Google Cloud
+// project + service-account key, neither of which exists for this
+// ecosystem and neither of which a library alone can substitute for.
 const UNIMPLEMENTED_CHANNELS = ['sms', 'email', 'push', 'voice'];
 
 const SEVERITIES = ['signal', 'alert', 'critical'];
@@ -99,6 +127,16 @@ function subscribe(store, options = {}) {
   }
   if (channel === 'webhook' && !target) {
     throw new Error('subscribe: a webhook subscription requires a target URL');
+  }
+  if (channel === 'webpush') {
+    if (!target || typeof target !== 'object' || !target.endpoint || !target.keys
+      || !target.keys.p256dh || !target.keys.auth) {
+      throw new Error(
+        'subscribe: a webpush subscription requires a target that is a real browser '
+        + 'PushSubscription ({ endpoint, keys: { p256dh, auth } }) -- the object '
+        + 'pushManager.subscribe() returns, not a URL',
+      );
+    }
   }
   if (apps !== null && (!Array.isArray(apps) || apps.length === 0)) {
     throw new Error('subscribe: apps must be null (all apps) or a non-empty array');
@@ -180,14 +218,52 @@ function makeWebhookAdapter(fetchFn) {
   };
 }
 
+// The real RFC 8030/8291 protocol (ECDH + HKDF + aes128gcm, VAPID JWT
+// auth), via `web-push` -- not a vendor SDK, a protocol library. Fails
+// loudly rather than stubbing when no VAPID key pair is configured,
+// the same rule every other real-but-unconfigured path in this
+// ecosystem follows (`settleVCoin` with no service token, VASH TAP
+// with no payer account): a channel that silently drops a message is
+// worse than one that says why it can't send.
+function makeWebPushAdapter(webpush, vapidDetails) {
+  const configured = Boolean(vapidDetails && vapidDetails.publicKey && vapidDetails.privateKey);
+  if (configured) {
+    webpush.setVapidDetails(vapidDetails.subject, vapidDetails.publicKey, vapidDetails.privateKey);
+  }
+  return async (notification, subscription) => {
+    if (!configured) {
+      throw new Error(
+        'webpush: no VAPID key pair configured -- set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY '
+        + '(run `npm run generate-vapid-keys` to create one)',
+      );
+    }
+    const payload = JSON.stringify({
+      title: `${notification.app}: ${notification.title}`,
+      body: notification.body,
+      severity: notification.severity,
+      app: notification.app,
+      notificationId: notification.id,
+    });
+    const result = await webpush.sendNotification(subscription.target, payload);
+    return { channel: 'webpush', statusCode: result.statusCode };
+  };
+}
+
 function createAdapters(deps = {}) {
   const fs = deps.fs || require('fs');
   const path = deps.path || require('path');
   const fetchFn = deps.fetchFn || globalThis.fetch;
+  const webpush = deps.webpush || require('web-push');
+  const vapidDetails = deps.vapidDetails || {
+    subject: process.env.VAPID_SUBJECT || 'mailto:admin@vaco.example',
+    publicKey: process.env.VAPID_PUBLIC_KEY || null,
+    privateKey: process.env.VAPID_PRIVATE_KEY || null,
+  };
   return {
     console: consoleAdapter,
     file: makeFileAdapter(fs, path),
     webhook: makeWebhookAdapter(fetchFn),
+    webpush: makeWebPushAdapter(webpush, vapidDetails),
   };
 }
 

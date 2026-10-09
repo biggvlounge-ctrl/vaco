@@ -121,6 +121,19 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
+// What a browser needs before it can ever create a webpush
+// subscription -- `pushManager.subscribe({ applicationServerKey })`
+// takes the PUBLIC half only. No session or service credential: the
+// public key is not a secret, the same way a webhook's target URL is
+// the secret half of that channel and the channel NAME is not.
+app.get('/api/webpush/public-key', (_req, res) => {
+  const publicKey = process.env.VAPID_PUBLIC_KEY || null;
+  if (!publicKey) {
+    return res.status(503).json({ error: 'webpush is not configured on this deployment (no VAPID_PUBLIC_KEY)' });
+  }
+  res.json({ publicKey });
+});
+
 // Sending is service-to-service: VSAFE, DREAMS and Analytics call it
 // with no end-user session. It is deliberately NOT behind requireActor
 // — there is no acting user — but it is also not a route a browser
