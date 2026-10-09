@@ -1122,6 +1122,58 @@ daycare."
   Daycare at `Town` (specialized civic infrastructure that only has
   anyone to serve once a real population exists).
 
+## Asylum seekers default to The Towers, with a real elite exception that is not absolute (9 Oct 2026, an eighth instruction the same day)
+
+Per direct instruction: "actually we will do that anybody who is
+coming over from the old world seeking asylum to the new world will
+be sent to the public housing and only the elite families that come
+over with some type of beneficial aspect, no matter if it's
+political, resources, or anything of that nature, they will be sent
+to the projects. And even some people that are elite will be sent
+over there too."
+
+- **A reading note, recorded rather than silently resolved.** Read
+  completely literally, this contradicts itself: "public housing" and
+  "the projects" are the same real place, named together by this
+  same user the same day ("project style, public housing style
+  environment... towers"), so a sentence that sends regular asylum
+  seekers to public housing and then separately says elite,
+  beneficial-aspect families are ALSO "sent to the projects" would
+  mean the one named exception does nothing. Read as dictation
+  dropping a "not" -- "...will NOT be sent to the projects" -- every
+  clause does real, distinct work: a real default, a real exception,
+  and a real reminder (the closing sentence) that the exception
+  itself is not a guarantee. That is the reading this module
+  implements; if it is wrong, the real rule is one boolean flip away
+  in `shouldAssignAsylumHousing`.
+- **`immigration.js`'s `admitWithPassport` gained two real fields**:
+  `seekingAsylum` (boolean, default false) and `eliteSponsorship`
+  (free text, default null -- "political, resources, or anything of
+  that nature" is the instruction's own open phrasing, same
+  discipline `originRegion`/`religion`/`smuggledGoods` already use
+  for an explicitly unenumerated category). Kept separate from the
+  existing `wealthTier` field on purpose: wealth tier is about
+  ADMISSION ORDER ("who gets in first"), this is about HOUSING, a
+  separate real fact an arrival can carry regardless of which wealth
+  tier admitted them.
+- **`shouldAssignAsylumHousing(arrival, { rng })` is a pure predicate**,
+  not a side effect -- `property.js`'s own `assignPublicHousing` is
+  what actually moves someone, called by `server.cjs` once the
+  decision is already made. Default: any `seekingAsylum` arrival with
+  no `eliteSponsorship` is assigned. Exception: a real, flagged-
+  interpretive `ELITE_ASYLUM_HOUSING_CHANCE` (0.15 -- no document
+  gives a real rate) is still rolled for an elite-sponsored arrival,
+  so the exemption is a real tendency, never an absolute rule.
+- **Wired into all three legal-admission routes**
+  (`/api/immigration/admit`, `/apply-citizenship`,
+  `/apply-temporary-passport`) -- `seekingAsylum`/`eliteSponsorship`
+  now forward from the request body, and `maybeAssignAsylumHousing`
+  fires right after a successful admission, for ANY arrival, real
+  player or NPC. Unlike the earlier ticket/detention relocation
+  trigger (`maybeRelocateToProjectHousing`), there is deliberately no
+  real-player guard here -- the arriving person is exactly who this
+  is about, not an unrelated id a ticket happened to name.
+
 ## What is still open
 
 - The area's own name — nothing has been given yet (the product name,

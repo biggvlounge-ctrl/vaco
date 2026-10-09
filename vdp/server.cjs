@@ -358,6 +358,26 @@ let store = createVdpStore();
     return assigned;
   }
 
+  // "Anybody who is coming over from the old world seeking asylum...
+  // will be sent to the public housing" (9 Oct 2026, a later direct
+  // instruction) -- called right after a real admission succeeds, for
+  // ANY arrival (real player or NPC; unlike `maybeRelocateToProjectHousing`
+  // above, there is no real-player guard here, because the arriving
+  // person -- not some unrelated id a ticket happened to name -- is
+  // exactly who this is about). `immigrationLib.shouldAssignAsylumHousing`
+  // is the pure decision (default/elite-exception/not-absolute); this
+  // is only the real side effect once that decision is already made.
+  function maybeAssignAsylumHousing(arrival) {
+    if (!immigrationLib.shouldAssignAsylumHousing(arrival)) return null;
+    const assigned = propertyLib.assignPublicHousing(store.property, {
+      ownerId: arrival.personId, reason: 'asylum arrival',
+    });
+    newsLib.recordEvent(store.news, {
+      kind: 'relocation', text: `${arrival.personId} arrived seeking asylum and was sent to ${propertyLib.PUBLIC_HOUSING_NAME}`,
+    });
+    return assigned;
+  }
+
   // Register Meridian's own real VOID Hub Stations once, idempotently
   // -- guarded by the persisted `registered` flag so a server restart
   // never re-registers duplicates. Two real stations, matching the
@@ -980,9 +1000,12 @@ let store = createVdpStore();
         oldWorldBeliefs: req.body.oldWorldBeliefs,
         citizenshipType: req.body.citizenshipType,
         dissident: req.body.dissident,
+        seekingAsylum: req.body.seekingAsylum,
+        eliteSponsorship: req.body.eliteSponsorship,
       });
       newsLib.recordEvent(store.news, { kind: 'immigration', text: `${req.body.personId} arrived through passport control` });
-      res.status(201).json(arrival);
+      const housingAssignment = maybeAssignAsylumHousing(arrival);
+      res.status(201).json({ ...arrival, housingAssignment });
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
@@ -999,9 +1022,12 @@ let store = createVdpStore();
         religion: req.body.religion,
         oldWorldSkills: req.body.oldWorldSkills,
         oldWorldBeliefs: req.body.oldWorldBeliefs,
+        seekingAsylum: req.body.seekingAsylum,
+        eliteSponsorship: req.body.eliteSponsorship,
       });
       newsLib.recordEvent(store.news, { kind: 'immigration', text: `${req.body.personId} was granted citizenship` });
-      res.status(201).json(arrival);
+      const housingAssignment = maybeAssignAsylumHousing(arrival);
+      res.status(201).json({ ...arrival, housingAssignment });
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
@@ -1015,9 +1041,12 @@ let store = createVdpStore();
         religion: req.body.religion,
         oldWorldSkills: req.body.oldWorldSkills,
         oldWorldBeliefs: req.body.oldWorldBeliefs,
+        seekingAsylum: req.body.seekingAsylum,
+        eliteSponsorship: req.body.eliteSponsorship,
       });
       newsLib.recordEvent(store.news, { kind: 'immigration', text: `${req.body.personId} was granted a temporary passport` });
-      res.status(201).json(arrival);
+      const housingAssignment = maybeAssignAsylumHousing(arrival);
+      res.status(201).json({ ...arrival, housingAssignment });
     } catch (err) {
       res.status(400).json({ error: err.message });
     }

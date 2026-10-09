@@ -11,7 +11,7 @@ import {
   applyForTemporaryPassport, isPassportExpired, TEMPORARY_PASSPORT_DURATION_MS,
   generateMigrationWave, deportPerson, isDeported, ILLEGAL_CROSSING_TERRAIN,
   findUndergroundWorldSpot, sponsorFamilyMembers, WEALTH_TIERS, DEFAULT_FAMILY_ADMISSION_FRACTION,
-  spreadWordOfMouth, knownByWordOfMouth,
+  spreadWordOfMouth, knownByWordOfMouth, shouldAssignAsylumHousing, ELITE_ASYLUM_HOUSING_CHANCE,
 } from '../src/lib/immigration.js';
 import { FRONTIER_ZONES, UNDERGROUND_ZONES } from '../src/lib/zones.js';
 
@@ -33,6 +33,52 @@ test('admitWithPassport refuses a second arrival for the same person', () => {
   const store = createImmigrationStore();
   admitWithPassport(store, { personId: 'alice' });
   assert.throws(() => admitWithPassport(store, { personId: 'alice' }), /already been recorded arriving/);
+});
+
+test('admitWithPassport defaults to not seeking asylum and no elite sponsorship', () => {
+  const store = createImmigrationStore();
+  const arrival = admitWithPassport(store, { personId: 'alice' });
+  assert.equal(arrival.seekingAsylum, false);
+  assert.equal(arrival.eliteSponsorship, null);
+});
+
+test('admitWithPassport records a real asylum-seeking arrival with its elite sponsorship, if any', () => {
+  const store = createImmigrationStore();
+  const arrival = admitWithPassport(store, {
+    personId: 'alice', seekingAsylum: true, eliteSponsorship: 'political',
+  });
+  assert.equal(arrival.seekingAsylum, true);
+  assert.equal(arrival.eliteSponsorship, 'political');
+});
+
+// -- shouldAssignAsylumHousing: default public housing, elite exception, the exception is not absolute
+
+test('shouldAssignAsylumHousing is false for an arrival not seeking asylum at all', () => {
+  const store = createImmigrationStore();
+  const arrival = admitWithPassport(store, { personId: 'alice' });
+  assert.equal(shouldAssignAsylumHousing(arrival), false);
+});
+
+test('shouldAssignAsylumHousing is true by default for a real asylum seeker with no elite sponsorship', () => {
+  const store = createImmigrationStore();
+  const arrival = admitWithPassport(store, { personId: 'alice', seekingAsylum: true });
+  assert.equal(shouldAssignAsylumHousing(arrival), true);
+});
+
+test('shouldAssignAsylumHousing refuses a null/undefined arrival rather than throwing', () => {
+  assert.equal(shouldAssignAsylumHousing(null), false);
+  assert.equal(shouldAssignAsylumHousing(undefined), false);
+});
+
+test('shouldAssignAsylumHousing rolls the real flagged-interpretive chance for an elite-sponsored asylum seeker', () => {
+  const store = createImmigrationStore();
+  const arrival = admitWithPassport(store, {
+    personId: 'alice', seekingAsylum: true, eliteSponsorship: 'resources',
+  });
+  // Exactly at the boundary: rng() < ELITE_ASYLUM_HOUSING_CHANCE
+  assert.equal(shouldAssignAsylumHousing(arrival, { rng: () => ELITE_ASYLUM_HOUSING_CHANCE - 0.001 }), true);
+  assert.equal(shouldAssignAsylumHousing(arrival, { rng: () => ELITE_ASYLUM_HOUSING_CHANCE }), false);
+  assert.equal(shouldAssignAsylumHousing(arrival, { rng: () => 0.9 }), false);
 });
 
 test('crossIllegally records a real arrival flagged illegal, carrying whatever was smuggled', () => {

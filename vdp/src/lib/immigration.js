@@ -151,6 +151,48 @@ export const ILLEGAL_CROSSING_TERRAIN = "uncharted, wooded territory, away from 
 // not specified and not invented here.
 export const WEALTH_TIERS = ['affluent', 'family-sponsored', 'general'];
 
+// **Asylum seekers default to public housing, elite sponsorship is
+// the one exception, and even that is not absolute (9 Oct 2026, a
+// later direct instruction)**: "anybody who is coming over from the
+// old world seeking asylum to the new world will be sent to the
+// public housing and only the elite families that come over with
+// some type of beneficial aspect, no matter if it's political,
+// resources, or anything of that nature, [will not be sent to the
+// projects]. And even some people that are elite will be sent over
+// there too." (The bracketed clause is this module's own best-faith
+// repair of a dropped word in dictation -- read literally, "the
+// projects" and "public housing" are the same place, per the
+// instruction that coined both terms together the same day, so the
+// sentence otherwise contradicts itself. This reading is the one
+// that makes every clause do real work: a real default, a real
+// exception, and a real reminder that the exception is not a
+// guarantee.)
+//
+// `seekingAsylum` is a real, named flag on the arrival record, not
+// folded into `wealthTier` above -- wealth tier is about ADMISSION
+// ORDER ("who gets in first"), this is about HOUSING, a separate
+// real fact an arrival can carry regardless of which wealth tier
+// admitted them. `eliteSponsorship` is free text, same discipline
+// `originRegion`/`religion`/`smuggledGoods` already use: "political,
+// resources, or anything of that nature" is the instruction's own
+// open phrasing, not a closed enum this module would otherwise
+// refuse to invent.
+export const ELITE_ASYLUM_HOUSING_CHANCE = 0.15; // interpretive -- no document gives a real rate
+
+// A pure predicate, not a side effect -- `property.js`'s own
+// `assignPublicHousing` is what actually moves someone, called by
+// whichever caller already holds a real property store
+// (`server.cjs`'s admission routes), the same decoupled-by-injection
+// shape `sponsorFamilyMembers` above already uses for its own
+// independent `rng`. Kept pure so the real default/exception/
+// exception-to-the-exception logic is testable without a property
+// store at all.
+export function shouldAssignAsylumHousing(arrival, { rng = Math.random } = {}) {
+  if (!arrival?.seekingAsylum) return false;
+  if (!arrival.eliteSponsorship) return true;
+  return rng() < ELITE_ASYLUM_HOUSING_CHANCE;
+}
+
 // Flagged interpretive fraction, same footing every other unspecified
 // number in this file already stands on -- no document gives VDP a
 // real family-reunification admission rate.
@@ -181,7 +223,8 @@ function requireNoExistingArrival(store, personId, fnName) {
 export function admitWithPassport(store, {
   personId, originRegion, religion, oldWorldSkills, oldWorldBeliefs,
   citizenshipType = 'citizenship', dissident = false,
-  wealthTier = 'general', sponsorId = null, familyImportCapacity = null, now = Date.now(),
+  wealthTier = 'general', sponsorId = null, familyImportCapacity = null,
+  seekingAsylum = false, eliteSponsorship = null, now = Date.now(),
 } = {}) {
   if (!personId) throw new Error('admitWithPassport requires a personId');
   requireNoExistingArrival(store, personId, 'admitWithPassport');
@@ -210,6 +253,8 @@ export function admitWithPassport(store, {
     wealthTier,
     sponsorId,
     familyImportCapacity: familyImportCapacity ?? null,
+    seekingAsylum,
+    eliteSponsorship: eliteSponsorship || null,
     // "Multiple people... will try to revolt against the technology
     // being the government" (8 Oct 2026) -- a real, named stance an
     // arrival can carry, distinct from `legal`/`caught`: opposing the
