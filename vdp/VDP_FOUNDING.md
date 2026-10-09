@@ -1491,6 +1491,52 @@ the factions of everything from the old world to the new world."
   assumed. Both are now real, live reads: `wealthTier` is what the new
   occupation draw above actually needs to do anything at all.
 
+## Customs: the government's own real reach over what comes in (9 Oct 2026, a twenty-second instruction the same day)
+
+Per direct instruction: "the government wants to be involved in all
+transactions and in control of everything that comes in the country.
+This is what these illegal trade routes and smuggling routes will
+do."
+
+Read against everything already real in this directory, this names a
+CAUSE this document had not yet written down, not a new effect:
+`immigration.js`'s own closed border and robot patrols, `taxes.js`'s
+real income tax, and `property.js`'s business tax all already say the
+government wants in on every real transaction it can reach. A
+smuggling route (`immigration.js`'s `claimSmugglingRoute`) or an
+untaxed barter trade (`barter.js`, deliberately never given a
+`transferFn`) are worth something to the people using them precisely
+because the government's own real reach stops at the ones that stay
+hidden from it. This instruction asks for the government's own real
+HALF of that story -- the legitimate channel someone can go through
+instead of a smuggling route -- not a rewrite of either already-real
+mechanic, which stay exactly as untaxed/ungoverned as before.
+
+- **New `customs.js`.** `declareImport` is the real, legitimate
+  alternative to smuggling a good in: a real declared item, a real
+  computed duty (`CUSTOMS_DUTY_RATE`, flagged interpretive, set above
+  `taxes.js`'s own `DEFAULT_INCOME_TAX_RATE` on purpose -- this is the
+  government's own named priority, not an ordinary income tax).
+  `payCustomsDuty` is claim-before-pay, the same ordering every other
+  paid action in this directory already uses, and pays into the same
+  real `taxes.js` `GOVERNMENT_TREASURY_ACCOUNT` -- one government
+  ledger, not two.
+- **`seizeSmuggledGoods` is the real enforcement half.** A robot
+  patrol or customs officer catching a good that never went through
+  `declareImport` -- a real, named record of the seizure, not a
+  second inventory (`barter.js`'s own inventory is untouched by this
+  module, the same decoupled-by-injection shape every cross-module
+  reference in this directory already uses). Deliberately asymmetric
+  with the declared path: nothing says a seizure can be bought back,
+  so no such mechanic is invented here.
+- **`immigration.js` already controls who crosses the border; this is
+  the same real control applied to what they bring** -- the missing
+  other half, not a second border mechanic.
+- Wired into `server.cjs`: `POST /api/customs/declare-import`,
+  `POST /api/customs/declarations/:id/pay`, `POST /api/customs/seize`,
+  and their real `GET` readouts -- all actor-gated the same way every
+  other paid/enforcement route in this app already is.
+
 ## What is still open
 
 - The area's own name — nothing has been given yet (the product name,

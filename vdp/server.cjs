@@ -291,6 +291,7 @@ let store = createVdpStore();
   const hospitalLib = await import('./src/lib/hospital.js');
   const schoolLib = await import('./src/lib/school.js');
   const daycareLib = await import('./src/lib/daycare.js');
+  const customsLib = await import('./src/lib/customs.js');
 
   // A migrant's real old-world background carries over if one was
   // recorded (`immigration.js`'s `admitWithPassport`/`crossIllegally`,
@@ -474,6 +475,7 @@ let store = createVdpStore();
       if (!store.taxes) store.taxes = taxesLib.createTaxesStore();
       if (!store.barter) store.barter = barterLib.createBarterStore();
       if (!store.diseases) store.diseases = diseasesLib.createDiseaseStore();
+      if (!store.customs) store.customs = customsLib.createCustomsStore();
       registerMeridianVoidHubsOnce();
       postGovernmentJobsToVoidOnce();
     },
@@ -1951,6 +1953,80 @@ let store = createVdpStore();
   app.post('/api/barter/:id/cancel', (req, res) => {
     try {
       res.status(200).json(barterLib.cancelTrade(store.barter, Number(req.params.id)));
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // --- Customs: the government's real reach over what comes in --------
+  // "The government wants to be involved in all transactions and in
+  // control of everything that comes in the country. This is what
+  // these illegal trade routes and smuggling routes will do" (9 Oct
+  // 2026, direct instruction). `declare-import` is the real,
+  // legitimate alternative to a smuggling route or an untaxed barter
+  // trade -- a real declared good, a real duty paid into the same
+  // treasury `taxes.js` already runs.
+  app.get('/api/customs/declarations/:personId', (req, res) => {
+    res.json({ declarations: customsLib.declarationsFor(store.customs, req.params.personId) });
+  });
+
+  app.post('/api/customs/declare-import', requireActor('personId'), (req, res) => {
+    try {
+      const declaration = customsLib.declareImport(store.customs, {
+        personId: req.body.personId,
+        itemName: req.body.itemName,
+        quantity: req.body.quantity,
+        declaredValue: req.body.declaredValue,
+      });
+      newsLib.recordEvent(store.news, {
+        kind: 'customs', text: `${req.body.personId} declared ${req.body.itemName} with customs`,
+      });
+      res.status(201).json(declaration);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // The declarer is the one who pays their own duty -- same
+  // "the session must really match the real record's own owner" check
+  // `justice.js`'s own ticket-pay route already applies.
+  app.post('/api/customs/declarations/:declarationId/pay', requireActor('personId'), async (req, res) => {
+    try {
+      const declaration = store.customs.declarations.find((d) => d.id === Number(req.params.declarationId));
+      if (!declaration) return res.status(404).json({ error: `no declaration #${req.params.declarationId}` });
+      if (declaration.personId !== req.body.personId) {
+        return res.status(403).json({ error: 'pay: this declaration does not belong to the acting user' });
+      }
+      const paid = await customsLib.payCustomsDuty(store.customs, declaration.id, {
+        transferFn: (args) => transferVCoin({ ...args, toUserId: taxesLib.GOVERNMENT_TREASURY_ACCOUNT }),
+      });
+      taxesLib.recordTaxCollection(store.taxes, { amount: paid.dutyOwed, source: `customs-${paid.id}` });
+      res.status(200).json(paid);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/customs/seizures/:personId', (req, res) => {
+    res.json({ seizures: customsLib.seizuresFor(store.customs, req.params.personId) });
+  });
+
+  // The government's own real enforcement action -- a robot
+  // patrol/customs officer catching a good that never went through
+  // `declare-import` at all. No `transferFn`: a seizure is a real,
+  // recorded loss of the good, not a purchase.
+  app.post('/api/customs/seize', requireActor('seizedBy'), (req, res) => {
+    try {
+      const seizure = customsLib.seizeSmuggledGoods(store.customs, {
+        personId: req.body.personId,
+        itemName: req.body.itemName,
+        quantity: req.body.quantity,
+        seizedBy: req.body.seizedBy,
+      });
+      newsLib.recordEvent(store.news, {
+        kind: 'customs', text: `customs seized ${req.body.itemName} from ${req.body.personId}`,
+      });
+      res.status(201).json(seizure);
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
