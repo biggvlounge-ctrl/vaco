@@ -46,6 +46,7 @@ const PORT = process.env.PORT || 8827;
 const V3_API_URL = process.env.V3_API_URL || 'http://localhost:8811';
 const VOID_API_URL = process.env.VOID_API_URL || 'http://localhost:8793';
 const VACAY_API_URL = process.env.VACAY_API_URL || 'http://localhost:8803';
+const VASH_TAP_API_URL = process.env.VASH_TAP_API_URL || 'http://localhost:8825';
 // The shared ecosystem-wide convention every other real app's
 // server.js already uses (checked directly: voken/server.js,
 // voidmagic/server.js) -- one env var pair, not a per-app-named one.
@@ -176,6 +177,35 @@ async function postGovernmentJobToVoid({ businessId, positionType, hourlyRate })
   return res.json();
 }
 
+// "Everybody who comes in the world will have a band similar to Vash
+// Tap... that could be tapped on the screen for payment and other
+// screens" (9 Oct 2026) -- a real, personal VASH TAP, registered
+// server-to-server (a trusted service credential, same posture as
+// `transferVCoin`/`registerVoidHub` above) the moment a new real
+// player record is actually created (`ensurePlayer`, below). Fire-
+// and-forget, same fail-soft shape `registerMeridianVoidHubsOnce`
+// already uses -- a brand-new player must never be blocked on VASH
+// TAP being reachable, and `ensurePlayer` itself stays synchronous
+// (every existing caller reads `.skills`/`.state` off it immediately).
+async function registerPersonalTap(ownerIdentityId) {
+  const res = await fetch(`${VASH_TAP_API_URL}/api/taps`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Service-Name': VACO_SERVICE_NAME,
+      'X-Service-Token': VACO_SERVICE_TOKEN,
+    },
+    body: JSON.stringify({ tapType: 'personal', ownerIdentityId }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    let message = `registerPersonalTap failed (${res.status})`;
+    try { message = JSON.parse(text).error || message; } catch { /* not JSON */ }
+    throw new Error(message);
+  }
+  return res.json();
+}
+
 async function registerVoidHub({ regionId, bayCount, temperatureControlled, lat, lng }) {
   const res = await fetch(`${VOID_API_URL}/api/station`, {
     method: 'POST',
@@ -246,6 +276,9 @@ let store = createVdpStore();
         beliefs: beliefsLib.createBeliefs(),
         library: libraryLib.createLibrary(),
       };
+      registerPersonalTap(userId).catch((err) => {
+        console.warn(`VDP: could not register a real personal VASH TAP for "${userId}" (VASH TAP may not be running): ${err.message}`);
+      });
     }
     return store.players[userId];
   }

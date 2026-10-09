@@ -25,6 +25,30 @@ export const AFFINITY_MAX = 100;
 export const CONVERSATION_AFFINITY_DELTA = 3;
 export const SHARED_ACTIVITY_AFFINITY_DELTA = 1;
 
+// **Shared culture/religion/origin (9 Oct 2026), per direct
+// instruction**: "culture, religion, and location of where they're
+// coming from also will play a big part... this is how, as their type
+// of people migrate, that is how these relationships will be formed."
+// A real, flagged interpretive multiplier -- no document gives VDP a
+// real number for how much more two people with the same real
+// background click, so this reuses the same restraint every other
+// unspecified figure in this directory already stands on.
+// `shareBackground` reads the plain demographic fields
+// (`demographics.js`'s own shape) directly -- not imported, since any
+// two objects with these three field names already qualify, the same
+// way `pairKey` works on any two ids without needing to know where
+// they came from.
+export const SHARED_BACKGROUND_MULTIPLIER = 1.5;
+
+export function shareBackground(demoA, demoB) {
+  if (!demoA || !demoB) return false;
+  return Boolean(
+    (demoA.culture && demoA.culture === demoB.culture)
+    || (demoA.religion && demoA.religion === demoB.religion)
+    || (demoA.originRegion && demoA.originRegion === demoB.originRegion),
+  );
+}
+
 function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
@@ -62,13 +86,17 @@ function adjust(relationships, aId, bId, delta) {
 // A conversation moves affinity more than passive shared activity
 // does — talking to someone is a deliberate act, standing in the same
 // district is not. `positive` lets a hostile exchange (not built yet,
-// but not precluded) subtract instead of add.
-export function recordConversation(relationships, aId, bId, { positive = true } = {}) {
-  return adjust(relationships, aId, bId, positive ? CONVERSATION_AFFINITY_DELTA : -CONVERSATION_AFFINITY_DELTA);
+// but not precluded) subtract instead of add. `sharedBackground`
+// (optional, default `false` -- every existing caller's behavior is
+// unchanged) scales the real delta by `SHARED_BACKGROUND_MULTIPLIER`.
+export function recordConversation(relationships, aId, bId, { positive = true, sharedBackground = false } = {}) {
+  const base = positive ? CONVERSATION_AFFINITY_DELTA : -CONVERSATION_AFFINITY_DELTA;
+  return adjust(relationships, aId, bId, sharedBackground ? base * SHARED_BACKGROUND_MULTIPLIER : base);
 }
 
-export function recordSharedActivity(relationships, aId, bId) {
-  return adjust(relationships, aId, bId, SHARED_ACTIVITY_AFFINITY_DELTA);
+export function recordSharedActivity(relationships, aId, bId, { sharedBackground = false } = {}) {
+  const base = SHARED_ACTIVITY_AFFINITY_DELTA;
+  return adjust(relationships, aId, bId, sharedBackground ? base * SHARED_BACKGROUND_MULTIPLIER : base);
 }
 
 export function listRelationshipsFor(relationships, personId) {

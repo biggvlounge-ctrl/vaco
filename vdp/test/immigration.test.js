@@ -11,6 +11,7 @@ import {
   applyForTemporaryPassport, isPassportExpired, TEMPORARY_PASSPORT_DURATION_MS,
   generateMigrationWave, deportPerson, isDeported, ILLEGAL_CROSSING_TERRAIN,
   findUndergroundWorldSpot, sponsorFamilyMembers, WEALTH_TIERS, DEFAULT_FAMILY_ADMISSION_FRACTION,
+  spreadWordOfMouth, knownByWordOfMouth,
 } from '../src/lib/immigration.js';
 import { FRONTIER_ZONES, UNDERGROUND_ZONES } from '../src/lib/zones.js';
 
@@ -210,6 +211,28 @@ test('foundIllegalSettlement starts off the grid -- real and active, but not yet
   assert.equal(settlement.discovered, false);
   assert.deepEqual(listActiveIllegalSettlements(store), [settlement]);
   assert.deepEqual(listKnownIllegalSettlements(store), [], 'the government does not know about it yet');
+});
+
+test('spreadWordOfMouth tells a real person about a real settlement without the government ever finding out', () => {
+  const store = createImmigrationStore();
+  const settlement = foundIllegalSettlement(store, { founderId: 'carol', locationLabel: 'the frontier ridge' });
+  spreadWordOfMouth(store, settlement.id, { toPersonId: 'dave' });
+  assert.equal(knownByWordOfMouth(store, settlement.id).length, 1);
+  assert.equal(knownByWordOfMouth(store, settlement.id)[0].toPersonId, 'dave');
+  // Government awareness is untouched -- "off the grid" means exactly that.
+  assert.equal(settlement.discovered, false);
+  assert.deepEqual(listKnownIllegalSettlements(store), []);
+});
+
+test('spreadWordOfMouth refuses to tell the same real person twice, and refuses a cleared settlement', () => {
+  const store = createImmigrationStore();
+  const settlement = foundIllegalSettlement(store, { founderId: 'carol', locationLabel: 'the frontier ridge' });
+  spreadWordOfMouth(store, settlement.id, { toPersonId: 'dave' });
+  assert.throws(() => spreadWordOfMouth(store, settlement.id, { toPersonId: 'dave' }), /already knows/);
+
+  discoverSettlement(store, settlement.id, { discoveredBy: 'patrol-1' });
+  clearIllegalSettlement(store, settlement.id, { clearedBy: 'patrol-1' });
+  assert.throws(() => spreadWordOfMouth(store, settlement.id, { toPersonId: 'erin' }), /already been cleared/);
 });
 
 test('clearIllegalSettlement refuses to clear a settlement the government has not discovered', () => {

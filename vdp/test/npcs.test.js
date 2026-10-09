@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import {
   TRAIT_NAMES, NEED_NAMES, HABIT_NAMES,
   createNpc, createNpcWorld, addNpcToWorld, removeNpcFromWorld, getNpc, listNpcs, latestDecision,
-  explainDecision, pickAction, advanceWorldTick,
+  explainDecision, pickAction, advanceWorldTick, createPlayerState,
   GOVERNMENT_LIAISON_ROLE, seedGovernmentLiaisons, listGovernmentLiaisons,
 } from '../src/lib/npcs.js';
 import { DISTRICTS } from '../src/lib/world.js';
@@ -38,6 +38,26 @@ test('a fresh NPC carries every trait, need and ordinary habit, all in range', (
   }
   assert.equal(npc.habits.pettySwipe, 0, 'the flavor habit starts at zero, never seeded');
   assert.deepEqual([npc.x, npc.y], [HOME.x, HOME.y]);
+});
+
+test('every NPC carries a real demographic draw -- origin, income, and a real Hawkins consciousness state', () => {
+  const npc = createNpc(1, HOME, fixedRng(0.5));
+  assert.ok(npc.demographics.originRegion);
+  assert.ok(npc.demographics.incomeLevel);
+  assert.ok(npc.demographics.consciousnessLevel);
+  assert.equal(typeof npc.demographics.consciousnessValue, 'number');
+});
+
+test('createNpc lets a real caller override the drawn demographics, e.g. a real migrant\'s own known origin/religion', () => {
+  const npc = createNpc(1, HOME, fixedRng(0.5), { originRegion: 'a region the caller already knows', religion: 'a faith the caller already knows' });
+  assert.equal(npc.demographics.originRegion, 'a region the caller already knows');
+  assert.equal(npc.demographics.religion, 'a faith the caller already knows');
+});
+
+test('createPlayerState carries the same real demographic draw as an NPC', () => {
+  const player = createPlayerState(fixedRng(0.5));
+  assert.ok(player.demographics.originRegion);
+  assert.ok(player.demographics.consciousnessLevel);
 });
 
 test('createNpcWorld spawns the requested count, each with a distinct rota slot pattern', () => {

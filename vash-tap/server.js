@@ -32,7 +32,7 @@ const {
   freezeTap, unfreezeTap, transactionsForTap, spenderHistory, revenueByTap, reseedIds,
 } = require('./lib/tap');
 const { seedDemoData } = require('./lib/seedDemoData');
-const { requireActor, requireSession } = require('./lib/shieldAuth.cjs');
+const { requireActor, requireSession, actorOrService } = require('./lib/shieldAuth.cjs');
 const { createServiceAuth } = require('./lib/serviceAuth.cjs');
 const { traceMiddleware } = require('./lib/tracing.cjs');
 
@@ -222,7 +222,23 @@ app.get('/api/health', (_req, res) => {
 // requiring a personal Tap's owner to be the caller themselves
 // (mirroring the ownership check a business Tap already gets), closes
 // that without loosening either check.
+// `req.callingService` (9 Oct 2026) -- "everybody who comes into the
+// world will have a band similar to Vash Tap." VDP's own server
+// registers a real personal Tap for a brand-new arrival who has no
+// live browser session yet to present. Two real layers needed the
+// same escape, not one: the route itself now wraps `requireSession()`
+// in `shieldAuth.cjs`'s own `actorOrService` (a service call skips
+// session resolution entirely, the same posture `/api/library/
+// record`'s own `actorOrService(requireActor('buyerId'))` already
+// uses in VDP) -- and this function needs its own identical check,
+// because without it a service call would reach here with no real
+// `req.sessionUserId` to compare against, and be refused as if it
+// were an unauthenticated browser. A trusted service is already a
+// real, separate trust boundary (`serviceAuth.cjs`'s own
+// X-Service-Name/X-Service-Token check, upstream of both), so it may
+// register either kind of Tap on a real caller's behalf.
 async function requireCrossAppBusinessOwner(req, res, next) {
+  if (req.callingService) return next();
   const subject = resolveTapRegistrationSubject(req.body || {});
   if (subject.kind === 'missing') {
     return res.status(400).json({ error: 'this route must name the businessId (business tap) or ownerIdentityId (personal tap) it acts on' });
@@ -241,7 +257,7 @@ async function requireCrossAppBusinessOwner(req, res, next) {
   return next();
 }
 
-app.post('/api/taps', requireSession(), requireCrossAppBusinessOwner, async (req, res) => {
+app.post('/api/taps', actorOrService(requireSession()), requireCrossAppBusinessOwner, async (req, res) => {
   try {
     const tap = await registerTap(store, { ...req.body, businessFetchFn: fetchHvntzBusiness });
     res.status(201).json(tap);

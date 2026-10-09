@@ -79,3 +79,33 @@ export function householdSize(store, propertyId) {
   const household = householdFor(store, propertyId);
   return household ? household.memberIds.length : 0;
 }
+
+// **Hosting the homeless (9 Oct 2026), per direct instruction**: "some
+// people will let the homeless or less fortunate families come live
+// with them and it builds more income and more unity and more of a
+// tribal organization... if the right combination works -- if it
+// also could go wrong if they meet the wrong homeless or if the
+// homeless group meets the wrong family." Reuses `addMember` as the
+// real, only act of taking someone in -- this adds a real, named
+// outcome roll on top, never a second membership mechanic. Whether
+// `sharedBackground` is true comes from the caller
+// (`relationships.js`'s own `shareBackground`, reading each side's
+// real `demographics.js` record) -- the real combination the
+// instruction names, not this module's own guess. The actual income
+// bump, cohesion gain, or real negative consequence of a bad outcome
+// is the caller's own real effect (an `organizations.js` cohesion
+// change, a real VCoin transfer, `justice.js`'s own citation) --
+// this function reports which outcome happened, it does not apply
+// the effect itself, the same decoupled shape every other
+// cross-module call in this directory already uses.
+export const HOST_GOOD_OUTCOME_CHANCE = 0.8;
+export const HOST_NEUTRAL_OUTCOME_CHANCE = 0.5;
+
+export function hostGuest(store, {
+  propertyId, guestId, sharedBackground = false, rng = Math.random,
+} = {}) {
+  const household = addMember(store, { propertyId, memberId: guestId });
+  const goodChance = sharedBackground ? HOST_GOOD_OUTCOME_CHANCE : HOST_NEUTRAL_OUTCOME_CHANCE;
+  const outcome = rng() < goodChance ? 'good' : 'bad';
+  return { household, guestId, sharedBackground, outcome };
+}

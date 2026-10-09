@@ -6,7 +6,8 @@ import assert from 'node:assert/strict';
 import {
   pairKey, createRelationships, labelFor, getRelationship,
   recordConversation, recordSharedActivity, listRelationshipsFor,
-  AFFINITY_MIN, AFFINITY_MAX,
+  AFFINITY_MIN, AFFINITY_MAX, shareBackground, SHARED_BACKGROUND_MULTIPLIER,
+  CONVERSATION_AFFINITY_DELTA, SHARED_ACTIVITY_AFFINITY_DELTA,
 } from '../src/lib/relationships.js';
 
 test('pairKey is order-independent and refuses a self-pair', () => {
@@ -54,4 +55,32 @@ test('listRelationshipsFor finds a person on either side of the stored key', () 
   recordConversation(relationships, 'carol', 'alice');
   const forAlice = listRelationshipsFor(relationships, 'alice').map((r) => r.otherId).sort();
   assert.deepEqual(forAlice, ['bob', 'carol']);
+});
+
+// -- shared culture/religion/origin (9 Oct 2026) ------------------------
+
+test('shareBackground is true when two real demographic records share a culture, religion, or origin region', () => {
+  assert.equal(shareBackground({ culture: 'x' }, { culture: 'x' }), true);
+  assert.equal(shareBackground({ religion: 'y' }, { religion: 'y' }), true);
+  assert.equal(shareBackground({ originRegion: 'Asia' }, { originRegion: 'Asia' }), true);
+  assert.equal(shareBackground({ culture: 'x' }, { culture: 'z' }), false);
+  assert.equal(shareBackground(null, { culture: 'x' }), false);
+});
+
+test('shareBackground never matches on two real, shared nulls -- "neither has one" is not "the same background"', () => {
+  assert.equal(shareBackground({ culture: null }, { culture: null }), false);
+});
+
+test('recordConversation/recordSharedActivity apply the real shared-background bonus only when asked', () => {
+  const relationships = createRelationships();
+  recordConversation(relationships, 'alice', 'bob', { sharedBackground: true });
+  assert.equal(getRelationship(relationships, 'alice', 'bob').affinity, CONVERSATION_AFFINITY_DELTA * SHARED_BACKGROUND_MULTIPLIER);
+
+  const plain = createRelationships();
+  recordSharedActivity(plain, 'alice', 'bob');
+  assert.equal(getRelationship(plain, 'alice', 'bob').affinity, SHARED_ACTIVITY_AFFINITY_DELTA, 'omitting sharedBackground must behave exactly as before');
+
+  const bonus = createRelationships();
+  recordSharedActivity(bonus, 'alice', 'bob', { sharedBackground: true });
+  assert.equal(getRelationship(bonus, 'alice', 'bob').affinity, SHARED_ACTIVITY_AFFINITY_DELTA * SHARED_BACKGROUND_MULTIPLIER);
 });

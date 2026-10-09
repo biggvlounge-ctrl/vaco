@@ -38,6 +38,7 @@
 // server of its own and this module doesn't give it one.
 
 import { DISTRICTS } from './world.js';
+import { drawDemographics } from './demographics.js';
 
 export const TRAIT_NAMES = ['ambition', 'diligence', 'creativity', 'sociability', 'frugality', 'boldness'];
 export const NEED_NAMES = ['income', 'purpose', 'social', 'rest'];
@@ -142,7 +143,15 @@ function randomInt(rng, max) {
   return Math.floor(rng() * max);
 }
 
-export function createNpc(id, home, rng = Math.random) {
+// `demographics` is optional -- "people coming from all across, all
+// around the world, different nationalities, religions, incomes" (9
+// Oct 2026). Omitted, this draws a real one via `demographics.js`
+// (region-weighted, income tier, Hawkins Scale state); a real
+// migrant's own already-known `originRegion`/`religion`
+// (`immigration.js`'s arrival record) can be passed through instead,
+// the same `seed`-overrides-the-draw convention `skills.js`'s
+// `createSkills(seed)` already uses for the same reason.
+export function createNpc(id, home, rng = Math.random, demographics = {}) {
   const traits = {};
   for (const t of TRAIT_NAMES) {
     traits[t] = randomInt(rng, 101);
@@ -176,6 +185,7 @@ export function createNpc(id, home, rng = Math.random) {
     traits,
     needs,
     habits,
+    demographics: { ...drawDemographics({ rng }), ...demographics },
     currentAction: 'rest',
     currentGoal: null,
     decisionLog: [],
@@ -188,7 +198,7 @@ export function createNpc(id, home, rng = Math.random) {
 // has no use for — `vdp/server.js` owns the player's actual position
 // and tick scheduling. `stepNeeds`/`updateGoal`/`reinforceHabit`/
 // `fadeHabits` above all operate on this shape unchanged.
-export function createPlayerState(rng = Math.random) {
+export function createPlayerState(rng = Math.random, demographics = {}) {
   const traits = {};
   for (const t of TRAIT_NAMES) {
     traits[t] = randomInt(rng, 101);
@@ -205,6 +215,7 @@ export function createPlayerState(rng = Math.random) {
     traits,
     needs,
     habits,
+    demographics: { ...drawDemographics({ rng }), ...demographics },
     currentGoal: null,
     lastActionTick: {},
   };
@@ -231,11 +242,11 @@ export function createNpcWorld(options = {}) {
 // uses. The new id is real and never reused: one past the highest id
 // already in the world, not a count that could collide after NPCs are
 // later removed.
-export function addNpcToWorld(world, { home, rng = Math.random } = {}) {
+export function addNpcToWorld(world, { home, rng = Math.random, demographics = {} } = {}) {
   const nextId = world.npcs.length ? Math.max(...world.npcs.map((n) => n.id)) + 1 : 1;
   const anchors = HOME_DISTRICT_IDS.map(districtCenter);
   const anchor = home || anchors[(nextId - 1) % anchors.length];
-  const npc = createNpc(nextId, anchor, rng);
+  const npc = createNpc(nextId, anchor, rng, demographics);
   world.npcs.push(npc);
   return npc;
 }

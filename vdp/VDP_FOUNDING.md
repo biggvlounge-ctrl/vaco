@@ -789,6 +789,107 @@ Per direct instruction:
   mall/village/commons cluster in `world.js`'s own grid), rather than
   restated here.
 
+## Real diversity, homelessness, culture-driven relationships, and the elite (9 Oct 2026, a fourth instruction the same day)
+
+Per direct instruction:
+
+- **"People coming from all across, all around the world, different
+  nationalities, religions, incomes... poor state of minds as well,
+  which we'll use through the Hawking scale... mixed in with
+  everything else, morality."** New `demographics.js`. Flagged
+  interpretive: "the Hawking scale" is read here as the real, named
+  **Hawkins Scale of Consciousness** (David R. Hawkins, *Power vs.
+  Force*, 1995) rather than any scale belonging to physicist Stephen
+  Hawking -- the context (poor states of mind mixed with morality)
+  matches Hawkins' own framework, not a coincidence of a similar name,
+  but this reading should be corrected if wrong. `HAWKINS_SCALE` carries
+  his own 17 named levels (Shame 20 through Enlightenment 700) and his
+  own named `COURAGE_THRESHOLD` of 200 separating destructive from
+  constructive states. `WORLD_REGIONS` draws a real origin continent
+  off real, approximate UN population-share figures (Asia 0.59, Africa
+  0.18, ...) rather than an even split. `drawDemographics` composes
+  origin region, religion, culture, a real income tier, and a drawn
+  consciousness level onto one real record; `createNpc` and
+  `createPlayerState` (`npcs.js`) now both carry it on `demographics`,
+  additive and backward compatible with every existing NPC/player test.
+- **"A lot of people will have to start off in one-bedroom apartments,
+  two-bedroom apartments, till they can move up."** Already real --
+  `property.js`'s own residential ladder starts below Penthouse and
+  `upgradeHome` is the existing climb; nothing new needed here beyond
+  confirming it.
+- **"A lot of, there will be some homelessness as well too, that the
+  government can't control."** New `homelessness.js`: `isHoused` is a
+  real derived read (owns a home via `property.js`, or belongs to a
+  household via `households.js`) -- homelessness is never its own
+  stored flag, so it can never drift out of sync with the real
+  property/household records it is read from. `isHomelessDueToIncome`
+  further checks the new `INCOME_LEVELS`' own `maxAffordablePropertyLevel`
+  -- a real, derived reason, not a separate invented cause field.
+- **"Move into outskirts and find migration to some of these spots
+  through word of mouth... that are off the grid. This will become a
+  big part of the game."** `immigration.js`'s illegal settlements gain
+  `knownByWordOfMouth` (a real, appended list of who has heard, and
+  when) via `spreadWordOfMouth` -- deliberately separate from and never
+  setting the existing `discovered` field, because word of mouth is
+  real, person-to-person knowledge, not official discovery by the
+  government.
+- **"Culture, religion, and location of where they're coming from...
+  will play a big part... this is how these relationships will be
+  formed."** `relationships.js` gains `shareBackground` (true when two
+  real demographics records match on culture, religion, or origin
+  region) and a real `SHARED_BACKGROUND_MULTIPLIER` of 1.5, applied as
+  an optional multiplier on `recordConversation`/`recordSharedActivity`
+  -- additive, defaulting to no multiplier so every existing
+  relationship test is untouched.
+- **"Everything is dependent on population, of who survived in the
+  vacancy game and who comes over... go to the whole globe and get a
+  good percentage."** This is the same real survivor-population figure
+  already recorded as open in this document ("the real survivor-
+  population figure -- how many people actually made it through
+  VACANCY's reset") -- `generateMigrationWave` is already built to
+  scale off it the instant it is given; still not invented here.
+- **"Some people will let the homeless or less fortunate families come
+  live with them... it builds more income and more unity... it also
+  could go wrong."** `households.js`'s new `hostGuest` reuses the
+  existing `addMember` and rolls a real outcome -- `HOST_GOOD_OUTCOME_CHANCE`
+  (0.8) when `shareBackground` is true, `HOST_NEUTRAL_OUTCOME_CHANCE`
+  (0.5) otherwise -- "the right combination" made real as a background
+  match improving the odds, not a guarantee.
+- **"A neighborhood... for the elite and the people who run the
+  government... skyscraper and penthouses... set for the elite...
+  autonomous cars... small security forces... different attitudes in
+  the elite."** New `elite.js`, additive rather than restrictive so the
+  existing Penthouse-purchase ladder keeps working for any ordinary
+  player: `isElite` is true for the real `GOVERNMENT_LIAISON_ROLE` or
+  for already owning the top real residential tier; `purchaseEliteEnclaveUnit`
+  sells a separate, new `elite-enclave` property type priced at a real
+  1.5x the top Penthouse price (flagged interpretive -- no source gives
+  an exact multiplier), with the same claim-before-pay/rollback
+  discipline every other purchase in this app uses. `assignPersonalSecurity`
+  is a thin wrapper over `robots.js`'s own `deployRobot` -- "different
+  attitudes" made real as a real, different robot type per protected
+  person, not an invented personality field.
+- **"Everybody who comes in the world will have a band similar to Vash
+  Tap."** VASH TAP's own `POST /api/taps` is widened to accept a
+  trusted-service caller with no end-user session to present
+  (`actorOrService(requireSession())`, plus the same `req.callingService`
+  check inside `requireCrossAppBusinessOwner`) -- VDP's `server.cjs`
+  now calls it (`registerPersonalTap`) as a real, fire-and-forget
+  personal Tap registration the moment a brand-new player record is
+  created in `ensurePlayer`, since a first-time arrival has no live
+  browser session of their own yet for VASH TAP to check.
+
+What this instruction also raised but does not yet have real code
+behind, carried into this document's own "what is still open" section
+rather than guessed at here: real-time media and native mobile push
+(explicitly requested, not yet started), DREAMS' per-business
+screen-purchase scaling and its emergency broadcast override, VENVS's
+VACON-C-derived business/corporation migration path ("hunts" and "the
+Venus" -- read as VENVS's own real marketplace, not VAGO's Venus Resort,
+on "sellers and buyers" language), and pulling VACON-C's own full trait
+taxonomy ("entrepreneurship, sneakiness") into this app's six-trait
+`npcs.js` set.
+
 ## What is still open
 
 - The area's own name — nothing has been given yet (the product name,

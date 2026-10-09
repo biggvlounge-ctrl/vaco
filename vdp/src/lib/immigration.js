@@ -463,6 +463,10 @@ export function foundIllegalSettlement(store, {
     discovered: false,
     discoveredBy: null,
     discoveredAt: null,
+    // "Off the grid... will become a big part of the game" (9 Oct
+    // 2026) -- see `spreadWordOfMouth` below for what this real list
+    // is and, just as importantly, is not.
+    knownByWordOfMouth: [],
     clearedAt: null,
     foundedAt: now,
   };
@@ -478,6 +482,39 @@ export function discoverSettlement(store, settlementId, { discoveredBy, now = Da
   settlement.discoveredBy = discoveredBy || null;
   settlement.discoveredAt = now;
   return settlement;
+}
+
+// **Off the grid, by word of mouth (9 Oct 2026), per direct
+// instruction**: "move into outskirts and find migration to some of
+// these spots through word of mouth that... are off the grid. This
+// will become a big part of the game." A real, separate channel from
+// `discoverSettlement` above -- the government learning a settlement
+// exists is one real event (`discovered`); a real person learning
+// about it from someone who already lives there is a different real
+// event, and must NOT set `discovered`, or "off the grid" would mean
+// nothing: the whole point is that the government does not yet know.
+// `security.js`'s own crime count already only reads
+// `listKnownIllegalSettlements` (discovered AND active) for exactly
+// this reason -- a word-of-mouth settlement stays genuinely invisible
+// to that count until a robot patrol separately finds it.
+export function spreadWordOfMouth(store, settlementId, { toPersonId, now = Date.now() } = {}) {
+  const settlement = store.illegalSettlements.find((s) => s.id === settlementId);
+  if (!settlement) throw new Error(`spreadWordOfMouth: no illegal settlement #${settlementId}`);
+  if (!toPersonId) throw new Error('spreadWordOfMouth requires a toPersonId');
+  if (settlement.clearedAt) throw new Error(`spreadWordOfMouth: settlement #${settlementId} has already been cleared`);
+  if (settlement.knownByWordOfMouth.some((k) => k.toPersonId === toPersonId)) {
+    throw new Error(`spreadWordOfMouth: "${toPersonId}" already knows about settlement #${settlementId}`);
+  }
+  settlement.knownByWordOfMouth.push({ toPersonId, heardAt: now });
+  return settlement;
+}
+
+// Real and informal -- who actually knows about this settlement
+// through word of mouth, government awareness aside.
+export function knownByWordOfMouth(store, settlementId) {
+  const settlement = store.illegalSettlements.find((s) => s.id === settlementId);
+  if (!settlement) throw new Error(`knownByWordOfMouth: no illegal settlement #${settlementId}`);
+  return settlement.knownByWordOfMouth;
 }
 
 export function clearIllegalSettlement(store, settlementId, { clearedBy, now = Date.now() } = {}) {
