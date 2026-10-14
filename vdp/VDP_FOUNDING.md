@@ -1537,6 +1537,120 @@ mechanic, which stay exactly as untaxed/ungoverned as before.
   and their real `GET` readouts -- all actor-gated the same way every
   other paid/enforcement route in this app already is.
 
+## The master lore handoff, and the world-rule foundation (14 Oct 2026)
+
+A large, two-part additive lore document arrived by direct instruction,
+explicit about its own authority: "THE CURRENT REPOSITORY AND EXISTING
+IMPLEMENTED SYSTEMS ARE THE IMPLEMENTATION AUTHORITY. THIS DOCUMENT IS
+THE CURRENT LORE AUTHORITY FOR THE WORLD EXPANSIONS DESCRIBED HERE...
+AUDIT FIRST... DO NOT DUPLICATE EXISTING SYSTEMS... ONLY ADD MISSING
+CAPABILITIES."
+
+It describes a VDP far larger than anything built so far -- four
+mainland countries, ten island countries, four central casino islands,
+four pirate islands, a hidden civilization inside each country and
+island, 40 starter cities, 180 founding families -- and the
+instruction's own closing words say not to build all of it at once:
+"I would keep the 40-city profiles and 10-island profiles as a
+subsequent detailed atlas, rather than bloating this handoff further.
+The master establishes the rules; those profiles can then populate
+the rules without changing the foundation." **This session built the
+rules, not the atlas** -- the real, generic shapes every later
+country/island/hidden-civilization record will be made FROM, with
+zero specific countries, islands, or founding families named anywhere
+in the code.
+
+**A real, honest correction, recorded because it almost caused real
+damage**: partway through this instruction, a stale local git
+checkout (not a real divergence -- confirmed directly afterward with
+`git merge-base`/`git fetch`) briefly looked like this branch's entire
+prior history (immigration, taxation, customs, occupations,
+organizations, The Towers, and everything else this document already
+records above) had been lost or overwritten. It had not been --
+`origin/claude/v4-proxy-server-s6dcp8` had the real, full history the
+whole time, through this very commit's own parent. The civilizations
+work below was built once, on the stale snapshot, then correctly
+rebuilt on the real one before anything was pushed -- recorded here
+so a future reader who notices the backup branch this produced
+(`backup-civilizations-foundation`) knows what it is and that it is
+safe to delete.
+
+**New `civilizations.js`** -- eight real, named rules out of the
+handoff, each with one real, checkable mechanism:
+
+1. **Technology divergence.** "There is no single technology
+   level... all can exist simultaneously" is enforced by the data's
+   own shape: `technologyEras` is a SET on a civilization, never a
+   single scalar field -- there is no `technologyLevel` to misuse.
+2. **Civilization identity profile.** `createCivilization` carries
+   every one of the handoff's 17 real fields (transportation culture,
+   government, economy, major industries, trade specialties,
+   religious/cultural identity, security philosophy, robot usage,
+   old-world relationship, famous businesses/families, resources,
+   languages/dialects, historical reputation, plus real relational id
+   lists for gateways, red zones, and vehicles rather than embedded
+   flavor text).
+3. **Gateway hierarchy.** `GATEWAY_TIERS`, the handoff's own six real
+   tiers verbatim (pedestrian/light-goods through strategic/military),
+   and `GATEWAY_LEGAL_STATUSES`, its own eleven real control states.
+4. **Trade-route history.** `createTradeRoute`/`recordRouteEvent` keep
+   a real timeline (`history`), not a single current-status field --
+   "who created it, what it transported, which families controlled
+   it, whether it is legal, secret, abandoned, rediscovered, or
+   contested" is a checkable sequence of real events.
+5. **Economic statistics.** `STATISTIC_NAMES` is the handoff's own two
+   real, verbatim lists -- §55's 33 civilization statistics and §56's
+   11 technology statistics -- seeded at an honest zero
+   ("not yet measured," the same discipline `taxes.js`'s own treasury
+   already uses) and moved by `adjustStatistic`/`setStatistic`, never
+   static lore.
+6. **Red-zone evolution.** `evolveRedZone` records a real transition
+   (`toActivities` replaces the zone's current activities, the prior
+   ones kept in `history`) -- "a gambling district can become
+   legitimate" is now a fact a caller can check, not a sentence. A
+   real, separate concept from this document's own existing red-zone
+   work in `immigration.js`'s illegal settlements -- that module's
+   `activities` field stays free text about ONE settlement; this
+   module's `RED_ZONE_ACTIVITIES` is the handoff's own closed, named
+   list, and a red zone here is not required to belong to an illegal
+   settlement at all.
+7. **Historical technology preservation.** `registerVehicle`/
+   `transferVehicle` keep a real status/ownership timeline per vehicle
+   (`VEHICLE_STATUSES`: active, collectible, inherited, traded,
+   restored, stolen, modified, museum-piece).
+8. **No civilization is automatically good or bad.** Enforced by
+   OMISSION, not a rule a future caller has to remember: there is no
+   `morality`/`alignment`/`reputation score` field anywhere in this
+   module. `historicalReputation` is free text -- what the world SAYS
+   about a place -- never a number anything could sort civilizations
+   by "goodness." A test (`civilizations.test.js`) asserts no such
+   field exists on a real civilization record, so this rule breaks
+   loudly if ever violated rather than drifting silently.
+
+**Wired into `server.cjs`** as `/api/civilizations` and its
+sub-routes (gateways, trade-routes, red-zones, vehicles). The
+world-authoring routes (founding a civilization, registering a
+gateway, opening a trade route, evolving a red zone) use
+`requireCallingService()` -- the same guard `/api/immigration/
+migration-wave`, `/api/robots/deploy`, `/api/contracts/post` and
+`/api/animals/discover` already use for an operational action with no
+single accountable player. `registerVehicle` stays `requireActor
+('ownerId')` -- a real player registering their own real vehicle --
+while `transferVehicle` stays service-credentialed, since a transfer
+can be an inheritance, a theft, or a restoration recorded by whoever
+is narrating the world's history, not only the current owner choosing
+to hand it off.
+
+**Deliberately NOT built this pass** (the "subsequent detailed
+atlas"): any specific country, island, casino island, pirate island,
+hidden civilization, founding family, starter city, gateway, trade
+route, red zone, or vehicle. The handoff's second part (uninhabited
+territory, small independent island civilizations, four pirate
+islands) is recorded here as received and not yet built into code at
+all -- the same `CIVILIZATION_KINDS` entries (`pirate-island`,
+`independent-community`) already cover its real vocabulary, but no
+instance of either exists yet.
+
 ## What is still open
 
 - The area's own name — nothing has been given yet (the product name,

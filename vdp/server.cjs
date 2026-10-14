@@ -292,6 +292,7 @@ let store = createVdpStore();
   const schoolLib = await import('./src/lib/school.js');
   const daycareLib = await import('./src/lib/daycare.js');
   const customsLib = await import('./src/lib/customs.js');
+  const civilizationsLib = await import('./src/lib/civilizations.js');
 
   // A migrant's real old-world background carries over if one was
   // recorded (`immigration.js`'s `admitWithPassport`/`crossIllegally`,
@@ -476,6 +477,7 @@ let store = createVdpStore();
       if (!store.barter) store.barter = barterLib.createBarterStore();
       if (!store.diseases) store.diseases = diseasesLib.createDiseaseStore();
       if (!store.customs) store.customs = customsLib.createCustomsStore();
+      if (!store.civilizations) store.civilizations = civilizationsLib.createCivilizationsStore();
       registerMeridianVoidHubsOnce();
       postGovernmentJobsToVoidOnce();
     },
@@ -2377,6 +2379,137 @@ let store = createVdpStore();
         }).catch((err) => console.warn(`VDP: call-end failed for session ${msg.sessionId}:`, err.message));
       }
     },
+  });
+
+  // --- Civilizations: the world-rule foundation (14 Oct 2026 master
+  // lore handoff) -- see `civilizations.js`'s own header for what this
+  // is and, just as importantly, is not: no specific country, island
+  // or founding family is named anywhere below, only the real, generic
+  // shapes they will be made FROM once "a subsequent detailed atlas"
+  // actually populates them. The world-authoring routes below use
+  // `requireCallingService()` -- the same guard `/api/immigration/
+  // migration-wave`, `/api/robots/deploy`, `/api/contracts/post` and
+  // `/api/animals/discover` already use for "an operational action
+  // with no single accountable player," not a new pattern invented
+  // for this module.
+  app.get('/api/civilizations', (_req, res) => {
+    res.json({ civilizations: civilizationsLib.listCivilizations(store.civilizations) });
+  });
+
+  app.get('/api/civilizations/:id', (req, res) => {
+    const civilization = civilizationsLib.getCivilization(store.civilizations, Number(req.params.id));
+    if (!civilization) return res.status(404).json({ error: `no civilization ${req.params.id}` });
+    res.json(civilization);
+  });
+
+  app.post('/api/civilizations', requireCallingService(), (req, res) => {
+    try {
+      const civilization = civilizationsLib.createCivilization(store.civilizations, req.body || {});
+      newsLib.recordEvent(store.news, {
+        kind: 'civilization',
+        text: `${civilization.name} is now recorded as a real ${civilization.kind}`,
+      });
+      res.status(201).json(civilization);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.patch('/api/civilizations/:id/statistics', requireCallingService(), (req, res) => {
+    const civilization = civilizationsLib.getCivilization(store.civilizations, Number(req.params.id));
+    if (!civilization) return res.status(404).json({ error: `no civilization ${req.params.id}` });
+    try {
+      const { name, delta, value } = req.body || {};
+      const result = value !== undefined
+        ? civilizationsLib.setStatistic(civilization, name, value)
+        : civilizationsLib.adjustStatistic(civilization, name, delta);
+      res.status(200).json({ name, value: result, statistics: civilization.statistics });
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/civilizations/gateways', (_req, res) => {
+    res.json({ gateways: civilizationsLib.listGateways(store.civilizations) });
+  });
+
+  app.post('/api/civilizations/gateways', requireCallingService(), (req, res) => {
+    try {
+      const gateway = civilizationsLib.registerGateway(store.civilizations, req.body || {});
+      res.status(201).json(gateway);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/civilizations/trade-routes', requireCallingService(), (req, res) => {
+    try {
+      const route = civilizationsLib.createTradeRoute(store.civilizations, req.body || {});
+      newsLib.recordEvent(store.news, { kind: 'civilization', text: `a real trade route, "${route.name}", was established` });
+      res.status(201).json(route);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/civilizations/trade-routes/:id/events', requireCallingService(), (req, res) => {
+    try {
+      const route = civilizationsLib.recordRouteEvent(store.civilizations, Number(req.params.id), req.body || {});
+      res.status(200).json(route);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/civilizations/red-zones', requireCallingService(), (req, res) => {
+    try {
+      const zone = civilizationsLib.createRedZone(store.civilizations, req.body || {});
+      res.status(201).json(zone);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // A red zone's own real evolution -- "a gambling district can
+  // become legitimate" -- is news-worthy precisely because it is rare
+  // and changes the world, unlike the routine routes above it.
+  app.post('/api/civilizations/red-zones/:id/evolve', requireCallingService(), (req, res) => {
+    try {
+      const zone = civilizationsLib.evolveRedZone(store.civilizations, Number(req.params.id), req.body || {});
+      newsLib.recordEvent(store.news, { kind: 'civilization', text: `${zone.locationLabel} changed character` });
+      res.status(200).json(zone);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/civilizations/vehicles/:ownerId', (req, res) => {
+    res.json({ vehicles: civilizationsLib.listVehiclesFor(store.civilizations, req.params.ownerId) });
+  });
+
+  // `registerVehicle` IS a real, player-owned fact (a specific
+  // person's specific vehicle) -- `requireActor('ownerId')` matches
+  // `property.js`'s own ownership-changing routes. `transferVehicle`
+  // stays service-credentialed: a transfer here can be an
+  // inheritance, a theft, or a restoration recorded by whoever is
+  // narrating the world's history, not only the current owner
+  // choosing to hand it off.
+  app.post('/api/civilizations/vehicles', requireActor('ownerId'), (req, res) => {
+    try {
+      const vehicle = civilizationsLib.registerVehicle(store.civilizations, req.body || {});
+      res.status(201).json(vehicle);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/civilizations/vehicles/:id/transfer', requireCallingService(), (req, res) => {
+    try {
+      const vehicle = civilizationsLib.transferVehicle(store.civilizations, Number(req.params.id), req.body || {});
+      res.status(200).json(vehicle);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
   });
 
   // Only the rare flavor actions (see npcs.js's own `pickAction`
