@@ -6,17 +6,21 @@ import assert from 'node:assert/strict';
 import { createCivilizationsStore, listGateways, listTradeRoutes, listTerritories } from '../src/lib/civilizations.js';
 import {
   seedWorldAtlas, isWorldAtlasSeeded, MAINLAND_COUNTRIES, MAINLAND_HIDDEN_CIVILIZATIONS,
-  CASINO_ISLANDS, PIRATE_ISLANDS, ICE_WALL_GATES,
+  CASINO_ISLANDS, PIRATE_ISLANDS, ICE_WALL_GATES, ISLAND_COUNTRIES, ISLAND_HIDDEN_CIVILIZATIONS,
 } from '../src/lib/worldAtlas.js';
 
-test('seedWorldAtlas creates every real mainland country, hidden civilization, casino island, and pirate island', () => {
+test('seedWorldAtlas creates every real mainland country, hidden civilization, casino island, pirate island, and island country', () => {
   const store = createCivilizationsStore();
   const result = seedWorldAtlas(store);
   assert.equal(result.seeded, true);
   assert.equal(store.civilizations.filter((c) => c.kind === 'mainland-country').length, MAINLAND_COUNTRIES.length);
-  assert.equal(store.civilizations.filter((c) => c.kind === 'hidden-civilization').length, MAINLAND_HIDDEN_CIVILIZATIONS.length);
+  assert.equal(
+    store.civilizations.filter((c) => c.kind === 'hidden-civilization').length,
+    MAINLAND_HIDDEN_CIVILIZATIONS.length + ISLAND_HIDDEN_CIVILIZATIONS.length,
+  );
   assert.equal(store.civilizations.filter((c) => c.kind === 'casino-island').length, CASINO_ISLANDS.length);
   assert.equal(store.civilizations.filter((c) => c.kind === 'pirate-island').length, PIRATE_ISLANDS.length);
+  assert.equal(store.civilizations.filter((c) => c.kind === 'island-country').length, ISLAND_COUNTRIES.length);
 });
 
 test('seedWorldAtlas is real and idempotent -- a second call seeds nothing twice', () => {
@@ -55,10 +59,11 @@ test('no casino island ever gets a real Ice Wall gateway -- reached only by mari
   }
 });
 
-test('every hidden civilization gets its own secret or restricted gateway, a red zone, an independent territory, and a trade route to its host', () => {
+test('every mainland hidden civilization gets its own secret or restricted gateway, a red zone, an independent territory, and a trade route to its host', () => {
   const store = createCivilizationsStore();
   seedWorldAtlas(store);
-  const hidden = store.civilizations.filter((c) => c.kind === 'hidden-civilization');
+  const mainlandHiddenNames = new Set(MAINLAND_HIDDEN_CIVILIZATIONS.map((d) => d.name));
+  const hidden = store.civilizations.filter((c) => c.kind === 'hidden-civilization' && mainlandHiddenNames.has(c.name));
   assert.equal(hidden.length, 4);
   for (const civ of hidden) {
     assert.ok(civ.gatewayIds.length >= 1, `${civ.name} must carry a real gateway`);
@@ -111,4 +116,35 @@ test('a real, named trade route connects the container hidden civilization to th
   const route = routes.find((r) => r.name.includes('Rustholt') && r.name.includes('Blackcrate Island'));
   assert.ok(route, 'the real cross-link between the container hidden civilization and the container-piracy pirate island must exist');
   assert.equal(route.status, 'secret');
+});
+
+test('every island country has a real, distinct population and no Ice Wall gateway', () => {
+  const store = createCivilizationsStore();
+  seedWorldAtlas(store);
+  const islands = store.civilizations.filter((c) => c.kind === 'island-country');
+  assert.equal(islands.length, ISLAND_COUNTRIES.length);
+  const populations = islands.map((c) => c.statistics.population);
+  assert.equal(new Set(populations).size, populations.length, 'no two island countries should share the same flagged population figure');
+  const gateways = listGateways(store);
+  for (const civ of islands) {
+    assert.equal(gateways.some((g) => g.civilizationId === civ.id), false, 'an island country must never carry a real Ice Wall gateway');
+  }
+});
+
+test('every island hidden civilization gets a real independent territory, but no gateway, red zone, or trade route', () => {
+  const store = createCivilizationsStore();
+  seedWorldAtlas(store);
+  const islandHiddenNames = new Set(ISLAND_HIDDEN_CIVILIZATIONS.map((d) => d.name));
+  const hidden = store.civilizations.filter((c) => c.kind === 'hidden-civilization' && islandHiddenNames.has(c.name));
+  assert.equal(hidden.length, ISLAND_HIDDEN_CIVILIZATIONS.length);
+  const gateways = listGateways(store);
+  const routes = listTradeRoutes(store);
+  for (const civ of hidden) {
+    assert.ok(civ.territoryIds.length >= 1, `${civ.name} must carry a real territory`);
+    const territory = listTerritories(store).find((t) => civ.territoryIds.includes(t.id));
+    assert.equal(territory.controlStatus, 'independent');
+    assert.equal(civ.redZoneIds.length, 0, `${civ.name} must not carry an invented red zone`);
+    assert.equal(gateways.some((g) => g.civilizationId === civ.id), false, `${civ.name} must not carry an invented gateway`);
+    assert.equal(routes.some((r) => r.name.includes(civ.name)), false, `${civ.name} must not carry an invented trade route`);
+  }
 });

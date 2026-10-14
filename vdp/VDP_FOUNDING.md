@@ -2176,10 +2176,70 @@ label. The ten generic island countries and their own smaller hidden
 civilizations remain the one real group still unseeded -- see "The
 first real world atlas content," above, for why.
 
+## The ten generic island countries, now seeded (14 Oct 2026, a ninth instruction the same day)
+
+Per direct instruction, continuing to "do all" of the open follow-up
+work: the ten generic primary island countries (§7) and their own
+smaller hidden civilizations (§12, addendum §4) -- the one real group
+left out of "The first real world atlas content," above -- are now
+seeded in `worldAtlas.js` (`ISLAND_COUNTRIES`/`ISLAND_HIDDEN_CIVILIZATIONS`),
+reusing the already-built `island-country` kind `civilizations.js`
+already carried.
+
+**Kept deliberately minimal, matching the real level of detail the
+source documents actually give this group** -- a population range and
+"not identical," nothing else per-island, unlike the individually-
+described mainland/casino/pirate quartet. No industries, specialties,
+or rivalries are invented for any of the ten. Left unnamed (functional
+labels, `Island Country One`..`Ten`) for the same reason: every other
+named thing in this file had a real theme or specialty in the source
+text to name FROM; these ten have none, so a real name for each would
+be inventing character, not labeling real content.
+
+**A real, honest limitation, recorded rather than hidden**: the
+master lore handoff's own text is not saved to any file in this
+repository and is not present in this session's current working
+context (confirmed directly -- no file anywhere in this repo contains
+it). The real population range the source document gives for this
+group is therefore NOT reproduced here, because it cannot be checked
+against the actual text right now. Every population figure in
+`ISLAND_COUNTRIES`/`ISLAND_HIDDEN_CIVILIZATIONS` is a flagged
+interpretive placeholder -- like every other undecided number in this
+project -- NOT asserted as the real sourced figure the way the
+mainland/casino/pirate populations are. **To do, whenever the master
+lore handoff's text is available again**: check these population
+figures against the real range it gives, and correct them if they
+disagree.
+
+No Ice Wall gateway for the island countries, and no gateway, red
+zone, or trade route for their hidden civilizations -- the Ice Wall is
+established elsewhere (§3) as the mainland's own crossing, and casino
+islands are explicitly maritime-only (§8); treating this group the
+same way is a reasonable, flagged inference from that pattern, not
+itself confirmed by source text for this specific group. Each hidden
+civilization still gets a real, independently-controlled territory
+claim -- the one structural fact definitional to the
+`hidden-civilization` kind itself, not invented content.
+
+**All thirty-six civilizations now live** (4 mainland countries + 4
+mainland hidden civilizations + 4 casino islands + 4 pirate islands +
+10 island countries + 10 island hidden civilizations), immediately
+visible in every generic route built earlier the same day -- `GET
+/api/civilizations/leaders/population` ranks all thirty-six correctly
+the instant they exist, confirmed directly against a real boot, with
+zero server.cjs changes needed.
+
 ## What is still open
 
 - The area's own name — nothing has been given yet (the product name,
   "VDP / Digital Planet," is not it — see the correction above).
+- **The ten generic island countries' real population range and any
+  other per-island detail the master lore handoff actually gives**
+  (see "The ten generic island countries, now seeded," above) — not
+  checkable right now because that document's text is not saved
+  anywhere in this repository. The populations seeded today are
+  flagged placeholders, not the sourced figures, pending a real check
+  against the original text.
 - Exactly how the tech team found a way past the ice wall, and what
   (if anything) was already there when they arrived — not specified;
   not invented here either.

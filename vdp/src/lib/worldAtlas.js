@@ -21,18 +21,46 @@
 //   - The four pirate islands (the addendum's own §9-30) -- same,
 //     each with its own named specialty and real rivalry rules.
 //
-// **Deliberately NOT seeded here** -- the ten generic primary island
-// countries and their own smaller hidden civilizations (§7, §12, and
-// the addendum's §4). The source documents give this quartet of
-// groups (mainland countries, mainland hidden civs, casino islands,
-// pirate islands) real, individual, distinguishing detail; the ten
-// islands get a population range and "not identical" and nothing
-// else per-island. Seeding ten real named islands today would mean
-// inventing nine-tenths of what distinguishes them, which is exactly
-// what this project refuses to do. They stay real and unbuilt until
-// there is real detail to build them from, the same "recorded, not
-// invented" treatment this document gives every other open lore
-// question.
+// **The ten generic primary island countries and their own smaller
+// hidden civilizations (§7, §12, and the addendum's §4), seeded now
+// (14 Oct 2026) at the real, minimal level of detail the source
+// documents actually give this group** -- a population range and
+// "not identical," nothing else per-island, unlike the mainland/
+// casino/pirate quartet above (each individually described). No
+// specific industries, specialties, or rivalries are invented for any
+// of the ten -- that would be exactly the "inventing nine-tenths of
+// what distinguishes them" this project refused to do when this
+// group was first left unseeded. Left unnamed, deliberately, for the
+// same reason: every other named thing in this file had a real theme
+// or specialty in the source text to name FROM (the water/mountain/
+// underground/vertical-cliff casino islands, the required-specialty
+// mainland hidden civilizations); these ten have no such anchor, so
+// inventing a name for each would be inventing character, not
+// labeling real content.
+//
+// **A real, honest limitation, flagged rather than hidden**: the
+// master lore handoff's own text is not saved to any file in this
+// repository -- it arrived as a direct instruction earlier in this
+// same long-running conversation, and is not present in this
+// session's current working context (checked directly: no file in
+// this repo contains it). The real population range the source
+// document gives for this group is therefore NOT reproduced here,
+// because it cannot be checked against the actual text right now.
+// Every population figure below is a flagged interpretive placeholder
+// -- like every other undecided number in this project -- NOT
+// asserted as the sourced figure the way the mainland/casino/pirate
+// populations above are. Reconcile against the real source if/when it
+// resurfaces.
+//
+// No Ice Wall gateway for any of the ten, and no red zone or trade
+// route for their hidden civilizations -- the Ice Wall is established
+// elsewhere (§3) as the mainland's own real crossing, and casino
+// islands are explicitly maritime-only (§8); treating these ten the
+// same way is a reasonable, flagged inference from that pattern, not
+// itself asserted by the source text for this specific group. Each
+// hidden civilization still gets a real, independently-controlled
+// territory claim -- the one structural fact definitional to the
+// `hidden-civilization` kind itself, not invented content.
 //
 // **All names below are real, flagged placeholders** -- "permanent
 // names can be established later" is the master document's own
@@ -209,6 +237,37 @@ export const PIRATE_ISLANDS = [
   },
 ];
 
+// §7, the ten generic primary island countries -- see the long note
+// above for why each is a functional label with only a flagged,
+// unverified population figure, not a real name or specific detail.
+export const ISLAND_COUNTRIES = [
+  { name: 'Island Country One', population: 8000 },
+  { name: 'Island Country Two', population: 8600 },
+  { name: 'Island Country Three', population: 9100 },
+  { name: 'Island Country Four', population: 9400 },
+  { name: 'Island Country Five', population: 9900 },
+  { name: 'Island Country Six', population: 10300 },
+  { name: 'Island Country Seven', population: 10800 },
+  { name: 'Island Country Eight', population: 11200 },
+  { name: 'Island Country Nine', population: 11700 },
+  { name: 'Island Country Ten', population: 12100 },
+];
+
+// §12 and the addendum's §4 -- one smaller hidden civilization per
+// island country above, same minimal, flagged-unverified treatment.
+export const ISLAND_HIDDEN_CIVILIZATIONS = [
+  { name: 'Island Hidden Civilization One', hostIndex: 0, population: 1200 },
+  { name: 'Island Hidden Civilization Two', hostIndex: 1, population: 1500 },
+  { name: 'Island Hidden Civilization Three', hostIndex: 2, population: 1350 },
+  { name: 'Island Hidden Civilization Four', hostIndex: 3, population: 1800 },
+  { name: 'Island Hidden Civilization Five', hostIndex: 4, population: 1650 },
+  { name: 'Island Hidden Civilization Six', hostIndex: 5, population: 2000 },
+  { name: 'Island Hidden Civilization Seven', hostIndex: 6, population: 1100 },
+  { name: 'Island Hidden Civilization Eight', hostIndex: 7, population: 1750 },
+  { name: 'Island Hidden Civilization Nine', hostIndex: 8, population: 1450 },
+  { name: 'Island Hidden Civilization Ten', hostIndex: 9, population: 1900 },
+];
+
 function requireCountOnce(store, kind, expected) {
   return store.civilizations.filter((c) => c.kind === kind).length >= expected;
 }
@@ -220,9 +279,10 @@ function requireCountOnce(store, kind, expected) {
 // (by any path) is never doubled.
 export function isWorldAtlasSeeded(store) {
   return requireCountOnce(store, 'mainland-country', MAINLAND_COUNTRIES.length)
-    && requireCountOnce(store, 'hidden-civilization', MAINLAND_HIDDEN_CIVILIZATIONS.length)
+    && requireCountOnce(store, 'hidden-civilization', MAINLAND_HIDDEN_CIVILIZATIONS.length + ISLAND_HIDDEN_CIVILIZATIONS.length)
     && requireCountOnce(store, 'casino-island', CASINO_ISLANDS.length)
-    && requireCountOnce(store, 'pirate-island', PIRATE_ISLANDS.length);
+    && requireCountOnce(store, 'pirate-island', PIRATE_ISLANDS.length)
+    && requireCountOnce(store, 'island-country', ISLAND_COUNTRIES.length);
 }
 
 export function seedWorldAtlas(store, { now = Date.now() } = {}) {
@@ -305,5 +365,32 @@ export function seedWorldAtlas(store, { now = Date.now() } = {}) {
     createdBy: hiddenCivilizations[0].name, cargo: ['containers', 'stolen merchandise'], status: 'secret', now,
   });
 
-  return { seeded: true, countries, hiddenCivilizations, casinoIslands, pirateIslands };
+  const islandCountries = ISLAND_COUNTRIES.map((def) => {
+    const civ = createCivilization(store, {
+      name: def.name, kind: 'island-country',
+      // Same flagged inference as the casino islands' own absence of
+      // a gateway above -- see this file's long note on why.
+      oldWorldRelationship: 'reached only by maritime and transportation networks, like the casino islands',
+      now,
+    });
+    setStatistic(civ, 'population', def.population);
+    return civ;
+  });
+
+  const islandHiddenCivilizations = ISLAND_HIDDEN_CIVILIZATIONS.map((def) => {
+    const host = islandCountries[def.hostIndex];
+    const civ = createCivilization(store, {
+      name: def.name, kind: 'hidden-civilization',
+      oldWorldRelationship: `secretly existed alongside its host, ${host.name}`,
+      now,
+    });
+    setStatistic(civ, 'population', def.population);
+    claimTerritory(store, { name: `${def.name}'s own territory`, civilizationId: civ.id, controlStatus: 'independent', now });
+    return civ;
+  });
+
+  return {
+    seeded: true, countries, hiddenCivilizations, casinoIslands, pirateIslands,
+    islandCountries, islandHiddenCivilizations,
+  };
 }
