@@ -1966,6 +1966,81 @@ No gap existed here to close -- confirmed directly rather than
 assumed, the same discipline this whole pass already applied to
 `totalRevenue` and `zone.bias`.
 
+## The first real world atlas content: mainland countries, hidden civilizations, casino islands, pirate islands (14 Oct 2026, a fifth instruction the same day)
+
+Per direct instruction -- asked to continue structuring "all the
+hidden civilizations... as many as you can" -- this is the first real
+content built on top of the rules foundation (`civilizations.js`)
+rather than the rules themselves. **New `worldAtlas.js`**, seeded
+idempotently at server boot (the same real-kind-count check
+`npcs.js`'s own `seedGovernmentLiaisons` already uses, not a second
+flag):
+
+- **The four mainland countries** (§5), named, specialized, and each
+  given one of the master document's own real Ice Wall gates
+  (Serpent's/Leviathan's/Sentinel's/Tiger's -- named by the source
+  document, paired to a country as a real structural choice this
+  module makes, not asserted by either source).
+- **One hidden civilization per mainland country** (§11, §13-20),
+  deliberately NOT mirroring its host's own specialty -- "no
+  civilization should possess everything" taken literally and
+  checked by a real test. Three of the four are the source document's
+  own REQUIRED specialties (gambling, clubs/nightlife, medicine/
+  pharmaceuticals -- each named "at least one hidden civilization...")
+  and the fourth is the real container/shipping role §19-20 gives
+  mainland hidden civilizations generally. Each carries a real secret
+  or restricted gateway, a real independent territory, a real red
+  zone matching its specialty, and a real trade route to its host.
+- **The four central casino islands** (§8), each individually
+  described rather than interchangeable (water/floating, mountain/
+  cave, underground, vertical/cliff). **None of them carries a real
+  Ice Wall gateway** -- the source document is explicit that these
+  are reached only by maritime and transportation networks, and a
+  real test asserts this absence directly rather than trusting the
+  seed data not to drift.
+- **The four pirate islands** (the addendum's own §9-30): container
+  piracy, gambling/nightlife, drug/exotic goods, fleet/maritime trade
+  -- each a real, rival faction with no single government, and one
+  real, named cross-link to the container-trade hidden civilization
+  ("some hidden civilizations may secretly trade with pirate
+  islands," the addendum's own words), the one specific real
+  connection either source document actually names.
+
+**Sixteen real civilizations, eight real gateways, twelve real red
+zones, nine real trade routes, eight real territories** -- all
+immediately live in every route built earlier the same day without
+one line of new server code: `GET /api/civilizations/leaders/
+population` ranks all sixteen correctly the instant they exist,
+because that route was built generic. That is the real payoff of
+building the rules before the atlas, stated back as a measured fact
+rather than a hope.
+
+**Deliberately NOT seeded**: the ten generic primary island
+countries and their own smaller hidden civilizations (§7, §12, the
+addendum's §4). Checked directly: the source documents give the
+quartet above real, individually-distinguishing detail (specific
+industries, specific specialties, specific rivalries); the ten
+islands get a population range and "not identical" and nothing
+else per-island. Seeding ten real named islands today would mean
+inventing nine-tenths of what makes each one itself -- recorded as
+open rather than guessed at, the same discipline this document
+applies everywhere else.
+
+**Meridian's own placement is a real, open question, asked back to
+the user rather than answered here.** Nothing in `worldAtlas.js`
+links Meridian (`town.js`, the Vaco elite tech team's own settlement)
+to any of the four mainland countries, any hidden civilization, or
+any island. One real candidate was discussed and not yet decided:
+Meridian sitting inside a mainland country's own CLAIMED-but-not-
+ACTUALLY-CONTROLLED territory (using `claimTerritory`'s own real
+`controlStatus` distinction) -- which would answer this document's
+own long-open "how did the tech team get past the ice wall" with "a
+real, independent gateway the host country does not control," and
+give the host country's eventual discovery of Meridian a real,
+structural reason to matter rather than an invented one. Not written
+into code until the user decides it, the same discipline every other
+undecided lore question in this document already gets.
+
 ## What is still open
 
 - The area's own name — nothing has been given yet (the product name,

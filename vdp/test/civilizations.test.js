@@ -8,7 +8,7 @@ import {
   CIVILIZATION_KINDS, createStatistics, STATISTIC_NAMES, ECONOMIC_STATISTIC_NAMES,
   TECHNOLOGY_STATISTIC_NAMES, adjustStatistic, setStatistic,
   GATEWAY_TIERS, GATEWAY_LEGAL_STATUSES, registerGateway, getGateway, listGateways,
-  ROUTE_STATUSES, createTradeRoute, getTradeRoute, recordRouteEvent,
+  ROUTE_STATUSES, createTradeRoute, getTradeRoute, listTradeRoutes, recordRouteEvent,
   RED_ZONE_ACTIVITIES, createRedZone, getRedZone, evolveRedZone,
   VEHICLE_STATUSES, registerVehicle, getVehicle, transferVehicle, listVehiclesFor,
   TERRITORY_CONTROL_STATUSES, claimTerritory, getTerritory, listTerritories, updateTerritoryControl,
@@ -152,6 +152,8 @@ test('createTradeRoute starts a real history, and recordRouteEvent appends to it
 
   assert.throws(() => recordRouteEvent(store, route.id, { status: 'thriving' }), /not a known route status/);
   assert.throws(() => createTradeRoute(store, { name: 'X', createdBy: null }), /createdBy/);
+
+  assert.equal(listTradeRoutes(store).length, 1);
 });
 
 test('createRedZone validates real activities, and evolveRedZone records a real transition rather than forgetting the past', () => {

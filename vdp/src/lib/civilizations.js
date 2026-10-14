@@ -308,6 +308,13 @@ export function getTradeRoute(store, id) {
   return store.tradeRoutes.find((r) => r.id === id) || null;
 }
 
+// A real, missing accessor, the same shape `listGateways`/
+// `listTerritories` already have -- found while writing `worldAtlas.js`'s
+// own tests rather than left for whoever reaches for it next.
+export function listTradeRoutes(store) {
+  return store.tradeRoutes;
+}
+
 // A real, recorded change -- control changing hands, or the route's
 // own legal status moving (e.g. `legal` -> `contested` -> `abandoned`
 // -> `rediscovered`), the same "found vs. closed are two real events"

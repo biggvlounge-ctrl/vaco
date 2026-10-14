@@ -335,6 +335,7 @@ let store = createVdpStore();
   const daycareLib = await import('./src/lib/daycare.js');
   const customsLib = await import('./src/lib/customs.js');
   const civilizationsLib = await import('./src/lib/civilizations.js');
+  const worldAtlasLib = await import('./src/lib/worldAtlas.js');
   const combatSportsLib = await import('./src/lib/combatSports.js');
   const leaderboardsLib = await import('./src/lib/leaderboards.js');
   const teamSportsLib = await import('./src/lib/teamSports.js');
@@ -525,6 +526,10 @@ let store = createVdpStore();
       if (!store.diseases) store.diseases = diseasesLib.createDiseaseStore();
       if (!store.customs) store.customs = customsLib.createCustomsStore();
       if (!store.civilizations) store.civilizations = civilizationsLib.createCivilizationsStore();
+      // Real, idempotent -- `worldAtlasLib.seedWorldAtlas` checks the
+      // real kind-counts itself (see its own header), so a restart
+      // against an existing `store.json` never doubles these.
+      worldAtlasLib.seedWorldAtlas(store.civilizations);
       // `combatSports.js` is deliberately storage-agnostic (see its
       // own header: it owns the card, not the store), so its matches
       // live directly on this app's own store, the same way every
