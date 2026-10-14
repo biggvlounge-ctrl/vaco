@@ -108,7 +108,7 @@ test('a real, named trade route connects the container hidden civilization to th
   const store = createCivilizationsStore();
   seedWorldAtlas(store);
   const routes = listTradeRoutes(store);
-  const route = routes.find((r) => r.name.includes('Hidden Civilization One') && r.name.includes('Blackcrate Island'));
+  const route = routes.find((r) => r.name.includes('Rustholt') && r.name.includes('Blackcrate Island'));
   assert.ok(route, 'the real cross-link between the container hidden civilization and the container-piracy pirate island must exist');
   assert.equal(route.status, 'secret');
 });

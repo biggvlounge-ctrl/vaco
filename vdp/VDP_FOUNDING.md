@@ -2144,12 +2144,37 @@ words.
 The one real, named cross-link the source document asks for by name
 -- the container hidden civilization secretly trading with the
 container-piracy pirate island -- now reads as a real, legible trade
-route name (`Hidden Civilization One ↔ Blackcrate Island route`)
-rather than two functional labels. The four mainland hidden
-civilizations (`MAINLAND_HIDDEN_CIVILIZATIONS`) and the ten generic
-island countries remain unnamed -- not asked for here, same
-"recorded, not invented" discipline as everywhere else in this
+route name (`Rustholt ↔ Blackcrate Island route`, once the mainland
+hidden civilizations were named too -- see the next section) rather
+than two functional labels. The ten generic island countries remain
+unnamed -- not asked for here, same "recorded, not invented"
+discipline as everywhere else in this
 document.
+
+## The four mainland hidden civilizations, named (14 Oct 2026, an eighth instruction the same day)
+
+Per direct instruction -- continuing "name the islands as well" to
+the remaining unnamed group -- the four mainland hidden civilizations
+(`worldAtlas.js`'s `MAINLAND_HIDDEN_CIVILIZATIONS`) are named, the
+same real, flagged proposal as the countries and islands: each name
+fit to the civilization's own specialty, not the source documents'
+own words.
+
+- **Rustholt** (hosted by Ironreach) -- containers and old-world
+  vehicle trade, §19-20's real container/shipping role.
+- **Wagerden** (hosted by Luminae) -- gambling, §15's own required
+  specialty.
+- **Nocturne Hollow** (hosted by Aegira) -- clubs and nightlife,
+  §16's own required specialty.
+- **Thornveil** (hosted by Verdane) -- medicine, herbs, and
+  pharmaceuticals, §17/§18's own required specialty.
+
+All sixteen seeded civilizations (four mainland countries, four
+mainland hidden civilizations, four casino islands, four pirate
+islands) now carry a real, flagged name rather than a functional
+label. The ten generic island countries and their own smaller hidden
+civilizations remain the one real group still unseeded -- see "The
+first real world atlas content," above, for why.
 
 ## What is still open
 

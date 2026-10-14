@@ -37,10 +37,9 @@
 // **All names below are real, flagged placeholders** -- "permanent
 // names can be established later" is the master document's own
 // words (§6, on the 40 starter cities; applied here the same way).
-// `Hidden Civilization Two` etc. are functional labels, not a claim
-// that naming is finished. The four mainland countries, the four
-// casino islands, and the four pirate islands are now named (see
-// below) -- a real, flagged proposal, not the source
+// The four mainland countries, the four mainland hidden civilizations,
+// the four casino islands, and the four pirate islands are all now
+// named (see below) -- a real, flagged proposal, not the source
 // documents' own words.
 //
 // **"Meridian" retired (14 Oct 2026), per direct instruction**:
@@ -110,31 +109,34 @@ export const ICE_WALL_GATES = {
 // fungal, psychoactive," §17/§18); the fourth, paired with the
 // robotics/heavy-industry country, is the real container/shipping
 // role §19-20 gives mainland hidden civilizations generally ("the
-// strongest access to large gateway shipments").
+// strongest access to large gateway shipments"). Names are the same
+// real, flagged proposal (14 Oct 2026) the mainland countries, casino
+// islands, and pirate islands already got -- fit to each one's own
+// specialty, not the source documents' own words.
 export const MAINLAND_HIDDEN_CIVILIZATIONS = [
   {
-    name: 'Hidden Civilization One', hostIndex: 0, population: 28000,
+    name: 'Rustholt', hostIndex: 0, population: 28000,
     specialty: 'containers and old-world vehicle trade',
     majorIndustries: ['containers', 'old vehicles', 'manufacturing'],
     redZoneActivities: ['smuggling'],
     gateTier: 'container', gateLegalStatus: 'secret',
   },
   {
-    name: 'Hidden Civilization Two', hostIndex: 1, population: 35000,
+    name: 'Wagerden', hostIndex: 1, population: 35000,
     specialty: 'gambling',
     majorIndustries: ['gambling', 'private gaming houses', 'bookmaking'],
     redZoneActivities: ['gambling'],
     gateTier: 'vehicle', gateLegalStatus: 'restricted',
   },
   {
-    name: 'Hidden Civilization Three', hostIndex: 2, population: 22000,
+    name: 'Nocturne Hollow', hostIndex: 2, population: 22000,
     specialty: 'clubs and nightlife',
     majorIndustries: ['clubs', 'music', 'entertainment', 'night markets'],
     redZoneActivities: ['nightlife', 'clubs'],
     gateTier: 'pedestrian-light-goods', gateLegalStatus: 'secret',
   },
   {
-    name: 'Hidden Civilization Four', hostIndex: 3, population: 31000,
+    name: 'Thornveil', hostIndex: 3, population: 31000,
     specialty: 'medicine, herbs, and pharmaceuticals',
     majorIndustries: ['traditional medicine', 'pharmaceutical industry', 'herbal remedies'],
     redZoneActivities: ['black-market-medicine'],
