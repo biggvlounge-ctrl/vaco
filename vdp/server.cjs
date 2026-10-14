@@ -337,6 +337,8 @@ let store = createVdpStore();
   const civilizationsLib = await import('./src/lib/civilizations.js');
   const combatSportsLib = await import('./src/lib/combatSports.js');
   const leaderboardsLib = await import('./src/lib/leaderboards.js');
+  const teamSportsLib = await import('./src/lib/teamSports.js');
+  const teamStandingsLib = await import('./src/lib/teamStandings.js');
 
   // A migrant's real old-world background carries over if one was
   // recorded (`immigration.js`'s `admitWithPassport`/`crossIllegally`,
@@ -529,6 +531,11 @@ let store = createVdpStore();
       // home here rather than inside the library itself.
       if (!store.combatSports) store.combatSports = { matches: [], nextMatchId: 1 };
       if (!store.leaderboards) store.leaderboards = leaderboardsLib.createLeaderboardsStore();
+      // `teamSports.js` is deliberately storage-agnostic, the same
+      // real reason `combatSports.js`'s own matches live on
+      // `store.combatSports` rather than inside that module.
+      if (!store.teamSports) store.teamSports = { teams: {}, games: [], nextGameId: 1 };
+      if (!store.teamStandings) store.teamStandings = teamStandingsLib.createTeamStandingsStore();
       registerMeridianVoidHubsOnce();
       postGovernmentJobsToVoidOnce();
     },
@@ -2701,6 +2708,141 @@ let store = createVdpStore();
   // no further segment the `:sport` route could shadow).
   app.get('/api/combat-sports/leaderboards', (_req, res) => {
     res.json({ leaders: leaderboardsLib.leagueLeaders(store.leaderboards) });
+  });
+
+  // --- Team Sports: basketball, football, and any other real team
+  // ball sport (14 Oct 2026) -- "when it's set up as basketball or
+  // football, it's set up just like the sports games as well." Same
+  // real split as Combat Sports above, one level up: a team, a game
+  // between two real rosters, a real scoreboard that DECIDES the
+  // winner rather than being told it.
+  app.get('/api/team-sports/teams', (_req, res) => {
+    res.json({ teams: Object.values(store.teamSports.teams) });
+  });
+
+  app.post('/api/team-sports/teams', requireCallingService(), (req, res) => {
+    try {
+      const team = teamSportsLib.createTeam(req.body || {});
+      if (store.teamSports.teams[team.teamId]) {
+        return res.status(400).json({ error: `team "${team.teamId}" already exists` });
+      }
+      store.teamSports.teams[team.teamId] = team;
+      res.status(201).json(team);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/team-sports/games', (_req, res) => {
+    res.json({ games: store.teamSports.games });
+  });
+
+  app.get('/api/team-sports/games/:id', (req, res) => {
+    const game = store.teamSports.games.find((g) => g.gameId === req.params.id);
+    if (!game) return res.status(404).json({ error: `no game ${req.params.id}` });
+    res.json(game);
+  });
+
+  // Scheduling a game is the same operational, district-level action
+  // booking a combat sports card already is.
+  app.post('/api/team-sports/games', requireCallingService(), (req, res) => {
+    try {
+      const gameId = `game-${store.teamSports.nextGameId++}`;
+      const homeTeam = store.teamSports.teams[req.body.homeTeamId];
+      const awayTeam = store.teamSports.teams[req.body.awayTeamId];
+      if (!homeTeam) return res.status(404).json({ error: `no team ${req.body.homeTeamId}` });
+      if (!awayTeam) return res.status(404).json({ error: `no team ${req.body.awayTeamId}` });
+      const game = teamSportsLib.createGame({ ...req.body, gameId, homeTeam, awayTeam });
+      teamSportsLib.assertBookable(game, store.teamSports.games);
+      store.teamSports.games.push(game);
+      newsLib.recordEvent(store.news, { kind: 'team-sports', text: `a real ${game.teamSportType} game was scheduled: ${homeTeam.name} vs ${awayTeam.name}` });
+      res.status(201).json(game);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // Starting a game is also where a real VAGO prediction market opens
+  // -- the same real tie-in Combat Sports already has, same
+  // `predictionMarketEligibility` gate, same honest `vagoMarketId`
+  // recorded either way.
+  app.post('/api/team-sports/games/:id/start', requireCallingService(), async (req, res) => {
+    const game = store.teamSports.games.find((g) => g.gameId === req.params.id);
+    if (!game) return res.status(404).json({ error: `no game ${req.params.id}` });
+    try {
+      teamSportsLib.startGame(game);
+      const eligibility = teamSportsLib.predictionMarketEligibility(game);
+      if (eligibility.eligible) {
+        const market = await openVagoMarket({
+          question: `Who will win the ${game.teamSportType} game between ${game.homeTeam.name} and ${game.awayTeam.name}?`,
+          category: 'sports',
+          creatorId: jobsLib.PLANETARY_GOVERNORS_PAYROLL,
+        });
+        game.vagoMarketId = market ? market.id : null;
+      } else {
+        game.vagoMarketId = null;
+      }
+      res.status(200).json(game);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/team-sports/games/:id/score', requireCallingService(), (req, res) => {
+    const game = store.teamSports.games.find((g) => g.gameId === req.params.id);
+    if (!game) return res.status(404).json({ error: `no game ${req.params.id}` });
+    try {
+      const result = req.body.playerId
+        ? teamSportsLib.recordPlayerStat(game, req.body)
+        : { teamScore: teamSportsLib.recordScore(game, req.body) };
+      res.status(200).json({ ...result, game: teamSportsLib.describeGame(game) });
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/team-sports/games/:id/advance-period', requireCallingService(), (req, res) => {
+    const game = store.teamSports.games.find((g) => g.gameId === req.params.id);
+    if (!game) return res.status(404).json({ error: `no game ${req.params.id}` });
+    try {
+      teamSportsLib.advancePeriod(game);
+      res.status(200).json(game);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // Ending a game is where the real result lands in the standings --
+  // `teamStandings.js`'s own `recordGameResult`, reading this real
+  // scoreboard-derived outcome rather than re-deriving it.
+  app.post('/api/team-sports/games/:id/end', requireCallingService(), (req, res) => {
+    const game = store.teamSports.games.find((g) => g.gameId === req.params.id);
+    if (!game) return res.status(404).json({ error: `no game ${req.params.id}` });
+    try {
+      teamSportsLib.endGame(game);
+      teamStandingsLib.recordGameResult(store.teamStandings, game);
+      newsLib.recordEvent(store.news, {
+        kind: 'team-sports',
+        text: game.tie
+          ? `${game.homeTeam.name} and ${game.awayTeam.name} tied ${game.homeTeam.score}-${game.awayTeam.score}`
+          : `${game.homeTeam.score > game.awayTeam.score ? game.homeTeam.name : game.awayTeam.name} won ${game.homeTeam.score}-${game.awayTeam.score}`,
+      });
+      res.status(200).json(game);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // "The league leaders" for a team sport -- the real standings.
+  app.get('/api/team-sports/standings', (_req, res) => {
+    res.json({ standings: teamStandingsLib.teamStandings(store.teamStandings) });
+  });
+
+  // "The player leaders" for a team sport -- real total points
+  // scored, the honest team-sport counterpart to Combat Sports' own
+  // per-discipline win/loss leaders.
+  app.get('/api/team-sports/scoring-leaders', (_req, res) => {
+    res.json({ leaders: teamStandingsLib.scoringLeaders(store.teamStandings) });
   });
 
   // Only the rare flavor actions (see npcs.js's own `pickAction`

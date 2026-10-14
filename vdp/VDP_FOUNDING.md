@@ -1792,6 +1792,68 @@ rather than re-asserted -- "make sure it's established" was, for most
 of this list, a question this document can now answer "yes, and
 here is exactly where," not a request to build something new.
 
+## Basketball and football: team sports, set up like real sports games (14 Oct 2026, a third instruction the same day)
+
+Per direct instruction: "when it's set up as basketball or football,
+it's set up just like the sports games as well... when you're
+playing, it's set up like the sports games." A real, distinct ask from
+the Combat Sports entry just above -- basketball and football are
+team sports, and `combatSports.js` is built around a one-on-one/tag-
+team/rumble ROSTER, not two fielded teams with their own running
+score.
+
+**New `teamSports.js`.** `teamSportType` stays an open string, the
+same treatment `combatSportType` already gets, for the same reason --
+the instruction names basketball and football as real examples, not
+an exhaustive list. The one real structural difference from
+`combatSports.js`, and the reason this earned its own module rather
+than one more match format on the existing one: a combat bout's
+winner is handed to `recordResult` as a given fact, decided outside
+the match. **A real team sports game is not refereed that way** --
+`endGame` DERIVES the winner from the real, accumulated score. Nobody
+declares who won a basketball game; the scoreboard does. A tie is a
+real, honest possible outcome (`winnerTeamId: null`, `tie: true`),
+never forced into an invented overtime this module has no business
+inventing. `recordPlayerStat` is the real box score -- one player's
+running point total, checked against the real roster they are
+actually fielded on for that game -- and `recordScore` is its
+team-level sibling for a score with no single attributed scorer (a
+team penalty, a defensive score), the same real distinction real
+sports games draw.
+
+**New `teamStandings.js`**, the team-sport counterpart to
+`leaderboards.js`: `teamStandings` is the real league table (wins/
+losses/ties, ranked by real win percentage with a tie worth half a
+win, point differential as the tiebreaker), and `scoringLeaders` is
+the real point-scoring board. These are deliberately two different
+real questions, proven by a real test case: a team can top the
+standings while a player on the LOSING side leads the league in
+individual scoring, which is not a contradiction -- it is what a real
+team that wins on defense looks like.
+
+**Wired into `server.cjs`** as `/api/team-sports/teams` and
+`/api/team-sports/games` plus their sub-routes (`start`, `score`,
+`advance-period`, `end`) and `/api/team-sports/standings` /
+`/scoring-leaders`. Starting a game opens a real VAGO prediction
+market the same way starting a Combat Sports match already does --
+same `openVagoMarket()`, same `predictionMarketEligibility` gate, same
+honest `vagoMarketId: null` when VAGO is unreachable. Ending a game is
+where the real result reaches `teamStandings.recordGameResult`,
+reading the scoreboard-derived outcome rather than re-deriving it a
+second time. Every mutating route is `requireCallingService()` --
+booking, scoring, and settling a team sports game is the same
+operational, no-single-accountable-player action Combat Sports and
+Civilizations already established that guard for, not a new pattern.
+
+Learned the route-ordering lesson from the Civilizations work
+earlier the same day and designed around it rather than repeating it:
+there is no bare `/api/team-sports/:id` route for a parameterized
+match to shadow a literal path the way `/api/civilizations/:id` once
+shadowed `/gateways` and `/territories` -- every team-sports GET route
+either takes no id at all or nests the id under a literal prefix
+(`/games/:id`), so no two routes ever share the same segment count
+with one a literal and the other a param.
+
 ## What is still open
 
 - The area's own name — nothing has been given yet (the product name,
