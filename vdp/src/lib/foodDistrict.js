@@ -275,6 +275,7 @@ export const FLAGSHIP_BRANDS = [
 // buffer does not apply to a stall nobody has cooked at yet.
 export const FRONTIER_PAYROLL_ACCOUNT_ID = 'planetary-governors-payroll';
 export const COOK_GAME_PER_BATCH = 1;
+export const COOK_FISH_PER_BATCH = 1;
 
 export const FRONTIER_STALLS = [
   {
@@ -287,6 +288,24 @@ export const FRONTIER_STALLS = [
     ingredient: { type: 'game', amount: COOK_GAME_PER_BATCH },
     menu: [
       { item: 'Game Stew', price: 11 },
+    ],
+  },
+  // **The Frontier Dock (14 Oct 2026)**, the same real home `game`
+  // got, one resource over -- "a fishing game" named directly among
+  // the gameplay pillars to establish, closed the same honest way
+  // hunting's own real yield was: a real catch needs a real place to
+  // be cooked, kept apart from the 11 sourced flagship brands for the
+  // same reason the Frontier Grill is.
+  {
+    slug: 'frontier-dock',
+    name: 'The Frontier Dock',
+    category: 'fish',
+    tagline: 'Real Caught Fish, Cooked Fresh',
+    nameConfirmed: false,
+    payrollAccountId: FRONTIER_PAYROLL_ACCOUNT_ID,
+    ingredient: { type: 'fish', amount: COOK_FISH_PER_BATCH },
+    menu: [
+      { item: 'Fish Stew', price: 10 },
     ],
   },
 ];

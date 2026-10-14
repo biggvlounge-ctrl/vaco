@@ -42,7 +42,14 @@
 // ever yield — see `jobs.js`'s `consumes`, starting with `farmer`
 // (irrigation), the one link universal enough not to be a guess about
 // any specific process.
-export const RESOURCE_TYPES = ['wood', 'stone', 'clay', 'ore', 'game', 'crop', 'water'];
+// `fish` joined 14 Oct 2026, the same real shape `game` already
+// has -- a real hunt-and-gather yield, not something `digForResources`
+// turns up, now with its own real job (`jobs.js`'s `fisher`) rather
+// than folded into `hunter`. VACON-C's own `occupations.js` already
+// names it as its own real tier-2 trade (`fisher: skill: 'Agriculture',
+// source: 'fishing'`, distinct from `hunter`'s `skill: 'Combat'`), the
+// same exact-match treatment `water`/`game`/`crop` already got.
+export const RESOURCE_TYPES = ['wood', 'stone', 'clay', 'ore', 'game', 'crop', 'water', 'fish'];
 
 // Wood is the one material the instruction named directly, so it is
 // the common case; the rest are "different materials... in the area",

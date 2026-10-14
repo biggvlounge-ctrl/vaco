@@ -62,8 +62,8 @@ test('listJobs/getJob agree on every job id', () => {
   }
 });
 
-test('the three frontier jobs are founder-run, with the planetary governors as payroll', () => {
-  for (const jobId of ['lumberjack', 'farmer', 'hunter']) {
+test('the four frontier jobs are founder-run, with the planetary governors as payroll', () => {
+  for (const jobId of ['lumberjack', 'farmer', 'hunter', 'fisher']) {
     assert.equal(getJob(jobId).payrollAccountId, PLANETARY_GOVERNORS_PAYROLL);
     assert.equal(getJob(jobId).districtId, 'frontier', `${jobId} must not claim a real world.js district`);
   }
@@ -92,7 +92,7 @@ test('a job with no real yields grants nothing, even when wired to a resources s
   });
 
   assert.equal(shift.yielded, undefined);
-  assert.deepEqual(materialsFor(resourcesStore, 'alice'), { wood: 0, stone: 0, clay: 0, ore: 0, game: 0, crop: 0, water: 0 });
+  assert.deepEqual(materialsFor(resourcesStore, 'alice'), { wood: 0, stone: 0, clay: 0, ore: 0, game: 0, crop: 0, water: 0, fish: 0 });
 });
 
 test('a failed payout grants no yield for a shift that never completed', async () => {
@@ -190,6 +190,22 @@ test('with no regulateYieldFn given, the yield is exactly job.yields.amount -- t
     workerId: 'alice', transferFn: fakeTransfer([]), resourcesStore, grantMaterialsFn: grantMaterials,
   });
   assert.deepEqual(shift.yielded, { type: 'game', amount: 5 });
+});
+
+// -- the fisher job (14 Oct 2026) -----------------------------------------
+
+test('a fisher shift pays VCoin and grants a real fish yield', async () => {
+  const store = createJobsStore();
+  const resourcesStore = createResourcesStore();
+  clockIn(store, { workerId: 'alice', jobId: 'fisher' });
+  const calls = [];
+  const shift = await clockOutAndPay(store, {
+    workerId: 'alice', transferFn: fakeTransfer(calls), resourcesStore, grantMaterialsFn: grantMaterials,
+  });
+
+  assert.equal(calls[0].amount, getJob('fisher').payPerShift);
+  assert.deepEqual(shift.yielded, { type: 'fish', amount: 6 });
+  assert.equal(materialsFor(resourcesStore, 'alice').fish, 6);
 });
 
 test('the water treatment job is government-run and has no input of its own — it is the base of the chain', () => {

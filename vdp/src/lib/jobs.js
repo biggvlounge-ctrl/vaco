@@ -134,6 +134,19 @@ export const JOBS = {
     payrollAccountId: PLANETARY_GOVERNORS_PAYROLL, payPerShift: 16,
     yields: { type: 'game', amount: 5 },
   },
+  // **Fisher (14 Oct 2026)**: "a fishing game" named directly among
+  // the gameplay pillars to establish. `occupations.js`'s own real
+  // tier-2 `fisher` entry was already ported (`skill: 'Agriculture',
+  // source: 'fishing'`) but had never been wired as a job anyone could
+  // actually work -- confirmed by direct grep before writing this, the
+  // same gap `physician`/`teacher` each closed in their own turn. Same
+  // real shape as `hunter`, one resource over: a real frontier yield,
+  // never something `digForResources` turns up.
+  fisher: {
+    title: 'Frontier Fisher', districtId: 'frontier', skill: 'Agriculture',
+    payrollAccountId: PLANETARY_GOVERNORS_PAYROLL, payPerShift: 14,
+    yields: { type: 'fish', amount: 6 },
+  },
   'water-treatment-worker': {
     title: 'Water Treatment Plumber', districtId: 'government', skill: 'Engineering',
     payrollAccountId: PLANETARY_GOVERNORS_PAYROLL, payPerShift: 15,

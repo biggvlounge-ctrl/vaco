@@ -48,6 +48,7 @@ const V3_API_URL = process.env.V3_API_URL || 'http://localhost:8811';
 const VOID_API_URL = process.env.VOID_API_URL || 'http://localhost:8793';
 const VACAY_API_URL = process.env.VACAY_API_URL || 'http://localhost:8803';
 const VASH_TAP_API_URL = process.env.VASH_TAP_API_URL || 'http://localhost:8825';
+const VAGO_API_URL = process.env.VAGO_API_URL || 'http://localhost:8795';
 // The shared ecosystem-wide convention every other real app's
 // server.js already uses (checked directly: voken/server.js,
 // voidmagic/server.js) -- one env var pair, not a per-app-named one.
@@ -252,6 +253,47 @@ async function registerVoidHub({ regionId, bayCount, temperatureControlled, lat,
   return res.json();
 }
 
+// "Make sure this all ties in with our predictions, where you can
+// make predictions on what's going to happen on VDP" (14 Oct 2026,
+// direct instruction). Checked directly before writing this:
+// `vago/server.js`'s `POST /api/markets` already takes a real
+// `source: 'vdp-in-world'`, and `GET /api/predictions/vdp` already
+// filters on exactly that source -- VAGO had already built the real
+// hook this instruction asks for; what was missing was VDP's own
+// server ever calling it. Server-to-server, the same
+// `X-Service-Name`/`X-Service-Token` pair every other cross-app call
+// in this file already uses, never a player's own session -- opening
+// a market is this app narrating a real in-world event, not a player
+// action. Fails soft (returns null) the same way `registerVoidHub`'s
+// own caller already does: VAGO may not be running in every dev
+// environment, and a missing prediction market must not take VDP's
+// own server down.
+async function openVagoMarket({ question, category, creatorId, openingYesPrice } = {}) {
+  try {
+    const res = await fetch(`${VAGO_API_URL}/api/markets`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Service-Name': VACO_SERVICE_NAME,
+        'X-Service-Token': VACO_SERVICE_TOKEN,
+      },
+      body: JSON.stringify({
+        question, category, source: 'vdp-in-world', creatorId, openingYesPrice,
+      }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      let message = `openVagoMarket failed (${res.status})`;
+      try { message = JSON.parse(text).error || message; } catch { /* not JSON */ }
+      throw new Error(message);
+    }
+    return await res.json();
+  } catch (err) {
+    console.warn(`VDP: could not open a VAGO prediction market (VAGO may not be running): ${err.message}`);
+    return null;
+  }
+}
+
 let store = createVdpStore();
 
 (async () => {
@@ -293,6 +335,8 @@ let store = createVdpStore();
   const daycareLib = await import('./src/lib/daycare.js');
   const customsLib = await import('./src/lib/customs.js');
   const civilizationsLib = await import('./src/lib/civilizations.js');
+  const combatSportsLib = await import('./src/lib/combatSports.js');
+  const leaderboardsLib = await import('./src/lib/leaderboards.js');
 
   // A migrant's real old-world background carries over if one was
   // recorded (`immigration.js`'s `admitWithPassport`/`crossIllegally`,
@@ -478,6 +522,13 @@ let store = createVdpStore();
       if (!store.diseases) store.diseases = diseasesLib.createDiseaseStore();
       if (!store.customs) store.customs = customsLib.createCustomsStore();
       if (!store.civilizations) store.civilizations = civilizationsLib.createCivilizationsStore();
+      // `combatSports.js` is deliberately storage-agnostic (see its
+      // own header: it owns the card, not the store), so its matches
+      // live directly on this app's own store, the same way every
+      // other pure, stateless library module in `src/lib` is given a
+      // home here rather than inside the library itself.
+      if (!store.combatSports) store.combatSports = { matches: [], nextMatchId: 1 };
+      if (!store.leaderboards) store.leaderboards = leaderboardsLib.createLeaderboardsStore();
       registerMeridianVoidHubsOnce();
       postGovernmentJobsToVoidOnce();
     },
@@ -2553,6 +2604,103 @@ let store = createVdpStore();
     const civilization = civilizationsLib.getCivilization(store.civilizations, Number(req.params.id));
     if (!civilization) return res.status(404).json({ error: `no civilization ${req.params.id}` });
     res.json(civilization);
+  });
+
+  // --- Combat Sports: the real sports pillar, wired in for the first
+  // time (14 Oct 2026) -- `combatSports.js` has been a complete,
+  // tested, pure module since it was built, confirmed by direct grep
+  // to have zero HTTP routes and zero server-side store before this.
+  // The module stays untouched; its matches live on this app's own
+  // store (see the header comment at `store.combatSports`'s own
+  // init), and this is the one place a real card is booked, started,
+  // settled, and ranked.
+  app.get('/api/combat-sports/matches', (_req, res) => {
+    res.json({ matches: store.combatSports.matches });
+  });
+
+  app.get('/api/combat-sports/matches/:id', (req, res) => {
+    const match = store.combatSports.matches.find((m) => m.matchId === req.params.id);
+    if (!match) return res.status(404).json({ error: `no match ${req.params.id}` });
+    res.json(match);
+  });
+
+  // Booking a card is an operational, district-level action (no
+  // single fighter books their own match the way a government
+  // liaison or a promoter would) -- `requireCallingService()`, the
+  // same guard every other no-single-accountable-player route in
+  // this app already uses.
+  app.post('/api/combat-sports/matches', requireCallingService(), (req, res) => {
+    try {
+      const matchId = `match-${store.combatSports.nextMatchId++}`;
+      const match = combatSportsLib.createMatch({ ...req.body, matchId });
+      combatSportsLib.assertBookable(match, store.combatSports.matches);
+      store.combatSports.matches.push(match);
+      newsLib.recordEvent(store.news, { kind: 'combat-sports', text: `a real ${match.combatSportType} card was booked: ${matchId}` });
+      res.status(201).json(match);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // Starting a match is also where a real VAGO prediction market opens
+  // -- "make sure this all ties in with our predictions" -- gated on
+  // `combatSports.js`'s own real `predictionMarketEligibility` (street
+  // tier settles nothing, by that module's own documented decision).
+  // `vagoMarketId` is recorded on the match itself, null when VAGO is
+  // unreachable or the bout is not a settling tier -- a real, honest
+  // fact either way, never silently retried.
+  app.post('/api/combat-sports/matches/:id/start', requireCallingService(), async (req, res) => {
+    const match = store.combatSports.matches.find((m) => m.matchId === req.params.id);
+    if (!match) return res.status(404).json({ error: `no match ${req.params.id}` });
+    try {
+      combatSportsLib.startMatch(match);
+      const eligibility = combatSportsLib.predictionMarketEligibility(match);
+      if (eligibility.eligible) {
+        const market = await openVagoMarket({
+          question: `Who will win the ${match.combatSportType} ${match.matchFormat} match "${match.matchId}"?`,
+          category: 'sports',
+          creatorId: jobsLib.PLANETARY_GOVERNORS_PAYROLL,
+        });
+        match.vagoMarketId = market ? market.id : null;
+      } else {
+        match.vagoMarketId = null;
+      }
+      res.status(200).json(match);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // Settling a card is the same operational footing as booking it --
+  // this is where a real win/loss is recorded into the leaderboards
+  // (`leaderboards.js`'s own `recordMatchResult`, reading this real
+  // result rather than re-deriving it).
+  app.post('/api/combat-sports/matches/:id/result', requireCallingService(), (req, res) => {
+    const match = store.combatSports.matches.find((m) => m.matchId === req.params.id);
+    if (!match) return res.status(404).json({ error: `no match ${req.params.id}` });
+    try {
+      combatSportsLib.recordResult(match, req.body.winnerIds);
+      leaderboardsLib.recordMatchResult(store.leaderboards, match);
+      newsLib.recordEvent(store.news, {
+        kind: 'combat-sports', text: `${req.body.winnerIds.join(', ')} won the ${match.combatSportType} card "${match.matchId}"`,
+      });
+      res.status(200).json(match);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // "The player leaders" -- real standing within one real discipline.
+  app.get('/api/combat-sports/leaderboards/:sport', (req, res) => {
+    res.json({ leaders: leaderboardsLib.disciplineLeaders(store.leaderboards, req.params.sport) });
+  });
+
+  // "The league leaders" -- real standing across every discipline
+  // combined. Registered after the parameterized route above only for
+  // readability; there is no real path collision (`/leaderboards` has
+  // no further segment the `:sport` route could shadow).
+  app.get('/api/combat-sports/leaderboards', (_req, res) => {
+    res.json({ leaders: leaderboardsLib.leagueLeaders(store.leaderboards) });
   });
 
   // Only the rare flavor actions (see npcs.js's own `pickAction`

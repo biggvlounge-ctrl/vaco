@@ -1682,6 +1682,116 @@ built into code at all -- the same `CIVILIZATION_KINDS` entries
 (`pirate-island`, `independent-community`) already cover its real
 vocabulary, but no instance of either exists yet.
 
+## The named gameplay pillars, audited against what is real (14 Oct 2026, a second instruction the same day)
+
+Per direct instruction: "make sure we add in our gameplay, make sure
+it's established even with these changes" -- naming Zelda, Maniac
+Mansion, Call of Duty, Grand Theft Auto, a fishing game, River City
+Ransom, Sim City, sports games with full statistics and leaders
+(player leaders, league leaders), predictions tied to real VDP
+outcomes, Where in the World is Carmen Sandiego, and Oregon Trail.
+
+**None of these titles is implemented as itself** -- VDP borrows the
+real MECHANIC each one is built from, the same "borrow the shape, not
+the scale" discipline this whole directory already applies to
+VACON-C. Audited one at a time, against the real code rather than
+asserted:
+
+- **Zelda** (exploration, dungeons, discovery) -- `zones.js`'s
+  `FRONTIER_ZONES`/`UNDERGROUND_ZONES`, `immigration.js`'s
+  `reportSmugglingSpot`/`findUndergroundWorldSpot`, `animals.js`'s
+  discovery, `resources.js`'s `digForResources`. Already real.
+- **Maniac Mansion** (multiple playable characters, dialogue-driven
+  puzzle-solving) -- real multiplayer (any number of real logged-in
+  players at once) plus `v4AgentClient.js`'s `talkToNpc`, a grounded
+  conversation against a specific NPC's own real traits/decision log.
+  Already real.
+- **Call of Duty** (combat, missions, weapons) -- `combatSports.js`
+  (wired into `server.cjs` for the first time this pass, see below),
+  `dissent.js`'s `organizeRevolt`/`attemptUprising`, `immigration.js`'s
+  real `smuggledGoods` (guns are the instruction's own named example).
+  Already real; combat sports specifically was dormant until today.
+- **Grand Theft Auto** (open-world crime, driving, police, gangs) --
+  `immigration.js`'s illegal settlements/smuggling routes,
+  `justice.js`'s citations/detention, `property.js`'s
+  `buildUnauthorized`, `organizations.js`'s gangs/cartels/extremist
+  organizations, `voidClient.js`'s autonomous vans, `civilizations.js`'s
+  vehicles and territory control. Already real -- this is, in a real
+  sense, the genre this whole session's prior work already builds
+  toward most directly.
+- **A fishing game** -- genuinely missing until this pass. Checked
+  directly: `occupations.js` already named `fisher` as a real
+  old-world trade, but nothing had ever wired it as a job anyone could
+  actually work, the same class of gap `physician`/`teacher` each
+  closed in their own turn. Closed the same way: a real `fisher` job
+  (`jobs.js`), a real `fish` resource (`resources.js`), and a real
+  place to cook the catch, The Frontier Dock (`foodDistrict.js`),
+  kept apart from the 11 sourced flagship brands the same way the
+  Frontier Grill already is.
+- **River City Ransom** (earn, then spend real money on real
+  stat growth) -- `jobs.js`'s payroll into `skills.js`'s real
+  job-shift/textbook/conversation skill gains, spent at `property.js`'s
+  real shops. Already real.
+- **Sim City** (a city that tracks its own real, changing numbers) --
+  `settlement.js`'s population-tier ladder, `cityTiers.js`,
+  `economy.js`, and now `civilizations.js`'s own real 44-statistic
+  sheet (§55/§56) at the civilization scale above Meridian. Already
+  real, and extended today.
+- **Sports games with full statistics and leaders, player leaders and
+  league leaders** -- genuinely missing until this pass. Checked
+  directly: `combatSports.js` was a complete, tested, pure module with
+  zero HTTP routes and zero server-side store, confirmed by grep
+  before writing anything -- a real sports district that had never
+  gone live. Closed with three real pieces: `combatSports.js` wired
+  into `server.cjs` (`/api/combat-sports/matches`, booking/starting/
+  settling a real card), a new `leaderboards.js` (real win/loss
+  records per fighter, `disciplineLeaders` for the real PLAYER
+  leaders within one sport, `leagueLeaders` for the real LEAGUE
+  leaders across every sport combined -- two different real
+  questions, not one list sliced two ways), and a real routing bug
+  caught and fixed along the way (see the dated entry just above this
+  one).
+- **Predictions tied to real VDP outcomes** -- genuinely missing until
+  this pass, and closer to already-built than expected. Checked
+  directly: VAGO's own `vago/server.js` already has a real
+  `POST /api/markets` taking `source: 'vdp-in-world'`, and a real
+  `GET /api/predictions/vdp` that already filters on exactly that
+  source -- VAGO had already built the real hook this instruction
+  asks for; nothing in VDP had ever called it. Closed with
+  `openVagoMarket()` in `server.cjs`, the same server-to-server
+  `X-Service-Name`/`X-Service-Token` pattern every other cross-app
+  call in this file already uses, called when a combat sports match
+  starts and `combatSports.js`'s own `predictionMarketEligibility`
+  says yes. Fails soft the same way `registerVoidHub`'s own caller
+  already does -- VAGO was not reachable in this session's own dev
+  environment, confirmed directly (`vagoMarketId: null`, recorded
+  honestly rather than retried silently).
+- **Where in the World is Carmen Sandiego** (tracking a suspect across
+  real, named places using real clues) -- the real convergence of
+  `justice.js`'s `catchIllegalArrival`/`detainPerson`,
+  `immigration.js`'s smuggling-spot discovery, and `civilizations.js`'s
+  own new gateways/territories/trade routes (a fleeing suspect's real
+  route is now, for the first time, a sequence of real, named places
+  rather than an abstraction). No new mechanic was built for this one
+  specifically -- the convergence is real once civilizations.js
+  exists, which is why this entry follows it rather than preceding it.
+- **Oregon Trail** (a real journey, real resource management, real
+  survival along the way) -- `immigration.js`'s
+  `admitWithPassport`/`crossIllegally`/`generateMigrationWave`,
+  `resources.js`'s `oldWorldStock` (a one-time stock that can only go
+  down, the same real shape a wagon's own limited supplies have), and
+  now `civilizations.js`'s vehicle-history timeline for whatever
+  actually made the crossing. Already real, and the vehicle piece
+  extended today.
+
+Two real, named things were built FOR this pass that did not exist
+an hour before it (the fisher job/fish resource/Frontier Dock, and
+the combat-sports-to-leaderboards-to-VAGO-predictions chain). Every
+other title on the list was already real, audited and cited here
+rather than re-asserted -- "make sure it's established" was, for most
+of this list, a question this document can now answer "yes, and
+here is exactly where," not a request to build something new.
+
 ## What is still open
 
 - The area's own name — nothing has been given yet (the product name,

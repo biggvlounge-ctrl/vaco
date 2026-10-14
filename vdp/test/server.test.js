@@ -133,7 +133,7 @@ test('GET /api/vacay-hotels reports Meridian\'s real tier cap, not a hardcoded n
 
 test('GET /api/resources/:id reports real zero materials and a real old-world stock for a never-seen player', { skip: SKIP }, async () => {
   const body = await (await fetch(`${BASE}/api/resources/never-seen-player`)).json();
-  assert.deepEqual(body.materials, { wood: 0, stone: 0, clay: 0, ore: 0, game: 0, crop: 0, water: 0 });
+  assert.deepEqual(body.materials, { wood: 0, stone: 0, clay: 0, ore: 0, game: 0, crop: 0, water: 0, fish: 0 });
   assert.equal(body.canDig, true);
   assert.ok(Number.isFinite(body.oldWorldStock) && body.oldWorldStock > 0);
 });
