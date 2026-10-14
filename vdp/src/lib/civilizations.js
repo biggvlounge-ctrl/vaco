@@ -118,6 +118,23 @@ export const TECHNOLOGY_STATISTIC_NAMES = [
 
 export const STATISTIC_NAMES = [...ECONOMIC_STATISTIC_NAMES, ...TECHNOLOGY_STATISTIC_NAMES];
 
+// Per the handoff's second part (14 Oct 2026, "Unclaimed Territory,
+// Island Tribal Civilizations & Four Pirate Islands"): "a government
+// may claim a territory on a map without actually controlling
+// everything inside it. This creates a difference between CLAIMED
+// TERRITORY and ACTUALLY CONTROLLED TERRITORY." That one real,
+// cross-cutting rule -- not the specific pirate islands or small
+// tribal civilizations populating it, which stay deferred with
+// everything else in "the subsequent detailed atlas" -- is what
+// `TERRITORY_CONTROL_STATUSES` and `claimTerritory`/
+// `updateTerritoryControl` below are for. `independent`/`disputed`/
+// `uninhabited` are the same document's own real words for the rest
+// of what a territory can honestly be, alongside the two the rule
+// itself names.
+export const TERRITORY_CONTROL_STATUSES = [
+  'claimed', 'actually-controlled', 'independent', 'disputed', 'uninhabited',
+];
+
 function requireStatisticName(name) {
   if (!STATISTIC_NAMES.includes(name)) {
     throw new Error(`civilizations: "${name}" is not a known statistic (expected one of ${STATISTIC_NAMES.join(', ')})`);
@@ -142,6 +159,7 @@ export function createCivilizationsStore() {
     tradeRoutes: [], nextTradeRouteId: 1,
     redZones: [], nextRedZoneId: 1,
     vehicles: [], nextVehicleId: 1,
+    territories: [], nextTerritoryId: 1,
   };
 }
 
@@ -181,6 +199,7 @@ export function createCivilization(store, {
     gatewayIds: [],
     redZoneIds: [],
     vehicleIds: [],
+    territoryIds: [],
     famousBusinessesFamilies: [...famousBusinessesFamilies],
     resources: [...resources],
     languagesDialects: [...languagesDialects],
@@ -419,4 +438,62 @@ export function transferVehicle(store, vehicleId, { toStatus, toOwnerId, note, n
 
 export function listVehiclesFor(store, ownerId) {
   return store.vehicles.filter((v) => v.ownerId === ownerId);
+}
+
+// ---------------------------------------------------------------------
+// Territory control -- "government borders do not automatically equal
+// actual control." A real timeline, the same shape as trade routes
+// and red zones above, so a territory's claimed-vs-controlled history
+// is a checkable sequence rather than a single overwritten field.
+// `civilizationId` is the CLAIMANT, not necessarily who actually holds
+// the ground -- `controlStatus: 'independent'` on a territory with a
+// real `civilizationId` is not a contradiction, it is exactly the
+// handoff's own point: a claim and the real control of it are two
+// different facts.
+// ---------------------------------------------------------------------
+export function claimTerritory(store, {
+  name, civilizationId = null, controlStatus = 'claimed', now = Date.now(),
+} = {}) {
+  if (!name || !name.trim()) throw new Error('claimTerritory requires a name');
+  if (!TERRITORY_CONTROL_STATUSES.includes(controlStatus)) {
+    throw new Error(`claimTerritory: "${controlStatus}" is not a known control status (expected one of ${TERRITORY_CONTROL_STATUSES.join(', ')})`);
+  }
+  const civilization = civilizationId ? getCivilization(store, civilizationId) : null;
+  if (civilizationId && !civilization) throw new Error(`claimTerritory: no civilization ${civilizationId}`);
+
+  const territory = {
+    id: store.nextTerritoryId++,
+    name: name.trim(),
+    civilizationId: civilizationId || null,
+    controlStatus,
+    history: [{ controlStatus, note: 'territory recorded', at: now }],
+    recordedAt: now,
+  };
+  store.territories.push(territory);
+  if (civilization) civilization.territoryIds.push(territory.id);
+  return territory;
+}
+
+export function getTerritory(store, id) {
+  return store.territories.find((t) => t.id === id) || null;
+}
+
+export function listTerritories(store) {
+  return store.territories;
+}
+
+// A real, recorded change -- a claim becoming actually controlled, a
+// controlled territory slipping to disputed, a disputed one going
+// independent. Never silent: every call appends to `history` even
+// when `controlStatus` repeats the current value, so "we checked
+// again and nothing changed" is still a real, timestamped fact.
+export function updateTerritoryControl(store, territoryId, { controlStatus, note, now = Date.now() } = {}) {
+  const territory = getTerritory(store, territoryId);
+  if (!territory) throw new Error(`updateTerritoryControl: no territory ${territoryId}`);
+  if (!TERRITORY_CONTROL_STATUSES.includes(controlStatus)) {
+    throw new Error(`updateTerritoryControl: "${controlStatus}" is not a known control status (expected one of ${TERRITORY_CONTROL_STATUSES.join(', ')})`);
+  }
+  territory.controlStatus = controlStatus;
+  territory.history.push({ controlStatus, note: note || null, at: now });
+  return territory;
 }

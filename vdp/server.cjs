@@ -2396,12 +2396,6 @@ let store = createVdpStore();
     res.json({ civilizations: civilizationsLib.listCivilizations(store.civilizations) });
   });
 
-  app.get('/api/civilizations/:id', (req, res) => {
-    const civilization = civilizationsLib.getCivilization(store.civilizations, Number(req.params.id));
-    if (!civilization) return res.status(404).json({ error: `no civilization ${req.params.id}` });
-    res.json(civilization);
-  });
-
   app.post('/api/civilizations', requireCallingService(), (req, res) => {
     try {
       const civilization = civilizationsLib.createCivilization(store.civilizations, req.body || {});
@@ -2510,6 +2504,55 @@ let store = createVdpStore();
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
+  });
+
+  // Territory control -- "government borders do not automatically
+  // equal actual control" (the handoff's second part, 14 Oct 2026).
+  // Service-credentialed for the same reason every other world-
+  // authoring civilizations route is: no single player claims or
+  // settles a dispute over territory on their own say-so.
+  app.get('/api/civilizations/territories', (_req, res) => {
+    res.json({ territories: civilizationsLib.listTerritories(store.civilizations) });
+  });
+
+  app.get('/api/civilizations/territories/:id', (req, res) => {
+    const territory = civilizationsLib.getTerritory(store.civilizations, Number(req.params.id));
+    if (!territory) return res.status(404).json({ error: `no territory ${req.params.id}` });
+    res.json(territory);
+  });
+
+  app.post('/api/civilizations/territories', requireCallingService(), (req, res) => {
+    try {
+      const territory = civilizationsLib.claimTerritory(store.civilizations, req.body || {});
+      res.status(201).json(territory);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/civilizations/territories/:id/control', requireCallingService(), (req, res) => {
+    try {
+      const territory = civilizationsLib.updateTerritoryControl(store.civilizations, Number(req.params.id), req.body || {});
+      newsLib.recordEvent(store.news, { kind: 'civilization', text: `control of ${territory.name} is now ${territory.controlStatus}` });
+      res.status(200).json(territory);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // Deliberately registered LAST among the `/api/civilizations/...`
+  // GET routes -- Express matches in registration order, and this
+  // catch-all `:id` param would otherwise shadow every literal path
+  // above it (`/gateways`, `/territories`, ...), matching them as a
+  // civilization id and answering a wrong 404 (`no civilization
+  // "gateways"`) instead of ever reaching the real handler. Found by
+  // actually curling the route rather than trusting the file read
+  // clean -- see `VDP_FOUNDING.md`'s own dated entry for the
+  // discipline this follows.
+  app.get('/api/civilizations/:id', (req, res) => {
+    const civilization = civilizationsLib.getCivilization(store.civilizations, Number(req.params.id));
+    if (!civilization) return res.status(404).json({ error: `no civilization ${req.params.id}` });
+    res.json(civilization);
   });
 
   // Only the rare flavor actions (see npcs.js's own `pickAction`

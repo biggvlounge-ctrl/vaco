@@ -11,6 +11,7 @@ import {
   ROUTE_STATUSES, createTradeRoute, getTradeRoute, recordRouteEvent,
   RED_ZONE_ACTIVITIES, createRedZone, getRedZone, evolveRedZone,
   VEHICLE_STATUSES, registerVehicle, getVehicle, transferVehicle, listVehiclesFor,
+  TERRITORY_CONTROL_STATUSES, claimTerritory, getTerritory, listTerritories, updateTerritoryControl,
 } from '../src/lib/civilizations.js';
 
 test('createCivilization carries every one of the 17 real identity-profile fields', () => {
@@ -192,4 +193,46 @@ test('registerVehicle starts active with a real history, and transferVehicle rec
   assert.deepEqual(listVehiclesFor(store, 'family-stone-jr').map((v) => v.id), [vehicle.id]);
   assert.equal(listVehiclesFor(store, 'family-stone').length, 0);
   assert.throws(() => transferVehicle(store, vehicle.id, { toStatus: 'brand-new' }), /not a known vehicle status/);
+});
+
+test('claimTerritory records a real claim, distinct from who actually controls it', () => {
+  const store = createCivilizationsStore();
+  assert.equal(TERRITORY_CONTROL_STATUSES.length, 5);
+  const civ = createCivilization(store, { name: 'Country One', kind: 'mainland-country' });
+
+  const territory = claimTerritory(store, { name: 'The Northern Wilds', civilizationId: civ.id, controlStatus: 'claimed' });
+  assert.equal(territory.controlStatus, 'claimed');
+  assert.equal(territory.history.length, 1);
+  assert.deepEqual(getCivilization(store, civ.id).territoryIds, [territory.id]);
+  assert.equal(getTerritory(store, territory.id).id, territory.id);
+  assert.equal(listTerritories(store).length, 1);
+
+  // A government may claim ground it does not actually hold -- a real,
+  // non-contradictory fact.
+  const independent = claimTerritory(store, { name: 'The Hill Tribes', civilizationId: civ.id, controlStatus: 'independent' });
+  assert.equal(independent.controlStatus, 'independent');
+  assert.equal(independent.civilizationId, civ.id);
+
+  assert.throws(() => claimTerritory(store, { name: 'X', controlStatus: 'owned' }), /not a known control status/);
+  assert.throws(() => claimTerritory(store, { controlStatus: 'claimed' }), /requires a name/);
+});
+
+test('updateTerritoryControl keeps a real, append-only history, including a real no-change check', () => {
+  const store = createCivilizationsStore();
+  const territory = claimTerritory(store, { name: 'The Borderlands', controlStatus: 'claimed' });
+
+  updateTerritoryControl(store, territory.id, { controlStatus: 'disputed', note: 'a rival family moved in' });
+  let updated = getTerritory(store, territory.id);
+  assert.equal(updated.controlStatus, 'disputed');
+  assert.equal(updated.history.length, 2);
+
+  updateTerritoryControl(store, territory.id, { controlStatus: 'disputed', note: 'checked again, still disputed' });
+  updated = getTerritory(store, territory.id);
+  assert.equal(updated.history.length, 3, 'a repeated status is still a real, timestamped check');
+
+  updateTerritoryControl(store, territory.id, { controlStatus: 'actually-controlled', note: 'the rival was pushed out' });
+  assert.equal(getTerritory(store, territory.id).controlStatus, 'actually-controlled');
+
+  assert.throws(() => updateTerritoryControl(store, territory.id, { controlStatus: 'owned' }), /not a known control status/);
+  assert.throws(() => updateTerritoryControl(store, 9999, { controlStatus: 'claimed' }), /no territory/);
 });

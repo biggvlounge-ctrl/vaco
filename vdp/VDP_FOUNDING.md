@@ -1627,29 +1627,60 @@ handoff, each with one real, checkable mechanism:
    field exists on a real civilization record, so this rule breaks
    loudly if ever violated rather than drifting silently.
 
+**A ninth rule, added the same pass once the handoff's second part
+("Unclaimed Territory, Island Tribal Civilizations & Four Pirate
+Islands") was read in full**: "a government may claim a territory on
+a map without actually controlling everything inside it... the
+difference between CLAIMED TERRITORY and ACTUALLY CONTROLLED
+TERRITORY." `TERRITORY_CONTROL_STATUSES` (`claimed`, `actually-
+controlled`, `independent`, `disputed`, `uninhabited`) and
+`claimTerritory`/`updateTerritoryControl` give this the same real
+timeline treatment as trade routes and red zones -- a civilization
+can be the recorded CLAIMANT of a territory whose `controlStatus` is
+`independent`, which is not a contradiction, it is exactly the
+handoff's own point stated as a real, checkable fact rather than
+flavor text.
+
 **Wired into `server.cjs`** as `/api/civilizations` and its
-sub-routes (gateways, trade-routes, red-zones, vehicles). The
-world-authoring routes (founding a civilization, registering a
-gateway, opening a trade route, evolving a red zone) use
-`requireCallingService()` -- the same guard `/api/immigration/
-migration-wave`, `/api/robots/deploy`, `/api/contracts/post` and
-`/api/animals/discover` already use for an operational action with no
-single accountable player. `registerVehicle` stays `requireActor
-('ownerId')` -- a real player registering their own real vehicle --
-while `transferVehicle` stays service-credentialed, since a transfer
-can be an inheritance, a theft, or a restoration recorded by whoever
-is narrating the world's history, not only the current owner choosing
-to hand it off.
+sub-routes (gateways, trade-routes, red-zones, vehicles,
+territories). The world-authoring routes (founding a civilization,
+registering a gateway, opening a trade route, evolving a red zone,
+claiming or updating a territory) use `requireCallingService()` --
+the same guard `/api/immigration/migration-wave`, `/api/robots/
+deploy`, `/api/contracts/post` and `/api/animals/discover` already
+use for an operational action with no single accountable player.
+`registerVehicle` stays `requireActor('ownerId')` -- a real player
+registering their own real vehicle -- while `transferVehicle` stays
+service-credentialed, since a transfer can be an inheritance, a
+theft, or a restoration recorded by whoever is narrating the world's
+history, not only the current owner choosing to hand it off.
+
+**A real routing bug, caught by actually curling the routes rather
+than trusting a clean file read.** `GET /api/civilizations/:id` was
+registered directly after `GET /api/civilizations`, before the
+literal `/gateways` and `/territories` GET routes -- Express matches
+in registration order, so `GET /api/civilizations/gateways` was
+silently answering `{"error": "no civilization \"gateways\""}`
+instead of ever reaching its real handler, and the same for
+`/territories`. Fixed by moving the generic `:id` route to the very
+end of the civilizations block, after every literal path. Caught
+specifically because this project's own standing discipline is to
+curl a new route for real rather than stop at a passing unit-test
+suite -- the unit tests for `civilizations.js` itself were never
+wrong, since they call the library functions directly and never go
+through Express's router at all; this class of bug is invisible to
+them by construction.
 
 **Deliberately NOT built this pass** (the "subsequent detailed
 atlas"): any specific country, island, casino island, pirate island,
 hidden civilization, founding family, starter city, gateway, trade
-route, red zone, or vehicle. The handoff's second part (uninhabited
-territory, small independent island civilizations, four pirate
-islands) is recorded here as received and not yet built into code at
-all -- the same `CIVILIZATION_KINDS` entries (`pirate-island`,
-`independent-community`) already cover its real vocabulary, but no
-instance of either exists yet.
+route, red zone, vehicle, or territory. The handoff's second part's
+own specific content (small island tribal civilizations at
+5,000-10,000 people each, the four named pirate islands and their
+individual specialties) is recorded here as received and not yet
+built into code at all -- the same `CIVILIZATION_KINDS` entries
+(`pirate-island`, `independent-community`) already cover its real
+vocabulary, but no instance of either exists yet.
 
 ## What is still open
 
