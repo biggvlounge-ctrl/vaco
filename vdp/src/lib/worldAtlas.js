@@ -37,9 +37,10 @@
 // **All names below are real, flagged placeholders** -- "permanent
 // names can be established later" is the master document's own
 // words (§6, on the 40 starter cities; applied here the same way).
-// `Pirate Island Two` etc. are functional labels, not a claim that
-// naming is finished. The four mainland countries themselves are now
-// named (see below) -- a real, flagged proposal, not the source
+// `Hidden Civilization Two` etc. are functional labels, not a claim
+// that naming is finished. The four mainland countries, the four
+// casino islands, and the four pirate islands are now named (see
+// below) -- a real, flagged proposal, not the source
 // documents' own words.
 //
 // **"Meridian" retired (14 Oct 2026), per direct instruction**:
@@ -141,28 +142,34 @@ export const MAINLAND_HIDDEN_CIVILIZATIONS = [
   },
 ];
 
-// §8, each one individually described -- not interchangeable.
+// §8, each one individually described -- not interchangeable. Names
+// are a real, flagged proposal (14 Oct 2026, per direct instruction:
+// "go ahead and name the islands as well"), each fit to its own
+// already-given theme below, the same discipline the four mainland
+// countries' own naming already used -- not the source document's
+// own words, which leave this open the same way it leaves the 40
+// starter cities' names open.
 export const CASINO_ISLANDS = [
   {
-    name: 'Casino Island One', theme: 'water',
+    name: 'Tidecrown Island', theme: 'water',
     majorIndustries: ['floating casinos', 'casino ships', 'luxury resorts', 'water sports'],
     transportationCulture: 'speedboats, ferries, autonomous water taxis',
     redZoneActivities: ['gambling', 'nightlife'],
   },
   {
-    name: 'Casino Island Two', theme: 'mountain',
+    name: 'Cragmoor Island', theme: 'mountain',
     majorIndustries: ['mountain and cave casinos', 'hot springs', 'adventure tourism'],
     transportationCulture: 'mountain rail and off-road vehicles',
     redZoneActivities: ['gambling', 'racing'],
   },
   {
-    name: 'Casino Island Three', theme: 'underground',
+    name: 'Duskvault Island', theme: 'underground',
     majorIndustries: ['underground casino district', 'hotels', 'shopping', 'arenas'],
     transportationCulture: 'underground transit terminals',
     redZoneActivities: ['gambling', 'underground-entertainment'],
   },
   {
-    name: 'Casino Island Four', theme: 'vertical-cliff',
+    name: 'Spireline Island', theme: 'vertical-cliff',
     majorIndustries: ['cliffside casinos', 'casino towers', 'terraced markets'],
     transportationCulture: 'vertical trams and bridges',
     redZoneActivities: ['gambling', 'nightlife'],
@@ -171,27 +178,29 @@ export const CASINO_ISLANDS = [
 
 // The addendum's own §9-30, each one individually described, in
 // explicit rivalry with the other three rather than one organization.
+// Names are the same real, flagged proposal as the casino islands'
+// own above -- fit to each island's already-given theme.
 export const PIRATE_ISLANDS = [
   {
-    name: 'Pirate Island One', theme: 'container-piracy', population: 6000,
+    name: 'Blackcrate Island', theme: 'container-piracy', population: 6000,
     majorIndustries: ['cargo interception', 'container theft', 'warehousing', 'black-market logistics'],
     government: 'rival pirate organizations; no single authority',
     redZoneActivities: ['smuggling', 'counterfeit-goods', 'illegal-markets'],
   },
   {
-    name: 'Pirate Island Two', theme: 'gambling-nightlife', population: 7500,
+    name: 'Neonreef Island', theme: 'gambling-nightlife', population: 7500,
     majorIndustries: ['unrestricted gambling', 'casinos', 'clubs', 'entertainment'],
     government: 'rival pirate organizations; no single authority',
     redZoneActivities: ['gambling', 'nightlife', 'clubs', 'underground-entertainment'],
   },
   {
-    name: 'Pirate Island Three', theme: 'drug-exotic-goods', population: 5200,
+    name: 'Hazeport Island', theme: 'drug-exotic-goods', population: 5200,
     majorIndustries: ['black-market pharmaceuticals', 'exotic substances', 'distribution networks'],
     government: 'rival pirate organizations; no single authority',
     redZoneActivities: ['drugs', 'black-market-medicine', 'illegal-markets'],
   },
   {
-    name: 'Pirate Island Four', theme: 'fleet-maritime', population: 4800,
+    name: 'Stormfleet Island', theme: 'fleet-maritime', population: 4800,
     majorIndustries: ['pirate fleet', 'shipbuilding', 'ship repair', 'fishing', 'cargo interception'],
     government: 'rival pirate organizations; no single authority',
     redZoneActivities: ['smuggling', 'weapons'],

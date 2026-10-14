@@ -2124,6 +2124,33 @@ taxonomy.)
   happened, and what (if anything) was already on the other side, is
   not specified by either source document and not invented here.
 
+## The eight islands, named (14 Oct 2026, a seventh instruction the same day)
+
+Per direct instruction -- "go ahead and name the islands as well" --
+the four casino islands and four pirate islands (`worldAtlas.js`'s
+`CASINO_ISLANDS`/`PIRATE_ISLANDS`) are named, the same real, flagged
+proposal the four mainland countries already got: each name fit to
+the island's own already-given theme, not the source documents' own
+words.
+
+- **Casino islands** (§8): **Tidecrown Island** (water/floating),
+  **Cragmoor Island** (mountain/cave), **Duskvault Island**
+  (underground), **Spireline Island** (vertical-cliff).
+- **Pirate islands** (the addendum's §9-30): **Blackcrate Island**
+  (container-piracy), **Neonreef Island** (gambling-nightlife),
+  **Hazeport Island** (drug-exotic-goods), **Stormfleet Island**
+  (fleet-maritime).
+
+The one real, named cross-link the source document asks for by name
+-- the container hidden civilization secretly trading with the
+container-piracy pirate island -- now reads as a real, legible trade
+route name (`Hidden Civilization One ↔ Blackcrate Island route`)
+rather than two functional labels. The four mainland hidden
+civilizations (`MAINLAND_HIDDEN_CIVILIZATIONS`) and the ten generic
+island countries remain unnamed -- not asked for here, same
+"recorded, not invented" discipline as everywhere else in this
+document.
+
 ## What is still open
 
 - The area's own name — nothing has been given yet (the product name,
