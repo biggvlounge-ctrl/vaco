@@ -13,6 +13,7 @@
 
 import { sessionHeaders } from './shieldAuth.js';
 import { TRAIT_FAMILIES, tagsFor } from './traits.js';
+import { TOWN_NAME } from './town.js';
 
 const V4_API_URL = import.meta.env?.VITE_V4_API_URL || 'http://localhost:8787';
 
@@ -175,7 +176,7 @@ export async function talkToNpc(npc, playerMessage, { latestDecisionEntry = null
 // numbered quest list, the thing the instruction explicitly asked
 // this NOT to feel like).
 function guideSystemPrompt(facts) {
-  return `You are V4, the AI that governs Meridian, a small futuristic colony everyone shares. You are given real, current facts about one resident and about the shared world right now. Based ONLY on these real facts, give this resident ONE natural, conversational suggestion for something they could do next in Meridian. Never invent a fact about them or the world that isn't given below. Speak like a government AI who genuinely knows this person's own situation -- not a quest log: no numbered steps, no "objective," just 1-3 natural sentences.
+  return `You are V4, the AI that governs ${TOWN_NAME}, the capital of one of the four mainland countries everyone shares. You are given real, current facts about one resident and about the shared world right now. Based ONLY on these real facts, give this resident ONE natural, conversational suggestion for something they could do next in ${TOWN_NAME}. Never invent a fact about them or the world that isn't given below. Speak like a government AI who genuinely knows this person's own situation -- not a quest log: no numbered steps, no "objective," just 1-3 natural sentences.
 
 Real facts right now:
 ${facts}
@@ -211,7 +212,7 @@ export async function suggestNextStep(facts) {
     headers: { 'Content-Type': 'application/json', ...sessionHeaders() },
     body: JSON.stringify({
       system: guideSystemPrompt(facts),
-      messages: [{ role: 'user', content: 'What should I do next in Meridian?' }],
+      messages: [{ role: 'user', content: `What should I do next in ${TOWN_NAME}?` }],
     }),
   });
 

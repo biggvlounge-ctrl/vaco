@@ -1,3 +1,5 @@
+import { TOWN_NAME } from './town.js';
+
 // VDP — the digital-mode walkable world (Phase 5, split out of VENVS
 // into its own project per explicit instruction).
 // Source of truth: VENVS's own CLAUDE.md §1 core design principle:
@@ -337,14 +339,14 @@ export const DISTRICTS = [
   {
     id: 'vavlt', name: 'The Vavlt', x: 580, y: 1980, width: 260, height: 260, contentType: 'vdp-native',
   },
-  // Meridian Commons -- the real landscape `cityTiers.js` describes
+  // The town's Commons -- the real landscape `cityTiers.js` describes
   // (water feature, nature trails, farm distribution at the top two
   // tiers) made walkable, a 9th row. `vdp-native`: this is VDP's own
   // ground, not a doorway into another app. Read live from
-  // `classifyMeridian()` (CommonsView.jsx), not hardcoded here --
-  // Meridian's own tier changes as its real amenity coverage does.
+  // `classifyTown()` (CommonsView.jsx), not hardcoded here -- the
+  // town's own tier changes as its real amenity coverage does.
   {
-    id: 'commons', name: 'Meridian Commons', x: 20, y: 2260, width: 260, height: 260, contentType: 'vdp-native',
+    id: 'commons', name: `${TOWN_NAME} Commons`, x: 20, y: 2260, width: 260, height: 260, contentType: 'vdp-native',
   },
   // **The starter hospital, school, and daycare (9 Oct 2026), per
   // direct instruction**: "we also will need a hospital, a starter
@@ -358,13 +360,13 @@ export const DISTRICTS = [
   // slot, moved out to its own isolated row below -- see that
   // district's own comment and `WORLD_HEIGHT`'s.)
   {
-    id: 'hospital', name: 'Meridian Starter Hospital', x: 580, y: 2260, width: 260, height: 260, contentType: 'vdp-native',
+    id: 'hospital', name: `${TOWN_NAME} Starter Hospital`, x: 580, y: 2260, width: 260, height: 260, contentType: 'vdp-native',
   },
   {
-    id: 'school', name: 'Meridian School', x: 20, y: 2540, width: 260, height: 260, contentType: 'vdp-native',
+    id: 'school', name: `${TOWN_NAME} School`, x: 20, y: 2540, width: 260, height: 260, contentType: 'vdp-native',
   },
   {
-    id: 'daycare', name: 'Meridian Technological Daycare', x: 300, y: 2540, width: 260, height: 260, contentType: 'vdp-native',
+    id: 'daycare', name: `${TOWN_NAME} Technological Daycare`, x: 300, y: 2540, width: 260, height: 260, contentType: 'vdp-native',
   },
   // **The Towers, isolated (9 Oct 2026, a later direct instruction)**:
   // "the public housing or towers should be... in an isolated area,

@@ -37,40 +37,53 @@
 // **All names below are real, flagged placeholders** -- "permanent
 // names can be established later" is the master document's own
 // words (§6, on the 40 starter cities; applied here the same way).
-// `Country One`/`Pirate Island Two` etc. are functional labels, not
-// a claim that naming is finished.
+// `Pirate Island Two` etc. are functional labels, not a claim that
+// naming is finished. The four mainland countries themselves are now
+// named (see below) -- a real, flagged proposal, not the source
+// documents' own words.
 //
-// **Meridian's own placement is left open, on purpose.** Nothing
-// below links Meridian (the Vaco elite tech team's own settlement,
-// `town.js`) to any of the four mainland countries -- that is a real
-// open question raised back to the user rather than silently
-// answered here.
+// **"Meridian" retired (14 Oct 2026), per direct instruction**:
+// "instead of the meridian, it will be the four countries that are
+// ran by the Vaco system... the four starter lands that are ran by
+// the families that came over and built what's going on." There is
+// no separate hidden settlement a tech team secretly found -- the
+// four mainland countries below ARE the starter lands, administered
+// by the Vaco system through the founding families who crossed over
+// (the master document's own §48: 20 founding families x 4 mainland
+// countries = 80). `town.js`'s own settlement (`TOWN_NAME`,
+// "Founders' Capital") is this file's `MAINLAND_COUNTRIES[0]`
+// (Ironreach) own starter capital, not a separate place.
 
 import {
   CIVILIZATION_KINDS, createCivilization, setStatistic, registerGateway,
   createRedZone, createTradeRoute, claimTerritory,
 } from './civilizations.js';
 
-// §5, verbatim specialization lists.
+// §5, verbatim specialization lists. Names are a real, flagged
+// proposal (14 Oct 2026) made when "Country One".."Country Four" were
+// retired as functional labels -- each chosen to fit its own real
+// specialty below, not asserted as the source documents' own words.
+// `Ironreach` (Country One) is `town.js`'s own already-built
+// settlement's (`TOWN_NAME`, "Founders' Capital") starter country.
 export const MAINLAND_COUNTRIES = [
   {
-    name: 'Country One', gateKey: 'serpent', gateTier: 'heavy-equipment',
+    name: 'Ironreach', gateKey: 'serpent', gateTier: 'heavy-equipment',
     majorIndustries: ['robotics', 'construction robots', 'heavy machinery', 'mining', 'excavation', 'industrial automation', 'fabrication', 'infrastructure', 'maintenance', 'heavy transportation'],
     economy: 'robotics and heavy industry', transportationCulture: 'heavy rail and robotic freight', robotUsage: 'pervasive, industrial-grade',
   },
   {
-    name: 'Country Two', gateKey: 'leviathan', gateTier: 'commercial-cargo',
+    name: 'Luminae', gateKey: 'leviathan', gateTier: 'commercial-cargo',
     majorIndustries: ['computing', 'sensors', 'communications', 'navigation', 'electronics', 'AI-support hardware', 'control systems', 'advanced digital infrastructure'],
     economy: 'electronics and advanced systems', transportationCulture: 'autonomous high-capacity speed buses', robotUsage: 'advanced, research-grade',
   },
   {
-    name: 'Country Three', gateKey: 'sentinel', gateTier: 'strategic-military',
+    name: 'Aegira', gateKey: 'sentinel', gateTier: 'strategic-military',
     majorIndustries: ['weapons', 'defense systems', 'security vehicles', 'protective infrastructure', 'tactical logistics', 'military manufacturing', 'security technology'],
     economy: 'defense and security', transportationCulture: 'armored convoy and tactical logistics', robotUsage: 'security and enforcement-grade',
     securityPhilosophy: 'heavy, centralized, government-controlled',
   },
   {
-    name: 'Country Four', gateKey: 'tiger', gateTier: 'container',
+    name: 'Verdane', gateKey: 'tiger', gateTier: 'container',
     majorIndustries: ['farms', 'greenhouses', 'hydroponics', 'fishing', 'food processing', 'agricultural robotics', 'storage', 'food distribution'],
     economy: 'food and agriculture', transportationCulture: 'rail freight and refrigerated cargo', robotUsage: 'agricultural automation',
   },

@@ -159,7 +159,7 @@ async function transferVCoin({ fromUserId, toUserId, amount, reason }) {
 
 // VDP's own server-to-server VOID Hub Station registration -- same
 // auth posture as transferVCoin above (X-Service-Name/X-Service-Token,
-// no end-user session), because registering Meridian's own real
+// no end-user session), because registering the town's own real
 // logistics infrastructure is VDP's server declaring its own
 // presence on VOID's network, not something any one player does.
 // VOID's own `registerStation` (void/lib/stations.js) rejects a bare
@@ -209,10 +209,10 @@ async function postGovernmentJobToVoid({ businessId, positionType, hourlyRate })
 // server-to-server (a trusted service credential, same posture as
 // `transferVCoin`/`registerVoidHub` above) the moment a new real
 // player record is actually created (`ensurePlayer`, below). Fire-
-// and-forget, same fail-soft shape `registerMeridianVoidHubsOnce`
-// already uses -- a brand-new player must never be blocked on VASH
-// TAP being reachable, and `ensurePlayer` itself stays synchronous
-// (every existing caller reads `.skills`/`.state` off it immediately).
+// and-forget, same fail-soft shape `registerTownVoidHubsOnce` already
+// uses -- a brand-new player must never be blocked on VASH TAP being
+// reachable, and `ensurePlayer` itself stays synchronous (every
+// existing caller reads `.skills`/`.state` off it immediately).
 async function registerPersonalTap(ownerIdentityId) {
   const res = await fetch(`${VASH_TAP_API_URL}/api/taps`, {
     method: 'POST',
@@ -314,6 +314,7 @@ let store = createVdpStore();
   const populationLib = await import('./src/lib/population.js');
   const newsLib = await import('./src/lib/news.js');
   const cityTiersLib = await import('./src/lib/cityTiers.js');
+  const townLib = await import('./src/lib/town.js');
   const foodDistrictLib = await import('./src/lib/foodDistrict.js');
   const chopzLib = await import('./src/lib/chopz.js');
   const immigrationLib = await import('./src/lib/immigration.js');
@@ -445,7 +446,7 @@ let store = createVdpStore();
     return assigned;
   }
 
-  // Register Meridian's own real VOID Hub Stations once, idempotently
+  // Register the town's own real VOID Hub Stations once, idempotently
   // -- guarded by the persisted `registered` flag so a server restart
   // never re-registers duplicates. Two real stations, matching the
   // user's own split ("locations for package distribution food
@@ -453,35 +454,36 @@ let store = createVdpStore();
   // VOID's own real temperature-controlled variant
   // (VOID_FOOD_CAPABLE_STATIONS.md's "hot and cold section" hybrid)
   // for food distribution. Coordinates are a flagged placeholder --
-  // Meridian is fictional, so this uses a real St. Charles, MO point
-  // (the first real-world reference this world's design pulled from)
-  // rather than an arbitrary lat/lng. Fails soft: VOID may not be
-  // running in every dev environment, and a missing hub must not take
-  // VDP's own server down.
+  // the town (`townLib.TOWN_NAME`) is fictional, so this uses a real
+  // St. Charles, MO point (the first real-world reference this
+  // world's design pulled from) rather than an arbitrary lat/lng.
+  // Fails soft: VOID may not be running in every dev environment, and
+  // a missing hub must not take VDP's own server down.
   //
   // Runs from inside `onReady`, not right after `attachStore()`
   // returns -- `attachStore` loads the persisted store asynchronously
   // and calls `onReady` once it's actually ready; code placed after
   // the `attachStore(...)` call itself runs immediately, against the
   // stale pre-load `store` binding, before the real one is in place.
-  async function registerMeridianVoidHubsOnce() {
+  //
+  async function registerTownVoidHubsOnce() {
     if (store.voidHubs.registered) return;
-    const MERIDIAN_REGION_ID = 'meridian';
-    const MERIDIAN_LAT = 38.7881;
-    const MERIDIAN_LNG = -90.4974;
+    const TOWN_REGION_ID = 'founders-capital';
+    const TOWN_LAT = 38.7881;
+    const TOWN_LNG = -90.4974;
     try {
       const packageHub = await registerVoidHub({
-        regionId: MERIDIAN_REGION_ID, bayCount: 2, temperatureControlled: false,
-        lat: MERIDIAN_LAT, lng: MERIDIAN_LNG,
+        regionId: TOWN_REGION_ID, bayCount: 2, temperatureControlled: false,
+        lat: TOWN_LAT, lng: TOWN_LNG,
       });
       const foodHub = await registerVoidHub({
-        regionId: MERIDIAN_REGION_ID, bayCount: 2, temperatureControlled: true,
-        lat: MERIDIAN_LAT, lng: MERIDIAN_LNG,
+        regionId: TOWN_REGION_ID, bayCount: 2, temperatureControlled: true,
+        lat: TOWN_LAT, lng: TOWN_LNG,
       });
       store.voidHubs = { registered: true, stations: [packageHub, foodHub] };
-      console.log(`VDP: registered ${store.voidHubs.stations.length} real VOID Hub Stations for Meridian.`);
+      console.log(`VDP: registered ${store.voidHubs.stations.length} real VOID Hub Stations for ${townLib.TOWN_NAME}.`);
     } catch (err) {
-      console.warn(`VDP: could not register Meridian's VOID Hub Stations (VOID may not be running): ${err.message}`);
+      console.warn(`VDP: could not register ${townLib.TOWN_NAME}'s VOID Hub Stations (VOID may not be running): ${err.message}`);
     }
   }
 
@@ -542,7 +544,7 @@ let store = createVdpStore();
       // `store.combatSports` rather than inside that module.
       if (!store.teamSports) store.teamSports = { teams: {}, games: [], nextGameId: 1 };
       if (!store.teamStandings) store.teamStandings = teamStandingsLib.createTeamStandingsStore();
-      registerMeridianVoidHubsOnce();
+      registerTownVoidHubsOnce();
       postGovernmentJobsToVoidOnce();
     },
   });
@@ -582,7 +584,7 @@ let store = createVdpStore();
     });
   });
 
-  // Meridian's own real VOID Hub Station registration -- a cached
+  // The town's own real VOID Hub Station registration -- a cached
   // readout of what VOID itself returned (not re-derived here), so
   // the client sees real registration status even if VOID is briefly
   // unreachable at request time.
@@ -590,7 +592,7 @@ let store = createVdpStore();
     res.json(store.voidHubs);
   });
 
-  // Meridian's own real VACAY hotels -- per direct instruction
+  // The town's own real VACAY hotels -- per direct instruction
   // ("every village will have hotels in them... tier one might just
   // have one hotel, up to tier five might have three"). A VACAY
   // "hotel" is a real Stay listing with `hostType: 'professional'`
@@ -602,11 +604,11 @@ let store = createVdpStore();
   // so VDP's server cannot register these itself the way it does Void
   // Hubs). This endpoint is VDP's own bookkeeping layer on top of that
   // real listing: VACAY's `Listing` record has no location field at
-  // all, so there is no way to ask VACAY "which listings are
-  // Meridian's" -- VDP tracks that itself, and enforces the real
-  // per-tier cap from `cityTiers.js`.
+  // all, so there is no way to ask VACAY "which listings are the
+  // town's" -- VDP tracks that itself, and enforces the real per-tier
+  // cap from `cityTiers.js`.
   app.get('/api/vacay-hotels', (_req, res) => {
-    const tier = cityTiersLib.classifyMeridian();
+    const tier = cityTiersLib.classifyTown();
     res.json({
       listingIds: store.vacayHotels.listingIds,
       maxHotels: tier ? tier.maxHotels : 0,
@@ -614,9 +616,9 @@ let store = createVdpStore();
     });
   });
 
-  // Registers an already-created VACAY Stay listing as one of
-  // Meridian's hotels. Two real checks, not just a client-trusted
-  // claim: (1) the tier cap from cityTiers.js is not exceeded, (2) the
+  // Registers an already-created VACAY Stay listing as one of the
+  // town's hotels. Two real checks, not just a client-trusted claim:
+  // (1) the tier cap from cityTiers.js is not exceeded, (2) the
   // listing genuinely exists on VACAY's own server and its real
   // `hostId` matches the session registering it -- a player cannot
   // claim someone else's listing as "theirs."
@@ -626,13 +628,13 @@ let store = createVdpStore();
       return res.status(400).json({ error: 'register requires an integer listingId' });
     }
     if (store.vacayHotels.listingIds.includes(listingId)) {
-      return res.status(409).json({ error: `listing ${listingId} is already registered as a Meridian hotel` });
+      return res.status(409).json({ error: `listing ${listingId} is already registered as a ${townLib.TOWN_NAME} hotel` });
     }
-    const tier = cityTiersLib.classifyMeridian();
+    const tier = cityTiersLib.classifyTown();
     const cap = tier ? tier.maxHotels : 0;
     if (store.vacayHotels.listingIds.length >= cap) {
       return res.status(409).json({
-        error: `Meridian (${tier ? tier.name : 'unclassified'}) already has its real cap of ${cap} hotel(s)`,
+        error: `${townLib.TOWN_NAME} (${tier ? tier.name : 'unclassified'}) already has its real cap of ${cap} hotel(s)`,
       });
     }
     let listing;
@@ -1099,8 +1101,8 @@ let store = createVdpStore();
       newsLib.recordEvent(store.news, {
         kind: 'property',
         text: shack.type === 'commercial'
-          ? `an unsecured ${shack.levelName} opened near ${req.body.locationLabel || 'Meridian'}`
-          : `an unauthorized structure went up near ${req.body.locationLabel || 'Meridian'}`,
+          ? `an unsecured ${shack.levelName} opened near ${req.body.locationLabel || townLib.TOWN_NAME}`
+          : `an unauthorized structure went up near ${req.body.locationLabel || townLib.TOWN_NAME}`,
       });
       res.status(201).json(shack);
     } catch (err) {

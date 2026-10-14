@@ -1,3 +1,5 @@
+import { TOWN_NAME } from './town.js';
+
 // VDP — jobs/careers.
 //
 // Real, fixed job slots tied to districts that already exist and
@@ -167,7 +169,7 @@ export const JOBS = {
   // online school" (see `school.js`) is the free self-serve path and
   // this is the in-person staffing role for players who want one.
   teacher: {
-    title: 'Meridian School Teacher', districtId: 'school', skill: 'Communication',
+    title: `${TOWN_NAME} School Teacher`, districtId: 'school', skill: 'Communication',
     payrollAccountId: PLANETARY_GOVERNORS_PAYROLL, payPerShift: 18,
   },
   // **Daycare Technician, same day.** No "daycare"/"childcare" entry

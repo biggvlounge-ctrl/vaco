@@ -12,8 +12,18 @@ planet in space — it is a real, undiscovered area of Earth itself,
 beyond the ice wall, which is why reaching it took finding a way
 IN rather than a way off-world. "VDP (Digital Planet)" stays the
 product's own real name regardless — a name given before this detail
-of the story was, the same way `town.js` kept "Meridian" through every
-other correction in this file. Flagged, not silently reconciled.
+of the story was. Flagged, not silently reconciled.
+
+**A second, larger correction (14 Oct 2026) -- see "Meridian retired:
+the four countries are the starter lands" below.** The "first
+settlement" language above, and `town.js`'s own former "Meridian"
+naming it referred to, are retired by direct instruction: there is no
+separate hidden settlement the tech team secretly found. The four
+mainland countries themselves (`worldAtlas.js`'s `MAINLAND_COUNTRIES`)
+are the real starter lands, administered by the Vaco system through
+the founding families who crossed over. Left in place above rather
+than rewritten, per this document's own standing rule: a correction is
+recorded as a new dated entry, not a silent edit of what came before.
 
 This is the real premise behind what the code already does, not a
 layer added on top of it — the pieces below already exist and already
@@ -54,10 +64,11 @@ loud.
 
 ## What this reframes, concretely
 
-- **`town.js`'s `TOWN_NAME = 'Meridian'`** is the name of the first
-  settlement the tech team founded beyond the ice wall — still flagged
-  as a placeholder in that file, not promoted to final by this
-  document. The area itself has no name on record yet either.
+- **`town.js`'s `TOWN_NAME`** (`"Founders' Capital"` as of 14 Oct 2026
+  -- see the retirement section below) is the starter capital of
+  Ironreach, one of the four mainland countries, not a separate
+  settlement the tech team secretly found. The area itself has no name
+  on record yet either.
 - **`settlement.js`'s population-tier unlock ladder** (Hamlet → Village
   → Town → City → Metropolis) is the literal growth of that first
   settlement as more people take up the invitation and arrive — not an
@@ -2040,6 +2051,78 @@ give the host country's eventual discovery of Meridian a real,
 structural reason to matter rather than an invented one. Not written
 into code until the user decides it, the same discipline every other
 undecided lore question in this document already gets.
+
+**Resolved, superseding the paragraph above (14 Oct 2026) -- see
+"Meridian retired: the four countries are the starter lands,"
+immediately below.** The user answered this open question directly,
+not by picking the CLAIMED-territory candidate floated above: there
+is no separate Meridian to place at all. Left on record rather than
+deleted, per this document's own standing rule.
+
+## Meridian retired: the four countries are the starter lands (14 Oct 2026, a sixth instruction the same day)
+
+Direct instruction, verbatim: "Instead of the meridian, it will be the
+four countries that are ran by the Vaco system. So basically the four
+starter lands that are ran by the families that came over and built
+what's going on. You can just remove the meridian. We just have to
+name the four countries."
+
+This resolves the open question immediately above, and reframes the
+top-of-document premise (see that section's own 14 Oct 2026
+correction): there was never a separate hidden settlement a tech team
+secretly found beyond the ice wall. The four mainland countries
+(`worldAtlas.js`'s `MAINLAND_COUNTRIES`) ARE the real starter lands --
+administered by "the Vaco system" through "the families that came
+over and built what's going on." The master lore handoff's own real
+figure for this is **180 founding families**, spread across all
+fourteen lands it describes (the four mainland countries plus the ten
+generic island countries, each with its own hidden civilization --
+see "The master lore handoff, and the world-rule foundation," above);
+the document does not give a per-country breakdown, and none is
+invented here. (Not to be confused with `traits.js`'s own, unrelated
+19-family/98-trait character sheet, described in "The real 19-family,
+98-trait sheet" section above -- same word, two different real
+things: one is a lore census figure, the other is a personality-trait
+taxonomy.)
+
+**What changed in code:**
+
+- **The four mainland countries are now named**, a real flagged
+  proposal (not the master document's own words, which leave this
+  open the same way they leave the 40 starter cities' names open):
+  **Ironreach** (robotics/heavy industry, Serpent's Gate),
+  **Luminae** (electronics/advanced systems, Leviathan's Gate),
+  **Aegira** (defense/security, Sentinel's Gate), **Verdane**
+  (food/agriculture, Tiger's Gate) -- each chosen to fit the real
+  specialty §5 already gives that country, not arbitrary.
+- **`town.js`'s `TOWN_NAME`** changed from `'Meridian'` to `"Founders'
+  Capital"` -- reusing the master lore document's own already-given
+  placeholder for exactly this slot (§6's own example city name for a
+  mainland country's first city), rather than inventing a new one.
+  This settlement is now real as Ironreach's own starter capital, not
+  a separate place a tech team secretly found. Every other system that
+  was already built against "Meridian" (VOID Hub Stations, VACAY
+  hotels, the town's population-tier classification, the governing AI
+  prompt, district names, the school-teacher job title) keeps working
+  exactly as before -- only the name and its place in the lore changed,
+  not the gameplay underneath it.
+- **No architectural split.** The existing single-settlement build
+  (districts, jobs, population tiers, NPCs -- all of `world.js`,
+  `jobs.js`, `settlement.js`, etc.) stays exactly as it was, now
+  understood as Ironreach's own capital rather than an isolated hidden
+  colony. Building three more fully-realized countries' worth of
+  districts/jobs/NPCs was not asked for here and is not assumed --
+  Luminae, Aegira, and Verdane exist today only as `worldAtlas.js`'s
+  own real civilization records (statistics, gateways, territory),
+  the same depth every hidden civilization/casino island/pirate island
+  in that module already has.
+- **The old "how did the tech team get past the ice wall" question
+  (see "What is still open," below) is reframed, not answered.** The
+  four Ice Wall Gates (Serpent's/Leviathan's/Sentinel's/Tiger's) are
+  now the real, named way across for the founding families themselves,
+  per §3's own gate list -- but exactly how the first crossing
+  happened, and what (if anything) was already on the other side, is
+  not specified by either source document and not invented here.
 
 ## What is still open
 

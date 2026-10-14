@@ -124,7 +124,7 @@ test('GET /api/jobs lists the real fixed job catalog', { skip: SKIP }, async () 
   assert.ok(body.jobs.every((j) => Number.isFinite(j.payPerShift) && j.payPerShift > 0));
 });
 
-test('GET /api/vacay-hotels reports Meridian\'s real tier cap, not a hardcoded number', { skip: SKIP }, async () => {
+test('GET /api/vacay-hotels reports the town\'s real tier cap, not a hardcoded number', { skip: SKIP }, async () => {
   const body = await (await fetch(`${BASE}/api/vacay-hotels`)).json();
   assert.deepEqual(body.listingIds, []);
   assert.ok(Number.isInteger(body.maxHotels) && body.maxHotels >= 1 && body.maxHotels <= 3);
@@ -156,12 +156,12 @@ test('a mutating route with a real bearer token gets a real 502 when Shield is u
   assert.equal(res.status, 502, 'requireSession must ask Shield and report the outage, not treat it as either success or an expired session');
 });
 
-test('registering a Meridian hotel with no credential is refused WITHOUT reaching Shield', { skip: SKIP }, async () => {
+test('registering a town hotel with no credential is refused WITHOUT reaching Shield', { skip: SKIP }, async () => {
   const res = await post('/api/vacay-hotels/register', { listingId: 1, registeredBy: 'alice' });
   assert.equal(res.status, 401);
 });
 
-test('registering a Meridian hotel with a real bearer token asks Shield -- real 502 when it is unreachable', { skip: SKIP }, async () => {
+test('registering a town hotel with a real bearer token asks Shield -- real 502 when it is unreachable', { skip: SKIP }, async () => {
   const res = await post('/api/vacay-hotels/register', { listingId: 1, registeredBy: 'alice' }, { Authorization: 'Bearer some-token' });
   assert.equal(res.status, 502, 'requireActor must ask Shield before ever checking the tier cap or calling VACAY');
 });

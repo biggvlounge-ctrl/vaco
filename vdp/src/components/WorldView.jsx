@@ -4,7 +4,7 @@ import {
   DISTRICTS, createWorldState, movePlayer, getCurrentDistrict, getNearbyBuilding, enterBuilding, getCameraOffset,
 } from "../lib/world.js";
 import { latestDecision, explainDecision } from "../lib/npcs.js";
-import { classifyMeridian, CITY_TIERS } from "../lib/cityTiers.js";
+import { classifyTown, CITY_TIERS } from "../lib/cityTiers.js";
 import { isDistrictUnlocked } from "../lib/settlement.js";
 import { TOWN_NAME } from "../lib/town.js";
 import { talkToNpc } from "../lib/v4AgentClient.js";
@@ -216,7 +216,7 @@ const DISTRICT_COLORS = {
   commons: "#3a6b3a",
 };
 
-// Meridian Commons' real landscape scene, read from cityTiers.js's
+// The town's Commons real landscape scene, read from cityTiers.js's
 // own tier data (not hardcoded): a grass base, a lagoon sized up for
 // real fishing spots at the largest tier, a dashed trail loop labeled
 // with the tier's own real trailMiles figure, and (tiers 4-5 only) a
@@ -299,7 +299,7 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
   // Pure/static given the current real feature set -- recomputed on
   // every render rather than memoized, since AMENITY_SOURCES never
   // changes within a session.
-  const cityTier = classifyMeridian();
+  const cityTier = classifyTown();
   const canvasRef = useRef(null);
   const worldStateRef = useRef(worldState);
   // Server-pushed, not locally simulated: `npcsRef` holds the last
@@ -481,7 +481,7 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
     ctx.fillStyle = "#1a1a2e";
     ctx.fillRect(0, 0, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
 
-    // Meridian's own real tier, read live -- drives both the Commons
+    // The town's own real tier, read live -- drives both the Commons
     // landscape scene below and the building-height shadow every
     // other district gets. A top-down 2D canvas has no real z-axis, so
     // "different scales of the heights of the buildings" (direct
@@ -489,11 +489,11 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
     // a literal 3D skyline -- CITY_TIERS' own buildingHeightTier index
     // (0 Low-Rise .. 4 Skyline Tower) scales it, real data driving a
     // real (if modest) visual, not a hardcoded look.
-    const meridianTier = classifyMeridian();
-    const heightIndex = meridianTier ? CITY_TIERS.findIndex((t) => t.id === meridianTier.id) : 0;
+    const townTier = classifyTown();
+    const heightIndex = townTier ? CITY_TIERS.findIndex((t) => t.id === townTier.id) : 0;
     const shadowDepth = 2 + heightIndex * 2; // 2px (Low-Rise) up to 10px (Skyline Tower)
 
-    // Meridian starts as one inhabited district and grows -- per
+    // The town starts as one inhabited district and grows -- per
     // direct instruction ("the rest of the area will be inhabited...
     // this is how the game will grow"), a district the real population
     // hasn't settled yet still physically exists (walkable, enterable)
@@ -509,8 +509,8 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
       const hasView = d.contentType !== 'none';
       const settled = isDistrictUnlocked(d.id, realPopulation);
 
-      if (d.id === 'commons' && meridianTier) {
-        drawCommonsLandscape(ctx, sx, sy, d.width, d.height, meridianTier);
+      if (d.id === 'commons' && townTier) {
+        drawCommonsLandscape(ctx, sx, sy, d.width, d.height, townTier);
       } else if (!settled) {
         ctx.fillStyle = "#2a2a35";
         ctx.fillRect(sx, sy, d.width, d.height);
@@ -824,7 +824,7 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
           </p>
           {!isDistrictUnlocked(enteredDistrict.id, population?.population ?? 0) ? (
             <p style={{ fontSize: 12, color: "#c60" }}>
-              Not yet settled — Meridian needs more real residents before {enteredDistrict.name} opens. The building is here; nobody has moved in yet.
+              Not yet settled — {TOWN_NAME} needs more real residents before {enteredDistrict.name} opens. The building is here; nobody has moved in yet.
             </p>
           ) : (
             <>

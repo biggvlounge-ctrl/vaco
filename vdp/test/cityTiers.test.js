@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import {
   CITY_TIERS, AMENITY_CATEGORIES, AMENITY_SOURCES, WORLD_AESTHETIC,
   getTier, tierIsSatisfiedBy, classifyComplex, describeCoverage,
-  needsRideshare, classifyMeridian,
+  needsRideshare, classifyTown,
 } from '../src/lib/cityTiers.js';
 
 test('there are real 5, 10, 15, 20, and 30 minute tiers, smallest to largest', () => {
@@ -124,10 +124,10 @@ test('building height escalates, one distinct real label per tier', () => {
   assert.equal(heights[4], 'Skyline Tower');
 });
 
-test('classifyMeridian reflects the real, currently-built feature set, not an assertion', () => {
-  const tier = classifyMeridian();
-  assert.ok(tier, 'Meridian must classify into a real tier given AMENITY_SOURCES');
-  // Meridian already has a real source for all 6 categories (My Home,
+test('classifyTown reflects the real, currently-built feature set, not an assertion', () => {
+  const tier = classifyTown();
+  assert.ok(tier, 'the town must classify into a real tier given AMENITY_SOURCES');
+  // The town already has a real source for all 6 categories (My Home,
   // CHOPZ Shorts/Fashion, Food District, DREAMS, Village District, The
   // Vavlt/VACAY) -- this is a live readout of that, not a fixed label.
   const coverage = describeCoverage(AMENITY_SOURCES);

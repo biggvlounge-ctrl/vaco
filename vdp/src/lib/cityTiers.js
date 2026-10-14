@@ -260,10 +260,14 @@ export function needsRideshare(distanceMeters, tierId) {
   return distanceMeters > tier.radiusMeters;
 }
 
-// Meridian's own real classification, computed from AMENITY_SOURCES
+// The town's own real classification, computed from AMENITY_SOURCES
 // above (not asserted) -- every VDP district/panel that backs each
 // category is named there, so this is a real readout of the actual
-// current build, re-evaluated if AMENITY_SOURCES ever shrinks.
-export function classifyMeridian() {
+// current build, re-evaluated if AMENITY_SOURCES ever shrinks. Named
+// `classifyTown` rather than after any one real place (`town.js`'s
+// own `TOWN_NAME` is the real, nameable thing; this module stays
+// decoupled from it the same way every other cross-module reference
+// in this app already is).
+export function classifyTown() {
   return classifyComplex(AMENITY_SOURCES);
 }
