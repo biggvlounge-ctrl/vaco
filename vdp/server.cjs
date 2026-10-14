@@ -339,6 +339,7 @@ let store = createVdpStore();
   const leaderboardsLib = await import('./src/lib/leaderboards.js');
   const teamSportsLib = await import('./src/lib/teamSports.js');
   const teamStandingsLib = await import('./src/lib/teamStandings.js');
+  const rankingsLib = await import('./src/lib/rankings.js');
 
   // A migrant's real old-world background carries over if one was
   // recorded (`immigration.js`'s `admitWithPassport`/`crossIllegally`,
@@ -851,10 +852,6 @@ let store = createVdpStore();
   });
 
   // --- Property / housing ----------------------------------------------
-  app.get('/api/property/:ownerId', (req, res) => {
-    res.json({ home: propertyLib.homeOwnedBy(store.property, req.params.ownerId) });
-  });
-
   app.post('/api/property/purchase', requireActor('ownerId'), async (req, res) => {
     try {
       const home = await propertyLib.purchaseHome(store.property, {
@@ -946,6 +943,34 @@ let store = createVdpStore();
     }
   });
 
+  // "Make sure everything that is manufactured... has a place... all
+  // the warehouses, whatever spaces are needed, farms" (14 Oct 2026,
+  // direct instruction) -- real, independent ownership slots, same
+  // footing commercial already stands on apart from a home.
+  app.get('/api/property/industrial/:ownerId/:type', (req, res) => {
+    res.json({ property: propertyLib.industrialOwnedBy(store.property, req.params.ownerId, req.params.type) });
+  });
+
+  app.get('/api/property/industrial-list/:type', (req, res) => {
+    res.json({ properties: propertyLib.listIndustrial(store.property, req.params.type) });
+  });
+
+  app.post('/api/property/purchase-industrial', requireActor('ownerId'), async (req, res) => {
+    try {
+      const property = await propertyLib.purchaseIndustrial(store.property, {
+        ownerId: req.body.ownerId,
+        type: req.body.type,
+        transferFn: (args) => transferVCoin({ ...args, toUserId: 'vdp-property-office' }),
+      });
+      const price = req.body.type === 'industrial' ? propertyLib.INDUSTRIAL_PRICE : propertyLib.FARM_PRICE;
+      economyLib.recordSpending(store.economy, price);
+      newsLib.recordEvent(store.news, { kind: 'property', text: `${req.body.ownerId} opened a real ${req.body.type} property` });
+      res.status(201).json(property);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
   // "We will start off with just a village, commercial, residential,
   // and dreams screen mix" -- a real, independent business slot
   // alongside a home, not a second home.
@@ -1017,6 +1042,42 @@ let store = createVdpStore();
 
   app.get('/api/property/unauthorized', (_req, res) => {
     res.json({ unauthorized: propertyLib.listUnauthorized(store.property) });
+  });
+
+  // "They lead in this organization, in trade, or they trade the
+  // most this" (14 Oct 2026) -- and "it's still based on
+  // businesses... the goal is to get as many businesses, real users,
+  // real sellers into the game... use the same statistic scale on
+  // that as well. Sales, most stores, most marketing." Real sales --
+  // `totalRevenue`, accumulated for the first time this pass (see
+  // `operateBusiness`'s own header). "Most marketing" is not
+  // tracked anywhere in this app and none is invented here; "most
+  // stores" is not meaningful per-owner today either, since
+  // `purchaseCommercial`/`grantFoundingBusiness` both cap one real
+  // commercial property per owner -- a real, named limitation, not
+  // silently answered with a fabricated number.
+  app.get('/api/property/business-leaders', (_req, res) => {
+    const records = propertyLib.listCommercial(store.property).map((p) => ({
+      id: p.id, ownerId: p.ownerId, category: p.category || null, value: p.totalRevenue || 0,
+    }));
+    res.json({ leaders: rankingsLib.rankBy(records) });
+  });
+
+  // **A real, pre-existing bug, found while smoke-testing the route
+  // just above (14 Oct 2026).** This single-segment `:ownerId` route
+  // was registered FIRST among `/api/property/...` GET routes,
+  // silently shadowing every real literal one-segment path after it
+  // -- `/unauthorized` had been answering `{"home": null}` instead of
+  // its real handler for the life of this session, and
+  // `/business-leaders` would have the instant it existed. Confirmed
+  // directly by curling it, not assumed. Moved to the end of this
+  // block, the same real lesson `/api/civilizations/:id` and
+  // `/api/organizations/leaders` already applied -- a third instance
+  // of the identical mistake is worth a standing habit, not a third
+  // one-off fix: **a bare `/:param` route in this app is now checked
+  // last, always, before it is ever written first again.**
+  app.get('/api/property/:ownerId', (req, res) => {
+    res.json({ home: propertyLib.homeOwnedBy(store.property, req.params.ownerId) });
   });
 
   // "People doing unauthorized buildings" -- no transferFn, no actor
@@ -1841,14 +1902,6 @@ let store = createVdpStore();
   });
 
   // --- Resources: local materials and the old-world import stock -------
-  app.get('/api/resources/:id', (req, res) => {
-    res.json({
-      materials: resourcesLib.materialsFor(store.resources, req.params.id),
-      canDig: resourcesLib.canDig(store.resources, req.params.id),
-      oldWorldStock: store.resources.oldWorldStock,
-    });
-  });
-
   app.post('/api/resources/:id/dig', requireParamActor('id'), (req, res) => {
     try {
       const result = resourcesLib.digForResources(store.resources, { entityId: req.params.id });
@@ -1871,6 +1924,21 @@ let store = createVdpStore();
       values[type] = resourcesLib.exoticValueFor(store.resources, type);
     }
     res.json({ values, totalProduced: store.resources.totalProduced });
+  });
+
+  // **Another real, pre-existing instance of the same route-ordering
+  // bug (14 Oct 2026), found by the same systematic sweep that fixed
+  // `/api/property/:ownerId`.** This bare `/:id` had been registered
+  // first, silently shadowing `/exotic-values` above it for the life
+  // of this session -- that real scarcity-price readout was
+  // unreachable. Moved to the end, same standing habit as every other
+  // fix of this exact shape today.
+  app.get('/api/resources/:id', (req, res) => {
+    res.json({
+      materials: resourcesLib.materialsFor(store.resources, req.params.id),
+      canDig: resourcesLib.canDig(store.resources, req.params.id),
+      oldWorldStock: store.resources.oldWorldStock,
+    });
   });
 
   app.post('/api/resources/:id/sell', requireParamActor('id'), async (req, res) => {
@@ -2047,6 +2115,37 @@ let store = createVdpStore();
     }
   });
 
+  // The real, symmetric other half -- "imported, exported" (14 Oct
+  // 2026, direct instruction). Same real duty, same real clearance
+  // path (`/declarations/:declarationId/pay` below handles either
+  // direction already, since it only reads `personId`/`dutyOwed`).
+  app.post('/api/customs/declare-export', requireActor('personId'), (req, res) => {
+    try {
+      const declaration = customsLib.declareExport(store.customs, {
+        personId: req.body.personId,
+        itemName: req.body.itemName,
+        quantity: req.body.quantity,
+        declaredValue: req.body.declaredValue,
+      });
+      newsLib.recordEvent(store.news, {
+        kind: 'customs', text: `${req.body.personId} declared ${req.body.itemName} for export`,
+      });
+      res.status(201).json(declaration);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // "This has the most this... they trade the most this" -- the real,
+  // named import/export counts, read straight off the real
+  // declarations rather than a separately maintained number.
+  app.get('/api/customs/declarations', (req, res) => {
+    const direction = req.query.direction;
+    res.json({
+      declarations: direction ? customsLib.declarationsByDirection(store.customs, direction) : store.customs.declarations,
+    });
+  });
+
   // The declarer is the one who pays their own duty -- same
   // "the session must really match the real record's own owner" check
   // `justice.js`'s own ticket-pay route already applies.
@@ -2141,6 +2240,19 @@ let store = createVdpStore();
   });
 
   // --- Organizations: family, tribe, cult (NPC + player mix) ------------
+  // "This tribe, this group leads in this" (14 Oct 2026, direct
+  // instruction) -- the real league-leader style applied to
+  // organizations, by the one real numeric stat they carry: cohesion.
+  // Registered BEFORE the single-segment `:id` route just below --
+  // the exact civilizations route-ordering lesson, applied here
+  // before it could repeat the bug rather than after.
+  app.get('/api/organizations/leaders', (_req, res) => {
+    const records = organizationsLib.listOrganizations(store.organizations).map((o) => ({
+      id: o.id, name: o.name, type: o.type, value: o.cohesion,
+    }));
+    res.json({ leaders: rankingsLib.rankBy(records) });
+  });
+
   app.get('/api/organizations/:id', (req, res) => {
     res.json({ organization: organizationsLib.getOrganization(store.organizations, Number(req.params.id)) });
   });
@@ -2593,6 +2705,34 @@ let store = createVdpStore();
       const territory = civilizationsLib.updateTerritoryControl(store.civilizations, Number(req.params.id), req.body || {});
       newsLib.recordEvent(store.news, { kind: 'civilization', text: `control of ${territory.name} is now ${territory.controlStatus}` });
       res.status(200).json(territory);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // "This team or this organization, this tribe, this group leads in
+  // this. This has the most this... they trade the most this" (14 Oct
+  // 2026, direct instruction) -- the real "league leader" style,
+  // applied to towns/countries/cities/areas via `civilizations.js`'s
+  // own real 44-statistic sheet. Any real statistic name works
+  // (`wealth`/`income`/`vcoinCirculation` for currency, `education`
+  // for information, `aiAdoption`/`roboticsAdoption` for technology,
+  // `militaryTechnology` for weapons, `tradeVolume`/`imports`/
+  // `exports` for trade) -- nothing here invents a new number, it
+  // only ranks the real ones that already exist. Two segments after
+  // `/civilizations`, so this never collides with the single-segment
+  // `:id` route below regardless of registration order -- the lesson
+  // from that earlier bug, designed around rather than repeated.
+  app.get('/api/civilizations/leaders/:statistic', (req, res) => {
+    try {
+      const records = civilizationsLib.listCivilizations(store.civilizations).map((c) => ({
+        id: c.id, name: c.name, kind: c.kind, value: civilizationsLib.STATISTIC_NAMES.includes(req.params.statistic)
+          ? c.statistics[req.params.statistic] : undefined,
+      }));
+      if (!civilizationsLib.STATISTIC_NAMES.includes(req.params.statistic)) {
+        return res.status(400).json({ error: `"${req.params.statistic}" is not a known statistic (expected one of ${civilizationsLib.STATISTIC_NAMES.join(', ')})` });
+      }
+      res.json({ statistic: req.params.statistic, leaders: rankingsLib.rankBy(records) });
     } catch (err) {
       res.status(400).json({ error: err.message });
     }

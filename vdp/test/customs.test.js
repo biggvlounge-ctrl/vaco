@@ -4,8 +4,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  createCustomsStore, declareImport, payCustomsDuty, declarationsFor, isCleared,
-  seizeSmuggledGoods, seizuresFor, listSeizures, CUSTOMS_DUTY_RATE,
+  createCustomsStore, declareImport, declareExport, payCustomsDuty, declarationsFor, isCleared,
+  declarationsByDirection, seizeSmuggledGoods, seizuresFor, listSeizures, CUSTOMS_DUTY_RATE,
 } from '../src/lib/customs.js';
 
 test('declareImport records a real declaration with a computed duty', () => {
@@ -85,4 +85,39 @@ test('a declaration and a seizure of the same good stay real and separate record
   seizeSmuggledGoods(store, { personId: 'alice', itemName: 'guns', seizedBy: 'patrol-2' });
   assert.equal(declarationsFor(store, 'alice').length, 1);
   assert.equal(seizuresFor(store, 'alice').length, 1);
+});
+
+// -- the real, symmetric export declaration (14 Oct 2026) ----------------
+
+test('declareExport records a real declaration with a computed duty, same as declareImport', () => {
+  const store = createCustomsStore();
+  const declaration = declareExport(store, { personId: 'alice', itemName: 'crop', quantity: 5, declaredValue: 60 });
+  assert.equal(declaration.direction, 'export');
+  assert.equal(declaration.dutyOwed, Math.round(60 * CUSTOMS_DUTY_RATE));
+  assert.equal(declaration.paid, false);
+});
+
+test('declareExport refuses a missing personId/itemName/quantity/declaredValue', () => {
+  const store = createCustomsStore();
+  assert.throws(() => declareExport(store, { itemName: 'crop', declaredValue: 10 }), /personId/);
+  assert.throws(() => declareExport(store, { personId: 'alice', declaredValue: 10 }), /itemName/);
+  assert.throws(() => declareExport(store, { personId: 'alice', itemName: 'crop', quantity: 0, declaredValue: 10 }), /quantity/);
+  assert.throws(() => declareExport(store, { personId: 'alice', itemName: 'crop', declaredValue: -5 }), /declaredValue/);
+});
+
+test('payCustomsDuty clears a real export declaration exactly like an import one', async () => {
+  const store = createCustomsStore();
+  const declaration = declareExport(store, { personId: 'alice', itemName: 'crop', declaredValue: 50 });
+  const cleared = await payCustomsDuty(store, declaration.id, { transferFn: async () => {} });
+  assert.equal(cleared.paid, true);
+  assert.equal(isCleared(store, declaration.id), true);
+});
+
+test('declarationsByDirection splits real imports from real exports', () => {
+  const store = createCustomsStore();
+  declareImport(store, { personId: 'alice', itemName: 'books', declaredValue: 50 });
+  declareImport(store, { personId: 'bob', itemName: 'guns', declaredValue: 80 });
+  declareExport(store, { personId: 'alice', itemName: 'crop', declaredValue: 60 });
+  assert.equal(declarationsByDirection(store, 'import').length, 2);
+  assert.equal(declarationsByDirection(store, 'export').length, 1);
 });

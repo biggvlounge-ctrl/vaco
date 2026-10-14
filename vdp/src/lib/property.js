@@ -71,7 +71,18 @@
 
 import { TOWN_NAME } from './town.js';
 
-export const PROPERTY_TYPES = ['residential', 'land', 'commercial', 'public-housing'];
+// `industrial`/`farm` joined 14 Oct 2026, per direct instruction:
+// "make sure everything that is manufactured at the beginning has a
+// place or a way for it to be produced or manufactured... all the
+// warehouses, whatever spaces are needed, farms." Both are ported
+// verbatim from VACON-C's own real `PROPERTY_TYPES` (checked
+// directly: `residential, commercial, industrial, government,
+// agricultural, mixed, farm, historical_site, digital_property,
+// virtual_location`) rather than an invented "warehouse" word --
+// `industrial` IS the real type a warehouse or a manufacturing
+// space is, the same exact-match discipline this project already
+// applies to every other VACON-C-sourced fact.
+export const PROPERTY_TYPES = ['residential', 'land', 'commercial', 'public-housing', 'industrial', 'farm'];
 
 // Verbatim from vacon-c/server/property.js's own LIFECYCLE list.
 export const LIFECYCLE = [
@@ -370,6 +381,63 @@ export async function purchaseLand(store, { ownerId, transferFn, now = Date.now(
   return property;
 }
 
+// `industrial`/`farm` are each their own independent ownership slot,
+// the same real split `commercial` already stands on apart from a
+// home -- a warehouse or a farm is not a place anyone lives, so it
+// has no business competing with `homeOwnedBy`'s own residential/
+// land slot. Flagged interpretive prices, same footing every other
+// unspecified figure in this file already stands on; `farm` priced
+// below `industrial` since a real farm plot is the less-built of
+// the two.
+export const INDUSTRIAL_PRICE = Math.round(PROPERTY_LEVELS[0].price * 0.6);
+export const FARM_PRICE = Math.round(PROPERTY_LEVELS[0].price * 0.5);
+
+export function industrialOwnedBy(store, ownerId, type) {
+  return store.properties.find((p) => p.ownerId === ownerId && p.type === type) || null;
+}
+
+export async function purchaseIndustrial(store, { ownerId, type, transferFn, now = Date.now() } = {}) {
+  const a = 'purchaseIndustrial';
+  if (!ownerId) throw new Error(`${a} requires an ownerId`);
+  if (!['industrial', 'farm'].includes(type)) {
+    throw new Error(`${a}: "${type}" is not a known type (expected industrial or farm)`);
+  }
+  if (industrialOwnedBy(store, ownerId, type)) {
+    throw new Error(`${a}: "${ownerId}" already owns a real ${type} property`);
+  }
+  if (typeof transferFn !== 'function') throw new Error(`${a} requires a transferFn`);
+
+  const price = type === 'industrial' ? INDUSTRIAL_PRICE : FARM_PRICE;
+  const property = {
+    id: store.nextPropertyId++,
+    type,
+    ownerId,
+    ownerType: 'individual',
+    ownershipType: 'owned',
+    lifecycleStage: 'operation',
+    authorized: true,
+    purchasedAt: now,
+  };
+  store.properties.push(property);
+
+  try {
+    await transferFn({ fromUserId: ownerId, amount: price, reason: `vdp-${type}-purchase` });
+  } catch (err) {
+    const idx = store.properties.indexOf(property);
+    if (idx !== -1) store.properties.splice(idx, 1);
+    throw err;
+  }
+
+  return property;
+}
+
+// Every real industrial or farm property, regardless of owner -- the
+// real, named inventory of "all the warehouses... farms" the
+// instruction asks to have accounted for.
+export function listIndustrial(store, type) {
+  return store.properties.filter((p) => p.type === type);
+}
+
 // "People doing unauthorized buildings" -- a real structure that
 // exists on the books as not sanctioned, built with no purchase at
 // all (an unauthorized builder did not go through the governors'
@@ -412,7 +480,9 @@ export function buildUnauthorized(store, { ownerId, locationLabel, type = 'resid
     authorized: false,
     locationLabel,
     builtAt: now,
-    ...(type === 'commercial' ? { level: COMMERCIAL_LEVELS[0].level, levelName: COMMERCIAL_LEVELS[0].name } : {}),
+    ...(type === 'commercial'
+      ? { level: COMMERCIAL_LEVELS[0].level, levelName: COMMERCIAL_LEVELS[0].name, totalRevenue: 0, timesOperated: 0 }
+      : {}),
   };
   store.properties.push(property);
   return property;
@@ -448,6 +518,15 @@ export function commercialOwnedBy(store, ownerId) {
   return store.properties.find((p) => p.ownerId === ownerId && p.type === 'commercial') || null;
 }
 
+// Every real commercial property, regardless of owner -- the real
+// population `server.cjs`'s own business-leaders route ranks by
+// `totalRevenue`, the same "the caller shapes real records, this
+// module just hands over the real list" split every other leader
+// board in this app already uses.
+export function listCommercial(store) {
+  return store.properties.filter((p) => p.type === 'commercial');
+}
+
 export async function purchaseCommercial(store, { ownerId, transferFn, now = Date.now() } = {}) {
   if (!ownerId) throw new Error('purchaseCommercial requires an ownerId');
   if (commercialOwnedBy(store, ownerId)) {
@@ -466,6 +545,11 @@ export async function purchaseCommercial(store, { ownerId, transferFn, now = Dat
     levelName: COMMERCIAL_LEVELS[0].name,
     authorized: true,
     purchasedAt: now,
+    // Real zeros -- "most sales" is unanswerable without a real
+    // running total `operateBusiness` actually accumulates, see its
+    // own header below.
+    totalRevenue: 0,
+    timesOperated: 0,
   };
   store.properties.push(property);
 
@@ -516,6 +600,8 @@ export function grantFoundingBusiness(store, { ownerId, category, now = Date.now
     authorized: true,
     category,
     grantedAt: now,
+    totalRevenue: 0,
+    timesOperated: 0,
   };
   store.properties.push(property);
   return property;
@@ -591,6 +677,18 @@ export function canOperateBusiness(property, now = Date.now()) {
 // own header): that choice, not an exemption written in here, is the
 // real reason "people will find out how to use bartering... to keep
 // these underground systems growing."
+//
+// **`totalRevenue`/`timesOperated` (14 Oct 2026, a later direct
+// instruction): "most sales"**, named directly among the real
+// business statistics this world should rank by. Before this, a shift
+// computed real revenue and paid it out, but kept no running total on
+// the property record itself -- the same class of gap `fisher`
+// closed for occupations.js, found by checking the real function
+// rather than assuming a number this obviously useful was already
+// kept somewhere. `|| 0` on the read guards a property persisted
+// before this field existed, the same defensive-read discipline a
+// restored world's own missing columns already require elsewhere in
+// this ecosystem.
 export async function operateBusiness(store, {
   ownerId, transferFn, economyMultiplier = 1, now = Date.now(),
   taxRate = 0, treasuryAccountId,
@@ -609,7 +707,11 @@ export async function operateBusiness(store, {
   const revenue = grossRevenue - taxAmount;
 
   const previousOperatedAt = property.lastOperatedAt || null;
+  const previousTotalRevenue = property.totalRevenue || 0;
+  const previousTimesOperated = property.timesOperated || 0;
   property.lastOperatedAt = now;
+  property.totalRevenue = previousTotalRevenue + grossRevenue;
+  property.timesOperated = previousTimesOperated + 1;
 
   try {
     await transferFn({
@@ -617,6 +719,8 @@ export async function operateBusiness(store, {
     });
   } catch (err) {
     property.lastOperatedAt = previousOperatedAt;
+    property.totalRevenue = previousTotalRevenue;
+    property.timesOperated = previousTimesOperated;
     throw err;
   }
 

@@ -20,9 +20,16 @@
 // `declareImport`/`payCustomsDuty` is the legitimate path: a real
 // declared good, a real duty owed, paid into the same real
 // `GOVERNMENT_TREASURY_ACCOUNT` `taxes.js` already uses -- one
-// government ledger, not two. `seizeSmuggledGoods` is the real
-// enforcement half: what a robot patrol or customs officer does when
-// they catch a good that never went through `declareImport` at all
+// government ledger, not two. `declareExport` (14 Oct 2026, a later
+// direct instruction -- "make sure everything that is manufactured...
+// has a way for it to be... imported, exported") is the real,
+// symmetric other half: the same declaration shape, the same real
+// duty, the same `payCustomsDuty`, distinguished only by a real
+// `direction` field -- not a second module, because the government's
+// own real reach over a border crossing does not care which way the
+// good is moving. `seizeSmuggledGoods` is the real enforcement half:
+// what a robot patrol or customs officer does when they catch a good
+// that never went through `declareImport` at all
 // (read off `barter.js`'s own real inventory, by injection -- this
 // module does not import `barter.js`, the same decoupled shape every
 // cross-module reference in this directory already uses). The two
@@ -64,6 +71,37 @@ export function declareImport(store, {
   }
   const declaration = {
     id: store.nextDeclarationId++,
+    direction: 'import',
+    personId,
+    itemName,
+    quantity,
+    declaredValue,
+    dutyOwed: Math.round(declaredValue * CUSTOMS_DUTY_RATE),
+    paid: false,
+    clearedAt: null,
+    declaredAt: now,
+  };
+  store.declarations.push(declaration);
+  return declaration;
+}
+
+// The real, symmetric other half of `declareImport` -- a real good
+// leaving rather than entering, same real duty, same real clearance
+// path. Validated identically; only `direction` differs.
+export function declareExport(store, {
+  personId, itemName, quantity = 1, declaredValue, now = Date.now(),
+} = {}) {
+  if (!personId) throw new Error('declareExport requires a personId');
+  if (!itemName) throw new Error('declareExport requires an itemName');
+  if (!Number.isInteger(quantity) || quantity <= 0) {
+    throw new Error('declareExport requires a positive integer quantity');
+  }
+  if (!Number.isFinite(declaredValue) || declaredValue < 0) {
+    throw new Error(`declareExport requires a non-negative declaredValue, got ${declaredValue}`);
+  }
+  const declaration = {
+    id: store.nextDeclarationId++,
+    direction: 'export',
     personId,
     itemName,
     quantity,
@@ -102,6 +140,14 @@ export async function payCustomsDuty(store, declarationId, { transferFn, now = D
 
 export function declarationsFor(store, personId) {
   return store.declarations.filter((d) => d.personId === personId);
+}
+
+// The real, named split "imported" vs "exported" -- the same two
+// real civilization statistics (`civilizations.js`'s own `imports`/
+// `exports`) this lets a caller actually feed with a real count
+// instead of a guessed one.
+export function declarationsByDirection(store, direction) {
+  return store.declarations.filter((d) => d.direction === direction);
 }
 
 export function isCleared(store, declarationId) {

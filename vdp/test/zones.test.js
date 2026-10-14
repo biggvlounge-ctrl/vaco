@@ -23,3 +23,11 @@ test('pickZone deterministically picks by the real injected rng', () => {
 test('pickZone refuses an empty real zone list', () => {
   assert.throws(() => pickZone([]), /non-empty real zone list/);
 });
+
+test('FRONTIER_ZONES carries a real, separate fish bias for a water-heavy world, distinct from the water bias', () => {
+  const fish = FRONTIER_ZONES.find((z) => z.bias === 'fish');
+  const water = FRONTIER_ZONES.find((z) => z.bias === 'water');
+  assert.ok(fish, 'a fish-biased zone must exist');
+  assert.ok(water, 'a water-biased zone must exist');
+  assert.notEqual(fish.name, water.name);
+});

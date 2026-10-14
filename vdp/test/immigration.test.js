@@ -306,6 +306,26 @@ test('reportSmugglingSpot draws its real zone from the frontier list, or the und
   assert.equal(undergroundSpot.zone, UNDERGROUND_ZONES[0].name);
 });
 
+// -- the real fix for the zone-bias gap (14 Oct 2026) ---------------------
+
+test('reportSmugglingSpot propagates the real zone bias onto the spot as resourceBias', () => {
+  const store = createImmigrationStore();
+  const fishIndex = FRONTIER_ZONES.findIndex((z) => z.bias === 'fish');
+  const spot = reportSmugglingSpot(store, {
+    locationLabel: 'the rivermouth trail', rng: () => fishIndex / FRONTIER_ZONES.length,
+  });
+  assert.equal(spot.zone, 'Rivermouth Shoals');
+  assert.equal(spot.resourceBias, 'fish');
+});
+
+test('reportSmugglingSpot records a real null resourceBias for an underground zone, which carries none', () => {
+  const store = createImmigrationStore();
+  const spot = reportSmugglingSpot(store, {
+    locationLabel: 'the deep vent', leadsToUndergroundWorld: true, rng: () => 0,
+  });
+  assert.equal(spot.resourceBias, null);
+});
+
 test('foundIllegalSettlement records real, free-text red-zone activities, defaulting to none', () => {
   const store = createImmigrationStore();
   const plain = foundIllegalSettlement(store, { founderId: 'carol', locationLabel: 'the frontier ridge' });

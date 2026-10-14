@@ -548,6 +548,17 @@ export function reportSmugglingSpot(store, {
     terrain: ILLEGAL_CROSSING_TERRAIN,
     leadsToUndergroundWorld,
     zone: zone.name,
+    // **A real fix, not a new field (14 Oct 2026).** `zones.js`'s own
+    // header had claimed since 9 Oct 2026 that a frontier zone's
+    // `bias` "is real and read by `immigration.js`" -- checked
+    // directly while widening the water/fishing zones below, and it
+    // was never true: `grep -rn '\.bias\b' src/lib` returned zero
+    // real readers anywhere in this app. `resourceBias` is the actual
+    // fix -- the one real field that propagates a zone's own bias
+    // onto the spot a player actually reads, so a found spot in
+    // Clearwater Flats or Rivermouth Shoals honestly hints at what is
+    // nearby, the same real intent the false claim already named.
+    resourceBias: zone.bias || null,
     reportedBy: reportedBy || null,
     sealed: false,
     // "Once trade routes are found and migration routes are found

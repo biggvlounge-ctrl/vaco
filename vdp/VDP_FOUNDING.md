@@ -1854,6 +1854,118 @@ either takes no id at all or nests the id under a literal prefix
 (`/games/:id`), so no two routes ever share the same segment count
 with one a literal and the other a param.
 
+## League leaders for everything, real businesses, warehouses/farms, imports/exports, and water-heavy fishing (14 Oct 2026, a fourth instruction the same day)
+
+Per direct instruction: "use this same league leader statistic style
+for everything that you can, so it makes the game just as fun
+statistically as sports... this team or this organization, this
+tribe, this group leads in this. This has the most this... they trade
+the most this... it's still based on businesses as well... the goal
+is to get as many businesses, real users, real sellers into the
+game... sales, most stores, most marketing... make sure everything
+that is manufactured at the beginning has a place or a way for it to
+be produced or manufactured, imported, exported... all the
+warehouses, whatever spaces are needed, farms... make the game heavily
+water heavy to where there's a lot of fishing involved as well... make
+sure you remember how the areas are made."
+
+**New `rankings.js`** -- the one real, generic mechanism every leader
+board from here on reaches for: `rankBy`/`rankByAscending` over any
+real `{ id, value }` population, and `rankOf` for "where do I rank"
+against the FULL population rather than a truncated board. It does
+not know what a civilization, an organization, or a business IS, on
+purpose -- shaping real domain data into that pair stays the caller's
+job, the same decoupled-by-injection discipline every cross-module
+call in this app already uses. `leaderboards.js` (fighter win/loss)
+and `teamStandings.js` (team win/loss/ties) keep their own real
+tie-breaking rules (win rate, point differential) rather than being
+rewritten onto this -- those are real per-sport facts this generic
+function has no business deciding.
+
+**Applied everywhere a real number already existed to rank by:**
+
+- `GET /api/civilizations/leaders/:statistic` -- towns, countries,
+  cities, areas, ranked by ANY of the real 44 statistics
+  `civilizations.js` already carries. Currency reads as `wealth`/
+  `income`/`vcoinCirculation`; information as `education`; technology
+  as `aiAdoption`/`roboticsAdoption`; weapons as `militaryTechnology`;
+  trade as `tradeVolume`/`imports`/`exports`. Nothing new was invented
+  to answer this -- the statistics already existed, only the ranking
+  of them is new.
+- `GET /api/organizations/leaders` -- tribes and groups, ranked by the
+  one real numeric stat they carry: cohesion.
+- `GET /api/property/business-leaders` -- real businesses ranked by
+  `totalRevenue` ("most sales"), closing a real gap found while
+  building this: `operateBusiness` computed and paid real revenue on
+  every shift but never kept a running total on the property record
+  itself, so "most sales" was unanswerable before today.
+  `timesOperated` is tracked alongside it for the same reason.
+  **"Most stores" and "most marketing" are explicitly NOT answered**
+  -- a single owner is capped at one real commercial property
+  (`purchaseCommercial`/`grantFoundingBusiness` both refuse a second),
+  so "most stores" is not a meaningful per-owner fact yet, and
+  "marketing" is not tracked anywhere in this app. Recorded as real,
+  named gaps rather than answered with an invented number.
+
+**Real places for what gets manufactured.** `PROPERTY_TYPES` gained
+`industrial` and `farm` -- ported verbatim from VACON-C's own real
+ten-type list (`residential, commercial, industrial, government,
+agricultural, mixed, farm, historical_site, digital_property,
+virtual_location`), checked directly rather than inventing a fictional
+"warehouse" word: `industrial` already IS the real type a warehouse or
+a manufacturing space is. `purchaseIndustrial`/`industrialOwnedBy`/
+`listIndustrial` give both their own real, independent ownership slot
+in `property.js`, the same real split `commercial` already stands on
+apart from a home.
+
+**Real import AND export.** `customs.js`'s `declareImport` had no real
+counterpart -- "imported, exported" named both halves, and only one
+existed. `declareExport` is the real, symmetric other half: same
+validation, same computed duty, same `payCustomsDuty` clearing either
+direction (distinguished only by a real `direction` field on the
+declaration). `declarationsByDirection` is the real split a caller
+needs to actually feed `civilizations.js`'s own `imports`/`exports`
+statistics with a real count instead of a guessed one.
+
+**Water-heavy, with real fishing, and a real fix along the way.**
+`zones.js` gained a second water-related frontier zone, `Rivermouth
+Shoals` (`bias: 'fish'`), distinct from `Clearwater Flats`
+(`bias: 'water'`) -- a fishing spot and a water-treatment spot are two
+different real things. **"Remember how the areas are made" was taken
+as a direct instruction to re-check the real mechanism before touching
+it, not just to avoid inventing a second one** -- doing that found a
+real, standing falsehood: `zones.js`'s own header had claimed since
+9 Oct 2026 that a zone's `bias` "is real and read by `immigration.js`."
+`grep -rn '\.bias\b' src/lib` returned zero real readers anywhere.
+Fixed for real rather than re-asserted: `reportSmugglingSpot` now
+propagates `resourceBias` onto the real spot record it returns.
+
+**Two more real, pre-existing route-ordering bugs, found by
+systematically sweeping every route in the file rather than waiting to
+trip over a third one by accident** (the same class of bug
+`/api/civilizations/:id` already taught this document once): a bare
+`GET /api/property/:ownerId`, registered first, had been silently
+shadowing `GET /api/property/unauthorized` for the entire life of this
+session, and would have shadowed the new `/business-leaders` the
+instant it existed; a bare `GET /api/resources/:id` had been shadowing
+`GET /api/resources/exotic-values` (the real scarcity-price readout)
+the same way, just as long. Both moved to the end of their own route
+blocks, and a small script (`node -e` scanning every registered
+`app.get`/`app.post` path for a same-segment-count literal-vs-param
+collision) confirmed zero remaining instances across the whole file --
+**a bare `/:param` route in this app is now checked last, always,
+before it is written first again.**
+
+**The real supply chain, audited rather than assumed.** Every one of
+`resources.js`'s eight real resource types already has a real, named
+production source: `wood` from both `lumberjack` and `digForResources`
+(the common case plus the dug-up case), `stone`/`clay`/`ore` from
+`digForResources`, `game`/`crop`/`water`/`fish` from their own real
+frontier jobs (`hunter`/`farmer`/`water-treatment-worker`/`fisher`).
+No gap existed here to close -- confirmed directly rather than
+assumed, the same discipline this whole pass already applied to
+`totalRevenue` and `zone.bias`.
+
 ## What is still open
 
 - The area's own name — nothing has been given yet (the product name,

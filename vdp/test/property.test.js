@@ -11,7 +11,8 @@ import {
   upgradeCommercial, COMMERCIAL_LEVELS, operateBusiness, canOperateBusiness,
   BASE_COMMERCIAL_REVENUE, BUSINESS_REVENUE_ACCOUNT, OPERATE_COOLDOWN_MS,
   PUBLIC_HOUSING_NAME, assignPublicHousing, isInPublicHousing, vacatePublicHousing,
-  grantFoundingBusiness, FOUNDING_BUSINESS_CATEGORIES,
+  grantFoundingBusiness, FOUNDING_BUSINESS_CATEGORIES, listCommercial,
+  PROPERTY_TYPES, INDUSTRIAL_PRICE, FARM_PRICE, industrialOwnedBy, purchaseIndustrial, listIndustrial,
 } from '../src/lib/property.js';
 import {
   createResourcesStore, spendMaterials, undoSpend, materialsFor, STARTING_OLD_WORLD_STOCK,
@@ -458,6 +459,44 @@ test('operateBusiness withholds a real income tax when a real rate and treasury 
   });
 });
 
+// -- real sales tracking (14 Oct 2026) ------------------------------------
+
+test('operateBusiness accumulates a real totalRevenue and timesOperated across real shifts', async () => {
+  const store = createPropertyStore();
+  await purchaseCommercial(store, { ownerId: 'gail', transferFn: fakeTransfer([]) });
+  const grossRevenue = COMMERCIAL_LEVELS[0].level * BASE_COMMERCIAL_REVENUE;
+
+  const first = await operateBusiness(store, { ownerId: 'gail', transferFn: fakeTransfer([]) });
+  assert.equal(first.property.totalRevenue, grossRevenue);
+  assert.equal(first.property.timesOperated, 1);
+
+  first.property.lastOperatedAt = 0; // bypass the real cooldown for this test only
+  const second = await operateBusiness(store, { ownerId: 'gail', transferFn: fakeTransfer([]) });
+  assert.equal(second.property.totalRevenue, grossRevenue * 2);
+  assert.equal(second.property.timesOperated, 2);
+});
+
+test('a failed payout rolls back totalRevenue/timesOperated along with lastOperatedAt', async () => {
+  const store = createPropertyStore();
+  await purchaseCommercial(store, { ownerId: 'gail', transferFn: fakeTransfer([]) });
+  await assert.rejects(operateBusiness(store, {
+    ownerId: 'gail', transferFn: async () => { throw new Error('insufficient funds'); },
+  }));
+  const property = commercialOwnedBy(store, 'gail');
+  assert.equal(property.totalRevenue, 0);
+  assert.equal(property.timesOperated, 0);
+  assert.equal(property.lastOperatedAt, null);
+});
+
+test('listCommercial returns every real commercial property regardless of owner', async () => {
+  const store = createPropertyStore();
+  await purchaseCommercial(store, { ownerId: 'gail', transferFn: fakeTransfer([]) });
+  await purchaseCommercial(store, { ownerId: 'hank', transferFn: fakeTransfer([]) });
+  const all = listCommercial(store);
+  assert.equal(all.length, 2);
+  assert.deepEqual(all.map((p) => p.ownerId).sort(), ['gail', 'hank']);
+});
+
 test('operateBusiness omitting taxRate leaves revenue exactly as before -- every existing caller unchanged', async () => {
   const store = createPropertyStore();
   await purchaseCommercial(store, { ownerId: 'gail', transferFn: fakeTransfer([]) });
@@ -606,4 +645,54 @@ test('a granted founding business can operate for real revenue just like a purch
 
 test('FOUNDING_BUSINESS_CATEGORIES names the instruction\'s own real examples', () => {
   assert.deepEqual(FOUNDING_BUSINESS_CATEGORIES, ['restaurant', 'construction', 'farming', 'clothing']);
+});
+
+// -- real warehouses (industrial) and farms (14 Oct 2026) ----------------
+
+test('PROPERTY_TYPES includes industrial and farm, ported verbatim from VACON-C\'s own real types', () => {
+  assert.ok(PROPERTY_TYPES.includes('industrial'));
+  assert.ok(PROPERTY_TYPES.includes('farm'));
+});
+
+test('purchaseIndustrial charges the real price and records a real property of the right type', async () => {
+  const store = createPropertyStore();
+  const calls = [];
+  const warehouse = await purchaseIndustrial(store, { ownerId: 'gail', type: 'industrial', transferFn: fakeTransfer(calls) });
+  assert.equal(warehouse.type, 'industrial');
+  assert.equal(calls[0].amount, INDUSTRIAL_PRICE);
+  assert.equal(industrialOwnedBy(store, 'gail', 'industrial').id, warehouse.id);
+});
+
+test('purchaseIndustrial refuses a second real property of the same type for the same owner', async () => {
+  const store = createPropertyStore();
+  await purchaseIndustrial(store, { ownerId: 'gail', type: 'farm', transferFn: fakeTransfer([]) });
+  await assert.rejects(
+    purchaseIndustrial(store, { ownerId: 'gail', type: 'farm', transferFn: fakeTransfer([]) }),
+    /already owns a real farm property/,
+  );
+});
+
+test('industrial and farm are real, independent ownership slots -- a home does not block either', async () => {
+  const store = createPropertyStore();
+  await purchaseHome(store, { ownerId: 'gail', transferFn: fakeTransfer([]) });
+  const farm = await purchaseIndustrial(store, { ownerId: 'gail', type: 'farm', transferFn: fakeTransfer([]) });
+  assert.equal(farm.type, 'farm');
+  assert.equal(FARM_PRICE < INDUSTRIAL_PRICE, true);
+});
+
+test('a failed payout rolls back a real industrial/farm purchase', async () => {
+  const store = createPropertyStore();
+  await assert.rejects(purchaseIndustrial(store, {
+    ownerId: 'gail', type: 'industrial', transferFn: async () => { throw new Error('insufficient funds'); },
+  }));
+  assert.equal(industrialOwnedBy(store, 'gail', 'industrial'), null);
+});
+
+test('listIndustrial returns every real property of one type, regardless of owner', async () => {
+  const store = createPropertyStore();
+  await purchaseIndustrial(store, { ownerId: 'gail', type: 'industrial', transferFn: fakeTransfer([]) });
+  await purchaseIndustrial(store, { ownerId: 'hank', type: 'industrial', transferFn: fakeTransfer([]) });
+  await purchaseIndustrial(store, { ownerId: 'hank', type: 'farm', transferFn: fakeTransfer([]) });
+  assert.equal(listIndustrial(store, 'industrial').length, 2);
+  assert.equal(listIndustrial(store, 'farm').length, 1);
 });
