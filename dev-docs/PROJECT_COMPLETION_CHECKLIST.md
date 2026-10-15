@@ -13,8 +13,10 @@ learned the hard way three times over, is that a doc's claim and the
 code's truth drift apart fast, so trust the code, re-check the doc.
 
 **Last updated:** 15 Oct 2026, this session (after the ground-truth
-audit landed and its findings were fixed, and after the new personal
-AI assistant feature was added).
+audit landed and its findings were fixed, the new personal AI
+assistant feature was added, and GO_LIVE_DOSSIER.md's own
+self-contradiction was corrected with the one real item it had
+buried — HTTP-level route tests — now closed too).
 
 ---
 
@@ -206,20 +208,32 @@ understated how much was done, not overstated it.**
       later work if wanted — see `vaco-shell/README.md`'s own "Not
       yet built."
 
-### 1.8 Noted, not attempted — a real gap, explicitly out of scope for this pass
-- [ ] **33.** **No HTTP-level route tests in `cvnvo`, `hvntz`, `dreams`.**
-      Every test in these three apps' suites calls lib functions
-      directly rather than issuing a real HTTP request through the
-      Express app (no `supertest` or equivalent anywhere in this
-      codebase, in any app). The business logic itself is thoroughly
-      tested; what's untested is the HTTP wiring layer — route
-      registration, middleware order, body parsing. Real, agent-
-      fixable, but a genuinely large, new undertaking (introducing a
-      testing pattern + dependency that doesn't exist anywhere in this
-      36-app ecosystem yet, across three apps' full route surfaces) —
-      flagged here rather than attempted in the same pass as smaller,
-      targeted fixes. Pick this up as its own dedicated session if it's
-      worth doing before launch.
+### 1.8 GO_LIVE_DOSSIER.md's own self-contradiction, and the real item it buried
+The project owner read `GO_LIVE_DOSSIER.md`'s §4b "what is actually
+left" table and reasonably concluded V3/V4 and CVNVO/YAP "hadn't been
+done at all" — three of its six rows had already been closed by this
+same document's own later §8/§9 sections, and the table was simply
+never updated to match (the exact self-contradicting-doc pattern this
+repo keeps finding in itself). Re-verified directly, not assumed from
+either version of the table:
+- [x] **33a.** V3: 120 tests, 95 pass + 25 correctly skip (no local
+      Postgres — `ECONNREFUSED`, not a real failure). V4-proxy: 59/59
+      once `npm install` ran (same recurring "just needed install"
+      pattern this session keeps finding). Neither was ever "not done."
+- [x] **33b.** CVNVO 52/52, YAP 36/36 — both fully real and tested
+      before this session even started. "14 untested money modules"
+      and "YAP moderation queue" were both already closed per
+      `GO_LIVE_DOSSIER.md`'s own §8.7/§9 — just never struck from §4b.
+      Fixed the table itself (see §1.6 above and the doc's own commit).
+- [x] **33c.** **The one real item buried in that confusion, now
+      closed**: no app in `cvnvo`/`hvntz`/`dreams`/`yap` issued a real
+      HTTP request through its own Express app in any test — every
+      test called a `lib/*.js` function directly. Found the real
+      precedent already in this ecosystem (`v4-proxy/test/server.test.js`
+      — spawn the real server, poll `/api/health`, hit real routes
+      with built-in `fetch`, no new dependency) and applied the same
+      pattern to each app's most safety/money-critical routes. 21 new
+      tests, all green. See the commit for the exact routes covered.
 
 ---
 
