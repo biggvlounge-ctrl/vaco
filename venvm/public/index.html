@@ -56,31 +56,28 @@ function renderScripts(body) {
     '<strong>VENVM cannot generate pixels.</strong> A script request moves through real stages and a production job '
     + 'records real state, but no model produces media here. Anything downstream needs art from elsewhere.', 'warn'));
 
-  out.appendChild(VACO.card('Request a script', [
-    VACO.form([
-      { name: 'brief', label: 'Brief', placeholder: 'a 30s spot for a coffee shop', width: '280px' },
-      { name: 'requesterId', label: 'Requester', value: VACO.userId() || '', width: '130px' },
-    ], function (values) {
-      return VACO.post('/api/scripts', values).then(function (s) {
-        VACO.toast('Script ' + s.id + ' requested.');
-        VACO.render();
-      });
-    }, 'Request'),
-  ]));
+  // `POST /api/scripts` and `.../generate` are `requireCallingService()`
+  // — real internal-scheduler-only routes (their own 403 names the
+  // reason), not something a signed-in person's browser session can
+  // ever satisfy. Showing a "Request"/"Advance" button here would be a
+  // control that always fails, which this ecosystem treats the same as
+  // a placeholder video: don't. Scripts are created by whatever
+  // internal system calls VENVM on a creator's behalf; this page can
+  // only look one up by id.
+  out.appendChild(VACO.notice(
+    'A script is requested by an internal production system, not from this page — '
+    + 'the creation route requires a trusted-service credential, the same boundary V3 holds on money routes. '
+    + 'Look one up by id below once you have one.', 'warn'));
 
   out.appendChild(VACO.card('Look up a script', [
     VACO.form([{ name: 'id', label: 'Script id', type: 'number', min: 1, value: 1, width: '100px' }],
       function (values) {
         return VACO.api('/api/scripts/' + values.id).then(function (s) {
-          while (out.childNodes.length > 3) out.removeChild(out.lastChild);
+          while (out.childNodes.length > 2) out.removeChild(out.lastChild);
           var lines = el('div', 'vaco-stack-sm');
           lines.appendChild(VACO.badge(s.status));
           lines.appendChild(el('p', 'vaco-small vaco-dim', s.brief || ''));
           if (s.body) lines.appendChild(el('pre', 'vaco-mono vaco-small', s.body));
-          lines.appendChild(VACO.button('Advance to generated', function () {
-            return VACO.post('/api/scripts/' + values.id + '/generate', {})
-              .then(function () { VACO.toast('Marked generated — no model ran.'); });
-          }));
           out.appendChild(VACO.card('Script ' + values.id, [lines]));
           VACO.mount(body, out);
         });
@@ -131,34 +128,39 @@ function renderReformat(body) {
 function renderJobs(body) {
   var out = el('div', 'vaco-stack');
 
-  out.appendChild(VACO.card('Start a production job', [
-    VACO.form([{ name: 'scriptId', label: 'Script id', type: 'number', min: 1, value: 1, width: '100px' }],
-      function (values) {
-        return VACO.post('/api/production-jobs', values)
-          .then(function (j) { VACO.toast('Job ' + j.id + ' created.'); VACO.render(); });
-      }, 'Create'),
-  ]));
+  // Same real boundary as the Scripts tab: creating a job and
+  // advancing its stage are `requireCallingService()` routes, run by
+  // whatever internal system is actually producing the piece. This
+  // page can watch a job, including the real external `videoUrl` once
+  // one is genuinely supplied — never a button that advances it.
+  out.appendChild(VACO.notice(
+    'A production job is created and advanced by the internal system actually producing the piece — '
+    + 'this page can only watch one by id.', 'warn'));
 
   out.appendChild(VACO.card('Track a job', [
     VACO.form([{ name: 'id', label: 'Job id', type: 'number', min: 1, value: 1, width: '90px' }],
       function (values) {
         return VACO.api('/api/production-jobs/' + values.id).then(function (job) {
-          while (out.childNodes.length > 2) out.removeChild(out.lastChild);
+          while (out.childNodes.length > 1) out.removeChild(out.lastChild);
           var lines = el('div', 'vaco-stack-sm');
           lines.appendChild(pipeline(job.stage));
           lines.appendChild(el('p', 'vaco-small vaco-dim', 'Script ' + job.scriptId));
 
-          var actions = el('div', 'vaco-row-tight');
-          [['Storyboard', 'storyboard'], ['Queue render', 'queue-render'], ['Mark rendered', 'mark-rendered']]
-            .forEach(function (pair) {
-              actions.appendChild(VACO.button(pair[0], function () {
-                return VACO.post('/api/production-jobs/' + values.id + '/' + pair[1], {})
-                  .then(function () { VACO.toast(pair[0] + ' recorded.'); });
-              }, 'sm'));
-            });
-          lines.appendChild(actions);
-          lines.appendChild(el('p', 'vaco-small vaco-faint',
-            'Each stage records real state. None of them renders anything.'));
+          // `videoUrl` is real and externally supplied, or it is
+          // honestly null — VENVM itself never produces one, so this
+          // never renders a placeholder.
+          if (job.stage === 'rendered' && job.videoUrl) {
+            var video = el('video', null);
+            video.src = job.videoUrl;
+            video.controls = true;
+            video.style.width = '100%';
+            lines.appendChild(video);
+          } else if (job.stage === 'rendered') {
+            lines.appendChild(VACO.notice('Marked rendered with no external videoUrl supplied — nothing to play.', 'warn'));
+          } else {
+            lines.appendChild(el('p', 'vaco-small vaco-faint',
+              'Each stage records real state. VENVM renders nothing itself.'));
+          }
           out.appendChild(VACO.card('Job ' + values.id, [lines]));
           VACO.mount(body, out);
         });
@@ -191,9 +193,32 @@ function renderConsent(body) {
         { name: 'scope', label: 'Scope', placeholder: 'scope name', width: '140px' },
       ], function (values) {
         return VACO.post('/api/likeness-consents', values)
-          .then(function (c) { VACO.toast('Consent ' + c.id + ' recorded.'); });
+          .then(function (c) { VACO.toast('Consent ' + c.id + ' recorded.'); VACO.render(); });
       }, 'Grant'),
     ]));
+
+    var userId = VACO.userId();
+    if (userId) {
+      return VACO.api('/api/likeness-consents?subjectId=' + encodeURIComponent(userId)).then(function (r) {
+        var consents = r.consents || [];
+        out.appendChild(VACO.card('Your consents', [
+          VACO.table([
+            { key: 'id', label: 'Id' },
+            { key: 'grantedToId', label: 'Granted to' },
+            { key: 'scope', label: 'Scope' },
+            { label: 'Status', render: function (c) { return VACO.badge(c.revokedAt ? 'revoked' : 'active', c.revokedAt ? undefined : 'money'); } },
+            { label: '', render: function (c) {
+              if (c.revokedAt) return '';
+              return VACO.button('Revoke', function () {
+                return VACO.post('/api/likeness-consents/' + c.id + '/revoke', {})
+                  .then(function () { VACO.toast('Consent ' + c.id + ' revoked.'); VACO.render(); });
+              }, 'sm');
+            } },
+          ], consents, { empty: 'No consents recorded yet.' }),
+        ]));
+        VACO.mount(body, out);
+      });
+    }
 
     VACO.mount(body, out);
   });
