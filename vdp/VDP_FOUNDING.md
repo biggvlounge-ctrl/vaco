@@ -2485,6 +2485,111 @@ just wanted to put that on file"), the same discipline the master
 lore handoff itself got (rules/content built only once asked for,
 not the instant the lore arrives).
 
+## The Villages of [Area]: real-estate acquisition, named, defining "the villages" the container-villa section above referenced (15 Oct 2026) -- recorded, not yet built
+
+Per direct instruction, continuing the same off-subject real-estate
+thread as the section immediately above -- this one answers what
+"the villages" (which the container villas were described as "a
+smaller version... of") actually are at full scale, and ties a real
+acquisition strategy to it.
+
+**The real plan, stated directly**: "we will be setting up, we will
+be buying property starting in St. Louis first. Certain different
+properties depending on the shape." St. Louis is the real starting
+market, named directly -- not a flagged guess the way most placeholder
+locations in this document are.
+
+**The real-world model, named directly**: "a similar operation to the
+operation in the streets of St. Charles, Beale Street, which is about
+27 acres of shopping area, walkable shopping area mixed with
+residential, hotels, commercial." Recorded verbatim rather than
+resolved into one single confirmed real place -- "the streets of St.
+Charles" and "Beale Street" are both named in the same breath, and
+this document does not know whether that means one place by two
+names, two separate comparable precedents, or a slip of the tongue;
+not guessed at here.
+
+**This is NOT a new precedent for this codebase -- it is the same one
+`cityTiers.js` already carries, now extended from a design
+justification into a real acquisition strategy.** `cityTiers.js`'s
+own header already recorded, from an earlier instruction: "some tier
+fives might even have a casino... the St. Charles location is only 27
+acres, and that's kind of a smaller tier operation, and it has a
+casino" -- the same real ~27-acre St. Charles figure, there cited as
+Hollywood Casino St. Charles, used to justify `casinoEligible: true`
+on every `CITY_TIERS` tier rather than just the largest. The two
+mentions, read together, now resolved: St. Charles's own real compact
+walkable/mixed-use/casino footprint is this whole project's one
+standing real-world reference for "how much a modest-acreage site can
+actually hold" -- cited twice, for two different real decisions, not
+two coincidences.
+
+**The real operation**: the same walkable, mixed shopping/residential/
+hotel/commercial model as that precedent, but "more technical, more
+technology based with our business inside those." Named: "they will
+be called the villages of whatever area that is" -- i.e. each one is
+"The Villages of `<Area>`," `<Area>` being wherever it's actually
+built (St. Louis first). This is the real, full-scale thing the
+container-villa section above called "the villages" without yet
+defining -- now defined. Whether "The Villages of `<Area>`" is the
+same real thing `town.js`/`world.js`'s own single built settlement
+is, or a second, parallel real-estate product VDP's world would need
+to represent multiple instances of, is open.
+
+**Screen density, scaled by acreage**: "we will be loading those
+areas up with screens, and that will be a 1-10 scale or 1-5 scale
+operation depending on how big the acreage is on the land." The
+user's own words leave the scale ambiguous (1-10 or 1-5) -- not
+resolved here. `cityTiers.js`'s existing `CITY_TIERS` is already a
+real 5-tier ladder (5/10/15/20/30-minute cities) with `screens`
+already one of its six real `AMENITY_CATEGORIES`
+(`dreamsClient.js`'s DREAMS Screens panel) -- but that ladder scales
+by walkable MINUTES, not acreage directly. Whether this new acreage-
+based screen scale is the SAME `CITY_TIERS` ladder (acreage and
+walkable-minute radius correlating in practice) or a second, separate
+tier axis specific to "The Villages of `<Area>`" is a real open
+question, not assumed either way.
+
+**Real business rationale, stated directly, worth keeping verbatim**:
+"mixing the real estate with the tech will extend our operations
+faster and help us improve with the tech and push it faster," and
+"real estate mixed with the technology will help these real estate
+locations produce income faster, which builds value faster." The real
+reason for this whole operation, not just flavor -- tech deployed on
+owned real estate is meant to accelerate both the tech's own adoption
+and the real estate's own income/value, each one feeding the other.
+
+**Per-hotel-room screens, a real, specific placement rule**: "with
+each one of those hotel rooms, each room will have a screen outside
+and on the inside. One outside, like on the patio or on the side of
+it, and then there also will be a screen on the inside." Two real
+DREAMS screens per hotel room, not one -- more granular than anything
+`cityTiers.js` currently models (`maxHotels` is only a room-count
+ladder today, with no per-room screen rule at all). The real VACAY
+hotel-registration route (`/api/vacay-hotels`) is the nearest existing
+hook; it does not yet know about screens at all.
+
+**VOID pickup stations at every location**: "we also will have our
+void pickup stations at each one of those locations as well." Checked
+directly against VOID's own real source (`void/lib/stations.js`,
+`void/CLAUDE.md`): VOID's own naming convention has no literal
+"pickup station," but it has exactly this real concept under a
+different real name -- **VOID Port Stations** ("the drone-specific
+stations: landing, charging, package pickup/drop-off"), distinct from
+the **VOID Hub Stations** (`stationType: 'hub-and-port'`) this app's
+own `registerVoidHub`/`registerTownVoidHubsOnce` already registers for
+the town. Read as: each Villages location gets a real VOID Port
+Station, not necessarily a full Hub Station -- a real, flagged
+reading of the user's own words against VOID's own real vocabulary,
+not asserted as confirmed by direct instruction.
+
+**What is deliberately NOT done here**: same as the section above --
+no new code. This defines a term the previous section used
+("the villages") and ties a real acquisition strategy and a real
+screen-density rule to it; building any of it (acquisition pipeline,
+a Villages-specific tier ladder, per-room screen registration, VOID
+Port Station wiring) waits for direct instruction to do so.
+
 ## What is still open
 
 - **The whole VOID Hub expansion** (see "VOID Hub expansion, container
@@ -2496,6 +2601,16 @@ not the instant the lore arrives).
   mechanic for schools/land; whether a 20-foot container hotel room
   counts against the existing VACAY per-tier `maxHotels` cap or needs
   its own.
+- **The Villages of [Area]** (see the section immediately above) —
+  recorded, not built. Open specifics: whether "the streets of St.
+  Charles" and "Beale Street" name one real place or two; whether its
+  screen-density scale is `cityTiers.js`'s existing 5-tier `CITY_TIERS`
+  ladder or a separate acreage-keyed one, and whether it's 1-5 or
+  1-10; whether "The Villages of [Area]" is the same real thing
+  `town.js`/`world.js` already build or a second, parallel product;
+  the real per-room screen registration mechanic; and whether "VOID
+  pickup stations" means VOID's real Port Stations (the flagged
+  reading above) or something else.
 - The area's own name — nothing has been given yet (the product name,
   "VDP / Digital Planet," is not it — see the correction above).
 - **The ten generic island countries' real population range and any
