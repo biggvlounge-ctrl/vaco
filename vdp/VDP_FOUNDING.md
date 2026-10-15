@@ -2276,6 +2276,55 @@ for `controlStatus`, fixed alongside the new `updateGatewayStatus`).
 Full suite (780 tests) passes; a real boot confirmed the GET route
 reads real zero-state and the POST route is correctly actor-gated.
 
+## Scarcity-driven trade between civilizations (15 Oct 2026)
+
+Per direct instruction, continuing "do all": this session's own
+second gameplay suggestion, that a civilization's real industry gaps
+should drive real business trade rather than sit as flavor text on a
+seed record. The master lore handoff's own rule (§13, "no civilization
+should possess everything") is already enforced in the seed data --
+confirmed directly by an existing real test
+(`'no mainland hidden civilization mirrors its own host country's
+specialty'`) -- but nothing used that fact until now.
+
+**New `src/lib/civilizationTrade.js`**, reusing the exact scarcity law
+`resources.js`'s own `exoticValueFor` already established (8 Oct 2026,
+direct instruction: "there will be an exotic value of things that are
+least accessible... more valuable until they increase"), at the
+civilization scale instead of the raw-material one -- `scarcityValueFor`
+divides a flagged `BASE_SCARCITY_VALUE` (200) by one plus how many of
+the world's real civilizations actually carry that industry, the same
+inverse-relationship formula, a different real denominator.
+
+- `findScarceOpportunities`: what a civilization actually lacks that
+  at least one OTHER real civilization actually carries, ranked
+  scarcest (most valuable) first -- the real "what should I import,
+  and who sells it" readout a player can act on.
+- `conductScarcityTrade`: the real, payable business action -- a
+  player moves goods from a civilization that actually carries an
+  industry to one that actually lacks it, and is paid the real
+  scarcity value times how much cargo moved. Refuses a trade that
+  isn't real scarcity (same source, already-has-it destination, or
+  the same civilization twice). Payment is attempted BEFORE the trade
+  route is recorded -- the reverse of this app's usual claim-before-
+  pay/rollback ordering, because there is no real inventory here to
+  deduct-then-restore; a trade route is a record of a COMPLETED real
+  trade, so it is only created once the payout actually succeeds.
+
+Wired into `server.cjs`: `GET
+/api/civilizations/scarcity-opportunities/:id` and `POST
+/api/civilizations/scarcity-trade` (actor-gated on `traderId`, same
+`transferVCoin` posture as `sellMaterials`'s own route). Both avoid
+the single-segment `:id` catch-all's route-shadowing risk by
+construction. Posts a real `news.js` event on every completed trade
+and credits `store.analytics.totalVCoinGenerated`, the same accounting
+every other paid action in this app already keeps.
+
+7 new tests; full suite (787 tests) passes; a real boot confirmed
+Ironreach's own real scarcity opportunities (computing, sensors,
+communications... all supplied by Luminae) and that the mutating
+route is correctly actor-gated.
+
 ## What is still open
 
 - The area's own name — nothing has been given yet (the product name,

@@ -338,6 +338,7 @@ let store = createVdpStore();
   const civilizationsLib = await import('./src/lib/civilizations.js');
   const worldAtlasLib = await import('./src/lib/worldAtlas.js');
   const discoveryLib = await import('./src/lib/discovery.js');
+  const civilizationTradeLib = await import('./src/lib/civilizationTrade.js');
   const combatSportsLib = await import('./src/lib/combatSports.js');
   const leaderboardsLib = await import('./src/lib/leaderboards.js');
   const teamSportsLib = await import('./src/lib/teamSports.js');
@@ -2748,6 +2749,41 @@ let store = createVdpStore();
         return res.status(400).json({ error: `"${req.params.statistic}" is not a known statistic (expected one of ${civilizationsLib.STATISTIC_NAMES.join(', ')})` });
       }
       res.json({ statistic: req.params.statistic, leaders: rankingsLib.rankBy(records) });
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // Scarcity-driven trade (15 Oct 2026, own gameplay suggestion,
+  // built): a civilization's own real `majorIndustries` gap is a real
+  // business opportunity now, not flavor text on a seed record.
+  // `scarcity-opportunities/:id` is two segments under
+  // `/civilizations`, same discipline as `discovery/:id` above, so it
+  // can never collide with the single-segment `:id` catch-all below.
+  app.get('/api/civilizations/scarcity-opportunities/:id', (req, res) => {
+    try {
+      res.json({ opportunities: civilizationTradeLib.findScarceOpportunities(store.civilizations, Number(req.params.id)) });
+    } catch (err) {
+      res.status(404).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/civilizations/scarcity-trade', requireActor('traderId'), async (req, res) => {
+    try {
+      const result = await civilizationTradeLib.conductScarcityTrade(store.civilizations, {
+        fromCivilizationId: Number(req.body.fromCivilizationId),
+        toCivilizationId: Number(req.body.toCivilizationId),
+        industry: req.body.industry,
+        traderId: req.body.traderId,
+        cargoAmount: req.body.cargoAmount,
+        transferFn: (args) => transferVCoin(args),
+      });
+      store.analytics.totalVCoinGenerated += result.payout;
+      newsLib.recordEvent(store.news, {
+        kind: 'civilization',
+        text: `${req.body.traderId} profited ${result.payout} VCoin trading ${result.route.cargo[0]} along a real scarcity gap`,
+      });
+      res.status(201).json(result);
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
