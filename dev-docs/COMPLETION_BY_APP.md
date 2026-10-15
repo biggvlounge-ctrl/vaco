@@ -11,7 +11,7 @@ each app's test suite actually executed. Nothing here is recalled.
 `scripts/test/completion-report.test.mjs` fails if this file drifts
 from what the script emits, which is the failure mode that made
 `COMPLETION_AUDIT.md` read 31 apps and 522 tests when the real numbers
-were 36 and 2512.
+were 36 and 2745.
 
 ---
 
@@ -35,11 +35,16 @@ in the design system, and land in all three deployment paths.
 **Three real gaps this table cannot see**, all of them larger than
 anything it can:
 
-1. **Real-time media.** Six surfaces cannot do their core thing —
-   Vvltvre Flix cannot play, Vvltvre Pods cannot stream, Vavlt Stvdios
-   cannot show a feed, CHOPZ cannot play video, VENVM cannot generate
-   media, DREAMS has no display. Blocked on a vendor decision, not
-   effort. See `dev-docs/MEDIA_INFRASTRUCTURE_DECISION.md`.
+1. **Real-time media.** Vvltvre Flix, Vvltvre Pods, CHOPZ, and Vavlt
+   Stvdios' on-demand Video primitive are wired end to end (as of 15 Oct
+   2026) — what's left for those four is real object storage + a CDN,
+   a vendor/budget line, not a code gap. Three surfaces still can't do
+   their core thing for reasons that stay blocked either way: Vavlt
+   Stvdios' *live* eight-screen wall cannot show a feed (needs a
+   real-time transport vendor, separate from the Video primitive above),
+   VENVM cannot generate media (a real AI-video-vendor decision), and
+   DREAMS has no display (no screen hardware exists anywhere in this
+   ecosystem). See `dev-docs/MEDIA_INFRASTRUCTURE_DECISION.md`.
 2. **Docker has never been build-tested** (#128) and **backups are
    same-host only** (#125). Both blocked on infrastructure, not work.
 3. **A guard being present is not a guard being right.**
@@ -54,9 +59,9 @@ anything it can:
 | Metric | Value |
 |---|---:|
 | Express backends in the manifest | **36** |
-| Overall criteria met | **100%** (276/276) |
+| Overall criteria met | **100%** (277/277) |
 | Apps at 100% | **36 / 36** |
-| Tests | **2512** |
+| Tests | **2745** |
 | Apps with no test suite | **0** |
 
 Two notes on that test count, so it is not read as contradicting
@@ -82,9 +87,9 @@ anything else:
 |---|---:|---:|---|---|---|---|---|---|---|---|---:|
 | `chopz` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 8 |
 | `chopz-shop` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 16 |
-| `cvnvo` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 16 |
-| `dreams` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 16 |
-| `hvntz` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 88 |
+| `cvnvo` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 23 |
+| `dreams` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 37 |
+| `hvntz` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 100 |
 | `shield` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 16 |
 | `v3` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 120 |
 | `v4-proxy` | **100%** | 7/7 | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | 59 |
@@ -94,15 +99,15 @@ anything else:
 | `vaco-analytics` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 39 |
 | `vaco-audit` | **100%** | 6/6 | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | 17 |
 | `vaco-media` | **100%** | 6/6 | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | 52 |
-| `vaco-notify` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 18 |
+| `vaco-notify` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 24 |
 | `vaco-operator` | **100%** | 6/6 | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | 24 |
-| `vaco-passport` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 24 |
-| `vaco-shell` | **100%** | 6/6 | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | 37 |
+| `vaco-passport` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 37 |
+| `vaco-shell` | **100%** | 7/7 | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | 48 |
 | `vacon` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 18 |
-| `vacon-c` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 1295 |
-| `vago` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 77 |
-| `vash-tap` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 59 |
-| `vavlt-stvdios` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 17 |
+| `vacon-c` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 1401 |
+| `vago` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 120 |
+| `vash-tap` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 63 |
+| `vavlt-stvdios` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 21 |
 | `venvm` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 44 |
 | `vex` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 19 |
 | `vex-trading` | **100%** | 6/6 | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | 10 |
@@ -115,7 +120,7 @@ anything else:
 | `vulture-pods` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 13 |
 | `vulture-studios` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 16 |
 | `vxllage` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 16 |
-| `yap` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 36 |
+| `yap` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 42 |
 
 `—` means the criterion does not apply to that app and is excluded
 from both halves of its fraction — an app is never marked down for
