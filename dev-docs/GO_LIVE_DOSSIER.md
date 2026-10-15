@@ -220,14 +220,23 @@ does not mean the products are finished** — the report says so itself.
 
 ### 4b. What is actually left **[MEASURED gaps, ESTIMATE effort]**
 
+**This table itself had gone stale — corrected 15 Oct 2026, read this
+note before the rows below.** Three of six rows were already closed
+by the time this document's own later sections (§8, §9) were written,
+and the table was simply never updated to match. The project owner
+read this table and reasonably concluded V3/V4 and CVNVO/YAP "hadn't
+been done at all" — they had; this table was wrong, not the code.
+Re-verified directly against the running code on the date above, not
+assumed from either version of this table.
+
 | Work | Why it matters | Effort |
 |---|---|---|
-| **Media vendor decision + integration** | Six surfaces cannot do their core thing: Flix can't play, Pods can't stream, Vault can't show a feed, CHOPZ can't play video, VENVM can't generate, DREAMS has no display | 1 senior eng, 6–10 weeks after the decision |
-| **14 untested money modules** | Today a risk-free money pump was found in one of them. Same condition holds in 14 more, incl. casino cash-out and the store purchase split | 1 eng, 3–5 weeks |
-| **YAP moderation queue** | Highest-liability gap; reports count against people with no review | 1 eng, 2–3 weeks |
+| ~~**Media vendor decision + integration**~~ **Mostly closed, 15 Oct.** | Flix, Pods, CHOPZ, and Vavlt Stvdios' on-demand Video are wired end to end — what's left for those four is an object store + CDN vendor pick, a config line once decided. Still genuinely blocked, each for its own reason: Vavlt Stvdios' *live* eight-screen wall (real-time transport vendor), VENVM (no AI-video-generation vendor), DREAMS (no screen hardware exists). See `MEDIA_INFRASTRUCTURE_DECISION.md`'s own "Update 3." | Config only for the four; vendor decision + integration still open for the other three |
+| ~~**14 untested money modules**~~ **Closed 12 Sep** — this row was never removed when §8.7/§9 below recorded the fix. Re-verified 15 Oct: `shared/settleOnce.js` is still synced to 10 apps (grew from 6), vago's (casino) suite is 120/120. | — | — |
+| ~~**YAP moderation queue**~~ **Was never actually missing** — `cvnvo/yap/lib/moderation.js` (publish/reject/dispute/remove/brigading-detection) predates this session; 36/36 tests pass. As of 15 Oct it also pages ops via vaco-notify on every action. | — | — |
 | **Off-host backups** | Database disk and backup disk are currently the same disk | 1 eng, 3–5 days |
 | **Docker build test + TLS + domain** | 36 build contexts never build-tested; nginx terminates plain HTTP | 1 DevOps, 1–2 weeks |
-| **126 untested routes in the VOID group** | cvnvo 59, hvntz 40, dreams 22, yap 5 | 1–2 eng, 6–8 weeks |
+| **No HTTP-level route tests in `cvnvo`/`hvntz`/`dreams`** | The specific "126 routes, cvnvo 59/hvntz 40/dreams 22/yap 5" count is itself stale (re-measured 15 Oct: cvnvo 59 — still matches; hvntz 62 total routes/33 mutating, not 40; dreams 27 total/15 mutating, not 22). The real, current gap: all three apps' tests call lib functions directly, never issue a real HTTP request through Express (no `supertest` or equivalent anywhere in this 36-app ecosystem). Business logic is thoroughly tested; the HTTP wiring layer (route registration, middleware order, body parsing) is not. | 1 eng, 1–2 weeks — a new pattern to introduce, not 126 routes' worth of business logic to write |
 
 ### 4c. Who should build it **[ESTIMATE]**
 
@@ -435,7 +444,11 @@ Said plainly because a cost table invites being read as complete:
 **[MEASURED]** — every one of these is stated elsewhere in the repo and
 none is hidden:
 
-1. **Real-time media** blocks six surfaces. Vendor decision, not effort.
+1. ~~**Real-time media** blocks six surfaces.~~ **Mostly closed, 15
+   Oct**: Flix, Pods, CHOPZ, and Vavlt Stvdios' on-demand Video are
+   wired; only the live wall (vendor), VENVM (vendor), and DREAMS
+   (hardware) remain, each already correctly a vendor/budget decision
+   rather than an effort gap.
 2. **Docker has never been build-tested** — 36 build contexts.
 3. **Backups are same-host only.** The database disk and its backup
    disk are the same disk.
@@ -454,7 +467,10 @@ none is hidden:
    probed and found sound on the split arithmetic, stated as a result
    rather than left unexamined. Fix: `shared/settleOnce.js`, one
    implementation synced to 6 apps.
-8. **YAP has no moderation queue.**
+8. ~~**YAP has no moderation queue.**~~ **Was never actually true** —
+   `cvnvo/yap/lib/moderation.js` predates this document and was never
+   checked before this line was written. 36/36 tests pass; now also
+   pages ops via vaco-notify on every action (15 Oct).
 9. **VCoin has no stated value in any real currency.**
 10. **A guard being present is not a guard being right** — the route
     audit says so in its own output.
@@ -468,9 +484,9 @@ none is hidden:
 | # | Do this | Because |
 |---|---|---|
 | ~~1~~ | ~~Test the 14 money modules~~ — **done 12 Sep** | 14 defects found, all measured and fixed; see §8.7 |
-| 2 | Decide the media vendor | Unblocks six products; nothing else unblocks six |
+| 2 | Decide the media vendor (object store/CDN; real-time transport) | Flix/Pods/CHOPZ/Vault-Video now only need the former; the live wall still needs the latter |
 | 3 | Off-host backups | Cheapest real risk reduction in the list |
-| 4 | YAP moderation queue | Highest liability, and it is a build |
+| ~~4~~ | ~~YAP moderation queue~~ — **was never actually missing** | Already built; see §8.8 |
 | 5 | Docker build + TLS + domain | Required before anyone outside sees it |
 | 6 | Price VCoin against something real | Every number in §1 is meaningless until this exists |
 | 7 | VDP-first onboarding | Biggest perceived quality gain per hour |
