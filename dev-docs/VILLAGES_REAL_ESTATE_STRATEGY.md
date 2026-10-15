@@ -23,26 +23,35 @@ hotel/stay listings, VOID's own Hub/Port Stations, DREAMS' own screen
 registration, VXLLAGE's own rideshare hooks) already exists in code
 as a *generic* mechanism; nothing here has yet been pointed at it.
 
-**A real naming collision, flagged so it is never mistaken for the
-same thing**: `vxllage/dev-docs/phase-2-villages/` builds a
-completely unrelated software feature also called "Villages" — a
-social-app community/group feature (membership, events, creator-owned
-rooms), modeled on Clubhouse Clubs. That is VXLLAGE's own in-app
-concept. **This document's "Villages" is physical real estate** — an
-actual development built on actual acquired land. Same word, two
-unrelated real things; do not conflate them.
+**Correction (15 Oct 2026) to this section's own earlier claim**: an
+earlier version of this paragraph called VXLLAGE's own in-app
+"Villages" feature (`vxllage/dev-docs/phase-2-villages/` — membership,
+events, creator-owned rooms, modeled on Clubhouse Clubs) "a real
+naming collision... two unrelated real things; do not conflate them."
+**That was wrong, corrected by direct instruction**: the shared name
+is deliberate, not a coincidence, and the two are meant to be
+functionally connected, not just similarly branded — see §11 below
+("Village app membership follows the lease") for the real mechanic.
+Left here, struck through in spirit rather than silently deleted, per
+this repo's own documentation discipline of recording a correction
+rather than erasing the record of the mistake.
 
-**A second, related but distinct thing this also is NOT**: VDP
-(`vdp/VDP_FOUNDING.md`) is a fictional in-game world — "a real, hidden
-place on Earth... beyond Antarctica's ice wall." Two of this
-document's own sections were briefly, mistakenly recorded inside
-`vdp/VDP_FOUNDING.md` before being corrected and moved here. Per
-direct instruction: "The things I'm speaking on are actual real life
-things that have to do with the Vaco app, not the VDP. So don't mix
-the two up." VDP may eventually depict a fictionalized version of
-real VACO business operations the way it already depicts VOID Hub
-Stations and VACAY hotels generically — but that is a separate,
-future decision, not something this document assumes.
+**What VDP (`vdp/VDP_FOUNDING.md`) is, and how it relates to this
+document**: VDP is a fictional in-game world — "a real, hidden place
+on Earth... beyond Antarctica's ice wall." Two of this document's
+sections were briefly, mistakenly recorded inside `vdp/VDP_FOUNDING.md`
+before being corrected and moved here ("The things I'm speaking on
+are actual real life things that have to do with the Vaco app, not
+the VDP. So don't mix the two up."). **That correction stands** — this
+document's own real-estate content is not VDP lore. But per a later,
+separate direct instruction, VDP's own in-game "villas"/"villages"
+architecture (see `VDP_FOUNDING.md`'s own "Villas and villages"
+section) deliberately reuses this exact same real-world brand
+template and naming, on purpose: "what I'm doing in the game or in
+VDP is keeping all of our branding similar." Two separate, parallel
+uses of one brand system — one real-world business, one fictional
+game world — not one unified thing, and not a mixing error either
+time.
 
 ---
 
@@ -290,6 +299,58 @@ apps deployed onto owned real estate accelerate the real estate's own
 income/value, and the owned real estate accelerates the apps' own
 adoption — each side compounding the other, not two separate bets.
 
+## 11. Brand map: which VACO app powers which part of a Village
+
+Per direct instruction: "what I'm doing in the game or in VDP is
+keeping all of our branding similar... we will keep it the same name
+as well." Every real-world and in-game Village is meant to use the
+SAME real VACO app name for the same real function, every time, so
+residents and tenants learn one vocabulary rather than a different
+one per location. Confirmed against each app's own real source below
+— this is an accurate real mapping, not invented pairings.
+
+| Village function | Real VACO app | Confirmed against |
+|---|---|---|
+| The community itself (residents/tenants' own social group) | **Village** (VXLLAGE) | `vxllage/README.md`: "**Village** is the product's own real brand identity... VXLLAGE stays the technical/repo name underneath" |
+| Hospitality / hotel rooms | **VACAY** | `vacay/README.md` |
+| Condos, container apartments, rental villa units | **Villas** (VXLLAS) | Same V-X-stylization pattern as VXLLAGE, per direct instruction |
+| The club / nightlife venue | **The Vault** (Vavlt Stvdios) | `vavlt-stvdios/README.md` |
+| Streaming for commercial tenants who choose to stream | **Vavlt Stvdios** | Same as above — "those Hunt's businesses that choose to stream will be streaming... through Vault Studios" |
+| Restaurant food, drone-delivered | **VOID** | `void/CLAUDE.md`: VOID is the ecosystem's shared logistics/delivery layer |
+| Commercial tenants / local businesses in the Village | **HVNTZ** ("Hunts") | `hvntz/README.md`: "Hunts, the original core mechanic" |
+| DTC screens those commercial tenants sell through | **DREAMS** | `dreams/` (filed under HVNTZ per `VACO.md`'s Part 1 table); `dreamsClient.js`'s own header: "DREAMS is the ecosystem's real ad/screen network... direct-to-consumer" |
+| Where residents/visitors actually buy things | **VENVS** ("Venus") | `venvs/CLAUDE.md`: "VENVS (stylized from 'Venus,' matching the ecosystem's vowel-dropping..." |
+| Village-level dating | **CVNVO** ("Convo") | `cvnvo/README.md` |
+
+**§11's own real mechanic -- "Village app membership follows the
+lease"**: "as soon as they get their lease or join the commercial
+real estate or join the residential real estate, they'll join a
+village, the Village Reddit style text, Reddit style group on
+Village... they'll automatically be tapped into though every
+village." Read as a real, specific trigger: signing a residential OR
+commercial lease/purchase at a physical Village location is meant to
+automatically enroll that person in the matching VXLLAGE app
+community for that specific location (e.g. leasing at Villages of
+Jamestown auto-joins the real "Villages of Jamestown" VXLLAGE group).
+This is the real mechanic the correction above points to — not a
+branding coincidence, an actual intended cross-app trigger. No such
+trigger exists in code anywhere today; VXLLAGE's own `villages.js`
+membership model (`vxllage/dev-docs/phase-2-villages/plan.md`) has no
+real-estate-lease-driven join path, only direct membership.
+
+**Further app fits, per direct invitation ("I'm sure you can run
+through the apps and see how more of them fit into this") -- flagged
+as this document's own observation, not confirmed by direct
+instruction**: **V3** is the obvious infrastructure fit for any real
+money changing hands at a Village (rent, leases, VACAY bookings,
+VENVS purchases) — it is already "the canonical ledger, 18 apps
+settle here" per `VACO.md`. **Shield** is the obvious fit for resident/
+tenant identity and the lease-to-Village-membership trigger above,
+since it is already the ecosystem's shared identity/session layer.
+Both are plumbing any of this would run through regardless of
+Village-specific branding, so neither needs (or has) its own
+consumer-facing Village brand name the way VACAY/Villas/The Vault do.
+
 ---
 
 ## What is still open
@@ -311,3 +372,14 @@ adoption — each side compounding the other, not two separate bets.
   conversion, and container hotel rooms, and at what real pricing.
 - Markets beyond St. Louis/North County — "all over the country" is
   the stated intent, with no other specific markets named.
+- The real lease-to-VXLLAGE-membership trigger (§11) — no such
+  mechanic exists in code; `villages.js`'s own membership model has
+  no real-estate-driven join path today.
+- "VXLLAS" as the real stylized spelling for villas — stated directly
+  but not yet cross-checked against any `vxllage/` or branding source
+  document the way VXLLAGE/VENVS's own vowel-dropping pattern was.
+- The "other programs... that taps those together" the user referenced
+  but did not name — not yet identified.
+- Whether V3/Shield's own obvious infrastructure fit (§11's closing
+  paragraph) should be stated as settled or stays this document's own
+  flagged inference.

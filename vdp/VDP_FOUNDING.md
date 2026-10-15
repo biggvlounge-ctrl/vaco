@@ -2444,6 +2444,21 @@ framing); a villa is the real individual-dwelling unit inside one,
 construction method (container vs. new-technology) determined by
 which of the two real groups above it belongs to.
 
+**This naming is not VDP-only -- it is one real, shared brand system,
+reused deliberately in both places (15 Oct 2026)**: "what I'm doing
+in the game or in VDP is keeping all of our branding similar... we
+will keep it the same name as well." The full real-world brand map
+(Village/VXLLAGE = the community itself, VACAY = hospitality, Villas/
+VXLLAS = the dwelling units, The Vault/Vavlt Stvdios = club and
+streaming, VOID = delivered food, HVNTZ/"Hunts" = commercial
+tenants, DREAMS = their DTC screens, VENVS/"Venus" = where purchases
+happen, CVNVO/"Convo" = dating) is recorded in full in
+`dev-docs/VILLAGES_REAL_ESTATE_STRATEGY.md`'s own §11, not repeated
+here -- that document is the real-world business strategy's own
+home, and this one stays VDP's. VDP's in-game villages/villas are the
+fictional-world expression of that exact same real brand system, not
+a second, independently-invented one.
+
 **What is deliberately NOT done here**: no new code, no new
 `worldAtlas.js` fields, no new `cityTiers.js` mechanics beyond the one
 header note above. This records a real design direction connecting
