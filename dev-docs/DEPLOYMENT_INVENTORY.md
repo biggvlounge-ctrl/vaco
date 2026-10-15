@@ -1,8 +1,27 @@
 # Deployment Inventory — What Exists and What Ships
 
-Verified by booting the whole ecosystem, not from memory. Result:
-**32 up, 0 down, out of 32** at the time of that boot; the stack has since gained `vaco-audit` and `vaco-operator`, both verified live but not in that count. Every claim below traces to a live health
-response or a file on disk.
+**Corrected 15 Oct 2026 — nearly every count in this document has
+moved, and a few numbers inside it already disagreed with each other
+before anything new was added.** Re-measured directly:
+
+| This doc says | Current (15 Oct 2026) |
+|---|---|
+| "32 up, 0 down, out of 32" | Booting fresh: **39 apps total, 37 up, 2 down** (`v4-proxy` down for missing `ANTHROPIC_API_KEY` — environmental, not a bug; `vxllage` had a real boot bug, fixed this same session) |
+| `docker-compose.yml`: 35 app services + nginx, 27 volumes | 39 app services + nginx + livekit + postgres, 33 named volumes |
+| `deploy/nginx-docker.conf`: "all 32 upstreams" | 39 `location` blocks |
+| Per-caller service tokens: given as 20, 19, 18 and 18 in four different places in this same document | **31**, per `node scripts/generate-service-tokens.mjs --list` — the doc disagreed with itself on this number even before the ecosystem grew past it |
+| §4 "Auth coverage — allowlist built, not yet enforced... ships in `observe`, which rejects nothing" | Contradicted by this doc's own §1 ("`VACO_SERVICE_AUTH_MODE` defaults to `enforce`") and by the code: `v3/lib/serviceAuth.cjs`'s `DEFAULT_MODE` is `'enforce'`. §4 was simply never revised after §1 was. |
+| Route-guard coverage: "508/508, zero unaccounted" | **571/571** (517 guarded + 54 declared-open), 36 apps |
+| "## The 16 apps" heading, over a table of ~31 rows, closing with "239 library modules, ~700 routes, 24 apps with disk persistence" | 616 lib files, 1,035 route registrations, 30 apps on `durable(...)` persistence — the "16" heading never matched its own table even before further drift |
+| "Tests — 130 across 9 services, 23 services still have none" | All 36 apps now have a test suite; total is in the thousands (see `dev-docs/COMPLETION_BY_APP.md`) |
+
+What's still accurate: the rate-limiting config, the compliance-gate
+file paths, `VACO_OPERATOR_BOOTSTRAP`'s default behavior, and
+`optionalOwnAccount`'s removed-not-deprecated status. Treat the
+tables below as the shape of what's deployed, not the count — re-run
+`start-ecosystem.sh`, `scripts/generate-service-tokens.mjs --list` or
+`scripts/audit-route-guards.mjs` for a live number instead of trusting
+any count on this page.
 
 ## Deployment tooling — what you already have
 

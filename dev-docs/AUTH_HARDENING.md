@@ -234,7 +234,7 @@ Re-run after the fix, against a live ecosystem:
 | All suites | **477/477** |
 | All frontends | **30/30** in a browser |
 
-`v3/test/shieldAuth.test.js` (13 tests) is written as "the attack
+`v3/test/shieldAuth.test.js` (~~13~~ **15** tests, 15 Oct 2026) is written as "the attack
 fails", not "the happy path works": no header, malformed header, forged
 token, impersonation, the matching-decoy-field case, a missing actor
 field, and Shield being down — which must be **502, never 401 and never

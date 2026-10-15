@@ -4,6 +4,33 @@ A check that every file lives under the app that owns it, and that
 every directory has a deliberate deployment disposition. Re-runnable:
 the commands behind each claim are in this repo's history.
 
+**Corrected 15 Oct 2026 — the fastest-drifting kind of claim in a
+growing monorepo is a file/service count, and this doc has not been
+revisited since at least three new apps were added.** Re-measured:
+- Repository root: ~~"only four files"~~ now has ~18 non-directory
+  files (`.env.example`, `gateway.js`, `package.json`,
+  `sync-design-system.sh`, `install-ecosystem.sh`, a Replit layer,
+  etc., alongside the original four).
+- `start-ecosystem.sh` services: ~~33~~ **39**. `docker-compose.yml`
+  services: ~~32~~ **42** (including nginx, livekit, postgres).
+  `deploy/nginx-docker.conf`: ~~32~~ **39** `location` blocks.
+- `vaco-shell/lib/registry.js`: ~~28 entries under 16 parents~~ **18
+  distinct parents** (CVLTVRE and VADO promoted 26 Aug 2026, per
+  `dev-docs/CVLTVRE_AND_VADO_EXTRACTION_AUDIT.md`'s own
+  recommendation — this doc's table was never updated to match).
+- "Zero cross-app `require()` calls... none found" — now false in one
+  place: `world-layer/test/sources.test.js` has 5 cross-directory
+  `require('../../vacon-c/...')` calls. They're in a test file, not
+  shipped app code, so the Docker-build-context conclusion likely
+  still holds in practice, but "none" as written is wrong.
+- New deploy infrastructure this doc's own inventory doesn't mention:
+  `deploy/generate-ecosystem-config.js` / `ecosystem.config.js`,
+  `deploy/replit-boot.sh`, `deploy/livekit.yaml`.
+
+The underlying METHOD (regenerate from `start-ecosystem.sh`, don't
+hand-edit the generated files) is unchanged and still the right
+rule — only the specific counts below are dated.
+
 ## The chain, and which link is canonical
 
 `start-ecosystem.sh` is **authoritative**. `docker-compose.yml` and

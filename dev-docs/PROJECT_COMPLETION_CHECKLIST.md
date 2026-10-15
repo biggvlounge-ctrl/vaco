@@ -244,6 +244,51 @@ either version of the table:
       all green. See each app's `test/server.test.js` for the exact
       routes covered.
 
+### 1.9 Old dev-docs sweep (this session) — 23 files nobody had re-checked since before 8 Oct
+Per the owner's direct request to check files "from months ago" for
+anything missed: three background agents re-verified every concrete
+claim in the remaining `dev-docs/` files against running code, split
+by topic. Found one real code bug and a long list of stale doc
+claims — both independently re-verified rather than trusted from the
+agents' reports (one agent-reported finding on `foodDistrict.js`'s
+brand count was checked directly and found to be a false positive
+before being written anywhere).
+- [x] **51a. Real bug, not a doc issue**: `vxllage/lib/store.js`
+      initialized `channelReadState` as a `new Map()`. The store is
+      JSON-serialized, and a Map survives a restart as `{}` — the
+      app's own persistence layer already carries a comment warning
+      about exactly this. Result: vxllage failed to boot from a fresh
+      store. Fixed with a plain object; confirmed boots clean and
+      16/16 tests still pass.
+- [x] **51b.** Fixed drifted counts, strikethrough + evidence, across
+      `VACO_ACCELERATION_MATRIX.md`, `ROUTE_AUTHORIZATION_AUDIT.md`,
+      `DECISION_AUDIT.md`, `VACO_CONSTELLATIONS.md`, `COMPANY_TREE.md`
+      (incl. its own 16-vs-18-parents self-contradiction),
+      `REVENUE_ENTITY_INVENTORY.md`, `MASTER_COMPANY_REGISTER.md`
+      (missing 6 real apps built since its baseline),
+      `COMPANY_COUNT_BY_GRANULARITY.md`, `CVLTVRE_AND_VADO_EXTRACTION_
+      AUDIT.md` (its own top two recommendations are done),
+      `REALTIME_MEDIA_SHARED_INFRASTRUCTURE.md`,
+      `DISASTER_RECOVERY.md`, `LAND_AND_MAP_DATA.md`,
+      `BROWSER_INITIATED_MONEY.md` (a flow moved from refuses to
+      works), `STANDING_INSTRUCTION_ONGOING_EVALUATION.md` (a direct
+      contradiction with `vacon-c/CLAUDE.md`'s own "VACON-C is not
+      paused"), `AUTH_HARDENING.md`, `COMPLETION_AUDIT.md` (flagged
+      superseded), and a second self-contradiction in
+      `GO_LIVE_DOSSIER.md` found on top of this session's earlier
+      pass over the same file.
+- [x] **51c.** The three most heavily drifted files
+      (`VACANCY_SPEC_IMPLEMENTATION_MAP.md`, `DEPLOYMENT_INVENTORY.md`,
+      `DEPLOYMENT_FILE_PLACEMENT.md` — nearly every absolute count
+      wrong, not just one or two) got a correction banner with a
+      before/after table rather than a line-by-line rewrite, same
+      treatment as `COMPLETION_AUDIT.md` — the method each describes
+      is still sound; only the numbers were dated.
+- [x] **51d.** Re-verified clean, no action needed:
+      `OPERATOR_ROLES_SCOPE.md`, `STANDING_INSTRUCTION_MIDDLEWARE_
+      COMPOSITION.md`, `STANDING_INSTRUCTION_TEST_VERIFICATION.md`,
+      `COMPARABLES_INDEX.md`, `CORPORATE_STRUCTURE.md`.
+
 ---
 
 ## Part 2 — What is left that only a human/engineer/business decision can close

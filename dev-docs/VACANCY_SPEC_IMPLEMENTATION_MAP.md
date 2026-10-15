@@ -1,5 +1,26 @@
 # VACANCY — spec to implementation map
 
+**Corrected 15 Oct 2026 — every absolute count in this map has moved,
+and `vacon-c/CLAUDE.md` is now the live, continuously-updated ground
+truth for this app; this map was last touched 8 Oct 2026 and wasn't
+revised since.** Re-measured directly:
+
+| This doc says | Current (15 Oct 2026) |
+|---|---|
+| Trait definitions: 128 (114 individual, 20 families) | 136 total, 122 individual, 21 families (a `skills` family and others added since) |
+| HTTP routes: 79 | 94 (`server.js`) |
+| Tests: 317 across 15 files | 1,241 (1,224 pass, 17 skip) across 75 files |
+| `server/` modules: 25, largest `engine.js` at 894 lines | 81 files; largest is `statistics.js` at 1,845 lines |
+| §3 "`region_id` is left null" | Populated for every generated world — `worldgen.js` now calls `migration.generateRegion()` |
+
+The structural claims (11-phase tick loop locked at 11, the §7 urban-
+systems 27/10/3/0 split, the three persistence/restore test counts,
+"no countries table") were re-verified and still hold. Only the
+absolute numbers above have drifted with six weeks of continued
+build-out. For anything not listed here, `vacon-c/CLAUDE.md`'s own
+running list of standing rules is the more current source — it is
+updated every time a new defect or gap is found, this map is not.
+
 **Read this before writing any VACANCY code.** The consolidated master
 spec (`vacon-c/VACANCY_CONSOLIDATED_MASTER_SPEC.md`) arrived with an
 explicit instruction: treat it as the design specification, then
