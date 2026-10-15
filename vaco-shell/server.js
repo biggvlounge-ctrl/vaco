@@ -40,9 +40,6 @@ import {
 import tracingModule from './lib/tracing.cjs';
 const { traceMiddleware } = tracingModule;
 import { getInsightCard } from './lib/insight.js';
-import {
-  TONE_OPTIONS, setProfile, getProfile, getHistory, sendMessage,
-} from './lib/personalAssistant.js';
 import { createShellStore } from './lib/store.js';
 import { attachStore } from './lib/storeBackend.js';
 import { settleVCoin, V3_API_URL } from './lib/v3Client.js';
@@ -102,6 +99,7 @@ attachStore(app, {
 
 const PORT = process.env.PORT || 8789;
 const SHIELD_API_URL = process.env.SHIELD_API_URL || 'http://localhost:8812';
+const ASSISTANT_API_URL = process.env.ASSISTANT_API_URL || 'http://localhost:8828';
 
 
 
@@ -249,29 +247,43 @@ app.get('/api/insight', async (req, res) => {
 
 // -- Personal assistant --------------------------------------------
 //
-// One profile per signed-in user, and the real chat built on top of
-// it. See lib/personalAssistant.js for the real routing decision
-// (VACON specialist vs. this user's own personalized v4-proxy call).
+// Extracted into its own app (`vaco-assistant`, port 8828) on 15 Oct
+// 2026, by direct decision -- the whole point of an assistant that
+// "connects to all of Vaco's and Vacon's AI system" is that it has to
+// be reachable from more than one dashboard, not stuck behind this
+// one. These routes are now a thin proxy: the frontend keeps calling
+// these exact same relative paths (so `VACO.api` keeps attaching the
+// session token with no frontend change at all), and this app
+// forwards the real request straight through, Authorization header
+// included -- same pattern `vulture-pods` already uses to reach
+// `vulture-music` and `vavlt-stvdios`. See vaco-assistant/README.md
+// for how any OTHER app reaches it the same way.
+function proxyToAssistant(method, path) {
+  return async (req, res) => {
+    try {
+      const upstream = await fetch(`${ASSISTANT_API_URL}${path}`, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(req.headers.authorization ? { Authorization: req.headers.authorization } : {}),
+        },
+        body: method === 'GET' ? undefined : JSON.stringify(req.body || {}),
+      });
+      const body = await upstream.json().catch(() => ({}));
+      res.status(upstream.status).json(body);
+    } catch (err) {
+      res.status(502).json({ error: `vaco-assistant unreachable: ${err.message}` });
+    }
+  };
+}
 
-app.get('/api/assistant/tones', (_req, res) => {
-  res.json({ tones: TONE_OPTIONS });
-});
-
-app.get('/api/assistant/profile/:userId', requireParamActor('userId'), (req, res) => {
-  res.json(getProfile(store, req.params.userId));
-});
-
-app.post('/api/assistant/profile', requireActor('userId'), (req, res) => handle(
-  res, () => setProfile(store, req.body || {}),
-));
-
-app.get('/api/assistant/history/:userId', requireParamActor('userId'), (req, res) => {
-  res.json({ messages: getHistory(store, req.params.userId) });
-});
-
-app.post('/api/assistant/chat', requireActor('userId'), (req, res) => handle(
-  res, () => sendMessage(store, req.body || {}), 201,
-));
+app.get('/api/assistant/tones', proxyToAssistant('GET', '/api/assistant/tones'));
+app.get('/api/assistant/profile/:userId', (req, res) => proxyToAssistant('GET', `/api/assistant/profile/${encodeURIComponent(req.params.userId)}`)(req, res));
+// audit-route-guards: open -- decides nothing locally; forwards the real Authorization header to vaco-assistant's own requireActor('userId'), which is the real guard
+app.post('/api/assistant/profile', proxyToAssistant('POST', '/api/assistant/profile'));
+app.get('/api/assistant/history/:userId', (req, res) => proxyToAssistant('GET', `/api/assistant/history/${encodeURIComponent(req.params.userId)}`)(req, res));
+// audit-route-guards: open -- same reasoning as /api/assistant/profile above: the real guard lives in vaco-assistant
+app.post('/api/assistant/chat', proxyToAssistant('POST', '/api/assistant/chat'));
 
 // The storefront needs to show a balance before it asks someone to
 // spend it. Proxied rather than called from the browser so the page has

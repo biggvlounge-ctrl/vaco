@@ -376,6 +376,7 @@ services:
       PORT: 8802
       CVNVO_API_URL: "http://cvnvo:8798"
       VACO_OPERATOR_URL: "http://vaco-operator:8820"
+      VACO_NOTIFY_URL: "http://vaco-notify:8818"
       VACO_SERVICE_NAME: yap
       VACO_SERVICE_TOKEN: "${VACO_TOKEN_YAP:?Set a V3 service token for yap in .env}"
       VACO_OPERATOR_MODE: "${VACO_OPERATOR_MODE:-enforce}"
@@ -1044,6 +1045,30 @@ services:
       - v3
       - shield
       - postgres
+  vaco-assistant:
+    build:
+      context: ./vaco-assistant
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8828
+    container_name: vaco-assistant
+    environment:
+      PORT: 8828
+      SHIELD_API_URL: "http://shield:8812"
+      V4_PROXY_URL: "http://v4-proxy:8787"
+      VACON_API_URL: "http://vacon:8805"
+      VACO_SERVICE_NAME: vaco-assistant
+      VACO_SERVICE_TOKEN: "${VACO_TOKEN_VACO_ASSISTANT:?Set a V3 service token for vaco-assistant in .env}"
+    ports:
+      - "8828:8828"
+    networks:
+      - vaco
+    restart: unless-stopped
+    volumes:
+      - "vaco_assistant_data:/app/data"
+    depends_on:
+      - v3
+      - shield
   venvs:
     build:
       context: ./venvs
@@ -1189,6 +1214,7 @@ volumes:
   vaco_media_data:
   vash_tap_data:
   vaco_passport_data:
+  vaco_assistant_data:
   vdp_server_data:
   vacon-c-pgdata:
 

@@ -186,6 +186,7 @@ APPS=(
   "vaco-media:vaco-media:node server.js:8821:/api/health"
   "vash-tap:vash-tap:node server.js:8825:/api/health"
   "vaco-passport:vaco-passport:node server.js:8826:/api/health"
+  "vaco-assistant:vaco-assistant:node server.js:8828:/api/health"
   "venvs:venvs:npm run dev:5173:/"
   "vdp:vdp:npm run dev:5174:/"
   # VDP's own real backend (server.cjs) -- player state, jobs, skills,

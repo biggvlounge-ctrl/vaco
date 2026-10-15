@@ -45,7 +45,7 @@ TARGETS=(
   vaco-passport vacon vacon-c vaco-analytics vago vash-tap vavlt-stvdios vdp venvm vex vex-trading vaco-notify
   void voidmagic voken vsafe vulture-flix vulture-music vulture-pods
   vulture-studios vxllage
-  v4-proxy v4-search cvnvo/yap
+  v4-proxy v4-search cvnvo/yap vaco-assistant
 )
 
 drift=0

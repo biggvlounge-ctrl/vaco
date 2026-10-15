@@ -1,4 +1,4 @@
-// VACO -- the personal AI assistant.
+// Vaco Assistant -- the personal AI assistant.
 //
 // The one real decision this module makes is which of two paths a
 // message takes, and both paths are asserted here with injected
@@ -6,13 +6,13 @@
 // own invokeFn) rather than a real network call -- deterministic, and
 // honest about never fabricating a completion.
 
-import test from 'node:test';
-import assert from 'node:assert';
+const test = require('node:test');
+const assert = require('node:assert');
 
-import { createShellStore } from '../lib/store.js';
-import {
+const { createVacoAssistantStore } = require('../lib/store');
+const {
   TONE_OPTIONS, setProfile, getProfile, buildSystemPrompt, getHistory, sendMessage,
-} from '../lib/personalAssistant.js';
+} = require('../lib/personalAssistant');
 
 function recordingInsight(result) {
   const calls = [];
@@ -35,14 +35,14 @@ function recordingInvoke(text) {
 }
 
 test('setProfile requires a non-empty name and a valid tone', () => {
-  const store = createShellStore();
+  const store = createVacoAssistantStore();
   assert.throws(() => setProfile(store, { userId: 'u1', name: '' }), /name cannot be empty/);
   assert.throws(() => setProfile(store, { userId: 'u1', tone: 'sarcastic' }), /tone must be one of/);
   assert.ok(TONE_OPTIONS.includes('friendly'));
 });
 
 test('getProfile returns the honest default for a person who never set one up', () => {
-  const store = createShellStore();
+  const store = createVacoAssistantStore();
   const profile = getProfile(store, 'never-configured');
   assert.equal(profile.name, 'Vaco');
   assert.equal(profile.tone, 'friendly');
@@ -50,7 +50,7 @@ test('getProfile returns the honest default for a person who never set one up', 
 });
 
 test('setProfile upserts -- a second call updates the same record, not a duplicate', () => {
-  const store = createShellStore();
+  const store = createVacoAssistantStore();
   setProfile(store, { userId: 'u1', name: 'Sunny', tone: 'motivational', lifestyle: 'marathon training' });
   setProfile(store, { userId: 'u1', name: 'Sunny', tone: 'direct', lifestyle: 'marathon training, now also cooking' });
   assert.equal(store.assistantProfiles.length, 1);
@@ -67,7 +67,7 @@ test("buildSystemPrompt carries this one user's own name, tone, and lifestyle --
 });
 
 test('a domain-matched message is relayed to the real VACON specialist, not answered generically', async () => {
-  const store = createShellStore();
+  const store = createVacoAssistantStore();
   const insightFn = recordingInsight({
     matchedAgents: [{ agentId: 'leslie', score: 3 }],
     completion: { text: 'Leslie here: your balance is 100 VCoin.' },
@@ -83,7 +83,7 @@ test('a domain-matched message is relayed to the real VACON specialist, not answ
 });
 
 test('a specialist match whose completion fails surfaces the real error rather than falling back silently', async () => {
-  const store = createShellStore();
+  const store = createVacoAssistantStore();
   const insightFn = recordingInsight({
     matchedAgents: [{ agentId: 'leslie', score: 3 }],
     completion: null,
@@ -99,7 +99,7 @@ test('a specialist match whose completion fails surfaces the real error rather t
 });
 
 test('no domain match falls back to this user\'s own personalized assistant', async () => {
-  const store = createShellStore();
+  const store = createVacoAssistantStore();
   setProfile(store, { userId: 'u1', name: 'Sunny', tone: 'motivational', lifestyle: 'marathon training' });
   const insightFn = recordingInsight({ matchedAgents: [], completion: null, completionError: null });
   const invokeFn = recordingInvoke('You got this -- six miles today, same as last week.');
@@ -114,7 +114,7 @@ test('no domain match falls back to this user\'s own personalized assistant', as
 });
 
 test('a VACON outage is treated as no match, not as a hard failure of the whole assistant', async () => {
-  const store = createShellStore();
+  const store = createVacoAssistantStore();
   const insightFn = async () => { throw new Error('VACON unreachable'); };
   const invokeFn = recordingInvoke('I can still help even without the specialist network right now.');
 
@@ -125,7 +125,7 @@ test('a VACON outage is treated as no match, not as a hard failure of the whole 
 });
 
 test('real conversation history rides along on the general path, most recent last', async () => {
-  const store = createShellStore();
+  const store = createVacoAssistantStore();
   const insightFn = recordingInsight({ matchedAgents: [], completion: null, completionError: null });
   const invokeFn = recordingInvoke('reply one');
   await sendMessage(store, { userId: 'u1', content: 'first message', insightFn, invokeFn });
@@ -140,7 +140,7 @@ test('real conversation history rides along on the general path, most recent las
 });
 
 test('getHistory records both the user turn and the real assistant reply, in order', async () => {
-  const store = createShellStore();
+  const store = createVacoAssistantStore();
   const insightFn = recordingInsight({ matchedAgents: [], completion: null, completionError: null });
   const invokeFn = recordingInvoke('a real reply');
   await sendMessage(store, { userId: 'u1', content: 'hello', insightFn, invokeFn });
@@ -154,7 +154,7 @@ test('getHistory records both the user turn and the real assistant reply, in ord
 });
 
 test('sendMessage requires a userId and non-empty content', async () => {
-  const store = createShellStore();
+  const store = createVacoAssistantStore();
   await assert.rejects(sendMessage(store, { content: 'hi' }), /requires a userId/);
   await assert.rejects(sendMessage(store, { userId: 'u1', content: '   ' }), /requires content/);
 });

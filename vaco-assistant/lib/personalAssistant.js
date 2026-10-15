@@ -1,7 +1,15 @@
-// VACO -- the shell's personal AI assistant: one per signed-in user,
-// personalized to how they described themselves, with a real
-// connection into VACON's own 14 named executive agents for anything
-// domain-specific.
+// Vaco Assistant -- one per signed-in user, personalized to how they
+// described themselves, with a real connection into VACON's own 14
+// named executive agents for anything domain-specific.
+//
+// **Extracted from `vaco-shell/lib/personalAssistant.js` into its own
+// app (15 Oct 2026), by direct decision.** It was built into vaco-shell
+// first because that was the only confirmed consumer; this app is the
+// second. Pulling it out means any app can now reach the same real
+// assistant the same way vaco-shell does -- an HTTP call, not a
+// `require()` across a directory boundary -- instead of the assistant
+// staying stuck behind one dashboard. The logic itself is unchanged
+// from the original, same decision, same mechanism.
 //
 // Builds directly on `lib/insight.js`'s own proven VACON routing/
 // invoke mechanism rather than re-implementing it -- the two features
@@ -29,15 +37,15 @@
 // surfaces as a real error, same posture every other AI-backed route in
 // this ecosystem already holds.
 
-import { getInsightCard } from './insight.js';
+const { getInsightCard } = require('./insight');
 
 const V4_PROXY_URL = process.env.V4_PROXY_URL || 'http://localhost:8787';
 
 // Same per-file service-credential pattern every cross-app caller in
-// this ecosystem holds its own copy of (see lib/v3Client.js,
-// lib/insight.js) -- this app settles/calls server-to-server with no
-// end-user session to present downstream.
-const VACO_SERVICE_NAME = process.env.VACO_SERVICE_NAME || 'vaco-shell';
+// this ecosystem holds its own copy of (see lib/insight.js) -- this
+// app settles/calls server-to-server with no end-user session to
+// present downstream.
+const VACO_SERVICE_NAME = process.env.VACO_SERVICE_NAME || 'vaco-assistant';
 const VACO_SERVICE_TOKEN = process.env.VACO_SERVICE_TOKEN || '';
 function serviceHeaders() {
   return VACO_SERVICE_TOKEN
@@ -45,7 +53,7 @@ function serviceHeaders() {
     : {};
 }
 
-export const TONE_OPTIONS = ['friendly', 'direct', 'professional', 'motivational'];
+const TONE_OPTIONS = ['friendly', 'direct', 'professional', 'motivational'];
 const DEFAULT_TONE = 'friendly';
 const DEFAULT_NAME = 'Vaco';
 // How much real conversation history rides along on the general
@@ -61,7 +69,7 @@ function requireCollections(store) {
   if (!store.nextAssistantMessageId) store.nextAssistantMessageId = 1;
 }
 
-export function setProfile(store, options = {}) {
+function setProfile(store, options = {}) {
   requireCollections(store);
   const {
     userId, name = DEFAULT_NAME, tone = DEFAULT_TONE, lifestyle = '', now = Date.now(),
@@ -88,13 +96,13 @@ export function setProfile(store, options = {}) {
 // has never set anything up yet gets the honest, unpersonalized
 // default rather than a 404, since asking a question is the more
 // natural first action than visiting a settings screen first.
-export function getProfile(store, userId) {
+function getProfile(store, userId) {
   requireCollections(store);
   return store.assistantProfiles.find((p) => p.userId === userId)
     || { userId, name: DEFAULT_NAME, tone: DEFAULT_TONE, lifestyle: '' };
 }
 
-export function buildSystemPrompt(profile) {
+function buildSystemPrompt(profile) {
   const lifestyleLine = profile.lifestyle
     ? ` Here is what this person has told you about their life, interests, and preferences -- use it to make `
       + `your answers specific to them, never generic: "${profile.lifestyle}"`
@@ -117,7 +125,7 @@ function recordMessage(store, options = {}) {
   return message;
 }
 
-export function getHistory(store, userId) {
+function getHistory(store, userId) {
   requireCollections(store);
   return store.assistantMessages
     .filter((m) => m.userId === userId)
@@ -141,7 +149,7 @@ async function invokeV4Direct(systemPrompt, messages) {
 // completion-shaped call in this ecosystem. Nothing here fabricates a
 // reply; a fake network layer is for a fast, deterministic test, not
 // for pretending a completion happened.
-export async function sendMessage(store, options = {}) {
+async function sendMessage(store, options = {}) {
   const { userId, content, insightFn = getInsightCard, invokeFn = invokeV4Direct } = options;
   if (!userId) throw new Error('sendMessage requires a userId');
   if (!content || !content.trim()) throw new Error('sendMessage requires content');
@@ -187,3 +195,7 @@ export async function sendMessage(store, options = {}) {
 
   return recordMessage(store, { userId, role: 'assistant', content: reply, routedTo });
 }
+
+module.exports = {
+  TONE_OPTIONS, setProfile, getProfile, buildSystemPrompt, getHistory, sendMessage,
+};

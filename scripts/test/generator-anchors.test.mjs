@@ -59,7 +59,8 @@ const codeOnly = (source) => source
 const FACTORY_ANCHORS = [
   ['start-ecosystem.sh', /(\n)(\s*"venvs:venvs:)/],
   ['vaco-shell/lib/registry.js', /(\n)(\s*\{ id: 'voken',)/],
-  ['sync-design-system.sh', '  v4-proxy v4-search cvnvo/yap\n'],
+  ['sync-design-system.sh', /(TARGETS=\([^)]*)\n\)/],
+  ['sync-shared-runtime.sh', /(PERSISTENCE_TARGETS=\([^)]*)\n\)/],
   ['sync-shared-runtime.sh', /(SHIELD_TARGETS=\([^)]*)\n\)/],
   ['vaco-shell/VACO_PALETTE_REGISTER.md', '| 78° | HVNTZ |'],
 ];

@@ -115,6 +115,15 @@ const files = (ctx) => ({
 
   '.dockerignore': read('v3/.dockerignore'),
 
+  // Every other app in this repo carries its own `node_modules/`
+  // line -- `.env` and `**/data/` are already covered by the ROOT
+  // .gitignore's own global patterns, so this is the one entry an app
+  // genuinely needs for itself. Missing here on the first real use of
+  // this generator: `scripts/test/gitignore-carveouts.test.mjs`
+  // caught it immediately ("vaco-assistant: nothing ignoring their
+  // node_modules").
+  '.gitignore': 'node_modules/\n',
+
   'lib/store.js': `// ${ctx.Name} — the store factory.
 //
 // One factory whose shape grows by adding top-level array/counter
@@ -192,7 +201,7 @@ require('dotenv/config');
 const { createPersistentStore, durable } = require('./lib/persistence');
 const { create${ctx.Pascal}Store } = require('./lib/store');
 const { createItem, getItem, listItems } = require('./lib/items');${ctx.auth ? `
-const { requireActor } = require('./lib/shieldAuth');` : ''}
+const { requireActor } = require('./lib/shieldAuth.cjs');` : ''}
 
 const app = express();
 app.use(cors());
@@ -426,8 +435,36 @@ function registrations(ctx) {
     },
     {
       file: 'sync-design-system.sh',
-      apply: (s) => s.replace('  v4-proxy v4-search cvnvo/yap\n', `  v4-proxy v4-search cvnvo/yap ${ctx.name}\n`),
+      // Anchored on the array's own closing paren, not on its last
+      // line's literal text. Found rotted the first time this
+      // generator was actually used: TARGETS' last line was exactly
+      // `  v4-proxy v4-search cvnvo/yap\n`, the previous anchor here,
+      // and the very first app this ran for appended itself onto that
+      // line -- so the SECOND run's anchor no longer matched anything,
+      // `replace()` silently returned the file unchanged, and the
+      // script would have reported success while registering nothing.
+      // Exactly `scripts/test/generator-anchors.test.mjs`'s own
+      // documented failure class #1, reproduced by this generator.
+      apply: (s) => s.replace(/(TARGETS=\([^)]*)\n\)/, `$1 ${ctx.name}\n)`),
       why: 'without this the app never receives design-system updates',
+    },
+    {
+      file: 'sync-shared-runtime.sh',
+      // Unconditional, unlike SHIELD_TARGETS below -- every app gets
+      // persistence.js copied at the bottom of this script regardless
+      // of --auth, so every app needs to be a registered sync target
+      // too. Found the hard way: the first real app this generator
+      // produced (vaco-assistant) had its persistence.js copied by a
+      // raw fs.copyFileSync with no registration anywhere, which
+      // sync-shared-runtime.sh --check caught as "UNMANAGED... will
+      // never receive updates to shared/persistence.js" -- exactly the
+      // "thirty-first divergent copy" this generator exists to
+      // prevent, reproduced by the generator itself.
+      //
+      // Anchored on the *end of the list*, not on a neighbour's name,
+      // same reasoning as SHIELD_TARGETS' own anchor below.
+      apply: (s) => s.replace(/(PERSISTENCE_TARGETS=\([^)]*)\n\)/, `$1\n  ${ctx.name}\n)`),
+      why: 'without this the app keeps a frozen copy of persistence.js',
     },
     ...(ctx.auth ? [{
       file: 'sync-shared-runtime.sh',
@@ -553,9 +590,11 @@ for (const reg of regs) {
 
 // The sync scripts place persistence.js, shieldAuth.js and the design
 // system — so the new app joins the sync rather than owning copies.
+// Unconditional: persistence.js is generated for every app regardless
+// of --auth (PERSISTENCE_TARGETS was just registered above), so this
+// must run even when ctx.auth is false, not only when it's true.
 execFileSync('./sync-design-system.sh', { cwd: REPO_ROOT, stdio: 'inherit' });
-if (ctx.auth) execFileSync('./sync-shared-runtime.sh', { cwd: REPO_ROOT, stdio: 'inherit' });
-fs.copyFileSync(path.join(REPO_ROOT, 'v3', 'lib', 'persistence.js'), path.join(REPO_ROOT, name, 'lib', 'persistence.js'));
+execFileSync('./sync-shared-runtime.sh', { cwd: REPO_ROOT, stdio: 'inherit' });
 
 execFileSync(process.execPath, ['deploy/generate-docker-compose.js'], { cwd: REPO_ROOT, stdio: 'inherit' });
 execFileSync(process.execPath, ['deploy/generate-nginx-conf.js', '--docker'], { cwd: REPO_ROOT, stdio: 'inherit' });

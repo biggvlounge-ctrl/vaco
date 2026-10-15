@@ -88,6 +88,7 @@ export const APPS = [
   // shared-infrastructure shelf and nowhere else. The VACON-C card is
   // the simulation engine alone.
   { id: 'vaco-notify', name: 'VACO Notify', description: 'The one notification channel — VSAFE escalations, DREAMS and Analytics alerts.', url: 'http://localhost:8818', category: 'system', parent: null, bundle: null },
+  { id: 'vaco-assistant', name: 'Vaco Assistant', description: "One personal AI assistant per signed-in user, personalized to how they describe themselves, that relays anything domain-specific to VACON's real executive agents. Extracted out of vaco-shell (15 Oct 2026) so any app can reach it, not only this one.", url: 'http://localhost:8828', category: 'infra', parent: 'V4', bundle: 'Operations & Infrastructure' },
   { id: 'voken', name: 'VOKEN', description: 'The card engine — minting, editions, provenance, value scores.', url: 'http://localhost:8794', category: 'consumer', parent: 'VOKEN', bundle: 'Commerce & Marketplace' },
   { id: 'cvltvre', name: 'CVLTVRE', description: 'Collect, trade, and auction anything with real cultural relevance.', url: 'http://localhost:8794/#packs', category: 'consumer', parent: 'CVLTVRE', bundle: 'Commerce & Marketplace' },
   { id: 'vado', name: 'VADO', description: 'The Art District — auctions, galleries, art frames.', url: 'http://localhost:8794/#vado', category: 'consumer', parent: 'VADO', bundle: 'Commerce & Marketplace' },

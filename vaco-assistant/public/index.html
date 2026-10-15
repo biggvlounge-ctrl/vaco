@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Vaco Assistant</title>
+<link rel="stylesheet" href="/vaco-design.css" />
+</head>
+<body class="vaco">
+<script src="/vaco-ui.js"></script>
+<script>
+// Vaco Assistant — one personal AI assistant per signed-in user,
+// personalized to how they describe themselves, with a real
+// connection into VACON's own named executive agents for anything
+// domain-specific.
+//
+// Extracted out of vaco-shell's own "Assistant" tab (15 Oct 2026) —
+// this is the same UI, same behavior, now served by this app directly
+// rather than only reachable from one dashboard. `VACO.api` attaches
+// the Shield session token automatically on same-origin calls, which
+// is why a write here satisfies requireActor with no header handling
+// in this file.
+
+var el = VACO.el;
+
+function renderAssistantMessage(message) {
+  var row = el('div', 'vaco-stack-sm');
+  var label = message.role === 'user' ? 'You'
+    : (message.routedTo ? 'Assistant (via ' + message.routedTo + ')' : 'Assistant');
+  row.appendChild(el('span', 'vaco-label', label));
+  row.appendChild(el('p', 'vaco-body', message.content));
+  return row;
+}
+
+function renderAssistant(body) {
+  var out = el('div', 'vaco-stack');
+
+  out.appendChild(VACO.notice(
+    'Every reply is a real completion through V4 — a real <strong>ANTHROPIC_API_KEY</strong> '
+    + 'must be configured behind v4-proxy for either path to answer. Routing to the right '
+    + 'specialist (finance, legal, travel, dating, logistics, advertising, production, market '
+    + 'research, music) is real either way; this never fabricates a reply when the key is '
+    + 'missing or a service is unreachable.',
+    'warn',
+  ));
+
+  if (!VACO.session) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in above to set up your assistant.'));
+    return VACO.mount(body, out);
+  }
+
+  var userId = VACO.userId();
+
+  var profileDetails = el('details', 'vaco-card');
+  var summary = el('summary', 'vaco-h3', 'Personalize your assistant');
+  summary.style.cursor = 'pointer';
+  profileDetails.appendChild(summary);
+
+  var profileForm = el('form', 'vaco-stack');
+  profileForm.style.marginTop = 'var(--vaco-space-3)';
+
+  var nameWrap = el('label', 'vaco-stack-sm');
+  nameWrap.appendChild(el('span', 'vaco-label', 'Name'));
+  var nameInput = el('input', 'vaco-input');
+  nameInput.placeholder = 'Vaco';
+  nameInput.maxLength = 40;
+  nameWrap.appendChild(nameInput);
+  profileForm.appendChild(nameWrap);
+
+  var toneWrap = el('label', 'vaco-stack-sm');
+  toneWrap.appendChild(el('span', 'vaco-label', 'Tone'));
+  var toneSelect = el('select', 'vaco-select');
+  ['friendly', 'direct', 'professional', 'motivational'].forEach(function (t) {
+    var o = el('option', null, t.charAt(0).toUpperCase() + t.slice(1));
+    o.value = t;
+    toneSelect.appendChild(o);
+  });
+  toneWrap.appendChild(toneSelect);
+  profileForm.appendChild(toneWrap);
+
+  var lifestyleWrap = el('label', 'vaco-stack-sm');
+  lifestyleWrap.appendChild(el('span', 'vaco-label', 'Your life, interests, and preferences'));
+  var lifestyleInput = el('textarea', 'vaco-input');
+  lifestyleInput.rows = 3;
+  lifestyleInput.placeholder = 'e.g. training for a marathon, run a small shop on VENVS, two kids, night owl';
+  lifestyleWrap.appendChild(lifestyleInput);
+  profileForm.appendChild(lifestyleWrap);
+
+  var saveBtn = el('button', 'vaco-btn vaco-btn-primary', 'Save');
+  saveBtn.type = 'submit';
+  saveBtn.style.alignSelf = 'flex-start';
+  profileForm.appendChild(saveBtn);
+
+  profileForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    VACO.post('/api/assistant/profile', {
+      userId: userId,
+      name: nameInput.value.trim() || 'Vaco',
+      tone: toneSelect.value,
+      lifestyle: lifestyleInput.value.trim(),
+    }).then(function () {
+      VACO.toast('Assistant personalized.', 'money');
+      profileDetails.removeAttribute('open');
+    }).catch(VACO.error);
+  });
+
+  profileDetails.appendChild(profileForm);
+  out.appendChild(profileDetails);
+
+  var chatCard = el('div', 'vaco-card');
+  chatCard.style.marginTop = 'var(--vaco-space-4)';
+  var messagesBox = el('div', 'vaco-stack-sm');
+  messagesBox.style.maxHeight = '420px';
+  messagesBox.style.overflowY = 'auto';
+  chatCard.appendChild(messagesBox);
+
+  var chatForm = el('form', 'vaco-row');
+  chatForm.style.marginTop = 'var(--vaco-space-3)';
+  var chatInput = el('input', 'vaco-input');
+  chatInput.style.flex = '1';
+  chatInput.style.minWidth = '200px';
+  chatInput.placeholder = 'Ask anything…';
+  chatForm.appendChild(chatInput);
+  var sendBtn = el('button', 'vaco-btn vaco-btn-primary', 'Send');
+  sendBtn.type = 'submit';
+  chatForm.appendChild(sendBtn);
+
+  chatForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var content = chatInput.value.trim();
+    if (!content) return;
+    var empty = messagesBox.querySelector('.vaco-empty');
+    if (empty) empty.remove();
+    messagesBox.appendChild(renderAssistantMessage({ role: 'user', content: content }));
+    chatInput.value = '';
+    var thinking = el('p', 'vaco-small vaco-dim', 'Thinking…');
+    messagesBox.appendChild(thinking);
+    messagesBox.scrollTop = messagesBox.scrollHeight;
+    VACO.post('/api/assistant/chat', { userId: userId, content: content }).then(function (reply) {
+      thinking.remove();
+      messagesBox.appendChild(renderAssistantMessage(reply));
+      messagesBox.scrollTop = messagesBox.scrollHeight;
+    }).catch(function (err) {
+      thinking.remove();
+      messagesBox.appendChild(el('p', 'vaco-small vaco-dim', 'No reply: ' + err.message));
+      messagesBox.scrollTop = messagesBox.scrollHeight;
+    });
+  });
+
+  chatCard.appendChild(chatForm);
+  out.appendChild(chatCard);
+
+  VACO.mount(body, out);
+
+  return VACO.api('/api/assistant/profile/' + encodeURIComponent(userId)).then(function (profile) {
+    nameInput.value = profile.name || '';
+    toneSelect.value = profile.tone || 'friendly';
+    lifestyleInput.value = profile.lifestyle || '';
+  }).catch(VACO.error).then(function () {
+    return VACO.api('/api/assistant/history/' + encodeURIComponent(userId));
+  }).then(function (history) {
+    messagesBox.innerHTML = '';
+    if (!history.messages.length) {
+      messagesBox.appendChild(el('div', 'vaco-empty', 'Say something to start.'));
+    } else {
+      history.messages.forEach(function (m) { messagesBox.appendChild(renderAssistantMessage(m)); });
+      messagesBox.scrollTop = messagesBox.scrollHeight;
+    }
+  }).catch(VACO.error);
+}
+
+VACO.app({
+  id: 'vaco-assistant',
+  name: 'Vaco Assistant',
+  tagline: 'One personal AI assistant per user, that relays to VACON\'s real specialists.',
+  //: Registered in vaco-shell/VACO_PALETTE_REGISTER.md. Per-app identity
+  //: is colour only — the shared layer owns structure.
+  accent: '#8674dc',
+  accentDim: '#6557a5',
+  accentInk: '#0b0912',
+  tabs: [
+    { id: 'assistant', label: 'Assistant', heading: 'Your Assistant', render: renderAssistant },
+  ],
+});
+</script>
+</body>
+</html>

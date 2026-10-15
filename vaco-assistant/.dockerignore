@@ -1,0 +1,17 @@
+# Never copied into the image by `COPY . .`.
+#
+# node_modules/  the image installs its own for the right architecture
+# data/          runtime state; compose mounts a named volume at /app/data,
+#                and Docker SEEDS a fresh volume from image content -- so a
+#                baked-in store.json becomes the deployed starting state
+# .env           real secrets. v4-proxy's .env holds a live Anthropic key,
+#                and an image is a distributable artifact
+node_modules/
+data/
+logs/
+.git/
+.env
+.env.*
+!.env.example
+npm-debug.log
+*.log

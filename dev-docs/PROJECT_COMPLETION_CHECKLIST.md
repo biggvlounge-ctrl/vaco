@@ -289,6 +289,47 @@ before being written anywhere).
       COMPOSITION.md`, `STANDING_INSTRUCTION_TEST_VERIFICATION.md`,
       `COMPARABLES_INDEX.md`, `CORPORATE_STRUCTURE.md`.
 
+### 1.10 Personal AI assistant extracted into its own app (this session)
+By direct decision, after discussing whether it belonged in the V3/V4/
+VACON systems tier: it did, because an assistant that "connects to
+all of Vaco's and Vacon's AI system" has to be reachable from more
+than one dashboard to mean that literally.
+- [x] **52a.** New app `vaco-assistant` (port 8828), scaffolded with
+      `scripts/new-app.mjs` — its first real use, which surfaced and
+      fixed a real bug in the generator itself: its server.js template
+      required `./lib/shieldAuth` with no `.cjs` extension, which the
+      auth-sync script actually places as `shieldAuth.cjs`. Every
+      hand-built app before this one spelled the extension out; this
+      generator would have silently failed to boot the next app too.
+      Fixed at the source.
+- [x] **52b.** The real assistant logic (`lib/personalAssistant.js`,
+      `lib/insight.js`), its store shape, its 11 unit tests, and a real
+      chat-and-profile frontend all moved from `vaco-shell` into the
+      new app unchanged in behavior. Added 8 new HTTP-level
+      route-guard tests (19 total) and live-verified end to end:
+      profile set/read, impersonation refused (403), domain-specific
+      chat reaching VACON's real router.
+- [x] **52c.** `vaco-shell`'s own `/api/assistant/*` routes are now a
+      thin proxy — same relative paths so the existing frontend and
+      `VACO.api`'s automatic session-token attachment need no change,
+      forwarding the real `Authorization` header straight through
+      (same pattern `vulture-pods` already uses for `vulture-music`/
+      `vavlt-stvdios`). Live-verified: a profile set through the proxy
+      lands in `vaco-assistant`'s own store when read back directly.
+      Annotated both proxy POST routes `audit-route-guards: open` with
+      the real reason (the guard lives downstream) rather than letting
+      the sweep read them as a false regression — caught via
+      `node scripts/audit-route-guards.mjs` showing vaco-shell drop
+      from 12 guarded/0 open to 10 guarded/2 open before the fix.
+- [x] **52d.** Registered everywhere a new app needs to be: the
+      ecosystem manifest, the shell registry (`category: 'infra'`,
+      `parent: 'V4'` — confirmed via `constellationOf()` that it
+      really resolves into the ○ SYSTEMS constellation alongside V3/
+      V4/VENVS, not just by name in prose), both sync scripts, the
+      palette register (hue 250°, between Shield and Vavlt Stvdios),
+      `VACO_CONSTELLATIONS.md`, and regenerated `docker-compose.yml`/
+      nginx config.
+
 ---
 
 ## Part 2 — What is left that only a human/engineer/business decision can close

@@ -185,8 +185,18 @@ CHOPZ SHOP riding along).
 | | Holds |
 |---|---|
 | **V3** | The VCoin/VASH ledger and VACA identity. ~~18~~ **21** apps settle through it (15 Oct 2026 recount) |
-| **V4** | Agent proxy, Search, and the whole Maps layer |
+| **V4** | Agent proxy, Search, the whole Maps layer, and (added 15 Oct 2026) **Vaco Assistant** — one personal AI per signed-in user, relaying to VACON's specialists |
 | **VENVS** | Marketplace, shop, publishing |
+
+**Vaco Assistant joined this tier on 15 Oct 2026, by direct decision.**
+It was built into `vaco-shell` first because that was the only
+confirmed consumer — but an assistant that "connects to all of Vaco's
+and Vacon's AI system" has to be reachable from more than one
+dashboard to mean that literally, so it was extracted into its own
+app, port 8828, sitting next to VACON and v4-proxy the same way VACA
+and Shield sit next to V3. `vaco-shell`'s own `/api/assistant/*`
+routes are now a thin proxy to it; any other app reaches it the exact
+same way. See `vaco-assistant/README.md`.
 
 - **Shared roadmap:** this is where every ecosystem-wide fix lands
   first — off-host backups, `requireActor`, OpenTelemetry, the Postgres

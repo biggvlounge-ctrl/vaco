@@ -61,6 +61,7 @@ sorted by it.
 | 230° | VACON | `#8a90b8` | Slate-indigo. Infrastructure, deliberately quieter than the apps it routes to. |
 | 235° | VOID | `#7c85e8` | Deep indigo. Logistics at night. |
 | 240° | Shield | `#8f8fd6` | Steel-lavender. Plumbing, adjacent to VACON. |
+| 250° | Vaco Assistant | `#8674dc` | Periwinkle-violet, 10° from Shield and 15° from Vavlt Stvdios so neither neighbour reads as the same brand. Sits in the same infrastructure cluster as VACON and Shield by design — it's a service other apps call, same shape as those two — but a touch warmer and more saturated than either, because unlike them it's the one piece of infrastructure a person actually talks to. |
 | 265° | Vavlt Stvdios | `#9b6ef0` | Electric violet. Broadcast and stage lighting. |
 | 280° | VENVM | `#a45ce0` | Violet-purple, one step warmer than Vavlt Stvdios — related, since both are production tools, without being confusable. |
 | 295° | Vvltvre Music | `#c45ad4` | Orchid-magenta. |

@@ -53,6 +53,7 @@ SHIELD_TARGETS=(
   chopz chopz/chopz-shop cvnvo dreams hvntz v3 v4-proxy vaca vacay vaco-audit vaco-shell vacon-c vaco-notify vaco-passport vago vash-tap vavlt-stvdios vdp venvm void vex voidmagic voken
   vsafe vulture-flix vulture-music vulture-pods vulture-studios vxllage vaco-media
   vaco-analytics
+  vaco-assistant
 )
 
 # Apps that record operator-grade decisions in vaco-audit. This is
@@ -121,7 +122,7 @@ DECISION_LOG_TARGETS=(
 # rather than filename, so none of them produces a false positive.
 PERSISTENCE_TARGETS=(
   chopz chopz/chopz-shop cvnvo cvnvo/yap dreams hvntz shield v3 vaca vacay
-  vaco-audit vaco-media vaco-notify vaco-operator vaco-passport vacon vago vash-tap vavlt-stvdios
+  vaco-assistant vaco-audit vaco-media vaco-notify vaco-operator vaco-passport vacon vago vash-tap vavlt-stvdios
   venvm vex void voidmagic voken vsafe vulture-flix vulture-music
   vulture-pods vulture-studios vxllage
 )
