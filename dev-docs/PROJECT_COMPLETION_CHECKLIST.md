@@ -13,7 +13,8 @@ learned the hard way three times over, is that a doc's claim and the
 code's truth drift apart fast, so trust the code, re-check the doc.
 
 **Last updated:** 15 Oct 2026, this session (after the ground-truth
-audit landed and its findings were fixed).
+audit landed and its findings were fixed, and after the new personal
+AI assistant feature was added).
 
 ---
 
@@ -180,7 +181,32 @@ understated how much was done, not overstated it.**
       weren't) and `scripts/completion-report.mjs`'s hardcoded (not
       computed) stale narrative string — both now match current reality.
 
-### 1.7 Noted, not attempted — a real gap, explicitly out of scope for this pass
+### 1.7 Personal AI assistant — new feature, built this session
+- [x] **33a.** Per direct decision, a personal AI assistant for every
+      signed-in user, built into vaco-shell (not a new standalone app).
+      Real per-user profile (name/tone/lifestyle) + real multi-turn
+      chat. Domain-specific questions relay to the real VACON
+      specialist who owns them (finance, legal, travel, dating,
+      logistics, advertising, production, market research, music) —
+      the literal "connects to Vacon's AI system." Everything else is
+      answered by a real v4-proxy completion carrying that one user's
+      own personalization. 11 new tests with injected routing/
+      completion functions (same real pattern as venvm's `invokeFn`);
+      live-verified end to end against real running shield/vacon/
+      vaco-shell with matching service credentials.
+- [x] **33b.** Found and fixed a real, pre-existing bug while building
+      it: vaco-shell's own bespoke frontend never attached the
+      `Authorization: Bearer` header any `requireActor`-gated route
+      needs — unlike the shared `vaco-ui.js` kit every other app uses.
+      Every existing authenticated write on that page (merch orders,
+      app installs) was silently 401ing before this fix.
+- [ ] **33c.** Deliberately deferred by direct decision: automatic
+      cross-app data in the assistant's context (pulling purchases,
+      bookings, etc. from other apps without being told). Real,
+      later work if wanted — see `vaco-shell/README.md`'s own "Not
+      yet built."
+
+### 1.8 Noted, not attempted — a real gap, explicitly out of scope for this pass
 - [ ] **33.** **No HTTP-level route tests in `cvnvo`, `hvntz`, `dreams`.**
       Every test in these three apps' suites calls lib functions
       directly rather than issuing a real HTTP request through the
