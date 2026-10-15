@@ -24,5 +24,12 @@ export function createShellStore() {
     merchProducts: [],
     merchOrders: [],
     nextMerchOrderId: 1,
+
+    // The personal AI assistant — one profile per signed-in user
+    // (name/tone/lifestyle), and the real conversation history behind
+    // it. See lib/personalAssistant.js.
+    assistantProfiles: [],
+    assistantMessages: [],
+    nextAssistantMessageId: 1,
   };
 }

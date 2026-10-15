@@ -92,6 +92,27 @@ curl "http://localhost:8789/api/insight?query=hunt%20sponsor%20budget"
   through, not just an internal ecosystem SSO shortcut. Live-verified
   in a real browser: register, log out, log back in with the right
   password, real error on a wrong one.
+- **The personal AI assistant (new)** — `lib/personalAssistant.js`: one
+  profile per signed-in user (name, tone, a free-text "life, interests
+  and preferences" field), and a real multi-turn chat on top of it.
+  Every message is routed through VACON's real keyword matcher first
+  (reusing `lib/insight.js`'s own proven routing/invoke call rather
+  than a second implementation): a real domain match (finance, legal,
+  travel, dating, logistics, advertising, production, market
+  research, music) is relayed to the VACON specialist who actually
+  owns it — this is the literal mechanism behind "connects to Vacon's
+  AI system," not a metaphor. Anything general is answered by a real
+  v4-proxy completion carrying THIS user's own name/tone/lifestyle in
+  its system prompt, so the same question gets a different, genuinely
+  personalized answer for every user who asks it. Never fabricates a
+  reply on either path — a real completion failure (no
+  `ANTHROPIC_API_KEY` behind v4-proxy, VACON or v4-proxy unreachable)
+  surfaces honestly. **Also fixed the same pass**: this page's own
+  bespoke `api()` helper never attached the `Authorization: Bearer`
+  header Shield-gated writes require — unlike every other app's
+  shared `vaco-ui.js` kit, which already does this — so every existing
+  authenticated write (merch orders, app installs) was silently
+  401ing before this fix, not just the new assistant routes.
 - **The real SSO handoff, now genuinely closed on both ends**: once
   logged in, every tile's outbound link carries the current Shield
   session token as a `?shieldToken=` query param. VENVS and VDP (see
@@ -121,7 +142,24 @@ exact same "never fake an AI call" posture this session has held for
 VACON's own MIA routing, HVNTZ's DREA, and every other agent gap.
 Zero console/page errors across the whole pass.
 
+The personal assistant, separately: live end-to-end against real
+running `shield`, `vacon`, and `vaco-shell` instances with matching
+service credentials — a profile created and persisted; a message
+("what is my vcoin balance") confirmed routed by VACON's real engine
+to `leslie` (verified by calling VACON's own `/api/route` directly);
+the specialist-relay attempt and the general-chat fallback attempt
+both confirmed reaching for a real v4-proxy completion and both
+failing with the same honest, expected reason (no `ANTHROPIC_API_KEY`
+configured anywhere in this environment) rather than either path
+fabricating a reply.
+
 ## Not yet built
+- **Automatic cross-app data in the assistant's context** — per
+  direct decision, the first real build relays to VACON's specialists
+  and personalizes on what a user explicitly tells it, but does not
+  automatically pull live data from other apps (purchases from VENVS,
+  bookings from VACAY, etc.) into context. Real, later work if wanted,
+  not assumed here.
 - Real cross-origin SSO for apps beyond VDP/VENVS — the `?shieldToken=`
   handoff itself is real, live-verified, and now genuinely read by
   VDP and VENVS (real browser pass: a real Shield session for

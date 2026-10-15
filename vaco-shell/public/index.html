@@ -126,6 +126,7 @@
       <button class="vaco-tab" role="tab" data-view="library" aria-selected="false">Library</button>
       <button class="vaco-tab" role="tab" data-view="ecosystem" aria-selected="false">Ecosystem</button>
       <button class="vaco-tab" role="tab" data-view="insight" aria-selected="false">Insight</button>
+      <button class="vaco-tab" role="tab" data-view="assistant" aria-selected="false">Assistant</button>
     </nav>
     <span class="vaco-spacer"></span>
     <div class="vaco-row-tight" id="identityBox"></div>
@@ -241,6 +242,66 @@
     </div>
   </section>
 
+  <!-- ================= Personal assistant ================= -->
+  <section class="view" data-view="assistant">
+    <div class="vaco-stack">
+      <h1 class="vaco-h1">Your Assistant</h1>
+      <p class="vaco-body vaco-dim" style="max-width: 62ch;">
+        One AI assistant, personalized to you, that hands off anything domain-specific to
+        whichever of VACON's real executive agents owns it (finance, legal, travel, dating,
+        logistics, advertising, production, market research, music) and answers everything
+        else itself, in your own tone, grounded in what you tell it about your life.
+      </p>
+
+      <div class="vaco-notice vaco-notice-warn">
+        <div>
+          Every reply is a real completion through V4 — a real
+          <strong>ANTHROPIC_API_KEY</strong> must be configured behind v4-proxy for either path
+          to answer. Routing to the right specialist is real either way; this never fabricates
+          a reply when the key is missing or a service is unreachable.
+        </div>
+      </div>
+
+      <div id="assistantSignedOut" class="vaco-empty">Sign in above to set up your assistant.</div>
+
+      <div id="assistantBody" style="display: none;">
+        <details class="vaco-card" id="assistantProfileCard">
+          <summary class="vaco-h3" style="cursor: pointer;">Personalize your assistant</summary>
+          <form class="vaco-stack" id="assistantProfileForm" style="margin-top: var(--vaco-space-3);">
+            <label class="vaco-stack-sm">
+              <span class="vaco-label">Name</span>
+              <input class="vaco-input" id="assistantName" placeholder="Vaco" maxlength="40" />
+            </label>
+            <label class="vaco-stack-sm">
+              <span class="vaco-label">Tone</span>
+              <select class="vaco-select" id="assistantTone">
+                <option value="friendly">Friendly</option>
+                <option value="direct">Direct</option>
+                <option value="professional">Professional</option>
+                <option value="motivational">Motivational</option>
+              </select>
+            </label>
+            <label class="vaco-stack-sm">
+              <span class="vaco-label">Your life, interests, and preferences</span>
+              <textarea class="vaco-input" id="assistantLifestyle" rows="3"
+                        placeholder="e.g. training for a marathon, run a small shop on VENVS, two kids, night owl"></textarea>
+            </label>
+            <button class="vaco-btn vaco-btn-primary" type="submit" style="align-self: flex-start;">Save</button>
+          </form>
+        </details>
+
+        <div class="vaco-card" style="margin-top: var(--vaco-space-4);">
+          <div id="assistantMessages" class="vaco-stack-sm" style="max-height: 420px; overflow-y: auto;"></div>
+          <form class="vaco-row" id="assistantChatForm" style="margin-top: var(--vaco-space-3);">
+            <input class="vaco-input" id="assistantInput" style="flex: 1; min-width: 200px;"
+                   placeholder="Ask anything…" />
+            <button class="vaco-btn vaco-btn-primary" type="submit">Send</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
+
 </main>
 
 <div class="vaco-toast-host" id="toastHost"></div>
@@ -262,8 +323,20 @@
 
   // -- plumbing --------------------------------------------------------
 
+  // **The session token rides along automatically.** `requireActor`-
+  // gated routes (merch orders, app installs, and now the assistant
+  // below) want `Authorization: Bearer <shieldToken>` — this page had
+  // its own bespoke `api()` rather than the shared `vaco-ui.js` kit
+  // (which already attaches this; see its own comment), and never
+  // attached it, so every one of those writes silently 401'd. Fixed
+  // once, here, for every call site rather than per call.
   async function api(path, options) {
-    const res = await fetch(path, options);
+    const opts = options || {};
+    const headers = Object.assign({}, opts.headers || {});
+    if (state.session && state.session.sessionToken && !headers.Authorization) {
+      headers.Authorization = `Bearer ${state.session.sessionToken}`;
+    }
+    const res = await fetch(path, Object.assign({}, opts, { headers }));
     const body = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(body.error || `${path} failed (${res.status})`);
     return body;
@@ -878,6 +951,51 @@
     }
   }
 
+  // -- personal assistant -----------------------------------------------
+
+  function renderAssistantMessage(message) {
+    const row = el('div', 'vaco-stack-sm');
+    const label = message.role === 'user' ? 'You' : (message.routedTo ? `Assistant (via ${message.routedTo})` : 'Assistant');
+    row.appendChild(el('span', 'vaco-label', label));
+    row.appendChild(el('p', 'vaco-body', message.content));
+    return row;
+  }
+
+  async function renderAssistant() {
+    const signedOut = document.getElementById('assistantSignedOut');
+    const body = document.getElementById('assistantBody');
+    if (!state.session) {
+      signedOut.style.display = '';
+      body.style.display = 'none';
+      return;
+    }
+    signedOut.style.display = 'none';
+    body.style.display = '';
+
+    try {
+      const profile = await api(`/api/assistant/profile/${encodeURIComponent(state.session.userId)}`);
+      document.getElementById('assistantName').value = profile.name || '';
+      document.getElementById('assistantTone').value = profile.tone || 'friendly';
+      document.getElementById('assistantLifestyle').value = profile.lifestyle || '';
+    } catch (err) {
+      toast(err.message, 'danger');
+    }
+
+    try {
+      const history = await api(`/api/assistant/history/${encodeURIComponent(state.session.userId)}`);
+      const box = document.getElementById('assistantMessages');
+      box.innerHTML = '';
+      if (!history.messages.length) {
+        box.appendChild(el('div', 'vaco-empty', 'Say something to start.'));
+      } else {
+        history.messages.forEach((m) => box.appendChild(renderAssistantMessage(m)));
+        box.scrollTop = box.scrollHeight;
+      }
+    } catch (err) {
+      toast(err.message, 'danger');
+    }
+  }
+
   // -- Insight ---------------------------------------------------------
 
   document.getElementById('insightForm').addEventListener('submit', async (e) => {
@@ -898,6 +1016,56 @@
     } catch (err) {
       result.textContent = `Error: ${err.message}`;
     }
+  });
+
+  document.getElementById('assistantProfileForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!state.session) return;
+    try {
+      await api('/api/assistant/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: state.session.userId,
+          name: document.getElementById('assistantName').value.trim() || 'Vaco',
+          tone: document.getElementById('assistantTone').value,
+          lifestyle: document.getElementById('assistantLifestyle').value.trim(),
+        }),
+      });
+      toast('Assistant personalized.', 'money');
+      document.getElementById('assistantProfileCard').removeAttribute('open');
+    } catch (err) {
+      toast(err.message, 'danger');
+    }
+  });
+
+  document.getElementById('assistantChatForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!state.session) return;
+    const input = document.getElementById('assistantInput');
+    const content = input.value.trim();
+    if (!content) return;
+    const box = document.getElementById('assistantMessages');
+    const empty = box.querySelector('.vaco-empty');
+    if (empty) empty.remove();
+    box.appendChild(renderAssistantMessage({ role: 'user', content }));
+    input.value = '';
+    const thinking = el('p', 'vaco-small vaco-dim', 'Thinking…');
+    box.appendChild(thinking);
+    box.scrollTop = box.scrollHeight;
+    try {
+      const reply = await api('/api/assistant/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: state.session.userId, content }),
+      });
+      thinking.remove();
+      box.appendChild(renderAssistantMessage(reply));
+    } catch (err) {
+      thinking.remove();
+      box.appendChild(el('p', 'vaco-small vaco-dim', `No reply: ${err.message}`));
+    }
+    box.scrollTop = box.scrollHeight;
   });
 
   // -- tabs ------------------------------------------------------------
@@ -924,6 +1092,7 @@
     renderMerch();
     renderLibrary();
     renderApps();
+    renderAssistant();
   }
 
   async function boot() {

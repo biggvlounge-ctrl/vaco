@@ -40,6 +40,9 @@ import {
 import tracingModule from './lib/tracing.cjs';
 const { traceMiddleware } = tracingModule;
 import { getInsightCard } from './lib/insight.js';
+import {
+  TONE_OPTIONS, setProfile, getProfile, getHistory, sendMessage,
+} from './lib/personalAssistant.js';
 import { createShellStore } from './lib/store.js';
 import { attachStore } from './lib/storeBackend.js';
 import { settleVCoin, V3_API_URL } from './lib/v3Client.js';
@@ -52,7 +55,7 @@ import operatorAuthModule from './lib/operatorAuth.cjs';
 // sync as `.cjs` for exactly that reason. Default-imported and
 // destructured rather than named-imported, which does not depend on
 // Node's CJS named-export detection holding for these files.
-const { requireActor, requireCallingService } = shieldAuth;
+const { requireActor, requireParamActor, requireCallingService } = shieldAuth;
 const { createServiceAuth } = serviceAuthModule;
 const { createDecisionLog } = decisionLogModule;
 const { createOperatorAuth } = operatorAuthModule;
@@ -243,6 +246,32 @@ app.get('/api/insight', async (req, res) => {
     res.status(400).json({ error: err.message });
   }
 });
+
+// -- Personal assistant --------------------------------------------
+//
+// One profile per signed-in user, and the real chat built on top of
+// it. See lib/personalAssistant.js for the real routing decision
+// (VACON specialist vs. this user's own personalized v4-proxy call).
+
+app.get('/api/assistant/tones', (_req, res) => {
+  res.json({ tones: TONE_OPTIONS });
+});
+
+app.get('/api/assistant/profile/:userId', requireParamActor('userId'), (req, res) => {
+  res.json(getProfile(store, req.params.userId));
+});
+
+app.post('/api/assistant/profile', requireActor('userId'), (req, res) => handle(
+  res, () => setProfile(store, req.body || {}),
+));
+
+app.get('/api/assistant/history/:userId', requireParamActor('userId'), (req, res) => {
+  res.json({ messages: getHistory(store, req.params.userId) });
+});
+
+app.post('/api/assistant/chat', requireActor('userId'), (req, res) => handle(
+  res, () => sendMessage(store, req.body || {}), 201,
+));
 
 // The storefront needs to show a balance before it asks someone to
 // spend it. Proxied rather than called from the browser so the page has
