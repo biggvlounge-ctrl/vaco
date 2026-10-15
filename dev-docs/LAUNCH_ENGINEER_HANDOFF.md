@@ -1,8 +1,9 @@
 # Launch engineer handoff — the $1,600–5,200 engagement
 
 **What this is.** A one-page brief for the one-time contractor engagement
-scoped in this conversation: get the ecosystem (36 backends + VDP +
-VENVS) actually live for a closed/beta rollout, at the minimal tier —
+scoped in this conversation: get the ecosystem (37 backends + VDP +
+VENVS as the two Vite frontends, 39 processes total as of 15 Oct 2026)
+actually live for a closed/beta rollout, at the minimal tier —
 not the full production-hardening, not the compliance/moderation
 spend, not the big engineering team. Those are real, and they're
 costed separately in `GO_LIVE_DOSSIER.md` §2b/§4c; this document does
@@ -18,9 +19,12 @@ tooling, not a new build.
 
 `deploy/README.md` documents three real paths. For this engagement,
 **use pm2 + nginx**, not Docker Compose, for one concrete reason: pm2
-has actually been run end-to-end and verified live (34 apps managed,
-33/34 online, every health check answered 200, reload tested, `pm2
-save`/`startup` both produced real output). Docker Compose's config is
+has actually been run end-to-end and verified live. (The process list
+has grown to 37 apps as of 15 Oct 2026 — `deploy/ecosystem.config.js`
+is regenerated from the live manifest each time, per the mandatory
+step below, so this count moves on its own; it was 34 when this doc
+was first verified.) Every health check answered 200, reload tested,
+`pm2 save`/`startup` both produced real output. Docker Compose's config is
 fully generated and validated (`docker compose config` parses clean,
 volumes/env/cross-service URLs all checked), but **no image has ever
 actually been built anywhere** — this sandboxed environment's own
