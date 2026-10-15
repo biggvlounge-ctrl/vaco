@@ -40,6 +40,25 @@
 const { getInsightCard } = require('./insight');
 
 const V4_PROXY_URL = process.env.V4_PROXY_URL || 'http://localhost:8787';
+const V3_API_URL = process.env.V3_API_URL || 'http://localhost:8811';
+
+// A real balance question gets a real, deterministic lookup against
+// V3's own ledger -- never routed to VACON's finance specialist (Leslie),
+// who has no actual account access and would otherwise either refuse
+// or, worse, guess. This is the same "never fabricate" posture
+// `sendMessage` already holds for completions, applied to the one
+// class of question this app can answer exactly rather than
+// generatively. Narrow on purpose: a false match costs nothing (the
+// real number is still correct), a false *non*-match just falls
+// through to the normal routing below.
+const BALANCE_INTENT = /\b(my\s+)?(vcoin|balance|wallet)\b/i;
+
+async function lookupBalance(userId) {
+  const res = await fetch(`${V3_API_URL}/api/vcoin/balance/${encodeURIComponent(userId)}`);
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || `V3 balance lookup failed (${res.status})`);
+  return body.balance;
+}
 
 // Same per-file service-credential pattern every cross-app caller in
 // this ecosystem holds its own copy of (see lib/insight.js) -- this
@@ -150,7 +169,9 @@ async function invokeV4Direct(systemPrompt, messages) {
 // reply; a fake network layer is for a fast, deterministic test, not
 // for pretending a completion happened.
 async function sendMessage(store, options = {}) {
-  const { userId, content, insightFn = getInsightCard, invokeFn = invokeV4Direct } = options;
+  const {
+    userId, content, insightFn = getInsightCard, invokeFn = invokeV4Direct, balanceFn = lookupBalance,
+  } = options;
   if (!userId) throw new Error('sendMessage requires a userId');
   if (!content || !content.trim()) throw new Error('sendMessage requires content');
 
@@ -158,6 +179,23 @@ async function sendMessage(store, options = {}) {
     .slice(-HISTORY_WINDOW)
     .map((m) => ({ role: m.role, content: m.content }));
   recordMessage(store, { userId, role: 'user', content });
+
+  // Checked before VACON routing, not after: VACON's own keyword
+  // router would send "what's my balance" to Leslie (finance) anyway,
+  // and Leslie is a generic completion with no real account access --
+  // she would either refuse or guess. A real number, looked up once,
+  // beats either.
+  if (BALANCE_INTENT.test(content)) {
+    let balance;
+    try {
+      balance = await balanceFn(userId);
+    } catch (err) {
+      throw new Error(`I couldn't check your real balance just now: ${err.message}`);
+    }
+    return recordMessage(store, {
+      userId, role: 'assistant', content: `You have ${balance} VCoin right now.`, routedTo: 'wallet',
+    });
+  }
 
   // A VACON outage is treated the same as "no domain match" -- the
   // assistant's own core job (personalized chat) does not need VACON

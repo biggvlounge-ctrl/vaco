@@ -70,14 +70,14 @@ test('a domain-matched message is relayed to the real VACON specialist, not answ
   const store = createVacoAssistantStore();
   const insightFn = recordingInsight({
     matchedAgents: [{ agentId: 'leslie', score: 3 }],
-    completion: { text: 'Leslie here: your balance is 100 VCoin.' },
+    completion: { text: 'Leslie here: that contract clause looks standard.' },
     completionError: null,
   });
   const invokeFn = recordingInvoke('should not be called');
 
-  const reply = await sendMessage(store, { userId: 'u1', content: 'what is my vcoin balance', insightFn, invokeFn });
+  const reply = await sendMessage(store, { userId: 'u1', content: 'can you review this contract clause', insightFn, invokeFn });
 
-  assert.equal(reply.content, 'Leslie here: your balance is 100 VCoin.');
+  assert.equal(reply.content, 'Leslie here: that contract clause looks standard.');
   assert.equal(reply.routedTo, 'leslie');
   assert.equal(invokeFn.calls.length, 0, 'the general path must not run when a specialist answered');
 });
@@ -92,7 +92,7 @@ test('a specialist match whose completion fails surfaces the real error rather t
   const invokeFn = recordingInvoke('should not be called');
 
   await assert.rejects(
-    sendMessage(store, { userId: 'u1', content: 'what is my balance', insightFn, invokeFn }),
+    sendMessage(store, { userId: 'u1', content: 'can you review this contract', insightFn, invokeFn }),
     /no ANTHROPIC_API_KEY configured/,
   );
   assert.equal(invokeFn.calls.length, 0, 'a real infra failure must surface, not be hidden by a fallback');
@@ -157,4 +157,43 @@ test('sendMessage requires a userId and non-empty content', async () => {
   const store = createVacoAssistantStore();
   await assert.rejects(sendMessage(store, { content: 'hi' }), /requires a userId/);
   await assert.rejects(sendMessage(store, { userId: 'u1', content: '   ' }), /requires content/);
+});
+
+test('a balance question is answered with a real looked-up number, never routed to VACON', async () => {
+  const store = createVacoAssistantStore();
+  const insightFn = recordingInsight({ matchedAgents: [{ agentId: 'leslie' }], completion: { text: 'generic finance answer' }, completionError: null });
+  const invokeFn = recordingInvoke('should not be called');
+  const balanceFn = async (userId) => { assert.equal(userId, 'u1'); return 42; };
+
+  const reply = await sendMessage(store, { userId: 'u1', content: 'what is my vcoin balance', insightFn, invokeFn, balanceFn });
+
+  assert.equal(reply.content, 'You have 42 VCoin right now.');
+  assert.equal(reply.routedTo, 'wallet');
+  assert.equal(insightFn.calls.length, 0, 'a balance question must never reach VACON -- Leslie has no real ledger access');
+  assert.equal(invokeFn.calls.length, 0);
+});
+
+test('a failed real balance lookup surfaces honestly rather than guessing', async () => {
+  const store = createVacoAssistantStore();
+  const insightFn = recordingInsight({ matchedAgents: [], completion: null, completionError: null });
+  const invokeFn = recordingInvoke('should not be called');
+  const balanceFn = async () => { throw new Error('V3 unreachable'); };
+
+  await assert.rejects(
+    sendMessage(store, { userId: 'u1', content: 'how much is in my wallet', insightFn, invokeFn, balanceFn }),
+    /couldn't check your real balance.*V3 unreachable/,
+  );
+  assert.equal(invokeFn.calls.length, 0);
+});
+
+test('an unrelated message does not trigger the balance path', async () => {
+  const store = createVacoAssistantStore();
+  const insightFn = recordingInsight({ matchedAgents: [], completion: null, completionError: null });
+  const invokeFn = recordingInvoke('a real reply about marathon training');
+  const balanceFn = async () => { throw new Error('must not be called'); };
+
+  const reply = await sendMessage(store, { userId: 'u1', content: 'how many miles should I run today', insightFn, invokeFn, balanceFn });
+
+  assert.equal(reply.content, 'a real reply about marathon training');
+  assert.equal(invokeFn.calls.length, 1);
 });
