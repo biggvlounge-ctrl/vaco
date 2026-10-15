@@ -98,16 +98,21 @@ function getPost(store, postId) {
   return store.posts.find((p) => p.id === postId) || null;
 }
 
-// The real gated read -- locked media is withheld unless the caller
-// supplies a real `hasAccess: true` (computed by the caller against
-// `lib/lockedContentTiers.js`'s own `canAccessLockedContent`, kept
-// separate here since posts.js has no real reason to depend on the
-// tiers module for a pure read).
-function getPostForViewer(store, postId, hasAccess) {
-  const post = getPost(store, postId);
-  if (!post) return null;
-  if (!post.isLocked || hasAccess) return post;
+// The one real strip rule, shared by the single-item read below and
+// by every listing route -- locked media is withheld unless the
+// caller supplies a real `hasAccess: true` (computed by the caller
+// against `lib/lockedContentTiers.js`'s own `canAccessLockedContent`,
+// kept separate here since posts.js has no real reason to depend on
+// the tiers module for a pure read). Exported so a listing route can
+// gate each item against its OWN `requiredTierId` rather than one
+// hasAccess value for every row.
+function applyPostAccess(post, hasAccess) {
+  if (!post || !post.isLocked || hasAccess) return post;
   return { ...post, mediaUrl: null, mediaUrls: null };
+}
+
+function getPostForViewer(store, postId, hasAccess) {
+  return applyPostAccess(getPost(store, postId), hasAccess);
 }
 
 function getFeedPosts(store) {
@@ -178,6 +183,7 @@ module.exports = {
   createPost,
   getPost,
   getPostForViewer,
+  applyPostAccess,
   getFeedPosts,
   getActiveStories,
   getReels,

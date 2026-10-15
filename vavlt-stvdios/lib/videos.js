@@ -62,14 +62,22 @@ function getVideo(store, videoId) {
   return store.videos.find((v) => v.id === videoId) || null;
 }
 
-// The real gated read, mirroring `posts.js`'s own `getPostForViewer`
-// exactly -- same shape, same reasoning (locked media withheld unless
-// the caller supplies a real, already-computed `hasAccess`).
-function getVideoForViewer(store, videoId, hasAccess) {
-  const video = getVideo(store, videoId);
-  if (!video) return null;
-  if (!video.isLocked || hasAccess) return video;
+// The one real strip rule, shared by the single-item read below and
+// by every listing route -- a locked video withholds its real
+// `mediaUrl` unless the caller supplies a real, already-computed
+// `hasAccess`. Exported so a listing route can gate each item against
+// its OWN `requiredTierId` rather than one hasAccess value for every
+// row (two locked videos can require two different tiers).
+function applyVideoAccess(video, hasAccess) {
+  if (!video || !video.isLocked || hasAccess) return video;
   return { ...video, mediaUrl: null };
+}
+
+// Mirrors `posts.js`'s own `getPostForViewer` exactly -- same shape,
+// same reasoning (locked media withheld unless the caller supplies a
+// real, already-computed `hasAccess`).
+function getVideoForViewer(store, videoId, hasAccess) {
+  return applyVideoAccess(getVideo(store, videoId), hasAccess);
 }
 
 function listVideosForAuthor(store, authorId) {
@@ -88,6 +96,7 @@ module.exports = {
   createVideo,
   getVideo,
   getVideoForViewer,
+  applyVideoAccess,
   listVideosForAuthor,
   getVideoFeed,
 };

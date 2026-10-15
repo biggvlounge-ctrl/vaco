@@ -29,7 +29,7 @@ const {
 const { getChannelChat, postMessage, getMessages } = require('./lib/channelChat');
 const { tipChannel, getTipsForChannel, getTotalTipsForPerson } = require('./lib/channelTips');
 const {
-  POST_TYPES, POST_SOURCES, createPost, getPost, getPostForViewer, getFeedPosts, getActiveStories,
+  POST_TYPES, POST_SOURCES, createPost, getPost, getPostForViewer, applyPostAccess, getFeedPosts, getActiveStories,
   getReels, getExplorePosts, listPostsForAuthor, createHighlight, listHighlightsForAuthor,
 } = require('./lib/posts');
 const { followUser, unfollowUser, isFollowing, getFollowedIds } = require('./lib/follows');
@@ -48,7 +48,8 @@ const {
   listScreenSessionsForOwner, getScreenSessionWithChannels,
 } = require('./lib/screenSessions');
 const {
-  VIDEO_SOURCES, MAX_VIDEO_DURATION_SECONDS, createVideo, getVideo, getVideoForViewer, listVideosForAuthor, getVideoFeed,
+  VIDEO_SOURCES, MAX_VIDEO_DURATION_SECONDS, createVideo, getVideo, getVideoForViewer, applyVideoAccess,
+  listVideosForAuthor, getVideoFeed,
 } = require('./lib/videos');
 const {
   REFERRAL_TIERS, SPIN_PRIZES, getReferralProgress, recordReferral, spinWheel,
@@ -322,26 +323,39 @@ app.get('/api/posts/:id', (req, res) => {
   res.json(getPostForViewer(store, post.id, hasAccess));
 });
 
-app.get('/api/feed', (_req, res) => {
-  res.json({ posts: getFeedPosts(store) });
+// Every listing route below used to return `store.posts`/`store.videos`
+// untouched -- the single-item routes above correctly withheld a
+// locked item's real media unless the viewer could pay for it, but a
+// feed/reels/explore/author-listing call bypassed that gate entirely
+// and handed out every locked video or Reel's real `mediaUrl` for
+// free. Gate each item against ITS OWN `requiredTierId` (two locked
+// posts can require two different tiers, so one hasAccess value for
+// the whole list would be wrong), the same way the single-item routes
+// already do.
+function gatePostList(posts, viewerId) {
+  return posts.map((p) => applyPostAccess(p, viewerId ? canAccessLockedContent(store, p.requiredTierId, viewerId) : false));
+}
+
+app.get('/api/feed', (req, res) => {
+  res.json({ posts: gatePostList(getFeedPosts(store), req.query.viewerId) });
 });
 
-app.get('/api/stories', (_req, res) => {
-  res.json({ stories: getActiveStories(store) });
+app.get('/api/stories', (req, res) => {
+  res.json({ stories: gatePostList(getActiveStories(store), req.query.viewerId) });
 });
 
-app.get('/api/reels', (_req, res) => {
-  res.json({ reels: getReels(store) });
+app.get('/api/reels', (req, res) => {
+  res.json({ reels: gatePostList(getReels(store), req.query.viewerId) });
 });
 
 app.get('/api/explore', (req, res) => {
   const viewerId = req.query.viewerId;
   if (!viewerId) return res.status(400).json({ error: 'explore requires a viewerId query param' });
-  res.json({ posts: getExplorePosts(store, { viewerId, followedIds: getFollowedIds(store, viewerId) }) });
+  res.json({ posts: gatePostList(getExplorePosts(store, { viewerId, followedIds: getFollowedIds(store, viewerId) }), viewerId) });
 });
 
 app.get('/api/authors/:authorId/posts', (req, res) => {
-  res.json({ posts: listPostsForAuthor(store, req.params.authorId) });
+  res.json({ posts: gatePostList(listPostsForAuthor(store, req.params.authorId), req.query.viewerId) });
 });
 
 app.post('/api/videos', requireActor('authorId'), (req, res) => {
@@ -360,12 +374,18 @@ app.get('/api/videos/:id', (req, res) => {
   res.json(getVideoForViewer(store, video.id, hasAccess));
 });
 
+// Same gating fix as gatePostList above, for the same reason: these
+// used to hand out a locked video's real mediaUrl for free.
+function gateVideoList(videos, viewerId) {
+  return videos.map((v) => applyVideoAccess(v, viewerId ? canAccessLockedContent(store, v.requiredTierId, viewerId) : false));
+}
+
 app.get('/api/authors/:authorId/videos', (req, res) => {
-  res.json({ videos: listVideosForAuthor(store, req.params.authorId) });
+  res.json({ videos: gateVideoList(listVideosForAuthor(store, req.params.authorId), req.query.viewerId) });
 });
 
-app.get('/api/video-feed', (_req, res) => {
-  res.json({ videos: getVideoFeed(store) });
+app.get('/api/video-feed', (req, res) => {
+  res.json({ videos: gateVideoList(getVideoFeed(store), req.query.viewerId) });
 });
 
 app.post('/api/highlights', requireActor('authorId'), (req, res) => {

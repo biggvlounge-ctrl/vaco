@@ -245,6 +245,43 @@ function renderEvents(body) {
 
 // -- Feed -------------------------------------------------------------
 
+// `p.mediaUrl`/`mediaUrls` are real, caller-supplied addresses — the
+// server already withholds them for a locked post the viewer hasn't
+// paid for (`applyPostAccess`, fixed 15 Oct 2026 to also cover every
+// listing route, not just the single-item one). So this renders the
+// real media when the field is present, and the honest "locked" note
+// when the server has withheld it — never a placeholder box standing
+// in for media it never tried to show.
+function postMedia(p) {
+  if (p.isLocked && !p.mediaUrl && !p.mediaUrls) {
+    return VACO.notice('Locked — subscribe to this creator\'s tier to view.', 'warn');
+  }
+  if (p.postType === 'carousel' && p.mediaUrls && p.mediaUrls.length) {
+    var row = el('div', 'vaco-row-tight');
+    p.mediaUrls.forEach(function (url) {
+      var img = el('img', null);
+      img.src = url;
+      img.style.width = '96px';
+      img.style.borderRadius = 'var(--vaco-radius-sm)';
+      row.appendChild(img);
+    });
+    return row;
+  }
+  if (!p.mediaUrl) return el('div', 'screen');
+  if (p.postType === 'reel') {
+    var video = el('video', null);
+    video.src = p.mediaUrl;
+    video.controls = true;
+    video.style.width = '100%';
+    return video;
+  }
+  var img = el('img', null);
+  img.src = p.mediaUrl;
+  img.style.width = '100%';
+  img.style.borderRadius = 'var(--vaco-radius-sm)';
+  return img;
+}
+
 function renderFeed(body) {
   var id = VACO.userId();
   if (!id) return el('div', 'vaco-empty', 'Sign in to see the content feed.');
@@ -256,15 +293,68 @@ function renderFeed(body) {
       if (!posts.length) return el('div', 'vaco-empty', 'Nothing in the feed yet.');
       return VACO.grid(posts.map(function (p) {
         var lines = el('div', 'vaco-stack-sm');
-        lines.appendChild(el('div', 'screen'));
+        lines.appendChild(postMedia(p));
         lines.appendChild(el('p', 'vaco-small vaco-dim', p.caption || p.body || ''));
         var meta = el('div', 'vaco-row-tight');
         if (p.postType) meta.appendChild(VACO.badge(p.postType));
         if (p.source) meta.appendChild(VACO.badge(p.source));
+        if (p.isLocked) meta.appendChild(VACO.badge('locked tier', 'warn'));
         lines.appendChild(meta);
         return VACO.card(p.authorId || 'post', [lines]);
       }), true);
     });
+}
+
+// -- Videos (long-form, on-demand) --------------------------------------
+//
+// `mediaUrl` is real and caller-supplied at creation, the same honest
+// "already-hosted elsewhere" shape as VENVM's videoUrl and DREAMS'
+// creativeUrl — there is no vaco-media asset-registration step here
+// because there is no upload-then-wait lifecycle to model; the real
+// address already exists by the time a Video record is created.
+function renderVideos(body) {
+  var out = el('div', 'vaco-stack');
+
+  out.appendChild(VACO.card('Post a video', [
+    VACO.form([
+      { name: 'title', label: 'Title', placeholder: 'What it is', width: '200px' },
+      { name: 'authorId', label: 'Author', value: VACO.userId() || '', width: '130px' },
+      { name: 'mediaUrl', label: 'Media URL', placeholder: 'https://…', width: '220px' },
+      { name: 'durationSeconds', label: 'Duration (s)', type: 'number', min: 1, width: '110px' },
+    ], function (values) {
+      return VACO.post('/api/videos', values)
+        .then(function () { VACO.toast('Video posted.'); VACO.render(); });
+    }, 'Post'),
+  ]));
+
+  var viewerId = VACO.userId();
+  var url = '/api/video-feed' + (viewerId ? '?viewerId=' + encodeURIComponent(viewerId) : '');
+  return VACO.api(url).then(function (data) {
+    var videos = data.videos || [];
+    if (!videos.length) {
+      out.appendChild(el('div', 'vaco-empty', 'No videos yet.'));
+      return VACO.mount(body, out);
+    }
+    out.appendChild(VACO.grid(videos.map(function (v) {
+      var lines = el('div', 'vaco-stack-sm');
+      if (v.isLocked && !v.mediaUrl) {
+        lines.appendChild(VACO.notice('Locked — subscribe to view.', 'warn'));
+      } else {
+        var video = el('video', null);
+        video.src = v.mediaUrl;
+        video.controls = true;
+        video.style.width = '100%';
+        lines.appendChild(video);
+      }
+      lines.appendChild(el('p', 'vaco-small vaco-dim', v.title));
+      var meta = el('div', 'vaco-row-tight');
+      meta.appendChild(VACO.badge(v.source));
+      if (v.isLocked) meta.appendChild(VACO.badge('locked tier', 'warn'));
+      lines.appendChild(meta);
+      return VACO.card(v.authorId, [lines]);
+    }), true));
+    VACO.mount(body, out);
+  });
 }
 
 VACO.app({
@@ -282,6 +372,7 @@ VACO.app({
     { id: 'sessions', label: 'Sessions', heading: 'Live screen sessions', render: renderSessions },
     { id: 'events', label: 'Events', heading: 'Casino streams', render: renderEvents },
     { id: 'feed', label: 'Feed', heading: 'Content', render: renderFeed },
+    { id: 'videos', label: 'Videos', heading: 'On-demand, long-form', render: renderVideos },
   ],
 });
 </script>
