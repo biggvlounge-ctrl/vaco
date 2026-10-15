@@ -265,6 +265,12 @@ export function registerGateway(store, {
     civilizationId: civilizationId || null,
     legalStatus,
     registeredAt: now,
+    // Same real, always-appended history `claimTerritory`'s own
+    // `history` already seeds for a territory's controlStatus -- a
+    // gateway's legal status changes over real time too (discovered,
+    // abandoned, rediscovered), and that history is a discovery arc's
+    // own real record, not something to re-derive from scratch.
+    history: [{ legalStatus, note: 'gateway registered', at: now }],
   };
   store.gateways.push(gateway);
   if (civilization) civilization.gatewayIds.push(gateway.id);
@@ -273,6 +279,21 @@ export function registerGateway(store, {
 
 export function getGateway(store, id) {
   return store.gateways.find((g) => g.id === id) || null;
+}
+
+// A real, recorded change -- `secret` becoming `rediscovered`, a
+// `public` gate going `abandoned` -- the same never-silent pattern
+// `updateTerritoryControl` already uses: every call appends to
+// `history` even when `legalStatus` repeats the current value.
+export function updateGatewayStatus(store, gatewayId, { legalStatus, note, now = Date.now() } = {}) {
+  const gateway = getGateway(store, gatewayId);
+  if (!gateway) throw new Error(`updateGatewayStatus: no gateway ${gatewayId}`);
+  if (!GATEWAY_LEGAL_STATUSES.includes(legalStatus)) {
+    throw new Error(`updateGatewayStatus: "${legalStatus}" is not a known legal status (expected one of ${GATEWAY_LEGAL_STATUSES.join(', ')})`);
+  }
+  gateway.legalStatus = legalStatus;
+  gateway.history.push({ legalStatus, note: note || null, at: now });
+  return gateway;
 }
 
 export function listGateways(store) {

@@ -337,6 +337,7 @@ let store = createVdpStore();
   const customsLib = await import('./src/lib/customs.js');
   const civilizationsLib = await import('./src/lib/civilizations.js');
   const worldAtlasLib = await import('./src/lib/worldAtlas.js');
+  const discoveryLib = await import('./src/lib/discovery.js');
   const combatSportsLib = await import('./src/lib/combatSports.js');
   const leaderboardsLib = await import('./src/lib/leaderboards.js');
   const teamSportsLib = await import('./src/lib/teamSports.js');
@@ -532,6 +533,13 @@ let store = createVdpStore();
       // real kind-counts itself (see its own header), so a restart
       // against an existing `store.json` never doubles these.
       worldAtlasLib.seedWorldAtlas(store.civilizations);
+      // `discovery.js`'s own real player-facing progress, separate
+      // from `store.civilizations` -- a hidden civilization's own
+      // identity record and a real player's investigation progress
+      // toward discovering it are two different facts, the same
+      // reason `store.leaderboards`/`store.combatSports` are kept
+      // apart from each other above.
+      if (!store.discovery) store.discovery = discoveryLib.createDiscoveryStore();
       // `combatSports.js` is deliberately storage-agnostic (see its
       // own header: it owns the card, not the store), so its matches
       // live directly on this app's own store, the same way every
@@ -2740,6 +2748,36 @@ let store = createVdpStore();
         return res.status(400).json({ error: `"${req.params.statistic}" is not a known statistic (expected one of ${civilizationsLib.STATISTIC_NAMES.join(', ')})` });
       }
       res.json({ statistic: req.params.statistic, leaders: rankingsLib.rankBy(records) });
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // The discovery arc (14 Oct 2026, own gameplay suggestion, built):
+  // a hidden civilization starts secret, with nothing for a real
+  // player to actually do about it until now. `discovery.js`'s own
+  // `investigate()` is the one real mutating action; the civilization
+  // id sits two segments under `/civilizations`, the same
+  // `/leaders/:statistic` discipline above, so it can never collide
+  // with the single-segment `:id` catch-all below regardless of
+  // registration order.
+  app.get('/api/civilizations/discovery/:id', (req, res) => {
+    res.json(discoveryLib.getDiscoveryProgress(store.discovery, Number(req.params.id)));
+  });
+
+  app.post('/api/civilizations/discovery/:id/investigate', requireActor('investigatorId'), (req, res) => {
+    try {
+      // `recordClue` (called inside `investigate`) throws once a
+      // civilization is already discovered, so this call only ever
+      // reaches `discovered: true` on the one real call that tips it
+      // over -- a news event here is never posted twice for the same
+      // civilization.
+      const progress = discoveryLib.investigate(store.civilizations, store.discovery, Number(req.params.id), req.body || {});
+      if (progress.discovered) {
+        const civ = civilizationsLib.getCivilization(store.civilizations, Number(req.params.id));
+        if (civ) newsLib.recordEvent(store.news, { kind: 'civilization', text: `${civ.name} has been discovered` });
+      }
+      res.status(200).json(progress);
     } catch (err) {
       res.status(400).json({ error: err.message });
     }

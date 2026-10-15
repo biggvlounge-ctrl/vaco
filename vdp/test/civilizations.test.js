@@ -7,7 +7,7 @@ import {
   createCivilizationsStore, createCivilization, getCivilization, listCivilizations,
   CIVILIZATION_KINDS, createStatistics, STATISTIC_NAMES, ECONOMIC_STATISTIC_NAMES,
   TECHNOLOGY_STATISTIC_NAMES, adjustStatistic, setStatistic,
-  GATEWAY_TIERS, GATEWAY_LEGAL_STATUSES, registerGateway, getGateway, listGateways,
+  GATEWAY_TIERS, GATEWAY_LEGAL_STATUSES, registerGateway, getGateway, listGateways, updateGatewayStatus,
   ROUTE_STATUSES, createTradeRoute, getTradeRoute, listTradeRoutes, recordRouteEvent,
   RED_ZONE_ACTIVITIES, createRedZone, getRedZone, evolveRedZone,
   VEHICLE_STATUSES, registerVehicle, getVehicle, transferVehicle, listVehiclesFor,
@@ -130,6 +130,24 @@ test('registerGateway requires a real tier and a real legal status, from the six
     () => registerGateway(store, { name: 'Bad', tier: 'vehicle', legalStatus: 'friendly' }),
     /not a known legal status/,
   );
+});
+
+test('registerGateway seeds a real history entry, and updateGatewayStatus appends to it -- including a real no-change check', () => {
+  const store = createCivilizationsStore();
+  const gate = registerGateway(store, { name: "Serpent's Gate", tier: 'container', legalStatus: 'secret' });
+  assert.equal(gate.history.length, 1);
+
+  updateGatewayStatus(store, gate.id, { legalStatus: 'rediscovered', note: 'a player found it' });
+  let updated = getGateway(store, gate.id);
+  assert.equal(updated.legalStatus, 'rediscovered');
+  assert.equal(updated.history.length, 2);
+
+  updateGatewayStatus(store, gate.id, { legalStatus: 'rediscovered', note: 'checked again, still rediscovered' });
+  updated = getGateway(store, gate.id);
+  assert.equal(updated.history.length, 3, 'a repeated status is still a real, timestamped check');
+
+  assert.throws(() => updateGatewayStatus(store, gate.id, { legalStatus: 'friendly' }), /not a known legal status/);
+  assert.throws(() => updateGatewayStatus(store, 9999, { legalStatus: 'secret' }), /no gateway/);
 });
 
 test('createTradeRoute starts a real history, and recordRouteEvent appends to it', () => {

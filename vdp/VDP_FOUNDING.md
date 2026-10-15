@@ -2229,6 +2229,53 @@ visible in every generic route built earlier the same day -- `GET
 the instant they exist, confirmed directly against a real boot, with
 zero server.cjs changes needed.
 
+## The discovery arc: hidden civilizations become real, player-findable content (15 Oct 2026)
+
+Per direct instruction, continuing "do all" of the gameplay/lore
+follow-up work -- specifically this session's own first suggestion
+from "what could make the gameplay or lore better": a hidden
+civilization/gateway should not just sit there forever, permanently
+secret, with nothing for a real player to actually do about it.
+
+**New `src/lib/discovery.js`**, built directly on vocabulary
+`civilizations.js` already carried but nothing used until now --
+`GATEWAY_LEGAL_STATUSES`/`ROUTE_STATUSES` both already name
+`rediscovered` as a real state, and `TERRITORY_CONTROL_STATUSES`
+already separates a `claimed` land from one `actually-controlled`.
+The arc: a real player investigates a hidden civilization
+(`recordClue`, any real `investigatorId` and an optional free-text
+`source`); once enough real clues exist (`CLUES_TO_DISCOVER`, flagged
+interpretive at 5 -- no source document gives a number),
+`attemptDiscovery` fires a real, one-way transition -- every one of
+that civilization's gateways and secret trade routes flips to
+`rediscovered`, and its territory flips from `independent` to
+`claimed` (known to exist now, deliberately NOT `actually-controlled`
+-- that would be a real conquest/negotiation mechanic this does not
+invent). `investigate()` does both steps in one call, the real entry
+point `server.cjs` wires to two new routes: `GET
+/api/civilizations/discovery/:id` (progress, unauthenticated read) and
+`POST /api/civilizations/discovery/:id/investigate` (actor-gated on
+`investigatorId`, same posture as every other mutating route in this
+app). Both sit two segments under `/civilizations`, the same
+`/leaders/:statistic` discipline already used, so they can never
+collide with the single-segment `:id` catch-all regardless of
+registration order -- designed around the route-shadowing bug class
+this document has already recorded three times, not repeated a
+fourth.
+
+A discovered civilization posts a real `news.js` event
+("`<name> has been discovered`"); `recordClue` refuses a target that
+isn't actually `hidden-civilization` kind (nothing to discover about
+a mainland country everyone already knows exists) and refuses once
+already discovered, so a discovery is a real, one-way fact rather
+than something to keep "finding" indefinitely. Added 20 new tests
+(`discovery.test.js`, plus a `civilizations.js` gateway-history test
+this exposed a real gap in -- `registerGateway` never kept a history
+of its own `legalStatus` the way `claimTerritory` already kept one
+for `controlStatus`, fixed alongside the new `updateGatewayStatus`).
+Full suite (780 tests) passes; a real boot confirmed the GET route
+reads real zero-state and the POST route is correctly actor-gated.
+
 ## What is still open
 
 - The area's own name — nothing has been given yet (the product name,
