@@ -10,12 +10,25 @@ node vacon-c/scripts/measure-world.mjs --empty    # the world before worldgen.js
 Run it rather than trusting this document to have aged well. If the two
 disagree, the script is right.
 
+> **Correction, 15 Oct 2026**: this document's own advice was followed
+> and the headline below was stale — the catalogue has grown from 67 to
+> **122 statistics** since this was written, and coverage moved with
+> it: a generated world now answers **111 of 122** (not 57 of 67), and
+> the empty world answers **70 of 122** (not 36 of 67). The declared-gap
+> set also changed content, not just count — see the current list in
+> `vacon-c/server/statistics.js` itself, which is the real source of
+> truth this document only ever summarized. None of the specific
+> per-statistic reasoning below is wrong, just the totals it was
+> computed against; read the mechanisms, not the headline numbers.
+
 ---
 
 ## The headline
 
-`server/statistics.js` carries **67 statistics** across §9's eleven
-MASTER BLOCK KEY categories. What a world can actually answer:
+`server/statistics.js` carried **67 statistics** across §9's eleven
+MASTER BLOCK KEY categories when this was written; it carries **122**
+now. What a world could actually answer, at the time of this
+measurement (superseded by the correction above):
 
 | World | Answered | Computable but silent | Declared gaps |
 |---|---|---|---|
