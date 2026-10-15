@@ -1,5 +1,13 @@
 # VACO Ecosystem — Completion Audit
 
+**Superseded 15 Oct 2026 by `dev-docs/PROJECT_COMPLETION_CHECKLIST.md`
+and `dev-docs/COMPLETION_BY_APP.md`.** This document is exactly the
+cautionary example its own successor opens with: measured once on 22
+Aug 2026 at 31 apps and 522 tests, read again later and still said so
+while the real numbers had grown to 36 apps and 2,745+ tests. Kept
+here for its history, not as a current source — read the two files
+above instead.
+
 **Date:** 2026-08-22 · **Method:** measured against the repo, not
 recalled. Every number below came from running the code or counting the
 files at audit time. Where a claim could not be verified, it says so.
