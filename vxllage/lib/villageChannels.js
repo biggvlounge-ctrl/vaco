@@ -72,7 +72,7 @@ function markChannelRead(store, options = {}) {
   if (!channel) throw new Error(`markChannelRead: no channel with id ${channelId}`);
   if (!userId) throw new Error('markChannelRead requires a userId');
   const lastMessageId = channel.messages.length > 0 ? channel.messages[channel.messages.length - 1].id : 0;
-  store.channelReadState.set(`${channelId}:${userId}`, lastMessageId);
+  store.channelReadState[`${channelId}:${userId}`] = lastMessageId;
   return { channelId, userId, lastReadMessageId: lastMessageId };
 }
 
@@ -80,7 +80,7 @@ function getUnreadCount(store, options = {}) {
   const { channelId, userId } = options;
   const channel = getChannel(store, channelId);
   if (!channel) throw new Error(`getUnreadCount: no channel with id ${channelId}`);
-  const lastRead = store.channelReadState.get(`${channelId}:${userId}`) || 0;
+  const lastRead = store.channelReadState[`${channelId}:${userId}`] || 0;
   return channel.messages.filter((m) => m.id > lastRead).length;
 }
 

@@ -27,16 +27,28 @@ guard you have verified.
 > node scripts/audit-route-guards.mjs --app vsafe
 > ```
 >
-> **Where the sweep got to: 56 of 467 guarded → 417 of 467 (89%).**
-> Seventeen apps are at 100% of their mutating routes: vxllage, v3,
-> vacay, voken, vago, hvntz, dreams, venvm, chopz, chopz-shop, void,
-> voidmagic, vavlt-stvdios and all four vulture-* apps — plus cvnvo and
-> vsafe at everything except pure text classifiers that name no user.
+> **Where the sweep got to (26 Aug 2026): 56 of 467 guarded → 417 of
+> 467 (89%).** Seventeen apps are at 100% of their mutating routes:
+> vxllage, v3, vacay, voken, vago, hvntz, dreams, venvm, chopz,
+> chopz-shop, void, voidmagic, vavlt-stvdios and all four vulture-*
+> apps — plus cvnvo and vsafe at everything except pure text
+> classifiers that name no user.
 >
 > The 50 that remain are almost entirely **category A: correctly open**
 > (§3.A) — `v4-proxy`'s shared reference layer, `shield`'s own
 > register/login/session, and service-to-service ingest already covered
 > by an app-level credential. See §6.
+>
+> **Re-run 15 Oct 2026, exactly as this section already told readers
+> to** (`node scripts/audit-route-guards.mjs`): the ecosystem grew
+> past this snapshot, as it was always going to — **36 apps, 571
+> mutating routes, 517 guarded + 54 declared-open (91%), 0
+> unaccounted.** The categories and reasoning in §3 still hold; only
+> the absolute counts in §1 and §6 below are from the smaller,
+> 26-Aug-2026 ecosystem. This is the one section of this document
+> that cannot go stale by accident — it says to re-run the script
+> instead of trusting itself, and re-running it is what produced this
+> note.
 >
 > **What remains, and why it was not in this sweep** (§6).
 
@@ -292,9 +304,16 @@ Two deserved naming ahead of the rest, and **both are now closed**:
 
 ### D. Admin/operator surfaces with no operator concept
 
-`vacon-c`, parts of `void` (stations, no-fly zones, drone routes),
+~~`vacon-c`, parts of `void` (stations, no-fly zones, drone routes),
 `dreams` advertiser onboarding. These need an operator role before a
-guard means anything — a design decision, not a mechanical fix.
+guard means anything — a design decision, not a mechanical fix.~~
+**`void` closed 15 Oct 2026** — a real operator-role app
+(`vaco-operator`) now exists, and `void/server.js`'s own
+`POST /api/no-fly-zone`, the exact surface named above, carries
+`requireOperator('void:enforce')`; its vetting routes carry
+`requireOperator('void:vetting')`. `vacon-c` and `dreams` advertiser
+onboarding remain genuinely open — no operator-role integration found
+in either.
 
 ---
 

@@ -3,6 +3,22 @@
 **Date:** 2026-08-26 · **Method:** measured against the repository.
 Every file path, route, and dependency below was read at audit time.
 
+**Updated 15 Oct 2026 — this document's own Part 7 top two
+recommendations are both done.** Re-verified directly:
+1. *"Write VOKEN money tests — all eight flows."* `voken/test/money.test.js`
+   exists (37/37 passing), explicitly written because of this audit —
+   its own header cites this document by name.
+2. *"Fix the Shield actor gap — VOKEN chains `optionalOwnAccount` on
+   two routes."* `voken/lib/shieldAuth.js` is gone; `shieldAuth.cjs`
+   has deliberately **removed** `optionalOwnAccount` (calling it now
+   throws) and ~18+ routes carry mandatory `requireActor`/
+   `requireParamActor` instead.
+
+The module/line/route counts further down (27 lib modules, 2,683
+lines, 65 routes, one test file) are now stale too — 29+ lib modules,
+3,510+ lines, 64 routes, two test files — but the two items above were
+the actual risk this document exists to flag, and both are closed.
+
 **Why this document exists.** The Ecosystem Acceleration Directive asks
 to expand the parent ecosystem from 16 to 18, adding **CVLTVRE** as
 parent #17 and **VADO / The Art District** as parent #18, and requires a

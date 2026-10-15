@@ -183,6 +183,15 @@ to VRG. Listed under VEDA.*
 | VEDA — physical | 29 |
 | **Total** | **64** |
 
+**This total is now a floor, not a ceiling (15 Oct 2026).** Six real,
+running, tested apps built after this register's 26 Aug 2026 baseline
+appear nowhere in it: `vaco-notify`, `vaco-audit`, `vaco-operator`,
+`vaco-media`, `vash-tap`, `vaco-passport`. None was added here when
+it was built — the same blind spot `COMPANY_TREE.md` and
+`REVENUE_ENTITY_INVENTORY.md` share, since all three independently
+repeated the stale "18 apps settle through V3" figure above rather
+than catching each other's gap.
+
 **Of these, 55 exist in code today.** Three are corporate functions
 with no app (the VEDA groups), one is paused (VACON-C), one is gated
 (VEX), and one has no locked name (Chicken Spot).
@@ -207,7 +216,10 @@ Things that exist as names or documents without being businesses yet:
 It does not say which of these should be **separately incorporated**.
 Sixty-four entities would mean sixty-four sets of filings, books, and
 returns, plus intercompany agreements for every cross-app flow — and
-eighteen apps settle through V3 alone.
+~~eighteen~~ **21** apps settle through V3 alone (15 Oct 2026
+recount). This doc's own 64-entity total is also now a floor rather
+than a ceiling — see the note below on apps built after this
+register's 26 Aug 2026 baseline.
 
 `REVENUE_ENTITY_INVENTORY.md` covers that question. Its short version:
 form the holding companies and the entities the regulated businesses

@@ -114,6 +114,15 @@ destroyed and recovered.** Everything before this was per-app, or
 against the file backend, or reasoned about. What follows is what was
 actually driven, in order, on one machine against a real PostgreSQL 16:
 
+**Kept as the historical record of that actual drill, not re-run or
+re-numbered for its own sake.** The ecosystem has since grown past 36
+apps (39 as of 15 Oct 2026 — `vaco-notify`, `vash-tap`,
+`vaco-passport`, `vdp-server` are new) and `scripts/smoke-frontend.mjs`
+now covers 33 frontends, not 29. The table below is what was really
+run against the smaller, 36-app ecosystem; it is evidence a recovery
+drill works, not a live count of today's app total — re-run it rather
+than scale its numbers up by hand if a current drill is needed.
+
 | step | result |
 |---|---|
 | Boot all 36 apps with `DATABASE_URL` set | **35 up, 1 down** — the one is `v4-proxy`, refusing without `ANTHROPIC_API_KEY`, which is correct |
@@ -487,7 +496,7 @@ versions live nowhere but the host.
 ## 7. Verifying any of this
 
 ```bash
-node --test scripts/test/backup-restore.test.mjs   # 13 tests
+node --test scripts/test/backup-restore.test.mjs   # 17 tests (16 pass, 1 correctly skips; was 13 as of this doc's writing)
 ```
 
 The suite runs entirely against temporary directories, never the real

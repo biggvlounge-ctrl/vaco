@@ -107,8 +107,21 @@ county.
 ### Gap 2 — Block-level statistics
 
 **This is the gap that matters most to this engine**, because
-`server/statistics.js` declares sixteen statistics unavailable and a
-real import fills several of them outright. See §3 for the mapping.
+`server/statistics.js` declares ~~sixteen~~ **nine** statistics
+unavailable (15 Oct 2026 recount: `body_composition`,
+`knowledge_stock`, `informal_economy_share`, `resource_stock`,
+`camera_coverage`, `street_lighting`, `private_security_presence`,
+`pollution`, `terrain_and_water`) and a real import fills several of
+them outright. Ten of the doc's original sixteen were since built
+(`demographic_composition`, `school_dropout_rate`,
+`school_capacity_per_1k`, `hospital_capacity_per_1k`,
+`infrastructure_condition`, `migration_rate`, `birth_rate`,
+`teenage_pregnancy_rate`, `patrol_frequency`, `police_trust`) and
+three new ones were declared that this doc never named
+(`body_composition`, `knowledge_stock`, `resource_stock`). §3's table
+below is this same drift and was not individually re-walked row by
+row — treat `server/statistics.js`'s own `unavailable` entries as the
+live source, not this section.
 
 - **TIGER/Line shapefiles** (US Census Bureau) — the geometry for
   states, counties, places, tracts, block groups and blocks. Public
@@ -347,9 +360,20 @@ the block GEOID knows which municipality it is in.
 
 ## What this does not do
 
-No code here, and no import has been run. The nearest working thing in
-the repo is `world-layer/imports/unescoImport.js`, and its own README
-marks it a stub for the same network reason.
+~~No code here, and no import has been run. The nearest working thing
+in the repo is `world-layer/imports/unescoImport.js`, and its own
+README marks it a stub for the same network reason.~~ **Stale as of
+15 Oct 2026** — `world-layer/imports/` now has 19 importer files, and
+18 of them (census, fbi, cdc, nces, cms, hifld, fema, usgs, noaa,
+gnis, nrhp, naturalEarth, overture, overtureTransportation, wikidata,
+religion, openweather, bls) are real, non-stub transform code, not
+the single stub this section describes. `unescoImport.js` alone
+remains a stub. **No import has actually fetched live data** —
+`world-layer/sources.js`'s own comments confirm every host
+(`query.wikidata.org`, `whc.unesco.org`, `services1.arcgis.com`, etc.)
+is still proxy-blocked in this environment — so the real-data gap
+this section is about is still open; only the "no code exists"
+framing is wrong.
 
 And the honest scope limit: `vacon-c/CLAUDE.md` defers Transportation,
 so roads, routes and movement stay out regardless of how good the

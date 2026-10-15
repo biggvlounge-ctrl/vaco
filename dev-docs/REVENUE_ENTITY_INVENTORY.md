@@ -179,9 +179,13 @@ Making all 31 separate corporations means 31 sets of: state filings,
 registered agents, annual reports, separate books, separate bank
 accounts, separate tax returns, and **intercompany agreements for every
 cross-app flow** — and this ecosystem is built on cross-app flows.
-Eighteen apps settle through V3. That is 18 intercompany money
-movements that would each need a written agreement and transfer
-pricing.
+~~Eighteen apps settle through V3. That is 18 intercompany money
+movements~~ — **21 as of 15 Oct 2026** (chopz, cvnvo, dreams, hvntz,
+vacay, vaco-passport, vaco-shell, vago, vash-tap, vavlt-stvdios, vdp,
+venvs, vex, void, voidmagic, voken, vulture-flix, vulture-music,
+vulture-pods, vulture-studios, vxllage), each one still an
+intercompany money movement
+that would each need a written agreement and transfer pricing.
 
 That is real recurring cost and real ongoing administration, and it is
 the main argument against maximal separation.

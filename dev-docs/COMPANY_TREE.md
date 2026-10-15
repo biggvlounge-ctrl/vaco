@@ -82,7 +82,7 @@ same way CVNVO consumes it for proximity and DREAMS for foot traffic.
 Four VACON agent prompts already said so; the layer is now built.
 
 ### 6. V3 — money & identity
-- **V3** — the VCoin/VASH ledger. 18 apps settle through it
+- **V3** — the VCoin/VASH ledger. ~~18~~ **21** apps settle through it (15 Oct 2026 recount; this exact number is also repeated and now corrected in `REVENUE_ENTITY_INVENTORY.md`, `MASTER_COMPANY_REGISTER.md` and `VACO_CONSTELLATIONS.md` — three independent docs agreeing on a stale count, not a cross-check that it was right)
 - **VACA** — identity & authenticity attestation
 
 ### 7. CVNVO — dating
@@ -194,7 +194,7 @@ architecture diagram.
 
 | | |
 |---|---|
-| Parent groups | **16** |
+| Parent groups | ~~16~~ **18** (this document's own title and body already said 18 — CVLTVRE and VADO, promoted 26 Aug 2026 — this one cell never caught up; confirmed 15 Oct 2026 against `vaco-shell/lib/registry.js`'s own distinct-parent count) |
 | Named businesses across those groups | **~30** |
 | Systems with a Google-scale equivalent | **10** |
 | Owned food & wellness brands | **11** |

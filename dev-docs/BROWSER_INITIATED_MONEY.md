@@ -62,8 +62,15 @@ Two injected functions, because two different authorities:
 | `payoutFn` | the **platform's** money | a service credential | a backend — nothing else |
 
 `requirePayoutFn` lives in each module and throws when a payout is
-attempted without one. No component in either app supplies a
-`payoutFn`, and none should.
+attempted without one. ~~No component in either app supplies a
+`payoutFn`, and none should.~~ **Stale as of 15 Oct 2026** — see the
+table below; `ChopzView.jsx` now supplies a real `payoutFn` for
+`runShift`, backed by a genuine backend-held service credential
+(`POST /api/chopz/shift-payout`, `vdp/server.cjs`), closing exactly
+the gap this document's own "What closing this actually needs"
+section called for. `collectEarnings` deliberately still has none —
+its amount is client-computed and unverifiable server-side, and that
+button stays disabled on purpose, which is still the right call.
 
 **A flow with any platform leg refuses entirely rather than settling
 half.** Charging the buyer and not paying the author is precisely the
@@ -81,8 +88,9 @@ refuse **before** charging anyone.
 | VDP `leaseUnit` | tenant → platform | **works** — buyer-funded |
 | VENVS `purchaseBook`, self-published | buyer → platform, platform → author | refuses |
 | VENVS `checkout` | buyer → platform, platform → each seller | refuses |
-| VDP `runShift` | platform → user | refuses |
-| VDP `collectEarnings` | platform → user | refuses |
+| VDP `runShift` | platform → user | ~~refuses~~ **works (15 Oct 2026)** — `ChopzView.jsx` now supplies a real `payoutFn` backed by `POST /api/chopz/shift-payout` |
+| VDP `collectEarnings` | platform → user | refuses (deliberately — amount is client-computed, unverifiable server-side) |
+| VDP `cookBatch` (Food District) | platform → cook | **works** — `FoodDistrictView.jsx` + `POST /api/food-district/cook-payout` (`vdp/server.cjs`), a flow this document never previously listed |
 
 The three that work now work *properly* for the first time — the
 session token reaches V3, so its guard engages instead of 401ing.

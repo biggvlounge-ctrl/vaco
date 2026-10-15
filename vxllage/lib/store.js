@@ -17,7 +17,7 @@ function createVxllageStore() {
     // Phase 3 -- real text Channels, boost economy, village cosmetics, search
     villageChannels: [],
     nextChannelId: 1,
-    channelReadState: new Map(), // `${channelId}:${userId}` -> lastReadMessageId
+    channelReadState: {}, // `${channelId}:${userId}` -> lastReadMessageId (plain object: the store is JSON-serialized, and a Map survives a restart as `{}`)
     villageBoostContributions: [],
     nextBoostContributionId: 1,
     villageCosmeticItems: [],

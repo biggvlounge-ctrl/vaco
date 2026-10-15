@@ -184,7 +184,7 @@ CHOPZ SHOP riding along).
 
 | | Holds |
 |---|---|
-| **V3** | The VCoin/VASH ledger and VACA identity. 18 apps settle through it |
+| **V3** | The VCoin/VASH ledger and VACA identity. ~~18~~ **21** apps settle through it (15 Oct 2026 recount) |
 | **V4** | Agent proxy, Search, and the whole Maps layer |
 | **VENVS** | Marketplace, shop, publishing |
 

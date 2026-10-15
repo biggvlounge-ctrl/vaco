@@ -1,9 +1,15 @@
 # The decision log (vaco-audit)
 
-**Status: shipped.** Port 8819. Recording today from seven apps across
-27 routes. Every row currently says `decidedByKind: "service"`, and
-that is the honest state of the world rather than a defect — see
-[§7](#7-what-this-does-not-answer-yet).
+**Status: shipped.** Port 8819. ~~Recording today from seven apps
+across 27 routes. Every row currently says `decidedByKind: "service"`,
+and that is the honest state of the world rather than a defect~~ —
+**stale as of 15 Oct 2026.** A real operator-credential app
+(`vaco-operator`) now exists, `decidedByKind: 'operator'` is a valid,
+validated value (`vaco-audit/lib/decisions.js`), and 40
+`decisionLog.record` call sites across 10 apps (`vaco-operator`,
+`void`, `vago`, `voken`, `vulture-music`, `vulture-studios`, `hvntz`,
+`vaca`, `vaco-shell`, `vex`) now pass it. §7 below is corrected to
+match — see that section rather than this one.
 
 This is the audit half of `dev-docs/OPERATOR_ROLES_SCOPE.md`, shipped
 ahead of the authorization half on purpose. The two are independent:
@@ -182,14 +188,18 @@ it. Without that one line the same request returns `201`.
 
 ## 6. What is recorded today
 
-27 routes across seven apps — group 2 of the scope doc, and
-deliberately not every app holding a service credential. An app that
-only reports telemetry has nothing to attribute.
+~~27 routes across seven apps~~ — **39 call sites across 10 apps as
+of 15 Oct 2026** (void 8, vago 10, hvntz 4, vulture-studios 4,
+vulture-music 3, vaca 2, voken 2, vaco-operator 4, vex 1, vaco-shell
+1), grown past group 2 of the scope doc as more routes adopted
+`decisionLog.record` and `vaco-operator` itself started writing to
+it. Still deliberately not every app holding a service credential —
+an app that only reports telemetry has nothing to attribute.
 
 | app | routes | outcome kinds recorded |
 |---|---|---|
-| void | 7 | `credential`, `enforcement` |
-| vago | 6 | `settlement`, `grade`, `state-change` |
+| void | ~~7~~ **8** | `credential`, `enforcement` |
+| vago | ~~6~~ **10** | `settlement`, `grade`, `state-change` |
 | hvntz | 4 | `settlement`, `grade`, `enforcement` |
 | vulture-studios | 4 | `settlement`, `state-change` |
 | vulture-music | 3 | `settlement`, `state-change` |
@@ -219,15 +229,25 @@ thing's history in two.
 
 ## 7. What this does not answer yet
 
-**Every row says `decidedByKind: "service"`.** Today the log's answer
-is *"a service token decided this, and here is which one"* — strictly
-better than the previous answer of nothing at all, and still not a
-person. `GET /api/coverage` reports `operatorCoveragePercent`, which is
-**0% by construction** right now and is the honest progress metric for
-the operator-role work in `OPERATOR_ROLES_SCOPE.md`. When operator
-credentials arrive, the same rows start carrying `operator`, and the
-difference is queryable — which is how you find the routes that were
-never migrated.
+~~**Every row says `decidedByKind: "service"`.** Today the log's
+answer is *"a service token decided this, and here is which one"* —
+strictly better than the previous answer of nothing at all, and still
+not a person. `GET /api/coverage` reports `operatorCoveragePercent`,
+which is **0% by construction** right now and is the honest progress
+metric for the operator-role work in `OPERATOR_ROLES_SCOPE.md`. When
+operator credentials arrive, the same rows start carrying `operator`,
+and the difference is queryable — which is how you find the routes
+that were never migrated.~~ **Operator credentials arrived (15 Oct
+2026).** `vaco-operator` is a real app issuing scoped
+`X-Operator-Credential` headers, and `decidedByKind: 'operator'` now
+appears at 40 call sites across 10 apps — `void`'s `no-fly-zone` and
+vetting routes among them, closing exactly the "when operator
+credentials arrive" case this section was written to anticipate.
+`operatorCoveragePercent` is no longer zero by construction; what it
+reads on a given day now depends on real traffic, which this
+container has none of to measure. The queryable difference this
+section promised — finding routes never migrated off `service` — is
+the right next read of `GET /api/coverage`, not a re-statement here.
 
 **The log records attempts, not only outcomes.** Because the record is
 written *before* the decision runs, a settlement that is then rejected

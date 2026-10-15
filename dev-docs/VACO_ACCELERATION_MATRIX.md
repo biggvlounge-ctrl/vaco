@@ -9,6 +9,35 @@ knowledge, **not from a live check** — see the caveat immediately below.
 
 ---
 
+**Corrected 15 Oct 2026 — the baseline below has moved on every
+number it states, and several of its own recommendations have since
+been built.** Re-measured directly against the repo rather than
+recalled from this document:
+
+| This doc says (26 Aug 2026) | Current (15 Oct 2026) |
+|---|---|
+| 29 apps | **36** (`package.json`'s own description: 34 Node/Express backends + 2 Vite frontends) |
+| 855 routes | **1,035** counted in `server.js` files alone, 1,670 including mounted sub-routers |
+| 391 tests, 17 of 29 apps tested, 12 apps with none | **2,890 tests** (2,841 pass, 49 correctly skip, 0 fail) across all **41 suites in all 36 apps** — see `dev-docs/COMPLETION_BY_APP.md`. There are no untested apps, including the three this doc names (VACA, VEX, YAP all now covered). |
+| "CI: none — no `.github/workflows` directory exists" | `.github/workflows/ci.yml` exists (shipped) |
+| "three packages: express, cors, dotenv... pg only in vacon-c" | `pg` is now a dependency of 30+ apps via the shared `shared/storeBackend.js` pattern, and `docker-compose.yml` provisions a `postgres` service wired into every app via `DATABASE_URL` — §12's PostgreSQL recommendation below is done, not pending |
+
+Section 5's route-authorization gap is also closed — see
+`dev-docs/ROUTE_AUTHORIZATION_AUDIT.md`'s own live-script note (91%
+of mutating routes guarded, the rest declared open with a stated
+reason). Section 9's real-time media framing ("nothing that plays...
+blocked on a founder decision") is half-stale too — a named control
+plane (`vaco-media`, port 8821) is built and tested; only the actual
+media transport (an SFU) remains an unmade vendor decision. See
+`dev-docs/REALTIME_MEDIA_SHARED_INFRASTRUCTURE.md`.
+
+The per-technology KEEP/INTEGRATE/REPLACE/BUILD verdicts below were
+not re-litigated — only the baseline facts they were measured against
+have moved. Re-check a verdict against current numbers before acting
+on it, same discipline §1's own caveat already asks for.
+
+---
+
 ## Read this first — two caveats that bound every recommendation
 
 **1. No network access in this session.** Versions, pricing, licence
@@ -45,23 +74,27 @@ inventory to be replaced. Where a verdict is REPLACE, it replaces a
 Before evaluating anything external, here is what the repository
 actually runs on. This was measured, not recalled.
 
-**The entire 29-app Node backend depends on three packages**:
-`express`, `cors`, `dotenv`. That is the whole dependency surface.
+~~**The entire 29-app Node backend depends on three packages**:
+`express`, `cors`, `dotenv`. That is the whole dependency surface.~~
+**Stale as of 15 Oct 2026** — see the correction banner above. `pg`
+now reaches 30+ apps and CI exists; the table below is kept as
+written for its historical shape, corrected inline where a cell is
+now simply wrong rather than just dated.
 
 | Concern | What VACO uses today |
 |---|---|
 | HTTP | `express` |
-| Persistence | a recursive `Proxy` over an in-memory object, debounce-flushed to `store.json`, with a synchronous `commit()` on money routes |
+| Persistence | a recursive `Proxy` over an in-memory object, debounce-flushed to `store.json`, with a synchronous `commit()` on money routes — **plus an optional real Postgres backend (`shared/storeBackend.js`) now live in 30+ apps** |
 | Money | `v3` — a real double-entry-ish ledger service, HTTP, idempotency keys, no reversal endpoint by design |
 | Identity | `shield` — one session service, `?shieldToken=` handoff, `requireSession()` middleware copied per app |
 | Cross-app calls | injected function parameters (`transferFn`, `appExistsFn`, `hvntzFetchFn`) — **zero cross-app `require()`** |
 | Search | `v4-search` — fan-out over per-app adapters |
 | Telemetry | `vaco-analytics` — apps POST metrics to it |
-| Tests | `node:test`, 391 of them |
+| Tests | `node:test`, ~~391 of them~~ **2,890, across all 41 suites in all 36 apps (15 Oct 2026)** |
 | Browser tests | Playwright, one smoke harness |
 | Deploy | `docker-compose.yml`, three shell scripts |
-| CI | **none** — no `.github/workflows` directory exists |
-| Frontend | `vaco-design.css` + `vaco-ui.js`, synced into 29 `public/` dirs |
+| CI | ~~**none** — no `.github/workflows` directory exists~~ **`.github/workflows/ci.yml` exists (15 Oct 2026)** |
+| Frontend | `vaco-design.css` + `vaco-ui.js`, synced into ~~29~~ **32** `public/` dirs |
 
 **One exception, and it matters.** `vex-business/` already runs
 PostgreSQL, Alembic, uv, ruff, mypy, pytest, and its own

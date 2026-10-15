@@ -53,26 +53,27 @@ numbers, from code:
 | **Vavlt Stvdios** | Streaming, 8-screen sessions, VOD, tips, locked tiers | 5 |
 | **VXLLAGE** | Feed, threads, villages, cosmetics, search | 5 |
 | **VENVS** | Marketplace, shop, publishing | 3 |
-| **VDP** | 22 districts | **22** |
+| **VDP** | ~~22~~ **29** districts (`vdp/src/lib/world.js`'s `DISTRICTS` array, re-counted 15 Oct 2026) | **29** |
 | **Vex** | VEX brokerage, Vex Business | 2 |
 | **Systems** | 10 (see below) | **10** |
 
-**VEGA total: ~145 operating lines**
+**VEGA total:** ~~145 operating lines~~ **~152 operating lines**
+(VDP's own district count grew from 22 to 29, 15 Oct 2026)
 
 ### VEDA — physical
 
 | Group | Lines | Count |
 |---|---|---|
 | **SVMIKO DEGVCHI** | 13 fashion houses | **13** |
-| **VEDA Food Group** | 10 food brands | **10** |
+| **VEDA Food Group** | ~~10~~ **11** food brands (`vdp/src/lib/foodDistrict.js`'s `FLAGSHIP_BRANDS`, re-counted 15 Oct 2026 — two further "Frontier Stalls," Frontier Grill and The Frontier Dock, are deliberately kept apart from this count by the file's own design, not missing from it) | **11** |
 | **VAZAN** | Supplements, skincare | 2 |
 | **DREAMS** | Screen network (revenue to VRG) | 1 |
 | **VRG** | Property holdings | 1 |
 | **VEDA Investment Group** | Investment, stock | 2 |
 
-**VEDA total: ~29 operating lines**
+**VEDA total:** ~~29 operating lines~~ **~30 operating lines**
 
-### **Level 3 total: roughly 180**
+### **Level 3 total:** ~~roughly 180~~ **roughly 182** (15 Oct 2026 recount)
 
 ---
 
@@ -138,9 +139,10 @@ VAZAN, the food group, and VOID's licensing-gated verticals.
 ## One thing this makes obvious
 
 At Level 3, **VOID alone is 25 businesses** — more than most holding
-companies own in total. VDP is another 22. VOKEN is 22.
+companies own in total. VDP is another ~~22~~ **29** (15 Oct 2026
+recount). VOKEN is 22.
 
-Those three parents contain 69 operating lines between them, which is
+Those three parents contain ~~69~~ **76** operating lines between them, which is
 more than the entire Level 2 count of the ecosystem. The structure
 discussion has been treating them as three names on a list; they are
 each a conglomerate in their own right.

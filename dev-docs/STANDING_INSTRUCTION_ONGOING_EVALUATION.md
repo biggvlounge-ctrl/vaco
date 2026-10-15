@@ -101,8 +101,8 @@ intended rather than as a formality.
 
 | Example it names | Status |
 |---|---|
-| Postgres migration tooling | Migration itself still unstarted — see `v3/V3_FIRST_PROMPT.md`. Nothing to evaluate yet, and it remains V3's highest-value open item. |
-| AI 3D asset generation service | Research placed at `vacon-c/AI_3D_ASSET_GENERATION_COST_REDUCTION.md`. VACON-C is paused; revisit at build time, as instructed. |
+| Postgres migration tooling | ~~Migration itself still unstarted — see `v3/V3_FIRST_PROMPT.md`. Nothing to evaluate yet, and it remains V3's highest-value open item.~~ **Done, 11 Sep 2026** — `v3/lib/persistencePg.js`, `storeBackend.js`, `idempotencyPg.js` all exist, and the same `shared/storeBackend.js` pattern now reaches 30+ apps. (`v3/V3_FIRST_PROMPT.md` itself still carries the old "genuinely unstarted" line in its own "what actually happened" section — that doc needs the same fix, out of scope for this pass.) |
+| AI 3D asset generation service | Research placed at `vacon-c/AI_3D_ASSET_GENERATION_COST_REDUCTION.md`. ~~VACON-C is paused; revisit at build time, as instructed.~~ **Stale as of 15 Oct 2026** — `vacon-c/CLAUDE.md`'s own words: "VACON-C is not paused. It is the most built thing in this repo." (`dev-docs/VACO_CONSTELLATIONS.md` separately says VACON-C "stays paused" in a different sense — a public-release/go-to-market decision, not a build-activity one; the two aren't about the same kind of "paused" and a future reader reconciling them should go to `vacon-c/CLAUDE.md` for build status and `VACO_CONSTELLATIONS.md` for release status.) Revisit this research now that build is active, not at some future "build time." |
 | Bundled datasets (Cesium, UNESCO, Overture) | None are integrated in this repo. Access terms genuinely should be rechecked before use — they are the kind of thing that changes quietly. |
 
 **One addition this directive should absorb, learned the hard way

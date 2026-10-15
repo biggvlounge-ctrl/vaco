@@ -3,8 +3,8 @@
 **Status: BUILT — control plane. `vaco-media`, port 8821.**
 
 Sessions, per-participant join grants, capacity, expiry, revocation,
-presence and lifecycle are real, tested (32 tests, every one watched
-fail) and running. The **media plane is not**: carrying audio and video
+presence and lifecycle are real, tested (~~32~~ **52** tests as of 15
+Oct 2026, every one watched fail first) and running. The **media plane is not**: carrying audio and video
 needs an SFU process, `deploy/` does not run one yet, and the default
 `loopback` transport approves joins while saying plainly that nothing
 will connect.
