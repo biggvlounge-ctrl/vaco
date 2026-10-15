@@ -108,7 +108,7 @@ The live gates:
 | VEX (in VOKEN) | `placeTradeOrder` | Held pending broker-dealer review — **not cleared to move money** |
 | VOID | `cannabisDelivery`, `medicalTransportation` | Licensing-gated. **Must not be relaxed.** |
 | VOID MAGIC | Geofence | In place |
-| CVNVO / YAP | Moderation, safety reporting | YAP recorded as the highest-liability item in the ecosystem |
+| CVNVO / YAP | Moderation, safety reporting | Built and tested (`lib/moderation.js`, 36/36) — §2c below once called this the highest-liability gap in the ecosystem, which was never actually true |
 | VENVM | Likeness consent | **Throws, does not warn** |
 | VXLLAGE | `isVisibleToOthersAtVenue: false` | Deliberate default, stays |
 | Vvltvre Flix / Studios / Music | Content licensing | Licence terms modelled; no real rights acquired |
@@ -160,9 +160,14 @@ around it. What that means in headcount **[ESTIMATE]**:
 - At scale: **3–5 FTE plus a lead**, $180k–400k, and a vendor
   (Hive, Sift, or similar) for the first-pass filter at $2–10k/mo.
 
-**YAP has no moderation queue today** — nothing reviews a report before
-it counts against a subject. That is the single highest-liability gap
-in the ecosystem and it is a build, not a hire.
+~~**YAP has no moderation queue today** — nothing reviews a report
+before it counts against a subject. That is the single
+highest-liability gap in the ecosystem and it is a build, not a
+hire.~~ **Was never actually true** — `cvnvo/yap/lib/moderation.js`
+predates this document and was never checked before this line was
+written; see item 8 in §8 below. The real headcount gap
+above (CVNVO/YAP/VXLLAGE/CHOPZ/DREAMS still need a human in the
+queue the code already builds) stands regardless.
 
 ---
 
