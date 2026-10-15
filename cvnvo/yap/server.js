@@ -41,6 +41,40 @@ app.use(traceMiddleware());
 app.use(express.static(path.join(__dirname, 'public')));
 const PORT = process.env.PORT || 8802;
 const CVNVO_API_URL = process.env.CVNVO_API_URL || 'http://localhost:8798';
+const VACO_NOTIFY_URL = process.env.VACO_NOTIFY_URL || 'http://localhost:8818';
+const VACO_SERVICE_NAME = process.env.VACO_SERVICE_NAME || 'yap';
+const VACO_SERVICE_TOKEN = process.env.VACO_SERVICE_TOKEN || '';
+function serviceHeaders() {
+  return VACO_SERVICE_TOKEN
+    ? { 'X-Service-Name': VACO_SERVICE_NAME, 'X-Service-Token': VACO_SERVICE_TOKEN }
+    : {};
+}
+
+// **What this does and does not close.** `lib/moderation.js`'s own
+// header names the real gap as "a subject is not told that a report
+// about them was published, and a reporter is not told their report
+// was rejected." vaco-notify is an OPERATOR-paging channel (whoever
+// subscribes to the "yap" app gets alerted) -- it has no concept of a
+// specific end user's inbox, so this cannot and does not deliver that
+// message to the subject or the reporter themselves. What it does
+// close: moderators and ops are no longer blind to moderation actions
+// after the fact, which is real value on its own and the only thing
+// this infrastructure can actually provide. Closing the original gap
+// for real needs an in-app notification/inbox feature CVNVO doesn't
+// have yet -- a bigger, separate build, not a wiring task.
+async function notifyOps(title, body, context) {
+  try {
+    await fetch(`${VACO_NOTIFY_URL}/api/notify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...serviceHeaders() },
+      body: JSON.stringify({ app: 'yap', severity: 'alert', title, body, context }),
+    });
+  } catch {
+    // Honest no-op, same posture as every other fire-and-forget alert
+    // in this ecosystem: a notification-channel outage must not block
+    // the moderation action itself.
+  }
+}
 // -- The store, and which backend holds it ----------------------------
 //
 // `let`, not `const`: with DATABASE_URL set this app's store lives in
@@ -162,34 +196,46 @@ app.get('/yap/moderation/queue', requireOperator('yap:moderate'), (req, res) => 
 // decides who may publish a report about a person," recording the
 // wrong person as the one who decided defeats the accountability this
 // app exists to provide.
-app.post('/yap/moderation/:id/publish', requireOperator('yap:moderate'), (req, res) => {
+app.post('/yap/moderation/:id/publish', requireOperator('yap:moderate'), async (req, res) => {
+  let report;
   try {
-    res.json(publishReport(store, {
+    report = publishReport(store, {
       ...req.body, reportId: Number(req.params.id), moderatorId: req.operator.operatorName,
-    }));
+    });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return res.status(400).json({ error: err.message });
   }
+  await notifyOps('Yap report published', `Report ${report.id} about ${report.subjectId} was published by ${req.operator.operatorName}.`,
+    { reportId: report.id, subjectId: report.subjectId, moderatorId: req.operator.operatorName });
+  res.json(report);
 });
 
-app.post('/yap/moderation/:id/reject', requireOperator('yap:moderate'), (req, res) => {
+app.post('/yap/moderation/:id/reject', requireOperator('yap:moderate'), async (req, res) => {
+  let report;
   try {
-    res.json(rejectReport(store, {
+    report = rejectReport(store, {
       ...req.body, reportId: Number(req.params.id), moderatorId: req.operator.operatorName,
-    }));
+    });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return res.status(400).json({ error: err.message });
   }
+  await notifyOps('Yap report rejected', `Report ${report.id} about ${report.subjectId} was rejected by ${req.operator.operatorName}: ${report.reviewReason}`,
+    { reportId: report.id, subjectId: report.subjectId, moderatorId: req.operator.operatorName });
+  res.json(report);
 });
 
-app.post('/yap/moderation/:id/remove', requireOperator('yap:moderate'), (req, res) => {
+app.post('/yap/moderation/:id/remove', requireOperator('yap:moderate'), async (req, res) => {
+  let report;
   try {
-    res.json(removeReport(store, {
+    report = removeReport(store, {
       ...req.body, reportId: Number(req.params.id), moderatorId: req.operator.operatorName,
-    }));
+    });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return res.status(400).json({ error: err.message });
   }
+  await notifyOps('Yap report removed', `Report ${report.id} about ${report.subjectId} was removed by ${req.operator.operatorName}: ${report.reviewReason}`,
+    { reportId: report.id, subjectId: report.subjectId, moderatorId: req.operator.operatorName });
+  res.json(report);
 });
 
 // Flags only. Nothing acts on this — see `detectBrigading`.

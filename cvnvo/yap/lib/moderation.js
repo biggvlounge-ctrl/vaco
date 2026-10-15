@@ -53,11 +53,17 @@
 // ---------------------------------------------------------------------
 // What this deliberately does not do
 //
-// **It does not notify anybody.** A subject is not told that a report
-// about them was published, and a reporter is not told their report
-// was rejected. Both should happen and both are cross-app work
-// (vaco-notify), so they are a named gap rather than a half-built
-// one -- see the app README.
+// **It does not notify the subject or the reporter.** `server.js`'s
+// publish/reject/remove routes now page ops via vaco-notify on every
+// moderation action (15 Oct 2026) -- but vaco-notify is an
+// operator-paging channel, whoever subscribes to the "yap" app gets
+// alerted, with no concept of a specific end user's inbox. So that
+// closes "moderators are blind to actions after the fact," which is
+// real, and does NOT close "the subject is told their report was
+// published" or "the reporter is told their report was rejected,"
+// which still needs a real in-app notification/inbox feature CVNVO
+// doesn't have. Named as a remaining gap rather than assumed solved
+// by the ops-alert wiring.
 //
 // **It does not decide the policy.** What makes a report publishable
 // is a judgement this module records and does not make. The
