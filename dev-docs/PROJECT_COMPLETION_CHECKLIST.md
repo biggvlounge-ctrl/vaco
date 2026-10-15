@@ -12,7 +12,8 @@ recalled from an older doc — this project's own standing lesson,
 learned the hard way three times over, is that a doc's claim and the
 code's truth drift apart fast, so trust the code, re-check the doc.
 
-**Last updated:** 15 Oct 2026, this session.
+**Last updated:** 15 Oct 2026, this session (after the ground-truth
+audit landed and its findings were fixed).
 
 ---
 
@@ -82,14 +83,18 @@ mis-diagnosed and got a different, more accurate fix.**
 - [x] **19.** **Vvltvre Pods** — real "Play" button on each episode;
       `POST /api/episodes/:id/listen` now also resolves playback behind
       the existing subscription gate.
-- [x] **20.** **Vavlt Stvdios** — this one is a *live session* consumer
-      (`kind: 'wall'`), not VOD, so it needed the join contract, not the
-      playback one. Added the missing `GET /api/owners/:ownerId/channels`
-      route (there was no way to even list which channels to bundle into
-      a session) and a new "Sessions" tab: create a real screen session
-      from 1-8 owned channels, join it, see the honest control-plane
-      state. Actually connecting a feed is still vendor-blocked (below)
-      — this closes the UI gap, not the transport gap.
+- [x] **20.** **Vavlt Stvdios** — has two separate media surfaces, and
+      they needed two separate fixes. The *live* eight-screen wall
+      (`kind: 'wall'`) is a live-session consumer, not VOD, so it needed
+      the join contract: added the missing
+      `GET /api/owners/:ownerId/channels` route (no way to even list
+      which channels to bundle into a session) and a new "Sessions" tab
+      — create a real session from 1-8 owned channels, join it, see the
+      honest control-plane state. Actually connecting a feed is still
+      vendor-blocked (below). Separately, the *on-demand Video*
+      primitive (long-form, `lib/videos.js`) had a real, caller-supplied
+      `mediaUrl` from day one but zero frontend anywhere — found in the
+      ground-truth audit (§1.6) and fixed with a real Videos tab.
 - [x] **21.** **CHOPZ** — added the missing `POST /chopz/videos/:id/play`
       grant route and a real "Play" button on each reel.
 - [x] **22.** **VENVM** — re-diagnosed. It is not a VOD consumer; its
@@ -131,22 +136,64 @@ mis-diagnosed and got a different, more accurate fix.**
       `requireEpisodeShowCreator()` already verified belongs to the
       show's creator.
 
-### 1.6 In progress / pending confirmation at end of this session
-- [ ] **26.** Full ecosystem test sweep (`scripts/run-all-tests.mjs`)
-      re-run after today's changes — launched, not yet returned as of
-      this writing. Update this line with the real pass/fail count once
-      it reports.
-- [ ] **27.** `dev-docs/COMPLETION_BY_APP.md` + `TEST_COUNTS.json`
-      regeneration (`node scripts/completion-report.mjs`) — launched,
-      not yet returned. Both files are currently ~1 week stale (8 Oct)
-      relative to this session's work and should not be read as current
-      until regenerated.
-- [ ] **28.** A dedicated ground-truth audit of every remaining claim in
-      `GO_LIVE_DOSSIER.md` / `WHAT_THE_WORLD_IS_MISSING.md` beyond the
-      media-wiring section above — launched as a background pass, not
-      yet returned. This checklist will be updated with whatever it
-      finds: either more items move into §1 (done) or into §2 (real,
-      still-open, Claude-fixable work).
+### 1.6 Ground-truth audit results (this session) — the older dossiers were stale, mostly in the good direction
+A dedicated background pass independently re-verified every concrete
+claim in `GO_LIVE_DOSSIER.md` and `WHAT_THE_WORLD_IS_MISSING.md` against
+the running code — not recalled, re-measured. Headline: **both docs
+understated how much was done, not overstated it.**
+- [x] **26.** YAP's moderation queue — called "the single highest-
+      liability gap in the ecosystem... a build not a hire" — was
+      already fully built and tested (`cvnvo/yap/lib/moderation.js`,
+      36/36 tests) before this session even started.
+- [x] **27.** VACON-C's statistics catalogue is at 111/122 (91%)
+      answered on a real generated world, not the dossier's stale
+      57/67. Overall ecosystem criteria: 100% of 276 (not 260); total
+      tests 2512 (not 1609) prior to this session's own additions.
+- [x] **28.** Pricing table, take-rate constants, Postgres-backend
+      count, and frontend count in `GO_LIVE_DOSSIER.md` §1a/§1b/§7a all
+      independently re-verified exact and current — not stale, no
+      action needed.
+- [x] **29.** **The real remaining gap the audit found**: Vavlt
+      Stvdios' on-demand Video primitive had a real, caller-supplied
+      `mediaUrl` from day one but zero frontend rendering anywhere.
+      Fixed — see §1.4 note on Vavlt Stvdios above, now updated to
+      cover both the live wall AND the Video primitive.
+- [x] **30.** **A real security bug found while fixing the above**:
+      `getPostForViewer`/`getVideoForViewer` correctly withheld a
+      locked post/video's real media address for single-item GET
+      routes, but every LISTING route (feed, stories, reels, explore,
+      author-posts, author-videos, video-feed) returned the raw,
+      unfiltered store contents — so a locked Reel or Video's real
+      address was visible to anyone calling the free public feed, with
+      no subscription. Fixed in both `lib/posts.js` and `lib/videos.js`
+      (`vavlt-stvdios`), with 4 new regression tests proving the leak
+      and the fix.
+- [x] **31.** YAP's moderation actions (publish/reject/remove) now
+      page ops via vaco-notify — closes "moderators are blind to
+      actions after the fact." Does **not** close "the subject/reporter
+      themselves are told" — vaco-notify is an operator-paging channel
+      with no per-end-user inbox concept, and the header comment in
+      `lib/moderation.js` now says so precisely rather than overclaiming.
+- [x] **32.** Fixed `dev-docs/MEDIA_INFRASTRUCTURE_DECISION.md`'s
+      self-contradicting body (an "Update 2" note said three apps were
+      wired while the table/Recommendation below still said they
+      weren't) and `scripts/completion-report.mjs`'s hardcoded (not
+      computed) stale narrative string — both now match current reality.
+
+### 1.7 Noted, not attempted — a real gap, explicitly out of scope for this pass
+- [ ] **33.** **No HTTP-level route tests in `cvnvo`, `hvntz`, `dreams`.**
+      Every test in these three apps' suites calls lib functions
+      directly rather than issuing a real HTTP request through the
+      Express app (no `supertest` or equivalent anywhere in this
+      codebase, in any app). The business logic itself is thoroughly
+      tested; what's untested is the HTTP wiring layer — route
+      registration, middleware order, body parsing. Real, agent-
+      fixable, but a genuinely large, new undertaking (introducing a
+      testing pattern + dependency that doesn't exist anywhere in this
+      36-app ecosystem yet, across three apps' full route surfaces) —
+      flagged here rather than attempted in the same pass as smaller,
+      targeted fixes. Pick this up as its own dedicated session if it's
+      worth doing before launch.
 
 ---
 
@@ -160,35 +207,36 @@ plus the handful of decisions that sit above the engineer, with the
 business owner.
 
 ### 2.1 The engineer's one job
-- [ ] **29.** Run the pm2+nginx sequence in `LAUNCH_ENGINEER_HANDOFF.md`
+- [ ] **34.** Run the pm2+nginx sequence in `LAUNCH_ENGINEER_HANDOFF.md`
       on a real VPS: generate secrets, start the process list, point
       nginx + a real domain + TLS at it, verify health checks. That is
       the entire scope of the paid engagement.
 
 ### 2.2 Decisions that sit with the business owner, before or alongside that
-- [ ] **30.** **Real-time media vendor (LiveKit or equivalent).**
-      Needed for: Vavlt Stvdios' screen sessions, VXLLAGE Live/Call,
-      CVNVO speed dating, V4 agent calls to actually carry audio/video.
-      The control plane for all of these is real and tested today
-      (sessions, grants, lifecycle); only the transport is unconfigured.
-      Setting `VACO_MEDIA_TRANSPORT=livekit` + real LiveKit credentials
-      is a config change, not a code change, once this is decided.
-- [ ] **31.** **An object store (S3-compatible: AWS S3, MinIO,
+- [ ] **35.** **Real-time media vendor (LiveKit or equivalent).**
+      Needed for: Vavlt Stvdios' live eight-screen wall, VXLLAGE
+      Live/Call, CVNVO speed dating, V4 agent calls to actually carry
+      audio/video. The control plane for all of these is real and
+      tested today (sessions, grants, lifecycle); only the transport is
+      unconfigured. Setting `VACO_MEDIA_TRANSPORT=livekit` + real
+      LiveKit credentials is a config change, not a code change, once
+      this is decided.
+- [ ] **36.** **An object store (S3-compatible: AWS S3, MinIO,
       SeaweedFS, etc.) for VOD storage.** Needed for: Vvltvre Flix,
       Vvltvre Pods, CHOPZ to actually serve bytes instead of the honest
       "nothing stored yet" note. Setting `VACO_MEDIA_STORAGE=s3` + real
       bucket credentials is a config change, not a code change, once
       this is decided.
-- [ ] **32.** **Compliance/moderation budget** ($95k–305k/yr per
+- [ ] **37.** **Compliance/moderation budget** ($95k–305k/yr per
       `GO_LIVE_DOSSIER.md` §2b/§4c) — not needed for a closed/beta
       rollout; needed before opening CVNVO/YAP-class features to the
       general public.
-- [ ] **33.** **Actual video/image-generation infrastructure**
+- [ ] **38.** **Actual video/image-generation infrastructure**
       (Seedance/Kling/Runway/Nerfstudio-class tools) for VENVM to
       produce real pixels instead of orchestrating a pipeline around a
       caller-supplied external render. Named by VENVM's own docs as a
       permanent ceiling for this environment, not a deferred task.
-- [ ] **34.** **Villages real-estate acquisition itself** (the
+- [ ] **39.** **Villages real-estate acquisition itself** (the
       Jamestown Mall site, ~144 acres, and the ~20 total North County
       locations) — a real-world capital/legal transaction, not
       something any amount of code addresses. The software side (VOID
@@ -196,14 +244,14 @@ business owner.
       it whenever it happens.
 
 ### 2.3 Lower-priority, genuinely optional at this tier
-- [ ] **35.** Docker build-testing — the compose file is complete and
+- [ ] **40.** Docker build-testing — the compose file is complete and
       validated but has never actually built an image anywhere (this
       sandbox's network policy blocks Docker Hub). Not needed if the
       engineer uses the recommended pm2+nginx path instead.
-- [ ] **36.** TLS automation beyond a single certbot cert, and off-host
+- [ ] **41.** TLS automation beyond a single certbot cert, and off-host
       backups at scale — real, tracked, genuinely optional for a
       closed/beta demo tier.
-- [ ] **37.** VACON-C's 9 remaining declared statistic gaps (body
+- [ ] **42.** VACON-C's 9 remaining declared statistic gaps (body
       composition, knowledge stock, informal economy share, resource
       stock, camera coverage, street lighting, private security
       presence, pollution, terrain/water) — none block a launch; the
