@@ -128,7 +128,7 @@ async function settleVCoin(legs, meta = {}) {
     headers: {
       'Content-Type': 'application/json',
       ...serviceHeaders(),
-      ...(meta.reason ? { 'Idempotency-Key': `settle:${meta.reason}` } : {}),
+      ...(meta.reason ? { 'Idempotency-Key': `settle:${encodeURIComponent(meta.reason)}` } : {}),
     },
     body: JSON.stringify({ legs, reason: meta.reason ?? null }),
   });

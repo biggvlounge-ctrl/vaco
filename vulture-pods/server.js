@@ -121,7 +121,7 @@ async function settleVCoin(legs, meta = {}) {
       // settlement replays V3's first answer rather than paying
       // twice. Atomicity stops a *partial* settlement; this stops
       // a *duplicate* one.
-      ...(meta.reason ? { 'Idempotency-Key': `settle:${meta.reason}` } : {}),
+      ...(meta.reason ? { 'Idempotency-Key': `settle:${encodeURIComponent(meta.reason)}` } : {}),
     },
     body: JSON.stringify({ legs, reason: meta.reason ?? null }),
   });
@@ -137,10 +137,21 @@ async function settleVCoin(legs, meta = {}) {
 // project's own existing `DISTRIBUTION_TARGETS` (a real, valid,
 // already-accurate podcast platform), rather than expanding another
 // already-shipped project's enum as a side effect of this build.
-async function distributeEpisodeViaVultureMusic(episode, show) {
+// `vulture-music`'s `POST /api/releases` is `requireActor('artistId')`
+// — a real end-user session matching `artistId`, not a service
+// credential (see `shieldAuth.cjs`'s `requireActor`: it always resolves
+// a session and never accepts `X-Service-Name`/`X-Service-Token`). The
+// caller of this route (`requireEpisodeShowCreator()`, above) already
+// proved the request carries that exact creator's own Bearer token, so
+// forwarding it is correct; inventing a service credential here would
+// still 401, just on a different line.
+async function distributeEpisodeViaVultureMusic(episode, show, authorization) {
   const res = await fetch(`${VULTURE_MUSIC_API_URL}/api/releases`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(authorization ? { Authorization: authorization } : {}),
+    },
     body: JSON.stringify({
       artistId: show.creatorId,
       title: `${show.title} — ${episode.title}`,
@@ -168,8 +179,12 @@ async function distributeEpisodeViaVultureMusic(episode, show) {
 // cap -- rejections pass straight through, not re-raised.
 const REEL_DURATION_CAP_SECONDS = 1200; // Vavlt Stvdios' own real Reel cap (lib/posts.js)
 
+// Same cross-app auth shape as `distributeEpisodeViaVultureMusic` above:
+// `vavlt-stvdios`'s `/api/posts`/`/api/videos` are `requireActor('authorId')`,
+// so this forwards the caller's own Bearer token rather than a service
+// credential that route would never accept.
 async function postVideoToVaultStvdios({
-  authorId, caption, mediaUrl, durationSeconds,
+  authorId, caption, mediaUrl, durationSeconds, authorization,
 }) {
   const useLongForm = durationSeconds > REEL_DURATION_CAP_SECONDS;
   const path = useLongForm ? '/api/videos' : '/api/posts';
@@ -183,7 +198,10 @@ async function postVideoToVaultStvdios({
 
   const res = await fetch(`${VAULT_STVDIOS_API_URL}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(authorization ? { Authorization: authorization } : {}),
+    },
     body: JSON.stringify(body),
   });
   const responseBody = await res.json();
@@ -280,7 +298,10 @@ app.get('/api/shows/:id/episodes', (req, res) => {
 app.post('/api/episodes/:id/publish', requireEpisodeShowCreator(), async (req, res) => {
   let published;
   try {
-    published = await publishEpisode(store, { episodeId: Number(req.params.id), distributeFn: distributeEpisodeViaVultureMusic });
+    published = await publishEpisode(store, {
+      episodeId: Number(req.params.id),
+      distributeFn: (ep, sh) => distributeEpisodeViaVultureMusic(ep, sh, req.headers.authorization),
+    });
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
@@ -311,6 +332,7 @@ app.post('/api/episodes/:id/video', requireEpisodeShowCreator(), async (req, res
     const show = getShow(store, episode.showId);
     const post = await postVideoToVaultStvdios({
       authorId: show.creatorId, caption: req.body.caption || episode.title, mediaUrl: req.body.mediaUrl, durationSeconds: req.body.durationSeconds,
+      authorization: req.headers.authorization,
     });
     res.status(201).json(attachEpisodeVideo(store, { episodeId, vaultStvdiosPostId: post.id, contentType: post.contentType }));
   } catch (err) {
@@ -318,12 +340,36 @@ app.post('/api/episodes/:id/video', requireEpisodeShowCreator(), async (req, res
   }
 });
 
-app.post('/api/episodes/:id/listen', requireActor('userId'), (req, res) => {
+// Entitlement (published, and subscribed if the episode requires it)
+// is decided by `recordListen` first, for the same reason Vvltvre
+// Flix's stream route decides its tier limit before touching
+// vaco-media: the ticket is only ever handed out after the product
+// rule has already said yes.
+app.post('/api/episodes/:id/listen', requireActor('userId'), async (req, res) => {
+  const episodeId = Number(req.params.id);
+  let listenEvent;
   try {
-    res.status(201).json(recordListen(store, { ...req.body, episodeId: Number(req.params.id) }));
+    listenEvent = recordListen(store, { ...req.body, episodeId });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return res.status(400).json({ error: err.message });
   }
+
+  const asset = await media.assetState(episodeId);
+  const playback = asset && asset.status === 'ready'
+    ? await media.grantPlayback(asset.id, (req.body || {}).userId)
+    : null;
+
+  res.status(201).json({
+    ...listenEvent,
+    media: playback
+      ? { assetId: asset.id, playbackCredential: playback.credential, playAt: '/api/play' }
+      : {
+        available: false,
+        reason: asset
+          ? `this episode's media asset is "${asset.status}", not ready to play`
+          : 'no media asset is registered for this episode yet',
+      },
+  });
 });
 
 app.get('/api/episodes/:id/listen-count', (req, res) => {

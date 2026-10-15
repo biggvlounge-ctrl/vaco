@@ -30,12 +30,39 @@
 // Real client of its own 17 routes. Listen counts and subscription
 // state are server-owned.
 //
-// **No audio plays.** There is no media infrastructure here, so an
-// episode is a real record with a real listen count, and pressing play
-// increments that count rather than starting a stream. Said on the
-// surface rather than implied by a play button that does nothing.
+// **A real "Play" action, wired to vaco-media (15 Oct 2026).** Pressing
+// play is a real listen record, gated by the same subscription check
+// `recordListen` already enforced, that also returns a real playback
+// credential when the episode's media asset is registered and ready.
+// `VACO.resolvePlayback` + `VACO.mediaPlayer` (vaco-ui.js) turn that
+// into either a real `<audio>` or the honest "nothing is stored yet"
+// note — never a placeholder clip. No object store is configured
+// anywhere in this ecosystem yet, so today every click shows that
+// honest note; the moment `VACO_MEDIA_STORAGE=s3` points at a real
+// bucket, the exact same code plays the real file.
 
 var el = VACO.el;
+
+function playEpisode(episodeId, host) {
+  var userId = VACO.userId();
+  if (!userId) { VACO.toast('Sign in to listen.', 'danger'); return; }
+  return VACO.post('/api/episodes/' + episodeId + '/listen', { userId: userId })
+    .then(function (listen) {
+      if (!listen.media || listen.media.available === false) {
+        VACO.mount(host, VACO.notice(
+          (listen.media && listen.media.reason) || 'This episode has no media asset registered yet.',
+          'warn',
+        ));
+        return;
+      }
+      VACO.mount(host, el('p', 'vaco-small vaco-dim', 'Connecting…'));
+      return VACO.resolvePlayback(listen.media.assetId, listen.media.playbackCredential)
+        .then(function (playback) {
+          VACO.mount(host, VACO.mediaPlayer(playback));
+        });
+    })
+    .catch(VACO.error);
+}
 var state = { category: null, categories: ['comedy', 'news', 'true-crime', 'sports', 'music', 'business'] };
 
 function fmtDuration(seconds) {
@@ -88,11 +115,10 @@ function renderShows(body) {
             fmtDuration(ep.durationSeconds) + ' · ' + (ep.listenCount || 0) + ' listens'));
           row.appendChild(text);
           row.appendChild(el('span', 'vaco-spacer'));
-          row.appendChild(VACO.button('Count a listen', function () {
-            return VACO.post('/api/episodes/' + ep.id + '/listen', { userId: VACO.userId() })
-              .then(function () { VACO.toast('Listen recorded — no audio is streamed.'); VACO.render(); });
-          }, 'sm'));
+          var playerHost = el('div', 'vaco-stack-sm');
+          row.appendChild(VACO.button('Play', function () { playEpisode(ep.id, playerHost); }, 'sm'));
           episodes.appendChild(row);
+          episodes.appendChild(playerHost);
         });
       }).catch(function () { episodes.textContent = 'Episodes unavailable.'; });
 
@@ -111,8 +137,9 @@ function renderShows(body) {
 function renderLibrary(body) {
   var out = el('div', 'vaco-stack');
   out.appendChild(VACO.notice(
-    'Vvltvre Pods holds real listen history and subscriptions. <strong>Audio is not hosted or streamed</strong> — '
-    + 'that needs media infrastructure this ecosystem does not yet have.', 'warn'));
+    'Vvltvre Pods holds real listen history and subscriptions, and a real playback path to vaco-media. '
+    + '<strong>No object store is configured yet</strong>, so Play currently shows an honest "nothing stored" '
+    + 'note instead of audio — the same code plays the real file once one is.', 'warn'));
 
   var id = VACO.userId();
   if (!id) {

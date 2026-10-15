@@ -131,7 +131,7 @@ async function settleVCoin(legs, meta = {}) {
       'Content-Type': 'application/json',
       ...serviceHeaders(),
       // Unlike the helper this replaces, the key is actually sent.
-      ...(meta.reason ? { 'Idempotency-Key': `settle:${meta.reason}` } : {}),
+      ...(meta.reason ? { 'Idempotency-Key': `settle:${encodeURIComponent(meta.reason)}` } : {}),
     },
     body: JSON.stringify({ legs, reason: meta.reason ?? null }),
   });

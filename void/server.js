@@ -361,7 +361,7 @@ async function settleVCoin(legs, meta = {}) {
       // retried settlement replays V3's first answer rather than paying
       // twice. Belt as well as braces -- atomicity prevents a *partial*
       // settlement, this prevents a *duplicate* one.
-      ...(meta.reason ? { 'Idempotency-Key': `settle:${meta.reason}` } : {}),
+      ...(meta.reason ? { 'Idempotency-Key': `settle:${encodeURIComponent(meta.reason)}` } : {}),
     },
     body: JSON.stringify({ legs, reason: meta.reason ?? null }),
   });
