@@ -24,7 +24,7 @@ const { attachStore } = require('./lib/storeBackend');
 const { createMediaClient } = require('./lib/mediaClient.cjs');
 const {
   GROUPING_TYPES, createChannelGroup, getChannelGroup, createChannel, getChannel,
-  listChannelsInGroup, listLiveChannels, goLive, endStream,
+  listChannelsInGroup, listLiveChannels, listChannelsForOwner, goLive, endStream,
 } = require('./lib/channels');
 const { getChannelChat, postMessage, getMessages } = require('./lib/channelChat');
 const { tipChannel, getTipsForChannel, getTotalTipsForPerson } = require('./lib/channelTips');
@@ -240,6 +240,10 @@ app.post('/api/channels', requireActor('ownerId'), (req, res) => {
 
 app.get('/api/channels/live', (_req, res) => {
   res.json({ channels: listLiveChannels(store) });
+});
+
+app.get('/api/owners/:ownerId/channels', (req, res) => {
+  res.json({ channels: listChannelsForOwner(store, req.params.ownerId) });
 });
 
 app.get('/api/channels/:id', (req, res) => {

@@ -131,6 +131,93 @@ function renderWall(body) {
   });
 }
 
+// -- Screen sessions ---------------------------------------------------
+//
+// A screen session is a real vaco-media live session (`kind: 'wall'`),
+// distinct from the static channel-group wall above: creating one
+// opens a real session and issues the owner a real join credential.
+// `VACO.resolveJoin` + `VACO.joinPanel` (vaco-ui.js) render whatever
+// `POST /api/join` answers -- a connected feed once a transport is
+// configured, or, today, the honest "approved, nothing will connect"
+// note, never a fake live screen.
+
+function joinScreenSession(session, host) {
+  if (!session.media || session.media.available === false) {
+    VACO.mount(host, VACO.notice(
+      (session.media && session.media.reason) || 'This session has no media session registered.',
+      'warn',
+    ));
+    return;
+  }
+  VACO.mount(host, el('p', 'vaco-small vaco-dim', 'Connecting…'));
+  return VACO.resolveJoin(session.media.sessionId, session.media.joinCredential)
+    .then(function (join) { VACO.mount(host, VACO.joinPanel(join)); });
+}
+
+function renderSessions(body) {
+  var userId = VACO.userId();
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Bundle 1-8 of your own channels into a real screen session and join it. '
+    + 'The session and join credential are real; whether a feed actually connects '
+    + 'depends on a live-media transport this ecosystem has not configured yet.', 'warn'));
+
+  if (!userId) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to create a screen session.'));
+    return VACO.mount(body, out);
+  }
+
+  var picker = el('div', 'vaco-stack-sm');
+  var checkboxes = [];
+  var createHost = el('div', 'vaco-stack-sm');
+
+  return VACO.api('/api/owners/' + encodeURIComponent(userId) + '/channels').then(function (data) {
+    var channels = data.channels || [];
+    if (!channels.length) {
+      picker.appendChild(el('div', 'vaco-empty', 'You have no channels yet — create one first.'));
+    } else {
+      channels.forEach(function (c) {
+        var row = el('label', 'vaco-row-tight');
+        var box = el('input', null);
+        box.type = 'checkbox';
+        box.value = c.id;
+        checkboxes.push(box);
+        row.appendChild(box);
+        row.appendChild(el('span', 'vaco-small', c.name || ('Channel ' + c.id)));
+        picker.appendChild(row);
+      });
+      picker.appendChild(VACO.button('Create session', function () {
+        var channelIds = checkboxes.filter(function (b) { return b.checked; }).map(function (b) { return Number(b.value); });
+        if (!channelIds.length) throw new Error('Pick at least one channel.');
+        return VACO.post('/api/screen-sessions', {
+          ownerId: userId, sessionType: 'broadcaster', channelIds: channelIds,
+        }).then(function (session) {
+          VACO.toast('Screen session ' + session.id + ' created.');
+          joinScreenSession(session, createHost);
+        });
+      }));
+    }
+    out.appendChild(VACO.card('New session', [picker, createHost]));
+
+    return VACO.api('/api/owners/' + encodeURIComponent(userId) + '/screen-sessions').catch(function () { return null; });
+  }).then(function (existing) {
+    var sessions = (existing && (existing.sessions || existing.screenSessions || existing)) || [];
+    if (sessions.length) {
+      // No stored session here carries a joinable credential — vaco-media
+      // issues one fresh at creation, not a reusable one kept on the
+      // record — so this list is real history, not a "Join" surface.
+      out.appendChild(VACO.card('Your past sessions', [
+        VACO.table([
+          { key: 'id', label: 'Id' },
+          { key: 'sessionType', label: 'Type' },
+          { label: 'Screens', render: function (s) { return (s.channelIds || []).length; } },
+        ], sessions, { empty: 'No sessions yet.' }),
+      ]));
+    }
+    VACO.mount(body, out);
+  });
+}
+
 // -- Casino events ----------------------------------------------------
 
 function renderEvents(body) {
@@ -192,6 +279,7 @@ VACO.app({
   tabs: [
     { id: 'live', label: 'Live', heading: 'On air now', render: renderLive },
     { id: 'wall', label: 'The Wall', heading: 'Eight-screen sessions', render: renderWall },
+    { id: 'sessions', label: 'Sessions', heading: 'Live screen sessions', render: renderSessions },
     { id: 'events', label: 'Events', heading: 'Casino streams', render: renderEvents },
     { id: 'feed', label: 'Feed', heading: 'Content', render: renderFeed },
   ],

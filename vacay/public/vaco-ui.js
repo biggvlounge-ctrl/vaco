@@ -305,6 +305,50 @@
     return node;
   };
 
+  // -- media (vaco-media live sessions) ----------------------------------
+  //
+  // `resolvePlayback`/`mediaPlayer` above are for VOD assets (a title
+  // with a stored file). A live session (a call, a wall, a room) is a
+  // different vaco-media contract -- `POST /api/join`, not
+  // `POST /api/play` -- and never resolves to a stored URL: the
+  // control plane answers with who may join and what transport (if
+  // any) carries the bytes. Same fail-soft posture, same reason:
+  // joining is real and verified even when `mediaPlane: 'none'`
+  // (the loopback adapter) means nothing will actually connect yet.
+  VACO.resolveJoin = function (sessionId, credential) {
+    return fetch(VACO.MEDIA_URL + '/api/join', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: sessionId, credential: credential }),
+    })
+      .then(function (res) { return res.json().then(function (body) { return { res: res, body: body }; }); })
+      .then(function (r) {
+        if (!r.res.ok) return { mediaPlane: 'none', note: r.body.error || 'vaco-media refused this join.' };
+        return r.body;
+      })
+      .catch(function (err) {
+        return { mediaPlane: 'none', note: 'vaco-media is unreachable: ' + err.message };
+      });
+  };
+
+  // Renders whatever `POST /api/join` returned -- a real connected
+  // feed once a transport is configured (`mediaPlane` other than
+  // `'none'`), or, today, the honest "approved, nothing will connect"
+  // note every app in this ecosystem shows for the same reason: no
+  // media vendor is wired in yet. Never a placeholder video.
+  VACO.joinPanel = function (join) {
+    if (!join || join.mediaPlane === 'none' || !join.mediaPlane) {
+      return VACO.notice(
+        (join && join.note) || 'No live transport is configured for this session yet.',
+        'warn',
+      );
+    }
+    var out = el('div', 'vaco-stack-sm');
+    out.appendChild(VACO.badge(join.mediaPlane + ' connected', 'accent'));
+    out.appendChild(el('p', 'vaco-small vaco-dim', 'Room: ' + join.room));
+    return out;
+  };
+
   // -- forms ------------------------------------------------------------
 
   // fields: [{ name, label, type?, placeholder?, value?, options?, width? }]

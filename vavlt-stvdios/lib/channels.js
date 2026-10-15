@@ -119,6 +119,14 @@ function listLiveChannels(store) {
   return store.channels.filter((c) => c.isLive);
 }
 
+// Needed so a creator can pick which of their own channels to bundle
+// into a screen session -- `createScreenSession` already requires
+// every `broadcaster`-type channel to be owned by the session's
+// owner, and there was no way to list them to choose from.
+function listChannelsForOwner(store, ownerId) {
+  return store.channels.filter((c) => c.ownerId === ownerId);
+}
+
 function goLive(store, channelId) {
   const channel = getChannel(store, channelId);
   if (!channel) throw new Error(`goLive: no channel with id ${channelId}`);
@@ -143,6 +151,7 @@ module.exports = {
   getChannel,
   listChannelsInGroup,
   listLiveChannels,
+  listChannelsForOwner,
   goLive,
   endStream,
 };
