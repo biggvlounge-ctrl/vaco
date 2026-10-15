@@ -137,12 +137,15 @@ Cvltvre Card with `category: 'art'`; VADO's auctions call the Cvltvre
 card engine's `transferEditionOwnership` in the same tick as the VCoin
 transfer.
 
-- **Shared roadmap:** VOKEN's eight untested money flows (packs,
-  raffles, trades, auction settle, fractional buy, secondary shares,
-  merch, referral spins), plus VEX's untested compliance gates.
-- **Shared risk:** VOKEN has one test file and it covers the compliance
-  gate, not the money. VEX has 7 untested routes and is gated pending
-  broker-dealer registration.
+- ~~**Shared roadmap:** VOKEN's eight untested money flows...~~
+  **Closed — re-verified 15 Oct, not just re-read.** `voken/test/money.test.js`
+  now covers all eight by name (packs, raffles, trades, three auction
+  formats, fractional buy, secondary shares, merch, referral spins),
+  plus a concurrent-settlement/idempotency test for each — 46 tests
+  across two files, not the one-file compliance-only suite this line
+  described. VEX's compliance gate stays closed pending broker-dealer
+  registration — that part was never stale, it is a real legal gate,
+  not a build.
 - **Do not** split VADO into its own service — see the extraction audit.
   Every reason still holds now that VEX is in the square.
 
@@ -239,22 +242,33 @@ untested routes from `COMPLETION_AUDIT.md` §3.2 by constellation:
 | ✕ VVLTVRE | 22 |
 | ○ SYSTEMS | 10 |
 | ▲ GAMES | 8 |
-| ■ VOKEN | 7 *(plus 8 untested money flows)* |
+| ■ VOKEN | 7 *(money flows now covered — see above)* |
 | ◇ internal | 7 |
 
-**126 of 180 untested routes sit in this one group** — cvnvo 59,
-hvntz 40, dreams 22, yap 5. That concentration was invisible in a flat
-list of parents.
+**This 126-route figure, and the per-app breakdown below it, are both
+stale — corrected 15 Oct.** The specific counts had drifted (re-measured:
+hvntz 62 total routes/33 mutating, not 40; dreams 27 total/15 mutating,
+not 22; cvnvo 59 still matches), and the real underlying gap — no app
+in this group issued a real HTTP request through its own Express app
+in any test, only direct lib-function calls — is closed: `cvnvo`,
+`hvntz`, `dreams`, and `yap` each now have a `test/server.test.js`
+spawning the real server and hitting real routes with `fetch`,
+modeled on the one real precedent for this pattern already in the
+ecosystem (`v4-proxy/test/server.test.js`). That concentration was
+invisible in a flat list of parents, which is still the real point
+this section makes — just not evidence of untested code anymore.
 
 And it is a group of extremes rather than a uniformly weak one: **VOID
 is the best-tested app in the ecosystem** (158 routes, 124 tests, one
-settlement path for all 25 verticals), and VACAY has 22. The untested
-126 belongs entirely to HVNTZ, CVNVO, DREAMS and YAP.
+settlement path for all 25 verticals), and VACAY has 22.
 
-- **Shared roadmap:** moderation and the notification channel. YAP has
-  no moderation queue — nothing reviews a report before it counts
-  against a subject — and DREAMS alerts page nobody. One build fixes
-  both.
+- ~~**Shared roadmap:** moderation and the notification channel. YAP has
+  no moderation queue...~~ **Both already closed when this was
+  checked, 15 Oct.** `cvnvo/yap/lib/moderation.js` (publish/reject/
+  dispute/remove/brigading-detection) predates this document and was
+  never actually missing — 36 tests. DREAMS already calls vaco-notify
+  on alert (`dreams/server.js:374`). YAP's moderation actions now also
+  page ops via that same channel on every publish/reject/remove.
 - **Shared risk:** YAP is recorded in the company tree as the highest-
   liability item in the ecosystem, and VOID carries the licensing gates
   on `cannabisDelivery` and `medicalTransportation` that **must not be
@@ -355,6 +369,19 @@ reading it cold would re-do it.
 | **✕ VVLTVRE** | The media vendor decision blocks six surfaces | **Unchanged** — still blocked on the same vendor decision, confirmed today via `COMPLETION_BY_APP.md`'s own standing gap list | Still the single highest-leverage decision in the repo; start with Pods on storage + CDN, no SFU needed |
 | **▲ GAMES** | VDP is one of two frontends outside the design system | **Closed 25 Sep 2026** — `vdp` is now a `sync-design-system.sh` target; `App.jsx`'s chrome is real JSX on `vaco-design.css`'s classes | The 25 district view components (`WorldView` and its children) were deliberately left alone — see `vdp/README.md`'s own note on why forcing the design system onto a game canvas isn't a real improvement |
 | **◇ internal** | VACO Notify shipped · Analytics had 7 untested routes | Analytics now carries `routeGuards.test.js` alongside `analytics.test.js`, 39 tests total | Same caveat as ✕ VOID — worth a per-route confirmation, not just a suite-passes check, before calling it closed |
+
+**Re-verified again, 15 Oct 2026 — this time the ✕ VOID row's own
+"real next" is done.** `cvnvo`, `hvntz`, `dreams`, and `yap` each now
+have a `test/server.test.js` that spawns the real server and hits real
+routes with `fetch` (modeled on `v4-proxy/test/server.test.js`, the
+one real precedent for this pattern in the ecosystem) — the actual
+per-route audit this table asked for rather than another suite-passes
+check. YAP's moderation actions also now page ops via `vaco-notify` on
+every publish/reject/remove, closing the other half of that row's
+"real next." The ✕ VVLTVRE row is now substantially less blocked too:
+Flix, Pods, CHOPZ, and Vavlt Stvdios' on-demand Video are wired end to
+end — see `MEDIA_INFRASTRUCTURE_DECISION.md`'s own "Update 3." The
+other four rows are unchanged as of today.
 
 ---
 
