@@ -29,12 +29,44 @@
 // Real client of its own 17 routes. Tier limits, concurrent-stream
 // enforcement, and licence windows are all server-decided.
 //
-// **No video plays here.** There is no media infrastructure in this
-// ecosystem, so a title is a catalogue record and a "watch" is a real
-// stream-slot claim against a real concurrency limit — which is the
-// part that was actually built.
+// **A real "Watch" action, wired to vaco-media (15 Oct 2026).** A
+// watch is a real stream-slot claim against a real concurrency limit
+// (`POST /api/titles/:id/stream`) that also returns a real playback
+// credential when a media asset is registered and ready.
+// `VACO.resolvePlayback` + `VACO.mediaPlayer` (vaco-ui.js) turn that
+// into either a real `<video>` or the honest "nothing is stored yet"
+// note — never a placeholder clip. No object store is configured
+// anywhere in this ecosystem yet, so today every click shows that
+// honest note; the moment `VACO_MEDIA_STORAGE=s3` points at a real
+// bucket, the exact same code plays the real file.
 
 var el = VACO.el;
+
+function watchTitle(titleId, host) {
+  var userId = VACO.userId();
+  if (!userId) { VACO.toast('Sign in to watch.', 'danger'); return; }
+  return VACO.post('/api/titles/' + titleId + '/stream', { userId: userId })
+    .then(function (stream) {
+      if (!stream.media || stream.media.available === false) {
+        VACO.mount(host, VACO.notice(
+          (stream.media && stream.media.reason) || 'This title has no media asset registered yet.',
+          'warn',
+        ));
+        return;
+      }
+      VACO.mount(host, el('p', 'vaco-small vaco-dim', 'Connecting…'));
+      return VACO.resolvePlayback(stream.media.assetId, stream.media.playbackCredential)
+        .then(function (playback) {
+          var player = VACO.mediaPlayer(playback);
+          var stop = VACO.button('Stop', function () {
+            VACO.post('/api/streams/' + stream.id + '/end', { userId: userId }).catch(VACO.error);
+            VACO.mount(host, el('p', 'vaco-small vaco-dim', 'Stream ended.'));
+          }, 'ghost');
+          VACO.mount(host, [player, stop]);
+        });
+    })
+    .catch(VACO.error);
+}
 
 function renderCatalog(body) {
   return VACO.api('/api/catalog').then(function (data) {
@@ -56,6 +88,11 @@ function renderCatalog(body) {
         : VACO.badge('Licensed'));
       if (t.requiredTier) meta.appendChild(VACO.badge(t.requiredTier + ' tier'));
       card.appendChild(meta);
+
+      var playerHost = el('div', 'vaco-stack-sm');
+      card.appendChild(VACO.button('Watch', function () { watchTitle(t.id, playerHost); }));
+      card.appendChild(playerHost);
+
       grid.appendChild(card);
     });
     return grid;

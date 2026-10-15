@@ -44,12 +44,13 @@
   };
 
   // -- URLs -------------------------------------------------------------
-  // Every app talks to the same two shared services. Read from a global
+  // Every app talks to the same shared services. Read from a global
   // an app may override before calling VACO.app(), so a deployed app can
   // point at real hosts without editing this file.
   VACO.SHIELD_URL = global.VACO_SHIELD_URL || 'http://localhost:8812';
   VACO.V3_URL = global.VACO_V3_URL || 'http://localhost:8811';
   VACO.SHELL_URL = global.VACO_SHELL_URL || 'http://localhost:8789';
+  VACO.MEDIA_URL = global.VACO_MEDIA_URL || 'http://localhost:8821';
 
   // -- fetch ------------------------------------------------------------
 
@@ -249,6 +250,58 @@
     var inner = el('div');
     inner.innerHTML = text;
     node.appendChild(inner);
+    return node;
+  };
+
+  // -- media (vaco-media VOD assets) -------------------------------------
+
+  // Renders whatever `POST /api/play` (vaco-media's own route) or a
+  // caller's own `media` field already returned -- never fakes a
+  // connected state. The shape is always `{kind, stored, url, note}`;
+  // `stored: false` is the real, current state until a real object
+  // store is configured (`storage/local.js`'s own header: "do not add a
+  // <video> tag pointing at a placeholder file to make a demo look
+  // complete"), so this renders the honest note instead of a broken
+  // player in that case, same posture VDP's own CallPanel.jsx already
+  // takes for live sessions. `kind` ('video'|'audio'|'short') picks the
+  // real element -- one caller, one shape, no per-app guessing.
+  // Resolves a `{assetId, playbackCredential}` pair (what every app's
+  // own stream/claim route hands back, per vaco-media's real contract)
+  // into the real `{stored, url, kind, note}` shape by calling
+  // vaco-media's own `POST /api/play` directly -- cross-origin, no
+  // Shield session involved, because the credential itself is the
+  // authorization (same posture vaco-media's own route comment states).
+  // Never throws: resolves to the honest "not available" shape on any
+  // failure, same fail-soft rule `shared/mediaClient.js` already holds
+  // server-side.
+  VACO.resolvePlayback = function (assetId, credential) {
+    return fetch(VACO.MEDIA_URL + '/api/play', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ assetId: assetId, credential: credential }),
+    })
+      .then(function (res) { return res.json().then(function (body) { return { res: res, body: body }; }); })
+      .then(function (r) {
+        if (!r.res.ok) return { stored: false, note: r.body.error || 'vaco-media refused this playback.' };
+        return r.body;
+      })
+      .catch(function (err) {
+        return { stored: false, note: 'vaco-media is unreachable: ' + err.message };
+      });
+  };
+
+  VACO.mediaPlayer = function (playback) {
+    if (!playback || !playback.stored || !playback.url) {
+      return VACO.notice(
+        (playback && playback.note) || 'No media is configured for this title yet.',
+        'warn',
+      );
+    }
+    var tag = playback.kind === 'audio' ? 'audio' : 'video';
+    var node = el(tag, 'vaco-media-player');
+    node.src = playback.url;
+    node.controls = true;
+    if (tag === 'video') node.style.width = '100%';
     return node;
   };
 
