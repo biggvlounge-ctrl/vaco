@@ -137,6 +137,106 @@ function renderAdvertisers(body) {
   return VACO.mount(body, out);
 }
 
+// -- Self-serve campaign flow ------------------------------------------
+//
+// The real step-by-step flow `lib/campaigns.js` already enforces in
+// order (draft -> screens -> creative -> budget -> incentive -> live)
+// had no frontend at all — only a read-only lookup existed. Every step
+// below hits the real route; the server still enforces order and
+// completeness (`launchCampaign` refuses a campaign missing any of
+// them), so this is a convenience, not a second source of truth.
+
+function renderCampaignFlow(body) {
+  var out = el('div', 'vaco-stack');
+  var state = { campaign: null };
+
+  function refresh(campaignId) {
+    return VACO.api('/api/campaigns/' + campaignId).then(function (c) {
+      state.campaign = c;
+      renderStepCard();
+    });
+  }
+
+  function renderStepCard() {
+    while (out.childNodes.length > 1) out.removeChild(out.lastChild);
+    var c = state.campaign;
+    if (!c) return;
+
+    var lines = el('div', 'vaco-stack-sm');
+    lines.appendChild(VACO.badge(c.status));
+    lines.appendChild(el('p', 'vaco-small vaco-dim', c.name + ' · screens: ' + (c.screenIds || []).length
+      + ' · creative: ' + (c.creativeUrl || c.creativeText ? 'set' : 'none')
+      + ' · budget: ' + (c.budget || 'none') + ' · incentive: ' + (c.incentive ? c.incentive.type : 'none')));
+
+    if (c.status === 'live') {
+      lines.appendChild(VACO.notice('This campaign is live.', 'money'));
+      out.appendChild(VACO.card('Campaign ' + c.id, [lines]));
+      return;
+    }
+
+    lines.appendChild(VACO.form([{ name: 'screenIds', label: 'Screen ids (comma-separated)', placeholder: '1,2,3', width: '220px' }],
+      function (values) {
+        var screenIds = String(values.screenIds).split(',').map(Number).filter(function (n) { return !isNaN(n); });
+        return VACO.post('/api/campaigns/' + c.id + '/screens', { screenIds: screenIds })
+          .then(function () { return refresh(c.id); });
+      }, 'Select screens'));
+
+    lines.appendChild(VACO.form([{ name: 'creativeUrl', label: 'Creative URL', placeholder: 'https://…', width: '220px' }],
+      function (values) {
+        return VACO.post('/api/campaigns/' + c.id + '/creative', { creativeUrl: values.creativeUrl })
+          .then(function () { return refresh(c.id); });
+      }, 'Upload creative'));
+
+    lines.appendChild(VACO.button('Generate creative text (AI)', function () {
+      return VACO.post('/api/campaigns/' + c.id + '/generate-creative', {}).then(function () { return refresh(c.id); });
+    }, 'ghost'));
+
+    lines.appendChild(VACO.form([{ name: 'budget', label: 'Budget', type: 'number', min: 1, width: '110px' }],
+      function (values) {
+        return VACO.post('/api/campaigns/' + c.id + '/budget', { budget: values.budget })
+          .then(function () { return refresh(c.id); });
+      }, 'Set budget'));
+
+    lines.appendChild(VACO.form([
+      { name: 'type', label: 'Incentive', options: ['percent-off', 'amount-off', 'coupon'] },
+      { name: 'value', label: 'Value (%/amount)', type: 'number', min: 0, width: '100px' },
+      { name: 'code', label: 'Coupon code', placeholder: 'optional', width: '120px' },
+    ], function (values) {
+      var payload = { type: values.type };
+      if (values.type === 'coupon') payload.code = values.code;
+      else payload.value = values.value;
+      return VACO.post('/api/campaigns/' + c.id + '/incentive', payload)
+        .then(function () { return refresh(c.id); });
+    }, 'Set incentive'));
+
+    lines.appendChild(el('p', 'vaco-small vaco-faint',
+      'Every DREAMS ad gives something away — a coupon or a percent/amount off — before it can go live, no exception for size.'));
+
+    lines.appendChild(VACO.button('Launch', function () {
+      return VACO.post('/api/campaigns/' + c.id + '/launch', {})
+        .then(function () { VACO.toast('Campaign ' + c.id + ' is live.', 'money'); return refresh(c.id); });
+    }, 'primary'));
+
+    out.appendChild(VACO.card('Campaign ' + c.id, [lines]));
+  }
+
+  out.appendChild(VACO.card('Start a campaign', [
+    VACO.form([
+      { name: 'advertiserId', label: 'Advertiser id', placeholder: 'from the Advertisers tab', width: '150px' },
+      { name: 'name', label: 'Campaign name', placeholder: 'Gym Launch', width: '180px' },
+    ], function (values) {
+      return VACO.post('/api/campaigns', values).then(function (c) { return refresh(c.id); });
+    }, 'Create'),
+  ]));
+
+  out.appendChild(VACO.card('Continue a draft', [
+    VACO.form([{ name: 'id', label: 'Campaign id', type: 'number', min: 1, width: '110px' }],
+      function (values) { return refresh(values.id); }, 'Load'),
+  ]));
+
+  return VACO.mount(body, out);
+}
+
 function renderOffline(body) {
   return VACO.api('/api/offline-plays').then(function (data) {
     var plays = data.plays || data.offlinePlays || [];
@@ -168,6 +268,7 @@ VACO.app({
   tabs: [
     { id: 'screens', label: 'Screens', heading: 'The network', render: renderScreens },
     { id: 'advertisers', label: 'Advertisers', heading: 'Self-serve campaigns', render: renderAdvertisers },
+    { id: 'campaign', label: 'New Campaign', heading: 'The self-serve flow', render: renderCampaignFlow },
     { id: 'offline', label: 'Offline', heading: 'Cached playback', render: renderOffline },
   ],
 });
