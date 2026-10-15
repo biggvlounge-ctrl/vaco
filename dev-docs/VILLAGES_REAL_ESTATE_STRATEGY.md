@@ -376,59 +376,35 @@ trigger exists in code anywhere today; VXLLAGE's own `villages.js`
 membership model (`vxllage/dev-docs/phase-2-villages/plan.md`) has no
 real-estate-lease-driven join path, only direct membership.
 
-### 11a. "Villas" as the sub-sections inside a Village, in the app -- a real naming question, flagged rather than settled
+### 11a. "Villa" (VXLLA) is the real, decided brand name for a room inside a Village
 
-Per direct instruction, floated as a question rather than a
-settled decision ("however you think that should fit... if it makes
-sense"): "we have our different sections in villas, in village, the
-app... we have the audio, basically audio... Twitter style...
-Clubhouse style, which is audio... Reddit style... Let's call these
-subgroups villas... So join my villa."
+**Decided (15 Oct 2026), confirming this document's own earlier
+recommendation.** Per direct instruction: "Yes, that sounds good.
+Instead of room, we'll just use Villa. VXLLA." The question raised in
+this section's own earlier draft is now settled, not just flagged:
+**"room" is retired as the user-facing word; "Villa" replaces it.**
+Singular stylization confirmed as **VXLLA** -- paired with the
+already-given plural **VXLLAS** (§9 above, the real-estate dwelling
+units), the same singular/plural pair now covering both the physical
+container-home unit AND the in-app room, deliberately, as one more
+instance of this whole document's own standing rule: one brand
+vocabulary, reused on purpose across every real context it fits.
 
-**This would be a THIRD scope for a word that already has two,
-compounding an ambiguity VXLLAGE's own README already flags on
-purpose rather than hides**: `vxllage/README.md` already states, in
-its own words, that "Village" (the whole app's brand) and "Villages"
-(the existing Discord-style sub-feature -- real membership, rooms,
-channels, boost economy -- and separately, VDP's own Village
-District) "share a name at two different scopes on purpose... flagged
-here rather than silently smoothed over." Adding "Villa" as a THIRD
-real meaning -- on top of its own already-settled real-estate
-dwelling-unit brand (§9 above, Villas/VXLLAS) -- means the one root
-word would carry: the whole app (Village), a community inside it
-(a Village/Villages), a physical dwelling (a Villa), and now
-possibly an in-app room or feed section (a Villa) too. Worth being
-certain this is wanted before it is built, the same way VXLLAGE's
-own README was certain enough about its first two scopes to name
-the ambiguity outright rather than avoid it.
-
-**This document's own best, most literal read, not confirmed by
-direct instruction**: "join my villa" is the strongest real clue --
-you join a ROOM or a creator's space, not a feed format. VXLLAGE
-already has exactly this real, built concept: `lib/villageRooms.js`'s
-real, permanent, creator-owned rooms, "modeled directly on
-Clubhouse's actual Clubs feature," already supporting a recurring
-scheduled slot. Read this way, "villa" brands those existing rooms
-(and, by the same logic, the Discord-style sub-feature's own
-"channels," per the README's own "rooms, channels" phrasing) --
-**not** a rename of VXLLAGE's six real, identity-defining top-level
-comparables (Home/Twitter, Threads/Reddit, Articles/Substack,
-Call/Zoom, Live/Clubhouse) themselves, which the "different sections"
-part of the instruction could also plausibly mean, read on its own.
-Renaming those six would be a far bigger, more disruptive brand
-change than renaming the rooms/channels inside them, and nothing in
-the instruction said to touch VXLLAGE's own top-level identity.
-
-**Recommendation, not a decision**: "villa" = a real room or channel
-*inside* a Village (any format -- an audio/Clubhouse-style villa, a
-text-discussion villa), reusing `villageRooms.js`'s already-built
-creator-owned-room mechanic and the Discord-style sub-feature's
-existing channels, rather than relabeling the app's own six top-level
-tabs. If this is wrong, say so before it is built into
-`vxllage/`'s own docs or code -- this is the one naming decision in
-this whole document most likely to need a real walk-through rather
-than a one-line confirmation, given how many scopes "Village"/"Villa"
-already carry.
+**What this real-world decision sets as the real code task, mapped
+precisely**: `vxllage/lib/villageRooms.js`'s real, permanent, creator-
+owned rooms (modeled on Clubhouse's Clubs feature, already supporting
+a recurring scheduled slot) are the real thing being renamed. The
+precedent for how to do this without breaking anything is already
+written into `vxllage/README.md` itself, for the exact same kind of
+rename: "real user-facing copy calls a post a **Note**, per direct
+instruction; the underlying `Post` entity/API/field names stay
+exactly as built, not renamed." Applied here the same way: user-
+facing copy says "Villa"/"create a Villa"/"join my Villa"; the
+underlying `villageRooms.js` module, its `Room` entity, and its real
+API field names stay exactly as built, not renamed -- only the
+product-facing word changes. No code change has been made yet; this
+is the real naming decision for whenever `vxllage/`'s own docs or
+copy are updated to reflect it.
 
 **Further app fits, per direct invitation ("I'm sure you can run
 through the apps and see how more of them fit into this") -- flagged
@@ -464,11 +440,10 @@ consumer-facing Village brand name the way VACAY/Villas/The Vault do.
   conversion, and container hotel rooms, and at what real pricing --
   the BASE hub itself is now settled as always full-size (§6a), but
   these add-ons are not.
-- **"Villa" as an in-app room/channel name (§11a) — a real open
-  question, not yet decided.** My own best read is rooms/channels
-  inside a Village, not VXLLAGE's own six top-level tabs; flagged
-  explicitly for confirmation before anything is built or written
-  into `vxllage/`'s own docs.
+- The real code change itself (§11a) — "Villa"/VXLLA is now the
+  decided brand name for `villageRooms.js`'s own rooms, but no code
+  or `vxllage/` doc has been updated yet to actually rename the
+  user-facing copy.
 - The real mechanic connecting a Village location to VOID's own
   marketplace loop for rideshare/courier/cleaning/pet-care/laundry
   (§6a) — the verticals exist; nothing wires a specific Village
@@ -478,9 +453,6 @@ consumer-facing Village brand name the way VACAY/Villas/The Vault do.
 - The real lease-to-VXLLAGE-membership trigger (§11) — no such
   mechanic exists in code; `villages.js`'s own membership model has
   no real-estate-driven join path today.
-- "VXLLAS" as the real stylized spelling for villas — stated directly
-  but not yet cross-checked against any `vxllage/` or branding source
-  document the way VXLLAGE/VENVS's own vowel-dropping pattern was.
 - The "other programs... that taps those together" the user referenced
   but did not name — not yet identified.
 - Whether V3/Shield's own obvious infrastructure fit (§11's closing
