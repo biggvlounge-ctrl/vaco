@@ -2325,6 +2325,55 @@ Ironreach's own real scarcity opportunities (computing, sensors,
 communications... all supplied by Luminae) and that the mutating
 route is correctly actor-gated.
 
+## Per-civilization sports culture (15 Oct 2026)
+
+Per direct instruction, completing "do all": this session's own third
+and final gameplay suggestion, that sports culture should be a real,
+per-civilization fact rather than every combat match or team game
+being placeless. No source document names which real-world
+civilization favors which real sport -- entirely flagged interpretive,
+the same footing every other undecided fact in this project stands
+on.
+
+**New `src/lib/civilizationSports.js`**, a thin overlay deliberately
+NOT written into `combatSports.js`/`teamSports.js` themselves -- both
+are complete, tested, pure modules that stay untouched, the same
+"this module owns the card, not the culture" split VDP already uses
+for Combat Sports/Vavlt Stvdios/VAGO.
+
+- `declareSportsCulture`/`getSportsCulture`: a real, additive,
+  normalized (lower-cased) record of which combat/team sport
+  disciplines a civilization favors, plus an optional named home
+  venue -- never a single overwritten field, so declaring a second
+  favored sport never erases the first.
+- `civilizationsFavoring`: the reverse lookup -- given a real sport,
+  which civilizations actually declared it, the real "who's the home
+  crowd" query.
+- `hostMatch`/`getMatchHost`: associates an already-real match/game
+  (`combatSports.js`'s own `matchId`, `teamSports.js`'s own `gameId`,
+  both already unique) with a real host civilization, and flags
+  whether that civilization's own declared culture actually favors
+  the sport being played -- a real, checkable signal, not an invented
+  bonus or multiplier.
+
+Wired into `server.cjs`: `GET /api/civilizations/sports-culture/:id`,
+`POST /api/civilizations/sports-culture/:id` (`requireCallingService()`,
+same no-single-accountable-player posture as registering a gateway or
+claiming a territory), and `GET
+/api/civilizations/sports-culture-favoring`. The existing `POST
+/api/combat-sports/matches` and `POST /api/team-sports/games` routes
+gained one optional field, `hostCivilizationId` -- when given, they
+call `hostMatch` as an orchestration step in `server.cjs` itself,
+never writing a new field onto the match/game record those two
+already-complete modules own.
+
+6 new tests; full suite (793 tests) passes; a real boot confirmed the
+GET routes read real zero-state and the mutating route is correctly
+service-gated. **All three of this session's own gameplay
+suggestions from "what could make the gameplay or lore better" are
+now real, built mechanics**: the discovery arc, scarcity-driven trade,
+and this one.
+
 ## What is still open
 
 - The area's own name — nothing has been given yet (the product name,

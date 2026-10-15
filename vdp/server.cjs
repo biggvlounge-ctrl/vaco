@@ -339,6 +339,7 @@ let store = createVdpStore();
   const worldAtlasLib = await import('./src/lib/worldAtlas.js');
   const discoveryLib = await import('./src/lib/discovery.js');
   const civilizationTradeLib = await import('./src/lib/civilizationTrade.js');
+  const civilizationSportsLib = await import('./src/lib/civilizationSports.js');
   const combatSportsLib = await import('./src/lib/combatSports.js');
   const leaderboardsLib = await import('./src/lib/leaderboards.js');
   const teamSportsLib = await import('./src/lib/teamSports.js');
@@ -541,6 +542,11 @@ let store = createVdpStore();
       // reason `store.leaderboards`/`store.combatSports` are kept
       // apart from each other above.
       if (!store.discovery) store.discovery = discoveryLib.createDiscoveryStore();
+      // `civilizationSports.js`'s own real overlay, same reason kept
+      // apart from `store.civilizations` as `store.discovery` is --
+      // a civilization's identity and a real declared sports culture
+      // are two different facts.
+      if (!store.civilizationSports) store.civilizationSports = civilizationSportsLib.createCivilizationSportsStore();
       // `combatSports.js` is deliberately storage-agnostic (see its
       // own header: it owns the card, not the store), so its matches
       // live directly on this app's own store, the same way every
@@ -2754,6 +2760,41 @@ let store = createVdpStore();
     }
   });
 
+  // Sports culture (15 Oct 2026, own gameplay suggestion, built): a
+  // civilization's own real, declared sports culture -- which real
+  // combat/team sport disciplines it favors, and its own home venue
+  // -- rather than every match/game being placeless. Two segments
+  // under `/civilizations`, same discipline as `discovery/:id` and
+  // `scarcity-opportunities/:id` above, so this can never collide
+  // with the single-segment `:id` catch-all below.
+  app.get('/api/civilizations/sports-culture/:id', (req, res) => {
+    res.json(civilizationSportsLib.getSportsCulture(store.civilizationSports, Number(req.params.id)));
+  });
+
+  // Declaring a civilization's own sports culture is the same
+  // operational, no-single-accountable-player action registering a
+  // gateway or claiming a territory already is -- `requireCallingService()`,
+  // the same guard those two civilization-identity routes already use.
+  app.post('/api/civilizations/sports-culture/:id', requireCallingService(), (req, res) => {
+    try {
+      const culture = civilizationSportsLib.declareSportsCulture(store.civilizations, store.civilizationSports, Number(req.params.id), req.body || {});
+      res.status(200).json(culture);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/civilizations/sports-culture-favoring', (req, res) => {
+    try {
+      const fans = civilizationSportsLib.civilizationsFavoring(store.civilizations, store.civilizationSports, {
+        combatSportType: req.query.combatSportType, teamSportType: req.query.teamSportType,
+      });
+      res.json({ civilizations: fans });
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
   // Scarcity-driven trade (15 Oct 2026, own gameplay suggestion,
   // built): a civilization's own real `majorIndustries` gap is a real
   // business opportunity now, not flavor text on a seed record.
@@ -2864,6 +2905,14 @@ let store = createVdpStore();
       combatSportsLib.assertBookable(match, store.combatSports.matches);
       store.combatSports.matches.push(match);
       newsLib.recordEvent(store.news, { kind: 'combat-sports', text: `a real ${match.combatSportType} card was booked: ${matchId}` });
+      // Optional, additive -- `civilizationSports.js`'s own overlay,
+      // never written onto `match` itself, the real reason this is a
+      // separate function call rather than a new field on the match.
+      if (req.body.hostCivilizationId != null) {
+        civilizationSportsLib.hostMatch(store.civilizations, store.civilizationSports, matchId, {
+          civilizationId: Number(req.body.hostCivilizationId), combatSportType: match.combatSportType,
+        });
+      }
       res.status(201).json(match);
     } catch (err) {
       res.status(400).json({ error: err.message });
@@ -2977,6 +3026,14 @@ let store = createVdpStore();
       teamSportsLib.assertBookable(game, store.teamSports.games);
       store.teamSports.games.push(game);
       newsLib.recordEvent(store.news, { kind: 'team-sports', text: `a real ${game.teamSportType} game was scheduled: ${homeTeam.name} vs ${awayTeam.name}` });
+      // Same optional, additive overlay the combat-sports booking
+      // route above uses -- host civilization is `civilizationSports.js`'s
+      // own fact, never written onto `game` itself.
+      if (req.body.hostCivilizationId != null) {
+        civilizationSportsLib.hostMatch(store.civilizations, store.civilizationSports, gameId, {
+          civilizationId: Number(req.body.hostCivilizationId), teamSportType: game.teamSportType,
+        });
+      }
       res.status(201).json(game);
     } catch (err) {
       res.status(400).json({ error: err.message });
