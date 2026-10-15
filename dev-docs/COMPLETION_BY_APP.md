@@ -11,7 +11,7 @@ each app's test suite actually executed. Nothing here is recalled.
 `scripts/test/completion-report.test.mjs` fails if this file drifts
 from what the script emits, which is the failure mode that made
 `COMPLETION_AUDIT.md` read 31 apps and 522 tests when the real numbers
-were 36 and 2764.
+were 37 and 2775.
 
 ---
 
@@ -58,17 +58,17 @@ anything it can:
 
 | Metric | Value |
 |---|---:|
-| Express backends in the manifest | **36** |
-| Overall criteria met | **100%** (277/277) |
-| Apps at 100% | **36 / 36** |
-| Tests | **2764** |
+| Express backends in the manifest | **37** |
+| Overall criteria met | **100%** (285/285) |
+| Apps at 100% | **37 / 37** |
+| Tests | **2775** |
 | Apps with no test suite | **0** |
 
 Two notes on that test count, so it is not read as contradicting
 anything else:
 
 - It is **lower than `scripts/run-all-tests.mjs`'s**, and both are
-  right. This table counts only the 36 Express backends in the
+  right. This table counts only the 37 Express backends in the
   manifest. The full run also covers the Vite frontends (VDP, VENVS),
   the shared `scripts/` suites, `world-layer` and `vaco-mcp` — real
   tests, but not any single manifest app's.
@@ -97,12 +97,13 @@ anything else:
 | `vaca` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 25 |
 | `vacay` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 30 |
 | `vaco-analytics` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 39 |
+| `vaco-assistant` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 19 |
 | `vaco-audit` | **100%** | 6/6 | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | 17 |
 | `vaco-media` | **100%** | 6/6 | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | 52 |
 | `vaco-notify` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 24 |
 | `vaco-operator` | **100%** | 6/6 | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | 24 |
 | `vaco-passport` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 37 |
-| `vaco-shell` | **100%** | 7/7 | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | 48 |
+| `vaco-shell` | **100%** | 7/7 | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | 40 |
 | `vacon` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 18 |
 | `vacon-c` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 1401 |
 | `vago` | **100%** | 8/8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 120 |
