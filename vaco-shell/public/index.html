@@ -127,6 +127,7 @@
       <button class="vaco-tab" role="tab" data-view="ecosystem" aria-selected="false">Ecosystem</button>
       <button class="vaco-tab" role="tab" data-view="insight" aria-selected="false">Insight</button>
       <button class="vaco-tab" role="tab" data-view="assistant" aria-selected="false">Assistant</button>
+      <button class="vaco-tab" role="tab" data-view="explore" aria-selected="false">Explore</button>
     </nav>
     <span class="vaco-spacer"></span>
     <div class="vaco-row-tight" id="identityBox"></div>
@@ -297,6 +298,30 @@
                    placeholder="Ask anything…" />
             <button class="vaco-btn vaco-btn-primary" type="submit">Send</button>
           </form>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= Explore: your own VACO ================= -->
+  <section class="view" data-view="explore">
+    <div class="vaco-stack">
+      <h1 class="vaco-h1">Your VACO</h1>
+      <p class="vaco-body vaco-dim" style="max-width: 62ch;">
+        One real presence across the ecosystem — your VCoin balance, your VXLLAGE
+        reach, your VOKEN referrals, your VAGO entries — and your real recent
+        activity, pulled live from each app. One app being down only blanks its
+        own tile, never the rest of the page.
+      </p>
+
+      <div id="exploreSignedOut" class="vaco-empty">Sign in above to see your own VACO.</div>
+
+      <div id="exploreBody" style="display: none;">
+        <div class="vaco-grid" id="exploreProfileGrid"></div>
+
+        <h2 class="vaco-h3" style="margin-top: var(--vaco-space-4);">Recent activity</h2>
+        <div class="vaco-card" id="exploreActivityCard">
+          <div id="exploreActivity" class="vaco-stack-sm"></div>
         </div>
       </div>
     </div>
@@ -996,6 +1021,100 @@
     }
   }
 
+  // -- Explore: your own VACO -------------------------------------------
+
+  const EXPLORE_SOURCES = [
+    { key: 'wallet', appId: 'v3', metric: (s) => `${s.balance} VCoin` },
+    { key: 'vxllage', appId: 'vxllage', metric: (s) => `${s.articleCount} posts · ${s.subscriberCount} subscribers` },
+    { key: 'voken', appId: 'voken', metric: (s) => `${s.referralCount} referrals` },
+    { key: 'vago', appId: 'vago', metric: (s) => `${s.entryCount} entries` },
+  ];
+
+  function renderExploreProfile(profile) {
+    const grid = document.getElementById('exploreProfileGrid');
+    grid.innerHTML = '';
+    for (const source of EXPLORE_SOURCES) {
+      const section = profile[source.key];
+      const app = state.apps.find((a) => a.id === source.appId);
+      const card = el('div', 'vaco-card store-tile');
+      const head = el('div', 'tile-head');
+      head.appendChild(el('h3', 'vaco-h3', section.label));
+      card.appendChild(head);
+
+      if (section.ok) {
+        card.appendChild(el('p', 'vaco-body', section.metric(section)));
+      } else {
+        card.appendChild(el('p', 'vaco-small vaco-dim', `Unavailable: ${section.error}`));
+      }
+
+      const foot = el('div', 'tile-foot');
+      foot.appendChild(el('span', 'vaco-spacer'));
+      if (app && app.url) {
+        const open = el('a', 'vaco-btn vaco-btn-sm', 'Open');
+        open.href = state.session
+          ? `${app.url}/?shieldToken=${encodeURIComponent(state.session.sessionToken)}`
+          : app.url;
+        open.target = '_blank';
+        open.rel = 'noopener';
+        foot.appendChild(open);
+      }
+      card.appendChild(foot);
+      grid.appendChild(card);
+    }
+  }
+
+  function renderExploreActivity(activity) {
+    const box = document.getElementById('exploreActivity');
+    box.innerHTML = '';
+    if (!activity.ok) {
+      box.appendChild(el('div', 'vaco-empty', `Unavailable: ${activity.error}`));
+      return;
+    }
+    if (!activity.items.length) {
+      box.appendChild(el('div', 'vaco-empty', 'Nothing yet.'));
+      return;
+    }
+    for (const item of activity.items) {
+      const row = el('div', 'vaco-row', null);
+      row.style.justifyContent = 'space-between';
+      const label = item.direction === 'in' ? `From ${item.counterparty}` : `To ${item.counterparty}`;
+      const left = el('div', 'vaco-stack-sm');
+      left.appendChild(el('span', 'vaco-body', item.reason || label));
+      left.appendChild(el('span', 'vaco-small vaco-dim', `${label} · ${new Date(item.timestamp).toLocaleString()}`));
+      row.appendChild(left);
+      const amount = el('span', `vaco-num ${item.direction === 'in' ? 'vaco-price' : ''}`,
+        `${item.direction === 'in' ? '+' : '-'}${item.amount}`);
+      row.appendChild(amount);
+      box.appendChild(row);
+    }
+  }
+
+  async function renderExplore() {
+    const signedOut = document.getElementById('exploreSignedOut');
+    const body = document.getElementById('exploreBody');
+    if (!state.session) {
+      signedOut.style.display = '';
+      body.style.display = 'none';
+      return;
+    }
+    signedOut.style.display = 'none';
+    body.style.display = '';
+
+    try {
+      const profile = await api(`/api/explore/profile/${encodeURIComponent(state.session.userId)}`);
+      renderExploreProfile(profile);
+    } catch (err) {
+      toast(err.message, 'danger');
+    }
+
+    try {
+      const activity = await api(`/api/explore/activity/${encodeURIComponent(state.session.userId)}`);
+      renderExploreActivity(activity);
+    } catch (err) {
+      toast(err.message, 'danger');
+    }
+  }
+
   // -- Insight ---------------------------------------------------------
 
   document.getElementById('insightForm').addEventListener('submit', async (e) => {
@@ -1093,6 +1212,7 @@
     renderLibrary();
     renderApps();
     renderAssistant();
+    renderExplore();
   }
 
   async function boot() {

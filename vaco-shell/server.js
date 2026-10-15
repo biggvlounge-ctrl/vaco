@@ -40,6 +40,7 @@ import {
 import tracingModule from './lib/tracing.cjs';
 const { traceMiddleware } = tracingModule;
 import { getInsightCard } from './lib/insight.js';
+import { getProfileSummary, getRecentActivity } from './lib/explore.js';
 import { createShellStore } from './lib/store.js';
 import { attachStore } from './lib/storeBackend.js';
 import { settleVCoin, V3_API_URL } from './lib/v3Client.js';
@@ -296,6 +297,22 @@ app.get('/api/wallet/:userId', async (req, res) => {
   } catch (err) {
     res.status(502).json({ error: `V3 ledger unreachable: ${err.message}` });
   }
+});
+
+// -- Explore: your own VACO ------------------------------------------
+//
+// "An explore page, but for your own apps" -- one person's real
+// presence across the ecosystem (VCoin balance, VXLLAGE articles/
+// subscribers, VOKEN referrals, VAGO fantasy entries) and their real
+// recent activity (V3's own settlement log), pulled live rather than
+// stored here. `requireParamActor` guards both: this is personal data,
+// so only the signed-in owner of `:userId` may read it.
+app.get('/api/explore/profile/:userId', requireParamActor('userId'), async (req, res) => {
+  res.json(await getProfileSummary(req.params.userId));
+});
+
+app.get('/api/explore/activity/:userId', requireParamActor('userId'), async (req, res) => {
+  res.json(await getRecentActivity(req.params.userId));
 });
 
 // -- The App Store -------------------------------------------------
