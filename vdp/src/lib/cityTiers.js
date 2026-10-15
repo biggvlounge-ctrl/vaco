@@ -121,6 +121,18 @@ export const AMENITY_SOURCES = {
 // VDP's own real "riverboat + land casino complex." Nothing new to
 // build for this part; just a correction to this ladder.
 //
+// **This same real St. Charles precedent, extended (15 Oct 2026)**:
+// "that same 27-acre model will be the model that's used for the
+// initial cities that we're describing in VDP with commercial, dream
+// screens, and residential." The same real site this file already
+// cited for casino eligibility is now also the direct real-world
+// template for this ladder's own `AMENITY_CATEGORIES` composition
+// (`shopping`/`screens`/`residential` map onto "commercial, dream
+// screens, and residential" almost one-to-one) -- confirmed, not
+// contradicted, by the design already here. See `VDP_FOUNDING.md`'s
+// own dated entry for the full record, including the villa/village
+// settlement-architecture detail this same instruction added.
+//
 // **Building height, per direct instruction**: "different scales of
 // the heights of the buildings." `buildingHeightTier` is a real design
 // label escalating with tier size, same honest-limit caveat as

@@ -2374,8 +2374,97 @@ suggestions from "what could make the gameplay or lore better" are
 now real, built mechanics**: the discovery arc, scarcity-driven trade,
 and this one.
 
+## Villas and villages: VDP's own real settlement architecture, modeled on the real St. Charles template (15 Oct 2026) -- recorded, not yet built
+
+**This IS VDP's own subject matter** -- the instruction explicitly
+says so ("the initial cities that we're describing in VDP," "the four
+starter countries") -- unlike the real-world VACAY/VOID/DREAMS
+real-estate strategy recorded separately in
+`dev-docs/VILLAGES_REAL_ESTATE_STRATEGY.md`, which stays out of this
+file per that same direct correction. **The two documents share a
+design vocabulary on purpose, by direct instruction, not by
+re-mistake**: the same real St. Charles site and the same "villa"/
+"village" naming are each being used as a template in two separate
+places -- once for an actual real-estate operation, once for VDP's
+own fictional world. They remain two different applications of one
+real-world model, not one unified thing; this section is the
+fictional-world one only.
+
+**The real St. Charles template, now extended beyond casino
+eligibility**: "that same 27-acre model will be the model that's used
+for the initial cities that we're describing in VDP with commercial,
+dream screens, and residential. That is what we're describing right
+there." `cityTiers.js` already cited this same real ~27-acre St.
+Charles site (Hollywood Casino St. Charles) once before, to justify
+`casinoEligible: true` on every tier -- this instruction confirms
+that was the right real-world anchor and extends it: the site's own
+real mix (commercial, screens, residential) is now the direct
+template for `AMENITY_CATEGORIES`' own composition
+(`shopping`/`screens`/`residential` map onto "commercial, dream
+screens, and residential" almost one-to-one). Noted directly in
+`cityTiers.js`'s own header, alongside its existing St. Charles
+citation.
+
+**Villas and villages, as VDP's own real settlement-architecture
+terms**: "we can use the models that we discussed as far as the
+villas with the containers... we actually will call them villas...
+all the container worlds will be set up like villages and villas."
+Two real, distinct villa types, tied to two real, already-seeded
+groups in `worldAtlas.js`:
+
+- **Container villas**, for civilizations that predate the mainland
+  countries' own founding: "we'll be using those in some of the
+  pre-civilization cities, the people that have been there for
+  already, they use the containers." This is a direct, confirming
+  match for something already seeded, not a new idea --
+  `MAINLAND_HIDDEN_CIVILIZATIONS`' own `technologyEras` already
+  includes `'repurposed containers'`, and every hidden civilization's
+  own `oldWorldRelationship` already says it "secretly existed... for
+  approximately fifty years" before being found -- the real
+  "been there already" population this instruction names. Read as:
+  every seeded hidden civilization (mainland AND island) is built as
+  a village of container villas, not just the mainland ones that
+  already mention containers in their own seed data.
+- **New-technology villas**, for the four mainland countries'
+  founding population: "the initial societies that first start off in
+  the four starter countries will be villas, but new technology
+  villas according to what our plans are, not in containers." A
+  direct, confirming match for `WORLD_AESTHETIC.buildingStyle:
+  'futuristic'`, already established -- the founding families'
+  villages are built from futuristic villas, explicitly NOT
+  containers, the opposite construction method from the hidden
+  civilizations' own.
+
+**Both are "villages" of "villas," the real settlement-structure
+pattern now named for VDP generally** -- not a one-off description of
+a single location. A village is the real community-scale unit (the
+same real word `worldAtlas.js`'s own seed data and `town.js`'s
+"Founders' Capital" already sit inside, per the §48 founding-families
+framing); a villa is the real individual-dwelling unit inside one,
+construction method (container vs. new-technology) determined by
+which of the two real groups above it belongs to.
+
+**What is deliberately NOT done here**: no new code, no new
+`worldAtlas.js` fields, no new `cityTiers.js` mechanics beyond the one
+header note above. This records a real design direction connecting
+already-seeded facts (`technologyEras`, `WORLD_AESTHETIC`,
+`AMENITY_CATEGORIES`) that nothing currently surfaces as a visible
+"villa"/"village" concept anywhere in `world.js`'s own rendering or
+`property.js`'s own housing types -- building that waits for direct
+instruction to do so.
+
 ## What is still open
 
+- **Villas and villages** (see "Villas and villages," above) —
+  recorded, not built. Open specifics: whether a `property.js` unit
+  type should represent a villa at all, or this stays a settlement-
+  level description only; whether every one of the 14 seeded hidden
+  civilizations (not just the mainland ones whose own `technologyEras`
+  already names containers) actually gets container villas, or just
+  the ones the source text explicitly calls "been there already";
+  and how (or whether) `world.js`'s flat-rectangle districts could
+  ever visually distinguish a container villa from a new-technology
+  one.
 - The area's own name — nothing has been given yet (the product name,
   "VDP / Digital Planet," is not it — see the correction above).
 - **The ten generic island countries' real population range and any
