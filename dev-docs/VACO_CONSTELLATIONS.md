@@ -211,8 +211,20 @@ CHOPZ SHOP riding along).
   which would fight React for the DOM; the 25 district view components
   are untouched, on purpose — see `vdp/README.md`'s own note on why).
   VENVS's half is still open and belongs to VENVS wherever VENVS sits.
-- VACA (8 routes) and V4 Search (2 routes) are both untested. VACA is
-  the identity gate other apps trust.
+- ~~VACA (8 routes) and V4 Search (2 routes) are both untested. VACA is
+  the identity gate other apps trust.~~ **Closed 15 Oct 2026** — both
+  now carry a real HTTP-level route-guard suite (`vaca/test/server.test.js`,
+  `v4-search/test/server.test.js`), spawning the actual server rather
+  than calling the library underneath it, same pattern already proven
+  in `v4-proxy/test/server.test.js` and extended to cvnvo, hvntz,
+  dreams, yap and vex. VACA: 7 tests — confirms the self-service
+  submit route is open to a service credential but not to an
+  anonymous caller, and that approve/reject demand a real
+  `vaca:verify` operator credential, with a service token refused in
+  its place. V4 Search: 6 tests — confirms its one route is genuinely
+  open by design, and that its input validation (missing query,
+  unknown app id, app-scoped results) runs in the live app, not just
+  in the adapter a unit test exercises underneath it.
 
 ---
 

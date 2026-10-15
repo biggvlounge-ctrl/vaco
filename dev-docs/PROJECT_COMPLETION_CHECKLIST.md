@@ -232,8 +232,17 @@ either version of the table:
       precedent already in this ecosystem (`v4-proxy/test/server.test.js`
       — spawn the real server, poll `/api/health`, hit real routes
       with built-in `fetch`, no new dependency) and applied the same
-      pattern to each app's most safety/money-critical routes. 21 new
-      tests, all green. See the commit for the exact routes covered.
+      pattern to each app's most safety/money-critical routes. Extended
+      the same pattern past the original four once `VACO_CONSTELLATIONS.md`
+      named two more untested surfaces (VACA's 8 routes, V4 Search's 2)
+      and `vex` came up separately as the ungated brokerage compliance
+      gate. Checked `vaco-analytics` too, since its own doc claimed this
+      gap already closed — confirmed genuine (`routeGuards.test.js`
+      really does spawn the server, 6/6 passing), so no new file needed
+      there. Totals: `cvnvo` 7, `hvntz` 6, `dreams` 6, `yap` 6, `vex` 6,
+      `vaca` 7, `v4-search` 6 — 44 new HTTP-level tests across 7 apps,
+      all green. See each app's `test/server.test.js` for the exact
+      routes covered.
 
 ---
 
