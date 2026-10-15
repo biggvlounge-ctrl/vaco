@@ -229,6 +229,44 @@ town) is the nearest real code hook for the Hub/Port Station side;
 Vhaul, storage rental, truck stops, and container hotel rooms have no
 real mechanic anywhere yet.
 
+### 6a. Every Village gets a full hub, and VOID handles everything in-house
+
+Per direct instruction, restated to settle any ambiguity left by §6
+above: "every village will have a Void hub inside of it with all its
+amenities at its fullest." Not a scaled-down or partial hub at any
+Village, regardless of the Village's own size — the full real VOID
+Hub Station configuration (`stationType: 'hub-and-port'`, not a
+bare `port`; real `temperatureControlled` food capability; a real
+`bayCount` sized to the location). This settles §6's own "which hub
+sizes qualify for Vhaul... and at what real pricing" open question
+for the base hub itself, if not yet for Vhaul/truck-stop/container-
+room specifically: the base hub is never partial.
+
+"Void will handle everything from the rideshare package delivery...
+the delivery... the rideshare... the cleaning. Everything that Void
+can handle, it will handle directly in-house. The pet needs...
+the laundry that's involved in void." Checked directly against
+VOID's own real vertical registry (`void/lib/verticals.js`) — every
+one of these is already a real, live VOID vertical, not a new
+service being proposed:
+
+| What was said | Real VOID vertical | Real pricing model |
+|---|---|---|
+| Rideshare | `transportation` | per-trip, 20% take |
+| Package delivery | `courier` (Courier / Same-day Delivery) | flat-quote, 20% take, free pickup/delivery |
+| Cleaning | `cleaningHandyman` | hourly, 20% take |
+| Pet needs | `petCare` (`void/lib/petCare.js`) | per-job, 20% take |
+| Laundry | `laundry` (`void/lib/laundry.js`) | per-pound, 25% take, free pickup/delivery |
+
+Read as: every Village location is meant to be a real, direct
+customer of VOID's own existing marketplace loop for every one of
+these verticals — "directly in-house" meaning VOID runs it (through
+its own real provider network), not that a Village operator builds a
+second, parallel cleaning/laundry/pet-care system. No code wires a
+Village location to VOID's marketplace today; the verticals
+themselves already exist and need no new building to support this,
+only the real connection.
+
 ## 7. Container-home "villas" on scattered smaller urban plots
 
 Per direct instruction, a separate, smaller-scale real-estate format
@@ -338,6 +376,60 @@ trigger exists in code anywhere today; VXLLAGE's own `villages.js`
 membership model (`vxllage/dev-docs/phase-2-villages/plan.md`) has no
 real-estate-lease-driven join path, only direct membership.
 
+### 11a. "Villas" as the sub-sections inside a Village, in the app -- a real naming question, flagged rather than settled
+
+Per direct instruction, floated as a question rather than a
+settled decision ("however you think that should fit... if it makes
+sense"): "we have our different sections in villas, in village, the
+app... we have the audio, basically audio... Twitter style...
+Clubhouse style, which is audio... Reddit style... Let's call these
+subgroups villas... So join my villa."
+
+**This would be a THIRD scope for a word that already has two,
+compounding an ambiguity VXLLAGE's own README already flags on
+purpose rather than hides**: `vxllage/README.md` already states, in
+its own words, that "Village" (the whole app's brand) and "Villages"
+(the existing Discord-style sub-feature -- real membership, rooms,
+channels, boost economy -- and separately, VDP's own Village
+District) "share a name at two different scopes on purpose... flagged
+here rather than silently smoothed over." Adding "Villa" as a THIRD
+real meaning -- on top of its own already-settled real-estate
+dwelling-unit brand (§9 above, Villas/VXLLAS) -- means the one root
+word would carry: the whole app (Village), a community inside it
+(a Village/Villages), a physical dwelling (a Villa), and now
+possibly an in-app room or feed section (a Villa) too. Worth being
+certain this is wanted before it is built, the same way VXLLAGE's
+own README was certain enough about its first two scopes to name
+the ambiguity outright rather than avoid it.
+
+**This document's own best, most literal read, not confirmed by
+direct instruction**: "join my villa" is the strongest real clue --
+you join a ROOM or a creator's space, not a feed format. VXLLAGE
+already has exactly this real, built concept: `lib/villageRooms.js`'s
+real, permanent, creator-owned rooms, "modeled directly on
+Clubhouse's actual Clubs feature," already supporting a recurring
+scheduled slot. Read this way, "villa" brands those existing rooms
+(and, by the same logic, the Discord-style sub-feature's own
+"channels," per the README's own "rooms, channels" phrasing) --
+**not** a rename of VXLLAGE's six real, identity-defining top-level
+comparables (Home/Twitter, Threads/Reddit, Articles/Substack,
+Call/Zoom, Live/Clubhouse) themselves, which the "different sections"
+part of the instruction could also plausibly mean, read on its own.
+Renaming those six would be a far bigger, more disruptive brand
+change than renaming the rooms/channels inside them, and nothing in
+the instruction said to touch VXLLAGE's own top-level identity.
+
+**Recommendation, not a decision**: "villa" = a real room or channel
+*inside* a Village (any format -- an audio/Clubhouse-style villa, a
+text-discussion villa), reusing `villageRooms.js`'s already-built
+creator-owned-room mechanic and the Discord-style sub-feature's
+existing channels, rather than relabeling the app's own six top-level
+tabs. If this is wrong, say so before it is built into
+`vxllage/`'s own docs or code -- this is the one naming decision in
+this whole document most likely to need a real walk-through rather
+than a one-line confirmation, given how many scopes "Village"/"Villa"
+already carry.
+
 **Further app fits, per direct invitation ("I'm sure you can run
 through the apps and see how more of them fit into this") -- flagged
 as this document's own observation, not confirmed by direct
@@ -369,7 +461,18 @@ consumer-facing Village brand name the way VACAY/Villas/The Vault do.
 - Whether "VOID pickup stations" maps exactly to VOID's real Port
   Stations (the flagged reading in §6) or means something else.
 - Which hub sizes qualify for Vhaul, storage rental, truck-stop
-  conversion, and container hotel rooms, and at what real pricing.
+  conversion, and container hotel rooms, and at what real pricing --
+  the BASE hub itself is now settled as always full-size (§6a), but
+  these add-ons are not.
+- **"Villa" as an in-app room/channel name (§11a) — a real open
+  question, not yet decided.** My own best read is rooms/channels
+  inside a Village, not VXLLAGE's own six top-level tabs; flagged
+  explicitly for confirmation before anything is built or written
+  into `vxllage/`'s own docs.
+- The real mechanic connecting a Village location to VOID's own
+  marketplace loop for rideshare/courier/cleaning/pet-care/laundry
+  (§6a) — the verticals exist; nothing wires a specific Village
+  address to them yet.
 - Markets beyond St. Louis/North County — "all over the country" is
   the stated intent, with no other specific markets named.
 - The real lease-to-VXLLAGE-membership trigger (§11) — no such
