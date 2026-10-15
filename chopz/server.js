@@ -140,6 +140,31 @@ app.post('/chopz/videos/:id/verify-linked-product', requireVideoCreator(), async
   }
 });
 
+// A grant is only issued for a `ready` asset -- the same rule every
+// other app's watch/listen route holds, so a feed never hands out an
+// address for a clip that is still "registered" with no bytes behind it.
+app.post('/chopz/videos/:id/play', requireActor('viewerId'), async (req, res) => {
+  const videoId = Number(req.params.id);
+  const video = getChopzVideo(store, videoId);
+  if (!video) return res.status(404).json({ error: `no video with id ${videoId}` });
+
+  const asset = await media.assetState(videoId);
+  const playback = asset && asset.status === 'ready'
+    ? await media.grantPlayback(asset.id, (req.body || {}).viewerId)
+    : null;
+
+  res.json({
+    media: playback
+      ? { assetId: asset.id, playbackCredential: playback.credential, playAt: '/api/play' }
+      : {
+        available: false,
+        reason: asset
+          ? `this video's media asset is "${asset.status}", not ready to play`
+          : 'no media asset is registered for this video yet',
+      },
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`CHOPZ listening on http://localhost:${PORT}`);
   console.log(`Health check: curl http://localhost:${PORT}/api/health`);

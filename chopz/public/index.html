@@ -22,21 +22,47 @@
 <script>
 // CHOPZ — the short-form video feed.
 //
-// **No video plays.** There is no media infrastructure in this
-// ecosystem, so a "video" is a real record with a real linked product
-// and a real verification state. Pretending otherwise with a play
-// button that does nothing would be the dishonest version.
+// **A real "Play" action, wired to vaco-media (15 Oct 2026).** Posting
+// a video registers a real media asset; pressing Play claims a real
+// playback grant for it (`POST /chopz/videos/:id/play`), which
+// `VACO.resolvePlayback` + `VACO.mediaPlayer` (vaco-ui.js) turn into a
+// real `<video>` or the honest "nothing stored yet" note — never a
+// placeholder clip. No object store is configured anywhere in this
+// ecosystem yet, so today Play shows that honest note; the moment
+// `VACO_MEDIA_STORAGE=s3` points at a real bucket, the same code plays
+// the real file.
 //
-// What IS real, and is the thing worth showing: a video that claims to
-// link a product is verified against CHOPZ SHOP's actual catalogue, so
-// a creator cannot tag something that does not exist.
+// What else is real: a video that claims to link a product is
+// verified against CHOPZ SHOP's actual catalogue, so a creator cannot
+// tag something that does not exist.
 
 var el = VACO.el;
+
+function playChopzVideo(videoId, host) {
+  var viewerId = VACO.userId();
+  if (!viewerId) { VACO.toast('Sign in to watch.', 'danger'); return; }
+  return VACO.post('/chopz/videos/' + videoId + '/play', { viewerId: viewerId })
+    .then(function (r) {
+      if (!r.media || r.media.available === false) {
+        VACO.mount(host, VACO.notice(
+          (r.media && r.media.reason) || 'This video has no media asset registered yet.',
+          'warn',
+        ));
+        return;
+      }
+      VACO.mount(host, el('p', 'vaco-small vaco-dim', 'Connecting…'));
+      return VACO.resolvePlayback(r.media.assetId, r.media.playbackCredential)
+        .then(function (playback) { VACO.mount(host, VACO.mediaPlayer(playback)); });
+    })
+    .catch(VACO.error);
+}
 
 function renderFeed(body) {
   var out = el('div', 'vaco-stack');
   out.appendChild(VACO.notice(
-    '<strong>Video is not hosted or played here.</strong> Each card is a real record. '
+    'Each card is a real record with a real playback path to vaco-media. '
+    + '<strong>No object store is configured yet</strong>, so Play currently shows an honest '
+    + '"nothing stored" note instead of video — the same code plays the real file once one is. '
     + 'The linked-product check below is real: it verifies against CHOPZ SHOP’s catalogue, '
     + 'so a tagged product either exists or the tag is refused.', 'warn'));
 
@@ -54,6 +80,10 @@ function renderFeed(body) {
       reel.appendChild(el('strong', null, v.creatorId || ''));
       reel.appendChild(el('span', 'vaco-small', v.caption || ''));
       cell.appendChild(reel);
+
+      var playerHost = el('div', 'vaco-stack-sm');
+      cell.appendChild(VACO.button('Play', function () { playChopzVideo(v.id, playerHost); }, 'sm'));
+      cell.appendChild(playerHost);
 
       var meta = el('div', 'vaco-row-tight');
       if (v.linkedProductId) {
