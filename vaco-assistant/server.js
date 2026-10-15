@@ -28,7 +28,11 @@ const { createVacoAssistantStore } = require('./lib/store');
 const {
   TONE_OPTIONS, setProfile, getProfile, getHistory, sendMessage,
 } = require('./lib/personalAssistant');
-const { requireActor, requireParamActor } = require('./lib/shieldAuth.cjs');
+const {
+  placeAssistantCall, getAssistantCall, listAssistantCalls,
+  declineAssistantCall, recordAssistantCallEvent, endAssistantCall,
+} = require('./lib/assistantCall');
+const { requireActor, requireParamActor, requireSession } = require('./lib/shieldAuth.cjs');
 
 const app = express();
 app.use(cors());
@@ -84,6 +88,54 @@ app.get('/api/assistant/history/:userId', requireParamActor('userId'), (req, res
 
 app.post('/api/assistant/chat', requireActor('userId'), (req, res) => handle(
   res, () => sendMessage(store, req.body || {}), 201,
+));
+
+// -- FaceTime-style calls with your own assistant ---------------------
+//
+// V4's own call state lives in V4, not here -- this app holds no
+// `store.calls` of its own. A call's `:id` names no user in the path
+// or body the way profile/history do, so the ownership check reads
+// the real call back from V4 first and compares its `userId` against
+// this session, the same shape V4's own `requireCallParty` takes for
+// the same reason (stated in v4-proxy/server.js: three honest copies
+// beat one abstraction that fits none of them -- this is the fourth,
+// because here the record lives in a different app's store).
+async function requireOwnCall(req, res, next) {
+  let call;
+  try {
+    call = await getAssistantCall(req.params.id);
+  } catch (err) {
+    return res.status(err.status || 502).json({ error: err.message });
+  }
+  if (call.userId !== req.sessionUserId) {
+    return res.status(403).json({ error: 'requireOwnCall: this session is not the party on that call' });
+  }
+  req.assistantCall = call;
+  return next();
+}
+
+app.post('/api/assistant/calls', requireActor('userId'), (req, res) => handle(
+  res, () => placeAssistantCall(req.body.userId, req.body || {}), 201,
+));
+
+app.get('/api/assistant/calls', requireSession(), (req, res) => handle(
+  res, () => listAssistantCalls(req.sessionUserId),
+));
+
+app.get('/api/assistant/calls/:id', requireSession(), requireOwnCall, (req, res) => {
+  res.json(req.assistantCall);
+});
+
+app.post('/api/assistant/calls/:id/decline', requireSession(), requireOwnCall, (req, res) => handle(
+  res, () => declineAssistantCall(req.params.id),
+));
+
+app.post('/api/assistant/calls/:id/events', requireSession(), requireOwnCall, (req, res) => handle(
+  res, () => recordAssistantCallEvent(req.params.id, (req.body || {}).event),
+));
+
+app.post('/api/assistant/calls/:id/end', requireSession(), requireOwnCall, (req, res) => handle(
+  res, () => endAssistantCall(req.params.id),
 ));
 
 app.listen(PORT, () => {

@@ -286,6 +286,20 @@ app.get('/api/assistant/history/:userId', (req, res) => proxyToAssistant('GET', 
 // audit-route-guards: open -- same reasoning as /api/assistant/profile above: the real guard lives in vaco-assistant
 app.post('/api/assistant/chat', proxyToAssistant('POST', '/api/assistant/chat'));
 
+// The FaceTime-style call flow V4 already built, reached through your
+// own assistant rather than a VACON executive. Plain pass-throughs,
+// same reasoning as every assistant proxy above: the real guard
+// (a live Shield session, and for the call-id routes a real ownership
+// check against V4's own call record) lives in vaco-assistant, not here.
+// audit-route-guards: open -- real guard is vaco-assistant's own requireActor('userId')
+app.post('/api/assistant/calls', proxyToAssistant('POST', '/api/assistant/calls'));
+// audit-route-guards: open -- real guard is vaco-assistant's own requireSession()
+app.get('/api/assistant/calls', proxyToAssistant('GET', '/api/assistant/calls'));
+app.get('/api/assistant/calls/:id', (req, res) => proxyToAssistant('GET', `/api/assistant/calls/${encodeURIComponent(req.params.id)}`)(req, res));
+app.post('/api/assistant/calls/:id/decline', (req, res) => proxyToAssistant('POST', `/api/assistant/calls/${encodeURIComponent(req.params.id)}/decline`)(req, res));
+app.post('/api/assistant/calls/:id/events', (req, res) => proxyToAssistant('POST', `/api/assistant/calls/${encodeURIComponent(req.params.id)}/events`)(req, res));
+app.post('/api/assistant/calls/:id/end', (req, res) => proxyToAssistant('POST', `/api/assistant/calls/${encodeURIComponent(req.params.id)}/end`)(req, res));
+
 // The storefront needs to show a balance before it asks someone to
 // spend it. Proxied rather than called from the browser so the page has
 // one origin to talk to, the same reasoning as the Shield proxies above.

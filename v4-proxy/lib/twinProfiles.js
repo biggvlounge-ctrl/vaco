@@ -118,6 +118,15 @@ export const TWIN_PROFILES = {
   //: an avatar feels apt. It isn't -- Jake produces the script that a
   //: presenter performs, and he is never the one on screen.
   jake: { embodied: false, voiceProfile: 'neutral-professional' },
+  //: Not a VACON-roster executive -- every signed-in user's own
+  //: personal assistant (see vaco-assistant/lib/personalAssistant.js)
+  //: shares this one twin id, since the call flow's twin is purely
+  //: presentational. The actual personalization (name/tone/lifestyle)
+  //: lives per-user in vaco-assistant's own profile, not here. Listed
+  //: explicitly rather than left to DEFAULT_PROFILE so a reader does
+  //: not mistake "no entry" for "not supported" -- it would resolve to
+  //: the same values either way.
+  assistant: { preferredFraming: 'head-and-shoulders', voiceProfile: 'neutral-professional' },
 };
 
 // Resolving a twin never invents an agent. Callers pass an agent id

@@ -292,6 +292,27 @@
         </details>
 
         <div class="vaco-card" style="margin-top: var(--vaco-space-4);">
+          <div class="vaco-row" style="justify-content: space-between; align-items: center;">
+            <div>
+              <span class="vaco-h3" style="margin: 0;">FaceTime-style call</span>
+              <p class="vaco-small vaco-dim" style="margin: 2px 0 0;">
+                The same ring → live call → text-fallback flow V4 built for its executive agents,
+                reached through your own assistant. It always picks up — there's no one to miss it.
+              </p>
+            </div>
+            <button class="vaco-btn vaco-btn-primary" id="assistantCallBtn" type="button">Call</button>
+          </div>
+          <div id="assistantCallCard" style="display: none; margin-top: var(--vaco-space-3);">
+            <div class="vaco-row" style="justify-content: space-between; align-items: center;">
+              <span class="vaco-badge" id="assistantCallStatus">connecting…</span>
+              <span class="vaco-small vaco-dim vaco-mono" id="assistantCallTimer"></span>
+              <button class="vaco-btn vaco-btn-danger vaco-btn-sm" id="assistantCallEndBtn" type="button">Hang up</button>
+            </div>
+            <p class="vaco-small vaco-dim" id="assistantCallMediaNote" style="margin-top: var(--vaco-space-2);"></p>
+          </div>
+        </div>
+
+        <div class="vaco-card" style="margin-top: var(--vaco-space-4);">
           <div id="assistantMessages" class="vaco-stack-sm" style="max-height: 420px; overflow-y: auto;"></div>
           <form class="vaco-row" id="assistantChatForm" style="margin-top: var(--vaco-space-3);">
             <input class="vaco-input" id="assistantInput" style="flex: 1; min-width: 200px;"
@@ -344,6 +365,7 @@
     orders: [],
     balance: null,
     brandFilter: null,
+    assistantCall: null,
   };
 
   // -- plumbing --------------------------------------------------------
@@ -992,6 +1014,7 @@
     if (!state.session) {
       signedOut.style.display = '';
       body.style.display = 'none';
+      renderAssistantCall(null);
       return;
     }
     signedOut.style.display = 'none';
@@ -1020,6 +1043,97 @@
       toast(err.message, 'danger');
     }
   }
+
+  // -- personal assistant: FaceTime-style call ---------------------------
+  //
+  // V4's own real call flow (ring → live call → text fallback),
+  // reached through your own assistant: place a call and this auto-
+  // answers (your assistant is always available, so there is nothing
+  // to wait on), tracks the real connected duration, and shows exactly
+  // what V4's own media check reported rather than pretending a video
+  // stream exists where none was built.
+
+  let assistantCallTimer = null;
+
+  function stopAssistantCallTimer() {
+    if (assistantCallTimer) { clearInterval(assistantCallTimer); assistantCallTimer = null; }
+  }
+
+  function renderAssistantCall(call) {
+    const card = document.getElementById('assistantCallCard');
+    const callBtn = document.getElementById('assistantCallBtn');
+    stopAssistantCallTimer();
+
+    const live = call && ['ringing', 'connected'].includes(call.status);
+    state.assistantCall = live ? call : null;
+
+    if (!live) {
+      card.style.display = 'none';
+      callBtn.disabled = false;
+      callBtn.textContent = 'Call';
+      return;
+    }
+
+    card.style.display = '';
+    callBtn.disabled = true;
+    callBtn.textContent = 'In call…';
+
+    const statusBadge = document.getElementById('assistantCallStatus');
+    statusBadge.textContent = call.status;
+    statusBadge.className = 'vaco-badge' + (call.status === 'connected' ? ' vaco-badge-money' : '');
+
+    const note = document.getElementById('assistantCallMediaNote');
+    if (call.media && call.media.available === false) {
+      note.textContent = call.media.reason;
+    } else if (call.media && call.media.sessionId) {
+      note.textContent = 'Real live media session open — no in-browser audio/video player is built yet, so this reports the real session state rather than showing a stand-in.';
+    } else {
+      note.textContent = '';
+    }
+
+    const timer = document.getElementById('assistantCallTimer');
+    if (call.status === 'connected' && call.connectedAt) {
+      const tick = () => {
+        const seconds = Math.max(0, Math.floor((Date.now() - call.connectedAt) / 1000));
+        const mm = String(Math.floor(seconds / 60)).padStart(2, '0');
+        const ss = String(seconds % 60).padStart(2, '0');
+        timer.textContent = `${mm}:${ss}`;
+      };
+      tick();
+      assistantCallTimer = setInterval(tick, 1000);
+    } else {
+      timer.textContent = '';
+    }
+  }
+
+  document.getElementById('assistantCallBtn').addEventListener('click', async () => {
+    if (!state.session) return;
+    const btn = document.getElementById('assistantCallBtn');
+    btn.disabled = true;
+    btn.textContent = 'Calling…';
+    try {
+      const call = await api('/api/assistant/calls', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: state.session.userId }),
+      });
+      renderAssistantCall(call);
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = 'Call';
+      toast(err.message, 'danger');
+    }
+  });
+
+  document.getElementById('assistantCallEndBtn').addEventListener('click', async () => {
+    if (!state.assistantCall) return;
+    try {
+      const call = await api(`/api/assistant/calls/${state.assistantCall.id}/end`, { method: 'POST' });
+      renderAssistantCall(call);
+    } catch (err) {
+      toast(err.message, 'danger');
+    }
+  });
 
   // -- Explore: your own VACO -------------------------------------------
 
