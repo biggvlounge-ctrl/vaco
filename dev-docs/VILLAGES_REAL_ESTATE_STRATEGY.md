@@ -402,9 +402,12 @@ exactly as built, not renamed." Applied here the same way: user-
 facing copy says "Villa"/"create a Villa"/"join my Villa"; the
 underlying `villageRooms.js` module, its `Room` entity, and its real
 API field names stay exactly as built, not renamed -- only the
-product-facing word changes. No code change has been made yet; this
-is the real naming decision for whenever `vxllage/`'s own docs or
-copy are updated to reflect it.
+product-facing word changes. **Done**: `vxllage/public/index.html`'s
+own Villages-tab blurb now reads "Villas" instead of "rooms," and
+`vxllage/README.md` records the decision with the same precedent
+language used for Post/Note. `villageRooms.js` itself, and every real
+`/api/village-rooms*` route and field name, were deliberately left
+untouched, per the precedent above.
 
 **Further app fits, per direct invitation ("I'm sure you can run
 through the apps and see how more of them fit into this") -- flagged
@@ -440,10 +443,6 @@ consumer-facing Village brand name the way VACAY/Villas/The Vault do.
   conversion, and container hotel rooms, and at what real pricing --
   the BASE hub itself is now settled as always full-size (§6a), but
   these add-ons are not.
-- The real code change itself (§11a) — "Villa"/VXLLA is now the
-  decided brand name for `villageRooms.js`'s own rooms, but no code
-  or `vxllage/` doc has been updated yet to actually rename the
-  user-facing copy.
 - The real mechanic connecting a Village location to VOID's own
   marketplace loop for rideshare/courier/cleaning/pet-care/laundry
   (§6a) — the verticals exist; nothing wires a specific Village

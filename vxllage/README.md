@@ -16,9 +16,21 @@ renamed, since VDP's own Village District already calls into them),
 **Zoom** and **Zoom Business** (Call — two real, named call surfaces,
 still unbuilt pending real audio/video infrastructure, see "Not yet
 built"), and **Clubhouse** (Live). The existing Discord-style Villages
-sub-feature (real membership, rooms, channels, boost economy) keeps
-its own name and scope inside the brand — see "A real naming note"
-below for the one real ambiguity this creates.
+sub-feature (real membership, **Villas**, channels, boost economy)
+keeps its own name and scope inside the brand — see "A real naming
+note" below for the one real ambiguity this creates.
+
+**A room is a Villa, per direct instruction (15 Oct 2026)**: "Instead
+of room, we'll just use Villa. VXLLA." Same real pattern as Post/Note
+above — real user-facing copy calls a room a **Villa** (stylized
+**VXLLA**, plural **VXLLAS**, matching the real-estate "Villas of
+`<Area>`" brand this same word covers in VACO's own real-world
+Villages strategy, see `dev-docs/VILLAGES_REAL_ESTATE_STRATEGY.md`);
+the underlying `lib/villageRooms.js` module, its `Room` entity, and
+every real API route/field name (`/api/village-rooms`,
+`/api/villages/:id/rooms`, `roomId`, `roomType`, etc.) stay exactly as
+built, not renamed. `public/index.html`'s own Villages-tab blurb
+already reads "Villas," not "rooms."
 
 Fresh backend build in this repo — the existing prototype
 (`VXLLAGE_CLAUDE.md`'s source) is a live-demo-only React file with no
@@ -29,7 +41,11 @@ backend, no persistence beyond `localStorage`, and no Replit zip.
 "Village District") now share a name at two different scopes on
 purpose, per direct instruction — flagged here rather than silently
 smoothed over, the same posture already applied to Shell/Shield/VACO
-and VACANCY/VACON-C. Context resolves which one is meant: this
+and VACANCY/VACON-C. "Villa" is now a THIRD scope of the same root
+word, on purpose, for a room inside a village — and a fourth, in
+VACO's own real-world real-estate strategy, for a physical dwelling
+unit. All deliberate reuse of one brand vocabulary, not drift.
+Context resolves which one is meant: this
 README's own title is the brand; `lib/villages.js` and VDP's own
 Village District are the sub-feature.
 
