@@ -1089,6 +1089,7 @@ services:
       PORT: 8827
       SHIELD_API_URL: "http://shield:8812"
       V3_API_URL: "http://v3:8811"
+      VACO_MEDIA_URL: "http://vaco-media:8821"
       VOID_API_URL: "http://void:8793"
       VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
       VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
