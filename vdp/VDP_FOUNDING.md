@@ -2374,8 +2374,128 @@ suggestions from "what could make the gameplay or lore better" are
 now real, built mechanics**: the discovery arc, scarcity-driven trade,
 and this one.
 
+## VOID Hub expansion, container villas, and VOID truck hubs (15 Oct 2026) -- recorded, not yet built
+
+Per direct instruction, explicitly "off the subject" of the gameplay
+mechanics above and given "to put on file" -- recorded here in full,
+verbatim-quoted where it matters, per this document's own standing
+rule that new real content gets written down before it gets built,
+not invented into code from a paraphrase. **None of this is built
+yet.** Every real connection point named below (`registerVoidHub`,
+the VACAY hotel-registration route, `dreamsClient.js`'s screen
+registration) already exists in this codebase; this section records
+what is meant to sit on top of them.
+
+**Vhaul -- rentable automated delivery trucks at VOID hubs.** "We also
+will add in our void hubs, we also will add in some of those will
+have our vhaul operation, which will be like we'll have some delivery
+trucks that you can rent that are automated, that can be done through
+app or through our locations, depending on the size of the hub." Not
+every VOID hub gets this -- which hub sizes qualify, the real fleet
+size, and the real rental price are all open. `registerVoidHub`'s own
+real `bayCount`/`stationType: 'hub-and-port'` fields are the existing
+real hook a Vhaul-capable hub would extend, not something this
+records as decided.
+
+**Storage space for rental at every VOID hub.** "We'll have storage
+space for rental at every space, even if it's a small amount at the
+smaller ones." Scales with hub size the same direction Vhaul and the
+car washes below do -- a real, standing rule across this whole VOID
+Hub expansion, not three separate coincidences. Real unit sizes and
+pricing are open.
+
+**Container villas -- a smaller, urban container-home version of "the
+villages."** "We're adding in another operation that we'll be using
+in some of our urban areas called a smaller version or a more
+container home version of the villages, but put on smaller city
+blocks, like in St. Louis's LRA properties, which are small plots of
+land all over St. Louis." St. Louis's real Land Reutilization
+Authority -- scattered, individually small vacant lots across the
+city -- is the real-world model named for how these villas sit in a
+real urban footprint: many small, dispersed sites, not one large
+complex the way `town.js`'s own settlement is.
+
+- **Acquisition plan, stated plainly**: "we will try to acquire all
+  the schools that are for sale and all the land that is for sale."
+  Real intent, not a real transaction mechanic -- no acquisition
+  pipeline exists in this codebase yet.
+- **The villas themselves**: container homes, "up to a certain size
+  and different architecture, but with similar accents" across one
+  villa -- a real design constraint (shared accents unify a villa;
+  size cap and the accent details themselves are open, flagged, not
+  invented).
+- **Unit mix varies by villa**: "they will have a connected, they
+  will be different bedrooms. Some will be condos, some will be
+  apartments, depending on what the villa is" -- read as: a given
+  villa is internally consistent in unit TYPE (a condo villa, an
+  apartment villa, a multi-bedroom villa), not that every villa mixes
+  all three. Which real property type(s) in `property.js`'s own
+  existing `PROPERTY_TYPES` these map to (`residential`? a new type?)
+  is open.
+- **Shared amenities, per villa**: "some type of shared entertainment
+  space, sitting area, barbecue area, vending area, things of that
+  nature" -- real, named categories; "things of that nature" is the
+  user's own open door for more, not a closed list.
+- **Connects to VACAY and VOID**: "I just wanted to add that into the
+  puzzle for part of the vacay and void hubs part of it" -- the real
+  integration point this falls under, not a fourth, separate system.
+
+**VOID Hub Truck Stops.** "We will be doing void hub truck stops,
+where we'll have all the void hub things, but we'll also have a piece
+of land in like closer to downtown areas. And this is for the vacay
+and void truck." A real, distinct hub variant, closer to downtown than
+a plain VOID hub, combining:
+
+- Every standard VOID hub operation ("all the void hub operations we
+  have there").
+- A real truck parking area ("an area on the side that will be for
+  trucks to park"), for VACAY and VOID trucks.
+- **Dreams screens incorporated** -- the first real, named connection
+  between this expansion and the DREAMS Network (`dreamsClient.js`'s
+  own already-real screen registration, parallel income category to
+  property per that file's own header).
+  - VOID hub food operations, same as any VOID hub.
+- **Automated car washes, scaled by hub size**: a regular automated
+  car wash "if the void hub is large enough," and a full truck-sized
+  automated wash "all the way up to at the truck stop" -- the same
+  size-scaling rule Vhaul and storage already follow, now a third
+  confirmed instance of it.
+
+**Container hotel rooms -- 20-foot container units, ~20 to a site.**
+"Some void hubs will have, without the trucking part, will have 20
+different variations of just small hotel rooms in containers. So like
+a 20-foot container set like hotel rooms in certain areas." Two real
+deployment contexts, both named directly: "some of them will just be
+container parks set up for rental for vacay, and some of them will be
+set up for at like our void truck hubs." Either way: "that will be
+part of it, to be connected to the vacay operation, connected to
+void, connected to the Dreams Network" -- the same three-system
+connection (VACAY/VOID/DREAMS) the truck stops above already
+establish, now extended to this smaller-unit format too. The existing
+VACAY hotel-registration route (`/api/vacay-hotels`, tier-capped by
+`cityTiers.js`'s own real `maxHotels`) is the nearest real hook for
+the VACAY-side container parks; whether a 20-foot container room
+counts against that same real per-tier cap, or needs its own, is
+open.
+
+**What is deliberately NOT done here**: no new code, no new
+`civilizations.js`/`property.js`/`worldAtlas.js` fields, no new
+server.cjs routes. This is the record, per direct instruction ("I
+just wanted to put that on file"), the same discipline the master
+lore handoff itself got (rules/content built only once asked for,
+not the instant the lore arrives).
+
 ## What is still open
 
+- **The whole VOID Hub expansion** (see "VOID Hub expansion, container
+  villas, and VOID truck hubs," above) — recorded, not built. Open
+  specifics: which hub sizes get Vhaul and at what rental price; real
+  storage-unit sizes/pricing; the real container-villa size cap and
+  accent details; which `property.js` type a villa unit maps to;
+  which VOID hubs become truck stops and the real acquisition
+  mechanic for schools/land; whether a 20-foot container hotel room
+  counts against the existing VACAY per-tier `maxHotels` cap or needs
+  its own.
 - The area's own name — nothing has been given yet (the product name,
   "VDP / Digital Planet," is not it — see the correction above).
 - **The ten generic island countries' real population range and any
