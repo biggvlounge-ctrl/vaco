@@ -460,11 +460,16 @@ in the design system, and land in all three deployment paths.
 **Three real gaps this table cannot see**, all of them larger than
 anything it can:
 
-1. **Real-time media.** Six surfaces cannot do their core thing —
-   Vvltvre Flix cannot play, Vvltvre Pods cannot stream, Vavlt Stvdios
-   cannot show a feed, CHOPZ cannot play video, VENVM cannot generate
-   media, DREAMS has no display. Blocked on a vendor decision, not
-   effort. See \`dev-docs/MEDIA_INFRASTRUCTURE_DECISION.md\`.
+1. **Real-time media.** Vvltvre Flix, Vvltvre Pods, CHOPZ, and Vavlt
+   Stvdios' on-demand Video primitive are wired end to end (as of 15 Oct
+   2026) — what's left for those four is real object storage + a CDN,
+   a vendor/budget line, not a code gap. Three surfaces still can't do
+   their core thing for reasons that stay blocked either way: Vavlt
+   Stvdios' *live* eight-screen wall cannot show a feed (needs a
+   real-time transport vendor, separate from the Video primitive above),
+   VENVM cannot generate media (a real AI-video-vendor decision), and
+   DREAMS has no display (no screen hardware exists anywhere in this
+   ecosystem). See \`dev-docs/MEDIA_INFRASTRUCTURE_DECISION.md\`.
 2. **Docker has never been build-tested** (#128) and **backups are
    same-host only** (#125). Both blocked on infrastructure, not work.
 3. **A guard being present is not a guard being right.**
