@@ -77,6 +77,17 @@ that genuinely batch through the real routing engine.
 - **Cross-app** — `externalIntegration.js` (VOID Direct + Affiliate
   Network), `staffing.js`, `regulatedBoxes.js`, `taas.js`,
   `deliveryChoice.js`.
+- **VOID DROP — mobile space rental & deployment** (select → book →
+  deliver → deploy → use → retrieve → redeploy) — `voidDropCategories.js`
+  (the 14 named products, e.g. DROP SHOP/DROP FOOD/DROP SPA, as config,
+  not code — a 15th product is a new entry, never a new module),
+  `voidDropAssets.js` (the physical unit's own lifecycle, independent
+  of any one booking — the real new thing here; everything else in
+  VOID lives only inside a job), `voidDropBooking.js` (eligibility —
+  never auto-approves, a real human/operator call always finalizes it
+  — pricing, and the booking lifecycle, which creates a real job
+  through `marketplace.js` rather than forking it, same as
+  `movingServices.js`). Registered as the `voidDrop` vertical.
 - **Persistence** — `store.js` + `persistence.js` (Proxy-based
   auto-flush to `data/store.json`).
 
@@ -123,6 +134,26 @@ that genuinely batch through the real routing engine.
   `'driver'` by any real rule here, so never emitted.
 - **Proactive hardware suggestions** (TaaS) — depends on a proactive
   business suggestion engine that exists only in planning docs.
+- **VOID DROP's real zoning/permit automation.** No real zoning or
+  permit database exists anywhere in this ecosystem, so
+  `assessEligibility` never auto-approves a location — it can only
+  reject on a real, checkable data mismatch (no confirmed road access,
+  a declared site weight limit the unit genuinely exceeds). Everything
+  else comes back `pending-review` and needs a real human/operator
+  approval. Don't change this to auto-approve without a real data
+  source behind it.
+- **VOID DROP deposits, partial payment, and refunds.** The founder's
+  own spec shows payment happening right after booking, before the
+  unit ever moves; this instead follows every other VOID vertical's
+  convention and settles once, at `completeCleaningAndClose`, when the
+  physical rental is actually done. An upfront deposit/hold and a real
+  refund policy are a genuine product decision not invented here.
+- **VOID DROP third-party marketplace listings, V4 natural-language
+  discovery, and the DREAMS/HVNTZ/VACAY/real-estate cross-app hooks**
+  the founder's spec describes (§§11, 13–17) — the asset model already
+  separates `ownerId`/`ownerType` from `operatorId` so third-party
+  ownership is not a later rewrite, but nothing calls into those other
+  apps yet.
 
 ## Decisions on the three questions `VOID_MASTER_FREEZE.md` raised
 

@@ -112,7 +112,7 @@ test('every registered vertical has a service config', async () => {
   const configured = Object.keys(SERVICE_CONFIGS);
   const missing = Object.keys(VERTICALS).filter((v) => !configured.includes(v));
   assert.deepStrictEqual(missing, [], 'every vertical must be a service app');
-  assert.strictEqual(configured.length, 25);
+  assert.strictEqual(configured.length, 26);
 });
 
 test('no config names a vertical that does not exist', async () => {

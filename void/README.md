@@ -13,6 +13,8 @@ Source docs, follow-up features (Phases 8–11):
 `VOID_AMAZON_LOGISTICS_INTEGRATION.md`, `VOID_MOVING_REAL_ESTATE_MEDIA.md`,
 `VOID_MEITUAN_MODEL_INTEGRATION.md`, `VOID_FOOD_CAPABLE_STATIONS.md`,
 `VOID_HUB_WALKUP_ORIGINATION.md`, `VOID_APARTMENT_UNIVERSITY_LOCKER_NETWORK.md`.
+Source doc, VOID DROP: `VOID_DROP.md` (the founder's own spec, plus
+the real implementation decisions made against it).
 (A marketing-strategy/budget document, and a document about Vvltvre
 Music's own separate catalog-acquisition plan, were both uploaded
 alongside these at various points and are explicitly excluded from
@@ -405,6 +407,29 @@ recommendation needs. So this is real, bounded future work — add a
 business dimension to that existing loop, then match hardware to venue
 type the way HVNTZ's DREA already matches ad content to venue type —
 rather than a from-scratch invention. See `lib/taas.js`'s own header.
+
+**VOID DROP — mobile space rental & deployment** (`lib/voidDropCategories.js`,
+`lib/voidDropAssets.js`, `lib/voidDropBooking.js`; see `VOID_DROP.md`):
+select → book → deliver → deploy → use → retrieve → redeploy, additive
+to this ecosystem as the founder's own spec asked. Real new idea: a
+physical `MobileSpaceAsset` outlives any one booking, the same shape
+`businessLockers.js` already proved, serving customer A, then B, then
+C. Registered as the `voidDrop` vertical; `createDropBooking` creates
+a real job through the existing `requestJob`/`matchProvider`/
+`acceptJob`/`completeJob` loop rather than a second booking system. 14
+named products (DROP SHOP, DROP FOOD, …) are config entries over one
+real engine, not 14 modules. **Three decisions worth knowing before
+touching this**: eligibility never auto-approves (no real zoning/permit
+data source exists anywhere in this ecosystem — a real human/operator
+call always finalizes it, recorded in vaco-audit first); payment
+settles once, at `completeCleaningAndClose`, not at booking time (the
+spec's own flow shows it earlier, which would mean charging before the
+unit moves — a real deposit/refund product decision not invented
+here); delivery pricing is real Haversine distance when both endpoints
+are known, honestly `0` when they are not. **Deliberately not built**:
+third-party marketplace listings (the owner/operator split already
+supports it), V4 discovery, the DREAMS/HVNTZ/VACAY/real-estate hooks,
+DROP ZONES, rent-to-own/revenue-share billing.
 
 **Real seed data** (`lib/seedDemoData.js`, `SEED_DEMO_DATA_REQUIREMENT.md`):
 two real St. Louis Port Stations, two gig drivers, and four real

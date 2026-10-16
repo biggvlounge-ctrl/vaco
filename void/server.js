@@ -98,6 +98,17 @@ const {
 const {
   ACQUISITION_MODELS, registerTaasSubscription, getTaasSubscription, getTaasSubscriptionsForClient,
 } = require('./lib/taas');
+const { listDropCategories, getDropCategory } = require('./lib/voidDropCategories');
+const {
+  ASSET_STATUSES, OWNER_TYPES, MAINTENANCE_TYPES, registerDropAsset, getDropAsset, listDropAssets,
+  setAssetStatus, moveAsset, logMaintenanceEvent, resolveMaintenanceEvent, getMaintenanceHistory,
+} = require('./lib/voidDropAssets');
+const {
+  LOCATION_TYPES, computeDropPrice, createDropBooking, getDropBooking, listDropBookingsForUser,
+  approveDropBooking, rejectDropBooking, scheduleDelivery, dispatchDelivery, markArrivedAndDeploying,
+  startRental, scheduleRetrieval, dispatchRetrieval, markReturnedForInspection, recordInspectionResult,
+  completeCleaningAndClose, cancelDropBooking,
+} = require('./lib/voidDropBooking');
 
 const {
   requireActor, requireParamActor, requireSession, requireCallingService, actorOrService,
@@ -216,6 +227,18 @@ const requireJobParty = () => requireRecordParty(
 );
 const requireJobCustomer = () => requireRecordParty(
   'job', (req) => getJob(store, Number(req.params.id)), (j) => j.customerId,
+);
+// A drop booking has a customer and, once approved, the asset's real
+// operator -- both may read it; only the customer side is exposed for
+// self-service cancellation (see the route itself), but the read guard
+// is shared so an operator checking their own fleet's bookings is not
+// blocked.
+const requireDropBookingParty = () => requireRecordParty(
+  'drop booking', (req) => getDropBooking(store, Number(req.params.id)),
+  (b) => {
+    const asset = getDropAsset(store, b.assetId);
+    return [b.customerId, asset ? asset.operatorId : null];
+  },
 );
 const requireReserveBookingRider = () => requireRecordParty(
   'reserve booking', (req) => getReserveBooking(store, Number(req.params.id)), (b) => b.riderId,
@@ -1392,6 +1415,248 @@ app.get('/api/taas-subscription/:id', (req, res) => {
 
 app.get('/api/taas-subscriptions/client/:clientBusinessId', (req, res) => {
   res.json({ subscriptions: getTaasSubscriptionsForClient(store, req.params.clientBusinessId) });
+});
+
+// -- VOID DROP: mobile space rental & deployment -----------------------
+//
+// Select → book → deliver → deploy → use → retrieve → redeploy. See
+// lib/voidDropCategories.js, lib/voidDropAssets.js, lib/voidDropBooking.js
+// for the real mechanics; this is thin routing over them, same shape
+// every other vertical in this file already takes.
+
+app.get('/api/drop/categories', (_req, res) => {
+  res.json({ categories: listDropCategories() });
+});
+
+// Registering a physical asset into the fleet is fleet operations, not
+// a customer action -- same posture as `/api/station` and
+// `/api/business-locker` above.
+app.post('/api/drop/asset', requireCallingService(), (req, res) => {
+  try {
+    res.status(201).json(registerDropAsset(store, req.body || {}));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/drop/asset/:id', (req, res) => {
+  const asset = getDropAsset(store, req.params.id);
+  if (!asset) return res.status(404).json({ error: `no drop asset with id ${req.params.id}` });
+  res.json(asset);
+});
+
+// Open to anyone browsing what's available to book -- same posture as
+// `/api/verticals` and `/api/store/listings` elsewhere in this
+// ecosystem: a catalog read needs no session.
+app.get('/api/drop/assets', (req, res) => {
+  const { category, status, ownerId } = req.query;
+  res.json({ assets: listDropAssets(store, { category, status, ownerId }) });
+});
+
+app.post('/api/drop/asset/:id/status', requireOperator('void:drop'), (req, res) => {
+  try {
+    res.json(setAssetStatus(store, { ...req.body, assetId: req.params.id }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/drop/asset/:id/location', requireOperator('void:drop'), (req, res) => {
+  try {
+    res.json(moveAsset(store, { ...req.body, assetId: req.params.id }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/drop/asset/:id/maintenance', requireOperator('void:drop'), (req, res) => {
+  try {
+    res.status(201).json(logMaintenanceEvent(store, { ...req.body, assetId: req.params.id }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/drop/maintenance/:eventId/resolve', requireOperator('void:drop'), (req, res) => {
+  try {
+    res.json(resolveMaintenanceEvent(store, { eventId: Number(req.params.eventId) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/drop/asset/:id/maintenance', (req, res) => {
+  res.json({ events: getMaintenanceHistory(store, req.params.id) });
+});
+
+// A real quote before a real booking -- lets a customer see the price
+// (and whether the dates are even free) without committing to
+// anything, same role `computeHourlyCharge`/`computeDynamicCargoPricing`
+// already play for their own verticals.
+app.get('/api/drop/asset/:id/quote', (req, res) => {
+  try {
+    const durationDays = Number(req.query.durationDays);
+    const deliveryLat = req.query.deliveryLat !== undefined ? Number(req.query.deliveryLat) : null;
+    const deliveryLng = req.query.deliveryLng !== undefined ? Number(req.query.deliveryLng) : null;
+    res.json(computeDropPrice(store, { assetId: req.params.id, durationDays, deliveryLat, deliveryLng }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/drop/booking', requireActor('customerId'), (req, res) => {
+  try {
+    res.status(201).json(createDropBooking(store, req.body || {}));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/drop/booking/:id', requireDropBookingParty(), (req, res) => {
+  const booking = getDropBooking(store, Number(req.params.id));
+  res.json(booking);
+});
+
+app.get('/api/drop/bookings/user/:userId', requireParamActor('userId'), (req, res) => {
+  res.json({ bookings: listDropBookingsForUser(store, req.params.userId) });
+});
+
+// The real eligibility sign-off -- never automatic (see
+// voidDropBooking.js's own header). Recorded in vaco-audit before it
+// executes, same posture every other physical-world verification
+// decision in this file already holds (regulated-box custody,
+// provider skill approval).
+app.post('/api/drop/booking/:id/approve', requireOperator('void:drop:approve'), async (req, res) => {
+  try {
+    await decisionLog.record({
+      route: 'POST /api/drop/booking/:id/approve',
+      outcomeKind: 'approval',
+      subjectType: 'dropBooking',
+      subjectId: req.params.id,
+      decidedBy: req.operator.operatorName,
+      decidedByKind: 'operator',
+      inputs: req.body || {},
+      reason: (req.body || {}).reason || null,
+    });
+  } catch (err) {
+    return res.status(503).json({ error: err.message });
+  }
+  try {
+    res.json(approveDropBooking(store, { bookingId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/drop/booking/:id/reject', requireOperator('void:drop:approve'), async (req, res) => {
+  try {
+    await decisionLog.record({
+      route: 'POST /api/drop/booking/:id/reject',
+      outcomeKind: 'rejection',
+      subjectType: 'dropBooking',
+      subjectId: req.params.id,
+      decidedBy: req.operator.operatorName,
+      decidedByKind: 'operator',
+      inputs: req.body || {},
+      reason: (req.body || {}).reason || null,
+    });
+  } catch (err) {
+    return res.status(503).json({ error: err.message });
+  }
+  try {
+    res.json(rejectDropBooking(store, { bookingId: Number(req.params.id), reason: (req.body || {}).reason }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Delivery → deploy → active → retrieval → inspection → cleaning: real
+// fleet-operations progress, gated to operators the same way the
+// routine (non-decision) provider-skill actions above are, not logged
+// to vaco-audit individually -- these are status updates, not the kind
+// of credential/approval decision that posture is for.
+app.post('/api/drop/booking/:id/schedule-delivery', requireOperator('void:drop'), (req, res) => {
+  try {
+    res.json(scheduleDelivery(store, { ...req.body, bookingId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/drop/booking/:id/dispatch-delivery', requireOperator('void:drop'), (req, res) => {
+  try {
+    res.json(dispatchDelivery(store, { bookingId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/drop/booking/:id/mark-deploying', requireOperator('void:drop'), (req, res) => {
+  try {
+    res.json(markArrivedAndDeploying(store, { bookingId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/drop/booking/:id/start-rental', requireOperator('void:drop'), (req, res) => {
+  try {
+    res.json(startRental(store, { bookingId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/drop/booking/:id/schedule-retrieval', requireOperator('void:drop'), (req, res) => {
+  try {
+    res.json(scheduleRetrieval(store, { ...req.body, bookingId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/drop/booking/:id/dispatch-retrieval', requireOperator('void:drop'), (req, res) => {
+  try {
+    res.json(dispatchRetrieval(store, { bookingId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/drop/booking/:id/mark-returned', requireOperator('void:drop'), (req, res) => {
+  try {
+    res.json(markReturnedForInspection(store, { bookingId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/drop/booking/:id/inspection-result', requireOperator('void:drop'), (req, res) => {
+  try {
+    res.json(recordInspectionResult(store, { ...req.body, bookingId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// The one route that moves money (see voidDropBooking.js header) --
+// closes the loop through the real shared marketplace settlement, same
+// `settleVCoin` every other vertical's completion already uses.
+app.post('/api/drop/booking/:id/complete', requireOperator('void:drop'), async (req, res) => {
+  try {
+    const booking = await completeCleaningAndClose(store, { bookingId: Number(req.params.id), settleFn: settleVCoin });
+    res.json(booking);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/drop/booking/:id/cancel', requireDropBookingParty(), (req, res) => {
+  try {
+    res.json(cancelDropBooking(store, { bookingId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 // -- Real background-job-runner behavior (closes the previously

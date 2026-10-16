@@ -56,6 +56,12 @@ const VERTICALS = {
   // post-production are different mechanics, not the same thing under
   // a new name. See lib/realEstateMedia.js.
   realEstateMedia: { name: 'Real Estate Media', pricingUnit: 'flat-quote', takeRate: 0.20, freePickupDelivery: false, licensingGated: false },
+  // VOID DROP -- mobile/modular space rental & deployment (select a
+  // physical unit, have it delivered, use it, have it retrieved). Not
+  // licensing-gated at the vertical level: eligibility is per-booking
+  // and per-location, assessed in lib/voidDropBooking.js, not a
+  // blanket category refusal the way cannabisDelivery's is.
+  voidDrop: { name: 'VOID DROP', pricingUnit: 'flat-quote', takeRate: 0.20, freePickupDelivery: false, licensingGated: false },
 };
 
 function getVertical(verticalId) {

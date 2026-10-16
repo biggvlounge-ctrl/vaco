@@ -286,6 +286,36 @@ const SERVICE_CONFIGS = {
     comparables: ['Roundtrip', 'ModivCare'],
     freeCancellationHours: 24,
   },
+
+  // -- E. A real physical asset, not a person's time ---------------------
+  // The product is a specific, reusable unit (spec: lib/voidDropAssets.js),
+  // not a worker's visit -- the engine's own "quote" archetype fits
+  // (price is not known until a specific unit, location, and duration
+  // are assessed, same as freightMoving/realEstateMedia above), but the
+  // real booking/asset-lifecycle mechanics live entirely in
+  // lib/voidDropBooking.js, same "graduated to its own module" shape
+  // this file's own header describes. `requiresSubject: false` --
+  // there is no person/pet/property subject record the way the other
+  // archetypes use one; the asset itself is the thing being booked and
+  // is tracked in its own collection, not through `serviceSubjects`.
+
+  voidDrop: {
+    archetype: 'quote',
+    hasDedicatedModule: 'lib/voidDropBooking.js',
+    // 14 named products (DROP SHOP, DROP FOOD, …) -- see
+    // lib/voidDropCategories.js for the full, real list; not restated
+    // here since `services` elsewhere in this file names task types
+    // within one vertical, not 14 separate product lines.
+    services: ['delivered-space-rental'],
+    requiresSubject: false,
+    defaultDurationMinutes: null,
+    // Real companies, each real in one slice of this (portable storage,
+    // hourly/daily space marketplaces, modular housing) -- no single
+    // comparable covers "a reusable mobile space delivered across 14
+    // product categories," so this is honestly thinner than the five
+    // deep-researched verticals, not a gap filled by invention.
+    comparables: ['PODS', 'Giggster', 'Boxabl'],
+  },
 };
 
 module.exports = { SERVICE_CONFIGS };

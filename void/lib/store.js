@@ -97,6 +97,17 @@ function createVoidStore() {
     nextLockerId: 1,
     lockerToDoorRequests: [],
     nextLockerToDoorId: 1,
+    // VOID DROP: mobile space rental & deployment. See
+    // lib/voidDropAssets.js (the durable physical unit, outliving any
+    // one booking) and lib/voidDropBooking.js (eligibility, pricing,
+    // the booking lifecycle -- creates real jobs through the shared
+    // marketplace loop above, does not fork it).
+    dropAssets: [],
+    nextDropAssetId: 1,
+    dropMaintenanceEvents: [],
+    nextDropMaintenanceEventId: 1,
+    dropBookings: [],
+    nextDropBookingId: 1,
   };
 }
 
