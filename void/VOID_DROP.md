@@ -120,28 +120,46 @@ on an asset, and `registerDreamsScreenFn`/`deactivateDreamsScreenFn` —
 **injected, optional, fail-soft** parameters on
 `markArrivedAndDeploying`/`dispatchRetrieval` — are the real hook.
 
-**The screen is always VOID's, never the unit owner's.** A real
-follow-up correction: "those won't have necessarily a direct touch to
-a Hunt's business ... those will be our screens ... where other
-people are paying us to advertise." `registerDreamsScreenFn` is now
-called with `screenOwnerId: VOID_PLATFORM_ACCOUNT_ID` (the same
-`'void-platform'` account every vertical's take rate already settles
-to) regardless of whether the asset itself is VOID-owned or a real
-third-party/business/investor unit — the billboard-company shape: VOID
-owns and sells the ad placement, independent of who owns the structure
-it rides on. A unit rented out carries VOID's own ad network, which
-could be advertising VOID's own other apps or any real paying
-advertiser — the same real DREAMS marketplace model already built,
-not a second one. Tested directly, including on a third-party-owned
-unit specifically to prove the screen does not inherit that ownership.
+**The screen belongs to the current renter, not VOID and not the
+asset's owner.** A real follow-up correction, superseding the earlier
+"always VOID's own" decision: "those screens that are connected to the
+void operation ... will just be connected to whatever business is out
+there ... it's just like having an apartment complex with screens in
+it that we created — those screens are attached to that apartment
+complex, but are also still part of the Dreams network." A fresh
+screen is registered per deployment (the asset's own `dreamsScreenId`
+is cleared on retrieval, so a redeploy to a new customer registers a
+new one), and `screenOwnerId` is now `booking.customerId` — the
+business currently renting and running that location — regardless of
+who owns the physical unit itself. Tested directly, including on a
+third-party-owned unit, to prove the screen follows the renter, not
+the asset's owner.
+
+**This is what makes "the renter receives a small percentage of scans
+and sales on the screens" real, using DREAMS' own existing payout
+mechanism rather than inventing a second one.** DREAMS'
+`screenOwnerId` was already both the registration/deactivation
+authority and the payout recipient for ad-impression revenue (a real
+70/30 split, `SCREEN_OWNER_SHARE`). The founder's own further
+follow-up ("we will run our ads ... plus the renter's personal ads
+... they will receive a small percentage of scans and sales on the
+screens") needed two things DREAMS did not yet have — real, audited —
+and now does: `setScanPricing`/`recordScan` (a scan priced and split
+the same shape as an impression) and `setSaleCommission`/`recordSale`
+(a real commission, a percentage of an actual sale's own value, since
+taking a cut of a full sale the way an impression is charged would be
+unrealistic — the "small percentage" the founder names). Both split
+70/30 to whoever is registered as `screenOwnerId` at the time, so the
+renter is who actually gets paid while their deployment is live. See
+`dreams/lib/campaigns.js` and `dreams/test/scanSale.test.js`.
 
 **Why no default registration implementation is wired into
 `server.js`.** DREAMS' own `POST /api/screens` requires the real
 screen owner's own Shield session (`requireActor('screenOwnerId')`) —
 confirmed directly against `dreams/server.js`, not assumed — with no
 service-credential path at all. VOID cannot register a screen
-server-to-server through that route as it exists today, even on its
-own platform account's behalf. The hook is real, fully tested
+server-to-server through that route as it exists today, even on the
+renter's own behalf. The hook is real, fully tested
 (`test/voidDrop.test.js`), and ready for whatever real flow eventually
 authorizes this — nothing here pretends that flow already exists.
 
@@ -220,10 +238,11 @@ founder's own two follow-ups, stated plainly rather than inferred:
   its own yet.
 
 Nothing here stands up a formal "Village" (physical) account or
-corporate entity — the one concrete consequence already real above is
-that a Drop unit's screen is VOID-platform-owned, independent of the
-unit's own owner, which is the behavior "Village" describes regardless
-of what formally holds that account later.
+corporate entity. The screen-ownership behavior above no longer
+implies one either: a Drop unit's screen is now the current renter's,
+not VOID's own platform account — "Village" as the physical
+real-estate/screen-network half of the brand remains undecided in
+code, a real naming question, not a built one.
 
 ## Three decisions that needed to be made, stated honestly
 
@@ -272,8 +291,15 @@ not a gap discovered later, a scope line drawn now:
 - A real DREAMS screen registration flow (the hook exists; see "DREAMS
   screens" above for exactly what's missing and why).
 - A formal "Village" (physical) account/entity in code — see the
-  naming note above; the one concrete behavior it implies is already
-  real (platform-owned screens).
+  naming note above. No longer implied by screen ownership (now the
+  renter's), and still undecided.
+- A real QR/NFC scan mechanism on a physical screen, and a real
+  sales-attribution link between a scan and a confirmed purchase.
+  `recordScan`/`recordSale` (DREAMS) are the real revenue-settlement
+  half — pricing, the 70/30 split, the budget/commission math — but
+  nothing here simulates the hardware/attribution chain that would
+  call them from an actual scan or sale happening in the real world;
+  see "DREAMS screens" above.
 - Rent-to-own ledgers, fractional ownership, revenue-share splits —
   real financial products that need their own real agreement model,
   the same way DREAMS' own VRG revenue attribution needed one

@@ -433,10 +433,20 @@ tie to a real Hub/Port station (`homeStationId`); delivery/retrieval
 can be run by a real, approved (verified-skill) VOID driver, paid
 their own real per-leg fee out of the asset operator's proceeds; a
 unit can carry a real DREAMS screen flag, registered/deactivated
-through an injected, fail-soft hook — always to VOID's own platform
-account (`VOID_PLATFORM_ACCOUNT_ID`), never the unit owner's, since
-these are VOID's own ad placements riding on whatever structure they
-happen to be mounted on, not the unit owner's. **Decisions worth
+through an injected, fail-soft hook — to the current renter
+(`booking.customerId`), never the unit owner's and no longer a VOID
+platform account (a real founder correction: "connected to whatever
+business is out there... attached to that apartment complex, but also
+still part of the Dreams network"), fresh per deployment. That renter
+registration is what lets DREAMS' own real, extended revenue model pay
+them directly: alongside the existing 70/30 ad-impression split, a
+scan is now priced and split the same way
+(`setScanPricing`/`recordScan`) and a sale commissions a percentage of
+its own real value (`setSaleCommission`/`recordSale`) — "the renter
+will receive a small percentage of scans and sales on the screens,"
+built as DREAMS' own settlement primitives rather than a second
+revenue system (`dreams/lib/campaigns.js`,
+`dreams/test/scanSale.test.js`). **Decisions worth
 knowing before touching this**: eligibility never auto-approves (no
 real zoning/permit data source exists anywhere in this ecosystem — a
 real human/operator call always finalizes it, recorded in vaco-audit
@@ -454,10 +464,13 @@ credential. **Now wired to VACAY** (`vacay/lib/bookings/dropStays.js`)
 is the hospitality company; "Villas" is the real branded name, not
 "Drop Hotel"). **Deliberately not built**: third-party marketplace
 listings (the owner/operator split already supports it), V4 discovery,
-the HVNTZ/real-estate hooks, rent-to-own/revenue-share billing, and a
-formal "Village" (physical) account/entity in code — see `VOID_DROP.md`'s
-naming note; the one concrete behavior it implies (platform-owned
-screens) is already real. See `VOID_DROP.md`.
+the HVNTZ/real-estate hooks, rent-to-own/revenue-share billing, a
+formal "Village" (physical) account/entity in code (see
+`VOID_DROP.md`'s naming note — no longer implied by screen ownership,
+which now belongs to the renter), and a real QR/NFC scan or
+sale-attribution mechanism (the money-settlement side is real; nothing
+here simulates the hardware/attribution chain that would call it). See
+`VOID_DROP.md`.
 
 **Real seed data** (`lib/seedDemoData.js`, `SEED_DEMO_DATA_REQUIREMENT.md`):
 two real St. Louis Port Stations, two gig drivers, and four real

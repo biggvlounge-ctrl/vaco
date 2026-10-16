@@ -39,6 +39,7 @@ const { signUpAdvertiser, getAdvertiser } = require('./lib/advertisers');
 const {
   CAMPAIGN_STATUSES, INCENTIVE_TYPES, createCampaign, getCampaign, listCampaignsForAdvertiser,
   selectScreens, setCreative, generateCreativeText, setBudget, setIncentive, launchCampaign, recordImpression,
+  setScanPricing, setSaleCommission, recordScan, recordSale,
 } = require('./lib/campaigns');
 const {
   EMERGENCY_BROADCAST_TYPES, pushEmergencyBroadcast, getActiveEmergencyBroadcast,
@@ -339,6 +340,22 @@ app.post('/api/campaigns/:id/incentive', requireCampaignAdvertiser(), (req, res)
   }
 });
 
+app.post('/api/campaigns/:id/scan-pricing', requireCampaignAdvertiser(), (req, res) => {
+  try {
+    res.json(setScanPricing(store, { ...req.body, campaignId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/campaigns/:id/sale-commission', requireCampaignAdvertiser(), (req, res) => {
+  try {
+    res.json(setSaleCommission(store, { ...req.body, campaignId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.post('/api/campaigns/:id/launch', requireCampaignAdvertiser(), (req, res) => {
   try {
     res.json(launchCampaign(store, { campaignId: Number(req.params.id) }));
@@ -407,6 +424,45 @@ app.post('/api/campaigns/:id/impression', requireCallingService(), async (req, r
       );
     }
     res.status(201).json(impression);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/campaigns/:id/scan', requireCallingService(), async (req, res) => {
+  try {
+    const scan = await recordScan(store, {
+      ...req.body, campaignId: Number(req.params.id), settleFn: settleVCoin,
+    });
+    await pushMetric('screen_scan_revenue', scan.screenOwnerPayout);
+
+    const campaign = getCampaign(store, Number(req.params.id));
+    if (campaign && campaign.status === 'completed') {
+      await notify(
+        `Campaign ${campaign.id} has exhausted its budget`,
+        `"${campaign.name}" stopped serving. Budget ${campaign.budget} is spent `
+        + `across ${campaign.screenIds.length} screen(s).`,
+        {
+          campaignId: campaign.id,
+          advertiserId: campaign.advertiserId,
+          budget: campaign.budget,
+          screenIds: campaign.screenIds,
+        },
+      );
+    }
+    res.status(201).json(scan);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/campaigns/:id/sale', requireCallingService(), async (req, res) => {
+  try {
+    const sale = await recordSale(store, {
+      ...req.body, campaignId: Number(req.params.id), settleFn: settleVCoin,
+    });
+    await pushMetric('screen_sale_revenue', sale.screenOwnerPayout);
+    res.status(201).json(sale);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

@@ -65,8 +65,23 @@ curl -X POST http://localhost:8814/api/campaigns -H "Content-Type: application/j
   real validation that every prior step genuinely completed, no
   defaults silently filled) → `recordImpression` (a real per-screen ad
   run).
+- **Scan and sale revenue, new (16 Oct 2026)** — the founder's own
+  follow-up on VOID DROP's screens: "we will run our ads... plus the
+  renter's personal ads, [and the renter] will receive a small
+  percentage of scans and sales on the screens." `setScanPricing` +
+  `recordScan` price and settle a scan the same 70/30 shape as an
+  impression (drawn from the campaign's own ad-spend budget, same as
+  an impression); `setSaleCommission` + `recordSale` commission a real
+  percentage of an actual sale's own value instead — a referral shape,
+  not a flat cost, and deliberately *not* metered against ad-spend
+  budget, since a performance payment on money the advertiser already
+  made is a different thing from money spent to be seen. Both pay
+  whoever is registered as `screenOwnerId` — for a VOID DROP asset,
+  that's now the current renter, not VOID's own platform account (see
+  `void/VOID_DROP.md`'s "DREAMS screens" section).
 - `server.js` — the real Express API tying all three together, plus
-  the real `pushMetric` call to VACO Analytics on every impression.
+  the real `pushMetric` call to VACO Analytics on every impression,
+  scan, and sale.
 - **Required real incentive, per direct instruction (9 Oct 2026)**:
   "everything has to be used to give away something, a coupon, a
   percentage off, even if it's a large corporation." `setIncentive`
@@ -111,13 +126,17 @@ own `completeJob` already established, guaranteeing the two amounts
 always sum to the exact real cost.
 
 ## Verified
-6 real unit test groups: screen registration validation, the full
+7 real unit test groups: screen registration validation, the full
 self-serve flow enforcing every step in order with no silently-filled
 defaults, the real 70/30 revenue split with budget depletion
 auto-completing a campaign, an impression rejected on a screen not
 selected for that campaign, `generateCreativeText`'s real success and
 real honest failure both handled correctly (a real completion failure
-never fabricates ad copy), and owner-scoped screen deactivation.
+never fabricates ad copy), owner-scoped screen deactivation, and scan/
+sale revenue (`setScanPricing`/`recordScan`, `setSaleCommission`/
+`recordSale` — the 70/30 split on both, a scan drawing down the
+campaign's ad-spend budget the same as an impression, a sale's
+commission deliberately not drawing it down at all).
 
 Then live, against real running `v3`, `dreams`, and `vaco-analytics`
 instances: registered a real screen, signed up a real advertiser,

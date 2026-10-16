@@ -163,10 +163,10 @@ that genuinely batch through the real routing engine.
   VXLLAGE, the already-built social app, as the app half of that same
   two-sided "Village" brand — the exact parallel to The Vault
   (physical)/Vault Studios (app). No "Village" account exists in code
-  today, and none is invented here; the one concrete behavior it
-  implies — screens being platform-owned, not the unit owner's — is
-  already real via `VOID_PLATFORM_ACCOUNT_ID`. See `VOID_DROP.md`'s
-  naming note.
+  today, and none is invented here. Screen ownership is no longer the
+  one concrete behavior it implies either — see the next bullet; it
+  belongs to the renter now, not a platform account. See
+  `VOID_DROP.md`'s naming note.
 - **VOID DROP third-party marketplace listings, V4 natural-language
   discovery, and the HVNTZ/real-estate cross-app hooks** the founder's
   spec describes (§§11, 15, 17) — the asset model already separates
@@ -176,14 +176,26 @@ that genuinely batch through the real routing engine.
   booking for `dropRoom`/`dropHome`, branded "Vacay Villas").
 - **VOID DROP's real DREAMS screen registration.** `hasDreamsScreen`
   and the `registerDreamsScreenFn`/`deactivateDreamsScreenFn` hooks on
-  the deploy/retrieve steps are real and tested — always registered
-  to `VOID_PLATFORM_ACCOUNT_ID`, never the unit's own owner, regardless
-  of unit ownership type — but nothing wires a default implementation
-  in `server.js` — DREAMS' own
-  `POST /api/screens` requires the real screen owner's own Shield
-  session, with no service-credential path, so VOID cannot register a
-  screen server-to-server on an owner's behalf through that route as
-  it exists today. See `VOID_DROP.md`'s "DREAMS screens" section.
+  the deploy/retrieve steps are real and tested — registered to
+  `booking.customerId` (the current renter), never the unit's own
+  owner or a VOID platform account, regardless of unit ownership type
+  — but nothing wires a default implementation in `server.js` —
+  DREAMS' own `POST /api/screens` requires the real screen owner's own
+  Shield session, with no service-credential path, so VOID cannot
+  register a screen server-to-server on a renter's behalf through that
+  route as it exists today. See `VOID_DROP.md`'s "DREAMS screens"
+  section.
+- **DREAMS scan/sale revenue** (`dreams/lib/campaigns.js`:
+  `setScanPricing`/`recordScan`, `setSaleCommission`/`recordSale`) —
+  the real settlement half of "the renter will receive a small
+  percentage of scans and sales on the screens": a scan priced and
+  split the same 70/30 shape as an ad impression, and a sale
+  commissioned as a percentage of its own real value rather than
+  metered against ad-spend budget, both paid to whoever is registered
+  as `screenOwnerId` (the renter, via the bullet above). Tested in
+  `dreams/test/scanSale.test.js`. The hardware/attribution chain that
+  would actually call these from a real-world scan or sale is not
+  built — these are the money-settlement primitives, not the scanner.
 
 ## Decisions on the three questions `VOID_MASTER_FREEZE.md` raised
 

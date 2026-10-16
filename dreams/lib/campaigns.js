@@ -52,6 +52,8 @@ function createCampaign(store, options = {}) {
     budget: null,
     remainingBudget: null,
     incentive: null,
+    costPerScan: null,
+    saleCommissionRate: null,
     status: 'draft',
     createdAt: now,
     launchedAt: null,
@@ -173,6 +175,42 @@ function setIncentive(store, options = {}) {
     throw new Error('setIncentive: a coupon incentive requires a code');
   }
   campaign.incentive = { type, value, code };
+  return campaign;
+}
+
+// Real "pay per scan" opt-in -- per founder's own follow-up on VOID
+// DROP's screens: "we will run our ads... plus the renter's personal
+// ads, [and the renter] will receive a small percentage of scans and
+// sales on the screens." A scan is a stronger engagement signal than a
+// plain impression (someone actually acted on the ad), so it is priced
+// and set separately rather than folded into costPerImpression --
+// optional, same as the rest of a campaign's setup, and `recordScan`
+// below refuses to run until this is set.
+function setScanPricing(store, options = {}) {
+  const { campaignId, costPerScan } = options;
+  const campaign = requireDraft(store, campaignId, 'setScanPricing');
+  if (!Number.isFinite(costPerScan) || costPerScan <= 0) {
+    throw new Error('setScanPricing requires a positive costPerScan');
+  }
+  campaign.costPerScan = round(costPerScan);
+  return campaign;
+}
+
+// Real "pay a commission on a sale the screen drove" opt-in -- the
+// other half of the same founder instruction. Unlike an impression or
+// a scan, a sale has its own real dollar value, so this is priced as a
+// percentage of that value (a real referral-commission shape) rather
+// than a flat per-event cost. **Flagged interpretive**: no source doc
+// anywhere states an exact number for "a small percentage" -- callers
+// choose the rate; nothing here defaults or caps it beyond being a
+// genuine percentage.
+function setSaleCommission(store, options = {}) {
+  const { campaignId, saleCommissionRate } = options;
+  const campaign = requireDraft(store, campaignId, 'setSaleCommission');
+  if (!Number.isFinite(saleCommissionRate) || saleCommissionRate <= 0 || saleCommissionRate > 1) {
+    throw new Error('setSaleCommission requires a saleCommissionRate between 0 (exclusive) and 1 (inclusive)');
+  }
+  campaign.saleCommissionRate = saleCommissionRate;
   return campaign;
 }
 
@@ -298,6 +336,115 @@ async function recordImpression(store, options = {}) {
   return impression;
 }
 
+// Real per-screen scan event -- same shape as `recordImpression`
+// (same real settlement split, same budget-decrement-before-settle and
+// per-event-id idempotency fix, for the same reasons documented on that
+// function above), charged at the campaign's own `costPerScan` rather
+// than a caller-supplied figure, since a scan's price is something the
+// advertiser agreed to up front via `setScanPricing`, not something a
+// caller can set on the fly.
+async function recordScan(store, options = {}) {
+  const { campaignId, screenId, settleFn, now = Date.now() } = options;
+
+  const campaign = getCampaign(store, campaignId);
+  if (!campaign) throw new Error(`recordScan: no campaign with id ${campaignId}`);
+  if (campaign.status !== 'live') {
+    throw new Error(`recordScan: campaign ${campaignId} is "${campaign.status}", not "live"`);
+  }
+  if (!campaign.screenIds.includes(screenId)) {
+    throw new Error(`recordScan: screen ${screenId} is not selected for campaign ${campaignId}`);
+  }
+  if (!Number.isFinite(campaign.costPerScan) || campaign.costPerScan <= 0) {
+    throw new Error(`recordScan: campaign ${campaignId} has no costPerScan set -- call setScanPricing first`);
+  }
+  if (campaign.costPerScan > campaign.remainingBudget) {
+    throw new Error(`recordScan: costPerScan ${campaign.costPerScan} exceeds campaign ${campaignId}'s remaining budget ${campaign.remainingBudget}`);
+  }
+  if (typeof settleFn !== 'function') {
+    throw new Error('recordScan requires a settleFn(legs, meta)');
+  }
+
+  const screen = getScreen(store, screenId);
+  if (!screen) throw new Error(`recordScan: no screen with id ${screenId}`);
+
+  const screenOwnerPayout = round(campaign.costPerScan * SCREEN_OWNER_SHARE);
+  const platformFee = round(campaign.costPerScan - screenOwnerPayout);
+
+  const scanId = store.nextScanId++;
+  const remainingAfter = round(campaign.remainingBudget - campaign.costPerScan);
+  await settleOnce(campaign, { remainingBudget: remainingAfter }, async () => {
+    await settleFn([
+      { fromUserId: campaign.advertiserId, toUserId: screen.screenOwnerId, amount: screenOwnerPayout, reason: `dreams_scan:${campaignId}:${screenId}:${scanId}` },
+      { fromUserId: campaign.advertiserId, toUserId: DREAMS_PLATFORM_ACCOUNT, amount: platformFee, reason: `dreams_scan_platform_fee:${campaignId}:${screenId}:${scanId}` },
+    ], { reason: `dreams_scan:${campaignId}:${screenId}:${scanId}` });
+  });
+
+  if (campaign.remainingBudget <= 0) {
+    campaign.status = 'completed';
+  }
+
+  const scan = {
+    id: scanId, campaignId, screenId, advertiserId: campaign.advertiserId,
+    costPerScan: campaign.costPerScan, screenOwnerPayout, platformFee, recordedAt: now,
+  };
+  store.scans.push(scan);
+  return scan;
+}
+
+// Real per-screen sale event -- a confirmed, real-dollar conversion the
+// screen drove, commissioned as a percentage of the sale's own value
+// rather than metered against the campaign's ad-spend budget: a
+// performance payment on money the advertiser actually made is a
+// different thing from money they spend to be seen, and capping it at
+// an ad budget set before any sale happened would make no sense. Not
+// run through `settleOnce`/a capacity claim for the same reason --
+// there is no campaign-level capacity field a sale draws down; it
+// carries the same per-event-id idempotency-key shape `recordImpression`
+// and `recordScan` use, and inherits the same known limitation they
+// already carry: a genuine retry of the exact same real-world event is
+// not deduplicated, only overspend past a cap is guarded against.
+async function recordSale(store, options = {}) {
+  const { campaignId, screenId, saleAmount, settleFn, now = Date.now() } = options;
+
+  const campaign = getCampaign(store, campaignId);
+  if (!campaign) throw new Error(`recordSale: no campaign with id ${campaignId}`);
+  if (campaign.status !== 'live') {
+    throw new Error(`recordSale: campaign ${campaignId} is "${campaign.status}", not "live"`);
+  }
+  if (!campaign.screenIds.includes(screenId)) {
+    throw new Error(`recordSale: screen ${screenId} is not selected for campaign ${campaignId}`);
+  }
+  if (!Number.isFinite(campaign.saleCommissionRate) || campaign.saleCommissionRate <= 0) {
+    throw new Error(`recordSale: campaign ${campaignId} has no saleCommissionRate set -- call setSaleCommission first`);
+  }
+  if (!Number.isFinite(saleAmount) || saleAmount <= 0) {
+    throw new Error('recordSale requires a positive saleAmount');
+  }
+  if (typeof settleFn !== 'function') {
+    throw new Error('recordSale requires a settleFn(legs, meta)');
+  }
+
+  const screen = getScreen(store, screenId);
+  if (!screen) throw new Error(`recordSale: no screen with id ${screenId}`);
+
+  const commission = round(saleAmount * campaign.saleCommissionRate);
+  const screenOwnerPayout = round(commission * SCREEN_OWNER_SHARE);
+  const platformFee = round(commission - screenOwnerPayout);
+  const saleId = store.nextSaleId++;
+
+  await settleFn([
+    { fromUserId: campaign.advertiserId, toUserId: screen.screenOwnerId, amount: screenOwnerPayout, reason: `dreams_sale:${campaignId}:${screenId}:${saleId}` },
+    { fromUserId: campaign.advertiserId, toUserId: DREAMS_PLATFORM_ACCOUNT, amount: platformFee, reason: `dreams_sale_platform_fee:${campaignId}:${screenId}:${saleId}` },
+  ], { reason: `dreams_sale:${campaignId}:${screenId}:${saleId}` });
+
+  const sale = {
+    id: saleId, campaignId, screenId, advertiserId: campaign.advertiserId,
+    saleAmount: round(saleAmount), commission, screenOwnerPayout, platformFee, recordedAt: now,
+  };
+  store.sales.push(sale);
+  return sale;
+}
+
 module.exports = {
   CAMPAIGN_STATUSES,
   SCREEN_OWNER_SHARE,
@@ -313,4 +460,8 @@ module.exports = {
   setIncentive,
   launchCampaign,
   recordImpression,
+  setScanPricing,
+  setSaleCommission,
+  recordScan,
+  recordSale,
 };

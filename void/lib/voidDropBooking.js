@@ -40,15 +40,6 @@ const { canWorkVertical, getProvider } = require('./providerProfiles');
 const { getDropZone, isZoneAvailable } = require('./voidDropZones');
 const { haversineDistanceKm } = require('./geo');
 
-// Real, and reused verbatim from `marketplace.js`'s own platform-fee
-// recipient id -- the same one account every vertical's take rate
-// already settles to. DREAMS screens on a Drop unit are never the
-// asset owner's, even when the unit itself is third-party/business/
-// investor-owned (founder's own words: "those will be our screens...
-// where other people are paying us to advertise" -- the billboard-
-// company shape: VOID owns and sells the ad placement regardless of
-// who owns the structure it is mounted on).
-const VOID_PLATFORM_ACCOUNT_ID = 'void-platform';
 
 const LOCATION_TYPES = [
   'residential-driveway', 'residential-yard', 'commercial-parking-lot', 'commercial-property',
@@ -420,6 +411,26 @@ function dispatchDelivery(store, options = {}) {
 // (`asset.hasDreamsScreen`) and only once per deployment (skipped if
 // `asset.dreamsScreenId` is already set, e.g. a redeploy after the
 // screen was somehow never cleared).
+//
+// **`screenOwnerId` is the current renter (`booking.customerId`), not
+// VOID's own platform account.** Founder's own correction: "those
+// screens that are connected to the void operation ... will just be
+// connected to whatever business is out there ... it's just like
+// having an apartment complex with screens in it that we created --
+// those screens are attached to that apartment complex, but are also
+// still part of the Dreams network." The renter's own ads run
+// alongside DREAMS' advertiser ads on the screen while it's deployed
+// to them, and DREAMS' real `screenOwnerId` field is already both the
+// payout recipient (70% of ad-impression revenue, plus scan/sale
+// revenue via `setScanPricing`/`setSaleCommission`) and the
+// deactivation authority -- registering the renter as that id is what
+// makes "the renter receives a small percentage of scans and sales on
+// the screens" real, using DREAMS' own existing payout mechanism
+// rather than a second one. A fresh screen is registered per
+// deployment (the asset's own `dreamsScreenId` is cleared on
+// retrieval -- see `dispatchRetrieval` below), so each new renter
+// genuinely becomes the owner of record for their own deployment, not
+// a one-time assignment that outlives them.
 async function markArrivedAndDeploying(store, options = {}) {
   const { bookingId, registerDreamsScreenFn = null, now = Date.now() } = options;
   const booking = requireBookingInStatus(store, bookingId, 'in-transit', 'markArrivedAndDeploying');
@@ -432,7 +443,7 @@ async function markArrivedAndDeploying(store, options = {}) {
     try {
       const category = getDropCategory(asset.category);
       const screen = await registerDreamsScreenFn({
-        screenOwnerId: VOID_PLATFORM_ACCOUNT_ID,
+        screenOwnerId: booking.customerId,
         locationName: `VOID DROP ${category.label} — booking #${booking.id}`,
         locationAddress: booking.siteAddress || `${booking.deliveryLat}, ${booking.deliveryLng}`,
       });
@@ -600,7 +611,6 @@ module.exports = {
   DELIVERY_FEE_PER_KM,
   SETUP_FEE_FLAT,
   DEFAULT_MAX_DELIVERY_KM,
-  VOID_PLATFORM_ACCOUNT_ID,
   requireApprovedDropDriver,
   assessEligibility,
   computeDropPrice,
