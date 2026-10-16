@@ -197,3 +197,96 @@ test('an unrelated message does not trigger the balance path', async () => {
   assert.equal(reply.content, 'a real reply about marathon training');
   assert.equal(invokeFn.calls.length, 1);
 });
+
+test('a VXLLAGE question is answered with a real cross-app read, never routed to VACON', async () => {
+  const store = createVacoAssistantStore();
+  const insightFn = recordingInsight({ matchedAgents: [{ agentId: 'anderson' }], completion: { text: 'generic answer' }, completionError: null });
+  const invokeFn = recordingInvoke('should not be called');
+  const profileFn = async (userId) => {
+    assert.equal(userId, 'u1');
+    return {
+      vxllage: { ok: true, articleCount: 4, subscriberCount: 12 },
+      voken: { ok: true, referralCount: 0 },
+      vago: { ok: true, entryCount: 0 },
+    };
+  };
+
+  const reply = await sendMessage(store, { userId: 'u1', content: 'how is my VXLLAGE doing', insightFn, invokeFn, profileFn });
+
+  assert.equal(reply.content, 'On VXLLAGE you have 4 posts and 12 subscribers.');
+  assert.equal(reply.routedTo, 'explore');
+  assert.equal(insightFn.calls.length, 0, 'a VXLLAGE question must never reach VACON');
+  assert.equal(invokeFn.calls.length, 0);
+});
+
+test('mentioning more than one app in one message answers every one of them', async () => {
+  const store = createVacoAssistantStore();
+  const insightFn = recordingInsight({ matchedAgents: [], completion: null, completionError: null });
+  const invokeFn = recordingInvoke('should not be called');
+  const profileFn = async () => ({
+    vxllage: { ok: true, articleCount: 1, subscriberCount: 2 },
+    voken: { ok: true, referralCount: 5 },
+    vago: { ok: true, entryCount: 0 },
+  });
+
+  const reply = await sendMessage(store, { userId: 'u1', content: 'how are my VXLLAGE and VOKEN doing', insightFn, invokeFn, profileFn });
+
+  assert.match(reply.content, /VXLLAGE you have 1 posts and 2 subscribers/);
+  assert.match(reply.content, /VOKEN you have 5 referrals/);
+  assert.equal(invokeFn.calls.length, 0);
+});
+
+test('a down VXLLAGE surfaces the real error rather than guessing', async () => {
+  const store = createVacoAssistantStore();
+  const insightFn = recordingInsight({ matchedAgents: [], completion: null, completionError: null });
+  const invokeFn = recordingInvoke('should not be called');
+  const profileFn = async () => ({
+    vxllage: { ok: false, error: 'unreachable: ECONNREFUSED' },
+  });
+
+  const reply = await sendMessage(store, { userId: 'u1', content: 'what about vxllage', insightFn, invokeFn, profileFn });
+
+  assert.match(reply.content, /couldn't check your real VXLLAGE data.*ECONNREFUSED/);
+});
+
+test('a recent-activity question is answered with the real V3 settlement log', async () => {
+  const store = createVacoAssistantStore();
+  const insightFn = recordingInsight({ matchedAgents: [], completion: null, completionError: null });
+  const invokeFn = recordingInvoke('should not be called');
+  const activityFn = async (userId) => {
+    assert.equal(userId, 'u1');
+    return { ok: true, items: [{ direction: 'in', counterparty: 'u2', amount: 25, reason: 'referral payout' }] };
+  };
+
+  const reply = await sendMessage(store, { userId: 'u1', content: 'show me my recent activity', insightFn, invokeFn, activityFn });
+
+  assert.equal(reply.content, 'Your most recent real activity: +25 from u2 (referral payout).');
+  assert.equal(reply.routedTo, 'explore');
+  assert.equal(invokeFn.calls.length, 0);
+});
+
+test('an empty real activity feed is reported honestly, not fabricated', async () => {
+  const store = createVacoAssistantStore();
+  const insightFn = recordingInsight({ matchedAgents: [], completion: null, completionError: null });
+  const invokeFn = recordingInvoke('should not be called');
+  const activityFn = async () => ({ ok: true, items: [] });
+
+  const reply = await sendMessage(store, { userId: 'u1', content: 'what have i been up to', insightFn, invokeFn, activityFn });
+
+  assert.equal(reply.content, "There's nothing in your real recent activity yet.");
+});
+
+test('an unrelated message does not trigger the explore or activity paths', async () => {
+  const store = createVacoAssistantStore();
+  const insightFn = recordingInsight({ matchedAgents: [], completion: null, completionError: null });
+  const invokeFn = recordingInvoke('a real reply about marathon training');
+  const profileFn = async () => { throw new Error('must not be called'); };
+  const activityFn = async () => { throw new Error('must not be called'); };
+
+  const reply = await sendMessage(store, {
+    userId: 'u1', content: 'how many miles should I run today', insightFn, invokeFn, profileFn, activityFn,
+  });
+
+  assert.equal(reply.content, 'a real reply about marathon training');
+  assert.equal(invokeFn.calls.length, 1);
+});

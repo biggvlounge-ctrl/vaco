@@ -38,6 +38,7 @@
 // this ecosystem already holds.
 
 const { getInsightCard } = require('./insight');
+const { getProfileSummary, getRecentActivity } = require('./explore');
 
 const V4_PROXY_URL = process.env.V4_PROXY_URL || 'http://localhost:8787';
 const V3_API_URL = process.env.V3_API_URL || 'http://localhost:8811';
@@ -58,6 +59,47 @@ async function lookupBalance(userId) {
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.error || `V3 balance lookup failed (${res.status})`);
   return body.balance;
+}
+
+// The same real cross-app reads vaco-shell's own Explore tab pulls
+// ("your VACO" -- VXLLAGE posts/subscribers, VOKEN referrals, VAGO
+// entries, V3's own settlement log), answered through chat instead of
+// only through a dashboard tile. Same reasoning as BALANCE_INTENT: no
+// VACON specialist has real access to another app's data either, so
+// this is checked before VACON routing, not handed to it. App names
+// are distinctive enough brand terms that a false match costs nothing
+// (the real number is still correct) and a false non-match just falls
+// through to normal routing.
+const EXPLORE_APPS = {
+  vxllage: {
+    pattern: /\bvxllage\b/i,
+    describe: (p) => (p.vxllage.ok
+      ? `On VXLLAGE you have ${p.vxllage.articleCount} posts and ${p.vxllage.subscriberCount} subscribers.`
+      : `I couldn't check your real VXLLAGE data just now: ${p.vxllage.error}`),
+  },
+  voken: {
+    pattern: /\bvoken\b/i,
+    describe: (p) => (p.voken.ok
+      ? `On VOKEN you have ${p.voken.referralCount} referrals.`
+      : `I couldn't check your real VOKEN data just now: ${p.voken.error}`),
+  },
+  vago: {
+    pattern: /\bvago\b/i,
+    describe: (p) => (p.vago.ok
+      ? `On VAGO you have ${p.vago.entryCount} fantasy entries.`
+      : `I couldn't check your real VAGO data just now: ${p.vago.error}`),
+  },
+};
+const ACTIVITY_INTENT = /\b(recent activity|my activity|my transactions|what (have i|i'?ve) been up to)\b/i;
+
+function describeActivity(activity) {
+  if (!activity.ok) return `I couldn't check your real recent activity just now: ${activity.error}`;
+  if (!activity.items.length) return "There's nothing in your real recent activity yet.";
+  const lines = activity.items.slice(0, 5).map((item) => {
+    const side = item.direction === 'in' ? `+${item.amount} from ${item.counterparty}` : `-${item.amount} to ${item.counterparty}`;
+    return item.reason ? `${side} (${item.reason})` : side;
+  });
+  return `Your most recent real activity: ${lines.join('; ')}.`;
 }
 
 // Same per-file service-credential pattern every cross-app caller in
@@ -171,6 +213,7 @@ async function invokeV4Direct(systemPrompt, messages) {
 async function sendMessage(store, options = {}) {
   const {
     userId, content, insightFn = getInsightCard, invokeFn = invokeV4Direct, balanceFn = lookupBalance,
+    profileFn = getProfileSummary, activityFn = getRecentActivity,
   } = options;
   if (!userId) throw new Error('sendMessage requires a userId');
   if (!content || !content.trim()) throw new Error('sendMessage requires content');
@@ -194,6 +237,25 @@ async function sendMessage(store, options = {}) {
     }
     return recordMessage(store, {
       userId, role: 'assistant', content: `You have ${balance} VCoin right now.`, routedTo: 'wallet',
+    });
+  }
+
+  // Same real-data-over-routing posture as the balance check above,
+  // for the rest of "your VACO": a mentioned app name gets a real
+  // cross-app read instead of a generic completion that has no actual
+  // access to VXLLAGE/VOKEN/VAGO. More than one app name in one
+  // message gets every real answer it asked for, not just the first.
+  const matchedApps = Object.entries(EXPLORE_APPS).filter(([, app]) => app.pattern.test(content));
+  if (matchedApps.length > 0) {
+    const profile = await profileFn(userId);
+    const reply = matchedApps.map(([, app]) => app.describe(profile)).join(' ');
+    return recordMessage(store, { userId, role: 'assistant', content: reply, routedTo: 'explore' });
+  }
+
+  if (ACTIVITY_INTENT.test(content)) {
+    const activity = await activityFn(userId);
+    return recordMessage(store, {
+      userId, role: 'assistant', content: describeActivity(activity), routedTo: 'explore',
     });
   }
 
