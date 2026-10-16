@@ -20,7 +20,7 @@ const {
   createDropBooking, getDropBooking,
   approveDropBooking, rejectDropBooking, scheduleDelivery, dispatchDelivery, markArrivedAndDeploying,
   startRental, scheduleRetrieval, dispatchRetrieval, markReturnedForInspection, recordInspectionResult,
-  completeCleaningAndClose, cancelDropBooking,
+  completeCleaningAndClose, cancelDropBooking, VOID_PLATFORM_ACCOUNT_ID,
 } = require('../lib/voidDropBooking');
 const { getJob } = require('../lib/marketplace');
 const { registerStation } = require('../lib/stations');
@@ -306,7 +306,7 @@ test('the full select -> book -> deliver -> deploy -> use -> retrieve -> redeplo
   assert.equal(getDropAsset(store, asset.id).status, 'deploying');
   assert.equal(getDropAsset(store, asset.id).lat, 38.63);
   assert.equal(getDropAsset(store, asset.id).dreamsScreenId, 777, 'a real screen must be registered for a unit that carries one');
-  assert.equal(registeredScreen.screenOwnerId, asset.ownerId);
+  assert.equal(registeredScreen.screenOwnerId, VOID_PLATFORM_ACCOUNT_ID, 'the screen belongs to VOID, not whoever owns the physical unit it rides on');
   assert.equal(registeredScreen.locationAddress, '123 Main St, driveway on the left');
 
   startRental(store, { bookingId: booking.id, now: NOW });
@@ -407,7 +407,31 @@ test('a unit with no DREAMS screen never calls the registration function', async
   await markArrivedAndDeploying(store, { bookingId: booking.id, registerDreamsScreenFn, now: NOW });
 });
 
-// -- nearby search: VACAY's "Drop Hotel" surface calls this ---------------
+test('a screen on a third-party-owned unit still registers as VOID\'s own, not the owner\'s', async () => {
+  // Founder's own words: "those won't have necessarily a direct touch
+  // to a Hunt's business ... those will be our screens." The asset's
+  // owner is a real third party here precisely to prove the screen
+  // does not inherit that ownership.
+  const store = createVoidStore();
+  const asset = registerDropAsset(store, {
+    category: 'dropShop', sizeDescription: '20ft retail unit', weightKg: 4000, dailyRate: 100,
+    ownerId: 'hvntz-business-42', ownerType: 'business', hasDreamsScreen: true,
+    homeLat: 38.627, homeLng: -90.1994,
+  });
+  const booking = createDropBooking(store, eligibleBookingArgs(store, asset, { category: 'dropShop' }));
+  approveDropBooking(store, { bookingId: booking.id, now: NOW });
+  scheduleDelivery(store, { bookingId: booking.id, deliveryWindowStart: NOW, deliveryWindowEnd: NOW + 3600000 });
+  dispatchDelivery(store, { bookingId: booking.id, now: NOW });
+
+  let registered = null;
+  const registerDreamsScreenFn = async (payload) => { registered = payload; return { screenId: 42 }; };
+  await markArrivedAndDeploying(store, { bookingId: booking.id, registerDreamsScreenFn, now: NOW });
+
+  assert.equal(registered.screenOwnerId, VOID_PLATFORM_ACCOUNT_ID);
+  assert.notEqual(registered.screenOwnerId, asset.ownerId);
+});
+
+// -- nearby search: VACAY's "Vacay Villas" surface calls this -------------
 
 test('listAvailableDropAssetsNear returns only bookable, available, in-radius assets, nearest first', () => {
   const store = createVoidStore();

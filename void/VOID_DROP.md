@@ -42,7 +42,7 @@ real branded name is "DROP POP SHOP" — the category id stayed
 `dropShop`, only the label changed. DROP BATH — mobile luxury
 bathroom — is the 15th, added the same way.)
 
-A sauna/jacuzzi combo, a sauna inside a Drop Hotel, a pool alongside
+A sauna/jacuzzi combo, a sauna inside a Vacay Villa, a pool alongside
 one — none of these needed a new category. `amenities` on the asset
 is a free list; "this specific DROP SAUNA unit also has a hot tub" is
 just two entries in it, not a `dropSaunaSpa` category. DROP OFFICE
@@ -119,32 +119,59 @@ on an asset, and `registerDreamsScreenFn`/`deactivateDreamsScreenFn` —
 **injected, optional, fail-soft** parameters on
 `markArrivedAndDeploying`/`dispatchRetrieval` — are the real hook.
 
-**Why no default implementation is wired into `server.js`.** DREAMS'
-own `POST /api/screens` requires the real screen owner's own Shield
-session (`requireActor('screenOwnerId')`) — confirmed directly against
-`dreams/server.js`, not assumed — with no service-credential path at
-all. VOID cannot register a screen server-to-server on an owner's
-behalf through that route as it exists today. The hook is real, fully
-tested (`test/voidDrop.test.js`), and ready for whatever real flow
-eventually lets an owner authorize this once (most likely: the owner
-registers their own screen directly with DREAMS and tells VOID the
-resulting `screenId`) — nothing here pretends that flow already exists.
+**The screen is always VOID's, never the unit owner's.** A real
+follow-up correction: "those won't have necessarily a direct touch to
+a Hunt's business ... those will be our screens ... where other
+people are paying us to advertise." `registerDreamsScreenFn` is now
+called with `screenOwnerId: VOID_PLATFORM_ACCOUNT_ID` (the same
+`'void-platform'` account every vertical's take rate already settles
+to) regardless of whether the asset itself is VOID-owned or a real
+third-party/business/investor unit — the billboard-company shape: VOID
+owns and sells the ad placement, independent of who owns the structure
+it rides on. A unit rented out carries VOID's own ad network, which
+could be advertising VOID's own other apps or any real paying
+advertiser — the same real DREAMS marketplace model already built,
+not a second one. Tested directly, including on a third-party-owned
+unit specifically to prove the screen does not inherit that ownership.
 
-## VACAY: "Drop Hotel"
+**Why no default registration implementation is wired into
+`server.js`.** DREAMS' own `POST /api/screens` requires the real
+screen owner's own Shield session (`requireActor('screenOwnerId')`) —
+confirmed directly against `dreams/server.js`, not assumed — with no
+service-credential path at all. VOID cannot register a screen
+server-to-server through that route as it exists today, even on its
+own platform account's behalf. The hook is real, fully tested
+(`test/voidDrop.test.js`), and ready for whatever real flow eventually
+authorizes this — nothing here pretends that flow already exists.
+
+## VACAY: "Vacay Villas"
 
 A visitor in town who does not want a hotel but wants to stay close —
-the real use case named directly. `vacay/lib/bookings/dropStays.js` +
-two routes (`GET /api/bookings/drop-stays/search`,
-`POST /api/bookings/drop-stays`) let a VACAY guest search real
-`dropRoom`/`dropHome` units near a location/date range (VOID's own
-`GET /api/drop/assets/nearby`) and book one, with the guest's real
-session forwarded straight through to VOID's own booking endpoint.
-VACAY tracks no drop-booking state of its own — VOID stays the one
-real system of record, the same "read/write-through, not a second
-system" posture `voidServices.js` already held for VOID job requests.
-Searching with no category means both `dropRoom` and `dropHome`,
-merged by real distance, since VOID has no single "Drop Hotel"
-category.
+the real use case named directly. VACAY is the hospitality company;
+"Vacay Villas" is the real branded name for these container-built
+stays (a real correction — not "Drop Hotel").
+`vacay/lib/bookings/dropStays.js` + two routes
+(`GET /api/bookings/drop-stays/search`, `POST /api/bookings/drop-stays`)
+let a VACAY guest search real `dropRoom`/`dropHome` units near a
+location/date range (VOID's own `GET /api/drop/assets/nearby`) and
+book one, with the guest's real session forwarded straight through to
+VOID's own booking endpoint. VACAY tracks no drop-booking state of its
+own — VOID stays the one real system of record, the same
+"read/write-through, not a second system" posture `voidServices.js`
+already held for VOID job requests. Searching with no category means
+both `dropRoom` and `dropHome`, merged by real distance, since VOID
+has no single "Vacay Villas" category.
+
+**A naming note, not a built module.** The founder distinguishes
+VACAY (the hospitality company booking these stays) from "Village" —
+described as the real-estate-plus-DREAMS-screen network spanning
+commercial, residential, and these container properties. No such
+entity exists in this codebase today (confirmed: distinct from
+VXLLAGE, the unrelated social app) and nothing here builds one — the
+one concrete consequence already real above is that a Drop unit's
+screen is VOID-platform-owned, independent of the unit's own owner,
+which is the behavior "Village" describes regardless of what formally
+holds that account later.
 
 ## Three decisions that needed to be made, stated honestly
 
@@ -189,7 +216,7 @@ not a gap discovered later, a scope line drawn now:
 - V4 natural-language discovery ("I need a space for 30 people
   Saturday").
 - The HVNTZ and real-estate cross-app hooks the spec describes
-  (§§15, 17) — VACAY's own "Drop Hotel" hook is now built; see above.
+  (§§15, 17) — VACAY's own "Vacay Villas" hook is now built; see above.
 - A real DREAMS screen registration flow (the hook exists; see "DREAMS
   screens" above for exactly what's missing and why).
 - DROP ZONES (clustering several units at one property).

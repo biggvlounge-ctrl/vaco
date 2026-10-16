@@ -159,11 +159,13 @@ that genuinely batch through the real routing engine.
   `ownerId`/`ownerType` from `operatorId` so third-party ownership is
   not a later rewrite, but nothing calls into those apps yet. **VACAY
   is now wired** (`vacay/lib/bookings/dropStays.js` — real search +
-  booking for `dropRoom`/`dropHome`, "Drop Hotel").
+  booking for `dropRoom`/`dropHome`, branded "Vacay Villas").
 - **VOID DROP's real DREAMS screen registration.** `hasDreamsScreen`
   and the `registerDreamsScreenFn`/`deactivateDreamsScreenFn` hooks on
-  the deploy/retrieve steps are real and tested, but nothing wires a
-  default implementation in `server.js` — DREAMS' own
+  the deploy/retrieve steps are real and tested — always registered
+  to `VOID_PLATFORM_ACCOUNT_ID`, never the unit's own owner, regardless
+  of unit ownership type — but nothing wires a default implementation
+  in `server.js` — DREAMS' own
   `POST /api/screens` requires the real screen owner's own Shield
   session, with no service-credential path, so VOID cannot register a
   screen server-to-server on an owner's behalf through that route as

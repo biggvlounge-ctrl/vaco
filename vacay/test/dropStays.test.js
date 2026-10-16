@@ -1,5 +1,5 @@
 // VACAY -- Drop Stays. The one real decision this module makes:
-// VOID has no single "Drop Hotel" category, it has two real ones
+// VOID has no single "Vacay Villas" category, it has two real ones
 // (dropRoom, dropHome) -- searching with neither named must search
 // both and merge by real distance, not silently return only whichever
 // one happened to be passed.

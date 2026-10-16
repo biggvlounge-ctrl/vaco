@@ -1455,7 +1455,7 @@ app.get('/api/drop/assets', (req, res) => {
 
 // "Is there any drop in that location, and where could it be dropped
 // without a problem" -- the founder's own words. The real cross-app
-// read VACAY's own "Drop Hotel" search calls (see
+// read VACAY's own "Vacay Villas" search calls (see
 // vacay/lib/bookings/dropStays.js): a location, a date range, an
 // optional category, back comes every real bookable unit within
 // delivery range with a real quote already attached. A plain catalog

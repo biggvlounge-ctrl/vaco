@@ -85,11 +85,13 @@ const DROP_CATEGORIES = {
     uses: ['gaming', 'esports', 'parties', 'events', 'brand activation'],
     supportedRentalModels: ['hourly', 'daily', 'weekend', 'event-deployment', 'business-deployment'],
   },
-  // Branded "Drop Hotel" when surfaced on VACAY (see
-  // vacay/lib/bookings/dropStays.js) -- the real use case named
-  // directly: a visitor in town who does not want to stay at a hotel
-  // but wants to stay close, so the room comes to the host's own
-  // driveway/yard instead.
+  // Branded "Vacay Villas" when surfaced on VACAY (see
+  // vacay/lib/bookings/dropStays.js), alongside dropHome below --
+  // VACAY is the hospitality company; "Villas" is the real name for
+  // these container-built stays, not "Drop Hotel." The real use case
+  // named directly: a visitor in town who does not want to stay at a
+  // hotel but wants to stay close, so the room comes to the host's
+  // own driveway/yard instead.
   dropRoom: {
     label: 'DROP ROOM', description: 'Mobile guest accommodation.',
     uses: ['guest room', 'temporary lodging', 'resort expansion', 'event lodging', 'workforce lodging', 'property overflow', 'visiting guest near a host\'s home'],

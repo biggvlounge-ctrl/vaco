@@ -39,6 +39,16 @@ const {
 const { canWorkVertical, getProvider } = require('./providerProfiles');
 const { haversineDistanceKm } = require('./geo');
 
+// Real, and reused verbatim from `marketplace.js`'s own platform-fee
+// recipient id -- the same one account every vertical's take rate
+// already settles to. DREAMS screens on a Drop unit are never the
+// asset owner's, even when the unit itself is third-party/business/
+// investor-owned (founder's own words: "those will be our screens...
+// where other people are paying us to advertise" -- the billboard-
+// company shape: VOID owns and sells the ad placement regardless of
+// who owns the structure it is mounted on).
+const VOID_PLATFORM_ACCOUNT_ID = 'void-platform';
+
 const LOCATION_TYPES = [
   'residential-driveway', 'residential-yard', 'commercial-parking-lot', 'commercial-property',
   'vacant-lot', 'event-venue', 'construction-site', 'resort', 'campground', 'festival',
@@ -172,7 +182,7 @@ function computeDropPrice(store, options = {}) {
   };
 }
 
-// The real-location search VACAY's own "Drop Hotel" surface calls
+// The real-location search VACAY's own "Vacay Villas" surface calls
 // (and anything else wanting "what could actually be dropped near
 // me"): every bookable asset, filtered by category and real date
 // availability, within a real delivery radius of the requested point,
@@ -393,7 +403,7 @@ async function markArrivedAndDeploying(store, options = {}) {
     try {
       const category = getDropCategory(asset.category);
       const screen = await registerDreamsScreenFn({
-        screenOwnerId: asset.ownerId,
+        screenOwnerId: VOID_PLATFORM_ACCOUNT_ID,
         locationName: `VOID DROP ${category.label} — booking #${booking.id}`,
         locationAddress: booking.siteAddress || `${booking.deliveryLat}, ${booking.deliveryLng}`,
       });
@@ -561,6 +571,7 @@ module.exports = {
   DELIVERY_FEE_PER_KM,
   SETUP_FEE_FLAT,
   DEFAULT_MAX_DELIVERY_KM,
+  VOID_PLATFORM_ACCOUNT_ID,
   requireApprovedDropDriver,
   assessEligibility,
   computeDropPrice,

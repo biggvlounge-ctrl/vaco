@@ -90,10 +90,10 @@ curl http://localhost:8803/api/flights/meta
   `voidServices.js` (real cross-app VOID transportation/cleaning job
   requests), `voidHourly.js` (real VOID Hourly sightseeing
   integration, with its own honestly-flagged `driverId` limitation),
-  `dropStays.js` (VOID DROP's "Drop Hotel" — real `dropRoom`/`dropHome`
+  `dropStays.js` (VOID DROP's "Vacay Villas" — real `dropRoom`/`dropHome`
   units searched by real location/dates through VOID's own
   `/api/drop/assets/nearby`; searching with no category means both,
-  merged by real distance, since VOID has no single "Drop Hotel"
+  merged by real distance, since VOID has no single "Vacay Villas"
   category. `POST /api/bookings/drop-stays` forwards the guest's real
   session straight through to VOID's own booking endpoint — VACAY
   tracks no drop-booking state of its own; VOID stays the one real

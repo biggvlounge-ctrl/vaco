@@ -423,24 +423,29 @@ tie to a real Hub/Port station (`homeStationId`); delivery/retrieval
 can be run by a real, approved (verified-skill) VOID driver, paid
 their own real per-leg fee out of the asset operator's proceeds; a
 unit can carry a real DREAMS screen flag, registered/deactivated
-through an injected, fail-soft hook. **Decisions worth knowing before
-touching this**: eligibility never auto-approves (no real zoning/permit
-data source exists anywhere in this ecosystem — a real human/operator
-call always finalizes it, recorded in vaco-audit first); payment
-settles once, at `completeCleaningAndClose`, not at booking time (the
-spec's own flow shows it earlier, which would mean charging before the
-unit moves — a real deposit/refund product decision not invented
-here); delivery pricing is real Haversine distance for *both* real
-legs (delivery and retrieval, each priced — an earlier version only
-charged the outbound one) when both endpoints are known, honestly `0`
-when they are not; DREAMS screen registration has no default
-server-to-server implementation because DREAMS' own `/api/screens`
-requires the real owner's own session, not a service credential. **Now
-wired to VACAY** (`vacay/lib/bookings/dropStays.js`) — real "Drop
-Hotel" search/booking for `dropRoom`/`dropHome`. **Deliberately not
-built**: third-party marketplace listings (the owner/operator split
-already supports it), V4 discovery, the HVNTZ/real-estate hooks, DROP
-ZONES, rent-to-own/revenue-share billing. See `VOID_DROP.md`.
+through an injected, fail-soft hook — always to VOID's own platform
+account (`VOID_PLATFORM_ACCOUNT_ID`), never the unit owner's, since
+these are VOID's own ad placements riding on whatever structure they
+happen to be mounted on, not the unit owner's. **Decisions worth
+knowing before touching this**: eligibility never auto-approves (no
+real zoning/permit data source exists anywhere in this ecosystem — a
+real human/operator call always finalizes it, recorded in vaco-audit
+first); payment settles once, at `completeCleaningAndClose`, not at
+booking time (the spec's own flow shows it earlier, which would mean
+charging before the unit moves — a real deposit/refund product
+decision not invented here); delivery pricing is real Haversine
+distance for *both* real legs (delivery and retrieval, each priced —
+an earlier version only charged the outbound one) when both endpoints
+are known, honestly `0` when they are not; DREAMS screen registration
+has no default server-to-server implementation because DREAMS' own
+`/api/screens` requires the real owner's own session, not a service
+credential. **Now wired to VACAY** (`vacay/lib/bookings/dropStays.js`)
+— real "Vacay Villas" search/booking for `dropRoom`/`dropHome` (VACAY
+is the hospitality company; "Villas" is the real branded name, not
+"Drop Hotel"). **Deliberately not built**: third-party marketplace
+listings (the owner/operator split already supports it), V4 discovery,
+the HVNTZ/real-estate hooks, DROP ZONES, rent-to-own/revenue-share
+billing. See `VOID_DROP.md`.
 
 **Real seed data** (`lib/seedDemoData.js`, `SEED_DEMO_DATA_REQUIREMENT.md`):
 two real St. Louis Port Stations, two gig drivers, and four real

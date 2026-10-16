@@ -1,16 +1,18 @@
-// VACAY -- Drop Stays: VOID DROP's "Drop Hotel" (dropRoom/dropHome)
-// units, searchable from inside VACAY the same way a regular stay is.
-// Real cross-app READ into VOID's own real asset/booking system
-// (void/lib/voidDropBooking.js's `listAvailableDropAssetsNear`) --
-// not a second, parallel inventory. VACAY tracks nothing of its own
-// here; VOID stays the one real system of record. Same shape
-// `voidServices.js` already takes for its own VOID job requests: an
-// injected function does the real network call, this module holds the
-// one real decision around it.
+// VACAY -- Drop Stays, branded "Vacay Villas": VOID DROP's
+// dropRoom/dropHome units, searchable from inside VACAY the same way
+// a regular stay is. VACAY is the hospitality company; "Villas" is
+// the real name for these container-built stays (founder's own
+// correction -- not "Drop Hotel"). Real cross-app READ into VOID's
+// own real asset/booking system (void/lib/voidDropBooking.js's
+// `listAvailableDropAssetsNear`) -- not a second, parallel inventory.
+// VACAY tracks nothing of its own here; VOID stays the one real
+// system of record. Same shape `voidServices.js` already takes for
+// its own VOID job requests: an injected function does the real
+// network call, this module holds the one real decision around it.
 //
-// **The one real decision**: VOID has no single "Drop Hotel" category
-// -- it has two real ones, `dropRoom` and `dropHome` (spec: "the
-// drop homes, the drop hotel to a location"). Searching with no
+// **The one real decision**: VOID has no single "Vacay Villas"
+// category -- it has two real ones, `dropRoom` and `dropHome` (spec:
+// "the drop homes, the drop hotel to a location"). Searching with no
 // category means both, merged and sorted by real distance, not just
 // whichever VOID happened to answer first.
 

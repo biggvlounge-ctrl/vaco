@@ -183,10 +183,10 @@ function createBookingsRouter(deps) {
     res.json(request);
   });
 
-  // -- Drop Stays: VOID DROP's "Drop Hotel" (dropRoom/dropHome units
-  // delivered to a real driveway/yard, searched the same way a
-  // regular stay is) -- a read-through and write-through into VOID's
-  // own real asset/booking system, not a second one. See
+  // -- Drop Stays, branded "Vacay Villas": VOID DROP's dropRoom/
+  // dropHome units delivered to a real driveway/yard, searched the
+  // same way a regular stay is -- a read-through and write-through
+  // into VOID's own real asset/booking system, not a second one. See
   // lib/bookings/dropStays.js's own header.
 
   router.get('/drop-stays/search', async (req, res) => {
