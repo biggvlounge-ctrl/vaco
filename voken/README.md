@@ -95,6 +95,14 @@ curl -X POST http://localhost:8794/api/card/1/value-score -H "Content-Type: appl
 }'
 # authenticityGrade is no longer read from this request -- it's fetched
 # live from VACA (../vaca/, localhost:8804). Needs VACA running too.
+
+# An operator-minted external-entity card (a World Layer landmark, no
+# single real owner to verify) -- needs a real X-Operator-Credential
+# for the voken:mint-external-card scope in production; VACO_OPERATOR_
+# MODE=off bypasses that for local testing, as here.
+curl -X POST http://localhost:8794/api/card/external -H "Content-Type: application/json" \
+  -H "X-Operator-Credential: <a real operator credential>" \
+  -d '{"sourceApp":"world-layer","sourceType":"location","externalRef":"WL-LOC-0001","category":"landmarks","rarityTier":"legendary","tokenizationType":"digital","formats":["digital"],"plannedDigitalMintCount":500,"reason":"UNESCO landmark curation"}'
 ```
 
 ## What's here
@@ -108,6 +116,27 @@ curl -X POST http://localhost:8794/api/card/1/value-score -H "Content-Type: appl
   and the subject's guaranteed first mint, performed atomically for
   both digital and physical formats in the same call.
   `mintAdditionalEdition()` enforces the real mint cap per format.
+  **`mintExternalEntityCard()` is the other mint path**, for a card
+  about something that is not a person — a World Layer `location` or
+  a Vavlt Stvdios `casino-event` (`landmarks`/`eventMoments` already
+  existed as real categories; no new ones needed). The subject-gets-
+  card-1 guarantee has no person to apply to here, so `mintedByRole`
+  decides what the mint actually guarantees instead:
+  `server.js`'s `POST /api/card/external` verifies a real `'owner'`
+  (a Vavlt Stvdios casino event's real `hostId`, checked live against
+  `GET /api/casino-events/:id` — never merely claimed) and gives them
+  the same guaranteed-first-copy treatment a person subject gets, or
+  falls back to a real `'operator'` credential
+  (`voken:mint-external-card`, recorded in vaco-audit first) for a
+  subject with no verifiable single owner at all — a World Layer
+  location's `ownershipData` is always `null` there (VACON-C, not
+  World Layer, would generate it), and World Layer itself exposes no
+  HTTP API to check against in the first place. **An operator-minted
+  card deliberately mints no guaranteed edition to anyone, including
+  the operator themselves** — curating a card into existence is not
+  the same act as owning what it depicts, and the alternative would
+  make minting-on-behalf-of a way to self-enrich. See
+  `test/externalEntityCard.test.js`.
 - `lib/valueAlgorithm.js` — **the real, hybrid Value Algorithm (Phase
   1)**: a log-scale scarcity curve, log-normalized digital engagement
   with a real capped velocity bonus, and a completely independent
@@ -396,11 +425,12 @@ restart-survival confirmed.
 - Any actual manufacturing/shipping logic behind merch or physical art
   frames — both are real digital records of a real transaction, not a
   fulfillment pipeline.
-- The actual Kenji AI agent, and any connection to the Universal World
-  Layer, VACANCY Tribes, or Vavlt Stvdios. **Still unbuilt, but the
-  reason given here was stale and is corrected**: this used to say
-  "none of the three are documented in any of the four source docs read
-  so far." Two of them are now real, built apps — `../world-layer/`
-  and `../vavlt-stvdios/` — so the gap is that VOKEN has no connection
-  to them, not that they are undocumented. Checked by grep: VOKEN's
-  code references neither. Kenji genuinely does not exist anywhere.
+- The actual Kenji AI agent, and any connection to VACANCY Tribes.
+  Kenji genuinely does not exist anywhere.
+- **Connection to the Universal World Layer and Vavlt Stvdios is now
+  real, via `mintExternalEntityCard()`** (`lib/cultureCards.js`,
+  `POST /api/card/external`) — see below. What's still not built: any
+  *automatic* minting from either app's own content (a World Layer
+  UNESCO import, a Vavlt Stvdios casino event going live) — every mint
+  today is a real, explicit, individually-authorized call, never a
+  background job that mints on its own.

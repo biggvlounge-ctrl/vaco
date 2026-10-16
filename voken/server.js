@@ -42,7 +42,8 @@ const { attachStore } = require('./lib/storeBackend');
 const { getBrandInfo } = require('./lib/brand');
 const { CATEGORIES, RARITY_TIERS, TOKENIZATION_TYPES, FORMATS } = require('./lib/cardTypes');
 const {
-  mintCultureCard, getCultureCard, listCultureCardsByCategory, mintAdditionalEdition, transferEditionOwnership, listEditionsWithSerials} = require('./lib/cultureCards');
+  SOURCE_APPS, MINTED_BY_ROLES,
+  mintCultureCard, mintExternalEntityCard, getCultureCard, listCultureCardsByCategory, mintAdditionalEdition, transferEditionOwnership, listEditionsWithSerials} = require('./lib/cultureCards');
 const { computeCultureCardValueScore } = require('./lib/valueAlgorithm');
 const { assessEstablishedCreator } = require('./lib/establishedCreatorAssessment');
 const { PACK_TIER_NAMES, createPackTier, getPackTier, openPack } = require('./lib/cardPacks');
@@ -108,6 +109,10 @@ function serviceHeaders() {
 }
 
 const VACO_ANALYTICS_URL = process.env.VACO_ANALYTICS_URL || 'http://localhost:8790';
+// Real ownership check for a Vavlt Stvdios casino-event external card
+// -- same env var name hvntz/server.js already established for calling
+// this app.
+const VAVLT_STVDIOS_API_URL = process.env.VAVLT_STVDIOS_API_URL || 'http://localhost:8808';
 // -- The store, and which backend holds it ----------------------------
 //
 // `let`, not `const`: with DATABASE_URL set this app's store lives in
@@ -144,6 +149,84 @@ app.use(serviceAuth.middleware);
 const decisionLog = createDecisionLog({ app: 'voken' });
 const operatorAuth = createOperatorAuth();
 const { requireOperator } = operatorAuth;
+
+// -- External-entity card authority: real owner, or an operator -------
+//
+// `requireActor('subjectPersonId')` on /api/card exists so nobody
+// mints a card about another real person without that person's own
+// session -- the likeness problem. A World Layer location or a Vavlt
+// Stvdios casino event is not a person and has no session to require.
+// Founder's own call: "anyone with standing, operator or owner
+// (either)."
+//
+// **The owner branch is verified against the owning app's own data,
+// never merely claimed.** For a Vavlt Stvdios casino event, that means
+// a real `GET /api/casino-events/:id` call confirming the caller's own
+// session matches the event's real `hostId` -- the same field
+// `createCasinoEvent` itself already enforces.
+//
+// **World Layer has no owner to verify at all.** Confirmed directly
+// against `world-layer/sources.js` and `locations.js`: a `Location`'s
+// `ownershipData` is always `null` there by design ("who owns what is
+// simulation state, not world data... VACON-C generates it"), and
+// World Layer itself exposes no HTTP API to call in the first place --
+// it is a pure library nothing in this ecosystem currently consumes.
+// So a world-layer card can only ever go through the operator branch
+// below; the owner branch always refuses it, honestly, rather than
+// inventing an ownership check against data that does not exist.
+async function verifyExternalCardOwnership({ sourceApp, sourceType, externalRef, userId }) {
+  if (sourceApp === 'vavlt-stvdios' && sourceType === 'casino-event') {
+    const res = await fetch(`${VAVLT_STVDIOS_API_URL}/api/casino-events/${encodeURIComponent(externalRef)}`);
+    if (res.status === 404) return false;
+    if (!res.ok) throw new Error(`vavlt-stvdios answered ${res.status}`);
+    const event = await res.json();
+    return event.hostId === userId;
+  }
+  return false;
+}
+
+// Fails closed like `requireOperator` itself -- an unreachable owning
+// app, or an unverifiable subject, is refused rather than treated as
+// permission, because this gate decides whether a card gets minted at
+// all, not a soft signal.
+function requireExternalCardAuthority(verifyOwnershipFn) {
+  const operatorGuard = requireOperator('voken:mint-external-card');
+  const sessionGuard = requireSession();
+  return (req, res, next) => {
+    if (req.headers['x-operator-credential']) {
+      return operatorGuard(req, res, () => {
+        // `req.operator` is only set on a verdict vaco-operator itself
+        // returned (enforce, or observe's own 'unverified' stand-in).
+        // `VACO_OPERATOR_MODE=off` skips straight to `next()` and sets
+        // nothing at all -- found by a live boot in that mode, which
+        // crashed the whole process on `req.operator.operatorName`
+        // rather than answering the request.
+        req.mintedByRole = 'operator';
+        req.mintedByUserId = req.operator ? req.operator.operatorName : 'operator (VACO_OPERATOR_MODE=off)';
+        return next();
+      });
+    }
+    return sessionGuard(req, res, async () => {
+      const { sourceApp, sourceType, externalRef } = req.body || {};
+      let owns;
+      try {
+        owns = await verifyOwnershipFn({ sourceApp, sourceType, externalRef, userId: req.sessionUserId });
+      } catch (err) {
+        return res.status(503).json({
+          error: `requireExternalCardAuthority: cannot verify ownership of ${sourceApp}:${sourceType}:${externalRef} (${err.message}). Refusing rather than assuming permission.`,
+        });
+      }
+      if (!owns) {
+        return res.status(403).json({
+          error: `requireExternalCardAuthority: session user is not the verified owner/host of ${sourceApp}:${sourceType}:${externalRef} -- an operator credential (X-Operator-Credential) is required for a subject with no verifiable single owner`,
+        });
+      }
+      req.mintedByRole = 'owner';
+      req.mintedByUserId = req.sessionUserId;
+      return next();
+    });
+  };
+}
 
 // Atomic settlement: every leg moves, or none does.
 //
@@ -210,6 +293,7 @@ app.get('/api/health', (_req, res) => {
     auctionTypes: AUCTION_TYPES,
     merchItemTypes: ITEM_TYPES,
     referralTiers: REFERRAL_TIERS, spinPrizes: SPIN_PRIZES,
+    sourceApps: SOURCE_APPS, mintedByRoles: MINTED_BY_ROLES,
   });
 });
 
@@ -243,6 +327,37 @@ app.get('/api/cards/category/:category', (req, res) => {
 app.post('/api/card/:id/edition', requireActor('ownerId'), (req, res) => {
   try {
     res.status(201).json(mintAdditionalEdition(store, { ...req.body, cardId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// A Cvltvre Card about a non-person subject -- a World Layer location
+// or a Vavlt Stvdios casino event. See `requireExternalCardAuthority`
+// above for the real owner-or-operator authorization this runs
+// through instead of `requireActor('subjectPersonId')`.
+app.post('/api/card/external', requireExternalCardAuthority(verifyExternalCardOwnership), async (req, res) => {
+  if (req.mintedByRole === 'operator') {
+    try {
+      await decisionLog.record({
+        route: 'POST /api/card/external',
+        outcomeKind: 'mint',
+        subjectType: 'cultureCard',
+        subjectId: `${(req.body || {}).sourceApp}:${(req.body || {}).sourceType}:${(req.body || {}).externalRef}`,
+        decidedBy: req.mintedByUserId,
+        decidedByKind: 'operator',
+        inputs: req.body || {},
+        reason: (req.body || {}).reason || null,
+      });
+    } catch (err) {
+      return res.status(503).json({ error: err.message });
+    }
+  }
+
+  try {
+    res.status(201).json(mintExternalEntityCard(store, {
+      ...req.body, mintedByUserId: req.mintedByUserId, mintedByRole: req.mintedByRole,
+    }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

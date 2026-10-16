@@ -12,40 +12,59 @@
 
 const { CATEGORIES, RARITY_TIERS, TOKENIZATION_TYPES, FORMATS } = require('./cardTypes');
 
-function mintCultureCard(store, options = {}) {
+// Shared by every mint path -- the category/rarity/tokenization/format/
+// mint-count validation a person-subject and an external-entity card
+// both need identically. Only what each subject *is* differs.
+function validateMintParams(options, action) {
   const {
-    subjectPersonId, category, rarityTier, tokenizationType, formats = [],
+    category, rarityTier, tokenizationType, formats = [],
     plannedDigitalMintCount, plannedPhysicalMintCount = 0,
   } = options;
 
-  if (!subjectPersonId) throw new Error('mintCultureCard requires a subjectPersonId');
   if (!CATEGORIES.includes(category)) {
-    throw new Error(`mintCultureCard: invalid category "${category}" (expected one of ${CATEGORIES.join(', ')})`);
+    throw new Error(`${action}: invalid category "${category}" (expected one of ${CATEGORIES.join(', ')})`);
   }
   if (!RARITY_TIERS.includes(rarityTier)) {
-    throw new Error(`mintCultureCard: invalid rarityTier "${rarityTier}" (expected one of ${RARITY_TIERS.join(', ')})`);
+    throw new Error(`${action}: invalid rarityTier "${rarityTier}" (expected one of ${RARITY_TIERS.join(', ')})`);
   }
   if (!TOKENIZATION_TYPES.includes(tokenizationType)) {
-    throw new Error(`mintCultureCard: invalid tokenizationType "${tokenizationType}" (expected one of ${TOKENIZATION_TYPES.join(', ')})`);
+    throw new Error(`${action}: invalid tokenizationType "${tokenizationType}" (expected one of ${TOKENIZATION_TYPES.join(', ')})`);
   }
   if (!Array.isArray(formats) || formats.length === 0) {
-    throw new Error('mintCultureCard requires at least one format');
+    throw new Error(`${action} requires at least one format`);
   }
   for (const f of formats) {
     if (!FORMATS.includes(f)) {
-      throw new Error(`mintCultureCard: invalid format "${f}" (expected one of ${FORMATS.join(', ')})`);
+      throw new Error(`${action}: invalid format "${f}" (expected one of ${FORMATS.join(', ')})`);
     }
   }
   if (!Number.isInteger(plannedDigitalMintCount) || plannedDigitalMintCount < 1) {
-    throw new Error('mintCultureCard requires a positive integer plannedDigitalMintCount');
+    throw new Error(`${action} requires a positive integer plannedDigitalMintCount`);
   }
   if (!Number.isInteger(plannedPhysicalMintCount) || plannedPhysicalMintCount < 0) {
-    throw new Error('mintCultureCard requires a non-negative integer plannedPhysicalMintCount');
+    throw new Error(`${action} requires a non-negative integer plannedPhysicalMintCount`);
   }
+
+  return { category, rarityTier, tokenizationType, formats, plannedDigitalMintCount, plannedPhysicalMintCount };
+}
+
+function mintCultureCard(store, options = {}) {
+  const { subjectPersonId } = options;
+  if (!subjectPersonId) throw new Error('mintCultureCard requires a subjectPersonId');
+
+  const {
+    category, rarityTier, tokenizationType, formats,
+    plannedDigitalMintCount, plannedPhysicalMintCount,
+  } = validateMintParams(options, 'mintCultureCard');
 
   const card = {
     id: store.nextCardId++,
     subjectPersonId,
+    sourceApp: null,
+    sourceType: null,
+    externalRef: null,
+    mintedByUserId: null,
+    mintedByRole: null,
     category,
     rarityTier,
     tokenizationType,
@@ -67,6 +86,88 @@ function mintCultureCard(store, options = {}) {
     card.editions.push({ editionNumber: 1, format: 'physical', ownerId: subjectPersonId, mintedAt: card.createdAt });
   }
   card.provenance.push({ year: new Date(card.createdAt).getFullYear(), event: 'minted', ownerId: subjectPersonId });
+
+  store.cultureCards.push(card);
+  return card;
+}
+
+// A Cvltvre Card about something that is not a person -- a World Layer
+// location, a Vavlt Stvdios casino event -- so `mintCultureCard`'s own
+// consent mechanism (the subject's guaranteed first copy) does not
+// apply: there is no person whose likeness is at stake, and therefore
+// no `subjectPersonId`.
+//
+// **`mintedByRole` decides what the mint guarantees, deliberately
+// asymmetric**: a real, *verified* owner/host (checked server-side
+// against the owning app, not merely claimed -- see
+// `server.js`'s `requireExternalCardAuthority`) gets the same
+// guaranteed-first-copy treatment a person subject gets, because they
+// have the same real standing. An **operator**-minted card (the only
+// path for a subject with no single owner at all -- a World Layer
+// location's `ownershipData` is always null; VACON-C, not World Layer,
+// would generate it) mints no guaranteed first copy to anyone,
+// including the operator themselves: an operator curating a card into
+// existence is not the same act as owning what it depicts, and handing
+// the operator a free edition would make minting-on-behalf-of a way to
+// self-enrich.
+const SOURCE_APPS = ['world-layer', 'vavlt-stvdios'];
+const SOURCE_TYPES_BY_APP = {
+  'world-layer': ['location'],
+  'vavlt-stvdios': ['casino-event'],
+};
+const MINTED_BY_ROLES = ['owner', 'operator'];
+
+function mintExternalEntityCard(store, options = {}) {
+  const { sourceApp, sourceType, externalRef, mintedByUserId, mintedByRole } = options;
+
+  if (!SOURCE_APPS.includes(sourceApp)) {
+    throw new Error(`mintExternalEntityCard: invalid sourceApp "${sourceApp}" (expected one of ${SOURCE_APPS.join(', ')})`);
+  }
+  if (!SOURCE_TYPES_BY_APP[sourceApp].includes(sourceType)) {
+    throw new Error(`mintExternalEntityCard: invalid sourceType "${sourceType}" for ${sourceApp} (expected one of ${SOURCE_TYPES_BY_APP[sourceApp].join(', ')})`);
+  }
+  if (!externalRef) throw new Error('mintExternalEntityCard requires an externalRef');
+  if (!MINTED_BY_ROLES.includes(mintedByRole)) {
+    throw new Error(`mintExternalEntityCard: mintedByRole must be one of ${MINTED_BY_ROLES.join(', ')}`);
+  }
+  if (!mintedByUserId) throw new Error('mintExternalEntityCard requires a mintedByUserId');
+
+  const {
+    category, rarityTier, tokenizationType, formats,
+    plannedDigitalMintCount, plannedPhysicalMintCount,
+  } = validateMintParams(options, 'mintExternalEntityCard');
+
+  const card = {
+    id: store.nextCardId++,
+    subjectPersonId: null,
+    sourceApp,
+    sourceType,
+    externalRef,
+    mintedByUserId,
+    mintedByRole,
+    category,
+    rarityTier,
+    tokenizationType,
+    formats,
+    mintPlan: {
+      plannedDigitalMintCount,
+      plannedPhysicalMintCount,
+      visibleAtApplicationStage: true,
+    },
+    editions: [],
+    provenance: [],
+    createdAt: Date.now(),
+  };
+
+  if (mintedByRole === 'owner') {
+    card.editions.push({ editionNumber: 1, format: 'digital', ownerId: mintedByUserId, mintedAt: card.createdAt });
+    if (plannedPhysicalMintCount > 0) {
+      card.editions.push({ editionNumber: 1, format: 'physical', ownerId: mintedByUserId, mintedAt: card.createdAt });
+    }
+    card.provenance.push({ year: new Date(card.createdAt).getFullYear(), event: 'minted', ownerId: mintedByUserId });
+  } else {
+    card.provenance.push({ year: new Date(card.createdAt).getFullYear(), event: 'minted', ownerId: null });
+  }
 
   store.cultureCards.push(card);
   return card;
@@ -163,9 +264,13 @@ function transferEditionOwnership(store, options = {}) {
 }
 
 module.exports = {
+  SOURCE_APPS,
+  SOURCE_TYPES_BY_APP,
+  MINTED_BY_ROLES,
   serialNumberFor,
   listEditionsWithSerials,
   mintCultureCard,
+  mintExternalEntityCard,
   getCultureCard,
   listCultureCardsByCategory,
   countMintedEditions,

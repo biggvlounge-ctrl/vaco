@@ -65,6 +65,19 @@ const SCOPES = [
   'voken:settle',          // resolve a market, distribute
   'voken:grade',           // assess a pack/asset outcome
 
+  // Minting a card about a non-person subject (a World Layer location,
+  // a Vavlt Stvdios casino event) -- `requireActor('subjectPersonId')`
+  // exists specifically so nobody mints a card about another real
+  // person without their own session; a landmark or event has no
+  // session to require. Founder's own call: "anyone with standing,
+  // operator or owner (either)" -- the real owner/host can still mint
+  // their own event under their own session (verified against the
+  // owning app, not merely claimed), but a subject with no single
+  // owner (a World Layer location -- `ownershipData` is always null
+  // there; VACON-C, not World Layer, would generate it) needs a named
+  // human decision instead of an unverifiable claim.
+  'voken:mint-external-card',
+
   'vulture-music:settle',  // distribute revenue to artists and labels
   'vulture-music:state',   // release lifecycle
 
