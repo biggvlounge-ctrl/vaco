@@ -70,11 +70,11 @@ function unapprovedDriver(store, id = 'driver-unverified') {
 
 // -- categories ----------------------------------------------------------
 
-test('all 15 named products are registered categories', () => {
+test('all 16 named products are registered categories', () => {
   const ids = listDropCategories().map((c) => c.id);
-  assert.equal(ids.length, 15);
+  assert.equal(ids.length, 16);
   for (const id of ['dropShop', 'dropFood', 'dropSpa', 'dropHot', 'dropPool', 'dropSauna', 'dropIce',
-    'dropOffice', 'dropStudio', 'dropEvent', 'dropGame', 'dropRoom', 'dropHome', 'dropStorage', 'dropBath']) {
+    'dropOffice', 'dropStudio', 'dropEvent', 'dropGame', 'dropRoom', 'dropHome', 'dropStorage', 'dropBath', 'dropBar']) {
     assert.ok(ids.includes(id), `missing category ${id}`);
   }
 });

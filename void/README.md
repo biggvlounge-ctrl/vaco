@@ -409,16 +409,26 @@ type the way HVNTZ's DREA already matches ad content to venue type —
 rather than a from-scratch invention. See `lib/taas.js`'s own header.
 
 **VOID DROP — mobile space rental & deployment** (`lib/voidDropCategories.js`,
-`lib/voidDropAssets.js`, `lib/voidDropBooking.js`; see `VOID_DROP.md`):
+`lib/voidDropAssets.js`, `lib/voidDropBooking.js`, `lib/voidDropZones.js`;
+see `VOID_DROP.md`):
 select → book → deliver → deploy → use → retrieve → redeploy, additive
 to this ecosystem as the founder's own spec asked. Real new idea: a
 physical `MobileSpaceAsset` outlives any one booking, the same shape
 `businessLockers.js` already proved, serving customer A, then B, then
 C. Registered as the `voidDrop` vertical; `createDropBooking` creates
 a real job through the existing `requestJob`/`matchProvider`/
-`acceptJob`/`completeJob` loop rather than a second booking system. 15
-named products (DROP POP SHOP, DROP FOOD, …, DROP BATH) are config
-entries over one real engine, not 15 modules. A unit's home base can
+`acceptJob`/`completeJob` loop rather than a second booking system. 16
+named products (DROP POP SHOP, DROP FOOD, …, DROP BATH, DROP BAR) are
+config entries over one real engine, not 16 modules. Several units can
+now co-locate into a real **Drop Zone** (`lib/voidDropZones.js`) — a
+founder-requested "small village"/"shopping center" with its own real
+integer capacity (`isZoneAvailable` refuses a booking once full, same
+overlap-refusal posture `isAssetAvailable` already holds) and its own
+proven site: a booking into a zone inherits the zone's own
+location/address and treats road access as already confirmed, since
+the zone itself is the proof a site supports Drop deliveries.
+`getZoneOccupancy` reports what's genuinely on site right now (deployed
+units only, not merely-booked ones). A unit's home base can
 tie to a real Hub/Port station (`homeStationId`); delivery/retrieval
 can be run by a real, approved (verified-skill) VOID driver, paid
 their own real per-leg fee out of the asset operator's proceeds; a
@@ -444,8 +454,10 @@ credential. **Now wired to VACAY** (`vacay/lib/bookings/dropStays.js`)
 is the hospitality company; "Villas" is the real branded name, not
 "Drop Hotel"). **Deliberately not built**: third-party marketplace
 listings (the owner/operator split already supports it), V4 discovery,
-the HVNTZ/real-estate hooks, DROP ZONES, rent-to-own/revenue-share
-billing. See `VOID_DROP.md`.
+the HVNTZ/real-estate hooks, rent-to-own/revenue-share billing, and a
+formal "Village" (physical) account/entity in code — see `VOID_DROP.md`'s
+naming note; the one concrete behavior it implies (platform-owned
+screens) is already real. See `VOID_DROP.md`.
 
 **Real seed data** (`lib/seedDemoData.js`, `SEED_DEMO_DATA_REQUIREMENT.md`):
 two real St. Louis Port Stations, two gig drivers, and four real

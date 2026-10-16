@@ -31,16 +31,17 @@ other non-deep-researched vertical uses) and as an entry in
 `SERVICE_CONFIGS` (`archetype: 'quote'`, `hasDedicatedModule`) so
 `describeService` answers for it uniformly.
 
-**Three modules, not fifteen.** 15 named products (DROP POP SHOP, DROP
+**Four modules, not sixteen.** 16 named products (DROP POP SHOP, DROP
 FOOD, …) differ in label, typical uses, and which rental models make
 sense — not in mechanics. `voidDropCategories.js` is config, matching
 `verticalServiceConfigs.js`'s own SERVICE_CONFIGS pattern; one real
-engine (`voidDropAssets.js` + `voidDropBooking.js`) serves all 15.
-Adding a 16th product is a new config entry, never a new module —
-the founder's own standing instruction, applied directly. (DROP SHOP's
-real branded name is "DROP POP SHOP" — the category id stayed
-`dropShop`, only the label changed. DROP BATH — mobile luxury
-bathroom — is the 15th, added the same way.)
+engine (`voidDropAssets.js` + `voidDropBooking.js` + `voidDropZones.js`,
+the last covered below) serves all 16. Adding a 17th product is a new
+config entry, never a new module — the founder's own standing
+instruction, applied directly. (DROP SHOP's real branded name is
+"DROP POP SHOP" — the category id stayed `dropShop`, only the label
+changed. DROP BATH — mobile luxury bathroom — and DROP BAR — mobile
+bar setup — are the 15th and 16th, added the same way.)
 
 A sauna/jacuzzi combo, a sauna inside a Vacay Villa, a pool alongside
 one — none of these needed a new category. `amenities` on the asset
@@ -144,6 +145,43 @@ own platform account's behalf. The hook is real, fully tested
 (`test/voidDrop.test.js`), and ready for whatever real flow eventually
 authorizes this — nothing here pretends that flow already exists.
 
+## Drop Zones: a real "small village" or "shopping center"
+
+Spec §18, previously the one deliberately-not-built item on this
+list: "A vacant commercial property could temporarily host DROP FOOD,
+DROP SHOP, DROP SPA, DROP GAME, DROP EVENT — creating a temporary
+commercial village." Built now, directly against the founder's own
+follow-up ("if we have enough different setups, we could piece all
+these things together and have a small village or a small shopping
+center").
+
+`voidDropZones.js` registers a real `DropZone` — a named location
+with real coordinates and a real integer `maxUnits` — and
+`createDropBooking` takes an optional `zoneId`. Two real consequences
+of booking into a zone rather than a bare address:
+
+1. **The zone's own real capacity gates the booking**, the same
+   "refuse before accepting" posture `isAssetAvailable` already holds
+   for a single asset's date range — a booking into a full zone for
+   an overlapping date range is refused outright, not silently
+   over-packed.
+2. **The zone's own site is already proven.** `locationType`/`lat`/
+   `lng`/`siteAddress` come from the zone itself, and road access is
+   treated as already confirmed — registering a zone *is* the
+   real-world act of establishing that a location supports drop
+   deliveries, so asking the same two eligibility questions again for
+   every unit dropped there would be real, pointless duplication. The
+   zone's own location overrides whatever the caller passed for those
+   fields.
+
+`GET /api/drop/zone/:id/occupancy` is the real "what does this little
+village look like right now" view: every unit actually on site
+(`deployed`/`active`/`retrieval-scheduled`, whose date range covers
+right now), each with its own real category — not a stand-in list,
+and not units merely booked for a future date. No category
+restriction on what may book into a zone, matching the spec's own
+mixed-category example directly.
+
 ## VACAY: "Vacay Villas"
 
 A visitor in town who does not want a hotel but wants to stay close —
@@ -162,16 +200,30 @@ already held for VOID job requests. Searching with no category means
 both `dropRoom` and `dropHome`, merged by real distance, since VOID
 has no single "Vacay Villas" category.
 
-**A naming note, not a built module.** The founder distinguishes
-VACAY (the hospitality company booking these stays) from "Village" —
-described as the real-estate-plus-DREAMS-screen network spanning
-commercial, residential, and these container properties. No such
-entity exists in this codebase today (confirmed: distinct from
-VXLLAGE, the unrelated social app) and nothing here builds one — the
-one concrete consequence already real above is that a Drop unit's
-screen is VOID-platform-owned, independent of the unit's own owner,
-which is the behavior "Village" describes regardless of what formally
-holds that account later.
+**A naming note, not a built module.** The brand family, per the
+founder's own two follow-ups, stated plainly rather than inferred:
+
+- **VACAY is one hospitality company/app**, hotel-style and Airbnb-
+  style both. **Vacay Villa** is the container-built product line
+  under it (a single unit); many Villas clustered together (what this
+  file calls a Drop Zone above) is a **container village** — a small
+  one, distinct from the larger "Village" below. Plural branding
+  follows the same letter-swap VXLLAGE already uses: "Villas" →
+  "VXLLAS."
+- **"Village" is a two-sided brand, same shape as "The Vault" (physical)
+  and Vault Studios (the app)**: one physical half (real estate plus
+  the DREAMS screen network, spanning commercial, residential, and
+  container properties) and one app half. **VXLLAGE — the social app
+  already built in this repo** (feed, threads, villages, live, call,
+  cosmetics) — is that app half, not an unrelated brand as an earlier
+  draft of this note assumed; the physical half has no built entity of
+  its own yet.
+
+Nothing here stands up a formal "Village" (physical) account or
+corporate entity — the one concrete consequence already real above is
+that a Drop unit's screen is VOID-platform-owned, independent of the
+unit's own owner, which is the behavior "Village" describes regardless
+of what formally holds that account later.
 
 ## Three decisions that needed to be made, stated honestly
 
@@ -219,7 +271,9 @@ not a gap discovered later, a scope line drawn now:
   (§§15, 17) — VACAY's own "Vacay Villas" hook is now built; see above.
 - A real DREAMS screen registration flow (the hook exists; see "DREAMS
   screens" above for exactly what's missing and why).
-- DROP ZONES (clustering several units at one property).
+- A formal "Village" (physical) account/entity in code — see the
+  naming note above; the one concrete behavior it implies is already
+  real (platform-owned screens).
 - Rent-to-own ledgers, fractional ownership, revenue-share splits —
   real financial products that need their own real agreement model,
   the same way DREAMS' own VRG revenue attribution needed one
@@ -250,7 +304,9 @@ not a gap discovered later, a scope line drawn now:
 `POST /api/drop/booking/:id/inspection-result` ·
 `POST /api/drop/booking/:id/complete` ·
 `POST /api/drop/booking/:id/cancel` ·
-`GET /api/drop/assets/nearby`
+`GET /api/drop/assets/nearby` ·
+`POST /api/drop/zone` · `GET /api/drop/zone/:id` · `GET /api/drop/zones` ·
+`POST /api/drop/zone/:id/status` · `GET /api/drop/zone/:id/occupancy`
 
 VACAY: `GET /api/bookings/drop-stays/search` ·
 `POST /api/bookings/drop-stays`.

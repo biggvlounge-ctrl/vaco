@@ -109,6 +109,9 @@ const {
   startRental, scheduleRetrieval, dispatchRetrieval, markReturnedForInspection, recordInspectionResult,
   completeCleaningAndClose, cancelDropBooking,
 } = require('./lib/voidDropBooking');
+const {
+  ZONE_STATUSES, registerDropZone, getDropZone, listDropZones, setZoneStatus, getZoneOccupancy,
+} = require('./lib/voidDropZones');
 
 const {
   requireActor, requireParamActor, requireSession, requireCallingService, actorOrService,
@@ -1426,6 +1429,52 @@ app.get('/api/taas-subscriptions/client/:clientBusinessId', (req, res) => {
 
 app.get('/api/drop/categories', (_req, res) => {
   res.json({ categories: listDropCategories() });
+});
+
+// -- Drop Zones: several real units, co-located into a real "small
+// village" or "shopping center" (spec §18, founder's own follow-up).
+// See lib/voidDropZones.js.
+
+// Establishing a zone is a real-world act -- a property
+// owner/operator vouching that this site genuinely supports drop
+// deliveries -- so it is fleet operations, same posture as
+// `/api/drop/asset` and `/api/station` above, not self-service.
+app.post('/api/drop/zone', requireCallingService(), (req, res) => {
+  try {
+    res.status(201).json(registerDropZone(store, req.body || {}));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/drop/zone/:id', (req, res) => {
+  const zone = getDropZone(store, req.params.id);
+  if (!zone) return res.status(404).json({ error: `no drop zone with id ${req.params.id}` });
+  res.json(zone);
+});
+
+app.get('/api/drop/zones', (req, res) => {
+  res.json({ zones: listDropZones(store, { status: req.query.status || null }) });
+});
+
+app.post('/api/drop/zone/:id/status', requireOperator('void:drop'), (req, res) => {
+  try {
+    res.json(setZoneStatus(store, { ...req.body, zoneId: req.params.id }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// The real "what does this little village look like right now" read
+// -- every unit actually on site, with its own real category. A
+// plain catalog read, same posture as `/api/drop/assets` -- needs no
+// session.
+app.get('/api/drop/zone/:id/occupancy', (req, res) => {
+  try {
+    res.json(getZoneOccupancy(store, req.params.id));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 // Registering a physical asset into the fleet is fleet operations, not

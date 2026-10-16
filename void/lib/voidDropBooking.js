@@ -37,6 +37,7 @@ const {
   getDropAsset, listDropAssets, isBookable, setAssetStatus, moveAsset, setAssetDreamsScreen, logMaintenanceEvent,
 } = require('./voidDropAssets');
 const { canWorkVertical, getProvider } = require('./providerProfiles');
+const { getDropZone, isZoneAvailable } = require('./voidDropZones');
 const { haversineDistanceKm } = require('./geo');
 
 // Real, and reused verbatim from `marketplace.js`'s own platform-fee
@@ -229,11 +230,23 @@ function isAssetAvailable(store, options = {}) {
     && startDate < b.endDate && b.startDate < endDate);
 }
 
+// `zoneId` is optional. When given, the zone's own real location
+// (`locationType`/`lat`/`lng`/`siteAddress`) is used in place of
+// whatever the caller passed for those fields, and road access is
+// treated as already confirmed -- a registered zone is itself the
+// real-world act of establishing that this site supports drop
+// deliveries (see voidDropZones.js's own header); asking the same two
+// questions again for every unit dropped at an already-proven site
+// would be real, pointless duplication. The zone's own real capacity
+// (`isZoneAvailable`) is checked alongside the asset's own date-range
+// availability -- both must have room, not just one.
 function createDropBooking(store, options = {}) {
   const {
     customerId, assetId, category, rentalModel, startDate, endDate,
-    locationType, deliveryLat, deliveryLng, siteAddress = null, roadAccessConfirmed, siteMaxWeightKg = null,
-    intendedUse, now = Date.now(),
+    zoneId = null, siteMaxWeightKg = null, intendedUse, now = Date.now(),
+  } = options;
+  let {
+    locationType, deliveryLat, deliveryLng, siteAddress = null, roadAccessConfirmed,
   } = options;
 
   if (!customerId) throw new Error('createDropBooking requires a customerId');
@@ -256,6 +269,21 @@ function createDropBooking(store, options = {}) {
     throw new Error(`createDropBooking: asset ${assetId} is already booked for an overlapping date range`);
   }
 
+  let zone = null;
+  if (zoneId !== null) {
+    zone = getDropZone(store, zoneId);
+    if (!zone) throw new Error(`createDropBooking: no zone with id ${zoneId}`);
+    if (zone.status !== 'active') throw new Error(`createDropBooking: zone ${zoneId} is "${zone.status}", not "active"`);
+    if (!isZoneAvailable(store, { zoneId, startDate, endDate })) {
+      throw new Error(`createDropBooking: zone ${zoneId} has no open slot for this date range (capacity ${zone.maxUnits})`);
+    }
+    locationType = zone.locationType;
+    deliveryLat = zone.lat;
+    deliveryLng = zone.lng;
+    siteAddress = zone.siteAddress;
+    roadAccessConfirmed = true;
+  }
+
   const durationDays = (endDate - startDate) / MS_PER_DAY;
   const eligibility = assessEligibility(store, {
     assetId, locationType, roadAccessConfirmed, siteMaxWeightKg, durationDays, intendedUse,
@@ -275,6 +303,7 @@ function createDropBooking(store, options = {}) {
     startDate,
     endDate,
     durationDays,
+    zoneId,
     locationType,
     deliveryLat,
     deliveryLng,

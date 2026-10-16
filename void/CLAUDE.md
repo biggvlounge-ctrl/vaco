@@ -79,9 +79,9 @@ that genuinely batch through the real routing engine.
   `deliveryChoice.js`.
 - **VOID DROP — mobile space rental & deployment** (select → book →
   deliver → deploy → use → retrieve → redeploy) — `voidDropCategories.js`
-  (15 named products, e.g. DROP POP SHOP/DROP FOOD/DROP SPA/DROP BATH,
-  as config, not code — a 16th product is a new entry, never a new
-  module), `voidDropAssets.js` (the physical unit's own lifecycle,
+  (16 named products, e.g. DROP POP SHOP/DROP FOOD/DROP SPA/DROP BATH/
+  DROP BAR, as config, not code — a 17th product is a new entry, never
+  a new module), `voidDropAssets.js` (the physical unit's own lifecycle,
   independent of any one booking — the real new thing here; everything
   else in VOID lives only inside a job — plus an optional
   `homeStationId` tying a unit's fleet base to a real Hub/Port station,
@@ -92,7 +92,11 @@ that genuinely batch through the real routing engine.
   with a real per-leg fee payout, and the booking lifecycle, which
   creates a real job through `marketplace.js` rather than forking it,
   same as
-  `movingServices.js`). Registered as the `voidDrop` vertical.
+  `movingServices.js`), `voidDropZones.js` (several real units
+  co-located into a founder-requested "small village"/"shopping
+  center" — a `DropZone` with its own real integer capacity gating
+  bookings, and its own proven location/road-access that a booking
+  into it simply inherits). Registered as the `voidDrop` vertical.
 - **Persistence** — `store.js` + `persistence.js` (Proxy-based
   auto-flush to `data/store.json`).
 
@@ -153,6 +157,16 @@ that genuinely batch through the real routing engine.
   convention and settles once, at `completeCleaningAndClose`, when the
   physical rental is actually done. An upfront deposit/hold and a real
   refund policy are a genuine product decision not invented here.
+- **A formal "Village" (physical) account/entity in code.** The founder
+  distinguishes VACAY (hospitality company/app) from "Village" (the
+  physical commercial/residential/DREAMS-screen network) and confirms
+  VXLLAGE, the already-built social app, as the app half of that same
+  two-sided "Village" brand — the exact parallel to The Vault
+  (physical)/Vault Studios (app). No "Village" account exists in code
+  today, and none is invented here; the one concrete behavior it
+  implies — screens being platform-owned, not the unit owner's — is
+  already real via `VOID_PLATFORM_ACCOUNT_ID`. See `VOID_DROP.md`'s
+  naming note.
 - **VOID DROP third-party marketplace listings, V4 natural-language
   discovery, and the HVNTZ/real-estate cross-app hooks** the founder's
   spec describes (§§11, 15, 17) — the asset model already separates

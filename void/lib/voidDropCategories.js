@@ -114,13 +114,18 @@ const DROP_CATEGORIES = {
     uses: ['residential storage', 'business storage', 'construction storage', 'event storage', 'inventory storage'],
     supportedRentalModels: RENTAL_MODELS,
   },
-  // 15th product, added directly as a config entry per the founder's
-  // own follow-up -- no module changed, exactly the design this file's
-  // own header describes.
+  // 15th and 16th products, added directly as config entries per the
+  // founder's own follow-ups -- no module changed, exactly the design
+  // this file's own header describes.
   dropBath: {
     label: 'DROP BATH', description: 'Mobile luxury bathroom.',
     uses: ['event restroom', 'wedding/venue overflow', 'job-site high-end restroom', 'festival VIP restroom', 'property overflow'],
     supportedRentalModels: ['hourly', 'daily', 'weekend', 'weekly', 'event-deployment', 'business-deployment'],
+  },
+  dropBar: {
+    label: 'DROP BAR', description: 'Mobile bar setup.',
+    uses: ['wedding bar', 'private party', 'corporate event', 'festival bar', 'pop-up bar', 'brand activation'],
+    supportedRentalModels: ['hourly', 'daily', 'weekend', 'event-deployment', 'business-deployment', 'revenue-share'],
   },
 };
 

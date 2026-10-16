@@ -108,6 +108,10 @@ function createVoidStore() {
     nextDropMaintenanceEventId: 1,
     dropBookings: [],
     nextDropBookingId: 1,
+    // Drop Zones: several real units, co-located (spec §18's "small
+    // village"/"shopping center"). See lib/voidDropZones.js.
+    dropZones: [],
+    nextDropZoneId: 1,
   };
 }
 
