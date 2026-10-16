@@ -16,6 +16,7 @@
 // and nothing here hardcodes a container's dimensions or mechanics.
 
 const { getDropCategory } = require('./voidDropCategories');
+const { getStation } = require('./stations');
 
 const ASSET_STATUSES = [
   'available', 'reserved', 'in-transit', 'deploying', 'active-rental',
@@ -57,11 +58,21 @@ function round(n) {
   return Math.round(n * 100) / 100;
 }
 
+// `homeStationId` ties the unit's fleet base to a real VOID Hub/Port
+// station (`stations.js`) rather than a bare pair of coordinates --
+// "stored at the Void Hub, the larger hubs, or different hubs in
+// different areas" (founder's own words). When given, the station's
+// own real `lat`/`lng` become the asset's home base unless explicit
+// `homeLat`/`homeLng` are also passed (explicit wins) -- a unit
+// without a home station is still valid (third-party/investor-owned
+// inventory may not stage at a VOID hub at all), just without a
+// station-derived home.
 function registerDropAsset(store, options = {}) {
   const {
     category, sizeDescription, dimensions = null, weightKg, amenities = [],
     dailyRate, ownerId, ownerType = 'void', operatorId = null,
-    homeLat = null, homeLng = null, now = Date.now(),
+    homeStationId = null, homeLat = null, homeLng = null,
+    hasDreamsScreen = false, now = Date.now(),
   } = options;
 
   if (!getDropCategory(category)) {
@@ -78,6 +89,17 @@ function registerDropAsset(store, options = {}) {
   if (!OWNER_TYPES.includes(ownerType)) {
     throw new Error(`registerDropAsset: invalid ownerType "${ownerType}" (expected one of ${OWNER_TYPES.join(', ')})`);
   }
+  if (typeof hasDreamsScreen !== 'boolean') {
+    throw new Error('registerDropAsset requires hasDreamsScreen to be a boolean');
+  }
+
+  let station = null;
+  if (homeStationId !== null) {
+    station = getStation(store, homeStationId);
+    if (!station) throw new Error(`registerDropAsset: no station with id ${homeStationId}`);
+  }
+  const resolvedHomeLat = homeLat !== null ? homeLat : (station ? station.lat : null);
+  const resolvedHomeLng = homeLng !== null ? homeLng : (station ? station.lng : null);
 
   const asset = {
     id: `VOID-DROP-${String(store.nextDropAssetId++).padStart(4, '0')}`,
@@ -91,13 +113,20 @@ function registerDropAsset(store, options = {}) {
     ownerType,
     operatorId: operatorId || ownerId,
     status: 'available',
+    homeStationId,
     // Current location — where the unit physically sits right now,
     // distinct from `homeLat/homeLng` (its fleet base, used for
     // delivery-distance pricing in voidDropBooking.js).
-    lat: homeLat,
-    lng: homeLng,
-    homeLat,
-    homeLng,
+    lat: resolvedHomeLat,
+    lng: resolvedHomeLng,
+    homeLat: resolvedHomeLat,
+    homeLng: resolvedHomeLng,
+    // DREAMS screen (founder's own follow-up: "put our screens on so
+    // they're always advertising"). `dreamsScreenId` is set/cleared by
+    // voidDropBooking.js's own deploy/retrieve steps, fail-soft -- a
+    // DREAMS outage never blocks a real rental.
+    hasDreamsScreen,
+    dreamsScreenId: null,
     createdAt: now,
     retiredAt: null,
   };
@@ -176,6 +205,19 @@ function moveAsset(store, options = {}) {
   return asset;
 }
 
+// Set once a real DREAMS screen is registered for the asset's current
+// deployment (`screenId`), cleared once the unit leaves that location
+// -- see voidDropBooking.js's own deploy/retrieve steps, which call
+// this around a fail-soft DREAMS call rather than this module knowing
+// anything about DREAMS itself.
+function setAssetDreamsScreen(store, options = {}) {
+  const { assetId, screenId } = options;
+  const asset = getDropAsset(store, assetId);
+  if (!asset) throw new Error(`setAssetDreamsScreen: no asset with id ${assetId}`);
+  asset.dreamsScreenId = screenId;
+  return asset;
+}
+
 // `resolvedAt: null` is what `hasOpenMaintenanceIssue` checks — an
 // unresolved event blocks booking regardless of the asset's own
 // `status` field, so a cleaning crew logging "found mold" cannot be
@@ -235,6 +277,7 @@ module.exports = {
   hasOpenMaintenanceIssue,
   setAssetStatus,
   moveAsset,
+  setAssetDreamsScreen,
   logMaintenanceEvent,
   resolveMaintenanceEvent,
   getMaintenanceHistory,

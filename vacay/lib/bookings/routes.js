@@ -40,6 +40,7 @@ const {
 const {
   requestSightseeing, getSightseeingRequest, listSightseeingRequests,
 } = require('./voidHourly');
+const { searchDropStays } = require('./dropStays');
 
 const { requireActor, requireSession } = require('../shieldAuth.cjs');
 
@@ -79,6 +80,7 @@ function requireGuest(getBooking, label) {
 function createBookingsRouter(deps) {
   const {
     store, settleVCoin, requestVoidJob, requestVoidHourlyBooking,
+    searchDropStaysFn, createDropBookingFn,
   } = deps;
   const router = express.Router();
 
@@ -179,6 +181,42 @@ function createBookingsRouter(deps) {
     const request = getSightseeingRequest(store, Number(req.params.id));
     if (!request) return res.status(404).json({ error: `no sightseeing request with id ${req.params.id}` });
     res.json(request);
+  });
+
+  // -- Drop Stays: VOID DROP's "Drop Hotel" (dropRoom/dropHome units
+  // delivered to a real driveway/yard, searched the same way a
+  // regular stay is) -- a read-through and write-through into VOID's
+  // own real asset/booking system, not a second one. See
+  // lib/bookings/dropStays.js's own header.
+
+  router.get('/drop-stays/search', async (req, res) => {
+    try {
+      const { category, lat, lng, startDate, endDate } = req.query;
+      const results = await searchDropStays({
+        category: category || null,
+        lat: Number(lat), lng: Number(lng),
+        startDate: Number(startDate), endDate: Number(endDate),
+        searchDropStaysFn,
+      });
+      res.json({ results });
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // Forwards the real guest's own session to VOID -- `createDropBookingFn`
+  // presents it to VOID's own `requireActor('customerId')` guard, the
+  // same "forward the real Authorization header" pattern vaco-shell's
+  // and vaco-assistant's own cross-app proxies already use. VACAY's
+  // own `requireActor` check here is a real, independent check, not a
+  // formality -- a session invalid here never reaches VOID at all.
+  router.post('/drop-stays', requireActor('customerId'), async (req, res) => {
+    try {
+      const booking = await createDropBookingFn(req.body || {}, req.headers.authorization);
+      res.status(201).json(booking);
+    } catch (err) {
+      res.status(err.status || 400).json({ error: err.message });
+    }
   });
 
   // -- The booking resource itself: same word as the section, no

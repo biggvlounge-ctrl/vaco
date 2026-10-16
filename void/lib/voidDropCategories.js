@@ -25,8 +25,13 @@ const RENTAL_MODELS = [
 ];
 
 const DROP_CATEGORIES = {
+  // Real name, per the founder's own follow-up: "Drop Pop Shop," not
+  // "Drop Shop" -- the mobile retail/pop-up-shop product gets its real
+  // branded name here. The category id stays `dropShop` (it is a
+  // stable key other code and data reference, not customer-facing
+  // copy), only the label/description changed.
   dropShop: {
-    label: 'DROP SHOP', description: 'Mobile retail / pop-up shop.',
+    label: 'DROP POP SHOP', description: 'Mobile retail / pop-up shop.',
     uses: ['boutique', 'retail store', 'temporary storefront', 'vendor space', 'market booth', 'seasonal business', 'product launch', 'brand activation'],
     supportedRentalModels: RENTAL_MODELS,
   },
@@ -80,9 +85,14 @@ const DROP_CATEGORIES = {
     uses: ['gaming', 'esports', 'parties', 'events', 'brand activation'],
     supportedRentalModels: ['hourly', 'daily', 'weekend', 'event-deployment', 'business-deployment'],
   },
+  // Branded "Drop Hotel" when surfaced on VACAY (see
+  // vacay/lib/bookings/dropStays.js) -- the real use case named
+  // directly: a visitor in town who does not want to stay at a hotel
+  // but wants to stay close, so the room comes to the host's own
+  // driveway/yard instead.
   dropRoom: {
     label: 'DROP ROOM', description: 'Mobile guest accommodation.',
-    uses: ['guest room', 'temporary lodging', 'resort expansion', 'event lodging', 'workforce lodging', 'property overflow'],
+    uses: ['guest room', 'temporary lodging', 'resort expansion', 'event lodging', 'workforce lodging', 'property overflow', 'visiting guest near a host\'s home'],
     supportedRentalModels: RENTAL_MODELS,
   },
   dropHome: {
@@ -101,6 +111,14 @@ const DROP_CATEGORIES = {
     label: 'DROP STORAGE', description: 'Secure mobile storage.',
     uses: ['residential storage', 'business storage', 'construction storage', 'event storage', 'inventory storage'],
     supportedRentalModels: RENTAL_MODELS,
+  },
+  // 15th product, added directly as a config entry per the founder's
+  // own follow-up -- no module changed, exactly the design this file's
+  // own header describes.
+  dropBath: {
+    label: 'DROP BATH', description: 'Mobile luxury bathroom.',
+    uses: ['event restroom', 'wedding/venue overflow', 'job-site high-end restroom', 'festival VIP restroom', 'property overflow'],
+    supportedRentalModels: ['hourly', 'daily', 'weekend', 'weekly', 'event-deployment', 'business-deployment'],
   },
 };
 

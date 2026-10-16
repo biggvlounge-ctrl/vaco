@@ -184,6 +184,47 @@ async function requestVoidHourlyBooking(riderId, driverId, blockHours, hourlyRat
   return res.json();
 }
 
+// A plain catalog read -- VOID's own `/api/drop/assets/nearby` needs
+// no session (same posture as `/api/verticals`/`/api/store/listings`
+// elsewhere), so this presents no credential of its own.
+async function searchDropStaysFn({ category, lat, lng, startDate, endDate }) {
+  const params = new URLSearchParams({ category, lat: String(lat), lng: String(lng), startDate: String(startDate), endDate: String(endDate) });
+  const res = await fetch(`${VOID_API_URL}/api/drop/assets/nearby?${params}`);
+  if (!res.ok) {
+    const text = await res.text();
+    let message = `searchDropStaysFn failed (${res.status})`;
+    try { message = JSON.parse(text).error || message; } catch { /* not JSON */ }
+    throw new Error(message);
+  }
+  const body = await res.json();
+  return body.results;
+}
+
+// A real booking, so VOID's own `requireActor('customerId')` guard
+// must see the real guest's session -- `authHeader` is the request's
+// own `Authorization` header, forwarded exactly as received, never
+// VACAY's own service credential (this is not a service-to-service
+// write, it is the guest's own write, relayed).
+async function createDropBookingFn(bookingArgs, authHeader) {
+  const res = await fetch(`${VOID_API_URL}/api/drop/booking`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(authHeader ? { Authorization: authHeader } : {}),
+    },
+    body: JSON.stringify(bookingArgs),
+  });
+  const text = await res.text();
+  let body;
+  try { body = JSON.parse(text); } catch { body = { error: text || `createDropBookingFn failed (${res.status})` }; }
+  if (!res.ok) {
+    const err = new Error(body.error || `createDropBookingFn failed (${res.status})`);
+    err.status = res.status;
+    throw err;
+  }
+  return body;
+}
+
 app.get('/api/health', (_req, res) => {
   res.json({
     ok: true, service: 'vacay', sections: ['bookings', 'home', 'auto', 'flights'],
@@ -221,6 +262,7 @@ function lazyRouter(build) {
 
 app.use('/api/bookings', lazyRouter(() => createBookingsRouter({
   store: store.bookings, settleVCoin, requestVoidJob, requestVoidHourlyBooking,
+  searchDropStaysFn, createDropBookingFn,
 })));
 app.use('/api/home', lazyRouter(() => createHomeRouter({ store: store.home, settleVCoin })));
 app.use('/api/auto', lazyRouter(() => createAutoRouter({ store: store.auto, settleVCoin })));

@@ -416,20 +416,31 @@ physical `MobileSpaceAsset` outlives any one booking, the same shape
 `businessLockers.js` already proved, serving customer A, then B, then
 C. Registered as the `voidDrop` vertical; `createDropBooking` creates
 a real job through the existing `requestJob`/`matchProvider`/
-`acceptJob`/`completeJob` loop rather than a second booking system. 14
-named products (DROP SHOP, DROP FOOD, …) are config entries over one
-real engine, not 14 modules. **Three decisions worth knowing before
+`acceptJob`/`completeJob` loop rather than a second booking system. 15
+named products (DROP POP SHOP, DROP FOOD, …, DROP BATH) are config
+entries over one real engine, not 15 modules. A unit's home base can
+tie to a real Hub/Port station (`homeStationId`); delivery/retrieval
+can be run by a real, approved (verified-skill) VOID driver, paid
+their own real per-leg fee out of the asset operator's proceeds; a
+unit can carry a real DREAMS screen flag, registered/deactivated
+through an injected, fail-soft hook. **Decisions worth knowing before
 touching this**: eligibility never auto-approves (no real zoning/permit
 data source exists anywhere in this ecosystem — a real human/operator
 call always finalizes it, recorded in vaco-audit first); payment
 settles once, at `completeCleaningAndClose`, not at booking time (the
 spec's own flow shows it earlier, which would mean charging before the
 unit moves — a real deposit/refund product decision not invented
-here); delivery pricing is real Haversine distance when both endpoints
-are known, honestly `0` when they are not. **Deliberately not built**:
-third-party marketplace listings (the owner/operator split already
-supports it), V4 discovery, the DREAMS/HVNTZ/VACAY/real-estate hooks,
-DROP ZONES, rent-to-own/revenue-share billing.
+here); delivery pricing is real Haversine distance for *both* real
+legs (delivery and retrieval, each priced — an earlier version only
+charged the outbound one) when both endpoints are known, honestly `0`
+when they are not; DREAMS screen registration has no default
+server-to-server implementation because DREAMS' own `/api/screens`
+requires the real owner's own session, not a service credential. **Now
+wired to VACAY** (`vacay/lib/bookings/dropStays.js`) — real "Drop
+Hotel" search/booking for `dropRoom`/`dropHome`. **Deliberately not
+built**: third-party marketplace listings (the owner/operator split
+already supports it), V4 discovery, the HVNTZ/real-estate hooks, DROP
+ZONES, rent-to-own/revenue-share billing. See `VOID_DROP.md`.
 
 **Real seed data** (`lib/seedDemoData.js`, `SEED_DEMO_DATA_REQUIREMENT.md`):
 two real St. Louis Port Stations, two gig drivers, and four real

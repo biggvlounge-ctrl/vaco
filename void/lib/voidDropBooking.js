@@ -34,8 +34,9 @@
 const { requestJob, matchProvider, acceptJob, completeJob } = require('./marketplace');
 const { getDropCategory } = require('./voidDropCategories');
 const {
-  getDropAsset, isBookable, setAssetStatus, moveAsset, logMaintenanceEvent,
+  getDropAsset, listDropAssets, isBookable, setAssetStatus, moveAsset, setAssetDreamsScreen, logMaintenanceEvent,
 } = require('./voidDropAssets');
+const { canWorkVertical, getProvider } = require('./providerProfiles');
 const { haversineDistanceKm } = require('./geo');
 
 const LOCATION_TYPES = [
@@ -57,11 +58,35 @@ const DROP_BOOKING_STATUSES = [
 // directly, the constant is named so nobody has to grep for a literal.
 const DELIVERY_FEE_PER_KM = 3; // VCoin per km, one-way
 const SETUP_FEE_FLAT = 50; // VCoin, utilities/positioning labor
+// Flagged interpretive: no source document sets a real maximum
+// delivery radius. A visible, overridable default for "how far VOID
+// will actually drive a mobile space," not a hidden assumption.
+const DEFAULT_MAX_DELIVERY_KM = 160; // ~100 miles
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 function round(n) {
   return Math.round(n * 100) / 100;
+}
+
+// "Approved VOID drivers" (founder's own words, describing who picks
+// up and delivers a drop booking). `voidDrop` is not licensing-gated
+// at the vertical level (see verticals.js), so the ecosystem's default
+// `canWorkVertical` would accept a merely-claimed skill -- placing a
+// multi-ton physical structure in a stranger's driveway is real
+// enough stakes to hold this one assignment to the stronger bar
+// licensing-gated verticals already use: a VERIFIED skill, not a
+// claimed one.
+function requireApprovedDropDriver(store, driverId) {
+  const permission = canWorkVertical(store, driverId, 'voidDrop');
+  if (!permission.allowed) {
+    throw new Error(`requireApprovedDropDriver: ${permission.reason}`);
+  }
+  const profile = getProvider(store, driverId);
+  const skill = profile.skills.find((s) => s.verticalId === 'voidDrop');
+  if (skill.status !== 'verified') {
+    throw new Error(`requireApprovedDropDriver: "${driverId}" has only claimed the voidDrop skill, not been verified -- delivering or retrieving a physical unit requires an approved (verified), not merely claimed, driver`);
+  }
 }
 
 // Real rejections only on a real mismatch; everything else needs a
@@ -107,10 +132,20 @@ function assessEligibility(store, options = {}) {
   return { status: 'pending-review', reasons: [], notes };
 }
 
-// Delivery fee is real distance-based pricing, not a flat guess, when
-// both the asset's home location and the drop location are known;
-// `distanceKm: null` (fee 0) when either is missing rather than
-// inventing a number from nothing.
+// Delivery pricing is real distance-based pricing, not a flat guess,
+// when both the asset's home location and the drop location are
+// known; `distanceKm: null` (both fees 0) when either is missing
+// rather than inventing a number from nothing.
+//
+// **Two real legs, two real fees.** A drop booking genuinely requires
+// two one-way trips -- delivery out, retrieval back -- and an earlier
+// version of this function charged `DELIVERY_FEE_PER_KM` once,
+// silently pricing only the outbound leg while the fleet still had to
+// run the return trip for free. `outboundDeliveryFee` and
+// `retrievalFee` are named and summed separately so each real leg's
+// cost is visible, and so a driver who actually drives one of them
+// (see `requireApprovedDropDriver`) can be paid that leg's real fee
+// rather than an invented split of a single combined number.
 function computeDropPrice(store, options = {}) {
   const { assetId, durationDays, deliveryLat = null, deliveryLng = null } = options;
   const asset = getDropAsset(store, assetId);
@@ -122,17 +157,54 @@ function computeDropPrice(store, options = {}) {
   const rentalPrice = round(asset.dailyRate * durationDays);
 
   let distanceKm = null;
-  let deliveryFee = 0;
+  let outboundDeliveryFee = 0;
+  let retrievalFee = 0;
   if (Number.isFinite(asset.homeLat) && Number.isFinite(asset.homeLng)
     && Number.isFinite(deliveryLat) && Number.isFinite(deliveryLng)) {
     distanceKm = round(haversineDistanceKm(asset.homeLat, asset.homeLng, deliveryLat, deliveryLng));
-    deliveryFee = round(distanceKm * DELIVERY_FEE_PER_KM);
+    outboundDeliveryFee = round(distanceKm * DELIVERY_FEE_PER_KM);
+    retrievalFee = outboundDeliveryFee;
   }
 
-  const totalPrice = round(rentalPrice + deliveryFee + SETUP_FEE_FLAT);
+  const totalPrice = round(rentalPrice + outboundDeliveryFee + retrievalFee + SETUP_FEE_FLAT);
   return {
-    rentalPrice, deliveryFee, setupFee: SETUP_FEE_FLAT, distanceKm, totalPrice,
+    rentalPrice, outboundDeliveryFee, retrievalFee, setupFee: SETUP_FEE_FLAT, distanceKm, totalPrice,
   };
+}
+
+// The real-location search VACAY's own "Drop Hotel" surface calls
+// (and anything else wanting "what could actually be dropped near
+// me"): every bookable asset, filtered by category and real date
+// availability, within a real delivery radius of the requested point,
+// nearest first, each with a real quote already computed.
+function listAvailableDropAssetsNear(store, options = {}) {
+  const {
+    category = null, lat, lng, startDate, endDate, maxDistanceKm = DEFAULT_MAX_DELIVERY_KM,
+  } = options;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    throw new Error('listAvailableDropAssetsNear requires numeric lat/lng');
+  }
+  if (!Number.isFinite(startDate) || !Number.isFinite(endDate) || endDate <= startDate) {
+    throw new Error('listAvailableDropAssetsNear requires a numeric startDate before endDate');
+  }
+
+  const durationDays = (endDate - startDate) / MS_PER_DAY;
+  return listDropAssets(store, { category })
+    .filter((asset) => isBookable(store, asset.id))
+    .filter((asset) => isAssetAvailable(store, { assetId: asset.id, startDate, endDate }))
+    .map((asset) => {
+      const distanceKm = (Number.isFinite(asset.homeLat) && Number.isFinite(asset.homeLng))
+        ? round(haversineDistanceKm(asset.homeLat, asset.homeLng, lat, lng))
+        : null;
+      return { asset, distanceKm };
+    })
+    .filter((entry) => entry.distanceKm !== null && entry.distanceKm <= maxDistanceKm)
+    .sort((a, b) => a.distanceKm - b.distanceKm)
+    .map((entry) => ({
+      asset: entry.asset,
+      distanceKm: entry.distanceKm,
+      pricing: computeDropPrice(store, { assetId: entry.asset.id, durationDays, deliveryLat: lat, deliveryLng: lng }),
+    }));
 }
 
 // No overlap, checked against every non-cancelled/non-rejected booking
@@ -150,7 +222,7 @@ function isAssetAvailable(store, options = {}) {
 function createDropBooking(store, options = {}) {
   const {
     customerId, assetId, category, rentalModel, startDate, endDate,
-    locationType, deliveryLat, deliveryLng, roadAccessConfirmed, siteMaxWeightKg = null,
+    locationType, deliveryLat, deliveryLng, siteAddress = null, roadAccessConfirmed, siteMaxWeightKg = null,
     intendedUse, now = Date.now(),
   } = options;
 
@@ -196,6 +268,13 @@ function createDropBooking(store, options = {}) {
     locationType,
     deliveryLat,
     deliveryLng,
+    // Free text ("123 Main St, driveway on the left") -- real
+    // dispatch/ops need something more specific than coordinates, and
+    // it is also what gets passed to DREAMS as a screen's real
+    // `locationAddress` when the asset carries one (see
+    // markArrivedAndDeploying below). Optional: not every category
+    // needs it and no source document requires it.
+    siteAddress,
     intendedUse,
     eligibilityStatus: eligibility.status,
     eligibilityNotes: eligibility.notes,
@@ -273,22 +352,60 @@ function scheduleDelivery(store, options = {}) {
   return booking;
 }
 
+// `driverId` is optional -- a VOID-owned unit may still be driven by
+// VOID's own staff with no outside gig driver at all. When one is
+// named, they must be an approved (verified, not merely claimed)
+// voidDrop driver (see requireApprovedDropDriver's header) -- the real
+// "void drivers that are approved ... will come get it, pick it up,
+// and take it to where it needs to go" mechanism, named directly.
 function dispatchDelivery(store, options = {}) {
-  const { bookingId, now = Date.now() } = options;
+  const { bookingId, driverId = null, now = Date.now() } = options;
   const booking = requireBookingInStatus(store, bookingId, 'delivery-scheduled', 'dispatchDelivery');
+  if (driverId) requireApprovedDropDriver(store, driverId);
   setAssetStatus(store, { assetId: booking.assetId, status: 'in-transit', now });
   booking.status = 'in-transit';
+  booking.deliveryDriverId = driverId;
   return booking;
 }
 
 // The unit has physically arrived and is being positioned/connected --
 // the "Unit is positioned / Utilities connected" step of spec §1.
-function markArrivedAndDeploying(store, options = {}) {
-  const { bookingId, now = Date.now() } = options;
+//
+// **`registerDreamsScreenFn` is injected, not hard-wired** (CLAUDE.md
+// standing rule #4), and fails soft on purpose (standing rule #5: fail
+// soft on signals, hard on money) -- advertising revenue is a feature
+// of the unit, not the rental itself. No function passed, or the call
+// itself failing, means no screen is registered this deployment; it
+// never blocks positioning the unit or starting the rental. Called
+// only for a unit that actually carries a screen
+// (`asset.hasDreamsScreen`) and only once per deployment (skipped if
+// `asset.dreamsScreenId` is already set, e.g. a redeploy after the
+// screen was somehow never cleared).
+async function markArrivedAndDeploying(store, options = {}) {
+  const { bookingId, registerDreamsScreenFn = null, now = Date.now() } = options;
   const booking = requireBookingInStatus(store, bookingId, 'in-transit', 'markArrivedAndDeploying');
+  const asset = getDropAsset(store, booking.assetId);
   setAssetStatus(store, { assetId: booking.assetId, status: 'deploying', now });
   moveAsset(store, { assetId: booking.assetId, lat: booking.deliveryLat, lng: booking.deliveryLng });
   booking.status = 'deployed';
+
+  if (asset.hasDreamsScreen && !asset.dreamsScreenId && typeof registerDreamsScreenFn === 'function') {
+    try {
+      const category = getDropCategory(asset.category);
+      const screen = await registerDreamsScreenFn({
+        screenOwnerId: asset.ownerId,
+        locationName: `VOID DROP ${category.label} — booking #${booking.id}`,
+        locationAddress: booking.siteAddress || `${booking.deliveryLat}, ${booking.deliveryLng}`,
+      });
+      if (screen && screen.screenId) {
+        setAssetDreamsScreen(store, { assetId: booking.assetId, screenId: screen.screenId });
+      }
+    } catch {
+      // Fail soft -- see header. A DREAMS outage must never block a
+      // real deployment.
+    }
+  }
+
   return booking;
 }
 
@@ -315,11 +432,29 @@ function scheduleRetrieval(store, options = {}) {
   return booking;
 }
 
-function dispatchRetrieval(store, options = {}) {
-  const { bookingId, now = Date.now() } = options;
+// Same approved-driver and fail-soft-DREAMS posture as the outbound
+// leg (`dispatchDelivery`/`markArrivedAndDeploying`) -- a different
+// driver may do the return trip than did the delivery, which is
+// exactly why each leg tracks (and, at settlement, pays) its own
+// driver rather than assuming one person does both.
+async function dispatchRetrieval(store, options = {}) {
+  const { bookingId, driverId = null, deactivateDreamsScreenFn = null, now = Date.now() } = options;
   const booking = requireBookingInStatus(store, bookingId, 'retrieval-scheduled', 'dispatchRetrieval');
+  if (driverId) requireApprovedDropDriver(store, driverId);
+  const asset = getDropAsset(store, booking.assetId);
+
+  if (asset.dreamsScreenId && typeof deactivateDreamsScreenFn === 'function') {
+    try {
+      await deactivateDreamsScreenFn({ screenId: asset.dreamsScreenId });
+    } catch {
+      // Fail soft -- see markArrivedAndDeploying's header.
+    }
+    setAssetDreamsScreen(store, { assetId: booking.assetId, screenId: null });
+  }
+
   setAssetStatus(store, { assetId: booking.assetId, status: 'in-transit', now });
   booking.status = 'returning';
+  booking.retrievalDriverId = driverId;
   return booking;
 }
 
@@ -368,8 +503,32 @@ function recordInspectionResult(store, options = {}) {
 async function completeCleaningAndClose(store, options = {}) {
   const { bookingId, settleFn, now = Date.now() } = options;
   const booking = requireBookingInStatus(store, bookingId, 'cleaning', 'completeCleaningAndClose');
+  const asset = getDropAsset(store, booking.assetId);
 
   await completeJob(store, { jobId: booking.jobId, settleFn });
+
+  // The operator's payout above already includes both delivery legs'
+  // real fees (they are part of `totalPrice`). When an approved driver
+  // actually drove a leg rather than the operator doing it themselves,
+  // the operator pays that driver their real leg fee out of what they
+  // were just paid -- a second, separate real settlement through the
+  // same V3 ledger, not a second payment system.
+  const driverLegs = [];
+  if (booking.deliveryDriverId && booking.pricing.outboundDeliveryFee > 0) {
+    driverLegs.push({
+      fromUserId: asset.operatorId, toUserId: booking.deliveryDriverId,
+      amount: booking.pricing.outboundDeliveryFee, reason: `void_drop_delivery_fee:${bookingId}`,
+    });
+  }
+  if (booking.retrievalDriverId && booking.pricing.retrievalFee > 0) {
+    driverLegs.push({
+      fromUserId: asset.operatorId, toUserId: booking.retrievalDriverId,
+      amount: booking.pricing.retrievalFee, reason: `void_drop_retrieval_fee:${bookingId}`,
+    });
+  }
+  if (driverLegs.length > 0) {
+    await settleFn(driverLegs, { reason: `void_drop_driver_fees:${bookingId}` });
+  }
 
   setAssetStatus(store, { assetId: booking.assetId, status: 'available', now });
   booking.status = 'completed';
@@ -401,8 +560,11 @@ module.exports = {
   DROP_BOOKING_STATUSES,
   DELIVERY_FEE_PER_KM,
   SETUP_FEE_FLAT,
+  DEFAULT_MAX_DELIVERY_KM,
+  requireApprovedDropDriver,
   assessEligibility,
   computeDropPrice,
+  listAvailableDropAssetsNear,
   isAssetAvailable,
   createDropBooking,
   getDropBooking,

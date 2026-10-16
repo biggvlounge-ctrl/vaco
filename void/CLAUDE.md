@@ -79,14 +79,19 @@ that genuinely batch through the real routing engine.
   `deliveryChoice.js`.
 - **VOID DROP — mobile space rental & deployment** (select → book →
   deliver → deploy → use → retrieve → redeploy) — `voidDropCategories.js`
-  (the 14 named products, e.g. DROP SHOP/DROP FOOD/DROP SPA, as config,
-  not code — a 15th product is a new entry, never a new module),
-  `voidDropAssets.js` (the physical unit's own lifecycle, independent
-  of any one booking — the real new thing here; everything else in
-  VOID lives only inside a job), `voidDropBooking.js` (eligibility —
-  never auto-approves, a real human/operator call always finalizes it
-  — pricing, and the booking lifecycle, which creates a real job
-  through `marketplace.js` rather than forking it, same as
+  (15 named products, e.g. DROP POP SHOP/DROP FOOD/DROP SPA/DROP BATH,
+  as config, not code — a 16th product is a new entry, never a new
+  module), `voidDropAssets.js` (the physical unit's own lifecycle,
+  independent of any one booking — the real new thing here; everything
+  else in VOID lives only inside a job — plus an optional
+  `homeStationId` tying a unit's fleet base to a real Hub/Port station,
+  and `hasDreamsScreen`/`dreamsScreenId` for a unit that carries a
+  DREAMS screen), `voidDropBooking.js` (eligibility — never
+  auto-approves, a real human/operator call always finalizes it —
+  real two-leg delivery/retrieval pricing, approved-driver dispatch
+  with a real per-leg fee payout, and the booking lifecycle, which
+  creates a real job through `marketplace.js` rather than forking it,
+  same as
   `movingServices.js`). Registered as the `voidDrop` vertical.
 - **Persistence** — `store.js` + `persistence.js` (Proxy-based
   auto-flush to `data/store.json`).
@@ -149,11 +154,20 @@ that genuinely batch through the real routing engine.
   physical rental is actually done. An upfront deposit/hold and a real
   refund policy are a genuine product decision not invented here.
 - **VOID DROP third-party marketplace listings, V4 natural-language
-  discovery, and the DREAMS/HVNTZ/VACAY/real-estate cross-app hooks**
-  the founder's spec describes (§§11, 13–17) — the asset model already
-  separates `ownerId`/`ownerType` from `operatorId` so third-party
-  ownership is not a later rewrite, but nothing calls into those other
-  apps yet.
+  discovery, and the HVNTZ/real-estate cross-app hooks** the founder's
+  spec describes (§§11, 15, 17) — the asset model already separates
+  `ownerId`/`ownerType` from `operatorId` so third-party ownership is
+  not a later rewrite, but nothing calls into those apps yet. **VACAY
+  is now wired** (`vacay/lib/bookings/dropStays.js` — real search +
+  booking for `dropRoom`/`dropHome`, "Drop Hotel").
+- **VOID DROP's real DREAMS screen registration.** `hasDreamsScreen`
+  and the `registerDreamsScreenFn`/`deactivateDreamsScreenFn` hooks on
+  the deploy/retrieve steps are real and tested, but nothing wires a
+  default implementation in `server.js` — DREAMS' own
+  `POST /api/screens` requires the real screen owner's own Shield
+  session, with no service-credential path, so VOID cannot register a
+  screen server-to-server on an owner's behalf through that route as
+  it exists today. See `VOID_DROP.md`'s "DREAMS screens" section.
 
 ## Decisions on the three questions `VOID_MASTER_FREEZE.md` raised
 

@@ -104,7 +104,7 @@ const {
   setAssetStatus, moveAsset, logMaintenanceEvent, resolveMaintenanceEvent, getMaintenanceHistory,
 } = require('./lib/voidDropAssets');
 const {
-  LOCATION_TYPES, computeDropPrice, createDropBooking, getDropBooking, listDropBookingsForUser,
+  LOCATION_TYPES, computeDropPrice, listAvailableDropAssetsNear, createDropBooking, getDropBooking, listDropBookingsForUser,
   approveDropBooking, rejectDropBooking, scheduleDelivery, dispatchDelivery, markArrivedAndDeploying,
   startRental, scheduleRetrieval, dispatchRetrieval, markReturnedForInspection, recordInspectionResult,
   completeCleaningAndClose, cancelDropBooking,
@@ -1453,6 +1453,32 @@ app.get('/api/drop/assets', (req, res) => {
   res.json({ assets: listDropAssets(store, { category, status, ownerId }) });
 });
 
+// "Is there any drop in that location, and where could it be dropped
+// without a problem" -- the founder's own words. The real cross-app
+// read VACAY's own "Drop Hotel" search calls (see
+// vacay/lib/bookings/dropStays.js): a location, a date range, an
+// optional category, back comes every real bookable unit within
+// delivery range with a real quote already attached. A plain catalog
+// read, same posture as `/api/drop/assets` above -- needs no session.
+app.get('/api/drop/assets/nearby', (req, res) => {
+  try {
+    const { category } = req.query;
+    const lat = Number(req.query.lat);
+    const lng = Number(req.query.lng);
+    const startDate = Number(req.query.startDate);
+    const endDate = Number(req.query.endDate);
+    const maxDistanceKm = req.query.maxDistanceKm !== undefined ? Number(req.query.maxDistanceKm) : undefined;
+    res.json({
+      results: listAvailableDropAssetsNear(store, {
+        category: category || null, lat, lng, startDate, endDate,
+        ...(maxDistanceKm !== undefined ? { maxDistanceKm } : {}),
+      }),
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.post('/api/drop/asset/:id/status', requireOperator('void:drop'), (req, res) => {
   try {
     res.json(setAssetStatus(store, { ...req.body, assetId: req.params.id }));
@@ -1583,17 +1609,30 @@ app.post('/api/drop/booking/:id/schedule-delivery', requireOperator('void:drop')
   }
 });
 
+// `driverId` names the real, approved VOID driver (requireApprovedDropDriver's
+// own verified-skill check) who is making this run -- see
+// voidDropBooking.js's own header for why this is optional (a
+// VOID-owned unit may still move with no outside gig driver at all).
 app.post('/api/drop/booking/:id/dispatch-delivery', requireOperator('void:drop'), (req, res) => {
   try {
-    res.json(dispatchDelivery(store, { bookingId: Number(req.params.id) }));
+    res.json(dispatchDelivery(store, { ...req.body, bookingId: Number(req.params.id) }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
-app.post('/api/drop/booking/:id/mark-deploying', requireOperator('void:drop'), (req, res) => {
+// **No default `registerDreamsScreenFn` is wired here.** DREAMS' own
+// `POST /api/screens` requires the real screen owner's own Shield
+// session (`requireActor('screenOwnerId')`) -- confirmed directly,
+// not assumed -- with no service-credential path at all, so VOID
+// cannot register a screen server-to-server on an owner's behalf. The
+// real hook (`voidDropBooking.js`'s own `registerDreamsScreenFn`
+// parameter, fail-soft, fully tested) is ready for whatever real
+// flow eventually lets an owner authorize this once; nothing here
+// pretends that flow already exists.
+app.post('/api/drop/booking/:id/mark-deploying', requireOperator('void:drop'), async (req, res) => {
   try {
-    res.json(markArrivedAndDeploying(store, { bookingId: Number(req.params.id) }));
+    res.json(await markArrivedAndDeploying(store, { bookingId: Number(req.params.id) }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -1615,9 +1654,11 @@ app.post('/api/drop/booking/:id/schedule-retrieval', requireOperator('void:drop'
   }
 });
 
-app.post('/api/drop/booking/:id/dispatch-retrieval', requireOperator('void:drop'), (req, res) => {
+// Same `driverId` posture as dispatch-delivery; same "no default
+// DREAMS hook" posture as mark-deploying above.
+app.post('/api/drop/booking/:id/dispatch-retrieval', requireOperator('void:drop'), async (req, res) => {
   try {
-    res.json(dispatchRetrieval(store, { bookingId: Number(req.params.id) }));
+    res.json(await dispatchRetrieval(store, { ...req.body, bookingId: Number(req.params.id) }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
