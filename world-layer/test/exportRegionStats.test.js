@@ -14,9 +14,11 @@ const { importHifldLayer } = require('../imports/hifldImport');
 const { importOverturePlaces } = require('../imports/overtureImport');
 const { importPlacesTract } = require('../imports/cdcImport');
 const { importClimateNormals } = require('../imports/noaaImport');
+const { importRiskIndex } = require('../imports/femaImport');
+const { importReligionCensus } = require('../imports/religionImport');
 const {
   exportPopulationPack, exportLabourPack, exportInfrastructurePack,
-  exportBusinessPack, exportClimatePack,
+  exportBusinessPack, exportClimatePack, exportRiskPack, exportReligionPack,
 } = require('../exportRegionStats');
 
 test('exportPopulationPack is per-region, and refuses to be otherwise', () => {
@@ -211,4 +213,74 @@ test('exportClimatePack refuses a location with no real climate classification o
     () => exportClimatePack(layer, location.id, { region: 'St. Louis, Missouri' }),
     /no real climate classification/,
   );
+});
+
+// ---------------------------------------------------------------------
+// exportRiskPack
+// ---------------------------------------------------------------------
+
+test('exportRiskPack is per-region, and refuses to be otherwise', () => {
+  assert.throws(() => exportRiskPack(createWorldLayer(), {}), /requires options\.region/);
+});
+
+test('exportRiskPack carries a real NRI county\'s modelled hazard weights', () => {
+  const layer = createWorldLayer();
+  const location = generateLocation(layer, { name: 'St. Louis County', lat: 38.6, lng: -90.2, tier: 'hero' });
+  importRiskIndex(layer, location.id, {
+    countyFips: '29189',
+    countyName: 'St. Louis County, Missouri',
+    ratings: { hurricane: 'Very High', drought: 'Very Low', wildfire: 'Relatively High' },
+  });
+
+  const pack = exportRiskPack(layer, { region: 'St. Louis, Missouri' });
+  assert.equal(pack.counties.length, 1);
+  assert.equal(pack.counties[0].countyFips, '29189');
+  assert.equal(pack.counties[0].hazardRisk.storm, 1);
+  // `drought` rated Very Low (weight 0) is excluded — it carries
+  // nothing a consumer could use, same as excluding it entirely.
+  assert.equal(pack.counties[0].hazardRisk.drought, undefined);
+  // `wildfire` is a real NRI hazard this engine has no mechanism for —
+  // it must not leak into the pack under any `environment.SEVERE` key.
+  assert.deepEqual(Object.keys(pack.counties[0].hazardRisk), ['storm']);
+});
+
+test('exportRiskPack excludes a county whose every modelled hazard is Very Low', () => {
+  const layer = createWorldLayer();
+  const location = generateLocation(layer, { name: 'Quiet County', lat: 38.6, lng: -90.2, tier: 'hero' });
+  importRiskIndex(layer, location.id, { countyFips: '00000', ratings: { drought: 'Very Low' } });
+  const pack = exportRiskPack(layer, { region: 'St. Louis, Missouri' });
+  assert.deepEqual(pack.counties, []);
+});
+
+// ---------------------------------------------------------------------
+// exportReligionPack
+// ---------------------------------------------------------------------
+
+test('exportReligionPack is per-region, and refuses to be otherwise', () => {
+  assert.throws(() => exportReligionPack(createWorldLayer(), {}), /requires options\.region/);
+});
+
+test('exportReligionPack carries a real county\'s religious composition', () => {
+  const layer = createWorldLayer();
+  const location = generateLocation(layer, { name: 'St. Louis County', lat: 38.6, lng: -90.2, tier: 'hero' });
+  importReligionCensus(layer, location.id, {
+    countyFips: '29189',
+    countyName: 'St. Louis County, Missouri',
+    population: 1000000,
+    adherents: { catholic: 300000, evangelicalProtestant: 200000 },
+  });
+
+  const pack = exportReligionPack(layer, { region: 'St. Louis, Missouri' });
+  assert.equal(pack.counties.length, 1);
+  assert.equal(pack.counties[0].countyFips, '29189');
+  assert.ok(pack.counties[0].shares.catholic > 0);
+  assert.ok(pack.counties[0].shares.unaffiliated > 0);
+});
+
+test('exportReligionPack excludes a county with no real population figure to compute shares from', () => {
+  const layer = createWorldLayer();
+  const location = generateLocation(layer, { name: 'Unmeasured County', lat: 38.6, lng: -90.2, tier: 'hero' });
+  importReligionCensus(layer, location.id, { countyFips: '00000', adherents: { catholic: 100 } });
+  const pack = exportReligionPack(layer, { region: 'St. Louis, Missouri' });
+  assert.deepEqual(pack.counties, []);
 });

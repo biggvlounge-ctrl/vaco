@@ -186,6 +186,26 @@ const SEVERE = {
   storm: { resourceType: 'food', supplyDelta: -2, demandDelta: 0, ticks: 4 },
 };
 
+//: Exactly `Object.keys(SEVERE)` — `server/riskPacks.js` duplicates
+//: this list rather than requiring this file (no cross-module
+//: `require` between peer engine files is assumed elsewhere, but the
+//: real reason is the same one every duplicated vocabulary in this
+//: project gives: the two are cross-checked by test, so they cannot
+//: drift silently).
+const HAZARD_CONDITIONS = Object.keys(SEVERE);
+
+//: How much a real, maximal hazard rating (FEMA's "Very High", a
+//: `riskPacks` weight of 1) multiplies that weather's own climate
+//: weight. **Flagged interpretive** — the National Risk Index publishes
+//: a percentile band, not a probability, so there is no real number to
+//: derive this from. Doubling a maximal-risk condition's weight is
+//: deliberately modest, and modest on purpose: climate still decides
+//: which weathers are POSSIBLE for a place — `CLIMATES.arid.storm` is 0
+//: and stays 0 however a real county's flood rating reads, because a
+//: desert does not get coastal flooding. A real hazard pack narrows
+//: WITHIN what the climate already allows; it does not override it.
+const RISK_BOOST = 1;
+
 //: How long a spell of weather lasts before it is redrawn. Flagged
 //: interpretive. A tick is a day, so a week is long enough that the
 //: weather is not noise and short enough that a season is not a
@@ -213,7 +233,7 @@ function stateOf(worldState, cityId) {
 function generateEnvironmentState(worldState, options = {}) {
   const {
     cityId, climate = null, weather = null, seed = worldState.seed ?? 'environment',
-    tick = worldState.tick ?? 0,
+    tick = worldState.tick ?? 0, riskWeights = null,
   } = options;
 
   if (cityId === undefined || cityId === null) {
@@ -235,7 +255,7 @@ function generateEnvironmentState(worldState, options = {}) {
   const row = {
     city_id: cityId,
     climate: chosen,
-    weather: weather ?? drawWeather(chosen, seed, cityId, tick),
+    weather: weather ?? drawWeather(chosen, seed, cityId, tick, riskWeights),
     // JSONB. The live conditions affecting THIS city — which is what
     // gives a drought somewhere to live across a checkpoint.
     active_disasters: [],
@@ -248,9 +268,20 @@ function generateEnvironmentState(worldState, options = {}) {
   return row;
 }
 
-// Weather drawn against the climate's own weights.
-function drawWeather(climate, seed, cityId, tick) {
-  const weights = CLIMATES[climate] ?? CLIMATES.temperate;
+// Weather drawn against the climate's own weights — boosted, per
+// condition, by a real hazard pack's weight for this city, when there
+// is one. `riskWeights` is `{ <SEVERE condition>: 0..1 }`, set once at
+// generation from a real FEMA NRI county (`server/riskPacks.js`) and
+// carried on the city row as `hazardRisk` — null for a world with no
+// risk pack, which reproduces the exact previous computation.
+function drawWeather(climate, seed, cityId, tick, riskWeights = null) {
+  const base = CLIMATES[climate] ?? CLIMATES.temperate;
+  const weights = riskWeights
+    ? Object.fromEntries(Object.entries(base).map(([name, weight]) => {
+      const risk = Number(riskWeights[name]);
+      return [name, Number.isFinite(risk) && risk > 0 ? weight * (1 + risk * RISK_BOOST) : weight];
+    }))
+    : base;
   const total = Object.values(weights).reduce((a, b) => a + b, 0);
   if (total <= 0) return 'clear';
 
@@ -313,7 +344,7 @@ function runEnvironment(worldState, options = {}) {
     if (tick - (state.spell_started_tick ?? 0) < SPELL_TICKS) continue;
 
     const previous = state.weather;
-    state.weather = drawWeather(state.climate, seed, city.id, tick);
+    state.weather = drawWeather(state.climate, seed, city.id, tick, city.hazardRisk ?? null);
     state.spell_started_tick = tick;
     if (state.weather === previous) continue;
 
@@ -382,6 +413,8 @@ module.exports = {
   LATITUDE_BANDS,
   climateForLatitude,
   SEVERE,
+  HAZARD_CONDITIONS,
+  RISK_BOOST,
   SPELL_TICKS,
   stateOf,
   generateEnvironmentState,

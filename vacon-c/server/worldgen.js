@@ -106,6 +106,8 @@ const labourPacks = require('./labourPacks.js');
 const infrastructurePacks = require('./infrastructurePacks.js');
 const businessPacks = require('./businessPacks.js');
 const climatePacks = require('./climatePacks.js');
+const riskPacks = require('./riskPacks.js');
+const religionPacks = require('./religionPacks.js');
 const merchandise = require('./merchandise.js');
 const worldStore = require('./worldStore.js');
 const { hashSeed, seededUnit } = require('./seeded.js');
@@ -319,6 +321,16 @@ function generateWorld(options = {}) {
   } else if (w.climatePack) {
     climatePacks.assertPack(w.climatePack);
   }
+  if (config.riskPack) {
+    w.riskPack = riskPacks.assertPack(config.riskPack);
+  } else if (w.riskPack) {
+    riskPacks.assertPack(w.riskPack);
+  }
+  if (config.religionPack) {
+    w.religionPack = religionPacks.assertPack(config.religionPack);
+  } else if (w.religionPack) {
+    religionPacks.assertPack(w.religionPack);
+  }
 
   // **`worldState.seed` was read by two modules and set by none.**
   // `infrastructure.advanceInfrastructure` seeds its failure draw on
@@ -419,6 +431,18 @@ function generateWorld(options = {}) {
     });
     summary.cities.push(city.id);
 
+    // **The real hazard profile for this city, when a risk pack has
+    // one — a county assigned by the city's own position (§88).** A
+    // real FEMA NRI weight only narrows WITHIN what the city's climate
+    // already allows; see `environment.drawWeather`'s own header.
+    //
+    // **Known, stated limitation: in-memory only.** `cities` has no
+    // `hazard_risk` column in `VACANCY_POSTGRESQL_SCHEMA.sql`, so this
+    // does not survive a restore — same posture as `city.healthBaseline`
+    // just below, and documented in the same two places.
+    const realHazardRisk = riskPacks.riskFor(riskPacks.countyFor(w.riskPack, c));
+    if (realHazardRisk) city.hazardRisk = realHazardRisk;
+
     // Every city gets weather, and now a climate drawn from where it
     // actually sits (`environment.climateForLatitude`) rather than a
     // uniform pick blind to geography — `cityPosition.lat` is a real
@@ -429,6 +453,7 @@ function generateWorld(options = {}) {
     environment.generateEnvironmentState(w, {
       cityId: city.id,
       climate: environment.climateForLatitude(cityPosition.lat, config.seed, c),
+      riskWeights: city.hazardRisk,
       tick,
     });
 
@@ -698,6 +723,12 @@ function generateWorld(options = {}) {
       const tract = populationPacks.tractFor(w.populationPack, tractPosition);
       const realHealthBaseline = populationPacks.healthBaselineFor(tract);
       if (realHealthBaseline !== null) cityHealthBaselines.push(realHealthBaseline);
+      // **The real county for this community's religious composition,
+      // when a religion pack has one — assigned by the same position
+      // a tract is.** See `religionPacks.js`'s own header for why this
+      // one exists on explicit instruction rather than by the same
+      // default this engine applies to every other real source.
+      const religionCounty = religionPacks.countyFor(w.religionPack, tractPosition);
       const residents = [];
       for (let p = 0; p < config.populationPerCommunity; p += 1) {
         //: An age structure rather than a uniform draw: weighting the
@@ -730,7 +761,12 @@ function generateWorld(options = {}) {
           name: `${random.pick(GIVEN_NAMES, 'given', c, b, p)} `
             + `${random.pick(SURNAMES, 'family', c, b, p)}`,
           education: null,     // set below, but only for adults
-          religion: random.pick(config.religions, 'religion', c, b, p),
+          // A real tradition, drawn from the county's own shares, when
+          // this world was built with a religion pack; the invented
+          // vocabulary otherwise — the fallback every other pack in
+          // this file already has, unchanged.
+          religion: religionPacks.religionFor(religionCounty, random.unit('religion-real', c, b, p))
+            ?? random.pick(config.religions, 'religion', c, b, p),
           ethnicity: random.pick(config.ethnicities, 'ethnicity', c, b, p),
           traitValueFor: (def) => Math.round(
             random.range(10, 95, 'trait', c, b, p, def.family, def.name),

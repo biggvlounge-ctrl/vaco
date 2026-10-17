@@ -178,12 +178,73 @@ function exportClimatePack(worldLayer, locationId, options = {}) {
   };
 }
 
+//: `vacon-c/server/riskPacks.js`'s own `HAZARD_CONDITIONS` — duplicated
+//: and cross-checked by that consumer's test.
+const HAZARD_CONDITIONS = ['drought', 'heat', 'freeze', 'storm'];
+
+// A region's real FEMA National Risk Index counties, as a risk pack
+// `vacon-c/server/riskPacks.js` can read.
+//
+// Only a county with at least one modelled hazard above zero is
+// included — a county the NRI covers with every modelled hazard at
+// `Very Low` carries nothing a consumer could use in place of its
+// climate's own baseline weights.
+function exportRiskPack(worldLayer, options = {}) {
+  const { region, source = 'sample' } = options;
+  if (!region) {
+    throw new Error('exportRiskPack requires options.region — a pack is per-region by definition');
+  }
+
+  const counties = [];
+  for (const location of worldLayer.locations || []) {
+    const data = location.geographyData;
+    if (!data || data.source !== 'fema-nri') continue;
+    const hazardRisk = {};
+    for (const [condition, weight] of Object.entries(data.hazardRisk ?? {})) {
+      if (HAZARD_CONDITIONS.includes(condition) && Number(weight) > 0) hazardRisk[condition] = weight;
+    }
+    if (Object.keys(hazardRisk).length === 0) continue;
+    counties.push({ countyFips: data.countyFips, countyName: data.countyName ?? null, hazardRisk });
+  }
+
+  return { region, source, counties };
+}
+
+// A region's real U.S. Religion Census counties, as a religion pack
+// `vacon-c/server/religionPacks.js` can read.
+//
+// **This is the one export in this file for a source `sources.js`
+// records as licence-encumbered rather than public domain.** The
+// warning travels with every county row, same as the importer carries
+// it on every location — see that module's own header, and
+// `religionPacks.js`'s, for why this pack exists at all.
+function exportReligionPack(worldLayer, options = {}) {
+  const { region, source = 'sample' } = options;
+  if (!region) {
+    throw new Error('exportReligionPack requires options.region — a pack is per-region by definition');
+  }
+
+  const counties = [];
+  for (const location of worldLayer.locations || []) {
+    const religion = location.populationData?.religion;
+    if (!religion || religion.source !== 'us-religion-census' || !religion.shares) continue;
+    counties.push({
+      countyFips: religion.countyFips, countyName: religion.countyName ?? null, shares: religion.shares,
+    });
+  }
+
+  return { region, source, counties };
+}
+
 module.exports = {
   RETAIL_CATEGORIES,
   KOPPEN_GROUP_LETTERS,
+  HAZARD_CONDITIONS,
   exportPopulationPack,
   exportLabourPack,
   exportInfrastructurePack,
   exportBusinessPack,
   exportClimatePack,
+  exportRiskPack,
+  exportReligionPack,
 };

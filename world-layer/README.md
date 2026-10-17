@@ -16,11 +16,24 @@ each generating its own separate copy.
 > real CDC PLACES health baseline), `labourPacks.js` (real BLS OES
 > employment shares and wages), `infrastructurePacks.js` (real HIFLD
 > facility capacities), `businessPacks.js` (real Overture Places
-> retail businesses, named and categorized), and `climatePacks.js` (a
-> real NOAA-derived Köppen-Geiger climate key, one per region). Each
-> pack is optional and a world with none of the six still generates
-> exactly as it always did — these are enrichments, never a
+> retail businesses, named and categorized), `climatePacks.js` (a
+> real NOAA-derived Köppen-Geiger climate key, one per region), and
+> `riskPacks.js` (real FEMA National Risk Index hazard weights, which
+> narrow a city's weather draw within its climate's own possibilities).
+> Each of these seven is optional and a world with none of them still
+> generates exactly as it always did — these are enrichments, never a
 > requirement.
+>
+> **One more, `religionPacks.js` (real U.S. Religion Census shares,
+> onto `npcs.religion`), is a different kind of pack and says so in its
+> own header.** Every pack above replaces an invented NUMBER with a
+> real one; this one replaces an invented VOCABULARY — VACON-C's
+> `worldgen.js` deliberately uses fictional religion names for the same
+> stated reason it uses fictional ethnicities, and this pack's real
+> labels go onto people also subject to simulated crime, death and
+> disease mechanics. It exists on explicit instruction, against the
+> recommendation given when it was proposed. A world with no religion
+> pack keeps the fictional vocabulary, unchanged.
 >
 > This module is the layer the global-coverage cost argument rests on:
 > the architecture document's target is "90%+ automated world
@@ -112,8 +125,22 @@ for the full reasoning.
   the published Köppen-Geiger vocabulary. All three are real,
   tested transforms with no live fetch (same outbound-proxy block as
   the rest of this list).
+- `imports/femaImport.js` — real FEMA National Risk Index county
+  ratings, turned into a weight per `environment.SEVERE` condition
+  (`exportRegionStats.js`'s `exportRiskPack`) — and, named rather than
+  folded in, the published hazards (wildfire, earthquake, and so on)
+  this engine genuinely has no mechanism for. No live fetch (same
+  outbound-proxy block).
+- `imports/religionImport.js` — the U.S. Religion Census, the one
+  source in `sources.js` that is licence-encumbered rather than public
+  domain, carrying that warning on every row it writes. `importReligionCensus()`
+  turns real county adherent counts into shares over a closed,
+  stated tradition vocabulary plus `unaffiliated`. Unlike every other
+  source here, wiring this into VACON-C was a genuine design tension
+  rather than a default — see `religionPacks.js`'s own header on the
+  VACON-C side.
 - `exportRegion.js` / `exportRegionStats.js` — the consumer join: turn
-  a region's real imported data into the six packs VACON-C's own
+  a region's real imported data into the eight packs VACON-C's own
   reader modules validate and read (see the note at the top of this
   file). Plain JSON, never a cross-directory `require`.
 - `schema.sql` — the literal Postgres shape (`world_locations`,

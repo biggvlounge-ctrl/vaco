@@ -1039,6 +1039,61 @@ either real source, not one specific string — the sixth rule's shape,
 a field read that assumes a vocabulary narrower than the one the
 writer actually uses.
 
+**A twenty-ninth, and it is the first of these that is not a bug. Two
+more real sources closed the same way as the twenty-seventh and
+twenty-eighth rules' six — and one of them is not like the rest, and
+says so rather than pretending otherwise.**
+
+`world-layer/imports/femaImport.js` (real FEMA National Risk Index
+hazard ratings) and `imports/religionImport.js` (real U.S. Religion
+Census shares) had been sitting fully built and tested, same posture
+as every other importer, when a direct question ("what else could we
+add for consistency?") surfaced them.
+
+**FEMA risk closes the same way everything else has: `server/
+riskPacks.js` is `landmarkPacks.js`'s shape again, assigned by city
+position (§88).** `environment.js`'s own header already named the gap
+— "a climate profile is not a hazard profile... two temperate river
+towns, one on a floodplain and one on a bluff, get the same storms" —
+and a real county's weight now boosts `environment.drawWeather`'s own
+climate-weighted draw, **narrowing WITHIN what the climate already
+allows, never outside it**: `CLIMATES.arid.storm` stays 0 however a
+real county's flood rating reads, because a desert does not get
+coastal flooding. `city.hazardRisk` is in-memory only, same known
+limitation as `city.healthBaseline`.
+
+**Religion Census is not the same shape, and the difference was
+caught before it shipped rather than after.** Every pack before this
+one replaces an invented NUMBER with a real one. `worldgen.js`'s
+religion vocabulary (`'Tidewater', 'Ridge', 'None'`) is invented for a
+different, stated reason — the same file renames its ethnicities too,
+"because borrowing real ethnonyms would attach real-world associations
+to a simulation that models none of them." The U.S. Religion Census
+uses real tradition names (Protestant, Catholic, Muslim, Jewish, and
+so on), and this engine's NPCs are also subject to its own crime,
+death and disease mechanics — wiring real religious identity onto a
+procedurally generated crime record is a different kind of call than a
+real wage band or a real climate key.
+
+This was raised directly rather than decided silently either way, and
+the explicit answer was to wire it in — against the recommendation
+given when it was raised. `server/religionPacks.js` exists and is
+wired into `worldgen.js` exactly that way, with the tension recorded in
+its own header rather than smoothed over, and the §9 firewall carried
+through unchanged: this reader draws one NPC's value from real local
+shares the same way `attainmentFor` already does for education, and
+nothing in this engine's generators reads `religion` to gate morality,
+criminality, intelligence or worth. A world built with no religion
+pack keeps the invented vocabulary, exactly as before — the judgement
+about whether to supply one belongs to whoever builds that world.
+
+The general shape, for whichever of this project's remaining unwired
+sources comes up next: most of them are the twenty-seventh rule's kind
+— a real number standing in for an invented one, wire it the same way
+every time. A few, where the real vocabulary carries a real-world
+identity onto simulated people, are not, and the difference is worth
+surfacing before writing the reader, not after.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and
