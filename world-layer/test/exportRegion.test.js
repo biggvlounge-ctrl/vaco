@@ -15,6 +15,8 @@ const assert = require('node:assert/strict');
 const { createWorldLayer, generateLocation, setLocationData } = require('../locations');
 const { exportRegion, categoryOf, significanceOf, KEY_CATEGORIES } = require('../exportRegion');
 const { importUnescoSites } = require('../imports/unescoImport');
+const { importGnisFeatures } = require('../imports/gnisImport');
+const { importOvertureDivisions } = require('../imports/overtureImport');
 
 function layerWith(entries) {
   const layer = createWorldLayer();
@@ -105,4 +107,43 @@ test('the Key is the documents’ twenty-three, plus the school they disagree ab
   assert.ok(KEY_CATEGORIES.includes('school'));
   assert.ok(KEY_CATEGORIES.includes('masonic-building'));
   assert.ok(KEY_CATEGORIES.includes('other-distinctive-feature'));
+});
+
+// ---------------------------------------------------------------------
+// GNIS and Overture Divisions need no new exporter code at all — this
+// locks that finding in rather than leaving it as something somebody
+// has to re-derive. Both write onto `landmarkData` with categories
+// already in `KEY_CATEGORIES`, the same field and vocabulary every
+// other landmark source here uses, so `exportRegion` already reads
+// them with zero changes.
+// ---------------------------------------------------------------------
+
+test('a real GNIS natural feature exports through the existing join, unmodified', () => {
+  const layer = createWorldLayer();
+  const { imported, places } = importGnisFeatures(layer, [
+    { featureName: 'Elephant Rocks', featureClass: 'summit', primaryLatitude: 37.6, primaryLongitude: -90.7, countyName: 'Iron County' },
+    { featureName: 'Mark Twain Cave', featureClass: 'cave', primaryLatitude: 39.5, primaryLongitude: -91.4 },
+    { featureName: 'Hannibal', featureClass: 'populated place', primaryLatitude: 39.7, primaryLongitude: -91.3 },
+  ]);
+  assert.equal(imported.length, 2, 'the two real features should be placed');
+  assert.deepEqual(places, ['Hannibal'], 'the populated place should be collected as an area name, not a landmark');
+
+  const pack = exportRegion(layer, { region: 'Missouri', tiers: ['regional'] });
+  assert.equal(pack.locations.length, 2);
+  assert.ok(pack.locations.some((l) => l.name === 'Elephant Rocks' && l.category === 'natural-formation'));
+  assert.ok(pack.locations.some((l) => l.name === 'Mark Twain Cave' && l.category === 'cave-system'));
+  assert.equal(pack.locations.find((l) => l.name === 'Elephant Rocks').area, 'Iron County');
+});
+
+test('real Overture Divisions names are exactly the areas a landmark pack wants', () => {
+  const layer = createWorldLayer();
+  const { byLevel } = importOvertureDivisions(layer, [
+    { names: { primary: 'Forest Park' }, subtype: 'neighborhood', lat: 38.64, lng: -90.29 },
+    { names: { primary: 'Downtown' }, subtype: 'neighborhood', lat: 38.63, lng: -90.19 },
+    { names: { primary: 'Missouri' }, subtype: 'region', lat: 38.5, lng: -92.3 },
+  ]);
+  // `byLevel.community` is already the shape `landmarkPacks.js`
+  // validates as `pack.areas` — a caller assembling a real pack
+  // passes it straight through, no transform needed.
+  assert.deepEqual(byLevel.community.sort(), ['Downtown', 'Forest Park']);
 });

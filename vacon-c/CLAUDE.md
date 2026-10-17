@@ -1094,6 +1094,56 @@ every time. A few, where the real vocabulary carries a real-world
 identity onto simulated people, are not, and the difference is worth
 surfacing before writing the reader, not after.
 
+**A thirtieth, and it is the twenty-seventh rule's third case: not
+every real source needs a new join at all.** A full pass over
+`world-layer/sources.js`'s remaining entries found four shapes, not
+one:
+
+- **`cmsImport.js` and `ncesImport.js` are REFRESH sources for a join
+  that already existed**, not new ones. Both write a real capacity
+  onto the exact `buildingData.infrastructureType`/`.capacity` fields
+  HIFLD already fills — CMS a fresher, legally-required hospital bed
+  count (`preferByDate` decides the winner at import time, not by
+  which source is declared authoritative), NCES a real pupil count
+  for `schools`. `world-layer/exportRegionStats.js`'s
+  `exportInfrastructurePack` gated on `source === 'hifld-open'`
+  alone, which would have silently dropped every CMS-refreshed or
+  NCES-sourced facility — the twenty-eighth rule's
+  `exportPopulationPack` bug, in a third place. Fixed the same way:
+  check for any of the real sources, not one string.
+- **`gnisImport.js` and `overtureImport.js`'s
+  `importOvertureDivisions()` needed no new code anywhere.** GNIS
+  writes real natural features (caves, summits — the two Key
+  categories nothing else in the registry names) onto `landmarkData`
+  with a category already in `exportRegion.js`'s `KEY_CATEGORIES`, so
+  the existing exporter already reads them with zero changes; its own
+  `places` output and Overture Divisions' `byLevel.community` are
+  both already the exact shape `landmarkPacks.js`'s `areas` field
+  wants. `world-layer/test/exportRegion.test.js` now asserts this
+  rather than leaving it as a claim nobody checked.
+- **`usgsImport.js` (elevation/terrain) is a real, tested transform
+  with no VACON-C consumer to join it to**, and that is a declared
+  choice rather than an oversight: nothing in this engine currently
+  decides anything from a terrain fact, and wiring real data into a
+  field nothing reads is the eleventh rule read backwards — a real
+  import nothing reads is indistinguishable from not importing it.
+  `statistics.terrain_and_water`'s own entry already named this
+  precisely ("two importers and a pack reader away") before this
+  pass; re-read rather than re-guessed, and still correctly
+  unavailable — closing it needs a design decision about what
+  terrain should DO, not a reader.
+- **`overtureImport.js`'s `importOvertureBuildings()` (real footprint/
+  height/floor data) is real and matches no existing per-city or
+  per-community join** — every other pack here is assigned one real
+  row per city or community; a building pack would need one real row
+  per ordinary generated HOME, a materially larger structural change
+  left for its own round rather than folded into this one.
+  `wikidataImport.js`/`wikimediaCommons` overlap UNESCO/NRHP/GNIS with
+  little marginal value (and Commons is images this engine has no
+  renderer for); `naturalEarthImport.js`/`openweatherImport.js` sit at
+  a grain this engine's city/community model does not currently ask
+  for.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

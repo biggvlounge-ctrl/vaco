@@ -49,14 +49,14 @@ const BUILD_SCOPE = {
   },
   worldLayer: {
     modules: 31,
-    lines: 6940,
+    lines: 6957,
     sources: 24,
     importers: 22,
   },
   tests: {
     files: 89,
-    lines: 33671,
-    cases: 1687,
+    lines: 33749,
+    cases: 1692,
   },
   countedAt: '2026-10-17',
 };

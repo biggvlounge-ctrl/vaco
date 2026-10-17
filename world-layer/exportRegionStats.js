@@ -90,12 +90,28 @@ function exportLabourPack(worldLayer, options = {}) {
   return { region, source, metros };
 }
 
-// A region's real HIFLD facilities, as an infrastructure pack
+//: Sources that can fill `infrastructurePacks.js`'s `facilitiesByType`.
+//: **Three, not one, and all real.** `imports/cmsImport.js` is a
+//: REFRESH source for the same `hospitals` type HIFLD already fills —
+//: its own header explains why a bed count needs a second, dated
+//: source — and resolves which figure wins at IMPORT time
+//: (`cmsImport.preferByDate`), so by the time a location is read here
+//: its `buildingData.source` already says whichever won.
+//: `imports/ncesImport.js` fills `schools` the same way HIFLD fills
+//: `hospitals`: a real pupil count in `buildingData.capacity`. Gating
+//: this export on `'hifld-open'` alone was exactly the bug
+//: `exportPopulationPack` had for a CDC-only tract — a real figure
+//: silently dropped because it arrived under a different source
+//: string.
+const INFRASTRUCTURE_SOURCES = ['hifld-open', 'cms-pos', 'nces'];
+
+// A region's real HIFLD/CMS/NCES facilities, as an infrastructure pack
 // `vacon-c/server/infrastructurePacks.js` can read.
 //
 // Only facilities with a real, reported capacity are included — a
-// facility HIFLD could not report a capacity for carries nothing this
-// pack's consumer could use in place of its own invented band.
+// facility none of the three could report a capacity for carries
+// nothing this pack's consumer could use in place of its own invented
+// band.
 function exportInfrastructurePack(worldLayer, options = {}) {
   const { region, source = 'sample' } = options;
   if (!region) {
@@ -105,7 +121,7 @@ function exportInfrastructurePack(worldLayer, options = {}) {
   const facilitiesByType = {};
   for (const location of worldLayer.locations || []) {
     const data = location.buildingData;
-    if (!data || data.source !== 'hifld-open' || !data.capacityReported) continue;
+    if (!data || !INFRASTRUCTURE_SOURCES.includes(data.source) || !data.capacityReported) continue;
     const type = data.infrastructureType;
     if (!facilitiesByType[type]) facilitiesByType[type] = [];
     facilitiesByType[type].push(data.capacity);
@@ -240,6 +256,7 @@ module.exports = {
   RETAIL_CATEGORIES,
   KOPPEN_GROUP_LETTERS,
   HAZARD_CONDITIONS,
+  INFRASTRUCTURE_SOURCES,
   exportPopulationPack,
   exportLabourPack,
   exportInfrastructurePack,

@@ -16,6 +16,8 @@ const { importPlacesTract } = require('../imports/cdcImport');
 const { importClimateNormals } = require('../imports/noaaImport');
 const { importRiskIndex } = require('../imports/femaImport');
 const { importReligionCensus } = require('../imports/religionImport');
+const { importProvider } = require('../imports/cmsImport');
+const { importInstitution } = require('../imports/ncesImport');
 const {
   exportPopulationPack, exportLabourPack, exportInfrastructurePack,
   exportBusinessPack, exportClimatePack, exportRiskPack, exportReligionPack,
@@ -98,6 +100,41 @@ test('exportInfrastructurePack excludes a facility HIFLD reported no capacity fo
   ]);
   const pack = exportInfrastructurePack(layer, { region: 'St. Louis, Missouri' });
   assert.deepEqual(pack.facilitiesByType, {});
+});
+
+test('exportInfrastructurePack carries a real CMS-refreshed bed count, not just HIFLD\'s', () => {
+  // `cmsImport.preferByDate` decides the winner at import time — this
+  // proves the exporter does not then drop it for arriving under a
+  // different source string, the exact bug `exportPopulationPack` had.
+  const layer = createWorldLayer();
+  const location = generateLocation(layer, { name: 'Barnes-Jewish Hospital', lat: 38.63, lng: -90.26, tier: 'hero' });
+  importProvider(layer, location.id, {
+    ccn: '260001', providerType: 'short-term-hospital', beds: 1250, collectedAt: '2026-01-01',
+  });
+  const pack = exportInfrastructurePack(layer, { region: 'St. Louis, Missouri' });
+  assert.deepEqual(pack.facilitiesByType.hospitals, [1250]);
+});
+
+test('exportInfrastructurePack carries a real NCES school enrolment as capacity', () => {
+  const layer = createWorldLayer();
+  const location = generateLocation(layer, { name: 'Lincoln Elementary', lat: 38.6, lng: -90.2, tier: 'filler' });
+  importInstitution(layer, location.id, 'ccd', { enrolment: 420, teachers: 28, gradeSpan: 'KG-05' });
+  const pack = exportInfrastructurePack(layer, { region: 'St. Louis, Missouri' });
+  assert.deepEqual(pack.facilitiesByType.schools, [420]);
+});
+
+test('exportInfrastructurePack blends HIFLD, CMS and NCES facilities of different types together', () => {
+  const layer = createWorldLayer();
+  const { imported } = importHifldLayer(layer, 'hospitals', [
+    { name: 'Mercy Hospital St. Louis', lat: 38.65, lng: -90.35, beds: 974 },
+  ]);
+  assert.equal(imported.length, 1);
+  const school = generateLocation(layer, { name: 'Central High', lat: 38.6, lng: -90.2, tier: 'filler' });
+  importInstitution(layer, school.id, 'ccd', { enrolment: 900, teachers: 60, gradeSpan: '09-12' });
+
+  const pack = exportInfrastructurePack(layer, { region: 'St. Louis, Missouri' });
+  assert.deepEqual(pack.facilitiesByType.hospitals, [974]);
+  assert.deepEqual(pack.facilitiesByType.schools, [900]);
 });
 
 // ---------------------------------------------------------------------

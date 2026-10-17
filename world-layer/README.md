@@ -35,6 +35,32 @@ each generating its own separate copy.
 > recommendation given when it was proposed. A world with no religion
 > pack keeps the fictional vocabulary, unchanged.
 >
+> **`cmsImport.js` and `ncesImport.js` are REFRESH sources for
+> `infrastructurePacks.js`, not new packs** — a real CMS bed count and
+> a real NCES pupil count fill the same `hospitals`/`schools` capacity
+> HIFLD fills, and the exporter now reads all three. `gnisImport.js`
+> and `overtureImport.js`'s `importOvertureDivisions()` needed **no
+> new code at all**: both already write onto the exact fields
+> `exportRegion.js` and `landmarkPacks.js` already read.
+>
+> **Genuinely not wired, and that is a stated choice, not an
+> oversight.** `usgsImport.js` (elevation/terrain) has no existing
+> VACON-C consumer — nothing in the engine reads a terrain fact today
+> — and wiring real data into a field nothing decides anything from
+> would be the eleventh standing rule read backwards: a real import
+> nothing reads is indistinguishable from not importing it. Closing it
+> for real means a design decision about what terrain should DO first,
+> not a pack reader. `overtureImport.js`'s `importOvertureBuildings()`
+> (real footprint/height/floor data) would mean matching every
+> ordinary generated home, not one per city or community — a materially
+> bigger structural change than anything above, left for its own round
+> rather than rushed into this one. `wikidataImport.js` and
+> `wikimediaCommons` overlap UNESCO/NRHP/GNIS landmark coverage with
+> little marginal value, and Commons is images this engine has no
+> renderer to use. `naturalEarthImport.js` and `openweatherImport.js`
+> sit at a grain (country boundaries; historical weather events) this
+> engine's city/community model does not currently ask for.
+>
 > This module is the layer the global-coverage cost argument rests on:
 > the architecture document's target is "90%+ automated world
 > construction, 10% human refinement", and this is the 90%. It is real
@@ -139,10 +165,32 @@ for the full reasoning.
   source here, wiring this into VACON-C was a genuine design tension
   rather than a default — see `religionPacks.js`'s own header on the
   VACON-C side.
+- `imports/cmsImport.js`, `imports/ncesImport.js` — two more REFRESH
+  sources for the same `infrastructurePacks.js` consumer HIFLD already
+  fills, not new pack types. `importProvider()` is CMS's quarterly,
+  legally-required bed count — fresher than HIFLD's own, decided by
+  collection date (`preferByDate`) rather than by which source is
+  "the" winner. `importInstitution()` turns a real NCES pupil count
+  into a school's capacity the same way HIFLD gives a hospital one.
+  `exportRegionStats.js`'s `exportInfrastructurePack` reads all three
+  sources now — gating it on `'hifld-open'` alone would have silently
+  dropped every CMS-refreshed or NCES-sourced facility, the same bug
+  class `exportPopulationPack` had for a CDC-only tract.
+- `imports/gnisImport.js`, `imports/overtureImport.js`'s
+  `importOvertureDivisions()` — **both needed zero new exporter or
+  reader code.** GNIS writes real natural features (caves, summits,
+  bluffs — the two Key categories nothing else in this registry names)
+  onto `landmarkData` with a category already in `exportRegion.js`'s
+  own `KEY_CATEGORIES`, so `exportRegion` already reads them; its
+  `places` output (real populated-place names) and Overture Divisions'
+  `byLevel.community` are both already the exact shape a landmark
+  pack's `areas` field wants. `test/exportRegion.test.js` locks this in
+  rather than leaving it as something to re-derive later.
 - `exportRegion.js` / `exportRegionStats.js` — the consumer join: turn
   a region's real imported data into the eight packs VACON-C's own
   reader modules validate and read (see the note at the top of this
-  file). Plain JSON, never a cross-directory `require`.
+  file), plus the two sources above that need no pack of their own.
+  Plain JSON, never a cross-directory `require`.
 - `schema.sql` — the literal Postgres shape (`world_locations`,
   `world_location_events`, `world_npcs`, `world_businesses`,
   `world_business_employees`, `world_transport_nodes`,

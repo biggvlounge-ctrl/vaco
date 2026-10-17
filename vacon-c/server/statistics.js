@@ -1468,22 +1468,26 @@ const CATALOGUE = [
   },
   {
     key: 'terrain_and_water', category: 'environment', unit: 'share', scope: 'community',
-    unavailable: '§9 asks for woods, rivers, lakes and flood zones. `regions.geography_key` '
-      + 'and `regions.climate_key` are the only geography in the schema, both TEXT, both '
-      + 'written by nothing. **This entry was re-read on 23 Sep 2026 because two of the four '
-      + 'sources it was waiting on now exist** — the twenty-first standing rule, which is '
-      + 'about exactly this: a declared gap goes stale in one direction, because nothing '
-      + 'prompts you to re-check what it was waiting for. `world-layer/imports/usgsImport.js` '
-      + 'now classifies terrain from 3DEP elevation and writes `locations.terrainType`, and '
-      + '`imports/femaImport.js` carries FEMA flood risk as `geographyData.hazardRisk`. '
-      + 'What is genuinely left is smaller and nameable: (1) the National Hydrography '
-      + 'Dataset and NLCD have no importer, so rivers, lakes and woodland specifically are '
-      + 'still unsourced; (2) no engine-side reader — this would arrive as a DATA pack the '
-      + 'way `landmarkPacks.js` reads landmarks, never a cross-directory require; and (3) '
-      + 'nothing has actually been imported, because every source host is blocked at this '
-      + 'environment\'s proxy (`world-layer/sources.realisedCoverage()` reports zero). The '
-      + 'statistic stays unavailable, but it is now two importers and a pack reader away '
-      + 'rather than four sources away.',
+    unavailable: '§9 asks for woods, rivers, lakes and flood zones. Re-read a second time '
+      + '(17 Oct 2026) for the same reason the first re-read happened — the twenty-first '
+      + 'standing rule, about a declared gap going stale in one direction because nothing '
+      + 'prompts a re-check. **`regions.climate_key` is no longer written by nothing**: '
+      + '`climatePacks.js` (built this pass) writes a real NOAA-derived Köppen key through '
+      + '`migration.generateRegion`, so the first re-read\'s "both TEXT, both written by '
+      + 'nothing" is now true only of `geography_key`. **A real hazard reader also exists '
+      + 'now** — `riskPacks.js` closes the second re-read\'s point (2), and FEMA NRI weights '
+      + 'reach `environment.drawWeather` directly rather than sitting on `geographyData` '
+      + 'unconsumed. **Terrain itself is still the one piece with no engine-side reader at '
+      + 'all** — `usgsImport.js` classifies real 3DEP elevation and writes '
+      + '`locations.terrainType`, and nothing in this engine decides anything from a terrain '
+      + 'fact today, so building a reader with nothing to feed would be the eleventh rule '
+      + 'read backwards (see CLAUDE.md\'s thirtieth standing rule). What is genuinely left: '
+      + '(1) the National Hydrography Dataset and NLCD have no importer, so rivers, lakes '
+      + 'and woodland specifically are still unsourced; (2) terrain needs a design decision '
+      + 'about what it should DO before it needs a reader; and (3) nothing has actually been '
+      + 'imported, because every source host is blocked at this environment\'s proxy '
+      + '(`world-layer/sources.realisedCoverage()` reports zero). The statistic stays '
+      + 'unavailable, and what it is waiting on changed shape rather than closed.',
   },
 
   // ---- psychological -------------------------------------------------
