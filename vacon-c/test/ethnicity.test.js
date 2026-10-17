@@ -93,11 +93,16 @@ test('exactly one module reads it, and it is the one that counts', () => {
   // `engine.js` and `worldgen.js` SET it; `births.js` inherits it;
   // `migrate.js` and `restore.js` CARRY it, which is not the same as
   // deciding with it — a persistence layer that skipped the column
-  // would drop the dimension on every checkpoint. Anything outside this
-  // list is a new decision somebody should make on purpose.
+  // would drop the dimension on every checkpoint. `ancestryPacks.js`
+  // RESOLVES the real-vs-invented VALUE `worldgen.js` sets it to — the
+  // same explicit decision `religionPacks.js` took for `religion` one
+  // field over, made on purpose, on 17 Oct 2026, after this tension
+  // was raised directly. It adds no new READER of the field; nothing
+  // downstream of `npc.ethnicity` changed. Anything outside this list
+  // is a new decision somebody should make on purpose.
   const expected = [
-    'births.js', 'demographics.js', 'engine.js', 'migrate.js',
-    'restore.js', 'statistics.js', 'worldgen.js',
+    'ancestryPacks.js', 'births.js', 'demographics.js', 'engine.js',
+    'migrate.js', 'restore.js', 'statistics.js', 'worldgen.js',
   ];
   const unexpected = readers.filter((f) => !expected.includes(f));
   assert.deepEqual(unexpected, [],

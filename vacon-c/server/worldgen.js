@@ -108,6 +108,7 @@ const businessPacks = require('./businessPacks.js');
 const climatePacks = require('./climatePacks.js');
 const riskPacks = require('./riskPacks.js');
 const religionPacks = require('./religionPacks.js');
+const ancestryPacks = require('./ancestryPacks.js');
 const natalityPacks = require('./natalityPacks.js');
 const incomePacks = require('./incomePacks.js');
 const gangPacks = require('./gangPacks.js');
@@ -335,6 +336,11 @@ function generateWorld(options = {}) {
     w.religionPack = religionPacks.assertPack(config.religionPack);
   } else if (w.religionPack) {
     religionPacks.assertPack(w.religionPack);
+  }
+  if (config.ancestryPack) {
+    w.ancestryPack = ancestryPacks.assertPack(config.ancestryPack);
+  } else if (w.ancestryPack) {
+    ancestryPacks.assertPack(w.ancestryPack);
   }
   if (config.natalityPack) {
     w.natalityPack = natalityPacks.assertPack(config.natalityPack);
@@ -839,6 +845,12 @@ function generateWorld(options = {}) {
       // one exists on explicit instruction rather than by the same
       // default this engine applies to every other real source.
       const religionCounty = religionPacks.countyFor(w.religionPack, tractPosition);
+      // **The real tract for this community's ancestry composition,
+      // when an ancestry pack has one — assigned by the same position
+      // a tract is.** See `ancestryPacks.js`'s own header for why this
+      // one exists on explicit instruction, same posture as
+      // `religionCounty` just above.
+      const ancestryTract = ancestryPacks.tractFor(w.ancestryPack, tractPosition);
       const residents = [];
       for (let p = 0; p < config.populationPerCommunity; p += 1) {
         //: An age structure rather than a uniform draw: weighting the
@@ -877,7 +889,12 @@ function generateWorld(options = {}) {
           // this file already has, unchanged.
           religion: religionPacks.religionFor(religionCounty, random.unit('religion-real', c, b, p))
             ?? random.pick(config.religions, 'religion', c, b, p),
-          ethnicity: random.pick(config.ethnicities, 'ethnicity', c, b, p),
+          // A real ancestry group, drawn from the tract's own shares,
+          // when this world was built with an ancestry pack; the
+          // invented vocabulary otherwise — same fallback shape as
+          // `religion` just above.
+          ethnicity: ancestryPacks.ethnicityFor(ancestryTract, random.unit('ethnicity-real', c, b, p))
+            ?? random.pick(config.ethnicities, 'ethnicity', c, b, p),
           traitValueFor: (def) => Math.round(
             random.range(10, 95, 'trait', c, b, p, def.family, def.name),
           ),

@@ -403,6 +403,26 @@ function exportCrimeHotspotPack(worldLayer, options = {}) {
   return { region, source, city, areas };
 }
 
+// A region's real Census ACS ancestry/national-origin shares, as an
+// ancestry pack `vacon-c/server/ancestryPacks.js` can read. Read
+// `imports/ancestryImport.js`'s header before using this — it writes
+// onto the same invented-vocabulary tension `exportReligionPack` does.
+function exportAncestryPack(worldLayer, options = {}) {
+  const { region, source = 'sample' } = options;
+  if (!region) {
+    throw new Error('exportAncestryPack requires options.region — a pack is per-region by definition');
+  }
+
+  const tracts = [];
+  for (const location of worldLayer.locations || []) {
+    const ancestry = location.populationData?.ancestry;
+    if (!ancestry || ancestry.source !== 'us-census-acs-ancestry' || !ancestry.shares) continue;
+    tracts.push({ tractId: ancestry.tractId, shares: ancestry.shares });
+  }
+
+  return { region, source, tracts };
+}
+
 module.exports = {
   RETAIL_CATEGORIES,
   KOPPEN_GROUP_LETTERS,
@@ -421,4 +441,5 @@ module.exports = {
   exportNatalityPack,
   exportPoliticalPack,
   exportCrimeHotspotPack,
+  exportAncestryPack,
 };

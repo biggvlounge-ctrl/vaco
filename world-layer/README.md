@@ -264,8 +264,18 @@ for the full reasoning.
   own open-data portals are the real thing closest to what was asked
   for. Feeds only VACON-C's deprivation/property-crime pressure, never
   the separately calibrated violent-crime mechanism.
+- `imports/ancestryImport.js` — real Census ACS ancestry/national-
+  origin shares (Table B04006), turned into a tract's composition over
+  a closed vocabulary that keeps Somali and Bosnian as their own
+  groups rather than folding them into a region —
+  `exportAncestryPack`, read via `ancestryPacks.js` on the VACON-C
+  side. **The same tension `religionImport.js` already carries, one
+  field over.** `worldgen.js`'s ethnicity vocabulary is invented for a
+  stated reason; this source replaces it on explicit instruction,
+  after that tension was raised a second time. See that module's own
+  header.
 - `exportRegion.js` / `exportRegionStats.js` — the consumer join: turn
-  a region's real imported data into the twelve packs VACON-C's own
+  a region's real imported data into the thirteen packs VACON-C's own
   reader modules validate and read (see the note at the top of this
   file), plus the sources above that need no pack of their own.
   Plain JSON, never a cross-directory `require`.

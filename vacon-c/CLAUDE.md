@@ -1382,6 +1382,45 @@ exactly the balance those four attempts fixed. A test
 is not defined there — rather than trying to prove a negative through
 a seeded draw.
 
+**A thirty-fifth, closing the ancestry/national-origin half of the
+thirty-third rule's correction — the reversal explicitly approved,
+built the same way `religionPacks.js` was.**
+
+`world-layer/imports/ancestryImport.js` and `server/ancestryPacks.js`
+replace `worldgen.js`'s invented ethnicity vocabulary
+(`'Riverborn', 'Highland', 'Coastwise', 'Outlander'`) with real Census
+ACS ancestry/national-origin groups (Table B04006), the same shape
+`religionPacks.js` already took for `npcs.religion` — a real
+vocabulary standing in for an invented one, wired on explicit
+instruction after the tension (borrowing real ethnonyms attaches
+real-world associations to a simulation that models none of them) was
+raised and the call made anyway.
+
+**Somali and Bosnian are kept as their own groups, not folded into a
+region.** B04006 enumerates roughly ninety specific ancestry codes;
+this importer generalises most of them into major groups the way
+`religionImport.js` generalises denominations into traditions, but the
+two groups the request named directly — "Somali community in
+Minnesota," "Bosnian community in St. Louis" — stay their own entries
+rather than being absorbed into `subsaharan-african` or a generic
+European bucket. Collapsing the two specific examples the request gave
+into a regional average would have defeated the entire point of
+building this.
+
+**The §9 firewall is easier to hold here than it was for religion, and
+the reason is the existing guard rather than a new one.**
+`test/ethnicity.test.js` already asserted, before this round, that
+NOTHING in this engine reads `npc.ethnicity` to decide an outcome, and
+that exactly one module (`demographics.js`) measures it. Adding
+`ancestryPacks.js` as a second permitted reader — it supplies the
+VALUE the field is set to, the same relationship `religionPacks.js`
+has to `npcs.religion` — required updating that test's own allowlist,
+and nothing else. The firewall test is the proof: it would have failed
+loudly had this reader tried to make a DECISION with the field instead
+of just filling it, and it did fail once, for the right reason, before
+the allowlist was updated — see the test's own comment on why
+`ancestryPacks.js` belongs there now.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

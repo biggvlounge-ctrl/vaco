@@ -590,6 +590,24 @@ const SOURCES = {
       + 'carefully calibrated violent-crime escalation mechanism — see '
       + '`crimeHotspotPacks.js`\'s own header.',
   },
+  ancestry: {
+    name: 'U.S. Census ACS Ancestry (Table B04006)',
+    licence: 'U.S. Government Work — public domain',
+    licenceCheckedAt: null,
+    access: 'census.gov API, same endpoint family as censusImport.js; no key',
+    host: 'data.census.gov',
+    fills: ['populationData'],
+    tiers: ['regional'],
+    scale: 'self-reported ancestry/national-origin counts, per tract, every ACS 5-year release',
+    wired: 'imports/ancestryImport.js',
+    note: '**Not like most sources here, and the tension is religionCensus\'s, raised and '
+      + 'approved the same way.** `worldgen.js`\'s ethnicity vocabulary is invented on '
+      + 'purpose, for the same stated reason its religion vocabulary is. Wired in on '
+      + 'explicit instruction after being asked directly for real community character '
+      + '(Somali/Minneapolis, Bosnian/St. Louis, Jewish/New York) — see '
+      + '`server/ancestryPacks.js`\'s own header. `npc.ethnicity` stays read by nothing, '
+      + 'enforced by `test/ethnicity.test.js`; this changes what fills it, not what reads it.',
+  },
 
   // -------------------------------------------------------------------
   // People, work and money

@@ -24,6 +24,7 @@ const { importPitCount } = require('../imports/hudPitImport');
 const { importNygsJurisdiction } = require('../imports/nygsImport');
 const { importCountyReturns } = require('../imports/electionImport');
 const { importAreaIncidents } = require('../imports/cityCrimeImport');
+const { importAncestryTract } = require('../imports/ancestryImport');
 const {
   exportPopulationPack, exportLabourPack, exportInfrastructurePack,
   exportBusinessPack, exportClimatePack, exportRiskPack, exportReligionPack,
@@ -32,6 +33,7 @@ const {
   exportGangPack,
   exportPoliticalPack,
   exportCrimeHotspotPack,
+  exportAncestryPack,
 } = require('../exportRegionStats');
 
 test('exportPopulationPack is per-region, and refuses to be otherwise', () => {
@@ -521,4 +523,32 @@ test('exportCrimeHotspotPack excludes an area with neither real rate', () => {
   importAreaIncidents(layer, location.id, { city: 'los-angeles', areaName: 'Nowhere', population: null });
   const pack = exportCrimeHotspotPack(layer, { region: 'Los Angeles, California', city: 'los-angeles' });
   assert.deepEqual(pack.areas, []);
+});
+
+// ---------------------------------------------------------------------
+// exportAncestryPack
+// ---------------------------------------------------------------------
+
+test('exportAncestryPack is per-region, and refuses to be otherwise', () => {
+  assert.throws(() => exportAncestryPack(createWorldLayer(), {}), /requires options\.region/);
+});
+
+test('exportAncestryPack carries a real tract\'s ancestry composition', () => {
+  const layer = createWorldLayer();
+  const location = generateLocation(layer, { name: 'Tract A', lat: 44.9, lng: -93.2, tier: 'filler' });
+  importAncestryTract(layer, location.id, {
+    tractId: '27053001100', population: 20000, counts: { somali: 6000, bosnian: 2000 },
+  });
+  const pack = exportAncestryPack(layer, { region: 'Minneapolis, Minnesota' });
+  assert.equal(pack.tracts.length, 1);
+  assert.equal(pack.tracts[0].tractId, '27053001100');
+  assert.equal(pack.tracts[0].shares.somali, 0.3);
+});
+
+test('exportAncestryPack excludes a tract with no real population figure to compute shares from', () => {
+  const layer = createWorldLayer();
+  const location = generateLocation(layer, { name: 'Tract B', lat: 44.9, lng: -93.2, tier: 'filler' });
+  importAncestryTract(layer, location.id, { tractId: '00000', counts: { somali: 100 } });
+  const pack = exportAncestryPack(layer, { region: 'Minneapolis, Minnesota' });
+  assert.deepEqual(pack.tracts, []);
 });
