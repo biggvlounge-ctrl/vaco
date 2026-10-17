@@ -294,7 +294,14 @@ function addDiseaseOutbreak(worldState, options = {}) {
 // `survivalScarcity` its own `cityId`; an outbreak scoped to one city
 // raising every city's death rate is the same bug one file over.
 function diseasePressure(worldState, cityId = null) {
-  let pressure = 1;
+  // **A real CDC PLACES baseline, when this city has one — 1
+  // (ordinary, unmeasured) otherwise.** `worldgen.js` sets
+  // `city.healthBaseline` from a real tract's prevalence when a
+  // population pack covers it; nothing here invents a number for a
+  // city that was never measured.
+  const city = cityId !== null ? (worldState.cities || []).find((c) => c.id === cityId) : null;
+  const baseline = Number(city?.healthBaseline);
+  let pressure = Number.isFinite(baseline) ? baseline : 1;
   for (const condition of worldState.activeConditions || []) {
     if (cityId !== null && condition.cityId !== cityId) continue;
     const multiplier = Number(condition.mortalityMultiplier);

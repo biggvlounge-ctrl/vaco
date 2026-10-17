@@ -6,4 +6,6 @@ module.exports = {
   ...require('./propagation'),
   ...require('./assetLibrary'),
   ...require('./imports/unescoImport'),
+  ...require('./exportRegion'),
+  ...require('./exportRegionStats'),
 };

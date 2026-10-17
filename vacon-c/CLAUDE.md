@@ -944,6 +944,101 @@ on the DISTRIBUTION — 1,000 draws, more than 990 distinct, mean between
 rule's lesson in a new place: **assert the property that was claimed,
 not the one that is easy to check.**
 
+**A twenty-seventh, and it is the twenty-first rule's own sequel: the
+join it made for landmarks was not the whole join.**
+`world-layer/imports/censusImport.js`, `blsImport.js`, and
+`hifldImport.js` had been sitting next to `unescoImport.js` the whole
+time, turning real Census ACS, BLS OES, and HIFLD Open data into
+exactly the shapes three of this engine's own invented bands stand in
+for — age structure and adult attainment (`worldgen.js`'s population
+loop), occupation weighting (`occupations.drawOccupation`'s `1/tier`
+pyramid) and wages (`worldgen.js`'s flat `random.range(8, 90, ...)`
+hire), and per-type infrastructure capacity
+(`DESIGN_CAPACITY_PER_1K * cityPopulation / 1000`). Nobody had asked
+whether `landmarkPacks.js`'s join was the only one these three
+importers were waiting for.
+
+`server/populationPacks.js`, `labourPacks.js`, and
+`infrastructurePacks.js` are the same join, three more times, same
+shape as `landmarkPacks.js` throughout: a pack is data, never a
+`require('../world-layer')`; a bad pack is refused outright, never
+half-applied; a world with none of the three still generates exactly
+as it always did (every new call site is a `realValue ?? inventedBand`
+fallback, verified by running the full suite before and after with no
+behavior change on the no-pack path). The one new wrinkle: a tract or
+a metro has no NAME an auto-generated community can be matched to the
+way a landmark's own `area` field matches it to a neighbourhood, so
+packs are assigned by POSITION (city index * communitiesPerCity +
+community index) — standing rule 8 (§88) applied to data this engine
+did not generate, not just data it did.
+
+See `world-layer/README.md`'s own corrected header for what this
+closes on that side.
+
+**A twenty-eighth, and it is the twenty-seventh rule's own sequel:
+three more real sources were sitting beside the three that closed it,
+asked for in the same breath as "corporations, businesses... disease...
+weather" and never checked separately.**
+`world-layer/imports/overtureImport.js` (real named businesses, mapped
+onto this engine's ten retail types), `cdcImport.js` (real CDC PLACES
+chronic-disease prevalence), and `noaaImport.js` (real NOAA climate
+normals, classified into the published Köppen-Geiger vocabulary) had
+each already been built and tested in isolation, same as the census/
+BLS/HIFLD trio was before the twenty-seventh rule closed that join.
+
+`server/businessPacks.js`, a `healthBaseline` extension to
+`populationPacks.js`, and `server/climatePacks.js` are the same three
+joins, same shape throughout — a pack is data, never a
+`require('../world-layer')`; a bad pack is refused outright, never
+half-applied; a world with none of the three still generates exactly
+as it always did. Three real wrinkles, not one:
+
+- **Retail is matched BY NAME, not position — the landmark rule, not
+  the tract rule.** A real Overture business has an `area`, the same
+  field a landmark pack's `byArea` groups on, so `worldgen.js`'s
+  existing shop-placement loop (draw-without-replacement from
+  `landmarks.RETAIL_CATEGORIES`, per area) now checks a real business
+  queue for that area first and falls through to the random draw only
+  once it is empty. A real business's significance still comes from
+  its category's own band — Overture knows a business exists, not what
+  it is worth remembering, and inventing a score would be exactly the
+  mistake `landmarkPacks.js`'s own `significanceFor` was written to
+  avoid on the hero side.
+- **A multiplicative baseline needs a starting point other mechanisms
+  can still move.** `mortality.diseasePressure` already multiplies in
+  each active condition's `mortalityMultiplier` against an implicit
+  starting pressure of 1; a real CDC baseline (itself already centred
+  on 1, per `toHealthPressure`) replaces that implicit 1 rather than
+  replacing the function. `city.healthBaseline` is the mean of its
+  covered communities' real tract baselines, set once at generation —
+  **known, stated limitation: in-memory only**, no column in
+  `VACANCY_POSTGRESQL_SCHEMA.sql`, so a world rebuilt from Postgres
+  loses the enrichment and falls back to the unmeasured default, same
+  as a world with no pack at all. Not a silent loss: this is the
+  declaration, same posture as a statistic this engine declares it
+  cannot compute.
+- **One climate per region, because this engine generates one region
+  per world — and scoped to the one column confirmed to be read by
+  nothing.** `migration.js#generateRegion`'s `climateKey` parameter and
+  `barter.js`'s "`regions.climate_key` is written by nothing" were both
+  already on file, waiting for exactly this caller. Deliberately NOT
+  wired into `environment.climateForLatitude`'s own per-city value,
+  which already feeds live weather mechanics with an incompatible,
+  invented vocabulary — Köppen letters are a different classification,
+  and overriding a live reader's enum with a different one is the
+  mistake worth avoiding here.
+
+Found and fixed in the same pass: `world-layer/exportRegionStats.js`'s
+own `exportPopulationPack` gated a tract's inclusion on
+`data.source === 'us-census-acs'` alone, which would have silently
+dropped a location's real CDC health baseline on any tract CDC covered
+but ACS did not — `importPlacesTract` nests its own data under
+`healthPrevalence` without necessarily being the import that set a
+location's top-level `populationData.source`. The fix checks for
+either real source, not one specific string — the sixth rule's shape,
+a field read that assumes a vocabulary narrower than the one the
+writer actually uses.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

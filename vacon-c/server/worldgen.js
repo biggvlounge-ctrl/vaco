@@ -101,6 +101,11 @@ const landmarks = require('./landmarks.js');
 const salvage = require('./salvage.js');
 const produce = require('./produce.js');
 const landmarkPacks = require('./landmarkPacks.js');
+const populationPacks = require('./populationPacks.js');
+const labourPacks = require('./labourPacks.js');
+const infrastructurePacks = require('./infrastructurePacks.js');
+const businessPacks = require('./businessPacks.js');
+const climatePacks = require('./climatePacks.js');
 const merchandise = require('./merchandise.js');
 const worldStore = require('./worldStore.js');
 const { hashSeed, seededUnit } = require('./seeded.js');
@@ -283,6 +288,38 @@ function generateWorld(options = {}) {
     landmarkPacks.assertPack(w.landmarkPack);
   }
 
+  // **A population, labour, or infrastructure pack, on the same terms
+  // as the landmark pack just above.** Each is optional, each is
+  // refused outright rather than half-applied, and a world with none
+  // of the three still generates exactly as it always has — see
+  // `populationPacks.js`/`labourPacks.js`/`infrastructurePacks.js`
+  // for what each actually changes.
+  if (config.populationPack) {
+    w.populationPack = populationPacks.assertPack(config.populationPack);
+  } else if (w.populationPack) {
+    populationPacks.assertPack(w.populationPack);
+  }
+  if (config.labourPack) {
+    w.labourPack = labourPacks.assertPack(config.labourPack);
+  } else if (w.labourPack) {
+    labourPacks.assertPack(w.labourPack);
+  }
+  if (config.infrastructurePack) {
+    w.infrastructurePack = infrastructurePacks.assertPack(config.infrastructurePack);
+  } else if (w.infrastructurePack) {
+    infrastructurePacks.assertPack(w.infrastructurePack);
+  }
+  if (config.businessPack) {
+    w.businessPack = businessPacks.assertPack(config.businessPack);
+  } else if (w.businessPack) {
+    businessPacks.assertPack(w.businessPack);
+  }
+  if (config.climatePack) {
+    w.climatePack = climatePacks.assertPack(config.climatePack);
+  } else if (w.climatePack) {
+    climatePacks.assertPack(w.climatePack);
+  }
+
   // **`worldState.seed` was read by two modules and set by none.**
   // `infrastructure.advanceInfrastructure` seeds its failure draw on
   // `worldState.seed ?? 'infra'` and `statecraft.runSchooling` seeds a
@@ -397,6 +434,18 @@ function generateWorld(options = {}) {
 
     const cityPopulation = config.communitiesPerCity * config.populationPerCommunity;
 
+    // **The real metro for this city, when a labour pack has one —
+    // assigned by the city's own position (§88), cycling if there are
+    // fewer real metros than cities.** Resolved once per city and
+    // reused for every hire in it, the same way `tract` is resolved
+    // once per community above.
+    const metro = labourPacks.metroFor(w.labourPack, c);
+
+    // Real CDC PLACES health baselines, collected per community as
+    // each one resolves its own real tract below, then averaged onto
+    // the city once every community in it has been built.
+    const cityHealthBaselines = [];
+
     // ---- infrastructure --------------------------------------------
     for (const spec of CITY_INFRASTRUCTURE) {
       // Placed in the city, not at its centre. **This is the whole
@@ -408,14 +457,20 @@ function generateWorld(options = {}) {
       const sitePosition = geo.scatter(
         cityPosition, geo.COMMUNITY_SPREAD_M, [config.seed, 'site', c, spec.type],
       );
+      // **A real facility's own capacity, when an infrastructure pack
+      // has one for this type — the per-capita band otherwise.**
+      // `infrastructurePacks.capacityFor` returns null for a world
+      // with no pack, or a pack with nothing for this type, so the
+      // `??` falls through to exactly what this line computed before.
+      const realCapacity = infrastructurePacks.capacityFor(w.infrastructurePack, spec.type, c);
       infrastructure.generateInfrastructure(w, {
         cityId: city.id,
         type: spec.type,
         latitude: sitePosition.lat,
         longitude: sitePosition.lon,
-        capacity: spec.capacityPer1k === undefined
+        capacity: realCapacity ?? (spec.capacityPer1k === undefined
           ? null
-          : Math.round((spec.capacityPer1k * cityPopulation) / 1000),
+          : Math.round((spec.capacityPer1k * cityPopulation) / 1000)),
         // A world that starts at 100 everywhere has no variation for
         // any statistic to find, and a world that starts at 50
         // everywhere has the placeholder problem this project keeps
@@ -633,6 +688,16 @@ function generateWorld(options = {}) {
       }
 
       // ---- people ------------------------------------------------------
+      // **The real tract for this community, when a population pack
+      // has one — a tract assigned by this community's own position
+      // in the loop (city index * communitiesPerCity + community
+      // index), never by `community.id` (§88).** Null for a world
+      // with no pack, which is exactly the fallback every draw below
+      // already had.
+      const tractPosition = c * config.communitiesPerCity + b;
+      const tract = populationPacks.tractFor(w.populationPack, tractPosition);
+      const realHealthBaseline = populationPacks.healthBaselineFor(tract);
+      if (realHealthBaseline !== null) cityHealthBaselines.push(realHealthBaseline);
       const residents = [];
       for (let p = 0; p < config.populationPerCommunity; p += 1) {
         //: An age structure rather than a uniform draw: weighting the
@@ -647,7 +712,19 @@ function generateWorld(options = {}) {
         //: work or bear. 1.5 puts the median near thirty, which is the
         //: figure a real population lands on.
         const u = random.unit('age', c, b, p);
-        const age = 1 + (u ** 1.5) * 84;
+        // **A real age band, when this community has a real tract —
+        // the invented pyramid otherwise.** `ageBandFor` draws the
+        // band off `u` against the tract's real shares; a SEPARATE
+        // draw places the person within that band, because reusing
+        // `u` for both would correlate "early in the band" with
+        // "low `u`" and skew every band toward its own young end.
+        const realBand = populationPacks.ageBandFor(tract, u);
+        const age = realBand
+          ? (() => {
+            const [low, high] = populationPacks.AGE_BAND_RANGES[realBand];
+            return low + random.unit('age-within-band', c, b, p) * (high - low);
+          })()
+          : 1 + (u ** 1.5) * 84;
 
         const npc = engine.generateNPC({
           name: `${random.pick(GIVEN_NAMES, 'given', c, b, p)} `
@@ -707,11 +784,17 @@ function generateWorld(options = {}) {
         // invented.
         if (age >= 18) {
           const level = random.unit('edu', c, b, p);
-          npc.education = level < 0.12 ? 'none'
-            : level < 0.45 ? 'basic'
-              : level < 0.7 ? 'secondary'
-                : level < 0.85 ? 'vocational'
-                  : level < 0.96 ? 'higher' : 'advanced';
+          // **The tract's own real attainment shares, when it has
+          // them — the invented threshold ladder otherwise.** ACS
+          // suppresses attainment for some tracts (small populations),
+          // so a tract with no shares recorded still falls through to
+          // the same fixed thresholds this always used.
+          npc.education = populationPacks.attainmentFor(tract, level)
+            ?? (level < 0.12 ? 'none'
+              : level < 0.45 ? 'basic'
+                : level < 0.7 ? 'secondary'
+                  : level < 0.85 ? 'vocational'
+                    : level < 0.96 ? 'higher' : 'advanced');
         } else {
           npc.education = 'none';
         }
@@ -819,22 +902,31 @@ function generateWorld(options = {}) {
         if (businesses.length === 0) return;
         if (random.unit('employed', c, b, ai) > config.employmentRate) return;
         const employer = businesses[random.int(businesses.length, 'employer', c, b, ai)];
+        // **The trade, which no hire in this engine ever recorded.**
+        // Seeded on the person, which is `occupations.drawOccupation`'s
+        // own §88 exception: the draw is about them. Gated on their
+        // attainment, so the schooling this file already sets decides
+        // what work they can hold — and never on whether they hold any.
+        // Weighted by the city's real metro, when there is one.
+        const hiredPosition = occupations.drawOccupation({
+          npc,
+          worldState: w,
+          organizationType: employer.type,
+          seed: config.seed,
+          extra: [c, b, ai],
+          metro,
+        });
         economy.hireEntity(w, {
           entityId: npc.id,
           employerOrganizationId: employer.id,
-          wage: Math.round(random.range(8, 90, 'wage', c, b, ai)),
-          // **The trade, which no hire in this engine ever recorded.**
-          // Seeded on the person, which is `occupations.drawOccupation`'s
-          // own §88 exception: the draw is about them. Gated on their
-          // attainment, so the schooling this file already sets decides
-          // what work they can hold — and never on whether they hold any.
-          position: occupations.drawOccupation({
-            npc,
-            worldState: w,
-            organizationType: employer.type,
-            seed: config.seed,
-            extra: [c, b, ai],
-          }),
+          // **The real median wage for this trade in this metro, when
+          // one is recorded — the flat invented band otherwise.** A
+          // real labour market pays an engineer and a cook
+          // differently; the band this always drew from did not.
+          wage: Math.round(
+            labourPacks.medianWageFor(metro, hiredPosition) ?? random.range(8, 90, 'wage', c, b, ai),
+          ),
+          position: hiredPosition,
           tick,
         });
         membership.joinOrganization(w, {
@@ -919,6 +1011,26 @@ function generateWorld(options = {}) {
           rel.trust = Math.round(random.range(25, 85, 'rtrust', c, b, i, k));
         }
       }
+    }
+
+    // **The city's real health baseline, if any of its communities had
+    // one — the mean of a real multiplier, never an invented one.**
+    // `mortality.diseasePressure` reads this in place of the implicit
+    // 1 an unmeasured city carries; a city with no covered community
+    // leaves the field unset and `diseasePressure` falls through to
+    // exactly what it always did.
+    //
+    // **Known, stated limitation: in-memory only.** `cities` has no
+    // `health_baseline` column in `VACANCY_POSTGRESQL_SCHEMA.sql`, so
+    // this does not survive a restore — a world rebuilt from Postgres
+    // loses the enrichment and falls back to the unmeasured default,
+    // same as a world that was never given a population pack. Not a
+    // silent loss: documented here and in `VACANCY_INVENTORY.md`,
+    // same posture as this file's own §88 seed-not-identity notes.
+    if (cityHealthBaselines.length > 0) {
+      city.healthBaseline = Math.round(
+        (cityHealthBaselines.reduce((a, v) => a + v, 0) / cityHealthBaselines.length) * 1000,
+      ) / 1000;
     }
 
     // ---- landmarks and shops ------------------------------------------
@@ -1040,16 +1152,38 @@ function generateWorld(options = {}) {
       // Drawn without replacement WITHIN an area, so one neighbourhood
       // does not get two pharmacies, and re-drawn per area, so the ten
       // retail types are all reachable across a city.
+      // **A real business pack's own businesses for this area, when it
+      // has any — matched by the community's own name, exactly like
+      // `landmarkPacks.byArea` matches a landmark.** Queued per area
+      // and shifted off as rounds for that area run, so a real
+      // business is used once, never twice, and an area with fewer
+      // real businesses than `shopsPerArea` falls through to the
+      // existing random draw for the rest.
+      const realBusinessQueues = new Map();
       const retailRounds = [];
       for (const home of (cityCommunityRows.length > 0 ? cityCommunityRows : [anchor])) {
         const pool = [...landmarks.RETAIL_CATEGORIES];
+        realBusinessQueues.set(home, [...businessPacks.businessesForArea(w.businessPack, home?.name)]);
         for (let n = 0; n < config.shopsPerArea && pool.length > 0; n += 1) {
           retailRounds.push({ home, pool });
         }
       }
       for (let k = 0; k < retailRounds.length; k += 1) {
         const { home: area, pool } = retailRounds[k];
-        const pick = pool.splice(random.int(pool.length, 'shop', c, k), 1)[0];
+        const realBusiness = realBusinessQueues.get(area)?.shift() ?? null;
+        let pick;
+        if (realBusiness) {
+          // Remove it from the random pool too, when it is still
+          // there — an earlier round in this same area may already
+          // have drawn the same category at random, which a real
+          // business sharing it is not a bug, just a real area that
+          // happens to have two of one kind.
+          const poolIndex = pool.indexOf(realBusiness.category);
+          if (poolIndex !== -1) pool.splice(poolIndex, 1);
+          pick = realBusiness.category;
+        } else {
+          pick = pool.splice(random.int(pool.length, 'shop', c, k), 1)[0];
+        }
         const definition = landmarks.RETAIL_TYPES[pick];
         const home = area ?? anchor;
         const row = property.generateProperty(w, {
@@ -1077,6 +1211,11 @@ function generateWorld(options = {}) {
             random.range(definition.significance[0], definition.significance[1], 'ssig', c, k),
           ),
           tick,
+          // A real business's own name, when this round used one —
+          // Overture knows a business exists, not what it is worth
+          // remembering, so significance still comes from the
+          // category's own band above, same as a generated shop.
+          name: realBusiness?.name ?? null,
           // "a auto parts store" — the article has to follow the word,
           // and this text is a name a player reads.
           what: `${/^[aeiou]/.test(pick) ? 'an' : 'a'} ${pick.replace(/-/g, ' ')} on this corner`,
@@ -1261,10 +1400,15 @@ function generateWorld(options = {}) {
   // somewhere genuinely elsewhere — and what `civilization_id` on a
   // region connects to.
   //
-  // `geography_key` and `climate_key` stay null: both are free TEXT
-  // that no document enumerates, and inventing a climate vocabulary
-  // here is the mistake `environment_state` is still open for.
-  const region = migration.generateRegion(w, { name: config.regionName });
+  // `geography_key` stays null — still free TEXT no document
+  // enumerates, and still not invented here. `climate_key` now gets a
+  // real Köppen-Geiger code when a climate pack has one — see
+  // `climatePacks.js` for why it was safe to close this one and not
+  // `geography_key`: nothing else in this engine reads `climate_key`
+  // at all yet, so there was no existing vocabulary to collide with.
+  const region = migration.generateRegion(w, {
+    name: config.regionName, climateKey: climatePacks.climateKeyFor(w.climatePack),
+  });
   for (const cityId of summary.cities) {
     const city = w.cities.find((x) => x.id === cityId);
     if (city) city.region_id = region.id;

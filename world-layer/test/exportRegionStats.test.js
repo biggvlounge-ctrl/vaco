@@ -1,0 +1,214 @@
+// Exporting a region's real population, labour, and infrastructure
+// statistics — `exportRegion.test.js`'s sibling for the three
+// non-landmark importers.
+
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+
+const { createWorldLayer, generateLocation, setLocationData } = require('../locations');
+const { importAcsTract } = require('../imports/censusImport');
+const { importOesMetro } = require('../imports/blsImport');
+const { importHifldLayer } = require('../imports/hifldImport');
+const { importOverturePlaces } = require('../imports/overtureImport');
+const { importPlacesTract } = require('../imports/cdcImport');
+const { importClimateNormals } = require('../imports/noaaImport');
+const {
+  exportPopulationPack, exportLabourPack, exportInfrastructurePack,
+  exportBusinessPack, exportClimatePack,
+} = require('../exportRegionStats');
+
+test('exportPopulationPack is per-region, and refuses to be otherwise', () => {
+  assert.throws(() => exportPopulationPack(createWorldLayer(), {}), /requires options\.region/);
+});
+
+test('exportPopulationPack carries a real ACS tract\'s age bands and attainment', () => {
+  const layer = createWorldLayer();
+  const location = generateLocation(layer, { name: 'Tract 1234', lat: 38.6, lng: -90.2, tier: 'filler' });
+  importAcsTract(layer, location.id, {
+    tractId: '29510123400',
+    population: 4200,
+    ageCounts: { child: 800, working: 2700, elder: 700 },
+    attainment: {
+      less_than_high_school: 400, high_school_graduate: 1200,
+      some_college: 900, associates_degree: 300, bachelors_degree: 900, graduate_or_professional: 300,
+    },
+  });
+
+  const pack = exportPopulationPack(layer, { region: 'St. Louis, Missouri' });
+  assert.equal(pack.region, 'St. Louis, Missouri');
+  assert.equal(pack.tracts.length, 1);
+  assert.equal(pack.tracts[0].tractId, '29510123400');
+  assert.ok(pack.tracts[0].ageBands.working > 0.5);
+  assert.ok(pack.tracts[0].attainment.basic > 0);
+});
+
+test('exportPopulationPack skips a location with no real ACS import', () => {
+  const layer = createWorldLayer();
+  generateLocation(layer, { name: 'Unimported Tract', lat: 1, lng: 2, tier: 'filler' });
+  const pack = exportPopulationPack(layer, { region: 'St. Louis, Missouri' });
+  assert.deepEqual(pack.tracts, []);
+});
+
+test('exportLabourPack is per-region, and refuses to be otherwise', () => {
+  assert.throws(() => exportLabourPack(createWorldLayer(), {}), /requires options\.region/);
+});
+
+test('exportLabourPack carries a real OES metro\'s employment shares and wages', () => {
+  const layer = createWorldLayer();
+  const location = generateLocation(layer, { name: 'St. Louis MSA', lat: 38.6, lng: -90.2, tier: 'hero' });
+  importOesMetro(layer, location.id, {
+    areaCode: '41180', areaName: 'St. Louis, MO-IL', year: 2024,
+    rows: [
+      { socGroup: '17', employment: 20000, medianWage: 85000, meanWage: 90000 },
+      { socGroup: '35', employment: 30000, medianWage: 28000, meanWage: 30000 },
+    ],
+  });
+
+  const pack = exportLabourPack(layer, { region: 'St. Louis, Missouri' });
+  assert.equal(pack.metros.length, 1);
+  assert.equal(pack.metros[0].areaCode, '41180');
+  assert.equal(pack.metros[0].employmentShares['17'], 0.4);
+  assert.equal(pack.metros[0].wages['17'].medianWage, 85000);
+});
+
+test('exportInfrastructurePack is per-region, and refuses to be otherwise', () => {
+  assert.throws(() => exportInfrastructurePack(createWorldLayer(), {}), /requires options\.region/);
+});
+
+test('exportInfrastructurePack carries real HIFLD capacities, grouped by engine type', () => {
+  const layer = createWorldLayer();
+  const { imported } = importHifldLayer(layer, 'hospitals', [
+    { name: 'Barnes-Jewish Hospital', lat: 38.63, lng: -90.26, beds: 1328 },
+    { name: 'Mercy Hospital St. Louis', lat: 38.65, lng: -90.35, beds: 974 },
+  ]);
+  assert.equal(imported.length, 2);
+
+  const pack = exportInfrastructurePack(layer, { region: 'St. Louis, Missouri' });
+  assert.deepEqual(pack.facilitiesByType.hospitals.sort((a, b) => b - a), [1328, 974]);
+});
+
+test('exportInfrastructurePack excludes a facility HIFLD reported no capacity for', () => {
+  const layer = createWorldLayer();
+  importHifldLayer(layer, 'fire-stations', [
+    { name: 'Engine House 1', lat: 38.6, lng: -90.2 },
+  ]);
+  const pack = exportInfrastructurePack(layer, { region: 'St. Louis, Missouri' });
+  assert.deepEqual(pack.facilitiesByType, {});
+});
+
+// ---------------------------------------------------------------------
+// exportPopulationPack carries a CDC-only tract's health baseline, not
+// just an ACS one — the bug this header's own comment records: gating
+// inclusion on `source === 'us-census-acs'` alone silently dropped a
+// tract CDC covered but ACS did not.
+// ---------------------------------------------------------------------
+
+test('exportPopulationPack carries a real CDC health baseline even with no ACS coverage on the same tract', () => {
+  const layer = createWorldLayer();
+  const location = generateLocation(layer, { name: 'Tract 9999', lat: 38.6, lng: -90.2, tier: 'filler' });
+  importPlacesTract(layer, location.id, {
+    tractId: '29510199900',
+    prevalences: { DIABETES: 10, OBESITY: 30 },
+  });
+
+  const pack = exportPopulationPack(layer, { region: 'St. Louis, Missouri' });
+  assert.equal(pack.tracts.length, 1);
+  assert.equal(pack.tracts[0].tractId, '29510199900');
+  assert.ok(Number.isFinite(pack.tracts[0].healthBaseline));
+  // No ACS import ran on this location, so there is no real age/attainment
+  // to carry — only what CDC actually measured.
+  assert.equal(pack.tracts[0].ageBands, undefined);
+});
+
+test('exportPopulationPack carries both a real ACS tract\'s shares and its CDC health baseline together', () => {
+  const layer = createWorldLayer();
+  const location = generateLocation(layer, { name: 'Tract 1235', lat: 38.6, lng: -90.2, tier: 'filler' });
+  importAcsTract(layer, location.id, {
+    tractId: '29510123500',
+    population: 4200,
+    ageCounts: { child: 800, working: 2700, elder: 700 },
+    attainment: {
+      less_than_high_school: 400, high_school_graduate: 1200,
+      some_college: 900, associates_degree: 300, bachelors_degree: 900, graduate_or_professional: 300,
+    },
+  });
+  importPlacesTract(layer, location.id, { tractId: '29510123500', prevalences: { DIABETES: 9 } });
+
+  const pack = exportPopulationPack(layer, { region: 'St. Louis, Missouri' });
+  assert.equal(pack.tracts.length, 1);
+  assert.ok(pack.tracts[0].ageBands.working > 0.5);
+  assert.ok(Number.isFinite(pack.tracts[0].healthBaseline));
+});
+
+// ---------------------------------------------------------------------
+// exportBusinessPack
+// ---------------------------------------------------------------------
+
+test('exportBusinessPack is per-region, and refuses to be otherwise', () => {
+  assert.throws(() => exportBusinessPack(createWorldLayer(), {}), /requires options\.region/);
+});
+
+test('exportBusinessPack carries a real Overture retail business, named and categorized', () => {
+  const layer = createWorldLayer();
+  const { imported } = importOverturePlaces(layer, [
+    {
+      names: { primary: 'Old Town Hardware' },
+      categories: { primary: 'hardware' },
+      geometry: { coordinates: [-90.2, 38.6] },
+      addresses: [{ locality: 'Old Town' }],
+    },
+  ]);
+  assert.equal(imported.length, 1);
+
+  const pack = exportBusinessPack(layer, { region: 'St. Louis, Missouri' });
+  assert.equal(pack.businesses.length, 1);
+  assert.equal(pack.businesses[0].name, 'Old Town Hardware');
+  assert.equal(pack.businesses[0].category, 'hardware-store');
+  assert.equal(pack.businesses[0].area, 'Old Town');
+});
+
+test('exportBusinessPack excludes a hero-tier landmark — that is the other exporter\'s vocabulary', () => {
+  const layer = createWorldLayer();
+  importOverturePlaces(layer, [
+    {
+      names: { primary: 'City Museum' },
+      categories: { primary: 'museum' },
+      geometry: { coordinates: [-90.2, 38.6] },
+    },
+  ], { tiers: ['regional'] });
+  const pack = exportBusinessPack(layer, { region: 'St. Louis, Missouri' });
+  assert.deepEqual(pack.businesses, []);
+});
+
+// ---------------------------------------------------------------------
+// exportClimatePack
+// ---------------------------------------------------------------------
+
+test('exportClimatePack is per-region, and refuses to be otherwise', () => {
+  assert.throws(() => exportClimatePack(createWorldLayer(), 1, {}), /requires options\.region/);
+});
+
+test('exportClimatePack carries a real NOAA-classified Köppen key for the named location', () => {
+  const layer = createWorldLayer();
+  const location = generateLocation(layer, { name: 'St. Louis', lat: 38.6, lng: -90.2, tier: 'hero' });
+  importClimateNormals(layer, location.id, {
+    temperaturesC: [0.1, 2.3, 7.5, 13.6, 19.2, 24.3, 26.8, 25.7, 21.5, 14.8, 7.6, 1.8],
+    precipitationMm: [55, 58, 86, 97, 114, 112, 107, 87, 79, 83, 94, 70],
+    latitude: 38.6,
+  });
+
+  const pack = exportClimatePack(layer, location.id, { region: 'St. Louis, Missouri' });
+  assert.equal(pack.climateKey[0], 'C');
+  assert.ok(Number.isFinite(pack.measures.annualMeanC));
+});
+
+test('exportClimatePack refuses a location with no real climate classification on it', () => {
+  const layer = createWorldLayer();
+  const location = generateLocation(layer, { name: 'Unclassified', lat: 38.6, lng: -90.2, tier: 'hero' });
+  assert.throws(
+    () => exportClimatePack(layer, location.id, { region: 'St. Louis, Missouri' }),
+    /no real climate classification/,
+  );
+});

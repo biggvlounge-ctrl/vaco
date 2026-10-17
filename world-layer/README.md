@@ -4,19 +4,28 @@ Shared "Universal World Layer" data module. One generated record per
 real-world location, so that consuming apps read one city instead of
 each generating its own separate copy.
 
-> **Nothing consumes it yet.** An earlier version of this line said the
-> module is "read by VACON-C, VENVS, and HVNTZ". It is not, and was
-> not: a repo-wide search finds no `require` of this package from any
-> app. Every hit is a code comment citing it as a *pattern*. VACON-C
-> reading this layer is a real, scoped integration decision — see
-> `dev-docs/phase-8-vacon-c-reconciliation/plan.md`, which deliberately
-> deferred it — not something that has quietly happened.
+> **This line used to say "nothing consumes it yet." That is no longer
+> true, and the correction is kept here rather than quietly dropped.**
+> `require('world-layer')` is still never allowed across the directory
+> boundary — see `dev-docs/phase-8-vacon-c-reconciliation/plan.md` and
+> `dev-docs/DEPLOYMENT_FILE_PLACEMENT.md` — so the real integration is
+> by DATA, as a pack VACON-C's own reader modules validate and read:
+> `exportRegion.js` → `vacon-c/server/landmarkPacks.js` (real named
+> places), and `exportRegionStats.js` → `vacon-c/server/
+> populationPacks.js` (real Census ACS age/attainment shares, plus a
+> real CDC PLACES health baseline), `labourPacks.js` (real BLS OES
+> employment shares and wages), `infrastructurePacks.js` (real HIFLD
+> facility capacities), `businessPacks.js` (real Overture Places
+> retail businesses, named and categorized), and `climatePacks.js` (a
+> real NOAA-derived Köppen-Geiger climate key, one per region). Each
+> pack is optional and a world with none of the six still generates
+> exactly as it always did — these are enrichments, never a
+> requirement.
 >
-> That matters more than a wording fix, because this module is the
-> layer the global-coverage cost argument rests on: the architecture
-> document's target is "90%+ automated world construction, 10% human
-> refinement", and this is the 90%. It is real code and it is now
-> tested (28 tests, `npm test`) — it is simply not plugged in.
+> This module is the layer the global-coverage cost argument rests on:
+> the architecture document's target is "90%+ automated world
+> construction, 10% human refinement", and this is the 90%. It is real
+> code, genuinely consumed now, not just tested in isolation.
 
 See `UNIVERSAL_WORLD_LAYER_ARCHITECTURE.md` (project root) for the
 full architecture. For the four things this stack does NOT cover —
@@ -73,6 +82,40 @@ for the full reasoning.
   UNESCO's own site (confirmed directly, not assumed)**, so the live
   fetch isn't implemented, but the import pipeline itself is real code
   ready to receive real data from wherever it ends up being fetched.
+- `imports/censusImport.js`, `imports/blsImport.js`, `imports/hifldImport.js`
+  — real U.S. government open-data importers: Census Bureau ACS (age/
+  household/attainment/income distributions, per tract), BLS OES
+  (employment shares and median/mean wages, per metro, mapped onto
+  this engine's occupations by SOC major group), and HIFLD Open (real
+  facility capacities — hospital beds, water systems served, power
+  plant megawatts — for VACON-C's own ten infrastructure types). All
+  three write onto a `Location`'s `populationData`/`economicData`/
+  `buildingData`; none fetch live (the real government hosts are
+  outside this sandboxed environment's outbound proxy, confirmed
+  directly rather than assumed, same as UNESCO below) — each importer's
+  transform is the tested part, ready for real rows from wherever they
+  end up being fetched.
+- `imports/overtureImport.js`, `imports/cdcImport.js`, `imports/noaaImport.js`
+  — three more real sources, same posture as the three above.
+  `importOverturePlaces()` turns real Overture Places records into
+  named retail businesses (mapped onto VACON-C's ten retail types) and
+  hero-tier landmarks, onto `landmarkData` — the same field the UNESCO
+  importer writes, with `exportRegionStats.js`'s `exportBusinessPack`
+  reading back only the retail half (the hero half is
+  `exportRegion.js`'s own `KEY_CATEGORIES`). `importOvertureDivisions()`
+  and `importOvertureBuildings()` round out the same source with real
+  administrative area names and building footprints.
+  `importPlacesTract()` turns real CDC PLACES chronic-disease
+  prevalence into a baseline mortality-pressure multiplier, centred on
+  1 — a share for a place, never a per-person fact (§9's firewall).
+  `importClimateNormals()` classifies real NOAA climate normals into
+  the published Köppen-Geiger vocabulary. All three are real,
+  tested transforms with no live fetch (same outbound-proxy block as
+  the rest of this list).
+- `exportRegion.js` / `exportRegionStats.js` — the consumer join: turn
+  a region's real imported data into the six packs VACON-C's own
+  reader modules validate and read (see the note at the top of this
+  file). Plain JSON, never a cross-directory `require`.
 - `schema.sql` — the literal Postgres shape (`world_locations`,
   `world_location_events`, `world_npcs`, `world_businesses`,
   `world_business_employees`, `world_transport_nodes`,

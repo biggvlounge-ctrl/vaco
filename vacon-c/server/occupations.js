@@ -72,6 +72,7 @@
 const { seededDraw } = require('./seeded.js');
 const demographics = require('./demographics.js');
 const { getLiveEntity } = require('./entityTraits.js');
+const labourPacks = require('./labourPacks.js');
 
 // ---------------------------------------------------------------------
 // §25, verbatim in its own subjects
@@ -520,7 +521,7 @@ function aptitudeWeight(sheet, name) {
 function drawOccupation(options = {}) {
   const {
     npc = null, organizationType = null, seed = 'world', extra = [],
-    worldState = null,
+    worldState = null, metro = null,
   } = options;
   if (!organizationType) return null;
 
@@ -540,7 +541,17 @@ function drawOccupation(options = {}) {
   // tier-only pyramid.
   const sheet = worldState && npc ? getLiveEntity(worldState, npc.id)?.traits ?? null : null;
 
-  const weights = pool.map((name) => (1 / OCCUPATIONS[name].tier) * aptitudeWeight(sheet, name));
+  // **A real metro's own employment share, when one is given, in
+  // place of the invented `1/tier` pyramid — per occupation, not per
+  // pool.** An occupation the real labour market reports no share for
+  // (or no metro at all) falls back to `1/tier` exactly as before, so
+  // a labour pack covering some but not all of a pool's occupations
+  // still produces a usable draw rather than a zeroed-out one.
+  const weights = pool.map((name) => {
+    const realShare = metro ? labourPacks.employmentShareFor(metro, name) : null;
+    const base = realShare ?? (1 / OCCUPATIONS[name].tier);
+    return base * aptitudeWeight(sheet, name);
+  });
   const total = weights.reduce((sum, wt) => sum + wt, 0);
   let cut = seededDraw([seed, 'occupation', npc ? npc.id : 0, ...extra]) * total;
   for (let i = 0; i < pool.length; i += 1) {
