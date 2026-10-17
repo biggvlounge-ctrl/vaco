@@ -370,6 +370,39 @@ function exportPoliticalPack(worldLayer, options = {}) {
   return { region, source, counties };
 }
 
+//: The two cities `imports/cityCrimeImport.js` covers — see that
+//: module's header for why this is a two-city exception rather than a
+//: national source like every other pack in this registry.
+const CRIME_HOTSPOT_CITIES = ['los-angeles', 'chicago'];
+
+// A region's real LA/Chicago sub-city incident rates, as a crime
+// hot-spot pack `vacon-c/server/crimeHotspotPacks.js` can read.
+// `options.city` selects which of the two cities this pack is for —
+// a region pack covers one city, same as every other pack here covers
+// one region.
+function exportCrimeHotspotPack(worldLayer, options = {}) {
+  const { region, source = 'sample', city } = options;
+  if (!region) {
+    throw new Error('exportCrimeHotspotPack requires options.region — a pack is per-region by definition');
+  }
+  if (!CRIME_HOTSPOT_CITIES.includes(city)) {
+    throw new Error(`exportCrimeHotspotPack requires options.city to be one of: ${CRIME_HOTSPOT_CITIES.join(', ')}`);
+  }
+
+  const areas = [];
+  for (const location of worldLayer.locations || []) {
+    const data = location.populationData?.crimeHotspot;
+    if (!data || data.city !== city) continue;
+    if (data.violentRatePer1k === null && data.propertyRatePer1k === null) continue;
+    const area = { areaName: data.areaName };
+    if (data.violentRatePer1k !== null) area.violentRatePer1k = data.violentRatePer1k;
+    if (data.propertyRatePer1k !== null) area.propertyRatePer1k = data.propertyRatePer1k;
+    areas.push(area);
+  }
+
+  return { region, source, city, areas };
+}
+
 module.exports = {
   RETAIL_CATEGORIES,
   KOPPEN_GROUP_LETTERS,
@@ -387,4 +420,5 @@ module.exports = {
   exportReligionPack,
   exportNatalityPack,
   exportPoliticalPack,
+  exportCrimeHotspotPack,
 };

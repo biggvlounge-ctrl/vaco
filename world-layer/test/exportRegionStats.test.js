@@ -23,6 +23,7 @@ const { importNatalityRates } = require('../imports/natalityImport');
 const { importPitCount } = require('../imports/hudPitImport');
 const { importNygsJurisdiction } = require('../imports/nygsImport');
 const { importCountyReturns } = require('../imports/electionImport');
+const { importAreaIncidents } = require('../imports/cityCrimeImport');
 const {
   exportPopulationPack, exportLabourPack, exportInfrastructurePack,
   exportBusinessPack, exportClimatePack, exportRiskPack, exportReligionPack,
@@ -30,6 +31,7 @@ const {
   exportIncomePack,
   exportGangPack,
   exportPoliticalPack,
+  exportCrimeHotspotPack,
 } = require('../exportRegionStats');
 
 test('exportPopulationPack is per-region, and refuses to be otherwise', () => {
@@ -480,4 +482,43 @@ test('exportPoliticalPack excludes a county with no usable share', () => {
   importCountyReturns(layer, location.id, { countyFips: '29999', year: 2020, democraticVotes: null });
   const pack = exportPoliticalPack(layer, { region: 'St. Louis, Missouri' });
   assert.deepEqual(pack.counties, []);
+});
+
+// ---------------------------------------------------------------------
+// exportCrimeHotspotPack
+// ---------------------------------------------------------------------
+
+test('exportCrimeHotspotPack is per-region and per-city, and refuses to be otherwise', () => {
+  assert.throws(
+    () => exportCrimeHotspotPack(createWorldLayer(), { city: 'chicago' }),
+    /requires options\.region/,
+  );
+  assert.throws(
+    () => exportCrimeHotspotPack(createWorldLayer(), { region: 'Chicago, Illinois' }),
+    /requires options\.city/,
+  );
+});
+
+test('exportCrimeHotspotPack carries a real area\'s rates, scoped to one city', () => {
+  const layer = createWorldLayer();
+  const laArea = generateLocation(layer, { name: 'Rampart', lat: 34.0, lng: -118.2, tier: 'filler' });
+  const chiArea = generateLocation(layer, { name: 'Englewood', lat: 41.8, lng: -87.6, tier: 'filler' });
+  importAreaIncidents(layer, laArea.id, {
+    city: 'los-angeles', areaName: 'Rampart', violentCount: 300, propertyCount: 900, population: 30000,
+  });
+  importAreaIncidents(layer, chiArea.id, {
+    city: 'chicago', areaName: 'Englewood', propertyCount: 500, population: 25000,
+  });
+  const pack = exportCrimeHotspotPack(layer, { region: 'Los Angeles, California', city: 'los-angeles' });
+  assert.equal(pack.areas.length, 1);
+  assert.equal(pack.areas[0].areaName, 'Rampart');
+  assert.equal(pack.areas[0].propertyRatePer1k, 30);
+});
+
+test('exportCrimeHotspotPack excludes an area with neither real rate', () => {
+  const layer = createWorldLayer();
+  const location = generateLocation(layer, { name: 'Nowhere', lat: 34.0, lng: -118.2, tier: 'filler' });
+  importAreaIncidents(layer, location.id, { city: 'los-angeles', areaName: 'Nowhere', population: null });
+  const pack = exportCrimeHotspotPack(layer, { region: 'Los Angeles, California', city: 'los-angeles' });
+  assert.deepEqual(pack.areas, []);
 });

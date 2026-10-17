@@ -570,6 +570,26 @@ const SOURCES = {
       + 'the mistake this registry exists to avoid, not the fix for one. '
       + '`server/politicalPacks.js`\'s own header explains the scope choice at length.',
   },
+  cityCrime: {
+    name: 'LAPD / Chicago PD open crime-incident data',
+    licence: 'public domain (municipal open-data portals)',
+    licenceCheckedAt: null,
+    access: 'data.lacity.org and data.cityofchicago.org open-data APIs; no key',
+    host: 'data.lacity.org, data.cityofchicago.org',
+    fills: ['populationData'],
+    tiers: ['filler'],
+    scale: 'geocoded incident-level crime records, sub-city area, Los Angeles and Chicago only',
+    wired: 'imports/cityCrimeImport.js',
+    note: '**The one source in this registry that is a two-city exception rather than a '
+      + 'national one, named explicitly rather than generalized.** Asked directly for an '
+      + 'LA/Chicago gang-territory map, the real answer is that none exists as public '
+      + 'structured data (CPD has said publicly it will not release one) — what IS real for '
+      + 'those two cities is their own geocoded incident-level open crime data, at a grain '
+      + '(sub-city area) nothing else in this registry reaches. Feeds only '
+      + '`vacon-c/server/crime.js`\'s deprivation/property pressure, never the separately and '
+      + 'carefully calibrated violent-crime escalation mechanism — see '
+      + '`crimeHotspotPacks.js`\'s own header.',
+  },
 
   // -------------------------------------------------------------------
   // People, work and money

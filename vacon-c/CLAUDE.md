@@ -1348,6 +1348,40 @@ substitute is place-level, same as everything else in this registry.
 Both need a new per-NPC field, the same complexity class already
 deferred once for disability/veteran status and real ethnicity.
 
+**A thirty-fourth, closing the LA/Chicago crime-hotspot half of the
+thirty-third rule's own correction.** What IS real for those two
+cities — LAPD and Chicago PD's own geocoded, incident-level open-data
+portals — is now wired, and it is the one source in this registry
+that is a two-city exception rather than a national one, named as
+such rather than generalized: `imports/cityCrimeImport.js` and
+`server/crimeHotspotPacks.js` cover Los Angeles and Chicago only, and
+every other generated city gets no pack and is unaffected.
+
+**Self-normalizing, because there is no external "ordinary crime
+rate" worth inventing.** Every other real multiplier in this registry
+(`healthBaseline`, `overdoseBaseline`) centres on an external
+reference the source itself implies (CDC's own national baseline is
+implicitly 1). A property-crime rate has no equivalent universally
+agreed "ordinary" figure, so `crimeHotspotPacks.weightFor` centres
+each area against the MEAN of its own pack's areas — the seventeenth
+standing rule's "the right reference is usually inside the model,"
+applied to a real import rather than an internal constant.
+
+**Deliberately scoped to the one crime mechanism that was already
+flagged as chosen rather than measured.** `crime.js#runDeprivationCrime`
+draws property/theft risk from `BASE_DEPRIVATION_RISK` (0.0006), flat
+and already labelled interpretive. The real weight multiplies that
+constant only. It does NOT touch `keys.resolveAggression` — that
+mechanism's floor and rate cost four measured, written-down attempts
+(the seventeenth rule's own case study) to calibrate against this
+engine's internal distributions, and grafting an external real-world
+weight onto it without equivalent measurement would risk re-breaking
+exactly the balance those four attempts fixed. A test
+(`crime-hotspot-packs.test.js`) checks the wiring directly — that
+`crimeHotspotWeight` is read in `crime.js` and that `resolveAggression`
+is not defined there — rather than trying to prove a negative through
+a seeded draw.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

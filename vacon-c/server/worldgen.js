@@ -112,6 +112,7 @@ const natalityPacks = require('./natalityPacks.js');
 const incomePacks = require('./incomePacks.js');
 const gangPacks = require('./gangPacks.js');
 const politicalPacks = require('./politicalPacks.js');
+const crimeHotspotPacks = require('./crimeHotspotPacks.js');
 const merchandise = require('./merchandise.js');
 const worldStore = require('./worldStore.js');
 const { hashSeed, seededUnit } = require('./seeded.js');
@@ -354,6 +355,11 @@ function generateWorld(options = {}) {
     w.politicalPack = politicalPacks.assertPack(config.politicalPack);
   } else if (w.politicalPack) {
     politicalPacks.assertPack(w.politicalPack);
+  }
+  if (config.crimeHotspotPack) {
+    w.crimeHotspotPack = crimeHotspotPacks.assertPack(config.crimeHotspotPack);
+  } else if (w.crimeHotspotPack) {
+    crimeHotspotPacks.assertPack(w.crimeHotspotPack);
   }
 
   // **`worldState.seed` was read by two modules and set by none.**
@@ -664,6 +670,22 @@ function generateWorld(options = {}) {
       const realFertilityCounty = natalityPacks.countyFor(w.natalityPack, c * config.communitiesPerCity + b);
       const realFertilityRates = natalityPacks.ratesFor(realFertilityCounty);
       if (realFertilityRates) community.fertilityRates = realFertilityRates;
+
+      // **A real sub-city property-crime weight, when a crime
+      // hot-spot pack has one — assigned by this community's own
+      // position (§88), the same sub-city grain a population tract
+      // uses.** `crimeHotspotPacks.js`'s own header on why this is a
+      // two-city exception and why it feeds only the deprivation/
+      // property pressure, never the separately calibrated violent
+      // crime mechanism.
+      //
+      // **Known, stated limitation: in-memory only** — same posture as
+      // `community.fertilityRates` just above.
+      const realCrimeArea = crimeHotspotPacks.areaFor(
+        w.crimeHotspotPack, c * config.communitiesPerCity + b,
+      );
+      const realCrimeWeight = crimeHotspotPacks.propertyWeightFor(w.crimeHotspotPack, realCrimeArea);
+      if (realCrimeWeight !== null) community.crimeHotspotWeight = realCrimeWeight;
 
       // Territory: a faction holds this ground, or nobody does.
       //

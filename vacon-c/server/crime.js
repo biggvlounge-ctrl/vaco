@@ -566,7 +566,17 @@ function runDeprivationCrime(worldState, tick = worldState.tick ?? 0) {
     const scarcity = scarcityFor(cityOf(worldState, npc));
     const pressure = deprivationPressure(worldState, npc, { line, scarcity });
     if (pressure <= 0) continue;
-    if (seededDraw([npc.id, tick, 'crime:deprivation']) >= pressure * BASE_DEPRIVATION_RISK) continue;
+
+    // **A real sub-city property-crime weight, when a crime hot-spot
+    // pack covers this community — never the person, only the place.**
+    // `crimeHotspotPacks.js`'s own header on why this is a two-city
+    // (LA/Chicago) exception and why it stays out of the violent-crime
+    // mechanism entirely. `?? 1` is the fallback for every other city,
+    // where no pack covers any community — bit-identical to before
+    // this existed.
+    const community = (worldState.communities || []).find((c) => c.id === npc.communityId);
+    const hotspotWeight = community?.crimeHotspotWeight ?? 1;
+    if (seededDraw([npc.id, tick, 'crime:deprivation']) >= pressure * BASE_DEPRIVATION_RISK * hotspotWeight) continue;
 
     const target = targetsByCommunity.get(npc.communityId);
     // Never the offender themselves — a world with one rich person in

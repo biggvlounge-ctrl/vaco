@@ -254,8 +254,18 @@ for the full reasoning.
   policing-intensity term) from a real vote share would be fabricating
   a causal claim, not closing a gap — see that module's own header.
   Read only, as a reported `statistics.js` entry.
+- `imports/cityCrimeImport.js` — real LAPD/Chicago PD open incident
+  data (data.lacity.org, data.cityofchicago.org), turned into a
+  sub-city area's violent/property crime rate per 1,000 —
+  `exportCrimeHotspotPack`, read via `crimeHotspotPacks.js` on the
+  VACON-C side. **The one two-city exception in this registry** — see
+  that module's own header for why no national gang-territory or
+  crime-rate source exists for every town, and why these two cities'
+  own open-data portals are the real thing closest to what was asked
+  for. Feeds only VACON-C's deprivation/property-crime pressure, never
+  the separately calibrated violent-crime mechanism.
 - `exportRegion.js` / `exportRegionStats.js` — the consumer join: turn
-  a region's real imported data into the eleven packs VACON-C's own
+  a region's real imported data into the twelve packs VACON-C's own
   reader modules validate and read (see the note at the top of this
   file), plus the sources above that need no pack of their own.
   Plain JSON, never a cross-directory `require`.
