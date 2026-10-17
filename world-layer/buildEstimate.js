@@ -56,7 +56,7 @@ const BUILD_SCOPE = {
   tests: {
     files: 102,
     lines: 35474,
-    cases: 1819,
+    cases: 1855,
   },
   countedAt: '2026-10-17',
 };
