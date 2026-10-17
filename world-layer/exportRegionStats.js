@@ -44,19 +44,22 @@ function exportPopulationPack(worldLayer, options = {}) {
   const tracts = [];
   for (const location of worldLayer.locations || []) {
     const data = location.populationData;
-    // **Either real import counts — not just ACS.** `importPlacesTract`
-    // (CDC) nests its own data under `healthPrevalence` without
-    // necessarily being the import that set the top-level `source`,
-    // so gating on `source === 'us-census-acs'` alone would silently
-    // drop a tract's real health baseline on a location CDC covered
-    // but ACS did not.
+    // **Any real import counts — not just ACS.** `importPlacesTract`
+    // (CDC) and `importOverdoseRates` (CDC/NCHS) each nest their own
+    // data under their own key without necessarily being the import
+    // that set the top-level `source`, so gating on
+    // `source === 'us-census-acs'` alone would silently drop a
+    // tract's real baseline on a location one of them covered but
+    // ACS did not.
     const hasAcs = data?.source === 'us-census-acs';
     const hasHealth = Number.isFinite(Number(data?.healthPrevalence?.baselinePressure));
-    if (!data || (!hasAcs && !hasHealth)) continue;
-    const tract = { tractId: data.tractId ?? data.healthPrevalence?.tractId };
+    const hasOverdose = Number.isFinite(Number(data?.overdoseMortality?.baselinePressure));
+    if (!data || (!hasAcs && !hasHealth && !hasOverdose)) continue;
+    const tract = { tractId: data.tractId ?? data.healthPrevalence?.tractId ?? data.overdoseMortality?.countyFips };
     if (data.ageBands) tract.ageBands = data.ageBands;
     if (data.attainment?.distribution) tract.attainment = data.attainment.distribution;
     if (hasHealth) tract.healthBaseline = Number(data.healthPrevalence.baselinePressure);
+    if (hasOverdose) tract.overdoseBaseline = Number(data.overdoseMortality.baselinePressure);
     tracts.push(tract);
   }
 
@@ -252,6 +255,28 @@ function exportReligionPack(worldLayer, options = {}) {
   return { region, source, counties };
 }
 
+// A region's real CDC/NCHS age-specific fertility rates, as a natality
+// pack `vacon-c/server/natalityPacks.js` can read.
+function exportNatalityPack(worldLayer, options = {}) {
+  const { region, source = 'sample' } = options;
+  if (!region) {
+    throw new Error('exportNatalityPack requires options.region — a pack is per-region by definition');
+  }
+
+  const counties = [];
+  for (const location of worldLayer.locations || []) {
+    const natality = location.populationData?.natality;
+    if (!natality || natality.source !== 'cdc-natality' || !natality.ratesPerThousand) continue;
+    counties.push({
+      countyFips: natality.countyFips,
+      countyName: natality.countyName ?? null,
+      ratesPerThousand: natality.ratesPerThousand,
+    });
+  }
+
+  return { region, source, counties };
+}
+
 module.exports = {
   RETAIL_CATEGORIES,
   KOPPEN_GROUP_LETTERS,
@@ -264,4 +289,5 @@ module.exports = {
   exportClimatePack,
   exportRiskPack,
   exportReligionPack,
+  exportNatalityPack,
 };

@@ -13,14 +13,17 @@ const { importOesMetro } = require('../imports/blsImport');
 const { importHifldLayer } = require('../imports/hifldImport');
 const { importOverturePlaces } = require('../imports/overtureImport');
 const { importPlacesTract } = require('../imports/cdcImport');
+const { importOverdoseRates } = require('../imports/overdoseImport');
 const { importClimateNormals } = require('../imports/noaaImport');
 const { importRiskIndex } = require('../imports/femaImport');
 const { importReligionCensus } = require('../imports/religionImport');
 const { importProvider } = require('../imports/cmsImport');
 const { importInstitution } = require('../imports/ncesImport');
+const { importNatalityRates } = require('../imports/natalityImport');
 const {
   exportPopulationPack, exportLabourPack, exportInfrastructurePack,
   exportBusinessPack, exportClimatePack, exportRiskPack, exportReligionPack,
+  exportNatalityPack,
 } = require('../exportRegionStats');
 
 test('exportPopulationPack is per-region, and refuses to be otherwise', () => {
@@ -181,6 +184,29 @@ test('exportPopulationPack carries both a real ACS tract\'s shares and its CDC h
   assert.ok(Number.isFinite(pack.tracts[0].healthBaseline));
 });
 
+test('exportPopulationPack carries a real overdose-mortality baseline even with no ACS or CDC coverage', () => {
+  const layer = createWorldLayer();
+  const location = generateLocation(layer, { name: 'Tract 9998', lat: 38.6, lng: -90.2, tier: 'filler' });
+  importOverdoseRates(layer, location.id, { countyFips: '29510', ratePer100k: 45 });
+
+  const pack = exportPopulationPack(layer, { region: 'St. Louis, Missouri' });
+  assert.equal(pack.tracts.length, 1);
+  assert.equal(pack.tracts[0].overdoseBaseline, 1.5);
+  assert.equal(pack.tracts[0].healthBaseline, undefined);
+});
+
+test('exportPopulationPack carries a real CDC health baseline AND a real overdose baseline together, independently', () => {
+  const layer = createWorldLayer();
+  const location = generateLocation(layer, { name: 'Tract 9997', lat: 38.6, lng: -90.2, tier: 'filler' });
+  importPlacesTract(layer, location.id, { tractId: '29510999700', prevalences: { DIABETES: 12 } });
+  importOverdoseRates(layer, location.id, { countyFips: '29510', ratePer100k: 45 });
+
+  const pack = exportPopulationPack(layer, { region: 'St. Louis, Missouri' });
+  assert.equal(pack.tracts.length, 1);
+  assert.ok(Number.isFinite(pack.tracts[0].healthBaseline));
+  assert.equal(pack.tracts[0].overdoseBaseline, 1.5);
+});
+
 // ---------------------------------------------------------------------
 // exportBusinessPack
 // ---------------------------------------------------------------------
@@ -319,5 +345,35 @@ test('exportReligionPack excludes a county with no real population figure to com
   const location = generateLocation(layer, { name: 'Unmeasured County', lat: 38.6, lng: -90.2, tier: 'hero' });
   importReligionCensus(layer, location.id, { countyFips: '00000', adherents: { catholic: 100 } });
   const pack = exportReligionPack(layer, { region: 'St. Louis, Missouri' });
+  assert.deepEqual(pack.counties, []);
+});
+
+// ---------------------------------------------------------------------
+// exportNatalityPack
+// ---------------------------------------------------------------------
+
+test('exportNatalityPack is per-region, and refuses to be otherwise', () => {
+  assert.throws(() => exportNatalityPack(createWorldLayer(), {}), /requires options\.region/);
+});
+
+test('exportNatalityPack carries a real county\'s age-specific fertility rates', () => {
+  const layer = createWorldLayer();
+  const location = generateLocation(layer, { name: 'St. Louis County', lat: 38.6, lng: -90.2, tier: 'hero' });
+  importNatalityRates(layer, location.id, {
+    countyFips: '29189', countyName: 'St. Louis County, Missouri', year: 2022,
+    rates: { '15-19': 14.2, '20-24': 61.8, '25-29': 98.3 },
+  });
+
+  const pack = exportNatalityPack(layer, { region: 'St. Louis, Missouri' });
+  assert.equal(pack.counties.length, 1);
+  assert.equal(pack.counties[0].countyFips, '29189');
+  assert.equal(pack.counties[0].ratesPerThousand['25-29'], 98.3);
+});
+
+test('exportNatalityPack excludes a county with no usable rate at all', () => {
+  const layer = createWorldLayer();
+  const location = generateLocation(layer, { name: 'Unmeasured County', lat: 38.6, lng: -90.2, tier: 'hero' });
+  importNatalityRates(layer, location.id, { countyFips: '00000', rates: { '10-14': 0.1 } });
+  const pack = exportNatalityPack(layer, { region: 'St. Louis, Missouri' });
   assert.deepEqual(pack.counties, []);
 });

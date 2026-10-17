@@ -108,6 +108,7 @@ const businessPacks = require('./businessPacks.js');
 const climatePacks = require('./climatePacks.js');
 const riskPacks = require('./riskPacks.js');
 const religionPacks = require('./religionPacks.js');
+const natalityPacks = require('./natalityPacks.js');
 const merchandise = require('./merchandise.js');
 const worldStore = require('./worldStore.js');
 const { hashSeed, seededUnit } = require('./seeded.js');
@@ -331,6 +332,11 @@ function generateWorld(options = {}) {
   } else if (w.religionPack) {
     religionPacks.assertPack(w.religionPack);
   }
+  if (config.natalityPack) {
+    w.natalityPack = natalityPacks.assertPack(config.natalityPack);
+  } else if (w.natalityPack) {
+    natalityPacks.assertPack(w.natalityPack);
+  }
 
   // **`worldState.seed` was read by two modules and set by none.**
   // `infrastructure.advanceInfrastructure` seeds its failure draw on
@@ -470,6 +476,7 @@ function generateWorld(options = {}) {
     // each one resolves its own real tract below, then averaged onto
     // the city once every community in it has been built.
     const cityHealthBaselines = [];
+    const cityOverdoseBaselines = [];
 
     // ---- infrastructure --------------------------------------------
     for (const spec of CITY_INFRASTRUCTURE) {
@@ -603,6 +610,22 @@ function generateWorld(options = {}) {
       made.communities.push(community);
       summary.communities += 1;
 
+      // **The real county's age-specific fertility rates, when a
+      // natality pack has one — assigned by this community's own
+      // position (§88).** Resolved once, here, because `births.js`
+      // needs it every tick thereafter and a bearer's age at that
+      // point gives no way back to the position this community was
+      // built at.
+      //
+      // **Known, stated limitation: in-memory only.** `communities`
+      // has no `fertility_rates` column in
+      // `VACANCY_POSTGRESQL_SCHEMA.sql`, so this does not survive a
+      // restore — same posture as `city.healthBaseline` and
+      // `city.hazardRisk`.
+      const realFertilityCounty = natalityPacks.countyFor(w.natalityPack, c * config.communitiesPerCity + b);
+      const realFertilityRates = natalityPacks.ratesFor(realFertilityCounty);
+      if (realFertilityRates) community.fertilityRates = realFertilityRates;
+
       // Territory: a faction holds this ground, or nobody does.
       //
       // **Not every community, and that is the change that lets areas
@@ -723,6 +746,8 @@ function generateWorld(options = {}) {
       const tract = populationPacks.tractFor(w.populationPack, tractPosition);
       const realHealthBaseline = populationPacks.healthBaselineFor(tract);
       if (realHealthBaseline !== null) cityHealthBaselines.push(realHealthBaseline);
+      const realOverdoseBaseline = populationPacks.overdoseBaselineFor(tract);
+      if (realOverdoseBaseline !== null) cityOverdoseBaselines.push(realOverdoseBaseline);
       // **The real county for this community's religious composition,
       // when a religion pack has one — assigned by the same position
       // a tract is.** See `religionPacks.js`'s own header for why this
@@ -1066,6 +1091,18 @@ function generateWorld(options = {}) {
     if (cityHealthBaselines.length > 0) {
       city.healthBaseline = Math.round(
         (cityHealthBaselines.reduce((a, v) => a + v, 0) / cityHealthBaselines.length) * 1000,
+      ) / 1000;
+    }
+
+    // **The city's real overdose-mortality baseline, the same way and
+    // for the same reason — a SECOND real multiplier
+    // `mortality.diseasePressure` compounds with `healthBaseline`
+    // rather than replacing it.** `populationPacks.js`'s own header on
+    // why this is a second input to the existing mechanism rather than
+    // a new one. Same known, stated limitation: in-memory only.
+    if (cityOverdoseBaselines.length > 0) {
+      city.overdoseBaseline = Math.round(
+        (cityOverdoseBaselines.reduce((a, v) => a + v, 0) / cityOverdoseBaselines.length) * 1000,
       ) / 1000;
     }
 

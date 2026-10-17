@@ -1144,6 +1144,62 @@ one:
   a grain this engine's city/community model does not currently ask
   for.
 
+**A thirty-first, from a direct question about mental health,
+addiction, childbirth and crime data — and it is two findings and a
+correction to my own prior framing, in that order.**
+
+**First, a clean extension of an existing join.** CDC PLACES publishes
+real tract-level DEPRESSION and BINGE (binge drinking) prevalence —
+the only two measures it publishes at this grain for mental health and
+alcohol use — and `cdcImport.js` now maps both, same `behaviour` kind
+and weight as `CSMOKING`/`OBESITY` already have. No specific drug is
+estimated at this grain by CDC at all.
+
+**Second, a real curve closed the twenty-seventh rule's way.**
+`births.js#fertilityForAge` and `BASE_ANNUAL_BIRTH_RATE` are both
+flagged interpretive — "no document gives a fertility curve" — and
+real CDC/NCHS Natality data is exactly that curve, measured: live
+births per 1,000 women, per county, per standard five-year age band.
+`natalityPacks.js` resolves a real county onto `community.
+fertilityRates` at generation (the same in-memory-only posture as
+`healthBaseline`/`hazardRisk`, for the same reason — no schema
+column), and `births.js#runBirths` reads it fresh every tick, since a
+bearer's age moves and a tract's age bands do not need to be re-read
+that way. `statistics.js`'s `teenage_birth_rate` was already a real,
+computed statistic over whatever `births.js` generated; this is the
+generator becoming real underneath it.
+
+Drug-overdose mortality is real too, and folds into a mechanism that
+already exists rather than adding one: this engine has no drug or
+substance mechanic of any kind — `crime.js`'s own `CATEGORIES.drug`
+entry says "no substance, contraband or trade in one exists... a drug
+offence has no object," and `mortality.DEATH_CAUSES` has no overdose
+entry. A real county overdose-death rate is still the same KIND of
+fact `cdcImport.js`'s chronic-disease baseline already is — excess
+mortality a place genuinely carries — so `populationPacks.
+overdoseBaselineFor` is a SECOND real input to `mortality.
+diseasePressure`, compounding with the CDC PLACES baseline rather than
+replacing it or introducing a category this engine does not have.
+
+**Third, and this one reverses something I had proposed one turn
+earlier: `fbiImport.js` stays unwired, because the premise for wiring
+it was wrong.** Its own header describes `crime.DANGER_REFERENCE_PER_
+1K` as currently 40 and broken — "crime: 100" in most areas — and
+argues real FBI rates are the safe fix because this only anchors a
+DISPLAYED scale, never the escalation floor the seventeenth rule
+protects. Reading `crime.js` directly found the constant is 280, not
+40, already corrected through an INTERNALLY-measured method: "280 is
+the 95th percentile of the SHRUNK distribution... Measured, not
+chosen." That is the seventeenth rule's own preferred answer for
+exactly this kind of constant — the right reference was inside the
+model, and somebody already found it. Wiring real FBI data in now
+would not fix a bug; it would silently replace a correct, internally-
+measured constant with an external one, on a premise (`= 40`) that
+was itself stale. **A proposal approved before the premise was
+checked is not a decision to execute anyway once the premise turns
+out to be wrong** — the twenty-fifth rule's shape, pointed at my own
+reasoning instead of at a measurement.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

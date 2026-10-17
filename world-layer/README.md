@@ -19,10 +19,16 @@ each generating its own separate copy.
 > retail businesses, named and categorized), `climatePacks.js` (a
 > real NOAA-derived Köppen-Geiger climate key, one per region), and
 > `riskPacks.js` (real FEMA National Risk Index hazard weights, which
-> narrow a city's weather draw within its climate's own possibilities).
-> Each of these seven is optional and a world with none of them still
-> generates exactly as it always did — these are enrichments, never a
-> requirement.
+> narrow a city's weather draw within its climate's own possibilities),
+> and `natalityPacks.js` (a real CDC/NCHS age-specific fertility rate,
+> for a curve `births.js` itself calls invented). `populationPacks.js`
+> also now carries `overdoseBaselineFor` — a real CDC/NCHS drug-
+> overdose death rate, as a SECOND baseline that compounds with the
+> CDC PLACES one in `mortality.diseasePressure` rather than a new
+> mechanism; this engine has no drug/substance mechanic of any kind,
+> and that was a deliberate line not to cross. Each of these eight is
+> optional and a world with none of them still generates exactly as it
+> always did — these are enrichments, never a requirement.
 >
 > **One more, `religionPacks.js` (real U.S. Religion Census shares,
 > onto `npcs.religion`), is a different kind of pack and says so in its
@@ -34,6 +40,26 @@ each generating its own separate copy.
 > disease mechanics. It exists on explicit instruction, against the
 > recommendation given when it was proposed. A world with no religion
 > pack keeps the fictional vocabulary, unchanged.
+>
+> **`cdcImport.js` now maps DEPRESSION and BINGE too** — the only two
+> measures CDC PLACES actually publishes at tract level for mental
+> health and alcohol use. No specific drug is estimated at this grain
+> by CDC at all, which is exactly why overdose mortality is a separate,
+> county-level source instead of a third measure here.
+>
+> **`imports/fbiImport.js` exists, is tested, and is deliberately left
+> unwired — because the bug it was built to fix is already fixed, a
+> better way.** Its own header describes `crime.DANGER_REFERENCE_PER_1K`
+> reading "crime: 100" in most areas because the reference was 40; a
+> direct read of `crime.js` found that constant is now 280, corrected
+> through an internally-measured method ("the 95th percentile of the
+> SHRUNK distribution... Measured, not chosen") that is EXACTLY what
+> the seventeenth standing rule asks for — the right reference for an
+> internal mechanic came from inside the model. Recalibrating against
+> real FBI rates now would not fix a bug; it would reintroduce the one
+> already corrected, with an external number standing in for an
+> internal measurement that already exists and is better-suited to a
+> world where every area can read as `contested`.
 >
 > **`cmsImport.js` and `ncesImport.js` are REFRESH sources for
 > `infrastructurePacks.js`, not new packs** — a real CMS bed count and
@@ -186,8 +212,20 @@ for the full reasoning.
   `byLevel.community` are both already the exact shape a landmark
   pack's `areas` field wants. `test/exportRegion.test.js` locks this in
   rather than leaving it as something to re-derive later.
+- `imports/natalityImport.js` — real CDC/NCHS age-specific fertility
+  rates, per county, per the six standard five-year bands —
+  `exportRegionStats.js`'s `exportNatalityPack`. A rate, not a share:
+  several age bands do not sum to 1, unlike every other demographic
+  source in this registry.
+- `imports/overdoseImport.js` — real CDC/NCHS drug-overdose mortality,
+  turned into a SECOND baseline mortality multiplier that compounds
+  with CDC PLACES' chronic-disease one rather than replacing it or
+  introducing a new mechanism — `exportPopulationPack` now reads
+  either, or both, independently. Its own header explains at length
+  why this folds into the existing mechanism instead of inventing a
+  drug/substance mechanic that does not otherwise exist here.
 - `exportRegion.js` / `exportRegionStats.js` — the consumer join: turn
-  a region's real imported data into the eight packs VACON-C's own
+  a region's real imported data into the nine packs VACON-C's own
   reader modules validate and read (see the note at the top of this
   file), plus the two sources above that need no pack of their own.
   Plain JSON, never a cross-directory `require`.

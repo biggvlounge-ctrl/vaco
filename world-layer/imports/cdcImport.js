@@ -59,7 +59,7 @@ const { setLocationData, getLocation } = require('../locations');
 //: `mortality.healthMultiplier` already reads a `Chronic Conditions`
 //: trait and treats it as the dominant term; this keeps the imported
 //: side agreeing with the generated side rather than inventing a second
-//: opinion.
+//: opinion. PLACES publishes around forty and this maps thirteen.
 const MEASURES = {
   CHD: { label: 'coronary heart disease', kind: 'chronic', weight: 1 },
   STROKE: { label: 'stroke', kind: 'chronic', weight: 1 },
@@ -71,6 +71,14 @@ const MEASURES = {
   BPHIGH: { label: 'high blood pressure', kind: 'chronic', weight: 0.5 },
   CSMOKING: { label: 'current smoking', kind: 'behaviour', weight: 0.5 },
   OBESITY: { label: 'obesity', kind: 'behaviour', weight: 0.5 },
+  // **The two measures PLACES actually publishes for mental health and
+  // alcohol use, at the same tract grain as every measure above.**
+  // PLACES has no tract-level measure for any specific drug — opioids,
+  // methamphetamine and so on are not estimated at this grain by CDC,
+  // which is exactly why `imports/overdoseImport.js` exists as a
+  // separate, county-level source rather than an entry here.
+  DEPRESSION: { label: 'depression among adults', kind: 'behaviour', weight: 0.5 },
+  BINGE: { label: 'binge drinking among adults', kind: 'behaviour', weight: 0.5 },
   // **Access, not illness**, and kept separate for that reason: a place
   // where people cannot see a doctor is not a place where people are
   // sicker, it is a place where illness goes further.

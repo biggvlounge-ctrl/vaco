@@ -302,6 +302,14 @@ function diseasePressure(worldState, cityId = null) {
   const city = cityId !== null ? (worldState.cities || []).find((c) => c.id === cityId) : null;
   const baseline = Number(city?.healthBaseline);
   let pressure = Number.isFinite(baseline) ? baseline : 1;
+  // **A second, independent real baseline — overdose mortality —
+  // compounds rather than replaces.** `worldgen.js` sets
+  // `city.overdoseBaseline` from a real county's CDC/NCHS overdose
+  // death rate when a population pack covers it; see
+  // `populationPacks.js`'s own header on why this is a second input
+  // to the same mechanism, not a new one.
+  const overdoseBaseline = Number(city?.overdoseBaseline);
+  if (Number.isFinite(overdoseBaseline)) pressure *= overdoseBaseline;
   for (const condition of worldState.activeConditions || []) {
     if (cityId !== null && condition.cityId !== cityId) continue;
     const multiplier = Number(condition.mortalityMultiplier);

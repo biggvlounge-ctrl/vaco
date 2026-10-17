@@ -73,6 +73,14 @@ const AGE_BAND_RANGES = { child: [0, 15], working: [16, 64], elder: [65, 100] };
 //: world by arithmetic.
 const HEALTH_BASELINE_BOUNDS = [0.75, 1.5];
 
+//: `world-layer/imports/overdoseImport.js`'s own `PRESSURE_BOUNDS` — a
+//: SECOND real excess-mortality signal, independent of and compounding
+//: with `healthBaseline`. See that importer's header for why this is
+//: a second real input to the same multiplier rather than a new
+//: mechanism: this engine has no drug/substance mechanic of any kind,
+//: and a pack reader does not get to introduce one.
+const OVERDOSE_BASELINE_BOUNDS = [0.75, 1.75];
+
 function isShareObject(value, keys) {
   if (!value || typeof value !== 'object') return false;
   for (const key of Object.keys(value)) {
@@ -113,6 +121,13 @@ function validatePack(pack) {
       const value = Number(tract.healthBaseline);
       if (!Number.isFinite(value) || value < HEALTH_BASELINE_BOUNDS[0] || value > HEALTH_BASELINE_BOUNDS[1]) {
         problems.push(`${where}: healthBaseline must be between ${HEALTH_BASELINE_BOUNDS[0]} and ${HEALTH_BASELINE_BOUNDS[1]}`);
+      }
+    }
+    if (tract.overdoseBaseline !== undefined && tract.overdoseBaseline !== null) {
+      const value = Number(tract.overdoseBaseline);
+      if (!Number.isFinite(value) || value < OVERDOSE_BASELINE_BOUNDS[0] || value > OVERDOSE_BASELINE_BOUNDS[1]) {
+        problems.push(`${where}: overdoseBaseline must be between ${OVERDOSE_BASELINE_BOUNDS[0]} `
+          + `and ${OVERDOSE_BASELINE_BOUNDS[1]}`);
       }
     }
   });
@@ -196,12 +211,22 @@ function healthBaselineFor(tract) {
   return Number.isFinite(value) ? value : null;
 }
 
+// A tract's real CDC/NCHS overdose-mortality baseline — a SECOND,
+// independent multiplier `mortality.diseasePressure` compounds with
+// `healthBaseline` rather than replacing it. Null when the tract has
+// none recorded.
+function overdoseBaselineFor(tract) {
+  const value = Number(tract?.overdoseBaseline);
+  return Number.isFinite(value) ? value : null;
+}
+
 module.exports = {
   SOURCES,
   EDUCATION_LEVELS,
   AGE_BAND_KEYS,
   AGE_BAND_RANGES,
   HEALTH_BASELINE_BOUNDS,
+  OVERDOSE_BASELINE_BOUNDS,
   validatePack,
   assertPack,
   packFor,
@@ -209,4 +234,5 @@ module.exports = {
   ageBandFor,
   attainmentFor,
   healthBaselineFor,
+  overdoseBaselineFor,
 };

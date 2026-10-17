@@ -312,6 +312,19 @@ test('cdc pressure is bounded, so a health import cannot empty a world', () => {
   assert.equal(result.pressure, cdc.PRESSURE_BOUNDS[1]);
 });
 
+test('depression and binge drinking are real PLACES measures this importer now maps', () => {
+  // The only two PLACES publishes at tract level for mental health and
+  // alcohol use — no specific drug is estimated at this grain, which
+  // is why overdose data is a separate, county-level source.
+  assert.ok(cdc.MEASURES.DEPRESSION, 'DEPRESSION should be a mapped measure');
+  assert.ok(cdc.MEASURES.BINGE, 'BINGE should be a mapped measure');
+  assert.equal(cdc.MEASURES.DEPRESSION.kind, 'behaviour');
+  assert.equal(cdc.MEASURES.BINGE.kind, 'behaviour');
+  const result = cdc.toHealthPressure({ DEPRESSION: 20, BINGE: 16 });
+  assert.ok(result.used.some((m) => m.measure === 'DEPRESSION'));
+  assert.ok(result.used.some((m) => m.measure === 'BINGE'));
+});
+
 // ---------------------------------------------------------------------
 // U.S. Religion Census
 // ---------------------------------------------------------------------

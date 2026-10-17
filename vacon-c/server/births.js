@@ -83,6 +83,7 @@
 const areaStats = require('./areaStats.js');
 const economy = require('./economy.js');
 const mortality = require('./mortality.js');
+const natalityPacks = require('./natalityPacks.js');
 const worldStore = require('./worldStore.js');
 const { INDIVIDUAL_DEFINITIONS } = require('./traitDefinitions.js');
 const { generateEntityTraits, traitsToSheet, getLiveEntity } = require('./entityTraits.js');
@@ -532,8 +533,14 @@ function runBirths(worldState, tick = worldState.tick ?? 0) {
     if (last !== null && tick - last < GESTATION_TICKS) continue;
 
     const { scarcity, pressure } = readingsFor(cityOf(worldState, pair.bearer));
-    const annual = BASE_ANNUAL_BIRTH_RATE
-      * pair.fertility
+    // **A real age-specific fertility rate, when the bearer's own
+    // community has one — the invented curve-times-base-rate
+    // otherwise.** `natalityPacks.js` for why this is a rate read
+    // fresh every tick rather than a share resolved once, at
+    // generation, the way a tract's age bands are.
+    const community = (worldState.communities || []).find((cm) => cm.id === pair.bearer.communityId);
+    const realAnnualRate = natalityPacks.annualRateFor(community?.fertilityRates, pair.bearerAge);
+    const annual = (realAnnualRate ?? (BASE_ANNUAL_BIRTH_RATE * pair.fertility))
       * environmentalFertility(worldState, pair.bearer, { scarcity, pressure, line });
     if (annual <= 0) continue;
 

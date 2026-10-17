@@ -482,6 +482,39 @@ const SOURCES = {
       + 'archive with its own terms; treat it as unverified until somebody reads them, '
       + 'which `describeSources` already counts it among.',
   },
+  overdoseMortality: {
+    name: 'CDC/NCHS drug overdose mortality (Underlying Cause of Death)',
+    licence: 'U.S. Government Work — public domain',
+    licenceCheckedAt: null,
+    access: 'CDC WONDER Underlying Cause of Death module; no key',
+    host: 'wonder.cdc.gov',
+    fills: ['populationData'],
+    tiers: ['regional'],
+    scale: 'drug-induced death rate per 100,000, every U.S. county, annually',
+    wired: 'imports/overdoseImport.js',
+    note: '**A second real input to a mechanism that already exists, not a new one.** '
+      + '`vacon-c/server/crime.js` is explicit that no drug/substance mechanic exists in '
+      + 'this engine at all; this does not add one. It feeds `mortality.diseasePressure` '
+      + 'as a second baseline, compounding with the CDC PLACES chronic-disease baseline '
+      + '`cdcPlaces` already supplies, through `populationPacks.overdoseBaselineFor`.',
+  },
+  natality: {
+    name: 'CDC/NCHS Natality (age-specific fertility rate)',
+    licence: 'U.S. Government Work — public domain',
+    licenceCheckedAt: null,
+    access: 'CDC WONDER Natality module, or NCHS public-use files; both need no key',
+    host: 'wonder.cdc.gov',
+    fills: ['populationData'],
+    tiers: ['regional'],
+    scale: 'live births per 1,000 women, six age bands, every U.S. county, annually',
+    wired: 'imports/natalityImport.js',
+    note: '**A real curve for a shape `vacon-c/server/births.js` labels invented.** That '
+      + 'file\'s own `fertilityForAge` is a bell curve the header calls "flagged '
+      + 'interpretive... no document gives a fertility curve," and `BASE_ANNUAL_BIRTH_RATE` '
+      + 'is chosen rather than measured. This is the measurement. `statistics.js`\'s '
+      + '`teenage_birth_rate` was already real and computed over whatever `births.js` '
+      + 'generated; this closes the twenty-seventh standing rule\'s loop for it.',
+  },
 
   // -------------------------------------------------------------------
   // People, work and money

@@ -98,6 +98,35 @@ test('healthBaselineFor reads a real number, and null with no value or no tract'
 });
 
 // ---------------------------------------------------------------------
+// overdoseBaseline — CDC/NCHS, the second real mortality multiplier
+// ---------------------------------------------------------------------
+
+test('an overdoseBaseline outside [0.75, 1.75] is refused, not clamped silently', () => {
+  const tooHigh = populationPacks.validatePack(pack({
+    tracts: [{ tractId: 'T1', overdoseBaseline: 2.1 }],
+  }));
+  assert.ok(tooHigh.some((p) => p.includes('overdoseBaseline')));
+  const tooLow = populationPacks.validatePack(pack({
+    tracts: [{ tractId: 'T1', overdoseBaseline: 0.1 }],
+  }));
+  assert.ok(tooLow.some((p) => p.includes('overdoseBaseline')));
+});
+
+test('an overdoseBaseline inside the bound validates alongside a healthBaseline', () => {
+  assert.deepEqual(populationPacks.validatePack(pack({
+    tracts: [{ tractId: 'T1', healthBaseline: 1.1, overdoseBaseline: 1.4 }],
+  })), []);
+});
+
+test('overdoseBaselineFor reads a real number, independently of healthBaselineFor', () => {
+  const tract = { tractId: 'T1', healthBaseline: 1.1, overdoseBaseline: 1.4 };
+  assert.equal(populationPacks.overdoseBaselineFor(tract), 1.4);
+  assert.equal(populationPacks.healthBaselineFor(tract), 1.1);
+  assert.equal(populationPacks.overdoseBaselineFor({ tractId: 'T1' }), null);
+  assert.equal(populationPacks.overdoseBaselineFor(null), null);
+});
+
+// ---------------------------------------------------------------------
 // tractFor, ageBandFor, attainmentFor
 // ---------------------------------------------------------------------
 
@@ -183,6 +212,28 @@ test('a world built with a real health baseline averages it onto the city, and m
     // No active conditions in a freshly generated city, so the real
     // baseline is the pressure, unmultiplied.
     assert.equal(mortality.diseasePressure(w, newCity.id), 1.35);
+  } finally {
+    cleanup();
+  }
+});
+
+test('a world built with both a real health and overdose baseline compounds them in diseasePressure', () => {
+  const mortality = require('../server/mortality.js');
+  const w = engine.WorldState;
+  const citiesBefore = w.cities.length;
+  try {
+    worldgen.generateWorld({
+      seed: 'pop-pack-overdose',
+      populationPack: pack({ tracts: [{ tractId: 'T1', healthBaseline: 1.1, overdoseBaseline: 1.4 }] }),
+      communitiesPerCity: 1,
+      populationPerCommunity: 5,
+    });
+    const newCity = w.cities[citiesBefore];
+    assert.equal(newCity.healthBaseline, 1.1);
+    assert.equal(newCity.overdoseBaseline, 1.4);
+    // Independent real inputs compound multiplicatively, same as an
+    // active condition does against the baseline.
+    assert.equal(Math.round(mortality.diseasePressure(w, newCity.id) * 100) / 100, 1.54);
   } finally {
     cleanup();
   }
