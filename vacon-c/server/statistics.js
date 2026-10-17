@@ -1229,6 +1229,25 @@ const CATALOGUE = [
       : infrastructure.cityCondition(ctx.worldState, ctx.cityId)),
   },
   {
+    key: 'political_lean', category: 'community', unit: 'share', scope: 'city',
+    // **A real county's two-party Democratic vote share, reported —
+    // deliberately the only kind of reading this statistic gets.**
+    // `politicalPacks.js`'s own header explains why this is not wired
+    // to any behavioral mechanism: there is no existing invented
+    // political-lean constant to replace, and inventing a causal link
+    // from a real vote share to crime, policing or law-strictness
+    // would be fabricating a political claim rather than closing a
+    // gap. Null for a world built with no political pack, same as
+    // `terrain_and_water` is null with no terrain reader — a
+    // genuinely absent fact, not an invented default.
+    compute: (ctx) => {
+      if (ctx.cityId === null) return null;
+      const city = (ctx.worldState.cities || []).find((c) => c.id === ctx.cityId);
+      const value = Number(city?.politicalLean);
+      return Number.isFinite(value) ? value : null;
+    },
+  },
+  {
     key: 'utilities_down', category: 'community', unit: 'count', scope: 'city',
     // **`failureRisk` was computed, crossed and read by nothing.** A
     // grid at risk 0.95 behaved exactly like one at 0.05 — §7's Energy

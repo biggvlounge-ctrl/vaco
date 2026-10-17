@@ -151,11 +151,17 @@ function importAcsTract(worldLayer, locationId, record = {}) {
   });
 
   const existingEconomic = location.economicData ?? {};
+  // **`giniIndex` (ACS table B19083) — real, and sat next to
+  // `medianHouseholdIncome`/`incomeQuantiles` with no reader on either
+  // side for the life of this importer.** All three are written and
+  // none had a VACON-C consumer until `incomePacks.js`.
+  const gini = Number(record.giniIndex);
   setLocationData(worldLayer, locationId, 'economicData', {
     ...existingEconomic,
     source: 'us-census-acs',
     medianHouseholdIncome: Number(record.medianHouseholdIncome) || null,
     incomeQuantiles: record.incomeQuantiles ?? null,
+    giniIndex: Number.isFinite(gini) && gini >= 0 && gini <= 1 ? gini : null,
   });
 
   return location;

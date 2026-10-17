@@ -81,6 +81,12 @@ const HEALTH_BASELINE_BOUNDS = [0.75, 1.5];
 //: and a pack reader does not get to introduce one.
 const OVERDOSE_BASELINE_BOUNDS = [0.75, 1.75];
 
+//: `world-layer/imports/hudPitImport.js`'s own `RATE_BOUNDS` — a real
+//: per-capita homelessness rate, the opposite condition
+//: `worldgen.js`'s `homesPerResident` margin (always above 1) can
+//: never express on its own.
+const HOMELESSNESS_RATE_BOUNDS = [0, 0.05];
+
 function isShareObject(value, keys) {
   if (!value || typeof value !== 'object') return false;
   for (const key of Object.keys(value)) {
@@ -128,6 +134,13 @@ function validatePack(pack) {
       if (!Number.isFinite(value) || value < OVERDOSE_BASELINE_BOUNDS[0] || value > OVERDOSE_BASELINE_BOUNDS[1]) {
         problems.push(`${where}: overdoseBaseline must be between ${OVERDOSE_BASELINE_BOUNDS[0]} `
           + `and ${OVERDOSE_BASELINE_BOUNDS[1]}`);
+      }
+    }
+    if (tract.homelessnessRate !== undefined && tract.homelessnessRate !== null) {
+      const value = Number(tract.homelessnessRate);
+      if (!Number.isFinite(value) || value < HOMELESSNESS_RATE_BOUNDS[0] || value > HOMELESSNESS_RATE_BOUNDS[1]) {
+        problems.push(`${where}: homelessnessRate must be between ${HOMELESSNESS_RATE_BOUNDS[0]} `
+          + `and ${HOMELESSNESS_RATE_BOUNDS[1]}`);
       }
     }
   });
@@ -220,6 +233,15 @@ function overdoseBaselineFor(tract) {
   return Number.isFinite(value) ? value : null;
 }
 
+// A tract's real HUD Point-in-Time per-capita homelessness rate — the
+// opposite condition `worldgen.js`'s `homesPerResident` margin cannot
+// express on its own (it is always above 1). Null when the tract has
+// none recorded.
+function homelessnessRateFor(tract) {
+  const value = Number(tract?.homelessnessRate);
+  return Number.isFinite(value) ? value : null;
+}
+
 module.exports = {
   SOURCES,
   EDUCATION_LEVELS,
@@ -227,6 +249,7 @@ module.exports = {
   AGE_BAND_RANGES,
   HEALTH_BASELINE_BOUNDS,
   OVERDOSE_BASELINE_BOUNDS,
+  HOMELESSNESS_RATE_BOUNDS,
   validatePack,
   assertPack,
   packFor,
@@ -235,4 +258,5 @@ module.exports = {
   attainmentFor,
   healthBaselineFor,
   overdoseBaselineFor,
+  homelessnessRateFor,
 };

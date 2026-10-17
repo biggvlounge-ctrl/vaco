@@ -224,11 +224,48 @@ for the full reasoning.
   either, or both, independently. Its own header explains at length
   why this folds into the existing mechanism instead of inventing a
   drug/substance mechanic that does not otherwise exist here.
+- `imports/censusImport.js`'s Gini/income extension — `importAcsTract`
+  had been writing real `medianHouseholdIncome`/`incomeQuantiles`
+  since round 1, with zero VACON-C consumer; `giniIndex` (bounded
+  `[0, 1]`, dropped rather than coerced if out of range — the
+  `Number(null)` corollary applies here exactly as it does everywhere
+  else in this registry) closes the same gap `exportIncomePack`
+  reads, via `incomePacks.js` on the VACON-C side.
+- `imports/hudPitImport.js` — real HUD Point-in-Time per-capita
+  homelessness rates, per Continuum of Care, turned into the opposite
+  condition VACON-C's invented `homesPerResident` margin (always above
+  1) can never express on its own — `exportPopulationPack`'s
+  `hasHomelessness` branch, read via `populationPacks.
+  homelessnessRateFor` on the VACON-C side.
+- `imports/nygsImport.js` — OJJDP's National Youth Gang Survey, the
+  one real, public, structured gang-count source after FBI NGIC
+  (qualitative/PDF), GangNET and CalGang (both restricted, non-public)
+  were checked and ruled out. Its own header documents exactly what
+  was checked. Deliberately not current: `LAST_SURVEY_YEAR = 2012` is
+  enforced (the importer throws on a later year) and a `staleness`
+  string is carried on every row — `exportGangPack`, read via
+  `gangPacks.js` on the VACON-C side.
+- `imports/electionImport.js` — real MIT Election Lab county
+  presidential returns (CC0), turned into a two-party Democratic vote
+  share — `exportPoliticalPack`, read via `politicalPacks.js` on the
+  VACON-C side. **Deliberately the one source in this registry with no
+  behavioral consumer.** VACON-C has no invented political-lean
+  constant to replace, and inventing one (a crime-rate bias, a
+  policing-intensity term) from a real vote share would be fabricating
+  a causal claim, not closing a gap — see that module's own header.
+  Read only, as a reported `statistics.js` entry.
 - `exportRegion.js` / `exportRegionStats.js` — the consumer join: turn
-  a region's real imported data into the nine packs VACON-C's own
+  a region's real imported data into the eleven packs VACON-C's own
   reader modules validate and read (see the note at the top of this
-  file), plus the two sources above that need no pack of their own.
+  file), plus the sources above that need no pack of their own.
   Plain JSON, never a cross-directory `require`.
+- **`imports/overtureTransportationImport.js` (roads) remains
+  deliberately unconsumed, by explicit project policy rather than
+  oversight.** Its own header opens "VACON-C DEFERS TRANSPORTATION BY
+  POLICY. READ THIS FIRST" and every row carries a `DEFERRED_BY` field.
+  This was proposed as a join twice in this project's history and
+  excluded both times on reading that header — recorded here so a
+  future pass checks the policy before writing the reader, not after.
 - `schema.sql` — the literal Postgres shape (`world_locations`,
   `world_location_events`, `world_npcs`, `world_businesses`,
   `world_business_employees`, `world_transport_nodes`,

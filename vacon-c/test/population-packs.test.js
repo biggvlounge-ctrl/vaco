@@ -127,6 +127,86 @@ test('overdoseBaselineFor reads a real number, independently of healthBaselineFo
 });
 
 // ---------------------------------------------------------------------
+// homelessnessRate — HUD Point-in-Time, the opposite condition
+// `homesPerResident`'s invented margin can never express on its own
+// ---------------------------------------------------------------------
+
+test('a homelessnessRate outside [0, 0.05] is refused, not clamped silently', () => {
+  const tooHigh = populationPacks.validatePack(pack({
+    tracts: [{ tractId: 'T1', homelessnessRate: 0.09 }],
+  }));
+  assert.ok(tooHigh.some((p) => p.includes('homelessnessRate')));
+  const negative = populationPacks.validatePack(pack({
+    tracts: [{ tractId: 'T1', homelessnessRate: -0.01 }],
+  }));
+  assert.ok(negative.some((p) => p.includes('homelessnessRate')));
+});
+
+test('a homelessnessRate inside the bound validates alongside health and overdose baselines', () => {
+  assert.deepEqual(populationPacks.validatePack(pack({
+    tracts: [{
+      tractId: 'T1', healthBaseline: 1.1, overdoseBaseline: 1.4, homelessnessRate: 0.012,
+    }],
+  })), []);
+});
+
+test('homelessnessRateFor reads a real rate, including a real zero, and null with no tract or value', () => {
+  assert.equal(populationPacks.homelessnessRateFor({ tractId: 'T1', homelessnessRate: 0.012 }), 0.012);
+  assert.equal(populationPacks.homelessnessRateFor({ tractId: 'T1', homelessnessRate: 0 }), 0);
+  assert.equal(populationPacks.homelessnessRateFor({ tractId: 'T1' }), null);
+  assert.equal(populationPacks.homelessnessRateFor(null), null);
+});
+
+test('a world built with a real homelessness rate draws homeCount below the invented margin', () => {
+  const w = engine.WorldState;
+  try {
+    worldgen.generateWorld({
+      seed: 'homelessness-pack-test',
+      populationPack: pack({
+        tracts: [{ tractId: 'T1', homelessnessRate: 0.04 }],
+      }),
+      communitiesPerCity: 1,
+      populationPerCommunity: 100,
+    });
+    const community = w.communities[w.communities.length - 1];
+    const homesPerResident = 1 - 0.04;
+    const expectedHomeCount = Math.round(100 * homesPerResident);
+    const homesInCommunity = w.properties.filter(
+      (p) => p.type === 'residential' && p.community_id === community.id,
+    );
+    assert.equal(homesInCommunity.length, expectedHomeCount);
+    assert.ok(expectedHomeCount < Math.round(100 * 1.15),
+      'a real homelessness rate should produce fewer homes than the invented 1.15 margin');
+  } finally {
+    cleanup();
+  }
+});
+
+test('a bad homelessnessRate is refused at generation, not half-applied', () => {
+  cleanup();
+  assert.throws(
+    () => worldgen.generateWorld({
+      seed: 'bad-homelessness-pack',
+      populationPack: { region: 'X', source: 'sample', tracts: [{ tractId: 'Y', homelessnessRate: 0.5 }] },
+    }),
+    /not usable/,
+  );
+  cleanup();
+});
+
+test('a world with no homelessness data still builds homeCount from the invented 1.15 margin', () => {
+  cleanup();
+  const w = engine.WorldState;
+  worldgen.generateWorld({ seed: 'no-homelessness-pack', communitiesPerCity: 1, populationPerCommunity: 100 });
+  const community = w.communities[w.communities.length - 1];
+  const homesInCommunity = w.properties.filter(
+    (p) => p.type === 'residential' && p.community_id === community.id,
+  );
+  assert.equal(homesInCommunity.length, Math.round(100 * 1.15));
+  cleanup();
+});
+
+// ---------------------------------------------------------------------
 // tractFor, ageBandFor, attainmentFor
 // ---------------------------------------------------------------------
 

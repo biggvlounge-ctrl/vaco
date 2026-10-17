@@ -1200,6 +1200,154 @@ checked is not a decision to execute anyway once the premise turns
 out to be wrong** — the twenty-fifth rule's shape, pointed at my own
 reasoning instead of at a measurement.
 
+**A thirty-second, from the "is there a more accurate gang/criminal-
+organization picture" question, and it closes three more real joins
+while declining a fourth that was never real to begin with.**
+
+**First, the twenty-seventh rule's gap, found a second time.**
+`world-layer/imports/censusImport.js` had been writing
+`medianHouseholdIncome`, `incomeQuantiles` and `giniIndex` onto
+`economicData` since round 1, with zero VACON-C consumer — the exact
+shape of the twenty-seventh rule's `censusImport`/`blsImport`/
+`hifldImport` trio, sitting unread a second time in the same file.
+`server/incomePacks.js` is the join: a real median income and Gini
+RE-CENTRE and RE-SPREAD `worldgen.js`'s invented `[4000, 60000]`
+home-value range (`valueRangeFor`) rather than replacing it outright,
+because this engine has no other anchor for what a home should be
+worth absent a real figure — the same posture `riskPacks.js` takes
+narrowing a climate's storm odds rather than replacing them outright.
+
+**Second, a real structural inverse for a margin that could only ever
+go one way.** `worldgen.js`'s `homesPerResident` is a flat 1.15,
+always above 1 — structurally incapable of expressing a housing
+deficit. HUD's Point-in-Time count is a real per-capita homelessness
+rate, and `realHomesPerResident = 1 - realHomelessnessRate` is the
+opposite condition the invented margin can never produce on its own.
+`server/populationPacks.js#homelessnessRateFor` reads it (bounded
+`[0, 0.05]`, a conservative sanity ceiling — HUD's own PIT counts run
+far below that even in the highest-rate CoCs) and `worldgen.js`'s
+`homeCount` computation uses it in place of the invented margin only
+when a real rate is present.
+
+**Third, the gang-database question asked three times this round, and
+answered for real rather than invented.** FBI NGIC's "National Gang
+Report" is qualitative/PDF, not structured; GangNET and CalGang are
+both restricted, non-public law-enforcement systems (CalGang
+additionally carries documented, court-flagged accuracy problems).
+OJJDP's National Youth Gang Survey is the one real, public, structured
+option — and it is also not current: `LAST_SURVEY_YEAR = 2012` is
+enforced in both `world-layer/imports/nygsImport.js` (the importer
+throws on a later year) and `server/gangPacks.js` (the pack reader
+refuses one), and a `staleness` string is carried on every row rather
+than left in a comment where the fourteenth rule's own "a warning is
+not a guard" would apply. `gangPacks.js` replaces `worldgen.js`'s
+invented `factionsPerCity`/`gangMembershipRate` with a real jurisdiction's
+gang count (including a real zero — `gangCountFor` returns it, not
+null) and membership rate, assigned by city position (§88).
+
+**Fourth, and this is the twenty-ninth rule's distinction applied
+again rather than relearned: a request for Antifa/political-
+organization "terrorist" data was declined outright, not deferred.**
+Antifa carries no formal U.S. terrorist designation — there is no real
+data of the kind asked for to wire in, and inventing a designation
+that does not exist is a different and worse mistake than any of the
+ones this file catalogues, because the other thirty-one are all about
+a real fact sitting unread. There was no fact here. Separately, a
+request to derive "an accurate assessment" from scraped Reddit content
+was also declined on its own terms — not an access problem
+(`world-layer/sources.js` already distinguishes `access: blocked` from
+`access: none`), but a sampling-bias problem: a self-selected posting
+population is not a representative one at any access level, so the
+word "accurate" in the request was the premise that needed correcting,
+not the data source.
+
+**Disability/veteran status (Census ACS shares, also real and also
+approved) and real race/ethnicity + marital-status data (approved,
+reversing the deliberately-fictional-ethnicity rule the twenty-ninth
+rule's religion section already named) are deliberately NOT part of
+this round** — both need a new per-NPC field rather than reusing an
+existing mechanism's invented band, the same complexity class as
+`religionPacks.js` was, and are left for their own round rather than
+folded in here.
+
+**Roads/Overture Transportation was raised again this round and
+excluded again, on the same policy grounds the thirtieth rule already
+recorded — restated here because it was proposed a second time before
+being checked a second time.**
+`world-layer/imports/overtureTransportationImport.js`'s own header
+opens with "VACON-C DEFERS TRANSPORTATION BY POLICY. READ THIS FIRST,"
+and every row it produces carries a `DEFERRED_BY` field. That is an
+explicit, binding project policy, not a design-philosophy tension like
+religion or ethnicity where the user's own sign-off can reasonably
+override it — the distinction the twenty-first rule's "two disagreeing
+answers" shape does not capture, because here there is only one
+answer and it says not yet.
+
+**A thirty-third, and it is the thirty-second rule's own fourth case —
+real, clean, and deliberately a report rather than a mechanism.**
+
+Asked directly whether every locality's "political status — red,
+blue, Democrat, Republican" could be added, the answer is yes and it
+is real: MIT Election Lab publishes county-level presidential returns
+(CC0), and `server/politicalPacks.js` reads a real two-party
+Democratic vote share onto `city.politicalLean`, assigned by city
+position (§88), same as every other pack here.
+
+**This one earns a header of its own because it has no invented
+constant to replace.** Every pack before it either replaces a flagged
+invented band (`incomePacks.js`) or narrows an existing one
+(`riskPacks.js`). VACON-C's elections (`politics.js`) are a procedural
+mechanism — candidates, votes cast by generated citizens — with no
+real-world left/right baseline anywhere in it. So the twenty-seventh
+rule's shape ("a real number standing in for an invented one") does
+not apply, and reaching for the NEXT thing that shape suggests — read
+the real share, then have it bias something, a crime rate or a
+policing intensity or a law-strictness term — would not be closing a
+gap. It would be fabricating a causal political claim this project has
+no research behind and no business asserting, which is a different
+and worse mistake than any of this file's other thirty-two entries,
+because every one of those is a real fact sitting unread and this
+would be a real fact put to a use nothing licenses.
+
+So `political_lean` is a new `statistics.js` entry, reported, null for
+a world with no political pack, and read by nothing else in the
+engine. That is the correct scope, not an unfinished wiring — see
+`politicalPacks.js`'s own header for the point stated in full, so a
+future pass checks this reasoning before adding a behavioral hook, not
+after.
+
+The same question also asked for (1) crime statistics by age, broken
+out for literally every town, and (2) an official LA/Chicago
+gang-territory map. Both needed a correction rather than a build.
+**(1) is real in part and impossible as stated**: FBI NIBRS carries
+real offender-age data where an agency reports it, but participation
+has real gaps, and no dataset gives real per-capita crime for every
+town — some report inconsistently, some not at all. **(2) does not
+exist**, and for Chicago specifically that is policy, not an
+oversight: CPD has stated publicly it does not release gang-boundary
+data because of how it could be used for retaliation. A 2019 WBEZ/
+Sun-Times FOIA'd one internal CPD dataset and reported it as already
+outdated by CPD's own account — a single investigative project's
+one-time release, not a live structured source, and treating it as
+current coverage would repeat the NYGS staleness problem with none of
+the labelling. What IS real for those two cities: `data.lacity.org`
+and `data.cityofchicago.org` both publish real, geocoded, incident-
+level crime data at neighborhood/beat grain — genuinely strong, but a
+two-city exception to "one source, every region" that every other pack
+in this registry follows, and not yet built pending that scope call.
+
+Two further real sources from the same conversation, both approved and
+both NOT yet built, for the complexity reasons stated when raised:
+Census ACS ancestry/national-origin tables (B04006/B05006) for real
+community character (Somali/Minneapolis, Bosnian/St. Louis-style), and
+Census ACS nativity/year-of-entry/citizenship-status shares as the
+honest substitute for "ICE records and immigration status" — individual
+enforcement records are not public and a per-NPC immigration-status
+field would violate this file's own §9 firewall, so the real
+substitute is place-level, same as everything else in this registry.
+Both need a new per-NPC field, the same complexity class already
+deferred once for disability/veteran status and real ethnicity.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

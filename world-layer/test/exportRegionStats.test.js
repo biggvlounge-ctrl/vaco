@@ -20,10 +20,16 @@ const { importReligionCensus } = require('../imports/religionImport');
 const { importProvider } = require('../imports/cmsImport');
 const { importInstitution } = require('../imports/ncesImport');
 const { importNatalityRates } = require('../imports/natalityImport');
+const { importPitCount } = require('../imports/hudPitImport');
+const { importNygsJurisdiction } = require('../imports/nygsImport');
+const { importCountyReturns } = require('../imports/electionImport');
 const {
   exportPopulationPack, exportLabourPack, exportInfrastructurePack,
   exportBusinessPack, exportClimatePack, exportRiskPack, exportReligionPack,
   exportNatalityPack,
+  exportIncomePack,
+  exportGangPack,
+  exportPoliticalPack,
 } = require('../exportRegionStats');
 
 test('exportPopulationPack is per-region, and refuses to be otherwise', () => {
@@ -375,5 +381,103 @@ test('exportNatalityPack excludes a county with no usable rate at all', () => {
   const location = generateLocation(layer, { name: 'Unmeasured County', lat: 38.6, lng: -90.2, tier: 'hero' });
   importNatalityRates(layer, location.id, { countyFips: '00000', rates: { '10-14': 0.1 } });
   const pack = exportNatalityPack(layer, { region: 'St. Louis, Missouri' });
+  assert.deepEqual(pack.counties, []);
+});
+
+// ---------------------------------------------------------------------
+// exportIncomePack
+// ---------------------------------------------------------------------
+
+test('exportIncomePack is per-region, and refuses to be otherwise', () => {
+  assert.throws(() => exportIncomePack(createWorldLayer(), {}), /requires options\.region/);
+});
+
+test('exportIncomePack carries a real tract\'s median income and Gini index — both sat unread before this', () => {
+  const layer = createWorldLayer();
+  const location = generateLocation(layer, { name: 'Tract 1236', lat: 38.6, lng: -90.2, tier: 'filler' });
+  importAcsTract(layer, location.id, {
+    tractId: '29510123600', medianHouseholdIncome: 85000, giniIndex: 0.44,
+  });
+  const pack = exportIncomePack(layer, { region: 'St. Louis, Missouri' });
+  assert.equal(pack.tracts.length, 1);
+  assert.equal(pack.tracts[0].medianHouseholdIncome, 85000);
+  assert.equal(pack.tracts[0].giniIndex, 0.44);
+});
+
+test('exportIncomePack excludes a tract with neither real figure', () => {
+  const layer = createWorldLayer();
+  const location = generateLocation(layer, { name: 'Tract 1237', lat: 38.6, lng: -90.2, tier: 'filler' });
+  importAcsTract(layer, location.id, { tractId: '29510123700' });
+  const pack = exportIncomePack(layer, { region: 'St. Louis, Missouri' });
+  assert.deepEqual(pack.tracts, []);
+});
+
+// ---------------------------------------------------------------------
+// exportPopulationPack also carries a real HUD homelessness rate
+// ---------------------------------------------------------------------
+
+test('exportPopulationPack carries a real HUD homelessness rate even with no ACS/CDC/overdose coverage', () => {
+  const layer = createWorldLayer();
+  const location = generateLocation(layer, { name: 'CoC Area 2', lat: 38.6, lng: -90.2, tier: 'filler' });
+  importPitCount(layer, location.id, { cocCode: 'MO-500', shelteredCount: 1200, unshelteredCount: 300, population: 300000 });
+  const pack = exportPopulationPack(layer, { region: 'St. Louis, Missouri' });
+  assert.equal(pack.tracts.length, 1);
+  assert.equal(pack.tracts[0].homelessnessRate, 0.005);
+});
+
+// ---------------------------------------------------------------------
+// exportGangPack
+// ---------------------------------------------------------------------
+
+test('exportGangPack is per-region, and refuses to be otherwise', () => {
+  assert.throws(() => exportGangPack(createWorldLayer(), {}), /requires options\.region/);
+});
+
+test('exportGangPack carries a real, dated jurisdiction\'s gang count and membership rate', () => {
+  const layer = createWorldLayer();
+  const location = generateLocation(layer, { name: 'Jurisdiction A', lat: 38.6, lng: -90.2, tier: 'filler' });
+  importNygsJurisdiction(layer, location.id, {
+    jurisdictionName: 'Testville PD', year: 2012, gangCount: 5, memberCount: 400, population: 100000,
+  });
+  const pack = exportGangPack(layer, { region: 'St. Louis, Missouri' });
+  assert.equal(pack.jurisdictions.length, 1);
+  assert.equal(pack.jurisdictions[0].gangCount, 5);
+  assert.equal(pack.jurisdictions[0].membershipRate, 0.004);
+  assert.equal(pack.jurisdictions[0].year, 2012);
+});
+
+test('exportGangPack excludes a jurisdiction with neither real figure', () => {
+  const layer = createWorldLayer();
+  const location = generateLocation(layer, { name: 'Jurisdiction B', lat: 38.6, lng: -90.2, tier: 'filler' });
+  importNygsJurisdiction(layer, location.id, { jurisdictionName: 'Nowhere PD', year: 2012 });
+  const pack = exportGangPack(layer, { region: 'St. Louis, Missouri' });
+  assert.deepEqual(pack.jurisdictions, []);
+});
+
+// ---------------------------------------------------------------------
+// exportPoliticalPack
+// ---------------------------------------------------------------------
+
+test('exportPoliticalPack is per-region, and refuses to be otherwise', () => {
+  assert.throws(() => exportPoliticalPack(createWorldLayer(), {}), /requires options\.region/);
+});
+
+test('exportPoliticalPack carries a real county\'s two-party Democratic vote share', () => {
+  const layer = createWorldLayer();
+  const location = generateLocation(layer, { name: 'County A', lat: 38.6, lng: -90.2, tier: 'filler' });
+  importCountyReturns(layer, location.id, {
+    countyFips: '29510', year: 2020, democraticVotes: 180000, republicanVotes: 40000,
+  });
+  const pack = exportPoliticalPack(layer, { region: 'St. Louis, Missouri' });
+  assert.equal(pack.counties.length, 1);
+  assert.equal(pack.counties[0].democraticShare, 0.818182);
+  assert.equal(pack.counties[0].year, 2020);
+});
+
+test('exportPoliticalPack excludes a county with no usable share', () => {
+  const layer = createWorldLayer();
+  const location = generateLocation(layer, { name: 'County B', lat: 38.6, lng: -90.2, tier: 'filler' });
+  importCountyReturns(layer, location.id, { countyFips: '29999', year: 2020, democraticVotes: null });
+  const pack = exportPoliticalPack(layer, { region: 'St. Louis, Missouri' });
   assert.deepEqual(pack.counties, []);
 });

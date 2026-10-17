@@ -515,6 +515,61 @@ const SOURCES = {
       + '`teenage_birth_rate` was already real and computed over whatever `births.js` '
       + 'generated; this closes the twenty-seventh standing rule\'s loop for it.',
   },
+  hudPit: {
+    name: 'HUD Point-in-Time homelessness count',
+    licence: 'U.S. Government Work — public domain',
+    licenceCheckedAt: null,
+    access: 'HUD Exchange annual PIT tables, per Continuum of Care; no key',
+    host: 'hudexchange.info',
+    fills: ['populationData'],
+    tiers: ['regional'],
+    scale: 'sheltered/unsheltered counts, one night, every U.S. Continuum of Care, annually',
+    wired: 'imports/hudPitImport.js',
+    note: '**A real deficit, for a mechanism that only ever generates a surplus.** '
+      + '`worldgen.js`\'s `homesPerResident` margin (1.15) is always above 1, so no '
+      + 'generated world has ever had fewer homes than residents — the real opposite '
+      + 'condition this margin cannot express. A real per-capita PIT rate lowers the margin '
+      + 'below 1.0 only where the real rate is high enough to matter.',
+  },
+  nygs: {
+    name: 'OJJDP National Youth Gang Survey (NYGS)',
+    licence: 'U.S. Government Work — public domain',
+    licenceCheckedAt: null,
+    access: 'NYGS archive (ICPSR/NIJ); no key',
+    host: 'n/a — archived at ICPSR, not a live API',
+    fills: ['populationData'],
+    tiers: ['regional'],
+    scale: 'self-reported gang and member counts per surveyed jurisdiction, 1996-2012',
+    wired: 'imports/nygsImport.js',
+    note: '**The one source in this registry that is not current, and the importer\'s own '
+      + 'header says so at length before any code.** FBI\'s National Gang Intelligence '
+      + 'Center publishes a qualitative report, not structured data; GangNET and state '
+      + 'systems (CalGang, etc.) are real but restricted to law enforcement, not public. '
+      + 'NYGS is the one real, structured, public option — discontinued after 2012, '
+      + 'self-reported by police agencies rather than measured. `worldgen.js` draws '
+      + '`factionsPerCity` and `gangMembershipRate` flat and invented in every city in '
+      + 'every world; this is a real number standing in for an invented one, with the '
+      + 'staleness named on every row rather than hidden.',
+  },
+  election: {
+    name: 'MIT Election Lab — county presidential returns',
+    licence: 'CC0',
+    licenceCheckedAt: null,
+    access: 'Harvard Dataverse download, countypres_2000-2020.tab; no key',
+    host: 'dataverse.harvard.edu',
+    fills: ['populationData'],
+    tiers: ['regional'],
+    scale: 'two-party vote counts per county, every U.S. presidential election, 2000-2020',
+    wired: 'imports/electionImport.js',
+    note: '**A real civic fact with no existing invented stand-in, and deliberately wired '
+      + 'to a reported statistic rather than a behavioral mechanism.** Every other real '
+      + 'source in this registry either replaces an invented number '
+      + '(`incomePacks.js`) or narrows an existing one (`riskPacks.js`). Nothing in VACON-C '
+      + 'invents a political lean today, so there is nothing to replace — and inventing a '
+      + 'causal link from this real share to a behavior (crime, law-strictness) would be '
+      + 'the mistake this registry exists to avoid, not the fix for one. '
+      + '`server/politicalPacks.js`\'s own header explains the scope choice at length.',
+  },
 
   // -------------------------------------------------------------------
   // People, work and money

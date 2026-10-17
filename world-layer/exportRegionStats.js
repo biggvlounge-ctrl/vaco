@@ -45,21 +45,26 @@ function exportPopulationPack(worldLayer, options = {}) {
   for (const location of worldLayer.locations || []) {
     const data = location.populationData;
     // **Any real import counts — not just ACS.** `importPlacesTract`
-    // (CDC) and `importOverdoseRates` (CDC/NCHS) each nest their own
-    // data under their own key without necessarily being the import
-    // that set the top-level `source`, so gating on
-    // `source === 'us-census-acs'` alone would silently drop a
-    // tract's real baseline on a location one of them covered but
-    // ACS did not.
+    // (CDC), `importOverdoseRates` (CDC/NCHS) and `importPitCount`
+    // (HUD) each nest their own data under their own key without
+    // necessarily being the import that set the top-level `source`,
+    // so gating on `source === 'us-census-acs'` alone would silently
+    // drop a tract's real baseline on a location one of them covered
+    // but ACS did not.
     const hasAcs = data?.source === 'us-census-acs';
     const hasHealth = Number.isFinite(Number(data?.healthPrevalence?.baselinePressure));
     const hasOverdose = Number.isFinite(Number(data?.overdoseMortality?.baselinePressure));
-    if (!data || (!hasAcs && !hasHealth && !hasOverdose)) continue;
-    const tract = { tractId: data.tractId ?? data.healthPrevalence?.tractId ?? data.overdoseMortality?.countyFips };
+    const hasHomelessness = Number.isFinite(Number(data?.homelessness?.ratePerCapita));
+    if (!data || (!hasAcs && !hasHealth && !hasOverdose && !hasHomelessness)) continue;
+    const tract = {
+      tractId: data.tractId ?? data.healthPrevalence?.tractId ?? data.overdoseMortality?.countyFips
+        ?? data.homelessness?.cocCode,
+    };
     if (data.ageBands) tract.ageBands = data.ageBands;
     if (data.attainment?.distribution) tract.attainment = data.attainment.distribution;
     if (hasHealth) tract.healthBaseline = Number(data.healthPrevalence.baselinePressure);
     if (hasOverdose) tract.overdoseBaseline = Number(data.overdoseMortality.baselinePressure);
+    if (hasHomelessness) tract.homelessnessRate = Number(data.homelessness.ratePerCapita);
     tracts.push(tract);
   }
 
@@ -277,12 +282,103 @@ function exportNatalityPack(worldLayer, options = {}) {
   return { region, source, counties };
 }
 
+// A region's real ACS median household income and Gini index, as an
+// income pack `vacon-c/server/incomePacks.js` can read.
+//
+// **Two real fields that sat next to each other with no reader on
+// either side.** `censusImport.js` has written `medianHouseholdIncome`
+// and `incomeQuantiles` onto `economicData` since this importer's
+// first version; nothing in VACON-C ever read either until
+// `incomePacks.js`.
+function exportIncomePack(worldLayer, options = {}) {
+  const { region, source = 'sample' } = options;
+  if (!region) {
+    throw new Error('exportIncomePack requires options.region — a pack is per-region by definition');
+  }
+
+  const tracts = [];
+  for (const location of worldLayer.locations || []) {
+    const economic = location.economicData;
+    if (!economic || economic.source !== 'us-census-acs') continue;
+    const hasIncome = Number(economic.medianHouseholdIncome) > 0;
+    // **`Number(null)` is 0 and 0 is finite**, so null/undefined is
+    // checked first — a tract censusImport never set a Gini figure
+    // for must not read as a tract with Gini exactly 0 (perfect
+    // equality), which is a real and very different claim.
+    const hasGini = economic.giniIndex !== null && economic.giniIndex !== undefined
+      && Number.isFinite(Number(economic.giniIndex));
+    if (!hasIncome && !hasGini) continue;
+    const tract = { tractId: location.populationData?.tractId ?? location.id };
+    if (hasIncome) tract.medianHouseholdIncome = Number(economic.medianHouseholdIncome);
+    if (hasGini) tract.giniIndex = Number(economic.giniIndex);
+    tracts.push(tract);
+  }
+
+  return { region, source, tracts };
+}
+
+//: `vacon-c/server/gangPacks.js`'s own `LAST_SURVEY_YEAR` — the NYGS
+//: was discontinued after this wave; see that module's header, and
+//: `imports/nygsImport.js`'s before it, for what this does and does
+//: not claim about how current this data is.
+const LAST_NYGS_SURVEY_YEAR = 2012;
+
+// A region's real, dated OJJDP National Youth Gang Survey
+// jurisdictions, as a gang pack `vacon-c/server/gangPacks.js` can
+// read. **Read `imports/nygsImport.js`'s header before using this —
+// it is the one source in this registry that is not current.**
+function exportGangPack(worldLayer, options = {}) {
+  const { region, source = 'sample' } = options;
+  if (!region) {
+    throw new Error('exportGangPack requires options.region — a pack is per-region by definition');
+  }
+
+  const jurisdictions = [];
+  for (const location of worldLayer.locations || []) {
+    const data = location.populationData?.gangActivity;
+    if (!data || data.source !== 'ojjdp-nygs') continue;
+    if (data.gangCount === null && data.membershipRate === null) continue;
+    const jurisdiction = { jurisdictionName: data.jurisdictionName, year: data.year };
+    if (data.gangCount !== null) jurisdiction.gangCount = data.gangCount;
+    if (data.membershipRate !== null) jurisdiction.membershipRate = data.membershipRate;
+    jurisdictions.push(jurisdiction);
+  }
+
+  return { region, source, jurisdictions };
+}
+
+// A region's real county-level two-party Democratic vote share, as a
+// political pack `vacon-c/server/politicalPacks.js` can read.
+function exportPoliticalPack(worldLayer, options = {}) {
+  const { region, source = 'sample' } = options;
+  if (!region) {
+    throw new Error('exportPoliticalPack requires options.region — a pack is per-region by definition');
+  }
+
+  const counties = [];
+  for (const location of worldLayer.locations || []) {
+    const data = location.populationData?.politicalLean;
+    if (!data || data.source !== 'mit-election-lab') continue;
+    if (data.democraticShare === null) continue;
+    counties.push({
+      countyFips: data.countyFips,
+      year: data.year,
+      democraticShare: data.democraticShare,
+    });
+  }
+
+  return { region, source, counties };
+}
+
 module.exports = {
   RETAIL_CATEGORIES,
   KOPPEN_GROUP_LETTERS,
   HAZARD_CONDITIONS,
   INFRASTRUCTURE_SOURCES,
+  LAST_NYGS_SURVEY_YEAR,
   exportPopulationPack,
+  exportIncomePack,
+  exportGangPack,
   exportLabourPack,
   exportInfrastructurePack,
   exportBusinessPack,
@@ -290,4 +386,5 @@ module.exports = {
   exportRiskPack,
   exportReligionPack,
   exportNatalityPack,
+  exportPoliticalPack,
 };

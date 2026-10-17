@@ -109,6 +109,9 @@ const climatePacks = require('./climatePacks.js');
 const riskPacks = require('./riskPacks.js');
 const religionPacks = require('./religionPacks.js');
 const natalityPacks = require('./natalityPacks.js');
+const incomePacks = require('./incomePacks.js');
+const gangPacks = require('./gangPacks.js');
+const politicalPacks = require('./politicalPacks.js');
 const merchandise = require('./merchandise.js');
 const worldStore = require('./worldStore.js');
 const { hashSeed, seededUnit } = require('./seeded.js');
@@ -337,6 +340,21 @@ function generateWorld(options = {}) {
   } else if (w.natalityPack) {
     natalityPacks.assertPack(w.natalityPack);
   }
+  if (config.incomePack) {
+    w.incomePack = incomePacks.assertPack(config.incomePack);
+  } else if (w.incomePack) {
+    incomePacks.assertPack(w.incomePack);
+  }
+  if (config.gangPack) {
+    w.gangPack = gangPacks.assertPack(config.gangPack);
+  } else if (w.gangPack) {
+    gangPacks.assertPack(w.gangPack);
+  }
+  if (config.politicalPack) {
+    w.politicalPack = politicalPacks.assertPack(config.politicalPack);
+  } else if (w.politicalPack) {
+    politicalPacks.assertPack(w.politicalPack);
+  }
 
   // **`worldState.seed` was read by two modules and set by none.**
   // `infrastructure.advanceInfrastructure` seeds its failure draw on
@@ -448,6 +466,15 @@ function generateWorld(options = {}) {
     // just below, and documented in the same two places.
     const realHazardRisk = riskPacks.riskFor(riskPacks.countyFor(w.riskPack, c));
     if (realHazardRisk) city.hazardRisk = realHazardRisk;
+
+    // **A real county's two-party vote share, when a political pack
+    // has one — assigned by the city's own position (§88).** Reported
+    // only, by `statistics.js`'s `political_lean` entry — see
+    // `politicalPacks.js`'s own header for why this is deliberately
+    // NOT wired to any behavioral mechanism. Known, stated limitation:
+    // in-memory only, same posture as `city.hazardRisk` above.
+    const realPoliticalLean = politicalPacks.leanFor(politicalPacks.countyFor(w.politicalPack, c));
+    if (realPoliticalLean !== null) city.politicalLean = realPoliticalLean;
 
     // Every city gets weather, and now a climate drawn from where it
     // actually sits (`environment.climateForLatitude`) rather than a
@@ -572,8 +599,20 @@ function generateWorld(options = {}) {
     }
 
     // ---- factions ---------------------------------------------------
+    // **A real, if dated, gang count and membership rate, when a gang
+    // pack covers this city — assigned by city position (§88).**
+    // `gangPacks.js`'s own header, and `world-layer/imports/
+    // nygsImport.js`'s before it, on exactly how dated: the National
+    // Youth Gang Survey was discontinued after 2012 and every figure
+    // it published is self-reported, not measured. The invented
+    // `factionsPerCity`/`gangMembershipRate` are the fallback either
+    // way.
+    const jurisdiction = gangPacks.jurisdictionFor(w.gangPack, c);
+    const realGangCount = gangPacks.gangCountFor(jurisdiction);
+    const realMembershipRate = gangPacks.membershipRateFor(jurisdiction);
+    const factionCount = realGangCount ?? config.factionsPerCity;
     const factions = [];
-    for (let f = 0; f < config.factionsPerCity; f += 1) {
+    for (let f = 0; f < factionCount; f += 1) {
       const faction = engine.generateFaction({
         name: `${random.pick(SURNAMES, 'faction', c, f)} Crew`,
         type: 'gang',
@@ -656,7 +695,27 @@ function generateWorld(options = {}) {
       }
 
       // ---- homes -----------------------------------------------------
-      const homeCount = Math.round(config.populationPerCommunity * config.homesPerResident);
+      // **A real per-capita homelessness rate, when a population pack
+      // covers this community, lowers the margin below 1.0 — the
+      // opposite condition `homesPerResident`'s own invented margin
+      // (always above 1) can never produce.** Read off the same
+      // population tract `healthBaseline`/`overdoseBaseline` already
+      // use, same position.
+      const homesTract = populationPacks.tractFor(w.populationPack, c * config.communitiesPerCity + b);
+      const realHomelessnessRate = populationPacks.homelessnessRateFor(homesTract);
+      const realHomesPerResident = realHomelessnessRate !== null
+        ? 1 - realHomelessnessRate
+        : null;
+      const homeCount = Math.round(
+        config.populationPerCommunity * (realHomesPerResident ?? config.homesPerResident),
+      );
+      // **A real [low, high] home-value range, when an income pack
+      // covers this community — the invented band otherwise.**
+      // `incomePacks.js`'s own header on why real income/Gini re-centre
+      // and re-spread the invented band rather than replacing it with
+      // a cited value directly.
+      const incomeTract = incomePacks.tractFor(w.incomePack, c * config.communitiesPerCity + b);
+      const realValueRange = incomePacks.valueRangeFor(incomeTract);
       const homes = [];
       for (let h = 0; h < homeCount; h += 1) {
         homes.push(property.generateProperty(w, {
@@ -664,7 +723,11 @@ function generateWorld(options = {}) {
           communityId: community.id,
           cityId: city.id,
           landSize: Math.round(random.range(120, 900, 'land', c, b, h)),
-          value: Math.round(random.range(4000, 60000, 'value', c, b, h)),
+          value: Math.round(random.range(
+            realValueRange ? realValueRange[0] : 4000,
+            realValueRange ? realValueRange[1] : 60000,
+            'value', c, b, h,
+          )),
           condition: Math.round(random.range(25, 100, 'cond', c, b, h)),
           floors: 1 + random.int(3, 'floors', c, b, h),
           units: 1,
@@ -1045,7 +1108,7 @@ function generateWorld(options = {}) {
       // ---- affiliation -----------------------------------------------------
       adults.forEach((npc, ai) => {
         if (factions.length === 0) return;
-        if (random.unit('gang', c, b, ai) > config.gangMembershipRate) return;
+        if (random.unit('gang', c, b, ai) > (realMembershipRate ?? config.gangMembershipRate)) return;
         membership.joinOrganization(w, {
           entityId: npc.id,
           organizationId: random.pick(factions, 'gangpick', c, b, ai).id,
