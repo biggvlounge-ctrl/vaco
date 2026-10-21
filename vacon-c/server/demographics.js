@@ -62,6 +62,7 @@
 'use strict';
 
 const { nextAfter } = require('./nextAfter.js');
+const migrationPathwayPacks = require('./migrationPathwayPacks.js');
 
 //: Flagged interpretive. `npcs.education` is TEXT with no comment and
 //: no enumeration anywhere in the package — unlike almost every other
@@ -210,6 +211,14 @@ function dominantShareOf(distribution) {
   return Math.round((known[0].count / total) * 10000) / 10000;
 }
 
+// The dominant category's own VALUE, not its share — `dominantShareOf`
+// one field over. Null when nothing is recorded, same as that function.
+function dominantValueOf(distribution) {
+  const known = distribution.rows.filter((r) => r.value !== 'unknown');
+  if (known.length === 0) return null;
+  return known[0].value;
+}
+
 // Every composition for one set of residents, in one pass.
 function compositionOf(worldState, residents) {
   const language = distributionOf(residents, (n) => {
@@ -251,6 +260,18 @@ function compositionOf(worldState, residents) {
       distribution: ethnicity,
       diversity: diversityOf(ethnicity),
       dominantShare: dominantShareOf(ethnicity),
+      // **A real, documented migration-pathway classification for the
+      // area's dominant ancestry group, when a real ancestry pack
+      // drew one — never for the invented vocabulary.**
+      // `migrationPathwayPacks.js`'s own header explains why this is
+      // reported only, same posture `political_lean` already takes,
+      // and why most groups read `legacy-not-applicable` rather than
+      // a pathway: ACS ancestry counts generations-removed descendants
+      // alongside anyone who actually migrated, and this field does
+      // not pretend otherwise. Null when the dominant group is
+      // `unknown` or is not a real ancestry-pack group (the invented
+      // vocabulary has no real-world pathway to report).
+      dominantPathway: migrationPathwayPacks.pathwayFor(dominantValueOf(ethnicity)),
     },
     education: {
       distribution: education,
@@ -281,5 +302,6 @@ module.exports = {
   distributionOf,
   diversityOf,
   dominantShareOf,
+  dominantValueOf,
   compositionOf,
 };

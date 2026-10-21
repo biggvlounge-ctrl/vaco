@@ -56,6 +56,22 @@
 // this environment's outbound proxy allowlist (403 CONNECT).
 // `fetchAncestryTable` throws with that reason; the transform is the
 // tested part.
+//
+// ---------------------------------------------------------------------
+// Extended a second time, for the same reason Somali and Bosnian stayed
+// their own groups
+// ---------------------------------------------------------------------
+// `jamaican` and `haitian` were split out of `west-indian`, and
+// `guatemalan`, `honduran` and `salvadoran` were added, when
+// `server/migrationPathwayPacks.js` needed real per-group migration
+// data and these five were exactly the groups where the real DHS/CBP
+// pattern differs sharply within what had been one bucket or was
+// missing outright — Haitian migration carries a documented
+// humanitarian-parole/asylum component Jamaican migration does not,
+// and the Northern Triangle countries (Guatemala, Honduras, El
+// Salvador) are the nationalities DHS/CBP's own published encounter
+// statistics name most often, and ACS reports them as real ancestry
+// codes in their own right, same as Mexican.
 
 'use strict';
 
@@ -97,14 +113,17 @@ const GROUP_MAP = {
   ghanaian: 'subsaharan-african',
   kenyan: 'subsaharan-african',
   subsaharanAfricanOther: 'subsaharan-african',
-  jamaican: 'west-indian',
-  haitian: 'west-indian',
+  jamaican: 'jamaican',
+  haitian: 'haitian',
   westIndianOther: 'west-indian',
   vietnamese: 'vietnamese',
   chinese: 'chinese',
   filipino: 'filipino',
   asianIndian: 'asian-indian',
   mexican: 'mexican',
+  guatemalan: 'guatemalan',
+  honduran: 'honduran',
+  salvadoran: 'salvadoran',
   american: 'american',
 };
 

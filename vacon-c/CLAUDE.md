@@ -1476,6 +1476,57 @@ data, restricted for the same safety reason, with an oversight body
 actively flagging it as unreliable rather than merely non-public.
 Nothing wired in; nothing fabricated.
 
+**A thirty-seventh, closing the DHS/CBP migration-pathway statistic
+offered and approved, and the first real source in this registry with
+no geography of its own.**
+
+Asked for "how people are crossing the border" reframed correctly as a
+statistics question rather than an operational one: DHS's Yearbook of
+Immigration Statistics (real annual LPR admissions by country and
+category) and CBP's own Enforcement Statistics (real encounter counts
+by sector and nationality) are the real, citable answer. Neither
+publishes a single "predominant pathway" per ancestry group — that is
+one step of generalisation this project took itself, the same shape
+`religionImport.TRADITION_MAP` already takes, anchored to specific,
+checked, real facts rather than assumed: Somali and Bosnian read as
+`refugee-asylee` (documented federal refugee resettlement, the same
+two examples that approved the ancestry work itself); Haiti as
+`humanitarian-parole` (TPS since the 2010 earthquake, named in the
+2022-23 CHNV parole process); El Salvador's TPS population is the
+largest of any country, dating to 2001; Mexico and the Northern
+Triangle (newly added to `ancestryPacks.GROUPS` for exactly this) as
+`mixed`, the nationalities CBP's own statistics name most often
+alongside substantial long-standing family-sponsored admissions;
+Asian-Indian as `employment-based`, one of the most consistently
+documented H-1B/EB patterns on file; most legacy European ancestries
+as `legacy-not-applicable`, because ACS ancestry counts everyone who
+REPORTS an ancestry, the overwhelming majority of whom are many
+generations removed from any migration event — a pathway classification
+would misdescribe most of the people in those groups.
+
+**`migrationPathwayPacks.js` has no `validatePack`/`assertPack`/
+`packFor`/position assignment, and that absence is the point, not an
+omission.** Every other pack in this registry reads per-LOCATION data
+assigned by §88 position. This source has no location at all — DHS/CBP
+publish by country and year, not by U.S. tract or county, so there is
+nothing to assign a position to. It is a static, cited reference table
+keyed on `ancestryPacks.GROUPS`, checked against that list at load
+time (a group here that is not a real `ancestryPacks.GROUPS` entry
+throws immediately, the same drift-prevention `religionPacks.js`'s and
+`gangPacks.js`'s cross-checked vocabularies already hold elsewhere).
+
+**Reported through `demographics.compositionOf`'s ethnicity block
+(`dominantPathway`), not through `statistics.js`.** Every unit in that
+catalogue is numeric; a pathway classification is categorical, and
+forcing it into a share or an index would misrepresent what it is.
+`compositionOf` already carries nested, non-scalar fields this way
+(`education.meanLevel` alongside its diversity and dominant share), so
+this follows that precedent rather than inventing a new unit type.
+`npc.ethnicity` itself is still read by nothing that decides an
+outcome — `migrationPathwayPacks.js` never touches the field directly,
+it only maps a group NAME to a classification, and the one place that
+calls it (`demographics.js`) was already the sole permitted reader.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

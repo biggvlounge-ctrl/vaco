@@ -36,8 +36,8 @@
 //: that can drift, so this cannot quietly become a claim.
 const BUILD_SCOPE = {
   engine: {
-    modules: 94,
-    lines: 44502,
+    modules: 95,
+    lines: 44767,
     tables: 63,
     routes: 79,
     tickPhases: 11,
@@ -54,8 +54,8 @@ const BUILD_SCOPE = {
     importers: 29,
   },
   tests: {
-    files: 102,
-    lines: 35474,
+    files: 103,
+    lines: 35578,
     cases: 1855,
   },
   countedAt: '2026-10-17',

@@ -606,7 +606,11 @@ const SOURCES = {
       + 'explicit instruction after being asked directly for real community character '
       + '(Somali/Minneapolis, Bosnian/St. Louis, Jewish/New York) — see '
       + '`server/ancestryPacks.js`\'s own header. `npc.ethnicity` stays read by nothing, '
-      + 'enforced by `test/ethnicity.test.js`; this changes what fills it, not what reads it.',
+      + 'enforced by `test/ethnicity.test.js`; this changes what fills it, not what reads it. '
+      + '`GROUP_MAP` was extended a round later (Jamaican/Haitian split, Guatemalan/Honduran/ '
+      + 'Salvadoran added) when `vacon-c/server/migrationPathwayPacks.js` needed real '
+      + 'per-group DHS/CBP migration-pathway data and these five were exactly where the real '
+      + 'pattern differed sharply within one bucket or was missing outright.',
   },
 
   // -------------------------------------------------------------------

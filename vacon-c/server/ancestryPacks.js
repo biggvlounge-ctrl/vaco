@@ -68,7 +68,8 @@ const GROUPS = [
   'dutch', 'norwegian', 'swedish', 'russian', 'ukrainian', 'greek',
   'portuguese', 'hungarian', 'czech', 'swiss', 'welsh', 'lithuanian',
   'arab', 'somali', 'bosnian', 'subsaharan-african', 'west-indian',
-  'vietnamese', 'chinese', 'filipino', 'asian-indian', 'mexican',
+  'jamaican', 'haitian', 'vietnamese', 'chinese', 'filipino',
+  'asian-indian', 'mexican', 'guatemalan', 'honduran', 'salvadoran',
   'american', 'other',
 ];
 

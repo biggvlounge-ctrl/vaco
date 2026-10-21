@@ -1,0 +1,169 @@
+// server/migrationPathwayPacks.js
+//
+// **A real, documented, predominant immigration pathway per ancestry
+// group — reported, same posture as `political_lean`, never wired to
+// any decision mechanic.**
+//
+// ---------------------------------------------------------------------
+// What this answers, and what it deliberately does not
+// ---------------------------------------------------------------------
+// Asked directly how people actually arrive — legal category versus
+// an irregular border encounter — the real, citable answer is DHS's
+// Office of Homeland Security Statistics Yearbook of Immigration
+// Statistics (annual LPR admissions by country and category: family-
+// sponsored, employment-based, refugee/asylee, diversity visa) and
+// CBP's own published Enforcement Statistics (monthly/annual
+// encounter counts by sector and nationality). Both are real,
+// public, and this module turns their well-documented country-level
+// PATTERNS into one classification per `ancestryPacks.GROUPS` entry.
+//
+// This is explicitly NOT a request for how to physically cross a
+// border undetected, and does not answer that question — see
+// CLAUDE.md's standing rule on why that stays out of scope regardless
+// of framing. What it answers is the real, aggregate, publicly
+// documented ANSWER to "how do people from this background typically
+// get here" — exactly the statistic a simulation needs, as opposed to
+// an operational how-to nothing here provides.
+//
+// ---------------------------------------------------------------------
+// One step of generalisation, like every other closed vocabulary here
+// ---------------------------------------------------------------------
+// DHS/CBP data is published per COUNTRY, per YEAR, per category — not
+// as a single "predominant pathway" per ancestry group. This table is
+// that one step of generalisation, the same shape `religionImport
+// .TRADITION_MAP` and `ancestryImport.GROUP_MAP` already take: a
+// documented, real, well-established pattern collapsed to a closed
+// vocabulary, not an invented guess. Most of `ancestryPacks.GROUPS`
+// are legacy European ancestries — `demographics.js`'s own
+// distinction matters here: ACS ancestry counts everyone who REPORTS
+// an ancestry, the overwhelming majority of whom are many generations
+// removed from any migration event at all. `legacy-not-applicable` is
+// that fact, named rather than forced into a pathway that does not
+// describe most of the people in the group.
+//
+// Specific, real anchors for the groups where the classification is
+// not simply "legacy" — checked directly rather than assumed:
+//
+//   somali / bosnian       federally resettled refugee populations,
+//                          each extensively documented (Minnesota's
+//                          Somali resettlement, St. Louis's Bosnian
+//                          resettlement after the 1992-95 war — the
+//                          same two examples that approved this round
+//                          of ancestry work in the first place).
+//   haitian                a substantial, real humanitarian-parole/
+//                          TPS component distinct from other
+//                          Caribbean ancestry groups — Haiti has held
+//                          Temporary Protected Status since the 2010
+//                          earthquake and was a named country in the
+//                          2022-23 CHNV humanitarian parole process.
+//   salvadoran             El Salvador holds the single largest TPS
+//                          population of any country, dating to the
+//                          2001 earthquakes — among the most
+//                          well-documented facts in US immigration
+//                          statistics.
+//   mexican / guatemalan /
+//   honduran               the "Northern Triangle" plus Mexico are
+//                          the nationalities CBP's own published
+//                          encounter statistics name most often,
+//                          alongside long-standing, substantial
+//                          family-sponsored admissions — genuinely
+//                          mixed, not a single-channel pattern.
+//   asian-indian            dominated by employment-based (H-1B/EB)
+//                          admission — one of the most consistently
+//                          documented patterns in DHS's own category
+//                          tables.
+//
+// ---------------------------------------------------------------------
+// §9 applies here exactly as it does to ethnicity and religion
+// ---------------------------------------------------------------------
+// A documented pattern about a GROUP, reported through `statistics.js`
+// only — never a per-person fact, never read by anything that decides
+// an outcome. No NPC's own migration pathway is modelled; nothing
+// here could be, since `npc.ethnicity` is an ancestry group, not a
+// personal migration event, and conflating the two would misdescribe
+// most of the people in almost every group this module covers.
+
+'use strict';
+
+const ancestryPacks = require('./ancestryPacks.js');
+
+const PATHWAYS = [
+  'family-sponsored', 'employment-based', 'refugee-asylee',
+  'humanitarian-parole', 'mixed', 'legacy-not-applicable',
+];
+
+//: Every real group in `ancestryPacks.GROUPS` except `other` (the
+//: unrecognised-code catch-all, which names no real population to
+//: classify). Cross-checked by this module's own test so the two
+//: cannot drift.
+const PATHWAY_BY_GROUP = {
+  german: 'legacy-not-applicable',
+  irish: 'legacy-not-applicable',
+  english: 'legacy-not-applicable',
+  italian: 'legacy-not-applicable',
+  polish: 'legacy-not-applicable',
+  french: 'legacy-not-applicable',
+  scottish: 'legacy-not-applicable',
+  dutch: 'legacy-not-applicable',
+  norwegian: 'legacy-not-applicable',
+  swedish: 'legacy-not-applicable',
+  russian: 'legacy-not-applicable',
+  ukrainian: 'legacy-not-applicable',
+  greek: 'legacy-not-applicable',
+  portuguese: 'legacy-not-applicable',
+  hungarian: 'legacy-not-applicable',
+  czech: 'legacy-not-applicable',
+  swiss: 'legacy-not-applicable',
+  welsh: 'legacy-not-applicable',
+  lithuanian: 'legacy-not-applicable',
+  american: 'legacy-not-applicable',
+  arab: 'mixed',
+  somali: 'refugee-asylee',
+  bosnian: 'refugee-asylee',
+  'subsaharan-african': 'mixed',
+  'west-indian': 'family-sponsored',
+  jamaican: 'family-sponsored',
+  haitian: 'humanitarian-parole',
+  vietnamese: 'refugee-asylee',
+  chinese: 'mixed',
+  filipino: 'mixed',
+  'asian-indian': 'employment-based',
+  mexican: 'mixed',
+  guatemalan: 'mixed',
+  honduran: 'mixed',
+  salvadoran: 'mixed',
+};
+
+// **Checked once, at load time, not left to drift.** Every key here
+// must be a real `ancestryPacks.GROUPS` entry — a typo or a renamed
+// group on that side would otherwise silently stop being classified,
+// which is exactly the kind of drift `religionPacks.js`'s and
+// `gangPacks.js`'s own cross-checked vocabularies are built to catch.
+for (const group of Object.keys(PATHWAY_BY_GROUP)) {
+  if (!ancestryPacks.GROUPS.includes(group)) {
+    throw new Error(`migrationPathwayPacks.js: "${group}" is not in ancestryPacks.GROUPS`);
+  }
+}
+
+function pathwayFor(group) {
+  return PATHWAY_BY_GROUP[group] ?? null;
+}
+
+// The classification for a group, or null for `other` and any name
+// this table does not recognise — never a guessed default.
+function describePathway(group) {
+  const pathway = pathwayFor(group);
+  if (!pathway) return null;
+  return {
+    group,
+    pathway,
+    source: 'dhs-yearbook-cbp-enforcement-statistics',
+  };
+}
+
+module.exports = {
+  PATHWAYS,
+  PATHWAY_BY_GROUP,
+  pathwayFor,
+  describePathway,
+};
