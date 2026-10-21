@@ -1421,6 +1421,61 @@ of just filling it, and it did fail once, for the right reason, before
 the allowlist was updated — see the test's own comment on why
 `ancestryPacks.js` belongs there now.
 
+**A thirty-sixth, from being asked directly to use academic papers for
+gang information where no structured database exists — and it found
+a real, independent SECOND measurement rather than new jurisdiction
+data.**
+
+Pyrooz & Sweeten (2015, *Journal of Adolescent Health*) is a national
+self-report estimate of youth gang membership from the NLSY97 cohort
+(youths born 1980-84, nine survey waves), combined with 2010 Census
+population figures: 2.0% overall prevalence ages 5-17, peaking at 14
+(5.0%), implying roughly 1,059,000 youth gang members nationally in
+2010 — more than three times the ~300,000 contemporary
+law-enforcement-based estimate, which the authors attribute to police
+records favouring older, more criminally-involved youth.
+
+**This could not be wired in as a pack, and the reason is worth
+naming rather than working around.** It has no geography at all — a
+single national number, the opposite grain from NYGS's per-
+jurisdiction counts — so there is nothing for `jurisdictionFor` to
+assign by position; §88 has nothing to seed on here. Blending it into
+a real jurisdiction's NYGS rate would also average two different
+grains measuring different-aged populations, which is a worse
+mistake than leaving them separate.
+
+So `gangPacks.SELF_REPORT_REFERENCE` carries the finding as flagged
+data, and `describeUndercountCaveat` reports it ALONGSIDE a real
+jurisdiction's NYGS rate, never blended into it — the caveat that
+every real NYGS-derived rate this module reads is likely a floor,
+attached to the number rather than left in a comment where the
+fourteenth rule's "a warning is not a guard" would apply again.
+
+Also checked at the same time, with a real, concrete, negative
+result: RAND's actual LA County Sheriff's Department research is
+about DEPUTY gangs/cliques inside the department (a real, separate,
+well-documented scandal — "Vikings," "Banditos," and so on), not
+inmate or street gangs, and even that report says membership counts
+are unknown. The last LA County gang-membership snapshots found were
+one-time historical figures (a 2000 DOJ count and a 2007 City of LA
+estimate) — old, uncorroborated by anything current, and not wired in
+for the same staleness reason NYGS itself is already flagged for.
+
+**Jail/prison gang (STG) classification data — checked directly,
+also a real no, and a worse one than CalGang.** CDCR abandoned its
+validation-based indefinite SHU isolation approach in 2012 after
+*Ashker v. Brown* successfully challenged it as a due-process
+violation; the only public figure is a single 2012 press snapshot
+(~3,100 STG members/associates, ~20% formally validated), not a
+dataset. LA County's own Office of Inspector General found the
+Sheriff's Department has a "confusing collection of databases and
+processes" for jail statistics and recommended NOT releasing numbers
+until their accuracy could be confirmed. This is the CalGang pattern
+one level deeper into the system — individual custody-classification
+data, restricted for the same safety reason, with an oversight body
+actively flagging it as unreliable rather than merely non-public.
+Nothing wired in; nothing fabricated.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

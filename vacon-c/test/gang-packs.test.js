@@ -96,6 +96,30 @@ test('membershipRateFor reads a real rate, and null with no jurisdiction', () =>
 });
 
 // ---------------------------------------------------------------------
+// The self-report/law-enforcement gap — Pyrooz & Sweeten (2015), a
+// real, independent, national finding carried as a caveat, never
+// blended into a jurisdiction's own real NYGS rate
+// ---------------------------------------------------------------------
+
+test('selfReportUndercountFactor is computed from the reference, not retyped', () => {
+  const expected = gangPacks.SELF_REPORT_REFERENCE.nationalEstimate2010
+    / gangPacks.SELF_REPORT_REFERENCE.lawEnforcementComparatorEstimate;
+  assert.equal(gangPacks.selfReportUndercountFactor(), Math.round(expected * 10) / 10);
+});
+
+test('describeUndercountCaveat reports the real rate alongside the reference, never averaged', () => {
+  const described = gangPacks.describeUndercountCaveat({ jurisdictionName: 'Testville PD', membershipRate: 0.04 });
+  assert.equal(described.nygsMembershipRate, 0.04, 'the real rate must pass through unchanged');
+  assert.equal(described.selfReportReference, gangPacks.SELF_REPORT_REFERENCE);
+  assert.ok(described.undercountFactor > 1, 'self-report ran higher than the law-enforcement estimate');
+});
+
+test('describeUndercountCaveat is null with no jurisdiction or no real rate, never a fabricated figure', () => {
+  assert.equal(gangPacks.describeUndercountCaveat(null), null);
+  assert.equal(gangPacks.describeUndercountCaveat({ jurisdictionName: 'X' }), null);
+});
+
+// ---------------------------------------------------------------------
 // A world built from it
 // ---------------------------------------------------------------------
 
