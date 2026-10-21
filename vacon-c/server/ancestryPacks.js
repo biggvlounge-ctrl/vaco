@@ -67,10 +67,10 @@ const GROUPS = [
   'german', 'irish', 'english', 'italian', 'polish', 'french', 'scottish',
   'dutch', 'norwegian', 'swedish', 'russian', 'ukrainian', 'greek',
   'portuguese', 'hungarian', 'czech', 'swiss', 'welsh', 'lithuanian',
-  'arab', 'somali', 'bosnian', 'subsaharan-african', 'west-indian',
-  'jamaican', 'haitian', 'vietnamese', 'chinese', 'filipino',
-  'asian-indian', 'mexican', 'guatemalan', 'honduran', 'salvadoran',
-  'american', 'other',
+  'arab', 'somali', 'bosnian', 'nigerian', 'ethiopian', 'ghanaian',
+  'kenyan', 'subsaharan-african', 'west-indian', 'jamaican', 'haitian',
+  'vietnamese', 'chinese', 'filipino', 'asian-indian', 'mexican',
+  'guatemalan', 'honduran', 'salvadoran', 'american', 'other',
 ];
 
 //: `ancestryImport.js`'s own `UNSPECIFIED` — its own value, not a

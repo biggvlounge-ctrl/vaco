@@ -63,6 +63,7 @@
 
 const { nextAfter } = require('./nextAfter.js');
 const migrationPathwayPacks = require('./migrationPathwayPacks.js');
+const africanEthnicGroupPacks = require('./africanEthnicGroupPacks.js');
 
 //: Flagged interpretive. `npcs.education` is TEXT with no comment and
 //: no enumeration anywhere in the package — unlike almost every other
@@ -226,6 +227,7 @@ function compositionOf(worldState, residents) {
     return primary ? primary.name : null;
   });
   const religion = distributionOf(residents, (n) => n.religion ?? null);
+  const islamicSect = distributionOf(residents, (n) => n.islamicSect ?? null);
   const ethnicity = distributionOf(residents, (n) => n.ethnicity ?? null);
   const education = distributionOf(residents, (n) => n.education ?? null);
 
@@ -239,6 +241,17 @@ function compositionOf(worldState, residents) {
       distribution: religion,
       diversity: diversityOf(religion),
       dominantShare: dominantShareOf(religion),
+    },
+    // **A real Sunni/Shia/unaffiliated split, measured here and read
+    // nowhere else — `islamicSectPacks.js`'s own header, same firewall
+    // discipline `ethnicity` already holds.** `unknown` here means
+    // either "not Muslim" or "no real data drew a sect," which is the
+    // same ambiguity every other `unknown` in this file carries: a
+    // fact genuinely absent, not an invented default.
+    islamicSect: {
+      distribution: islamicSect,
+      diversity: diversityOf(islamicSect),
+      dominantShare: dominantShareOf(islamicSect),
     },
     // **`ethnicity` is measured here and read NOWHERE else**, which is
     // the whole design and is enforced by `test/ethnicity.test.js`.
@@ -272,6 +285,17 @@ function compositionOf(worldState, residents) {
       // `unknown` or is not a real ancestry-pack group (the invented
       // vocabulary has no real-world pathway to report).
       dominantPathway: migrationPathwayPacks.pathwayFor(dominantValueOf(ethnicity)),
+      // **A real, documented ethnic/tribal composition for the area's
+      // dominant ancestry group, when that group is one of the four
+      // named countries this reference covers — a fact about the
+      // COUNTRY, never about any one generated person.**
+      // `africanEthnicGroupPacks.js`'s own header explains why this
+      // cannot and does not claim a per-person tribal identity: ACS
+      // ancestry data has no sub-national breakdown to read, so this
+      // reports the country's own documented composition instead,
+      // same posture as `dominantPathway` just above. Null for every
+      // other group, including the invented vocabulary.
+      dominantEthnicComposition: africanEthnicGroupPacks.compositionFor(dominantValueOf(ethnicity)),
     },
     education: {
       distribution: education,

@@ -120,6 +120,17 @@ const PATHWAY_BY_GROUP = {
   arab: 'mixed',
   somali: 'refugee-asylee',
   bosnian: 'refugee-asylee',
+  // Nigerian, Ethiopian, Ghanaian and Kenyan admissions are each
+  // documented as genuinely mixed — substantial family-sponsored and
+  // employment-based shares for all four, a real, well-documented
+  // Diversity Visa lottery component for West African countries
+  // specifically, and (for Ethiopian) a real historical refugee/
+  // asylee component from the Derg era and the Eritrean-Ethiopian
+  // war. None of these is confidently the single dominant channel.
+  nigerian: 'mixed',
+  ethiopian: 'mixed',
+  ghanaian: 'mixed',
+  kenyan: 'mixed',
   'subsaharan-african': 'mixed',
   'west-indian': 'family-sponsored',
   jamaican: 'family-sponsored',

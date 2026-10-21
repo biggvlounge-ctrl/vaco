@@ -72,6 +72,17 @@
 // Salvador) are the nationalities DHS/CBP's own published encounter
 // statistics name most often, and ACS reports them as real ancestry
 // codes in their own right, same as Mexican.
+//
+// `nigerian`, `ethiopian`, `ghanaian` and `kenyan` were split out of
+// `subsaharan-african` into their own groups a round later, when
+// `server/africanEthnicGroupPacks.js` needed a named country to
+// classify — CIA World Factbook-style ethnic/tribal composition
+// (Hausa-Fulani/Yoruba/Igbo for Nigeria, Oromo/Amhara for Ethiopia,
+// and so on) is a real fact about a COUNTRY, not about "Subsaharan
+// Africa" as an undifferentiated region, and folding four of its
+// most populous source countries into one bucket here would have
+// left nothing for that module to classify. `subsaharanAfricanOther`
+// remains the residual bucket for every other Sub-Saharan country.
 
 'use strict';
 
@@ -108,10 +119,10 @@ const GROUP_MAP = {
   arab: 'arab',
   somali: 'somali',
   bosnian: 'bosnian',
-  nigerian: 'subsaharan-african',
-  ethiopian: 'subsaharan-african',
-  ghanaian: 'subsaharan-african',
-  kenyan: 'subsaharan-african',
+  nigerian: 'nigerian',
+  ethiopian: 'ethiopian',
+  ghanaian: 'ghanaian',
+  kenyan: 'kenyan',
   subsaharanAfricanOther: 'subsaharan-african',
   jamaican: 'jamaican',
   haitian: 'haitian',

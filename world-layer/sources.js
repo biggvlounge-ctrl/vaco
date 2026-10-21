@@ -610,7 +610,9 @@ const SOURCES = {
       + '`GROUP_MAP` was extended a round later (Jamaican/Haitian split, Guatemalan/Honduran/ '
       + 'Salvadoran added) when `vacon-c/server/migrationPathwayPacks.js` needed real '
       + 'per-group DHS/CBP migration-pathway data and these five were exactly where the real '
-      + 'pattern differed sharply within one bucket or was missing outright.',
+      + 'pattern differed sharply within one bucket or was missing outright. Extended a third '
+      + 'time (Nigerian/Ethiopian/Ghanaian/Kenyan split out of `subsaharan-african`) when '
+      + '`vacon-c/server/africanEthnicGroupPacks.js` needed a named country to classify.',
   },
 
   // -------------------------------------------------------------------

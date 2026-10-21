@@ -15,10 +15,12 @@ function place(worldLayer) {
   return generateLocation(worldLayer, { name: 'Tract 1', lat: 44.9, lng: -93.2, tier: 'filler' });
 }
 
-test('groupFor keeps Somali and Bosnian as their own groups, not folded into a region', () => {
+test('groupFor keeps Somali, Bosnian and named country groups as their own groups, not folded into a region', () => {
   assert.equal(ancestry.groupFor('somali'), 'somali');
   assert.equal(ancestry.groupFor('bosnian'), 'bosnian');
-  assert.equal(ancestry.groupFor('nigerian'), 'subsaharan-african');
+  assert.equal(ancestry.groupFor('nigerian'), 'nigerian');
+  assert.equal(ancestry.groupFor('ethiopian'), 'ethiopian');
+  assert.equal(ancestry.groupFor('subsaharanAfricanOther'), 'subsaharan-african');
   assert.equal(ancestry.groupFor('unknownCode'), null);
 });
 

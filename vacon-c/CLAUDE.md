@@ -1527,6 +1527,78 @@ outcome — `migrationPathwayPacks.js` never touches the field directly,
 it only maps a group NAME to a classification, and the one place that
 calls it (`demographics.js`) was already the sole permitted reader.
 
+**A thirty-eighth, from being asked to go a step deeper on tribes,
+sects and political subcultures — three real, two declined, and one
+unrelated defect found along the way.**
+
+**African ethnic/tribal composition** is real as a fact about the
+COUNTRY and not real as a fact about the American population this
+engine models — Census ACS ancestry data (B04006) tracks country of
+origin, never sub-national tribe, so there is no U.S. per-tract
+source to name Hausa-Fulani/Yoruba/Igbo shares within Nigerian-
+American ancestry specifically. `nigerian`/`ethiopian`/`ghanaian`/
+`kenyan` were split out of `subsaharan-african` into their own
+`ancestryPacks.GROUPS` entries, and `africanEthnicGroupPacks.js`
+reports each country's own documented composition (CIA World
+Factbook-style figures) — a fact about the country, reported through
+`demographics.compositionOf` exactly like `dominantPathway`, never a
+claim about any one generated person's tribal affiliation.
+
+**Sunni/Shia is real, and checked directly rather than assumed to
+exist.** The U.S. Religion Census reports Muslims as one undifferentiated
+category at the county level in every edition (2000, 2010, 2020) —
+there is no county-level sect split anywhere in that source. Pew
+Research's own national surveys of American Muslims DO ask this
+directly, but only nationally, and the published shares move
+noticeably between survey waves (2007: ~50% Sunni/16% Shia; 2011: 65%
+Sunni/11% Shia) — `islamicSectPacks.js` uses the 2007 wave's actual
+published numbers rather than averaging the waves into an invented
+blend neither survey published. `npc.islamicSect` is a new per-NPC
+field, drawn only when a real religion pack resolves `religion` to
+`'muslim'`, and holds the exact §9 firewall `npc.ethnicity` already
+holds — enforced by `test/islamic-sect-packs.test.js`'s own copy of
+`test/ethnicity.test.js`'s forbidden-file scan, not left to a comment.
+
+**U.S. political ideological factions ("neocon" and similar labels)
+were declined, not researched and then declined — there is nothing
+to research.** Party registration and county vote share are real and
+already wired (`politicalPacks.js`). A finer ideological label like
+"neocon" has no operational definition any survey counts against —
+unlike Sunni/Shia, which Pew asks directly, no comparable national
+survey asks Americans to self-identify into factional labels like
+this one, and the term itself is used inconsistently even in its own
+usual context. The real analogue, if this is wanted later, is Pew's
+own published political typology (named, survey-derived ideological
+clusters, re-run periodically) — a different and considerably more
+defensible category than inventing one.
+
+**Israeli domestic politics and the secular/religious Israeli divide
+were declined outright, on scope grounds rather than a data gap.**
+Every real source in this registry — Census, HUD, FBI/NYGS, DHS/CBP,
+Pew — is about the United States, because this engine generates one
+U.S. region per world; it has no concept of a non-U.S. location to
+attach foreign domestic politics to in the first place. Beyond the
+scope mismatch, modelling a live, actively contested foreign
+political and religious fault line onto generated people who are also
+subject to this engine's own crime/death/disease mechanics is a
+sharper version of the tension `religionPacks.js`'s own header already
+raised once about U.S. religion, and unlike Somali/Bosnian refugee
+resettlement (a settled historical fact), there is no settled,
+uncontested version of this one to report.
+
+**A real, unrelated defect found while checking how `ethnicity`
+persists, not fixed here.** `migrate.js`'s `INSERT INTO npcs` names
+`name` and `ethnicity` columns; neither exists on `npcs` in
+`VACANCY_POSTGRESQL_SCHEMA.sql`, and `name` does not exist on
+`entities` either. Against a real Postgres instance this would throw
+on every single NPC, which is likely why it has never been caught —
+Postgres has been unreachable from this environment for the life of
+this project, the same condition `restore.js`'s own header already
+names for a different defect. Flagged rather than fixed: `islamicSect`
+was deliberately NOT added to this same broken INSERT, so it doesn't
+compound this, and it stays in-memory-only, the same documented
+posture `npc.ethnicity` already has.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

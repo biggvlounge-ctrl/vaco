@@ -454,6 +454,11 @@ function generateNPC(options = {}) {
     // forbidden to read it. Null unless a caller supplies one, exactly
     // like `religion` and `education`.
     ethnicity: options.ethnicity ?? null,
+    // A real Sunni/Shia/unaffiliated split, drawn only when `religion`
+    // resolved to the real `'muslim'` tradition — see
+    // `islamicSectPacks.js`'s own header. Null unless a caller
+    // supplies one, same posture as `religion` and `ethnicity`.
+    islamicSect: options.islamicSect ?? null,
     traits: traitsToSheet(traitRows),
     createdTick: WorldState.tick,
     updatedTick: WorldState.tick,

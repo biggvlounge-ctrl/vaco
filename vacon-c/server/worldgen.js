@@ -108,6 +108,7 @@ const businessPacks = require('./businessPacks.js');
 const climatePacks = require('./climatePacks.js');
 const riskPacks = require('./riskPacks.js');
 const religionPacks = require('./religionPacks.js');
+const islamicSectPacks = require('./islamicSectPacks.js');
 const ancestryPacks = require('./ancestryPacks.js');
 const natalityPacks = require('./natalityPacks.js');
 const incomePacks = require('./incomePacks.js');
@@ -879,16 +880,27 @@ function generateWorld(options = {}) {
           })()
           : 1 + (u ** 1.5) * 84;
 
+        // A real tradition, drawn from the county's own shares, when
+        // this world was built with a religion pack; the invented
+        // vocabulary otherwise — the fallback every other pack in
+        // this file already has, unchanged.
+        const religionValue = religionPacks.religionFor(religionCounty, random.unit('religion-real', c, b, p))
+          ?? random.pick(config.religions, 'religion', c, b, p);
+
         const npc = engine.generateNPC({
           name: `${random.pick(GIVEN_NAMES, 'given', c, b, p)} `
             + `${random.pick(SURNAMES, 'family', c, b, p)}`,
           education: null,     // set below, but only for adults
-          // A real tradition, drawn from the county's own shares, when
-          // this world was built with a religion pack; the invented
-          // vocabulary otherwise — the fallback every other pack in
-          // this file already has, unchanged.
-          religion: religionPacks.religionFor(religionCounty, random.unit('religion-real', c, b, p))
-            ?? random.pick(config.religions, 'religion', c, b, p),
+          religion: religionValue,
+          // A real Sunni/Shia/unaffiliated split, drawn ONLY when the
+          // real tradition above resolved to `'muslim'` — the invented
+          // religion vocabulary has no `'muslim'` value to condition
+          // on, so a world with no religion pack never sets this.
+          // `islamicSectPacks.js`'s own header on why this is a
+          // national constant rather than a geographic pack.
+          islamicSect: religionValue === 'muslim'
+            ? islamicSectPacks.sectFor(random.unit('islamic-sect-real', c, b, p))
+            : null,
           // A real ancestry group, drawn from the tract's own shares,
           // when this world was built with an ancestry pack; the
           // invented vocabulary otherwise — same fallback shape as
