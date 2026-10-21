@@ -109,6 +109,7 @@ const climatePacks = require('./climatePacks.js');
 const riskPacks = require('./riskPacks.js');
 const religionPacks = require('./religionPacks.js');
 const islamicSectPacks = require('./islamicSectPacks.js');
+const jewishObservancePacks = require('./jewishObservancePacks.js');
 const ancestryPacks = require('./ancestryPacks.js');
 const natalityPacks = require('./natalityPacks.js');
 const incomePacks = require('./incomePacks.js');
@@ -901,6 +902,12 @@ function generateWorld(options = {}) {
           islamicSect: religionValue === 'muslim'
             ? islamicSectPacks.sectFor(random.unit('islamic-sect-real', c, b, p))
             : null,
+          // A real Reform/Conservative/Orthodox/no-particular-branch
+          // split, drawn ONLY when the real tradition above resolved
+          // to `'jewish'` — same fallback shape as `islamicSect`.
+          jewishObservance: religionValue === 'jewish'
+            ? jewishObservancePacks.branchFor(random.unit('jewish-observance-real', c, b, p))
+            : null,
           // A real ancestry group, drawn from the tract's own shares,
           // when this world was built with an ancestry pack; the
           // invented vocabulary otherwise — same fallback shape as
@@ -1600,6 +1607,7 @@ function generateWorld(options = {}) {
   const region = migration.generateRegion(w, {
     name: config.regionName, climateKey: climatePacks.climateKeyFor(w.climatePack),
     countryKey: config.countryKey ?? null,
+    temperamentKey: config.temperamentKey ?? null,
   });
   for (const cityId of summary.cities) {
     const city = w.cities.find((x) => x.id === cityId);

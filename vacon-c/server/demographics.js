@@ -228,6 +228,7 @@ function compositionOf(worldState, residents) {
   });
   const religion = distributionOf(residents, (n) => n.religion ?? null);
   const islamicSect = distributionOf(residents, (n) => n.islamicSect ?? null);
+  const jewishObservance = distributionOf(residents, (n) => n.jewishObservance ?? null);
   const ethnicity = distributionOf(residents, (n) => n.ethnicity ?? null);
   const education = distributionOf(residents, (n) => n.education ?? null);
 
@@ -252,6 +253,17 @@ function compositionOf(worldState, residents) {
       distribution: islamicSect,
       diversity: diversityOf(islamicSect),
       dominantShare: dominantShareOf(islamicSect),
+    },
+    // **A real Reform/Conservative/Orthodox/no-particular-branch
+    // split, measured here and read nowhere else —
+    // `jewishObservancePacks.js`'s own header, same firewall
+    // discipline `islamicSect` holds.** "No particular branch" is
+    // Pew's own term for what gets called "secular" colloquially,
+    // carried under the survey's actual label rather than relabelled.
+    jewishObservance: {
+      distribution: jewishObservance,
+      diversity: diversityOf(jewishObservance),
+      dominantShare: dominantShareOf(jewishObservance),
     },
     // **`ethnicity` is measured here and read NOWHERE else**, which is
     // the whole design and is enforced by `test/ethnicity.test.js`.

@@ -1660,6 +1660,63 @@ already asked about — a war-torn place already reads as more chaotic
 under the existing mechanics once real inputs (like `countryPacks.js`'s
 conflict level, once calibrated in) feed them.
 
+**A fortieth, and it is a correction to the thirty-eighth rule's own
+mistake, plus the principled line that mistake obscured, plus one
+more real source checked and wired.**
+
+**The "secular vs. religious Israeli" ask was wrongly declined.**
+What was actually asked for — real representation of secular and
+religious Jewish identity — is not Israeli domestic politics at all.
+It is the same real, Pew-surveyed American demographic split
+`islamicSectPacks.js` already built for Muslim Americans, one
+tradition over: Pew's "Jewish Americans in 2020" survey reports
+Reform (37%), Conservative (17%), Orthodox (9%), other (4%) and "no
+particular branch" (32%) — "no particular branch" being Pew's own
+term for what gets called secular colloquially.
+`jewishObservancePacks.js` builds this, same shape, same firewall.
+The earlier answer folded two different questions together and
+declined both; only one of them should have been declined.
+
+**The line on inter-group conflict is narrower than "decline it," and
+worth stating precisely rather than repeating the blanket version.**
+Real representation of tribes and sects — Hausa-Fulani/Yoruba/Igbo in
+Nigeria, Reform/Conservative/Orthodox among American Jews, Sunni/Shia
+among American Muslims — is built, real, and reported, exactly like
+every other demographic fact in this registry. What stays declined
+is narrower and specific: making a real-world group pairing (which
+tribes, which countries) an INPUT that shifts an individual NPC's
+modelled probability of violence. That is the literal text of §9 —
+"demographics... must never determine an NPC's morality,
+criminality... or worth" — applied here exactly as it is already
+applied, with a test, to `npc.ethnicity`, `npc.islamicSect` and
+`npc.jewishObservance`. The two cases are not parallel: two NPCs
+fighting because of their own relationship history (trust, rivalry,
+strain) is the existing mechanism, blind to ethnicity for every NPC
+regardless of group; wiring a group-pairing multiplier into that
+same escalation would make ethnicity the reason, for the first time
+in this registry, which is the one thing every other demographic
+dimension here has been built specifically to avoid doing. Real,
+documented historical fact ABOUT groups or places remains entirely
+fair game to report — the line is reporting a fact versus using it to
+decide an outcome, the same line this file draws everywhere else.
+
+**`regionalTemperamentPacks.js` closes the "does a New Yorker have a
+different temperament than someone in Iowa" question with a real,
+peer-reviewed answer**: Rentfrow, Gosling & Potter's "Divided We
+Stand" (JPSP, 2013) surveyed over half a million people and found the
+contiguous U.S. clusters into three real psychological regions —
+Friendly and Conventional (Great Plains/South), Relaxed and Creative
+(the coasts), Temperamental and Uninhibited (the Northeast). Reported
+on the region via an optional `temperamentKey`, exactly the same
+posture `countryPacks.js` took and for the same reason: `Aggression`
+and `Volatility` are real, existing trait names, and `Aggression`
+specifically feeds `keys.resolveAggression` — the seventeenth
+standing rule's four-attempt calibrated escalation system. Wiring a
+real regional bias into that trait's draw without equivalent
+calibration work is the third time this session has named that exact
+risk (`crimeHotspotPacks.js`, `countryPacks.js`, now this), and it
+stays a separate, future round each time for the same reason.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

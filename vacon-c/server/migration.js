@@ -48,6 +48,7 @@ const { getLiveEntity } = require('./entityTraits.js');
 const areaStats = require('./areaStats.js');
 const crime = require('./crime.js');
 const countryPacks = require('./countryPacks.js');
+const regionalTemperamentPacks = require('./regionalTemperamentPacks.js');
 const motivation = require('./motivation.js');
 const { seededDraw } = require('./seeded.js');
 
@@ -202,14 +203,23 @@ const SETTLING_TICKS = 180;
 // that needs its own calibration pass, not a default here. Null
 // `countryKey` or an unrecognised one leaves the region exactly as it
 // was before this existed.
+//
+// **`temperamentKey`, when supplied, reports one of Rentfrow et al.'s
+// three real psychological regions — see `regionalTemperamentPacks
+// .js`'s own header for the real research and for why this is
+// reported only, not wired into the `Aggression`/`Volatility` traits
+// it would most directly touch.** In-memory only, same posture as
+// `countryKey`.
 function generateRegion(worldState, options = {}) {
   const {
     name, civilizationId = null, geographyKey = null, climateKey = null, countryKey = null,
+    temperamentKey = null,
   } = options;
   if (!name) {
     throw new Error('migration.generateRegion requires options.name (regions.name is NOT NULL)');
   }
   const country = countryKey ? countryPacks.countryFor(countryKey) : null;
+  const temperament = temperamentKey ? regionalTemperamentPacks.describeCluster(temperamentKey) : null;
   const region = {
     id: nextRegionId++,
     name,
@@ -220,6 +230,8 @@ function generateRegion(worldState, options = {}) {
     incomeLevel: country?.incomeLevel ?? null,
     conflictLevel: country?.conflictLevel ?? null,
     governmentType: country?.governmentType ?? null,
+    temperamentKey,
+    temperamentCluster: temperament,
   };
   (worldState.regions || (worldState.regions = [])).push(region);
   return region;

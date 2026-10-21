@@ -459,6 +459,11 @@ function generateNPC(options = {}) {
     // `islamicSectPacks.js`'s own header. Null unless a caller
     // supplies one, same posture as `religion` and `ethnicity`.
     islamicSect: options.islamicSect ?? null,
+    // A real Reform/Conservative/Orthodox/no-particular-branch split,
+    // drawn only when `religion` resolved to the real `'jewish'`
+    // tradition — see `jewishObservancePacks.js`'s own header. Null
+    // unless a caller supplies one, same posture as `islamicSect`.
+    jewishObservance: options.jewishObservance ?? null,
     traits: traitsToSheet(traitRows),
     createdTick: WorldState.tick,
     updatedTick: WorldState.tick,
