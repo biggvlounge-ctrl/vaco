@@ -1717,6 +1717,35 @@ calibration work is the third time this session has named that exact
 risk (`crimeHotspotPacks.js`, `countryPacks.js`, now this), and it
 stays a separate, future round each time for the same reason.
 
+**Forty-first: "collect real data from around the world... do
+military... oil data... specific political parties" extended
+`countryPacks.js` with three more real, cited, confidence-flagged
+fields rather than three new modules**, because these are facts about
+the same 36 countries `countryPacks.js` already names, not a new
+dimension needing its own vocabulary. `regimeType` (EIU Democracy
+Index 2024, four published bands: full/flawed/hybrid/authoritarian)
+is the deliberate, honest substitute for "specific political
+parties" — a currently-ruling party goes stale at the next election
+and could not be verified with confidence across three dozen
+countries from here, while a country's scored democratic character
+is durable and stable. `militaryExpenditurePctGDP` is confidence-
+flagged per entry: only Russia (7.1% of GDP) and Ukraine (34%, the
+highest in the world) are SIPRI's own published figures; every other
+value present is a third-party estimate `confidence:
+'secondary-estimate'`, never presented as equally solid. `oilProducer`
+is `null` for the great majority of entries on purpose — Norway,
+Russia, Nigeria, Mexico and the United States are real major
+exporters with real 2024 EIA figures; forcing a number onto every
+other country would misstate them, and China is explicitly `null`
+despite large domestic production because it is the world's largest
+net crude IMPORTER, not an exporter. Somalia's `regimeType` stays
+`null` because no EIU score for it was found — not guessed from
+its neighbours or its conflict level. All three fields are wired into
+`migration.generateRegion` the same report-only way `incomeLevel`/
+`conflictLevel`/`governmentType` already were, with the same
+in-memory-only, no-schema-column posture, and the same deliberate
+absence from any calibrated mechanic.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

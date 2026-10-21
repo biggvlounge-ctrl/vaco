@@ -37,7 +37,7 @@
 const BUILD_SCOPE = {
   engine: {
     modules: 100,
-    lines: 45506,
+    lines: 45769,
     tables: 63,
     routes: 79,
     tickPhases: 11,
@@ -55,10 +55,10 @@ const BUILD_SCOPE = {
   },
   tests: {
     files: 108,
-    lines: 36077,
-    cases: 1855,
+    lines: 36132,
+    cases: 1861,
   },
-  countedAt: '2026-10-17',
+  countedAt: '2026-10-21',
 };
 
 const TOTAL_LINES = BUILD_SCOPE.engine.lines

@@ -1,8 +1,25 @@
 // server/countryPacks.js
 //
 // **The first step of global expansion: a real, cited, per-country
-// reference — income level, conflict level, government type — keyed
-// on the same vocabulary `ancestryPacks.GROUPS` already uses.**
+// reference — income level, conflict level, government type,
+// democratic regime type, military expenditure, oil-producer status
+// — keyed on the same vocabulary `ancestryPacks.GROUPS` already
+// uses.**
+//
+// ---------------------------------------------------------------------
+// Three fields added after the first round, same discipline
+// ---------------------------------------------------------------------
+// `regimeType` (EIU Democracy Index 2024), `militaryExpenditurePctGDP`
+// (SIPRI, confidence-flagged — only Russia and Ukraine are SIPRI's own
+// published figures, everything else present is a third-party
+// estimate marked `secondary-estimate`), and `oilProducer` (EIA 2024,
+// present only for the handful of these 36 countries that are
+// actually major producers/exporters — `null` everywhere else, not a
+// forced "not applicable" row). "Specific political parties" was
+// asked for and deliberately NOT built: a currently-ruling party goes
+// stale at the next election and could not be verified with
+// confidence across three dozen countries from here. Regime type is
+// the honest substitute — durable, published, stable methodology.
 //
 // ---------------------------------------------------------------------
 // What this is a first step TOWARD, and what it does not attempt yet
@@ -96,6 +113,49 @@ const CONFLICT_LEVELS = [
   'no-active-conflict', 'high-nonstate-violence', 'localized-conflict', 'active-armed-conflict',
 ];
 
+//: EIU Democracy Index 2024 (https://www.eiu.com) — four regime
+//: types by published score band: full democracy >=8.01, flawed
+//: democracy 6.01-8.00, hybrid regime 4.01-6.00, authoritarian
+//: regime <4.00. **This is the deliberate, honest substitute for
+//: "specific political parties."** A currently-ruling party goes
+//: stale at the next election and cannot be verified with confidence
+//: across three dozen countries from here; a country's democratic
+//: character, scored on a stable published methodology, is a durable
+//: fact this module can actually stand behind without re-checking it
+//: every few months.
+const REGIME_TYPE_REFERENCE = {
+  source: 'eiu-democracy-index-2024',
+  checkedAt: null,
+  thresholds: { fullDemocracyMin: 8.01, flawedDemocracyMin: 6.01, hybridRegimeMin: 4.01 },
+};
+
+const REGIME_TYPES = [
+  'full-democracy', 'flawed-democracy', 'hybrid-regime', 'authoritarian-regime',
+];
+
+//: SIPRI military expenditure as % of GDP. Only Russia's and
+//: Ukraine's figures below are SIPRI's own reported numbers — every
+//: other value present is a third-party estimate that cites SIPRI
+//: without being SIPRI's own published fact sheet, and is marked
+//: `confidence: 'secondary-estimate'` rather than presented as
+//: equally solid. Where no figure at all could be found (most of
+//: this list), the field is `null` — left unknown rather than guessed.
+const MILITARY_EXPENDITURE_REFERENCE = {
+  source: 'sipri-military-expenditure-database',
+  checkedAt: null,
+  note: 'confidence: "sipri-official" is SIPRI\'s own figure; "secondary-estimate" cites '
+    + 'SIPRI via a third party and is not independently confirmed here.',
+};
+
+//: EIA 2024 crude oil export figures. Only included for the handful
+//: of these 36 countries that are actually major producers/exporters
+//: — forcing an oil figure onto every entry would misstate the ones
+//: that aren't. Everyone else in COUNTRIES gets `oilProducer: null`.
+const OIL_PRODUCER_REFERENCE = {
+  source: 'eia-2024-crude-export-figures',
+  checkedAt: null,
+};
+
 //: Keyed on `ancestryPacks.GROUPS` — checked against that list at
 //: load time below. Every figure is a good-faith, checked-where-
 //: possible characterization, not a live feed; `source` names what
@@ -104,51 +164,246 @@ const CONFLICT_LEVELS = [
 //: crackdown, the Tigray ceasefire, Russia/Ukraine) changes faster
 //: than this file can track without live access.
 const COUNTRIES = {
-  german: { country: 'Germany', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'federal parliamentary republic' },
-  irish: { country: 'Ireland', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary republic' },
-  english: { country: 'United Kingdom', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary constitutional monarchy' },
-  scottish: { country: 'United Kingdom', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary constitutional monarchy' },
-  welsh: { country: 'United Kingdom', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary constitutional monarchy' },
-  italian: { country: 'Italy', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary republic' },
-  polish: { country: 'Poland', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary republic' },
-  french: { country: 'France', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'semi-presidential republic' },
-  dutch: { country: 'Netherlands', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary constitutional monarchy' },
-  norwegian: { country: 'Norway', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary constitutional monarchy' },
-  swedish: { country: 'Sweden', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary constitutional monarchy' },
-  greek: { country: 'Greece', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary republic' },
-  portuguese: { country: 'Portugal', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary republic' },
-  hungarian: { country: 'Hungary', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary republic' },
-  czech: { country: 'Czech Republic', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary republic' },
-  swiss: { country: 'Switzerland', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'federal semi-direct democratic republic' },
-  lithuanian: { country: 'Lithuania', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary republic' },
+  german: {
+    country: 'Germany', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'federal parliamentary republic',
+    regimeType: 'full-democracy', regimeScore: 8.73,
+    militaryExpenditurePctGDP: { value: 1.84, year: 2024, confidence: 'secondary-estimate' },
+    oilProducer: null,
+  },
+  irish: {
+    country: 'Ireland', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary republic',
+    regimeType: 'full-democracy', regimeScore: 9.19,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+  },
+  english: {
+    country: 'United Kingdom', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary constitutional monarchy',
+    regimeType: 'full-democracy', regimeScore: 8.34,
+    militaryExpenditurePctGDP: { value: 2.44, year: 2024, confidence: 'secondary-estimate' },
+    // North Sea production is real but in long, well-documented decline; no solid
+    // 2024 production figure was found, so this flags the status without a number.
+    oilProducer: { status: 'minor-and-declining-producer', dailyProductionBbl: null, exportValueUsd2024: null },
+  },
+  scottish: {
+    country: 'United Kingdom', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary constitutional monarchy',
+    regimeType: 'full-democracy', regimeScore: 8.34,
+    militaryExpenditurePctGDP: { value: 2.44, year: 2024, confidence: 'secondary-estimate' },
+    oilProducer: { status: 'minor-and-declining-producer', dailyProductionBbl: null, exportValueUsd2024: null },
+  },
+  welsh: {
+    country: 'United Kingdom', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary constitutional monarchy',
+    regimeType: 'full-democracy', regimeScore: 8.34,
+    militaryExpenditurePctGDP: { value: 2.44, year: 2024, confidence: 'secondary-estimate' },
+    oilProducer: { status: 'minor-and-declining-producer', dailyProductionBbl: null, exportValueUsd2024: null },
+  },
+  italian: {
+    country: 'Italy', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary republic',
+    regimeType: 'flawed-democracy', regimeScore: 7.58,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+  },
+  polish: {
+    country: 'Poland', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary republic',
+    regimeType: 'flawed-democracy', regimeScore: 7.40,
+    // Poland is widely reported as NATO's highest %-of-GDP spender in 2024, but no
+    // specific figure was confirmed this round — left null rather than guessed.
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+  },
+  french: {
+    country: 'France', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'semi-presidential republic',
+    // EIU downgraded France from full to flawed democracy in the 2024 index.
+    regimeType: 'flawed-democracy', regimeScore: null,
+    militaryExpenditurePctGDP: { value: 2.01, year: 2024, confidence: 'secondary-estimate' },
+    oilProducer: null,
+  },
+  dutch: {
+    country: 'Netherlands', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary constitutional monarchy',
+    regimeType: 'full-democracy', regimeScore: 9.00,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+  },
+  norwegian: {
+    country: 'Norway', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary constitutional monarchy',
+    regimeType: 'full-democracy', regimeScore: 9.81,
+    militaryExpenditurePctGDP: null,
+    oilProducer: { status: 'major-exporter', dailyProductionBbl: 1690000, exportValueUsd2024: 49700000000 },
+  },
+  swedish: {
+    country: 'Sweden', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary constitutional monarchy',
+    regimeType: 'full-democracy', regimeScore: 9.39,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+  },
+  greek: {
+    country: 'Greece', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary republic',
+    regimeType: 'full-democracy', regimeScore: 8.07,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+  },
+  portuguese: {
+    country: 'Portugal', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary republic',
+    // EIU upgraded Portugal to full democracy in the 2024 index; exact score not confirmed.
+    regimeType: 'full-democracy', regimeScore: null,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+  },
+  hungarian: {
+    country: 'Hungary', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary republic',
+    regimeType: 'flawed-democracy', regimeScore: 6.51,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+  },
+  czech: {
+    country: 'Czech Republic', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary republic',
+    // EIU upgraded the Czech Republic to full democracy in the 2024 index; exact score not confirmed.
+    regimeType: 'full-democracy', regimeScore: null,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+  },
+  swiss: {
+    country: 'Switzerland', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'federal semi-direct democratic republic',
+    regimeType: 'full-democracy', regimeScore: 9.32,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+  },
+  lithuanian: {
+    country: 'Lithuania', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary republic',
+    regimeType: 'flawed-democracy', regimeScore: 7.59,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+  },
   // **Russia and Ukraine, checked directly: this is an active,
   // ongoing, state-based war, among the most documented in the world
   // — not a judgement call.** Income levels carry real uncertainty
   // (sanctions, wartime disruption); flagged rather than overstated.
-  russian: { country: 'Russia', incomeLevel: 'upper-middle-income', conflictLevel: 'active-armed-conflict', governmentType: 'federal semi-presidential republic' },
-  ukrainian: { country: 'Ukraine', incomeLevel: 'lower-middle-income', conflictLevel: 'active-armed-conflict', governmentType: 'unitary semi-presidential republic' },
-  somali: { country: 'Somalia', incomeLevel: 'low-income', conflictLevel: 'active-armed-conflict', governmentType: 'federal parliamentary republic' },
-  'bosnian': { country: 'Bosnia and Herzegovina', incomeLevel: 'upper-middle-income', conflictLevel: 'no-active-conflict', governmentType: 'federal parliamentary republic' },
-  nigerian: { country: 'Nigeria', incomeLevel: 'lower-middle-income', conflictLevel: 'localized-conflict', governmentType: 'federal presidential republic' },
-  ethiopian: { country: 'Ethiopia', incomeLevel: 'low-income', conflictLevel: 'localized-conflict', governmentType: 'federal parliamentary republic' },
-  ghanaian: { country: 'Ghana', incomeLevel: 'lower-middle-income', conflictLevel: 'no-active-conflict', governmentType: 'unitary presidential republic' },
-  kenyan: { country: 'Kenya', incomeLevel: 'lower-middle-income', conflictLevel: 'no-active-conflict', governmentType: 'unitary presidential republic' },
-  jamaican: { country: 'Jamaica', incomeLevel: 'upper-middle-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary constitutional monarchy' },
-  haitian: { country: 'Haiti', incomeLevel: 'low-income', conflictLevel: 'localized-conflict', governmentType: 'unitary semi-presidential republic' },
-  vietnamese: { country: 'Vietnam', incomeLevel: 'lower-middle-income', conflictLevel: 'no-active-conflict', governmentType: 'one-party socialist republic' },
-  chinese: { country: 'China', incomeLevel: 'upper-middle-income', conflictLevel: 'no-active-conflict', governmentType: 'one-party socialist republic' },
-  filipino: { country: 'Philippines', incomeLevel: 'lower-middle-income', conflictLevel: 'localized-conflict', governmentType: 'unitary presidential republic' },
-  'asian-indian': { country: 'India', incomeLevel: 'lower-middle-income', conflictLevel: 'no-active-conflict', governmentType: 'federal parliamentary republic' },
-  mexican: { country: 'Mexico', incomeLevel: 'upper-middle-income', conflictLevel: 'high-nonstate-violence', governmentType: 'federal presidential republic' },
-  guatemalan: { country: 'Guatemala', incomeLevel: 'upper-middle-income', conflictLevel: 'high-nonstate-violence', governmentType: 'unitary presidential republic' },
-  honduran: { country: 'Honduras', incomeLevel: 'lower-middle-income', conflictLevel: 'high-nonstate-violence', governmentType: 'unitary presidential republic' },
+  russian: {
+    country: 'Russia', incomeLevel: 'upper-middle-income', conflictLevel: 'active-armed-conflict', governmentType: 'federal semi-presidential republic',
+    regimeType: 'authoritarian-regime', regimeScore: 2.03,
+    militaryExpenditurePctGDP: { value: 7.1, year: 2024, confidence: 'sipri-official' },
+    oilProducer: { status: 'major-exporter', dailyProductionBbl: 4500000, exportValueUsd2024: 122500000000 },
+  },
+  ukrainian: {
+    country: 'Ukraine', incomeLevel: 'lower-middle-income', conflictLevel: 'active-armed-conflict', governmentType: 'unitary semi-presidential republic',
+    // Score (4.90) sits in EIU's own published hybrid-regime band; wartime conditions
+    // make a conventional democracy/autocracy label a poor fit regardless.
+    regimeType: 'hybrid-regime', regimeScore: 4.90,
+    militaryExpenditurePctGDP: { value: 34, year: 2024, confidence: 'sipri-official' },
+    oilProducer: null,
+  },
+  somali: {
+    country: 'Somalia', incomeLevel: 'low-income', conflictLevel: 'active-armed-conflict', governmentType: 'federal parliamentary republic',
+    // No EIU Democracy Index score was found for Somalia at all — left null
+    // rather than invented, same discipline as every other "not found" field here.
+    regimeType: null, regimeScore: null,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+  },
+  'bosnian': {
+    country: 'Bosnia and Herzegovina', incomeLevel: 'upper-middle-income', conflictLevel: 'no-active-conflict', governmentType: 'federal parliamentary republic',
+    regimeType: 'hybrid-regime', regimeScore: 5.06,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+  },
+  nigerian: {
+    country: 'Nigeria', incomeLevel: 'lower-middle-income', conflictLevel: 'localized-conflict', governmentType: 'federal presidential republic',
+    regimeType: 'hybrid-regime', regimeScore: 4.16,
+    militaryExpenditurePctGDP: null,
+    oilProducer: { status: 'major-exporter', dailyProductionBbl: 1520000, exportValueUsd2024: 38400000000 },
+  },
+  ethiopian: {
+    country: 'Ethiopia', incomeLevel: 'low-income', conflictLevel: 'localized-conflict', governmentType: 'federal parliamentary republic',
+    regimeType: 'authoritarian-regime', regimeScore: 3.24,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+  },
+  ghanaian: {
+    country: 'Ghana', incomeLevel: 'lower-middle-income', conflictLevel: 'no-active-conflict', governmentType: 'unitary presidential republic',
+    regimeType: 'flawed-democracy', regimeScore: 6.24,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+  },
+  kenyan: {
+    country: 'Kenya', incomeLevel: 'lower-middle-income', conflictLevel: 'no-active-conflict', governmentType: 'unitary presidential republic',
+    // Score (5.05) sits in EIU's own published hybrid-regime band.
+    regimeType: 'hybrid-regime', regimeScore: 5.05,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+  },
+  jamaican: {
+    country: 'Jamaica', incomeLevel: 'upper-middle-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary constitutional monarchy',
+    regimeType: 'flawed-democracy', regimeScore: 6.74,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+  },
+  haitian: {
+    country: 'Haiti', incomeLevel: 'low-income', conflictLevel: 'localized-conflict', governmentType: 'unitary semi-presidential republic',
+    regimeType: 'authoritarian-regime', regimeScore: 2.74,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+  },
+  vietnamese: {
+    country: 'Vietnam', incomeLevel: 'lower-middle-income', conflictLevel: 'no-active-conflict', governmentType: 'one-party socialist republic',
+    regimeType: 'authoritarian-regime', regimeScore: 2.62,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+  },
+  chinese: {
+    country: 'China', incomeLevel: 'upper-middle-income', conflictLevel: 'no-active-conflict', governmentType: 'one-party socialist republic',
+    regimeType: 'authoritarian-regime', regimeScore: 2.11,
+    militaryExpenditurePctGDP: { value: 1.66, year: 2024, confidence: 'secondary-estimate' },
+    // China is the world's largest crude IMPORTER despite large domestic production —
+    // not a net exporter, so this is deliberately null rather than misleadingly "producer".
+    oilProducer: null,
+  },
+  filipino: {
+    country: 'Philippines', incomeLevel: 'lower-middle-income', conflictLevel: 'localized-conflict', governmentType: 'unitary presidential republic',
+    regimeType: 'flawed-democracy', regimeScore: 6.63,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+  },
+  'asian-indian': {
+    country: 'India', incomeLevel: 'lower-middle-income', conflictLevel: 'no-active-conflict', governmentType: 'federal parliamentary republic',
+    regimeType: 'flawed-democracy', regimeScore: 7.3,
+    militaryExpenditurePctGDP: { value: 2.22, year: 2024, confidence: 'secondary-estimate' },
+    oilProducer: null,
+  },
+  mexican: {
+    country: 'Mexico', incomeLevel: 'upper-middle-income', conflictLevel: 'high-nonstate-violence', governmentType: 'federal presidential republic',
+    // Score (5.3) sits in EIU's own published hybrid-regime band.
+    regimeType: 'hybrid-regime', regimeScore: 5.3,
+    militaryExpenditurePctGDP: null,
+    oilProducer: { status: 'exporter', dailyProductionBbl: 848000, exportValueUsd2024: 21700000000 },
+  },
+  guatemalan: {
+    country: 'Guatemala', incomeLevel: 'upper-middle-income', conflictLevel: 'high-nonstate-violence', governmentType: 'unitary presidential republic',
+    regimeType: 'hybrid-regime', regimeScore: 4.55,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+  },
+  honduran: {
+    country: 'Honduras', incomeLevel: 'lower-middle-income', conflictLevel: 'high-nonstate-violence', governmentType: 'unitary presidential republic',
+    regimeType: 'hybrid-regime', regimeScore: 4.98,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+  },
   // **El Salvador is flagged explicitly as fast-moving.** The 2022
   // "state of exception" gang crackdown is widely reported to have
   // sharply cut homicides; this reflects that more recent picture
   // rather than the country's earlier, much higher-violence years,
   // and should be the first entry re-checked against a live source.
-  salvadoran: { country: 'El Salvador', incomeLevel: 'upper-middle-income', conflictLevel: 'no-active-conflict', governmentType: 'unitary presidential republic' },
-  'united-states': { country: 'United States', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'federal presidential republic' },
+  salvadoran: {
+    country: 'El Salvador', incomeLevel: 'upper-middle-income', conflictLevel: 'no-active-conflict', governmentType: 'unitary presidential republic',
+    regimeType: 'hybrid-regime', regimeScore: 4.61,
+    militaryExpenditurePctGDP: { value: 1.39, year: 2024, confidence: 'secondary-estimate' },
+    oilProducer: null,
+  },
+  'united-states': {
+    country: 'United States', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'federal presidential republic',
+    regimeType: 'flawed-democracy', regimeScore: null,
+    militaryExpenditurePctGDP: { value: 3.4, year: 2024, confidence: 'secondary-estimate' },
+    oilProducer: { status: 'major-exporter', dailyProductionBbl: 4100000, exportValueUsd2024: 118500000000 },
+  },
 };
 
 function requireAncestryPacks() {
@@ -189,6 +444,10 @@ module.exports = {
   INCOME_THRESHOLDS_USD,
   INCOME_LEVELS,
   CONFLICT_LEVELS,
+  REGIME_TYPE_REFERENCE,
+  REGIME_TYPES,
+  MILITARY_EXPENDITURE_REFERENCE,
+  OIL_PRODUCER_REFERENCE,
   COUNTRIES,
   countryFor,
   describeCountry,

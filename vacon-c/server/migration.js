@@ -194,10 +194,11 @@ const SETTLING_TICKS = 180;
 // table is still open for.
 //
 // **`countryKey`, when supplied, is the first real step of global
-// expansion — a real income level, conflict level and government
-// type from `countryPacks.js`, attached in-memory only (no
-// `country_key` column in `VACANCY_POSTGRESQL_SCHEMA.sql`, same known
-// limitation `city.hazardRisk` already carries).** Reported only;
+// expansion — a real income level, conflict level, government
+// type, EIU democratic regime type, SIPRI military expenditure and
+// EIA oil-producer status from `countryPacks.js`, attached in-memory
+// only (no `country_key` column in `VACANCY_POSTGRESQL_SCHEMA.sql`,
+// same known limitation `city.hazardRisk` already carries).** Reported only;
 // see `countryPacks.js`'s own header for why it is not yet wired into
 // `authority.js`'s regime system or `environment.js`'s weather —
 // that needs its own calibration pass, not a default here. Null
@@ -230,6 +231,9 @@ function generateRegion(worldState, options = {}) {
     incomeLevel: country?.incomeLevel ?? null,
     conflictLevel: country?.conflictLevel ?? null,
     governmentType: country?.governmentType ?? null,
+    regimeType: country?.regimeType ?? null,
+    militaryExpenditurePctGDP: country?.militaryExpenditurePctGDP ?? null,
+    oilProducer: country?.oilProducer ?? null,
     temperamentKey,
     temperamentCluster: temperament,
   };
