@@ -47,6 +47,7 @@ const { nextAfter } = require('./nextAfter.js');
 const { getLiveEntity } = require('./entityTraits.js');
 const areaStats = require('./areaStats.js');
 const crime = require('./crime.js');
+const countryPacks = require('./countryPacks.js');
 const motivation = require('./motivation.js');
 const { seededDraw } = require('./seeded.js');
 
@@ -190,19 +191,35 @@ const SETTLING_TICKS = 180;
 // anywhere in the package, so a caller supplies them or they stay null.
 // Inventing a climate vocabulary here would be the mistake the weather
 // table is still open for.
+//
+// **`countryKey`, when supplied, is the first real step of global
+// expansion — a real income level, conflict level and government
+// type from `countryPacks.js`, attached in-memory only (no
+// `country_key` column in `VACANCY_POSTGRESQL_SCHEMA.sql`, same known
+// limitation `city.hazardRisk` already carries).** Reported only;
+// see `countryPacks.js`'s own header for why it is not yet wired into
+// `authority.js`'s regime system or `environment.js`'s weather —
+// that needs its own calibration pass, not a default here. Null
+// `countryKey` or an unrecognised one leaves the region exactly as it
+// was before this existed.
 function generateRegion(worldState, options = {}) {
   const {
-    name, civilizationId = null, geographyKey = null, climateKey = null,
+    name, civilizationId = null, geographyKey = null, climateKey = null, countryKey = null,
   } = options;
   if (!name) {
     throw new Error('migration.generateRegion requires options.name (regions.name is NOT NULL)');
   }
+  const country = countryKey ? countryPacks.countryFor(countryKey) : null;
   const region = {
     id: nextRegionId++,
     name,
     civilization_id: civilizationId,
     geography_key: geographyKey,
     climate_key: climateKey,
+    countryKey,
+    incomeLevel: country?.incomeLevel ?? null,
+    conflictLevel: country?.conflictLevel ?? null,
+    governmentType: country?.governmentType ?? null,
   };
   (worldState.regions || (worldState.regions = [])).push(region);
   return region;

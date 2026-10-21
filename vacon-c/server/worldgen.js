@@ -1593,8 +1593,13 @@ function generateWorld(options = {}) {
   // `climatePacks.js` for why it was safe to close this one and not
   // `geography_key`: nothing else in this engine reads `climate_key`
   // at all yet, so there was no existing vocabulary to collide with.
+  // `countryKey`, when supplied, is the first real step of global
+  // expansion — see `countryPacks.js`'s own header and
+  // `migration.generateRegion`'s. Null by default, which is exactly
+  // the U.S.-implicit behaviour every world had before this existed.
   const region = migration.generateRegion(w, {
     name: config.regionName, climateKey: climatePacks.climateKeyFor(w.climatePack),
+    countryKey: config.countryKey ?? null,
   });
   for (const cityId of summary.cities) {
     const city = w.cities.find((x) => x.id === cityId);

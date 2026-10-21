@@ -1599,6 +1599,67 @@ was deliberately NOT added to this same broken INSERT, so it doesn't
 compound this, and it stays in-memory-only, the same documented
 posture `npc.ethnicity` already has.
 
+**A thirty-ninth, and it is the decision this project's entire real-
+data discipline has been implicitly deferring: whether to expand
+beyond the United States at all.**
+
+Every real source wired before this point — Census, HUD, FBI/NYGS,
+DHS/CBP, Pew, CDC, NOAA, FEMA — is U.S. federal or U.S.-focused
+academic data, because this engine generates exactly one region per
+world (`migration.generateRegion`, called once in `worldgen.js`) and
+nothing in it has ever had a concept of a non-U.S. location. Asked
+directly whether to expand to other countries — militaries, first/
+second/third-world realism, war-level chaos, realistic landscape —
+the choice was made explicitly to expand, not assumed.
+
+**`countryPacks.js` is the first real step, not the whole thing, and
+says so.** It carries a real, cited income level (World Bank's own
+current classification — the real, standard replacement for the
+retired Cold War "first/second/third world" framing, which measured
+political alignment, not poverty), conflict level (UCDP's own
+distinction between nationwide state-based war, localized conflict,
+high non-state/cartel-style violence, and none), and government type,
+for 35 named countries keyed on `ancestryPacks.GROUPS` — not all
+190-odd countries on Earth, and not claimed to be. Attached to a
+region via an optional `countryKey` on `migration.generateRegion`,
+in-memory only (no `country_key` column), reported and nothing more.
+
+**Deliberately NOT wired into `authority.js`'s regime system or
+`environment.js`'s weather, for the exact reason `crimeHotspotPacks.js`
+stayed out of the violent-crime mechanism.** Both were calibrated
+through measured, written-down work (the seventeenth and twenty-
+eighth standing rules); a real conflict-level multiplier dropped in
+without equivalent measurement risks re-breaking exactly the balance
+that work fixed. That wiring is a real, separate, future round with
+its own calibration pass — this round is the real reference data
+existing first, same order every other extension here has followed.
+
+**Two things asked for in the same breath were declined outright,
+not deferred — see the thirty-eighth rule's shape repeated here.**
+Occupation tied to ethnicity (a "Mexican police officer," a "black
+influencer" as their own categories) stays declined: occupation is
+drawn independent of ethnicity by design, and §9 forbids a demographic
+determining a person's role. Modelling which real ethnic groups or
+countries are "in conflict" or do not "coincide" with each other as a
+mechanic feeding this engine's own violence generator stays declined
+too — a sharper version of the tension already named for Israeli
+politics, now at the level of entire peoples rather than one country's
+politics, and there is no settled, uncontested version of that claim
+to report the way Somali/Bosnian refugee resettlement is settled
+history.
+
+**What real occupation and "chaos bar" coverage already existed,
+pointed to rather than rebuilt.** SOC major group 27 (Arts, Design,
+Entertainment, Sports, and Media) is already wired in `labourPacks.js`
+onto `athlete`/`reporter`/`curator` — entertainers and performers are
+already real, BLS-sourced occupations, generalised the same way every
+other SOC major group here is. `authority.js`'s governed/contested/
+lawless regime, `crime.js`'s per-community danger score, and
+`statecraft.js`'s stability bands are, between them, the "chaos bar"
+already asked about — a war-torn place already reads as more chaotic
+under the existing mechanics once real inputs (like `countryPacks.js`'s
+conflict level, once calibrated in) feed them.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and
