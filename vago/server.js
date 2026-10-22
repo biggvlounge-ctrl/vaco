@@ -42,9 +42,10 @@ const {
   MATCH_STATUSES, createEsportsMatch, getEsportsMatch, startEsportsMatch, placeStake, resolveEsportsMatch,
 } = require('./lib/esportsStaking');
 const {
-  ORIGINALS_RTP, MIN_MINES_COUNT, MAX_MINES_COUNT, PLINKO_ROWS, HILO_CARD_VALUES,
+  ORIGINALS_RTP, MIN_MINES_COUNT, MAX_MINES_COUNT, PLINKO_ROWS, HILO_CARD_VALUES, BLACKJACK_RULES,
   getOriginalsRound, startMinesRound, revealMinesTile, cashOutMines, startPlinkoRound, dropPlinkoBall,
   startHiloRound, guessHilo, cashOutHilo,
+  startBlackjackRound, hitBlackjack, standBlackjack, settleBlackjackNatural,
 } = require('./lib/originals');
 const {
   MIN_PICKS, MAX_PICKS, FLEX_MIN_PICKS, PERFECT_PAYOUT_TABLE, FLEX_PAYOUT_TABLE,
@@ -267,6 +268,7 @@ app.get('/api/health', (_req, res) => {
     minesCountBounds: { min: MIN_MINES_COUNT, max: MAX_MINES_COUNT },
     plinkoRows: PLINKO_ROWS,
     hiloCardValues: HILO_CARD_VALUES,
+    blackjackRules: BLACKJACK_RULES,
     fantasyPickBounds: { min: MIN_PICKS, max: MAX_PICKS },
     fantasyFlexMinPicks: FLEX_MIN_PICKS,
     fantasyPerfectPayoutTable: PERFECT_PAYOUT_TABLE,
@@ -381,6 +383,46 @@ app.post('/api/casino/hilo/:id/cash-out', requireRoundPlayer(), async (req, res)
   try {
     const round_ = await cashOutHilo(store, { roundId: Number(req.params.id), settleFn: settleVCoin });
     await pushMetric('casino_payout', round_.payout);
+    res.json(round_);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/casino/blackjack/start', requireCasinoSessionOwner(), (req, res) => {
+  try {
+    res.status(201).json(startBlackjackRound(store, req.body || {}));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/casino/blackjack/:id/hit', requireRoundPlayer(), (req, res) => {
+  try {
+    res.json(hitBlackjack(store, { roundId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/casino/blackjack/:id/stand', requireRoundPlayer(), async (req, res) => {
+  try {
+    const round_ = await standBlackjack(store, { roundId: Number(req.params.id), settleFn: settleVCoin });
+    if ('payout' in round_) await pushMetric('casino_payout', round_.payout);
+    res.json(round_);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// A player natural resolves at deal time (see `originals.js`'s own
+// header) -- this is the one real endpoint that pays it out, called
+// by the client the instant `startBlackjackRound`'s own response comes
+// back with `status: "player-blackjack"` or `"push"`.
+app.post('/api/casino/blackjack/:id/settle-natural', requireRoundPlayer(), async (req, res) => {
+  try {
+    const round_ = await settleBlackjackNatural(store, { roundId: Number(req.params.id), settleFn: settleVCoin });
+    if ('payout' in round_) await pushMetric('casino_payout', round_.payout);
     res.json(round_);
   } catch (err) {
     res.status(400).json({ error: err.message });

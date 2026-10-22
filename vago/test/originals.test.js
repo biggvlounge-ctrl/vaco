@@ -42,6 +42,8 @@ const {
   startMinesRound, revealMinesTile, cashOutMines,
   startPlinkoRound, dropPlinkoBall,
   startHiloRound, guessHilo, cashOutHilo,
+  BLACKJACK_RULES, handTotal, isNatural,
+  startBlackjackRound, hitBlackjack, standBlackjack, settleBlackjackNatural,
 } = require('../lib/originals');
 const { startCasinoSession } = require('../lib/casinoSession');
 const { getGoldCoinBalance } = require('../lib/goldCoin');
@@ -304,4 +306,197 @@ test('a Gold Coin round never touches the VCoin ledger', async () => {
     'a Gold Coin cash-out moved VCoin through the ledger');
   assert.ok(getGoldCoinBalance(store, 'gina') > before - 10,
     'the Gold Coin payout was not credited');
+});
+
+// -- Blackjack ------------------------------------------------------------
+//
+// Outcomes depend on real card draws, which are deterministic from a
+// seed but not predictable by inspection -- so most of these set up
+// an exact scenario by overwriting the round's own cards/deck in the
+// store after starting it, the same legitimate technique
+// `revealOneSafeTile` already uses on `minePositions` above: reading
+// and setting the fixture's own state is what makes a test
+// deterministic, and the production code under test still learns
+// nothing it should not.
+
+function card(rank, suit = 'spades') { return { rank, suit }; }
+
+function forceHand(store, roundId, { playerCards, dealerCards, deck = [] }) {
+  const round_ = store.originalsRounds.find((r) => r.id === roundId);
+  assert.ok(round_, `no round ${roundId} in the store`);
+  round_.playerCards = playerCards;
+  round_.dealerCards = dealerCards;
+  round_.deck = deck;
+  round_.nextCardIndex = 0;
+  // The real initial deal (before this overwrite) resolves a dealer
+  // natural roughly 1 in 21 times on its own, which would otherwise
+  // leave this fixture's round already `lost` regardless of the hand
+  // just forced onto it -- reset to `active` so every test exercises
+  // the scenario it actually set up, not whatever the real shuffle did.
+  round_.status = 'active';
+  delete round_.payout;
+  delete round_.resolvedAt;
+  return round_;
+}
+
+test('handTotal counts Aces as 11 until the hand would bust, then converts them one at a time', () => {
+  assert.deepEqual(handTotal([card('A'), card('K')]), { total: 21, isSoft: true, isBust: false });
+  assert.deepEqual(handTotal([card('A'), card('A'), card('9')]), { total: 21, isSoft: true, isBust: false });
+  assert.deepEqual(handTotal([card('10'), card('10'), card('5')]), { total: 25, isSoft: false, isBust: true });
+  assert.deepEqual(handTotal([card('7'), card('8')]), { total: 15, isSoft: false, isBust: false });
+});
+
+test('isNatural is true only for a two-card 21', () => {
+  assert.equal(isNatural([card('A'), card('K')]), true);
+  assert.equal(isNatural([card('7'), card('7'), card('7')]), false);
+  assert.equal(isNatural([card('10'), card('9')]), false);
+});
+
+test('startBlackjackRound deals two cards each and hides the dealer hole card', async () => {
+  const store = createVagoStore();
+  const session = await vcoinSession(store);
+  const round_ = startBlackjackRound(store, { sessionId: session.id, clientSeed: 'bj1' });
+  assert.equal(round_.playerCards.length, 2);
+  assert.equal(round_.dealerCards.length, 1, 'the dealer hole card leaked before the round resolved');
+  assert.equal(round_.dealerTotal, undefined, 'dealerTotal was revealed before resolution');
+});
+
+test('a player bust loses immediately with no payout', async () => {
+  const store = createVagoStore();
+  const session = await vcoinSession(store);
+  let round_ = startBlackjackRound(store, { sessionId: session.id, clientSeed: 'bj2' });
+  forceHand(store, round_.id, {
+    playerCards: [card('10'), card('9')], // 19, one hit busts it
+    dealerCards: [card('6'), card('6')],
+    deck: [card('5')],
+  });
+  const view = hitBlackjack(store, { roundId: round_.id });
+  assert.equal(view.status, 'lost');
+  assert.equal(view.payout, 0);
+  assert.equal(view.dealerCards.length, 2, 'a resolved round must reveal the hole card');
+});
+
+test('standing resolves the dealer by the real fixed rule: hit under 17, stand on 17+', async () => {
+  const store = createVagoStore();
+  const session = await vcoinSession(store);
+  let round_ = startBlackjackRound(store, { sessionId: session.id, clientSeed: 'bj3' });
+  forceHand(store, round_.id, {
+    playerCards: [card('10'), card('9')], // 19, standing
+    dealerCards: [card('10'), card('2')], // 12, must hit
+    deck: [card('4'), card('A'), card('A')], // dealer draws 4 -> 16, must hit again -> draws A -> 17, stands
+  });
+  const fn = ledger({ delayMs: 0 });
+  const view = await standBlackjack(store, { roundId: round_.id, settleFn: fn });
+  assert.equal(view.dealerTotal, 17, `dealer should stand the instant it reaches 17, got ${view.dealerTotal}`);
+  assert.equal(view.status, 'resolved');
+  assert.equal(view.payout, session.stakeAmount * 2, 'a plain win should pay even money (stake back + stake)');
+});
+
+test('a dealer bust pays the player even money', async () => {
+  const store = createVagoStore();
+  const session = await vcoinSession(store);
+  let round_ = startBlackjackRound(store, { sessionId: session.id, clientSeed: 'bj4' });
+  forceHand(store, round_.id, {
+    playerCards: [card('10'), card('7')], // 17, standing
+    dealerCards: [card('10'), card('6')], // 16, must hit
+    deck: [card('10')], // dealer draws 10 -> 26, bust
+  });
+  const fn = ledger({ delayMs: 0 });
+  const view = await standBlackjack(store, { roundId: round_.id, settleFn: fn });
+  assert.equal(view.status, 'resolved');
+  assert.equal(view.payout, session.stakeAmount * 2);
+});
+
+test('a tied total is a real push: stake returned, no profit', async () => {
+  const store = createVagoStore();
+  const session = await vcoinSession(store);
+  let round_ = startBlackjackRound(store, { sessionId: session.id, clientSeed: 'bj5' });
+  forceHand(store, round_.id, {
+    playerCards: [card('10'), card('8')], // 18, standing
+    dealerCards: [card('10'), card('2')], // 12, must hit
+    deck: [card('6')], // dealer draws 6 -> 18, stands, tied
+  });
+  const fn = ledger({ delayMs: 0 });
+  const view = await standBlackjack(store, { roundId: round_.id, settleFn: fn });
+  assert.equal(view.status, 'push');
+  assert.equal(view.payout, session.stakeAmount, 'a push should return exactly the stake, no more and no less');
+});
+
+test('a player natural blackjack resolves at deal time and pays 3:2', async () => {
+  const store = createVagoStore();
+  const session = await vcoinSession(store, { stakeAmount: 100 });
+  let round_ = startBlackjackRound(store, { sessionId: session.id, clientSeed: 'bj6' });
+  forceHand(store, round_.id, {
+    playerCards: [card('A'), card('K')],
+    dealerCards: [card('9'), card('6')],
+    deck: [],
+  });
+  // Re-run the natural check the way startBlackjackRound itself would
+  // have, since forceHand overwrote the hand it already resolved.
+  store.originalsRounds.find((r) => r.id === round_.id).status = 'player-blackjack';
+  const fn = ledger({ delayMs: 0 });
+  const view = await settleBlackjackNatural(store, { roundId: round_.id, settleFn: fn });
+  assert.equal(view.payout, 100 * 2.5, `blackjack should pay 3:2, got ${view.payout} on a 100 stake`);
+});
+
+test('two natural blackjacks is a real push, not a double win', async () => {
+  const store = createVagoStore();
+  const session = await vcoinSession(store);
+  const round_ = startBlackjackRound(store, { sessionId: session.id, clientSeed: 'bj7' });
+  forceHand(store, round_.id, { playerCards: [card('A'), card('K')], dealerCards: [card('A'), card('Q')], deck: [] });
+  store.originalsRounds.find((r) => r.id === round_.id).status = 'push';
+  const fn = ledger({ delayMs: 0 });
+  const view = await settleBlackjackNatural(store, { roundId: round_.id, settleFn: fn });
+  assert.equal(view.status, 'push');
+  assert.equal(view.payout, session.stakeAmount);
+});
+
+test('hitting or standing on a round that already resolved is refused', async () => {
+  const store = createVagoStore();
+  const session = await vcoinSession(store);
+  const round_ = startBlackjackRound(store, { sessionId: session.id, clientSeed: 'bj8' });
+  forceHand(store, round_.id, { playerCards: [card('10'), card('10'), card('5')], dealerCards: [card('6'), card('6')], deck: [] });
+  const live = store.originalsRounds.find((r) => r.id === round_.id);
+  live.status = 'lost'; live.payout = 0;
+  assert.throws(() => hitBlackjack(store, { roundId: round_.id }), /not active/);
+  await assert.rejects(standBlackjack(store, { roundId: round_.id, settleFn: async () => {} }), /not active/);
+});
+
+test('concurrent stands on the same blackjack round pay exactly once', async () => {
+  const store = createVagoStore();
+  const session = await vcoinSession(store);
+  const round_ = startBlackjackRound(store, { sessionId: session.id, clientSeed: 'bj9' });
+  forceHand(store, round_.id, {
+    playerCards: [card('10'), card('9')], // 19, standing
+    dealerCards: [card('10'), card('2')], // 12, must hit
+    deck: [card('4')], // dealer draws 4 -> 16, must stand (16 < 17 is not reached since deck runs out intentionally -- see below)
+  });
+  // Give the dealer enough room to legally resolve without running off
+  // the end of the deck (16 -> hit again -> 17 to force a clean stand).
+  forceHand(store, round_.id, {
+    playerCards: [card('10'), card('9')],
+    dealerCards: [card('10'), card('2')],
+    deck: [card('4'), card('A')],
+  });
+
+  const fn = ledger();
+  const results = await Promise.allSettled(
+    Array.from({ length: 8 }, () => standBlackjack(store, { roundId: round_.id, settleFn: fn })),
+  );
+  const paid = fn.legs.filter((l) => l.reason.startsWith('vago_blackjack_'));
+  assert.equal(paid.length, 1,
+    `one blackjack round paid out ${paid.length} times for ${paid.reduce((n, l) => n + l.amount, 0)}`);
+  assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1,
+    'more than one caller was told the round had resolved');
+});
+
+test('publicRoundView never includes the dealer hole card before resolution, over many real deals', async () => {
+  const store = createVagoStore();
+  for (let i = 0; i < 25; i += 1) {
+    const session = await vcoinSession(store, { userId: `p${i}` });
+    const round_ = startBlackjackRound(store, { sessionId: session.id, clientSeed: `leak-${i}` });
+    if (round_.status === 'active') {
+      assert.equal(round_.dealerCards.length, 1, `round ${i} leaked the hole card while active`);
+    }
+  }
 });

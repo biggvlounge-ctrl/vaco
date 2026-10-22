@@ -32,6 +32,30 @@
 // `settleFn` from `VAGO_HOUSE_ACCOUNT` for vcoin sessions) -- the
 // same "never cross the Gold Coin/VCoin boundary" rule `casinoSession.js`
 // itself establishes.
+//
+// ---------------------------------------------------------------------
+// Blackjack -- a real "card room" game, added per a direct batch
+// instruction naming card rooms/bingo halls/pool tournaments as a
+// casino expansion
+// ---------------------------------------------------------------------
+// Unlike Plinko/Mines/HiLo, blackjack's house edge is NOT a target RTP
+// scaled onto an invented payout curve -- it emerges from the real,
+// standard rules themselves (dealer plays a fixed strategy, blackjack
+// pays 3:2, player chooses hit/stand), the same way a real casino's
+// edge does. `BLACKJACK_RULES` states exactly which standard variant
+// this implements (dealer stands on any 17, single deck, no double-
+// down or split) rather than leaving the rules implicit. **Double-
+// down and split are real, standard blackjack options this pass does
+// NOT implement** -- a real, stated limitation, not a silent gap:
+// adding them is a real, separate, well-scoped follow-up once this
+// base game is proven, not attempted inside the same pass as four
+// other named gameplay systems.
+//
+// The deck is drawn the same provably-fair way `pickMinePositions`
+// already shuffles the Mines board: one real Fisher-Yates shuffle of
+// all 52 cards, seeded from the committed `serverSeed`/`clientSeed`/
+// `nonce` triple, dealt sequentially as the round progresses. Nothing
+// about the deck can be chosen after the round starts.
 
 const {
   generateServerSeed, hashServerSeed, deriveFloat, deriveFloats, verifyServerSeedHash,
@@ -188,9 +212,22 @@ function publicRoundView(round_) {
       currentValue: round_.currentValue, currentMultiplier: round_.currentMultiplier,
     });
   } else {
+    // Covers `blackjack` and any future game with no mid-round
+    // progress field of its own.
     Object.assign(base, { serverSeedHash: round_.serverSeedHash, clientSeed: round_.clientSeed, nonce: round_.nonce });
   }
-  const resolved = round_.status === 'lost' || round_.status === 'cashed-out' || round_.status === 'resolved';
+  const resolved = round_.status === 'lost' || round_.status === 'cashed-out' || round_.status === 'resolved'
+    || round_.status === 'player-blackjack' || round_.status === 'push';
+  if (round_.game === 'blackjack') {
+    // The player's own hand is always real and visible. The dealer's
+    // hole card is the one real secret a live table keeps until the
+    // player is done acting -- hidden here the same way, shown only
+    // once the round is actually resolved.
+    base.playerCards = round_.playerCards;
+    base.playerTotal = handTotal(round_.playerCards).total;
+    base.dealerCards = resolved ? round_.dealerCards : [round_.dealerCards[0]];
+    if (resolved) base.dealerTotal = handTotal(round_.dealerCards).total;
+  }
   if (resolved) {
     base.serverSeed = round_.serverSeed;
     base.verified = verifyServerSeedHash(round_.serverSeed, round_.serverSeedHash);
@@ -453,9 +490,223 @@ async function cashOutHilo(store, options = {}) {
   return publicRoundView(round_);
 }
 
+// ---------------------------------------------------------------------
+// Blackjack
+// ---------------------------------------------------------------------
+
+const BLACKJACK_RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+const BLACKJACK_SUITS = ['spades', 'hearts', 'diamonds', 'clubs'];
+const BLACKJACK_DECK_SIZE = BLACKJACK_RANKS.length * BLACKJACK_SUITS.length; // 52, a real single deck
+
+// Stated plainly, not left implicit -- see the header on why this
+// variant is the real, standard baseline rather than a guess.
+const BLACKJACK_RULES = {
+  decks: 1,
+  dealerStandsOn: 17,
+  dealerHitsSoft17: false, // dealer STANDS on soft 17 (the more player-favorable of the two standard variants)
+  blackjackPayout: 1.5, // 3:2
+  doubleDown: false, // not implemented this pass -- see the header
+  split: false, // not implemented this pass -- see the header
+};
+
+function buildShuffledDeck(serverSeed, clientSeed, nonce) {
+  const deck = [];
+  for (const suit of BLACKJACK_SUITS) {
+    for (const rank of BLACKJACK_RANKS) deck.push({ rank, suit });
+  }
+  const floats = deriveFloats(serverSeed, clientSeed, nonce, BLACKJACK_DECK_SIZE);
+  for (let i = deck.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(floats[i] * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+  return deck;
+}
+
+function cardBaseValue(rank) {
+  if (rank === 'A') return 11;
+  if (rank === 'J' || rank === 'Q' || rank === 'K') return 10;
+  return Number(rank);
+}
+
+// The real, standard soft/hard total rule: every Ace counts as 11
+// until the hand would bust, then Aces convert to 1 one at a time
+// until the hand is 21 or under (or every Ace has been converted).
+function handTotal(cards) {
+  let total = cards.reduce((sum, c) => sum + cardBaseValue(c.rank), 0);
+  let aces = cards.filter((c) => c.rank === 'A').length;
+  let soft = aces > 0;
+  while (total > 21 && aces > 0) {
+    total -= 10;
+    aces -= 1;
+  }
+  if (aces === 0) soft = false;
+  return { total, isSoft: soft, isBust: total > 21 };
+}
+
+function isNatural(cards) {
+  return cards.length === 2 && handTotal(cards).total === 21;
+}
+
+function dealNextCard(round_) {
+  const card = round_.deck[round_.nextCardIndex];
+  round_.nextCardIndex += 1;
+  return card;
+}
+
+function startBlackjackRound(store, options = {}) {
+  const { sessionId, clientSeed } = options;
+  claimSession(store, sessionId);
+  if (!clientSeed) throw new Error('startBlackjackRound requires a clientSeed');
+
+  const serverSeed = generateServerSeed();
+  const id = store.nextOriginalsRoundId++;
+  const deck = buildShuffledDeck(serverSeed, clientSeed, id);
+  const round_ = {
+    id,
+    sessionId,
+    game: 'blackjack',
+    serverSeed,
+    serverSeedHash: hashServerSeed(serverSeed),
+    clientSeed,
+    nonce: id,
+    deck,
+    nextCardIndex: 0,
+    playerCards: [],
+    dealerCards: [],
+    status: 'active',
+    createdAt: Date.now(),
+  };
+  // Real deal order: player, dealer, player, dealer -- the same
+  // sequence a real table deals in, not player-then-dealer-in-pairs.
+  round_.playerCards.push(dealNextCard(round_));
+  round_.dealerCards.push(dealNextCard(round_));
+  round_.playerCards.push(dealNextCard(round_));
+  round_.dealerCards.push(dealNextCard(round_)); // the hole card -- hidden in publicRoundView until resolved
+
+  store.originalsRounds.push(round_);
+  const session = getCasinoSession(store, sessionId);
+  session.roundStarted = true;
+
+  // A player natural resolves immediately -- there is no hit/stand
+  // decision to make on a made 21, the same real rule every table
+  // follows. A dealer natural is checked too (real rule: dealer peeks
+  // on a possible blackjack before play continues), which can only
+  // ever produce a loss or a push for the player here, never a loss
+  // the player could have avoided by playing on.
+  if (isNatural(round_.playerCards)) {
+    round_.status = isNatural(round_.dealerCards) ? 'push' : 'player-blackjack';
+    round_.resolvedAt = Date.now();
+  } else if (isNatural(round_.dealerCards)) {
+    round_.status = 'lost';
+    round_.payout = 0;
+    round_.resolvedAt = Date.now();
+  }
+  return publicRoundView(round_);
+}
+
+function hitBlackjack(store, { roundId } = {}) {
+  const round_ = store.originalsRounds.find((r) => r.id === roundId && r.game === 'blackjack');
+  if (!round_) throw new Error(`no blackjack round with id ${roundId}`);
+  if (round_.status !== 'active') throw new Error(`blackjack round ${roundId} is not active (status: ${round_.status})`);
+
+  round_.playerCards.push(dealNextCard(round_));
+  const { isBust } = handTotal(round_.playerCards);
+  if (isBust) {
+    round_.status = 'lost';
+    round_.payout = 0;
+    round_.resolvedAt = Date.now();
+  }
+  return publicRoundView(round_);
+}
+
+// Standing is the player's last decision -- everything from here is
+// the dealer's own fixed, real strategy (hit while under 17, stand on
+// 17 or more), with no choice left for either side, the same reason
+// `standBlackjack` alone decides win/lose/push rather than a further
+// per-card call.
+function resolveDealerPlay(round_) {
+  while (handTotal(round_.dealerCards).total < BLACKJACK_RULES.dealerStandsOn) {
+    round_.dealerCards.push(dealNextCard(round_));
+  }
+}
+
+async function standBlackjack(store, options = {}) {
+  const { roundId, settleFn } = options;
+  const round_ = store.originalsRounds.find((r) => r.id === roundId && r.game === 'blackjack');
+  if (!round_) throw new Error(`no blackjack round with id ${roundId}`);
+  if (round_.status !== 'active') throw new Error(`blackjack round ${roundId} is not active (status: ${round_.status})`);
+
+  resolveDealerPlay(round_);
+  const player = handTotal(round_.playerCards);
+  const dealer = handTotal(round_.dealerCards);
+
+  let outcome;
+  if (dealer.isBust || player.total > dealer.total) outcome = 'player-win';
+  else if (player.total === dealer.total) outcome = 'push';
+  else outcome = 'dealer-win';
+
+  if (outcome === 'dealer-win') {
+    round_.status = 'lost';
+    round_.payout = 0;
+    round_.resolvedAt = Date.now();
+    return publicRoundView(round_);
+  }
+
+  await settleBlackjackWin(store, round_, outcome === 'push' ? 'push' : 'player-win', settleFn);
+  return publicRoundView(round_);
+}
+
+// Shared by the natural-blackjack-at-deal path and the stand-to-
+// showdown path -- one real place that credits a blackjack win or
+// push, the same "never cross the currency boundary" rule every other
+// payout in this file already follows.
+async function settleBlackjackWin(store, round_, outcome, settleFn) {
+  const session = getCasinoSession(store, round_.sessionId);
+  const multiplier = outcome === 'push' ? 1
+    : (isNatural(round_.playerCards) ? 1 + BLACKJACK_RULES.blackjackPayout : 2);
+  const payout = round(session.stakeAmount * multiplier);
+  if (session.currency !== 'gold-coin' && typeof settleFn !== 'function') {
+    throw new Error('standBlackjack requires a settleFn(legs, meta) for vcoin sessions');
+  }
+
+  await settleRoundOnce(round_, {
+    status: outcome === 'push' ? 'push' : 'resolved',
+    payout,
+    extra: { multiplier },
+    pay: async () => {
+      if (session.currency === 'gold-coin') {
+        creditGoldCoin(store, { userId: session.userId, amount: payout, reason: `vago_blackjack_${outcome}` });
+      } else {
+        await settleFn(
+          [{ fromUserId: VAGO_HOUSE_ACCOUNT, toUserId: session.userId, amount: payout, reason: `vago_blackjack_${outcome}` }],
+          { reason: `vago_blackjack_${outcome}` },
+        );
+      }
+    },
+  });
+}
+
+// `startBlackjackRound` resolves a natural at deal time, synchronously,
+// before any settlement -- so a round that opened holding blackjack
+// needs its win paid out through the exact same real path `standBlackjack`
+// uses, not a second, divergent payout implementation. Callers settle
+// a natural explicitly, the same deliberate two-step `startMinesRound`/
+// `cashOutMines` already uses rather than one function doing both.
+async function settleBlackjackNatural(store, options = {}) {
+  const { roundId, settleFn } = options;
+  const round_ = store.originalsRounds.find((r) => r.id === roundId && r.game === 'blackjack');
+  if (!round_) throw new Error(`no blackjack round with id ${roundId}`);
+  if (round_.status !== 'player-blackjack' && round_.status !== 'push') {
+    throw new Error(`blackjack round ${roundId} is not a natural outcome (status: ${round_.status})`);
+  }
+  await settleBlackjackWin(store, round_, round_.status === 'push' ? 'push' : 'player-win', settleFn);
+  return publicRoundView(round_);
+}
+
 module.exports = {
   ORIGINALS_RTP, MINES_BOARD_SIZE, MIN_MINES_COUNT, MAX_MINES_COUNT, PLINKO_ROWS, PLINKO_MULTIPLIER_TABLE,
-  HILO_CARD_VALUES, HILO_DIRECTIONS,
+  HILO_CARD_VALUES, HILO_DIRECTIONS, BLACKJACK_RULES, BLACKJACK_RANKS, BLACKJACK_SUITS,
   computeMinesMultiplier, getOriginalsRound, startMinesRound, revealMinesTile, cashOutMines, startPlinkoRound, dropPlinkoBall,
   startHiloRound, guessHilo, cashOutHilo,
+  handTotal, isNatural, startBlackjackRound, hitBlackjack, standBlackjack, settleBlackjackNatural,
 };
