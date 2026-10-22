@@ -18,23 +18,25 @@
 // XCHANGE, RED VEIL → ROJO VELO, VvLGAR → VvLGARI, 7EVEN newly added,
 // BOOBI Couture and DVMB retired).
 //
-// **Eleven entries, not twelve.** VvLGARI's own positioning in the
-// current handoff is explicitly "to be established" -- no real
-// product description exists to turn into a wearable, the same real
-// reason `seedSvmikoDegvchiStorefronts` skips it on the VENVS side
-// rather than seeding an empty shop. It is deliberately absent here
-// rather than represented by an invented item; add its real entry
-// once the brand's own direction is actually decided.
+// **Sixteen entries across twelve brands, now that VvLGARI is real
+// too.** VvLGARI's positioning was "to be established" through 21 Oct
+// 2026; it was given directly on 22 Oct 2026 as a luxury accessories
+// house focused on cologne, perfume, sunglasses, and handbags for men
+// and women -- the same real update `venvs/src/lib/svmikoDegvchi.js`
+// took on the VENVS side (see that module's own header). Five rows
+// below share `slug: 'vvlgari'` rather than one, because it is one
+// brand with five real virtual items, not five brands.
 //
-// Real, deliberate scope: one virtual wearable per sub-brand that
-// currently has a defined product, matching each brand's real
-// described identity to one of `degvchi.js`'s own three real
-// categories (clothing/cosmetics/accessories) -- `clothing` for the
-// 9 brands built around garments, `accessories` for the 2 built
-// around hardware/jewelry/emblems (STONE BONES' hardware, VAISON's
-// own transformation-themed pendant). No SVMIKO DEGVCHI brand's real
-// description centers on cosmetics specifically, so `cosmetics` is
-// honestly unused here, not forced.
+// Real, deliberate scope: one virtual wearable per sub-brand product
+// that currently exists, matching each brand's real described identity
+// to one of `degvchi.js`'s own three real categories (clothing/
+// cosmetics/accessories) -- `clothing` for the 9 brands built around
+// garments, `accessories` for brands built around hardware/jewelry/
+// emblems/eyewear/bags (STONE BONES' hardware, VAISON's own
+// transformation-themed pendant, VvLGARI's sunglasses and both
+// handbags), and `cosmetics` for VvLGARI's cologne and perfume -- the
+// first real use of that category here, since no other SVMIKO DEGVCHI
+// brand's description centers on fragrance.
 //
 // Real, deliberately DIFFERENT pricing scale from VENVS's own physical
 // flagship prices: virtual avatar-wearable economies price far lower
@@ -68,6 +70,11 @@ export const SUB_BRAND_WEARABLES = [
   { slug: 'vaison', name: '△AISON Virtual Transformation Pendant', category: 'accessories', price: 28 },
   { slug: 'ancor', name: 'ANCÓR Virtual Blended-Material Jacket', category: 'clothing', price: 20 },
   { slug: 'seven-even', name: '7EVEN Virtual Everyday Track Jacket', category: 'clothing', price: 18 },
+  { slug: 'vvlgari', name: 'VvLGARI Virtual Pour Homme Fragrance', category: 'cosmetics', price: 11 },
+  { slug: 'vvlgari', name: 'VvLGARI Virtual Pour Femme Fragrance', category: 'cosmetics', price: 11 },
+  { slug: 'vvlgari', name: 'VvLGARI Virtual Aviator Sunglasses', category: 'accessories', price: 19 },
+  { slug: 'vvlgari', name: "VvLGARI Virtual Women's Structured Tote", category: 'accessories', price: 42 },
+  { slug: 'vvlgari', name: "VvLGARI Virtual Men's Weekender Bag", category: 'accessories', price: 38 },
 ];
 
 // Matches VENVS's own `ownerIdFor()` exactly -- kept as a real,

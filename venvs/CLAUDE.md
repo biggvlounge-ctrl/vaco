@@ -113,9 +113,12 @@ in a browser — the original "never actually run" caveat is resolved.
   renamed, one retired pair dropped, one new brand added; see
   `src/lib/svmikoDegvchi.js`'s own header) live here as real branded
   sellers inside the Marketplace storefront system
-  (`src/lib/svmikoDegvchi.js`). One brand (VvLGARI) is real identity
-  with no product yet — its own positioning is still "to be
-  established," so it has no open storefront until that's decided.
+  (`src/lib/svmikoDegvchi.js`). All 12 now have a real, open
+  storefront — VvLGARI's own positioning was given directly on 22 Oct
+  2026 (a luxury accessories house: cologne, perfume, sunglasses, and a
+  handbag for each of men and women) and is no longer "to be
+  established." It is the one sub-brand whose `flagshipProducts` array
+  holds more than one item, listed under its single real storefront.
   Note the split: the **brands/storefronts** are VENVS commerce; the
   **avatar wearables** economy is VDP's.
 

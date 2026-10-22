@@ -569,20 +569,23 @@ test('seeding registers every sub-brand WITH a real flagship product as a real s
   // validation, it would throw here rather than when a shopper first
   // opened the storefront.
   //
-  // Not every real brand has a real product yet — VvLGARI's own
-  // positioning is explicitly "to be established" in the current
-  // handoff, so `seedSvmikoDegvchiStorefronts` skips it rather than
-  // opening an empty shop (see that function's own comment). The
-  // brand count and the seeded-storefront count are therefore
-  // deliberately different numbers now, not the same assertion twice.
-  const brandsWithProduct = SUB_BRANDS.filter((b) => b.flagshipProduct);
+  // All twelve brands now carry at least one real `flagshipProducts`
+  // entry — VvLGARI's own positioning (cologne, perfume, sunglasses,
+  // and handbags for men and women, given directly 22 Oct 2026) is no
+  // longer "to be established," so nothing is skipped today. The skip
+  // path itself (`seeded.skipped`) stays real in the source module for
+  // the case of a future brand with no product yet, and is checked
+  // here as empty rather than deleted from the assertion entirely.
+  const brandsWithProduct = SUB_BRANDS.filter((b) => b.flagshipProducts && b.flagshipProducts.length > 0);
+  const totalProducts = SUB_BRANDS.reduce((sum, b) => sum + (b.flagshipProducts ? b.flagshipProducts.length : 0), 0);
   const m = createMarketplace();
   const seeded = seedSvmikoDegvchiStorefronts(m);
 
   assert.equal(seeded.length, brandsWithProduct.length);
+  assert.equal(seeded.length, SUB_BRANDS.length, 'every sub-brand has a real product now, including VvLGARI');
   assert.equal(m.sellers.length, brandsWithProduct.length);
-  assert.ok(m.products.length >= brandsWithProduct.length, 'a seeded storefront with no stock is an empty shop');
-  assert.ok(seeded.skipped.length > 0, 'expected at least one brand (VvLGARI) to still be pending a real product');
+  assert.equal(m.products.length, totalProducts, 'VvLGARI alone lists five products under one storefront');
+  assert.equal(seeded.skipped.length, 0, 'nothing should be pending a real product any more');
 
   for (const seller of m.sellers) {
     const front = getSellerStorefront(m, seller.id);
@@ -591,6 +594,26 @@ test('seeding registers every sub-brand WITH a real flagship product as a real s
       assert.ok(p.price > 0, `${seller.name} lists "${p.title}" at ${p.price}`);
     }
   }
+});
+
+test('VvLGARI carries all five of its real products under one storefront', () => {
+  // VvLGARI is the one brand whose `flagshipProducts` array has more
+  // than one entry, because its own real positioning spans cologne,
+  // perfume, sunglasses, and handbags for both men and women rather
+  // than one single flagship garment.
+  const m = createMarketplace();
+  seedSvmikoDegvchiStorefronts(m);
+  const vvlgariSeller = m.sellers.find((s) => s.name === 'VvLGARI');
+  assert.ok(vvlgariSeller, 'VvLGARI should have its own real storefront now');
+
+  const front = getSellerStorefront(m, vvlgariSeller.id);
+  assert.equal(front.products.length, 5, 'cologne, perfume, sunglasses, and a handbag for each of men and women');
+  const categories = front.products.map((p) => p.category);
+  assert.ok(categories.includes('luxury-fragrance-men'));
+  assert.ok(categories.includes('luxury-fragrance-women'));
+  assert.ok(categories.includes('luxury-eyewear'));
+  assert.ok(categories.includes('luxury-handbags-men'));
+  assert.ok(categories.includes('luxury-handbags-women'));
 });
 
 test('a seeded storefront can actually take an order end to end', () => {

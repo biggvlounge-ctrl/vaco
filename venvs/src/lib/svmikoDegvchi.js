@@ -15,19 +15,23 @@
 // populated here with each brand's real, distinct positioning and
 // signature element, not left empty or generic.
 //
-// **One real, representative flagship product per brand, EXCEPT
-// VvLGARI.** The handoff itself states VvLGARI's positioning as
-// "Restored — positioning to define" and its signature as "To be
-// established" -- an explicit, direct instruction not to invent one.
-// `flagshipProduct: null` is that instruction taken literally rather
-// than worked around; `seedSvmikoDegvchiStorefronts` skips opening a
-// storefront for any brand with no real product rather than seeding
-// an empty shop (see that function's own comment). Every other
-// brand's flagship product/price below is this module's own
-// reasonable derivation from its NEW positioning and signature, same
-// "flagged, interpretive" posture `ownerIdFor`'s own comment already
-// holds for payout-account ids -- not specified in the handoff table
-// itself, which named identity and signature only.
+// **`flagshipProducts` is an array, not a single object**, because
+// VvLGARI's own real positioning (given directly, 22 Oct 2026: "that
+// will be our cologne, sunglasses, brand... sunglasses, cologne,
+// perfume, and handbag for men and women accessories") needs more than
+// one product under one storefront, while every other brand only ever
+// needed one. Rather than give VvLGARI a different shape from the
+// other eleven, every brand's single flagship item was wrapped into a
+// one-element array so `seedSvmikoDegvchiStorefronts` has one real loop
+// instead of a special case. VvLGARI's positioning is no longer "to be
+// established" -- it is now defined directly, so it is no longer
+// skipped at seeding (see that function's own comment, still kept for
+// the real case of a future brand with no product yet). Exact product
+// names and prices below are this module's own reasonable derivation
+// from the stated focus (cologne/perfume/sunglasses/handbags for men
+// and women), same "flagged, interpretive" posture already held for
+// the other eleven brands' flagship products and for payout-account
+// ids -- not specified verbatim in the handoff itself.
 //
 // Not built here, flagged directly (unchanged from the original):
 // the SD monogram and the DEGVCHI Gateway Symbol (出口/deguchi) are
@@ -47,86 +51,116 @@ export const SUB_BRANDS = [
     name: 'DEGVCHI',
     positioning: 'Japanese luxury streetwear.',
     signatureElement: 'Japanese heritage materials',
-    flagshipProduct: { title: 'DEGVCHI Heritage-Weave Bomber Jacket', price: 420, category: 'luxury-streetwear' },
+    flagshipProducts: [
+      { title: 'DEGVCHI Heritage-Weave Bomber Jacket', price: 420, category: 'luxury-streetwear' },
+    ],
   },
   {
     slug: 'lvcii',
     name: 'LVCII',
     positioning: 'Modern everyday luxury.',
     signatureElement: 'Designer handkerchief collections',
-    flagshipProduct: { title: 'LVCII Signature Handkerchief Collection', price: 180, category: 'luxury-accessories' },
+    flagshipProducts: [
+      { title: 'LVCII Signature Handkerchief Collection', price: 180, category: 'luxury-accessories' },
+    ],
   },
   {
     slug: 'stone-bones',
     name: 'STONE BONES',
     positioning: 'Dark/sculptural luxury.',
     signatureElement: 'Heavy details + precious hardware',
-    flagshipProduct: { title: 'STONE BONES Sculpted-Hardware Jacket', price: 520, category: 'luxury-outerwear' },
+    flagshipProducts: [
+      { title: 'STONE BONES Sculpted-Hardware Jacket', price: 520, category: 'luxury-outerwear' },
+    ],
   },
   {
     slug: 'boulevard-xchange',
     name: 'BOULÉVARD XCHANGE',
     positioning: 'Luxury streetwear.',
     signatureElement: 'Cultural exchange',
-    flagshipProduct: { title: 'BOULÉVARD XCHANGE Cultural Capsule Hoodie', price: 165, category: 'luxury-streetwear' },
+    flagshipProducts: [
+      { title: 'BOULÉVARD XCHANGE Cultural Capsule Hoodie', price: 165, category: 'luxury-streetwear' },
+    ],
   },
   {
     slug: 'jacqve',
     name: 'JACQVÉ',
     positioning: "Women's handbags & footwear.",
     signatureElement: 'Detachable jewelry',
-    flagshipProduct: { title: 'JACQVÉ Detachable-Jewelry Tote', price: 480, category: 'luxury-handbags' },
+    flagshipProducts: [
+      { title: 'JACQVÉ Detachable-Jewelry Tote', price: 480, category: 'luxury-handbags' },
+    ],
   },
   {
     slug: 'zv',
     name: 'ZV',
     positioning: 'Minimalist streetwear.',
     signatureElement: 'Silhouette',
-    flagshipProduct: { title: 'ZV Signature-Silhouette Tee', price: 58, category: 'streetwear-basics' },
+    flagshipProducts: [
+      { title: 'ZV Signature-Silhouette Tee', price: 58, category: 'streetwear-basics' },
+    ],
   },
   {
     slug: 'rojo-velo',
     name: 'ROJO VELO',
     positioning: 'Modern European luxury.',
     signatureElement: 'Signature accent / fashion-forward construction',
-    flagshipProduct: { title: 'ROJO VELO Accent-Seam Trench Coat', price: 560, category: 'luxury-outerwear' },
+    flagshipProducts: [
+      { title: 'ROJO VELO Accent-Seam Trench Coat', price: 560, category: 'luxury-outerwear' },
+    ],
   },
   {
     slug: 'vedellin',
     name: 'VEDELLÍN',
     positioning: 'Global exotic luxury.',
     signatureElement: 'Extraordinary materials',
-    flagshipProduct: { title: 'VEDELLÍN Rare-Material Field Jacket', price: 640, category: 'luxury-outerwear' },
+    flagshipProducts: [
+      { title: 'VEDELLÍN Rare-Material Field Jacket', price: 640, category: 'luxury-outerwear' },
+    ],
   },
   {
     slug: 'vaison',
     name: 'VAISON / △AISON',
     positioning: 'Avant-garde luxury.',
     signatureElement: 'Transformation',
-    flagshipProduct: { title: '△AISON Transformable Deconstructed Coat', price: 610, category: 'avant-garde-luxury' },
+    flagshipProducts: [
+      { title: '△AISON Transformable Deconstructed Coat', price: 610, category: 'avant-garde-luxury' },
+    ],
   },
   {
     slug: 'ancor',
     name: 'ANCÓR',
     positioning: 'Luxury leisure/yachting.',
     signatureElement: 'Material blending',
-    flagshipProduct: { title: 'ANCÓR Blended-Material Yacht Jacket', price: 310, category: 'luxury-resortwear' },
+    flagshipProducts: [
+      { title: 'ANCÓR Blended-Material Yacht Jacket', price: 310, category: 'luxury-resortwear' },
+    ],
   },
   {
     slug: 'seven-even',
     name: '7EVEN',
     positioning: 'Luxury athletic/everyday.',
     signatureElement: 'Perfecting everyday clothing',
-    flagshipProduct: { title: '7EVEN Perfected Everyday Track Jacket', price: 145, category: 'luxury-athleisure' },
+    flagshipProducts: [
+      { title: '7EVEN Perfected Everyday Track Jacket', price: 145, category: 'luxury-athleisure' },
+    ],
   },
   {
     slug: 'vvlgari',
     name: 'VvLGARI',
-    positioning: 'Restored — positioning to define.',
-    signatureElement: 'To be established',
-    // No flagship product -- see this file's own header on why that
-    // is deliberate, not an omission.
-    flagshipProduct: null,
+    positioning: 'Luxury accessories house -- cologne, perfume, sunglasses, and handbags for men and women.',
+    signatureElement: 'Fragrance and eyewear as the house\'s focus, not clothing',
+    // Real positioning as given directly, 22 Oct 2026 -- cologne,
+    // perfume, sunglasses, and a handbag for each of men and women.
+    // Five items, not one, is why `flagshipProducts` is an array at
+    // all; see this file's own header.
+    flagshipProducts: [
+      { title: 'VvLGARI Pour Homme Eau de Parfum', price: 160, category: 'luxury-fragrance-men' },
+      { title: 'VvLGARI Pour Femme Eau de Parfum', price: 170, category: 'luxury-fragrance-women' },
+      { title: 'VvLGARI Aviator Sunglasses', price: 290, category: 'luxury-eyewear' },
+      { title: "VvLGARI Women's Structured Leather Tote", price: 640, category: 'luxury-handbags-women' },
+      { title: "VvLGARI Men's Leather Weekender Bag", price: 580, category: 'luxury-handbags-men' },
+    ],
   },
 ];
 
@@ -138,18 +172,23 @@ export function ownerIdFor(slug) {
   return `svmiko-degvchi-${slug}`;
 }
 
-// Every brand in `SUB_BRANDS` is real identity; not every brand has a
-// real product yet. Opening a storefront with nothing to sell is a
-// worse state than not opening one at all (the existing test suite's
-// own standing rule: "a seeded storefront with no stock is an empty
-// shop") -- so a brand with `flagshipProduct: null` (today, only
-// VvLGARI) is skipped here rather than seeded empty, and the real
-// reason is returned alongside the ones that were.
+// Every brand in `SUB_BRANDS` is real identity; not every brand is
+// guaranteed to have a real product -- today all twelve do, but the
+// skip stays real rather than removed, for the same reason a brand
+// might arrive again with its positioning still "to be established."
+// Opening a storefront with nothing to sell is a worse state than not
+// opening one at all (the existing test suite's own standing rule: "a
+// seeded storefront with no stock is an empty shop") -- so a brand
+// with an empty or missing `flagshipProducts` is skipped here rather
+// than seeded empty, and the real reason is returned alongside the
+// ones that were seeded. Every product in a brand's `flagshipProducts`
+// array is listed under that brand's one real storefront/seller --
+// one seller per brand, however many products it carries.
 export function seedSvmikoDegvchiStorefronts(marketplace) {
   const seeded = [];
   const skipped = [];
   for (const brand of SUB_BRANDS) {
-    if (!brand.flagshipProduct) {
+    if (!brand.flagshipProducts || brand.flagshipProducts.length === 0) {
       skipped.push({ brand: brand.slug, reason: 'no flagship product defined yet' });
       continue;
     }
@@ -164,13 +203,13 @@ export function seedSvmikoDegvchiStorefronts(marketplace) {
         signatureElement: brand.signatureElement,
       },
     });
-    const product = listProduct(marketplace, {
+    const products = brand.flagshipProducts.map((flagshipProduct) => listProduct(marketplace, {
       sellerId: seller.id,
-      title: brand.flagshipProduct.title,
-      price: brand.flagshipProduct.price,
-      category: brand.flagshipProduct.category,
-    });
-    seeded.push({ brand: brand.slug, seller, product });
+      title: flagshipProduct.title,
+      price: flagshipProduct.price,
+      category: flagshipProduct.category,
+    }));
+    seeded.push({ brand: brand.slug, seller, products });
   }
   seeded.skipped = skipped;
   return seeded;

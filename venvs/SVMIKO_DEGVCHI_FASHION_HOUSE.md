@@ -29,26 +29,33 @@ European luxury, signature accent/fashion-forward construction),
 VEDELLÍN (global exotic luxury, extraordinary materials), VAISON
 (avant-garde luxury, transformation), ANCÓR (luxury leisure/yachting,
 material blending), 7EVEN (luxury athletic/everyday, perfecting
-everyday clothing), VvLGARI (restored — positioning to define,
-signature to be established).
+everyday clothing), VvLGARI (luxury accessories — cologne, perfume,
+sunglasses, and handbags for men and women).
 
 Several brands kept their name but changed positioning/signature
 (DEGVCHI, LVCII, JACQVÉ, ZV, VEDELLÍN, VAISON, ANCÓR); some were
 renamed (Devil in Details/DND → STONE BONES, Boulevard/BLVD →
 BOULÉVARD XCHANGE, RED VEIL → ROJO VELO, VvLGAR → VvLGARI); one is
 genuinely new (7EVEN); two from the original roster (BOOBI/BOOBI
-Couture, DVMB) are retired. VvLGARI is real identity with no real
-product yet — its positioning is explicitly "to be established" in
-this handoff, not something this codebase invents on its own.
+Couture, DVMB) are retired.
 
-Direct integration: each of the 11 brands with a defined product
-becomes a real, distinct seller/storefront within VENVS's Shopify-
-style branded storefront system already built — each brand gets its
-own customized storefront, consistent with the "branded-per-seller-
-within-unified-marketplace" model already established for VENVS.
-VvLGARI's storefront opens once its own real product is defined.
+**Updated again, same day (22 Oct 2026) — VvLGARI is defined.** Its
+positioning was given directly: a luxury accessories house focused on
+cologne, perfume, sunglasses, and handbags for both men and women. It
+is no longer "to be established," and it is the one sub-brand with
+more than one real flagship product (five, not one) under its single
+storefront. Exact product names/prices are this codebase's own
+reasonable derivation from that stated focus, same "flagged,
+interpretive" posture already held for the other eleven brands.
 
-Status: populating VENVS's branded storefront system now.
+Direct integration: all 12 brands are now real, distinct sellers/
+storefronts within VENVS's Shopify-style branded storefront system
+already built — each brand gets its own customized storefront,
+consistent with the "branded-per-seller-within-unified-marketplace"
+model already established for VENVS. VvLGARI's storefront lists all
+five of its real products under that one seller.
+
+Status: all 12 branded storefronts are open in VENVS's system.
 
 ---
 
@@ -59,7 +66,8 @@ below this point describes the ORIGINAL 13-brand roster and is kept
 as a real historical record, not rewritten to pretend it always said
 12. The current, real code (`venvs/src/lib/svmikoDegvchi.js`,
 `vdp/src/lib/svmikoDegvchiWearables.js`) now implements the upgraded
-roster. The current real wearable table:
+roster, with VvLGARI's own positioning defined the same day. The
+current real wearable table:
 
 | Brand | Product | Price |
 |---|---|---|
@@ -74,11 +82,17 @@ roster. The current real wearable table:
 | △AISON (VAISON) | Virtual Transformation Pendant | 28 |
 | ANCÓR | Virtual Blended-Material Jacket | 20 |
 | 7EVEN | Virtual Everyday Track Jacket | 18 |
-| VvLGARI | *(none yet — positioning to be established)* | — |
+| VvLGARI | Virtual Pour Homme Fragrance | 11 |
+| VvLGARI | Virtual Pour Femme Fragrance | 11 |
+| VvLGARI | Virtual Aviator Sunglasses | 19 |
+| VvLGARI | Virtual Women's Structured Tote | 42 |
+| VvLGARI | Virtual Men's Weekender Bag | 38 |
 
-Eleven real entries plus one real brand identity with no product yet.
-Flagship-product titles/prices for the ten renamed-or-repositioned
-brands are this codebase's own reasonable derivation from the new
+Sixteen real entries across twelve brands — VvLGARI alone carries
+five, one per real product its positioning named (cologne, perfume,
+sunglasses, and a handbag for each of men and women). Flagship-product
+titles/prices for the eleven renamed-or-repositioned-or-newly-defined
+brands are this codebase's own reasonable derivation from the
 positioning/signature table above, not separately specified in the
 handoff — the same "flagged, interpretive" posture the original
 build already held for payout-account ids.

@@ -534,14 +534,29 @@ test('every sub-brand wearable is sellable and in a real category', () => {
   }
 });
 
-test('every sub-brand has its own payout account', () => {
-  // Thirteen sub-brands under one house, each paid separately — a
-  // duplicate slug would route one label's sales to another.
-  const slugs = SUB_BRAND_WEARABLES.map((i) => i.slug);
-  assert.equal(new Set(slugs).size, slugs.length);
-  const accounts = slugs.map(creatorIdFor);
-  assert.equal(new Set(accounts).size, accounts.length);
+test('every sub-brand has its own payout account, even brands with more than one item', () => {
+  // Twelve sub-brands under one house, each paid separately — a
+  // duplicate slug ACROSS brands would route one label's sales to
+  // another. VvLGARI alone carries five real items under its one real
+  // slug (cologne, perfume, sunglasses, and a handbag for each of men
+  // and women), so the real invariant is "different brands never
+  // collide," not "one row per brand" — deduping brand slugs first is
+  // what actually protects that.
+  const brandSlugs = [...new Set(SUB_BRAND_WEARABLES.map((i) => i.slug))];
+  assert.ok(brandSlugs.length > 1, 'expected more than one real sub-brand');
+  const accounts = brandSlugs.map(creatorIdFor);
+  assert.equal(new Set(accounts).size, accounts.length, 'two different sub-brands share a payout account');
   assert.notEqual(creatorIdFor('a'), creatorIdFor('b'));
+});
+
+test('VvLGARI is the one sub-brand with more than one real item, and every item still pays the same account', () => {
+  const vvlgariItems = SUB_BRAND_WEARABLES.filter((i) => i.slug === 'vvlgari');
+  assert.equal(vvlgariItems.length, 5, 'cologne, perfume, sunglasses, and a handbag for each of men and women');
+  for (const item of vvlgariItems) {
+    assert.equal(creatorIdFor(item.slug), creatorIdFor('vvlgari'));
+  }
+  const names = vvlgariItems.map((i) => i.name);
+  assert.equal(new Set(names).size, names.length, 'VvLGARI lists the same item twice');
 });
 
 test('seeding registers every sub-brand item into a real DEGVCHI store', () => {
