@@ -31,20 +31,24 @@
 // reading is this brand's design ethos.
 //
 // STONE BONES's own real comparable, given the same day: Chrome
-// Hearts -- heavy sterling-silver-style hardware worn as jewelry-grade
-// accessory, carried over from this module's own `accessories`
-// category choice for it below.
+// Hearts -- gothic/sculptural hardware worn as jewelry-grade accessory.
+// The material is the real point of difference, given directly in a
+// later correction: not chrome/sterling silver like Chrome Hearts, but
+// hardware cast to look like stone and concrete -- a treatment the
+// house itself claims has never been done before. The virtual piece
+// below stays `clothing` (it's a jacket, the hardware is a detail on
+// it, same as VENVS's own flagship piece), not `accessories`.
 //
 // Real, deliberate scope: one virtual wearable per sub-brand product
 // that currently exists, matching each brand's real described identity
 // to one of `degvchi.js`'s own three real categories (clothing/
-// cosmetics/accessories) -- `clothing` for the 9 brands built around
-// garments, `accessories` for brands built around hardware/jewelry/
-// emblems/eyewear/bags (STONE BONES' hardware, VAISON's own
-// transformation-themed pendant, VvLGARI's sunglasses and both
-// handbags), and `cosmetics` for VvLGARI's cologne and perfume -- the
-// first real use of that category here, since no other SVMIKO DEGVCHI
-// brand's description centers on fragrance.
+// cosmetics/accessories) -- `clothing` for the 10 brands built around
+// garments (STONE BONES' concrete-hardware jacket among them),
+// `accessories` for brands built around jewelry/emblems/eyewear/bags
+// (VAISON's own transformation-themed pendant, VvLGARI's sunglasses
+// and both handbags), and `cosmetics` for VvLGARI's cologne and
+// perfume -- the first real use of that category here, since no other
+// SVMIKO DEGVCHI brand's description centers on fragrance.
 //
 // Real, deliberately DIFFERENT pricing scale from VENVS's own physical
 // flagship prices: virtual avatar-wearable economies price far lower
@@ -69,7 +73,7 @@ export const SVMIKO_DEGVCHI_HOUSE = 'svmiko-degvchi-fashion-house';
 export const SUB_BRAND_WEARABLES = [
   { slug: 'degvchi', name: 'DEGVCHI Virtual Heritage-Weave Bomber', category: 'clothing', price: 30 },
   { slug: 'lvcii', name: 'LVCII Virtual Handkerchief Set', category: 'accessories', price: 14 },
-  { slug: 'stone-bones', name: 'STONE BONES Virtual Hardware Jacket', category: 'clothing', price: 34 },
+  { slug: 'stone-bones', name: 'STONE BONES Virtual Concrete-Hardware Jacket', category: 'clothing', price: 34 },
   { slug: 'boulevard-xchange', name: 'BOULÉVARD XCHANGE Virtual Capsule Hoodie', category: 'clothing', price: 16 },
   { slug: 'jacqve', name: 'JACQVÉ Virtual Detachable-Jewelry Tote', category: 'accessories', price: 28 },
   { slug: 'zv', name: 'ZV Virtual Signature-Silhouette Tee', category: 'clothing', price: 9 },

@@ -56,12 +56,16 @@ kept here as the real record rather than just in code comments:**
   anything else. That's the brand's design ethos as much as its name's
   etymology, and it now shapes `positioning` in
   `venvs/src/lib/svmikoDegvchi.js`, not just a comment.
-- **STONE BONES is this house's own Chrome Hearts** — heavy
-  sterling-silver-style hardware worn as jewelry-grade accessory,
-  gothic/sculptural detail. It is the brand that replaced Devil in
-  Details (DND) in the 12-brand upgrade above; the comparable is a
-  real anchor for any future STONE BONES product, not an invented
-  flourish.
+- **STONE BONES is this house's own Chrome Hearts** — gothic/
+  sculptural hardware worn as jewelry-grade accessory. The material is
+  the deliberate point of difference, given directly in a follow-up
+  correction: where Chrome Hearts' hardware is chrome/sterling silver,
+  STONE BONES' own is cast to look like stone and concrete — a
+  treatment the house itself claims has never been done before in
+  this kind of hardware. It is the brand that replaced Devil in
+  Details (DND) in the 12-brand upgrade above; the comparable and the
+  material are both a real anchor for any future STONE BONES product,
+  not an invented flourish.
 
 Direct integration: all 12 brands are now real, distinct sellers/
 storefronts within VENVS's Shopify-style branded storefront system
@@ -88,7 +92,7 @@ current real wearable table:
 |---|---|---|
 | DEGVCHI | Virtual Heritage-Weave Bomber | 30 |
 | LVCII | Virtual Handkerchief Set | 14 |
-| STONE BONES | Virtual Hardware Jacket | 34 |
+| STONE BONES | Virtual Concrete-Hardware Jacket | 34 |
 | BOULÉVARD XCHANGE | Virtual Capsule Hoodie | 16 |
 | JACQVÉ | Virtual Detachable-Jewelry Tote | 28 |
 | ZV | Virtual Signature-Silhouette Tee | 9 |

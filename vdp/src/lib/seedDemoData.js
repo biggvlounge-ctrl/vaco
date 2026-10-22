@@ -77,7 +77,7 @@ const DEMO_ORDERS = [
 const DEMO_AVATARS = [
   { userId: "demo-user", outfit: ["DEGVCHI Signature Jacket", "Sunset Glow Palette", "Chrome Chain"] },
   { userId: "demo-maya", outfit: ["DEGVCHI Virtual Heritage-Weave Bomber", "△AISON Virtual Transformation Pendant"] },
-  { userId: "demo-carlos", outfit: ["ZV Virtual Signature-Silhouette Tee", "STONE BONES Virtual Hardware Jacket"] },
+  { userId: "demo-carlos", outfit: ["ZV Virtual Signature-Silhouette Tee", "STONE BONES Virtual Concrete-Hardware Jacket"] },
   { userId: "demo-priya", outfit: ["ROJO VELO Virtual Accent Trench Coat", "ANCÓR Virtual Blended-Material Jacket"] },
 ];
 

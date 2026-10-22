@@ -68,14 +68,19 @@ export const SUB_BRANDS = [
     slug: 'stone-bones',
     name: 'STONE BONES',
     // The house's own real comparable, given directly: Chrome Hearts --
-    // heavy sterling-silver-style hardware, gothic/sculptural detail,
-    // worn as jewelry-grade accessory rather than plain trim. This is
-    // the brand that replaced Devil in Details (DND); see this file's
-    // own header for the rename.
-    positioning: "Dark/sculptural luxury -- the house's own Chrome Hearts.",
-    signatureElement: 'Heavy sterling-silver-style hardware + precious details',
+    // gothic/sculptural luxury hardware worn as jewelry-grade accessory
+    // rather than plain trim. The material is the deliberate point of
+    // difference, given directly in a later correction: where Chrome
+    // Hearts' hardware is chrome/sterling silver, STONE BONES' own is
+    // cast to look like stone and concrete -- a material treatment the
+    // house itself claims has never been done before in this kind of
+    // hardware. This is the brand that replaced Devil in Details (DND);
+    // see this file's own header for the rename.
+    positioning: "Dark/sculptural luxury -- the house's own answer to "
+      + 'Chrome Hearts, but in stone and concrete rather than chrome.',
+    signatureElement: 'Stone-and-concrete-cast hardware, not chrome or silver',
     flagshipProducts: [
-      { title: 'STONE BONES Sculpted-Hardware Jacket', price: 520, category: 'luxury-outerwear' },
+      { title: 'STONE BONES Concrete-Cast Hardware Jacket', price: 520, category: 'luxury-outerwear' },
     ],
   },
   {
