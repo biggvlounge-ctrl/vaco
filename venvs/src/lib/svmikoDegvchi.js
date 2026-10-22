@@ -70,23 +70,37 @@ export const SUB_BRANDS = [
     // The house's own real comparable, given directly: Chrome Hearts --
     // gothic/sculptural luxury hardware worn as jewelry-grade accessory
     // rather than plain trim. The brand's own two-word name carries
-    // three real points of difference, given directly across three
+    // three real points of difference, given directly across four
     // corrections, not just a label: STONE is the material -- both a
-    // cast concrete/stone-look finish AND, given directly in this
-    // latest correction, genuine natural stone and gemstone inlay
-    // (emerald and assorted rock among them, not one fixed stone) --
-    // and BONES is the shape (the hardware itself -- buckles, charms,
-    // chain links -- is cast in bone silhouettes, not Chrome Hearts'
-    // own crosses and daggers). This is the brand that replaced Devil
-    // in Details (DND); see this file's own header for the rename.
+    // cast concrete/stone-look finish AND genuine natural stone and
+    // colored-gemstone accents (emerald and assorted colored rock
+    // among them, not one fixed stone or color) -- and BONES is the
+    // shape (the hardware itself -- buckles, charms, chain links -- is
+    // cast in bone silhouettes, not Chrome Hearts' own crosses and
+    // daggers). This is the brand that replaced Devil in Details
+    // (DND); see this file's own header for the rename.
+    //
+    // **Every piece is an original design, made in a real limited
+    // run -- given directly as the reason buyers can also trade them
+    // afterward.** `editionSize` below is this module's own real,
+    // flagged-interpretive number (not given verbatim); the mechanism
+    // itself is real: `seedSvmikoDegvchiStorefronts` passes it through
+    // to `listProduct`, and `checkout` in `marketplace.js` refuses to
+    // sell past it. A sold-out piece's only path to a new owner from
+    // then on is exactly what "traded" means here -- a prior buyer
+    // reselling it peer to peer through this same Marketplace, the
+    // same `registerSeller`/`listProduct` mechanism any reseller uses,
+    // nothing STONE BONES-specific.
     positioning: "Dark/sculptural luxury -- the house's own answer to "
       + 'Chrome Hearts: bone-shaped hardware, cast in stone and '
-      + 'concrete and inlaid with genuine natural stones and gemstones '
-      + '(emerald among them), rather than chrome.',
-    signatureElement: 'Bone-shaped hardware (buckles, charms, chain links) -- cast in stone/concrete, inlaid with real natural stones and gemstones -- not chrome or silver',
+      + 'concrete and accented with genuine natural stones and colored '
+      + 'gemstones (emerald among them), rather than chrome. Every '
+      + 'piece is an original design, made in a limited run so it can '
+      + 'also be traded.',
+    signatureElement: 'Bone-shaped hardware (buckles, charms, chain links) -- cast in stone/concrete, accented with real natural stones and colored gemstones -- not chrome or silver; every piece an original, limited-run design',
     flagshipProducts: [
-      { title: 'STONE BONES Concrete Bone-Buckle Jacket', price: 520, category: 'luxury-outerwear' },
-      { title: 'STONE BONES Emerald-Inlay Bone Chain', price: 380, category: 'luxury-accessories' },
+      { title: 'STONE BONES Concrete Bone-Buckle Jacket', price: 520, category: 'luxury-outerwear', editionSize: 150 },
+      { title: 'STONE BONES Emerald-Inlay Bone Chain', price: 380, category: 'luxury-accessories', editionSize: 75 },
     ],
   },
   {
@@ -231,6 +245,10 @@ export function seedSvmikoDegvchiStorefronts(marketplace) {
       title: flagshipProduct.title,
       price: flagshipProduct.price,
       category: flagshipProduct.category,
+      // Most brands don't specify one -- `listProduct`'s own default
+      // (`null`, unlimited) applies to them unchanged. STONE BONES is
+      // the real first user of this field; see its own entry above.
+      editionSize: flagshipProduct.editionSize ?? null,
     }));
     seeded.push({ brand: brand.slug, seller, products });
   }

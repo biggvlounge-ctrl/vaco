@@ -57,15 +57,15 @@ kept here as the real record rather than just in code comments:**
   etymology, and it now shapes `positioning` in
   `venvs/src/lib/svmikoDegvchi.js`, not just a comment.
 - **STONE BONES is this house's own Chrome Hearts** — gothic/
-  sculptural hardware worn as jewelry-grade accessory. Three follow-up
-  corrections gave the brand's own two-word name all of its real
-  points of difference: STONE is the material — both a cast concrete/
-  stone-look finish AND, given directly in the latest correction,
-  genuine natural stone and gemstone inlay (emerald and assorted rock
-  among them, not one fixed stone), rather than Chrome Hearts'
-  chrome/sterling silver — and BONES is the shape (the hardware
-  itself — buckles, charms, chain links — is cast in bone silhouettes,
-  not Chrome Hearts' own crosses and daggers). It is the brand that
+  sculptural hardware worn as jewelry-grade accessory. A run of
+  follow-up corrections gave the brand's own two-word name all of its
+  real points of difference: STONE is the material — both a cast
+  concrete/stone-look finish AND genuine natural stone and colored-
+  gemstone accents (emerald and assorted colored rock among them, not
+  one fixed stone or color), rather than Chrome Hearts' chrome/
+  sterling silver — and BONES is the shape (the hardware itself —
+  buckles, charms, chain links — is cast in bone silhouettes, not
+  Chrome Hearts' own crosses and daggers). It is the brand that
   replaced Devil in Details (DND) in the 12-brand upgrade above. The
   natural-stone correction is also why STONE BONES is now the second
   sub-brand (after VvLGARI) with more than one real flagship product:
@@ -73,6 +73,22 @@ kept here as the real record rather than just in code comments:**
   distinct from its flagship jacket. The comparable, the material, and
   the shape are all a real anchor for any future STONE BONES product,
   not an invented flourish.
+- **Every STONE BONES piece is an original design, made in a real
+  limited run — given directly as the reason buyers can also trade
+  them.** This is now a real mechanic, not just brand copy:
+  `listProduct` in `venvs/src/lib/marketplace.js` takes an optional
+  `editionSize`, and `checkout` refuses to sell past it, before the
+  buyer is ever charged (same posture as the Food District's own
+  inventory refusal) — claimed and rolled back with the same
+  claim-before-settle discipline the cart-status race fix already
+  established, so two concurrent checkouts of the last piece cannot
+  both succeed. STONE BONES' own jacket (150 pieces) and chain (75
+  pieces) are the first real use of it; the edition sizes themselves
+  are this codebase's own flagged, interpretive numbers, not given
+  verbatim. Once a piece sells out, "traded" needs no separate
+  system: a prior buyer resells it exactly the way any peer reseller
+  already can here, through the same `registerSeller`/`listProduct`
+  Marketplace mechanism.
 
 Direct integration: all 12 brands are now real, distinct sellers/
 storefronts within VENVS's Shopify-style branded storefront system

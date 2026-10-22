@@ -93,8 +93,20 @@ export function getSeller(marketplace, sellerId) {
   return marketplace.sellers.find((s) => s.id === sellerId) || null;
 }
 
+// `editionSize` is real, optional scarcity: a limited-edition piece
+// (first real use: STONE BONES, whose own positioning is that every
+// piece is original and made in a limited run precisely so it can
+// also be traded afterward, peer to peer, through this same
+// Marketplace) names how many units the brand itself will ever sell.
+// `null` (the default, and every other product in this file before
+// this feature) stays genuinely unlimited -- nothing about existing
+// products changes. Once `unitsRemaining` reaches 0, `checkout`
+// refuses to sell any more of it; a buyer who already owns one can
+// still resell it through `registerSeller`/`listProduct` exactly as
+// any other peer reseller would, which is the real mechanism "traded"
+// means here -- no separate resale system needed.
 export function listProduct(marketplace, options = {}) {
-  const { sellerId, title, price, category = null } = options;
+  const { sellerId, title, price, category = null, editionSize = null } = options;
   if (!getSeller(marketplace, sellerId)) {
     throw new Error(`listProduct: no seller with id ${sellerId}`);
   }
@@ -104,12 +116,17 @@ export function listProduct(marketplace, options = {}) {
   if (!Number.isFinite(price) || price <= 0) {
     throw new Error('listProduct requires a positive price');
   }
+  if (editionSize !== null && (!Number.isInteger(editionSize) || editionSize <= 0)) {
+    throw new Error('listProduct: editionSize must be a positive integer when given');
+  }
   const product = {
     id: marketplace.nextProductId++,
     sellerId,
     title,
     price,
     category,
+    editionSize,
+    unitsRemaining: editionSize,
     createdAt: Date.now(),
   };
   marketplace.products.push(product);
@@ -216,6 +233,21 @@ export async function checkout(marketplace, options = {}) {
   // ecosystem spent a sweep removing.
   requirePayoutFn(payoutFn, 'checkout');
 
+  // **A limited-edition product refuses once it's sold out, same
+  // posture as the Food District's own inventory check -- before the
+  // buyer is ever charged, not after.** Unlimited products
+  // (`editionSize: null`, every product before this feature existed)
+  // are untouched by this loop.
+  for (const item of cart.items) {
+    const product = getProduct(marketplace, item.productId);
+    if (product.editionSize !== null && product.unitsRemaining < item.quantity) {
+      throw new Error(
+        `checkout: "${product.title}" has only ${product.unitsRemaining} left of its `
+        + `${product.editionSize}-piece edition`,
+      );
+    }
+  }
+
   // **The cart is claimed before any money moves, not written
   // 'completed' only after every leg settles.** This checked
   // cart.status, awaited the buyer's charge and every seller's
@@ -229,7 +261,17 @@ export async function checkout(marketplace, options = {}) {
   // 'completed' here means the second call sees it immediately and is
   // refused by the guard above, before it ever reaches transferFn. A
   // failure below restores 'active' so the cart stays retryable.
+  // Limited-edition units are claimed in this same synchronous step,
+  // for the same reason: claimed here, a second concurrent checkout
+  // against the same product sees the reduced `unitsRemaining`
+  // immediately, before either call's first `await`.
   cart.status = 'completed';
+  for (const item of cart.items) {
+    const product = getProduct(marketplace, item.productId);
+    if (product.editionSize !== null) {
+      product.unitsRemaining -= item.quantity;
+    }
+  }
 
   const total = cartTotal(marketplace, cart);
   try {
@@ -269,6 +311,12 @@ export async function checkout(marketplace, options = {}) {
     return order;
   } catch (err) {
     cart.status = 'active';
+    for (const item of cart.items) {
+      const product = getProduct(marketplace, item.productId);
+      if (product.editionSize !== null) {
+        product.unitsRemaining += item.quantity;
+      }
+    }
     throw err;
   }
 }

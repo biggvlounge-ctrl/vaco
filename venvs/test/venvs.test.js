@@ -338,6 +338,92 @@ test('an order that cannot be paid for leaves the cart usable', () => {
 });
 
 // ===========================================================================
+// Marketplace — limited editions (first real use: STONE BONES)
+// ===========================================================================
+
+test('editionSize is optional and validated, and leaves ordinary products unlimited', () => {
+  const { m, a } = shopFixture();
+  assert.throws(
+    () => listProduct(m, { sellerId: a.id, title: 'Bad', price: 1, editionSize: 0 }),
+    /editionSize must be a positive integer/,
+  );
+  assert.throws(
+    () => listProduct(m, { sellerId: a.id, title: 'Bad', price: 1, editionSize: 1.5 }),
+    /editionSize must be a positive integer/,
+  );
+  assert.throws(
+    () => listProduct(m, { sellerId: a.id, title: 'Bad', price: 1, editionSize: -3 }),
+    /editionSize must be a positive integer/,
+  );
+
+  const unlimited = listProduct(m, { sellerId: a.id, title: 'Tee', price: 20 });
+  assert.equal(unlimited.editionSize, null);
+  assert.equal(unlimited.unitsRemaining, null, 'an unlimited product has no cap to run out of');
+
+  const limited = listProduct(m, { sellerId: a.id, title: 'Numbered Piece', price: 500, editionSize: 3 });
+  assert.equal(limited.editionSize, 3);
+  assert.equal(limited.unitsRemaining, 3);
+});
+
+test('a limited edition sells through its real run and then refuses, never charging for the refused sale', async () => {
+  const { m, a } = shopFixture();
+  const piece = listProduct(m, { sellerId: a.id, title: 'Numbered Piece', price: 100, editionSize: 2 });
+  const transferFn = ledger();
+
+  for (let i = 0; i < 2; i += 1) {
+    const cart = createCart(m, { buyerId: `buyer-${i}` });
+    addToCart(m, cart.id, piece.id, 1);
+    await checkout(m, { cartId: cart.id, transferFn, payoutFn: transferFn });
+  }
+  assert.equal(getProduct(m, piece.id).unitsRemaining, 0);
+
+  const soldOutCart = createCart(m, { buyerId: 'buyer-2' });
+  addToCart(m, soldOutCart.id, piece.id, 1);
+  await assert.rejects(
+    () => checkout(m, { cartId: soldOutCart.id, transferFn, payoutFn: transferFn }),
+    /has only 0 left of its 2-piece edition/,
+  );
+  assert.equal(transferFn.paidBy('buyer-2'), 0, 'a sold-out piece must never charge the buyer who was refused');
+  assert.equal(getCart(m, soldOutCart.id).status, 'active', 'a refused checkout must leave the cart retryable');
+});
+
+test('a failed payment on a limited edition restores its real unitsRemaining, not just the cart', async () => {
+  const { m, a } = shopFixture();
+  const piece = listProduct(m, { sellerId: a.id, title: 'Numbered Piece', price: 100, editionSize: 1 });
+  const cart = createCart(m, { buyerId: 'buyer' });
+  addToCart(m, cart.id, piece.id, 1);
+  const broke = async () => { throw new Error('insufficient funds'); };
+
+  await assert.rejects(
+    () => checkout(m, { cartId: cart.id, transferFn: broke, payoutFn: broke }),
+    /insufficient funds/,
+  );
+  assert.equal(
+    getProduct(m, piece.id).unitsRemaining, 1,
+    'a failed payment must not permanently burn a unit of a real limited run',
+  );
+});
+
+test('a limited edition cannot be oversold by two concurrent checkouts of the last unit', async () => {
+  const { m, a } = shopFixture();
+  const piece = listProduct(m, { sellerId: a.id, title: 'Numbered Piece', price: 100, editionSize: 1 });
+  const cartA = createCart(m, { buyerId: 'buyer-a' });
+  const cartB = createCart(m, { buyerId: 'buyer-b' });
+  addToCart(m, cartA.id, piece.id, 1);
+  addToCart(m, cartB.id, piece.id, 1);
+  const transferFn = ledger();
+
+  const results = await Promise.allSettled([
+    checkout(m, { cartId: cartA.id, transferFn, payoutFn: transferFn }),
+    checkout(m, { cartId: cartB.id, transferFn, payoutFn: transferFn }),
+  ]);
+
+  const fulfilled = results.filter((r) => r.status === 'fulfilled');
+  assert.equal(fulfilled.length, 1, 'a one-piece edition was sold to more than one concurrent buyer');
+  assert.equal(getProduct(m, piece.id).unitsRemaining, 0);
+});
+
+// ===========================================================================
 // Fulfillment and abandonment
 // ===========================================================================
 
@@ -634,6 +720,31 @@ test('STONE BONES carries both its flagship jacket and its emerald-inlay bone ch
   const categories = front.products.map((p) => p.category);
   assert.ok(categories.includes('luxury-outerwear'));
   assert.ok(categories.includes('luxury-accessories'));
+
+  // Every real STONE BONES piece is a limited run, not just priced
+  // like one -- seeding must carry `editionSize` through to the real
+  // product, not drop it on the way from `svmikoDegvchi.js` into
+  // `listProduct`.
+  for (const product of front.products) {
+    assert.ok(Number.isInteger(product.editionSize) && product.editionSize > 0,
+      `${product.title} should seed with a real editionSize`);
+    assert.equal(product.unitsRemaining, product.editionSize);
+  }
+});
+
+test('every other seeded SVMIKO DEGVCHI product stays genuinely unlimited', () => {
+  // STONE BONES is the one brand with limited runs today; nothing
+  // about seeding should impose that on a brand that never asked for
+  // it.
+  const m = createMarketplace();
+  const seeded = seedSvmikoDegvchiStorefronts(m);
+  const nonStoneBonesProducts = seeded
+    .filter((s) => s.brand !== 'stone-bones')
+    .flatMap((s) => s.products);
+  for (const product of nonStoneBonesProducts) {
+    assert.equal(product.editionSize, null, `${product.title} should not have an edition cap`);
+    assert.equal(product.unitsRemaining, null);
+  }
 });
 
 test('a seeded storefront can actually take an order end to end', () => {
