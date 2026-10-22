@@ -38,6 +38,32 @@ Never fabricates a reply either way — a real completion failure (no
 `ANTHROPIC_API_KEY` behind v4-proxy, v4-proxy or VACON unreachable)
 surfaces as a real error.
 
+## Muse-style agentic features — what's real, and the one real gap
+
+Per a direct instruction to check this app against Meta's own Muse
+(a personal AI agent that pays real bills — even ones outside its own
+ecosystem — via one-time-use Link by Stripe cards, inside a dedicated
+secure browser VM, plus booking appointments and cancelling
+subscriptions), added 22 Oct 2026:
+
+- **Real**: `lib/assistantTasks.js` — a goal/task framework, real
+  user-maintained subscription tracking with real cancellation-request
+  status, real reminders, and real proactive suggestions pulled
+  straight from a person's own stored data (no model call).
+- **The one gap, named rather than faked**: this ecosystem has *no*
+  real external money-movement infrastructure anywhere (`v3/VASH_BAAS_
+  VCOIN_ADVANCEMENT.md` says so in its own words — no bank account, no
+  card issuance, no payment rail). A goal that genuinely needs one
+  (`pay-bill`, `book-appointment`, `make-purchase`,
+  `cancel-external-subscription`) starts `blocked-no-connector` with
+  the real reason attached, and `sendMessage` intercepts a payment/
+  booking/purchase-sounding message *before* it can ever reach a
+  completion that might hallucinate "I paid it" — the single most
+  safety-critical check in `lib/personalAssistant.js`.
+- Browser automation itself (what actually lets Muse act on arbitrary
+  external sites) is a separate, large, security-sensitive engineering
+  effort and is not attempted here.
+
 ## API
 
 | Route | Guard | What it does |
@@ -46,11 +72,26 @@ surfaces as a real error.
 | `GET /api/assistant/profile/:userId` | `requireParamActor('userId')` | This user's own profile, or the honest default if they never set one. |
 | `POST /api/assistant/profile` | `requireActor('userId')` | Set name/tone/lifestyle. |
 | `GET /api/assistant/history/:userId` | `requireParamActor('userId')` | Real multi-turn chat history. |
-| `POST /api/assistant/chat` | `requireActor('userId')` | Send a message, get the real routed-or-personalized reply. |
+| `POST /api/assistant/chat` | `requireActor('userId')` | Send a message, get the real routed-or-personalized reply (or an honest connector-unavailable reply for a payment/booking/purchase-sounding message). |
+| `GET /api/assistant/goals/:userId` | `requireParamActor('userId')` | This user's own goals. |
+| `POST /api/assistant/goals` | `requireActor('userId')` | Create a goal — starts `blocked-no-connector` automatically if its `kind` needs a real connector. |
+| `POST /api/assistant/goals/:id/complete` | own-record check | Mark a non-blocked goal done. Refuses a blocked one. |
+| `POST /api/assistant/goals/:id/cancel` | own-record check | Cancel a goal. |
+| `GET /api/assistant/subscriptions/:userId` | `requireParamActor('userId')` | This user's own tracked subscriptions. |
+| `POST /api/assistant/subscriptions` | `requireActor('userId')` | Add a subscription to track (user-entered — not auto-discovered). |
+| `POST /api/assistant/subscriptions/:id/request-cancellation` | own-record check | Flags it for cancellation and opens a real blocked goal — does not cancel anything. |
+| `POST /api/assistant/reminders` | `requireActor('userId')` | Create a reminder. |
+| `GET /api/assistant/reminders/:userId/due` | `requireParamActor('userId')` | This user's own due, unacknowledged reminders. |
+| `POST /api/assistant/reminders/:id/acknowledge` | own-record check | Acknowledge a reminder. |
+| `GET /api/assistant/suggestions/:userId` | `requireParamActor('userId')` | Real proactive suggestions — due reminders, blocked goals, pending cancellations. |
 
 `requireParamActor`/`requireActor` both demand a real, live Shield
 session belonging to the named user — nobody else's profile or chat
-history is readable, including another signed-in user.
+history is readable, including another signed-in user. The goal/
+subscription/reminder mutation routes above take an id in the path
+rather than a userId, so ownership is checked the same real way
+`requireOwnCall` already checks a call — against the record's own
+stored `userId`, not a route parameter that isn't there.
 
 ## How another app reaches it
 

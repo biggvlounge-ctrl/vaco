@@ -13,6 +13,7 @@ const { createVacoAssistantStore } = require('../lib/store');
 const {
   TONE_OPTIONS, setProfile, getProfile, buildSystemPrompt, getHistory, sendMessage,
 } = require('../lib/personalAssistant');
+const { listGoals } = require('../lib/assistantTasks');
 
 function recordingInsight(result) {
   const calls = [];
@@ -289,4 +290,63 @@ test('an unrelated message does not trigger the explore or activity paths', asyn
 
   assert.equal(reply.content, 'a real reply about marathon training');
   assert.equal(invokeFn.calls.length, 1);
+});
+
+// -- The single most safety-critical behavior in this file ---------------
+//
+// A payment/booking/purchase-sounding message must NEVER reach the
+// general completion path, because an LLM asked "did you pay my
+// bill?" will happily claim yes. These assert that the completion
+// path is never even called for these messages.
+
+test('a bill-paying request never reaches the completion -- no real connector exists', async () => {
+  const store = createVacoAssistantStore();
+  const insightFn = recordingInsight({ matchedAgents: [], completion: null, completionError: null });
+  const invokeFn = recordingInvoke('I paid it!'); // what a hallucinating LLM might say if allowed to answer
+
+  const reply = await sendMessage(store, { userId: 'u1', content: 'please pay my electric bill', insightFn, invokeFn });
+
+  assert.equal(invokeFn.calls.length, 0, 'the completion must never be called for a real payment request');
+  assert.match(reply.content, /can't actually do that yet/);
+  assert.equal(reply.routedTo, 'connector');
+
+  const goals = listGoals(store, 'u1');
+  assert.equal(goals.length, 1);
+  assert.equal(goals[0].kind, 'pay-bill');
+  assert.equal(goals[0].status, 'blocked-no-connector');
+});
+
+test('an appointment-booking request is also intercepted honestly, never routed to a completion', async () => {
+  const store = createVacoAssistantStore();
+  const insightFn = recordingInsight({ matchedAgents: [], completion: null, completionError: null });
+  const invokeFn = recordingInvoke('Booked!');
+
+  const reply = await sendMessage(store, { userId: 'u1', content: 'book me an appointment with the dentist', insightFn, invokeFn });
+
+  assert.equal(invokeFn.calls.length, 0);
+  assert.match(reply.content, /can't actually do that yet/);
+  assert.equal(listGoals(store, 'u1')[0].kind, 'book-appointment');
+});
+
+test('a subscription-cancellation request is tracked as a real blocked goal, not silently actioned', async () => {
+  const store = createVacoAssistantStore();
+  const insightFn = recordingInsight({ matchedAgents: [], completion: null, completionError: null });
+  const invokeFn = recordingInvoke('Cancelled!');
+
+  const reply = await sendMessage(store, { userId: 'u1', content: 'cancel my streaming subscription', insightFn, invokeFn });
+
+  assert.equal(invokeFn.calls.length, 0);
+  assert.equal(listGoals(store, 'u1')[0].status, 'blocked-no-connector');
+  assert.ok(reply.content.includes('logged it as a task'));
+});
+
+test('a message that merely mentions "bill" without asking to pay one is NOT intercepted', async () => {
+  const store = createVacoAssistantStore();
+  const insightFn = recordingInsight({ matchedAgents: [], completion: null, completionError: null });
+  const invokeFn = recordingInvoke('Bill Gates co-founded Microsoft.');
+
+  const reply = await sendMessage(store, { userId: 'u1', content: 'who is bill gates', insightFn, invokeFn });
+
+  assert.equal(invokeFn.calls.length, 1, 'an unrelated mention of "bill" must not trigger the payment intercept');
+  assert.equal(reply.content, 'Bill Gates co-founded Microsoft.');
 });

@@ -32,6 +32,12 @@ const {
   placeAssistantCall, getAssistantCall, listAssistantCalls,
   declineAssistantCall, recordAssistantCallEvent, endAssistantCall,
 } = require('./lib/assistantCall');
+const {
+  GOAL_STATUSES, CONNECTOR_REQUIRED_KINDS,
+  createGoal, getGoal, listGoals, completeGoal, cancelGoal,
+  addSubscription, listSubscriptions, requestCancellation,
+  createReminder, acknowledgeReminder, dueReminders, proactiveSuggestions,
+} = require('./lib/assistantTasks');
 const { requireActor, requireParamActor, requireSession } = require('./lib/shieldAuth.cjs');
 
 const app = express();
@@ -63,6 +69,11 @@ app.get('/api/health', (_req, res) => {
     tones: TONE_OPTIONS,
     profiles: store.assistantProfiles.length,
     messages: store.assistantMessages.length,
+    goalStatuses: GOAL_STATUSES,
+    // Named plainly in health, not hidden: every one of these is a
+    // real connector-required task kind this environment cannot
+    // actually execute yet. See lib/assistantTasks.js's own header.
+    connectorRequiredKinds: CONNECTOR_REQUIRED_KINDS,
   });
 });
 
@@ -114,6 +125,38 @@ async function requireOwnCall(req, res, next) {
   return next();
 }
 
+// Same real shape as `requireOwnCall` just above -- a goal/
+// subscription/reminder id in the path names a record, not a user,
+// so ownership is checked against the record's own stored `userId`
+// rather than asking `requireParamActor` to check something the path
+// never names.
+function requireOwnGoal(req, res, next) {
+  const goal = getGoal(store, Number(req.params.id));
+  if (!goal) return res.status(404).json({ error: `no goal with id ${req.params.id}` });
+  if (goal.userId !== req.sessionUserId) {
+    return res.status(403).json({ error: 'requireOwnGoal: this session does not own that goal' });
+  }
+  req.assistantGoal = goal;
+  return next();
+}
+
+function requireOwnSubscription(req, res, next) {
+  const subscription = listSubscriptions(store, req.sessionUserId).find((s) => s.id === Number(req.params.id));
+  if (!subscription) return res.status(404).json({ error: `no subscription with id ${req.params.id} owned by this session` });
+  req.assistantSubscription = subscription;
+  return next();
+}
+
+function requireOwnReminder(req, res, next) {
+  const reminder = (store.assistantReminders || []).find((r) => r.id === Number(req.params.id));
+  if (!reminder) return res.status(404).json({ error: `no reminder with id ${req.params.id}` });
+  if (reminder.userId !== req.sessionUserId) {
+    return res.status(403).json({ error: 'requireOwnReminder: this session does not own that reminder' });
+  }
+  req.assistantReminder = reminder;
+  return next();
+}
+
 app.post('/api/assistant/calls', requireActor('userId'), (req, res) => handle(
   res, () => placeAssistantCall(req.body.userId, req.body || {}), 201,
 ));
@@ -137,6 +180,59 @@ app.post('/api/assistant/calls/:id/events', requireSession(), requireOwnCall, (r
 app.post('/api/assistant/calls/:id/end', requireSession(), requireOwnCall, (req, res) => handle(
   res, () => endAssistantCall(req.params.id),
 ));
+
+// -- Goals, subscriptions, reminders -- the real Muse-style task layer --
+//
+// See lib/assistantTasks.js's own header for what is real here and
+// what explicitly is not (anything needing a real external connector
+// -- a bank, a card issuer, a booking system -- stays
+// `blocked-no-connector`, never faked as completed). These normally
+// reach a user through `/api/assistant/chat`'s own connector
+// interception; the routes below exist for a client that wants its
+// own task list UI rather than only a chat transcript.
+app.get('/api/assistant/goals/:userId', requireParamActor('userId'), (req, res) => {
+  res.json({ goals: listGoals(store, req.params.userId) });
+});
+
+app.post('/api/assistant/goals', requireActor('userId'), (req, res) => handle(
+  res, () => createGoal(store, req.body || {}), 201,
+));
+
+app.post('/api/assistant/goals/:id/complete', requireSession(), requireOwnGoal, (req, res) => handle(
+  res, () => completeGoal(store, { goalId: req.assistantGoal.id }),
+));
+
+app.post('/api/assistant/goals/:id/cancel', requireSession(), requireOwnGoal, (req, res) => handle(
+  res, () => cancelGoal(store, { goalId: req.assistantGoal.id }),
+));
+
+app.get('/api/assistant/subscriptions/:userId', requireParamActor('userId'), (req, res) => {
+  res.json({ subscriptions: listSubscriptions(store, req.params.userId) });
+});
+
+app.post('/api/assistant/subscriptions', requireActor('userId'), (req, res) => handle(
+  res, () => addSubscription(store, req.body || {}), 201,
+));
+
+app.post('/api/assistant/subscriptions/:id/request-cancellation', requireSession(), requireOwnSubscription, (req, res) => handle(
+  res, () => requestCancellation(store, { subscriptionId: req.assistantSubscription.id }),
+));
+
+app.post('/api/assistant/reminders', requireActor('userId'), (req, res) => handle(
+  res, () => createReminder(store, req.body || {}), 201,
+));
+
+app.get('/api/assistant/reminders/:userId/due', requireParamActor('userId'), (req, res) => {
+  res.json({ reminders: dueReminders(store, req.params.userId) });
+});
+
+app.post('/api/assistant/reminders/:id/acknowledge', requireSession(), requireOwnReminder, (req, res) => handle(
+  res, () => acknowledgeReminder(store, req.assistantReminder.id),
+));
+
+app.get('/api/assistant/suggestions/:userId', requireParamActor('userId'), (req, res) => {
+  res.json({ suggestions: proactiveSuggestions(store, req.params.userId) });
+});
 
 app.listen(PORT, () => {
   console.log(`Vaco Assistant listening on http://localhost:${PORT}`);

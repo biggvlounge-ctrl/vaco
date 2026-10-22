@@ -39,6 +39,7 @@
 
 const { getInsightCard } = require('./insight');
 const { getProfileSummary, getRecentActivity } = require('./explore');
+const { connectorStatus, createGoal } = require('./assistantTasks');
 
 const V4_PROXY_URL = process.env.V4_PROXY_URL || 'http://localhost:8787';
 const V3_API_URL = process.env.V3_API_URL || 'http://localhost:8811';
@@ -91,6 +92,23 @@ const EXPLORE_APPS = {
   },
 };
 const ACTIVITY_INTENT = /\b(recent activity|my activity|my transactions|what (have i|i'?ve) been up to)\b/i;
+
+// **The single most safety-critical check in this file.** A payment/
+// booking/purchase-sounding request is intercepted here, BEFORE it
+// can ever reach a general completion -- an LLM asked "did you pay my
+// electric bill?" will happily say yes if nothing stops it first, and
+// this ecosystem has no real connector that could have actually done
+// it (see `assistantTasks.js`'s own header: no real bank/card/booking
+// integration exists anywhere here). Checked in the same place and
+// for the same reason `BALANCE_INTENT` already is: no VACON specialist
+// has real access to pay a bill either, so this is answered directly,
+// never routed.
+const CONNECTOR_INTENTS = {
+  'pay-bill': /\b(pay|paying)\s+(my\s+|the\s+)?[\w\s]{0,20}\bbills?\b/i,
+  'book-appointment': /\b(book|schedule)\s+(me\s+)?(an?\s+)?appointment\b/i,
+  'make-purchase': /\b(buy|purchase|order)\s+(me\s+)?(a|an|some)\b/i,
+  'cancel-external-subscription': /\bcancel\s+(my\s+)?[\w\s]{0,20}\bsubscriptions?\b/i,
+};
 
 function describeActivity(activity) {
   if (!activity.ok) return `I couldn't check your real recent activity just now: ${activity.error}`;
@@ -222,6 +240,23 @@ async function sendMessage(store, options = {}) {
     .slice(-HISTORY_WINDOW)
     .map((m) => ({ role: m.role, content: m.content }));
   recordMessage(store, { userId, role: 'user', content });
+
+  // Checked first, before anything else -- see CONNECTOR_INTENTS' own
+  // comment on why this is the single most safety-critical check
+  // here. A real goal is opened (so the person's own task list shows
+  // it), and the reply states the real, honest connector status
+  // rather than letting the message fall through to a completion that
+  // could hallucinate "done."
+  const connectorMatch = Object.entries(CONNECTOR_INTENTS).find(([, pattern]) => pattern.test(content));
+  if (connectorMatch) {
+    const [kind] = connectorMatch;
+    const status = connectorStatus(kind);
+    const goal = createGoal(store, { userId, kind, description: content });
+    const reply = status.available
+      ? `I've started on that: ${goal.description}`
+      : `I can't actually do that yet -- ${status.reason} I've logged it as a task so you don't lose track of it.`;
+    return recordMessage(store, { userId, role: 'assistant', content: reply, routedTo: 'connector' });
+  }
 
   // Checked before VACON routing, not after: VACON's own keyword
   // router would send "what's my balance" to Leslie (finance) anyway,
