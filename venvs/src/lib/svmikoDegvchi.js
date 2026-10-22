@@ -67,8 +67,13 @@ export const SUB_BRANDS = [
   {
     slug: 'stone-bones',
     name: 'STONE BONES',
-    positioning: 'Dark/sculptural luxury.',
-    signatureElement: 'Heavy details + precious hardware',
+    // The house's own real comparable, given directly: Chrome Hearts --
+    // heavy sterling-silver-style hardware, gothic/sculptural detail,
+    // worn as jewelry-grade accessory rather than plain trim. This is
+    // the brand that replaced Devil in Details (DND); see this file's
+    // own header for the rename.
+    positioning: "Dark/sculptural luxury -- the house's own Chrome Hearts.",
+    signatureElement: 'Heavy sterling-silver-style hardware + precious details',
     flagshipProducts: [
       { title: 'STONE BONES Sculpted-Hardware Jacket', price: 520, category: 'luxury-outerwear' },
     ],
@@ -148,8 +153,15 @@ export const SUB_BRANDS = [
   {
     slug: 'vvlgari',
     name: 'VvLGARI',
-    positioning: 'Luxury accessories house -- cologne, perfume, sunglasses, and handbags for men and women.',
-    signatureElement: 'Fragrance and eyewear as the house\'s focus, not clothing',
+    // The name is a deliberate play on "vulgar" -- given directly as
+    // the word's real, older sense (bold, out-of-the-box, unlike
+    // anything else), not profanity. That reading is the brand's
+    // design ethos, not just its name's etymology, so it belongs in
+    // `positioning` rather than only a comment.
+    positioning: "Luxury accessories, vulgar in its true sense -- bold, "
+      + "out-of-the-box, unlike anything else: cologne, perfume, "
+      + 'sunglasses, and handbags for men and women.',
+    signatureElement: "Fragrance and eyewear as the house's focus, not clothing",
     // Real positioning as given directly, 22 Oct 2026 -- cologne,
     // perfume, sunglasses, and a handbag for each of men and women.
     // Five items, not one, is why `flagshipProducts` is an array at

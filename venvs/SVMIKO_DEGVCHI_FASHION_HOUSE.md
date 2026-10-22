@@ -48,6 +48,21 @@ storefront. Exact product names/prices are this codebase's own
 reasonable derivation from that stated focus, same "flagged,
 interpretive" posture already held for the other eleven brands.
 
+**The two name/identity notes behind this update, given directly and
+kept here as the real record rather than just in code comments:**
+
+- **VvLGARI is a deliberate play on "vulgar"** — not the profanity
+  sense, but the real, older meaning: bold, out-of-the-box, unlike
+  anything else. That's the brand's design ethos as much as its name's
+  etymology, and it now shapes `positioning` in
+  `venvs/src/lib/svmikoDegvchi.js`, not just a comment.
+- **STONE BONES is this house's own Chrome Hearts** — heavy
+  sterling-silver-style hardware worn as jewelry-grade accessory,
+  gothic/sculptural detail. It is the brand that replaced Devil in
+  Details (DND) in the 12-brand upgrade above; the comparable is a
+  real anchor for any future STONE BONES product, not an invented
+  flourish.
+
 Direct integration: all 12 brands are now real, distinct sellers/
 storefronts within VENVS's Shopify-style branded storefront system
 already built — each brand gets its own customized storefront,

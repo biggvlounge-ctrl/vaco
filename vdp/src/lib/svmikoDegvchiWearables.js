@@ -25,7 +25,15 @@
 // and women -- the same real update `venvs/src/lib/svmikoDegvchi.js`
 // took on the VENVS side (see that module's own header). Five rows
 // below share `slug: 'vvlgari'` rather than one, because it is one
-// brand with five real virtual items, not five brands.
+// brand with five real virtual items, not five brands. The name
+// itself is a deliberate play on "vulgar" in its real, older sense --
+// bold, out-of-the-box, unlike anything else -- not profanity; that
+// reading is this brand's design ethos.
+//
+// STONE BONES's own real comparable, given the same day: Chrome
+// Hearts -- heavy sterling-silver-style hardware worn as jewelry-grade
+// accessory, carried over from this module's own `accessories`
+// category choice for it below.
 //
 // Real, deliberate scope: one virtual wearable per sub-brand product
 // that currently exists, matching each brand's real described identity
