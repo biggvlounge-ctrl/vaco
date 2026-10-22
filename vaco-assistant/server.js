@@ -38,7 +38,13 @@ const {
   addSubscription, listSubscriptions, requestCancellation,
   createReminder, acknowledgeReminder, dueReminders, proactiveSuggestions,
 } = require('./lib/assistantTasks');
-const { requireActor, requireParamActor, requireSession } = require('./lib/shieldAuth.cjs');
+const { requireActor, requireParamActor, requireSession, requireCallingService } = require('./lib/shieldAuth.cjs');
+const {
+  createTestCardholder, issueTestVirtualCard, simulateTestAuthorization,
+} = require('./lib/stripeIssuingConnector');
+const {
+  createSandboxPublicToken, exchangePublicToken, getSandboxAccounts,
+} = require('./lib/plaidSandboxConnector');
 
 const app = express();
 app.use(cors());
@@ -233,6 +239,72 @@ app.post('/api/assistant/reminders/:id/acknowledge', requireSession(), requireOw
 app.get('/api/assistant/suggestions/:userId', requireParamActor('userId'), (req, res) => {
   res.json({ suggestions: proactiveSuggestions(store, req.params.userId) });
 });
+
+// -- Stripe Issuing (test mode) + Plaid Sandbox -- real sandbox
+// integrations, operational-only routes --------------------------
+//
+// Gated by `requireCallingService()`, the same guard booking a
+// combat-sports card uses in VDP: there is no single end user who
+// "owns" issuing a test card the way they own their own chat history,
+// and these routes move through real external APIs on real
+// credentials, not a per-user action. See both connector modules'
+// own headers for the three real reasons neither one is real
+// bill-pay capability, sandbox credentials or not.
+function requireStripeKey(req, res, next) {
+  if (!process.env.STRIPE_SECRET_KEY) {
+    return res.status(503).json({ error: 'STRIPE_SECRET_KEY is not configured in this environment' });
+  }
+  return next();
+}
+
+function requirePlaidCredentials(req, res, next) {
+  if (!process.env.PLAID_CLIENT_ID || !process.env.PLAID_SECRET) {
+    return res.status(503).json({ error: 'PLAID_CLIENT_ID/PLAID_SECRET are not configured in this environment' });
+  }
+  return next();
+}
+
+app.get('/api/connectors/status', (_req, res) => {
+  res.json({
+    // Presence only -- never the real values.
+    stripeIssuing: { configured: Boolean(process.env.STRIPE_SECRET_KEY) },
+    plaidSandbox: { configured: Boolean(process.env.PLAID_CLIENT_ID && process.env.PLAID_SECRET) },
+  });
+});
+
+app.post('/api/connectors/stripe/cardholders', requireCallingService(), requireStripeKey, (req, res) => handle(
+  res, () => createTestCardholder(process.env.STRIPE_SECRET_KEY, req.body || {}), 201,
+));
+
+app.post('/api/connectors/stripe/cards', requireCallingService(), requireStripeKey, (req, res) => handle(
+  res, () => issueTestVirtualCard(process.env.STRIPE_SECRET_KEY, req.body || {}), 201,
+));
+
+app.post('/api/connectors/stripe/authorizations', requireCallingService(), requireStripeKey, (req, res) => handle(
+  res, () => simulateTestAuthorization(process.env.STRIPE_SECRET_KEY, req.body || {}), 201,
+));
+
+app.post('/api/connectors/plaid/sandbox-token', requireCallingService(), requirePlaidCredentials, (req, res) => handle(
+  res,
+  () => createSandboxPublicToken(
+    { clientId: process.env.PLAID_CLIENT_ID, secret: process.env.PLAID_SECRET }, req.body || {},
+  ),
+  201,
+));
+
+app.post('/api/connectors/plaid/exchange', requireCallingService(), requirePlaidCredentials, (req, res) => handle(
+  res,
+  () => exchangePublicToken(
+    { clientId: process.env.PLAID_CLIENT_ID, secret: process.env.PLAID_SECRET }, req.body || {},
+  ),
+));
+
+app.post('/api/connectors/plaid/accounts', requireCallingService(), requirePlaidCredentials, (req, res) => handle(
+  res,
+  () => getSandboxAccounts(
+    { clientId: process.env.PLAID_CLIENT_ID, secret: process.env.PLAID_SECRET }, req.body || {},
+  ),
+));
 
 app.listen(PORT, () => {
   console.log(`Vaco Assistant listening on http://localhost:${PORT}`);

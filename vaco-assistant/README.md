@@ -64,6 +64,31 @@ subscriptions), added 22 Oct 2026:
   external sites) is a separate, large, security-sensitive engineering
   effort and is not attempted here.
 
+### Sandbox connectors — real code, not real bill-pay (added 22 Oct 2026)
+
+`lib/stripeIssuingConnector.js` and `lib/plaidSandboxConnector.js` are
+real, working integrations against Stripe's real Issuing API (test
+mode) and Plaid's real Sandbox API — virtual card issuance, a
+simulated purchase authorization, and fake-bank account linking. Set
+`STRIPE_SECRET_KEY` (a real `sk_test_...` key) and `PLAID_CLIENT_ID`/
+`PLAID_SECRET` (from Plaid's Sandbox) in this environment's secrets to
+use them; `GET /api/connectors/status` reports honestly whether
+either is configured, never the values themselves.
+
+**Still not real bill-pay, even once configured** — both modules'
+own headers explain why: a Stripe test card isn't accepted by any
+real merchant, Plaid Sandbox only ever talks to a fake institution,
+and Stripe Issuing needs its own account approval beyond just holding
+a `sk_test_` key. `assistantTasks.js`'s `connectorStatus('pay-bill')`
+is deliberately NOT changed by either module's existence — a sandbox
+integration and a real paying-your-electric-bill capability are
+different facts. Each module also carries a hard, checked safety
+rail: `stripeIssuingConnector.js` refuses to run against anything but
+a real `sk_test_` key (Stripe's test/live split is which key you use,
+not which URL you call), and `plaidSandboxConnector.js` hardcodes its
+base URL to `sandbox.plaid.com` with no parameter anywhere that could
+point it at production.
+
 ## API
 
 | Route | Guard | What it does |
@@ -84,6 +109,13 @@ subscriptions), added 22 Oct 2026:
 | `GET /api/assistant/reminders/:userId/due` | `requireParamActor('userId')` | This user's own due, unacknowledged reminders. |
 | `POST /api/assistant/reminders/:id/acknowledge` | own-record check | Acknowledge a reminder. |
 | `GET /api/assistant/suggestions/:userId` | `requireParamActor('userId')` | Real proactive suggestions — due reminders, blocked goals, pending cancellations. |
+| `GET /api/connectors/status` | open | Whether Stripe/Plaid sandbox credentials are configured — presence only, never the values. |
+| `POST /api/connectors/stripe/cardholders` | `requireCallingService()` | Real Stripe Issuing test cardholder. 503 if `STRIPE_SECRET_KEY` isn't set. |
+| `POST /api/connectors/stripe/cards` | `requireCallingService()` | Real Stripe Issuing test virtual card. |
+| `POST /api/connectors/stripe/authorizations` | `requireCallingService()` | Simulates a real test purchase against a test card. |
+| `POST /api/connectors/plaid/sandbox-token` | `requireCallingService()` | Real Plaid Sandbox public token for a fake test institution. 503 if Plaid credentials aren't set. |
+| `POST /api/connectors/plaid/exchange` | `requireCallingService()` | Real Plaid public-token exchange. |
+| `POST /api/connectors/plaid/accounts` | `requireCallingService()` | Real (fake-institution) Plaid Sandbox account data. |
 
 `requireParamActor`/`requireActor` both demand a real, live Shield
 session belonging to the named user — nobody else's profile or chat
