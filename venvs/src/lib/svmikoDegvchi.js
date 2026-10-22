@@ -1,35 +1,39 @@
 // VENVS — SVMIKO DEGVCHI Fashion House.
-// Source of truth: the real, confirmed brand architecture handed off
-// directly -- European-simplicity-meets-Japanese-craftsmanship house
-// identity, 13 real sub-brands, each becoming its own real, distinct
-// seller/storefront inside VENVS's already-built Shopify-style
-// branded-storefront system (`marketplace.js`'s `registerSeller`/
-// `listProduct`, Phase 3) -- the same real "own branded page, not one
-// generic template" model already proven there, not a new mechanism.
-// These are the first real clothing lines populating that system --
-// Marketplace's original two sellers (Cherokee Hardware Co., Riverfront
-// Vinyl) were pattern-establishing demo fixtures, the same real role
-// the source brief says restaurant examples played elsewhere in this
-// ecosystem; both are left in place (still real, still valid multi-
-// seller proof), not removed, since this module is additive.
+// Source of truth: `SVMIKO_DEGVCHI_FASHION_HOUSE.md`, updated 22 Oct
+// 2026 with a direct, upgraded 12-brand roster replacing the original
+// 13 -- several brands kept their name but changed positioning and
+// signature (DEGVCHI, LVCII, JACQVÉ, ZV, VEDELLÍN, VAISON, ANCÓR all
+// carry real, different identities now), some were renamed (Devil in
+// Details → STONE BONES, Boulevard/BLVD → BOULÉVARD XCHANGE, RED VEIL
+// → ROJO VELO, VvLGAR → VvLGARI), one is genuinely new (7EVEN), and
+// three from the original roster (BOOBI/BOOBI Couture, DVMB) are
+// retired -- not in the new handoff, not kept as unlisted legacy
+// stock. This file is a full replacement, not an additive patch.
 //
 // `theme` is a real, free-form object per `registerSeller`'s own
 // design (no fixed schema exists anywhere in the source doc) --
 // populated here with each brand's real, distinct positioning and
 // signature element, not left empty or generic.
 //
-// One real, representative flagship product per brand, priced by real,
-// deliberate tier matching each brand's own stated positioning --
-// luxury/accessory-heavy houses (DEGVCHI, LVCII, DND, JACQVÉ, RED VEIL,
-// VEDELLÍN, VAISON, BOOBI Couture, ANCÓR) priced meaningfully higher
-// than the streetwear houses (BLVD, ZV, VvLGAR, DVMB), not uniform
-// placeholder pricing across all 13.
+// **One real, representative flagship product per brand, EXCEPT
+// VvLGARI.** The handoff itself states VvLGARI's positioning as
+// "Restored — positioning to define" and its signature as "To be
+// established" -- an explicit, direct instruction not to invent one.
+// `flagshipProduct: null` is that instruction taken literally rather
+// than worked around; `seedSvmikoDegvchiStorefronts` skips opening a
+// storefront for any brand with no real product rather than seeding
+// an empty shop (see that function's own comment). Every other
+// brand's flagship product/price below is this module's own
+// reasonable derivation from its NEW positioning and signature, same
+// "flagged, interpretive" posture `ownerIdFor`'s own comment already
+// holds for payout-account ids -- not specified in the handoff table
+// itself, which named identity and signature only.
 //
-// Not built here, flagged directly: the SD monogram and the DEGVCHI
-// Gateway Symbol (出口/deguchi) are real visual/asset design work --
-// no image assets exist in this session to render them, so `theme`
-// carries their real textual description only (`monogram`,
-// `gatewaySymbol` fields), not a fabricated graphic.
+// Not built here, flagged directly (unchanged from the original):
+// the SD monogram and the DEGVCHI Gateway Symbol (出口/deguchi) are
+// real visual/asset design work -- no image assets exist in this
+// session to render them, so `theme` carries their real textual
+// description only, not a fabricated graphic.
 
 import { registerSeller, listProduct } from './marketplace.js';
 
@@ -41,93 +45,88 @@ export const SUB_BRANDS = [
   {
     slug: 'degvchi',
     name: 'DEGVCHI',
-    positioning: 'Flagship namesake luxury — the primary expression of the house: European silhouettes, kimono-inspired textiles, Japanese silk and traditional patterns.',
-    signatureElement: 'SD monogram + DEGVCHI Gateway Symbol on hardware and linings',
-    flagshipProduct: { title: 'DEGVCHI Kimono-Sleeve Wool Coat', price: 640, category: 'luxury-outerwear' },
+    positioning: 'Japanese luxury streetwear.',
+    signatureElement: 'Japanese heritage materials',
+    flagshipProduct: { title: 'DEGVCHI Heritage-Weave Bomber Jacket', price: 420, category: 'luxury-streetwear' },
   },
   {
     slug: 'lvcii',
     name: 'LVCII',
-    positioning: 'Classic European luxury positioning.',
-    signatureElement: 'SD monogram lining',
-    flagshipProduct: { title: 'LVCII Structured Wool Blazer', price: 480, category: 'luxury-tailoring' },
+    positioning: 'Modern everyday luxury.',
+    signatureElement: 'Designer handkerchief collections',
+    flagshipProduct: { title: 'LVCII Signature Handkerchief Collection', price: 180, category: 'luxury-accessories' },
   },
   {
-    slug: 'devil-in-details',
-    name: 'Devil in Details (DND)',
-    positioning: "Heavy luxury accessory and fashion line — the house's Chrome Hearts-inspired lane: hardware, jewelry, leather goods, chains, statement pieces.",
-    signatureElement: 'DEGVCHI Gateway Symbol as belt buckle / bag hardware',
-    flagshipProduct: { title: 'DND Sterling Chain Wallet', price: 385, category: 'luxury-accessories' },
+    slug: 'stone-bones',
+    name: 'STONE BONES',
+    positioning: 'Dark/sculptural luxury.',
+    signatureElement: 'Heavy details + precious hardware',
+    flagshipProduct: { title: 'STONE BONES Sculpted-Hardware Jacket', price: 520, category: 'luxury-outerwear' },
   },
   {
-    slug: 'boobi-couture',
-    name: 'BOOBI / BOOBI Couture',
-    positioning: "Women's sexy luxury — feminine, provocative, glamorous clothing.",
-    signatureElement: 'SD monogram hardware on corsetry and eveningwear',
-    flagshipProduct: { title: 'BOOBI Couture Corset Gown', price: 520, category: 'luxury-eveningwear' },
-  },
-  {
-    slug: 'boulevard',
-    name: 'Boulevard (BLVD)',
-    positioning: 'Gallery-inspired streetwear — elevated urban/art-fashion identity.',
-    signatureElement: 'Rotating gallery-artist graphic capsules',
-    flagshipProduct: { title: 'BLVD Gallery Graphic Hoodie', price: 95, category: 'streetwear' },
+    slug: 'boulevard-xchange',
+    name: 'BOULÉVARD XCHANGE',
+    positioning: 'Luxury streetwear.',
+    signatureElement: 'Cultural exchange',
+    flagshipProduct: { title: 'BOULÉVARD XCHANGE Cultural Capsule Hoodie', price: 165, category: 'luxury-streetwear' },
   },
   {
     slug: 'jacqve',
     name: 'JACQVÉ',
-    positioning: "Women's luxury — elegant, refined European positioning.",
-    signatureElement: 'SD monogram on silk linings',
-    flagshipProduct: { title: 'JACQVÉ Silk Wrap Blouse', price: 340, category: 'luxury-womenswear' },
+    positioning: "Women's handbags & footwear.",
+    signatureElement: 'Detachable jewelry',
+    flagshipProduct: { title: 'JACQVÉ Detachable-Jewelry Tote', price: 480, category: 'luxury-handbags' },
   },
   {
     slug: 'zv',
     name: 'ZV',
-    positioning: 'Minimalist streetwear and contemporary basics — simple, clean, understated.',
-    signatureElement: 'Understated tonal ZV wordmark only',
-    flagshipProduct: { title: 'ZV Essential Crewneck', price: 58, category: 'streetwear-basics' },
+    positioning: 'Minimalist streetwear.',
+    signatureElement: 'Silhouette',
+    flagshipProduct: { title: 'ZV Signature-Silhouette Tee', price: 58, category: 'streetwear-basics' },
   },
   {
-    slug: 'red-veil',
-    name: 'RED VEIL',
-    positioning: 'Prada-inspired luxury. Signature number: 33, incorporated into stylized name/logo treatments.',
-    signatureElement: 'No. 33 hardware tag',
-    flagshipProduct: { title: 'RED VEIL No. 33 Trench Coat', price: 590, category: 'luxury-outerwear' },
+    slug: 'rojo-velo',
+    name: 'ROJO VELO',
+    positioning: 'Modern European luxury.',
+    signatureElement: 'Signature accent / fashion-forward construction',
+    flagshipProduct: { title: 'ROJO VELO Accent-Seam Trench Coat', price: 560, category: 'luxury-outerwear' },
   },
   {
     slug: 'vedellin',
     name: 'VEDELLÍN',
-    positioning: 'European/global luxury identity with a geographic-name-inspired character.',
-    signatureElement: 'SD monogram embossed leather tag',
-    flagshipProduct: { title: 'VEDELLÍN Leather Field Jacket', price: 560, category: 'luxury-outerwear' },
-  },
-  {
-    slug: 'vvlgar',
-    name: 'VvLGAR',
-    positioning: 'Streetwear with a raw, bold, rebellious identity.',
-    signatureElement: 'Distressed hardware branding',
-    flagshipProduct: { title: 'VvLGAR Distressed Denim Jacket', price: 110, category: 'streetwear' },
+    positioning: 'Global exotic luxury.',
+    signatureElement: 'Extraordinary materials',
+    flagshipProduct: { title: 'VEDELLÍN Rare-Material Field Jacket', price: 640, category: 'luxury-outerwear' },
   },
   {
     slug: 'vaison',
     name: 'VAISON / △AISON',
-    positioning: 'Avant-garde luxury inspired by the Maison Margiela space.',
-    signatureElement: 'Two geometric pyramid/triangle forms (downward = V, upward = A) forming an hourglass mark',
-    flagshipProduct: { title: '△AISON Deconstructed Wool Coat', price: 610, category: 'avant-garde-luxury' },
+    positioning: 'Avant-garde luxury.',
+    signatureElement: 'Transformation',
+    flagshipProduct: { title: '△AISON Transformable Deconstructed Coat', price: 610, category: 'avant-garde-luxury' },
   },
   {
     slug: 'ancor',
     name: 'ANCÓR',
-    positioning: 'Relaxed luxury boating/lifestyle — "ALO meets Polo" with a nautical identity.',
-    signatureElement: 'Custom anchor emblem in place of a polo player',
-    flagshipProduct: { title: 'ANCÓR Anchor-Embroidered Polo', price: 165, category: 'luxury-resortwear' },
+    positioning: 'Luxury leisure/yachting.',
+    signatureElement: 'Material blending',
+    flagshipProduct: { title: 'ANCÓR Blended-Material Yacht Jacket', price: 310, category: 'luxury-resortwear' },
   },
   {
-    slug: 'dvmb',
-    name: 'DVMB',
-    positioning: 'Simple contemporary street-fashion — extremely clean, accessible, minimal graphics, intentionally the least complicated house label.',
-    signatureElement: 'Straightforward DVMB wordmark only',
-    flagshipProduct: { title: 'DVMB Basic Tee', price: 32, category: 'streetwear-basics' },
+    slug: 'seven-even',
+    name: '7EVEN',
+    positioning: 'Luxury athletic/everyday.',
+    signatureElement: 'Perfecting everyday clothing',
+    flagshipProduct: { title: '7EVEN Perfected Everyday Track Jacket', price: 145, category: 'luxury-athleisure' },
+  },
+  {
+    slug: 'vvlgari',
+    name: 'VvLGARI',
+    positioning: 'Restored — positioning to define.',
+    signatureElement: 'To be established',
+    // No flagship product -- see this file's own header on why that
+    // is deliberate, not an omission.
+    flagshipProduct: null,
   },
 ];
 
@@ -139,8 +138,21 @@ export function ownerIdFor(slug) {
   return `svmiko-degvchi-${slug}`;
 }
 
+// Every brand in `SUB_BRANDS` is real identity; not every brand has a
+// real product yet. Opening a storefront with nothing to sell is a
+// worse state than not opening one at all (the existing test suite's
+// own standing rule: "a seeded storefront with no stock is an empty
+// shop") -- so a brand with `flagshipProduct: null` (today, only
+// VvLGARI) is skipped here rather than seeded empty, and the real
+// reason is returned alongside the ones that were.
 export function seedSvmikoDegvchiStorefronts(marketplace) {
-  return SUB_BRANDS.map((brand) => {
+  const seeded = [];
+  const skipped = [];
+  for (const brand of SUB_BRANDS) {
+    if (!brand.flagshipProduct) {
+      skipped.push({ brand: brand.slug, reason: 'no flagship product defined yet' });
+      continue;
+    }
     const seller = registerSeller(marketplace, {
       name: brand.name,
       ownerId: ownerIdFor(brand.slug),
@@ -158,6 +170,8 @@ export function seedSvmikoDegvchiStorefronts(marketplace) {
       price: brand.flagshipProduct.price,
       category: brand.flagshipProduct.category,
     });
-    return { brand: brand.slug, seller, product };
-  });
+    seeded.push({ brand: brand.slug, seller, product });
+  }
+  seeded.skipped = skipped;
+  return seeded;
 }

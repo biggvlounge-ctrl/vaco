@@ -18,30 +18,72 @@ movement, entering a new world; applications: belt chains, buckles,
 bag hardware, clasps, wallets, jewelry, charms, zippers, buttons,
 embroidery, limited-edition pieces).
 
-The 13 brands: DEGVCHI (flagship namesake luxury), LVCII (classic
-European luxury), Devil in Details/DND (Chrome Hearts-inspired heavy
-accessory/hardware/leather luxury), BOOBI/BOOBI Couture (women's sexy
-luxury), Boulevard/BLVD (gallery-inspired streetwear), JACQVÉ (women's
-refined European luxury), ZV (minimalist streetwear/basics), RED VEIL
-(Prada-inspired luxury, signature number 33), VEDELLÍN (European/
-global luxury, geographic-name identity), VvLGAR (raw bold rebellious
-streetwear), VAISON/△AISON (Margiela-inspired avant-garde, two
-triangle logo forming an hourglass V/A), ANCÓR (ALO-meets-Polo boating/
-lifestyle, custom anchor symbol instead of a polo player), DVMB
-(simple contemporary streetwear — basic tees, hoodies, minimal
-graphics).
+**Updated 22 Oct 2026 — the upgraded 12-brand roster, replacing the
+original 13.** The 12 brands: DEGVCHI (Japanese luxury streetwear,
+Japanese heritage materials), LVCII (modern everyday luxury, designer
+handkerchief collections), STONE BONES (dark/sculptural luxury, heavy
+details + precious hardware), BOULÉVARD XCHANGE (luxury streetwear,
+cultural exchange), JACQVÉ (women's handbags & footwear, detachable
+jewelry), ZV (minimalist streetwear, silhouette), ROJO VELO (modern
+European luxury, signature accent/fashion-forward construction),
+VEDELLÍN (global exotic luxury, extraordinary materials), VAISON
+(avant-garde luxury, transformation), ANCÓR (luxury leisure/yachting,
+material blending), 7EVEN (luxury athletic/everyday, perfecting
+everyday clothing), VvLGARI (restored — positioning to define,
+signature to be established).
 
-Direct integration: each of the 13 brands becomes a real, distinct
-seller/storefront within VENVS's Shopify-style branded storefront
-system already built — each brand gets its own customized storefront,
-consistent with the "branded-per-seller-within-unified-marketplace"
-model already established for VENVS.
+Several brands kept their name but changed positioning/signature
+(DEGVCHI, LVCII, JACQVÉ, ZV, VEDELLÍN, VAISON, ANCÓR); some were
+renamed (Devil in Details/DND → STONE BONES, Boulevard/BLVD →
+BOULÉVARD XCHANGE, RED VEIL → ROJO VELO, VvLGAR → VvLGARI); one is
+genuinely new (7EVEN); two from the original roster (BOOBI/BOOBI
+Couture, DVMB) are retired. VvLGARI is real identity with no real
+product yet — its positioning is explicitly "to be established" in
+this handoff, not something this codebase invents on its own.
 
-Status: ready to populate VENVS's branded storefront system at launch.
+Direct integration: each of the 11 brands with a defined product
+becomes a real, distinct seller/storefront within VENVS's Shopify-
+style branded storefront system already built — each brand gets its
+own customized storefront, consistent with the "branded-per-seller-
+within-unified-marketplace" model already established for VENVS.
+VvLGARI's storefront opens once its own real product is defined.
+
+Status: populating VENVS's branded storefront system now.
 
 ---
 
 ## Implementation status (added when this file was placed into the repo)
+
+**Superseded 22 Oct 2026 — read the section above first.** Everything
+below this point describes the ORIGINAL 13-brand roster and is kept
+as a real historical record, not rewritten to pretend it always said
+12. The current, real code (`venvs/src/lib/svmikoDegvchi.js`,
+`vdp/src/lib/svmikoDegvchiWearables.js`) now implements the upgraded
+roster. The current real wearable table:
+
+| Brand | Product | Price |
+|---|---|---|
+| DEGVCHI | Virtual Heritage-Weave Bomber | 30 |
+| LVCII | Virtual Handkerchief Set | 14 |
+| STONE BONES | Virtual Hardware Jacket | 34 |
+| BOULÉVARD XCHANGE | Virtual Capsule Hoodie | 16 |
+| JACQVÉ | Virtual Detachable-Jewelry Tote | 28 |
+| ZV | Virtual Signature-Silhouette Tee | 9 |
+| ROJO VELO | Virtual Accent Trench Coat | 36 |
+| VEDELLÍN | Virtual Rare-Material Jacket | 40 |
+| △AISON (VAISON) | Virtual Transformation Pendant | 28 |
+| ANCÓR | Virtual Blended-Material Jacket | 20 |
+| 7EVEN | Virtual Everyday Track Jacket | 18 |
+| VvLGARI | *(none yet — positioning to be established)* | — |
+
+Eleven real entries plus one real brand identity with no product yet.
+Flagship-product titles/prices for the ten renamed-or-repositioned
+brands are this codebase's own reasonable derivation from the new
+positioning/signature table above, not separately specified in the
+handoff — the same "flagged, interpretive" posture the original
+build already held for payout-account ids.
+
+### Original build record (13-brand roster, through 21 Oct 2026)
 
 **Built, and all thirteen brands are real in code** — which makes this
 one of the few documents in the corpus that shipped complete rather

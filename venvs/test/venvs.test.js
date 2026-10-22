@@ -563,17 +563,26 @@ test('every sub-brand has a distinct payout account', () => {
   assert.equal(new Set(owners).size, owners.length);
 });
 
-test('seeding registers every sub-brand as a real storefront with real stock', () => {
+test('seeding registers every sub-brand WITH a real flagship product as a real storefront with real stock', () => {
   // The catalogue and the marketplace are separate modules and this is
   // where they meet — if any sub-brand failed the marketplace's own
   // validation, it would throw here rather than when a shopper first
   // opened the storefront.
+  //
+  // Not every real brand has a real product yet — VvLGARI's own
+  // positioning is explicitly "to be established" in the current
+  // handoff, so `seedSvmikoDegvchiStorefronts` skips it rather than
+  // opening an empty shop (see that function's own comment). The
+  // brand count and the seeded-storefront count are therefore
+  // deliberately different numbers now, not the same assertion twice.
+  const brandsWithProduct = SUB_BRANDS.filter((b) => b.flagshipProduct);
   const m = createMarketplace();
   const seeded = seedSvmikoDegvchiStorefronts(m);
 
-  assert.equal(seeded.length, SUB_BRANDS.length);
-  assert.equal(m.sellers.length, SUB_BRANDS.length);
-  assert.ok(m.products.length >= SUB_BRANDS.length, 'a seeded storefront with no stock is an empty shop');
+  assert.equal(seeded.length, brandsWithProduct.length);
+  assert.equal(m.sellers.length, brandsWithProduct.length);
+  assert.ok(m.products.length >= brandsWithProduct.length, 'a seeded storefront with no stock is an empty shop');
+  assert.ok(seeded.skipped.length > 0, 'expected at least one brand (VvLGARI) to still be pending a real product');
 
   for (const seller of m.sellers) {
     const front = getSellerStorefront(m, seller.id);

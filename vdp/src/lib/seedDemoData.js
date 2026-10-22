@@ -76,9 +76,9 @@ const DEMO_ORDERS = [
 // `seedSvmikoDegvchiWearables` (App.jsx seeds those before this runs).
 const DEMO_AVATARS = [
   { userId: "demo-user", outfit: ["DEGVCHI Signature Jacket", "Sunset Glow Palette", "Chrome Chain"] },
-  { userId: "demo-maya", outfit: ["DEGVCHI Virtual Kimono-Sleeve Coat", "△AISON Virtual Hourglass Pendant"] },
-  { userId: "demo-carlos", outfit: ["VvLGAR Virtual Distressed Denim Jacket", "DND Virtual Chain Wallet"] },
-  { userId: "demo-priya", outfit: ["BOOBI Couture Virtual Corset Gown", "ANCÓR Virtual Anchor Pin"] },
+  { userId: "demo-maya", outfit: ["DEGVCHI Virtual Heritage-Weave Bomber", "△AISON Virtual Transformation Pendant"] },
+  { userId: "demo-carlos", outfit: ["ZV Virtual Signature-Silhouette Tee", "STONE BONES Virtual Hardware Jacket"] },
+  { userId: "demo-priya", outfit: ["ROJO VELO Virtual Accent Trench Coat", "ANCÓR Virtual Blended-Material Jacket"] },
 ];
 
 async function seedFoodDistrictOrders(foodDistrictStore, userId, transferFn) {

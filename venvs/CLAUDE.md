@@ -108,10 +108,15 @@ in a browser — the original "never actually run" caveat is resolved.
   with the real KDP/ACX-derived royalty math in
   `src/lib/royalties.js` (70% band at $2.99–$9.99, 35% outside;
   print at 60% minus print cost), per `VENVS_PUBLISHING_ADDITION.md`.
-- **SVMIKO DEGVCHI Fashion House** — the fashion *house* and its 13
-  real sub-brands live here as real branded sellers inside the
-  Marketplace storefront system (`src/lib/svmikoDegvchi.js`). Note
-  the split: the **brands/storefronts** are VENVS commerce; the
+- **SVMIKO DEGVCHI Fashion House** — the fashion *house* and its 12
+  real sub-brands (updated 22 Oct 2026 from the original 13 — several
+  renamed, one retired pair dropped, one new brand added; see
+  `src/lib/svmikoDegvchi.js`'s own header) live here as real branded
+  sellers inside the Marketplace storefront system
+  (`src/lib/svmikoDegvchi.js`). One brand (VvLGARI) is real identity
+  with no product yet — its own positioning is still "to be
+  established," so it has no open storefront until that's decided.
+  Note the split: the **brands/storefronts** are VENVS commerce; the
   **avatar wearables** economy is VDP's.
 
 **Not here anymore** (don't re-add): the walkable world, CHOPZ
