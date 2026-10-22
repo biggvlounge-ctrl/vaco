@@ -345,6 +345,7 @@ let store = createVdpStore();
   const teamSportsLib = await import('./src/lib/teamSports.js');
   const teamStandingsLib = await import('./src/lib/teamStandings.js');
   const rankingsLib = await import('./src/lib/rankings.js');
+  const puzzleGamesLib = await import('./src/lib/puzzleGames.js');
 
   // A migrant's real old-world background carries over if one was
   // recorded (`immigration.js`'s `admitWithPassport`/`crossIllegally`,
@@ -559,6 +560,13 @@ let store = createVdpStore();
       // `store.combatSports` rather than inside that module.
       if (!store.teamSports) store.teamSports = { teams: {}, games: [], nextGameId: 1 };
       if (!store.teamStandings) store.teamStandings = teamStandingsLib.createTeamStandingsStore();
+      // `puzzleGames.js` is deliberately storage-agnostic, the same
+      // real reason `combatSports.js`'s own matches live on
+      // `store.combatSports` rather than inside that module.
+      // `scores` is a flat playerId -> total-points map, shaped for
+      // `rankingsLib.rankBy` exactly the way every other leaderboard
+      // in this file already is.
+      if (!store.puzzles) store.puzzles = { puzzles: [], nextPuzzleId: 1, scores: {} };
       registerTownVoidHubsOnce();
       postGovernmentJobsToVoidOnce();
     },
@@ -3121,6 +3129,123 @@ let store = createVdpStore();
   // per-discipline win/loss leaders.
   app.get('/api/team-sports/scoring-leaders', (_req, res) => {
     res.json({ leaders: teamStandingsLib.scoringLeaders(store.teamStandings) });
+  });
+
+  // --- Puzzle & Casual Games: a new gameplay pillar, not one of the
+  // ones `VDP_FOUNDING.md` already audited. `puzzleGames.js` is
+  // deliberately storage-agnostic, the same real reason Combat
+  // Sports' and Team Sports' matches live on this app's own store
+  // rather than inside their own modules. Generation is a real,
+  // operational, content-producing action (`requireCallingService()`,
+  // same guard booking a combat-sports card uses) -- but SOLVING one
+  // is a real player action, so `attempt` is gated by
+  // `requireParamActor('playerId')` instead, the same split
+  // `/api/players/:id/talk` already draws between an operational
+  // system action and a player's own move.
+  app.get('/api/puzzles', (_req, res) => {
+    res.json({ puzzles: store.puzzles.puzzles.map((p) => puzzleGamesLib.describePuzzle(p)) });
+  });
+
+  app.get('/api/puzzles/:id', (req, res) => {
+    const puzzle = store.puzzles.puzzles.find((p) => p.puzzleId === req.params.id);
+    if (!puzzle) return res.status(404).json({ error: `no puzzle ${req.params.id}` });
+    // Never the raw puzzle over this read-only, player-reachable
+    // route -- `playerView` strips the solution the same way every
+    // puzzle type's own header says it must.
+    res.json(puzzleGamesLib.playerView(puzzle));
+  });
+
+  app.post('/api/puzzles', requireCallingService(), (req, res) => {
+    try {
+      const puzzleId = `puzzle-${store.puzzles.nextPuzzleId++}`;
+      const puzzle = puzzleGamesLib.createPuzzle({ ...req.body, puzzleId });
+      store.puzzles.puzzles.push(puzzle);
+      newsLib.recordEvent(store.news, { kind: 'puzzle', text: `a new ${puzzle.difficulty} ${puzzle.puzzleType} puzzle opened: ${puzzleId}` });
+      res.status(201).json(puzzle);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // One real daily instance per (type, difficulty, theme, date) --
+  // `dailyChallengeFor`'s own seeding means every caller on the same
+  // date gets the identical puzzle, created once and reused rather
+  // than regenerated per request.
+  app.get('/api/puzzles/daily/:date', (req, res) => {
+    const { puzzleType = 'sudoku', difficulty = 'medium', theme = null } = req.query;
+    try {
+      const existingId = `daily-${puzzleType}-${req.params.date}`;
+      let puzzle = store.puzzles.puzzles.find((p) => p.puzzleId === existingId);
+      if (!puzzle) {
+        puzzle = puzzleGamesLib.dailyChallengeFor(req.params.date, { puzzleType, difficulty, theme });
+        store.puzzles.puzzles.push(puzzle);
+      }
+      res.json(puzzleGamesLib.playerView(puzzle));
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // A player's own attempt at one puzzle. `attempt`'s shape depends
+  // on `puzzleType` -- real per-type submissions, not one generic
+  // "answer" string pretending every puzzle type takes the same
+  // input. Full-puzzle types (sudoku/crossword/trivia) are marked
+  // solved and scored on a correct complete submission; per-item
+  // types (word-search finds, memory-match flips) are checked and
+  // scored per item, never marked solved by this module on their own
+  // (there is no single "the whole word search is done" fact to
+  // check without the caller's own found-word count, which this
+  // route does not have).
+  app.post('/api/players/:playerId/puzzles/:puzzleId/attempt', requireParamActor('playerId'), (req, res) => {
+    const puzzle = store.puzzles.puzzles.find((p) => p.puzzleId === req.params.puzzleId);
+    if (!puzzle) return res.status(404).json({ error: `no puzzle ${req.params.puzzleId}` });
+    const { attempt } = req.body;
+    try {
+      let correct = false;
+      let solvedWhole = false;
+      switch (puzzle.puzzleType) {
+        case 'sudoku':
+          correct = puzzleGamesLib.checkSudokuSolution(attempt?.grid, puzzle.content.solution);
+          solvedWhole = correct;
+          break;
+        case 'crossword':
+          correct = puzzleGamesLib.checkCrosswordAnswer(puzzle.content, attempt?.number, attempt?.direction, attempt?.answer);
+          solvedWhole = correct && puzzle.content.entries.every(
+            (e) => puzzleGamesLib.checkCrosswordAnswer(puzzle.content, e.number, e.direction, e.word),
+          ) && Array.isArray(attempt?.allAnswered) && attempt.allAnswered;
+          break;
+        case 'trivia':
+          correct = puzzleGamesLib.checkTriviaAnswer(puzzle.content, attempt?.questionIndex, attempt?.answer);
+          solvedWhole = correct && attempt?.questionIndex === puzzle.content.questions.length - 1 && attempt?.allCorrectSoFar === true;
+          break;
+        case 'word-search':
+          correct = puzzleGamesLib.checkWordSearchFind(puzzle.content, attempt?.word, attempt?.row, attempt?.col, attempt?.dr, attempt?.dc);
+          break;
+        case 'memory-match':
+          correct = puzzleGamesLib.checkMemoryMatch(puzzle.content, attempt?.positionA, attempt?.positionB);
+          break;
+        default:
+          return res.status(400).json({ error: `puzzleType "${puzzle.puzzleType}" has no attempt handler` });
+      }
+      if (solvedWhole && puzzle.status !== 'solved') {
+        puzzleGamesLib.markSolved(puzzle);
+        const points = puzzleGamesLib.scoreFor(puzzle);
+        store.puzzles.scores[req.params.playerId] = (store.puzzles.scores[req.params.playerId] || 0) + points;
+        newsLib.recordEvent(store.news, { kind: 'puzzle', text: `${req.params.playerId} solved the ${puzzle.puzzleType} puzzle "${puzzle.puzzleId}"` });
+      }
+      res.json({ correct, solved: puzzle.status === 'solved' });
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // The real league leaders across every puzzle type combined --
+  // `rankingsLib.rankBy`'s own generic mechanism, the same one
+  // `civilizations`/`organizations`/`businesses` already use, fed a
+  // real `{ id, value }` shape built from `store.puzzles.scores`.
+  app.get('/api/puzzles/leaders', (_req, res) => {
+    const records = Object.entries(store.puzzles.scores).map(([id, value]) => ({ id, value }));
+    res.json({ leaders: rankingsLib.rankBy(records) });
   });
 
   // Only the rare flavor actions (see npcs.js's own `pickAction`

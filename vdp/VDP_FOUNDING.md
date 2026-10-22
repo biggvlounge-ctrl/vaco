@@ -2468,6 +2468,91 @@ already-seeded facts (`technologyEras`, `WORLD_AESTHETIC`,
 `property.js`'s own housing types -- building that waits for direct
 instruction to do so.
 
+## Puzzle & Casual Games: a new gameplay pillar, built real (22 Oct 2026)
+
+Per a direct, large batch instruction naming bingo, crossword, word
+search, sudoku, memory, hidden object, trivia, logic games, picture
+match, pool, and a long list of card and board games, plus an "AI
+puzzle generator" with difficulty tiers and themes, and a Live Host
+Mode -- a genuinely new gameplay pillar, not one of the eleven titles
+`VDP_FOUNDING.md` already audited above ("The named gameplay pillars,
+audited against what is real"). Checked first, same discipline as
+every other pass in this document: nothing named here existed
+anywhere in the repo before this one.
+
+**New `puzzleGames.js`.** Same "borrow the shape, not the scale"
+treatment `combatSports.js` already established -- five of the named
+puzzle types are genuinely tractable as pure, deterministic
+algorithms and got real, working generators: `sudoku` (real
+backtracking fill + difficulty-scaled clue removal), `word-search`
+(real 8-direction grid placement), `crossword` (real, if
+intentionally simple, greedy letter-intersection placement -- not
+every word is guaranteed a slot, and an unplaced word is reported,
+never forced), `memory-match` (real paired-tile shuffle), and
+`trivia` (a real themed question bank with session scoring). Three
+more named types -- `hidden-object`, `logic`, `picture-match` -- are
+real, named, and have NO generator yet; `createPuzzle` refuses them
+explicitly rather than returning something that looks like a working
+puzzle and is not one.
+
+**No generative AI is used or required**, despite the instruction's
+own name for this ("AI puzzle generator"). Checked directly before
+building anything: this session's environment has no image/video/
+voice-generation API key configured at all, which blocks several
+OTHER items in the same batch instruction (the CHOPZ Storytime
+engine's scene-building/character-generation/animation, VENVM's AI
+copywriting/image/video/voice generation, and a PhotoRoom-style
+product studio) -- those are real, named gaps left honestly unbuilt
+rather than faked with mocked output, and are recorded separately.
+Crossword/sudoku/word-search generation needs no model call at all;
+"AI" in the instruction's own name means automatic, not generative.
+
+**The card games and board games named in the same instruction
+(chess, checkers, dominoes, Uno-style, spades, hearts, rummy, poker,
+blackjack, Texas Hold'em, solitaire, crazy eights, and the Monopoly/
+Scrabble/Risk/Sorry/Clue-inspired board games) are a separate, later
+build, not covered by `puzzleGames.js`.** A real chess or Monopoly
+rule engine is each independently a large, multi-week undertaking on
+its own; attempting all of them inside the same pass as the five
+puzzle generators above would have produced exactly the shallow,
+half-working stubs this whole document's own discipline exists to
+avoid. Recorded as open, not silently dropped.
+
+**Wired into `server.cjs`** the same real way Combat Sports and Team
+Sports were: `GET /api/puzzles` (list), `GET /api/puzzles/:id` and
+`GET /api/puzzles/daily/:date` (both via `playerView`, which never
+leaks a solution), `POST /api/puzzles` (generation, gated by
+`requireCallingService()` the same way booking a combat-sports card
+already is -- an operational, content-producing action), and
+`POST /api/players/:playerId/puzzles/:puzzleId/attempt` (a real
+player's own move, gated by `requireParamActor('playerId')` the same
+way `/api/players/:id/talk` already is). `GET /api/puzzles/leaders`
+reuses `rankings.js`'s own generic `rankBy` against a real per-player
+points total -- the same reusable mechanism every other leaderboard
+in this file already reaches for, not a bespoke sort rewritten a
+fourth time.
+
+**"Game Show Integration" (tournaments, daily challenges, weekly
+championships, clan competitions), per the same instruction**:
+`dailyChallengeFor(dateString, options)` is real and date-seeded --
+every caller on the same date gets the identical puzzle, deterministic
+from the date string rather than a random pick that happens to look
+daily. Weekly championships and clan competitions are not built --
+they are an aggregation window and a team-scoping rule on top of the
+same real per-player score this module already produces, deferred
+the same honest way the card/board games above are, not invented
+with a fake schedule.
+
+**Live Host Mode (AI or human hosts for live bingo/trivia/puzzle
+nights, integrated into Vault Studios) is not built.** Checked
+directly in `vavlt-stvdios` before writing anything: no host/session
+mechanic for a live puzzle event exists there. `trivia`'s real
+question-bank/scoring logic in `puzzleGames.js` is the one real piece
+a future live-hosted trivia night would actually need from this pass;
+the hosting/streaming/scheduling layer itself is a `vavlt-stvdios`
+build, not a `VDP` one, and is recorded here as open rather than
+guessed at.
+
 ## What is still open
 
 - **Villas and villages** (see "Villas and villages," above) —
