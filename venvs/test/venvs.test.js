@@ -597,10 +597,10 @@ test('seeding registers every sub-brand WITH a real flagship product as a real s
 });
 
 test('VvLGARI carries all five of its real products under one storefront', () => {
-  // VvLGARI is the one brand whose `flagshipProducts` array has more
-  // than one entry, because its own real positioning spans cologne,
-  // perfume, sunglasses, and handbags for both men and women rather
-  // than one single flagship garment.
+  // VvLGARI's `flagshipProducts` array has five entries, because its
+  // own real positioning spans cologne, perfume, sunglasses, and
+  // handbags for both men and women rather than one single flagship
+  // garment.
   const m = createMarketplace();
   seedSvmikoDegvchiStorefronts(m);
   const vvlgariSeller = m.sellers.find((s) => s.name === 'VvLGARI');
@@ -614,6 +614,26 @@ test('VvLGARI carries all five of its real products under one storefront', () =>
   assert.ok(categories.includes('luxury-eyewear'));
   assert.ok(categories.includes('luxury-handbags-men'));
   assert.ok(categories.includes('luxury-handbags-women'));
+});
+
+test('STONE BONES carries both its flagship jacket and its emerald-inlay bone chain', () => {
+  // The natural-stone/gemstone correction gave STONE BONES a second
+  // real product -- a standalone jewelry-grade accessory distinct
+  // from its flagship outerwear, the same "more than one item under
+  // one brand" shape VvLGARI already has.
+  const m = createMarketplace();
+  seedSvmikoDegvchiStorefronts(m);
+  const stoneBonesSeller = m.sellers.find((s) => s.name === 'STONE BONES');
+  assert.ok(stoneBonesSeller, 'STONE BONES should have its own real storefront');
+
+  const front = getSellerStorefront(m, stoneBonesSeller.id);
+  assert.equal(front.products.length, 2, 'the concrete bone-buckle jacket and the emerald-inlay bone chain');
+  const titles = front.products.map((p) => p.title);
+  assert.ok(titles.some((t) => t.includes('Bone-Buckle Jacket')));
+  assert.ok(titles.some((t) => t.includes('Emerald-Inlay Bone Chain')));
+  const categories = front.products.map((p) => p.category);
+  assert.ok(categories.includes('luxury-outerwear'));
+  assert.ok(categories.includes('luxury-accessories'));
 });
 
 test('a seeded storefront can actually take an order end to end', () => {

@@ -57,18 +57,22 @@ kept here as the real record rather than just in code comments:**
   etymology, and it now shapes `positioning` in
   `venvs/src/lib/svmikoDegvchi.js`, not just a comment.
 - **STONE BONES is this house's own Chrome Hearts** — gothic/
-  sculptural hardware worn as jewelry-grade accessory. Two follow-up
-  corrections gave the brand's own two-word name both of its real
-  points of difference: STONE is the material (cast to look like
-  stone and concrete rather than Chrome Hearts' chrome/sterling
-  silver — a treatment the house itself claims has never been done
-  before in this kind of hardware), and BONES is the shape (the
-  hardware itself — buckles, charms, chain links — is cast in bone
-  silhouettes, not Chrome Hearts' own crosses and daggers). It is the
-  brand that replaced Devil in Details (DND) in the 12-brand upgrade
-  above; the comparable, the material, and the shape are all a real
-  anchor for any future STONE BONES product, not an invented
-  flourish.
+  sculptural hardware worn as jewelry-grade accessory. Three follow-up
+  corrections gave the brand's own two-word name all of its real
+  points of difference: STONE is the material — both a cast concrete/
+  stone-look finish AND, given directly in the latest correction,
+  genuine natural stone and gemstone inlay (emerald and assorted rock
+  among them, not one fixed stone), rather than Chrome Hearts'
+  chrome/sterling silver — and BONES is the shape (the hardware
+  itself — buckles, charms, chain links — is cast in bone silhouettes,
+  not Chrome Hearts' own crosses and daggers). It is the brand that
+  replaced Devil in Details (DND) in the 12-brand upgrade above. The
+  natural-stone correction is also why STONE BONES is now the second
+  sub-brand (after VvLGARI) with more than one real flagship product:
+  its own emerald-inlay bone chain, a standalone jewelry-grade piece
+  distinct from its flagship jacket. The comparable, the material, and
+  the shape are all a real anchor for any future STONE BONES product,
+  not an invented flourish.
 
 Direct integration: all 12 brands are now real, distinct sellers/
 storefronts within VENVS's Shopify-style branded storefront system
@@ -96,6 +100,7 @@ current real wearable table:
 | DEGVCHI | Virtual Heritage-Weave Bomber | 30 |
 | LVCII | Virtual Handkerchief Set | 14 |
 | STONE BONES | Virtual Concrete Bone-Buckle Jacket | 34 |
+| STONE BONES | Virtual Emerald-Inlay Bone Chain | 26 |
 | BOULÉVARD XCHANGE | Virtual Capsule Hoodie | 16 |
 | JACQVÉ | Virtual Detachable-Jewelry Tote | 28 |
 | ZV | Virtual Signature-Silhouette Tee | 9 |
@@ -110,14 +115,16 @@ current real wearable table:
 | VvLGARI | Virtual Women's Structured Tote | 42 |
 | VvLGARI | Virtual Men's Weekender Bag | 38 |
 
-Sixteen real entries across twelve brands — VvLGARI alone carries
-five, one per real product its positioning named (cologne, perfume,
-sunglasses, and a handbag for each of men and women). Flagship-product
-titles/prices for the eleven renamed-or-repositioned-or-newly-defined
-brands are this codebase's own reasonable derivation from the
-positioning/signature table above, not separately specified in the
-handoff — the same "flagged, interpretive" posture the original
-build already held for payout-account ids.
+Seventeen real entries across twelve brands — VvLGARI carries five
+(one per real product its positioning named: cologne, perfume,
+sunglasses, and a handbag for each of men and women), STONE BONES
+carries two (its flagship jacket and its emerald-inlay bone chain, the
+standalone piece the natural-stone correction called for). Flagship-
+product titles/prices for the ten renamed-or-repositioned-or-newly-
+defined brands besides those two are this codebase's own reasonable
+derivation from the positioning/signature table above, not separately
+specified in the handoff — the same "flagged, interpretive" posture
+the original build already held for payout-account ids.
 
 ### Original build record (13-brand roster, through 21 Oct 2026)
 

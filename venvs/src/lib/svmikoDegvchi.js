@@ -69,22 +69,24 @@ export const SUB_BRANDS = [
     name: 'STONE BONES',
     // The house's own real comparable, given directly: Chrome Hearts --
     // gothic/sculptural luxury hardware worn as jewelry-grade accessory
-    // rather than plain trim. Two deliberate points of difference were
-    // then given directly, and the brand's own two-word name is both
-    // of them, not just a label: STONE is the material (cast to look
-    // like stone and concrete, not chrome/sterling silver -- a
-    // treatment the house itself claims has never been done before in
-    // this kind of hardware), and BONES is the shape (the hardware
-    // itself -- buckles, charms, chain links -- is cast in bone
-    // silhouettes, not Chrome Hearts' own crosses and daggers). This
-    // is the brand that replaced Devil in Details (DND); see this
-    // file's own header for the rename.
+    // rather than plain trim. The brand's own two-word name carries
+    // three real points of difference, given directly across three
+    // corrections, not just a label: STONE is the material -- both a
+    // cast concrete/stone-look finish AND, given directly in this
+    // latest correction, genuine natural stone and gemstone inlay
+    // (emerald and assorted rock among them, not one fixed stone) --
+    // and BONES is the shape (the hardware itself -- buckles, charms,
+    // chain links -- is cast in bone silhouettes, not Chrome Hearts'
+    // own crosses and daggers). This is the brand that replaced Devil
+    // in Details (DND); see this file's own header for the rename.
     positioning: "Dark/sculptural luxury -- the house's own answer to "
-      + 'Chrome Hearts: bone-shaped hardware cast in stone and '
-      + 'concrete rather than chrome.',
-    signatureElement: 'Bone-shaped hardware (buckles, charms, chain links), cast in stone and concrete, not chrome or silver',
+      + 'Chrome Hearts: bone-shaped hardware, cast in stone and '
+      + 'concrete and inlaid with genuine natural stones and gemstones '
+      + '(emerald among them), rather than chrome.',
+    signatureElement: 'Bone-shaped hardware (buckles, charms, chain links) -- cast in stone/concrete, inlaid with real natural stones and gemstones -- not chrome or silver',
     flagshipProducts: [
       { title: 'STONE BONES Concrete Bone-Buckle Jacket', price: 520, category: 'luxury-outerwear' },
+      { title: 'STONE BONES Emerald-Inlay Bone Chain', price: 380, category: 'luxury-accessories' },
     ],
   },
   {

@@ -117,8 +117,11 @@ in a browser — the original "never actually run" caveat is resolved.
   storefront — VvLGARI's own positioning was given directly on 22 Oct
   2026 (a luxury accessories house: cologne, perfume, sunglasses, and a
   handbag for each of men and women) and is no longer "to be
-  established." It is the one sub-brand whose `flagshipProducts` array
-  holds more than one item, listed under its single real storefront.
+  established." STONE BONES carries a second real product too (an
+  emerald-inlay bone chain, alongside its flagship jacket) — a later
+  correction gave it genuine natural stone/gemstone inlay as part of
+  its own material signature. Both brands list more than one item
+  under their single real storefront; the other ten carry one each.
   Note the split: the **brands/storefronts** are VENVS commerce; the
   **avatar wearables** economy is VDP's.
 

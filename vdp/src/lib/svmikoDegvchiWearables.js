@@ -32,16 +32,18 @@
 //
 // STONE BONES's own real comparable, given the same day: Chrome
 // Hearts -- gothic/sculptural hardware worn as jewelry-grade accessory.
-// The brand's own two-word name carries both real points of
-// difference, given directly in two follow-up corrections: STONE is
-// the material (cast to look like stone and concrete, not chrome/
-// sterling silver like Chrome Hearts -- a treatment the house itself
-// claims has never been done before), and BONES is the shape (the
-// hardware -- buckles, charms, chain links -- is cast in bone
-// silhouettes, not Chrome Hearts' own crosses and daggers). The
-// virtual piece below stays `clothing` (it's a jacket, the hardware
-// is a detail on it, same as VENVS's own flagship piece), not
-// `accessories`.
+// The brand's own two-word name carries three real points of
+// difference, given directly across three follow-up corrections:
+// STONE is the material -- both a cast concrete/stone-look finish AND
+// genuine natural stone/gemstone inlay (emerald and assorted rock
+// among them, not chrome/sterling silver like Chrome Hearts) -- and
+// BONES is the shape (the hardware -- buckles, charms, chain links --
+// is cast in bone silhouettes, not Chrome Hearts' own crosses and
+// daggers). STONE BONES is the one brand with two real virtual items
+// below, not one: the jacket stays `clothing` (the hardware is a
+// detail on it, same as VENVS's own flagship piece), and the new
+// emerald-inlay bone chain is `accessories` -- the real, standalone
+// jewelry-grade piece the natural-stone correction calls for.
 //
 // Real, deliberate scope: one virtual wearable per sub-brand product
 // that currently exists, matching each brand's real described identity
@@ -49,10 +51,11 @@
 // cosmetics/accessories) -- `clothing` for the 10 brands built around
 // garments (STONE BONES' concrete bone-buckle jacket among them),
 // `accessories` for brands built around jewelry/emblems/eyewear/bags
-// (VAISON's own transformation-themed pendant, VvLGARI's sunglasses
-// and both handbags), and `cosmetics` for VvLGARI's cologne and
-// perfume -- the first real use of that category here, since no other
-// SVMIKO DEGVCHI brand's description centers on fragrance.
+// (STONE BONES' own emerald-inlay bone chain, VAISON's own
+// transformation-themed pendant, VvLGARI's sunglasses and both
+// handbags), and `cosmetics` for VvLGARI's cologne and perfume -- the
+// first real use of that category here, since no other SVMIKO DEGVCHI
+// brand's description centers on fragrance.
 //
 // Real, deliberately DIFFERENT pricing scale from VENVS's own physical
 // flagship prices: virtual avatar-wearable economies price far lower
@@ -78,6 +81,7 @@ export const SUB_BRAND_WEARABLES = [
   { slug: 'degvchi', name: 'DEGVCHI Virtual Heritage-Weave Bomber', category: 'clothing', price: 30 },
   { slug: 'lvcii', name: 'LVCII Virtual Handkerchief Set', category: 'accessories', price: 14 },
   { slug: 'stone-bones', name: 'STONE BONES Virtual Concrete Bone-Buckle Jacket', category: 'clothing', price: 34 },
+  { slug: 'stone-bones', name: 'STONE BONES Virtual Emerald-Inlay Bone Chain', category: 'accessories', price: 26 },
   { slug: 'boulevard-xchange', name: 'BOULÉVARD XCHANGE Virtual Capsule Hoodie', category: 'clothing', price: 16 },
   { slug: 'jacqve', name: 'JACQVÉ Virtual Detachable-Jewelry Tote', category: 'accessories', price: 28 },
   { slug: 'zv', name: 'ZV Virtual Signature-Silhouette Tee', category: 'clothing', price: 9 },

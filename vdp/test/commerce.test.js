@@ -549,7 +549,7 @@ test('every sub-brand has its own payout account, even brands with more than one
   assert.notEqual(creatorIdFor('a'), creatorIdFor('b'));
 });
 
-test('VvLGARI is the one sub-brand with more than one real item, and every item still pays the same account', () => {
+test('VvLGARI carries five real items, all still paying the same account', () => {
   const vvlgariItems = SUB_BRAND_WEARABLES.filter((i) => i.slug === 'vvlgari');
   assert.equal(vvlgariItems.length, 5, 'cologne, perfume, sunglasses, and a handbag for each of men and women');
   for (const item of vvlgariItems) {
@@ -557,6 +557,20 @@ test('VvLGARI is the one sub-brand with more than one real item, and every item 
   }
   const names = vvlgariItems.map((i) => i.name);
   assert.equal(new Set(names).size, names.length, 'VvLGARI lists the same item twice');
+});
+
+test('STONE BONES carries two real items -- a jacket and a separate jewelry-grade piece', () => {
+  // The natural-stone/gemstone correction gave STONE BONES a real,
+  // standalone accessory distinct from its flagship jacket, the same
+  // "more than one item under one brand" shape VvLGARI already has.
+  const stoneBonesItems = SUB_BRAND_WEARABLES.filter((i) => i.slug === 'stone-bones');
+  assert.equal(stoneBonesItems.length, 2, 'the concrete bone-buckle jacket and the emerald-inlay bone chain');
+  for (const item of stoneBonesItems) {
+    assert.equal(creatorIdFor(item.slug), creatorIdFor('stone-bones'));
+  }
+  const categories = stoneBonesItems.map((i) => i.category);
+  assert.ok(categories.includes('clothing'), 'the jacket should still be clothing');
+  assert.ok(categories.includes('accessories'), 'the chain should be its own standalone accessory, not folded into the jacket');
 });
 
 test('seeding registers every sub-brand item into a real DEGVCHI store', () => {
