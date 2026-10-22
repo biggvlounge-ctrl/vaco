@@ -288,6 +288,36 @@ const OCCUPATIONS = {
     tier: 3, skill: 'Communication', source: 'organizations.type media',
     employers: ['media'],
   },
+  // **Added after a direct request: "make sure you have all
+  // occupations... singers, movie stars, entertainers... influencers".**
+  // One occupation each, at the same grain the taxonomy already uses
+  // everywhere else — `athlete` is not split into "basketball player"
+  // and "boxer", so `entertainer` is not split into "singer" and
+  // "actor" either; it covers all of them, same reasoning, same grain.
+  entertainer: {
+    tier: 3, skill: 'Art', source: 'organizations.type media',
+    employers: ['media', 'club'],
+  },
+  // Tier 2, not 3: unlike `reporter`/`entertainer`, which this
+  // taxonomy ties to an existing institution (a newsroom, a studio),
+  // a social-media influencer's defining fact is that the job exists
+  // with no institution and no formal credential behind it at all —
+  // the same "no §25 subject, no gate" shape as `athlete`/`enforcer`.
+  influencer: {
+    tier: 2, skill: 'Communication', source: 'organizations.type media',
+    employers: ['media', 'business'],
+  },
+  // Not `organizations.type`'s DEFINING_POST for `government` — that
+  // stays `diplomat`, which is specifically about external relations.
+  // `politician` is the elected-officeholder role `politics.js`'s
+  // procedural elections already assume exist but `occupations.js`
+  // never named: tiered with `diplomat`/`officer`/`scientist` because
+  // holding office is the same "advanced technical/strategic" grain
+  // §25's Tier 5 describes, even though §25 names no such subject.
+  politician: {
+    tier: 5, skill: 'Leadership', source: 'organizations.type government',
+    employers: ['government'],
+  },
 };
 
 const OCCUPATION_NAMES = Object.keys(OCCUPATIONS);

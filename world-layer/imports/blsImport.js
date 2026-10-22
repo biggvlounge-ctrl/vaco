@@ -54,8 +54,8 @@ const { setLocationData, getLocation } = require('../locations');
 //: never inform, which would leave part of the labour market on the
 //: invented pyramid with nothing to show which part.
 const SOC_GROUP_BY_OCCUPATION = {
-  // 11-0000 Management
-  manager: '11', logistician: '11', diplomat: '11',
+  // 11-0000 Management (`politician` is SOC 11-1031 "Legislators")
+  manager: '11', logistician: '11', diplomat: '11', politician: '11',
   // 13-0000 Business and financial
   trader: '13', financier: '13',
   // 17-0000 Architecture and engineering
@@ -66,8 +66,10 @@ const SOC_GROUP_BY_OCCUPATION = {
   preacher: '21',
   // 25-0000 Educational instruction and library
   teacher: '25', librarian: '25',
-  // 27-0000 Arts, design, entertainment, sports and media
-  curator: '27', athlete: '27', reporter: '27',
+  // 27-0000 Arts, design, entertainment, sports and media (`influencer`
+  // has no distinct SOC code as of the 2018 classification — the
+  // closest real category is this same media/communication group)
+  curator: '27', athlete: '27', reporter: '27', entertainer: '27', influencer: '27',
   // 29-0000 Healthcare practitioners
   physician: '29',
   // 31-0000 Healthcare support

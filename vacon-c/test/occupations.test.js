@@ -96,6 +96,28 @@ test('every tier minimum is a real attainment level', () => {
 });
 
 // ---------------------------------------------------------------------
+// entertainer / influencer / politician — added after a direct request
+// for "singers, movie stars, entertainers... influencers" and
+// representation of political office, same grain as every other
+// occupation already in the taxonomy
+// ---------------------------------------------------------------------
+
+test('entertainer, influencer and politician are real occupations in the taxonomy', () => {
+  for (const name of ['entertainer', 'influencer', 'politician']) {
+    assert.ok(occupations.OCCUPATIONS[name], `${name} is missing from OCCUPATIONS`);
+  }
+});
+
+test('entertainer covers singers, actors and movie stars at one grain, same as athlete covers every sport', () => {
+  assert.equal(occupations.OCCUPATIONS.entertainer.employers.includes('media'), true);
+});
+
+test('politician is available to government but is not government\'s DEFINING_POST (diplomat stays that)', () => {
+  assert.equal(occupations.OCCUPATIONS.politician.employers.includes('government'), true);
+  assert.equal(occupations.postFor('government'), 'diplomat');
+});
+
+// ---------------------------------------------------------------------
 // Unknown attainment is not zero attainment
 // ---------------------------------------------------------------------
 

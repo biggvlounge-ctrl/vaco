@@ -24,6 +24,10 @@ test('groupFor keeps Somali, Bosnian and named country groups as their own group
   assert.equal(ancestry.groupFor('unknownCode'), null);
 });
 
+test('groupFor keeps Israeli as its own group — B04006\'s own named code, not folded into arab', () => {
+  assert.equal(ancestry.groupFor('israeli'), 'israeli');
+});
+
 test('toDistribution with no population figure gives no shares, not shares of the claimed total', () => {
   const result = ancestry.toDistribution({ somali: 5000 }, null);
   assert.equal(result.shares, null);

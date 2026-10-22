@@ -464,6 +464,13 @@ function generateNPC(options = {}) {
     // tradition — see `jewishObservancePacks.js`'s own header. Null
     // unless a caller supplies one, same posture as `islamicSect`.
     jewishObservance: options.jewishObservance ?? null,
+    // Pew Research's real Political Typology group (ninth edition,
+    // 2026) — see `politicalTypologyPacks.js`'s own header for why
+    // this is drawn unconditionally, the honest substitute for naming
+    // "neocons" or current parties directly. Null unless a caller
+    // supplies one, same posture as every other real demographic
+    // field here.
+    politicalTypology: options.politicalTypology ?? null,
     traits: traitsToSheet(traitRows),
     createdTick: WorldState.tick,
     updatedTick: WorldState.tick,

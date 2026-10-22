@@ -143,6 +143,17 @@ const PATHWAY_BY_GROUP = {
   guatemalan: 'mixed',
   honduran: 'mixed',
   salvadoran: 'mixed',
+  // Added when `israeli` joined `ancestryPacks.GROUPS`. A country-
+  // specific DHS Yearbook class-of-admission cross-tab for Israel was
+  // not found directly this round (the yearbook's tables were
+  // confirmed to exist but a published country-by-category cross-tab
+  // was not located) — this is the well-established, uncontroversial
+  // characterization rather than a confirmed table figure: ordinary
+  // family-sponsored and employment-based (tech-sector) channels
+  // dominate, with no refugee/asylee or humanitarian-parole component
+  // for Israeli nationals specifically. `legacy-not-applicable` would
+  // misdescribe it as a pre-modern wave, which this is not.
+  israeli: 'mixed',
 };
 
 // **Checked once, at load time, not left to drift.** Every key here

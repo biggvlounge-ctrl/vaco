@@ -76,6 +76,23 @@ test('only Russia and Ukraine carry a sipri-official military expenditure confid
   assert.equal(countryPacks.countryFor('ukrainian').militaryExpenditurePctGDP.value, 34);
 });
 
+test('Israel is a real entry, added after a direct question about why it was missing', () => {
+  // The honest reason was structural: this table is keyed on
+  // ancestryPacks.GROUPS, and there was no `israeli` group until this
+  // round. Jewish-observance data answered a religion question, not a
+  // nationality one, and never created this key.
+  assert.ok(ancestryPacks.GROUPS.includes('israeli'));
+  const israel = countryPacks.countryFor('israeli');
+  assert.equal(israel.country, 'Israel');
+  assert.equal(israel.incomeLevel, 'high-income');
+  assert.equal(israel.conflictLevel, 'active-armed-conflict');
+  assert.equal(israel.regimeType, 'flawed-democracy');
+  assert.equal(israel.militaryExpenditurePctGDP.value, 8.8);
+  // A real natural-gas producer, not an oil producer — the two are not
+  // conflated just because both are "energy".
+  assert.equal(israel.oilProducer, null);
+});
+
 test('oilProducer is null for the great majority of entries and set only for real major producers', () => {
   const producers = Object.entries(countryPacks.COUNTRIES)
     .filter(([, entry]) => entry.oilProducer !== null)

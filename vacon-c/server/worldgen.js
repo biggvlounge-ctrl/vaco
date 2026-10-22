@@ -110,6 +110,7 @@ const riskPacks = require('./riskPacks.js');
 const religionPacks = require('./religionPacks.js');
 const islamicSectPacks = require('./islamicSectPacks.js');
 const jewishObservancePacks = require('./jewishObservancePacks.js');
+const politicalTypologyPacks = require('./politicalTypologyPacks.js');
 const ancestryPacks = require('./ancestryPacks.js');
 const natalityPacks = require('./natalityPacks.js');
 const incomePacks = require('./incomePacks.js');
@@ -914,6 +915,12 @@ function generateWorld(options = {}) {
           // `religion` just above.
           ethnicity: ancestryPacks.ethnicityFor(ancestryTract, random.unit('ethnicity-real', c, b, p))
             ?? random.pick(config.ethnicities, 'ethnicity', c, b, p),
+          // Pew's real Political Typology group, drawn unconditionally
+          // — `politicalTypologyPacks.js`'s own header on why there is
+          // no invented vocabulary to fall back to and no upstream
+          // real field to condition on, unlike `islamicSect`/
+          // `jewishObservance` just above.
+          politicalTypology: politicalTypologyPacks.groupFor(random.unit('political-typology-real', c, b, p)),
           traitValueFor: (def) => Math.round(
             random.range(10, 95, 'trait', c, b, p, def.family, def.name),
           ),

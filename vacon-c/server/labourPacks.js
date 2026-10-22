@@ -51,13 +51,20 @@ const SOURCES = ['us-bls-oes', 'sample'];
 //: `SOC_GROUP_BY_OCCUPATION`. Keep the two lists identical — see the
 //: header.
 const SOC_GROUP_BY_OCCUPATION = {
-  manager: '11', logistician: '11', diplomat: '11',
+  // `politician` is SOC 11-1031 "Legislators" — real BLS code, same
+  // major group 11 as `manager`/`logistician`/`diplomat`.
+  manager: '11', logistician: '11', diplomat: '11', politician: '11',
   trader: '13', financier: '13',
   engineer: '17', architect: '17', plumber: '17', electrician: '17',
   scientist: '19', researcher: '19', polymath: '19', agronomist: '19', linguist: '19',
   preacher: '21',
   teacher: '25', librarian: '25',
-  curator: '27', athlete: '27', reporter: '27',
+  // `entertainer` (SOC 27-2000 "Entertainers and Performers, Sports
+  // and Media") and `influencer` (closest real BLS category is the
+  // same major group's media/communication occupations — there is no
+  // distinct "influencer" SOC code as of the 2018 classification) both
+  // sit in major group 27 alongside the occupations already there.
+  curator: '27', athlete: '27', reporter: '27', entertainer: '27', influencer: '27',
   physician: '29',
   orderly: '31',
   officer: '33', enforcer: '33',

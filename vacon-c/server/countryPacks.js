@@ -404,6 +404,35 @@ const COUNTRIES = {
     militaryExpenditurePctGDP: { value: 3.4, year: 2024, confidence: 'secondary-estimate' },
     oilProducer: { status: 'major-exporter', dailyProductionBbl: 4100000, exportValueUsd2024: 118500000000 },
   },
+  // **Added after a direct question: "why did you build the United
+  // States entry but not Israel?"** The honest answer was structural,
+  // not political — this table is keyed on `ancestryPacks.GROUPS`, and
+  // there was no `israeli` group in that vocabulary until this round
+  // (see `ancestryImport.js`'s header). The earlier Jewish-observance
+  // work (`jewishObservancePacks.js`) answered a RELIGION question —
+  // Reform/Conservative/Orthodox — not a nationality/ancestry one, so
+  // it never created this key. Figures below: EIU Democracy Index 2024
+  // score 7.80 (rank 31/167, flawed democracy — confirmed directly,
+  // not assumed from the judicial-overhaul coverage); SIPRI military
+  // expenditure 8.8% of GDP in 2024 (world's 2nd-highest after
+  // Ukraine, corroborated across multiple sources citing SIPRI but not
+  // SIPRI's own fact sheet directly, so flagged `secondary-estimate`
+  // like every other non-Russia/Ukraine figure in this table).
+  // `conflictLevel` is checked the same direct way Russia/Ukraine's
+  // was: UCDP's 2025 report counts the Gaza war among its state-based
+  // conflicts and ACLED separately rates it an "Extreme"-severity hot
+  // spot — real, current, not a judgement call — though no single
+  // citable UCDP conflict-ID for it was found, which is noted rather
+  // than overstated. `oilProducer` is `null`: Israel is a significant
+  // NATURAL GAS producer/exporter (the Leviathan field), which is a
+  // different resource than this field tracks, not the same fact
+  // understated.
+  israeli: {
+    country: 'Israel', incomeLevel: 'high-income', conflictLevel: 'active-armed-conflict', governmentType: 'unitary parliamentary republic',
+    regimeType: 'flawed-democracy', regimeScore: 7.80,
+    militaryExpenditurePctGDP: { value: 8.8, year: 2024, confidence: 'secondary-estimate' },
+    oilProducer: null,
+  },
 };
 
 function requireAncestryPacks() {

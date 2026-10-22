@@ -1746,6 +1746,72 @@ its neighbours or its conflict level. All three fields are wired into
 in-memory-only, no-schema-column posture, and the same deliberate
 absence from any calibrated mechanic.
 
+**Forty-second: three real builds answering "do all of them" — all
+occupations including entertainers, and a direct challenge on why
+Israel got skipped when the United States didn't.**
+
+`occupations.js` gained three real occupations — `entertainer`
+(singers, actors, movie stars, all at the one grain `athlete` already
+covers every sport at), `influencer` (the "no institution, no
+credential" shape `athlete`/`enforcer` already hold), and `politician`
+(an elected officeholder, available to `government` but deliberately
+NOT replacing `diplomat` as that organization type's `DEFINING_POST` —
+diplomacy is a narrower, different real role). "Mexican police" needed
+no new occupation: `enforcer`/`officer` already exist and are not
+ethnicity-gated, so they already generate for any NPC regardless of
+ancestry context.
+
+**Israel was missing from `countryPacks.js` for a structural reason,
+not a political one, and saying so plainly matters more than fixing
+it quietly.** That table is keyed on `ancestryPacks.GROUPS`, and there
+was no `israeli` group in that vocabulary — the earlier Jewish-
+observance work (`jewishObservancePacks.js`) answered a RELIGION
+question (Reform/Conservative/Orthodox), never a nationality/ancestry
+one, so it never created this key, while `united-states` was always
+an explicit hardcoded baseline outside the ancestry-group vocabulary
+entirely. Checked directly before building: Census ACS table B04006
+reports "Israeli" as its own named ancestry code (variable
+B04006_050E), the same kind of real, already-existing source code
+`nigerian`/`ethiopian`/`ghanaian`/`kenyan` were split out from before.
+Israel's entry carries EIU Democracy Index 2024 (7.80, flawed
+democracy, rank 31/167 — confirmed directly), SIPRI-adjacent military
+expenditure (8.8% of GDP, 2024, world's second-highest after Ukraine,
+flagged `secondary-estimate` like most of this table), and
+`conflictLevel: 'active-armed-conflict'` — checked the same direct way
+Russia/Ukraine's was: UCDP's 2025 report counts Gaza among its
+state-based conflicts and ACLED separately rates it "Extreme"
+severity, real and current, not a judgement call, though no single
+citable UCDP conflict-ID was found and that gap is stated rather than
+papered over. `oilProducer` stays `null` — Israel is a real natural
+GAS producer/exporter (Leviathan field), a different resource than
+this field tracks, not the same fact understated.
+
+**`politicalTypologyPacks.js` is the real, durable substitute for
+"different types of American politicians... neocons, Republicans,
+different organizations"** that the thirty-eighth standing rule left
+unbuilt. "Neocon" was never built because it has no survey behind it
+— no polling organisation measures who is or is not one, unlike
+Sunni/Shia or Reform/Conservative/Orthodox, which this registry
+already reports from real surveys. Pew Research's own Political
+Typology is the real, rigorous, nonpartisan answer: nine named groups
+from 30 questions on social/political values, not party registration.
+**Checked directly rather than assumed from memory**: a 2021 wave
+(Faith and Flag Conservatives, Progressive Left, etc.) was what came
+to mind first, but Pew published a fully revised NINTH edition on 10
+June 2026 — "Beyond Red vs. Blue" — that supersedes it with nine
+different named groups (Leftward Progressives 7%, Loyal Liberals 11%,
+Left-Out Left 12%, Order and Opportunity Left 18%, Tuned-Out Middle
+9%, Pragmatic and Polite Right 11%, Unconventional Right 12%, Faith
+First Conservatives 12%, No Apologies Right 9%). Using the 2021 names
+would have been exactly the stale-data mistake this project already
+corrects elsewhere. `npc.politicalTypology` is drawn unconditionally
+— unlike `islamicSect`/`jewishObservance`, there is no upstream real
+field to gate it on, which is stated as an honest limitation (this
+reports the U.S. adult public's distribution for every generated
+person) rather than hidden. Same §9 firewall, same `demographics
+.compositionOf` reporting, same in-memory-only posture as every other
+field in this family.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

@@ -83,6 +83,16 @@
 // most populous source countries into one bucket here would have
 // left nothing for that module to classify. `subsaharanAfricanOther`
 // remains the residual bucket for every other Sub-Saharan country.
+//
+// `israeli` was added a third time, for a different reason than the
+// first two rounds: it was never folded into another bucket in the
+// first place — B04006 has always reported it as its own named code
+// (variable B04006_050E, confirmed against the Census API's own
+// variable metadata) — it simply had no reason to appear in this map
+// until `countryPacks.js` needed a real country to attach Israel's
+// income level, conflict level, regime type, military expenditure and
+// government type to. The gap was in what READS this list, not in
+// what the source itself provides.
 
 'use strict';
 
@@ -136,6 +146,15 @@ const GROUP_MAP = {
   honduran: 'honduran',
   salvadoran: 'salvadoran',
   american: 'american',
+  // Added a third time, same reasoning as the two rounds above: B04006
+  // reports "Israeli" as its own named ancestry code (variable
+  // B04006_050E, confirmed directly against the Census API's own
+  // variable metadata) — it was never folded into `arab`, so there was
+  // never a reason for this importer to fold it there either. It stayed
+  // out of this map only because nothing downstream asked for a named
+  // country for it until `countryPacks.js` needed one, which is the
+  // same reason `nigerian`/`ethiopian`/`ghanaian`/`kenyan` were split out.
+  israeli: 'israeli',
 };
 
 const GROUPS = [...new Set(Object.values(GROUP_MAP))];

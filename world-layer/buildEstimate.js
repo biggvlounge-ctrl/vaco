@@ -36,14 +36,14 @@
 //: that can drift, so this cannot quietly become a claim.
 const BUILD_SCOPE = {
   engine: {
-    modules: 100,
-    lines: 45769,
+    modules: 101,
+    lines: 46014,
     tables: 63,
     routes: 79,
     tickPhases: 11,
     traitFamilies: 20,
     traitDefinitions: 128,
-    occupations: 34,
+    occupations: 37,
     keyBuildingCategories: 24,
     statistics: 123,
   },
@@ -54,11 +54,11 @@ const BUILD_SCOPE = {
     importers: 29,
   },
   tests: {
-    files: 108,
-    lines: 36132,
-    cases: 1861,
+    files: 109,
+    lines: 36292,
+    cases: 1873,
   },
-  countedAt: '2026-10-21',
+  countedAt: '2026-10-22',
 };
 
 const TOTAL_LINES = BUILD_SCOPE.engine.lines

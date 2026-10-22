@@ -229,6 +229,7 @@ function compositionOf(worldState, residents) {
   const religion = distributionOf(residents, (n) => n.religion ?? null);
   const islamicSect = distributionOf(residents, (n) => n.islamicSect ?? null);
   const jewishObservance = distributionOf(residents, (n) => n.jewishObservance ?? null);
+  const politicalTypology = distributionOf(residents, (n) => n.politicalTypology ?? null);
   const ethnicity = distributionOf(residents, (n) => n.ethnicity ?? null);
   const education = distributionOf(residents, (n) => n.education ?? null);
 
@@ -264,6 +265,19 @@ function compositionOf(worldState, residents) {
       distribution: jewishObservance,
       diversity: diversityOf(jewishObservance),
       dominantShare: dominantShareOf(jewishObservance),
+    },
+    // **The real, nonpartisan substitute for "different types of
+    // American politicians... neocons, Republicans, different
+    // organizations" — Pew Research's Political Typology (ninth
+    // edition, 2026), measured here and read nowhere else, same
+    // firewall discipline `islamicSect`/`jewishObservance` hold.**
+    // `politicalTypologyPacks.js`'s own header on why "neocon" itself
+    // has no real survey behind it and could not be built the way
+    // Sunni/Shia or Reform/Conservative/Orthodox were.
+    politicalTypology: {
+      distribution: politicalTypology,
+      diversity: diversityOf(politicalTypology),
+      dominantShare: dominantShareOf(politicalTypology),
     },
     // **`ethnicity` is measured here and read NOWHERE else**, which is
     // the whole design and is enforced by `test/ethnicity.test.js`.

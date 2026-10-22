@@ -70,7 +70,7 @@ const GROUPS = [
   'arab', 'somali', 'bosnian', 'nigerian', 'ethiopian', 'ghanaian',
   'kenyan', 'subsaharan-african', 'west-indian', 'jamaican', 'haitian',
   'vietnamese', 'chinese', 'filipino', 'asian-indian', 'mexican',
-  'guatemalan', 'honduran', 'salvadoran', 'american', 'other',
+  'guatemalan', 'honduran', 'salvadoran', 'israeli', 'american', 'other',
 ];
 
 //: `ancestryImport.js`'s own `UNSPECIFIED` — its own value, not a
