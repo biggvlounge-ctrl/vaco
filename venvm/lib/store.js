@@ -10,6 +10,13 @@ function createVenvmStore() {
     likenessConsents: [],
     nextConsentId: 1,
     nextProductionJobId: 1,
+    // `growthPrograms.js` -- referral codes keyed by the code itself
+    // (a real lookup table, not an array scan, since every click on a
+    // referral link resolves one), referrals as a real list.
+    referralCodes: {},
+    nextReferralCodeSuffix: 1,
+    referrals: [],
+    nextReferralId: 1,
   };
 }
 

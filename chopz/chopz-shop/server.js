@@ -25,6 +25,7 @@ const { createAffiliateLink, getAffiliateLink, recordClick } = require('./lib/af
 const {
   CHOPZ_ESCROW_ACCOUNT, DEFAULT_FEE_PERCENT, createOrder, getOrder, requestFulfillment, createCartCheckout,
 } = require('./lib/orders');
+const { creatorDashboard, sellerDashboard, trendingProducts } = require('./lib/dashboards');
 
 const app = express();
 app.use(cors());
@@ -242,6 +243,28 @@ app.post('/chopz-shop/orders/:id/request-fulfillment', requireOrderBuyer(), asyn
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+});
+
+// --- Creator/Seller Dashboards and real product discovery (added per
+// a direct batch instruction asking for the Amazon Influencer/TikTok
+// Shop hybrid's "creator dashboards," "business dashboards" and
+// "product discovery") -- `dashboards.js`'s own header on why the
+// real affiliate/order engine these aggregate already existed and
+// only the aggregation itself was missing. Open reads, no actor
+// guard, the same posture `/chopz-shop/products` already takes --
+// a creator's or seller's own real numbers are not a secret to
+// another logged-in user the way a payment credential would be.
+app.get('/chopz-shop/dashboards/creator/:creatorId', (req, res) => {
+  res.json(creatorDashboard(store, req.params.creatorId));
+});
+
+app.get('/chopz-shop/dashboards/seller/:sellerId', (req, res) => {
+  res.json(sellerDashboard(store, req.params.sellerId));
+});
+
+app.get('/chopz-shop/discovery/trending', (req, res) => {
+  const limit = req.query.limit ? Number(req.query.limit) : undefined;
+  res.json({ products: trendingProducts(store, limit ? { limit } : {}) });
 });
 
 app.listen(PORT, () => {

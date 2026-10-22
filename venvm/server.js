@@ -36,6 +36,11 @@ const {
   CONSENT_SCOPES, recordConsent, revokeConsent, listConsents, ConsentError,
 } = require('./lib/likenessConsent');
 const {
+  REFERRAL_STATUSES, AMBASSADOR_TIERS, GROWTH_MISSIONS,
+  createReferralCode, getReferralCode, recordReferral, getReferral,
+  convertReferral, rewardReferral, ambassadorScorecard, checkMissionProgress,
+} = require('./lib/growthPrograms');
+const {
   PRODUCTION_STAGES, createProductionJob, getProductionJob, advanceToStoryboard, queueRender, markRendered,
 } = require('./lib/productionPipeline');
 
@@ -149,6 +154,9 @@ app.get('/api/health', (_req, res) => {
     scriptStatuses: SCRIPT_STATUSES,
     productionStages: PRODUCTION_STAGES,
     platforms: Object.keys(PLATFORM_SPECS),
+    referralStatuses: REFERRAL_STATUSES,
+    ambassadorTiers: AMBASSADOR_TIERS,
+    growthMissions: Object.keys(GROWTH_MISSIONS),
   });
 });
 
@@ -250,6 +258,65 @@ app.post('/api/likeness-consents', requireActor('subjectId'), (req, res) => {
 app.post('/api/likeness-consents/:id/revoke', requireConsentSubject(), (req, res) => {
   try { res.json(revokeConsent(store, { consentId: Number(req.params.id), ...(req.body || {}) })); }
   catch (err) { res.status(404).json({ error: err.message }); }
+});
+
+// --- Growth Programs: referrals, growth missions, ambassador tiers,
+// and the KPI scorecard (added per a direct batch instruction naming
+// a "Zeely AI inspired growth system") -- see `growthPrograms.js`'s
+// own header for what this builds and what it deliberately does not
+// (no AI recommendations/campaign optimization -- no model provider
+// configured; no real payout yet -- VENVM does not sync
+// `shared/settleOnce.js`).
+//
+// An ambassador creates their own code (`requireActor('ambassadorId')`,
+// the same real-person-owns-their-own-thing shape `likeness-consents`
+// already uses); recording a referral is the new recruit's own real
+// claim at signup time, so it is gated the same way. Converting and
+// rewarding a referral are operational facts an app observed (a real
+// purchase, a real published video), never the ambassador's or the
+// recruit's own call to make about themselves -- `requireCallingService()`.
+app.post('/api/growth/referral-codes', requireActor('ambassadorId'), (req, res) => {
+  try { res.status(201).json(createReferralCode(store, req.body || {})); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.get('/api/growth/referral-codes/:code', (req, res) => {
+  const entry = getReferralCode(store, req.params.code);
+  if (!entry) return res.status(404).json({ error: `no referral code "${req.params.code}"` });
+  res.json(entry);
+});
+
+app.post('/api/growth/referrals', requireActor('referredId'), (req, res) => {
+  try { res.status(201).json(recordReferral(store, req.body || {})); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.get('/api/growth/referrals/:id', (req, res) => {
+  const referral = getReferral(store, Number(req.params.id));
+  if (!referral) return res.status(404).json({ error: `no referral with id ${req.params.id}` });
+  res.json(referral);
+});
+
+app.post('/api/growth/referrals/:id/convert', requireCallingService(), (req, res) => {
+  try { res.json(convertReferral(store, { referralId: Number(req.params.id), ...(req.body || {}) })); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.post('/api/growth/referrals/:id/reward', requireCallingService(), (req, res) => {
+  try { res.json(rewardReferral(store, { referralId: Number(req.params.id), ...(req.body || {}) })); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.get('/api/growth/ambassadors/:ambassadorId/scorecard', (req, res) => {
+  res.json(ambassadorScorecard(store, req.params.ambassadorId));
+});
+
+app.get('/api/growth/ambassadors/:ambassadorId/missions/:missionKey', (req, res) => {
+  try {
+    res.json(checkMissionProgress(store, { ambassadorId: req.params.ambassadorId, missionKey: req.params.missionKey }));
+  } catch (err) {
+    res.status(404).json({ error: err.message });
+  }
 });
 
 app.listen(PORT, () => {
