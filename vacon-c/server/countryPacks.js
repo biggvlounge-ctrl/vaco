@@ -308,6 +308,33 @@
 // `server/` reads these to decide an outcome yet.
 //
 // ---------------------------------------------------------------------
+// Eleventh round: deepening the entries that only ever had the
+// original five fields, and closing the three missing regional
+// overviews `REGION_OVERVIEWS` itself used to admit it lacked
+// ---------------------------------------------------------------------
+// Poland, Nigeria, Ethiopia, Vietnam, China, the Philippines and India
+// each get real, current `notableFigures`/`politicalParties` (Tusk's
+// Civic Coalition, Tinubu's APC, Abiy's Prosperity Party, To Lam
+// holding both Vietnam's top posts, Xi Jinping's three posts, Marcos
+// Jr.'s PFP, Modi's BJP/NDA). Nigeria also gets real, current security
+// incidents (`securitySituation2026`) and Ethiopia a real, current
+// re-escalation of the Tigray conflict (`tigrayConflict2026`) -- with
+// an explicit note that Ethiopia's `conflictLevel` was not re-checked
+// against this new information, rather than silently reclassified.
+//
+// `ASIA_MIGRATION_OVERVIEW_2026`, `MIDDLE_EAST_MIGRATION_2026` and
+// `LATIN_AMERICA_MIGRATION_2026` close the three gaps
+// `REGION_OVERVIEWS` named by omission since the ninth round -- same
+// bounded-scope discipline as the Africa/Caribbean overviews: real,
+// dated, sourced figures for the largest real stories found (the
+// Asia-Arab labour corridor, Syria's real return-and-displacement
+// picture, the Venezuelan diaspora), not a claim that every country in
+// each region was individually researched.
+//
+// Same report-only posture as every other field here: nothing in
+// `server/` reads these to decide an outcome yet.
+//
+// ---------------------------------------------------------------------
 // What this is a first step TOWARD, and what it does not attempt yet
 // ---------------------------------------------------------------------
 // Asked to expand this engine beyond the United States — other
@@ -584,6 +611,15 @@ const COUNTRIES = {
     // specific figure was confirmed this round — left null rather than guessed.
     militaryExpenditurePctGDP: null,
     oilProducer: null,
+    notableFigures: [{ name: 'Donald Tusk', role: 'Prime Minister of Poland', note: 'in office since 13 Dec 2023; his government survived a confidence vote (243-in-favour) after a conservative, Karol Nawrocki, won the June 2025 presidential runoff' }],
+    politicalParties: {
+      ruling: { name: 'Civic Coalition (KO)', leader: 'Donald Tusk', note: 'Civic Platform, Modern and Polish Initiative merged into one party at a 25-26 Oct 2025 unification congress; Tusk was confirmed leader unopposed (98% of a March 2026 vote)' },
+      opposition: [{ name: 'PiS (Law and Justice)', note: 'polling around 28.3% as of one October 2026 report' }, { name: 'Confederation', note: 'polling around 20.7%' }],
+      president: { name: 'Karol Nawrocki', note: 'a conservative, elected June 2025 -- creates divided government against Tusk\'s coalition' },
+      nextParliamentaryElection: { year: 2027, season: 'autumn' },
+      source: 'wikipedia-donald-tusk; wikipedia-civic-coalition-unification-congress; polskieradio; eurointegration',
+      confidence: 'real-and-current-polling-figures-will-move',
+    },
   },
   french: {
     country: 'France', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'semi-presidential republic',
@@ -914,12 +950,59 @@ const COUNTRIES = {
     regimeType: 'hybrid-regime', regimeScore: 4.16,
     militaryExpenditurePctGDP: null,
     oilProducer: { status: 'major-exporter', dailyProductionBbl: 1520000, exportValueUsd2024: 38400000000 },
+    notableFigures: [{ name: 'Bola Tinubu', role: 'President of Nigeria', note: 'vowed to defeat Boko Haram/ISWAP after a March 2026 triple bombing in Maiduguri and renewed Borno attacks' }],
+    politicalParties: {
+      ruling: { name: 'APC (All Progressives Congress)', leader: 'Bola Tinubu', note: 'controls 31 of 36 states as of mid-2026, up from 21 in 2023, after a wave of opposition-governor defections' },
+      opposition: { note: 'fragmented and weakened, per a Timbuktu Institute analysis; had not nominated 2027 candidates as of this round' },
+      source: 'timbuktu-institute; statehouse-gov-ng; gazettengr',
+      confidence: 'real-and-current',
+    },
+    // Real, current security data -- same discipline as every other
+    // conflict entry: no invented casualty total where none was found.
+    securitySituation2026: {
+      globalTerrorismIndexRank: { value: 6, year: 2025, note: 'ranked the 6th most terrorised country globally, up 2 places from the prior ranking' },
+      notableAttacks2026: [
+        { date: '2026-03', location: 'Maiduguri, Borno State', event: 'three suicide bombers detonated explosives at the Main Market, a university teaching hospital, and a flyover near a post office' },
+        { date: '2026-08-ish', location: 'Ngoshe, Gwoza LGA, Borno State', event: 'Boko Haram overpowered soldiers and abducted more than 100 women and children, per opposition figure Peter Obi\'s account' },
+        { date: '2026-03', location: 'Plateau State', event: 'a bandit attack killed at least 28 residents' },
+      ],
+      note: 'no consolidated 2026 Boko Haram/ISWAP casualty or attack total was found this round; sources are largely partisan (government and opposition statements) and the figures above are individual, sourced incidents, not an aggregated count',
+      source: 'allafrica; gazettengr; statehouse-gov-ng',
+      confidence: 'individual-incidents-sourced-no-aggregate-total-found',
+    },
   },
   ethiopian: {
     country: 'Ethiopia', incomeLevel: 'low-income', conflictLevel: 'localized-conflict', governmentType: 'federal parliamentary republic',
+    // conflictLevel was not re-checked against UCDP's current
+    // classification this round -- tigrayConflict2026 below describes
+    // real 2026 fighting one press account calls "the most serious
+    // escalation since the end of the civil war," which may warrant
+    // reclassifying this to active-armed-conflict on a future check.
+    // Not changed here without that direct check, per this module's
+    // own "checked directly, not a judgement call" standard.
     regimeType: 'authoritarian-regime', regimeScore: 3.24,
     militaryExpenditurePctGDP: null,
     oilProducer: null,
+    politicalParties: {
+      ruling: { name: 'Prosperity Party', leader: 'Abiy Ahmed', note: 'Abiy has been PM since 2018; Prosperity Party formed in 2019 from the former EPRDF coalition -- a stable structural fact, not re-verified live this round' },
+      source: 'standard, stable party-system facts, not re-verified live this round',
+      confidence: 'durable-structural-fact-not-election-cycle-specific',
+    },
+    // Real, current re-escalation of the Tigray conflict -- a
+    // genuinely different, later situation from whatever this
+    // entry's conflictLevel was last calibrated against.
+    tigrayConflict2026: {
+      electionExclusion: { note: 'the TPLF\'s legal registration as a party was revoked in 2025; Tigray was excluded from Ethiopia\'s June 2026 national vote' },
+      pretoriaAccordStrain: { note: 'in April 2026 the TPLF reactivated a local parliament Addis Ababa deems illegitimate; reintegration into federal institutions remains incomplete' },
+      clashes: [
+        { date: '2026-01-29', location: 'Tselemti district', note: 'fighting erupted between the TPLF and Ethiopian government forces; the Tigray Defense Force withdrew by 1 Feb' },
+        { date: '2026-08', location: 'western Tigray, near the Sudan border', note: 'described as the most serious escalation since the end of the civil war; hundreds of civilians crossed into Sudan; no official casualty figures released' },
+        { date: '2026-09-28', note: 'fighting intensifying in northern Ethiopia per Euronews, with fears of a return to the 2020-2022 war spreading into Afar and Amhara' },
+      ],
+      eritreaTensions: { note: 'Ethiopia has accused Eritrea of aggression and of collaborating with the TPLF; troop deployments near Tigray were reported in May 2026' },
+      source: 'wikipedia-2026-ethiopia-tplf-clashes; nation-africa; euronews; fides; ewn',
+      confidence: 'press-sourced-no-official-casualty-figures-released-fast-moving',
+    },
   },
   ghanaian: {
     country: 'Ghana', incomeLevel: 'lower-middle-income', conflictLevel: 'no-active-conflict', governmentType: 'unitary presidential republic',
@@ -991,6 +1074,13 @@ const COUNTRIES = {
     regimeType: 'authoritarian-regime', regimeScore: 2.62,
     militaryExpenditurePctGDP: null,
     oilProducer: null,
+    notableFigures: [{ name: 'To Lam', role: 'Communist Party General Secretary and State President', note: 'became General Secretary 3 Aug 2024 succeeding the late Nguyen Phu Trong; re-elected General Secretary 23 Jan 2026 (14th National Party Congress, unanimous 180-member Central Committee); elected State President 7 Apr 2026 for the 2026-2031 term -- the first modern Vietnamese leader to hold both posts from the start of a term' }],
+    politicalParties: {
+      ruling: { name: 'Communist Party of Vietnam', leader: 'To Lam', note: 'one-party state; AP-sourced reporting compares his concentrated power to Xi Jinping\'s' },
+      primeMinister: { name: 'Le Minh Hung', confidence: 'single-secondary-source-appendix-less-certain' },
+      source: 'arabnews; vietnamlawmagazine; vneconomy; usasean-org-appendix',
+      confidence: 'real-and-current-except-the-flagged-pm-name',
+    },
   },
   chinese: {
     country: 'China', incomeLevel: 'upper-middle-income', conflictLevel: 'no-active-conflict', governmentType: 'one-party socialist republic',
@@ -999,18 +1089,43 @@ const COUNTRIES = {
     // China is the world's largest crude IMPORTER despite large domestic production —
     // not a net exporter, so this is deliberately null rather than misleadingly "producer".
     oilProducer: null,
+    notableFigures: [{ name: 'Xi Jinping', role: 'General Secretary of the Communist Party, President, Chairman of the Central Military Commission', note: 'holds all three posts as of mid-2026 reporting; his "core leader" status was written into party rules at the 2022 Congress' }],
+    politicalParties: {
+      ruling: { name: 'Communist Party of China', leader: 'Xi Jinping' },
+      nextPartyCongress: { year: 2027, note: 'the 21st Congress; Xi could seek an unprecedented fourth term. A 2018 constitutional amendment (NPC) removed the two-term limit on the presidency' },
+      source: 'shafaq; factually-co; standard-structural-facts',
+      confidence: 'real-and-current-no-change-in-status-found-through-oct-2026',
+    },
   },
   filipino: {
     country: 'Philippines', incomeLevel: 'lower-middle-income', conflictLevel: 'localized-conflict', governmentType: 'unitary presidential republic',
     regimeType: 'flawed-democracy', regimeScore: 6.63,
     militaryExpenditurePctGDP: null,
     oilProducer: null,
+    notableFigures: [
+      { name: 'Ferdinand Marcos Jr.', role: 'President of the Philippines', note: 'constitutionally limited to a single term; said 14 Aug 2026 he will back a 2028 presidential candidate but had not chosen one' },
+      { name: 'Sara Duterte', role: 'Vice President', note: 'has announced her own 2028 presidential bid while facing an impeachment trial in the Senate' },
+    ],
+    politicalParties: {
+      ruling: { name: 'PFP (Partido Federal ng Pilipinas)', leader: 'Ferdinand Marcos Jr. (chair)' },
+      alliance: [{ name: 'Nacionalista Party (NP)', leader: 'Manny Villar (president)' }, { name: 'NPC (Nationalist People\'s Coalition)' }],
+      source: 'inquirer-newsinfo; omanobserver; thevibes; khaleejtimes',
+      confidence: 'real-and-current',
+    },
   },
   'asian-indian': {
     country: 'India', incomeLevel: 'lower-middle-income', conflictLevel: 'no-active-conflict', governmentType: 'federal parliamentary republic',
     regimeType: 'flawed-democracy', regimeScore: 7.3,
     militaryExpenditurePctGDP: { value: 2.22, year: 2024, confidence: 'secondary-estimate' },
     oilProducer: null,
+    notableFigures: [{ name: 'Narendra Modi', role: 'Prime Minister of India', note: 'began a third term in 2024 leaning on coalition allies after the BJP fell 32 seats short of a majority on its own' }],
+    politicalParties: {
+      ruling: { name: 'BJP (Bharatiya Janata Party)', leader: 'Narendra Modi', note: 'won 240 of 543 Lok Sabha seats in 2024, short of the 272 needed alone' },
+      coalition: { name: 'NDA (National Democratic Alliance)', seats: 293, note: 'relies on allies including the TDP and JD(U); the AIADMK joined the NDA in April 2025' },
+      note: 'no primary-source confirmation of the coalition\'s 2026 structure was found this round; a Hoover Institution survey describes 2025 as stable, helped by state wins in Maharashtra, Haryana and Delhi',
+      source: 'tribune-com-pk; deccanherald; hoover-institution-survey-of-india-2026',
+      confidence: 'well-sourced-through-2025-2026-developments-thinly-sourced',
+    },
   },
   mexican: {
     country: 'Mexico', incomeLevel: 'upper-middle-income', conflictLevel: 'high-nonstate-violence', governmentType: 'federal presidential republic',
@@ -1371,6 +1486,68 @@ const YEMEN_CONFLICT_2026 = {
 };
 
 // ---------------------------------------------------------------------
+// The three missing regional overviews: Asia, the Middle East, Latin
+// America -- the real gap `REGION_OVERVIEWS` itself names further
+// down this file. Same bounded-scope discipline as
+// AFRICA_MIGRATION_OVERVIEW_2026: real figures found this round, dated
+// and sourced, not a claim of exhaustive regional coverage.
+// ---------------------------------------------------------------------
+
+const ASIA_MIGRATION_OVERVIEW_2026 = {
+  scopeNote: 'covers the Asia-Arab labour corridor and a UN DESA baseline found this round -- not a full Asia-wide migration survey, and dates mix 2020-2025 since no single clean 2025/2026 total was found',
+  asiaArabLabourCorridor: {
+    migrantsFromCentralSouthernAsia: { value: 18400000, year: 2024, sharePctOfCorridorOrigin: 41, priorValue: { value: 5100000, year: 2000 } },
+    remittanceCorridors: { note: 'the UAE-India and Saudi Arabia-India remittance corridors rank among the world\'s top three' },
+    averageRemittanceCostMenaPct: { value: 6.07, year: 2024, priorYear: { value: 7.17, year: 2020 }, note: 'still well above the UN SDG target of 3%' },
+  },
+  baseline: { note: 'UN DESA (2020 data): Asia hosts roughly 86 million international migrants (about a third of the world total), plus roughly 69 million more via migration internal to Asia -- an older baseline, kept because no newer equivalent total was found' },
+  source: 'adb-adbi-oecd-ilo-labour-migration-in-asia-sep-2025; unescwa-escap; un-desa',
+  confidence: 'mixed-dates-no-single-current-regional-total-found',
+};
+
+const MIDDLE_EAST_MIGRATION_2026 = {
+  scopeNote: 'covers UNHCR\'s own MENA regional totals and the real Syria return/displacement picture -- not a country-by-country Gulf states survey, which UNHCR itself notes those states publish very little data for',
+  globalContext: { refugees2025: { value: 41600000, change: '-3% vs 2024' } },
+  menaRegionalTotals: {
+    refugeesAndAsylumSeekers: { value: 4200000, asOf: 'end-2025' },
+    internallyDisplaced: { value: 14600000, asOf: 'end-2025', priorYear: { value: 13000000, year: 2024 } },
+  },
+  syria: {
+    returnsFromAbroad: { value: 1300000, asOf: 'end-2025', laterFigure: { value: 1500000, asOf: 'spring-2026', note: 'a later UNHCR update gives a higher cumulative figure since the fall of the former regime at the end of 2024' } },
+    idpReturnsToOrigin: { value: 1900000, asOf: 'end-2025', laterFigure: { value: 1800000, asOf: 'spring-2026', note: 'phrased as "more than" in the later update; kept alongside the end-2025 figure rather than reconciled' } },
+    stillDisplaced: { registeredRefugeesInNeighbouringCountries: 3810000, internallyDisplaced: 7100000, asOf: 'end-2025', note: 'despite the real returns above, Syrians remain one of the largest displaced populations globally' },
+  },
+  gulfOriginRefugees: {
+    value2025: 6570, value2015: 2332, change: '+181.7%',
+    note: 'this measures refugees FROM Gulf states, not refugees hosted there -- a different, much smaller real figure, led by Kuwait and Saudi Arabia',
+  },
+  dataGap: { note: 'Gulf states publish very little on hosted displaced or foreign populations broken down by nationality -- a real, stated gap, not estimated here' },
+  recentEscalation: { note: 'a June 2026 UNHCR population-movement map reports over 31 million forcibly displaced people and recent returnees across the wider Middle East region as of just before 28 Feb 2026, describing escalating hostilities worsening humanitarian conditions -- the same period israeli.warStatus covers for the Israel-Iran war' },
+  source: 'unhcr-mena-pacific-2026; theweek-in; data-unhcr-org-population-movement-map',
+  confidence: 'real-unhcr-sourced-figures-from-several-different-updates-dates-and-definitions-vary',
+};
+
+const LATIN_AMERICA_MIGRATION_2026 = {
+  scopeNote: 'centres on the Venezuelan diaspora, by far the dominant real migration story in the region -- not a survey of every Latin American country\'s migration picture',
+  venezuelanDiaspora: {
+    totalAbroad: { value: 7900000, asOf: '2025-11', source: 'r4v' },
+    inLatinAmericaAndCaribbean: {
+      value: 6950000, asOf: '2026-02',
+      topHosts: [{ country: 'Colombia', value: 2800000 }, { country: 'Peru', value: 1600000 }],
+    },
+    sharePctHostedInRegion: 97,
+  },
+  shiftingFlows: {
+    note: 'IOM reports irregular Venezuelan entries into Colombia, Mexico, Honduras and Panama fell 2022-2025, while regular intra-South-America entries rose',
+    darienGapCrossings: { value: 1200000, period: '2024-2025', note: 'mostly Venezuelan; a January 2025 US policy change reportedly contributed to more reverse (southward) migration' },
+  },
+  regionalDisplacementTotal: { value: 22800000, asOf: 'end-2025', priorYear: { value: 21900000, year: 2024 }, source: 'unhcr-americas-trends' },
+  note: 'Venezuela has held no census since 2011, so diaspora size and the pace of any return after the January 2026 change of government (see VENEZUELA_SITUATION_2026) remain genuinely open questions, not settled facts',
+  source: 'r4v; euaa-venezuela-country-focus; unhcr-americas-trends; eldiario; riotimesonline',
+  confidence: 'real-and-recent-but-explicitly-uncertain-on-post-january-2026-trajectory',
+};
+
+// ---------------------------------------------------------------------
 // Caribbean deep dive: Puerto Rico, Cape Verde, the Virgin Islands,
 // and a region-wide cruise-tourism figure -- none of these four are
 // COUNTRIES entries (no matching ancestryPacks.GROUPS key for any of
@@ -1523,6 +1700,9 @@ const REGION_OVERVIEWS = {
   europe: EU_MIGRATION_OVERVIEW_2025,
   africa: AFRICA_MIGRATION_OVERVIEW_2026,
   caribbean: CARIBBEAN_CRUISE_TOURISM_2026,
+  asia: ASIA_MIGRATION_OVERVIEW_2026,
+  'middle-east': MIDDLE_EAST_MIGRATION_2026,
+  'latin-america': LATIN_AMERICA_MIGRATION_2026,
 };
 
 // Standalone real references this module built outside `COUNTRIES`
@@ -1581,6 +1761,9 @@ module.exports = {
   CAPE_VERDE_2026,
   VIRGIN_ISLANDS_2026,
   CARIBBEAN_CRUISE_TOURISM_2026,
+  ASIA_MIGRATION_OVERVIEW_2026,
+  MIDDLE_EAST_MIGRATION_2026,
+  LATIN_AMERICA_MIGRATION_2026,
   REGION_BY_KEY,
   REGION_OVERVIEWS,
   STANDALONE_REFERENCES,

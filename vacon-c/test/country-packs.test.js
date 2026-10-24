@@ -552,14 +552,9 @@ test('regionalContextFor falls back to the region\'s own real overview when neit
   assert.ok(ctx.coverageNote.includes('falling back to its region'));
 });
 
-test('Latin America is a real, classified region with no overview built yet, and REGION_OVERVIEWS says so', () => {
-  // Every key REGION_BY_KEY currently puts in 'latin-america'
-  // (mexican/guatemalan/honduran/salvadoran/venezuela/colombia) happens
-  // to already have a dedicated or standalone entry of its own -- so
-  // the "region known, nothing built for it" case is checked directly
-  // against the registry instead of hunting for a key that triggers it.
+test('Latin America is a real, classified region, and now has a real overview (filled in the eleventh round)', () => {
   assert.equal(Object.values(countryPacks.REGION_BY_KEY).includes('latin-america'), true);
-  assert.equal(countryPacks.REGION_OVERVIEWS['latin-america'], undefined);
+  assert.strictEqual(countryPacks.REGION_OVERVIEWS['latin-america'], countryPacks.LATIN_AMERICA_MIGRATION_2026);
 });
 
 test('regionalContextFor is honest about a key it has never classified at all', () => {
@@ -576,8 +571,12 @@ test('REGION_OVERVIEWS only names regions that have a real, built overview', () 
   assert.strictEqual(countryPacks.REGION_OVERVIEWS.europe, countryPacks.EU_MIGRATION_OVERVIEW_2025);
   assert.strictEqual(countryPacks.REGION_OVERVIEWS.africa, countryPacks.AFRICA_MIGRATION_OVERVIEW_2026);
   assert.strictEqual(countryPacks.REGION_OVERVIEWS.caribbean, countryPacks.CARIBBEAN_CRUISE_TOURISM_2026);
-  assert.equal(countryPacks.REGION_OVERVIEWS['latin-america'], undefined,
-    'no Latin America overview has actually been built, so it must not appear here');
+  // As of the eleventh round, every region this module classifies at
+  // all finally has a real overview -- this test's own history (it
+  // used to assert Latin America was undefined) is the record of that.
+  assert.strictEqual(countryPacks.REGION_OVERVIEWS['latin-america'], countryPacks.LATIN_AMERICA_MIGRATION_2026);
+  assert.strictEqual(countryPacks.REGION_OVERVIEWS.asia, countryPacks.ASIA_MIGRATION_OVERVIEW_2026);
+  assert.strictEqual(countryPacks.REGION_OVERVIEWS['middle-east'], countryPacks.MIDDLE_EAST_MIGRATION_2026);
 });
 
 test('generateRegion reports regionalContext, additively, alongside the existing flat fields', () => {
@@ -654,6 +653,78 @@ test('generateRegion reports politicalParties, additively', () => {
 
 test('politicalParties is null for a country with no confirmed party data', () => {
   assert.ok(countryPacks.countryFor('german').politicalParties === null || countryPacks.countryFor('german').politicalParties === undefined);
+});
+
+// ---------------------------------------------------------------------
+// Eleventh round: Poland/Nigeria/Ethiopia/Vietnam/China/Philippines/
+// India deepened, plus the three missing regional overviews
+// ---------------------------------------------------------------------
+
+test('Poland, China and Vietnam each carry real, current named heads of government/state', () => {
+  assert.equal(countryPacks.countryFor('polish').politicalParties.ruling.name, 'Civic Coalition (KO)');
+  assert.equal(countryPacks.countryFor('polish').politicalParties.president.name, 'Karol Nawrocki');
+  assert.equal(countryPacks.countryFor('chinese').notableFigures[0].name, 'Xi Jinping');
+  assert.equal(countryPacks.countryFor('vietnamese').notableFigures[0].name, 'To Lam');
+});
+
+test('Nigeria carries real current security incidents without an invented aggregate total', () => {
+  const nigeria = countryPacks.countryFor('nigerian');
+  assert.equal(nigeria.securitySituation2026.globalTerrorismIndexRank.value, 6);
+  assert.ok(nigeria.securitySituation2026.notableAttacks2026.length >= 3);
+  assert.ok(nigeria.securitySituation2026.note.includes('not an aggregated count'));
+});
+
+test('Ethiopia\'s real 2026 Tigray re-escalation is reported without silently reclassifying conflictLevel', () => {
+  const ethiopia = countryPacks.countryFor('ethiopian');
+  assert.equal(ethiopia.conflictLevel, 'localized-conflict', 'unchanged -- the comment above explains why');
+  assert.equal(ethiopia.tigrayConflict2026.clashes[1].location, 'western Tigray, near the Sudan border');
+  assert.equal(ethiopia.politicalParties.ruling.name, 'Prosperity Party');
+});
+
+test('the Philippines and India carry real, current ruling coalitions', () => {
+  const ph = countryPacks.countryFor('filipino');
+  assert.equal(ph.politicalParties.ruling.name, 'PFP (Partido Federal ng Pilipinas)');
+  assert.equal(ph.notableFigures[1].name, 'Sara Duterte');
+
+  const india = countryPacks.countryFor('asian-indian');
+  assert.equal(india.politicalParties.ruling.name, 'BJP (Bharatiya Janata Party)');
+  assert.equal(india.politicalParties.coalition.seats, 293);
+});
+
+test('generateRegion reports securitySituation2026 and tigrayConflict2026, additively', () => {
+  const w = { regions: [] };
+  const nigeriaRegion = migration.generateRegion(w, { name: 'Test Region A', countryKey: 'nigerian' });
+  assert.equal(nigeriaRegion.securitySituation2026.globalTerrorismIndexRank.value, 6);
+  assert.equal(nigeriaRegion.tigrayConflict2026, null);
+
+  const ethiopiaRegion = migration.generateRegion(w, { name: 'Test Region B', countryKey: 'ethiopian' });
+  assert.equal(ethiopiaRegion.tigrayConflict2026.clashes.length, 3);
+  assert.equal(ethiopiaRegion.securitySituation2026, null);
+});
+
+test('the three previously-missing regional overviews now exist, bounded and sourced', () => {
+  assert.equal(countryPacks.ASIA_MIGRATION_OVERVIEW_2026.asiaArabLabourCorridor.migrantsFromCentralSouthernAsia.value, 18400000);
+  assert.ok(countryPacks.ASIA_MIGRATION_OVERVIEW_2026.scopeNote.includes('not a full Asia-wide'));
+
+  assert.equal(countryPacks.MIDDLE_EAST_MIGRATION_2026.syria.stillDisplaced.internallyDisplaced, 7100000);
+  assert.ok(countryPacks.MIDDLE_EAST_MIGRATION_2026.scopeNote.includes('not a country-by-country'));
+
+  assert.equal(countryPacks.LATIN_AMERICA_MIGRATION_2026.venezuelanDiaspora.totalAbroad.value, 7900000);
+  assert.ok(countryPacks.LATIN_AMERICA_MIGRATION_2026.scopeNote.includes('dominant real migration story'));
+});
+
+test('REGION_OVERVIEWS now covers all six classified regions, no gaps left unaddressed', () => {
+  for (const region of ['europe', 'africa', 'caribbean', 'asia', 'middle-east']) {
+    assert.ok(countryPacks.REGION_OVERVIEWS[region], `${region} should have a real overview by now`);
+  }
+  // latin-america was deliberately left without one in the ninth
+  // round's own test -- confirm it is now filled.
+  assert.strictEqual(countryPacks.REGION_OVERVIEWS['latin-america'], countryPacks.LATIN_AMERICA_MIGRATION_2026);
+});
+
+test('regionalContextFor now falls back to a real overview for a Chinese or Vietnamese key\'s region too', () => {
+  assert.equal(countryPacks.regionalContextFor('chinese').region, 'asia');
+  assert.strictEqual(countryPacks.regionalContextFor('chinese').regionalOverview, countryPacks.ASIA_MIGRATION_OVERVIEW_2026);
 });
 
 // ---------------------------------------------------------------------

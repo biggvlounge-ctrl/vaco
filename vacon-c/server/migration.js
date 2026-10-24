@@ -263,6 +263,8 @@ function generateRegion(worldState, options = {}) {
     // rather than reporting nothing at all. See `countryPacks.js`'s
     // own "Regional fallback" header section.
     politicalParties: country?.politicalParties ?? null,
+    securitySituation2026: country?.securitySituation2026 ?? null,
+    tigrayConflict2026: country?.tigrayConflict2026 ?? null,
     regionalContext: countryKey ? countryPacks.regionalContextFor(countryKey) : null,
     temperamentKey,
     temperamentCluster: temperament,

@@ -480,6 +480,61 @@ test('the Organization phase resolves control once blocks exist', { skip: SKIP }
     'losing a block must record when it started being contested');
 });
 
+// -- regions & country context ------------------------------------------------
+//
+// New, closing a real gap: `migration.js`/`countryPacks.js` carry
+// dozens of rounds of real, cited country data, and until these
+// routes existed none of it was reachable outside this process.
+
+test('a region can be created with a real countryKey and read back carrying its real country data', { skip: SKIP }, async () => {
+  const region = await (await post('/regions', { name: 'Test Region FR', countryKey: 'french' })).json();
+  assert.ok(region.id, 'generate must return an id');
+  assert.equal(region.incomeLevel, 'high-income');
+  assert.equal(region.homelessness.estimatedPeople.value, 350000);
+  assert.equal(region.politicalParties.ruling.name, 'Renaissance');
+
+  const readBack = await (await get(`/regions/${region.id}`)).json();
+  assert.equal(readBack.id, region.id);
+  assert.equal(readBack.homelessness.estimatedPeople.value, 350000, 'the full real-world payload survives a read-back, not just a trimmed summary');
+
+  const { regions, total } = await (await get('/regions')).json();
+  assert.ok(regions.some((r) => r.id === region.id));
+  assert.ok(total >= 1);
+});
+
+test('a region with no countryKey has every real-world field null, same as before these routes existed', { skip: SKIP }, async () => {
+  const region = await (await post('/regions', { name: 'Test Region Blank' })).json();
+  assert.equal(region.incomeLevel, null);
+  assert.equal(region.regionalContext, null);
+});
+
+test('POST /api/regions requires a name, matching migration.generateRegion\'s own validation', { skip: SKIP }, async () => {
+  assert.equal((await post('/regions', {})).status, 400);
+});
+
+test('GET /api/country-packs/:key answers directly, with no region required first', { skip: SKIP }, async () => {
+  const haiti = await (await get('/country-packs/haitian')).json();
+  assert.equal(haiti.dedicatedEntry.country, 'Haiti');
+  assert.equal(haiti.dedicatedEntry.gangCrisis2026.gangLeaderProfile.alias, 'Barbecue');
+
+  const cuba = await (await get('/country-packs/cuba')).json();
+  assert.equal(cuba.dedicatedEntry, null);
+  assert.ok(cuba.standaloneEntry.electricityGrid.deficitMW.value === 1700);
+
+  const fallback = await (await get('/country-packs/west-indian')).json();
+  assert.equal(fallback.dedicatedEntry, null);
+  assert.equal(fallback.standaloneEntry, null);
+  assert.equal(fallback.region, 'caribbean');
+  assert.ok(fallback.regionalOverview, 'a key with no entry of its own still gets its region\'s real overview');
+});
+
+test('GET /api/country-packs/:key answers 404 only for a key this module has never classified at all', { skip: SKIP }, async () => {
+  const res = await get('/country-packs/atlantis');
+  assert.equal(res.status, 404);
+  const body = await res.json();
+  assert.ok(body.coverageNote.includes('real, undone gap'));
+});
+
 // -- environmental conditions -------------------------------------------------
 
 test('a condition needs a resource type and an end', { skip: SKIP }, async () => {

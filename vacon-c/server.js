@@ -31,6 +31,8 @@ require('dotenv/config');
 const engine = require('./server/engine.js');
 const businesses = require('./server/businesses.js');
 const persistence = require('./server/persistence.js');
+const migration = require('./server/migration.js');
+const countryPacks = require('./server/countryPacks.js');
 
 const { requireActor } = require('./lib/shieldAuth.cjs');
 const { createServiceAuth } = require('./lib/serviceAuth.cjs');
@@ -583,6 +585,58 @@ app.post('/api/territory-blocks', (req, res) => {
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+});
+
+// -- regions & country context -----------------------------------------------
+//
+// New, beyond the original 7-document handoff package, same shape as
+// the other "two systems the map never anticipated" CLAUDE.md records
+// (contest.js, behavior.js). `migration.generateRegion` and
+// `countryPacks.js` have real, cited, dated data for dozens of real
+// countries (income level, conflict level, current crime/tourism/
+// immigration, named political parties and war-faction figures, and
+// a regional fallback for anything without a dedicated entry) built
+// up over many rounds this session -- and until this route existed,
+// none of it was reachable outside this process. These three routes
+// close that gap: they add no calibration, no mechanic reads any of
+// this to decide an outcome (same report-only posture countryPacks.js
+// itself documents) -- they just make the data a client can actually
+// ask for.
+app.get('/api/regions', (_req, res) => {
+  const regions = engine.WorldState.regions || [];
+  res.json({ regions, total: regions.length });
+});
+
+app.get('/api/regions/:id', (req, res) => {
+  const region = (engine.WorldState.regions || []).find((r) => r.id === Number(req.params.id));
+  if (!region) return res.status(404).json({ error: 'region not found' });
+  return res.json(region);
+});
+
+// audit-route-guards: open -- creates simulation geography, no real-world principal
+app.post('/api/regions', (req, res) => {
+  try {
+    res.status(201).json(migration.generateRegion(engine.WorldState, req.body || {}));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// A direct reference lookup, no region required -- `key` is an
+// `ancestryPacks.GROUPS` entry or one of the standalone keys
+// `countryPacks.regionalContextFor`'s own header documents (Venezuela,
+// Cuba, Colombia, the Dominican Republic, Canada, Yemen, Puerto Rico,
+// Cape Verde, the Virgin Islands). 404 only when the key is genuinely
+// unclassified by this module at all -- a known-but-uncovered key
+// (e.g. a real country with no dedicated entry, in a region with no
+// overview either) still returns 200 with its honest coverageNote,
+// which is itself real information, not an error.
+app.get('/api/country-packs/:key', (req, res) => {
+  const context = countryPacks.regionalContextFor(req.params.key);
+  if (!context.dedicatedEntry && !context.standaloneEntry && !context.region) {
+    return res.status(404).json({ error: `no coverage at all for "${req.params.key}"`, ...context });
+  }
+  return res.json(context);
 });
 
 // -- properties -------------------------------------------------------------
