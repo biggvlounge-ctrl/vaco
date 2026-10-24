@@ -512,6 +512,132 @@
       });
   };
 
+  // -- assistant (floating, every app) -----------------------------------
+
+  // The fix for "the assistant should be reachable from every app
+  // without being its own app": every app already loads this one
+  // script, so the launcher lives here instead of in vaco-shell alone.
+  // Talks straight to vaco-assistant (:8828) over the same real
+  // `POST /api/assistant/chat` route vaco-shell's own server-side
+  // proxy calls -- `requireActor('userId')`-guarded exactly like every
+  // other session-protected route in this ecosystem. Cross-origin, so
+  // (unlike VACO.api, which only auto-attaches on a same-origin path)
+  // this attaches the Shield bearer token itself.
+  VACO.ASSISTANT_URL = global.VACO_ASSISTANT_URL || 'http://localhost:8828';
+
+  VACO.assistantChat = function (content) {
+    var userId = VACO.userId();
+    if (!userId) return Promise.reject(new Error('Sign in to talk to your assistant.'));
+    var headers = { 'Content-Type': 'application/json' };
+    headers.Authorization = 'Bearer ' + VACO.session.sessionToken;
+    return fetch(VACO.ASSISTANT_URL + '/api/assistant/chat', {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify({ userId: userId, content: content }),
+    }).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (body) {
+        if (!res.ok) throw new Error(body.error || 'vaco-assistant chat failed (' + res.status + ')');
+        return body;
+      });
+    });
+  };
+
+  var ASSISTANT_CSS = ''
+    + '.vaco-assistant-launcher{position:fixed;right:var(--vaco-space-5);bottom:var(--vaco-space-5);'
+    + 'width:52px;height:52px;border-radius:var(--vaco-radius-pill);border:1px solid var(--vaco-border);'
+    + 'background:var(--vaco-accent);color:var(--vaco-accent-ink);font-size:var(--vaco-text-lg);'
+    + 'box-shadow:var(--vaco-shadow-lg);cursor:pointer;z-index:90;display:flex;align-items:center;'
+    + 'justify-content:center;}'
+    + '.vaco-assistant-launcher:focus-visible{outline:2px solid var(--vaco-accent);outline-offset:2px;}'
+    + '.vaco-assistant-panel{position:fixed;right:var(--vaco-space-5);bottom:84px;width:320px;'
+    + 'max-height:420px;background:var(--vaco-surface);border:1px solid var(--vaco-border);'
+    + 'border-radius:var(--vaco-radius-lg);box-shadow:var(--vaco-shadow-lg);display:flex;'
+    + 'flex-direction:column;z-index:90;overflow:hidden;}'
+    + '.vaco-assistant-panel[hidden]{display:none;}'
+    + '.vaco-assistant-head{display:flex;align-items:center;justify-content:space-between;'
+    + 'padding:var(--vaco-space-3) var(--vaco-space-4);border-bottom:1px solid var(--vaco-border-subtle);}'
+    + '.vaco-assistant-log{flex:1;overflow-y:auto;padding:var(--vaco-space-3) var(--vaco-space-4);'
+    + 'display:flex;flex-direction:column;gap:var(--vaco-space-2);}'
+    + '.vaco-assistant-msg{font-size:var(--vaco-text-sm);line-height:1.4;max-width:92%;'
+    + 'padding:var(--vaco-space-2) var(--vaco-space-3);border-radius:var(--vaco-radius);}'
+    + '.vaco-assistant-msg--user{align-self:flex-end;background:var(--vaco-accent-soft);color:var(--vaco-text);}'
+    + '.vaco-assistant-msg--assistant{align-self:flex-start;background:var(--vaco-surface-hover);color:var(--vaco-text);}'
+    + '.vaco-assistant-form{display:flex;gap:var(--vaco-space-2);padding:var(--vaco-space-3);'
+    + 'border-top:1px solid var(--vaco-border-subtle);}'
+    + '.vaco-assistant-form input{flex:1;}';
+
+  function buildAssistantWidget() {
+    if (document.getElementById('vaco-assistant-launcher')) return;
+
+    var style = el('style');
+    style.textContent = ASSISTANT_CSS;
+    document.head.appendChild(style);
+
+    var launcher = el('button', 'vaco-assistant-launcher', '✦');
+    launcher.id = 'vaco-assistant-launcher';
+    launcher.type = 'button';
+    launcher.setAttribute('aria-label', 'Ask your Vaco Assistant');
+    launcher.setAttribute('aria-expanded', 'false');
+
+    var panel = el('div', 'vaco-assistant-panel');
+    panel.hidden = true;
+
+    var head = el('div', 'vaco-assistant-head');
+    head.appendChild(el('strong', 'vaco-small', 'Your Vaco Assistant'));
+    var closeBtn = VACO.button('✕', function () { togglePanel(false); }, 'ghost vaco-btn-sm');
+    closeBtn.setAttribute('aria-label', 'Close assistant');
+    head.appendChild(closeBtn);
+    panel.appendChild(head);
+
+    var log = el('div', 'vaco-assistant-log');
+    log.appendChild(el('p', 'vaco-small vaco-dim',
+      'The same personal AI on every app — relays anything domain-specific to VACON’s real executive agents.'));
+    panel.appendChild(log);
+
+    var form = el('form', 'vaco-assistant-form');
+    var input = el('input', 'vaco-input');
+    input.type = 'text';
+    input.placeholder = 'Ask anything…';
+    input.setAttribute('aria-label', 'Message your assistant');
+    var send = el('button', 'vaco-btn vaco-btn-primary vaco-btn-sm', 'Send');
+    send.type = 'submit';
+    form.appendChild(input);
+    form.appendChild(send);
+    panel.appendChild(form);
+
+    function togglePanel(nextOpen) {
+      var open = nextOpen !== undefined ? nextOpen : panel.hidden;
+      panel.hidden = !open;
+      launcher.setAttribute('aria-expanded', String(open));
+      if (open) input.focus();
+    }
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var text = input.value.trim();
+      if (!text) return;
+      log.appendChild(el('div', 'vaco-assistant-msg vaco-assistant-msg--user', text));
+      input.value = '';
+      log.scrollTop = log.scrollHeight;
+      send.disabled = true;
+      VACO.assistantChat(text)
+        // `.content`, not `.reply` -- `sendMessage`'s real return value
+        // is the recorded message record itself (see
+        // vaco-assistant/lib/personalAssistant.js's `recordMessage`).
+        .then(function (body) {
+          log.appendChild(el('div', 'vaco-assistant-msg vaco-assistant-msg--assistant', body.content || '…'));
+        })
+        .catch(VACO.error)
+        .then(function () { send.disabled = false; log.scrollTop = log.scrollHeight; });
+    });
+
+    launcher.addEventListener('click', function () { togglePanel(); });
+
+    document.body.appendChild(launcher);
+    document.body.appendChild(panel);
+  }
+  VACO.buildAssistantWidget = buildAssistantWidget;
+
   // -- chrome -----------------------------------------------------------
 
   function buildMasthead(config) {
@@ -695,6 +821,7 @@
     var main = el('main', 'vaco-container');
     main.id = 'vaco-main';
     document.body.appendChild(main);
+    buildAssistantWidget();
 
     // Deep-link into a tab by hash, falling back to the first.
     var hash = (global.location.hash || '').replace('#', '');
