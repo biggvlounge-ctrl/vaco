@@ -87,19 +87,23 @@ function renderReport(body) {
   var out = el('div', 'vaco-stack');
   out.appendChild(VACO.notice(
     'Filing a report is a serious act with real consequences for the person named. '
-    + 'It is recorded against a reporter, not anonymous — <strong>and there is no moderation queue built</strong>, '
-    + 'so nothing here reviews a report before it counts toward a subject’s signal. That gate is genuinely missing.',
-    'warn'));
+    + 'It is recorded against a reporter, not anonymous, and only a <strong>verified</strong> reporter can file one. '
+    + 'A report arrives <strong>pending</strong> and stays invisible to everyone — including a lookup on the subject — '
+    + 'until a moderator reviews it on the Moderate tab. Nothing here publishes on a timer or a threshold.'));
 
   out.appendChild(VACO.card('File a report', [
     VACO.form([
       { name: 'reporterId', label: 'Reporter', value: VACO.userId() || '', width: '140px' },
       { name: 'subjectId', label: 'Subject', placeholder: 'who', width: '140px' },
-      { name: 'category', label: 'Category', options: ['harassment', 'safety', 'fraud', 'no-show', 'other'] },
-      { name: 'detail', label: 'What happened', placeholder: 'briefly', width: '240px' },
+      // The real field is `flag`, green|red — not a category. Filing as
+      // anything else fails with "invalid flag" against the real
+      // submitYapReport signature; this previously sent `category` and
+      // `detail`, which the server has never read.
+      { name: 'flag', label: 'Flag', options: ['red', 'green'] },
+      { name: 'details', label: 'What happened', placeholder: 'briefly', width: '240px' },
     ], function (values) {
       return VACO.post('/yap/reports', values)
-        .then(function (r) { VACO.toast('Report ' + (r.id || '') + ' filed.'); });
+        .then(function (r) { VACO.toast('Report ' + (r.report && r.report.id || '') + ' filed — pending review.'); });
     }, 'File'),
   ]));
 
@@ -135,6 +139,96 @@ function renderReport(body) {
   return VACO.mount(body, out);
 }
 
+// -- Moderation queue ---------------------------------------------------
+//
+// There was no UI for this at all: `lib/moderation.js` has a real queue,
+// publish/reject decisions, and brigading detection, with its own test
+// file -- and the only way to reach any of it was a raw curl. Every
+// write here is a real decision a named moderator takes, per this app's
+// own standing rule ("a person decides, always"), so every action
+// carries an operator credential rather than a session token.
+
+function renderModerate(body) {
+  var out = el('div', 'vaco-stack');
+  var state = { credential: '' };
+
+  out.appendChild(VACO.notice(
+    'Every publish/reject/remove here needs a real operator credential (not just your session) — '
+    + 'this app records exactly who made each call, per its own standing rule that content review '
+    + 'is a human decision, never a timer or a threshold.', 'warn'));
+
+  out.appendChild(VACO.card('Operator credential', [
+    VACO.form([{ name: 'credential', label: 'X-Operator-Credential', placeholder: 'from vaco-operator', width: '220px' }],
+      function (values) { state.credential = values.credential; VACO.toast('Credential set for this session.'); }, 'Use this credential'),
+  ]));
+
+  var queueCard = el('div');
+  out.appendChild(queueCard);
+
+  function act(reportId, action, extra) {
+    if (!state.credential) { VACO.toast('Set an operator credential first.', 'warn'); return Promise.resolve(); }
+    return VACO.api('/yap/moderation/' + reportId + '/' + action, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Operator-Credential': state.credential },
+      body: JSON.stringify(extra || {}),
+    }).then(function () { VACO.toast('Report ' + reportId + ' ' + action + 'ed.'); loadQueue(); });
+  }
+
+  function loadQueue() {
+    if (!state.credential) {
+      queueCard.innerHTML = '';
+      queueCard.appendChild(VACO.card('Queue', [el('p', 'vaco-small vaco-dim', 'Set a credential above, then load the queue.')]));
+      return Promise.resolve();
+    }
+    return VACO.api('/yap/moderation/queue', { headers: { 'X-Operator-Credential': state.credential } })
+      .then(function (data) {
+        var queue = data.queue || [];
+        var depth = data.depth || {};
+        var rows = queue.length
+          ? queue.map(function (r) {
+              var box = el('div', 'report');
+              var head = el('div', 'vaco-row-tight');
+              head.appendChild(VACO.badge(r.flag, r.flag === 'red' ? 'warn' : 'money'));
+              head.appendChild(VACO.badge(r.status));
+              box.appendChild(head);
+              box.appendChild(el('p', 'vaco-small', 'Subject ' + r.subjectId + ' — ' + r.details));
+              var actions = el('div', 'vaco-row-tight');
+              actions.appendChild(VACO.button('Publish', function () { return act(r.id, 'publish'); }, 'primary'));
+              actions.appendChild(VACO.button('Reject', function () {
+                var reason = prompt('Reason for rejecting report ' + r.id + ' (required):');
+                if (!reason) return Promise.resolve();
+                return act(r.id, 'reject', { reason: reason });
+              }, 'ghost'));
+              box.appendChild(actions);
+              return box;
+            })
+          : [el('div', 'vaco-empty', 'Queue is empty — nothing pending or disputed.')];
+        queueCard.innerHTML = '';
+        queueCard.appendChild(VACO.card(
+          'Queue — ' + (depth.pending || 0) + ' pending, ' + (depth.disputed || 0) + ' disputed',
+          rows,
+        ));
+      });
+  }
+
+  out.appendChild(VACO.card('Brigading check', [
+    el('p', 'vaco-small vaco-dim',
+      'Flags a subject hit by ' + 3 + '+ distinct reporters inside 24 hours — a coordinated pile-on, not acted on automatically.'),
+    VACO.button('Check for brigading', function () {
+      if (!state.credential) { VACO.toast('Set an operator credential first.', 'warn'); return Promise.resolve(); }
+      return VACO.api('/yap/moderation/brigading', { headers: { 'X-Operator-Credential': state.credential } })
+        .then(function (data) {
+          var flagged = data.flagged || [];
+          VACO.toast(flagged.length ? flagged.length + ' subject(s) flagged.' : 'Nothing flagged right now.');
+        });
+    }),
+  ]));
+
+  out.appendChild(VACO.button('Load queue', function () { return loadQueue(); }, 'primary'));
+
+  return VACO.mount(body, out);
+}
+
 VACO.app({
   id: 'yap',
   name: 'YAP',
@@ -147,6 +241,7 @@ VACO.app({
   tabs: [
     { id: 'lookup', label: 'Lookup', heading: 'Check a subject', render: renderLookup },
     { id: 'report', label: 'Report', heading: 'File & review', render: renderReport },
+    { id: 'moderate', label: 'Moderate', heading: 'Queue, publish, reject, brigading', render: renderModerate },
   ],
 });
 </script>
