@@ -36,7 +36,18 @@
 // review, provenance authentication houses), the same posture VSAFE's
 // own `idVerification.js` already takes for identity documents.
 
+const { hashPayload } = require('./cryptoAgility');
+
 const VERIFICATION_STATUSES = ['pending', 'verified', 'rejected'];
+
+// The real decision a verification record exists to make
+// (`approveVerification`/`rejectVerification`) gets a real,
+// tamper-evident hash through the same crypto-agility layer V3's
+// vcoin.js/vash.js now attach to every real transaction -- the same
+// posture applied to identity/authenticity decisions, not just money.
+function integrityHashFor(fields) {
+  return hashPayload(fields).hash;
+}
 const AUTHENTICITY_GRADES = ['A', 'B', 'C'];
 
 function submitVerification(store, options = {}) {
@@ -72,6 +83,7 @@ function submitVerification(store, options = {}) {
     reviewedBy: null,
     reviewNotes: null,
     reviewedAt: null,
+    integrityHash: null,
     createdAt: now,
   };
   store.verifications.push(verification);
@@ -116,6 +128,11 @@ function approveVerification(store, options = {}) {
   verification.grade = grade;
   verification.reviewedBy = reviewedBy;
   verification.reviewedAt = now;
+  verification.integrityHash = integrityHashFor({
+    id: verification.id, subjectType: verification.subjectType, subjectId: verification.subjectId,
+    claimType: verification.claimType, status: verification.status, grade: verification.grade,
+    reviewedBy: verification.reviewedBy, reviewedAt: verification.reviewedAt,
+  });
   return verification;
 }
 
@@ -129,6 +146,11 @@ function rejectVerification(store, options = {}) {
   verification.reviewedBy = reviewedBy;
   verification.reviewNotes = reason;
   verification.reviewedAt = now;
+  verification.integrityHash = integrityHashFor({
+    id: verification.id, subjectType: verification.subjectType, subjectId: verification.subjectId,
+    claimType: verification.claimType, status: verification.status, reviewedBy: verification.reviewedBy,
+    reviewNotes: verification.reviewNotes, reviewedAt: verification.reviewedAt,
+  });
   return verification;
 }
 

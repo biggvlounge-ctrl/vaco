@@ -22,7 +22,20 @@
 // across this ecosystem assert against this exact number, so it's
 // preserved exactly, not just "similar."
 
+const { hashPayload } = require('./cryptoAgility');
+
 const STARTING_VCOIN_BALANCE = 1000;
+
+// Every real transaction record gets a real, tamper-evident hash over
+// its own decided fields, through the same crypto-agility layer
+// `describeCryptoPosture` already reports on -- that module existed
+// but was wired into nothing before this; a record is the first real
+// consumer. Computed over a plain object built from the arguments,
+// never the record itself (so pushing the hash onto the record can
+// never change what was hashed).
+function integrityHashFor(fields) {
+  return hashPayload(fields).hash;
+}
 
 function round(n) {
   return Math.round(n * 100) / 100;
@@ -63,13 +76,15 @@ function transfer(store, options = {}) {
   store.vcoinBalances[fromUserId] = round(fromBalance - amount);
   store.vcoinBalances[toUserId] = round(getBalance(store, toUserId) + amount);
 
+  const id = store.nextTransactionId++;
   const transaction = {
-    id: store.nextTransactionId++, fromUserId, toUserId, amount, reason, timestamp: now,
+    id, fromUserId, toUserId, amount, reason, timestamp: now,
     // Added alongside cashout recording. Additive on purpose: every
     // existing consumer reads fromUserId/toUserId/amount and is
     // unaffected, but the ledger can no longer be read as "everything
     // in here is a transfer between two users" -- because it is not.
     type: 'transfer',
+    integrityHash: integrityHashFor({ id, fromUserId, toUserId, amount, reason, timestamp: now, type: 'transfer' }),
   };
   store.transactions.push(transaction);
 
@@ -176,8 +191,9 @@ function settle(store, options = {}) {
     store.vcoinBalances[fromUserId] = round(getBalance(store, fromUserId) - amount);
     store.vcoinBalances[toUserId] = round(getBalance(store, toUserId) + amount);
 
+    const id = store.nextTransactionId++;
     const transaction = {
-      id: store.nextTransactionId++,
+      id,
       fromUserId,
       toUserId,
       amount,
@@ -189,6 +205,9 @@ function settle(store, options = {}) {
       // happened together.
       settlementId,
       settlementReason: reason,
+      integrityHash: integrityHashFor({
+        id, fromUserId, toUserId, amount, reason: legReason, timestamp: now, type: 'transfer', settlementId, settlementReason: reason,
+      }),
     };
     store.transactions.push(transaction);
     return transaction;

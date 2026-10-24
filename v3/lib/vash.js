@@ -6,6 +6,7 @@
 // real rate" just because it now lives in its own dedicated service.
 
 const { getBalance: getVcoinBalance } = require('./vcoin');
+const { hashPayload } = require('./cryptoAgility');
 
 const VCOIN_TO_VASH_RATE = 0.01; // inferred, not specified anywhere -- flagged, preserved as-is from the mock
 
@@ -47,8 +48,9 @@ function cashout(store, options = {}) {
   store.vcoinBalances[userId] = round(currentVcoin - vcoinAmount);
   store.vashBalances[userId] = round(getVashBalance(store, userId) + vashAmount);
 
-  store.transactions.push({
-    id: store.nextTransactionId++,
+  const id = store.nextTransactionId++;
+  const fields = {
+    id,
     fromUserId: userId,
     toUserId: null,
     amount: vcoinAmount,
@@ -57,7 +59,11 @@ function cashout(store, options = {}) {
     type: 'cashout',
     vashCredited: vashAmount,
     rate: VCOIN_TO_VASH_RATE,
-  });
+  };
+  // Same real, tamper-evident hash vcoin.js's transfer/settle attach --
+  // a VASH cashout is the one operation that moves both ledgers, so it
+  // gets the same treatment, not a weaker one.
+  store.transactions.push({ ...fields, integrityHash: hashPayload(fields).hash });
 
   return {
     userId,
