@@ -40,6 +40,7 @@ function createVokenStore() {
     referralGrowth: [],
     spins: [],
     nextSpinId: 1,
+    nextSellBackId: 1,
   };
 }
 

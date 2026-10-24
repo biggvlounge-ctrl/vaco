@@ -45,6 +45,7 @@ const auctions = require('../lib/auctions');
 const fractional = require('../lib/fractionalOwnership');
 const merch = require('../lib/limitedEditionMerch');
 const referrals = require('../lib/referralGrowth');
+const sellBack = require('../lib/sellBack');
 
 const NOW = Date.UTC(2026, 5, 1);
 const DAY = 24 * 3600000;
@@ -926,6 +927,205 @@ test('spin prize odds are published and sum to a whole', () => {
   for (const prize of referrals.SPIN_PRIZES) {
     assert.ok(Number.isFinite(prize.vcoin) && prize.vcoin >= 0);
   }
+});
+
+// -- 9. Sell Back (instant buyback) ---------------------------------------
+
+test('sell-back value scales within the rarity tier\'s flagged range, and never crosses tiers', () => {
+  const low = sellBack.computeSellBackValue({ rarityTier: 'rare', combinedRealValueScore: 0 });
+  const high = sellBack.computeSellBackValue({ rarityTier: 'rare', combinedRealValueScore: 100 });
+  const mid = sellBack.computeSellBackValue({ rarityTier: 'rare', combinedRealValueScore: 50 });
+  const [min, max] = sellBack.SELLBACK_VALUE_RANGES.rare;
+
+  assert.strictEqual(low.fairMarketValue, min, 'score 0 bottoms out at the tier floor');
+  assert.strictEqual(high.fairMarketValue, max, 'score 100 tops out at the tier ceiling');
+  assert.ok(mid.fairMarketValue > low.fairMarketValue && mid.fairMarketValue < high.fairMarketValue,
+    'a mid score lands strictly between the floor and ceiling');
+
+  // The published range itself must widen as rarity climbs -- a rarer
+  // tier's floor and ceiling are each at least as high as the next
+  // tier down's, even though an exceptional low-tier card (a perfect
+  // epic) can still out-earn a weak high-tier one within that range.
+  const { RARITY_TIERS } = require('../lib/cardTypes');
+  for (let i = 1; i < RARITY_TIERS.length; i += 1) {
+    const [prevMin, prevMax] = sellBack.SELLBACK_VALUE_RANGES[RARITY_TIERS[i - 1]];
+    const [curMin, curMax] = sellBack.SELLBACK_VALUE_RANGES[RARITY_TIERS[i]];
+    assert.ok(curMin >= prevMin && curMax > prevMax,
+      `${RARITY_TIERS[i]}'s range must sit at or above ${RARITY_TIERS[i - 1]}'s`);
+  }
+});
+
+test('computeSellBackValue refuses an invalid rarity tier or an out-of-range score', () => {
+  assert.throws(() => sellBack.computeSellBackValue({ rarityTier: 'nonsense', combinedRealValueScore: 50 }),
+    /invalid rarityTier/);
+  assert.throws(() => sellBack.computeSellBackValue({ rarityTier: 'rare', combinedRealValueScore: 150 }),
+    /combinedRealValueScore between 0 and 100/);
+  assert.throws(() => sellBack.computeSellBackValue({ rarityTier: 'rare', combinedRealValueScore: NaN }),
+    /combinedRealValueScore between 0 and 100/);
+});
+
+test('selling a card back pays the seller and moves the edition to the platform', async () => {
+  const store = createVokenStore();
+  const settleFn = ledger({ [VOKEN_PLATFORM_ACCOUNT]: 10000 });
+  const subject = cardOwnedBy(store, 'nova', { rarityTier: 'epic' });
+
+  const result = await sellBack.sellBackCard(store, {
+    cardId: subject.id, editionNumber: 1, format: 'digital', sellerId: 'nova',
+    combinedRealValueScore: 80, settleFn,
+  });
+
+  const [min, max] = sellBack.SELLBACK_VALUE_RANGES.epic;
+  const expected = Math.round((min + (max - min) * 0.8) * 100) / 100;
+  assert.strictEqual(result.fairMarketValue, expected);
+  assert.strictEqual(settleFn.of('nova'), expected, 'the seller was actually paid');
+  assert.strictEqual(getCultureCard(store, subject.id).editions[0].ownerId, VOKEN_PLATFORM_ACCOUNT,
+    'the card the platform just paid for must leave the seller\'s custody');
+  assert.strictEqual(settleFn.drift(), 0);
+});
+
+test('selling back an edition you do not own is refused, and nothing is charged', async () => {
+  const store = createVokenStore();
+  const settleFn = ledger({ [VOKEN_PLATFORM_ACCOUNT]: 10000 });
+  const subject = cardOwnedBy(store, 'nova');
+
+  await assert.rejects(() => sellBack.sellBackCard(store, {
+    cardId: subject.id, editionNumber: 1, format: 'digital', sellerId: 'not-nova',
+    combinedRealValueScore: 50, settleFn,
+  }), /is not owned by/);
+  assert.ok(settleFn.movedNothing());
+});
+
+test('a failed sell-back payout leaves the edition with the seller, not the platform', async () => {
+  const store = createVokenStore();
+  const subject = cardOwnedBy(store, 'nova');
+  const declining = async () => { throw new Error('V3 unreachable'); };
+
+  await assert.rejects(() => sellBack.sellBackCard(store, {
+    cardId: subject.id, editionNumber: 1, format: 'digital', sellerId: 'nova',
+    combinedRealValueScore: 50, settleFn: declining,
+  }), /V3 unreachable/);
+
+  // The claim-before-pay pattern must restore ownership on a throw --
+  // a seller paid nothing must never also lose the card.
+  assert.strictEqual(getCultureCard(store, subject.id).editions[0].ownerId, 'nova');
+});
+
+test('two concurrent sell-backs of the same edition — only one is paid, the other is refused', async () => {
+  const store = createVokenStore();
+  const settleFn = idempotentLedger({ [VOKEN_PLATFORM_ACCOUNT]: 10000 });
+  const subject = cardOwnedBy(store, 'nova');
+
+  const results = await Promise.allSettled([
+    sellBack.sellBackCard(store, { cardId: subject.id, editionNumber: 1, format: 'digital', sellerId: 'nova', combinedRealValueScore: 50, settleFn }),
+    sellBack.sellBackCard(store, { cardId: subject.id, editionNumber: 1, format: 'digital', sellerId: 'nova', combinedRealValueScore: 50, settleFn }),
+  ]);
+
+  // The claim happens synchronously, before either call's first await,
+  // so the second caller must see the edition already owned by the
+  // platform and be refused -- the same race settleOnce.js's header
+  // documents fixing in four other apps, here with VOKEN paying out
+  // instead of taking a payment.
+  const fulfilled = results.filter((r) => r.status === 'fulfilled');
+  const rejected = results.filter((r) => r.status === 'rejected');
+  assert.strictEqual(fulfilled.length, 1, 'exactly one sell-back of the same edition may succeed');
+  assert.strictEqual(rejected.length, 1);
+  assert.strictEqual(settleFn.realCalls(), 1, 'the seller must be paid exactly once');
+  assert.strictEqual(getCultureCard(store, subject.id).editions[0].ownerId, VOKEN_PLATFORM_ACCOUNT);
+});
+
+test('a card sold back, re-acquired, and sold back again settles both times, against a real idempotency-enforcing ledger', () => {
+  // The bug class this guards against, same shape as every other
+  // idempotency-key test in this file: a key missing a per-sell-back
+  // nonce would make the second sell-back of the same edition collide
+  // with the first under a real, fingerprint-checking ledger.
+  return (async () => {
+    const store = createVokenStore();
+    const settleFn = idempotentLedger({ [VOKEN_PLATFORM_ACCOUNT]: 10000 });
+    const subject = cardOwnedBy(store, 'nova');
+
+    const first = await sellBack.sellBackCard(store, {
+      cardId: subject.id, editionNumber: 1, format: 'digital', sellerId: 'nova', combinedRealValueScore: 50, settleFn,
+    });
+    // The platform now owns the edition; hand it back to a new seller
+    // the way a later resale or re-grant would, then sell back again.
+    require('../lib/cultureCards').transferEditionOwnership(store, {
+      cardId: subject.id, editionNumber: 1, format: 'digital', fromOwnerId: VOKEN_PLATFORM_ACCOUNT, toOwnerId: 'rio',
+    });
+    const second = await sellBack.sellBackCard(store, {
+      cardId: subject.id, editionNumber: 1, format: 'digital', sellerId: 'rio', combinedRealValueScore: 50, settleFn,
+    });
+
+    assert.notStrictEqual(first.sellBackId, second.sellBackId);
+    assert.strictEqual(settleFn.realCalls(), 2, 'both sell-backs must actually reach the ledger');
+    assert.strictEqual(settleFn.of('nova'), first.fairMarketValue);
+    assert.strictEqual(settleFn.of('rio'), second.fairMarketValue);
+  })();
+});
+
+// -- 10. Pack odds disclosure ----------------------------------------------
+
+test('pack odds are computed from the real candidate pool, matching hand-counted combinations', () => {
+  const store = createVokenStore();
+  const tier = packs.createPackTier(store, { tierName: 'basic', price: 10, cardsPerPack: 2 });
+  // 2 common + 1 rare + 1 epic, drawing 2 of 4 with no guarantee: of
+  // the 6 equally-likely pairs, {common,common}=1, {*,rare}-best=2,
+  // {*,epic}-best=3 (epic also covers the {rare,epic} pair).
+  const ids = [
+    card(store, { rarityTier: 'common' }).id,
+    card(store, { rarityTier: 'common' }).id,
+    card(store, { rarityTier: 'rare' }).id,
+    card(store, { rarityTier: 'epic' }).id,
+  ];
+
+  const odds = packs.getPackOdds(store, { packTierId: tier.packTierId, candidateCardIds: ids });
+
+  assert.strictEqual(odds.poolSize, 4);
+  assert.strictEqual(odds.drawCount, 2);
+  const round4 = (n) => Math.round(n * 10000) / 10000;
+  assert.strictEqual(odds.bestCardRarityOdds.common, round4(1 / 6));
+  assert.strictEqual(odds.bestCardRarityOdds.uncommon, 0, 'no uncommon card is in the pool at all');
+  assert.strictEqual(odds.bestCardRarityOdds.rare, round4(2 / 6));
+  assert.strictEqual(odds.bestCardRarityOdds.epic, round4(3 / 6));
+  assert.strictEqual(odds.bestCardRarityOdds.legendary, 0);
+
+  const total = Object.values(odds.bestCardRarityOdds).reduce((a, b) => a + b, 0);
+  assert.ok(Math.abs(total - 1) < 1e-6, 'a pack always has some best card — the distribution sums to 1');
+  assert.strictEqual(odds.atLeastOneOfRarityOrBetter.rare, round4(2 / 6 + 3 / 6),
+    '"rare-or-better" must include the epic-best draws too');
+});
+
+test('a guaranteed-minimum-rarity tier moves all the odds below the floor up to the real swap-in card, never off the books', () => {
+  const store = createVokenStore();
+  const tier = packs.createPackTier(store, {
+    tierName: 'premium', price: 50, cardsPerPack: 2, guaranteedMinimumRarity: 'epic',
+  });
+  const ids = [
+    card(store, { rarityTier: 'common' }).id,
+    card(store, { rarityTier: 'common' }).id,
+    card(store, { rarityTier: 'rare' }).id,
+    card(store, { rarityTier: 'epic' }).id,
+  ];
+
+  const odds = packs.getPackOdds(store, { packTierId: tier.packTierId, candidateCardIds: ids });
+
+  // The only card meeting "epic-or-better" in this pool is the epic
+  // itself, so every draw must end up with epic as its best card.
+  assert.strictEqual(odds.bestCardRarityOdds.epic, 1);
+  assert.strictEqual(odds.bestCardRarityOdds.common, 0, 'the guarantee forbids ending below the floor');
+  assert.strictEqual(odds.bestCardRarityOdds.rare, 0);
+  assert.strictEqual(odds.atLeastOneOfRarityOrBetter.epic, 1);
+  assert.ok(odds.guaranteeNote && odds.guaranteeNote.includes('epic'));
+});
+
+test('odds disclosure refuses a guarantee the real pool cannot meet, the same as openPack itself', () => {
+  const store = createVokenStore();
+  const tier = packs.createPackTier(store, {
+    tierName: 'chase', price: 500, cardsPerPack: 2, guaranteedMinimumRarity: 'mythic',
+  });
+  const ids = [card(store, { rarityTier: 'epic' }).id, card(store, { rarityTier: 'rare' }).id];
+
+  assert.throws(() => packs.getPackOdds(store, { packTierId: tier.packTierId, candidateCardIds: ids }),
+    /no available card meets the guaranteed minimum rarity/);
 });
 
 // -- Every money path refuses a non-finite amount -------------------------

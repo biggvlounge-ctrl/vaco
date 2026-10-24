@@ -146,6 +146,124 @@ async function openPack(store, options = {}) {
   };
 }
 
+function round4(n) {
+  return Math.round(n * 10000) / 10000;
+}
+
+// P(every one of `drawCount` cards drawn without replacement from a
+// pool of `totalSize` comes from a sub-pool of `poolSize`) =
+// product_{i=0}^{drawCount-1} (poolSize-i)/(totalSize-i) -- the ratio
+// of binomial coefficients C(poolSize,drawCount)/C(totalSize,drawCount)
+// written without ever computing either coefficient directly, so it
+// never overflows regardless of pool size.
+function probabilityAllDrawnFromSubPool(poolSize, totalSize, drawCount) {
+  if (drawCount > poolSize) return 0;
+  let p = 1;
+  for (let i = 0; i < drawCount; i += 1) {
+    p *= (poolSize - i) / (totalSize - i);
+  }
+  return p;
+}
+
+// Real, honest pre-purchase odds disclosure, matching the real gap
+// against PrizePicks' Packs (pre-purchase odds disclosed per tier
+// before buying) -- computed from the *actual* candidate-card pool a
+// real `openPack` call would draw from, never a static or invented
+// table. Mirrors `openPack`'s own eligibility filter and
+// guaranteed-minimum-rarity swap-in exactly, so the disclosed odds are
+// the odds that call would actually produce, not an approximation of
+// them.
+//
+// Discloses the probability distribution of the single best (highest-
+// rarity) card a pack would contain, plus the derived "at least one
+// X-or-better" cumulative odds real card-collectible disclosures use.
+function getPackOdds(store, options = {}) {
+  const { packTierId, candidateCardIds } = options;
+
+  const packTier = getPackTier(store, packTierId);
+  if (!packTier) throw new Error(`getPackOdds: no pack tier with id ${packTierId}`);
+  if (!Array.isArray(candidateCardIds) || candidateCardIds.length === 0) {
+    throw new Error('getPackOdds requires at least one candidateCardId');
+  }
+
+  const available = candidateCardIds
+    .map((id) => getCultureCard(store, id))
+    .filter((c) => c && countMintedEditions(c, 'digital') < c.mintPlan.plannedDigitalMintCount);
+
+  if (available.length === 0) {
+    throw new Error('getPackOdds: no candidate cards have any remaining digital editions to mint');
+  }
+
+  const poolSize = available.length;
+  const drawCount = Math.min(packTier.cardsPerPack, poolSize);
+
+  const countByRank = RARITY_TIERS.map(() => 0);
+  for (const c of available) countByRank[RARITY_RANK[c.rarityTier]] += 1;
+
+  const cumulativeAtOrBelowRank = [];
+  let running = 0;
+  for (let r = 0; r < RARITY_TIERS.length; r += 1) {
+    running += countByRank[r];
+    cumulativeAtOrBelowRank[r] = running;
+  }
+
+  // P(natural best-drawn rank <= r) -- every drawn card comes from the
+  // sub-pool at rank <= r.
+  const probAtMostRank = (r) => (r < 0 ? 0 : probabilityAllDrawnFromSubPool(cumulativeAtOrBelowRank[r], poolSize, drawCount));
+
+  // P(natural best-drawn rank == r), by telescoping the cumulative --
+  // sums to 1 across all ranks by construction.
+  const naturalBestByRank = RARITY_TIERS.map((_, r) => probAtMostRank(r) - probAtMostRank(r - 1));
+
+  let finalBestByRank = naturalBestByRank;
+  let guaranteeNote = null;
+
+  if (packTier.guaranteedMinimumRarity) {
+    const requiredRank = RARITY_RANK[packTier.guaranteedMinimumRarity];
+    const qualifyingRanks = available
+      .map((c) => RARITY_RANK[c.rarityTier])
+      .filter((rank) => rank >= requiredRank);
+    if (qualifyingRanks.length === 0) {
+      throw new Error(`getPackOdds: no available card meets the guaranteed minimum rarity "${packTier.guaranteedMinimumRarity}"`);
+    }
+    // The rank `openPack` would actually swap in -- deterministic given
+    // the pool, since it always picks the single best qualifying card.
+    const swapInRank = Math.max(...qualifyingRanks);
+    const probBelowGuarantee = probAtMostRank(requiredRank - 1);
+
+    // Every draw whose natural best falls below the guarantee gets
+    // upgraded to exactly `swapInRank` -- that mass moves there, and
+    // ranks below the guarantee can never be the final best.
+    finalBestByRank = RARITY_TIERS.map((_, r) => {
+      if (r < requiredRank) return 0;
+      if (r === swapInRank) return naturalBestByRank[r] + probBelowGuarantee;
+      return naturalBestByRank[r];
+    });
+    guaranteeNote = `Every pack is guaranteed at least one ${packTier.guaranteedMinimumRarity}-or-better card; `
+      + `${round4(probBelowGuarantee * 100)}% of draws would not have met that naturally and receive the best qualifying card available.`;
+  }
+
+  const bestCardRarityOdds = {};
+  RARITY_TIERS.forEach((tier, r) => { bestCardRarityOdds[tier] = round4(finalBestByRank[r]); });
+
+  const atLeastOneOfRarityOrBetter = {};
+  let cumulativeFromTop = 0;
+  for (let r = RARITY_TIERS.length - 1; r >= 0; r -= 1) {
+    cumulativeFromTop += finalBestByRank[r];
+    atLeastOneOfRarityOrBetter[RARITY_TIERS[r]] = round4(cumulativeFromTop);
+  }
+
+  return {
+    packTierId,
+    poolSize,
+    drawCount,
+    guaranteedMinimumRarity: packTier.guaranteedMinimumRarity,
+    guaranteeNote,
+    bestCardRarityOdds,
+    atLeastOneOfRarityOrBetter,
+  };
+}
+
 module.exports = {
   PACK_TIER_NAMES,
   DIGITAL_OR_PHYSICAL,
@@ -154,4 +272,5 @@ module.exports = {
   createPackTier,
   getPackTier,
   openPack,
+  getPackOdds,
 };

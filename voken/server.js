@@ -46,7 +46,8 @@ const {
   mintCultureCard, mintExternalEntityCard, getCultureCard, listCultureCardsByCategory, mintAdditionalEdition, transferEditionOwnership, listEditionsWithSerials} = require('./lib/cultureCards');
 const { computeCultureCardValueScore } = require('./lib/valueAlgorithm');
 const { assessEstablishedCreator } = require('./lib/establishedCreatorAssessment');
-const { PACK_TIER_NAMES, createPackTier, getPackTier, openPack } = require('./lib/cardPacks');
+const { PACK_TIER_NAMES, createPackTier, getPackTier, openPack, getPackOdds } = require('./lib/cardPacks');
+const { SELLBACK_VALUE_RANGES, computeSellBackValue, sellBackCard } = require('./lib/sellBack');
 const {
   REFERRAL_TIERS, SPIN_PRIZES, getReferralProgress, recordReferral, spinWheel,
 } = require('./lib/referralGrowth');
@@ -294,6 +295,7 @@ app.get('/api/health', (_req, res) => {
     merchItemTypes: ITEM_TYPES,
     referralTiers: REFERRAL_TIERS, spinPrizes: SPIN_PRIZES,
     sourceApps: SOURCE_APPS, mintedByRoles: MINTED_BY_ROLES,
+    sellBackValueRanges: SELLBACK_VALUE_RANGES,
   });
 });
 
@@ -390,6 +392,33 @@ app.post('/api/card/:id/value-score', requireSession(), async (req, res) => {
   }
 });
 
+// A real, no-commitment quote -- the same `combinedRealValueScore`
+// the sell-back route itself will use to price the payout, surfaced
+// first so a seller can see the number before giving up the card.
+app.post('/api/card/:id/sell-back-quote', requireSession(), (req, res) => {
+  try {
+    const card = getCultureCard(store, Number(req.params.id));
+    if (!card) return res.status(404).json({ error: `no card with id ${req.params.id}` });
+    res.json(computeSellBackValue({ rarityTier: card.rarityTier, combinedRealValueScore: req.body.combinedRealValueScore }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Real instant buyback, matching PrizePicks' real "Sell Back" --
+// pays the seller a flagged, interpretive fair market value (see
+// lib/sellBack.js) and moves the edition to the platform account.
+// `combinedRealValueScore` is supplied by the caller (run the
+// value-score route above first), the same injected-signal posture
+// valueAlgorithm.js itself takes.
+app.post('/api/card/:id/sell-back', requireActor('sellerId'), async (req, res) => {
+  try {
+    res.json(await sellBackCard(store, { ...req.body, cardId: Number(req.params.id), settleFn: settleVCoin }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.post('/api/established-creator-assessment', requireActor('creatorId'), (req, res) => {
   try {
     res.status(201).json(assessEstablishedCreator(store, req.body || {}));
@@ -422,6 +451,18 @@ app.post('/api/pack-tier/:id/open', requireActor('buyerId'), async (req, res) =>
     res.status(201).json(await openPack(store, {
       ...req.body, packTierId: Number(req.params.id), settleFn: settleVCoin,
     }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Real pre-purchase odds disclosure, matching the gap against
+// PrizePicks' Packs (odds shown before buying, not after). Read-only
+// and computed from the real candidate pool the request names, so a
+// session is enough -- same posture as the value-score route below.
+app.post('/api/pack-tier/:id/odds', requireSession(), (req, res) => {
+  try {
+    res.json(getPackOdds(store, { ...req.body, packTierId: Number(req.params.id) }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
