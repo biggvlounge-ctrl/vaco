@@ -127,6 +127,8 @@ function createHvntzStore() {
     nextRevenueShareAgreementId: 1,
     revenueDistributions: [],
     nextRevenueDistributionId: 1,
+    trainingEnrollments: [],
+    nextTrainingEnrollmentId: 1,
   };
 }
 

@@ -46,6 +46,9 @@ const {
 } = require('./lib/adReview');
 const { getScreenAnalytics } = require('./lib/screenAnalytics');
 const {
+  listCourses, getCourse, enrollBusiness, completeCourse, getBusinessProgress, getRecommendedCourses,
+} = require('./lib/training');
+const {
   NETWORK_NODE_STATUSES, findNetwork, findNode, createNetwork, inviteNode,
   respondToInvitation, removeNode, linkVavltChannel, unlinkVavltChannel,
   linkNetworkScreenSession, unlinkNetworkScreenSession,
@@ -807,6 +810,58 @@ app.post('/api/ad-submission/:id/run', requireOperator('hvntz:settle'), async (r
 app.get('/api/screen-analytics/:businessId', (req, res) => {
   try {
     res.json(getScreenAnalytics(store, Number(req.params.businessId)));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// -- Hunts Academy: business owner training --------------------------
+//
+// The catalog and a course's own content are public reads — a
+// business shouldn't need to log in to see what a course teaches.
+// Enrolling, completing, and reading your own progress are actions on
+// a specific business's record, so they're owner-gated the same way
+// every other per-business write in this file is.
+
+app.get('/api/training/courses', (_req, res) => {
+  res.json({ courses: listCourses() });
+});
+
+app.get('/api/training/courses/:courseId', (req, res) => {
+  try {
+    res.json(getCourse(req.params.courseId));
+  } catch (err) {
+    res.status(404).json({ error: err.message });
+  }
+});
+
+app.post('/api/training/enroll', requireBodyBusinessOwner(), (req, res) => {
+  try {
+    res.status(201).json(enrollBusiness(store, req.body || {}));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/training/complete', requireBodyBusinessOwner(), (req, res) => {
+  try {
+    res.json(completeCourse(store, req.body || {}));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/training/progress/:businessId', requireParamBusinessOwner('businessId'), (req, res) => {
+  try {
+    res.json(getBusinessProgress(store, Number(req.params.businessId)));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/training/recommended/:businessId', requireParamBusinessOwner('businessId'), (req, res) => {
+  try {
+    res.json({ recommended: getRecommendedCourses(store, Number(req.params.businessId)) });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

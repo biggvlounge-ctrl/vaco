@@ -103,6 +103,111 @@ function renderRevenue(body) {
   });
 }
 
+function courseFormatLabel(format) {
+  return {
+    'self-paced-online': 'Self-paced online',
+    'in-app': 'In the app',
+    'live-virtual': 'Live virtual class',
+    'recorded-virtual': 'Recorded virtual class',
+    'in-person-city': 'In-person',
+  }[format] || format;
+}
+
+function renderTraining(body) {
+  var out = el('div', 'vaco-stack');
+
+  out.appendChild(VACO.card('Hunts Academy', [
+    el('p', 'vaco-small vaco-dim',
+      'Real training on how a business actually earns through HVNTZ: your VDP digital double, the Vavlt Stvdios '
+      + 'streaming unlock, and the screen network’s scans and direct-to-consumer sales — plus a course '
+      + 'for VENVS sellers on selling through that same screen network.'),
+    VACO.form([{ name: 'businessId', label: 'Business id', width: '150px', value: '1' }], function (values) {
+      return loadTraining(out, body, values.businessId);
+    }, 'Load my courses'),
+  ]));
+
+  out.appendChild(el('div', 'vaco-empty',
+    'Enter your business id above, signed in as its owner, to see recommended courses and track progress.'));
+  return VACO.mount(body, out);
+}
+
+function loadTraining(out, body, businessId) {
+  var numericId = Number(businessId);
+  return Promise.all([
+    VACO.api('/api/training/courses'),
+    VACO.api('/api/training/recommended/' + encodeURIComponent(businessId)).catch(function () { return null; }),
+    VACO.api('/api/training/progress/' + encodeURIComponent(businessId)).catch(function () { return null; }),
+  ]).then(function (r) {
+    var courses = r[0].courses, recommended = r[1], progress = r[2];
+    var statusByCourse = {};
+    if (progress) {
+      progress.enrollments.forEach(function (e) { statusByCourse[e.courseId] = e.status; });
+    }
+
+    var replacement = el('div', 'vaco-stack');
+
+    if (!progress) {
+      replacement.appendChild(VACO.notice(
+        'Sign in above as this business’s owner to see recommendations, enroll, and track progress.', 'warn'));
+    } else {
+      // Server-computed from this business's real Digital Twin level and
+      // participation, not a static "take everything" list -- see
+      // `getRecommendedCourses` in lib/training.js.
+      replacement.appendChild(VACO.card('Recommended next', [
+        el('p', 'vaco-small vaco-dim', 'Chosen from this business’s own real progress, not a fixed list.'),
+        VACO.table([
+          { key: 'title', label: 'Course' },
+          { label: 'Format', render: function (c) {
+            return courseFormatLabel(c.format) + (c.city ? ' · ' + c.city : '');
+          } },
+        ], recommended.recommended, { empty: 'Nothing recommended right now — you are caught up.' }),
+      ]));
+
+      replacement.appendChild(VACO.card('Your progress', [
+        el('p', 'vaco-small', progress.completedCount + ' of ' + progress.totalCourses + ' courses completed'),
+      ]));
+    }
+
+    replacement.appendChild(VACO.card('Full catalog', [
+      VACO.table([
+        { key: 'title', label: 'Course' },
+        { label: 'Format', render: function (c) {
+          return courseFormatLabel(c.format) + (c.city ? ' · ' + c.city : '');
+        } },
+        { label: 'Status', render: function (c) {
+          var status = statusByCourse[c.id];
+          return status ? VACO.badge(status) : el('span', 'vaco-small vaco-dim', 'Not enrolled');
+        } },
+        { label: '', render: function (c) {
+          if (!progress) return null;
+          var status = statusByCourse[c.id];
+          if (status === 'completed') return null;
+          if (status === 'enrolled') {
+            return VACO.button('Mark complete', function () {
+              return VACO.post('/api/training/complete', { businessId: numericId, courseId: c.id })
+                .then(function () { return loadTraining(out, body, businessId); })
+                .then(function () { VACO.toast('Marked complete'); });
+            }, 'sm');
+          }
+          return VACO.button('Enroll', function () {
+            return VACO.post('/api/training/enroll', { businessId: numericId, courseId: c.id })
+              .then(function () { return loadTraining(out, body, businessId); })
+              .then(function () { VACO.toast('Enrolled'); });
+          }, 'sm');
+        } },
+      ], courses, { empty: 'No courses yet.' }),
+    ]));
+
+    while (out.childNodes.length > 1) out.removeChild(out.lastChild);
+    out.appendChild(replacement);
+    VACO.mount(body, out);
+  }).catch(function (err) {
+    while (out.childNodes.length > 1) out.removeChild(out.lastChild);
+    out.appendChild(VACO.notice('Could not load training: ' + VACO.escapeHtml(err.message), 'danger'));
+    VACO.mount(body, out);
+  });
+}
+
 function renderBusiness(body) {
   var out = el('div', 'vaco-stack');
   out.appendChild(VACO.card('Look up a business', [
@@ -162,6 +267,8 @@ VACO.app({
       blurb: 'Progress, and a real break recommendation when the pace warrants one.', render: renderHunts },
     { id: 'business', label: 'Business', heading: 'Businesses & neighbours', render: renderBusiness },
     { id: 'revenue', label: 'Revenue', heading: 'The revenue stack', render: renderRevenue },
+    { id: 'training', label: 'Training', heading: 'Hunts Academy',
+      blurb: 'How a business owner actually makes money through HVNTZ, and how to learn it.', render: renderTraining },
   ],
 });
 </script>
