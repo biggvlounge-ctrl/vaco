@@ -196,9 +196,16 @@ const SETTLING_TICKS = 180;
 // **`countryKey`, when supplied, is the first real step of global
 // expansion — a real income level, conflict level, government
 // type, EIU democratic regime type, SIPRI military expenditure,
-// EIA oil-producer status, and (for the one country `countryPacks.js`
-// has it for so far, France) real homelessness, immigration and
-// informal-economy figures, from `countryPacks.js`, attached in-memory
+// EIA oil-producer status, real homelessness/crime/tourism/illicit-
+// cigarette-market/fraud/school-protest/named-political-figure data
+// (France only so far), real current immigration figures (France,
+// Germany, UK, Italy), a current war-status snapshot for countries in
+// one (Russia/Ukraine, Israel -- including the Israel-Iran war's real
+// global oil-market spillover), Haiti's real, current gang/
+// humanitarian crisis, named real notable figures (Putin, Zelenskyy,
+// Netanyahu), and real current cartel/gang data (Mexico's CJNG/
+// Sinaloa, El Salvador's crackdown) -- all from `countryPacks.js`,
+// attached in-memory
 // only (no `country_key` column in `VACANCY_POSTGRESQL_SCHEMA.sql`,
 // same known limitation `city.hazardRisk` already carries).** Reported only;
 // see `countryPacks.js`'s own header for why it is not yet wired into
@@ -239,6 +246,24 @@ function generateRegion(worldState, options = {}) {
     homelessness: country?.homelessness ?? null,
     immigration: country?.immigration ?? null,
     informalEconomyPctGDP: country?.informalEconomyPctGDP ?? null,
+    crime: country?.crime ?? null,
+    tourism: country?.tourism ?? null,
+    illicitCigaretteMarket: country?.illicitCigaretteMarket ?? null,
+    fraudAndScams: country?.fraudAndScams ?? null,
+    schoolProtests2026: country?.schoolProtests2026 ?? null,
+    politicalFigures: country?.politicalFigures ?? null,
+    warStatus: country?.warStatus ?? null,
+    gangCrisis2026: country?.gangCrisis2026 ?? null,
+    notableFigures: country?.notableFigures ?? null,
+    cartelsAndGangs2026: country?.cartelsAndGangs2026 ?? null,
+    // The real fallback chain (dedicated entry -> standalone reference
+    // -> the region's own real overview -> an honest named gap),
+    // same `countryKey`, so a region with no dedicated fields above
+    // still reports where it sits and what's known about that region,
+    // rather than reporting nothing at all. See `countryPacks.js`'s
+    // own "Regional fallback" header section.
+    politicalParties: country?.politicalParties ?? null,
+    regionalContext: countryKey ? countryPacks.regionalContextFor(countryKey) : null,
     temperamentKey,
     temperamentCluster: temperament,
   };
