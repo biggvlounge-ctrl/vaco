@@ -44,11 +44,15 @@ function renderScreens(body) {
 
   out.appendChild(VACO.card('Register a screen', [
     el('p', 'vaco-small vaco-dim',
-      'The venue keeps a share of everything played on its screen. That split is the reason a venue agrees to host one.'),
+      // Flat, not negotiable per screen -- SCREEN_OWNER_SHARE in lib/campaigns.js.
+      // There used to be an editable "venue share %" field here; it was never
+      // read by the server, so every venue got the same split regardless of
+      // what they typed. Shown as a fact instead of a form field now.
+      'You keep 70% of everything played on your screen — a flat platform split, the same for every screen in the network.'),
     VACO.form([
-      { name: 'venueName', label: 'Venue', placeholder: 'Magnolia Blues', width: '170px' },
-      { name: 'ownerId', label: 'Owner', value: VACO.userId() || '', width: '130px' },
-      { name: 'revenueSharePercent', label: 'Venue share %', type: 'number', min: 0, value: 30, width: '110px' },
+      { name: 'locationName', label: 'Location', placeholder: 'Magnolia Blues', width: '170px' },
+      { name: 'locationAddress', label: 'Address', placeholder: '123 Main St', width: '190px' },
+      { name: 'screenOwnerId', label: 'Owner', value: VACO.userId() || '', width: '130px' },
     ], function (values) {
       return VACO.post('/api/screens', values)
         .then(function (s) { VACO.toast('Screen ' + s.id + ' registered.'); VACO.render(); });
@@ -77,11 +81,14 @@ function renderScreens(body) {
         lines.appendChild(tile);
 
         if (entry.revenue) {
+          // Matches getScreenRevenue's real return shape exactly:
+          // { screenId, impressionCount, totalRevenue }. The previous
+          // version read venueShare/networkShare/playCount/ownerRevenue/
+          // platformRevenue/plays, none of which the server has ever sent —
+          // every pair silently skipped and the split note rendered empty.
           var r = entry.revenue;
           var split = el('div', 'split-note');
-          [['Venue', r.venueShare !== undefined ? r.venueShare : r.ownerRevenue],
-           ['Network', r.networkShare !== undefined ? r.networkShare : r.platformRevenue],
-           ['Plays', r.playCount !== undefined ? r.playCount : r.plays]].forEach(function (pair) {
+          [['Impressions', r.impressionCount], ['Earned', r.totalRevenue]].forEach(function (pair) {
             if (pair[1] === undefined) return;
             var part = el('div', 'split-part');
             part.appendChild(el('span', 'vaco-label', pair[0]));
@@ -91,8 +98,8 @@ function renderScreens(body) {
           lines.appendChild(split);
         }
 
-        return VACO.card(s.venueName || ('Screen ' + s.id), [lines],
-          { trailing: VACO.badge((s.revenueSharePercent || 0) + '% venue') });
+        return VACO.card(s.locationName || ('Screen ' + s.id), [lines],
+          { trailing: VACO.badge('70% to venue') });
       }), true));
       VACO.mount(body, out);
     });
@@ -107,16 +114,21 @@ function renderAdvertisers(body) {
 
   out.appendChild(VACO.card('Create an advertiser', [
     VACO.form([
-      { name: 'name', label: 'Business', placeholder: 'Cherokee Street Coffee', width: '190px' },
-      { name: 'contactEmail', label: 'Contact', placeholder: 'hello@example.com', width: '180px' },
+      // signUpAdvertiser(store, { advertiserId, businessName }) is the real
+      // signature -- `name` and `contactEmail` were never read server-side,
+      // and advertiserId (the real primary key, chosen by the signer-up,
+      // not auto-generated) had no field here at all, so this form could
+      // never actually succeed.
+      { name: 'advertiserId', label: 'Your user id', value: VACO.userId() || '', width: '150px' },
+      { name: 'businessName', label: 'Business', placeholder: 'Cherokee Street Coffee', width: '190px' },
     ], function (values) {
       return VACO.post('/api/advertisers', values)
-        .then(function (a) { VACO.toast('Advertiser ' + a.id + ' created.'); });
+        .then(function (a) { VACO.toast('Advertiser ' + a.advertiserId + ' created.'); });
     }, 'Create'),
   ]));
 
   out.appendChild(VACO.card('Look up an advertiser', [
-    VACO.form([{ name: 'id', label: 'Advertiser id', type: 'number', min: 1, value: 1, width: '110px' }],
+    VACO.form([{ name: 'id', label: 'Advertiser id', placeholder: 'owner1', width: '150px' }],
       function (values) {
         return VACO.api('/api/advertisers/' + values.id + '/campaigns').then(function (data) {
           var campaigns = data.campaigns || [];
