@@ -108,6 +108,50 @@ test('oilProducer is null for the great majority of entries and set only for rea
 });
 
 // ---------------------------------------------------------------------
+// homelessness, immigration, informalEconomyPctGDP — France only, same
+// "real, cited, null-if-not-found, never forced onto every entry" rule
+// ---------------------------------------------------------------------
+
+test('homelessness, immigration and informalEconomyPctGDP are null for countries with no confirmed figure', () => {
+  for (const key of ['german', 'irish', 'italian', 'swedish', 'russian', 'ukrainian']) {
+    const entry = countryPacks.countryFor(key);
+    assert.ok(entry.homelessness === null || entry.homelessness === undefined, `${key}: homelessness should not be forced`);
+    assert.ok(entry.immigration === null || entry.immigration === undefined, `${key}: immigration should not be forced`);
+    assert.ok(entry.informalEconomyPctGDP === null || entry.informalEconomyPctGDP === undefined, `${key}: informalEconomyPctGDP should not be forced`);
+  }
+});
+
+test('France carries a real, cited homelessness figure from the Fondation pour le Logement des Défavorisés', () => {
+  const france = countryPacks.countryFor('french');
+  assert.equal(france.homelessness.estimatedPeople.value, 350000);
+  assert.equal(france.homelessness.estimatedPeople.year, 2025);
+  assert.ok(france.homelessness.priorYears.some((p) => p.value === 143000 && p.year === 2012),
+    'the 2012 baseline is kept so "more than doubled since 2012" is checkable, not asserted');
+  assert.equal(france.homelessness.streetDeaths2024.low, 735);
+  assert.equal(france.homelessness.streetDeaths2024.high, 912);
+});
+
+test('France carries real asylum/immigration figures, including the Mayotte situation as its own sub-field', () => {
+  const france = countryPacks.countryFor('french');
+  assert.equal(france.immigration.asylumApplicationsOFPRA.value, 145211);
+  assert.equal(france.immigration.asylumApplicationsOFPRA.priorYear.value, 153715);
+  assert.equal(france.immigration.asylumRegistrationsInteriorMinistry.value, 160303);
+  assert.equal(france.immigration.estimatedUndocumentedPopulation.confidence, 'unconfirmed-secondary-estimate',
+    'an unconfirmed figure must say so, not read as solid as OFPRA\'s own count');
+  assert.equal(france.immigration.mayotte.maritimeInterceptions[2024], 6764);
+  assert.equal(france.immigration.mayotte.nationalityGrantsMayotte[2023], 860);
+  assert.ok(france.immigration.mayotte.citizenshipLawChange.includes('1 year'));
+});
+
+test('France\'s informal-economy figure is reported as a range with named methodologies, not one invented number', () => {
+  const france = countryPacks.countryFor('french');
+  assert.equal(france.informalEconomyPctGDP.range.low, 6.3);
+  assert.equal(france.informalEconomyPctGDP.range.high, 15);
+  assert.ok(france.informalEconomyPctGDP.estimates.length > 1,
+    'more than one method is named rather than collapsed into a single figure');
+});
+
+// ---------------------------------------------------------------------
 // generateRegion wiring
 // ---------------------------------------------------------------------
 
@@ -135,6 +179,22 @@ test('generateRegion leaves country fields null with no countryKey or an unrecog
   const badKey = migration.generateRegion(w, { name: 'Test Region B', countryKey: 'martian' });
   assert.equal(badKey.incomeLevel, null);
   assert.equal(badKey.countryKey, 'martian', 'the key itself is still recorded even if unrecognised');
+});
+
+test('generateRegion reports France\'s real homelessness/immigration/informal-economy figures', () => {
+  const w = { regions: [] };
+  const region = migration.generateRegion(w, { name: 'Test Region', countryKey: 'french' });
+  assert.equal(region.homelessness.estimatedPeople.value, 350000);
+  assert.equal(region.immigration.mayotte.maritimeInterceptions[2024], 6764);
+  assert.equal(region.informalEconomyPctGDP.range.low, 6.3);
+});
+
+test('generateRegion leaves the three new fields null for a country with no confirmed figure', () => {
+  const w = { regions: [] };
+  const region = migration.generateRegion(w, { name: 'Test Region', countryKey: 'german' });
+  assert.equal(region.homelessness, null);
+  assert.equal(region.immigration, null);
+  assert.equal(region.informalEconomyPctGDP, null);
 });
 
 // ---------------------------------------------------------------------

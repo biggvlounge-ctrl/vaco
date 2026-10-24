@@ -195,8 +195,10 @@ const SETTLING_TICKS = 180;
 //
 // **`countryKey`, when supplied, is the first real step of global
 // expansion — a real income level, conflict level, government
-// type, EIU democratic regime type, SIPRI military expenditure and
-// EIA oil-producer status from `countryPacks.js`, attached in-memory
+// type, EIU democratic regime type, SIPRI military expenditure,
+// EIA oil-producer status, and (for the one country `countryPacks.js`
+// has it for so far, France) real homelessness, immigration and
+// informal-economy figures, from `countryPacks.js`, attached in-memory
 // only (no `country_key` column in `VACANCY_POSTGRESQL_SCHEMA.sql`,
 // same known limitation `city.hazardRisk` already carries).** Reported only;
 // see `countryPacks.js`'s own header for why it is not yet wired into
@@ -234,6 +236,9 @@ function generateRegion(worldState, options = {}) {
     regimeType: country?.regimeType ?? null,
     militaryExpenditurePctGDP: country?.militaryExpenditurePctGDP ?? null,
     oilProducer: country?.oilProducer ?? null,
+    homelessness: country?.homelessness ?? null,
+    immigration: country?.immigration ?? null,
+    informalEconomyPctGDP: country?.informalEconomyPctGDP ?? null,
     temperamentKey,
     temperamentCluster: temperament,
   };

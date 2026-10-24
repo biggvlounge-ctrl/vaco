@@ -22,6 +22,45 @@
 // the honest substitute — durable, published, stable methodology.
 //
 // ---------------------------------------------------------------------
+// Fourth round: homelessness, immigration, informal-economy — France
+// only, same "add it where it's real, null everywhere else" rule
+// ---------------------------------------------------------------------
+// Asked specifically to get France's current migration/homelessness/
+// informal-economy picture right. Checked via direct search rather
+// than assumed (this environment cannot browse live, so every figure
+// below is dated and sourced, not re-verified after this round):
+//
+// - `homelessness`: the Fondation pour le Logement des Défavorisés
+//   (formerly Fondation Abbé Pierre)'s own annual "L'état du mal-
+//   logement en France" report — a foundation estimate from shelter/
+//   street counts, not a government census. Two real sources
+//   disagree on the 2024 street-death count (735 vs 912) and both are
+//   kept rather than silently picking one.
+// - `immigration`: OFPRA (the asylum office) and the Interior
+//   Ministry publish two different, both-real counts that disagree
+//   because they count different populations (Dublin-procedure cases
+//   land with Interior, not OFPRA) — both kept, not averaged. The
+//   ~700,000 undocumented-population figure is a widely-cited
+//   Interior Ministry estimate from a secondary source; it could not
+//   be confirmed here against a primary Interior document, and is
+//   flagged `unconfirmed-secondary-estimate` rather than presented as
+//   solid. Mayotte (the French overseas department with the sharpest
+//   real migration flashpoint tied to France) is reported as its own
+//   sub-field rather than folded into the metropolitan figures, since
+//   it is a genuinely different real situation (sea crossings from
+//   Comoros, a citizenship-law change specific to that territory).
+// - `informalEconomyPctGDP`: no single number exists — real published
+//   estimates range from ~6% to ~15% of GDP depending on method
+//   (Medina & Schneider's shadow-economy model vs. INSEE's own
+//   national-accounts non-observed-economy work vs. EU undeclared-
+//   work labour-input surveys), and the range is reported with its
+//   methodologies named rather than collapsed into one invented
+//   figure.
+//
+// Same report-only posture as every other field here: nothing in
+// `server/` reads these to decide an outcome yet.
+//
+// ---------------------------------------------------------------------
 // What this is a first step TOWARD, and what it does not attempt yet
 // ---------------------------------------------------------------------
 // Asked to expand this engine beyond the United States — other
@@ -216,6 +255,53 @@ const COUNTRIES = {
     regimeType: 'flawed-democracy', regimeScore: null,
     militaryExpenditurePctGDP: { value: 2.01, year: 2024, confidence: 'secondary-estimate' },
     oilProducer: null,
+    // Foundation estimate (shelter + street counts), not a government
+    // census. 350,000 was also the 2024 figure in last year's report —
+    // kept as reported rather than smoothed into a single trend line.
+    // Two real sources disagree on 2024 street deaths; both kept.
+    homelessness: {
+      estimatedPeople: { value: 350000, year: 2025 },
+      priorYears: [{ value: 350000, year: 2024 }, { value: 330000, year: 2023 }, { value: 300000, year: 2020 }, { value: 143000, year: 2012 }],
+      peopleInInadequateHousing: { value: 4200000, year: 2025 },
+      streetDeaths2024: { low: 735, high: 912, note: 'two real sources disagree (735 "highest ever recorded" vs 912, +16% on 2023); both kept, not reconciled' },
+      source: 'fondation-pour-le-logement-des-defavorises-rapport-mal-logement-2025-and-2026',
+      confidence: 'foundation-estimate',
+    },
+    immigration: {
+      asylumApplicationsOFPRA: { value: 145211, year: 2025, priorYear: { value: 153715, year: 2024 } },
+      asylumRegistrationsInteriorMinistry: { value: 160303, year: 2025, priorYear: { value: 169956, year: 2024 } },
+      estimatedUndocumentedPopulation: {
+        value: 700000, confidence: 'unconfirmed-secondary-estimate',
+        note: 'widely-cited Interior Ministry figure; not confirmed here against a primary Interior document',
+      },
+      regularisations: { value: 28610, year: 2025, priorYear: { value: 34700, year: 2024 } },
+      // Mayotte is a genuinely different real situation from
+      // metropolitan France -- a French overseas department off East
+      // Africa, sea crossings from Comoros, and a 2024 law tightening
+      // birthright citizenship specifically there -- reported as its
+      // own sub-field rather than folded into the national figures.
+      mayotte: {
+        maritimeInterceptions: { 2020: 3536, 2021: 6355, 2022: 8003, 2023: 8669, 2024: 6764, note: 'no 2025 figure found' },
+        nationalityGrantsMayotte: { 2018: 2800, 2022: 900, 2023: 860, note: 'arrivals have not fallen alongside the drop in grants' },
+        citizenshipLawChange: 'birthright citizenship in Mayotte now requires a parent to show 1 year of legal residence, up from the former 3-month rule; passed both chambers of Parliament',
+      },
+      ukFranceChannelPilot: 'a UK-France "one in, one out" Channel-crossing return pilot began 5 Aug 2025',
+      source: 'ofpra; french-interior-ministry; eurostat-asylum-statistics; iss-africa; infomigrants; constitutionnet',
+      confidence: 'mixed-official-and-secondary',
+    },
+    // No single real figure exists -- estimates range by method, named
+    // rather than collapsed into one invented number.
+    informalEconomyPctGDP: {
+      range: { low: 6.3, high: 15 },
+      estimates: [
+        { value: 11.65, year: 2015, method: 'medina-schneider-shadow-economy-model' },
+        { value: 7.5, year: 2019, method: 'insee-non-observed-economy-national-accounts' },
+        { valueWagedEmployment: 6.3, valueSelfEmploymentLabourInput: 48.9, year: 2019, method: 'eu-undeclared-work-labour-input-factsheet' },
+        { value: 8.8, confidenceInterval: [7.6, 10], years: '2012-2015', method: 'insee-linked-survey-based-undeclared-work-rate' },
+      ],
+      source: 'medina-schneider-shadow-economy-database; insee; european-parliament-undeclared-work-factsheet',
+      confidence: 'mixed-methodology-estimates',
+    },
   },
   dutch: {
     country: 'Netherlands', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary constitutional monarchy',

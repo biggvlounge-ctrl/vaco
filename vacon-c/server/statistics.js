@@ -916,7 +916,10 @@ const CATALOGUE = [
     unavailable: 'every movement of value is recorded the same way — payroll, production and '
       + 'barter.exchange all write individual_finances or organizations. Nothing is off the '
       + 'books, because there are no books to be off: an informal economy needs a formal one '
-      + 'to be outside of, and a way to transact without being recorded.',
+      + 'to be outside of, and a way to transact without being recorded. Not the same question '
+      + 'as `countryPacks.js`\'s `informalEconomyPctGDP` on France — that is a real-world, '
+      + 'country-level reference figure reported on the region, not a statistic this engine\'s '
+      + 'own simulated economy computes.',
   },
   {
     key: 'resource_stock', category: 'economics', unit: 'count', scope: 'city',
