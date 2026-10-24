@@ -112,6 +112,14 @@ function createVoidStore() {
     // village"/"shopping center"). See lib/voidDropZones.js.
     dropZones: [],
     nextDropZoneId: 1,
+    // VOID Academy: provider training. See lib/training.js.
+    trainingEnrollments: [],
+    nextTrainingEnrollmentId: 1,
+    // A real VENVM script-request + production-job pair tracked
+    // against a course, so training content shows its real pipeline
+    // stage instead of a fabricated "video ready."
+    courseVideoJobs: [],
+    nextCourseVideoJobId: 1,
   };
 }
 

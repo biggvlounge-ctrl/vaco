@@ -150,6 +150,7 @@ function serviceHeaders() {
 
 const HVNTZ_API_URL = process.env.HVNTZ_API_URL || 'http://localhost:8792';
 const VACA_API_URL = process.env.VACA_API_URL || 'http://localhost:8804';
+const VENVM_API_URL = process.env.VENVM_API_URL || 'http://localhost:8813';
 const VACO_ANALYTICS_URL = process.env.VACO_ANALYTICS_URL || 'http://localhost:8790';
 // -- The store, and which backend holds it ----------------------------
 //
@@ -347,6 +348,54 @@ async function fetchRecipientVerification(recipientId) {
   } catch {
     return false;
   }
+}
+
+// -- VENVM: real AI-presenter training-video requests ------------------
+//
+// VENVM's script and production-job routes are `requireCallingService()`
+// -- a server-to-server credential, not an end-user session -- so these
+// present the same `serviceHeaders()` VOID already presents to V3.
+// Unlike the fail-soft VACA checks above, these throw on failure: a
+// training-video request has no honest "soft" outcome, it either
+// produced a real script/job or it tells the caller exactly why not.
+async function submitVenvmScript({ requesterApp, brief, platform }) {
+  const res = await fetch(`${VENVM_API_URL}/api/scripts`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...serviceHeaders() },
+    body: JSON.stringify({ requesterApp, brief, platform }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || `VENVM script request failed (${res.status})`);
+  return body;
+}
+
+async function generateVenvmScript(requestId) {
+  const res = await fetch(`${VENVM_API_URL}/api/scripts/${encodeURIComponent(requestId)}/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...serviceHeaders() },
+  });
+  const body = await res.json().catch(() => ({}));
+  // VENVM's own route returns a real, honest 502 for a real completion
+  // failure (no key behind v4-proxy, v4-proxy unreachable, a real
+  // upstream error) -- by its own comment, "not silently 200'd". That
+  // is a meaningful result to record (`status: 'failed'`, the real
+  // `error`), not an exception to throw away the request id over --
+  // throwing here would mean a failed course video leaves no record
+  // of having been attempted at all.
+  if (res.status === 502 && body.status === 'failed') return body;
+  if (!res.ok) throw new Error(body.error || `VENVM script generation failed (${res.status})`);
+  return body;
+}
+
+async function createVenvmProductionJob(options) {
+  const res = await fetch(`${VENVM_API_URL}/api/production-jobs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...serviceHeaders() },
+    body: JSON.stringify(options),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || `VENVM production job failed (${res.status})`);
+  return body;
 }
 
 // **`transferVCoin` is deliberately gone.** Every settling path in
@@ -1778,6 +1827,7 @@ const serviceCommon = require('./lib/serviceCommon');
 const serviceDay = require('./lib/serviceDay');
 const petCare = require('./lib/petCare');
 const laundry = require('./lib/laundry');
+const training = require('./lib/training');
 
 // Every service route funnels through here. It has to handle async
 // handlers as well as sync ones: settlement made `completeBooking` and
@@ -2054,6 +2104,67 @@ app.post('/api/provider/:id/service-day', requireParamActor('id'), (req, res) =>
 
 app.post('/api/provider/:id/skill-suggestions', requireParamActor('id'), (req, res) => handle(res,
   () => serviceDay.suggestSkillsToAdd(store, { ...req.body, providerId: req.params.id })));
+
+// -- VOID Academy: provider training -----------------------------------
+//
+// Direct instruction: "do the same with all the void service apps that
+// we have as well" -- the same real Hunts Academy pattern, grounded in
+// VOID's own real verticals, take rates, and licensing gates.
+
+app.get('/api/training/courses', (_req, res) => {
+  res.json({ courses: training.listCourses() });
+});
+
+app.get('/api/training/courses/:courseId', (req, res) => {
+  try {
+    res.json(training.getCourse(req.params.courseId));
+  } catch (err) {
+    res.status(404).json({ error: err.message });
+  }
+});
+
+app.post('/api/training/enroll', requireActor('providerId'), (req, res) => handle(res,
+  () => training.enrollProvider(store, req.body || {}), 201));
+
+app.post('/api/training/complete', requireActor('providerId'), (req, res) => handle(res,
+  () => training.completeCourse(store, req.body || {})));
+
+app.get('/api/training/progress/:providerId', requireParamActor('providerId'), (req, res) => {
+  try {
+    res.json(training.getProviderProgress(store, req.params.providerId));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/training/recommended/:providerId', requireParamActor('providerId'), (req, res) => {
+  try {
+    res.json({ recommended: training.getRecommendedCourses(store, req.params.providerId) });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// A real AI-presenter video request against VENVM -- content
+// production, not a provider's own data, so this is operator-gated
+// the same way other VOID content/ops actions are (`requireOperator`),
+// not actor-gated like the provider-facing routes above.
+app.post('/api/training/courses/:courseId/video', requireOperator('void:training'), async (req, res) => {
+  try {
+    const record = await training.requestCourseVideo(store, { ...req.body, courseId: req.params.courseId }, {
+      submitScriptFn: submitVenvmScript,
+      generateScriptFn: generateVenvmScript,
+      createProductionJobFn: createVenvmProductionJob,
+    });
+    res.status(201).json(record);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/training/courses/:courseId/video', (req, res) => {
+  res.json({ jobs: training.getCourseVideoJobs(store, req.params.courseId) });
+});
 
 // -- Pet Care ---------------------------------------------------------
 
