@@ -41,6 +41,7 @@ import {
   browseProducts, getSellerStorefront, createCart, getCart, addToCart,
   checkout, getOrder, requestFulfillment, checkAbandonedCarts,
   generateRecoveryOffer, PLATFORM_USER_ID,
+  markChopzEligible, publishToChopzShop,
 } from '../src/lib/marketplace.js';
 
 import {
@@ -459,6 +460,62 @@ test('fulfillment refuses a missing order, a free shipment, or no VOID client', 
   return assert.rejects(
     () => requestFulfillment(m, { orderId: 9999, shippingCostPerSeller: 5, voidRequestFn }),
     /no order with id/,
+  );
+});
+
+// ===========================================================================
+// CHOPZ SHOP cross-app promotion — "certain items", not the whole catalogue
+// ===========================================================================
+
+test('a product defaults to not chopz-eligible, and marking it needs a real commission', () => {
+  const { m, p1 } = shopFixture();
+  const fresh = getProduct(m, p1.id);
+  assert.equal(fresh.chopzEligible, false);
+  assert.equal(fresh.chopzCommissionPercent, 0);
+  assert.equal(fresh.chopzShopProductId, null);
+
+  assert.throws(() => markChopzEligible(m, p1.id, 0), /between 0 and 1/);
+  assert.throws(() => markChopzEligible(m, p1.id, 1), /between 0 and 1/);
+  assert.throws(() => markChopzEligible(m, 9999, 0.15), /no product with id/);
+
+  const marked = markChopzEligible(m, p1.id, 0.15);
+  assert.equal(marked.chopzEligible, true);
+  assert.equal(marked.chopzCommissionPercent, 0.15);
+});
+
+test('publishing to Chop Shop sends the SELLER\'S ownerId, not VENVS\'s local sellerId, and is not repeatable', async () => {
+  const { m, a, p1 } = shopFixture();
+  markChopzEligible(m, p1.id, 0.2);
+
+  const calls = [];
+  const chopzRegisterFn = async (sellerOwnerId, name, price, category, affiliateCommissionPercent) => {
+    calls.push({ sellerOwnerId, name, price, category, affiliateCommissionPercent });
+    return { id: 777 };
+  };
+
+  const published = await publishToChopzShop(m, p1.id, { chopzRegisterFn });
+  assert.equal(published.chopzShopProductId, 777);
+  assert.equal(calls.length, 1);
+  // a.ownerId is 'owner-a' in shopFixture — the real payout identity,
+  // never VENVS's own local numeric sellerId (a.id).
+  assert.equal(calls[0].sellerOwnerId, a.ownerId);
+  assert.equal(calls[0].name, p1.title);
+  assert.equal(calls[0].price, p1.price);
+  assert.equal(calls[0].affiliateCommissionPercent, 0.2);
+
+  await assert.rejects(
+    () => publishToChopzShop(m, p1.id, { chopzRegisterFn }),
+    /already published to CHOPZ SHOP/,
+  );
+  assert.equal(calls.length, 1, 'a repeat call must not register the same product twice');
+});
+
+test('publishing to Chop Shop refuses a product that was never marked eligible', async () => {
+  const { m, p1 } = shopFixture();
+  const chopzRegisterFn = async () => ({ id: 1 });
+  await assert.rejects(
+    () => publishToChopzShop(m, p1.id, { chopzRegisterFn }),
+    /not chopz-eligible yet/,
   );
 });
 

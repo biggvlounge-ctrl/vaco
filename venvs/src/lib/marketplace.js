@@ -128,8 +128,71 @@ export function listProduct(marketplace, options = {}) {
     editionSize,
     unitsRemaining: editionSize,
     createdAt: Date.now(),
+    // Present and false/null rather than absent on every product, same
+    // posture as `editionSize` above — a reader should see "not
+    // eligible" rather than wonder whether the field exists yet. See
+    // `markChopzEligible`/`publishToChopzShop` below for what sets them.
+    chopzEligible: false,
+    chopzCommissionPercent: 0,
+    chopzShopProductId: null,
   };
   marketplace.products.push(product);
+  return product;
+}
+
+// A seller opts specific items into CHOPZ SHOP's creator/affiliate
+// program — "certain items", not the whole catalogue, per direct
+// instruction. This only sets the local flag and commission; it does
+// not reach CHOPZ SHOP itself, so a product can be marked eligible
+// long before (or without ever) actually being published there.
+export function markChopzEligible(marketplace, productId, affiliateCommissionPercent) {
+  const product = getProduct(marketplace, productId);
+  if (!product) {
+    throw new Error(`markChopzEligible: no product with id ${productId}`);
+  }
+  // Same bound CHOPZ SHOP's own createProduct enforces
+  // (chopz/chopz-shop/lib/products.js) — kept in sync by hand since
+  // the two are genuinely separate apps with no shared validation code.
+  if (!Number.isFinite(affiliateCommissionPercent) || affiliateCommissionPercent <= 0 || affiliateCommissionPercent >= 1) {
+    throw new Error('markChopzEligible requires an affiliateCommissionPercent between 0 and 1 (exclusive) — 0 would give a creator no reason to promote it');
+  }
+  product.chopzEligible = true;
+  product.chopzCommissionPercent = affiliateCommissionPercent;
+  return product;
+}
+
+// The real cross-app call: registers an eligible product as a real
+// CHOPZ SHOP product under the *same seller identity* (the VENVS
+// seller's ownerId, the payout identity, not VENVS's own local
+// sellerId — CHOPZ SHOP's attribution and this marketplace's payouts
+// have to agree on who the money belongs to). `chopzRegisterFn` is
+// the real POST /chopz-shop/products call, injected the same way
+// `voidRequestFn` is above and in catalog.js — this module stays
+// plain-Node testable with no live network, and the real HTTP client
+// lives in chopzClient.js, which only the browser build imports.
+export async function publishToChopzShop(marketplace, productId, options = {}) {
+  const { chopzRegisterFn } = options;
+  const product = getProduct(marketplace, productId);
+  if (!product) {
+    throw new Error(`publishToChopzShop: no product with id ${productId}`);
+  }
+  if (!product.chopzEligible) {
+    throw new Error(`publishToChopzShop: product ${productId} is not chopz-eligible yet — call markChopzEligible first`);
+  }
+  if (product.chopzShopProductId !== null) {
+    throw new Error(`publishToChopzShop: product ${productId} is already published to CHOPZ SHOP (its id there is ${product.chopzShopProductId})`);
+  }
+  if (typeof chopzRegisterFn !== 'function') {
+    throw new Error('publishToChopzShop requires a chopzRegisterFn(sellerOwnerId, name, price, category, affiliateCommissionPercent)');
+  }
+  const seller = getSeller(marketplace, product.sellerId);
+  if (!seller) {
+    throw new Error(`publishToChopzShop: no seller for product ${productId}`);
+  }
+  const registered = await chopzRegisterFn(
+    seller.ownerId, product.title, product.price, product.category, product.chopzCommissionPercent,
+  );
+  product.chopzShopProductId = registered.id;
   return product;
 }
 
