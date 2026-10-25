@@ -115,6 +115,8 @@ The live gates:
 | VACO Operator | Two-person rule, audit-before-authorization | Live |
 | V3 (VASH Mortgage) | Real NMLS Mortgage Loan Originator registration (SAFE Act) + a state lending licence | **Not built, not licensed.** VCoin-denominated loan administration only — real amortization, real underwriting decision, real VCoin settlement. Built 25 Oct 2026. |
 | V3 (VASH Insurance) | A real state insurance producer licence, and either carrier status or a real MGA agreement with a licensed carrier | **Not built, not licensed.** VCoin-denominated quote/policy/claims administration only, the same real MGA shape (Milliman) without the real licence behind it. Built 25 Oct 2026. |
+| VACA (local chain) | None — a real, tamper-evident hash-chain over VACA's own decisions, not a regulated financial instrument | **Built and live.** `vaca/lib/blockchain.js` — every approve/reject appends a real linked block; `verifyChainIntegrity` recomputes the whole chain rather than trusting a stored flag. No external network, no token, no custody — nothing here raises a new compliance gate. Built 25 Oct 2026. |
+| VACA (public-chain anchoring) | None specific to this repo, but publishing a hash to a public chain is an irreversible, costly, public act, and the wallet that pays for it is a real financial instrument once funded | **Built, not configured.** `vaca/lib/publicChainAnchor.js` — real `ethers`-based client, operator-gated and decision-logged, that throws a specific refusal rather than fabricating a transaction when `VACA_CHAIN_RPC_URL`/`VACA_CHAIN_PRIVATE_KEY` are unset (the default, today). Needs a funded wallet and an RPC provider account before it does anything — neither exists yet, and creating either is a real-money decision for the operator, not something built or funded automatically. Built 25 Oct 2026. |
 
 **Everything settles in VCoin or Gold Coin. No real-money path exists
 anywhere in the repository.** That is the single most important
@@ -157,6 +159,25 @@ see `dev-docs/VILLAGES_REAL_ESTATE_STRATEGY.md`) is actually under
 VACO's ownership. A real mortgage or a real insurance policy against
 a real house is exactly the kind of commitment that should follow
 licensing and counsel, not precede it.
+
+**VACA's blockchain capability is two different cost lines, not one.**
+The local hash-chain (`vaca/lib/blockchain.js`) is already live and
+costs nothing beyond what VACA already runs on — it is a data
+structure, not a network. Public-chain anchoring
+(`vaca/lib/publicChainAnchor.js`) is real, working code with a real
+ongoing cost once activated: gas for every anchored hash (cents to a
+few dollars per transaction depending on chain and congestion
+**[ESTIMATE]**), plus whatever an RPC provider charges past its free
+tier (Alchemy/Infura-class providers: $0–50/mo at this volume
+**[ESTIMATE]**), plus the operational cost of actually custodying a
+funded wallet's private key — the same "who holds the keys" question
+as any real crypto custody, and not one this document can discharge
+by writing code. **My recommendation [ESTIMATE]:** leave public
+anchoring unconfigured until there is a real reason to pay a public
+network to notarize a VACA decision — the local chain already gives
+tamper-evidence for free; anchoring buys independent, third-party
+timestamping, which only matters once an outside party needs to
+verify a decision without trusting VACA's own server.
 
 **Scenario B — VAGO and/or VEX go real-money.** This is a different
 company, not a feature.
@@ -511,6 +532,14 @@ none is hidden:
     underwriting, and claims mechanics, settled in VCoin, with no
     NMLS mortgage-lending registration and no state insurance
     producer/MGA licence — see §2a/§2b.
+12. **VACA's public-chain anchoring (built 25 Oct 2026) is real code
+    with no real wallet or RPC provider behind it.** The local
+    hash-chain is genuinely live and needs nothing further. Anchoring
+    a hash to a public chain is unconfigured by design, refuses with a
+    specific error rather than fabricating a transaction, and will not
+    do anything until a real funded wallet and RPC provider are
+    supplied — a real-money custody decision, not a code gap. See
+    §2a/§2b.
 
 ---
 
