@@ -79,6 +79,41 @@ test('registerTap accepts a personal tap with no business at all', async () => {
   assert.strictEqual(tap.ownerIdentityId, 'ada');
 });
 
+test('registerTap accepts a personal tap with no form factor named at all (the legacy default)', async () => {
+  const store = createTapStore();
+  const tap = await registerTap(store, { tapType: 'personal', ownerIdentityId: 'ada' });
+  assert.strictEqual(tap.objectType, null);
+});
+
+test('registerTap accepts "ring" as a real personal-wearable form factor, the smaller comparable to a bracelet', async () => {
+  const store = createTapStore();
+  const tap = await registerTap(store, { tapType: 'personal', ownerIdentityId: 'ada', objectType: 'ring' });
+  assert.strictEqual(tap.objectType, 'ring');
+});
+
+test('registerTap still accepts "bracelet" and "card", the other two named personal form factors', async () => {
+  const store = createTapStore();
+  const bracelet = await registerTap(store, { tapType: 'personal', ownerIdentityId: 'ada', objectType: 'bracelet' });
+  assert.strictEqual(bracelet.objectType, 'bracelet');
+  const card = await registerTap(store, { tapType: 'personal', ownerIdentityId: 'ben', objectType: 'card' });
+  assert.strictEqual(card.objectType, 'card');
+});
+
+test('registerTap rejects an unrecognized personal form factor rather than storing a fourth, undocumented product', async () => {
+  const store = createTapStore();
+  await assert.rejects(
+    registerTap(store, { tapType: 'personal', ownerIdentityId: 'ada', objectType: 'braclet' }),
+    /objectType must be one of/,
+  );
+  assert.strictEqual(store.taps.length, 0);
+});
+
+test('a business Tap Point keeps its free-form objectType — the catalog is personal-only', async () => {
+  const store = createTapStore();
+  const tap = await registerTap(store, { tapType: 'business', businessId: HUNT_ID, objectType: 'chair', businessFetchFn: fakeBusinessFetchFn });
+  assert.strictEqual(tap.objectType, 'chair');
+});
+
 test('registerTap normalizes a string businessId to the real number HVNTZ uses', async () => {
   // The gap an audit found: HVNTZ's own `GET /api/business/:id` route
   // coerces (`Number(req.params.id)`) — a real `fetchHvntzBusiness`

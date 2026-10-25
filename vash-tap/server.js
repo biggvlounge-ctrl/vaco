@@ -27,7 +27,7 @@ require('dotenv/config');
 
 const { attachStore } = require('./lib/storeBackend');
 const {
-  TAP_TYPES, createTapStore, registerTap, linkDreamsScreen, unlinkDreamsScreen,
+  TAP_TYPES, PERSONAL_WEARABLE_FORM_FACTORS, createTapStore, registerTap, linkDreamsScreen, unlinkDreamsScreen,
   assignTap, resolveTapRegistrationSubject, resolveTap, payViaTap,
   freezeTap, unfreezeTap, transactionsForTap, spenderHistory, revenueByTap, reseedIds,
 } = require('./lib/tap');
@@ -196,6 +196,12 @@ app.get('/api/health', (_req, res) => {
     ok: true,
     service: 'vash-tap',
     tapTypes: TAP_TYPES,
+    // The real personal-wearable product line (see lib/tap.js) --
+    // queryable rather than only prose, the same reason getPackOdds
+    // exists in VOKEN: a manufacturer or client deciding which form
+    // factor to register should read it from the API, not guess at a
+    // string.
+    personalWearableFormFactors: PERSONAL_WEARABLE_FORM_FACTORS,
     taps: store.taps.length,
     assignments: store.assignments.length,
     transactions: store.transactions.length,

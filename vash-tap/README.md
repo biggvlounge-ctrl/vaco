@@ -5,6 +5,48 @@ wristband, an object) resolves to whoever or whatever it currently
 represents, and a payment routes through VACO's existing VCoin ledger
 with revenue attributed back to the Tap.
 
+## The personal wearable line: Bracelet and Ring
+
+§53's own definition of "VASH TAP PERSONAL" ("Personal wearable/card")
+never named which physical products that covers; every personal Tap
+built so far has been described only generically ("a wristband," or,
+in VDP's own onboarding, "a band"). Two real, named products now exist,
+both registering the exact same `tapType: 'personal'` Tap underneath —
+the difference is the physical form, not the software:
+
+- **VASH TAP Bracelet** — the existing default: a wristband, presented
+  face-up to a reader. Unnamed until now; this is simply giving the
+  thing that already existed a real product name alongside its new
+  sibling.
+- **VASH Ring** — a smaller, cheaper comparable: a basic rubber band
+  with the NFC inlay set on the underside, against the palm, so the
+  whole gesture is resting a hand flat over the reader rather than
+  turning a wrist to present a face. Real, current (2025–2026) market
+  comparables confirming a rubber/ceramic ring carrying a passive NFC
+  payment inlay is a real, shipped hardware category, not a
+  speculative one: **Circular's Ring 3 Pro/Slim** (NFC Visa/Mastercard
+  tap-to-pay, announced at IFA Berlin, Sep 2026) and **Banco Inter's
+  "Inter Ring"** (passive, battery-free NFC, already shipping in the
+  US). Neither is VASH TAP-specific — they ground the form factor, not
+  the ecosystem.
+
+Both are `objectType` values on a `tapType: 'personal'` registration
+(`lib/tap.js`'s `PERSONAL_WEARABLE_FORM_FACTORS`, also `card` for §53's
+third personal form — a VASH TAP card carried in a wallet, no wearable
+at all). The catalog is queryable from `GET /api/health` rather than
+left as undocumented prose. `objectType` is optional and, if omitted,
+stays the same legacy `null` a personal Tap has always defaulted to —
+naming a form factor is additive, not a required migration for taps
+already issued.
+
+**What is not built here:** the physical ring itself (manufacturing,
+BOM, sourcing a rubber/ceramic band and an NFC inlay) is real hardware
+product work, not code — the same honest boundary this repo draws
+everywhere else between a real software slice and a real physical
+product (see §51's "VASH TAP READY MANUFACTURER SYSTEM" for the
+general pattern this already follows: software prepares the
+registration path, a manufacturer supplies the physical object).
+
 Source doc: `dev-docs/on-deck/VASH_TAP_FREEZE.md` — the full, frozen
 spec (~2300 lines: tap types, the 16-step resolution pipeline, security
 model, frontend). This app is **the narrowest real slice of it**, not

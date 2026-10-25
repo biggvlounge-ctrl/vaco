@@ -33,6 +33,31 @@ const TAP_TYPES = ['personal', 'business', 'wear', 'embed', 'point'];
 const TAP_STATUSES = ['active', 'frozen', 'inactive'];
 const ASSIGNMENT_STATUSES = ['active', 'ended', 'cancelled'];
 
+// **The real personal-wearable product line, named.** §53's own
+// definition of VASH TAP PERSONAL ("Personal wearable/card") never
+// named which physical forms that covers -- every personal Tap this
+// app has issued so far has been described only generically, as "a
+// band" (VDP's own onboarding comment above `requireCrossAppBusinessOwner`
+// calls it that). Two real, distinct products: **bracelet** (the
+// existing default -- a wristband, presented face-up to a reader) and
+// **ring** -- a smaller, cheaper comparable: a basic rubber band with
+// the NFC inlay set on the underside, against the palm, so the whole
+// gesture is resting a hand flat over the reader rather than turning a
+// wrist to present a face. Real, current (2025-2026) market
+// comparables for an NFC-ring form factor at all: Circular's Ring 3
+// Pro/Slim (NFC Visa/Mastercard tap-to-pay, announced IFA Berlin Sep
+// 2026) and Banco Inter's "Inter Ring" (passive NFC, battery-free,
+// already shipping in the US) -- neither is VASH TAP specific, both
+// confirm a rubber/ceramic ring carrying a passive NFC inlay is a real,
+// shipped hardware category, not a speculative one. `card` is §53's
+// own third personal form (a VASH TAP card carried in a wallet, no
+// wearable at all). Validated ONLY for `tapType === 'personal'` --
+// every other tap type's `objectType` (a business Tap Point's "chair",
+// "table", etc.) stays the free-form label it always was; this catalog
+// exists because the personal line is a real, named product
+// decision, not because every objectType needs one.
+const PERSONAL_WEARABLE_FORM_FACTORS = ['bracelet', 'ring', 'card'];
+
 function createTapStore() {
   return {
     taps: [],
@@ -96,6 +121,16 @@ async function registerTap(store, options = {}) {
   }
   if (!businessId && !ownerIdentityId) {
     throw new Error('registerTap requires a businessId (business tap) or an ownerIdentityId (personal tap)');
+  }
+  // **Optional, not required.** An existing personal Tap registered
+  // before this field existed has no form factor on record, and that
+  // stays a legitimate, legacy "bracelet" default rather than something
+  // every caller must now supply. Checked only once a caller actually
+  // names one, so a typo ("braclet") is refused rather than silently
+  // stored as a fourth, undocumented product.
+  if (tapType === 'personal' && objectType !== null && objectType !== undefined
+    && !PERSONAL_WEARABLE_FORM_FACTORS.includes(objectType)) {
+    throw new Error(`registerTap: a personal tap's objectType must be one of ${PERSONAL_WEARABLE_FORM_FACTORS.join(', ')}, got ${JSON.stringify(objectType)}`);
   }
   // **Normalized to a real number here, once, rather than trusting
   // whatever type the caller sent.** HVNTZ's own `business.id` is
@@ -458,6 +493,7 @@ module.exports = {
   TAP_TYPES,
   TAP_STATUSES,
   ASSIGNMENT_STATUSES,
+  PERSONAL_WEARABLE_FORM_FACTORS,
   createTapStore,
   tapCodeFor,
   findTap,
