@@ -219,7 +219,27 @@ curl http://localhost:8794/api/explore/historic
   is the real lookup the Value Algorithm's new influence term is built
   on — a creator can be reassessed over time, so this always returns
   their *most recent* real record, not their first or their biggest.
-  See `test/establishedCreatorAssessment.test.js`.
+  **`realContentConsumptionCount`, added by direct instruction**:
+  "check all their social media platforms... check the sales of what
+  they've done... duplicate this and use it for all of our
+  participants." `computeExternalScore()` now also takes a real,
+  cross-app content-consumption total — `server.js`'s value-score
+  endpoint fetches it **live, on every scoring call**, by summing four
+  real per-creator totals over real HTTP: `vulture-music`'s
+  `getTotalStreamCountForArtist`, `vulture-pods`'s
+  `getTotalListensForCreator`, `vulture-flix`'s
+  `getTotalViewsForCreator`, and `cvllex`'s
+  `getTotalUnitsRedeemedForCreator` — real streams, listens, views,
+  and units sold, generic across any real participant, nothing
+  hardcoded to one person. Each of the four fetches is fail-soft
+  (`fetchRealTotal`): an unreachable app contributes 0 rather than
+  failing the whole score, the same posture `pushMetric` already takes
+  elsewhere in this ecosystem for an optional signal. Deliberately
+  **not** persisted onto the stored assessment the way social
+  following is — it changes continuously (a stream happening right
+  now should move the number right now), where a follower count is
+  realistically only re-checked occasionally. See
+  `test/establishedCreatorAssessment.test.js`.
 - `lib/cardPacks.js` — **Card Packs (Phase 2)**: the real, structured
   pack-tier system (basic/standard/premium/chase); `openPack()`
   genuinely enforces a tier's guaranteed-minimum-rarity even when the

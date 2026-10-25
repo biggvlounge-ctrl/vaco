@@ -120,6 +120,47 @@ const VACO_ANALYTICS_URL = process.env.VACO_ANALYTICS_URL || 'http://localhost:8
 const VAVLT_STVDIOS_API_URL = process.env.VAVLT_STVDIOS_API_URL || 'http://localhost:8808';
 // Same real ownership-check pattern, for CVLLEX's production orders.
 const CVLLEX_API_URL = process.env.CVLLEX_API_URL || 'http://localhost:8822';
+// The real cross-app achievement sources -- by direct instruction
+// ("check all their social media platforms... get all the
+// information from everything we can so we can duplicate this and
+// use it for all of our participants"), generic across every real
+// creatorId/artistId, not hardcoded to any one person.
+const VULTURE_MUSIC_API_URL = process.env.VULTURE_MUSIC_API_URL || 'http://localhost:8806';
+const VULTURE_PODS_API_URL = process.env.VULTURE_PODS_API_URL || 'http://localhost:8810';
+const VULTURE_FLIX_API_URL = process.env.VULTURE_FLIX_API_URL || 'http://localhost:8807';
+
+// A single real total from one connected app -- fail-soft, same
+// posture `pushMetric` already takes elsewhere in this ecosystem for
+// optional signals: a scoring request should never 503 because one of
+// four unrelated apps happens to be down, and an unreachable app
+// honestly contributes 0 rather than blocking the other three real
+// numbers from counting.
+async function fetchRealTotal(url, field) {
+  try {
+    const res = await fetch(url, { headers: serviceHeaders() });
+    if (!res.ok) return 0;
+    const body = await res.json();
+    return Number.isInteger(body[field]) ? body[field] : 0;
+  } catch {
+    return 0;
+  }
+}
+
+// The real, live sum across every connected app's own real per-creator
+// total -- streams, listens, views, units sold -- for whichever real
+// id this card's subject actually has on each app (the same
+// creatorId/artistId string, by this ecosystem's own cross-app
+// convention). Works identically for any participant; nothing here
+// names a specific person.
+async function fetchRealContentConsumptionCount(id) {
+  const [streams, listens, views, unitsSold] = await Promise.all([
+    fetchRealTotal(`${VULTURE_MUSIC_API_URL}/api/artists/${encodeURIComponent(id)}/stream-count`, 'totalStreamCount'),
+    fetchRealTotal(`${VULTURE_PODS_API_URL}/api/creators/${encodeURIComponent(id)}/listen-count`, 'totalListenCount'),
+    fetchRealTotal(`${VULTURE_FLIX_API_URL}/api/creators/${encodeURIComponent(id)}/view-count`, 'totalViewCount'),
+    fetchRealTotal(`${CVLLEX_API_URL}/api/creators/${encodeURIComponent(id)}/units-redeemed`, 'totalUnitsRedeemed'),
+  ]);
+  return streams + listens + views + unitsSold;
+}
 // -- The store, and which backend holds it ----------------------------
 //
 // `let`, not `const`: with DATABASE_URL set this app's store lives in
@@ -474,15 +515,33 @@ app.post('/api/card/:id/value-score', requireSession(), async (req, res) => {
     // recent `establishedCreatorAssessment` (if any) already holds
     // their real cross-platform social-following/press/recognition
     // numbers. No assessment on file means no real external-influence
-    // data exists for them yet, so the term is honestly 0, never
+    // data exists for them yet, so that part is honestly 0, never
     // guessed.
+    //
+    // **The real content-consumption half is live, not snapshotted**,
+    // by direct instruction: "every time if something happens in
+    // their career, their card will be affected by that." A follower
+    // count is only knowable from a self-reported assessment because
+    // no live social API exists here -- but real streams/listens/
+    // views/units-sold genuinely are knowable, continuously, from
+    // this ecosystem's own connected apps, so they are fetched live on
+    // every scoring call rather than frozen at onboarding time. Works
+    // identically for any real participant -- `fetchRealContentConsumptionCount`
+    // names no one.
     const card = getCultureCard(store, cardId);
     const influenceSubjectId = card
       ? (card.subjectPersonId || (card.mintedByRole === 'owner' ? card.mintedByUserId : null))
       : null;
     const latestAssessment = influenceSubjectId ? getLatestAssessmentForCreator(store, influenceSubjectId) : null;
-    const externalInfluenceScore = latestAssessment
-      ? computeExternalScore(latestAssessment.existingExternalMetrics)
+    const realContentConsumptionCount = influenceSubjectId
+      ? await fetchRealContentConsumptionCount(influenceSubjectId)
+      : 0;
+    const externalInfluenceScore = (latestAssessment || realContentConsumptionCount > 0)
+      ? computeExternalScore({
+        realSocialFollowing: 0, realPressCoverageCount: 0, realIndustryRecognition: false,
+        ...(latestAssessment ? latestAssessment.existingExternalMetrics : {}),
+        realContentConsumptionCount,
+      })
       : 0;
 
     const traditional = { ...(options.traditional || {}), authenticityGrade, externalInfluenceScore };

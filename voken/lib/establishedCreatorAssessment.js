@@ -18,6 +18,14 @@ const { RARITY_TIERS } = require('./cardTypes');
 const SOCIAL_FOLLOWING_LOG_MULTIPLIER = 15;
 const PRESS_COVERAGE_POINTS_PER_ARTICLE = 5;
 const INDUSTRY_RECOGNITION_BONUS = 20;
+// Deliberately lower than the social-following multiplier: real
+// cross-app content-consumption totals (streams + listens + views +
+// units sold, summed) run into the tens or hundreds of millions for a
+// genuinely huge career, where a real follower count more commonly
+// tops out in the single-digit millions -- a lower multiplier means
+// this term saturates at a comparably huge, not trivially small,
+// real number.
+const CONTENT_CONSUMPTION_LOG_MULTIPLIER = 12;
 
 function round(n) {
   return Math.round(n * 100) / 100;
@@ -26,8 +34,24 @@ function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
 
+// **`realContentConsumptionCount`, added by direct instruction**: "get
+// all the information from everything we can... duplicate this and
+// use it for all of our participants" -- a real, cross-platform sum
+// of every connected app's own real per-creator total (vulture-music
+// streams, vulture-pods listens, vulture-flix views, cvllex units
+// sold), not a second parallel follower-style metric. Optional and
+// defaulting to 0: `assessEstablishedCreator`'s own one-time onboarding
+// snapshot below has no reason to call out to four other apps just to
+// record a starting tier, so this stays 0 there -- it is meant to be
+// supplied live, by the caller, at value-score time instead (see
+// `server.js`'s own real cross-app fetches), which is also exactly why
+// it is not persisted onto the stored assessment: it changes
+// continuously, the way a follower count self-reported once a year
+// does not.
 function computeExternalScore(options = {}) {
-  const { realSocialFollowing, realPressCoverageCount, realIndustryRecognition } = options;
+  const {
+    realSocialFollowing, realPressCoverageCount, realIndustryRecognition, realContentConsumptionCount = 0,
+  } = options;
 
   if (!Number.isInteger(realSocialFollowing) || realSocialFollowing < 0) {
     throw new Error('computeExternalScore requires a non-negative integer realSocialFollowing');
@@ -38,12 +62,16 @@ function computeExternalScore(options = {}) {
   if (typeof realIndustryRecognition !== 'boolean') {
     throw new Error('computeExternalScore requires a boolean realIndustryRecognition');
   }
+  if (!Number.isInteger(realContentConsumptionCount) || realContentConsumptionCount < 0) {
+    throw new Error('computeExternalScore requires a non-negative integer realContentConsumptionCount when given');
+  }
 
   const socialScore = Math.log10(realSocialFollowing + 1) * SOCIAL_FOLLOWING_LOG_MULTIPLIER;
   const pressScore = realPressCoverageCount * PRESS_COVERAGE_POINTS_PER_ARTICLE;
   const recognitionBonus = realIndustryRecognition ? INDUSTRY_RECOGNITION_BONUS : 0;
+  const consumptionScore = Math.log10(realContentConsumptionCount + 1) * CONTENT_CONSUMPTION_LOG_MULTIPLIER;
 
-  return round(clamp(socialScore + pressScore + recognitionBonus, 0, 100));
+  return round(clamp(socialScore + pressScore + recognitionBonus + consumptionScore, 0, 100));
 }
 
 // Upper five real tiers only -- never 'common' (not a blank-slate

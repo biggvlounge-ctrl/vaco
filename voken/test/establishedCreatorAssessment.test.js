@@ -60,3 +60,27 @@ test('an assessment\'s existingExternalMetrics round-trips cleanly through compu
   const score = computeExternalScore(latest.existingExternalMetrics);
   assert.equal(score, assessment.externalScore, 'recomputing from the stored metrics must reproduce the same real score');
 });
+
+test('realContentConsumptionCount defaults to 0 -- a one-time onboarding assessment never needs it', () => {
+  const score = computeExternalScore({ realSocialFollowing: 0, realPressCoverageCount: 0, realIndustryRecognition: false });
+  assert.equal(score, 0);
+});
+
+test('a real cross-platform content-consumption total strictly raises computeExternalScore, all else equal', () => {
+  const base = { realSocialFollowing: 1000, realPressCoverageCount: 0, realIndustryRecognition: false };
+  const noConsumption = computeExternalScore(base);
+  const withConsumption = computeExternalScore({ ...base, realContentConsumptionCount: 50000000 });
+  assert.ok(withConsumption > noConsumption);
+});
+
+test('computeExternalScore validates realContentConsumptionCount the same way every other input here is', () => {
+  const base = { realSocialFollowing: 0, realPressCoverageCount: 0, realIndustryRecognition: false };
+  assert.throws(
+    () => computeExternalScore({ ...base, realContentConsumptionCount: -1 }),
+    /non-negative integer realContentConsumptionCount/,
+  );
+  assert.throws(
+    () => computeExternalScore({ ...base, realContentConsumptionCount: 1.5 }),
+    /non-negative integer realContentConsumptionCount/,
+  );
+});
