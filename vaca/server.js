@@ -26,6 +26,8 @@ const {
   listVerificationsForSubject, approveVerification, rejectVerification, getAuthenticityGrade,
   isIdentityVerified,
 } = require('./lib/verifications');
+const { getChain, getBlock, verifyChainIntegrity } = require('./lib/blockchain');
+const { isConfigured: chainAnchorConfigured, describeChainPosture, anchorHash } = require('./lib/publicChainAnchor');
 
 const { requireActor } = require('./lib/shieldAuth.cjs');
 
@@ -186,6 +188,63 @@ app.get('/api/identity-status/:subjectType/:subjectId', (req, res) => {
     subjectId: req.params.subjectId,
     verified: isIdentityVerified(store, req.params.subjectType, req.params.subjectId),
   });
+});
+
+// -- The real local blockchain --------------------------------------
+// See lib/blockchain.js's own header for what this honestly is (a
+// real, cryptographically-linked chain of every verification
+// decision) and is not (a distributed, multi-party network).
+
+app.get('/api/chain', (_req, res) => {
+  res.json({ chain: getChain(store), integrity: verifyChainIntegrity(store) });
+});
+
+app.get('/api/chain/block/:index', (req, res) => {
+  const block = getBlock(store, Number(req.params.index));
+  if (!block) return res.status(404).json({ error: `no block with index ${req.params.index}` });
+  return res.json(block);
+});
+
+// -- Real public-blockchain anchoring --------------------------------
+// See lib/publicChainAnchor.js's own header for why this is
+// unconfigured by default and never fabricates a transaction.
+
+app.get('/api/chain/posture', (_req, res) => {
+  res.json(describeChainPosture());
+});
+
+// Spends real gas on every real call once configured -- operator-
+// gated for that reason, and decision-logged the same way an
+// approve/reject already is, since "post this hash publicly, for
+// real money" is exactly the kind of outcome vaco-audit exists to
+// record.
+app.post('/api/verifications/:id/anchor-on-chain', requireOperator('vaca:verify'), async (req, res) => {
+  const verification = getVerification(store, Number(req.params.id));
+  if (!verification) return res.status(404).json({ error: `no verification with id ${req.params.id}` });
+  if (!verification.blockHash) {
+    return res.status(400).json({ error: `verification ${req.params.id} has not been decided yet -- nothing to anchor` });
+  }
+  try {
+    await decisionLog.record({
+      route: 'POST /api/verifications/:id/anchor-on-chain',
+      outcomeKind: 'credential',
+      subjectType: 'verification',
+      subjectId: req.params.id,
+      decidedBy: req.operator.operatorName,
+      decidedByKind: 'operator',
+      inputs: { blockHash: verification.blockHash },
+      reason: (req.body || {}).reason || null,
+    });
+  } catch (err) {
+    return res.status(503).json({ error: err.message });
+  }
+  try {
+    const anchor = await anchorHash(verification.blockHash);
+    verification.chainAnchor = anchor;
+    res.status(201).json({ verification, anchor, chainConfigured: chainAnchorConfigured() });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 app.listen(PORT, () => {

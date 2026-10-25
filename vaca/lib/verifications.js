@@ -37,6 +37,7 @@
 // own `idVerification.js` already takes for identity documents.
 
 const { hashPayload } = require('./cryptoAgility');
+const { appendBlock } = require('./blockchain');
 
 const VERIFICATION_STATUSES = ['pending', 'verified', 'rejected'];
 
@@ -84,6 +85,8 @@ function submitVerification(store, options = {}) {
     reviewNotes: null,
     reviewedAt: null,
     integrityHash: null,
+    blockIndex: null,
+    blockHash: null,
     createdAt: now,
   };
   store.verifications.push(verification);
@@ -133,6 +136,14 @@ function approveVerification(store, options = {}) {
     claimType: verification.claimType, status: verification.status, grade: verification.grade,
     reviewedBy: verification.reviewedBy, reviewedAt: verification.reviewedAt,
   });
+  // A real block, linked to the one before it -- see lib/blockchain.js.
+  const block = appendBlock(store, {
+    verificationId: verification.id, subjectType: verification.subjectType, subjectId: verification.subjectId,
+    claimType: verification.claimType, status: verification.status, grade: verification.grade,
+    reviewedBy: verification.reviewedBy, reviewedAt: verification.reviewedAt,
+  }, { now });
+  verification.blockIndex = block.index;
+  verification.blockHash = block.hash;
   return verification;
 }
 
@@ -151,6 +162,13 @@ function rejectVerification(store, options = {}) {
     claimType: verification.claimType, status: verification.status, reviewedBy: verification.reviewedBy,
     reviewNotes: verification.reviewNotes, reviewedAt: verification.reviewedAt,
   });
+  const block = appendBlock(store, {
+    verificationId: verification.id, subjectType: verification.subjectType, subjectId: verification.subjectId,
+    claimType: verification.claimType, status: verification.status, reviewedBy: verification.reviewedBy,
+    reviewNotes: verification.reviewNotes, reviewedAt: verification.reviewedAt,
+  }, { now });
+  verification.blockIndex = block.index;
+  verification.blockHash = block.hash;
   return verification;
 }
 

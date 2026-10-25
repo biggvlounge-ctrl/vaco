@@ -7,6 +7,10 @@ function createVacaStore() {
   return {
     verifications: [],
     nextVerificationId: 1,
+    // A real local blockchain: every verification decision is a block
+    // cryptographically linked to the one before it. See
+    // lib/blockchain.js.
+    blockchainLedger: [],
   };
 }
 
