@@ -9,7 +9,10 @@ const assert = require('node:assert');
 
 const { createVokenStore } = require('../lib/store');
 const { mintHistoricCard, listHistoricCards } = require('../lib/cultureCards');
-const { HISTORIC_SUBJECT_TYPES, HISTORIC_REGISTRY, listHistoricEntries, getHistoricEntry } = require('../lib/historicRegistry');
+const {
+  HISTORIC_SUBJECT_TYPES, HISTORIC_REGISTRY, listHistoricEntries, getHistoricEntry, genuineSignificanceInputsFor,
+} = require('../lib/historicRegistry');
+const { computeGenuineSignificanceScore } = require('../lib/valueAlgorithm');
 
 function baseArgs(overrides = {}) {
   return {
@@ -24,16 +27,45 @@ function baseArgs(overrides = {}) {
   };
 }
 
-test('the historic register covers all four real subject types with at least one real entry each', () => {
-  assert.deepEqual(HISTORIC_SUBJECT_TYPES, ['place', 'person', 'invention', 'book']);
+test('the historic register covers all six real subject types with at least one real entry each', () => {
+  assert.deepEqual(HISTORIC_SUBJECT_TYPES, ['place', 'monument', 'home', 'person', 'invention', 'book']);
   for (const subjectType of HISTORIC_SUBJECT_TYPES) {
     const entries = listHistoricEntries(subjectType);
     assert.ok(entries.length > 0, `expected at least one real "${subjectType}" entry`);
     for (const e of entries) {
       assert.equal(e.subjectType, subjectType);
       assert.ok(e.slug && e.name && e.era && e.summary, `entry "${e.slug}" is missing a real field`);
+      assert.ok(Number.isInteger(e.earliestYear), `entry "${e.slug}" is missing a real integer earliestYear`);
+      assert.ok(Array.isArray(e.recognitions), `entry "${e.slug}" is missing a real recognitions array`);
     }
   }
+});
+
+test('genuineSignificanceInputsFor computes real, deterministic inputs from the register, not a per-call guess', () => {
+  // Marie Curie's two Nobel Prizes are the clearest real case: a fixed,
+  // citable recognitionCount of 2, and a longevity computed from her
+  // own earliestYear (1898), not asserted separately.
+  const now = new Date('2026-06-15').getTime();
+  const inputs = genuineSignificanceInputsFor('marie-curie', { now });
+  assert.equal(inputs.longevityOfImpactYears, 2026 - 1898);
+  assert.equal(inputs.institutionalRecognitionCount, 2);
+  assert.equal(inputs.documentedHistoricalImpact, true);
+
+  // Calling it again with the same slug and the same `now` must
+  // produce the exact same numbers -- no hidden randomness or drift.
+  assert.deepEqual(genuineSignificanceInputsFor('marie-curie', { now }), inputs);
+
+  // And the numbers it produces must themselves be valid inputs to the
+  // real significance-score function, not merely shaped like them.
+  const score = computeGenuineSignificanceScore(inputs);
+  assert.ok(score.genuineSignificanceScore > 0);
+});
+
+test('genuineSignificanceInputsFor refuses a slug not in the register', () => {
+  assert.throws(
+    () => genuineSignificanceInputsFor('not-a-real-slug'),
+    /no historic entry "not-a-real-slug" in the register/,
+  );
 });
 
 test('listHistoricEntries with no subjectType returns the whole register, and rejects an unknown subjectType', () => {

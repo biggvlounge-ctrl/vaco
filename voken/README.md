@@ -113,6 +113,11 @@ curl http://localhost:8794/api/historic-register?subjectType=invention
 curl -X POST http://localhost:8794/api/card/historic -H "Content-Type: application/json" \
   -H "X-Operator-Credential: <a real operator credential>" \
   -d '{"historicSlug":"printing-press","rarityTier":"legendary","tokenizationType":"digital","formats":["digital"],"plannedDigitalMintCount":500,"reason":"educational historic series, invention"}'
+
+# The Instagram-Explore-style browsing surface: one section per real
+# subject type, each card's real attentionScore and genuineSignificanceScore
+# shown right in the feed.
+curl http://localhost:8794/api/explore/historic
 ```
 
 ## What's here
@@ -148,20 +153,34 @@ curl -X POST http://localhost:8794/api/card/historic -H "Content-Type: applicati
   make minting-on-behalf-of a way to self-enrich. See
   `test/externalEntityCard.test.js`.
 - `lib/historicRegistry.js` + `mintHistoricCard()` — a **real, fixed
-  register** of historic places, people (inventors/authors/notable
-  figures), inventions, and books, each a real, well-documented
-  historical fact rather than caller-supplied free text. The same
-  "no single owner" shape `mintExternalEntityCard`'s operator path
-  already established applies here too: nobody owns Machu Picchu or
-  the invention of penicillin, so no guaranteed first edition goes to
-  anyone, including the operator who curated the card into existence.
-  Checked against the register at mint time rather than accepted as
-  free text, specifically so a `historic` card's factual content is
-  always real and checkable — the one thing this category exists to
-  guarantee. Browse the register with `GET /api/historic-register`
-  (optionally `?subjectType=place|person|invention|book`) or
+  register** of historic places, monuments, homes, people (inventors/
+  authors/notable figures), inventions, and books, each a real,
+  well-documented historical fact rather than caller-supplied free
+  text (31 entries as of this register's latest pass — the Great Wall,
+  the Statue of Liberty, Monticello, Marie Curie, the printing press,
+  Hamlet, and more). The same "no single owner" shape
+  `mintExternalEntityCard`'s operator path already established applies
+  here too: nobody owns Machu Picchu or the invention of penicillin, so
+  no guaranteed first edition goes to anyone, including the operator
+  who curated the card into existence. Checked against the register at
+  mint time rather than accepted as free text, specifically so a
+  `historic` card's factual content is always real and checkable — the
+  one thing this category exists to guarantee. Browse the register
+  with `GET /api/historic-register` (optionally
+  `?subjectType=place|monument|home|person|invention|book`) or
   `GET /api/historic-register/:slug` before minting against it. See
   `test/historicCard.test.js`.
+  **Each entry also carries a real `earliestYear` and `recognitions`
+  list** (a Nobel Prize, a UNESCO World Heritage Site designation —
+  left empty rather than guessed where no specific, confident citation
+  exists), feeding `genuineSignificanceInputsFor()`: the real bridge
+  into the Value Algorithm's Genuine Significance Score below, so a
+  historic card's "how much is it worth" answer is computed from the
+  register's own real facts, never asserted per mint or per scoring
+  call. `POST /api/card/:id/value-score` now forces this for any
+  historic card — the same "never trust the request body" discipline
+  that route already holds for the live VACA authenticity grade,
+  applied to the one other score a caller could otherwise just assert.
 - `lib/valueAlgorithm.js` — **the real, hybrid Value Algorithm (Phase
   1)**: a log-scale scarcity curve, log-normalized digital engagement
   with a real capped velocity bonus, and a completely independent
@@ -199,6 +218,22 @@ curl -X POST http://localhost:8794/api/card/historic -H "Content-Type: applicati
   own `computeDigitalEngagementScore()`, fed by this phase's real
   engagement stats — genuine cross-phase code reuse, not a rebuilt
   formula.
+- `lib/historicExplore.js` — **the Historic Explore Page**, an
+  Instagram-Explore-style browsing surface by direct instruction:
+  `GET /api/explore/historic` groups historic cards into one section
+  per real subject type (`place`/`monument`/`home`/`person`/
+  `invention`/`book`), cards ranked within each section by the same
+  real `attentionScore` `exploreVoken.js` already uses. Each card also
+  carries a real `genuineSignificanceScore`, computed synchronously
+  straight from the historic register (no VACA round-trip — a historic
+  card's significance is a fact about history, not about any one
+  minted card's condition) — two real, separable value signals shown
+  side by side in the feed itself, rather than one blended number a
+  viewer can't take apart. The *full* `combinedRealValueScore` (which
+  does need the live authenticity grade) stays a deliberate, single-
+  card action through `POST /api/card/:id/value-score`, the same
+  "quote first, then act" shape `sell-back-quote` already has. See
+  `test/historicExplore.test.js`.
 - `lib/creatorDigitalProfile.js` — aggregates a creator's own cards
   into one real, averaged engagement score (not a raw sum, which would
   unfairly favor volume over genuine per-work attention), with a real,

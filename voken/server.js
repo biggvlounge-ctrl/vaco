@@ -44,7 +44,10 @@ const { CATEGORIES, RARITY_TIERS, TOKENIZATION_TYPES, FORMATS } = require('./lib
 const {
   SOURCE_APPS, MINTED_BY_ROLES,
   mintCultureCard, mintExternalEntityCard, mintHistoricCard, listHistoricCards, getCultureCard, listCultureCardsByCategory, mintAdditionalEdition, transferEditionOwnership, listEditionsWithSerials} = require('./lib/cultureCards');
-const { HISTORIC_SUBJECT_TYPES, listHistoricEntries, getHistoricEntry } = require('./lib/historicRegistry');
+const {
+  HISTORIC_SUBJECT_TYPES, listHistoricEntries, getHistoricEntry, genuineSignificanceInputsFor,
+} = require('./lib/historicRegistry');
+const { getHistoricExplorePage } = require('./lib/historicExplore');
 const { computeCultureCardValueScore } = require('./lib/valueAlgorithm');
 const { assessEstablishedCreator } = require('./lib/establishedCreatorAssessment');
 const { PACK_TIER_NAMES, createPackTier, getPackTier, openPack, getPackOdds } = require('./lib/cardPacks');
@@ -432,6 +435,14 @@ app.get('/api/cards/historic', (req, res) => {
   res.json({ cards: listHistoricCards(store, req.query.subjectType || null) });
 });
 
+// The Instagram-Explore-style browsing surface for historic cards --
+// one section per real subjectType, ranked within each by real, live
+// engagement, with the real genuineSignificanceScore shown alongside
+// so value is visible in the feed itself. See lib/historicExplore.js.
+app.get('/api/explore/historic', (req, res) => {
+  res.json(getHistoricExplorePage(store));
+});
+
 app.post('/api/card/:id/transfer', requireActor('fromOwnerId'), (req, res) => {
   try {
     res.json(transferEditionOwnership(store, { ...req.body, cardId: Number(req.params.id) }));
@@ -453,7 +464,22 @@ app.post('/api/card/:id/value-score', requireSession(), async (req, res) => {
     // verifying it.
     const authenticityGrade = await fetchAuthenticityGrade(cardId);
     const traditional = { ...(options.traditional || {}), authenticityGrade };
-    res.json(computeCultureCardValueScore(cardId, { ...options, traditional }));
+
+    // Same discipline, applied to the Genuine Significance Score: a
+    // historic card's real longevity/recognition facts are already
+    // knowable from the historic register it was minted against (see
+    // historicRegistry.js's own header), so they are computed from
+    // there rather than trusted from the request body -- the same gap
+    // this route already closed for authenticityGrade, closed again
+    // here for the one other score a caller could otherwise just
+    // assert. Non-historic cards are unaffected: no register exists
+    // to defer to, so `options.genuineSignificance` still applies.
+    const card = getCultureCard(store, cardId);
+    const genuineSignificance = card && card.category === 'historic' && card.historicSlug
+      ? genuineSignificanceInputsFor(card.historicSlug)
+      : options.genuineSignificance;
+
+    res.json(computeCultureCardValueScore(cardId, { ...options, traditional, genuineSignificance }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
