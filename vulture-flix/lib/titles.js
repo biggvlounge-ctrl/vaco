@@ -340,6 +340,20 @@ function getWatchHistory(store, userId) {
   return store.watchEvents.filter((w) => w.userId === userId).sort((a, b) => b.watchedAt - a.watchedAt);
 }
 
+// The real, cross-title total for one creator -- added by direct
+// instruction so VOKEN's cross-platform achievement score can read a
+// creator's real total view count live. Counts every real watch event
+// across every title with this creatorId, exclusive/licensed/studio-
+// produced alike: an acquired title's views still count toward the
+// creator's own real reach even though `ownershipRetainedPercent: 0`
+// means Vvltvre Flix now owns the distribution rights -- this is
+// about how many real people watched their work, not who currently
+// holds the licence.
+function getTotalViewsForCreator(store, creatorId) {
+  const titleIds = new Set(listTitlesForCreator(store, creatorId).map((t) => t.id));
+  return store.watchEvents.filter((w) => titleIds.has(w.titleId)).length;
+}
+
 function countActiveStreams(store, userId) {
   return store.streamSessions.filter((s) => s.userId === userId && s.status === 'active').length;
 }
@@ -410,6 +424,7 @@ module.exports = {
   getCatalog,
   watchTitle,
   getWatchHistory,
+  getTotalViewsForCreator,
   startStream,
   endStream,
   listActiveStreams,

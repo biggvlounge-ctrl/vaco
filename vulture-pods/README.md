@@ -102,7 +102,14 @@ curl -X POST http://localhost:8810/api/shows -H "Content-Type: application/json"
   different from `vulture-flix`'s own `watchTitle`: no subscription
   check, no money moves, unless the specific episode is a real gated
   bonus episode, in which case it checks the listener's own real
-  subscription to that show.
+  subscription to that show. `getTotalListensForCreator()` is the
+  real, cross-show aggregate for one creator -- added by direct
+  instruction so a creator's real, total podcast listening can feed
+  VOKEN's cross-platform achievement score (`GET
+  /api/creators/:creatorId/listen-count`), summed straight from the
+  same real `listenEvents` log every per-episode count already reads,
+  never a separately-tracked number that could drift from it. See
+  `test/listening.test.js`.
 - `server.js` — a real Express API (CommonJS), real injected
   `transferVCoin` against V3 (`venvs-mock-backend`), plus a real,
   live HTTP client into `vulture-music`'s own server for episode

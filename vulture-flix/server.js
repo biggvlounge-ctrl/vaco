@@ -32,7 +32,7 @@ const { createServiceAuth } = require('./lib/serviceAuth.cjs');
 const { traceMiddleware } = require('./lib/tracing.cjs');
 const {
   TITLE_TYPES, TITLE_STATUSES, acquireExclusiveTitle, licenseNonExclusiveTitle, registerStudioProducedTitle, getTitleRecord, listTitlesForCreator,
-  markStreaming, removeTitle, getCatalog, watchTitle, getWatchHistory,
+  markStreaming, removeTitle, getCatalog, watchTitle, getWatchHistory, getTotalViewsForCreator,
   startStream, endStream, listActiveStreams,
   requestPhysicalRun,
 } = require('./lib/titles');
@@ -374,6 +374,14 @@ app.get('/api/creators/:creatorId/titles', (req, res) => {
 
 app.get('/api/users/:userId/watch-history', (req, res) => {
   res.json({ history: getWatchHistory(store, req.params.userId) });
+});
+
+// The real, cross-title total for one creator -- the number VOKEN's
+// real cross-platform achievement score reads live, by direct
+// instruction ("check all their social media platforms... get all
+// the information from everything we can").
+app.get('/api/creators/:creatorId/view-count', (req, res) => {
+  res.json({ creatorId: req.params.creatorId, totalViewCount: getTotalViewsForCreator(store, req.params.creatorId) });
 });
 
 app.listen(PORT, () => {

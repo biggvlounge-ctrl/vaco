@@ -34,7 +34,7 @@ const {
 const {
   PLATFORM_TAKE_PERCENT, subscribeToShow, cancelShowSubscription, isSubscribedToShow, listSubscriptionsForUser,
 } = require('./lib/subscriptions');
-const { recordListen, getListenHistory, getListenCount } = require('./lib/listening');
+const { recordListen, getListenHistory, getListenCount, getTotalListensForCreator } = require('./lib/listening');
 const {
   requireActor, requireParamActor, requireSession, requireCallingService,
 } = require('./lib/shieldAuth.cjs');
@@ -374,6 +374,15 @@ app.post('/api/episodes/:id/listen', requireActor('userId'), async (req, res) =>
 
 app.get('/api/episodes/:id/listen-count', (req, res) => {
   res.json({ episodeId: Number(req.params.id), listenCount: getListenCount(store, Number(req.params.id)) });
+});
+
+// The real, cross-show total for one creator -- the number VOKEN's
+// real cross-platform achievement score reads live, by direct
+// instruction ("check all their social media platforms... get all
+// the information from everything we can"), rather than a stale,
+// self-reported figure.
+app.get('/api/creators/:creatorId/listen-count', (req, res) => {
+  res.json({ creatorId: req.params.creatorId, totalListenCount: getTotalListensForCreator(store, req.params.creatorId) });
 });
 
 app.get('/api/users/:userId/listen-history', (req, res) => {

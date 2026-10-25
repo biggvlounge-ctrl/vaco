@@ -83,6 +83,15 @@ curl -X POST http://localhost:8807/api/titles -H "Content-Type: application/json
   limit. `endStream` closes a session and frees the slot for a new
   one — real session start/end, not the fire-and-forget single event
   `watchTitle` still is for a plain, non-slot-holding watch.
+  `getTotalViewsForCreator()` is the real, cross-title aggregate for
+  one creator — added by direct instruction so VOKEN's cross-platform
+  achievement score can read a creator's real total view count live
+  (`GET /api/creators/:creatorId/view-count`). Counts every real watch
+  event across every title with that creatorId — exclusive, licensed,
+  and studio-produced alike: an acquired title's views still count
+  toward the creator's own real reach even though
+  `ownershipRetainedPercent: 0` means Vvltvre Flix now owns the
+  distribution rights. See `test/creatorViews.test.js`.
 - `lib/subscriptions.js` — real monthly subscriptions
   (`MONTHLY_FEE`, a flagged-interpretive number grounded in Netflix's
   real current standard-tier price), `subscribe` (real charge + real

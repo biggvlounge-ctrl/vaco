@@ -7,8 +7,9 @@
 // `requiresSubscription` (a real bonus/exclusive episode) checks the
 // listener's own real subscription to that specific show.
 
-const { getEpisode } = require('./episodes');
+const { getEpisode, listEpisodesForShow } = require('./episodes');
 const { isSubscribedToShow } = require('./subscriptions');
+const { listShowsForCreator } = require('./shows');
 
 function recordListen(store, options = {}) {
   const { episodeId, userId, now = Date.now() } = options;
@@ -36,8 +37,27 @@ function getListenCount(store, episodeId) {
   return store.listenEvents.filter((l) => l.episodeId === episodeId).length;
 }
 
+// The real, cross-episode total for one creator -- by direct
+// instruction: "check all their social media platforms... get all the
+// information from everything we can," generalized across every
+// connected app. Every real show the creator owns, every real
+// published episode of each, summed from the same real `listenEvents`
+// log `getListenCount` already reads -- no separate running counter to
+// let drift from reality.
+function getTotalListensForCreator(store, creatorId) {
+  const shows = listShowsForCreator(store, creatorId);
+  let total = 0;
+  for (const show of shows) {
+    for (const episode of listEpisodesForShow(store, show.id)) {
+      total += getListenCount(store, episode.id);
+    }
+  }
+  return total;
+}
+
 module.exports = {
   recordListen,
   getListenHistory,
   getListenCount,
+  getTotalListensForCreator,
 };
