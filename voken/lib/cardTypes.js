@@ -10,6 +10,11 @@
 const CATEGORIES = [
   'vehicles', 'property', 'music', 'art', 'creatorMemberships',
   'digitalWearables', 'businessLoyalty', 'eventMoments', 'landmarks', 'collectibles',
+  // Real historic places, people (inventors/authors/notable figures),
+  // inventions, and books -- informational/educational, minted only
+  // against the fixed, real register in lib/historicRegistry.js. See
+  // mintHistoricCard in lib/cultureCards.js.
+  'historic',
 ];
 
 const RARITY_TIERS = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', '1-of-1'];

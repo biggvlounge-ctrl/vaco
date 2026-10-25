@@ -43,7 +43,8 @@ const { getBrandInfo } = require('./lib/brand');
 const { CATEGORIES, RARITY_TIERS, TOKENIZATION_TYPES, FORMATS } = require('./lib/cardTypes');
 const {
   SOURCE_APPS, MINTED_BY_ROLES,
-  mintCultureCard, mintExternalEntityCard, getCultureCard, listCultureCardsByCategory, mintAdditionalEdition, transferEditionOwnership, listEditionsWithSerials} = require('./lib/cultureCards');
+  mintCultureCard, mintExternalEntityCard, mintHistoricCard, listHistoricCards, getCultureCard, listCultureCardsByCategory, mintAdditionalEdition, transferEditionOwnership, listEditionsWithSerials} = require('./lib/cultureCards');
+const { HISTORIC_SUBJECT_TYPES, listHistoricEntries, getHistoricEntry } = require('./lib/historicRegistry');
 const { computeCultureCardValueScore } = require('./lib/valueAlgorithm');
 const { assessEstablishedCreator } = require('./lib/establishedCreatorAssessment');
 const { PACK_TIER_NAMES, createPackTier, getPackTier, openPack, getPackOdds } = require('./lib/cardPacks');
@@ -308,7 +309,27 @@ app.get('/api/health', (_req, res) => {
     referralTiers: REFERRAL_TIERS, spinPrizes: SPIN_PRIZES,
     sourceApps: SOURCE_APPS, mintedByRoles: MINTED_BY_ROLES,
     sellBackValueRanges: SELLBACK_VALUE_RANGES,
+    historicSubjectTypes: HISTORIC_SUBJECT_TYPES,
   });
+});
+
+// The fixed historic register itself -- browsable before minting, so
+// a caller can see what real entries exist (and their slugs) rather
+// than guessing. See lib/historicRegistry.js for why this is fixed
+// rather than free-text.
+app.get('/api/historic-register', (req, res) => {
+  const { subjectType } = req.query;
+  try {
+    res.json({ entries: listHistoricEntries(subjectType || null) });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/historic-register/:slug', (req, res) => {
+  const entry = getHistoricEntry(req.params.slug);
+  if (!entry) return res.status(404).json({ error: `no historic entry "${req.params.slug}"` });
+  res.json(entry);
 });
 
 app.get('/api/brand', (_req, res) => {
@@ -375,6 +396,40 @@ app.post('/api/card/external', requireExternalCardAuthority(verifyExternalCardOw
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+});
+
+// A Cvltvre Card about a real historic place, person, invention, or
+// book -- operator-only, since nobody on this platform has standing
+// to mint a card about the printing press the way a creator has
+// standing to mint one about themselves. Guarded directly by
+// `requireOperator` rather than `requireExternalCardAuthority`: there
+// is no owner path here at all, only the operator one.
+app.post('/api/card/historic', requireOperator('voken:mint-historic-card'), async (req, res) => {
+  const mintedByUserId = req.operator ? req.operator.operatorName : 'operator (VACO_OPERATOR_MODE=off)';
+  try {
+    await decisionLog.record({
+      route: 'POST /api/card/historic',
+      outcomeKind: 'mint',
+      subjectType: 'cultureCard',
+      subjectId: (req.body || {}).historicSlug || null,
+      decidedBy: mintedByUserId,
+      decidedByKind: 'operator',
+      inputs: req.body || {},
+      reason: (req.body || {}).reason || null,
+    });
+  } catch (err) {
+    return res.status(503).json({ error: err.message });
+  }
+
+  try {
+    res.status(201).json(mintHistoricCard(store, { ...req.body, mintedByUserId }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/cards/historic', (req, res) => {
+  res.json({ cards: listHistoricCards(store, req.query.subjectType || null) });
 });
 
 app.post('/api/card/:id/transfer', requireActor('fromOwnerId'), (req, res) => {

@@ -4,8 +4,9 @@ The ecosystem's digital collectibles marketplace, under a real,
 consolidated umbrella standard: VDAS (the VOKEN Digital Asset
 Standard). Anything with rarity, ownership, or cultural relevance —
 vehicles, property, music, art, creator memberships, digital
-wearables, business loyalty, event moments, landmarks — becomes a
-Cvltvre Card: collectible, tokenized, ownable, buyable/sellable/
+wearables, business loyalty, event moments, landmarks, **real historic
+places/people/inventions/books** — becomes a Cvltvre Card: collectible,
+tokenized, ownable, buyable/sellable/
 tradeable/auctionable/rafflable/giftable/displayable/shareable. VADO
 (art gallery/auctions) is a sub-division sharing the same card
 infrastructure. **VEX (Robinhood-style brokerage trading) was extracted
@@ -103,10 +104,19 @@ curl -X POST http://localhost:8794/api/card/1/value-score -H "Content-Type: appl
 curl -X POST http://localhost:8794/api/card/external -H "Content-Type: application/json" \
   -H "X-Operator-Credential: <a real operator credential>" \
   -d '{"sourceApp":"world-layer","sourceType":"location","externalRef":"WL-LOC-0001","category":"landmarks","rarityTier":"legendary","tokenizationType":"digital","formats":["digital"],"plannedDigitalMintCount":500,"reason":"UNESCO landmark curation"}'
+
+# Browse the real historic register before minting against it.
+curl http://localhost:8794/api/historic-register?subjectType=invention
+
+# A historic card -- operator-only (there is no owner path for history
+# at all), checked against the register above rather than free text.
+curl -X POST http://localhost:8794/api/card/historic -H "Content-Type: application/json" \
+  -H "X-Operator-Credential: <a real operator credential>" \
+  -d '{"historicSlug":"printing-press","rarityTier":"legendary","tokenizationType":"digital","formats":["digital"],"plannedDigitalMintCount":500,"reason":"educational historic series, invention"}'
 ```
 
 ## What's here
-- `lib/cardTypes.js` — `CATEGORIES` (10) and `RARITY_TIERS` (7):
+- `lib/cardTypes.js` — `CATEGORIES` (11) and `RARITY_TIERS` (7):
   flagged placeholders, since the master spec doc itself confirms the
   real label strings weren't recoverable from its source transcript —
   replace the moment real labels are available.
@@ -137,6 +147,21 @@ curl -X POST http://localhost:8794/api/card/external -H "Content-Type: applicati
   the same act as owning what it depicts, and the alternative would
   make minting-on-behalf-of a way to self-enrich. See
   `test/externalEntityCard.test.js`.
+- `lib/historicRegistry.js` + `mintHistoricCard()` — a **real, fixed
+  register** of historic places, people (inventors/authors/notable
+  figures), inventions, and books, each a real, well-documented
+  historical fact rather than caller-supplied free text. The same
+  "no single owner" shape `mintExternalEntityCard`'s operator path
+  already established applies here too: nobody owns Machu Picchu or
+  the invention of penicillin, so no guaranteed first edition goes to
+  anyone, including the operator who curated the card into existence.
+  Checked against the register at mint time rather than accepted as
+  free text, specifically so a `historic` card's factual content is
+  always real and checkable — the one thing this category exists to
+  guarantee. Browse the register with `GET /api/historic-register`
+  (optionally `?subjectType=place|person|invention|book`) or
+  `GET /api/historic-register/:slug` before minting against it. See
+  `test/historicCard.test.js`.
 - `lib/valueAlgorithm.js` — **the real, hybrid Value Algorithm (Phase
   1)**: a log-scale scarcity curve, log-normalized digital engagement
   with a real capped velocity bonus, and a completely independent

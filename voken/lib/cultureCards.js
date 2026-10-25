@@ -11,6 +11,7 @@
 // that first mint itself, atomically, before the card is returned.
 
 const { CATEGORIES, RARITY_TIERS, TOKENIZATION_TYPES, FORMATS } = require('./cardTypes');
+const { getHistoricEntry } = require('./historicRegistry');
 
 // Shared by every mint path -- the category/rarity/tokenization/format/
 // mint-count validation a person-subject and an external-entity card
@@ -179,6 +180,63 @@ function mintExternalEntityCard(store, options = {}) {
   return card;
 }
 
+// A Cvltvre Card about a real historic place, person, invention, or
+// book -- informational and educational, grounded against the fixed
+// register in `lib/historicRegistry.js` rather than free-text, so a
+// historic card's factual content is always real and checkable (see
+// that file's own header for why). Structurally the "no single owner"
+// shape `mintExternalEntityCard`'s operator path already established:
+// nobody owns the Great Wall of China or the invention of the printing
+// press, so no guaranteed first edition goes to anyone, including the
+// operator who curated the card into existence.
+function mintHistoricCard(store, options = {}) {
+  const { historicSlug, mintedByUserId } = options;
+  if (!historicSlug) throw new Error('mintHistoricCard requires a historicSlug');
+  const entry = getHistoricEntry(historicSlug);
+  if (!entry) throw new Error(`mintHistoricCard: no historic entry "${historicSlug}" in the register`);
+  if (!mintedByUserId) throw new Error('mintHistoricCard requires a mintedByUserId');
+
+  const {
+    rarityTier, tokenizationType, formats,
+    plannedDigitalMintCount, plannedPhysicalMintCount,
+  } = validateMintParams({ ...options, category: 'historic' }, 'mintHistoricCard');
+
+  const card = {
+    id: store.nextCardId++,
+    subjectPersonId: null,
+    sourceApp: null,
+    sourceType: null,
+    externalRef: null,
+    mintedByUserId,
+    mintedByRole: 'operator',
+    category: 'historic',
+    historicSlug: entry.slug,
+    historicSubjectType: entry.subjectType,
+    historicFact: { name: entry.name, era: entry.era, summary: entry.summary },
+    rarityTier,
+    tokenizationType,
+    formats,
+    mintPlan: {
+      plannedDigitalMintCount,
+      plannedPhysicalMintCount,
+      visibleAtApplicationStage: true,
+    },
+    editions: [],
+    provenance: [],
+    createdAt: Date.now(),
+  };
+  card.provenance.push({ year: new Date(card.createdAt).getFullYear(), event: 'minted', ownerId: null });
+
+  store.cultureCards.push(card);
+  return card;
+}
+
+function listHistoricCards(store, historicSubjectType = null) {
+  return store.cultureCards.filter(
+    (c) => c.category === 'historic' && (!historicSubjectType || c.historicSubjectType === historicSubjectType),
+  );
+}
+
 function getCultureCard(store, cardId) {
   return store.cultureCards.find((c) => c.id === cardId) || null;
 }
@@ -277,6 +335,8 @@ module.exports = {
   listEditionsWithSerials,
   mintCultureCard,
   mintExternalEntityCard,
+  mintHistoricCard,
+  listHistoricCards,
   getCultureCard,
   listCultureCardsByCategory,
   countMintedEditions,
