@@ -31,6 +31,16 @@
 // models the production process but cannot generate media. So
 // `designAssetUrl` is a reference to art that must come from somewhere
 // else today.
+//
+// **Tied into CVLLEX (VOKEN's star constellation's physical-production
+// app) via `requestPhysicalRun`**, identical in shape to the same
+// bridge already built for vulture-music, vulture-flix, and VOID MAGIC:
+// any `available` product here can request a real, limited, numbered
+// collectible run of itself through CVLLEX — vaulted as a real Cvltvre
+// Card, redeemed with a real claim-order serial number. This is a
+// parallel offering, not a replacement: the zero-inventory Printify/
+// Printful listing stays unlimited and on-demand; a CVLLEX run of the
+// same design is a genuinely scarce, tokenized edition alongside it.
 
 const PRODUCT_TYPES = ['apparel', 'watch-band', 'mug', 'accessory', 'other'];
 
@@ -136,6 +146,10 @@ export function createProduct(store, options = {}) {
     fulfilmentCostVcoin,
     takeRate,
     available: true,
+    // Real CVLLEX production-order ids requested against this product
+    // (see requestPhysicalRun below) — empty until a real limited,
+    // numbered collectible run is actually requested.
+    physicalProductionOrderIds: [],
     createdAt: now,
   };
   store.merchProducts.push(product);
@@ -162,6 +176,51 @@ export function listBrands(store) {
   return [...brands.entries()]
     .map(([appBrandId, products]) => ({ appBrandId, products }))
     .sort((a, b) => b.products - a.products);
+}
+
+// **The real bridge from a zero-inventory merch listing to a real,
+// limited, numbered collectible run.** CVLLEX (VOKEN's star
+// constellation's physical-production app) is the one real place in
+// this ecosystem that orders a limited physical run, vaults it as a
+// real Cvltvre Card through VOKEN, and redeems units with a real
+// claim-order serial number — see its own README for the real
+// Qrates/Printful/Lulu/Courtyard.io grounding. This store never builds
+// a second production mechanism for that; it calls CVLLEX's real
+// `POST /api/production-orders`, injected rather than imported (the
+// same "cross-app calls are injected, not hard-wired" convention this
+// whole ecosystem uses, identical in shape to vulture-music's
+// `requestPhysicalRun`, vulture-flix's, and VOID MAGIC's) —
+// `cvllexRequestFn` is CVLLEX's own real route in production, a fake
+// in tests.
+//
+// This is deliberately a separate, parallel offering, not a
+// replacement for the product's own zero-inventory Printify/Printful
+// listing: the ordinary listing stays unlimited and manufactured on
+// demand, while a CVLLEX run for the same design is a genuinely
+// scarce, numbered, tokenized edition of it. Only an `available`
+// product may request one — a discontinued listing has nothing live
+// to make a limited edition of.
+async function requestPhysicalRun(store, options = {}) {
+  const {
+    productId, creatorId, itemType, quantity, estimatedUnitCost = null, cvllexRequestFn,
+  } = options;
+  const product = getProduct(store, productId);
+  if (!product) throw new MerchError(`requestPhysicalRun: no product "${productId}"`);
+  if (!product.available) throw new MerchError(`requestPhysicalRun: "${productId}" is discontinued`);
+  if (!creatorId) throw new MerchError('requestPhysicalRun requires a creatorId');
+  if (typeof cvllexRequestFn !== 'function') {
+    throw new MerchError('requestPhysicalRun requires cvllexRequestFn(options)');
+  }
+
+  const order = await cvllexRequestFn({
+    creatorId,
+    itemType,
+    quantity,
+    estimatedUnitCost,
+    vendorNote: `vaco-merch product "${product.productId}" "${product.name}" (${product.appBrandId})`,
+  });
+  product.physicalProductionOrderIds.push(order.id);
+  return { product, order };
 }
 
 export function discontinueProduct(store, productId) {
@@ -378,4 +437,5 @@ export {
   VACO_MERCH_ACCOUNT,
   ORDER_STATUSES,
   MerchError,
+  requestPhysicalRun,
 };

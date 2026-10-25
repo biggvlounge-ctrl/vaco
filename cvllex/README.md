@@ -71,8 +71,29 @@ POST /api/production-orders/:id/advance   (ordered -> in-production -> produced,
 POST /api/production-orders/:id/vault     (mints the real Cvltvre Card via VOKEN,
                                             creates the vault record)
 POST /api/vault/:id/redeem                (decrements the real remaining-unit count,
-                                            requests a real VOID courier shipment)
+                                            requests a real VOID courier shipment,
+                                            assigns a real serial number and records
+                                            an optional engraving/specification note)
 ```
+
+## Numbering and specification, on redemption
+
+Every redemption gets a real `serialNumber` / `editionSize` (e.g. "3 of
+500") — but framed honestly as **claim order**, not mint order. `#N/total`
+normally claims to know mint order, and mint order is only knowable at
+mint time; this vault mints one Cvltvre Card for the whole run, not one
+per physical unit, so no real per-unit mint order exists to report (see
+`VOKEN_VALUE_DISPLAY_CARD_INDUSTRY_COMPARABLES.md`'s own "On serial
+numbering" note, which named this as the one serial-numbering gap worth
+closing). What CVLLEX can honestly report is the Nth unit actually
+redeemed, counted from when the vault opened — a real, non-fabricated
+number.
+
+A redemption can also carry a caller-stated `specification` — an
+engraving or customization note (e.g. `"engrave: For Maria"`). Recorded
+the same honest way `vendorNote` already works on a production order:
+for the real human operator who confirms production, not applied by any
+real engraving/finishing vendor integration, because none exists.
 
 ## What's real, and what honestly isn't
 
@@ -129,4 +150,4 @@ modules against injected fake cross-app functions — no network.
 | `POST /api/production-orders/:id/advance` | session, must be the order's creator | |
 | `POST /api/production-orders/:id/vault` | session, must be the order's creator | mints the real Cvltvre Card via VOKEN |
 | `GET /api/vault/:id` | none | |
-| `POST /api/vault/:id/redeem` | session, must be `redeemerId` | requests a real VOID courier shipment |
+| `POST /api/vault/:id/redeem` | session, must be `redeemerId` | requests a real VOID courier shipment; assigns a real claim-order serial number; accepts an optional `specification` engraving note |

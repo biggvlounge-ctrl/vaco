@@ -14,7 +14,7 @@ import { createShellStore } from '../lib/store.js';
 import {
   createProduct, getProduct, listByBrand, listBrands, discontinueProduct,
   placeOrder, getOrder, submitToFulfilment, advanceOrder,
-  listOrdersForCustomer, brandEarnings, describeMerch,
+  listOrdersForCustomer, brandEarnings, describeMerch, requestPhysicalRun,
   DEFAULT_FULFILMENT_PROVIDER, DEFAULT_MERCH_TAKE_RATE,
   VACO_MERCH_ACCOUNT, MerchError,
 } from '../lib/merchStore.js';
@@ -434,4 +434,70 @@ test('ordering the same product twice charges twice, not a free second shirt', a
   assert.equal(settleFn.totalFrom('sam'), 60,
     'a second identical order must really charge again, not replay the first order for free');
   assert.equal(store.merchOrders.length, 2);
+});
+
+// -- CVLLEX physical-run bridge -----------------------------------------
+
+function fakeCvllexOrder() {
+  let nextId = 1;
+  const calls = [];
+  const fn = async (options) => {
+    calls.push(options);
+    return { id: nextId++, ...options, status: 'ordered' };
+  };
+  fn.calls = calls;
+  return fn;
+}
+
+test('requestPhysicalRun orders through CVLLEX and records the real order id on the product', async () => {
+  const store = storeWithProducts();
+  const cvllexRequestFn = fakeCvllexOrder();
+
+  const { product, order } = await requestPhysicalRun(store, {
+    productId: 'void-tee', creatorId: 'void-brand-admin', itemType: 't-shirt', quantity: 100,
+    cvllexRequestFn,
+  });
+
+  assert.equal(order.id, 1);
+  assert.deepEqual(product.physicalProductionOrderIds, [1]);
+  assert.equal(cvllexRequestFn.calls.length, 1);
+  assert.equal(cvllexRequestFn.calls[0].creatorId, 'void-brand-admin');
+  assert.equal(cvllexRequestFn.calls[0].itemType, 't-shirt');
+  assert.equal(cvllexRequestFn.calls[0].quantity, 100);
+  assert.match(cvllexRequestFn.calls[0].vendorNote, /void-tee/);
+});
+
+test('requestPhysicalRun refuses a discontinued product', async () => {
+  const store = storeWithProducts();
+  discontinueProduct(store, 'void-tee');
+  await assert.rejects(
+    requestPhysicalRun(store, {
+      productId: 'void-tee', creatorId: 'void-brand-admin', itemType: 't-shirt', quantity: 100,
+      cvllexRequestFn: fakeCvllexOrder(),
+    }),
+    /is discontinued/,
+  );
+});
+
+test('requestPhysicalRun requires a creatorId and a cvllexRequestFn', async () => {
+  const store = storeWithProducts();
+  await assert.rejects(
+    requestPhysicalRun(store, { productId: 'void-tee', itemType: 't-shirt', quantity: 100, cvllexRequestFn: fakeCvllexOrder() }),
+    /requires a creatorId/,
+  );
+  await assert.rejects(
+    requestPhysicalRun(store, { productId: 'void-tee', creatorId: 'void-brand-admin', itemType: 't-shirt', quantity: 100 }),
+    /requires cvllexRequestFn/,
+  );
+});
+
+test('requestPhysicalRun refuses an unknown product', async () => {
+  const store = storeWithProducts();
+  await assert.rejects(
+    requestPhysicalRun(store, {
+      productId: 'no-such-product', creatorId: 'void-brand-admin', itemType: 't-shirt', quantity: 100,
+      cvllexRequestFn: fakeCvllexOrder(),
+    }),
+    /no product/,
+  );
 });

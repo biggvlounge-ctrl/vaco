@@ -79,8 +79,22 @@ async function vaultProducedOrder(store, options = {}) {
 // production cost itself) passed straight to VOID's real courier
 // vertical, same shape VENVS's own `voidClient.createShipment` already
 // established (`POST /api/job`, `verticalId: 'courier'`).
+// `specification` is a caller-stated engraving/customization note
+// (e.g. "engrave: For Maria", "matte finish"), recorded for the real
+// human operator who confirms production the same honest way
+// `vendorNote` already works on a production order — there is no real
+// engraving or finishing vendor integration here, and this field does
+// not pretend otherwise.
+function requireOptionalString(value, field) {
+  if (value !== null && typeof value !== 'string') {
+    throw new Error(`redeemUnit: ${field} must be a string when given`);
+  }
+}
+
 async function redeemUnit(store, options = {}) {
-  const { vaultId, redeemerId, shippingCost, voidRequestFn, now = Date.now() } = options;
+  const {
+    vaultId, redeemerId, shippingCost, voidRequestFn, specification = null, now = Date.now(),
+  } = options;
   const vault = getVaultedCollectible(store, vaultId);
   if (!vault) throw new Error(`redeemUnit: no vaulted collectible with id ${vaultId}`);
   if (!redeemerId) throw new Error('redeemUnit requires a redeemerId');
@@ -91,6 +105,7 @@ async function redeemUnit(store, options = {}) {
   if (typeof voidRequestFn !== 'function') {
     throw new Error('redeemUnit requires voidRequestFn(redeemerId, shippingCost)');
   }
+  requireOptionalString(specification, 'specification');
 
   // Claimed before the real shipment request goes out, same
   // claim-before-pay discipline this ecosystem's settleOnce.js
@@ -106,6 +121,18 @@ async function redeemUnit(store, options = {}) {
     redeemerId,
     shippingCost,
     voidShipmentId: String(job.id),
+    // **Real, not fabricated.** `#N/totalUnits` is normally a claim
+    // about mint order, and mint order is only knowable at mint time —
+    // this vault mints one card for the whole run, not one per unit,
+    // so no real per-unit mint order exists to report (see this
+    // file's own header, and
+    // VOKEN_VALUE_DISPLAY_CARD_INDUSTRY_COMPARABLES.md's "On serial
+    // numbering"). What IS real and knowable here is claim order: the
+    // Nth unit actually redeemed, counted from when this vault opened.
+    // Framed as that, not as mint order.
+    serialNumber: vault.totalUnits - vault.remainingUnits,
+    editionSize: vault.totalUnits,
+    specification,
     redeemedAt: now,
   };
   vault.redemptions.push(redemption);

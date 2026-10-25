@@ -18,19 +18,20 @@
 //
 // **The one real economic fact worth encoding, grounded rather than
 // guessed.** Physically pressed music media (CD/vinyl/cassette) and
-// print-on-demand goods (magazine/poster/pin/t-shirt/hat/other) are
-// NOT the same shape of business, confirmed by real, current (2025-
-// 2026) comparables:
+// print-on-demand goods (apparel/paper/accessories) are NOT the same
+// shape of business, confirmed by real, current (2025-2026)
+// comparables:
 //
 //   - **Qrates** (real, Tokyo-based) presses vinyl and cassettes in
 //     real batches as small as 100 units — a genuine minimum run, not
 //     a smooth per-unit cost curve, because physical pressing/plating
 //     has a real fixed setup cost a single unit can't absorb.
-//   - **Printful / Printify** (apparel, pins, posters) and **Lulu /
-//     Doxzoo** (magazines) are real, confirmed no-minimum
-//     print-on-demand services — order 1 unit or 10,000 at the same
-//     flat per-unit rate, because digital/short-run printing has no
-//     comparable plating step.
+//   - **Printful / Printify** (apparel — t-shirt/hoodie/hat; paper —
+//     poster/canvas-print/sticker; accessories — pin/tote-bag/
+//     phone-case) and **Lulu / Doxzoo** (magazine/zine) are real,
+//     confirmed no-minimum print-on-demand services — order 1 unit or
+//     10,000 at the same flat per-unit rate, because digital/short-run
+//     printing has no comparable plating step.
 //
 // No source found in this session's research gives a precise, current
 // dollar figure for either — so this module does NOT fabricate a
@@ -52,7 +53,19 @@
 // becomes a real, tokenized, redeemable collectible — this module
 // does not duplicate that mechanism either.
 
-const PRODUCTION_ITEM_TYPES = ['t-shirt', 'hat', 'cd', 'vinyl', 'cassette', 'magazine', 'poster', 'pin', 'other'];
+// Grounded in the same real vendor catalogs cited above rather than
+// invented: Printful's and Printify's own published product catalogs
+// cover apparel, paper goods, and small accessories; Lulu/Doxzoo cover
+// bound print goods; Qrates covers pressed music media. 'other' stays
+// as the honest escape hatch for a real good this list doesn't yet
+// name, not a stand-in for "whatever."
+const PRODUCTION_ITEM_TYPES = [
+  't-shirt', 'hoodie', 'hat',
+  'cd', 'vinyl', 'cassette',
+  'magazine', 'zine', 'poster', 'canvas-print',
+  'pin', 'sticker', 'tote-bag', 'phone-case',
+  'other',
+];
 
 // Real, cited minimum (Qrates): physically pressed music media has a
 // genuine plating/setup floor a single unit cannot absorb. Everything

@@ -102,6 +102,22 @@ const PORT = process.env.PORT || 8789;
 const SHIELD_API_URL = process.env.SHIELD_API_URL || 'http://localhost:8812';
 const ASSISTANT_API_URL = process.env.ASSISTANT_API_URL || 'http://localhost:8828';
 
+// CVLLEX -- VOKEN's star constellation's physical-production app.
+// Merch products here have no end-user session model (the same real
+// gap requireCallingService already closes for creating/discontinuing
+// a product), so this presents the same real service credential
+// rather than an Authorization header there is no session to forward
+// -- identical in shape to vulture-music's and vulture-flix's own
+// physical-run routes.
+const CVLLEX_API_URL = process.env.CVLLEX_API_URL || 'http://localhost:8822';
+const VACO_SERVICE_NAME = process.env.VACO_SERVICE_NAME || 'vaco-shell';
+const VACO_SERVICE_TOKEN = process.env.VACO_SERVICE_TOKEN || '';
+function serviceHeaders() {
+  return VACO_SERVICE_TOKEN
+    ? { 'X-Service-Name': VACO_SERVICE_NAME, 'X-Service-Token': VACO_SERVICE_TOKEN }
+    : {};
+}
+
 
 
 // Every store route funnels its errors through here so a bad request
@@ -523,6 +539,33 @@ app.get('/api/merch/customers/:customerId/orders', (req, res) => {
 
 app.get('/api/merch/brands/:appBrandId/earnings', (req, res) => {
   res.json(merch.brandEarnings(store, req.params.appBrandId));
+});
+
+// Order a real, limited, numbered collectible run of a merch listing
+// through CVLLEX -- a genuinely scarce, vaulted, tokenized edition of
+// the same design, alongside (not instead of) the listing's own
+// zero-inventory Printify/Printful run. Same real service credential
+// every other merch-product-management route already requires.
+app.post('/api/merch/products/:productId/physical-run', requireCallingService(), async (req, res) => {
+  try {
+    const result = await merch.requestPhysicalRun(store, {
+      ...req.body,
+      productId: req.params.productId,
+      cvllexRequestFn: async (orderOptions) => {
+        const r = await fetch(`${CVLLEX_API_URL}/api/production-orders`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...serviceHeaders() },
+          body: JSON.stringify(orderOptions),
+        });
+        const body = await r.json();
+        if (!r.ok) throw new Error(body.error || `cvllex answered ${r.status}`);
+        return body;
+      },
+    });
+    res.status(201).json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 app.listen(PORT, () => {

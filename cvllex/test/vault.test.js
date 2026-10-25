@@ -80,6 +80,41 @@ test('redeemUnit decrements remainingUnits and records a real VOID shipment', as
   assert.strictEqual(redemption.redeemerId, 'ben');
   assert.strictEqual(redemption.voidShipmentId, '42');
   assert.strictEqual(updated.redemptions.length, 1);
+  assert.strictEqual(redemption.serialNumber, 1);
+  assert.strictEqual(redemption.editionSize, 10);
+  assert.strictEqual(redemption.specification, null);
+});
+
+test('redeemUnit assigns serial numbers in real claim order, and records a given specification', async () => {
+  const store = createCvllexStore();
+  const order = produce(store, { quantity: 3 });
+  const vault = await vaultProducedOrder(store, { order, mintCultureCardFn: fakeMint });
+  const fakeVoid = async (redeemerId, shippingCost) => ({ id: 1, customerId: redeemerId, unitPrice: shippingCost });
+
+  const first = await redeemUnit(store, {
+    vaultId: vault.id, redeemerId: 'ben', shippingCost: 5, voidRequestFn: fakeVoid, specification: 'engrave: For Maria',
+  });
+  const second = await redeemUnit(store, {
+    vaultId: vault.id, redeemerId: 'cal', shippingCost: 5, voidRequestFn: fakeVoid,
+  });
+
+  assert.strictEqual(first.redemption.serialNumber, 1);
+  assert.strictEqual(first.redemption.editionSize, 3);
+  assert.strictEqual(first.redemption.specification, 'engrave: For Maria');
+  assert.strictEqual(second.redemption.serialNumber, 2);
+  assert.strictEqual(second.redemption.specification, null);
+});
+
+test('redeemUnit rejects a non-string specification', async () => {
+  const store = createCvllexStore();
+  const order = produce(store);
+  const vault = await vaultProducedOrder(store, { order, mintCultureCardFn: fakeMint });
+  await assert.rejects(
+    redeemUnit(store, {
+      vaultId: vault.id, redeemerId: 'ben', shippingCost: 5, voidRequestFn: async () => ({ id: 1 }), specification: 42,
+    }),
+    /specification must be a string/,
+  );
 });
 
 test('redeemUnit marks the vault depleted once the last unit is redeemed', async () => {
