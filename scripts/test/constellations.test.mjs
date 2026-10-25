@@ -47,7 +47,15 @@ const { APPS, CONSTELLATIONS, UNPLACED, constellationOf, listConstellations } = 
 // by splitting on runs of spaces — member names contain no spaces today,
 // but "VACO Analytics" and "VACO Operator" do, and a whitespace split
 // would have quietly read those as two entries each.
-const GLYPHS = ['■', '✕', '○', '▲', '◇'];
+const GLYPHS = ['■', '✕', '○', '▲', '◇', '★'];
+
+// Built from GLYPHS rather than a second, hand-copied literal --
+// the gap that let this drift once already: GLYPHS gained '★' on
+// 25 Oct 2026 and the regex below was a separate hardcoded character
+// class that nobody updated alongside it, so the parser silently
+// stopped seeing the new heading while the constant it was supposedly
+// "defined by" said otherwise.
+const HEADING_RE = new RegExp(`([${GLYPHS.join('')}])\\s+(\\S+)`, 'g');
 
 function parseDocMap() {
   const fence = doc.match(/```\n([\s\S]*?)```/);
@@ -57,7 +65,7 @@ function parseDocMap() {
   // Every heading, with the column it starts at and the row it is on.
   const heads = [];
   lines.forEach((line, row) => {
-    for (const m of line.matchAll(/([■✕○▲◇])\s+(\S+)/g)) {
+    for (const m of line.matchAll(HEADING_RE)) {
       heads.push({ glyph: m[1], name: m[2], col: m.index, row });
     }
   });
@@ -154,7 +162,7 @@ test('the shape vocabulary still describes the real group sizes', () => {
   // ■ and ✕ mean four, ▲ and ○ mean three. ◇ is the exception and the
   // document says so: it encodes a boundary, not a size, which is how
   // it went from 3 members to 8 without the vocabulary changing.
-  const MEANS = { '■': 4, '✕': 4, '▲': 3, '○': 3 };
+  const MEANS = { '■': 4, '✕': 4, '▲': 3, '○': 3, '★': 5 };
   for (const c of CONSTELLATIONS) {
     const expected = MEANS[c.glyph];
     if (!expected) continue;
@@ -163,14 +171,14 @@ test('the shape vocabulary still describes the real group sizes', () => {
   }
 });
 
-test('no parent is in two constellations, and there are eighteen', () => {
+test('no parent is in two constellations, and there are nineteen', () => {
   // The one rule the map states outright: "No parent in two places,
-  // none left out."
+  // none left out." (19, not 18, since CVLLEX joined Vulcan 25 Oct 2026.)
   const parents = CONSTELLATIONS.filter((c) => c.public).flatMap((c) => c.parents);
   const dups = parents.filter((p, i) => parents.indexOf(p) !== i);
   assert.deepEqual(dups, [], 'these parents are in more than one constellation');
-  assert.equal(parents.length, 18,
-    `${parents.length} public parents across the constellations; the map says 18`);
+  assert.equal(parents.length, 19,
+    `${parents.length} public parents across the constellations; the map says 19`);
 
   // And they are the same eighteen the registry actually uses.
   const real = [...new Set(APPS.filter((a) => a.parent).map((a) => a.parent))];

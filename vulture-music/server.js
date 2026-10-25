@@ -29,7 +29,7 @@ const { createOperatorAuth } = require('./lib/operatorAuth.cjs');
 const { traceMiddleware } = require('./lib/tracing.cjs');
 const {
   RELEASE_FORMATS, DISTRIBUTION_TARGETS, DISTRIBUTION_FEES, RELEASE_STATUSES,
-  submitRelease, getRelease, listReleasesForArtist, markDistributing, markLive, takeDown, attachMusicVideo,
+  submitRelease, getRelease, listReleasesForArtist, requestPhysicalRun, markDistributing, markLive, takeDown, attachMusicVideo,
   reportStreamingRevenue, getArtistSummary, getCollaboratorEarnings,
 } = require('./lib/releases');
 const {
@@ -70,6 +70,10 @@ function serviceHeaders() {
 }
 
 const VAULT_STVDIOS_API_URL = process.env.VAULT_STVDIOS_API_URL || 'http://localhost:8808';
+// CVLLEX -- the Vulcan constellation's physical-production app. Real
+// client, not a second pressing-order mechanism -- see lib/releases.js's
+// own requestPhysicalRun.
+const CVLLEX_API_URL = process.env.CVLLEX_API_URL || 'http://localhost:8822';
 const VACO_ANALYTICS_URL = process.env.VACO_ANALYTICS_URL || 'http://localhost:8790';
 // -- The store, and which backend holds it ----------------------------
 //
@@ -342,6 +346,33 @@ app.post('/api/releases/:id/video', requireReleaseArtist(), async (req, res) => 
       authorId: release.artistId, caption: req.body.caption || release.title, mediaUrl: req.body.mediaUrl, durationSeconds: req.body.durationSeconds,
     });
     res.status(201).json(attachMusicVideo(store, { releaseId, vaultStvdiosPostId: post.id }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Order a real physical run (CDs/vinyl/cassettes, merch) for a live
+// release -- the artist's own session token is forwarded to CVLLEX,
+// which requires it to verify the order's own creatorId itself (the
+// same real ownership check every cross-app call in this ecosystem
+// does, rather than trusting this app's say-so).
+app.post('/api/releases/:id/physical-run', requireReleaseArtist(), async (req, res) => {
+  try {
+    const result = await requestPhysicalRun(store, {
+      ...req.body,
+      releaseId: Number(req.params.id),
+      cvllexRequestFn: async (orderOptions) => {
+        const r = await fetch(`${CVLLEX_API_URL}/api/production-orders`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: req.headers.authorization },
+          body: JSON.stringify(orderOptions),
+        });
+        const body = await r.json();
+        if (!r.ok) throw new Error(body.error || `cvllex answered ${r.status}`);
+        return body;
+      },
+    });
+    res.status(201).json(result);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

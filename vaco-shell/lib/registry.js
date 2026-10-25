@@ -92,6 +92,7 @@ export const APPS = [
   { id: 'voken', name: 'VOKEN', description: 'The card engine — minting, editions, provenance, value scores.', url: 'http://localhost:8794', category: 'consumer', parent: 'VOKEN', bundle: 'Commerce & Marketplace' },
   { id: 'cvltvre', name: 'CVLTVRE', description: 'Collect, trade, and auction anything with real cultural relevance.', url: 'http://localhost:8794/#packs', category: 'consumer', parent: 'CVLTVRE', bundle: 'Commerce & Marketplace' },
   { id: 'vado', name: 'VADO', description: 'The Art District — auctions, galleries, art frames.', url: 'http://localhost:8794/#vado', category: 'consumer', parent: 'VADO', bundle: 'Commerce & Marketplace' },
+  { id: 'cvllex', name: 'CVLLEX', description: 'Order a real limited physical run (CDs/vinyl/cassettes, magazines, posters, collectible merch), vault it as a real Cvltvre Card through VOKEN, redeem it for the real physical item.', url: 'http://localhost:8822', category: 'consumer', parent: 'CVLLEX', bundle: 'Commerce & Marketplace' },
   { id: 'vago', name: 'VAGO', description: 'Wagering, prediction markets, and casino currency.', url: 'http://localhost:8795', category: 'consumer', parent: 'VAGO', bundle: 'Financial & Trading' },
   { id: 'vxllage', name: 'VXLLAGE', description: 'Home feed, Threads, Villages, Live, Call.', url: 'http://localhost:8796', category: 'consumer', parent: 'VXLLAGE', bundle: 'Social & Discovery' },
   { id: 'voidmagic', name: 'VOID MAGIC', description: 'Meet & Greet bookings -- Vvltvre -> Touring & Tix.', url: 'http://localhost:8797', category: 'consumer', parent: 'VOID', bundle: 'Operations & Infrastructure' },
@@ -152,7 +153,7 @@ export const APPS = [
 // other so they cannot disagree again.
 export const BUNDLES = [
   { name: 'Financial & Trading', parents: ['Vex', 'V3', 'VAGO'] },
-  { name: 'Commerce & Marketplace', parents: ['VENVS', 'VOKEN', 'CVLTVRE', 'VADO', 'CHOPZ'] },
+  { name: 'Commerce & Marketplace', parents: ['VENVS', 'VOKEN', 'CVLTVRE', 'VADO', 'CHOPZ', 'CVLLEX'] },
   { name: 'Social & Discovery', parents: ['VXLLAGE', 'CVNVO', 'HVNTZ'] },
   { name: 'Leisure & Entertainment', parents: ['VACAY', 'Vvltvre', 'Vault'] },
   { name: 'Gamified & Simulation', parents: ['VDP', 'VACON-C'] },
@@ -201,12 +202,20 @@ export const BUNDLES = [
 // other view.
 export const CONSTELLATIONS = [
   {
-    glyph: '■',
-    name: 'VOKEN',
+    // **Renamed from the VOKEN square to Vulcan, 25 Oct 2026, by direct
+    // decision.** `VACO_CONSTELLATIONS.md`'s own "Decisions recorded"
+    // section used to read: "'Vulcan' in the directive was a typo for
+    // VOKEN." That resolution is superseded, not silently overwritten
+    // — see that document's own corrected entry. CVLLEX (the Vulcan
+    // constellation's physical-production app) is the fifth member,
+    // which is also why this is now a five-point star rather than the
+    // four-point square every other glyph of this size still uses.
+    glyph: '★',
+    name: 'Vulcan',
     title: 'the card economy',
     public: true,
-    parents: ['VOKEN', 'Vex', 'VADO', 'CVLTVRE'],
-    note: 'One running process under four brands, plus VEX, which was extracted out of VOKEN.',
+    parents: ['VOKEN', 'Vex', 'VADO', 'CVLTVRE', 'CVLLEX'],
+    note: 'One running process under four brands (VOKEN/VEX/VADO/CVLTVRE), plus CVLLEX, standalone by decision so the one real place a Cvltvre Card comes from stays single — CVLLEX calls VOKEN\'s mint API, never the other way.',
   },
   {
     glyph: '✕',

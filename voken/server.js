@@ -73,11 +73,6 @@ const {
 const {
   ITEM_TYPES, createMerchListing, getMerchListing, purchaseMerchItem,
 } = require('./lib/limitedEditionMerch');
-const {
-  PRODUCTION_ITEM_TYPES, PRESSED_MEDIA_ITEM_TYPES, PRESSED_MEDIA_MINIMUM_UNITS,
-  createProductionOrder, getProductionOrder, listProductionOrdersForCreator,
-  advanceProductionOrder, listProducedOrder,
-} = require('./lib/physicalProduction');
 const { registerDigitalArtFrame, getDigitalArtFrame, loadArtworkOntoFrame } = require('./lib/digitalArtFrame');
 const {
   requireActor, requireParamActor, requireSession, requireCallingService,
@@ -119,6 +114,8 @@ const VACO_ANALYTICS_URL = process.env.VACO_ANALYTICS_URL || 'http://localhost:8
 // -- same env var name hvntz/server.js already established for calling
 // this app.
 const VAVLT_STVDIOS_API_URL = process.env.VAVLT_STVDIOS_API_URL || 'http://localhost:8808';
+// Same real ownership-check pattern, for CVLLEX's production orders.
+const CVLLEX_API_URL = process.env.CVLLEX_API_URL || 'http://localhost:8822';
 // -- The store, and which backend holds it ----------------------------
 //
 // `let`, not `const`: with DATABASE_URL set this app's store lives in
@@ -187,6 +184,16 @@ async function verifyExternalCardOwnership({ sourceApp, sourceType, externalRef,
     if (!res.ok) throw new Error(`vavlt-stvdios answered ${res.status}`);
     const event = await res.json();
     return event.hostId === userId;
+  }
+  // CVLLEX's production orders -- the caller must be the real creator
+  // who placed the order, same ownership shape as every other external
+  // source above, just a different real app answering it.
+  if (sourceApp === 'cvllex' && sourceType === 'production-order') {
+    const res = await fetch(`${CVLLEX_API_URL}/api/production-orders/${encodeURIComponent(externalRef)}`);
+    if (res.status === 404) return false;
+    if (!res.ok) throw new Error(`cvllex answered ${res.status}`);
+    const order = await res.json();
+    return order.creatorId === userId;
   }
   return false;
 }
@@ -551,9 +558,6 @@ const requireSecondarySeller = () => requireRecordOwner(
 );
 const requireFrameOwner = () => requireRecordOwner(
   'art frame', (req) => getDigitalArtFrame(store, Number(req.params.id)), (f) => f.ownerId,
-);
-const requireProductionOrderCreator = () => requireRecordOwner(
-  'production order', (req) => getProductionOrder(store, Number(req.params.id)), (o) => o.creatorId,
 );
 
 // A trade moves card editions — real property with a real resale
@@ -929,55 +933,6 @@ app.get('/api/merch/:id', (req, res) => {
 app.post('/api/merch/:id/purchase', requireActor('buyerId'), async (req, res) => {
   try {
     res.status(201).json(await purchaseMerchItem(store, { ...req.body, listingId: Number(req.params.id), settleFn: settleVCoin }));
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-// -- physical production -- getting a real limited run actually MADE,
-// before it is ever a merch listing. See lib/physicalProduction.js's
-// own header for the real Qrates/Printful/Lulu grounding and for why
-// cd/vinyl/cassette carry a real minimum run and nothing else does.
-
-app.get('/api/production-item-types', (_req, res) => {
-  res.json({
-    itemTypes: PRODUCTION_ITEM_TYPES,
-    pressedMediaItemTypes: PRESSED_MEDIA_ITEM_TYPES,
-    pressedMediaMinimumUnits: PRESSED_MEDIA_MINIMUM_UNITS,
-  });
-});
-
-app.post('/api/production-orders', requireActor('creatorId'), (req, res) => {
-  try {
-    res.status(201).json(createProductionOrder(store, req.body || {}));
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-app.get('/api/production-orders/:id', (req, res) => {
-  const order = getProductionOrder(store, Number(req.params.id));
-  if (!order) return res.status(404).json({ error: `no production order with id ${req.params.id}` });
-  res.json(order);
-});
-
-app.get('/api/production-orders/creator/:creatorId', (req, res) => {
-  res.json({ orders: listProductionOrdersForCreator(store, req.params.creatorId) });
-});
-
-app.post('/api/production-orders/:id/advance', requireProductionOrderCreator(), (req, res) => {
-  try {
-    res.json(advanceProductionOrder(store, { ...req.body, orderId: Number(req.params.id) }));
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-app.post('/api/production-orders/:id/list', requireProductionOrderCreator(), (req, res) => {
-  try {
-    res.status(201).json(listProducedOrder(store, {
-      ...req.body, orderId: Number(req.params.id), createMerchListingFn: createMerchListing,
-    }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

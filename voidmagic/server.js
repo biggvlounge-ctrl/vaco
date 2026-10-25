@@ -15,7 +15,9 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv/config');
 
-const { EXPERIENCE_TYPES, EXPERIENCE_FORMATS, createExperience, getExperience, discoverExperiences } = require('./lib/experiences');
+const {
+  EXPERIENCE_TYPES, EXPERIENCE_FORMATS, createExperience, getExperience, discoverExperiences, requestPhysicalRun,
+} = require('./lib/experiences');
 const {
   VOID_MAGIC_ESCROW_ACCOUNT, PLATFORM_TAKE_RATE, CANCELLATION_CUTOFF_HOURS, bookExperience, getBooking, checkIn, completeExperience, cancelBooking, getPostEventSummary,
 } = require('./lib/bookings');
@@ -72,6 +74,13 @@ function serviceHeaders() {
 }
 
 const VOID_API_URL = process.env.VOID_API_URL || 'http://localhost:8793';
+// CVLLEX -- the Vulcan constellation's physical-production app. A
+// host has a real session here (requireActor('hostId') on
+// POST /api/experiences), so their own Authorization is forwarded
+// rather than a service credential -- CVLLEX verifies the real
+// creator itself, same as every other cross-app mint/order check in
+// this ecosystem.
+const CVLLEX_API_URL = process.env.CVLLEX_API_URL || 'http://localhost:8822';
 // -- The store, and which backend holds it ----------------------------
 //
 // `let`, not `const`: with DATABASE_URL set this app's store lives in
@@ -288,6 +297,33 @@ app.post('/api/experiences/:id/event-services', requireExperienceHost(), async (
     res.status(201).json(await requestEventService(store, {
       ...req.body, experienceId: Number(req.params.id), voidRequestFn: requestVoidJob,
     }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Order real merch/collectibles for this event -- CVLLEX, the Vulcan
+// constellation's physical-production app. See lib/experiences.js's
+// own requestPhysicalRun for why this is the same real connection
+// VOID_MAGIC_MASTER_BUILD_BRIEF.md's §17 already names (Vvltvre's
+// creator-ecosystem connection into VOID MAGIC), not a new one.
+app.post('/api/experiences/:id/physical-run', requireExperienceHost(), async (req, res) => {
+  try {
+    const result = await requestPhysicalRun(store, {
+      ...req.body,
+      experienceId: Number(req.params.id),
+      cvllexRequestFn: async (orderOptions) => {
+        const r = await fetch(`${CVLLEX_API_URL}/api/production-orders`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: req.headers.authorization },
+          body: JSON.stringify(orderOptions),
+        });
+        const body = await r.json();
+        if (!r.ok) throw new Error(body.error || `cvllex answered ${r.status}`);
+        return body;
+      },
+    });
+    res.status(201).json(result);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

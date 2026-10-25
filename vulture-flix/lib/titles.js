@@ -200,6 +200,7 @@ function registerStudioProducedTitle(store, options = {}) {
     exclusiveUntil: null,
     licenseExpiresAt: null,
     studioProjectId,
+    physicalProductionOrderIds: [],
     createdAt: now,
   };
   store.titles.push(record);
@@ -227,6 +228,39 @@ function markStreaming(store, titleId) {
   const record = requireStatus(store, titleId, 'acquired', 'markStreaming');
   record.status = 'streaming';
   return record;
+}
+
+// **The real bridge from a film/show to a real physical collectible
+// run** (posters, a physical collectible edition) — through CVLLEX,
+// the Vulcan constellation's physical-production app. Injected rather
+// than imported, same convention every cross-app call in this
+// ecosystem uses.
+//
+// **Scoped to studio-produced titles only.** An acquired or licensed
+// title's physical-merchandising rights are not modeled anywhere in
+// this app — `acquisitionType` distinguishes real content ownership
+// from a license to stream it, and pressing physical merch for
+// content this app only has streaming rights to would be a real
+// rights violation this function must not make easy.
+async function requestPhysicalRun(store, options = {}) {
+  const { titleId, itemType, quantity, estimatedUnitCost = null, cvllexRequestFn } = options;
+  const record = requireStatus(store, titleId, 'streaming', 'requestPhysicalRun');
+  if (record.acquisitionType !== 'studio-produced') {
+    throw new Error(`requestPhysicalRun: title ${titleId} is "${record.acquisitionType}", not studio-produced -- this app does not hold merchandising rights to order physical goods for it`);
+  }
+  if (typeof cvllexRequestFn !== 'function') {
+    throw new Error('requestPhysicalRun requires cvllexRequestFn(options)');
+  }
+
+  const order = await cvllexRequestFn({
+    creatorId: record.creatorId,
+    itemType,
+    quantity,
+    estimatedUnitCost,
+    vendorNote: `vulture-flix title #${record.id} "${record.title}"`,
+  });
+  record.physicalProductionOrderIds.push(order.id);
+  return { title: record, order };
 }
 
 function removeTitle(store, options = {}) {
@@ -368,6 +402,7 @@ module.exports = {
   registerStudioProducedTitle,
   getTitleRecord,
   listTitlesForCreator,
+  requestPhysicalRun,
   markStreaming,
   removeTitle,
   isExclusive,

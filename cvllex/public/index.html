@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CVLLEX</title>
+<link rel="stylesheet" href="/vaco-design.css" />
+</head>
+<body class="vaco">
+<script src="/vaco-ui.js"></script>
+<script>
+// CVLLEX — the Vulcan constellation's physical-production app.
+//
+// A real client of this app's own 8 routes (see README.md): order a
+// real physical run, advance it through a real human-confirmed vendor
+// status, vault a produced run as a real Cvltvre Card minted through
+// VOKEN, and redeem a unit for a real VOID courier shipment. No game
+// logic lives here — every real decision (minimum-run enforcement,
+// status transitions, the mint call, the shipment request) is
+// computed server-side; this page only asks for it and renders what
+// comes back.
+
+var el = VACO.el;
+
+function orderRow(order) {
+  var lines = el('div', 'vaco-stack-sm');
+  lines.appendChild(el('p', 'vaco-small vaco-dim',
+    order.quantity + ' × ' + order.itemType + (order.minimumUnits > 1 ? ' (min run ' + order.minimumUnits + ')' : '')));
+  if (order.estimatedUnitCost) {
+    lines.appendChild(el('p', 'vaco-small vaco-dim', 'Estimated unit cost: ' + VACO.price(order.estimatedUnitCost, { freeLabel: false })));
+  }
+
+  var actions = el('div', 'vaco-row-tight');
+  if (order.status === 'ordered') {
+    actions.appendChild(VACO.button('Mark in-production', function () {
+      return VACO.api('/api/production-orders/' + order.id + '/advance', {
+        method: 'POST', body: { toStatus: 'in-production' },
+      }).then(renderMyOrders.refresh);
+    }, 'secondary'));
+  } else if (order.status === 'in-production') {
+    actions.appendChild(VACO.button('Mark produced', function () {
+      return VACO.api('/api/production-orders/' + order.id + '/advance', {
+        method: 'POST', body: { toStatus: 'produced' },
+      }).then(renderMyOrders.refresh);
+    }, 'secondary'));
+  } else if (order.status === 'produced' && !order.vaultId) {
+    actions.appendChild(VACO.button('Vault + mint Cvltvre Card', function () {
+      return VACO.api('/api/production-orders/' + order.id + '/vault', {
+        method: 'POST',
+        body: {
+          category: 'eventMoments', rarityTier: 'rare', tokenizationType: 'digital',
+          formats: ['digital'], plannedDigitalMintCount: order.quantity, plannedPhysicalMintCount: order.quantity,
+        },
+      }).then(renderMyOrders.refresh);
+    }, 'primary'));
+  } else if (order.vaultId) {
+    actions.appendChild(VACO.badge('vaulted · #' + order.vaultId, 'money'));
+  }
+  if (order.status !== 'cancelled' && order.status !== 'produced') {
+    actions.appendChild(VACO.button('Cancel', function () {
+      return VACO.api('/api/production-orders/' + order.id + '/advance', {
+        method: 'POST', body: { toStatus: 'cancelled' },
+      }).then(renderMyOrders.refresh);
+    }, 'danger'));
+  }
+  lines.appendChild(actions);
+
+  return VACO.card('Order #' + order.id, [lines], { trailing: VACO.badge(order.status) });
+}
+
+function renderNewOrder(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.card('Order a real physical run', [
+    el('p', 'vaco-small vaco-dim',
+      'CD/vinyl/cassette runs have a real ~100-unit minimum (Qrates’ own batch floor). Magazines, posters, pins, and apparel have none — order as few as one.'),
+    VACO.form([
+      { name: 'itemType', label: 'Item type', options: ['cd', 'vinyl', 'cassette', 'magazine', 'poster', 'pin', 't-shirt', 'hat', 'other'] },
+      { name: 'quantity', label: 'Quantity', type: 'number', value: 100, min: 1 },
+      { name: 'estimatedUnitCost', label: 'Est. unit cost (optional)', type: 'number', step: '0.01' },
+    ], function (values) {
+      if (!VACO.session) return Promise.reject(new Error('Sign in first.'));
+      return VACO.api('/api/production-orders', {
+        method: 'POST',
+        body: {
+          creatorId: VACO.userId(), itemType: values.itemType, quantity: values.quantity,
+          estimatedUnitCost: values.estimatedUnitCost || null,
+        },
+      }).then(function () {
+        VACO.notice('Order placed.', 'money');
+        if (renderMyOrders.refresh) renderMyOrders.refresh();
+      });
+    }, 'Place order'),
+  ]));
+  VACO.mount(body, out);
+}
+
+function renderMyOrders(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(el('div', null));
+  VACO.mount(body, out);
+
+  function load() {
+    if (!VACO.session) {
+      out.appendChild(el('div', 'vaco-empty', 'Sign in to see your production orders.'));
+      return;
+    }
+    VACO.api('/api/production-orders/creator/' + encodeURIComponent(VACO.userId()))
+      .then(function (r) {
+        while (out.lastChild) out.removeChild(out.lastChild);
+        var orders = r.orders || [];
+        if (orders.length === 0) {
+          out.appendChild(el('div', 'vaco-empty', 'No production orders yet — place one from the Order tab.'));
+          return;
+        }
+        orders.forEach(function (o) { out.appendChild(orderRow(o)); });
+      })
+      .catch(function (err) { out.appendChild(VACO.notice(VACO.escapeHtml(err.message), 'danger')); });
+  }
+  renderMyOrders.refresh = load;
+  load();
+}
+
+function renderRedeem(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.card('Look up a vaulted collectible', [
+    VACO.form([{ name: 'vaultId', label: 'Vault id', type: 'number', width: '120px' }], function (values) {
+      return VACO.api('/api/vault/' + values.vaultId).then(function (vault) {
+        renderVault(out, vault);
+      });
+    }, 'Look up'),
+  ]));
+  VACO.mount(body, out);
+}
+
+function renderVault(out, vault) {
+  while (out.childNodes.length > 1) out.removeChild(out.lastChild);
+  var lines = el('div', 'vaco-stack-sm');
+  lines.appendChild(el('p', 'vaco-small vaco-dim',
+    vault.remainingUnits + ' of ' + vault.totalUnits + ' units remaining · Cvltvre Card #' + vault.cultureCardId));
+  lines.appendChild(VACO.form([
+    { name: 'shippingCost', label: 'Shipping cost', type: 'number', step: '0.01', value: 5 },
+  ], function (values) {
+    if (!VACO.session) return Promise.reject(new Error('Sign in first.'));
+    return VACO.api('/api/vault/' + vault.id + '/redeem', {
+      method: 'POST', body: { redeemerId: VACO.userId(), shippingCost: values.shippingCost },
+    }).then(function (result) {
+      VACO.notice('Redeemed — VOID shipment #' + result.redemption.voidShipmentId + ' requested.', 'money');
+      renderVault(out, result.vault);
+    });
+  }, vault.remainingUnits > 0 ? 'Redeem one unit' : 'Sold out'));
+  out.appendChild(VACO.card('Vault #' + vault.id, [lines], { trailing: VACO.badge(vault.status, vault.status === 'vaulted' ? 'money' : 'warn') }));
+}
+
+VACO.app({
+  id: 'cvllex',
+  name: 'CVLLEX',
+  tagline: 'Order it made. Vault it. Redeem it.',
+  //: Vulcan's own forge-bronze — distinct from VOKEN's square and
+  //: every other accent already in the register.
+  accent: '#b8732e',
+  accentDim: '#8f5a22',
+  accentInk: '#1c0f04',
+  tabs: [
+    { id: 'order', label: 'Order', heading: 'Order a physical run',
+      blurb: 'CDs, vinyl, cassettes, magazines, posters, pins — a real, limited physical run.', render: renderNewOrder },
+    { id: 'mine', label: 'My orders', heading: 'Your production orders', render: renderMyOrders },
+    { id: 'redeem', label: 'Redeem', heading: 'Redeem a vaulted collectible',
+      blurb: 'Burn the digital twin, ship the real physical item.', render: renderRedeem },
+  ],
+});
+</script>
+</body>
+</html>

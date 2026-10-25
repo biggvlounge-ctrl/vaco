@@ -95,10 +95,39 @@ function createExperience(store, options = {}) {
     hostId, title, type, format, capacity, remainingCapacity: capacity, durationMinutes, price, scheduledAt, location,
     geofence,
     status: 'open',
+    physicalProductionOrderIds: [],
     createdAt: now,
   };
   store.experiences.push(experience);
   return experience;
+}
+
+// **The real bridge from an event to real merch a host can actually
+// sell there** — through CVLLEX, the Vulcan constellation's
+// physical-production app. VOID MAGIC's own §17 already names this
+// connection: "VVLTVRE -> TOURING & TIX -> VOID MAGIC," with Vvltvre
+// providing "touring, artist relationships, ticketing, distribution,
+// creator ecosystem" — ordering real collectible merch for a specific
+// event is exactly that creator-ecosystem connection, not a new one
+// invented here. Injected rather than imported, same convention every
+// cross-app call in this ecosystem uses.
+async function requestPhysicalRun(store, options = {}) {
+  const { experienceId, itemType, quantity, estimatedUnitCost = null, cvllexRequestFn } = options;
+  const experience = getExperience(store, experienceId);
+  if (!experience) throw new Error(`requestPhysicalRun: no experience with id ${experienceId}`);
+  if (typeof cvllexRequestFn !== 'function') {
+    throw new Error('requestPhysicalRun requires cvllexRequestFn(options)');
+  }
+
+  const order = await cvllexRequestFn({
+    creatorId: experience.hostId,
+    itemType,
+    quantity,
+    estimatedUnitCost,
+    vendorNote: `voidmagic experience #${experience.id} "${experience.title}"`,
+  });
+  experience.physicalProductionOrderIds.push(order.id);
+  return { experience, order };
 }
 
 function getExperience(store, experienceId) {
@@ -119,4 +148,6 @@ function discoverExperiences(store, options = {}) {
     .sort((a, b) => a.scheduledAt - b.scheduledAt);
 }
 
-module.exports = { EXPERIENCE_TYPES, EXPERIENCE_FORMATS, createExperience, getExperience, discoverExperiences };
+module.exports = {
+  EXPERIENCE_TYPES, EXPERIENCE_FORMATS, createExperience, getExperience, discoverExperiences, requestPhysicalRun,
+};

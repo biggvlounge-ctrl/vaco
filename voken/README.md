@@ -253,22 +253,20 @@ curl -X POST http://localhost:8794/api/card/external -H "Content-Type: applicati
   moment, not a stale one. `ITEM_TYPES` now also covers real physical
   media (`cd`, `vinyl`, `cassette`, `magazine`, `poster`, `pin`),
   not just apparel.
-- `lib/physicalProduction.js` — real order intake for getting a
-  limited physical run actually made before it's ever a merch
-  listing: "drop a digital album, get 1,000 real CDs made," or a
-  short magazine run, or limited collectible merch — closing the real
-  gap between a digital drop and a physical, tokenizable object.
-  Grounded in two real, distinct 2025–2026 comparables: **Qrates**
-  (real vinyl/cassette pressing in batches as small as 100 units — a
-  genuine minimum run, not a smooth per-unit cost) and **Printful/
-  Printify/Lulu/Doxzoo** (real no-minimum print-on-demand for merch
-  and magazines). `ordered → in-production → produced` is a real,
-  human-confirmed status progression (no vendor integration exists to
-  automate it), and a `produced` order bridges directly into the
-  existing, already-built `createMerchListing` — same store, same
-  `linkedCultureCardId` every listing already carries, so a physical
-  collectible's path to tokenization was already built; this closes
-  the step before it.
+- **Physical production (ordering a real limited run made) now lives
+  in its own standalone app, `../cvllex/`** — briefly built as a
+  module here first, then moved out by direct decision: Vulcan is now
+  a five-member constellation (VOKEN · VEX · VADO · CVLTVRE · CVLLEX,
+  up from the four-member VOKEN square), not VOKEN's own code. VOKEN's
+  job in that flow is unchanged and narrow: `mintExternalEntityCard()`
+  (see `lib/cultureCards.js`'s `SOURCE_APPS`) now recognizes
+  `sourceApp: 'cvllex'` the same way it already recognized
+  `vavlt-stvdios` — CVLLEX calls VOKEN's existing, real
+  `POST /api/card/external` to mint the Cvltvre Card for a produced
+  run; VOKEN never calls CVLLEX. `ITEM_TYPES` on
+  `limitedEditionMerch.js` still covers the real physical-media types
+  (`cd`, `vinyl`, `cassette`, `magazine`, `poster`, `pin`) in case a
+  listing is ever created directly here, independent of CVLLEX.
 - `lib/digitalArtFrame.js` — the Meural-Opus-comparable digital art
   frame: loading artwork is double ownership-gated — genuine ownership
   of both the frame and the specific digital edition being displayed.
@@ -440,22 +438,13 @@ restart-survival confirmed.
   fractional-share resale — Phase 10 built real peer-to-peer secondary
   trades (list a price, another buyer takes it), not live price
   discovery or partial-fill matching.
-- **Physical production order intake now exists**
-  (`lib/physicalProduction.js`, `POST /api/production-orders` — see
-  below) — a real, validated record of what a creator ordered made (a
-  CD/vinyl/cassette run, a magazine, posters, pins), with the one real
-  economic fact a creator actually needs enforced (pressed music media
-  has a real ~100-unit minimum run; everything else has none). What is
-  still genuinely not built: any real vendor integration. No pressing
-  plant, printer, or merch manufacturer credential exists anywhere in
-  this repository — a human operator manually marks an order
-  `in-production` then `produced` once a real vendor shipment actually
-  arrives, same honesty boundary digital art frames and merch listings
-  already drew for shipping. VOID's existing shipment handoff
-  (`voidRequestFn`, used by VENVS's own Marketplace/Publishing) is not
-  wired to a produced order yet either — the actual delivery leg,
-  once a creator has real units to ship, is a natural next step, not
-  done in this pass.
+- **Physical production order intake moved to its own standalone app,
+  `../cvllex/`** (built here first, 25 Oct 2026, then extracted the
+  same day by direct decision — Vulcan is a five-app constellation,
+  not a VOKEN module). What VOKEN itself still does not do: any real
+  vendor integration for manufacturing anything — that boundary moved
+  with the code, it did not close. See `../cvllex/README.md` for
+  what's real there and what still isn't.
 - The actual Kenji AI agent, and any connection to VACANCY Tribes.
   Kenji genuinely does not exist anywhere.
 - **Connection to the Universal World Layer and Vavlt Stvdios is now

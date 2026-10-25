@@ -15,11 +15,12 @@ the founder rather than guessed. This document records which is which.
 ## The map
 
 ```
-■ VOKEN                ✕ VVLTVRE               ○ SYSTEMS
+★ Vulcan               ✕ VVLTVRE               ○ SYSTEMS
    VOKEN                  Vvltvre                 V3
    VEX                    Vault                   V4
    VADO                   VXLLAGE                 VENVS
    CVLTVRE                CHOPZ
+   CVLLEX
 
 ✕ VOID                 ▲ GAMES                 ◇ internal — not public
    VOID                   VDP                     VACON
@@ -34,10 +35,11 @@ the founder rather than guessed. This document records which is which.
                                                   VACO Passport
 ```
 
-**18 public parents. One square, two X's, one triangle, one circle.**
-No parent in two places, none left out. The ten in ◇ sit outside the
-public structure entirely, because none of them is an app a customer
-opens.
+**19 public parents. One star, two X's, one triangle, one circle.**
+(Was 18, with a plain square where the star now is, until CVLLEX
+joined 25 Oct 2026 — see "Vulcan, renamed" below.) No parent in two
+places, none left out. The ten in ◇ sit outside the public structure
+entirely, because none of them is an app a customer opens.
 
 **The internal layer was drawn with three and now holds ten.** VACO
 Notify, Shield, VACO Audit, VACO Operator, VACO Media, VASH TAP and VACO
@@ -63,10 +65,18 @@ each shape now says something the reader can rely on:
 
 | shape | means | count |
 |---|---|---|
-| ■ / ✕ | a group of **four** | 4 each |
+| ★ | a group of **five** | 5 |
+| ✕ | a group of **four** | 4 |
 | ▲ | a group of **three** | 3 |
 | ○ | a group of three that is **shared infrastructure** | 3 |
-| ◇ | **not public** — nothing a customer opens | 8 |
+| ◇ | **not public** — nothing a customer opens | 10 |
+
+**★ is new, 25 Oct 2026** — the one Vulcan constellation grew from a
+four-member square to a five-member star when CVLLEX joined, and the
+old ■ glyph retired with it rather than being stretched to mean
+something it no longer does. ◇'s count is also corrected here — 10,
+not 8, matching the internal-layer table further down; this table had
+simply gone stale on that number, independent of the Vulcan rename.
 
 **◇ is the one shape whose count is not part of its meaning**, and that
 is why it can be 8 while ■ and ✕ must stay at 4. The other glyphs encode
@@ -74,18 +84,25 @@ a group size; ◇ encodes a boundary. An internal service added later
 joins it without disturbing anything, which is what happened five times
 between 2026-08-26 and 2026-09-11.
 
-**■ and ✕ both mean four, and the X was chosen because it *is* a
+~~**■ and ✕ both mean four, and the X was chosen because it *is* a
 four** — four arms, the same count it marks. Three groups of four and
 only one square meant two of them needed a second marker rather than a
-regrouping; nothing was merged or dissolved to make the shapes tidy.
+regrouping; nothing was merged or dissolved to make the shapes tidy.~~
+**No longer true, 25 Oct 2026** — the group that used to be the one
+square (VOKEN's) grew a fifth member and became Vulcan, ★. ✕ still
+means four, now with no sibling square to distinguish itself from;
+the distinction this paragraph drew no longer applies to anything.
 
-**Which four keeps the square is not arbitrary.** VOKEN is the only one
-of the three whose membership was directed outright — "VEX added to the
-square by instruction." VVLTVRE and VOID each gained their fourth member
-from the "decided when asked" list below (CHOPZ and VACAY respectively).
-So ■ marks the four that arrived whole, ✕ the two that were completed by
-a decision. That rule is cosmetic and easy to flip; it is written down
-so the assignment is checkable rather than a matter of taste.
+~~**Which four keeps the square is not arbitrary.** VOKEN is the only
+one of the three whose membership was directed outright — "VEX added
+to the square by instruction." VVLTVRE and VOID each gained their
+fourth member from the "decided when asked" list below (CHOPZ and
+VACAY respectively). So ■ marks the four that arrived whole, ✕ the
+two that were completed by a decision.~~ **Superseded, not deleted,
+for the same reason the paragraph above is struck through**: there is
+no square left to mark. VVLTVRE and VOID are still each a real,
+directed four completed by one decision (CHOPZ, VACAY) — that part of
+the history is unchanged and still correct, drawn as ✕ either way.
 
 **○ moved from GAMES to SYSTEMS**, and now means shared infrastructure
 rather than "a three". V3, V4 and VENVS are what the other constellations
@@ -118,11 +135,27 @@ and running, and none of them is an app anybody opens.
 
 ---
 
-## ■ VOKEN — the card economy
+## ★ Vulcan — the card economy
 
-**VOKEN · VEX · VADO · CVLTVRE (CVLTVRE)**
+**VOKEN · VEX · VADO · CVLTVRE (CVLTVRE) · CVLLEX**
 
-*Directed. VEX added to the square by instruction.*
+*Directed. VEX added to the square by instruction — back when this
+was still a square. CVLLEX added, and the constellation renamed
+Vulcan and redrawn as a five-point star, 25 Oct 2026, by direct
+decision: see "Vulcan, renamed" below.*
+
+**CVLLEX is standalone, not a VOKEN module, and that was a deliberate
+choice weighed against this constellation's own history.** It was
+built first as code inside VOKEN, then extracted the same day. The
+real precedent that shaped the decision is two paragraphs up: VEX was
+once extracted out of VOKEN into its own service, then folded back in,
+because a buy settles money and transfers card ownership in the same
+tick against one store — a network hop between those two lines can
+leave a buyer who paid and owns nothing. CVLLEX stays standalone for
+everything that is genuinely its own job (physical-production order
+intake, vendor status, vaulting, redemption); only the actual
+"mint this as a real Cvltvre Card" step crosses into VOKEN, through
+VOKEN's existing `POST /api/card/external`. See `cvllex/README.md`.
 
 VEX belongs here on lineage, and the repo records it: VEX was extracted
 **out of** VOKEN (task #92), `voken/dev-docs/phase-4-vex-brokerage/` and
@@ -147,7 +180,7 @@ transfer.
   registration — that part was never stale, it is a real legal gate,
   not a build.
 - **Do not** split VADO into its own service — see the extraction audit.
-  Every reason still holds now that VEX is in the square.
+  Every reason still holds now that VEX is in Vulcan, square or star.
 
 ---
 
@@ -414,6 +447,8 @@ than what was inferred.
 
 **Directed explicitly:**
 - VOKEN · VADO · CVLTVRE together, with **VEX added** to make a square
+  (and, 25 Oct 2026, **CVLLEX added** on top of that, renaming the
+  group Vulcan and making it a five-point star)
 - Vvltvre · Vault · VXLLAGE together
 - V3 · V4 · VENVS together
 - VOID · HVNTZ · CVNVO together *(superseding an earlier "Combo, Hunts,
@@ -426,9 +461,20 @@ than what was inferred.
 - **CHOPZ** → the VVLTVRE group (now ✕), making it a four
 - **VACON-C parent split** → the game public, VACON and VSAFE internal
 
-**Resolved, not open:** "Vulcan" in the directive was **a typo for
+~~**Resolved, not open:** "Vulcan" in the directive was **a typo for
 VOKEN**, confirmed by the founder. It is read as VOKEN throughout and
-there is no missing entity here.
+there is no missing entity here.~~
+
+**Vulcan, renamed — superseding the line above, 25 Oct 2026, by direct
+decision.** "Vulcan" is no longer read as a typo for VOKEN. The
+founder revisited it directly, asked for CVLLEX (the physical-
+production app built that same day) to join VOKEN's constellation as
+a real fifth member, and named the result Vulcan outright — the
+former VOKEN square is now ★ Vulcan: VOKEN · VEX · VADO · CVLTVRE ·
+CVLLEX. The old resolution is kept here, struck through rather than
+deleted, so a future reader sees both what was decided in August and
+what overrode it in October, instead of just the current answer with
+no record that it ever said something else.
 
 **Still undefined, one level higher:** **VVI**, the grandparent above
 VACO, appears in exactly two places in the repo — one line in

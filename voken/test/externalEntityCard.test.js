@@ -34,11 +34,22 @@ function baseArgs(overrides = {}) {
   };
 }
 
-test('real enums are exported and cover both wired apps', () => {
-  assert.deepEqual(SOURCE_APPS, ['world-layer', 'vavlt-stvdios']);
+test('real enums are exported and cover all three wired apps', () => {
+  assert.deepEqual(SOURCE_APPS, ['world-layer', 'vavlt-stvdios', 'cvllex']);
   assert.deepEqual(SOURCE_TYPES_BY_APP['world-layer'], ['location']);
   assert.deepEqual(SOURCE_TYPES_BY_APP['vavlt-stvdios'], ['casino-event']);
+  assert.deepEqual(SOURCE_TYPES_BY_APP.cvllex, ['production-order']);
   assert.deepEqual(MINTED_BY_ROLES, ['owner', 'operator']);
+});
+
+test('mintExternalEntityCard accepts a real cvllex production-order mint', () => {
+  const store = createVokenStore();
+  const card = mintExternalEntityCard(store, baseArgs({
+    sourceApp: 'cvllex', sourceType: 'production-order', externalRef: '7',
+  }));
+  assert.strictEqual(card.sourceApp, 'cvllex');
+  assert.strictEqual(card.sourceType, 'production-order');
+  assert.strictEqual(card.externalRef, '7');
 });
 
 test('mintExternalEntityCard validates sourceApp, sourceType, externalRef, mintedByRole, mintedByUserId', () => {

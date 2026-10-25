@@ -1,19 +1,17 @@
-// VOKEN — physical production orders: real minimum-run enforcement
-// for pressed media, no-minimum for print-on-demand goods, status
-// transitions, and the bridge into the existing merch-listing/
-// tokenization path.
+// CVLLEX — physical production orders: real minimum-run enforcement
+// for pressed media, no-minimum for print-on-demand goods, and status
+// transitions.
 
 'use strict';
 
 const test = require('node:test');
 const assert = require('node:assert');
 
-const { createVokenStore } = require('../lib/store');
-const { createMerchListing } = require('../lib/limitedEditionMerch');
+const { createCvllexStore } = require('../lib/store');
 const {
   PRODUCTION_ITEM_TYPES, PRESSED_MEDIA_ITEM_TYPES, PRESSED_MEDIA_MINIMUM_UNITS,
   minimumUnitsFor, createProductionOrder, getProductionOrder,
-  listProductionOrdersForCreator, advanceProductionOrder, listProducedOrder,
+  listProductionOrdersForCreator, advanceProductionOrder,
 } = require('../lib/physicalProduction');
 
 test('minimumUnitsFor returns the real pressed-media floor for cd/vinyl/cassette, and 1 for everything else', () => {
@@ -26,7 +24,7 @@ test('minimumUnitsFor returns the real pressed-media floor for cd/vinyl/cassette
 });
 
 test('createProductionOrder rejects an unknown itemType', () => {
-  const store = createVokenStore();
+  const store = createCvllexStore();
   assert.throws(
     () => createProductionOrder(store, { creatorId: 'ada', itemType: 'snow-globe', quantity: 10 }),
     /invalid itemType/,
@@ -34,7 +32,7 @@ test('createProductionOrder rejects an unknown itemType', () => {
 });
 
 test('createProductionOrder refuses a CD run below the real Qrates-style minimum', () => {
-  const store = createVokenStore();
+  const store = createCvllexStore();
   assert.throws(
     () => createProductionOrder(store, { creatorId: 'ada', itemType: 'cd', quantity: 1 }),
     /real minimum run of 100/,
@@ -43,31 +41,24 @@ test('createProductionOrder refuses a CD run below the real Qrates-style minimum
 });
 
 test('createProductionOrder accepts a CD run at exactly the minimum', () => {
-  const store = createVokenStore();
+  const store = createCvllexStore();
   const order = createProductionOrder(store, { creatorId: 'ada', itemType: 'cd', quantity: 100 });
   assert.strictEqual(order.quantity, 100);
   assert.strictEqual(order.minimumUnits, 100);
   assert.strictEqual(order.status, 'ordered');
+  assert.strictEqual(order.vaultId, null);
 });
 
 test('createProductionOrder accepts a single-unit magazine or poster run — no real minimum', () => {
-  const store = createVokenStore();
+  const store = createCvllexStore();
   const magazine = createProductionOrder(store, { creatorId: 'ada', itemType: 'magazine', quantity: 1 });
   assert.strictEqual(magazine.quantity, 1);
   const poster = createProductionOrder(store, { creatorId: 'ada', itemType: 'poster', quantity: 5 });
   assert.strictEqual(poster.quantity, 5);
 });
 
-test('createProductionOrder carries linkedCultureCardId through, same as a merch listing already does', () => {
-  const store = createVokenStore();
-  const order = createProductionOrder(store, {
-    creatorId: 'ada', itemType: 'vinyl', quantity: 150, linkedCultureCardId: 42,
-  });
-  assert.strictEqual(order.linkedCultureCardId, 42);
-});
-
 test('createProductionOrder rejects a non-positive estimatedUnitCost when one is given', () => {
-  const store = createVokenStore();
+  const store = createCvllexStore();
   assert.throws(
     () => createProductionOrder(store, { creatorId: 'ada', itemType: 'pin', quantity: 1, estimatedUnitCost: -1 }),
     /estimatedUnitCost must be a positive number/,
@@ -75,7 +66,7 @@ test('createProductionOrder rejects a non-positive estimatedUnitCost when one is
 });
 
 test('listProductionOrdersForCreator returns only that creator\'s orders, newest first', () => {
-  const store = createVokenStore();
+  const store = createCvllexStore();
   createProductionOrder(store, { creatorId: 'ada', itemType: 'poster', quantity: 1, now: 1000 });
   createProductionOrder(store, { creatorId: 'ben', itemType: 'pin', quantity: 1, now: 2000 });
   const second = createProductionOrder(store, { creatorId: 'ada', itemType: 'magazine', quantity: 2, now: 3000 });
@@ -85,7 +76,7 @@ test('listProductionOrdersForCreator returns only that creator\'s orders, newest
 });
 
 test('advanceProductionOrder only allows the next real step, not skipping in-production', () => {
-  const store = createVokenStore();
+  const store = createCvllexStore();
   const order = createProductionOrder(store, { creatorId: 'ada', itemType: 'poster', quantity: 1 });
   assert.throws(
     () => advanceProductionOrder(store, { orderId: order.id, toStatus: 'produced' }),
@@ -97,14 +88,14 @@ test('advanceProductionOrder only allows the next real step, not skipping in-pro
 });
 
 test('advanceProductionOrder allows cancelling from either open state', () => {
-  const store = createVokenStore();
+  const store = createCvllexStore();
   const order = createProductionOrder(store, { creatorId: 'ada', itemType: 'poster', quantity: 1 });
   advanceProductionOrder(store, { orderId: order.id, toStatus: 'cancelled' });
   assert.strictEqual(order.status, 'cancelled');
 });
 
 test('advanceProductionOrder refuses to move a produced or cancelled order any further', () => {
-  const store = createVokenStore();
+  const store = createCvllexStore();
   const order = createProductionOrder(store, { creatorId: 'ada', itemType: 'poster', quantity: 1 });
   advanceProductionOrder(store, { orderId: order.id, toStatus: 'cancelled' });
   assert.throws(
@@ -113,40 +104,7 @@ test('advanceProductionOrder refuses to move a produced or cancelled order any f
   );
 });
 
-test('listProducedOrder refuses to list an order that has not actually been produced yet', () => {
-  const store = createVokenStore();
-  const order = createProductionOrder(store, { creatorId: 'ada', itemType: 'poster', quantity: 10 });
-  assert.throws(
-    () => listProducedOrder(store, { orderId: order.id, basePrice: 20, createMerchListingFn: createMerchListing }),
-    /is ordered, not produced/,
-  );
-});
-
-test('listProducedOrder bridges into the real, existing createMerchListing — same store, same linkedCultureCardId', () => {
-  const store = createVokenStore();
-  const order = createProductionOrder(store, {
-    creatorId: 'ada', itemType: 'cd', quantity: 100, linkedCultureCardId: 7,
-  });
-  advanceProductionOrder(store, { orderId: order.id, toStatus: 'in-production' });
-  advanceProductionOrder(store, { orderId: order.id, toStatus: 'produced' });
-
-  const { listing } = listProducedOrder(store, { orderId: order.id, basePrice: 15, createMerchListingFn: createMerchListing });
-  assert.strictEqual(listing.creatorId, 'ada');
-  assert.strictEqual(listing.itemType, 'cd');
-  assert.strictEqual(listing.totalSupply, 100);
-  assert.strictEqual(listing.linkedCultureCardId, 7);
-  assert.strictEqual(store.limitedEditionMerch.length, 1, 'must use the real, existing merch store, not a second one');
-  assert.strictEqual(order.merchListingId, listing.id);
-});
-
-test('listProducedOrder refuses to list the same produced order twice', () => {
-  const store = createVokenStore();
-  const order = createProductionOrder(store, { creatorId: 'ada', itemType: 'poster', quantity: 1 });
-  advanceProductionOrder(store, { orderId: order.id, toStatus: 'in-production' });
-  advanceProductionOrder(store, { orderId: order.id, toStatus: 'produced' });
-  listProducedOrder(store, { orderId: order.id, basePrice: 10, createMerchListingFn: createMerchListing });
-  assert.throws(
-    () => listProducedOrder(store, { orderId: order.id, basePrice: 10, createMerchListingFn: createMerchListing }),
-    /already been listed as merch listing/,
-  );
+test('getProductionOrder returns null for an unknown id, not a throw', () => {
+  const store = createCvllexStore();
+  assert.strictEqual(getProductionOrder(store, 999), null);
 });

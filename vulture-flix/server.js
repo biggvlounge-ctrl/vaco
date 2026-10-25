@@ -34,6 +34,7 @@ const {
   TITLE_TYPES, TITLE_STATUSES, acquireExclusiveTitle, licenseNonExclusiveTitle, registerStudioProducedTitle, getTitleRecord, listTitlesForCreator,
   markStreaming, removeTitle, getCatalog, watchTitle, getWatchHistory,
   startStream, endStream, listActiveStreams,
+  requestPhysicalRun,
 } = require('./lib/titles');
 const {
   SUBSCRIPTION_TIERS, TIER_FEES, TIER_MAX_SIMULTANEOUS_STREAMS, MONTHLY_FEE,
@@ -72,6 +73,13 @@ function serviceHeaders() {
     ? { 'X-Service-Name': VACO_SERVICE_NAME, 'X-Service-Token': VACO_SERVICE_TOKEN }
     : {};
 }
+
+// CVLLEX -- the Vulcan constellation's physical-production app.
+// Titles here have no end-user session model (see requireCallingService
+// on every title-management route below), so this presents the same
+// real service credential rather than an Authorization header there is
+// no session to forward.
+const CVLLEX_API_URL = process.env.CVLLEX_API_URL || 'http://localhost:8822';
 
 const VACO_ANALYTICS_URL = process.env.VACO_ANALYTICS_URL || 'http://localhost:8790';
 // -- The store, and which backend holds it ----------------------------
@@ -266,6 +274,33 @@ app.post('/api/titles/:id/streaming', requireCallingService(), async (req, res) 
 app.post('/api/titles/:id/remove', requireCallingService(), (req, res) => {
   try {
     res.json(removeTitle(store, { ...req.body, titleId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Order a real physical run (posters, a physical collectible edition)
+// for a streaming, studio-produced title -- scoped to studio-produced
+// in lib/titles.js itself, since this app holds no merchandising
+// rights for an acquired or licensed title. Same real service
+// credential every other mutating title route already requires.
+app.post('/api/titles/:id/physical-run', requireCallingService(), async (req, res) => {
+  try {
+    const result = await requestPhysicalRun(store, {
+      ...req.body,
+      titleId: Number(req.params.id),
+      cvllexRequestFn: async (orderOptions) => {
+        const r = await fetch(`${CVLLEX_API_URL}/api/production-orders`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...serviceHeaders() },
+          body: JSON.stringify(orderOptions),
+        });
+        const body = await r.json();
+        if (!r.ok) throw new Error(body.error || `cvllex answered ${r.status}`);
+        return body;
+      },
+    });
+    res.status(201).json(result);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

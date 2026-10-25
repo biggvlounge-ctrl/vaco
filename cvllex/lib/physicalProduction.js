@@ -1,20 +1,19 @@
-// VOKEN — physical production orders: getting a limited run of real
-// physical goods actually MADE, before `limitedEditionMerch.js`'s
-// existing `createMerchListing` ever lists it for sale.
+// CVLLEX — physical production orders: getting a real limited run of
+// physical goods actually MADE. Built first as a module inside VOKEN
+// (25 Oct 2026), then extracted into this standalone app the same
+// day, by direct decision: Vulcan is a real, five-app constellation
+// (VOKEN · VEX · VADO · CVLTVRE · CVLLEX), not a VOKEN module. See
+// README.md for why CVLLEX is its own app rather than folded back in,
+// and for the real precedent (VEX) that was tried the other way.
 //
-// **The real gap this closes.** `limitedEditionMerch.js` already had
-// `linkedCultureCardId` on every listing — it was already built to
-// pair a physical item with a Cvltvre Card. What it never modeled is
-// where the physical item comes from: every existing listing assumes
-// the goods already exist, ready to ship. A creator dropping a
-// digital album and wanting 1,000 real CDs made, or a short real
-// magazine run, or limited collectible merch, has nowhere in this
-// ecosystem to place that order — VENVS's Publishing arm models
-// print-on-demand *economics* for books but never names who presses
-// them; VOID only ships goods that already exist (point A to point
-// B). This module is the missing step in between: order intake for a
-// real, small physical run, with the real economics named rather than
-// invented.
+// **The real gap this closes.** Nothing in this ecosystem modeled
+// ordering a real physical run (a creator dropping a digital album
+// and wanting 1,000 real CDs made, a short real magazine run, limited
+// collectible merch) and getting it made before it is a real,
+// tokenizable object. VENVS's Publishing arm models print-on-demand
+// *economics* for books but never names who presses them; VOID only
+// ships goods that already exist (point A to point B). This module is
+// order intake and status tracking for the step in between.
 //
 // **The one real economic fact worth encoding, grounded rather than
 // guessed.** Physically pressed music media (CD/vinyl/cassette) and
@@ -32,14 +31,13 @@
 //     flat per-unit rate, because digital/short-run printing has no
 //     comparable plating step.
 //
-// No source here gives a precise, current dollar figure for either
-// (Qrates' own public pricing wasn't found in this session's
-// research) — so this module does NOT fabricate a specific cost. It
-// enforces the one real, structural fact that IS confirmed (a real
-// minimum run size on pressed music media, no minimum on
-// print-on-demand goods) and leaves the actual unit cost as a real
-// input the creator or operator supplies, same as `basePrice` already
-// is on every other listing in this file's sibling module.
+// No source found in this session's research gives a precise, current
+// dollar figure for either — so this module does NOT fabricate a
+// specific cost. It enforces the one real, structural fact that IS
+// confirmed (a real minimum run size on pressed music media, no
+// minimum on print-on-demand goods) and leaves the actual unit cost as
+// a real input the creator or operator supplies, same posture
+// `basePrice` already has on VOKEN's own merch listings.
 //
 // **What this module is NOT.** It does not integrate with a real
 // pressing plant, printer, or merch manufacturer — no such vendor
@@ -49,10 +47,9 @@
 // tracking: a real record of what was ordered, at what quantity, for
 // what real-world cost the caller states, that a human operator marks
 // `produced` once the real-world shipment from a real vendor actually
-// arrives. Once `produced`, the existing, already-built
-// `createMerchListing` (same store, same `linkedCultureCardId`) is
-// how the now-real physical units get listed and sold — this module
-// does not duplicate that mechanism.
+// arrives. Once `produced`, `lib/vault.js` is where a produced run
+// becomes a real, tokenized, redeemable collectible — this module
+// does not duplicate that mechanism either.
 
 const PRODUCTION_ITEM_TYPES = ['t-shirt', 'hat', 'cd', 'vinyl', 'cassette', 'magazine', 'poster', 'pin', 'other'];
 
@@ -70,15 +67,14 @@ function minimumUnitsFor(itemType) {
 }
 
 // `estimatedUnitCost` is a real input the caller states (the same
-// posture `basePrice` already has on `createMerchListing`), not a
-// computed or fabricated figure — see this file's own header for why
-// no real current per-unit price exists to compute from. Recorded
-// only so a creator or operator can see what they committed to before
-// the real vendor invoice confirms it.
+// posture `basePrice` already has on VOKEN's own merch listings), not
+// a computed or fabricated figure — see this file's own header for why
+// no real current per-unit price exists to compute from. Recorded only
+// so a creator or operator can see what they committed to before the
+// real vendor invoice confirms it.
 function createProductionOrder(store, options = {}) {
   const {
-    creatorId, itemType, quantity, estimatedUnitCost = null,
-    linkedCultureCardId = null, vendorNote = null, now = Date.now(),
+    creatorId, itemType, quantity, estimatedUnitCost = null, vendorNote = null, now = Date.now(),
   } = options;
 
   if (!creatorId) throw new Error('createProductionOrder requires a creatorId');
@@ -103,10 +99,9 @@ function createProductionOrder(store, options = {}) {
     quantity,
     minimumUnits: minimum,
     estimatedUnitCost,
-    linkedCultureCardId,
     vendorNote,
     status: 'ordered',
-    merchListingId: null,
+    vaultId: null,
     createdAt: now,
     updatedAt: now,
   };
@@ -152,37 +147,6 @@ function advanceProductionOrder(store, options = {}) {
   return order;
 }
 
-// The one real seam back into the existing, already-built sell path:
-// once a production order is marked `produced` (a real vendor
-// shipment has actually arrived), this creates the
-// `limitedEditionMerch.js` listing for it directly -- same store, same
-// `linkedCultureCardId`, same `createMerchListing` every other listing
-// already goes through. Not a second listing mechanism; a bridge to
-// the one that already exists.
-function listProducedOrder(store, options = {}) {
-  const { orderId, basePrice, createMerchListingFn } = options;
-  const order = getProductionOrder(store, orderId);
-  if (!order) throw new Error(`listProducedOrder: no production order with id ${orderId}`);
-  if (order.status !== 'produced') {
-    throw new Error(`listProducedOrder: order ${orderId} is ${order.status}, not produced -- nothing real to list yet`);
-  }
-  if (order.merchListingId !== null) {
-    throw new Error(`listProducedOrder: order ${orderId} has already been listed as merch listing ${order.merchListingId}`);
-  }
-  if (typeof createMerchListingFn !== 'function') {
-    throw new Error('listProducedOrder requires createMerchListingFn(store, options)');
-  }
-  const listing = createMerchListingFn(store, {
-    creatorId: order.creatorId,
-    itemType: order.itemType,
-    totalSupply: order.quantity,
-    basePrice,
-    linkedCultureCardId: order.linkedCultureCardId,
-  });
-  order.merchListingId = listing.id;
-  return { order, listing };
-}
-
 module.exports = {
   PRODUCTION_ITEM_TYPES,
   PRESSED_MEDIA_ITEM_TYPES,
@@ -193,5 +157,4 @@ module.exports = {
   getProductionOrder,
   listProductionOrdersForCreator,
   advanceProductionOrder,
-  listProducedOrder,
 };

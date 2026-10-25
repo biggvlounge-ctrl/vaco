@@ -110,10 +110,16 @@ function mintCultureCard(store, options = {}) {
 // existence is not the same act as owning what it depicts, and handing
 // the operator a free edition would make minting-on-behalf-of a way to
 // self-enrich.
-const SOURCE_APPS = ['world-layer', 'vavlt-stvdios'];
+const SOURCE_APPS = ['world-layer', 'vavlt-stvdios', 'cvllex'];
 const SOURCE_TYPES_BY_APP = {
   'world-layer': ['location'],
   'vavlt-stvdios': ['casino-event'],
+  // CVLLEX (the Vulcan constellation's physical-production app)
+  // mints the Cvltvre Card for a produced run through this exact
+  // path -- `externalRef` names the CVLLEX production order id.
+  // VOKEN stays the one place a Cvltvre Card actually comes from;
+  // CVLLEX never gets its own competing token.
+  cvllex: ['production-order'],
 };
 const MINTED_BY_ROLES = ['owner', 'operator'];
 

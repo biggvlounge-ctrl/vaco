@@ -172,6 +172,7 @@ async function submitRelease(store, options = {}) {
     status: 'submitted',
     ownershipRetainedPercent: 100,
     vaultStvdiosPostId: null,
+    physicalProductionOrderIds: [],
     createdAt: now,
   };
   store.releases.push(release);
@@ -193,6 +194,38 @@ function requireStatus(store, releaseId, expectedStatus, action) {
     throw new Error(`${action}: release ${releaseId} is "${release.status}", expected "${expectedStatus}"`);
   }
   return release;
+}
+
+// **The real bridge from a music release to a real physical run.**
+// CVLLEX (the Vulcan constellation's physical-production app) is the
+// one real place in this ecosystem that orders CDs/vinyl/cassettes
+// actually pressed — see its own README for the real Qrates/Printful/
+// Lulu/Courtyard.io grounding. This app never builds a second
+// pressing-order mechanism; it calls CVLLEX's real
+// `POST /api/production-orders`, injected rather than imported (the
+// same "cross-app calls are injected, not hard-wired" convention this
+// whole ecosystem uses) — `cvllexRequestFn` is CVLLEX's own real route
+// in production, a fake in tests.
+//
+// Only a `live` release may order a physical run — ordering physical
+// goods for a release that was never actually distributed would press
+// real inventory for content that was never really put out.
+async function requestPhysicalRun(store, options = {}) {
+  const { releaseId, itemType, quantity, estimatedUnitCost = null, cvllexRequestFn } = options;
+  const release = requireStatus(store, releaseId, 'live', 'requestPhysicalRun');
+  if (typeof cvllexRequestFn !== 'function') {
+    throw new Error('requestPhysicalRun requires cvllexRequestFn(options)');
+  }
+
+  const order = await cvllexRequestFn({
+    creatorId: release.artistId,
+    itemType,
+    quantity,
+    estimatedUnitCost,
+    vendorNote: `vulture-music release #${release.id} "${release.title}"`,
+  });
+  release.physicalProductionOrderIds.push(order.id);
+  return { release, order };
 }
 
 function markDistributing(store, releaseId) {
@@ -479,6 +512,7 @@ module.exports = {
   submitRelease,
   getRelease,
   listReleasesForArtist,
+  requestPhysicalRun,
   markDistributing,
   markLive,
   takeDown,
