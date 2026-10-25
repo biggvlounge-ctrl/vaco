@@ -12,7 +12,7 @@ const assert = require('node:assert');
 const { createCvllexStore } = require('../lib/store');
 const { createProductionOrder, advanceProductionOrder } = require('../lib/physicalProduction');
 const {
-  getVaultedCollectible, vaultProducedOrder, redeemUnit,
+  getVaultedCollectible, vaultProducedOrder, redeemUnit, getTotalUnitsRedeemedForCreator,
 } = require('../lib/vault');
 
 function produce(store, overrides = {}) {
@@ -174,4 +174,56 @@ test('redeemUnit rejects a non-positive shippingCost', async () => {
     }),
     /requires a positive shippingCost/,
   );
+});
+
+test('getTotalUnitsRedeemedForCreator counts real redemptions, not vaulted inventory that hasn\'t sold', async () => {
+  const store = createCvllexStore();
+  const order = produce(store, { creatorId: 'ada', quantity: 10 });
+  const vault = await vaultProducedOrder(store, { order, mintCultureCardFn: fakeMint });
+  const fakeVoid = async (redeemerId, shippingCost) => ({ id: 1, customerId: redeemerId, unitPrice: shippingCost });
+
+  // Nothing redeemed yet -- real inventory sitting in the vault must
+  // not be counted as if it had already sold.
+  assert.equal(getTotalUnitsRedeemedForCreator(store, 'ada'), 0);
+
+  await redeemUnit(store, { vaultId: vault.id, redeemerId: 'ben', shippingCost: 5, voidRequestFn: fakeVoid });
+  await redeemUnit(store, { vaultId: vault.id, redeemerId: 'cal', shippingCost: 5, voidRequestFn: fakeVoid });
+
+  assert.equal(getTotalUnitsRedeemedForCreator(store, 'ada'), 2);
+});
+
+test('getTotalUnitsRedeemedForCreator sums across every vault this creator has ever opened', async () => {
+  const store = createCvllexStore();
+  const orderA = produce(store, { creatorId: 'ada', itemType: 'poster', quantity: 10 });
+  const orderB = produce(store, { creatorId: 'ada', itemType: 'cd', quantity: 100 });
+  const vaultA = await vaultProducedOrder(store, { order: orderA, mintCultureCardFn: fakeMint });
+  const vaultB = await vaultProducedOrder(store, { order: orderB, mintCultureCardFn: fakeMint });
+  const fakeVoid = async (redeemerId, shippingCost) => ({ id: 1, customerId: redeemerId, unitPrice: shippingCost });
+
+  await redeemUnit(store, { vaultId: vaultA.id, redeemerId: 'ben', shippingCost: 5, voidRequestFn: fakeVoid });
+  await redeemUnit(store, { vaultId: vaultB.id, redeemerId: 'cal', shippingCost: 5, voidRequestFn: fakeVoid });
+  await redeemUnit(store, { vaultId: vaultB.id, redeemerId: 'dee', shippingCost: 5, voidRequestFn: fakeVoid });
+
+  assert.equal(getTotalUnitsRedeemedForCreator(store, 'ada'), 3);
+});
+
+test('getTotalUnitsRedeemedForCreator never credits one creator with another creator\'s real redemptions', async () => {
+  const store = createCvllexStore();
+  const adaOrder = produce(store, { creatorId: 'ada', quantity: 10 });
+  const benOrder = produce(store, { creatorId: 'ben', quantity: 10 });
+  const adaVault = await vaultProducedOrder(store, { order: adaOrder, mintCultureCardFn: fakeMint });
+  const benVault = await vaultProducedOrder(store, { order: benOrder, mintCultureCardFn: fakeMint });
+  const fakeVoid = async (redeemerId, shippingCost) => ({ id: 1, customerId: redeemerId, unitPrice: shippingCost });
+
+  await redeemUnit(store, { vaultId: adaVault.id, redeemerId: 'x', shippingCost: 5, voidRequestFn: fakeVoid });
+  await redeemUnit(store, { vaultId: benVault.id, redeemerId: 'y', shippingCost: 5, voidRequestFn: fakeVoid });
+  await redeemUnit(store, { vaultId: benVault.id, redeemerId: 'z', shippingCost: 5, voidRequestFn: fakeVoid });
+
+  assert.equal(getTotalUnitsRedeemedForCreator(store, 'ada'), 1);
+  assert.equal(getTotalUnitsRedeemedForCreator(store, 'ben'), 2);
+});
+
+test('getTotalUnitsRedeemedForCreator is honestly 0 for a creator with no vaults', () => {
+  const store = createCvllexStore();
+  assert.equal(getTotalUnitsRedeemedForCreator(store, 'nobody-home'), 0);
 });

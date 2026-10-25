@@ -36,7 +36,7 @@ const {
   createProductionOrder, getProductionOrder, listProductionOrdersForCreator, advanceProductionOrder,
 } = require('./lib/physicalProduction');
 const {
-  getVaultedCollectible, vaultProducedOrder, redeemUnit,
+  getVaultedCollectible, vaultProducedOrder, redeemUnit, getTotalUnitsRedeemedForCreator,
 } = require('./lib/vault');
 const { requireActor, requireSession, actorOrService } = require('./lib/shieldAuth.cjs');
 const { createServiceAuth } = require('./lib/serviceAuth.cjs');
@@ -206,6 +206,13 @@ app.post('/api/vault/:id/redeem', requireActor('redeemerId'), async (req, res) =
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+});
+
+// The real "sales" number for one creator -- VOKEN's real
+// cross-platform achievement score reads this live, by direct
+// instruction ("check the sales of what they've done").
+app.get('/api/creators/:creatorId/units-redeemed', (req, res) => {
+  res.json({ creatorId: req.params.creatorId, totalUnitsRedeemed: getTotalUnitsRedeemedForCreator(store, req.params.creatorId) });
 });
 
 app.listen(PORT, () => {

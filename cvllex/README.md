@@ -103,6 +103,17 @@ the same honest way `vendorNote` already works on a production order:
 for the real human operator who confirms production, not applied by any
 real engraving/finishing vendor integration, because none exists.
 
+## Real sales, for one creator
+
+`getTotalUnitsRedeemedForCreator()` (`GET /api/creators/:creatorId/units-redeemed`)
+is the real, cross-vault "how many have actually sold" number — added
+by direct instruction so VOKEN's cross-platform achievement score can
+read it live. Deliberately **redemptions, not vaulted units**: vaulting
+only creates the record, a real unit reaches a real buyer only on
+redemption (that's the point VOID's courier job actually goes out), so
+counting `totalUnits` instead would report unsold inventory as if it
+had already sold.
+
 ## What's real, and what honestly isn't
 
 **Real:**
@@ -159,3 +170,4 @@ modules against injected fake cross-app functions — no network.
 | `POST /api/production-orders/:id/vault` | session, must be the order's creator | mints the real Cvltvre Card via VOKEN |
 | `GET /api/vault/:id` | none | |
 | `POST /api/vault/:id/redeem` | session, must be `redeemerId` | requests a real VOID courier shipment; assigns a real claim-order serial number; accepts an optional `specification` engraving note |
+| `GET /api/creators/:creatorId/units-redeemed` | none | the real cross-vault total units a creator has actually sold — read live by VOKEN's cross-platform achievement score |

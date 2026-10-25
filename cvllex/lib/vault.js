@@ -139,9 +139,25 @@ async function redeemUnit(store, options = {}) {
   return { vault, redemption };
 }
 
+// The real "sales" number for one creator -- added by direct
+// instruction ("check the sales of what they've done... get all the
+// information from everything we can") so VOKEN's cross-platform
+// achievement score can read it live. A redemption, not a vaulted
+// unit, is the real point a unit reaches a real buyer (vaulting just
+// creates the record; VOID's courier job only goes out on redemption)
+// -- so this counts real redemptions across every vault this creator
+// has ever opened, not totalUnits, which would count unsold inventory
+// as if it had already sold.
+function getTotalUnitsRedeemedForCreator(store, creatorId) {
+  return store.vaultedCollectibles
+    .filter((v) => v.creatorId === creatorId)
+    .reduce((sum, v) => sum + v.redemptions.length, 0);
+}
+
 module.exports = {
   VAULT_STATUSES,
   getVaultedCollectible,
   vaultProducedOrder,
   redeemUnit,
+  getTotalUnitsRedeemedForCreator,
 };
