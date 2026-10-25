@@ -32,6 +32,7 @@ const {
   submitRelease, getRelease, listReleasesForArtist, requestPhysicalRun, markDistributing, markLive, takeDown, attachMusicVideo,
   reportStreamingRevenue, getArtistSummary, getCollaboratorEarnings,
 } = require('./lib/releases');
+const { recordStream, getStreamCount, getTotalStreamCountForArtist } = require('./lib/streaming');
 const {
   DEFAULT_COMMISSION_PERCENT, signArtist, getDeal, terminateDeal, getArtistManager, getManagerRoster, getManagerSummary,
 } = require('./lib/managers');
@@ -416,6 +417,31 @@ app.get('/api/artists/:artistId/releases', (req, res) => {
 
 app.get('/api/artists/:artistId/summary', (req, res) => {
   res.json(getArtistSummary(store, req.params.artistId));
+});
+
+// Real raw stream counts -- genuinely distinct from
+// `reportStreamingRevenue` above (a dollar amount, reported in
+// aggregate): this is a real, free-to-record play event, the same
+// default economics `vulture-pods`' own `recordListen` already
+// established.
+app.post('/api/releases/:id/stream', requireActor('userId'), (req, res) => {
+  try {
+    res.status(201).json(recordStream(store, { ...req.body, releaseId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/releases/:id/stream-count', (req, res) => {
+  res.json({ releaseId: Number(req.params.id), streamCount: getStreamCount(store, Number(req.params.id)) });
+});
+
+// The real, cross-release total for one artist -- the number VOKEN's
+// real cross-platform achievement score reads live, by direct
+// instruction ("check all their social media platforms... get all
+// the information from everything we can").
+app.get('/api/artists/:artistId/stream-count', (req, res) => {
+  res.json({ artistId: req.params.artistId, totalStreamCount: getTotalStreamCountForArtist(store, req.params.artistId) });
 });
 
 app.get('/api/collaborators/:userId/earnings', (req, res) => {

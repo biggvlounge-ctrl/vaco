@@ -19,6 +19,8 @@ function createVultureMusicStore() {
     nextBeatId: 1,
     beatPurchases: [],
     nextBeatPurchaseId: 1,
+    streamEvents: [],
+    nextStreamEventId: 1,
   };
 }
 

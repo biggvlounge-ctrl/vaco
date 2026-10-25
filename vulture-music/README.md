@@ -74,6 +74,19 @@ curl -X POST http://localhost:8806/api/releases -H "Content-Type: application/js
   a second attach is rejected. Vavlt Stvdios' own real 20-minute Reel
   cap applies as-is, unremarked here since a real music video is
   almost always well under it.
+- `lib/streaming.js` — **real raw stream counts**, added by direct
+  instruction: this app already tracked real streaming *revenue*
+  (`reportStreamingRevenue` above, a dollar amount) but never a raw
+  play/stream *count* anywhere, unlike `vulture-pods`' own
+  `listenEvents` or `vulture-flix`'s own `watchEvents`. `recordStream`
+  is free to record (no money moves — an individual stream is not a
+  billable event, that happens in aggregate via
+  `reportStreamingRevenue` separately), scoped to a `live` release
+  only, the same real gate `reportStreamingRevenue` already uses.
+  `getTotalStreamCountForArtist()` is the real, cross-release
+  aggregate VOKEN's cross-platform achievement score reads live (`GET
+  /api/artists/:artistId/stream-count`). See `test/streaming.test.js`
+  — the first real test coverage this app's streaming side has had.
 - `server.js` — a real Express API (CommonJS), real injected
   `transferVCoin` calling V3's own live ledger (`venvs-mock-backend`),
   same cross-app pattern established for CHOPZ SHOP/VOID/VACAY.
