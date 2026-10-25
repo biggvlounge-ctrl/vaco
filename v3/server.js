@@ -40,7 +40,12 @@ const { attachStore } = require('./lib/storeBackend');
 const { STARTING_VCOIN_BALANCE } = require('./lib/vcoin');
 const { VCOIN_TO_VASH_RATE } = require('./lib/vash');
 const { createLedger } = require('./lib/ledger');
-const { requireActor, actorOrService: actorOrServiceWith, requireCallingService } = require('./lib/shieldAuth.cjs');
+const {
+  requireActor, requireSession, actorOrService: actorOrServiceWith, requireCallingService,
+} = require('./lib/shieldAuth.cjs');
+const { createOperatorAuth } = require('./lib/operatorAuth.cjs');
+const vashMortgage = require('./lib/vashMortgage');
+const vashInsurance = require('./lib/vashInsurance');
 
 const { createServiceAuth } = require('./lib/serviceAuth.cjs');
 const { traceMiddleware } = require('./lib/tracing.cjs');
@@ -184,6 +189,12 @@ app.use(serviceAuth.middleware);
 // `actorOrService('fromUserId')` rather than nesting two helpers.
 const actorOrService = (field) => actorOrServiceWith(requireActor(field));
 
+// VASH Mortgage/Insurance underwriting and claims decisions are
+// exactly the "decides an outcome somebody loses" routes
+// `operatorAuth.cjs`'s own header describes -- gated the same way
+// VAGO/VOID/VACA already gate theirs, not by a session alone.
+const { requireOperator } = createOperatorAuth();
+
 app.get('/api/health', async (_req, res, next) => {
   try {
     res.json({
@@ -274,6 +285,141 @@ app.get('/api/vash/balance/:userId', async (req, res, next) => {
   try {
     res.json({ userId: req.params.userId, vashBalance: await ledger.getVashBalance(req.params.userId) });
   } catch (err) { next(err); }
+});
+
+// -- VASH Mortgage ------------------------------------------------------
+// See lib/vashMortgage.js's own header for what this honestly is (a
+// real, VCoin-denominated loan-administration system) and is not (a
+// real, licensed mortgage lender).
+
+app.post('/api/vash-mortgage/apply', requireActor('borrowerId'), (req, res) => {
+  try {
+    res.status(201).json(vashMortgage.applyForMortgage(store, req.body || {}));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/vash-mortgage/:id', requireSession(), (req, res) => {
+  const application = vashMortgage.getMortgage(store, Number(req.params.id));
+  if (!application) return res.status(404).json({ error: `no mortgage application with id ${req.params.id}` });
+  if (application.borrowerId !== req.sessionUserId) {
+    return res.status(403).json({ error: 'only the borrower on this mortgage may view it' });
+  }
+  return res.json(application);
+});
+
+app.post('/api/vash-mortgage/:id/approve', requireOperator('v3:mortgage'), (req, res) => {
+  try {
+    res.json(vashMortgage.approveMortgage(store, { ...req.body, applicationId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/vash-mortgage/:id/deny', requireOperator('v3:mortgage'), (req, res) => {
+  try {
+    res.json(vashMortgage.denyMortgage(store, { ...req.body, applicationId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/vash-mortgage/:id/payment', idempotentFor('vash-mortgage/payment'), requireActor('borrowerId'), async (req, res) => {
+  try {
+    const result = await vashMortgage.makeMortgagePayment(
+      store, { ...req.body, applicationId: Number(req.params.id) }, { transferFn: (opts) => ledger.transfer(opts) },
+    );
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// -- VASH Insurance -------------------------------------------------------
+// See lib/vashInsurance.js's own header for what this honestly is (a
+// real, VCoin-denominated MGA-style administration system) and is not
+// (a licensed insurance carrier or MGA).
+
+// A GET, deliberately -- a quote is a pure read with no account
+// needed, the same real posture any insurance site's own quote tool
+// takes before asking you to sign up. Query params, not a body.
+app.get('/api/vash-insurance/quote', (req, res) => {
+  try {
+    res.json(vashInsurance.quotePolicy({
+      policyType: req.query.policyType, coverageAmount: Number(req.query.coverageAmount),
+    }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/vash-insurance/purchase', idempotentFor('vash-insurance/purchase'), requireActor('policyholderId'), async (req, res) => {
+  try {
+    const policy = await vashInsurance.purchasePolicy(store, req.body || {}, { transferFn: (opts) => ledger.transfer(opts) });
+    res.status(201).json(policy);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/vash-insurance/policy/:id', requireSession(), (req, res) => {
+  const policy = vashInsurance.getPolicy(store, Number(req.params.id));
+  if (!policy) return res.status(404).json({ error: `no policy with id ${req.params.id}` });
+  if (policy.policyholderId !== req.sessionUserId) {
+    return res.status(403).json({ error: 'only the policyholder on this policy may view it' });
+  }
+  return res.json(policy);
+});
+
+app.post('/api/vash-insurance/policy/:id/cancel', requireActor('policyholderId'), (req, res) => {
+  try {
+    res.json(vashInsurance.cancelPolicy(store, { ...req.body, policyId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/vash-insurance/claim', requireActor('policyholderId'), (req, res) => {
+  try {
+    res.status(201).json(vashInsurance.fileClaim(store, req.body || {}));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/vash-insurance/claim/:id', requireSession(), (req, res) => {
+  const claim = vashInsurance.getClaim(store, Number(req.params.id));
+  if (!claim) return res.status(404).json({ error: `no claim with id ${req.params.id}` });
+  if (claim.policyholderId !== req.sessionUserId) {
+    return res.status(403).json({ error: 'only the policyholder on this claim may view it' });
+  }
+  return res.json(claim);
+});
+
+app.post('/api/vash-insurance/claim/:id/approve', requireOperator('v3:insurance'), (req, res) => {
+  try {
+    res.json(vashInsurance.approveClaim(store, { ...req.body, claimId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/vash-insurance/claim/:id/deny', requireOperator('v3:insurance'), (req, res) => {
+  try {
+    res.json(vashInsurance.denyClaim(store, { ...req.body, claimId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/vash-insurance/claim/:id/pay', idempotentFor('vash-insurance/pay'), requireOperator('v3:insurance'), async (req, res) => {
+  try {
+    const result = await vashInsurance.payClaim(store, { claimId: Number(req.params.id) }, { transferFn: (opts) => ledger.transfer(opts) });
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 app.listen(PORT, () => {

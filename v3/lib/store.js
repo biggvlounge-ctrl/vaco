@@ -21,6 +21,14 @@ function createV3Store() {
     // existed comes back without it, which is why `settle` tolerates
     // its absence rather than assuming the factory ran.
     nextSettlementId: 1,
+    // VASH Mortgage: see lib/vashMortgage.js.
+    mortgageApplications: [],
+    nextMortgageApplicationId: 1,
+    // VASH Insurance: see lib/vashInsurance.js.
+    insurancePolicies: [],
+    nextInsurancePolicyId: 1,
+    insuranceClaims: [],
+    nextInsuranceClaimId: 1,
   };
 }
 

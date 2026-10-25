@@ -171,7 +171,7 @@ MEDIA_TARGETS=(
 
 OPERATOR_TARGETS=(
   vago voken hvntz void vulture-music vulture-studios vaco-shell vex vaca vacon-c vaco-notify
-  cvnvo/yap
+  cvnvo/yap v3
 )
 
 # **Every app that serves HTTP, with no exceptions.** Tracing is not a
