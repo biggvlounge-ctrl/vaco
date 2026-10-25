@@ -13,7 +13,19 @@
 
 const { settleOnce } = require('./settleOnce');
 
-const ITEM_TYPES = ['t-shirt', 'hat', 'other'];
+// **Extended (physical-production addition)** to cover more than
+// generic apparel. `cd`/`vinyl`/`cassette` are real, physically-
+// pressed music media (the Qrates comparable — real small-batch
+// vinyl/cassette pressing, a genuine floor on batch size, not a
+// smooth per-unit cost); `magazine`/`poster`/`pin` are real
+// no-minimum print-on-demand goods (the Printful/Lulu/Doxzoo
+// comparable). See `physicalProduction.js`'s own header for the full
+// grounding and for which of these carry a real minimum run size.
+// `linkedCultureCardId` already existed on every listing below before
+// this addition — this file was already built to pair a physical item
+// with a Cvltvre Card; what was missing was a way to get the physical
+// item made in the first place, which `physicalProduction.js` adds.
+const ITEM_TYPES = ['t-shirt', 'hat', 'cd', 'vinyl', 'cassette', 'magazine', 'poster', 'pin', 'other'];
 const MERCH_SCARCITY_PRICE_MULTIPLIER = 1.0; // price up to 2x basePrice once fully sold out
 
 function round(n) {

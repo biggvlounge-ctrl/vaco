@@ -73,6 +73,11 @@ const {
 const {
   ITEM_TYPES, createMerchListing, getMerchListing, purchaseMerchItem,
 } = require('./lib/limitedEditionMerch');
+const {
+  PRODUCTION_ITEM_TYPES, PRESSED_MEDIA_ITEM_TYPES, PRESSED_MEDIA_MINIMUM_UNITS,
+  createProductionOrder, getProductionOrder, listProductionOrdersForCreator,
+  advanceProductionOrder, listProducedOrder,
+} = require('./lib/physicalProduction');
 const { registerDigitalArtFrame, getDigitalArtFrame, loadArtworkOntoFrame } = require('./lib/digitalArtFrame');
 const {
   requireActor, requireParamActor, requireSession, requireCallingService,
@@ -547,6 +552,9 @@ const requireSecondarySeller = () => requireRecordOwner(
 const requireFrameOwner = () => requireRecordOwner(
   'art frame', (req) => getDigitalArtFrame(store, Number(req.params.id)), (f) => f.ownerId,
 );
+const requireProductionOrderCreator = () => requireRecordOwner(
+  'production order', (req) => getProductionOrder(store, Number(req.params.id)), (o) => o.creatorId,
+);
 
 // A trade moves card editions — real property with a real resale
 // market — so all four routes below need authorization, and until now
@@ -921,6 +929,55 @@ app.get('/api/merch/:id', (req, res) => {
 app.post('/api/merch/:id/purchase', requireActor('buyerId'), async (req, res) => {
   try {
     res.status(201).json(await purchaseMerchItem(store, { ...req.body, listingId: Number(req.params.id), settleFn: settleVCoin }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// -- physical production -- getting a real limited run actually MADE,
+// before it is ever a merch listing. See lib/physicalProduction.js's
+// own header for the real Qrates/Printful/Lulu grounding and for why
+// cd/vinyl/cassette carry a real minimum run and nothing else does.
+
+app.get('/api/production-item-types', (_req, res) => {
+  res.json({
+    itemTypes: PRODUCTION_ITEM_TYPES,
+    pressedMediaItemTypes: PRESSED_MEDIA_ITEM_TYPES,
+    pressedMediaMinimumUnits: PRESSED_MEDIA_MINIMUM_UNITS,
+  });
+});
+
+app.post('/api/production-orders', requireActor('creatorId'), (req, res) => {
+  try {
+    res.status(201).json(createProductionOrder(store, req.body || {}));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/production-orders/:id', (req, res) => {
+  const order = getProductionOrder(store, Number(req.params.id));
+  if (!order) return res.status(404).json({ error: `no production order with id ${req.params.id}` });
+  res.json(order);
+});
+
+app.get('/api/production-orders/creator/:creatorId', (req, res) => {
+  res.json({ orders: listProductionOrdersForCreator(store, req.params.creatorId) });
+});
+
+app.post('/api/production-orders/:id/advance', requireProductionOrderCreator(), (req, res) => {
+  try {
+    res.json(advanceProductionOrder(store, { ...req.body, orderId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/production-orders/:id/list', requireProductionOrderCreator(), (req, res) => {
+  try {
+    res.status(201).json(listProducedOrder(store, {
+      ...req.body, orderId: Number(req.params.id), createMerchListingFn: createMerchListing,
+    }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

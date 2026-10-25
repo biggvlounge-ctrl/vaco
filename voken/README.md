@@ -250,7 +250,25 @@ curl -X POST http://localhost:8794/api/card/external -H "Content-Type: applicati
 - `lib/limitedEditionMerch.js` — creator-designed limited-edition
   merch with real, StockX-style dynamic pricing: price rises as real
   supply shrinks, and every purchase charges the live price at that
-  moment, not a stale one.
+  moment, not a stale one. `ITEM_TYPES` now also covers real physical
+  media (`cd`, `vinyl`, `cassette`, `magazine`, `poster`, `pin`),
+  not just apparel.
+- `lib/physicalProduction.js` — real order intake for getting a
+  limited physical run actually made before it's ever a merch
+  listing: "drop a digital album, get 1,000 real CDs made," or a
+  short magazine run, or limited collectible merch — closing the real
+  gap between a digital drop and a physical, tokenizable object.
+  Grounded in two real, distinct 2025–2026 comparables: **Qrates**
+  (real vinyl/cassette pressing in batches as small as 100 units — a
+  genuine minimum run, not a smooth per-unit cost) and **Printful/
+  Printify/Lulu/Doxzoo** (real no-minimum print-on-demand for merch
+  and magazines). `ordered → in-production → produced` is a real,
+  human-confirmed status progression (no vendor integration exists to
+  automate it), and a `produced` order bridges directly into the
+  existing, already-built `createMerchListing` — same store, same
+  `linkedCultureCardId` every listing already carries, so a physical
+  collectible's path to tokenization was already built; this closes
+  the step before it.
 - `lib/digitalArtFrame.js` — the Meural-Opus-comparable digital art
   frame: loading artwork is double ownership-gated — genuine ownership
   of both the frame and the specific digital edition being displayed.
@@ -422,9 +440,22 @@ restart-survival confirmed.
   fractional-share resale — Phase 10 built real peer-to-peer secondary
   trades (list a price, another buyer takes it), not live price
   discovery or partial-fill matching.
-- Any actual manufacturing/shipping logic behind merch or physical art
-  frames — both are real digital records of a real transaction, not a
-  fulfillment pipeline.
+- **Physical production order intake now exists**
+  (`lib/physicalProduction.js`, `POST /api/production-orders` — see
+  below) — a real, validated record of what a creator ordered made (a
+  CD/vinyl/cassette run, a magazine, posters, pins), with the one real
+  economic fact a creator actually needs enforced (pressed music media
+  has a real ~100-unit minimum run; everything else has none). What is
+  still genuinely not built: any real vendor integration. No pressing
+  plant, printer, or merch manufacturer credential exists anywhere in
+  this repository — a human operator manually marks an order
+  `in-production` then `produced` once a real vendor shipment actually
+  arrives, same honesty boundary digital art frames and merch listings
+  already drew for shipping. VOID's existing shipment handoff
+  (`voidRequestFn`, used by VENVS's own Marketplace/Publishing) is not
+  wired to a produced order yet either — the actual delivery leg,
+  once a creator has real units to ship, is a natural next step, not
+  done in this pass.
 - The actual Kenji AI agent, and any connection to VACANCY Tribes.
   Kenji genuinely does not exist anywhere.
 - **Connection to the Universal World Layer and Vavlt Stvdios is now

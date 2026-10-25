@@ -33,6 +33,8 @@ function createVokenStore() {
     nextSecondaryListingId: 1,
     limitedEditionMerch: [],
     nextMerchListingId: 1,
+    productionOrders: [],
+    nextProductionOrderId: 1,
     digitalArtFrames: [],
     nextArtFrameId: 1,
     referrals: [],
