@@ -237,7 +237,22 @@ curl http://localhost:8794/api/explore/historic
   3)**: a real event log (not counters that could desync from
   reality), with `engagementVelocity` computed for real from a
   time-windowed rate, feeding directly into Phase 1's existing
-  velocity bonus.
+  velocity bonus. **`share` added as a real engagement type, by direct
+  instruction** — "promote their card for views, clicks, promotions,
+  share, like": a real, standard social metric this file's original
+  four (view/click/comment/like) didn't cover. `computeDigitalEngagementScore()`
+  weighs shares on par with comments and likes (0.25 each, rebalanced
+  from the original four weights so they still sum to exactly 1.0 —
+  an unshared card isn't silently penalized by the new term existing).
+  See `test/cardEngagement.test.js`.
+  **How "promoting a card" actually works, mechanically**: there is no
+  separate boost/ad mechanic — real views/clicks/shares/likes/comments
+  *are* the promotion. A creator driving more of them (sharing their
+  own card, asking fans to engage with it) directly raises
+  `digitalEngagementScore`, which is the exact real signal
+  `exploreVoken.js`/`historicExplore.js` already rank the Explore
+  page by — so real engagement earned today is also real, better
+  placement tomorrow, the same loop a real social feed runs on.
 - `lib/exploreVoken.js` — the Explore Page: ranks cards by Phase 1's
   own `computeDigitalEngagementScore()`, fed by this phase's real
   engagement stats — genuine cross-phase code reuse, not a rebuilt

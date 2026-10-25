@@ -25,7 +25,7 @@ function getVokenExplorePage(store, options = {}) {
   const surfaced = store.cultureCards.map((card) => {
     const stats = computeEngagementStats(store, { cardId: card.id, now });
     const { digitalEngagementScore } = computeDigitalEngagementScore({
-      views: stats.views, clicks: stats.clicks, comments: stats.comments, likes: stats.likes,
+      views: stats.views, clicks: stats.clicks, comments: stats.comments, likes: stats.likes, shares: stats.shares,
       engagementVelocity: stats.engagementVelocity,
     });
     return { contentType: 'culture-card', contentId: card.id, category: card.category, attentionScore: digitalEngagementScore };

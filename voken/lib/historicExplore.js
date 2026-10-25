@@ -43,7 +43,7 @@ function getHistoricExplorePage(store, options = {}) {
   const scored = historicCards.map((card) => {
     const stats = computeEngagementStats(store, { cardId: card.id, now });
     const { digitalEngagementScore: attentionScore } = computeDigitalEngagementScore({
-      views: stats.views, clicks: stats.clicks, comments: stats.comments, likes: stats.likes,
+      views: stats.views, clicks: stats.clicks, comments: stats.comments, likes: stats.likes, shares: stats.shares,
       engagementVelocity: stats.engagementVelocity,
     });
     const { genuineSignificanceScore } = computeGenuineSignificanceScore(

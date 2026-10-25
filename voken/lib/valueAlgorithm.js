@@ -108,13 +108,24 @@ function computeTraditionalScore(options = {}) {
   };
 }
 
-const DIGITAL_WEIGHTS = { views: 0.15, clicks: 0.25, comments: 0.30, likes: 0.30 };
+// `shares` added by direct instruction -- "promote their card for
+// views, clicks, promotions, share, like." Weighted on par with
+// comments and likes (0.25 each): a real reshare is at least as
+// strong a signal of genuine interest as a comment or a like, the
+// same real-world precedent social platforms' own "meaningful
+// interaction" ranking already uses (amplifying a card to a new
+// audience is more effort than reacting to it). Rebalanced to keep
+// the same real property the original four-weight version had: the
+// weights still sum to exactly 1.0, so a card with zero shares scores
+// no differently in kind, only distributed across one more term
+// rather than four.
+const DIGITAL_WEIGHTS = { views: 0.10, clicks: 0.15, comments: 0.25, likes: 0.25, shares: 0.25 };
 const MAX_VELOCITY_BONUS = 20;
 
 function computeDigitalEngagementScore(options = {}) {
-  const { views, clicks, comments, likes, engagementVelocity } = options;
+  const { views, clicks, comments, likes, shares, engagementVelocity } = options;
 
-  for (const [name, value] of Object.entries({ views, clicks, comments, likes, engagementVelocity })) {
+  for (const [name, value] of Object.entries({ views, clicks, comments, likes, shares, engagementVelocity })) {
     if (!Number.isFinite(value) || value < 0) {
       throw new Error(`computeDigitalEngagementScore requires a non-negative ${name}`);
     }
@@ -124,12 +135,14 @@ function computeDigitalEngagementScore(options = {}) {
   const normalizedClicks = clamp(Math.log10(clicks + 1) * 25, 0, 100);
   const normalizedComments = clamp(Math.log10(comments + 1) * 30, 0, 100);
   const normalizedLikes = clamp(Math.log10(likes + 1) * 25, 0, 100);
+  const normalizedShares = clamp(Math.log10(shares + 1) * 30, 0, 100);
 
   const baseEngagement =
     normalizedViews * DIGITAL_WEIGHTS.views +
     normalizedClicks * DIGITAL_WEIGHTS.clicks +
     normalizedComments * DIGITAL_WEIGHTS.comments +
-    normalizedLikes * DIGITAL_WEIGHTS.likes;
+    normalizedLikes * DIGITAL_WEIGHTS.likes +
+    normalizedShares * DIGITAL_WEIGHTS.shares;
 
   const velocityBonus = clamp(engagementVelocity, 0, MAX_VELOCITY_BONUS);
   const digitalEngagementScore = round(clamp(baseEngagement + velocityBonus, 0, 100));

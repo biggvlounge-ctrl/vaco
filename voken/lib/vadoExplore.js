@@ -20,7 +20,7 @@ function getVadoExplorePage(store, options = {}) {
     .map((card) => {
       const stats = computeEngagementStats(store, { cardId: card.id, now });
       const { digitalEngagementScore } = computeDigitalEngagementScore({
-        views: stats.views, clicks: stats.clicks, comments: stats.comments, likes: stats.likes,
+        views: stats.views, clicks: stats.clicks, comments: stats.comments, likes: stats.likes, shares: stats.shares,
         engagementVelocity: stats.engagementVelocity,
       });
       const artRecord = getArtCultureCard(store, card.id);

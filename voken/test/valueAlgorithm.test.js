@@ -11,7 +11,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 
 const {
-  TRADITIONAL_WEIGHTS, computeTraditionalScore, computeCultureCardValueScore,
+  TRADITIONAL_WEIGHTS, DIGITAL_WEIGHTS, computeTraditionalScore, computeDigitalEngagementScore, computeCultureCardValueScore,
 } = require('../lib/valueAlgorithm');
 
 function baseTraditionalArgs(overrides = {}) {
@@ -64,15 +64,68 @@ test('externalInfluenceScore is validated the same way every other score input h
 test('computeCultureCardValueScore carries externalInfluenceScore through the full real assembly', () => {
   const noInfluence = computeCultureCardValueScore(1, {
     traditional: baseTraditionalArgs(),
-    digitalEngagement: { views: 0, clicks: 0, comments: 0, likes: 0, engagementVelocity: 0 },
+    digitalEngagement: { views: 0, clicks: 0, comments: 0, likes: 0, shares: 0, engagementVelocity: 0 },
     genuineSignificance: { longevityOfImpactYears: 0, institutionalRecognitionCount: 0, documentedHistoricalImpact: false },
   });
   const massiveInfluence = computeCultureCardValueScore(1, {
     traditional: baseTraditionalArgs({ externalInfluenceScore: 95 }),
-    digitalEngagement: { views: 0, clicks: 0, comments: 0, likes: 0, engagementVelocity: 0 },
+    digitalEngagement: { views: 0, clicks: 0, comments: 0, likes: 0, shares: 0, engagementVelocity: 0 },
     genuineSignificance: { longevityOfImpactYears: 0, institutionalRecognitionCount: 0, documentedHistoricalImpact: false },
   });
 
   assert.ok(massiveInfluence.combinedRealValueScore > noInfluence.combinedRealValueScore);
   assert.equal(massiveInfluence.traditionalScore.externalInfluenceScore, 95);
+});
+
+function baseDigitalArgs(overrides = {}) {
+  return {
+    views: 100, clicks: 20, comments: 5, likes: 30, shares: 0, engagementVelocity: 0,
+    ...overrides,
+  };
+}
+
+test('the five digital-engagement weights (views/clicks/comments/likes/shares) sum to exactly 1.0', () => {
+  const sum = Object.values(DIGITAL_WEIGHTS).reduce((s, w) => s + w, 0);
+  assert.equal(Math.round(sum * 100) / 100, 1.0);
+});
+
+test('a real share is a real, standard metric now -- a share-only card scores above zero', () => {
+  const noShares = computeDigitalEngagementScore(baseDigitalArgs({ views: 0, clicks: 0, comments: 0, likes: 0, shares: 0 }));
+  const onlyShares = computeDigitalEngagementScore(baseDigitalArgs({ views: 0, clicks: 0, comments: 0, likes: 0, shares: 500 }));
+  assert.equal(noShares.digitalEngagementScore, 0);
+  assert.ok(onlyShares.digitalEngagementScore > 0);
+});
+
+test('shares is validated the same way every other digital-engagement input is', () => {
+  assert.throws(
+    () => computeDigitalEngagementScore(baseDigitalArgs({ shares: -1 })),
+    /requires a non-negative shares/,
+  );
+  assert.throws(
+    () => computeDigitalEngagementScore({ views: 1, clicks: 1, comments: 1, likes: 1, engagementVelocity: 1 }), // shares omitted entirely
+    /requires a non-negative shares/,
+  );
+});
+
+test('the per-type log-multipliers for views/clicks/comments/likes are unchanged from before shares existed', () => {
+  // Regression check: adding shares rebalanced DIGITAL_WEIGHTS, but the
+  // underlying log10(x+1)*k normalization for the original four types
+  // must still use the same real k values (20/25/30/25) -- only how
+  // much weight each normalized score carries changed, not the curve
+  // itself. Computed by hand against the real formula, not copied from
+  // the implementation.
+  const views1000 = Math.round((Math.log10(1001) * 20) * 100) / 100;
+  const clicks1000 = Math.round((Math.log10(1001) * 25) * 100) / 100;
+  const comments1000 = Math.round((Math.log10(1001) * 30) * 100) / 100;
+  const likes1000 = Math.round((Math.log10(1001) * 25) * 100) / 100;
+
+  const scoreViewsOnly = computeDigitalEngagementScore({ views: 1000, clicks: 0, comments: 0, likes: 0, shares: 0, engagementVelocity: 0 });
+  const scoreClicksOnly = computeDigitalEngagementScore({ views: 0, clicks: 1000, comments: 0, likes: 0, shares: 0, engagementVelocity: 0 });
+  const scoreCommentsOnly = computeDigitalEngagementScore({ views: 0, clicks: 0, comments: 1000, likes: 0, shares: 0, engagementVelocity: 0 });
+  const scoreLikesOnly = computeDigitalEngagementScore({ views: 0, clicks: 0, comments: 0, likes: 1000, shares: 0, engagementVelocity: 0 });
+
+  assert.equal(scoreViewsOnly.digitalEngagementScore, Math.round(views1000 * DIGITAL_WEIGHTS.views * 100) / 100);
+  assert.equal(scoreClicksOnly.digitalEngagementScore, Math.round(clicks1000 * DIGITAL_WEIGHTS.clicks * 100) / 100);
+  assert.equal(scoreCommentsOnly.digitalEngagementScore, Math.round(comments1000 * DIGITAL_WEIGHTS.comments * 100) / 100);
+  assert.equal(scoreLikesOnly.digitalEngagementScore, Math.round(likes1000 * DIGITAL_WEIGHTS.likes * 100) / 100);
 });

@@ -31,7 +31,7 @@ function computeCreatorDigitalProfile(store, options = {}) {
   for (const card of theirCards) {
     const stats = computeEngagementStats(store, { cardId: card.id, now });
     const { digitalEngagementScore } = computeDigitalEngagementScore({
-      views: stats.views, clicks: stats.clicks, comments: stats.comments, likes: stats.likes,
+      views: stats.views, clicks: stats.clicks, comments: stats.comments, likes: stats.likes, shares: stats.shares,
       engagementVelocity: stats.engagementVelocity,
     });
     scoreSum += digitalEngagementScore;

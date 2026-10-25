@@ -7,8 +7,15 @@
 // actually consumes -- that function was built first and takes raw
 // counts as input; this module is what produces real counts instead
 // of a caller having to supply invented numbers.
+//
+// **`share` added by direct instruction, beyond the source doc's own
+// four factors** -- "promote their card for views, clicks,
+// promotions, share, like" -- a real, standard, grounded social
+// metric (how a person actively spreads a card to a wider audience,
+// not just reacts to it), flagged as an interpretive addition the
+// same way every formula in `valueAlgorithm.js` already is.
 
-const ENGAGEMENT_TYPES = ['view', 'click', 'comment', 'like'];
+const ENGAGEMENT_TYPES = ['view', 'click', 'comment', 'like', 'share'];
 const DEFAULT_VELOCITY_WINDOW_MINUTES = 60;
 
 function recordEngagementEvent(store, options = {}) {
@@ -31,8 +38,8 @@ function computeEngagementStats(store, options = {}) {
   if (!cardId) throw new Error('computeEngagementStats requires a cardId');
 
   const events = store.cardEngagementEvents.filter((e) => e.cardId === cardId);
-  const counts = { views: 0, clicks: 0, comments: 0, likes: 0 };
-  const typeToField = { view: 'views', click: 'clicks', comment: 'comments', like: 'likes' };
+  const counts = { views: 0, clicks: 0, comments: 0, likes: 0, shares: 0 };
+  const typeToField = { view: 'views', click: 'clicks', comment: 'comments', like: 'likes', share: 'shares' };
   for (const event of events) {
     counts[typeToField[event.type]] += 1;
   }
