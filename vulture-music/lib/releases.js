@@ -197,7 +197,7 @@ function requireStatus(store, releaseId, expectedStatus, action) {
 }
 
 // **The real bridge from a music release to a real physical run.**
-// CVLLEX (the Vulcan constellation's physical-production app) is the
+// CVLLEX (VOKEN's star constellation's physical-production app) is the
 // one real place in this ecosystem that orders CDs/vinyl/cassettes
 // actually pressed — see its own README for the real Qrates/Printful/
 // Lulu/Courtyard.io grounding. This app never builds a second

@@ -15,7 +15,7 @@ the founder rather than guessed. This document records which is which.
 ## The map
 
 ```
-★ Vulcan               ✕ VVLTVRE               ○ SYSTEMS
+★ VOKEN                ✕ VVLTVRE               ○ SYSTEMS
    VOKEN                  Vvltvre                 V3
    VEX                    Vault                   V4
    VADO                   VXLLAGE                 VENVS
@@ -37,7 +37,7 @@ the founder rather than guessed. This document records which is which.
 
 **19 public parents. One star, two X's, one triangle, one circle.**
 (Was 18, with a plain square where the star now is, until CVLLEX
-joined 25 Oct 2026 — see "Vulcan, renamed" below.) No parent in two
+joined 25 Oct 2026 — see "On the name" below.) No parent in two
 places, none left out. The ten in ◇ sit outside the public structure
 entirely, because none of them is an app a customer opens.
 
@@ -71,12 +71,12 @@ each shape now says something the reader can rely on:
 | ○ | a group of three that is **shared infrastructure** | 3 |
 | ◇ | **not public** — nothing a customer opens | 10 |
 
-**★ is new, 25 Oct 2026** — the one Vulcan constellation grew from a
+**★ is new, 25 Oct 2026** — the VOKEN constellation grew from a
 four-member square to a five-member star when CVLLEX joined, and the
 old ■ glyph retired with it rather than being stretched to mean
 something it no longer does. ◇'s count is also corrected here — 10,
 not 8, matching the internal-layer table further down; this table had
-simply gone stale on that number, independent of the Vulcan rename.
+simply gone stale on that number, independent of CVLLEX joining.
 
 **◇ is the one shape whose count is not part of its meaning**, and that
 is why it can be 8 while ■ and ✕ must stay at 4. The other glyphs encode
@@ -89,9 +89,10 @@ four** — four arms, the same count it marks. Three groups of four and
 only one square meant two of them needed a second marker rather than a
 regrouping; nothing was merged or dissolved to make the shapes tidy.~~
 **No longer true, 25 Oct 2026** — the group that used to be the one
-square (VOKEN's) grew a fifth member and became Vulcan, ★. ✕ still
-means four, now with no sibling square to distinguish itself from;
-the distinction this paragraph drew no longer applies to anything.
+square (VOKEN's) grew a fifth member and is now drawn as a star, ★,
+still named VOKEN. ✕ still means four, now with no sibling square to
+distinguish itself from; the distinction this paragraph drew no
+longer applies to anything.
 
 ~~**Which four keeps the square is not arbitrary.** VOKEN is the only
 one of the three whose membership was directed outright — "VEX added
@@ -135,14 +136,15 @@ and running, and none of them is an app anybody opens.
 
 ---
 
-## ★ Vulcan — the card economy
+## ★ VOKEN — the card economy
 
 **VOKEN · VEX · VADO · CVLTVRE (CVLTVRE) · CVLLEX**
 
 *Directed. VEX added to the square by instruction — back when this
-was still a square. CVLLEX added, and the constellation renamed
-Vulcan and redrawn as a five-point star, 25 Oct 2026, by direct
-decision: see "Vulcan, renamed" below.*
+was still a square. CVLLEX added, and the constellation redrawn as a
+five-point star, 25 Oct 2026, by direct decision — the name stays
+VOKEN; see "On the name" below for why it was briefly called
+something else and got corrected back.*
 
 **CVLLEX is standalone, not a VOKEN module, and that was a deliberate
 choice weighed against this constellation's own history.** It was
@@ -180,7 +182,8 @@ transfer.
   registration — that part was never stale, it is a real legal gate,
   not a build.
 - **Do not** split VADO into its own service — see the extraction audit.
-  Every reason still holds now that VEX is in Vulcan, square or star.
+  Every reason still holds now that VEX is in VOKEN's star, square or
+  not.
 
 ---
 
@@ -447,8 +450,8 @@ than what was inferred.
 
 **Directed explicitly:**
 - VOKEN · VADO · CVLTVRE together, with **VEX added** to make a square
-  (and, 25 Oct 2026, **CVLLEX added** on top of that, renaming the
-  group Vulcan and making it a five-point star)
+  (and, 25 Oct 2026, **CVLLEX added** on top of that, keeping the
+  group named VOKEN and making it a five-point star)
 - Vvltvre · Vault · VXLLAGE together
 - V3 · V4 · VENVS together
 - VOID · HVNTZ · CVNVO together *(superseding an earlier "Combo, Hunts,
@@ -461,20 +464,26 @@ than what was inferred.
 - **CHOPZ** → the VVLTVRE group (now ✕), making it a four
 - **VACON-C parent split** → the game public, VACON and VSAFE internal
 
-~~**Resolved, not open:** "Vulcan" in the directive was **a typo for
+**Resolved, not open:** "Vulcan" in the directive was **a typo for
 VOKEN**, confirmed by the founder. It is read as VOKEN throughout and
-there is no missing entity here.~~
+there is no missing entity here.
 
-**Vulcan, renamed — superseding the line above, 25 Oct 2026, by direct
-decision.** "Vulcan" is no longer read as a typo for VOKEN. The
-founder revisited it directly, asked for CVLLEX (the physical-
-production app built that same day) to join VOKEN's constellation as
-a real fifth member, and named the result Vulcan outright — the
-former VOKEN square is now ★ Vulcan: VOKEN · VEX · VADO · CVLTVRE ·
-CVLLEX. The old resolution is kept here, struck through rather than
-deleted, so a future reader sees both what was decided in August and
-what overrode it in October, instead of just the current answer with
-no record that it ever said something else.
+**On the name — re-confirmed 25 Oct 2026, same finding as August,
+same cause.** When CVLLEX joined as a real fifth member, this
+document briefly recorded the group as renamed to "Vulcan" — a
+mistake on this document's own part, not a new founder decision: the
+same dictation artifact that produced "Vulcan" for VOKEN in August
+produced it again in October, and it was read as a deliberate rename
+instead of being checked against the resolution immediately above it.
+The founder corrected this directly: **there is no Vulcan, anywhere,
+in this ecosystem, ever** — every occurrence introduced on 25 Oct
+2026 (this document, `vaco-shell/lib/registry.js`, the dashboard
+artifact, and comments across `cvllex/`, `voken/`, `vulture-music/`,
+`vulture-flix/`, `voidmagic/`) has been corrected back to VOKEN. The
+structural decision underneath the naming error stands unchanged:
+CVLLEX is the group's real fifth member, and the group is drawn as a
+five-point star, ★, rather than a square. Only the name was ever
+wrong, both times.
 
 **Still undefined, one level higher:** **VVI**, the grandparent above
 VACO, appears in exactly two places in the repo — one line in

@@ -74,7 +74,7 @@ function serviceHeaders() {
 }
 
 const VOID_API_URL = process.env.VOID_API_URL || 'http://localhost:8793';
-// CVLLEX -- the Vulcan constellation's physical-production app. A
+// CVLLEX -- VOKEN's star constellation's physical-production app. A
 // host has a real session here (requireActor('hostId') on
 // POST /api/experiences), so their own Authorization is forwarded
 // rather than a service credential -- CVLLEX verifies the real
@@ -302,8 +302,8 @@ app.post('/api/experiences/:id/event-services', requireExperienceHost(), async (
   }
 });
 
-// Order real merch/collectibles for this event -- CVLLEX, the Vulcan
-// constellation's physical-production app. See lib/experiences.js's
+// Order real merch/collectibles for this event -- CVLLEX, VOKEN's
+// star constellation's own physical-production app. See lib/experiences.js's
 // own requestPhysicalRun for why this is the same real connection
 // VOID_MAGIC_MASTER_BUILD_BRIEF.md's §17 already names (Vvltvre's
 // creator-ecosystem connection into VOID MAGIC), not a new one.

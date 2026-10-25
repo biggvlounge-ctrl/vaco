@@ -232,7 +232,7 @@ function markStreaming(store, titleId) {
 
 // **The real bridge from a film/show to a real physical collectible
 // run** (posters, a physical collectible edition) — through CVLLEX,
-// the Vulcan constellation's physical-production app. Injected rather
+// VOKEN's star constellation's physical-production app. Injected rather
 // than imported, same convention every cross-app call in this
 // ecosystem uses.
 //

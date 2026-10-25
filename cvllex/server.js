@@ -1,11 +1,11 @@
-// CVLLEX — the Vulcan constellation's physical-production app.
+// CVLLEX — VOKEN's star constellation's physical-production app.
 //
 // Built first as a module inside VOKEN (25 Oct 2026: see VOKEN's own
 // commit "physical production orders -- get a real limited run MADE,
 // then tokenize it"), extracted into this standalone app the same
 // day, by direct decision: the four-member VOKEN square (VOKEN · VEX
-// · VADO · CVLTVRE) becomes a five-member constellation renamed
-// Vulcan, with CVLLEX as its fifth member. See README.md for the
+// · VADO · CVLTVRE) becomes a five-member star, still named VOKEN,
+// with CVLLEX as its fifth member. See README.md for the
 // real comparables (Qrates, Printful/Printify, Lulu/Doxzoo,
 // Courtyard.io) and for the real precedent (VEX, once extracted from
 // VOKEN and folded back in) that shaped how this app talks to VOKEN.

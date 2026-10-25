@@ -114,7 +114,7 @@ const SOURCE_APPS = ['world-layer', 'vavlt-stvdios', 'cvllex'];
 const SOURCE_TYPES_BY_APP = {
   'world-layer': ['location'],
   'vavlt-stvdios': ['casino-event'],
-  // CVLLEX (the Vulcan constellation's physical-production app)
+  // CVLLEX (VOKEN's star constellation's physical-production app)
   // mints the Cvltvre Card for a produced run through this exact
   // path -- `externalRef` names the CVLLEX production order id.
   // VOKEN stays the one place a Cvltvre Card actually comes from;

@@ -70,7 +70,7 @@ function serviceHeaders() {
 }
 
 const VAULT_STVDIOS_API_URL = process.env.VAULT_STVDIOS_API_URL || 'http://localhost:8808';
-// CVLLEX -- the Vulcan constellation's physical-production app. Real
+// CVLLEX -- VOKEN's star constellation's physical-production app. Real
 // client, not a second pressing-order mechanism -- see lib/releases.js's
 // own requestPhysicalRun.
 const CVLLEX_API_URL = process.env.CVLLEX_API_URL || 'http://localhost:8822';

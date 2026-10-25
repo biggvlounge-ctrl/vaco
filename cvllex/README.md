@@ -1,6 +1,6 @@
 # CVLLEX
 
-The Vulcan constellation's physical-production app: real order intake
+VOKEN's star constellation's own physical-production app: real order intake
 for getting a limited physical run actually MADE (CDs/vinyl/cassettes
 for a digital album drop, a short magazine run, limited collectible
 merch), vaulted as a real, tokenized Cvltvre Card through VOKEN, and
@@ -12,9 +12,12 @@ through VOID's courier vertical.
 Built first as a module inside VOKEN (25 Oct 2026), then extracted
 into this standalone app the same day, by direct decision: the
 four-member VOKEN square (VOKEN · VEX · VADO · CVLTVRE) is now a
-five-member constellation renamed **Vulcan**, drawn as a five-point
-star, with CVLLEX as its fifth member — see
-`dev-docs/VACO_CONSTELLATIONS.md`.
+five-member constellation, still named **VOKEN**, drawn as a
+five-point star, with CVLLEX as its fifth member — see
+`dev-docs/VACO_CONSTELLATIONS.md` (including its "On the name" note:
+this group was briefly mis-recorded as "Vulcan" the same day it grew
+to five members, caught and corrected — there is no Vulcan anywhere
+in this ecosystem).
 
 **The real gap this closes.** Nothing in this ecosystem modeled
 ordering a real physical run and getting it made before it's a real,

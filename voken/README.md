@@ -255,9 +255,10 @@ curl -X POST http://localhost:8794/api/card/external -H "Content-Type: applicati
   not just apparel.
 - **Physical production (ordering a real limited run made) now lives
   in its own standalone app, `../cvllex/`** — briefly built as a
-  module here first, then moved out by direct decision: Vulcan is now
-  a five-member constellation (VOKEN · VEX · VADO · CVLTVRE · CVLLEX,
-  up from the four-member VOKEN square), not VOKEN's own code. VOKEN's
+  module here first, then moved out by direct decision: this
+  constellation is now five members (VOKEN · VEX · VADO · CVLTVRE ·
+  CVLLEX, up from the four-member VOKEN square, drawn as a star, still
+  named VOKEN), not VOKEN's own code. VOKEN's
   job in that flow is unchanged and narrow: `mintExternalEntityCard()`
   (see `lib/cultureCards.js`'s `SOURCE_APPS`) now recognizes
   `sourceApp: 'cvllex'` the same way it already recognized
@@ -440,8 +441,8 @@ restart-survival confirmed.
   discovery or partial-fill matching.
 - **Physical production order intake moved to its own standalone app,
   `../cvllex/`** (built here first, 25 Oct 2026, then extracted the
-  same day by direct decision — Vulcan is a five-app constellation,
-  not a VOKEN module). What VOKEN itself still does not do: any real
+  same day by direct decision — this constellation is now a five-app
+  star, still named VOKEN, not a VOKEN module). What VOKEN itself still does not do: any real
   vendor integration for manufacturing anything — that boundary moved
   with the code, it did not close. See `../cvllex/README.md` for
   what's real there and what still isn't.

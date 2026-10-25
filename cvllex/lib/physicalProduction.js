@@ -1,8 +1,9 @@
 // CVLLEX — physical production orders: getting a real limited run of
 // physical goods actually MADE. Built first as a module inside VOKEN
 // (25 Oct 2026), then extracted into this standalone app the same
-// day, by direct decision: Vulcan is a real, five-app constellation
-// (VOKEN · VEX · VADO · CVLTVRE · CVLLEX), not a VOKEN module. See
+// day, by direct decision: VOKEN's own constellation is now a real,
+// five-app star (VOKEN · VEX · VADO · CVLTVRE · CVLLEX), with this
+// app standing alongside VOKEN rather than inside it. See
 // README.md for why CVLLEX is its own app rather than folded back in,
 // and for the real precedent (VEX) that was tried the other way.
 //

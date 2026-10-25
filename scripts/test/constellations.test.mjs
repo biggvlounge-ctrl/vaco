@@ -173,7 +173,7 @@ test('the shape vocabulary still describes the real group sizes', () => {
 
 test('no parent is in two constellations, and there are nineteen', () => {
   // The one rule the map states outright: "No parent in two places,
-  // none left out." (19, not 18, since CVLLEX joined Vulcan 25 Oct 2026.)
+  // none left out." (19, not 18, since CVLLEX joined VOKEN's star 25 Oct 2026.)
   const parents = CONSTELLATIONS.filter((c) => c.public).flatMap((c) => c.parents);
   const dups = parents.filter((p, i) => parents.indexOf(p) !== i);
   assert.deepEqual(dups, [], 'these parents are in more than one constellation');

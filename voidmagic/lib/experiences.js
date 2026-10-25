@@ -103,7 +103,7 @@ function createExperience(store, options = {}) {
 }
 
 // **The real bridge from an event to real merch a host can actually
-// sell there** — through CVLLEX, the Vulcan constellation's
+// sell there** — through CVLLEX, VOKEN's star constellation's own
 // physical-production app. VOID MAGIC's own §17 already names this
 // connection: "VVLTVRE -> TOURING & TIX -> VOID MAGIC," with Vvltvre
 // providing "touring, artist relationships, ticketing, distribution,

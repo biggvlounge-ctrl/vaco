@@ -202,16 +202,16 @@ export const BUNDLES = [
 // other view.
 export const CONSTELLATIONS = [
   {
-    // **Renamed from the VOKEN square to Vulcan, 25 Oct 2026, by direct
-    // decision.** `VACO_CONSTELLATIONS.md`'s own "Decisions recorded"
-    // section used to read: "'Vulcan' in the directive was a typo for
-    // VOKEN." That resolution is superseded, not silently overwritten
-    // — see that document's own corrected entry. CVLLEX (the Vulcan
-    // constellation's physical-production app) is the fifth member,
-    // which is also why this is now a five-point star rather than the
-    // four-point square every other glyph of this size still uses.
+    // **Grew from a square to a five-point star, 25 Oct 2026, by direct
+    // decision, when CVLLEX joined as a real fifth member.** The name
+    // stays VOKEN. "Vulcan" was briefly used here for this group and
+    // corrected back the same day — there is no Vulcan anywhere in
+    // this ecosystem; see `VACO_CONSTELLATIONS.md`'s own "On the name"
+    // for the full record (the same dictation artifact that produced
+    // "Vulcan" for VOKEN in August, confirmed then as a typo, produced
+    // it again in October and was mistakenly read as a new rename).
     glyph: '★',
-    name: 'Vulcan',
+    name: 'VOKEN',
     title: 'the card economy',
     public: true,
     parents: ['VOKEN', 'Vex', 'VADO', 'CVLTVRE', 'CVLLEX'],

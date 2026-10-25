@@ -74,7 +74,7 @@ function serviceHeaders() {
     : {};
 }
 
-// CVLLEX -- the Vulcan constellation's physical-production app.
+// CVLLEX -- VOKEN's star constellation's physical-production app.
 // Titles here have no end-user session model (see requireCallingService
 // on every title-management route below), so this presents the same
 // real service credential rather than an Authorization header there is
