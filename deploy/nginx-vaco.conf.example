@@ -1,5 +1,5 @@
 # VACO -- generated nginx config. Regenerate with
-# node deploy/generate-nginx-conf.js example.com
+# node deploy/generate-nginx-conf.js yourdomain.com
 # then re-run `certbot --nginx` if this is the first time (it edits
 # this file in place to add the ssl_certificate lines).
 
@@ -17,7 +17,7 @@ limit_req_zone $binary_remote_addr zone=vaco_general:10m rate=10r/s;
 
 server {
     listen 80;
-    server_name example.com;
+    server_name yourdomain.com;
 
     limit_req zone=vaco_general burst=20 nodelay;
     limit_req_status 503;
@@ -331,6 +331,15 @@ server {
     location /vaco-media/ {
         rewrite ^/vaco-media/(.*)$ /$1 break;
         proxy_pass http://127.0.0.1:8821;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /cvllex/ {
+        rewrite ^/cvllex/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8822;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

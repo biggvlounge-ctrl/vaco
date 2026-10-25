@@ -88,6 +88,7 @@ function readServerSrc(app) {
 // side is a visible, deliberate edit here, not a silent regex match.
 const ENV_VAR_TO_SERVICE = {
   CHOPZ_SHOP_API_URL: "chopz-shop",
+  CVLLEX_API_URL: "cvllex",
   CVNVO_API_URL: "cvnvo",
   DREAMS_API_URL: "dreams",
   HVNTZ_API_URL: "hvntz",

@@ -54,6 +54,7 @@ SHIELD_TARGETS=(
   vsafe vulture-flix vulture-music vulture-pods vulture-studios vxllage vaco-media
   vaco-analytics
   vaco-assistant
+  cvllex
 )
 
 # Apps that record operator-grade decisions in vaco-audit. This is
@@ -125,6 +126,7 @@ PERSISTENCE_TARGETS=(
   vaco-assistant vaco-audit vaco-media vaco-notify vaco-operator vaco-passport vacon vago vash-tap vavlt-stvdios
   venvm vex void voidmagic voken vsafe vulture-flix vulture-music
   vulture-pods vulture-studios vxllage
+  cvllex
 )
 
 # -- persistencePg.js --------------------------------------------------
@@ -145,6 +147,7 @@ PERSISTENCE_PG_TARGETS=(
   vacay vaco-audit vaco-media vaco-notify vaco-operator vaco-passport vacon vago vash-tap
   vavlt-stvdios venvm vex void voidmagic voken vsafe vulture-flix
   vulture-music vulture-pods vulture-studios vxllage
+  cvllex
 )
 
 # -- storeBackend.js ---------------------------------------------------
@@ -189,13 +192,14 @@ TRACING_TARGETS=(
   vacon vacon-c vago vash-tap vavlt-stvdios vdp venvm venvs-mock-backend vex vex-trading
   void voidmagic voken vsafe vulture-flix vulture-music vulture-pods vulture-studios vxllage
   vaco-mcp
+  cvllex
 )
 
 # Apps that RECEIVE service-to-service writes. Listed rather than
 # discovered, because "this app is written to by other apps" is a real
 # architectural fact per app, not something to infer from a directory.
 SERVICE_TARGETS=(
-  v3 v4-proxy vaca vacay vacon vaco-analytics vaco-audit vaco-notify vaco-passport vsafe cvnvo voken vago vash-tap hvntz dreams venvm vdp void voidmagic vavlt-stvdios vulture-music vulture-flix vulture-pods vulture-studios vaco-shell vaco-operator vex vacon-c vaco-media
+  v3 v4-proxy vaca vacay vacon vaco-analytics vaco-audit vaco-notify vaco-passport vsafe cvnvo voken vago vash-tap hvntz dreams venvm vdp void voidmagic vavlt-stvdios vulture-music vulture-flix vulture-pods vulture-studios vaco-shell vaco-operator vex vacon-c vaco-media cvllex
 )
 
 CHECK=0

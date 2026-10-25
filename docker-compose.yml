@@ -23,6 +23,7 @@ services:
       VACON_API_URL: "http://vacon:8805"
       VACO_AUDIT_URL: "http://vaco-audit:8819"
       VACO_OPERATOR_URL: "http://vaco-operator:8820"
+      VOKEN_API_URL: "http://voken:8794"
       VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
       VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
       VACO_SERVICE_NAME: vaco-shell
@@ -217,6 +218,7 @@ services:
     container_name: voidmagic
     environment:
       PORT: 8797
+      CVLLEX_API_URL: "http://cvllex:8822"
       SHIELD_API_URL: "http://shield:8812"
       V3_API_URL: "http://v3:8811"
       VOID_API_URL: "http://void:8793"
@@ -245,12 +247,14 @@ services:
     container_name: voken
     environment:
       PORT: 8794
+      CVLLEX_API_URL: "http://cvllex:8822"
       SHIELD_API_URL: "http://shield:8812"
       V3_API_URL: "http://v3:8811"
       VACA_API_URL: "http://vaca:8804"
       VACO_ANALYTICS_URL: "http://vaco-analytics:8790"
       VACO_AUDIT_URL: "http://vaco-audit:8819"
       VACO_OPERATOR_URL: "http://vaco-operator:8820"
+      VAVLT_STVDIOS_API_URL: "http://vavlt-stvdios:8808"
       VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
       VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
       VACO_SERVICE_NAME: voken
@@ -571,8 +575,12 @@ services:
     environment:
       PORT: 8811
       SHIELD_API_URL: "http://shield:8812"
+      VACO_OPERATOR_URL: "http://vaco-operator:8820"
       VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
       VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
+      VACO_SERVICE_NAME: v3
+      VACO_SERVICE_TOKEN: "${VACO_TOKEN_V3:?Set a V3 service token for v3 in .env}"
+      VACO_OPERATOR_MODE: "${VACO_OPERATOR_MODE:-enforce}"
       DATABASE_URL: "postgres://vacancy:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/vacancy"
     ports:
       - "8811:8811"
@@ -638,6 +646,7 @@ services:
     container_name: vulture-music
     environment:
       PORT: 8806
+      CVLLEX_API_URL: "http://cvllex:8822"
       SHIELD_API_URL: "http://shield:8812"
       V3_API_URL: "http://v3:8811"
       VACO_ANALYTICS_URL: "http://vaco-analytics:8790"
@@ -673,6 +682,7 @@ services:
     container_name: vulture-flix
     environment:
       PORT: 8807
+      CVLLEX_API_URL: "http://cvllex:8822"
       SHIELD_API_URL: "http://shield:8812"
       V3_API_URL: "http://v3:8811"
       VACO_ANALYTICS_URL: "http://vaco-analytics:8790"
@@ -985,6 +995,32 @@ services:
       - shield
       - livekit
       - postgres
+  cvllex:
+    build:
+      context: ./cvllex
+      dockerfile: ../deploy/Dockerfile.node
+      args:
+        PORT: 8822
+    container_name: cvllex
+    environment:
+      PORT: 8822
+      SHIELD_API_URL: "http://shield:8812"
+      VOID_API_URL: "http://void:8793"
+      VOKEN_API_URL: "http://voken:8794"
+      VACO_SERVICE_TOKENS: "${VACO_SERVICE_TOKENS:?Set VACO_SERVICE_TOKENS in .env -- see .env.example}"
+      VACO_SERVICE_AUTH_MODE: "${VACO_SERVICE_AUTH_MODE:-enforce}"
+      DATABASE_URL: "postgres://vacancy:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/vacancy"
+    ports:
+      - "8822:8822"
+    networks:
+      - vaco
+    restart: unless-stopped
+    volumes:
+      - "cvllex_data:/app/data"
+    depends_on:
+      - v3
+      - shield
+      - postgres
   vash-tap:
     build:
       context: ./vash-tap
@@ -1055,8 +1091,10 @@ services:
     environment:
       PORT: 8828
       SHIELD_API_URL: "http://shield:8812"
+      V3_API_URL: "http://v3:8811"
       V4_PROXY_URL: "http://v4-proxy:8787"
       VACON_API_URL: "http://vacon:8805"
+      VOKEN_API_URL: "http://voken:8794"
       VACO_SERVICE_NAME: vaco-assistant
       VACO_SERVICE_TOKEN: "${VACO_TOKEN_VACO_ASSISTANT:?Set a V3 service token for vaco-assistant in .env}"
     ports:
@@ -1212,6 +1250,7 @@ volumes:
   vaco_audit_data:
   vaco_operator_data:
   vaco_media_data:
+  cvllex_data:
   vash_tap_data:
   vaco_passport_data:
   vaco_assistant_data:

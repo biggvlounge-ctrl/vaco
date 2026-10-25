@@ -184,6 +184,7 @@ APPS=(
   "vaco-audit:vaco-audit:node server.js:8819:/api/health"
   "vaco-operator:vaco-operator:node server.js:8820:/api/health"
   "vaco-media:vaco-media:node server.js:8821:/api/health"
+  "cvllex:cvllex:node server.js:8822:/api/health"
   "vash-tap:vash-tap:node server.js:8825:/api/health"
   "vaco-passport:vaco-passport:node server.js:8826:/api/health"
   "vaco-assistant:vaco-assistant:node server.js:8828:/api/health"

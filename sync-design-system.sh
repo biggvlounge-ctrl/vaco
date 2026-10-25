@@ -46,6 +46,7 @@ TARGETS=(
   void voidmagic voken vsafe vulture-flix vulture-music vulture-pods
   vulture-studios vxllage
   v4-proxy v4-search cvnvo/yap vaco-assistant
+  cvllex
 )
 
 drift=0

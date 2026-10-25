@@ -10,7 +10,7 @@
 // stops matching that manifest, which is how six apps that had quietly
 // dropped out of the pm2 deployment were found.
 //
-// 38 real Express backends. The 2 Vite frontends (venvs, vdp)
+// 39 real Express backends. The 2 Vite frontends (venvs, vdp)
 // are deliberately NOT pm2-managed here -- they get a real production
 // build (npm run build) and are served as static files by nginx
 // instead, since the Vite dev server used by start-ecosystem.sh (for
@@ -295,6 +295,14 @@ module.exports = {
       cwd: "./vaco-media",
       script: "server.js",
       env: { PORT: "8821", NODE_ENV: "production" },
+      max_restarts: 10,
+      min_uptime: "10s",
+    },
+    {
+      name: "cvllex",
+      cwd: "./cvllex",
+      script: "server.js",
+      env: { PORT: "8822", NODE_ENV: "production" },
       max_restarts: 10,
       min_uptime: "10s",
     },
