@@ -33,7 +33,11 @@ this existed to supply the physical item in the first place.
 
 - **Qrates** — real, Tokyo-based platform pressing vinyl and cassettes
   in batches as small as 100 units, crowdfund-style. A genuine
-  minimum run, not a smooth per-unit cost curve.
+  minimum run, not a smooth per-unit cost curve. (Qrates' *current*
+  operating status is unverified as of 25 Oct 2026 research — see
+  `CVLLEX_VENDOR_OUTREACH.md` — though the real economic fact it
+  grounds, a genuine minimum run on pressed media, holds regardless of
+  any one vendor's status.)
 - **Printful / Printify** — real, no-minimum print-on-demand merch
   (apparel, posters, pins).
 - **Lulu / Doxzoo** — real, no-minimum on-demand magazine/zine
@@ -42,6 +46,10 @@ this existed to supply the physical item in the first place.
   physical collectible (today, graded trading cards) is vaulted
   (Brink's-insured), a 3D "digital twin" NFT is minted as a redemption
   voucher, and redeeming burns the NFT and ships the real card.
+
+See `CVLLEX_VENDOR_OUTREACH.md` for a real, current (25 Oct 2026)
+roundup of named vendors across every category CVLLEX orders from,
+researched for direct outreach, not just comparables.
 
 ## Why CVLLEX talks to VOKEN instead of minting its own card
 
