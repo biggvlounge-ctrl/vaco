@@ -49,7 +49,7 @@ const {
 } = require('./lib/historicRegistry');
 const { getHistoricExplorePage } = require('./lib/historicExplore');
 const { computeCultureCardValueScore } = require('./lib/valueAlgorithm');
-const { assessEstablishedCreator } = require('./lib/establishedCreatorAssessment');
+const { assessEstablishedCreator, computeExternalScore, getLatestAssessmentForCreator } = require('./lib/establishedCreatorAssessment');
 const { PACK_TIER_NAMES, createPackTier, getPackTier, openPack, getPackOdds } = require('./lib/cardPacks');
 const { SELLBACK_VALUE_RANGES, computeSellBackValue, sellBackCard } = require('./lib/sellBack');
 const {
@@ -463,7 +463,29 @@ app.post('/api/card/:id/value-score', requireSession(), async (req, res) => {
     // "VACA-verified authenticity" a real claim with nothing actually
     // verifying it.
     const authenticityGrade = await fetchAuthenticityGrade(cardId);
-    const traditional = { ...(options.traditional || {}), authenticityGrade };
+
+    // Same discipline again, applied to the new cross-platform
+    // influence term: "how many people view it... the algorithm of
+    // all of their social media put together, their influence" is a
+    // real, checkable fact about the card's own subject, not
+    // something a caller gets to assert in the request body. The
+    // subject is whoever has a real claim to the card -- the person
+    // it's about, or the real owner who minted it -- and their most
+    // recent `establishedCreatorAssessment` (if any) already holds
+    // their real cross-platform social-following/press/recognition
+    // numbers. No assessment on file means no real external-influence
+    // data exists for them yet, so the term is honestly 0, never
+    // guessed.
+    const card = getCultureCard(store, cardId);
+    const influenceSubjectId = card
+      ? (card.subjectPersonId || (card.mintedByRole === 'owner' ? card.mintedByUserId : null))
+      : null;
+    const latestAssessment = influenceSubjectId ? getLatestAssessmentForCreator(store, influenceSubjectId) : null;
+    const externalInfluenceScore = latestAssessment
+      ? computeExternalScore(latestAssessment.existingExternalMetrics)
+      : 0;
+
+    const traditional = { ...(options.traditional || {}), authenticityGrade, externalInfluenceScore };
 
     // Same discipline, applied to the Genuine Significance Score: a
     // historic card's real longevity/recognition facts are already
@@ -474,7 +496,6 @@ app.post('/api/card/:id/value-score', requireSession(), async (req, res) => {
     // here for the one other score a caller could otherwise just
     // assert. Non-historic cards are unaffected: no register exists
     // to defer to, so `options.genuineSignificance` still applies.
-    const card = getCultureCard(store, cardId);
     const genuineSignificance = card && card.category === 'historic' && card.historicSlug
       ? genuineSignificanceInputsFor(card.historicSlug)
       : options.genuineSignificance;

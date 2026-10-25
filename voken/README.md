@@ -193,9 +193,33 @@ curl http://localhost:8794/api/explore/historic
   of trusting the request body — confirmed live that a lying request
   (`"authenticityGrade":"A"` on an unverified card) is genuinely
   ignored, still resolving to grade C. See `../vaca/README.md`.
+  **Cross-platform social influence, added by direct instruction**:
+  "how many views, how many likes, the algorithm of all of their
+  social media put together, their influence" is answered two ways
+  now, deliberately kept separate rather than blended into one number
+  — `digitalEngagementScore` already answers it for the card itself
+  (views/clicks/comments/likes *on this Cvltvre Card*); the new
+  `externalInfluenceScore` inside `traditionalScore` answers it for
+  the *subject* — how famous they already are, across every platform
+  they're on, the same real factor that makes a LeBron rookie card
+  worth more than an equally scarce card of an unknown player. It
+  reuses `establishedCreatorAssessment.js`'s own `computeExternalScore()`
+  (real social-following log curve + press coverage + industry
+  recognition) rather than inventing a second formula for the same
+  question, and the ceiling is unchanged: the three multiplicative
+  traditional weights (scarcity/authenticity/influence) still sum to
+  the same 0.85 the original two-weight version had. `server.js`'s
+  value-score endpoint computes this live too, from the subject's most
+  recent real `establishedCreatorAssessment` — never from the request
+  body — defaulting honestly to 0 when no real assessment is on file,
+  rather than guessing. See `test/valueAlgorithm.test.js`.
 - `lib/establishedCreatorAssessment.js` — calibrates a real starting
   tier from external metrics for someone joining with existing fame,
-  never the blank-slate `common` tier.
+  never the blank-slate `common` tier. `getLatestAssessmentForCreator()`
+  is the real lookup the Value Algorithm's new influence term is built
+  on — a creator can be reassessed over time, so this always returns
+  their *most recent* real record, not their first or their biggest.
+  See `test/establishedCreatorAssessment.test.js`.
 - `lib/cardPacks.js` — **Card Packs (Phase 2)**: the real, structured
   pack-tier system (basic/standard/premium/chase); `openPack()`
   genuinely enforces a tier's guaranteed-minimum-rarity even when the

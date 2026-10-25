@@ -76,4 +76,20 @@ function assessEstablishedCreator(store, options = {}) {
   return assessment;
 }
 
-module.exports = { ELIGIBLE_TIERS, computeExternalScore, assessEstablishedCreator };
+// The real lookup `valueAlgorithm.js`'s new `externalInfluenceScore`
+// input is built from: a creator can be assessed more than once (a
+// following that was 10,000 at onboarding might be 500,000 a year
+// later), so this returns the *most recent* real assessment on file --
+// the current, real cross-platform-influence record for this creator,
+// or `null` if nobody has ever assessed them (an honest "no real
+// external-influence data exists for this creator," not a guessed 0
+// baked in here -- the caller decides what "no assessment" means).
+function getLatestAssessmentForCreator(store, creatorId) {
+  const assessments = store.establishedCreatorAssessments.filter((a) => a.creatorId === creatorId);
+  if (assessments.length === 0) return null;
+  return assessments.reduce((latest, a) => (a.assessedAt > latest.assessedAt ? a : latest));
+}
+
+module.exports = {
+  ELIGIBLE_TIERS, computeExternalScore, assessEstablishedCreator, getLatestAssessmentForCreator,
+};

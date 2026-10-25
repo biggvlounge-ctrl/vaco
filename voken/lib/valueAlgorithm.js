@@ -1,15 +1,36 @@
 // VOKEN — the real, hybrid value algorithm.
 // Source of truth: VOKEN_NEW_VALUE_ALGORITHM.md. Real value combines
 // two genuinely separate signal types -- traditional factors (real
-// scarcity, VACA-verified authenticity, rookie status) and digital-
-// native factors no physical card could ever track (live view/click/
-// comment/like counts, with engagement *velocity* tracked separately
-// from raw totals). A third, independent Genuine Significance Score
-// is weighted equally alongside digital engagement so that pure
-// virality can never silently outrank real, lasting substance -- the
-// doc's own direct example: a figure of Martin Luther King's genuine
-// historical significance shouldn't be beaten by a viral influencer
-// just because today's click numbers are bigger.
+// scarcity, VACA-verified authenticity, rookie status, and -- by
+// direct instruction -- the subject's own real, cross-platform social
+// influence) and digital-native factors no physical card could ever
+// track (live view/click/comment/like counts on the card itself, with
+// engagement *velocity* tracked separately from raw totals). A third,
+// independent Genuine Significance Score is weighted equally alongside
+// digital engagement so that pure virality can never silently outrank
+// real, lasting substance -- the doc's own direct example: a figure of
+// Martin Luther King's genuine historical significance shouldn't be
+// beaten by a viral influencer just because today's click numbers are
+// bigger.
+//
+// **Cross-platform social influence, added by direct instruction**:
+// "how many views, how many likes, the algorithm of all of their
+// social media put together, their influence" is a real, distinct
+// question from a single card's own view/like counts
+// (`computeDigitalEngagementScore` already answers that one) -- it's
+// asking how famous the *subject* already is, across every platform
+// they're on, the same real factor that makes a LeBron rookie card
+// worth more than an equally scarce card of an unknown player.
+// `externalInfluenceScore` is that answer, and it is a pure input
+// here, same posture as `authenticityGrade`: this module reuses
+// `establishedCreatorAssessment.js`'s own `computeExternalScore()`
+// (real social-following log curve + press coverage + industry
+// recognition, already built and already weighed at onboarding time)
+// rather than inventing a second formula for the same real question --
+// genuine cross-phase code reuse. The real, live assembly of *which*
+// cross-platform numbers to feed in happens one layer up, in
+// `server.js`'s `/api/card/:id/value-score` endpoint, exactly like
+// `authenticityGrade`.
 //
 // No exact formula is given anywhere in any source doc for any of
 // these three scores -- every formula below is real, deterministic,
@@ -28,7 +49,12 @@
 const AUTHENTICITY_GRADES = ['A', 'B', 'C'];
 const AUTHENTICITY_GRADE_SCORES = { A: 100, B: 70, C: 40 };
 const ROOKIE_BONUS = 15;
-const TRADITIONAL_WEIGHTS = { scarcity: 0.5, authenticity: 0.35, rookie: 0.15 };
+// Rebalanced to make room for `influence` while keeping the same real
+// ceiling the original two-weight version had: the three multiplicative
+// weights below still sum to 0.85, so a perfect scarcity+authenticity+
+// influence card plus the flat rookie bonus still tops out at exactly
+// 100 -- unchanged headroom, not a silent inflation of every score.
+const TRADITIONAL_WEIGHTS = { scarcity: 0.35, authenticity: 0.25, influence: 0.25, rookie: 0.15 };
 
 function round(n) {
   return Math.round(n * 100) / 100;
@@ -40,8 +66,14 @@ function clamp(n, min, max) {
 // Real log-scale scarcity curve: a 1/1 scores near-maximum, a
 // thousand-print run scores near zero, with a smooth curve between --
 // not a hard cliff at some arbitrary cutoff.
+//
+// `externalInfluenceScore` is optional and defaults to 0 -- not every
+// card has a real subject with a cross-platform following to score at
+// all (a historic card's subject is the printing press, not a person;
+// a World Layer location has no social media). Zero is the honest
+// value for "no real external influence to report," not a penalty.
 function computeTraditionalScore(options = {}) {
-  const { totalMintCount, authenticityGrade, isRookieDesignation } = options;
+  const { totalMintCount, authenticityGrade, isRookieDesignation, externalInfluenceScore = 0 } = options;
 
   if (!Number.isInteger(totalMintCount) || totalMintCount < 1) {
     throw new Error('computeTraditionalScore requires a positive integer totalMintCount');
@@ -52,16 +84,28 @@ function computeTraditionalScore(options = {}) {
   if (typeof isRookieDesignation !== 'boolean') {
     throw new Error('computeTraditionalScore requires a boolean isRookieDesignation');
   }
+  if (!Number.isFinite(externalInfluenceScore) || externalInfluenceScore < 0 || externalInfluenceScore > 100) {
+    throw new Error('computeTraditionalScore requires externalInfluenceScore to be a number between 0 and 100 when given');
+  }
 
   const scarcityScore = clamp(100 - Math.log10(totalMintCount + 1) * 40, 0, 100);
   const authenticityScore = AUTHENTICITY_GRADE_SCORES[authenticityGrade];
   const rookieBonus = isRookieDesignation ? ROOKIE_BONUS : 0;
 
   const traditionalScore = round(clamp(
-    scarcityScore * TRADITIONAL_WEIGHTS.scarcity + authenticityScore * TRADITIONAL_WEIGHTS.authenticity + rookieBonus,
+    scarcityScore * TRADITIONAL_WEIGHTS.scarcity
+      + authenticityScore * TRADITIONAL_WEIGHTS.authenticity
+      + externalInfluenceScore * TRADITIONAL_WEIGHTS.influence
+      + rookieBonus,
     0, 100
   ));
-  return { scarcityScore: round(scarcityScore), authenticityScore, rookieBonus, traditionalScore };
+  return {
+    scarcityScore: round(scarcityScore),
+    authenticityScore,
+    externalInfluenceScore: round(externalInfluenceScore),
+    rookieBonus,
+    traditionalScore,
+  };
 }
 
 const DIGITAL_WEIGHTS = { views: 0.15, clicks: 0.25, comments: 0.30, likes: 0.30 };
