@@ -1,6 +1,6 @@
 # Go-live dossier — pricing, compliance, cost, and who builds what
 
-**Date:** 2026-09-12 · Covers all 36 apps. **Revised the same day** to add §7 (production running cost) and to close the money-module gap in §8, which the work described there finished.
+**Date:** 2026-09-12 · Covers all 36 apps. **Revised the same day** to add §7 (production running cost) and to close the money-module gap in §8, which the work described there finished. **Revised again 25 Oct 2026** to add VASH Mortgage/Insurance to §2's compliance table and §2b's cost estimate, and to name real AI-production connector candidates in §4b's media-vendor row.
 
 **Read this first.** This document mixes two kinds of statement and
 they are marked throughout:
@@ -113,10 +113,14 @@ The live gates:
 | VXLLAGE | `isVisibleToOthersAtVenue: false` | Deliberate default, stays |
 | Vvltvre Flix / Studios / Music | Content licensing | Licence terms modelled; no real rights acquired |
 | VACO Operator | Two-person rule, audit-before-authorization | Live |
+| V3 (VASH Mortgage) | Real NMLS Mortgage Loan Originator registration (SAFE Act) + a state lending licence | **Not built, not licensed.** VCoin-denominated loan administration only — real amortization, real underwriting decision, real VCoin settlement. Built 25 Oct 2026. |
+| V3 (VASH Insurance) | A real state insurance producer licence, and either carrier status or a real MGA agreement with a licensed carrier | **Not built, not licensed.** VCoin-denominated quote/policy/claims administration only, the same real MGA shape (Milliman) without the real licence behind it. Built 25 Oct 2026. |
 
 **Everything settles in VCoin or Gold Coin. No real-money path exists
 anywhere in the repository.** That is the single most important
-compliance fact here, and it is what keeps the list below hypothetical.
+compliance fact here, and it is what keeps the list below hypothetical
+— VASH Mortgage and VASH Insurance included, per their own module
+headers.
 
 ### 2b. What it costs **[ESTIMATE — the widest ranges in this document]**
 
@@ -131,6 +135,28 @@ Two scenarios, because the gap between them is the whole decision:
 | Content moderation staffing (see §2c) | $60k–200k |
 | Trademark filings across the brand portfolio | $10k–35k |
 | **Total** | **~$95k–305k** |
+
+**This total excludes VASH Mortgage and VASH Insurance — both are a
+different scenario, not an add-on to this one**, the same way VAGO's
+real-money path is Scenario B below rather than a line item here.
+Real small-dollar mortgage lending (per-state NMLS Mortgage Loan
+Originator registration under the SAFE Act — background check,
+pre-licensure and continuing education, state-specific add-ons such
+as a surety bond) and real small-scale insurance (a state producer
+licence, plus either becoming a licensed carrier — reserves, solvency,
+rate filings — or a real MGA agreement with one) are each their own
+realistic floor in the low hundreds of thousands per state/line
+**[ESTIMATE, not independently priced this session]**, comparable in
+shape to §2b's gaming-licence figures below. **My recommendation
+[ESTIMATE]:** launch both the same way the rest of this ecosystem
+launches — VCoin-denominated, inside VASH, proving the real mechanic
+(amortization, underwriting, claims administration) with no users at
+risk — and treat real licensing as a second, later decision once the
+Villages pilot site (a real, named, currently-for-sale property —
+see `dev-docs/VILLAGES_REAL_ESTATE_STRATEGY.md`) is actually under
+VACO's ownership. A real mortgage or a real insurance policy against
+a real house is exactly the kind of commitment that should follow
+licensing and counsel, not precede it.
 
 **Scenario B — VAGO and/or VEX go real-money.** This is a different
 company, not a feature.
@@ -236,7 +262,7 @@ assumed from either version of this table.
 
 | Work | Why it matters | Effort |
 |---|---|---|
-| ~~**Media vendor decision + integration**~~ **Mostly closed, 15 Oct.** | Flix, Pods, CHOPZ, and Vavlt Stvdios' on-demand Video are wired end to end — what's left for those four is an object store + CDN vendor pick, a config line once decided. Still genuinely blocked, each for its own reason: Vavlt Stvdios' *live* eight-screen wall (real-time transport vendor), VENVM (no AI-video-generation vendor), DREAMS (no screen hardware exists). See `MEDIA_INFRASTRUCTURE_DECISION.md`'s own "Update 3." | Config only for the four; vendor decision + integration still open for the other three |
+| ~~**Media vendor decision + integration**~~ **Mostly closed, 15 Oct.** | Flix, Pods, CHOPZ, and Vavlt Stvdios' on-demand Video are wired end to end — what's left for those four is an object store + CDN vendor pick, a config line once decided. Still genuinely blocked, each for its own reason: Vavlt Stvdios' *live* eight-screen wall (real-time transport vendor), VENVM (no AI-video-generation vendor), DREAMS (no screen hardware exists). See `MEDIA_INFRASTRUCTURE_DECISION.md`'s own "Update 3." **Real candidate connectors checked 25 Oct 2026** (none installed, none a drop-in Runway/Kling/Sora/Midjourney-class generator — that tier isn't in the connector directory at all): audio — **ElevenLabs** or **Synthflow** (voice agents), **Speko** (narration/transcription); image — **Adobe** (Firefly-class generative tools, needs an Adobe account), **Hugging Face** (indirect, search-then-run access to open models); video — **Riverside** (real editing/polish of existing footage, not generation), **Orshot** (template-based image/video/PDF automation). Any of these is a real account/API-key decision, the same shape as the object-store/CDN pick already named here, not a build gap. | Config only for the four; vendor decision + integration still open for the other three; the audio/image/video connectors above are the same kind of decision, not yet made |
 | ~~**14 untested money modules**~~ **Closed 12 Sep** — this row was never removed when §8.7/§9 below recorded the fix. Re-verified 15 Oct: `shared/settleOnce.js` is still synced to 10 apps (grew from 6), vago's (casino) suite is 120/120. | — | — |
 | ~~**YAP moderation queue**~~ **Was never actually missing** — `cvnvo/yap/lib/moderation.js` (publish/reject/dispute/remove/brigading-detection) predates this session; 36/36 tests pass. As of 15 Oct it also pages ops via vaco-notify on every action. | — | — |
 | **Off-host backups** | Database disk and backup disk are currently the same disk | 1 eng, 3–5 days |
@@ -479,6 +505,12 @@ none is hidden:
 9. **VCoin has no stated value in any real currency.**
 10. **A guard being present is not a guard being right** — the route
     audit says so in its own output.
+11. **VASH Mortgage and VASH Insurance (built 25 Oct 2026) are real
+    administration systems with no real licence behind them.** Same
+    shape as item 9 above, deliberately: real amortization,
+    underwriting, and claims mechanics, settled in VCoin, with no
+    NMLS mortgage-lending registration and no state insurance
+    producer/MGA licence — see §2a/§2b.
 
 ---
 
