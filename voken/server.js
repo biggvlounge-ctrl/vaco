@@ -45,7 +45,7 @@ const {
   SOURCE_APPS, MINTED_BY_ROLES,
   mintCultureCard, mintExternalEntityCard, mintHistoricCard, listHistoricCards, getCultureCard, listCultureCardsByCategory, mintAdditionalEdition, transferEditionOwnership, listEditionsWithSerials, recordPeakValueScore, verifySubjectIdentity} = require('./lib/cultureCards');
 const {
-  HISTORIC_SUBJECT_TYPES, listHistoricEntries, getHistoricEntry, genuineSignificanceInputsFor,
+  HISTORIC_SUBJECT_TYPES, listHistoricEntries, getHistoricEntry, genuineSignificanceInputsFor, rankHistoricEntries,
 } = require('./lib/historicRegistry');
 const { getHistoricExplorePage } = require('./lib/historicExplore');
 const { computeCultureCardValueScore } = require('./lib/valueAlgorithm');
@@ -370,6 +370,20 @@ app.get('/api/historic-register', (req, res) => {
   const { subjectType } = req.query;
   try {
     res.json({ entries: listHistoricEntries(subjectType || null) });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// "find a way also to rank those things. The age, the rarity of these
+// places." Ranked from each entry's own real earliestYear and
+// recognitions -- see rankHistoricEntries()'s own header. Registered
+// before the "/:slug" route below so "rank" is never swallowed as a
+// literal slug.
+app.get('/api/historic-register/rank', (req, res) => {
+  const { subjectType } = req.query;
+  try {
+    res.json({ ranked: rankHistoricEntries({ subjectType: subjectType || null }) });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

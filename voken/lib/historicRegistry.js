@@ -76,6 +76,11 @@ const HISTORIC_REGISTRY = [
     summary: 'A prehistoric monument of standing stones on Salisbury Plain in England, whose exact original purpose remains debated among archaeologists.',
     recognitions: ['UNESCO World Heritage Site (1986)'],
   },
+  {
+    slug: 'cahokia-mounds', subjectType: 'place', name: 'Cahokia Mounds', era: 'c. 1050–1350 CE', earliestYear: 1050,
+    summary: 'The largest pre-Columbian settlement north of Mexico, located near present-day Collinsville, Illinois, built by the Mississippian culture and home to Monks Mound, the largest prehistoric earthen structure in the Americas.',
+    recognitions: ['UNESCO World Heritage Site (1982)'],
+  },
 
   // -- monuments --
   {
@@ -107,6 +112,11 @@ const HISTORIC_REGISTRY = [
     slug: 'christ-the-redeemer', subjectType: 'monument', name: 'Christ the Redeemer', era: '1931', earliestYear: 1931,
     summary: 'An Art Deco statue of Jesus Christ overlooking Rio de Janeiro, Brazil, designed by Paul Landowski and completed in 1931.',
     recognitions: ['New7Wonders of the World (2007)'],
+  },
+  {
+    slug: 'sears-tower', subjectType: 'monument', name: 'The Sears Tower (Willis Tower)', era: '1973–present', earliestYear: 1973,
+    summary: 'A 108-story skyscraper in Chicago, Illinois, designed by Skidmore, Owings & Merrill and completed in 1973, the tallest building in the world from 1973 until 1998; renamed the Willis Tower in 2009.',
+    recognitions: [],
   },
 
   // -- homes --
@@ -250,10 +260,46 @@ function genuineSignificanceInputsFor(slug, options = {}) {
   };
 }
 
+// The real ranking mechanism, by direct instruction: "find a way also
+// to rank those things. The age, the rarity of these places." Built
+// from exactly the two real facts already on each entry — no invented
+// third metric. `ageYears` is the same `longevityOfImpactYears`
+// `genuineSignificanceInputsFor()` already computes (current year
+// minus `earliestYear`); `rarityScore` is the entry's real
+// `recognitions` count — a named honor (a Nobel Prize, a UNESCO
+// designation) is the real, checkable stand-in for rarity, since
+// "how many other things share this level of formal recognition" is
+// an actual fact about the entry, not a guess. Ranked primarily by
+// age (oldest first, the first metric the user named), with rarity as
+// the real tie-breaker (the second metric named) — not blended into
+// one invented composite number, since age and rarity answer two
+// different real questions and collapsing them would hide which one
+// is driving a given rank.
+function rankHistoricEntries(options = {}) {
+  const { now = Date.now(), subjectType = null } = options;
+  if (subjectType !== null && !HISTORIC_SUBJECT_TYPES.includes(subjectType)) {
+    throw new Error(`rankHistoricEntries: invalid subjectType "${subjectType}" (expected one of ${HISTORIC_SUBJECT_TYPES.join(', ')})`);
+  }
+  const currentYear = new Date(now).getFullYear();
+  const entries = subjectType ? HISTORIC_REGISTRY.filter((e) => e.subjectType === subjectType) : HISTORIC_REGISTRY;
+
+  return entries
+    .map((e) => ({
+      slug: e.slug,
+      name: e.name,
+      subjectType: e.subjectType,
+      ageYears: currentYear - e.earliestYear,
+      rarityScore: e.recognitions.length,
+    }))
+    .sort((a, b) => (b.ageYears - a.ageYears) || (b.rarityScore - a.rarityScore))
+    .map((row, i) => ({ rank: i + 1, ...row }));
+}
+
 module.exports = {
   HISTORIC_SUBJECT_TYPES,
   HISTORIC_REGISTRY,
   listHistoricEntries,
   getHistoricEntry,
   genuineSignificanceInputsFor,
+  rankHistoricEntries,
 };

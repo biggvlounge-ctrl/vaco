@@ -156,9 +156,10 @@ curl http://localhost:8794/api/explore/historic
   register** of historic places, monuments, homes, people (inventors/
   authors/notable figures), inventions, and books, each a real,
   well-documented historical fact rather than caller-supplied free
-  text (31 entries as of this register's latest pass — the Great Wall,
+  text (33 entries as of this register's latest pass — the Great Wall,
   the Statue of Liberty, Monticello, Marie Curie, the printing press,
-  Hamlet, and more). The same "no single owner" shape
+  Hamlet, Cahokia Mounds, the Sears Tower, and more). The same "no
+  single owner" shape
   `mintExternalEntityCard`'s operator path already established applies
   here too: nobody owns Machu Picchu or the invention of penicillin, so
   no guaranteed first edition goes to anyone, including the operator
@@ -181,6 +182,18 @@ curl http://localhost:8794/api/explore/historic
   historic card — the same "never trust the request body" discipline
   that route already holds for the live VACA authenticity grade,
   applied to the one other score a caller could otherwise just assert.
+  **A real ranking across the whole register, by direct instruction:**
+  "find a way also to rank those things. The age, the rarity of these
+  places." `rankHistoricEntries()` ranks every entry (optionally
+  scoped by `subjectType`) primarily by real age (`ageYears`, the same
+  `longevityOfImpactYears` math `genuineSignificanceInputsFor()` uses)
+  and breaks ties by real rarity (`rarityScore`, the entry's
+  `recognitions` count) — the two real facts the user actually named,
+  kept as two explicit fields rather than blended into one invented
+  composite number. `GET /api/historic-register/rank` (optionally
+  `?subjectType=...`), registered before the `/:slug` route so "rank"
+  is never swallowed as a literal slug. See
+  `test/historicRanking.test.js`.
   **The one real exception to "no guaranteed edition goes to anyone,"
   by direct instruction:** "for the people who aren't living, the
   initial card... the master card, goes to the family."
