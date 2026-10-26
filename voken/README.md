@@ -308,6 +308,17 @@ curl http://localhost:8794/api/explore/historic
   (`marketPrice`) and standalone at `GET /api/card/:id/market-price`
   (using the card's stored peak, no fresh live score required). See
   `test/cardMarketPrice.test.js`.
+- `lib/walletValue.js` — **real wallet value, by direct instruction:**
+  "when people get the cards, they will know how much their wallet is
+  worth." `computeWalletValue(store, { ownerId })` sums the exact real
+  `marketPrice` above across every edition the real owner holds —
+  genuine reuse, never a second pricing formula. Owning three real
+  editions of the same card counts that card's real price three
+  times, the same real property holding three shares of the same
+  stock position has. A real card nobody has ever scored contributes
+  `$0` honestly rather than being dropped from `holdings` — the
+  ownership is still a real fact even when the price isn't known yet.
+  `GET /api/wallet/:ownerId/value`. See `test/walletValue.test.js`.
   **Real subject self-verification, by direct instruction:** "I want
   people to be able to verify their own cards to show that that is
   them and they verify it." `verifySubjectIdentity(store, { cardId,

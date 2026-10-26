@@ -69,6 +69,7 @@ const {
 const { ENGAGEMENT_TYPES, recordEngagementEvent, computeEngagementStats } = require('./lib/cardEngagement');
 const { followCard, unfollowCard, isFollowing, getFollowerCount } = require('./lib/cardFollows');
 const { computeCardMarketPrice } = require('./lib/cardMarketPrice');
+const { computeWalletValue } = require('./lib/walletValue');
 const { getVokenExplorePage } = require('./lib/exploreVoken');
 const { computeCreatorDigitalProfile } = require('./lib/creatorDigitalProfile');
 const { GATES, isComplianceCleared, setComplianceStatus } = require('./lib/complianceGate');
@@ -654,6 +655,19 @@ app.post('/api/card/:id/value-score', requireSession(), async (req, res) => {
 app.get('/api/card/:id/market-price', (req, res) => {
   try {
     res.json(computeCardMarketPrice(store, { cardId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Real wallet value, by direct instruction: "when people get the
+// cards, they will know how much their wallet is worth." Sums the
+// same real market price above across every edition this real owner
+// holds -- genuine reuse of computeCardMarketPrice, not a second
+// pricing formula.
+app.get('/api/wallet/:ownerId/value', (req, res) => {
+  try {
+    res.json(computeWalletValue(store, { ownerId: req.params.ownerId }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
