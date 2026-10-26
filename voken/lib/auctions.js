@@ -9,7 +9,7 @@
 // edition-ownership mechanics already built in cultureCards.js -- no
 // parallel ownership system.
 
-const { getCultureCard, transferEditionOwnership } = require('./cultureCards');
+const { getCultureCard, transferEditionOwnership, getRoyaltyRecipient, SECONDARY_SALE_ROYALTY_RATE } = require('./cultureCards');
 const { settleOnce } = require('./settleOnce');
 
 const AUCTION_TYPES = ['instant', 'english', 'dutch', 'offer'];
@@ -80,6 +80,10 @@ function createAuction(store, options = {}) {
     offers: [],
     soldPrice: null,
     buyerId: null,
+    // Real resale royalty, by direct instruction -- see settle()'s own
+    // header below.
+    royaltyRecipient: null,
+    royaltyAmount: 0,
   };
   store.auctions.push(auction);
   return auction;
@@ -131,11 +135,31 @@ async function settle(store, auction, buyerId, price, settleFn) {
   // scoping shape already found and fixed in hvntz's distributeRevenue
   // this session.
   const reason = `voken_vado_${auction.auctionType}:${auction.id}`;
-  await settleOnce(auction, { status: 'sold', soldPrice: price, buyerId }, async () => {
-    await settleFn(
-      [{ fromUserId: buyerId, toUserId: auction.sellerId, amount: price, reason }],
-      { reason },
-    );
+
+  // **Real resale royalty, by direct instruction** -- see
+  // `getRoyaltyRecipient()`'s own header in `cultureCards.js`. Skipped
+  // entirely when there's no real recipient (a fixed historic/
+  // operator-curated card) or when the recipient IS the seller
+  // (paying someone a cut of their own sale is a meaningless split of
+  // the same total into two legs that land on the same person) --
+  // both cases keep today's exact single-leg behavior unchanged.
+  const card = getCultureCard(store, auction.cardId);
+  const royaltyRecipient = getRoyaltyRecipient(card);
+  const payRoyalty = royaltyRecipient && royaltyRecipient !== auction.sellerId;
+  const royaltyAmount = payRoyalty ? Math.round(price * SECONDARY_SALE_ROYALTY_RATE * 100) / 100 : 0;
+  const sellerAmount = Math.round((price - royaltyAmount) * 100) / 100;
+
+  const legs = payRoyalty
+    ? [
+      { fromUserId: buyerId, toUserId: auction.sellerId, amount: sellerAmount, reason },
+      { fromUserId: buyerId, toUserId: royaltyRecipient, amount: royaltyAmount, reason: `${reason}:royalty` },
+    ]
+    : [{ fromUserId: buyerId, toUserId: auction.sellerId, amount: price, reason }];
+
+  await settleOnce(auction, {
+    status: 'sold', soldPrice: price, buyerId, royaltyRecipient: payRoyalty ? royaltyRecipient : null, royaltyAmount,
+  }, async () => {
+    await settleFn(legs, { reason });
     transferEditionOwnership(store, {
       cardId: auction.cardId, editionNumber: auction.editionNumber, format: auction.format,
       fromOwnerId: auction.sellerId, toOwnerId: buyerId,

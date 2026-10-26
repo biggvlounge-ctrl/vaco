@@ -481,8 +481,14 @@ test('a card resold through a second instant auction actually settles, against a
 
   assert.strictEqual(settleFn.realCalls(), 2, 'both sales must actually reach the ledger, not replay the first');
   assert.strictEqual(getCultureCard(store, subject.id).editions[0].ownerId, 'rio', 'the second sale must actually transfer the edition');
-  assert.strictEqual(settleFn.of('sam'), 1050, '-100 to buy, +150 to resell');
+  // The first sale's seller (nova) IS the card's real subject, so it
+  // settles with no royalty leg, same as before this feature existed.
+  // The second sale's seller (sam) is NOT the subject, so a real 10%
+  // resale royalty now goes to nova: sam nets 150 - 15 = 135, not the
+  // full 150.
+  assert.strictEqual(settleFn.of('sam'), 1035, '-100 to buy, +135 net to resell (150 minus the real 10% royalty to the card\'s subject)');
   assert.strictEqual(settleFn.of('rio'), 850);
+  assert.strictEqual(settleFn.of('nova'), 115, '100 from the first sale (its own, no royalty) + a real 15 royalty from the second sale it was not even a party to');
 });
 
 test('two concurrent buys of the same instant auction — only one settles, the other is refused', async () => {

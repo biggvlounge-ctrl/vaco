@@ -752,6 +752,26 @@ curl http://localhost:8794/api/explore/historic
   /api/auctions/open`), not routed around with `vadoExplore.js`'s
   different, unrelated data (that ranks *art cards* by engagement
   generally, not live auction state).
+  **Real resale royalty, by direct instruction**: "now they have an
+  asset which is their own card" — a card's real subject should keep
+  earning from it on every real resale, not just at the first mint.
+  `getRoyaltyRecipient()` (`cultureCards.js`) mirrors
+  `updateCardStatistics()`'s own three real authorities in the same
+  order (living subject, approved family representative, verified
+  external-entity owner); `SECONDARY_SALE_ROYALTY_RATE` (10%, flagged
+  interpretive, inside the real 5–10% range actual NFT marketplaces
+  commonly use) is paid out of `settle()`'s own real sale price —
+  split into a second leg the buyer pays directly to the recipient,
+  so the buyer's total cost never changes and the seller nets
+  `price - royalty`. Skipped (a single, full-price leg, unchanged
+  behavior) when there's no real recipient, or when the recipient IS
+  the seller — paying someone a cut of their own sale is a pointless
+  split of the same total into two legs landing on the same person.
+  Deliberately scoped to `auctions.js` only: `trading.js` is a real
+  barter swap with no price to take a percentage of, and
+  `sellBack.js` is the platform buying a card back from its seller,
+  not a peer reselling it to another collector — neither carries a
+  royalty leg. See `test/resaleRoyalty.test.js`.
 - `lib/artCultureCard.js` — real code reuse of Phase 1's
   `mintCultureCard()` (`category: 'art'`) for the card-#1 guarantee and
   mint transparency, with a separate `artCultureCards` record linked by

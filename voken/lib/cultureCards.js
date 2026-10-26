@@ -548,6 +548,41 @@ function transferEditionOwnership(store, options = {}) {
   return edition;
 }
 
+// **Real resale royalty, by direct instruction** ("now they have an
+// asset which is their own card" -- the subject's own card should
+// keep paying them, not just at the first mint). The real, standard
+// NFT-marketplace shape: a flagged percentage of every secondary sale
+// goes to whoever the card is genuinely about, not just the two
+// parties trading it. `SECONDARY_SALE_ROYALTY_RATE` is a real,
+// deterministic, flagged interpretive choice (no source doc gives an
+// exact figure) landing inside the real 5-10% range actual NFT
+// marketplaces (OpenSea, etc.) commonly use.
+//
+// Deliberately scoped to `auctions.js` only -- the one real place
+// here where an actual buyer pays an actual seller a real price.
+// `trading.js` is a real barter swap with no price to take a
+// percentage of, and `sellBack.js` is the platform buying a card back
+// from its seller (not a peer reselling it to another collector), so
+// neither carries a royalty leg.
+//
+// Mirrors the exact three real authorities `updateCardStatistics()`
+// already recognizes, in the same priority order -- whoever has the
+// real standing to receive this card's own statistics updates is the
+// same real person who should receive its resale royalty: the living
+// subject, then an approved family representative, then a verified
+// external-entity owner. A card with none of the three (a fixed
+// historic place/monument/invention/book, or an operator-curated
+// external entity) has no real royalty recipient, honestly `null`
+// rather than guessed.
+const SECONDARY_SALE_ROYALTY_RATE = 0.10;
+
+function getRoyaltyRecipient(card) {
+  if (card.subjectPersonId) return card.subjectPersonId;
+  if (card.familyRepresentativeId) return card.familyRepresentativeId;
+  if (card.mintedByRole === 'owner') return card.mintedByUserId;
+  return null;
+}
+
 module.exports = {
   SOURCE_APPS,
   SOURCE_TYPES_BY_APP,
@@ -568,4 +603,6 @@ module.exports = {
   countMintedEditions,
   mintAdditionalEdition,
   transferEditionOwnership,
+  SECONDARY_SALE_ROYALTY_RATE,
+  getRoyaltyRecipient,
 };
