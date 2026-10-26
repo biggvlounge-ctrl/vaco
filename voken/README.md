@@ -295,6 +295,26 @@ curl http://localhost:8794/api/explore/historic
   `verifiedBySubjectAt` on the card (present only on person-subject
   cards minted via `mintCultureCard`). See
   `test/verifySubjectIdentity.test.js`.
+  **Real, owner-updatable accomplishment statistics, by direct
+  instruction:** "the owner of the card, the verified owner of the
+  card, can update the statistics on the card... instead of 6 movies,
+  if it turns to 8 published movies, you can change those type of
+  things." `updateCardStatistics(store, { cardId, updaterId,
+  statistics })` merges a real statistics object (any real
+  number/string fields — movie counts, a biography count, an annual
+  visitor count) into the card's `statistics`, but only for one of
+  three real authorities, never an arbitrary editions-owner: a living
+  card's own real subject (and only once verified via
+  `verifySubjectIdentity` above), a historic person card's real
+  operator-approved family representative, or an external-entity
+  card's real verified owner (`mintedByRole === 'owner'`) — an
+  operator-curated card, with no real owner to begin with, can never
+  have its statistics updated by anyone. Merges rather than replaces
+  (changing one real field never erases the others already on file)
+  and records a real provenance entry for accountability. Exposed as
+  `POST /api/card/:id/statistics`, with `updaterId` taken from
+  `requireActor('updaterId')` session auth, never the request body.
+  See `test/updateCardStatistics.test.js`.
 - `lib/establishedCreatorAssessment.js` — calibrates a real starting
   tier from external metrics for someone joining with existing fame,
   never the blank-slate `common` tier. `getLatestAssessmentForCreator()`

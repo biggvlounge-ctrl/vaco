@@ -43,7 +43,7 @@ const { getBrandInfo } = require('./lib/brand');
 const { CATEGORIES, RARITY_TIERS, TOKENIZATION_TYPES, FORMATS } = require('./lib/cardTypes');
 const {
   SOURCE_APPS, MINTED_BY_ROLES,
-  mintCultureCard, mintExternalEntityCard, mintHistoricCard, listHistoricCards, getCultureCard, listCultureCardsByCategory, mintAdditionalEdition, transferEditionOwnership, listEditionsWithSerials, recordPeakValueScore, verifySubjectIdentity} = require('./lib/cultureCards');
+  mintCultureCard, mintExternalEntityCard, mintHistoricCard, listHistoricCards, getCultureCard, listCultureCardsByCategory, mintAdditionalEdition, transferEditionOwnership, listEditionsWithSerials, recordPeakValueScore, verifySubjectIdentity, updateCardStatistics} = require('./lib/cultureCards');
 const {
   HISTORIC_SUBJECT_TYPES, listHistoricEntries, getHistoricEntry, genuineSignificanceInputsFor, rankHistoricEntries,
 } = require('./lib/historicRegistry');
@@ -521,6 +521,21 @@ app.post('/api/card/:id/transfer', requireActor('fromOwnerId'), (req, res) => {
 app.post('/api/card/:id/verify', requireActor('verifierId'), (req, res) => {
   try {
     res.json(verifySubjectIdentity(store, { ...req.body, cardId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Real, owner-updatable accomplishment statistics, by direct
+// instruction: "the owner of the card, the verified owner of the
+// card, can update the statistics on the card." `requireActor('updaterId')`
+// proves this really is that session's own real user id --
+// `updateCardStatistics` then refuses unless that id is the card's
+// real verified subject, approved family representative, or verified
+// owner, never merely trusted from the request body.
+app.post('/api/card/:id/statistics', requireActor('updaterId'), (req, res) => {
+  try {
+    res.json(updateCardStatistics(store, { ...req.body, cardId: Number(req.params.id) }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

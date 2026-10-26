@@ -78,6 +78,11 @@ function mintCultureCard(store, options = {}) {
     },
     editions: [],
     provenance: [],
+    // Real, owner-updatable accomplishment statistics, by direct
+    // instruction: "instead of 6 movies, if it turns to 8 published
+    // movies, you can change those type of things." See
+    // updateCardStatistics() below for who may write to this and why.
+    statistics: {},
     // High-water-mark value tracking, by direct instruction: "the
     // card raises or stays the same... it just won't raise [downward]"
     // -- see recordPeakValueScore() below.
@@ -176,6 +181,12 @@ function mintExternalEntityCard(store, options = {}) {
     },
     editions: [],
     provenance: [],
+    // Real, owner-updatable accomplishment statistics -- see
+    // updateCardStatistics() below. Only ever writable here when
+    // mintedByRole is the real, verified 'owner' path (an 'operator'
+    // curated this card on behalf of no one, so there is no real
+    // authority to let update it).
+    statistics: {},
     // High-water-mark value tracking, by direct instruction: "the
     // card raises or stays the same... it just won't raise [downward]"
     // -- see recordPeakValueScore() below.
@@ -252,6 +263,11 @@ function mintHistoricCard(store, options = {}) {
     },
     editions: [],
     provenance: [],
+    // Real, owner-updatable accomplishment statistics -- see
+    // updateCardStatistics() below. Only ever writable here when a
+    // real, operator-approved family representative is on file for
+    // this slug (familyRepresentativeId below).
+    statistics: {},
     // High-water-mark value tracking, by direct instruction: "the
     // card raises or stays the same... it just won't raise [downward]"
     // -- see recordPeakValueScore() below.
@@ -343,6 +359,55 @@ function verifySubjectIdentity(store, options = {}) {
   }
   card.verifiedBySubject = true;
   card.verifiedBySubjectAt = now;
+  return card;
+}
+
+// **Real, owner-updatable accomplishment statistics, by direct
+// instruction**: "the owner of the card, the verified owner of the
+// card, can update the statistics on the card... instead of 6 movies,
+// if it turns to 8 published movies, you can change those type of
+// things." Deliberately gated to the same three real authorities
+// already established elsewhere in this file, and no others -- never
+// an arbitrary editions-owner (owning a traded copy is not the same
+// real standing as being the real subject, family, or verified
+// owner):
+//   - a living card's own real subject, but only once verified via
+//     `verifySubjectIdentity()` above -- an unverified claimed
+//     subject could otherwise inflate their own statistics before
+//     ever proving who they are;
+//   - a historic person card's real, operator-approved family
+//     representative (`familyRepresentativeId`, see
+//     `familyRepresentativeClaims.js`);
+//   - an external-entity card's real, verified owner
+//     (`mintedByRole === 'owner'`) -- never an 'operator'-curated
+//     card, which has no real owner to begin with.
+// Merges into the existing `statistics` object (so updating one real
+// field, like a movie count, never erases every other real stat
+// already on file) and records a real provenance entry, the same
+// accountability trail `transferEditionOwnership` already leaves.
+function updateCardStatistics(store, options = {}) {
+  const { cardId, updaterId, statistics, now = Date.now() } = options;
+  const card = getCultureCard(store, cardId);
+  if (!card) throw new Error(`updateCardStatistics: no card with id ${cardId}`);
+  if (!updaterId) throw new Error('updateCardStatistics requires an updaterId');
+  if (statistics === null || typeof statistics !== 'object' || Array.isArray(statistics) || Object.keys(statistics).length === 0) {
+    throw new Error('updateCardStatistics requires a non-empty statistics object');
+  }
+  for (const [key, value] of Object.entries(statistics)) {
+    if (typeof value !== 'number' && typeof value !== 'string') {
+      throw new Error(`updateCardStatistics: statistics.${key} must be a real number or string, not ${typeof value}`);
+    }
+  }
+
+  const isVerifiedSubject = card.subjectPersonId && card.verifiedBySubject && card.subjectPersonId === updaterId;
+  const isApprovedFamilyRepresentative = card.familyRepresentativeId && card.familyRepresentativeId === updaterId;
+  const isVerifiedOwner = card.mintedByRole === 'owner' && card.mintedByUserId === updaterId;
+  if (!isVerifiedSubject && !isApprovedFamilyRepresentative && !isVerifiedOwner) {
+    throw new Error(`updateCardStatistics: ${updaterId} has no real authority to update card ${cardId}'s statistics (must be its verified subject, approved family representative, or verified owner)`);
+  }
+
+  Object.assign(card.statistics, statistics);
+  card.provenance.push({ year: new Date(now).getFullYear(), event: 'statistics-updated', ownerId: updaterId });
   return card;
 }
 
@@ -441,6 +506,7 @@ module.exports = {
   getCultureCard,
   recordPeakValueScore,
   verifySubjectIdentity,
+  updateCardStatistics,
   listCultureCardsByCategory,
   countMintedEditions,
   mintAdditionalEdition,
