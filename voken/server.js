@@ -90,7 +90,7 @@ const {
   createSecondaryListing, getSecondaryListing, listOpenSecondaryListings, cancelSecondaryListing, buySecondaryShares,
 } = require('./lib/fractionalOwnership');
 const {
-  ITEM_TYPES, createMerchListing, getMerchListing, purchaseMerchItem,
+  ITEM_TYPES, createMerchListing, getMerchListing, purchaseMerchItem, listMerchForCard,
 } = require('./lib/limitedEditionMerch');
 const { registerDigitalArtFrame, getDigitalArtFrame, loadArtworkOntoFrame } = require('./lib/digitalArtFrame');
 const {
@@ -191,6 +191,26 @@ async function fetchRealTotal(url, field) {
     return Number.isInteger(body[field]) ? body[field] : 0;
   } catch {
     return 0;
+  }
+}
+
+// The real, live list of a creator's own CVLLEX production orders --
+// their real collectibles -- fail-soft the same way `fetchRealTotal`
+// already is: CVLLEX may not be running, and that must never break a
+// card's commerce page. See `GET /api/card/:id/commerce` below, by
+// direct instruction: "it should link directly to their merch
+// involved with them, or their merch involved with collects... this
+// is an opportunity for them to sell or promote their collectibles."
+async function fetchRealCreatorCollectibles(creatorId) {
+  try {
+    const res = await fetch(`${CVLLEX_API_URL}/api/production-orders/creator/${encodeURIComponent(creatorId)}`, {
+      headers: serviceHeaders(),
+    });
+    if (!res.ok) return [];
+    const body = await res.json();
+    return Array.isArray(body.orders) ? body.orders : [];
+  } catch {
+    return [];
   }
 }
 
@@ -459,6 +479,34 @@ app.get('/api/card/:id', (req, res) => {
   const card = getCultureCard(store, Number(req.params.id));
   if (!card) return res.status(404).json({ error: `no card with id ${req.params.id}` });
   res.json(card);
+});
+
+// Real commerce links on a card's own page, by direct instruction:
+// "it should link directly to their merch involved with them, or
+// their merch involved with collects, or anything that they have
+// that's a collectible or merch that's involved. This also is an
+// opportunity for them to sell or promote their collectibles as
+// well." `merch` is VOKEN's own real `limitedEditionMerch` listings
+// (see `listMerchForCard()`'s own header for the two real ways a
+// listing counts as theirs); `collectibles` is a live, fail-soft
+// fetch of the same real subject's own CVLLEX production orders --
+// an unreachable CVLLEX contributes an honest empty list rather than
+// breaking the page. A card with no real `subjectPersonId` (a place,
+// an invention, an external entity with no owner) has no "them" to
+// fetch collectibles for, so that lookup is skipped rather than
+// guessed at.
+app.get('/api/card/:id/commerce', async (req, res) => {
+  const cardId = Number(req.params.id);
+  const card = getCultureCard(store, cardId);
+  if (!card) return res.status(404).json({ error: `no card with id ${cardId}` });
+
+  try {
+    const merch = listMerchForCard(store, cardId);
+    const collectibles = card.subjectPersonId ? await fetchRealCreatorCollectibles(card.subjectPersonId) : [];
+    res.json({ cardId, merch, collectibles });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 app.get('/api/cards/category/:category', (req, res) => {

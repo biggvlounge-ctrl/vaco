@@ -12,6 +12,7 @@
 // interpretive choice, matching this project's established pattern.
 
 const { settleOnce } = require('./settleOnce');
+const { getCultureCard } = require('./cultureCards');
 
 // **Extended (physical-production addition)** to cover more than
 // generic apparel. `cd`/`vinyl`/`cassette` are real, physically-
@@ -121,6 +122,26 @@ async function purchaseMerchItem(store, options = {}) {
   return { listing, pricePaid: price };
 }
 
+// **The real reverse lookup a card's own page needs, by direct
+// instruction**: "on their page... it should link directly to their
+// merch involved with them... this is an opportunity for them to
+// sell or promote their collectibles as well." `linkedCultureCardId`
+// already existed on every listing (a merch item can be made FOR a
+// specific card), but nothing read it back FROM the card -- this is
+// that read. Two real, distinct ways a listing counts as "theirs":
+// explicitly linked to this exact card (`linkedCultureCardId`), or
+// created by this card's own real subject (`creatorId`) even when not
+// linked to this particular card -- the same person's other real
+// merch is still a real cross-promotion opportunity on their page.
+function listMerchForCard(store, cardId) {
+  const card = getCultureCard(store, cardId);
+  if (!card) throw new Error(`listMerchForCard: no card with id ${cardId}`);
+
+  return store.limitedEditionMerch.filter(
+    (m) => m.linkedCultureCardId === cardId || (card.subjectPersonId && m.creatorId === card.subjectPersonId),
+  );
+}
+
 module.exports = {
   ITEM_TYPES,
   MERCH_SCARCITY_PRICE_MULTIPLIER,
@@ -128,4 +149,5 @@ module.exports = {
   createMerchListing,
   getMerchListing,
   purchaseMerchItem,
+  listMerchForCard,
 };

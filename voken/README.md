@@ -800,6 +800,24 @@ curl http://localhost:8794/api/explore/historic
   moment, not a stale one. `ITEM_TYPES` now also covers real physical
   media (`cd`, `vinyl`, `cassette`, `magazine`, `poster`, `pin`),
   not just apparel.
+  **A card's own merch links, by direct instruction**: "on their
+  page... it should link directly to their merch involved with them,
+  or their merch involved with collects, or anything that they have
+  that's a collectible or merch that's involved. This also is an
+  opportunity for them to sell or promote their collectibles as
+  well." `linkedCultureCardId` already existed on every listing, but
+  nothing read it back from the card's side until now.
+  `listMerchForCard()` returns every real listing linked to this
+  exact card, plus every other real listing the card's own subject
+  has made — their other merch is still a real cross-promotion
+  opportunity even when not tied to this particular card. A card with
+  no real `subjectPersonId` (historic, external-entity-operator) only
+  ever sees explicitly-linked merch, never a false match on whoever
+  curated it. `GET /api/card/:id/commerce` combines this with a live,
+  fail-soft fetch of the same subject's real CVLLEX collectibles
+  (`GET /api/production-orders/creator/:creatorId` — an unreachable
+  CVLLEX contributes an honest empty list, never breaks the page). See
+  `test/cardCommerceLinks.test.js`.
 - **Physical production (ordering a real limited run made) now lives
   in its own standalone app, `../cvllex/`** — briefly built as a
   module here first, then moved out by direct decision: this
