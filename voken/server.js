@@ -43,7 +43,7 @@ const { getBrandInfo } = require('./lib/brand');
 const { CATEGORIES, RARITY_TIERS, TOKENIZATION_TYPES, FORMATS } = require('./lib/cardTypes');
 const {
   SOURCE_APPS, MINTED_BY_ROLES,
-  mintCultureCard, mintExternalEntityCard, mintHistoricCard, listHistoricCards, getCultureCard, listCultureCardsByCategory, mintAdditionalEdition, transferEditionOwnership, listEditionsWithSerials} = require('./lib/cultureCards');
+  mintCultureCard, mintExternalEntityCard, mintHistoricCard, listHistoricCards, getCultureCard, listCultureCardsByCategory, mintAdditionalEdition, transferEditionOwnership, listEditionsWithSerials, recordPeakValueScore, verifySubjectIdentity} = require('./lib/cultureCards');
 const {
   HISTORIC_SUBJECT_TYPES, listHistoricEntries, getHistoricEntry, genuineSignificanceInputsFor,
 } = require('./lib/historicRegistry');
@@ -494,6 +494,20 @@ app.post('/api/card/:id/transfer', requireActor('fromOwnerId'), (req, res) => {
   }
 });
 
+// Real subject self-verification, by direct instruction: "I want
+// people to be able to verify their own cards to show that that is
+// them and they verify it." `requireActor('verifierId')` proves this
+// really is that session's own real user id -- `verifySubjectIdentity`
+// then refuses unless that id is literally the card's own
+// `subjectPersonId`, never merely trusted from the request body.
+app.post('/api/card/:id/verify', requireActor('verifierId'), (req, res) => {
+  try {
+    res.json(verifySubjectIdentity(store, { ...req.body, cardId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // Scoring reads a card and returns a number; it writes nothing and
 // names no user. The app-level credential still refuses an anonymous
 // caller, which is the whole check that applies here.
@@ -573,7 +587,15 @@ app.post('/api/card/:id/value-score', requireSession(), async (req, res) => {
 
     const scoreResult = computeCultureCardValueScore(cardId, { ...options, traditional, genuineSignificance });
 
-    res.json({ ...scoreResult, externalInfluenceTier });
+    // The real "only ever goes up" floor, by direct instruction: "it
+    // really can't really lower, it just won't raise [further]."
+    // `peakValueScore` is this card's own real high-water mark,
+    // updated here on every live call -- a real dip in today's
+    // underlying numbers can never pull the card's effective value
+    // below the highest real score it has already earned.
+    const peakValueScore = recordPeakValueScore(store, { cardId, combinedRealValueScore: scoreResult.combinedRealValueScore });
+
+    res.json({ ...scoreResult, externalInfluenceTier, peakValueScore });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

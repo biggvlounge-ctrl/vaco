@@ -77,6 +77,18 @@ function mintCultureCard(store, options = {}) {
     },
     editions: [],
     provenance: [],
+    // High-water-mark value tracking, by direct instruction: "the
+    // card raises or stays the same... it just won't raise [downward]"
+    // -- see recordPeakValueScore() below.
+    peakValueScore: null,
+    peakValueScoreAt: null,
+    // Real subject self-verification, by direct instruction: "I want
+    // people to be able to verify their own cards to show that that
+    // is them and they verify it." Only the real subject's own
+    // session can ever set this true -- see verifySubjectIdentity()
+    // below.
+    verifiedBySubject: false,
+    verifiedBySubjectAt: null,
     createdAt: Date.now(),
   };
 
@@ -163,6 +175,11 @@ function mintExternalEntityCard(store, options = {}) {
     },
     editions: [],
     provenance: [],
+    // High-water-mark value tracking, by direct instruction: "the
+    // card raises or stays the same... it just won't raise [downward]"
+    // -- see recordPeakValueScore() below.
+    peakValueScore: null,
+    peakValueScoreAt: null,
     createdAt: Date.now(),
   };
 
@@ -223,6 +240,11 @@ function mintHistoricCard(store, options = {}) {
     },
     editions: [],
     provenance: [],
+    // High-water-mark value tracking, by direct instruction: "the
+    // card raises or stays the same... it just won't raise [downward]"
+    // -- see recordPeakValueScore() below.
+    peakValueScore: null,
+    peakValueScoreAt: null,
     createdAt: Date.now(),
   };
   card.provenance.push({ year: new Date(card.createdAt).getFullYear(), event: 'minted', ownerId: null });
@@ -241,8 +263,60 @@ function getCultureCard(store, cardId) {
   return store.cultureCards.find((c) => c.id === cardId) || null;
 }
 
+// **The real "only ever goes up" mechanic, by direct instruction**:
+// "the more attention... their card goes up in value or can go down
+// in value... I guess it really can't really lower, it just won't
+// raise [further until it does]." A card's real underlying metrics
+// CAN dip for real reasons (a creator's live follower count drops,
+// engagement quiets down for a stretch) -- but the card's own real
+// value is never allowed to fall below the highest real score it has
+// ever actually earned. This is the one place that peak is recorded
+// and enforced: `server.js`'s value-score route calls this on every
+// live computation, and the card's own stored `peakValueScore` is the
+// real floor from then on, regardless of what the live number says
+// today. A quiet month never erases a real high the card already
+// earned; only a new, higher real number ever moves it.
+function recordPeakValueScore(store, options = {}) {
+  const { cardId, combinedRealValueScore, now = Date.now() } = options;
+  const card = getCultureCard(store, cardId);
+  if (!card) throw new Error(`recordPeakValueScore: no card with id ${cardId}`);
+  if (!Number.isFinite(combinedRealValueScore) || combinedRealValueScore < 0 || combinedRealValueScore > 100) {
+    throw new Error('recordPeakValueScore requires combinedRealValueScore to be a number between 0 and 100');
+  }
+  if (card.peakValueScore === null || combinedRealValueScore > card.peakValueScore) {
+    card.peakValueScore = combinedRealValueScore;
+    card.peakValueScoreAt = now;
+  }
+  return card.peakValueScore;
+}
+
 function listCultureCardsByCategory(store, category) {
   return store.cultureCards.filter((c) => c.category === category);
+}
+
+// **Real subject self-verification, by direct instruction**: "I want
+// people to be able to verify their own cards to show that that is
+// them and they verify it." Deliberately narrow: only the real
+// `subjectPersonId` -- proven by their own session in `server.js`'s
+// route, never merely claimed here -- can ever verify their own card.
+// An external-entity or historic card has no living subject to verify
+// at all (`subjectPersonId` is always null on both), so this refuses
+// cleanly rather than letting an operator or owner stand in for a
+// subject who was never real to begin with.
+function verifySubjectIdentity(store, options = {}) {
+  const { cardId, verifierId, now = Date.now() } = options;
+  const card = getCultureCard(store, cardId);
+  if (!card) throw new Error(`verifySubjectIdentity: no card with id ${cardId}`);
+  if (!verifierId) throw new Error('verifySubjectIdentity requires a verifierId');
+  if (!card.subjectPersonId) {
+    throw new Error(`verifySubjectIdentity: card ${cardId} has no living subject to verify (subjectPersonId is null)`);
+  }
+  if (card.subjectPersonId !== verifierId) {
+    throw new Error(`verifySubjectIdentity: only card ${cardId}'s own real subject may verify it`);
+  }
+  card.verifiedBySubject = true;
+  card.verifiedBySubjectAt = now;
+  return card;
 }
 
 function countMintedEditions(card, format) {
@@ -338,6 +412,8 @@ module.exports = {
   mintHistoricCard,
   listHistoricCards,
   getCultureCard,
+  recordPeakValueScore,
+  verifySubjectIdentity,
   listCultureCardsByCategory,
   countMintedEditions,
   mintAdditionalEdition,

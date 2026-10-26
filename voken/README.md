@@ -223,6 +223,32 @@ curl http://localhost:8794/api/explore/historic
   exact same real formula with no special path for being deceased;
   `combinedRealValueScore` alone differentiates one card from another.
   See `test/valueAlgorithm.test.js`.
+  **A card's effective value only ever rises, by direct instruction:**
+  "the more attention that they gain, their card goes up in value or
+  can go down in value... I guess it really can't really lower, it
+  just won't raise." `recordPeakValueScore(store, { cardId,
+  combinedRealValueScore })` in `lib/cultureCards.js` is the real
+  high-water mark: it keeps each card's highest `combinedRealValueScore`
+  ever computed as `card.peakValueScore` (with `peakValueScoreAt`), and
+  a later, lower live score never pulls it back down — only a real new
+  high replaces it. `server.js`'s value-score endpoint calls this on
+  every real scoring request, so `peakValueScore` is always included
+  alongside the live `combinedRealValueScore` in the response. See
+  `test/peakValueScore.test.js`.
+  **Real subject self-verification, by direct instruction:** "I want
+  people to be able to verify their own cards to show that that is
+  them and they verify it." `verifySubjectIdentity(store, { cardId,
+  verifierId })` in `lib/cultureCards.js` lets a card's own real human
+  subject confirm the card is genuinely about them, strictly gated on
+  `card.subjectPersonId === verifierId` — nobody else, and an
+  external-entity card (no living subject) can't be "verified" by
+  anyone, since there's no real person to confirm it. Exposed as
+  `POST /api/card/:id/verify`, with `verifierId` taken from
+  `requireActor('verifierId')` session auth at the route layer, never
+  trusted from the request body alone. Sets `verifiedBySubject` /
+  `verifiedBySubjectAt` on the card (present only on person-subject
+  cards minted via `mintCultureCard`). See
+  `test/verifySubjectIdentity.test.js`.
 - `lib/establishedCreatorAssessment.js` — calibrates a real starting
   tier from external metrics for someone joining with existing fame,
   never the blank-slate `common` tier. `getLatestAssessmentForCreator()`
