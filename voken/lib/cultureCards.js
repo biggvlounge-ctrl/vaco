@@ -13,6 +13,7 @@
 const { CATEGORIES, RARITY_TIERS, TOKENIZATION_TYPES, FORMATS } = require('./cardTypes');
 const { getHistoricEntry } = require('./historicRegistry');
 const { getApprovedFamilyRepresentative } = require('./familyRepresentativeClaims');
+const { getApprovedCustomHistoricEntry } = require('./placeNominations');
 
 // Shared by every mint path -- the category/rarity/tokenization/format/
 // mint-count validation a person-subject and an external-entity card
@@ -232,7 +233,12 @@ function mintExternalEntityCard(store, options = {}) {
 function mintHistoricCard(store, options = {}) {
   const { historicSlug, mintedByUserId } = options;
   if (!historicSlug) throw new Error('mintHistoricCard requires a historicSlug');
-  const entry = getHistoricEntry(historicSlug);
+  // Falls back to a real, operator-approved community place nomination
+  // when the slug isn't in the fixed register -- see
+  // placeNominations.js's own header for why this is the one place
+  // the historic register is extended at runtime rather than only by
+  // a code change.
+  const entry = getHistoricEntry(historicSlug) || getApprovedCustomHistoricEntry(store, historicSlug);
   if (!entry) throw new Error(`mintHistoricCard: no historic entry "${historicSlug}" in the register`);
   if (!mintedByUserId) throw new Error('mintHistoricCard requires a mintedByUserId');
 

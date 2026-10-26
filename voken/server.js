@@ -70,6 +70,10 @@ const { ENGAGEMENT_TYPES, recordEngagementEvent, computeEngagementStats } = requ
 const { followCard, unfollowCard, isFollowing, getFollowerCount } = require('./lib/cardFollows');
 const { computeCardMarketPrice } = require('./lib/cardMarketPrice');
 const { computeWalletValue } = require('./lib/walletValue');
+const {
+  submitPlaceNomination, getPlaceNomination, reviewPlaceNomination,
+  listApprovedCustomHistoricEntries, genuineSignificanceInputsForCustomEntry,
+} = require('./lib/placeNominations');
 const { getVokenExplorePage } = require('./lib/exploreVoken');
 const { computeCreatorDigitalProfile } = require('./lib/creatorDigitalProfile');
 const { GATES, isComplianceCleared, setComplianceStatus } = require('./lib/complianceGate');
@@ -615,8 +619,14 @@ app.post('/api/card/:id/value-score', requireSession(), async (req, res) => {
     // here for the one other score a caller could otherwise just
     // assert. Non-historic cards are unaffected: no register exists
     // to defer to, so `options.genuineSignificance` still applies.
+    // A historic card minted against a real, operator-approved
+    // community place nomination isn't in the fixed register at all --
+    // falls back to the same real math applied to the nomination's
+    // own stored facts (placeNominations.js).
     const genuineSignificance = card && card.category === 'historic' && card.historicSlug
-      ? genuineSignificanceInputsFor(card.historicSlug)
+      ? (getHistoricEntry(card.historicSlug)
+        ? genuineSignificanceInputsFor(card.historicSlug)
+        : genuineSignificanceInputsForCustomEntry(store, card.historicSlug))
       : options.genuineSignificance;
 
     const scoreResult = computeCultureCardValueScore(cardId, { ...options, traditional, genuineSignificance });
@@ -1019,6 +1029,61 @@ app.post('/api/family-representative-claim/:id/review', requireOperator('voken:g
     res.json(reviewFamilyRepresentativeClaim(store, {
       ...req.body, claimId: Number(req.params.id), operatorName: req.operator.operatorName,
     }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Real community place nominations, by direct instruction: "we will
+// do a lot of the places ourselves. And then we will let people
+// nominate places as well." See placeNominations.js's own header for
+// why a nomination is never auto-added to the register the way a
+// self-initiated application can self-qualify.
+app.post('/api/place-nomination', requireActor('nominatorId'), (req, res) => {
+  try {
+    res.status(201).json(submitPlaceNomination(store, req.body || {}));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/place-nomination/:id', (req, res) => {
+  const nomination = getPlaceNomination(store, Number(req.params.id));
+  if (!nomination) return res.status(404).json({ error: `no place nomination with id ${req.params.id}` });
+  res.json(nomination);
+});
+
+app.post('/api/place-nomination/:id/review', requireOperator('voken:grade'), async (req, res) => {
+  try {
+    await decisionLog.record({
+      route: 'POST /api/place-nomination/:id/review',
+      outcomeKind: 'grade',
+      subjectType: 'placeNomination',
+      subjectId: req.params.id,
+      decidedBy: req.operator.operatorName,
+      decidedByKind: 'operator',
+      inputs: req.body || {},
+      reason: (req.body || {}).reason || null,
+    });
+  } catch (err) {
+    return res.status(503).json({ error: err.message });
+  }
+
+  try {
+    res.json(reviewPlaceNomination(store, {
+      ...req.body, nominationId: Number(req.params.id), operatorName: req.operator.operatorName,
+    }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Real, operator-approved community-nominated places, browsable
+// alongside the fixed register above -- real entries, just not
+// hand-curated into historicRegistry.js itself.
+app.get('/api/place-nomination/approved/list', (req, res) => {
+  try {
+    res.json({ entries: listApprovedCustomHistoricEntries(store, req.query.subjectType || null) });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

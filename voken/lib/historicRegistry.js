@@ -81,6 +81,11 @@ const HISTORIC_REGISTRY = [
     summary: 'The largest pre-Columbian settlement north of Mexico, located near present-day Collinsville, Illinois, built by the Mississippian culture and home to Monks Mound, the largest prehistoric earthen structure in the Americas.',
     recognitions: ['UNESCO World Heritage Site (1982)'],
   },
+  {
+    slug: 'vatican-city', subjectType: 'place', name: 'Vatican City', era: '1929–present (as a sovereign state)', earliestYear: 1929,
+    summary: 'The smallest sovereign state in the world by both area and population, established by the 1929 Lateran Treaty as the seat of the Holy See; home to St. Peter\'s Basilica and the Sistine Chapel, and the center of the Roman Catholic Church since the 4th century CE.',
+    recognitions: ['UNESCO World Heritage Site (1984)'],
+  },
 
   // -- monuments --
   {

@@ -44,6 +44,8 @@ function createVokenStore() {
     familyRepresentativeClaims: [],
     nextFamilyRepresentativeClaimId: 1,
     cardFollows: [],
+    placeNominations: [],
+    nextPlaceNominationId: 1,
   };
 }
 

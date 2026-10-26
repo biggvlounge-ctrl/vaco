@@ -156,10 +156,10 @@ curl http://localhost:8794/api/explore/historic
   register** of historic places, monuments, homes, people (inventors/
   authors/notable figures), inventions, and books, each a real,
   well-documented historical fact rather than caller-supplied free
-  text (33 entries as of this register's latest pass — the Great Wall,
+  text (34 entries as of this register's latest pass — the Great Wall,
   the Statue of Liberty, Monticello, Marie Curie, the printing press,
-  Hamlet, Cahokia Mounds, the Sears Tower, and more). The same "no
-  single owner" shape
+  Hamlet, Cahokia Mounds, the Sears Tower, Vatican City, and more).
+  The same "no single owner" shape
   `mintExternalEntityCard`'s operator path already established applies
   here too: nobody owns Machu Picchu or the invention of penicillin, so
   no guaranteed first edition goes to anyone, including the operator
@@ -227,6 +227,37 @@ curl http://localhost:8794/api/explore/historic
   `GET /api/family-representative-claim/:id`,
   `POST /api/family-representative-claim/:id/review`. See
   `test/familyRepresentativeClaims.test.js`.
+- `lib/placeNominations.js` — **real community place nominations, by
+  direct instruction:** "we will do a lot of the places ourselves.
+  And then we will let people nominate places as well." The fixed
+  `HISTORIC_REGISTRY` in `historicRegistry.js` stays exactly what it
+  is — a code-reviewed, hand-curated set of facts this repository
+  itself vouches for — but a nomination is a different real thing: a
+  third party proposing a brand-new real place with no vetting at all
+  yet, the same real problem `community-nomination` already solved
+  for a person being nominated by someone else, so this mirrors that
+  discipline: `submitPlaceNomination()` always lands `pending-review`,
+  never auto-added, and only a real, named operator decision
+  (`reviewPlaceNomination`, `voken:grade` authority, decision-logged)
+  can approve one — refused outright if the slug already exists in
+  the fixed register, or was already approved under a different
+  nominationId. Scoped to real physical places only
+  (`place`/`monument`/`home` — the types the user actually named,
+  "places... monuments... churches... the Vatican's"); a
+  `person`/`invention`/`book` nomination already has its own real
+  path and is refused here. **The one real place this register is
+  extended at runtime, without a code deploy**: once approved,
+  `getApprovedCustomHistoricEntry()` makes the nomination's own real
+  facts available in the exact shape a fixed-register entry has, and
+  `mintHistoricCard()` now checks it as a real fallback whenever a
+  slug isn't in the fixed register — the same real
+  `genuineSignificanceInputsFor()` math is also mirrored
+  (`genuineSignificanceInputsForCustomEntry()`) so a community-
+  nominated place scores by the identical real formula. Routes:
+  `POST /api/place-nomination`, `GET /api/place-nomination/:id`,
+  `POST /api/place-nomination/:id/review`,
+  `GET /api/place-nomination/approved/list` (optionally
+  `?subjectType=`). See `test/placeNominations.test.js`.
 - `lib/valueAlgorithm.js` — **the real, hybrid Value Algorithm (Phase
   1)**: a log-scale scarcity curve, log-normalized digital engagement
   with a real capped velocity bonus, and a completely independent
