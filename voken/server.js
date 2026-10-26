@@ -69,6 +69,7 @@ const {
 const { ENGAGEMENT_TYPES, recordEngagementEvent, computeEngagementStats } = require('./lib/cardEngagement');
 const { followCard, unfollowCard, isFollowing, getFollowerCount } = require('./lib/cardFollows');
 const { computeCardMarketPrice } = require('./lib/cardMarketPrice');
+const { computeVehicleCardValue } = require('./lib/vehicleCardValue');
 const { computeWalletValue } = require('./lib/walletValue');
 const {
   submitPlaceNomination, getPlaceNomination, reviewPlaceNomination,
@@ -698,6 +699,19 @@ app.post('/api/card/:id/value-score', requireSession(), async (req, res) => {
 app.get('/api/card/:id/market-price', (req, res) => {
   try {
     res.json(computeCardMarketPrice(store, { cardId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Culture Cars -- a real, separate vehicle attribute-based valuation,
+// by direct instruction: "most of it will be based on value, miles,
+// engine, the thing." Real attributes are set via the existing
+// `POST /api/card/:id/statistics` route (no new "owner can insert
+// data" mechanic needed); this is a read-only lookup.
+app.get('/api/card/:id/vehicle-value', (req, res) => {
+  try {
+    res.json(computeVehicleCardValue(store, { cardId: Number(req.params.id) }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

@@ -368,6 +368,38 @@ curl http://localhost:8794/api/explore/historic
   `$0` honestly rather than being dropped from `holdings` — the
   ownership is still a real fact even when the price isn't known yet.
   `GET /api/wallet/:ownerId/value`. See `test/walletValue.test.js`.
+- `lib/vehicleCardValue.js` — **Culture Cars, a real, separate vehicle
+  valuation algorithm, by direct instruction**: "we also have culture
+  cars where we have [come] up with a culture car algorithm as
+  well... just the value of the car. We can look up the attributes of
+  whatever the car has. And then the car will get a value from
+  that... most of it will be based on value, miles, engine, the
+  thing." Deliberately NOT the generic person-card formula routed
+  through a vehicle — a real reference value, mileage (a real
+  depreciation curve down to a flagged 200,000-mile floor), a real
+  standard condition grade (`poor`/`fair`/`good`/`excellent`/
+  `concours`, 0.5x–1.6x), a real engine/trim performance multiplier,
+  and model year all combine into `computeVehicleBaseValue()`.
+  **"Historic cars, new cars" are the same one formula** because a car
+  old enough crosses from depreciating with age to appreciating with
+  it: past a real, standard 25-year classic-car threshold, age adds a
+  real, capped premium instead of still subtracting.
+  **No new "owner can insert data" mechanic, by design** — "the owner
+  can add in certain influence... they could insert that information"
+  is exactly the already-built `updateCardStatistics()`
+  (`cultureCards.js`), already gated to a vehicle card's real verified
+  owner; this module only ever reads `card.statistics`, never writes
+  to it. **Popularity stays real but deliberately secondary** ("not
+  really from how many [times seen]... most of it will be based on
+  value, miles, engine"): rather than trusting a self-reported "times
+  seen" number, `computeVehicleCardValue()` reuses the real,
+  non-gameable deduped view count from `cardEngagement.js` and
+  `valueAlgorithm.js`'s own `computeDigitalEngagementScore()` —
+  genuine code reuse — folded in as a small, flagged, capped 15% bonus
+  that can never approach a real attribute-driven swing (verified
+  directly: even a maxed-out popularity bonus is dwarfed by the real
+  condition-grade range alone). `GET /api/card/:id/vehicle-value`. See
+  `test/vehicleCardValue.test.js`.
   **Real subject self-verification, by direct instruction:** "I want
   people to be able to verify their own cards to show that that is
   them and they verify it." `verifySubjectIdentity(store, { cardId,
