@@ -281,6 +281,33 @@ curl http://localhost:8794/api/explore/historic
   every real scoring request, so `peakValueScore` is always included
   alongside the live `combinedRealValueScore` in the response. See
   `test/peakValueScore.test.js`.
+  **A real, SEPARATE tradeable market price, by direct instruction —
+  reconciling an apparent contradiction with the paragraph above:**
+  "it could lower, though, if their following drops or if more cards
+  are added... as more people join cards, the value of cards will go
+  up because there are more cards available on the market now...
+  you might start off with a Bill Cosby card and it might be $2
+  because we're just getting started. But then as all the other cards
+  come in with a lower score, that Bill Cosby card will go up." The
+  real resolution: `peakValueScore` above and the new `cardMarketPrice.js`
+  are two different real numbers, the same way a real baseball
+  player's career-high stat line never erases even as the card's
+  market price moves. `computeCardMarketPrice(store, { cardId,
+  liveCombinedRealValueScore })` is built from (a) the card's LIVE
+  score, so a real following drop genuinely pulls it down, and (b) a
+  real `percentileRank` against every other real card's own
+  `peakValueScore` already on file, scaled by a real `marketMaturity`
+  factor (0 at zero other cards, 1 at a flagged 500-card anchor) — a
+  young, small market deliberately suppresses price ("we're just
+  getting started") even for a card sitting at the real top of it,
+  and a fixed card's real price genuinely rises as more lower-scoring
+  cards join (more real market to outrank) and genuinely falls as
+  more higher-scoring cards join (less real relative standing) — the
+  exact "Bill Cosby card" mechanic, verified directly for both
+  directions. Exposed inline in the value-score response
+  (`marketPrice`) and standalone at `GET /api/card/:id/market-price`
+  (using the card's stored peak, no fresh live score required). See
+  `test/cardMarketPrice.test.js`.
   **Real subject self-verification, by direct instruction:** "I want
   people to be able to verify their own cards to show that that is
   them and they verify it." `verifySubjectIdentity(store, { cardId,

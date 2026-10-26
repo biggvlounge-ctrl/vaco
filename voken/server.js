@@ -68,6 +68,7 @@ const {
 } = require('./lib/familyRepresentativeClaims');
 const { ENGAGEMENT_TYPES, recordEngagementEvent, computeEngagementStats } = require('./lib/cardEngagement');
 const { followCard, unfollowCard, isFollowing, getFollowerCount } = require('./lib/cardFollows');
+const { computeCardMarketPrice } = require('./lib/cardMarketPrice');
 const { getVokenExplorePage } = require('./lib/exploreVoken');
 const { computeCreatorDigitalProfile } = require('./lib/creatorDigitalProfile');
 const { GATES, isComplianceCleared, setComplianceStatus } = require('./lib/complianceGate');
@@ -627,7 +628,32 @@ app.post('/api/card/:id/value-score', requireSession(), async (req, res) => {
     // below the highest real score it has already earned.
     const peakValueScore = recordPeakValueScore(store, { cardId, combinedRealValueScore: scoreResult.combinedRealValueScore });
 
-    res.json({ ...scoreResult, peakValueScore });
+    // The real, tradeable market price -- a different real number
+    // from peakValueScore above, by direct instruction: "it could
+    // lower, though, if their following drops or if more cards are
+    // added... that Bill Cosby card will go up [as lower-scoring
+    // cards join]." Built from the LIVE score (so a real following
+    // drop can genuinely pull it down) and this card's real standing
+    // against every other real card's peak on file (so the market's
+    // own growth genuinely moves it). See cardMarketPrice.js's own
+    // header for why this and peakValueScore are deliberately two
+    // different real numbers.
+    const marketPrice = computeCardMarketPrice(store, { cardId, liveCombinedRealValueScore: scoreResult.combinedRealValueScore });
+
+    res.json({ ...scoreResult, peakValueScore, marketPrice });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// A lightweight real lookup for a card already scored at least once,
+// using its stored peakValueScore rather than requiring a fresh
+// live re-score -- the same real market comparison the value-score
+// route above runs inline, available on its own for a card's detail
+// page or a wallet total (see getWalletValue below).
+app.get('/api/card/:id/market-price', (req, res) => {
+  try {
+    res.json(computeCardMarketPrice(store, { cardId: Number(req.params.id) }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
