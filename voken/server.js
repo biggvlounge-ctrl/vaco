@@ -43,7 +43,7 @@ const { getBrandInfo } = require('./lib/brand');
 const { CATEGORIES, RARITY_TIERS, TOKENIZATION_TYPES, FORMATS } = require('./lib/cardTypes');
 const {
   SOURCE_APPS, MINTED_BY_ROLES,
-  mintCultureCard, mintExternalEntityCard, mintHistoricCard, listHistoricCards, getCultureCard, listCultureCardsByCategory, mintAdditionalEdition, transferEditionOwnership, listEditionsWithSerials, recordPeakValueScore, verifySubjectIdentity, updateCardStatistics} = require('./lib/cultureCards');
+  mintCultureCard, mintExternalEntityCard, mintHistoricCard, listHistoricCards, getCultureCard, listCultureCardsByCategory, mintAdditionalEdition, transferEditionOwnership, listEditionsWithSerials, recordPeakValueScore, verifySubjectIdentity, updateCardStatistics, describeCardForQuestion, recordCardPredictionMarket} = require('./lib/cultureCards');
 const {
   HISTORIC_SUBJECT_TYPES, listHistoricEntries, getHistoricEntry, genuineSignificanceInputsFor, rankHistoricEntries,
 } = require('./lib/historicRegistry');
@@ -141,6 +141,39 @@ const CVLLEX_API_URL = process.env.CVLLEX_API_URL || 'http://localhost:8822';
 const VULTURE_MUSIC_API_URL = process.env.VULTURE_MUSIC_API_URL || 'http://localhost:8806';
 const VULTURE_PODS_API_URL = process.env.VULTURE_PODS_API_URL || 'http://localhost:8810';
 const VULTURE_FLIX_API_URL = process.env.VULTURE_FLIX_API_URL || 'http://localhost:8807';
+const VAGO_API_URL = process.env.VAGO_API_URL || 'http://localhost:8795';
+
+// "let's also add in our predictions on the culture card market as
+// well." The exact same real pattern VDP already established for
+// opening a VAGO market (vdp/server.cjs's own `openVagoMarket`):
+// server-to-server, the same `X-Service-Name`/`X-Service-Token` pair
+// every other cross-app call in this file already uses, never a
+// player's own session -- opening a market curates a real question
+// about this app's own market, it is not a player action. Fails soft
+// (returns null) the same way `fetchRealTotal` already does: VAGO may
+// not be running in every dev environment, and a missing prediction
+// market must never take VOKEN's own server down.
+async function openVagoMarket({ question, category, creatorId, openingYesPrice } = {}) {
+  try {
+    const res = await fetch(`${VAGO_API_URL}/api/markets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...serviceHeaders() },
+      body: JSON.stringify({
+        question, category, source: 'voken-culture-card', creatorId, openingYesPrice,
+      }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      let message = `openVagoMarket failed (${res.status})`;
+      try { message = JSON.parse(text).error || message; } catch { /* not JSON */ }
+      throw new Error(message);
+    }
+    return await res.json();
+  } catch (err) {
+    console.warn(`VOKEN: could not open a VAGO prediction market (VAGO may not be running): ${err.message}`);
+    return null;
+  }
+}
 
 // A single real total from one connected app -- fail-soft, same
 // posture `pushMetric` already takes elsewhere in this ecosystem for
@@ -665,6 +698,53 @@ app.post('/api/card/:id/value-score', requireSession(), async (req, res) => {
 app.get('/api/card/:id/market-price', (req, res) => {
   try {
     res.json(computeCardMarketPrice(store, { cardId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Real VAGO prediction markets on a card's own real market price, by
+// direct instruction: "let's also add in our predictions on the
+// culture card market as well." Opening a market curates a real
+// question about VOKEN's own market -- the same real `voken:grade`-
+// shaped curatorial decision this app already gates behind a named
+// operator authority elsewhere, decision-logged the same way.
+app.post('/api/card/:id/prediction-market', requireOperator('voken:predict'), async (req, res) => {
+  const cardId = Number(req.params.id);
+  const { thresholdPrice, byDate } = req.body || {};
+
+  try {
+    await decisionLog.record({
+      route: 'POST /api/card/:id/prediction-market',
+      outcomeKind: 'grade',
+      subjectType: 'cultureCard',
+      subjectId: req.params.id,
+      decidedBy: req.operator.operatorName,
+      decidedByKind: 'operator',
+      inputs: req.body || {},
+      reason: (req.body || {}).reason || null,
+    });
+  } catch (err) {
+    return res.status(503).json({ error: err.message });
+  }
+
+  try {
+    const card = getCultureCard(store, cardId);
+    if (!card) return res.status(404).json({ error: `no card with id ${cardId}` });
+    if (!Number.isFinite(thresholdPrice) || thresholdPrice < 0) {
+      return res.status(400).json({ error: 'requires a non-negative thresholdPrice' });
+    }
+    if (!byDate) return res.status(400).json({ error: 'requires a byDate' });
+
+    const { marketPrice } = computeCardMarketPrice(store, { cardId });
+    const question = `Will ${describeCardForQuestion(card)}'s VOKEN market price exceed $${thresholdPrice} by ${byDate}? (currently $${marketPrice})`;
+    const market = await openVagoMarket({
+      question, category: 'culture-cards', creatorId: req.operator.operatorName,
+    });
+
+    res.status(201).json(recordCardPredictionMarket(store, {
+      cardId, question, thresholdPrice, byDate, vagoMarketId: market ? market.id : null,
+    }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

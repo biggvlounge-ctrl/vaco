@@ -84,6 +84,11 @@ function mintCultureCard(store, options = {}) {
     // movies, you can change those type of things." See
     // updateCardStatistics() below for who may write to this and why.
     statistics: {},
+    // Real VAGO prediction markets opened on this card's own real
+    // market price, by direct instruction: "let's also add in our
+    // predictions on the culture card market as well." See
+    // recordCardPredictionMarket() below.
+    predictionMarkets: [],
     // High-water-mark value tracking, by direct instruction: "the
     // card raises or stays the same... it just won't raise [downward]"
     // -- see recordPeakValueScore() below.
@@ -188,6 +193,11 @@ function mintExternalEntityCard(store, options = {}) {
     // curated this card on behalf of no one, so there is no real
     // authority to let update it).
     statistics: {},
+    // Real VAGO prediction markets opened on this card's own real
+    // market price, by direct instruction: "let's also add in our
+    // predictions on the culture card market as well." See
+    // recordCardPredictionMarket() below.
+    predictionMarkets: [],
     // High-water-mark value tracking, by direct instruction: "the
     // card raises or stays the same... it just won't raise [downward]"
     // -- see recordPeakValueScore() below.
@@ -274,6 +284,11 @@ function mintHistoricCard(store, options = {}) {
     // real, operator-approved family representative is on file for
     // this slug (familyRepresentativeId below).
     statistics: {},
+    // Real VAGO prediction markets opened on this card's own real
+    // market price, by direct instruction: "let's also add in our
+    // predictions on the culture card market as well." See
+    // recordCardPredictionMarket() below.
+    predictionMarkets: [],
     // High-water-mark value tracking, by direct instruction: "the
     // card raises or stays the same... it just won't raise [downward]"
     // -- see recordPeakValueScore() below.
@@ -417,6 +432,40 @@ function updateCardStatistics(store, options = {}) {
   return card;
 }
 
+// A real, honest name for a card in a prediction-market question --
+// a historic card's real `historicFact.name`, or an honest numeric
+// fallback (`Cvltvre Card #id`) rather than inventing a display name
+// for a living-subject card that has none stored here (VOKEN itself
+// never stores a person's name; `subjectPersonId` is an id, not a
+// name a real caller should trust this module to guess at).
+function describeCardForQuestion(card) {
+  return card.historicFact ? card.historicFact.name : `Cvltvre Card #${card.id}`;
+}
+
+// **Real VAGO prediction markets on a card's own real market price,
+// by direct instruction**: "let's also add in our predictions on the
+// culture card market as well." This function never calls VAGO
+// itself (this module stays a synchronous, directly-testable pure
+// function, the same posture `valueAlgorithm.js` and every other
+// scoring module here already takes) -- `server.js`'s route does the
+// real HTTP call, fail-soft the same way VDP's own `openVagoMarket`
+// already is, and passes the result in here to record. `vagoMarketId`
+// is honestly `null` when VAGO was unreachable, never fabricated.
+function recordCardPredictionMarket(store, options = {}) {
+  const { cardId, vagoMarketId, question, thresholdPrice, byDate, now = Date.now() } = options;
+  const card = getCultureCard(store, cardId);
+  if (!card) throw new Error(`recordCardPredictionMarket: no card with id ${cardId}`);
+  if (!question) throw new Error('recordCardPredictionMarket requires a question');
+  if (!Number.isFinite(thresholdPrice) || thresholdPrice < 0) {
+    throw new Error('recordCardPredictionMarket requires a non-negative thresholdPrice');
+  }
+  if (!byDate) throw new Error('recordCardPredictionMarket requires a byDate');
+
+  const record = { vagoMarketId, question, thresholdPrice, byDate, createdAt: now };
+  card.predictionMarkets.push(record);
+  return record;
+}
+
 function countMintedEditions(card, format) {
   return card.editions.filter((e) => e.format === format).length;
 }
@@ -513,6 +562,8 @@ module.exports = {
   recordPeakValueScore,
   verifySubjectIdentity,
   updateCardStatistics,
+  describeCardForQuestion,
+  recordCardPredictionMarket,
   listCultureCardsByCategory,
   countMintedEditions,
   mintAdditionalEdition,

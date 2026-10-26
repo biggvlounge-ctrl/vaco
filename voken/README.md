@@ -339,6 +339,24 @@ curl http://localhost:8794/api/explore/historic
   (`marketPrice`) and standalone at `GET /api/card/:id/market-price`
   (using the card's stored peak, no fresh live score required). See
   `test/cardMarketPrice.test.js`.
+  **Real VAGO prediction markets on that same market price, by direct
+  instruction**: "let's also add in our predictions on the culture
+  card market as well." `server.js`'s `openVagoMarket()` mirrors
+  VDP's own identical real pattern (server-to-server, the same
+  `X-Service-Name`/`X-Service-Token` pair, fails soft to `null` when
+  VAGO isn't running rather than taking VOKEN's server down with it).
+  `POST /api/card/:id/prediction-market` (a real, named
+  `voken:predict` operator decision, decision-logged) opens a real
+  market with a question templated from the card's own real current
+  `marketPrice` and a real threshold/date the operator names, sourced
+  as `voken-culture-card` (see `vago/lib/predictionMarkets.js`'s own
+  new source). `describeCardForQuestion()` names the card honestly —
+  a historic card's real `historicFact.name`, or `Cvltvre Card #id`
+  for a living-subject card, never an invented display name.
+  `recordCardPredictionMarket()` keeps the real result (including an
+  honest `null` `vagoMarketId` when VAGO was unreachable) on the
+  card's own `predictionMarkets` list. See
+  `test/cardPredictionMarkets.test.js`.
 - `lib/walletValue.js` — **real wallet value, by direct instruction:**
   "when people get the cards, they will know how much their wallet is
   worth." `computeWalletValue(store, { ownerId })` sums the exact real
