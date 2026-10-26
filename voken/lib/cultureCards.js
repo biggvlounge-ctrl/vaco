@@ -12,6 +12,7 @@
 
 const { CATEGORIES, RARITY_TIERS, TOKENIZATION_TYPES, FORMATS } = require('./cardTypes');
 const { getHistoricEntry } = require('./historicRegistry');
+const { getApprovedFamilyRepresentative } = require('./familyRepresentativeClaims');
 
 // Shared by every mint path -- the category/rarity/tokenization/format/
 // mint-count validation a person-subject and an external-entity card
@@ -206,6 +207,17 @@ function mintExternalEntityCard(store, options = {}) {
 // nobody owns the Great Wall of China or the invention of the printing
 // press, so no guaranteed first edition goes to anyone, including the
 // operator who curated the card into existence.
+//
+// **The one real exception, by direct instruction**: "for the people
+// who aren't living, the initial card... the master card, goes to the
+// family." A historic `person` entry can have a real, operator-
+// approved family representative on file (see
+// `lib/familyRepresentativeClaims.js`) -- when one exists, they get
+// the exact same guaranteed-first-edition treatment the living subject
+// gets in `mintCultureCard` above. When nobody has come forward and
+// been approved yet, this mints with no owner, the same honest
+// fallback every other historic card already has -- never a
+// fabricated family member standing in for a real one.
 function mintHistoricCard(store, options = {}) {
   const { historicSlug, mintedByUserId } = options;
   if (!historicSlug) throw new Error('mintHistoricCard requires a historicSlug');
@@ -245,9 +257,24 @@ function mintHistoricCard(store, options = {}) {
     // -- see recordPeakValueScore() below.
     peakValueScore: null,
     peakValueScoreAt: null,
+    familyRepresentativeId: null,
     createdAt: Date.now(),
   };
-  card.provenance.push({ year: new Date(card.createdAt).getFullYear(), event: 'minted', ownerId: null });
+
+  const familyRepresentativeId = entry.subjectType === 'person'
+    ? getApprovedFamilyRepresentative(store, entry.slug)
+    : null;
+
+  if (familyRepresentativeId) {
+    card.familyRepresentativeId = familyRepresentativeId;
+    card.editions.push({ editionNumber: 1, format: 'digital', ownerId: familyRepresentativeId, mintedAt: card.createdAt });
+    if (plannedPhysicalMintCount > 0) {
+      card.editions.push({ editionNumber: 1, format: 'physical', ownerId: familyRepresentativeId, mintedAt: card.createdAt });
+    }
+    card.provenance.push({ year: new Date(card.createdAt).getFullYear(), event: 'minted', ownerId: familyRepresentativeId });
+  } else {
+    card.provenance.push({ year: new Date(card.createdAt).getFullYear(), event: 'minted', ownerId: null });
+  }
 
   store.cultureCards.push(card);
   return card;

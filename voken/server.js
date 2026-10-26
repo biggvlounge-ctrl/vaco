@@ -62,6 +62,9 @@ const { TRADE_STATUSES, proposeTrade, getTrade, acceptTrade, rejectTrade, cancel
 const {
   APPLICATION_PATHS, APPLICATION_STATUSES, submitApplication, getApplication, runKenjiAnalysis, reviewNomination,
 } = require('./lib/cultureCardApplication');
+const {
+  CLAIM_STATUSES, submitFamilyRepresentativeClaim, getFamilyRepresentativeClaim, reviewFamilyRepresentativeClaim,
+} = require('./lib/familyRepresentativeClaims');
 const { ENGAGEMENT_TYPES, recordEngagementEvent, computeEngagementStats } = require('./lib/cardEngagement');
 const { getVokenExplorePage } = require('./lib/exploreVoken');
 const { computeCreatorDigitalProfile } = require('./lib/creatorDigitalProfile');
@@ -884,6 +887,51 @@ app.post('/api/application/:id/review-nomination', requireOperator('voken:grade'
   try {
     res.json(reviewNomination(store, {
       ...req.body, applicationId: Number(req.params.id), operatorName: req.operator.operatorName,
+    }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// The real family claim behind a historic person card's master
+// edition, by direct instruction: "for the people who aren't living,
+// the initial card... the master card, goes to the family." See
+// lib/familyRepresentativeClaims.js's own header for why this is a
+// real, operator-reviewed claim rather than something anyone can
+// simply assert about a stranger.
+app.post('/api/family-representative-claim', requireActor('claimantId'), (req, res) => {
+  try {
+    res.status(201).json(submitFamilyRepresentativeClaim(store, req.body || {}));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/family-representative-claim/:id', (req, res) => {
+  const claim = getFamilyRepresentativeClaim(store, Number(req.params.id));
+  if (!claim) return res.status(404).json({ error: `no family-representative claim with id ${req.params.id}` });
+  res.json(claim);
+});
+
+app.post('/api/family-representative-claim/:id/review', requireOperator('voken:grade'), async (req, res) => {
+  try {
+    await decisionLog.record({
+      route: 'POST /api/family-representative-claim/:id/review',
+      outcomeKind: 'grade',
+      subjectType: 'familyRepresentativeClaim',
+      subjectId: req.params.id,
+      decidedBy: req.operator.operatorName,
+      decidedByKind: 'operator',
+      inputs: req.body || {},
+      reason: (req.body || {}).reason || null,
+    });
+  } catch (err) {
+    return res.status(503).json({ error: err.message });
+  }
+
+  try {
+    res.json(reviewFamilyRepresentativeClaim(store, {
+      ...req.body, claimId: Number(req.params.id), operatorName: req.operator.operatorName,
     }));
   } catch (err) {
     res.status(400).json({ error: err.message });

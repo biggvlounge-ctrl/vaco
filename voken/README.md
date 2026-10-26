@@ -181,6 +181,32 @@ curl http://localhost:8794/api/explore/historic
   historic card — the same "never trust the request body" discipline
   that route already holds for the live VACA authenticity grade,
   applied to the one other score a caller could otherwise just assert.
+  **The one real exception to "no guaranteed edition goes to anyone,"
+  by direct instruction:** "for the people who aren't living, the
+  initial card... the master card, goes to the family."
+  `lib/familyRepresentativeClaims.js` is the real, operator-reviewed
+  claim this needs — scoped strictly to `subjectType === 'person'`
+  entries (a place, monument, invention, or book has no family to
+  claim it). A third party claiming to be a stranger's family is
+  exactly the unverified-claim problem `cultureCardApplication.js`'s
+  `community-nomination` path already solved, so this mirrors that
+  discipline exactly: `submitFamilyRepresentativeClaim()` always lands
+  `pending-review`, never auto-accepted, and only a real, named
+  operator decision (`reviewFamilyRepresentativeClaim`, requiring
+  `voken:grade` authority, logged to the decision log the same way a
+  nomination review is) can approve one — and only one approved claim
+  per slug can ever exist, since the master edition is a singular
+  guarantee. Once approved, `mintHistoricCard()` looks the claim up
+  and mints the real guaranteed first edition (digital, and physical
+  if planned) to that family representative, the identical mechanic
+  `mintCultureCard()` already gives a living subject. Until someone
+  real comes forward and is approved, a historic person card mints
+  with no owner, same as before — never a fabricated family member
+  standing in for one that was never real. Routes:
+  `POST /api/family-representative-claim`,
+  `GET /api/family-representative-claim/:id`,
+  `POST /api/family-representative-claim/:id/review`. See
+  `test/familyRepresentativeClaims.test.js`.
 - `lib/valueAlgorithm.js` — **the real, hybrid Value Algorithm (Phase
   1)**: a log-scale scarcity curve, log-normalized digital engagement
   with a real capped velocity bonus, and a completely independent

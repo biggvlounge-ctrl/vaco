@@ -41,6 +41,8 @@ function createVokenStore() {
     spins: [],
     nextSpinId: 1,
     nextSellBackId: 1,
+    familyRepresentativeClaims: [],
+    nextFamilyRepresentativeClaimId: 1,
   };
 }
 
