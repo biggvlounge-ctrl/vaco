@@ -70,6 +70,7 @@ const { ENGAGEMENT_TYPES, recordEngagementEvent, computeEngagementStats } = requ
 const { followCard, unfollowCard, isFollowing, getFollowerCount } = require('./lib/cardFollows');
 const { computeCardMarketPrice } = require('./lib/cardMarketPrice');
 const { computeVehicleCardValue } = require('./lib/vehicleCardValue');
+const { createCarClub, getCarClub, joinCarClub, leaveCarClub, getCarClubLeaderboard } = require('./lib/carClubs');
 const { computeWalletValue } = require('./lib/walletValue');
 const {
   submitPlaceNomination, getPlaceNomination, reviewPlaceNomination,
@@ -712,6 +713,47 @@ app.get('/api/card/:id/market-price', (req, res) => {
 app.get('/api/card/:id/vehicle-value', (req, res) => {
   try {
     res.json(computeVehicleCardValue(store, { cardId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Real Culture Car Clubs, by direct instruction: "also add in groups
+// where people could have car clubs... see who has the most value in
+// the car club through cards and cars."
+app.post('/api/car-club', requireActor('creatorId'), (req, res) => {
+  try {
+    res.status(201).json(createCarClub(store, req.body || {}));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/car-club/:id', (req, res) => {
+  const club = getCarClub(store, Number(req.params.id));
+  if (!club) return res.status(404).json({ error: `no car club with id ${req.params.id}` });
+  res.json(club);
+});
+
+app.post('/api/car-club/:id/join', requireActor('userId'), (req, res) => {
+  try {
+    res.json(joinCarClub(store, { ...req.body, clubId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/car-club/:id/leave', requireActor('userId'), (req, res) => {
+  try {
+    res.json(leaveCarClub(store, { ...req.body, clubId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/car-club/:id/leaderboard', (req, res) => {
+  try {
+    res.json({ leaderboard: getCarClubLeaderboard(store, Number(req.params.id)) });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

@@ -46,6 +46,8 @@ function createVokenStore() {
     cardFollows: [],
     placeNominations: [],
     nextPlaceNominationId: 1,
+    carClubs: [],
+    nextCarClubId: 1,
   };
 }
 

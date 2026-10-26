@@ -433,6 +433,21 @@ curl http://localhost:8794/api/explore/historic
   appraisal and an actual auction hammer price are two different real
   things for any other collectible. VOKEN never brokers the real
   physical car itself — only ever the card.
+- `lib/carClubs.js` — **Culture Car Clubs, by direct instruction**:
+  "also add in groups where people could have car clubs... see who
+  has the most value in the car club through cards and cars." A club
+  membership is a real, durable relationship (`createCarClub` auto-
+  joins its real creator; `joinCarClub`/`leaveCarClub` are real,
+  idempotent no-ops on repeat calls, the same shape `cardFollows.js`
+  already established). **"Through cards and cars" is genuine code
+  reuse, not a second value formula** — `getCarClubLeaderboard()`
+  ranks members by the exact same `computeWalletValue()`
+  (`walletValue.js`) VOKEN already uses for a personal wallet total,
+  which already sums every real card category a member holds,
+  Culture Cars included, with no vehicle-specific carve-out needed.
+  Routes: `POST /api/car-club`, `GET /api/car-club/:id`,
+  `POST /api/car-club/:id/join`, `POST /api/car-club/:id/leave`,
+  `GET /api/car-club/:id/leaderboard`. See `test/carClubs.test.js`.
   **Real subject self-verification, by direct instruction:** "I want
   people to be able to verify their own cards to show that that is
   them and they verify it." `verifySubjectIdentity(store, { cardId,
