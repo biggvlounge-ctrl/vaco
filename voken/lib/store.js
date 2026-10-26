@@ -43,6 +43,7 @@ function createVokenStore() {
     nextSellBackId: 1,
     familyRepresentativeClaims: [],
     nextFamilyRepresentativeClaimId: 1,
+    cardFollows: [],
   };
 }
 

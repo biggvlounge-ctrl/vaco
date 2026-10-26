@@ -67,6 +67,7 @@ const {
   CLAIM_STATUSES, submitFamilyRepresentativeClaim, getFamilyRepresentativeClaim, reviewFamilyRepresentativeClaim,
 } = require('./lib/familyRepresentativeClaims');
 const { ENGAGEMENT_TYPES, recordEngagementEvent, computeEngagementStats } = require('./lib/cardEngagement');
+const { followCard, unfollowCard, isFollowing, getFollowerCount } = require('./lib/cardFollows');
 const { getVokenExplorePage } = require('./lib/exploreVoken');
 const { computeCreatorDigitalProfile } = require('./lib/creatorDigitalProfile');
 const { GATES, isComplianceCleared, setComplianceStatus } = require('./lib/complianceGate');
@@ -983,9 +984,16 @@ app.post('/api/family-representative-claim/:id/review', requireOperator('voken:g
   }
 });
 
+// A "view" event's `viewerId` is taken from the real session, never
+// the request body -- the whole point of deduping views per viewer
+// (by direct instruction: "we'll use it like YouTube. You can only
+// view the card once") is that the identity being deduplicated
+// against is real, not whatever a caller claims.
 app.post('/api/card/:id/engagement', requireSession(), (req, res) => {
   try {
-    res.status(201).json(recordEngagementEvent(store, { ...req.body, cardId: Number(req.params.id) }));
+    const body = { ...req.body, cardId: Number(req.params.id) };
+    if (body.type === 'view') body.viewerId = req.sessionUserId;
+    res.status(201).json(recordEngagementEvent(store, body));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -994,6 +1002,39 @@ app.post('/api/card/:id/engagement', requireSession(), (req, res) => {
 app.get('/api/card/:id/engagement', (req, res) => {
   try {
     res.json(computeEngagementStats(store, { cardId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Real card follows, by direct instruction: "you can follow that card
+// and you can like that card." `followerId` comes from the real
+// session, never the request body -- same discipline as the view
+// event above, since a follow is a real relationship tied to a real
+// identity.
+app.post('/api/card/:id/follow', requireSession(), (req, res) => {
+  try {
+    res.status(201).json(followCard(store, { cardId: Number(req.params.id), followerId: req.sessionUserId }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/card/:id/follow', requireSession(), (req, res) => {
+  try {
+    const unfollowed = unfollowCard(store, { cardId: Number(req.params.id), followerId: req.sessionUserId });
+    res.json({ unfollowed });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/card/:id/follow', (req, res) => {
+  try {
+    const cardId = Number(req.params.id);
+    const result = { cardId, followerCount: getFollowerCount(store, cardId) };
+    if (req.query.followerId) result.isFollowing = isFollowing(store, { cardId, followerId: req.query.followerId });
+    res.json(result);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

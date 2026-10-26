@@ -18,13 +18,24 @@
 const ENGAGEMENT_TYPES = ['view', 'click', 'comment', 'like', 'share'];
 const DEFAULT_VELOCITY_WINDOW_MINUTES = 60;
 
+// **Views dedupe per real viewer, by direct instruction: "we'll use it
+// like YouTube. You can only view the card once."** A `view` event
+// therefore requires a real `viewerId` -- unlike a click, comment,
+// like, or share, which stay anonymous-allowed exactly as before,
+// since the instruction named views specifically. `computeEngagementStats`
+// below counts each real viewer only once no matter how many times
+// they reload the card, the same real property a YouTube view count
+// has.
 function recordEngagementEvent(store, options = {}) {
-  const { cardId, type, now = Date.now() } = options;
+  const { cardId, type, viewerId = null, now = Date.now() } = options;
   if (!cardId) throw new Error('recordEngagementEvent requires a cardId');
   if (!ENGAGEMENT_TYPES.includes(type)) {
     throw new Error(`recordEngagementEvent: invalid type "${type}" (expected one of ${ENGAGEMENT_TYPES.join(', ')})`);
   }
-  const event = { cardId, type, timestamp: now };
+  if (type === 'view' && !viewerId) {
+    throw new Error('recordEngagementEvent requires a real viewerId for a "view" event, so repeat views from the same viewer can be deduplicated');
+  }
+  const event = { cardId, type, viewerId, timestamp: now };
   store.cardEngagementEvents.push(event);
   return event;
 }
@@ -40,10 +51,19 @@ function computeEngagementStats(store, options = {}) {
   const events = store.cardEngagementEvents.filter((e) => e.cardId === cardId);
   const counts = { views: 0, clicks: 0, comments: 0, likes: 0, shares: 0 };
   const typeToField = { view: 'views', click: 'clicks', comment: 'comments', like: 'likes', share: 'shares' };
+  const seenViewers = new Set();
   for (const event of events) {
+    if (event.type === 'view') {
+      if (seenViewers.has(event.viewerId)) continue; // the real "only counts once" rule
+      seenViewers.add(event.viewerId);
+    }
     counts[typeToField[event.type]] += 1;
   }
 
+  // Velocity still reflects every real event in the window, including
+  // a repeat view -- a real viewer reloading the card right now is
+  // still real, current activity, even though it doesn't grow the
+  // deduplicated view total above.
   const windowMs = velocityWindowMinutes * 60 * 1000;
   const recentCount = events.filter((e) => now - e.timestamp <= windowMs).length;
   const engagementVelocity = Math.round((recentCount / velocityWindowMinutes) * 100) / 100;

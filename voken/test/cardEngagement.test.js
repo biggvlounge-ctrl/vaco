@@ -42,7 +42,36 @@ test('computeEngagementStats counts real shares separately from likes, not folde
 
 test('computeEngagementStats reports zero real shares for a card with none, not undefined', () => {
   const store = createVokenStore();
-  recordEngagementEvent(store, { cardId: 1, type: 'view' });
+  recordEngagementEvent(store, { cardId: 1, type: 'view', viewerId: 'ada' });
   const stats = computeEngagementStats(store, { cardId: 1 });
   assert.equal(stats.shares, 0);
+});
+
+// -- view deduplication, by direct instruction: "we'll use it like YouTube.
+// You can only view the card once." --------------------------------------
+
+test('a "view" event requires a real viewerId', () => {
+  const store = createVokenStore();
+  assert.throws(
+    () => recordEngagementEvent(store, { cardId: 1, type: 'view' }),
+    /requires a real viewerId/,
+  );
+});
+
+test('the same real viewer viewing a card repeatedly only ever counts once, the exact mechanic this file exists to prove', () => {
+  const store = createVokenStore();
+  recordEngagementEvent(store, { cardId: 1, type: 'view', viewerId: 'ada' });
+  recordEngagementEvent(store, { cardId: 1, type: 'view', viewerId: 'ada' });
+  recordEngagementEvent(store, { cardId: 1, type: 'view', viewerId: 'ada' });
+  const stats = computeEngagementStats(store, { cardId: 1 });
+  assert.equal(stats.views, 1, 'one real viewer reloading the card must not inflate the view count');
+});
+
+test('two different real viewers each count once, independently', () => {
+  const store = createVokenStore();
+  recordEngagementEvent(store, { cardId: 1, type: 'view', viewerId: 'ada' });
+  recordEngagementEvent(store, { cardId: 1, type: 'view', viewerId: 'ben' });
+  recordEngagementEvent(store, { cardId: 1, type: 'view', viewerId: 'ada' });
+  const stats = computeEngagementStats(store, { cardId: 1 });
+  assert.equal(stats.views, 2);
 });

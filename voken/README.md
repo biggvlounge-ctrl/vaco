@@ -509,6 +509,31 @@ curl http://localhost:8794/api/explore/historic
   `exploreVoken.js`/`historicExplore.js` already rank the Explore
   page by — so real engagement earned today is also real, better
   placement tomorrow, the same loop a real social feed runs on.
+  **Views dedupe per real viewer, by direct instruction: "we'll use it
+  like YouTube. You can only view the card once."** A `view` event now
+  requires a real `viewerId` (a click/comment/like/share stays
+  anonymous-allowed, since the instruction named views specifically);
+  `computeEngagementStats()` counts each distinct real viewer only
+  once no matter how many times they reload the card, the same real
+  property a YouTube view count has — a repeat view still counts
+  toward `engagementVelocity` (it's real, current activity) but never
+  inflates the deduplicated `views` total. `POST /api/card/:id/engagement`
+  takes `viewerId` from the real session (`req.sessionUserId`), never
+  the request body, for the same reason every other identity-bearing
+  field in this app does.
+- `lib/cardFollows.js` — **real card follows, by direct instruction:
+  "there will be a, you can follow that card and you can like that
+  card."** Deliberately a separate, real durable relationship
+  (`followCard`/`unfollowCard`/`isFollowing`/`getFollowerCount`), not
+  another entry in `cardEngagement.js`'s event log — a follow is a
+  real yes/no relationship to the card, not a countable action like a
+  comment. Both `followCard` and `unfollowCard` are real, idempotent
+  no-ops the second time (following twice, or unfollowing when not
+  following, changes nothing) — the same real property an actual
+  Follow button has. `POST`/`DELETE /api/card/:id/follow` take
+  `followerId` from the real session; `GET /api/card/:id/follow`
+  returns the real follower count (and, with `?followerId=`, whether
+  that real user currently follows it). See `test/cardFollows.test.js`.
 - `lib/exploreVoken.js` — the Explore Page: ranks cards by Phase 1's
   own `computeDigitalEngagementScore()`, fed by this phase's real
   engagement stats — genuine cross-phase code reuse, not a rebuilt
