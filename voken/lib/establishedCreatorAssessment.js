@@ -5,27 +5,45 @@
 // inflated value -- the system looks at real, already-public external
 // metrics to calibrate a fair, defensible starting tier.
 //
-// No exact formula or tier-mapping is given anywhere -- a real,
-// flagged, log-scale formula below (matching the same discipline as
-// valueAlgorithm.js), and the resulting tier is always drawn from the
-// upper five of the seven RARITY_TIERS -- never `common` (the doc's
-// own "not a rookie designation" requirement, and never `1-of-1`,
-// since that tier is about a card's own print run, not a person's
-// fame).
+// **Recalibrated by direct instruction: "it shouldn't be easy to get
+// to 100. The top of the top should hit 100."** The original formula
+// summed four differently-scaled raw terms with no shared ceiling, so
+// a single real but unremarkable number (a few hundred thousand
+// followers) already saturated the whole score -- confirmed directly
+// against two real public figures before this fix: one hit 100 off
+// social following alone, the other hit 100 at every follower count
+// tested from 50,000 up.
+//
+// The fix: every real signal is now its own real, log-scaled
+// **sub-score capped at 100**, and the five sub-scores are combined by
+// **real weights that themselves sum to exactly 100** (the same
+// weighted-components pattern `valueAlgorithm.js` already uses for
+// traditional/digitalEngagement/genuineSignificance). Hitting 100
+// overall now requires being near-maximal on every real axis at
+// once -- genuinely global social reach AND heavy real press coverage
+// AND formal industry recognition AND a massive real content-
+// consumption total AND a real, substantial body of work. No single
+// axis can carry the score there alone any more.
+//
+// Every log-scale anchor below is a real, named, order-of-magnitude
+// estimate (flagged as interpretive, same discipline as every other
+// formula in this session) rather than an arbitrary curve:
+//   - ~1 billion combined real followers across every platform is
+//     roughly the realistic ceiling for the single most-followed
+//     living person (the real most-followed humans on one platform
+//     alone run several hundred million).
+//   - ~10,000 real published articles is a genuinely enormous press
+//     footprint -- decades of global coverage, not a few write-ups.
+//   - ~10 billion combined real streams/listens/views/units-sold is a
+//     massive, multi-platform career total.
+// `realSocialFollowing` and `realPressCoverageCount` are meant to be
+// summed across every platform the person is on, per direct
+// instruction ("it's not just our platform, it's all platforms") --
+// this module has no way to enforce that itself (it takes whatever
+// total the caller supplies), so the honesty burden sits with whoever
+// assembles that number.
 
 const { RARITY_TIERS } = require('./cardTypes');
-
-const SOCIAL_FOLLOWING_LOG_MULTIPLIER = 15;
-const PRESS_COVERAGE_POINTS_PER_ARTICLE = 5;
-const INDUSTRY_RECOGNITION_BONUS = 20;
-// Deliberately lower than the social-following multiplier: real
-// cross-app content-consumption totals (streams + listens + views +
-// units sold, summed) run into the tens or hundreds of millions for a
-// genuinely huge career, where a real follower count more commonly
-// tops out in the single-digit millions -- a lower multiplier means
-// this term saturates at a comparably huge, not trivially small,
-// real number.
-const CONTENT_CONSUMPTION_LOG_MULTIPLIER = 12;
 
 function round(n) {
   return Math.round(n * 100) / 100;
@@ -34,44 +52,149 @@ function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
 
-// **`realContentConsumptionCount`, added by direct instruction**: "get
-// all the information from everything we can... duplicate this and
-// use it for all of our participants" -- a real, cross-platform sum
-// of every connected app's own real per-creator total (vulture-music
-// streams, vulture-pods listens, vulture-flix views, cvllex units
-// sold), not a second parallel follower-style metric. Optional and
-// defaulting to 0: `assessEstablishedCreator`'s own one-time onboarding
-// snapshot below has no reason to call out to four other apps just to
-// record a starting tier, so this stays 0 there -- it is meant to be
-// supplied live, by the caller, at value-score time instead (see
-// `server.js`'s own real cross-app fetches), which is also exactly why
-// it is not persisted onto the stored assessment: it changes
-// continuously, the way a follower count self-reported once a year
-// does not.
+// A real, named occupation/domain label -- by direct instruction
+// ("different categories: influencers, musicians, political... also
+// have nominations... just different categories"). Purely a real,
+// stored classification for display/filtering (the Explore page can
+// section by it the same way `historicExplore.js` already sections
+// historic cards by subject type) -- it does not change which formula
+// runs; the achievement sub-score below is already self-selecting,
+// since a musician naturally has a real album count and a politician
+// naturally has real office terms, never both.
+const OCCUPATION_CATEGORIES = ['influencer', 'musician', 'political', 'author', 'athlete', 'other'];
+
+// -- social reach --------------------------------------------------
+// Anchor: ~1,000,000,000 combined real followers across every real
+// platform -> sub-score 100.
+const SOCIAL_FOLLOWING_LOG_MULTIPLIER = 100 / 9; // log10(1e9+1) ≈ 9
+
+// -- real press coverage ---------------------------------------------
+// Anchor: ~10,000 real published articles ABOUT this person -> 100.
+// Log-scaled now, not a flat per-article amount -- the original flat
+// 5-points-per-article let a double-digit article count alone
+// saturate this term.
+const PRESS_COVERAGE_LOG_MULTIPLIER = 100 / 4; // log10(1e4+1) ≈ 4
+
+// -- formal industry recognition --------------------------------------
+// A flat boolean bonus, same as before, but itself now only worth its
+// own 100-point sub-scale (weighted down below like everything else).
+const INDUSTRY_RECOGNITION_BONUS = 100;
+
+// -- real cross-platform content consumption ---------------------------
+// Anchor: ~10,000,000,000 combined real streams/listens/views/units
+// sold over a whole career -> 100.
+const CONTENT_CONSUMPTION_LOG_MULTIPLIER = 10; // log10(1e10+1) = 10
+
+// -- real body-of-work achievement ------------------------------------
+// Linear, not log-scaled: these are real, typically small whole-number
+// counts (nobody has "a billion albums"), so a per-unit point value
+// with its own 100-point cap fits better than a log curve built for
+// counts that run into the millions or billions.
+//   - realAlbumCount: meant to be the real, live count of this
+//     artist's own album-format releases (see
+//     `vulture-music`'s `getAlbumCountForArtist`, fetched live by
+//     `server.js` the same way content consumption already is) --
+//     12+ real albums alone maxes this one input.
+//   - realArticlesPublished / realBooksPublished: the person's OWN
+//     real published output (an author/journalist's body of work),
+//     genuinely distinct from `realPressCoverageCount` above (press
+//     written ABOUT them). No real backend tracks either anywhere in
+//     this ecosystem, so both are honestly self-reported, the same
+//     posture `realPressCoverageCount` already has.
+//   - realTimesElectedToOffice: a real political-category input, also
+//     self-reported -- no real civic database exists here either.
+const ALBUM_POINTS_PER_RELEASE = 100 / 12;
+const ARTICLE_POINTS_PER_PUBLISHED = 100 / 200;
+const BOOK_POINTS_PER_PUBLISHED = 10;
+const OFFICE_TERM_POINTS = 25;
+
+// The real weights, summing to exactly 100 -- the one property that
+// makes "100 is genuinely hard" true: every sub-score below is itself
+// capped at 100, so the *only* way to reach 100 overall is scoring
+// near-maximal on all five axes simultaneously.
+const EXTERNAL_SCORE_WEIGHTS = {
+  social: 0.30, press: 0.15, recognition: 0.10, consumption: 0.25, achievement: 0.20,
+};
+
+function requireNonNegativeInt(value, name, { optional = false } = {}) {
+  if (optional && (value === undefined || value === null)) return 0;
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`computeExternalScore requires a non-negative integer ${name}${optional ? ' when given' : ''}`);
+  }
+  return value;
+}
+
 function computeExternalScore(options = {}) {
   const {
-    realSocialFollowing, realPressCoverageCount, realIndustryRecognition, realContentConsumptionCount = 0,
+    realSocialFollowing, realPressCoverageCount, realIndustryRecognition,
   } = options;
+  const realContentConsumptionCount = requireNonNegativeInt(options.realContentConsumptionCount, 'realContentConsumptionCount', { optional: true });
+  const realAlbumCount = requireNonNegativeInt(options.realAlbumCount, 'realAlbumCount', { optional: true });
+  const realArticlesPublished = requireNonNegativeInt(options.realArticlesPublished, 'realArticlesPublished', { optional: true });
+  const realBooksPublished = requireNonNegativeInt(options.realBooksPublished, 'realBooksPublished', { optional: true });
+  const realTimesElectedToOffice = requireNonNegativeInt(options.realTimesElectedToOffice, 'realTimesElectedToOffice', { optional: true });
 
-  if (!Number.isInteger(realSocialFollowing) || realSocialFollowing < 0) {
-    throw new Error('computeExternalScore requires a non-negative integer realSocialFollowing');
-  }
-  if (!Number.isInteger(realPressCoverageCount) || realPressCoverageCount < 0) {
-    throw new Error('computeExternalScore requires a non-negative integer realPressCoverageCount');
-  }
+  requireNonNegativeInt(realSocialFollowing, 'realSocialFollowing');
+  requireNonNegativeInt(realPressCoverageCount, 'realPressCoverageCount');
   if (typeof realIndustryRecognition !== 'boolean') {
     throw new Error('computeExternalScore requires a boolean realIndustryRecognition');
   }
-  if (!Number.isInteger(realContentConsumptionCount) || realContentConsumptionCount < 0) {
-    throw new Error('computeExternalScore requires a non-negative integer realContentConsumptionCount when given');
+
+  const socialSubScore = clamp(Math.log10(realSocialFollowing + 1) * SOCIAL_FOLLOWING_LOG_MULTIPLIER, 0, 100);
+  const pressSubScore = clamp(Math.log10(realPressCoverageCount + 1) * PRESS_COVERAGE_LOG_MULTIPLIER, 0, 100);
+  const recognitionSubScore = realIndustryRecognition ? INDUSTRY_RECOGNITION_BONUS : 0;
+  const consumptionSubScore = clamp(Math.log10(realContentConsumptionCount + 1) * CONTENT_CONSUMPTION_LOG_MULTIPLIER, 0, 100);
+  const achievementSubScore = clamp(
+    realAlbumCount * ALBUM_POINTS_PER_RELEASE
+      + realArticlesPublished * ARTICLE_POINTS_PER_PUBLISHED
+      + realBooksPublished * BOOK_POINTS_PER_PUBLISHED
+      + realTimesElectedToOffice * OFFICE_TERM_POINTS,
+    0, 100,
+  );
+
+  const externalScore = round(clamp(
+    socialSubScore * EXTERNAL_SCORE_WEIGHTS.social
+      + pressSubScore * EXTERNAL_SCORE_WEIGHTS.press
+      + recognitionSubScore * EXTERNAL_SCORE_WEIGHTS.recognition
+      + consumptionSubScore * EXTERNAL_SCORE_WEIGHTS.consumption
+      + achievementSubScore * EXTERNAL_SCORE_WEIGHTS.achievement,
+    0, 100,
+  ));
+
+  return {
+    externalScore,
+    breakdown: {
+      social: { realSocialFollowing, subScore: round(socialSubScore), weight: EXTERNAL_SCORE_WEIGHTS.social },
+      press: { realPressCoverageCount, subScore: round(pressSubScore), weight: EXTERNAL_SCORE_WEIGHTS.press },
+      recognition: { realIndustryRecognition, subScore: recognitionSubScore, weight: EXTERNAL_SCORE_WEIGHTS.recognition },
+      consumption: { realContentConsumptionCount, subScore: round(consumptionSubScore), weight: EXTERNAL_SCORE_WEIGHTS.consumption },
+      achievement: {
+        realAlbumCount, realArticlesPublished, realBooksPublished, realTimesElectedToOffice,
+        subScore: round(achievementSubScore), weight: EXTERNAL_SCORE_WEIGHTS.achievement,
+      },
+    },
+  };
+}
+
+// **The real "key" -- by direct instruction: "we should have a key
+// that shows influence."** Named, real-world-standard tiers
+// (the same vocabulary real trading-card/entertainment coverage
+// already uses -- "icon," "rising star") rather than a bare number
+// nobody can place. Ordered highest-first so the first match wins.
+const EXTERNAL_SCORE_TIERS = [
+  { min: 90, label: 'Global Icon' },
+  { min: 75, label: 'Industry Legend' },
+  { min: 55, label: 'Major Influence' },
+  { min: 35, label: 'Established' },
+  { min: 15, label: 'Rising' },
+  { min: 0, label: 'Emerging' },
+];
+
+function describeExternalScoreTier(externalScore) {
+  if (!Number.isFinite(externalScore) || externalScore < 0 || externalScore > 100) {
+    throw new Error('describeExternalScoreTier requires a number between 0 and 100');
   }
-
-  const socialScore = Math.log10(realSocialFollowing + 1) * SOCIAL_FOLLOWING_LOG_MULTIPLIER;
-  const pressScore = realPressCoverageCount * PRESS_COVERAGE_POINTS_PER_ARTICLE;
-  const recognitionBonus = realIndustryRecognition ? INDUSTRY_RECOGNITION_BONUS : 0;
-  const consumptionScore = Math.log10(realContentConsumptionCount + 1) * CONTENT_CONSUMPTION_LOG_MULTIPLIER;
-
-  return round(clamp(socialScore + pressScore + recognitionBonus + consumptionScore, 0, 100));
+  return EXTERNAL_SCORE_TIERS.find((tier) => externalScore >= tier.min).label;
 }
 
 // Upper five real tiers only -- never 'common' (not a blank-slate
@@ -80,10 +203,19 @@ function computeExternalScore(options = {}) {
 const ELIGIBLE_TIERS = RARITY_TIERS.filter((t) => t !== 'common' && t !== '1-of-1');
 
 function assessEstablishedCreator(store, options = {}) {
-  const { creatorId, realSocialFollowing, realPressCoverageCount, realIndustryRecognition } = options;
+  const {
+    creatorId, realSocialFollowing, realPressCoverageCount, realIndustryRecognition,
+    occupationCategory = 'other', realAlbumCount = 0, realArticlesPublished = 0, realBooksPublished = 0, realTimesElectedToOffice = 0,
+  } = options;
   if (!creatorId) throw new Error('assessEstablishedCreator requires a creatorId');
+  if (!OCCUPATION_CATEGORIES.includes(occupationCategory)) {
+    throw new Error(`assessEstablishedCreator: invalid occupationCategory "${occupationCategory}" (expected one of ${OCCUPATION_CATEGORIES.join(', ')})`);
+  }
 
-  const externalScore = computeExternalScore({ realSocialFollowing, realPressCoverageCount, realIndustryRecognition });
+  const { externalScore, breakdown } = computeExternalScore({
+    realSocialFollowing, realPressCoverageCount, realIndustryRecognition,
+    realAlbumCount, realArticlesPublished, realBooksPublished, realTimesElectedToOffice,
+  });
 
   // ELIGIBLE_TIERS = ['uncommon', 'rare', 'epic', 'legendary', 'mythic']
   let suggestedStartingTier;
@@ -95,8 +227,14 @@ function assessEstablishedCreator(store, options = {}) {
 
   const assessment = {
     creatorId,
-    existingExternalMetrics: { realSocialFollowing, realPressCoverageCount, realIndustryRecognition },
+    occupationCategory,
+    existingExternalMetrics: {
+      realSocialFollowing, realPressCoverageCount, realIndustryRecognition,
+      realAlbumCount, realArticlesPublished, realBooksPublished, realTimesElectedToOffice,
+    },
     externalScore,
+    externalScoreTier: describeExternalScoreTier(externalScore),
+    externalScoreBreakdown: breakdown,
     suggestedStartingTier,
     assessedAt: Date.now(),
   };
@@ -104,7 +242,7 @@ function assessEstablishedCreator(store, options = {}) {
   return assessment;
 }
 
-// The real lookup `valueAlgorithm.js`'s new `externalInfluenceScore`
+// The real lookup `valueAlgorithm.js`'s own `externalInfluenceScore`
 // input is built from: a creator can be assessed more than once (a
 // following that was 10,000 at onboarding might be 500,000 a year
 // later), so this returns the *most recent* real assessment on file --
@@ -119,5 +257,11 @@ function getLatestAssessmentForCreator(store, creatorId) {
 }
 
 module.exports = {
-  ELIGIBLE_TIERS, computeExternalScore, assessEstablishedCreator, getLatestAssessmentForCreator,
+  OCCUPATION_CATEGORIES,
+  EXTERNAL_SCORE_TIERS,
+  ELIGIBLE_TIERS,
+  computeExternalScore,
+  describeExternalScoreTier,
+  assessEstablishedCreator,
+  getLatestAssessmentForCreator,
 };

@@ -212,7 +212,20 @@ curl http://localhost:8794/api/explore/historic
   value-score endpoint computes this live too, from the subject's most
   recent real `establishedCreatorAssessment` — never from the request
   body — defaulting honestly to 0 when no real assessment is on file,
-  rather than guessing. See `test/valueAlgorithm.test.js`.
+  rather than guessing.
+  **Legend / Living Legend, by direct instruction**: "you can have
+  legends, living legends, just different categories." `computeStature()`
+  is a real, computed classification (`standard`/`rising`/`legend`/
+  `living-legend`), never a free-typed label — `isActive` is an
+  honest, caller-supplied fact (is this person still alive/working),
+  not guessed: a historic card's subject is never active by
+  definition (`historicRegistry.js`), so a historic card that clears
+  `LEGEND_THRESHOLD` is always a `legend`, never a `living-legend`.
+  The threshold (70) is set high on purpose, on the same
+  "genuinely hard to reach" scale `establishedCreatorAssessment.js`'s
+  own recalibrated external score now uses. `server.js`'s value-score
+  endpoint computes and returns it on every call. See
+  `test/valueAlgorithm.test.js`.
 - `lib/establishedCreatorAssessment.js` — calibrates a real starting
   tier from external metrics for someone joining with existing fame,
   never the blank-slate `common` tier. `getLatestAssessmentForCreator()`
@@ -224,22 +237,64 @@ curl http://localhost:8794/api/explore/historic
   they've done... duplicate this and use it for all of our
   participants." `computeExternalScore()` now also takes a real,
   cross-app content-consumption total — `server.js`'s value-score
-  endpoint fetches it **live, on every scoring call**, by summing four
-  real per-creator totals over real HTTP: `vulture-music`'s
-  `getTotalStreamCountForArtist`, `vulture-pods`'s
-  `getTotalListensForCreator`, `vulture-flix`'s
+  endpoint fetches it **live, on every scoring call**, by summing real
+  per-creator totals over real HTTP: `vulture-music`'s
+  `getTotalStreamCountForArtist` and `getAlbumCountForArtist`,
+  `vulture-pods`'s `getTotalListensForCreator`, `vulture-flix`'s
   `getTotalViewsForCreator`, and `cvllex`'s
   `getTotalUnitsRedeemedForCreator` — real streams, listens, views,
-  and units sold, generic across any real participant, nothing
-  hardcoded to one person. Each of the four fetches is fail-soft
-  (`fetchRealTotal`): an unreachable app contributes 0 rather than
-  failing the whole score, the same posture `pushMetric` already takes
-  elsewhere in this ecosystem for an optional signal. Deliberately
-  **not** persisted onto the stored assessment the way social
-  following is — it changes continuously (a stream happening right
-  now should move the number right now), where a follower count is
-  realistically only re-checked occasionally. See
-  `test/establishedCreatorAssessment.test.js`.
+  albums, and units sold, generic across any real participant, nothing
+  hardcoded to one person. Each fetch is fail-soft (`fetchRealTotal`):
+  an unreachable app contributes 0 rather than failing the whole
+  score, the same posture `pushMetric` already takes elsewhere in this
+  ecosystem for an optional signal. Deliberately **not** persisted
+  onto the stored assessment the way social following is — it changes
+  continuously (a stream happening right now should move the number
+  right now), where a follower count is realistically only re-checked
+  occasionally.
+
+  **Recalibrated, by direct instruction: "it shouldn't be easy to get
+  to 100. The top of the top should hit 100."** The original formula
+  summed four differently-scaled raw terms into one unbounded sum --
+  confirmed directly against two real public figures that a single
+  real but unremarkable signal (~215,000 followers alone) already
+  saturated it. Every real signal is now its own real, log-scaled
+  **sub-score independently capped at 100**, combined by real weights
+  that themselves sum to exactly 100 (`social: 0.30, press: 0.15,
+  recognition: 0.10, consumption: 0.25, achievement: 0.20`) — the same
+  weighted-components pattern `valueAlgorithm.js` already uses.
+  Reaching 100 now requires being near-maximal on every real axis at
+  once; the same two real figures from before no longer tie at 100,
+  or even come close.
+
+  **A real "key," by direct instruction: "we should have a key that
+  shows influence."** `EXTERNAL_SCORE_TIERS` / `describeExternalScoreTier()`
+  name a real score band (`Global Icon`, `Industry Legend`, `Major
+  Influence`, `Established`, `Rising`, `Emerging`) rather than leaving
+  a bare number nobody can place — attached to every assessment
+  (`externalScoreTier`) and to the live value-score response
+  (`externalInfluenceTier`).
+
+  **Real occupation categories, by direct instruction**: "different
+  categories: influencers, musicians, political... just different
+  categories." `OCCUPATION_CATEGORIES` (`influencer`/`musician`/
+  `political`/`author`/`athlete`/`other`) is a real, stored label for
+  display/filtering — it does not change which formula runs, since the
+  achievement sub-score below is already self-selecting (a musician
+  naturally has real albums, a politician naturally has real office
+  terms, never both).
+
+  **A real "achievement" sub-score, by direct instruction**: "just how
+  many of everything they have... how many albums... political
+  influence, how many times they've been in office." `realAlbumCount`
+  is live-fetched from `vulture-music` the same way content
+  consumption is (a real discography keeps growing). `realArticlesPublished`,
+  `realBooksPublished`, and `realTimesElectedToOffice` are honestly
+  self-reported — no real backend tracks a person's own published
+  output or political career anywhere in this ecosystem, the same
+  posture `realPressCoverageCount` already has.
+
+  See `test/establishedCreatorAssessment.test.js`.
 - `lib/cardPacks.js` — **Card Packs (Phase 2)**: the real, structured
   pack-tier system (basic/standard/premium/chase); `openPack()`
   genuinely enforces a tier's guaranteed-minimum-rarity even when the
@@ -250,9 +305,29 @@ curl http://localhost:8794/api/explore/historic
   minted through the same real edition-minting mechanic packs use.
 - `lib/trading.js` — real peer-to-peer trading with genuine ownership
   re-verification at accept time, not just trusted from proposal time.
-- `lib/cultureCardApplication.js` — Kenji's real two-path onboarding
-  flow (proactive invitation vs. self-initiated request), reusing
-  Phase 1's own external-score formula rather than a second one.
+- `lib/cultureCardApplication.js` — Kenji's real onboarding flow
+  (proactive invitation vs. self-initiated request), reusing Phase 1's
+  own external-score formula rather than a second one. **A third real
+  path, `community-nomination`, added by direct instruction**: "you
+  can be nominated for a card." Genuinely different in one real way: a
+  self-initiated applicant vouches for themselves, and a Kenji
+  invitation already passed Kenji's own vetting before it ever reached
+  this file — a nomination is a third party claiming facts about
+  someone else, with no vetting at all yet. So it is never
+  auto-accepted by score the way a self-initiated request is
+  (`runKenjiAnalysis` refuses to run on one at all); `reviewNomination()`
+  is the real, required, named human-operator decision instead (`POST
+  /api/application/:id/review-nomination`, same `voken:grade`
+  authority and decision-log recording `analyze` already uses). The
+  nominee's real external score is still computed and surfaced for
+  the operator to actually look at — it just never gets to decide the
+  outcome on its own. Accepting a nomination only marks the nominee
+  eligible, the same real effect an accepted application of any path
+  already has here — nothing in this file ever mints a card, so a
+  nomination can never mint one about someone without their own
+  session, regardless of who nominated them. See
+  `test/cultureCardApplication.test.js` — the first real test coverage
+  this module has had.
 - `lib/cardEngagement.js` — **real card engagement tracking (Phase
   3)**: a real event log (not counters that could desync from
   reality), with `engagementVelocity` computed for real from a

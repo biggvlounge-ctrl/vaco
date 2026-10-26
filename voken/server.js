@@ -48,8 +48,10 @@ const {
   HISTORIC_SUBJECT_TYPES, listHistoricEntries, getHistoricEntry, genuineSignificanceInputsFor,
 } = require('./lib/historicRegistry');
 const { getHistoricExplorePage } = require('./lib/historicExplore');
-const { computeCultureCardValueScore } = require('./lib/valueAlgorithm');
-const { assessEstablishedCreator, computeExternalScore, getLatestAssessmentForCreator } = require('./lib/establishedCreatorAssessment');
+const { computeCultureCardValueScore, computeStature } = require('./lib/valueAlgorithm');
+const {
+  assessEstablishedCreator, computeExternalScore, describeExternalScoreTier, getLatestAssessmentForCreator,
+} = require('./lib/establishedCreatorAssessment');
 const { PACK_TIER_NAMES, createPackTier, getPackTier, openPack, getPackOdds } = require('./lib/cardPacks');
 const { SELLBACK_VALUE_RANGES, computeSellBackValue, sellBackCard } = require('./lib/sellBack');
 const {
@@ -58,7 +60,7 @@ const {
 const { RAFFLE_STATUSES, createRaffle, getRaffle, enterRaffle, drawRaffleWinner } = require('./lib/raffles');
 const { TRADE_STATUSES, proposeTrade, getTrade, acceptTrade, rejectTrade, cancelTrade } = require('./lib/trading');
 const {
-  APPLICATION_PATHS, APPLICATION_STATUSES, submitApplication, getApplication, runKenjiAnalysis,
+  APPLICATION_PATHS, APPLICATION_STATUSES, submitApplication, getApplication, runKenjiAnalysis, reviewNomination,
 } = require('./lib/cultureCardApplication');
 const { ENGAGEMENT_TYPES, recordEngagementEvent, computeEngagementStats } = require('./lib/cardEngagement');
 const { getVokenExplorePage } = require('./lib/exploreVoken');
@@ -533,16 +535,26 @@ app.post('/api/card/:id/value-score', requireSession(), async (req, res) => {
       ? (card.subjectPersonId || (card.mintedByRole === 'owner' ? card.mintedByUserId : null))
       : null;
     const latestAssessment = influenceSubjectId ? getLatestAssessmentForCreator(store, influenceSubjectId) : null;
-    const realContentConsumptionCount = influenceSubjectId
-      ? await fetchRealContentConsumptionCount(influenceSubjectId)
-      : 0;
-    const externalInfluenceScore = (latestAssessment || realContentConsumptionCount > 0)
-      ? computeExternalScore({
+    // `realAlbumCount` is live too, same reasoning as content
+    // consumption: a real discography keeps growing, so it is fetched
+    // fresh from vulture-music rather than frozen at onboarding.
+    const [realContentConsumptionCount, realAlbumCount] = influenceSubjectId
+      ? await Promise.all([
+        fetchRealContentConsumptionCount(influenceSubjectId),
+        fetchRealTotal(`${VULTURE_MUSIC_API_URL}/api/artists/${encodeURIComponent(influenceSubjectId)}/album-count`, 'albumCount'),
+      ])
+      : [0, 0];
+    let externalInfluenceScore = 0;
+    let externalInfluenceTier = null;
+    if (latestAssessment || realContentConsumptionCount > 0 || realAlbumCount > 0) {
+      const scored = computeExternalScore({
         realSocialFollowing: 0, realPressCoverageCount: 0, realIndustryRecognition: false,
         ...(latestAssessment ? latestAssessment.existingExternalMetrics : {}),
-        realContentConsumptionCount,
-      })
-      : 0;
+        realContentConsumptionCount, realAlbumCount,
+      });
+      externalInfluenceScore = scored.externalScore;
+      externalInfluenceTier = describeExternalScoreTier(scored.externalScore);
+    }
 
     const traditional = { ...(options.traditional || {}), authenticityGrade, externalInfluenceScore };
 
@@ -559,7 +571,19 @@ app.post('/api/card/:id/value-score', requireSession(), async (req, res) => {
       ? genuineSignificanceInputsFor(card.historicSlug)
       : options.genuineSignificance;
 
-    res.json(computeCultureCardValueScore(cardId, { ...options, traditional, genuineSignificance }));
+    const scoreResult = computeCultureCardValueScore(cardId, { ...options, traditional, genuineSignificance });
+
+    // Legend / Living Legend -- a historic card's subject is never
+    // active by definition (see historicRegistry.js), so `isActive`
+    // defaults false there and true everywhere else, overridable by a
+    // real, caller-stated fact (e.g. a person-subject card whose
+    // subject has since passed away or retired).
+    const isActive = typeof options.isActive === 'boolean'
+      ? options.isActive
+      : !(card && card.category === 'historic');
+    const stature = computeStature({ combinedRealValueScore: scoreResult.combinedRealValueScore, isActive });
+
+    res.json({ ...scoreResult, externalInfluenceTier, stature });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -820,6 +844,35 @@ app.post('/api/application/:id/analyze', requireOperator('voken:grade'), async (
 
   try {
     res.json(runKenjiAnalysis(store, { applicationId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// A community nomination is never auto-accepted by score -- a real
+// named operator decides, the same real "voken:grade" authority
+// `analyze` above already requires, recorded in the decision log the
+// same way. See lib/cultureCardApplication.js's own header for why.
+app.post('/api/application/:id/review-nomination', requireOperator('voken:grade'), async (req, res) => {
+  try {
+    await decisionLog.record({
+      route: 'POST /api/application/:id/review-nomination',
+      outcomeKind: 'grade',
+      subjectType: 'cultureCardApplication',
+      subjectId: req.params.id,
+      decidedBy: req.operator.operatorName,
+      decidedByKind: 'operator',
+      inputs: req.body || {},
+      reason: (req.body || {}).reason || null,
+    });
+  } catch (err) {
+    return res.status(503).json({ error: err.message });
+  }
+
+  try {
+    res.json(reviewNomination(store, {
+      ...req.body, applicationId: Number(req.params.id), operatorName: req.operator.operatorName,
+    }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

@@ -187,6 +187,17 @@ function listReleasesForArtist(store, artistId) {
   return store.releases.filter((r) => r.artistId === artistId).sort((a, b) => b.createdAt - a.createdAt);
 }
 
+// The real album count for one artist -- added by direct instruction
+// ("just how many of everything they have... how many albums") so
+// VOKEN's cross-platform achievement score can read a real body-of-
+// work number live, rather than a self-reported one. Counts every
+// real `album`-format release regardless of status: a submitted or
+// distributing album is still a real album the artist made, not only
+// the ones currently `live`.
+function getAlbumCountForArtist(store, artistId) {
+  return listReleasesForArtist(store, artistId).filter((r) => r.format === 'album').length;
+}
+
 function requireStatus(store, releaseId, expectedStatus, action) {
   const release = getRelease(store, releaseId);
   if (!release) throw new Error(`${action}: no release with id ${releaseId}`);
@@ -512,6 +523,7 @@ module.exports = {
   submitRelease,
   getRelease,
   listReleasesForArtist,
+  getAlbumCountForArtist,
   requestPhysicalRun,
   markDistributing,
   markLive,

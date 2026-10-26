@@ -11,7 +11,8 @@ const test = require('node:test');
 const assert = require('node:assert');
 
 const {
-  TRADITIONAL_WEIGHTS, DIGITAL_WEIGHTS, computeTraditionalScore, computeDigitalEngagementScore, computeCultureCardValueScore,
+  TRADITIONAL_WEIGHTS, DIGITAL_WEIGHTS, LEGEND_THRESHOLD, RISING_THRESHOLD,
+  computeTraditionalScore, computeDigitalEngagementScore, computeCultureCardValueScore, computeStature,
 } = require('../lib/valueAlgorithm');
 
 function baseTraditionalArgs(overrides = {}) {
@@ -128,4 +129,30 @@ test('the per-type log-multipliers for views/clicks/comments/likes are unchanged
   assert.equal(scoreClicksOnly.digitalEngagementScore, Math.round(clicks1000 * DIGITAL_WEIGHTS.clicks * 100) / 100);
   assert.equal(scoreCommentsOnly.digitalEngagementScore, Math.round(comments1000 * DIGITAL_WEIGHTS.comments * 100) / 100);
   assert.equal(scoreLikesOnly.digitalEngagementScore, Math.round(likes1000 * DIGITAL_WEIGHTS.likes * 100) / 100);
+});
+
+// -- computeStature (Legend / Living Legend) -----------------------------
+
+test('a score below RISING_THRESHOLD is "standard", regardless of isActive', () => {
+  assert.equal(computeStature({ combinedRealValueScore: RISING_THRESHOLD - 1, isActive: true }), 'standard');
+  assert.equal(computeStature({ combinedRealValueScore: RISING_THRESHOLD - 1, isActive: false }), 'standard');
+});
+
+test('a score at or above LEGEND_THRESHOLD is "living-legend" if active, "legend" if not', () => {
+  assert.equal(computeStature({ combinedRealValueScore: LEGEND_THRESHOLD, isActive: true }), 'living-legend');
+  assert.equal(computeStature({ combinedRealValueScore: LEGEND_THRESHOLD, isActive: false }), 'legend');
+  assert.equal(computeStature({ combinedRealValueScore: 100, isActive: true }), 'living-legend');
+  assert.equal(computeStature({ combinedRealValueScore: 100, isActive: false }), 'legend');
+});
+
+test('a score between the two thresholds is "rising", regardless of isActive', () => {
+  const mid = (RISING_THRESHOLD + LEGEND_THRESHOLD) / 2;
+  assert.equal(computeStature({ combinedRealValueScore: mid, isActive: true }), 'rising');
+  assert.equal(computeStature({ combinedRealValueScore: mid, isActive: false }), 'rising');
+});
+
+test('computeStature validates its inputs', () => {
+  assert.throws(() => computeStature({ combinedRealValueScore: -1, isActive: true }), /between 0 and 100/);
+  assert.throws(() => computeStature({ combinedRealValueScore: 101, isActive: true }), /between 0 and 100/);
+  assert.throws(() => computeStature({ combinedRealValueScore: 50, isActive: 'yes' }), /requires a boolean isActive/);
 });

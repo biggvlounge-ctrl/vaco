@@ -199,6 +199,35 @@ function computeCombinedRealValueScore(options = {}) {
   return { combinedRealValueScore };
 }
 
+// **Legend / Living Legend, by direct instruction**: "you can have
+// legends, living legends, just different categories." A real,
+// computed stature, not a free-typed label -- `isActive` is an
+// honest, caller-supplied fact (is this person still alive/working),
+// not guessed: a historic card's subject is never active by
+// definition (see `historicRegistry.js`), so a historic card that
+// clears the threshold is always a `legend`, never a `living-legend`.
+// `LEGEND_THRESHOLD` is set high on purpose, on the same real scale
+// `establishedCreatorAssessment.js`'s own recalibrated external score
+// now uses -- genuinely hard to reach, the same "top of the top"
+// requirement driving that recalibration.
+const STATURE_LEVELS = ['standard', 'rising', 'legend', 'living-legend'];
+const LEGEND_THRESHOLD = 70;
+const RISING_THRESHOLD = 40;
+
+function computeStature(options = {}) {
+  const { combinedRealValueScore, isActive } = options;
+  if (!Number.isFinite(combinedRealValueScore) || combinedRealValueScore < 0 || combinedRealValueScore > 100) {
+    throw new Error('computeStature requires combinedRealValueScore to be a number between 0 and 100');
+  }
+  if (typeof isActive !== 'boolean') {
+    throw new Error('computeStature requires a boolean isActive');
+  }
+
+  if (combinedRealValueScore >= LEGEND_THRESHOLD) return isActive ? 'living-legend' : 'legend';
+  if (combinedRealValueScore >= RISING_THRESHOLD) return 'rising';
+  return 'standard';
+}
+
 // The full, real assembly -- one call producing the complete
 // CultureCardValueScore shape from the architecture doc.
 function computeCultureCardValueScore(cardId, options = {}) {
@@ -226,9 +255,13 @@ module.exports = {
   DIGITAL_WEIGHTS,
   MAX_VELOCITY_BONUS,
   COMBINED_WEIGHTS,
+  STATURE_LEVELS,
+  LEGEND_THRESHOLD,
+  RISING_THRESHOLD,
   computeTraditionalScore,
   computeDigitalEngagementScore,
   computeGenuineSignificanceScore,
   computeCombinedRealValueScore,
+  computeStature,
   computeCultureCardValueScore,
 };

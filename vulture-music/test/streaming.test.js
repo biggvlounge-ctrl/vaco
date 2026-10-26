@@ -8,7 +8,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { submitRelease, markDistributing, markLive } = require('../lib/releases');
+const { submitRelease, markDistributing, markLive, getAlbumCountForArtist } = require('../lib/releases');
 const { recordStream, getStreamCount, getTotalStreamCountForArtist } = require('../lib/streaming');
 const { createVultureMusicStore } = require('../lib/store');
 
@@ -87,4 +87,44 @@ test('getTotalStreamCountForArtist never credits one artist with another artist\
 test('getTotalStreamCountForArtist is honestly 0 for an artist with no releases, or releases with no streams yet', () => {
   const store = createVultureMusicStore();
   assert.equal(getTotalStreamCountForArtist(store, 'nobody-home'), 0);
+});
+
+test('getAlbumCountForArtist counts only real album-format releases, not singles or other formats', async () => {
+  const store = createVultureMusicStore();
+  await submitRelease(store, {
+    artistId: 'nova', title: 'Album One', format: 'album', targetPlatforms: ['Spotify'], settleFn: fakeSettle(), now: NOW,
+  });
+  await submitRelease(store, {
+    artistId: 'nova', title: 'Album Two', format: 'album', targetPlatforms: ['Spotify'], settleFn: fakeSettle(), now: NOW,
+  });
+  await submitRelease(store, {
+    artistId: 'nova', title: 'A Single', format: 'single', targetPlatforms: ['Spotify'], settleFn: fakeSettle(), now: NOW,
+  });
+
+  assert.equal(getAlbumCountForArtist(store, 'nova'), 2);
+});
+
+test('getAlbumCountForArtist counts a real album regardless of its distribution status', async () => {
+  const store = createVultureMusicStore();
+  await submitRelease(store, {
+    artistId: 'nova', title: 'Not Live Yet', format: 'album', targetPlatforms: ['Spotify'], settleFn: fakeSettle(), now: NOW,
+  });
+  assert.equal(getAlbumCountForArtist(store, 'nova'), 1, 'a real album the artist made counts even before it goes live');
+});
+
+test('getAlbumCountForArtist never credits one artist with another artist\'s real albums', async () => {
+  const store = createVultureMusicStore();
+  await submitRelease(store, {
+    artistId: 'nova', title: 'Nova Album', format: 'album', targetPlatforms: ['Spotify'], settleFn: fakeSettle(), now: NOW,
+  });
+  await submitRelease(store, {
+    artistId: 'ben', title: 'Ben Album', format: 'album', targetPlatforms: ['Spotify'], settleFn: fakeSettle(), now: NOW,
+  });
+  assert.equal(getAlbumCountForArtist(store, 'nova'), 1);
+  assert.equal(getAlbumCountForArtist(store, 'ben'), 1);
+});
+
+test('getAlbumCountForArtist is honestly 0 for an artist with no releases, or no albums among them', () => {
+  const store = createVultureMusicStore();
+  assert.equal(getAlbumCountForArtist(store, 'nobody-home'), 0);
 });

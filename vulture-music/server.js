@@ -29,7 +29,7 @@ const { createOperatorAuth } = require('./lib/operatorAuth.cjs');
 const { traceMiddleware } = require('./lib/tracing.cjs');
 const {
   RELEASE_FORMATS, DISTRIBUTION_TARGETS, DISTRIBUTION_FEES, RELEASE_STATUSES,
-  submitRelease, getRelease, listReleasesForArtist, requestPhysicalRun, markDistributing, markLive, takeDown, attachMusicVideo,
+  submitRelease, getRelease, listReleasesForArtist, getAlbumCountForArtist, requestPhysicalRun, markDistributing, markLive, takeDown, attachMusicVideo,
   reportStreamingRevenue, getArtistSummary, getCollaboratorEarnings,
 } = require('./lib/releases');
 const { recordStream, getStreamCount, getTotalStreamCountForArtist } = require('./lib/streaming');
@@ -442,6 +442,13 @@ app.get('/api/releases/:id/stream-count', (req, res) => {
 // the information from everything we can").
 app.get('/api/artists/:artistId/stream-count', (req, res) => {
   res.json({ artistId: req.params.artistId, totalStreamCount: getTotalStreamCountForArtist(store, req.params.artistId) });
+});
+
+// The real album count VOKEN's cross-platform achievement score reads
+// live, by direct instruction ("just how many of everything they
+// have... how many albums").
+app.get('/api/artists/:artistId/album-count', (req, res) => {
+  res.json({ artistId: req.params.artistId, albumCount: getAlbumCountForArtist(store, req.params.artistId) });
 });
 
 app.get('/api/collaborators/:userId/earnings', (req, res) => {
