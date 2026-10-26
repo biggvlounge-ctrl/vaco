@@ -213,19 +213,16 @@ curl http://localhost:8794/api/explore/historic
   recent real `establishedCreatorAssessment` — never from the request
   body — defaulting honestly to 0 when no real assessment is on file,
   rather than guessing.
-  **Legend / Living Legend, by direct instruction**: "you can have
-  legends, living legends, just different categories." `computeStature()`
-  is a real, computed classification (`standard`/`rising`/`legend`/
-  `living-legend`), never a free-typed label — `isActive` is an
-  honest, caller-supplied fact (is this person still alive/working),
-  not guessed: a historic card's subject is never active by
-  definition (`historicRegistry.js`), so a historic card that clears
-  `LEGEND_THRESHOLD` is always a `legend`, never a `living-legend`.
-  The threshold (70) is set high on purpose, on the same
-  "genuinely hard to reach" scale `establishedCreatorAssessment.js`'s
-  own recalibrated external score now uses. `server.js`'s value-score
-  endpoint computes and returns it on every call. See
-  `test/valueAlgorithm.test.js`.
+  **No special "legend" card type, by direct instruction, reversing an
+  earlier pass of this same file.** A `computeStature()` function
+  briefly classified a card as `legend`/`living-legend` based on
+  whether its real subject was alive. Removed on direct, explicit
+  correction: "I don't even think there should be [that
+  distinction]... let the value do the talking." Every card — a
+  historic figure, a living artist, a monument — is scored by the
+  exact same real formula with no special path for being deceased;
+  `combinedRealValueScore` alone differentiates one card from another.
+  See `test/valueAlgorithm.test.js`.
 - `lib/establishedCreatorAssessment.js` — calibrates a real starting
   tier from external metrics for someone joining with existing fame,
   never the blank-slate `common` tier. `getLatestAssessmentForCreator()`

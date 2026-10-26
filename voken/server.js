@@ -48,7 +48,7 @@ const {
   HISTORIC_SUBJECT_TYPES, listHistoricEntries, getHistoricEntry, genuineSignificanceInputsFor,
 } = require('./lib/historicRegistry');
 const { getHistoricExplorePage } = require('./lib/historicExplore');
-const { computeCultureCardValueScore, computeStature } = require('./lib/valueAlgorithm');
+const { computeCultureCardValueScore } = require('./lib/valueAlgorithm');
 const {
   assessEstablishedCreator, computeExternalScore, describeExternalScoreTier, getLatestAssessmentForCreator,
 } = require('./lib/establishedCreatorAssessment');
@@ -573,17 +573,7 @@ app.post('/api/card/:id/value-score', requireSession(), async (req, res) => {
 
     const scoreResult = computeCultureCardValueScore(cardId, { ...options, traditional, genuineSignificance });
 
-    // Legend / Living Legend -- a historic card's subject is never
-    // active by definition (see historicRegistry.js), so `isActive`
-    // defaults false there and true everywhere else, overridable by a
-    // real, caller-stated fact (e.g. a person-subject card whose
-    // subject has since passed away or retired).
-    const isActive = typeof options.isActive === 'boolean'
-      ? options.isActive
-      : !(card && card.category === 'historic');
-    const stature = computeStature({ combinedRealValueScore: scoreResult.combinedRealValueScore, isActive });
-
-    res.json({ ...scoreResult, externalInfluenceTier, stature });
+    res.json({ ...scoreResult, externalInfluenceTier });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -1039,7 +1029,7 @@ app.post('/api/art-card/:cardId/view', requireSession(), (req, res) => {
 });
 
 app.get('/api/vado/explore', (_req, res) => {
-  res.json({ surfaced: getVadoExplorePage(store) });
+  res.json(getVadoExplorePage(store));
 });
 
 app.post('/api/gallery-account', requireActor('userId'), (req, res) => {

@@ -7,15 +7,30 @@
 // `category === 'art'` and enriched with VADO-specific gallery signals
 // (`isForSale`, real gallery `viewCount`) that general Explore has no
 // concept of.
+//
+// **Instagram-Explore-style sections, by direct instruction**: "Bado
+// [VADO] to have the same Instagram feel to it and explore page feel
+// to it, similar to Culture Cards [the historic Explore page]." VADO
+// has no subject-type taxonomy the way historic cards do (place/
+// person/invention/book) -- what it does have, real and already
+// tracked, is a piece's actual real market state: a real open auction
+// (`lib/auctions.js`'s own `listOpenAuctions`), a real fixed-price
+// gallery listing (`isForSale`), or neither (viewable in the gallery,
+// not purchasable). Three real sections, not invented ones.
 
 const { computeEngagementStats } = require('./cardEngagement');
 const { computeDigitalEngagementScore } = require('./valueAlgorithm');
 const { getArtCultureCard } = require('./artCultureCard');
+const { listOpenAuctions } = require('./auctions');
+
+const VADO_EXPLORE_SECTIONS = ['live-auction', 'for-sale', 'gallery'];
 
 function getVadoExplorePage(store, options = {}) {
   const { now = Date.now() } = options;
 
-  const surfaced = store.cultureCards
+  const cardIdsWithOpenAuction = new Set(listOpenAuctions(store).map((a) => a.cardId));
+
+  const scored = store.cultureCards
     .filter((card) => card.category === 'art')
     .map((card) => {
       const stats = computeEngagementStats(store, { cardId: card.id, now });
@@ -24,17 +39,25 @@ function getVadoExplorePage(store, options = {}) {
         engagementVelocity: stats.engagementVelocity,
       });
       const artRecord = getArtCultureCard(store, card.id);
+      const isForSale = artRecord ? artRecord.isForSale : false;
+      const section = cardIdsWithOpenAuction.has(card.id) ? 'live-auction' : (isForSale ? 'for-sale' : 'gallery');
+
       return {
         contentType: 'art-culture-card',
         contentId: card.id,
+        section,
         attentionScore: digitalEngagementScore,
-        isForSale: artRecord ? artRecord.isForSale : false,
+        isForSale,
         galleryViewCount: artRecord ? artRecord.viewCount : 0,
       };
     });
 
-  surfaced.sort((a, b) => b.attentionScore - a.attentionScore);
-  return surfaced;
+  const sections = VADO_EXPLORE_SECTIONS.map((section) => ({
+    section,
+    cards: scored.filter((c) => c.section === section).sort((a, b) => b.attentionScore - a.attentionScore),
+  }));
+
+  return { sections, totalCards: scored.length };
 }
 
-module.exports = { getVadoExplorePage };
+module.exports = { VADO_EXPLORE_SECTIONS, getVadoExplorePage };
