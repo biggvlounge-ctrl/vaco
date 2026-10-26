@@ -8,11 +8,12 @@ const test = require('node:test');
 const assert = require('node:assert');
 
 const { createVokenStore } = require('../lib/store');
-const { mintHistoricCard, listHistoricCards } = require('../lib/cultureCards');
+const { mintHistoricCard, listHistoricCards, recordPeakValueScore } = require('../lib/cultureCards');
 const {
   HISTORIC_SUBJECT_TYPES, HISTORIC_REGISTRY, listHistoricEntries, getHistoricEntry, genuineSignificanceInputsFor,
 } = require('../lib/historicRegistry');
-const { computeGenuineSignificanceScore } = require('../lib/valueAlgorithm');
+const { computeGenuineSignificanceScore, computeCultureCardValueScore } = require('../lib/valueAlgorithm');
+const { computeCardMarketPrice } = require('../lib/cardMarketPrice');
 
 function baseArgs(overrides = {}) {
   return {
@@ -153,4 +154,34 @@ test('every minted historic card still gets a real incrementing id in the shared
   const b = mintHistoricCard(store, baseArgs({ historicSlug: 'telephone' }));
   assert.equal(b.id, a.id + 1);
   assert.equal(store.cultureCards.length, 2);
+});
+
+// -- a special/curated card starts with a real, non-zero value, by direct
+// instruction: "those cards will automatically come in with value and
+// then just increase in value through likes." --------------------------
+
+test('a freshly minted historic card, zero engagement, default authenticity grade, already scores a real non-zero value', () => {
+  const store = createVokenStore();
+  const card = mintHistoricCard(store, baseArgs({ historicSlug: 'stonehenge', plannedDigitalMintCount: 500 }));
+
+  const genuineSignificance = genuineSignificanceInputsFor('stonehenge');
+  const scoreResult = computeCultureCardValueScore(card.id, {
+    traditional: { totalMintCount: 500, authenticityGrade: 'C', isRookieDesignation: false, externalInfluenceScore: 0 },
+    digitalEngagement: { views: 0, clicks: 0, comments: 0, likes: 0, shares: 0, engagementVelocity: 0 },
+    genuineSignificance,
+  });
+
+  assert.ok(scoreResult.combinedRealValueScore > 0, 'genuineSignificance alone must already carry a real score before any real engagement exists');
+  assert.ok(scoreResult.genuineSignificanceScore.genuineSignificanceScore > 0, 'a real historical fact, not engagement, is what makes this non-zero');
+
+  recordPeakValueScore(store, { cardId: card.id, combinedRealValueScore: scoreResult.combinedRealValueScore });
+  const { marketPrice } = computeCardMarketPrice(store, { cardId: card.id });
+  assert.ok(marketPrice > 0, 'a brand-new special card must price at a real, non-zero amount, never $0');
+});
+
+test('genuineSignificanceScore never changes after mint -- only real engagement can raise a historic card\'s value further', () => {
+  const now = new Date('2026-01-01').getTime();
+  const dayOne = genuineSignificanceInputsFor('stonehenge', { now });
+  const monthsLater = genuineSignificanceInputsFor('stonehenge', { now: now + 1000 * 60 * 60 * 24 * 90 });
+  assert.deepEqual(dayOne, monthsLater, 'a real historical fact does not change over a few months -- only real engagement can move this card\'s value in that time');
 });

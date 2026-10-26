@@ -173,6 +173,24 @@ curl http://localhost:8794/api/explore/historic
   (Tesla: `"1856–1943"`, Ada Lovelace: `"1815–1852"`), carried onto the
   minted card's own `historicFact.era` — the real year range shows on
   the card itself, not a name-recognition label standing in for it.
+  **"Those [special location/legend] cards will automatically come in
+  with value and then just increase in value through likes," by
+  direct instruction — already satisfied, confirmed directly rather
+  than asserted.** A brand-new, zero-engagement, unverified historic
+  card already scores a real, non-zero `combinedRealValueScore` on
+  its very first scoring call — genuineSignificance alone (age +
+  recognitions, independent of engagement) and the real default
+  authenticity grade (`'C'`, never a guessed better one) already
+  produce one. Verified directly against a freshly-minted Stonehenge
+  card with zero likes/views and no VACA record: scores `31`
+  (`genuineSignificanceScore: 80` carrying nearly all of it), pricing
+  at a real `$15.50` the moment it's the only card in the market.
+  From there, `genuineSignificanceScore` never moves (it's a fact
+  about history, not about today's attention), so the only thing that
+  ever raises this card's value further is real engagement — the
+  literal mechanism "will only go up through their likeness and
+  popularity" asks for, already true by construction since nothing
+  else in the formula for a historic card changes after mint.
   Browse the register
   with `GET /api/historic-register` (optionally
   `?subjectType=place|monument|home|person|invention|book`) or
@@ -400,6 +418,21 @@ curl http://localhost:8794/api/explore/historic
   directly: even a maxed-out popularity bonus is dwarfed by the real
   condition-grade range alone). `GET /api/card/:id/vehicle-value`. See
   `test/vehicleCardValue.test.js`.
+  **Three deliberately separate real numbers, by direct
+  instruction**: "they could sell their card with their car. Their
+  card might be worth $20,000. And then the card, the actual car
+  might sell for $50,000." (1) `statistics.referenceValue` is a real
+  fact about the physical car itself — never computed, only ever
+  entered by its real verified owner, the same honesty-burden posture
+  every other self-reported real input in this codebase already has.
+  (2) `vehicleCardValue` is this module's own real, computed valuation
+  of the *collectible card* — derived from, but never equal to,
+  `referenceValue`. (3) Whatever the card actually sells for through
+  `auctions.js`/`trading.js`/`sellBack.js` is a third real number, set
+  by an actual real bid or trade, exactly the same way a computed
+  appraisal and an actual auction hammer price are two different real
+  things for any other collectible. VOKEN never brokers the real
+  physical car itself — only ever the card.
   **Real subject self-verification, by direct instruction:** "I want
   people to be able to verify their own cards to show that that is
   them and they verify it." `verifySubjectIdentity(store, { cardId,
