@@ -50,7 +50,7 @@ const {
 const { getHistoricExplorePage } = require('./lib/historicExplore');
 const { computeCultureCardValueScore } = require('./lib/valueAlgorithm');
 const {
-  assessEstablishedCreator, computeExternalScore, describeExternalScoreTier, getLatestAssessmentForCreator,
+  assessEstablishedCreator, computeExternalScore, getLatestAssessmentForCreator,
 } = require('./lib/establishedCreatorAssessment');
 const { PACK_TIER_NAMES, createPackTier, getPackTier, openPack, getPackOdds } = require('./lib/cardPacks');
 const { RECOMMENDED_MINT_COUNTS_BY_RARITY, recommendedMintCountsFor } = require('./lib/mintCountGuidance');
@@ -577,7 +577,6 @@ app.post('/api/card/:id/value-score', requireSession(), async (req, res) => {
       ])
       : [0, 0];
     let externalInfluenceScore = 0;
-    let externalInfluenceTier = null;
     if (latestAssessment || realContentConsumptionCount > 0 || realAlbumCount > 0) {
       const scored = computeExternalScore({
         realSocialFollowing: 0, realPressCoverageCount: 0, realIndustryRecognition: false,
@@ -585,7 +584,6 @@ app.post('/api/card/:id/value-score', requireSession(), async (req, res) => {
         realContentConsumptionCount, realAlbumCount,
       });
       externalInfluenceScore = scored.externalScore;
-      externalInfluenceTier = describeExternalScoreTier(scored.externalScore);
     }
 
     const traditional = { ...(options.traditional || {}), authenticityGrade, externalInfluenceScore };
@@ -613,7 +611,7 @@ app.post('/api/card/:id/value-score', requireSession(), async (req, res) => {
     // below the highest real score it has already earned.
     const peakValueScore = recordPeakValueScore(store, { cardId, combinedRealValueScore: scoreResult.combinedRealValueScore });
 
-    res.json({ ...scoreResult, externalInfluenceTier, peakValueScore });
+    res.json({ ...scoreResult, peakValueScore });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

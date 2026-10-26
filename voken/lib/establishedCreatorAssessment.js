@@ -176,26 +176,19 @@ function computeExternalScore(options = {}) {
   };
 }
 
-// **The real "key" -- by direct instruction: "we should have a key
-// that shows influence."** Named, real-world-standard tiers
-// (the same vocabulary real trading-card/entertainment coverage
-// already uses -- "icon," "rising star") rather than a bare number
-// nobody can place. Ordered highest-first so the first match wins.
-const EXTERNAL_SCORE_TIERS = [
-  { min: 90, label: 'Global Icon' },
-  { min: 75, label: 'Industry Legend' },
-  { min: 55, label: 'Major Influence' },
-  { min: 35, label: 'Established' },
-  { min: 15, label: 'Rising' },
-  { min: 0, label: 'Emerging' },
-];
-
-function describeExternalScoreTier(externalScore) {
-  if (!Number.isFinite(externalScore) || externalScore < 0 || externalScore > 100) {
-    throw new Error('describeExternalScoreTier requires a number between 0 and 100');
-  }
-  return EXTERNAL_SCORE_TIERS.find((tier) => externalScore >= tier.min).label;
-}
+// **No named tier labels, by direct instruction, reversing an earlier
+// pass of this same file.** An `EXTERNAL_SCORE_TIERS`/
+// `describeExternalScoreTier()` pair briefly existed here, labeling a
+// score "Rising" or "Industry Legend." Removed on direct, explicit
+// correction: "there won't be a rising industry legend or anything
+// like that... it is the value of the card that will represent it,
+// just like a baseball card. It will just have statistics on there...
+// shown in the value of the card." The real number
+// (`externalScore`) and the real statistics behind it
+// (`breakdown`) are the only things ever shown now -- no named-tier
+// word standing in for the number. Removed the same way
+// `computeStature()` was fully removed earlier this session: no
+// stale label path left half-wired in.
 
 // Upper five real tiers only -- never 'common' (not a blank-slate
 // rookie) and never '1-of-1' (a card-scarcity property, not a fame
@@ -233,7 +226,6 @@ function assessEstablishedCreator(store, options = {}) {
       realAlbumCount, realArticlesPublished, realBooksPublished, realTimesElectedToOffice,
     },
     externalScore,
-    externalScoreTier: describeExternalScoreTier(externalScore),
     externalScoreBreakdown: breakdown,
     suggestedStartingTier,
     assessedAt: Date.now(),
@@ -258,10 +250,8 @@ function getLatestAssessmentForCreator(store, creatorId) {
 
 module.exports = {
   OCCUPATION_CATEGORIES,
-  EXTERNAL_SCORE_TIERS,
   ELIGIBLE_TIERS,
   computeExternalScore,
-  describeExternalScoreTier,
   assessEstablishedCreator,
   getLatestAssessmentForCreator,
 };

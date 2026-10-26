@@ -11,8 +11,8 @@ const assert = require('node:assert');
 
 const { createVokenStore } = require('../lib/store');
 const {
-  OCCUPATION_CATEGORIES, EXTERNAL_SCORE_TIERS,
-  assessEstablishedCreator, computeExternalScore, describeExternalScoreTier, getLatestAssessmentForCreator,
+  OCCUPATION_CATEGORIES,
+  assessEstablishedCreator, computeExternalScore, getLatestAssessmentForCreator,
 } = require('../lib/establishedCreatorAssessment');
 
 function baseMetrics(overrides = {}) {
@@ -69,29 +69,6 @@ test('computeExternalScore returns a real breakdown, each sub-score independentl
   assert.ok(breakdown.press.subScore <= 100);
   assert.ok(breakdown.consumption.subScore <= 100);
   assert.ok(breakdown.achievement.subScore <= 100);
-});
-
-// -- the "key" (real score tiers) ----------------------------------------
-
-test('describeExternalScoreTier names a real, ordered tier for every score in range', () => {
-  assert.equal(describeExternalScoreTier(95), 'Global Icon');
-  assert.equal(describeExternalScoreTier(80), 'Industry Legend');
-  assert.equal(describeExternalScoreTier(60), 'Major Influence');
-  assert.equal(describeExternalScoreTier(40), 'Established');
-  assert.equal(describeExternalScoreTier(20), 'Rising');
-  assert.equal(describeExternalScoreTier(0), 'Emerging');
-});
-
-test('EXTERNAL_SCORE_TIERS is ordered highest-first, with no gap and no overlap', () => {
-  for (let i = 0; i < EXTERNAL_SCORE_TIERS.length - 1; i += 1) {
-    assert.ok(EXTERNAL_SCORE_TIERS[i].min > EXTERNAL_SCORE_TIERS[i + 1].min);
-  }
-  assert.equal(EXTERNAL_SCORE_TIERS[EXTERNAL_SCORE_TIERS.length - 1].min, 0);
-});
-
-test('describeExternalScoreTier rejects a score outside 0-100', () => {
-  assert.throws(() => describeExternalScoreTier(-1), /between 0 and 100/);
-  assert.throws(() => describeExternalScoreTier(101), /between 0 and 100/);
 });
 
 // -- the real achievement term (albums/articles/books/office terms) -----

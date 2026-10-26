@@ -166,7 +166,14 @@ curl http://localhost:8794/api/explore/historic
   who curated the card into existence. Checked against the register at
   mint time rather than accepted as free text, specifically so a
   `historic` card's factual content is always real and checkable — the
-  one thing this category exists to guarantee. Browse the register
+  one thing this category exists to guarantee.
+  **"a when they were born and when they passed type of card," by
+  direct instruction — already satisfied, no new field needed.** Every
+  `person` entry's real `era` string already is a birth-death range
+  (Tesla: `"1856–1943"`, Ada Lovelace: `"1815–1852"`), carried onto the
+  minted card's own `historicFact.era` — the real year range shows on
+  the card itself, not a name-recognition label standing in for it.
+  Browse the register
   with `GET /api/historic-register` (optionally
   `?subjectType=place|monument|home|person|invention|book`) or
   `GET /api/historic-register/:slug` before minting against it. See
@@ -329,13 +336,17 @@ curl http://localhost:8794/api/explore/historic
   once; the same two real figures from before no longer tie at 100,
   or even come close.
 
-  **A real "key," by direct instruction: "we should have a key that
-  shows influence."** `EXTERNAL_SCORE_TIERS` / `describeExternalScoreTier()`
-  name a real score band (`Global Icon`, `Industry Legend`, `Major
-  Influence`, `Established`, `Rising`, `Emerging`) rather than leaving
-  a bare number nobody can place — attached to every assessment
-  (`externalScoreTier`) and to the live value-score response
-  (`externalInfluenceTier`).
+  **No named "key" labels, by direct instruction, reversing an earlier
+  pass of this same file.** `EXTERNAL_SCORE_TIERS` / `describeExternalScoreTier()`
+  briefly named a real score band (`Global Icon`, `Industry Legend`,
+  `Major Influence`, `Established`, `Rising`, `Emerging`). Removed on
+  direct, explicit correction: "there won't be a rising industry
+  legend or anything like that... it is the value of the card that
+  will represent it, just like a baseball card. It will just have
+  statistics on there... shown in the value of the card." The real
+  `externalScore` number and the real statistics behind it
+  (`breakdown`) are the only things shown now — no named-tier word
+  standing in for either.
 
   **Real occupation categories, by direct instruction**: "different
   categories: influencers, musicians, political... just different
