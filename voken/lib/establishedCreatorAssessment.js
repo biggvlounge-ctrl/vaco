@@ -78,11 +78,38 @@ const PRESS_COVERAGE_LOG_MULTIPLIER = 100 / 4; // log10(1e4+1) ≈ 4
 // -- formal industry recognition --------------------------------------
 // A flat boolean bonus, same as before, but itself now only worth its
 // own 100-point sub-scale (weighted down below like everything else).
+// **`realCulturalImpactRecognitionCount`, added by direct
+// instruction**: "it could be something with civil rights that'll
+// make things go up high. It could be a Malcolm X... historians...
+// civil rights... groundbreaking influence." A real, named-honor
+// count independent of `realIndustryRecognition` (a Presidential
+// Medal of Freedom, a Congressional Gold Medal, a Rock & Roll Hall of
+// Fame induction, a Nobel Prize) -- the same real "named honors" idea
+// `historicRegistry.js`'s own `recognitions` list already uses for
+// historic cards, extended here to a living creator's own real
+// record. Additive with the boolean bonus, not a replacement for it --
+// either path alone, or both together, can reach the same real
+// ceiling.
 const INDUSTRY_RECOGNITION_BONUS = 100;
+const CULTURAL_IMPACT_POINTS_PER_HONOR = 40;
 
 // -- real cross-platform content consumption ---------------------------
 // Anchor: ~10,000,000,000 combined real streams/listens/views/units
-// sold over a whole career -> 100.
+// sold over a whole career -> 100. **Broadened by direct instruction:
+// "we don't just want to use information from our ecosystem. We want
+// to use all information from everything available... how many views
+// on YouTube, how many views on all social media... how many books
+// sold."** `realYoutubeViews`, `realAllSocialMediaViews` (distinct
+// from `realSocialFollowing` below -- a view is a single real
+// consumption event, a follower is an ongoing real relationship), and
+// `realBooksSoldCount` (distinct from `realBooksPublished` below -- a
+// book SOLD is audience reach, a book PUBLISHED is body of work, the
+// same real distinction `realAlbumCount` vs. streams already draws)
+// all feed the same one real consumption total and the same one real
+// log curve -- not separate sub-scores, since they are all the same
+// real kind of fact: how much of this person's real output has
+// actually been consumed, from any real source, inside this ecosystem
+// or outside it.
 const CONTENT_CONSUMPTION_LOG_MULTIPLIER = 10; // log10(1e10+1) = 10
 
 // -- real body-of-work achievement ------------------------------------
@@ -103,10 +130,20 @@ const CONTENT_CONSUMPTION_LOG_MULTIPLIER = 10; // log10(1e10+1) = 10
 //     posture `realPressCoverageCount` already has.
 //   - realTimesElectedToOffice: a real political-category input, also
 //     self-reported -- no real civic database exists here either.
+//   - realMoviesProduced / realInterviewCount / realBestsellerCount,
+//     added by direct instruction ("how many movies has he made...
+//     how many interviews... how many times have they been
+//     bestseller"): the same real, self-reported, per-unit-point
+//     pattern as every other achievement input above -- a real count
+//     of a real, named, countable accomplishment, never a guessed
+//     total.
 const ALBUM_POINTS_PER_RELEASE = 100 / 12;
 const ARTICLE_POINTS_PER_PUBLISHED = 100 / 200;
 const BOOK_POINTS_PER_PUBLISHED = 10;
 const OFFICE_TERM_POINTS = 25;
+const MOVIE_POINTS_PER_PRODUCED = 10;
+const INTERVIEW_POINTS_PER_APPEARANCE = 2;
+const BESTSELLER_POINTS_PER_TIME = 25;
 
 // The real weights, summing to exactly 100 -- the one property that
 // makes "100 is genuinely hard" true: every sub-score below is itself
@@ -129,10 +166,17 @@ function computeExternalScore(options = {}) {
     realSocialFollowing, realPressCoverageCount, realIndustryRecognition,
   } = options;
   const realContentConsumptionCount = requireNonNegativeInt(options.realContentConsumptionCount, 'realContentConsumptionCount', { optional: true });
+  const realYoutubeViews = requireNonNegativeInt(options.realYoutubeViews, 'realYoutubeViews', { optional: true });
+  const realAllSocialMediaViews = requireNonNegativeInt(options.realAllSocialMediaViews, 'realAllSocialMediaViews', { optional: true });
+  const realBooksSoldCount = requireNonNegativeInt(options.realBooksSoldCount, 'realBooksSoldCount', { optional: true });
+  const realCulturalImpactRecognitionCount = requireNonNegativeInt(options.realCulturalImpactRecognitionCount, 'realCulturalImpactRecognitionCount', { optional: true });
   const realAlbumCount = requireNonNegativeInt(options.realAlbumCount, 'realAlbumCount', { optional: true });
   const realArticlesPublished = requireNonNegativeInt(options.realArticlesPublished, 'realArticlesPublished', { optional: true });
   const realBooksPublished = requireNonNegativeInt(options.realBooksPublished, 'realBooksPublished', { optional: true });
   const realTimesElectedToOffice = requireNonNegativeInt(options.realTimesElectedToOffice, 'realTimesElectedToOffice', { optional: true });
+  const realMoviesProduced = requireNonNegativeInt(options.realMoviesProduced, 'realMoviesProduced', { optional: true });
+  const realInterviewCount = requireNonNegativeInt(options.realInterviewCount, 'realInterviewCount', { optional: true });
+  const realBestsellerCount = requireNonNegativeInt(options.realBestsellerCount, 'realBestsellerCount', { optional: true });
 
   requireNonNegativeInt(realSocialFollowing, 'realSocialFollowing');
   requireNonNegativeInt(realPressCoverageCount, 'realPressCoverageCount');
@@ -142,13 +186,20 @@ function computeExternalScore(options = {}) {
 
   const socialSubScore = clamp(Math.log10(realSocialFollowing + 1) * SOCIAL_FOLLOWING_LOG_MULTIPLIER, 0, 100);
   const pressSubScore = clamp(Math.log10(realPressCoverageCount + 1) * PRESS_COVERAGE_LOG_MULTIPLIER, 0, 100);
-  const recognitionSubScore = realIndustryRecognition ? INDUSTRY_RECOGNITION_BONUS : 0;
-  const consumptionSubScore = clamp(Math.log10(realContentConsumptionCount + 1) * CONTENT_CONSUMPTION_LOG_MULTIPLIER, 0, 100);
+  const recognitionSubScore = clamp(
+    (realIndustryRecognition ? INDUSTRY_RECOGNITION_BONUS : 0) + realCulturalImpactRecognitionCount * CULTURAL_IMPACT_POINTS_PER_HONOR,
+    0, 100,
+  );
+  const totalConsumptionCount = realContentConsumptionCount + realYoutubeViews + realAllSocialMediaViews + realBooksSoldCount;
+  const consumptionSubScore = clamp(Math.log10(totalConsumptionCount + 1) * CONTENT_CONSUMPTION_LOG_MULTIPLIER, 0, 100);
   const achievementSubScore = clamp(
     realAlbumCount * ALBUM_POINTS_PER_RELEASE
       + realArticlesPublished * ARTICLE_POINTS_PER_PUBLISHED
       + realBooksPublished * BOOK_POINTS_PER_PUBLISHED
-      + realTimesElectedToOffice * OFFICE_TERM_POINTS,
+      + realTimesElectedToOffice * OFFICE_TERM_POINTS
+      + realMoviesProduced * MOVIE_POINTS_PER_PRODUCED
+      + realInterviewCount * INTERVIEW_POINTS_PER_APPEARANCE
+      + realBestsellerCount * BESTSELLER_POINTS_PER_TIME,
     0, 100,
   );
 
@@ -166,10 +217,17 @@ function computeExternalScore(options = {}) {
     breakdown: {
       social: { realSocialFollowing, subScore: round(socialSubScore), weight: EXTERNAL_SCORE_WEIGHTS.social },
       press: { realPressCoverageCount, subScore: round(pressSubScore), weight: EXTERNAL_SCORE_WEIGHTS.press },
-      recognition: { realIndustryRecognition, subScore: recognitionSubScore, weight: EXTERNAL_SCORE_WEIGHTS.recognition },
-      consumption: { realContentConsumptionCount, subScore: round(consumptionSubScore), weight: EXTERNAL_SCORE_WEIGHTS.consumption },
+      recognition: {
+        realIndustryRecognition, realCulturalImpactRecognitionCount,
+        subScore: round(recognitionSubScore), weight: EXTERNAL_SCORE_WEIGHTS.recognition,
+      },
+      consumption: {
+        realContentConsumptionCount, realYoutubeViews, realAllSocialMediaViews, realBooksSoldCount,
+        totalConsumptionCount, subScore: round(consumptionSubScore), weight: EXTERNAL_SCORE_WEIGHTS.consumption,
+      },
       achievement: {
         realAlbumCount, realArticlesPublished, realBooksPublished, realTimesElectedToOffice,
+        realMoviesProduced, realInterviewCount, realBestsellerCount,
         subScore: round(achievementSubScore), weight: EXTERNAL_SCORE_WEIGHTS.achievement,
       },
     },
@@ -198,17 +256,25 @@ const ELIGIBLE_TIERS = RARITY_TIERS.filter((t) => t !== 'common' && t !== '1-of-
 function assessEstablishedCreator(store, options = {}) {
   const {
     creatorId, realSocialFollowing, realPressCoverageCount, realIndustryRecognition,
-    occupationCategory = 'other', realAlbumCount = 0, realArticlesPublished = 0, realBooksPublished = 0, realTimesElectedToOffice = 0,
+    occupationCategory = 'other',
+    realContentConsumptionCount = 0, realYoutubeViews = 0, realAllSocialMediaViews = 0, realBooksSoldCount = 0,
+    realCulturalImpactRecognitionCount = 0,
+    realAlbumCount = 0, realArticlesPublished = 0, realBooksPublished = 0, realTimesElectedToOffice = 0,
+    realMoviesProduced = 0, realInterviewCount = 0, realBestsellerCount = 0,
   } = options;
   if (!creatorId) throw new Error('assessEstablishedCreator requires a creatorId');
   if (!OCCUPATION_CATEGORIES.includes(occupationCategory)) {
     throw new Error(`assessEstablishedCreator: invalid occupationCategory "${occupationCategory}" (expected one of ${OCCUPATION_CATEGORIES.join(', ')})`);
   }
 
-  const { externalScore, breakdown } = computeExternalScore({
+  const metrics = {
     realSocialFollowing, realPressCoverageCount, realIndustryRecognition,
+    realContentConsumptionCount, realYoutubeViews, realAllSocialMediaViews, realBooksSoldCount,
+    realCulturalImpactRecognitionCount,
     realAlbumCount, realArticlesPublished, realBooksPublished, realTimesElectedToOffice,
-  });
+    realMoviesProduced, realInterviewCount, realBestsellerCount,
+  };
+  const { externalScore, breakdown } = computeExternalScore(metrics);
 
   // ELIGIBLE_TIERS = ['uncommon', 'rare', 'epic', 'legendary', 'mythic']
   let suggestedStartingTier;
@@ -221,10 +287,7 @@ function assessEstablishedCreator(store, options = {}) {
   const assessment = {
     creatorId,
     occupationCategory,
-    existingExternalMetrics: {
-      realSocialFollowing, realPressCoverageCount, realIndustryRecognition,
-      realAlbumCount, realArticlesPublished, realBooksPublished, realTimesElectedToOffice,
-    },
+    existingExternalMetrics: metrics,
     externalScore,
     externalScoreBreakdown: breakdown,
     suggestedStartingTier,

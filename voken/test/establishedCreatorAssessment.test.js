@@ -103,6 +103,58 @@ test('computeExternalScore validates every new achievement input the same way ev
   }
 });
 
+// -- expanded real statistics, by direct instruction: "we don't just want
+// to use information from our ecosystem. We want to use all information
+// from everything available... how many views on YouTube... books sold...
+// bestseller... movies... interviews... civil rights... groundbreaking
+// influence." ---------------------------------------------------------
+
+test('realYoutubeViews, realAllSocialMediaViews, and realBooksSoldCount all feed the one real consumption total, not separate sub-scores', () => {
+  const none = computeExternalScore(baseMetrics());
+  const withYoutube = computeExternalScore(baseMetrics({ realYoutubeViews: 5000000000 }));
+  const withSocial = computeExternalScore(baseMetrics({ realAllSocialMediaViews: 5000000000 }));
+  const withBooksSold = computeExternalScore(baseMetrics({ realBooksSoldCount: 5000000000 }));
+  for (const [label, scored] of [['YouTube views', withYoutube], ['all-social views', withSocial], ['books sold', withBooksSold]]) {
+    assert.ok(scored.externalScore > none.externalScore, `${label} must real-raise the score`);
+    assert.ok(scored.breakdown.consumption.subScore > 0);
+  }
+  // Combined, they sum into one real totalConsumptionCount.
+  const combined = computeExternalScore(baseMetrics({ realYoutubeViews: 1000, realAllSocialMediaViews: 2000, realBooksSoldCount: 3000, realContentConsumptionCount: 4000 }));
+  assert.equal(combined.breakdown.consumption.totalConsumptionCount, 10000);
+});
+
+test('realMoviesProduced, realInterviewCount, and realBestsellerCount each real-raise the achievement sub-score on their own', () => {
+  const none = computeExternalScore(baseMetrics());
+  const withMovies = computeExternalScore(baseMetrics({ realMoviesProduced: 10 }));
+  const withInterviews = computeExternalScore(baseMetrics({ realInterviewCount: 50 }));
+  const withBestseller = computeExternalScore(baseMetrics({ realBestsellerCount: 4 }));
+  for (const [label, scored] of [['movies', withMovies], ['interviews', withInterviews], ['bestseller', withBestseller]]) {
+    assert.ok(scored.externalScore > none.externalScore, `${label} must real-raise the score`);
+    assert.equal(scored.breakdown.achievement.subScore, 100, `${label} alone should max the achievement sub-score at its real anchor`);
+  }
+});
+
+test('realCulturalImpactRecognitionCount raises the recognition sub-score independently of, and additively with, realIndustryRecognition', () => {
+  const neither = computeExternalScore(baseMetrics());
+  const culturalOnly = computeExternalScore(baseMetrics({ realCulturalImpactRecognitionCount: 3 }));
+  const industryOnly = computeExternalScore(baseMetrics({ realIndustryRecognition: true }));
+  const both = computeExternalScore(baseMetrics({ realIndustryRecognition: true, realCulturalImpactRecognitionCount: 3 }));
+
+  assert.ok(culturalOnly.breakdown.recognition.subScore > neither.breakdown.recognition.subScore);
+  assert.equal(industryOnly.breakdown.recognition.subScore, 100);
+  // Both together still cap at the same real 100 ceiling, never overflow.
+  assert.equal(both.breakdown.recognition.subScore, 100);
+});
+
+test('the new statistics still validate like every other real input here', () => {
+  for (const field of ['realYoutubeViews', 'realAllSocialMediaViews', 'realBooksSoldCount', 'realCulturalImpactRecognitionCount', 'realMoviesProduced', 'realInterviewCount', 'realBestsellerCount']) {
+    assert.throws(
+      () => computeExternalScore(baseMetrics({ [field]: -1 })),
+      new RegExp(`non-negative integer ${field}`),
+    );
+  }
+});
+
 // -- occupationCategory (real, stored label) -----------------------------
 
 test('assessEstablishedCreator stores a real occupationCategory, defaulting to "other"', () => {

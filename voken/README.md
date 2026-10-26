@@ -348,6 +348,41 @@ curl http://localhost:8794/api/explore/historic
   (`breakdown`) are the only things shown now — no named-tier word
   standing in for either.
 
+  **Expanded real statistics, by direct instruction: "we don't just
+  want to use information from our ecosystem. We want to use all
+  information from everything available... how many views on
+  YouTube... how many books sold, how many times have they been
+  bestseller... how many movies has he made... how many
+  interviews... civil rights... groundbreaking influence."** Seven
+  new real inputs, each folded into the axis it genuinely belongs to
+  rather than invented new sub-scores — the five weighted axes still
+  sum to exactly 100, so "100 is genuinely hard" still holds:
+  - **Consumption** (log-scaled, same curve as before): `realYoutubeViews`
+    and `realAllSocialMediaViews` (distinct from `realSocialFollowing`
+    — a view is a single real consumption event, a follower is an
+    ongoing relationship) and `realBooksSoldCount` (distinct from
+    `realBooksPublished` below — units sold vs. body of work, the same
+    real split `realAlbumCount` vs. streams already draws) all sum
+    into one real `totalConsumptionCount` before the log curve runs —
+    one real "how much of this person's output has actually reached
+    people" fact, from any real source, not four competing numbers.
+  - **Achievement** (linear, per real unit): `realMoviesProduced`
+    (10 pts/movie), `realInterviewCount` (2 pts/interview), and
+    `realBestsellerCount` (25 pts/bestseller) — the same self-reported,
+    per-unit-point pattern `realAlbumCount`/`realTimesElectedToOffice`
+    already use.
+  - **Recognition**: `realCulturalImpactRecognitionCount` (40 pts per
+    real named honor — a Presidential Medal of Freedom, a Congressional
+    Gold Medal, a Rock & Roll Hall of Fame induction, a Nobel Prize) is
+    the real, generalized answer to "it could be something with civil
+    rights that'll make things go up high. It could be a Malcolm X" —
+    the same "named honors" idea `historicRegistry.js`'s own
+    `recognitions` list already uses for historic cards, extended to a
+    living creator's own real record. Additive with
+    `realIndustryRecognition`'s existing flat bonus, not a replacement
+    for it — either path, or both together, can reach the same real
+    100 ceiling. See `test/establishedCreatorAssessment.test.js`.
+
   **Real occupation categories, by direct instruction**: "different
   categories: influencers, musicians, political... just different
   categories." `OCCUPATION_CATEGORIES` (`influencer`/`musician`/
