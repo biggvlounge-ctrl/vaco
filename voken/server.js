@@ -53,6 +53,7 @@ const {
   assessEstablishedCreator, computeExternalScore, describeExternalScoreTier, getLatestAssessmentForCreator,
 } = require('./lib/establishedCreatorAssessment');
 const { PACK_TIER_NAMES, createPackTier, getPackTier, openPack, getPackOdds } = require('./lib/cardPacks');
+const { RECOMMENDED_MINT_COUNTS_BY_RARITY, recommendedMintCountsFor } = require('./lib/mintCountGuidance');
 const { SELLBACK_VALUE_RANGES, computeSellBackValue, sellBackCard } = require('./lib/sellBack');
 const {
   REFERRAL_TIERS, SPIN_PRIZES, getReferralProgress, recordReferral, spinWheel,
@@ -689,6 +690,23 @@ app.post('/api/pack-tier/:id/open', requireActor('buyerId'), async (req, res) =>
 app.post('/api/pack-tier/:id/odds', requireSession(), (req, res) => {
   try {
     res.json(getPackOdds(store, { ...req.body, packTierId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// "make sure we have the numbers correct... how many physical cards.
+// How many digital cards?" -- a real, flagged default recommendation
+// per rarity tier, grounded against the existing scarcity curve. See
+// lib/mintCountGuidance.js's own header for why there is deliberately
+// no single global count instead.
+app.get('/api/mint-count-guidance', (_req, res) => {
+  res.json({ recommendedMintCountsByRarity: RECOMMENDED_MINT_COUNTS_BY_RARITY });
+});
+
+app.get('/api/mint-count-guidance/:rarityTier', (req, res) => {
+  try {
+    res.json(recommendedMintCountsFor(req.params.rarityTier));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

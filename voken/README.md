@@ -362,7 +362,40 @@ curl http://localhost:8794/api/explore/historic
   genuinely enforces a tier's guaranteed-minimum-rarity even when the
   random draw alone would miss it, by swapping in the best-available
   qualifying card — proven against an `rng` deliberately rigged to
-  otherwise fail the guarantee.
+  otherwise fail the guarantee. **How packs are actually mixed**:
+  `shuffle()` is a real, unbiased Fisher-Yates shuffle over the live
+  candidate-card pool passed in, not a fixed slot order or a
+  pre-shuffled static deck — every open draws fresh from whatever
+  cards are actually eligible (still-available digital editions) at
+  that moment. `DEFAULT_CARDS_PER_PACK` is the real cards-per-pack
+  count (`basic`/`standard`/`premium`: 5, `chase`: 3, flagged as an
+  interpretive default — no source doc gives an exact number).
+  `getPackOdds()` discloses the real pre-purchase probability
+  distribution computed from that same live pool, mirroring
+  `openPack`'s own eligibility filter and guarantee swap-in exactly —
+  the odds shown are the odds that pack would actually produce.
+  **The "how many physical cards, how many digital cards" question,
+  by direct instruction** ("make sure we have the numbers correct...
+  how many physical cards. How many digital cards?"): there is
+  deliberately no single global count — `plannedDigitalMintCount`/
+  `plannedPhysicalMintCount` are set per card at mint time, the same
+  real "digital-first, physical-optional" design `cardTypes.js`
+  already documents, matching how real trading cards actually work (a
+  base common and a numbered 1-of-1 from the same set have wildly
+  different real print runs). `lib/mintCountGuidance.js`'s
+  `RECOMMENDED_MINT_COUNTS_BY_RARITY` is the real, flagged default an
+  operator can use per rarity tier — common 5000 digital / 500
+  physical, uncommon 2000/200, rare 500/50, epic 165/15, legendary
+  60/10, mythic 13/3, `1-of-1` 2/1 — chosen so the real scarcity curve
+  already in `lib/valueAlgorithm.js`
+  (`scarcityScore = 100 - log10(totalMintCount+1) * 40`) produces a
+  real, meaningfully increasing scarcity premium from `epic` upward,
+  rather than picked independently of the formula that actually
+  consumes these counts. `GET /api/mint-count-guidance` (all tiers) /
+  `GET /api/mint-count-guidance/:rarityTier` — a real lookup only,
+  never applied automatically; every mint function still requires the
+  caller to state its own counts explicitly. See
+  `test/mintCountGuidance.test.js`.
 - `lib/raffles.js` — real one-entry-per-user raffles, winner drawn and
   minted through the same real edition-minting mechanic packs use.
 - `lib/trading.js` — real peer-to-peer trading with genuine ownership
