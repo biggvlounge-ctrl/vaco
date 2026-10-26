@@ -574,6 +574,17 @@ app.get('/api/predictions/vacancy', (_req, res) => {
   res.json({ markets: listMarketsBySource(store, 'vacancy-in-game') });
 });
 
+// Real, live-traded markets opened by VOKEN on its own Cvltvre Card
+// market, by direct instruction: "let's also add in our predictions
+// on the culture card market as well." Price is attached on read
+// (not stored), same reasoning as `/api/predictions/real-world`
+// below -- a stored price goes stale the moment anyone trades.
+app.get('/api/predictions/voken', (_req, res) => {
+  res.json({
+    markets: listMarketsBySource(store, 'voken-culture-card').map((m) => ({ ...m, ...getMarketPrice(m) })),
+  });
+});
+
 // **The two lists the UI needed and neither existed.** Markets and
 // events could only be fetched one at a time by id, so a board could
 // not be drawn at all — which is why the Markets tab showed two

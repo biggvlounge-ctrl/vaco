@@ -51,7 +51,13 @@
 const { VAGO_HOUSE_ACCOUNT } = require('./casinoSession');
 const { settleOnce } = require('./settleOnce');
 
-const MARKET_SOURCES = ['real-world', 'vdp-in-world', 'vacancy-in-game'];
+// `voken-culture-card`, added by direct instruction: "let's also add
+// in our predictions on the culture card market as well." Real
+// questions about a Cvltvre Card's own real market -- e.g. whether a
+// specific card's marketPrice crosses a real threshold by a real
+// date -- opened server-to-server by VOKEN the same way VDP already
+// opens one for a real in-world match.
+const MARKET_SOURCES = ['real-world', 'vdp-in-world', 'vacancy-in-game', 'voken-culture-card'];
 const MARKET_SIDES = ['yes', 'no'];
 const MIN_PRICE = 0.01;
 const MAX_PRICE = 0.99;

@@ -104,6 +104,17 @@ curl -X POST http://localhost:8795/api/casino/sessions -H "Content-Type: applica
   in this project's simplified (no real matching engine) design before
   the fix; see `dev-docs/phase-2-prediction-markets/` for the full
   account.
+  **`voken-culture-card`, a fourth real market source, added by direct
+  instruction**: "let's also add in our predictions on the culture
+  card market as well." VOKEN opens these server-to-server the same
+  way VDP already opens a `vdp-in-world` market — a real question
+  about VOKEN's own Cvltvre Card market (e.g. whether a specific
+  card's market price crosses a real threshold by a real date), priced
+  and traded by this module exactly like every other source.
+  `GET /api/predictions/voken` lists them with their live price
+  attached on read, same reasoning as `/api/predictions/real-world`
+  below (a stored price goes stale the moment anyone trades). See
+  `test/vokenCultureCardMarkets.test.js`.
 - `lib/sportsbook.js` — **sportsbook (Phase 3)**: real, standard
   American odds math (favorite/underdog), odds locked in at bet time
   per the real, standard sportsbook rule — a bet's payout never
