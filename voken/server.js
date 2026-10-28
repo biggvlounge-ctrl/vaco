@@ -70,6 +70,7 @@ const { ENGAGEMENT_TYPES, recordEngagementEvent, computeEngagementStats } = requ
 const { followCard, unfollowCard, isFollowing, getFollowerCount } = require('./lib/cardFollows');
 const { computeCardMarketPrice } = require('./lib/cardMarketPrice');
 const { computeVehicleCardValue } = require('./lib/vehicleCardValue');
+const { getCardFullDetail } = require('./lib/cardFullDetail');
 const { createCarClub, getCarClub, joinCarClub, leaveCarClub, getCarClubLeaderboard } = require('./lib/carClubs');
 const { computeWalletValue } = require('./lib/walletValue');
 const {
@@ -506,6 +507,18 @@ app.get('/api/card/:id/commerce', async (req, res) => {
     res.json({ cardId, merch, collectibles });
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+// A real, unified card page -- see cardFullDetail.js's own header for
+// why this collapses ~8 separate real calls into one, and why
+// marketPrice/vehicleValue are honestly null rather than erroring the
+// whole page when they don't yet apply.
+app.get('/api/card/:id/full', async (req, res) => {
+  try {
+    res.json(await getCardFullDetail(store, { cardId: Number(req.params.id), fetchCollectibles: fetchRealCreatorCollectibles }));
+  } catch (err) {
+    res.status(404).json({ error: err.message });
   }
 });
 

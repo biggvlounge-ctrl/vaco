@@ -847,6 +847,26 @@ curl http://localhost:8794/api/explore/historic
   (`GET /api/production-orders/creator/:creatorId` — an unreachable
   CVLLEX contributes an honest empty list, never breaks the page). See
   `test/cardCommerceLinks.test.js`.
+- `lib/cardFullDetail.js` — **a real, unified card page, closing a
+  real gap this session itself flagged**: "a real card's page now
+  needs ~8 separate calls... worth collapsing into one
+  `GET /api/card/:id/full` so a real frontend isn't juggling
+  waterfalls." `getCardFullDetail()` assembles the card itself, its
+  stored `marketPrice` (never a fresh live re-score — the same real
+  "cached data on load, explicit action to re-score" split the
+  value-score route already implies), `vehicleValue` (for a vehicle
+  card with real attributes set), `valueHistory`, `predictionMarkets`,
+  real `engagement` stats, `followerCount`, `merch`, and
+  `collectibles` — every piece genuine reuse of an already-real,
+  already-tested function, nothing new computed here. `marketPrice`
+  and `vehicleValue` are honestly `null` rather than erroring the
+  whole page when they don't yet apply (an unscored card, a
+  non-vehicle category) — the same fail-soft posture `walletValue.js`
+  already takes for an unscored holding. `fetchCollectibles` is
+  injected the same real way every settlement in this codebase
+  already injects `settleFn`, so this stays directly testable with no
+  network mock required; `server.js` supplies the real, fail-soft
+  CVLLEX fetch. See `test/cardFullDetail.test.js`.
 - **Physical production (ordering a real limited run made) now lives
   in its own standalone app, `../cvllex/`** — briefly built as a
   module here first, then moved out by direct decision: this
