@@ -43,7 +43,7 @@ const { getBrandInfo } = require('./lib/brand');
 const { CATEGORIES, RARITY_TIERS, TOKENIZATION_TYPES, FORMATS } = require('./lib/cardTypes');
 const {
   SOURCE_APPS, MINTED_BY_ROLES,
-  mintCultureCard, mintExternalEntityCard, mintHistoricCard, listHistoricCards, getCultureCard, listCultureCardsByCategory, mintAdditionalEdition, transferEditionOwnership, listEditionsWithSerials, recordPeakValueScore, verifySubjectIdentity, updateCardStatistics, describeCardForQuestion, recordCardPredictionMarket} = require('./lib/cultureCards');
+  mintCultureCard, mintExternalEntityCard, mintHistoricCard, listHistoricCards, getCultureCard, listCultureCardsByCategory, mintAdditionalEdition, transferEditionOwnership, listEditionsWithSerials, recordPeakValueScore, getCardValueHistory, verifySubjectIdentity, updateCardStatistics, describeCardForQuestion, recordCardPredictionMarket} = require('./lib/cultureCards');
 const {
   HISTORIC_SUBJECT_TYPES, listHistoricEntries, getHistoricEntry, genuineSignificanceInputsFor, rankHistoricEntries,
 } = require('./lib/historicRegistry');
@@ -748,6 +748,18 @@ app.post('/api/card/:id/value-score', requireSession(), async (req, res) => {
 app.get('/api/card/:id/market-price', (req, res) => {
   try {
     res.json(computeCardMarketPrice(store, { cardId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Real value-history time series -- every real scoring call ever
+// recorded for this card, oldest first, so a real card page can
+// actually chart value over time instead of only ever showing today's
+// number.
+app.get('/api/card/:id/value-history', (req, res) => {
+  try {
+    res.json({ cardId: Number(req.params.id), valueHistory: getCardValueHistory(store, Number(req.params.id)) });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

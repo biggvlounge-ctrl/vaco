@@ -330,6 +330,15 @@ curl http://localhost:8794/api/explore/historic
   every real scoring request, so `peakValueScore` is always included
   alongside the live `combinedRealValueScore` in the response. See
   `test/peakValueScore.test.js`.
+  **A real value-history time series, closing a real gap this session
+  itself flagged** ("no real price-history / time-series tracking —
+  only ever the current state"): `recordPeakValueScore()` now also
+  appends every real scoring call — not just a new peak, a real quiet
+  dip included — to `card.valueHistory` (`{ combinedRealValueScore,
+  at }`, oldest first). `getCardValueHistory()` /
+  `GET /api/card/:id/value-history` is the real, chartable read — a
+  card's value over time can now actually be drawn, not only reported
+  as today's number. See `test/valueHistory.test.js`.
   **A real, SEPARATE tradeable market price, by direct instruction —
   reconciling an apparent contradiction with the paragraph above:**
   "it could lower, though, if their following drops or if more cards

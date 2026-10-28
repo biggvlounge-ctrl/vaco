@@ -94,6 +94,10 @@ function mintCultureCard(store, options = {}) {
     // -- see recordPeakValueScore() below.
     peakValueScore: null,
     peakValueScoreAt: null,
+    // Real value-history time series -- every real scoring call,
+    // not just a new peak, so a card's real value over time can
+    // actually be charted. See recordPeakValueScore() below.
+    valueHistory: [],
     // Real subject self-verification, by direct instruction: "I want
     // people to be able to verify their own cards to show that that
     // is them and they verify it." Only the real subject's own
@@ -203,6 +207,10 @@ function mintExternalEntityCard(store, options = {}) {
     // -- see recordPeakValueScore() below.
     peakValueScore: null,
     peakValueScoreAt: null,
+    // Real value-history time series -- every real scoring call,
+    // not just a new peak, so a card's real value over time can
+    // actually be charted. See recordPeakValueScore() below.
+    valueHistory: [],
     createdAt: Date.now(),
   };
 
@@ -294,6 +302,10 @@ function mintHistoricCard(store, options = {}) {
     // -- see recordPeakValueScore() below.
     peakValueScore: null,
     peakValueScoreAt: null,
+    // Real value-history time series -- every real scoring call,
+    // not just a new peak, so a card's real value over time can
+    // actually be charted. See recordPeakValueScore() below.
+    valueHistory: [],
     familyRepresentativeId: null,
     createdAt: Date.now(),
   };
@@ -351,7 +363,21 @@ function recordPeakValueScore(store, options = {}) {
     card.peakValueScore = combinedRealValueScore;
     card.peakValueScoreAt = now;
   }
+  // The real value-history time series -- every real scoring call,
+  // not just a new peak, so a card's real value over time can
+  // actually be charted. See `card.valueHistory`'s own header on the
+  // mint functions above for why this is separate from the peak.
+  card.valueHistory.push({ combinedRealValueScore, at: now });
   return card.peakValueScore;
+}
+
+// The real, chartable read -- every real scoring call ever recorded
+// for this card, oldest first (the order `valueHistory.push` already
+// builds it in).
+function getCardValueHistory(store, cardId) {
+  const card = getCultureCard(store, cardId);
+  if (!card) throw new Error(`getCardValueHistory: no card with id ${cardId}`);
+  return card.valueHistory;
 }
 
 function listCultureCardsByCategory(store, category) {
@@ -595,6 +621,7 @@ module.exports = {
   listHistoricCards,
   getCultureCard,
   recordPeakValueScore,
+  getCardValueHistory,
   verifySubjectIdentity,
   updateCardStatistics,
   describeCardForQuestion,
