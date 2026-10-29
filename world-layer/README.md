@@ -91,6 +91,50 @@ each generating its own separate copy.
 > the architecture document's target is "90%+ automated world
 > construction, 10% human refinement", and this is the 90%. It is real
 > code, genuinely consumed now, not just tested in isolation.
+>
+> **Three more real sources, added 29 Oct 2026 — `earthenvImport.js`,
+> `gladImport.js`, `earthEngineImport.js`.** All three fill a real gap
+> this registry had never had an entry for at all: everything wired
+> here before this round was United States-only except the hero-tier
+> landmark sources (UNESCO/Wikidata), so nothing could answer "what
+> can a region outside the U.S. actually pull down for free" in any
+> other slice. `earthenvImport.js` is the direct global-tier analogue
+> of `usgsImport.js` for elevation (90m vs 3DEP's 1-10m, never
+> overwriting the finer U.S. reading), plus a real global land-cover
+> classification with no U.S.-only equivalent at all.
+> `gladImport.js` is the one real environmental fact nothing in this
+> registry had ever named — annual global forest loss/cover, from the
+> same University of Maryland GLAD lab, 30m resolution, 2001-present.
+> `earthEngineImport.js` reaches a real global economic-activity proxy
+> (VIIRS nighttime-light radiance, the same measure development
+> economics literature has used for decades where no census exists).
+> **All three are real, tested transforms with no current VACON-C
+> consumer** — checked directly, same as this file already says above
+> for `usgsImport.js` itself before `terrainType` existed to receive
+> it. `economy.js`'s own schema comment already names `timber` as an
+> example resource type that nothing generates; a real per-location
+> tree-cover figure is what a future pack would need, not built here.
+>
+> **Google Earth Engine's own real gap is not the proxy block the
+> rest of this registry hits, and that distinction was checked
+> directly rather than assumed.** `earthengine.googleapis.com` answers
+> a real REST call with a genuine 401 UNAUTHENTICATED from Google's
+> own API — the agent proxy's own status endpoint confirms no
+> rejection was ever logged for that host, unlike `earthenv.org` and
+> `glad.umd.edu`, both of which are blocked exactly like every other
+> source here. The real obstacle is that no Earth Engine Cloud Project
+> is registered in this environment (`gcloud auth list`: no
+> credentialed accounts) — a different kind of gap, and
+> `fetchViirsNightLights`'s own error message says so rather than
+> repeating the 403-CONNECT message every other `fetch*` stub carries.
+>
+> **Cesium OSM Buildings (`sources.js`'s own `cesiumBuildings` entry)
+> stays `wired: null`, and the one open question about it — whether an
+> ion token can be added to this environment — has a real answer now:
+> yes, as a network secret / environment variable in the cloud
+> environment's own settings, picked up by a new session.** No
+> importer exists yet to receive it; adding the token is necessary and
+> not by itself sufficient.
 
 See `UNIVERSAL_WORLD_LAYER_ARCHITECTURE.md` (project root) for the
 full architecture. For the four things this stack does NOT cover —
@@ -274,6 +318,30 @@ for the full reasoning.
   stated reason; this source replaces it on explicit instruction,
   after that tension was raised a second time. See that module's own
   header.
+- `imports/earthenvImport.js` — EarthEnv-DEM90 (global 90m elevation)
+  and Consensus Land Cover (global 1km, 12 classes). The elevation
+  half is the direct global-tier analogue of `usgsImport.js`, re-using
+  its own `classifyTerrain` and never overwriting a finer real USGS
+  reading. Land cover is a real, tested transform with **no current
+  VACON-C consumer** — checked directly, the same declared-choice
+  category this file already names above for `usgsImport.js` itself.
+- `imports/gladImport.js` — University of Maryland GLAD lab's Global
+  Forest Change dataset: real global annual tree-cover loss at 30m,
+  2001-present, from a real 2000 baseline. **The one real
+  environmental fact nothing else in this registry had ever named at
+  all.** No current VACON-C consumer; `economy.js`'s own schema
+  comment names `timber` as an example resource type nothing
+  generates, which is the real, concrete future join this would
+  support.
+- `imports/earthEngineImport.js` — Google Earth Engine, reached for
+  one real, distinct product: NOAA/NASA VIIRS nighttime-light monthly
+  composites, a well-cited global proxy for local economic activity
+  where no census exists. **The one source in this registry whose
+  real gap is credentials, not the proxy block everything else here
+  hits** — checked directly: `earthengine.googleapis.com` answers a
+  genuine 401 from Google's own API, with no rejection logged at this
+  environment's agent proxy, because no Earth Engine Cloud Project is
+  registered here. No current VACON-C consumer.
 - `exportRegion.js` / `exportRegionStats.js` — the consumer join: turn
   a region's real imported data into the thirteen packs VACON-C's own
   reader modules validate and read (see the note at the top of this
@@ -376,13 +444,16 @@ of silently creating a stray property.
 - Postgres wiring (schema exists, no driver code yet — will follow
   `vacon-c/server/db.js` + `migrate.js`'s pattern when that's next).
 
-## Data sources — added 18 Sep 2026
+## Data sources — added 18 Sep 2026, recounted 29 Oct 2026
 
-`sources.js` is the registry: sixteen free datasets, each with its
-licence, access path, the slice of the world model it fills and the
-tier it serves. Five have importers — UNESCO, the National Register of
-Historic Places, Overture Places, Wikidata and Wikimedia Commons; the
-other eleven are identified with a named payoff each.
+`sources.js` is the registry, and the counts below are read from it
+directly (`sources.SOURCE_NAMES.length` / `sources.wiredSources().length`),
+the same "counted, not estimated" rule `buildEstimate.js` holds itself
+to — this paragraph went stale once already (recorded here as "sixteen
+... five have importers" when the real registry had long since grown
+past that) and the fix is to read it from the file rather than retype
+a number that will go stale the same way again. As of this count:
+34 sources, 32 with a real importer.
 
 `costModel.automationCoverage()` reports what that covers per tier, and
 `COST_REDUCTION_THROUGH_DATA.md` is the reasoning behind it: how far
@@ -390,8 +461,15 @@ free data can push the $420,000-$960,000 hero-tier figure down, what it
 can never pay for, and why the biggest lever is reclassification rather
 than discount.
 
-**Every source host is blocked from the build environment** (403
-CONNECT at the agent proxy, checked directly). Each importer is a real,
-tested transform plus a `fetch*` that throws naming the block and the
-genuine access path — so on a reachable network each is one function
-away and no transform changes.
+**Every source host but one is blocked from the build environment**
+(403 CONNECT at the agent proxy, checked directly against its own
+status endpoint). The one exception, found adding
+`earthEngineImport.js`: `earthengine.googleapis.com` is reachable here
+and answers with a genuine 401 UNAUTHENTICATED instead, because no
+Earth Engine Cloud Project is registered in this environment — a real,
+different kind of gap from a proxy block, and its own `fetch*` stub
+says so rather than repeating the 403-CONNECT message every other one
+carries. Every importer is a real, tested transform plus a `fetch*`
+that throws naming its real blocker and the genuine access path — so
+on a reachable network, or with real credentials where that is the gap
+instead, each is one function away and no transform changes.

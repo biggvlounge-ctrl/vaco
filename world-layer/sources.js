@@ -272,7 +272,15 @@ const SOURCES = {
     wired: null,
     note: '**Attribution is not optional under ODbL** and that is a licence obligation on '
       + 'the shipped product, not a build-time detail. Flagged here rather than discovered '
-      + 'later.',
+      + 'later.\n'
+      + '**Checked directly whether an ion token can be added to this environment**: no '
+      + '`CESIUM_ION_TOKEN` (or any Cesium-related variable) is currently set. There is no '
+      + 'Cesium connector, so the real path is a read-only API token stored as a network '
+      + 'secret / environment variable in this cloud environment\'s settings (the session\'s '
+      + 'environment menu → Edit → Network secrets, or an environment variable if that '
+      + 'section is not offered) — a new session picks it up once added. Still `wired: '
+      + 'null` because no importer has been written against it yet; the token is the one '
+      + 'real blocker checked, not the only piece of remaining work.',
   },
   naturalEarth: {
     name: 'Natural Earth',
@@ -684,6 +692,76 @@ const SOURCES = {
       + 'this project chose. **`regions.climate_key` is TEXT written by nothing** — '
       + '`barter.js` names that gap in its own header as one of three modifiers it cannot '
       + 'model. This is the source that closes it.',
+  },
+  earthenv: {
+    name: 'EarthEnv (EarthEnv-DEM90 + Consensus Land Cover)',
+    licence: 'Free for research/non-commercial use; citation to the source papers requested '
+      + '(Robinson et al. 2014 for the DEM, Tuanmu & Jetz 2014 for land cover) — not formally '
+      + 'public domain',
+    licenceCheckedAt: null,
+    access: 'direct GeoTIFF download at earthenv.org, no key, no rate limit',
+    host: 'earthenv.org',
+    fills: ['geographyData'],
+    tiers: ['regional', 'filler'],
+    scale: 'global elevation at ~90m; global land cover at 1km, 12 consensus classes',
+    wired: 'imports/earthenvImport.js',
+    note: '**The global-tier analogue of `usgs` for elevation** — `usgsImport.js`\'s own '
+      + 'header is explicit that 3DEP is U.S.-only; EarthEnv-DEM90 is coarser (90m vs 1-10m) '
+      + 'but genuinely global, the same "global tier" framing `openweather` already uses '
+      + 'against NOAA. Re-uses `usgsImport.classifyTerrain` rather than re-deriving a second '
+      + 'terrain classifier, and never overwrites a real USGS reading with a coarser one. '
+      + '**Deliberately kept out of the elevation field\'s own source list in `SLICE_FIELDS` '
+      + 'below** — merging the two would stop `usgs` from being independently load-bearing, '
+      + 'which `test/sources.test.js` checks mechanically by unwiring it alone. Consensus '
+      + 'Land Cover is a real, tested transform with **no current VACON-C consumer** — '
+      + 'checked directly (`grep -rn "forest\\|landCover\\|vegetation" vacon-c/server/*.js` '
+      + 'returns nothing) — the same declared-choice category `vacon-c/CLAUDE.md`\'s own '
+      + 'thirtieth standing rule already names for `usgsImport.js` itself.',
+  },
+  glad: {
+    name: 'GLAD (Global Land Analysis & Discovery) — Global Forest Change',
+    licence: 'Creative Commons Attribution 4.0 International (CC BY 4.0)',
+    licenceCheckedAt: null,
+    access: 'direct GeoTIFF tile download at glad.umd.edu, no key; also mirrored in Google '
+      + 'Earth Engine\'s public catalog',
+    host: 'glad.umd.edu',
+    fills: ['geographyData'],
+    tiers: ['regional', 'filler'],
+    scale: 'global annual tree-cover loss at 30m, 2001-present, from a real 2000 baseline',
+    wired: 'imports/gladImport.js',
+    note: '**The one real environmental fact nothing else in this registry names at all** — '
+      + 'no wired source here carries a single number about forest or vegetation anywhere on '
+      + 'Earth. `vacon-c/server/economy.js`\'s own schema comment names `timber` as an '
+      + 'example resource type, and nothing anywhere in `vacon-c/server/` ever generates one '
+      + '— checked directly. A real per-location tree-cover figure is exactly what a future '
+      + '`timberPacks.js` would need; not built here, the same declared-choice posture '
+      + '`usgsImport.js` already established for its own field before a consumer existed.',
+  },
+  googleEarthEngine: {
+    name: 'Google Earth Engine (VIIRS nighttime-lights monthly composite)',
+    licence: 'Free for noncommercial/research use under Earth Engine\'s terms of service; '
+      + 'Commercial use requires a billed Google Cloud project (policy effective since '
+      + 'Google\'s November 2024 pricing change)',
+    licenceCheckedAt: null,
+    access: 'Earth Engine Python/JS client or REST API, requires a registered Earth Engine '
+      + 'Cloud Project',
+    host: 'earthengine.googleapis.com',
+    fills: ['economicData'],
+    tiers: ['regional'],
+    scale: 'global monthly nighttime-light composites at ~500m, 2012-present',
+    wired: 'imports/earthEngineImport.js',
+    note: '**Not itself a dataset — the access layer this registry uses to reach a real, '
+      + 'distinct product**: NOAA/NASA VIIRS DNB nighttime-light radiance, a well-cited proxy '
+      + 'for local economic activity anywhere on Earth regardless of whether a census exists '
+      + '(Henderson, Storeygard & Weil 2012; Chen & Nordhaus 2011) — the same "global tier" '
+      + 'role `census`/`bls` cannot serve outside the United States. **Its real gap is not '
+      + 'the proxy block every other host in this registry hits** — checked directly, '
+      + '`earthengine.googleapis.com` is reachable from this environment and answers a real '
+      + 'REST call with a genuine 401 UNAUTHENTICATED, not a 403 CONNECT; the proxy\'s own '
+      + 'status endpoint confirms no rejection was logged for this host. The actual blocker '
+      + 'is that no Earth Engine Cloud Project is registered here (`gcloud auth list`: no '
+      + 'credentialed accounts). No current VACON-C consumer — same declared-choice category '
+      + 'as `glad` and `earthenv`\'s land cover.',
   },
   openweather: {
     name: 'OpenWeather historical datasets',

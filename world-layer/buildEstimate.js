@@ -48,17 +48,17 @@ const BUILD_SCOPE = {
     statistics: 123,
   },
   worldLayer: {
-    modules: 38,
-    lines: 8521,
-    sources: 31,
-    importers: 29,
+    modules: 41,
+    lines: 9219,
+    sources: 34,
+    importers: 32,
   },
   tests: {
     files: 109,
     lines: 36292,
     cases: 1873,
   },
-  countedAt: '2026-10-22',
+  countedAt: '2026-10-29',
 };
 
 const TOTAL_LINES = BUILD_SCOPE.engine.lines
