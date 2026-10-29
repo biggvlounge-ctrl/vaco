@@ -847,6 +847,16 @@ curl http://localhost:8794/api/explore/historic
   (`GET /api/production-orders/creator/:creatorId` — an unreachable
   CVLLEX contributes an honest empty list, never breaks the page). See
   `test/cardCommerceLinks.test.js`.
+  **Real bug fix: only a finished order is a real collectible.**
+  `fetchRealCreatorCollectibles()` used to return every CVLLEX
+  production order for a creator, including ones still
+  `ordered`/`in-production`, even `cancelled` ones. Showing an order
+  that hasn't actually shipped (or never will) as something real to
+  sell or promote is a genuine false claim. `lib/cvllexCollectibles.js`'s
+  `filterProducedOrders()` keeps only real, finished `produced`
+  orders — the one real check now shared by both
+  `GET /api/card/:id/commerce` and `GET /api/card/:id/full`. See
+  `test/cvllexCollectibles.test.js`.
 - `lib/cardFullDetail.js` — **a real, unified card page, closing a
   real gap this session itself flagged**: "a real card's page now
   needs ~8 separate calls... worth collapsing into one

@@ -71,6 +71,7 @@ const { followCard, unfollowCard, isFollowing, getFollowerCount } = require('./l
 const { computeCardMarketPrice } = require('./lib/cardMarketPrice');
 const { computeVehicleCardValue } = require('./lib/vehicleCardValue');
 const { getCardFullDetail } = require('./lib/cardFullDetail');
+const { filterProducedOrders } = require('./lib/cvllexCollectibles');
 const { createCarClub, getCarClub, joinCarClub, leaveCarClub, getCarClubLeaderboard } = require('./lib/carClubs');
 const { computeWalletValue } = require('./lib/walletValue');
 const {
@@ -202,6 +203,9 @@ async function fetchRealTotal(url, field) {
 // direct instruction: "it should link directly to their merch
 // involved with them, or their merch involved with collects... this
 // is an opportunity for them to sell or promote their collectibles."
+// See `lib/cvllexCollectibles.js`'s own header for the real bug
+// `filterProducedOrders` fixes -- an `ordered`/`in-production`/
+// `cancelled` CVLLEX order is not a real collectible yet.
 async function fetchRealCreatorCollectibles(creatorId) {
   try {
     const res = await fetch(`${CVLLEX_API_URL}/api/production-orders/creator/${encodeURIComponent(creatorId)}`, {
@@ -209,7 +213,7 @@ async function fetchRealCreatorCollectibles(creatorId) {
     });
     if (!res.ok) return [];
     const body = await res.json();
-    return Array.isArray(body.orders) ? body.orders : [];
+    return filterProducedOrders(body.orders);
   } catch {
     return [];
   }
