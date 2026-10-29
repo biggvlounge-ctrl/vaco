@@ -100,6 +100,24 @@ test('a card with no real subjectPersonId never calls fetchCollectibles at all',
   assert.equal(called, false, 'no real subject exists to fetch real collectibles for');
 });
 
+test('a card with a real subject surfaces its real royalty recipient and rate on the full page', async () => {
+  const store = createVokenStore();
+  const card = mintMusicCard(store, 'ada');
+  const detail = await getCardFullDetail(store, { cardId: card.id });
+  assert.equal(detail.royaltyRecipient, 'ada');
+  assert.equal(detail.royaltyRate, 0.10);
+});
+
+test('a card with no real royalty recipient honestly shows both as null, not a guessed rate', async () => {
+  const store = createVokenStore();
+  const card = mintMusicCard(store, 'ada');
+  // Force a no-recipient shape the same way a fixed historic/operator-curated card has it.
+  card.subjectPersonId = null;
+  const detail = await getCardFullDetail(store, { cardId: card.id });
+  assert.equal(detail.royaltyRecipient, null);
+  assert.equal(detail.royaltyRate, null);
+});
+
 test('getCardFullDetail refuses an unknown card', async () => {
   const store = createVokenStore();
   await assert.rejects(() => getCardFullDetail(store, { cardId: 999999 }), /no card with id 999999/);

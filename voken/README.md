@@ -901,7 +901,14 @@ curl http://localhost:8794/api/explore/historic
   injected the same real way every settlement in this codebase
   already injects `settleFn`, so this stays directly testable with no
   network mock required; `server.js` supplies the real, fail-soft
-  CVLLEX fetch. See `test/cardFullDetail.test.js`.
+  CVLLEX fetch. Also surfaces **real royalty transparency**:
+  `royaltyRecipient` and `royaltyRate`, reusing `cultureCards.js`'s own
+  `getRoyaltyRecipient()`/`SECONDARY_SALE_ROYALTY_RATE` — already live
+  in `auctions.js`'s settlement, but never actually shown anywhere a
+  real buyer could see it before bidding. Both are honestly `null`
+  together for a card with no real royalty recipient (a fixed
+  historic/operator-curated card), never a guessed rate. See
+  `test/cardFullDetail.test.js`.
 - **Physical production (ordering a real limited run made) now lives
   in its own standalone app, `../cvllex/`** — briefly built as a
   module here first, then moved out by direct decision: this

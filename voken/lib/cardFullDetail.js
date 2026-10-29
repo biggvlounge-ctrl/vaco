@@ -23,7 +23,7 @@
 // `server.js` supplies the real, fail-soft CVLLEX fetch; a caller
 // that passes nothing gets an honest empty list, never a guess.
 
-const { getCultureCard, getCardValueHistory } = require('./cultureCards');
+const { getCultureCard, getCardValueHistory, getRoyaltyRecipient, SECONDARY_SALE_ROYALTY_RATE } = require('./cultureCards');
 const { computeCardMarketPrice } = require('./cardMarketPrice');
 const { computeVehicleCardValue } = require('./vehicleCardValue');
 const { listMerchForCard } = require('./limitedEditionMerch');
@@ -50,6 +50,15 @@ async function getCardFullDetail(store, options = {}) {
     card.subjectPersonId ? fetchCollectibles(card.subjectPersonId) : Promise.resolve([]),
   ]);
 
+  // **Real royalty transparency** -- the resale-royalty mechanic
+  // (`cultureCards.js`'s `getRoyaltyRecipient`/`SECONDARY_SALE_ROYALTY_RATE`,
+  // already live in `auctions.js`'s settlement) was never actually
+  // surfaced anywhere a real buyer could see it before bidding.
+  // Honestly `null` when the card has no real royalty recipient (a
+  // fixed historic/operator-curated card) -- the same fail-soft
+  // posture `marketPrice`/`vehicleValue` already take above.
+  const royaltyRecipient = getRoyaltyRecipient(card);
+
   return {
     card,
     marketPrice,
@@ -60,6 +69,8 @@ async function getCardFullDetail(store, options = {}) {
     followerCount: getFollowerCount(store, cardId),
     merch,
     collectibles,
+    royaltyRecipient,
+    royaltyRate: royaltyRecipient ? SECONDARY_SALE_ROYALTY_RATE : null,
   };
 }
 
