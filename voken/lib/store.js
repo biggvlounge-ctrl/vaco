@@ -48,6 +48,8 @@ function createVokenStore() {
     nextPlaceNominationId: 1,
     carClubs: [],
     nextCarClubId: 1,
+    cardNotifications: [],
+    nextCardNotificationId: 1,
   };
 }
 

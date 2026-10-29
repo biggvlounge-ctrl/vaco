@@ -46,4 +46,13 @@ function getFollowerCount(store, cardId) {
   return store.cardFollows.filter((f) => f.cardId === cardId).length;
 }
 
-module.exports = { followCard, unfollowCard, isFollowing, getFollowerCount };
+// The real list of who, not just how many -- `cardNotifications.js`'s
+// own `notifyFollowersOfNewPeak()` needs the real follower ids
+// themselves to notify, the same way `getFollowerCount` already
+// needed the same real underlying data for a count.
+function listFollowersForCard(store, cardId) {
+  if (!cardId) throw new Error('listFollowersForCard requires a cardId');
+  return store.cardFollows.filter((f) => f.cardId === cardId).map((f) => f.followerId);
+}
+
+module.exports = { followCard, unfollowCard, isFollowing, getFollowerCount, listFollowersForCard };

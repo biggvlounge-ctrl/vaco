@@ -68,6 +68,7 @@ const {
 } = require('./lib/familyRepresentativeClaims');
 const { ENGAGEMENT_TYPES, recordEngagementEvent, computeEngagementStats } = require('./lib/cardEngagement');
 const { followCard, unfollowCard, isFollowing, getFollowerCount } = require('./lib/cardFollows');
+const { notifyFollowersIfNewPeak, getNotificationsForUser, markNotificationRead } = require('./lib/cardNotifications');
 const { computeCardMarketPrice } = require('./lib/cardMarketPrice');
 const { computeVehicleCardValue } = require('./lib/vehicleCardValue');
 const { getCardFullDetail } = require('./lib/cardFullDetail');
@@ -737,7 +738,17 @@ app.post('/api/card/:id/value-score', requireSession(), async (req, res) => {
     // updated here on every live call -- a real dip in today's
     // underlying numbers can never pull the card's effective value
     // below the highest real score it has already earned.
+    const previousPeak = card ? card.peakValueScore : null;
     const peakValueScore = recordPeakValueScore(store, { cardId, combinedRealValueScore: scoreResult.combinedRealValueScore });
+
+    // Real follow notifications, closing a real gap: "someone can
+    // follow a card now, but nothing ever tells them when it moves."
+    // See cardNotifications.js's own header for why this is a real,
+    // VOKEN-internal inbox rather than routed through vaco-notify (an
+    // ops-alerting app with no per-user addressing at all), and its
+    // own `notifyFollowersIfNewPeak` for why only a genuine new real
+    // peak counts as "moved."
+    notifyFollowersIfNewPeak(store, { cardId, previousPeak, newPeak: peakValueScore });
 
     // The real, tradeable market price -- a different real number
     // from peakValueScore above, by direct instruction: "it could
@@ -1353,6 +1364,25 @@ app.get('/api/card/:id/follow', (req, res) => {
     const result = { cardId, followerCount: getFollowerCount(store, cardId) };
     if (req.query.followerId) result.isFollowing = isFollowing(store, { cardId, followerId: req.query.followerId });
     res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// A real, per-user follow-notification inbox -- see
+// cardNotifications.js's own header for why this exists and why it
+// is not routed through vaco-notify.
+app.get('/api/notifications/:userId', (req, res) => {
+  try {
+    res.json({ notifications: getNotificationsForUser(store, req.params.userId) });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/notifications/:id/read', requireActor('userId'), (req, res) => {
+  try {
+    res.json(markNotificationRead(store, { notificationId: Number(req.params.id), userId: req.body.userId }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

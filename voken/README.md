@@ -709,7 +709,32 @@ curl http://localhost:8794/api/explore/historic
   Follow button has. `POST`/`DELETE /api/card/:id/follow` take
   `followerId` from the real session; `GET /api/card/:id/follow`
   returns the real follower count (and, with `?followerId=`, whether
-  that real user currently follows it). See `test/cardFollows.test.js`.
+  that real user currently follows it). Also exports
+  `listFollowersForCard(store, cardId)` — the real follower *ids*, not
+  just a count, which `cardNotifications.js` needs to actually notify
+  them. See `test/cardFollows.test.js`.
+- `lib/cardNotifications.js` — **a real per-user follow-notification
+  inbox, closing a real gap: a card could be followed, but nothing
+  ever told a follower when it actually moved.** Deliberately NOT
+  wired to `vaco-notify` — that app is a real ops-alerting/paging
+  service, with its own severity scale (`signal`/`alert`/`critical`)
+  and subscriptions matched by `app` + `severity` alone, with **no
+  per-user addressing at all**. Routing "a fan you follow hit a new
+  high" through an on-call paging system would be exactly the kind of
+  wrong-tool integration this codebase refuses, so this is instead a
+  small, real, VOKEN-internal inbox. The real trigger is
+  `notifyFollowersIfNewPeak(store, { cardId, previousPeak, newPeak })`,
+  wired into the value-score route: it's real news only on a genuine
+  new peak (including the very first real score), never on a tie or a
+  real quiet dip — the same "only ever goes up" semantic
+  `recordPeakValueScore` already has. On a genuine new peak, every
+  current real follower (from `listFollowersForCard`) gets their own
+  real notification via `notifyFollowersOfNewPeak`. `GET
+  /api/notifications/:userId` returns a real user's inbox;
+  `POST /api/notifications/:id/read` marks one read, with a real
+  ownership check — `requireActor('userId')` at the route, and the lib
+  itself refuses to mark a notification read for anyone but the real
+  user it belongs to. See `test/cardNotifications.test.js`.
 - `lib/exploreVoken.js` — the Explore Page: ranks cards by Phase 1's
   own `computeDigitalEngagementScore()`, fed by this phase's real
   engagement stats — genuine cross-phase code reuse, not a rebuilt
