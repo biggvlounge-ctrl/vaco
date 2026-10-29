@@ -43,6 +43,32 @@ const {
 const {
   PRODUCTION_STAGES, createProductionJob, getProductionJob, advanceToStoryboard, queueRender, markRendered,
 } = require('./lib/productionPipeline');
+const {
+  createBrand, getBrand, listBrands, updateBrandGuidelines, generateBrandVoiceGuidelines,
+} = require('./lib/brandManagement');
+const {
+  catalogAsset, getAsset, listAssetsForBrand, listAssetsForCampaign, recordAssetReuse,
+} = require('./lib/assetLibrary');
+const {
+  CAMPAIGN_STATUSES, createCampaign, getCampaign, listCampaignsForBrand, updateCampaignStatus,
+  recordSpend, campaignRemainingBudget, generateCampaignOptimization,
+} = require('./lib/campaigns');
+const {
+  createAd, getAd, listAdsForCampaign, recordAdMetrics, adPerformance, generateAdCopy,
+} = require('./lib/adDashboard');
+const {
+  CONTENT_CALENDAR_STATUSES, scheduleContent, getContentCalendarEntry, markPublished,
+  cancelScheduledContent, listUpcoming, suggestContentSlots,
+} = require('./lib/contentCalendar');
+const {
+  createLaunch, getLaunch, listLaunchesForBrand, completeMilestone, launchReadiness, generateLaunchCopy,
+} = require('./lib/productLaunches');
+const {
+  createAbTest, getAbTest, assignVariant, recordConversion, abTestResults, generateVariantCopy,
+} = require('./lib/abTesting');
+const { recordAnalyticsEvent, analyticsSummary, generateInsights } = require('./lib/marketingAnalytics');
+const { getMarketingDashboard, getCampaignDashboard } = require('./lib/marketingDashboard');
+const { PendingIntegrationError } = require('./lib/pendingIntegration');
 
 const { createServiceAuth } = require('./lib/serviceAuth.cjs');
 const { traceMiddleware, traceHeaders } = require('./lib/tracing.cjs');const app = express();
@@ -157,6 +183,8 @@ app.get('/api/health', (_req, res) => {
     referralStatuses: REFERRAL_STATUSES,
     ambassadorTiers: AMBASSADOR_TIERS,
     growthMissions: Object.keys(GROWTH_MISSIONS),
+    campaignStatuses: CAMPAIGN_STATUSES,
+    contentCalendarStatuses: CONTENT_CALENDAR_STATUSES,
   });
 });
 
@@ -317,6 +345,261 @@ app.get('/api/growth/ambassadors/:ambassadorId/missions/:missionKey', (req, res)
   } catch (err) {
     res.status(404).json({ error: err.message });
   }
+});
+
+// --- Marketing/Campaign dashboard scaffolding (task #59) -----------
+//
+// Brand Management, Asset Library, Campaign Dashboard, Ad Dashboard,
+// Content Calendar, Product Launch Manager, AI A/B Testing, and AI
+// Analytics -- see each lib module's own header for what is real
+// here (the data model and every analytics/tracking computation) and
+// what is a clearly-labeled pending integration point (every
+// generation call: ad copy, brand voice, launch copy, variant
+// creative, analytics insights, content-slot suggestions -- see
+// `lib/pendingIntegration.js`).
+//
+// This is internal marketing tooling, the same "apps submit briefs"
+// shape the rest of this server already uses for the production
+// pipeline -- there is no end-consumer session that owns a brand or a
+// campaign, so mutations are gated the same way script/production-job
+// submission already is: `requireCallingService()`.
+function sendPendingIntegration(res, err) {
+  if (err instanceof PendingIntegrationError) return res.status(501).json({ error: err.message });
+  return res.status(400).json({ error: err.message });
+}
+
+// Brand Management
+app.post('/api/marketing/brands', requireCallingService(), (req, res) => {
+  try { res.status(201).json(createBrand(store, req.body || {})); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.get('/api/marketing/brands', (req, res) => {
+  res.json({ brands: listBrands(store, { ownerApp: req.query.ownerApp }) });
+});
+
+app.get('/api/marketing/brands/:id', (req, res) => {
+  const brand = getBrand(store, Number(req.params.id));
+  if (!brand) return res.status(404).json({ error: `no brand with id ${req.params.id}` });
+  res.json(brand);
+});
+
+app.post('/api/marketing/brands/:id/guidelines', requireCallingService(), (req, res) => {
+  try { res.json(updateBrandGuidelines(store, { ...req.body, brandId: Number(req.params.id) })); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.post('/api/marketing/brands/:id/voice-guidelines/generate', requireCallingService(), (_req, res) => {
+  try { res.json(generateBrandVoiceGuidelines()); }
+  catch (err) { sendPendingIntegration(res, err); }
+});
+
+// Asset Library
+app.post('/api/marketing/assets', requireCallingService(), (req, res) => {
+  try { res.status(201).json(catalogAsset(store, req.body || {})); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.get('/api/marketing/assets/:id', (req, res) => {
+  const asset = getAsset(store, Number(req.params.id));
+  if (!asset) return res.status(404).json({ error: `no asset with id ${req.params.id}` });
+  res.json(asset);
+});
+
+app.get('/api/marketing/brands/:id/assets', (req, res) => {
+  res.json({ assets: listAssetsForBrand(store, Number(req.params.id)) });
+});
+
+app.post('/api/marketing/assets/:id/reuse', requireCallingService(), (req, res) => {
+  try { res.json(recordAssetReuse(store, { ...req.body, assetId: Number(req.params.id) })); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// Campaign Dashboard
+app.post('/api/marketing/campaigns', requireCallingService(), (req, res) => {
+  try { res.status(201).json(createCampaign(store, req.body || {})); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.get('/api/marketing/campaigns/:id', (req, res) => {
+  const campaign = getCampaign(store, Number(req.params.id));
+  if (!campaign) return res.status(404).json({ error: `no campaign with id ${req.params.id}` });
+  res.json(campaign);
+});
+
+app.get('/api/marketing/brands/:id/campaigns', (req, res) => {
+  res.json({ campaigns: listCampaignsForBrand(store, Number(req.params.id)) });
+});
+
+app.post('/api/marketing/campaigns/:id/status', requireCallingService(), (req, res) => {
+  try { res.json(updateCampaignStatus(store, { ...req.body, campaignId: Number(req.params.id) })); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.post('/api/marketing/campaigns/:id/spend', requireCallingService(), (req, res) => {
+  try { res.status(201).json(recordSpend(store, { ...req.body, campaignId: Number(req.params.id) })); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.get('/api/marketing/campaigns/:id/budget', (req, res) => {
+  try { res.json({ campaignId: Number(req.params.id), remainingBudget: campaignRemainingBudget(store, Number(req.params.id)) }); }
+  catch (err) { res.status(404).json({ error: err.message }); }
+});
+
+app.post('/api/marketing/campaigns/:id/optimize/generate', requireCallingService(), (_req, res) => {
+  try { res.json(generateCampaignOptimization()); }
+  catch (err) { sendPendingIntegration(res, err); }
+});
+
+app.get('/api/marketing/campaigns/:id/dashboard', (req, res) => {
+  try { res.json(getCampaignDashboard(store, { campaignId: Number(req.params.id) })); }
+  catch (err) { res.status(404).json({ error: err.message }); }
+});
+
+app.get('/api/marketing/brands/:id/dashboard', (req, res) => {
+  try { res.json(getMarketingDashboard(store, { brandId: Number(req.params.id) })); }
+  catch (err) { res.status(404).json({ error: err.message }); }
+});
+
+// Ad Dashboard
+app.post('/api/marketing/ads', requireCallingService(), (req, res) => {
+  try { res.status(201).json(createAd(store, req.body || {})); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.get('/api/marketing/campaigns/:id/ads', (req, res) => {
+  res.json({ ads: listAdsForCampaign(store, Number(req.params.id)) });
+});
+
+app.post('/api/marketing/ads/:id/metrics', requireCallingService(), (req, res) => {
+  try { res.status(201).json(recordAdMetrics(store, { ...req.body, adId: Number(req.params.id) })); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.get('/api/marketing/ads/:id/performance', (req, res) => {
+  try { res.json(adPerformance(store, Number(req.params.id))); }
+  catch (err) { res.status(404).json({ error: err.message }); }
+});
+
+app.post('/api/marketing/ads/:id/copy/generate', requireCallingService(), (_req, res) => {
+  try { res.json(generateAdCopy()); }
+  catch (err) { sendPendingIntegration(res, err); }
+});
+
+// Content Calendar
+app.post('/api/marketing/content-calendar', requireCallingService(), (req, res) => {
+  try { res.status(201).json(scheduleContent(store, req.body || {})); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.get('/api/marketing/content-calendar/:id', (req, res) => {
+  const entry = getContentCalendarEntry(store, Number(req.params.id));
+  if (!entry) return res.status(404).json({ error: `no content calendar entry with id ${req.params.id}` });
+  res.json(entry);
+});
+
+app.get('/api/marketing/brands/:id/content-calendar/upcoming', (req, res) => {
+  res.json({ upcoming: listUpcoming(store, { brandId: Number(req.params.id), fromTime: req.query.fromTime ? Number(req.query.fromTime) : undefined }) });
+});
+
+app.post('/api/marketing/content-calendar/:id/publish', requireCallingService(), (req, res) => {
+  try { res.json(markPublished(store, { ...req.body, entryId: Number(req.params.id) })); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.post('/api/marketing/content-calendar/:id/cancel', requireCallingService(), (req, res) => {
+  try { res.json(cancelScheduledContent(store, { entryId: Number(req.params.id) })); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.post('/api/marketing/content-calendar/suggest-slots/generate', requireCallingService(), (_req, res) => {
+  try { res.json(suggestContentSlots()); }
+  catch (err) { sendPendingIntegration(res, err); }
+});
+
+// Product Launch Manager
+app.post('/api/marketing/launches', requireCallingService(), (req, res) => {
+  try { res.status(201).json(createLaunch(store, req.body || {})); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.get('/api/marketing/launches/:id', (req, res) => {
+  const launch = getLaunch(store, Number(req.params.id));
+  if (!launch) return res.status(404).json({ error: `no launch with id ${req.params.id}` });
+  res.json(launch);
+});
+
+app.get('/api/marketing/brands/:id/launches', (req, res) => {
+  res.json({ launches: listLaunchesForBrand(store, Number(req.params.id)) });
+});
+
+app.post('/api/marketing/launches/:id/milestones/:index/complete', requireCallingService(), (req, res) => {
+  try { res.json(completeMilestone(store, { launchId: Number(req.params.id), milestoneIndex: Number(req.params.index) })); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.get('/api/marketing/launches/:id/readiness', (req, res) => {
+  try { res.json(launchReadiness(store, Number(req.params.id))); }
+  catch (err) { res.status(404).json({ error: err.message }); }
+});
+
+app.post('/api/marketing/launches/:id/copy/generate', requireCallingService(), (_req, res) => {
+  try { res.json(generateLaunchCopy()); }
+  catch (err) { sendPendingIntegration(res, err); }
+});
+
+// AI A/B Testing (real assignment + results math; generation stubbed)
+app.post('/api/marketing/ab-tests', requireCallingService(), (req, res) => {
+  try { res.status(201).json(createAbTest(store, req.body || {})); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.get('/api/marketing/ab-tests/:id', (req, res) => {
+  const test = getAbTest(store, Number(req.params.id));
+  if (!test) return res.status(404).json({ error: `no A/B test with id ${req.params.id}` });
+  res.json(test);
+});
+
+app.post('/api/marketing/ab-tests/:id/assign', requireCallingService(), (req, res) => {
+  try { res.json({ variantKey: assignVariant(store, { ...req.body, testId: Number(req.params.id) }) }); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.post('/api/marketing/ab-tests/:id/convert', requireCallingService(), (req, res) => {
+  try { res.json(recordConversion(store, { ...req.body, testId: Number(req.params.id) })); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.get('/api/marketing/ab-tests/:id/results', (req, res) => {
+  try { res.json(abTestResults(store, Number(req.params.id), { minSampleSize: req.query.minSampleSize ? Number(req.query.minSampleSize) : undefined })); }
+  catch (err) { res.status(404).json({ error: err.message }); }
+});
+
+app.post('/api/marketing/ab-tests/:id/variant-copy/generate', requireCallingService(), (_req, res) => {
+  try { res.json(generateVariantCopy()); }
+  catch (err) { sendPendingIntegration(res, err); }
+});
+
+// AI Analytics (real event tracking + aggregation; insight generation stubbed)
+app.post('/api/marketing/analytics/events', requireCallingService(), (req, res) => {
+  try { res.status(201).json(recordAnalyticsEvent(store, req.body || {})); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.get('/api/marketing/brands/:id/analytics/summary', (req, res) => {
+  try {
+    res.json(analyticsSummary(store, {
+      brandId: Number(req.params.id),
+      campaignId: req.query.campaignId ? Number(req.query.campaignId) : null,
+    }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/marketing/analytics/insights/generate', requireCallingService(), (_req, res) => {
+  try { res.json(generateInsights()); }
+  catch (err) { sendPendingIntegration(res, err); }
 });
 
 app.listen(PORT, () => {
