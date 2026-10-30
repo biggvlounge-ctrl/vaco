@@ -1431,6 +1431,144 @@ function renderBookings(body) {
   return VACO.mount(body, out);
 }
 
+// -- Hub Shipments & Business Lockers -------------------------------------
+//
+// hubOrigination.js (walk into a Hub, originate a shipment) and
+// businessLockers.js (Amazon-FBA-style forward-deployed seller
+// inventory) had zero frontend exposure. Loading a drone from a
+// locker is staffed fleet operations (requireCallingService) and
+// stays backend-only; this tab covers the customer/seller half.
+function renderHubLockers(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Walking into a Hub to originate a shipment, and a seller forward-deploying inventory into a Hub locker '
+    + '(Amazon FBA’s model, with one flat storage fee instead of a stacked fee structure) — both previously API-only.'));
+
+  // -- Originate a shipment at a Hub -----------------------------------
+  var shipmentResult = el('div', 'vaco-stack-sm');
+  var shipmentForm = VACO.form([
+    { name: 'originHubId', label: 'Hub (station) id', type: 'number', width: '120px' },
+    { name: 'originationMethod', label: 'Method',
+      options: [{ label: 'Self-service kiosk', value: 'self-service-kiosk' }, { label: 'Staff-assisted', value: 'staff-assisted' }] },
+    { name: 'staffMemberId', label: 'Staff member id (if staff-assisted)', width: '190px' },
+    { name: 'packageWeight', label: 'Weight (lb)', type: 'number', value: 5, width: '100px' },
+    { name: 'packageDimensions', label: 'Dimensions', placeholder: '12x12x8in', width: '120px' },
+    { name: 'destinationAddress', label: 'Destination address', placeholder: '1 Main St', width: '170px' },
+    { name: 'quotedPrice', label: 'Quoted price', type: 'number', value: 12, width: '110px' },
+  ], function (values) {
+    var customerId = VACO.userId();
+    if (!customerId) throw new Error('Sign in to originate a shipment.');
+    var payload = {
+      customerId: customerId, originHubId: values.originHubId, originationMethod: values.originationMethod,
+      packageWeight: values.packageWeight, packageDimensions: values.packageDimensions,
+      destinationAddress: values.destinationAddress, quotedPrice: values.quotedPrice,
+    };
+    if (values.originationMethod === 'staff-assisted') {
+      if (!values.staffMemberId) throw new Error('Staff-assisted origination requires a staff member id.');
+      payload.staffMemberId = values.staffMemberId;
+    }
+    return VACO.post('/api/hub-shipment', payload).then(function (shipment) {
+      VACO.mount(shipmentResult, VACO.notice(
+        'Shipment #' + shipment.id + ' originated, real courier job #' + shipment.jobId + ' created.', 'money'));
+    });
+  }, 'Originate shipment');
+  out.appendChild(VACO.card('Originate a shipment at a Hub', [
+    el('p', 'vaco-small vaco-dim', 'The third real delivery flow, alongside receiving and app-initiated — walking a package in, like a FedEx Office counter.'),
+    shipmentForm, shipmentResult,
+  ]));
+
+  var shipmentLookupResult = el('div', 'vaco-stack-sm');
+  var shipmentLookupForm = VACO.form([
+    { name: 'shipmentId', label: 'Shipment id', type: 'number', width: '100px' },
+  ], function (values) {
+    return VACO.api('/api/hub-shipment/' + values.shipmentId).then(function (shipment) {
+      VACO.mount(shipmentLookupResult, VACO.table([
+        { key: 'id', label: 'Shipment' },
+        { key: 'jobId', label: 'Job' },
+        { key: 'originationMethod', label: 'Method' },
+        { label: 'Fulfillment', render: function (s) { return s.fulfillmentMethod ? VACO.badge(s.fulfillmentMethod) : el('span', 'vaco-small vaco-dim', 'not decided yet'); } },
+      ], [shipment]));
+    });
+  }, 'Look up');
+  out.appendChild(VACO.card('Look up a shipment', [shipmentLookupForm, shipmentLookupResult]));
+
+  // -- Business Lockers (forward-deployed seller inventory) --------------
+  var lockersHost = el('div', 'vaco-stack-sm');
+  lockersHost.appendChild(el('div', 'vaco-empty', 'Sign in and load to see your lockers.'));
+
+  function refreshLockers() {
+    var sellerId = VACO.userId();
+    if (!sellerId) return Promise.resolve();
+    return VACO.api('/api/business-lockers/seller/' + encodeURIComponent(sellerId)).then(function (lockers) {
+      VACO.mount(lockersHost, VACO.table([
+        { key: 'id', label: 'Locker' },
+        { key: 'hubId', label: 'Hub' },
+        { key: 'lockerSize', label: 'Size' },
+        { label: 'Monthly fee', num: true, render: function (l) { return VACO.price(l.monthlyStorageFee, { freeLabel: false }); } },
+        { label: 'Items on hand', num: true, render: function (l) { return l.currentInventory.reduce(function (sum, i) { return sum + i.quantity; }, 0); } },
+      ], lockers, { empty: 'No business lockers registered yet.' }));
+    });
+  }
+
+  var lockerForm = VACO.form([
+    { name: 'hubId', label: 'Hub (station) id', type: 'number', width: '120px' },
+    { name: 'lockerSize', label: 'Size',
+      options: [{ label: 'Small', value: 'small' }, { label: 'Medium', value: 'medium' }, { label: 'Large', value: 'large' }] },
+    { name: 'monthlyStorageFee', label: 'Monthly fee', type: 'number', value: 40, width: '110px' },
+  ], function (values) {
+    var sellerId = VACO.userId();
+    if (!sellerId) throw new Error('Sign in to register a business locker.');
+    return VACO.post('/api/business-locker', {
+      sellerId: sellerId, hubId: values.hubId, lockerSize: values.lockerSize, monthlyStorageFee: values.monthlyStorageFee,
+    }).then(function (locker) {
+      VACO.toast('Business locker #' + locker.id + ' registered', 'money');
+      return refreshLockers();
+    });
+  }, 'Register locker');
+  out.appendChild(VACO.card('Your business lockers', [lockerForm, lockersHost]));
+
+  var placementResult = el('div', 'vaco-stack-sm');
+  var placementForm = VACO.form([
+    { name: 'businessLockerId', label: 'Locker id', type: 'number', width: '90px' },
+    { name: 'productId', label: 'Product id', placeholder: 'sku-123', width: '120px' },
+    { name: 'quantity', label: 'Quantity', type: 'number', value: 10, width: '90px' },
+    { name: 'placementFee', label: 'Placement fee', type: 'number', value: 0, width: '110px' },
+  ], function (values) {
+    var sellerId = VACO.userId();
+    if (!sellerId) throw new Error('Sign in to place inventory.');
+    return VACO.post('/api/seller-inventory-placement', {
+      sellerId: sellerId, productId: values.productId, quantity: values.quantity,
+      businessLockerId: values.businessLockerId, placementFee: values.placementFee,
+    }).then(function (placement) {
+      VACO.mount(placementResult, VACO.notice(
+        'Placement #' + placement.id + ': ' + placement.quantity + ' × ' + placement.productId + ' forward-deployed.', 'money'));
+      return refreshLockers();
+    });
+  }, 'Place inventory');
+  out.appendChild(VACO.card('Forward-deploy inventory into a locker', [placementForm, placementResult]));
+
+  var loadingEventsResult = el('div', 'vaco-stack-sm');
+  var loadingEventsForm = VACO.form([
+    { name: 'businessLockerId', label: 'Locker id', type: 'number', width: '90px' },
+  ], function (values) {
+    return VACO.api('/api/business-locker/' + values.businessLockerId + '/loading-events').then(function (data) {
+      VACO.mount(loadingEventsResult, VACO.table([
+        { key: 'productId', label: 'Product' },
+        { key: 'orderId', label: 'Order' },
+        { key: 'hubEmployeeId', label: 'Loaded by' },
+        { key: 'droneId', label: 'Drone' },
+        { label: 'Loaded at', render: function (e) { return fmtTime(e.loadedAt); } },
+      ], data.events, { empty: 'No drone-loading events for this locker yet.' }));
+    });
+  }, 'View loading events');
+  out.appendChild(VACO.card('Drone-loading history', [
+    el('p', 'vaco-small vaco-dim', 'Loading a drone from a locker is always staffed — a real Hub employee verifies and loads the item. This is a real, read-only history.'),
+    loadingEventsForm, loadingEventsResult,
+  ]));
+
+  return VACO.mount(body, out);
+}
+
 VACO.app({
   id: 'void',
   name: 'VOID',
@@ -1467,6 +1605,9 @@ VACO.app({
     { id: 'bookings', label: 'Bookings', heading: 'Pet Care & the 23-vertical service engine',
       blurb: 'Register pets and subjects, book a service, and move a booking through its own real lifecycle.',
       render: renderBookings },
+    { id: 'hub-lockers', label: 'Hub & Lockers', heading: 'Walk-up shipments & business lockers',
+      blurb: 'Originate a shipment in person at a Hub, and forward-deploy seller inventory into a Hub locker.',
+      render: renderHubLockers },
     { id: 'academy', label: 'Academy', heading: 'VOID Academy',
       blurb: 'Real training on how VOID actually pays you, chosen from your own claimed skills.',
       render: renderAcademy },
