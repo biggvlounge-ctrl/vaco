@@ -371,6 +371,39 @@ function renderFavorites(body) {
   });
 }
 
+function renderNotifications(body) {
+  var out = el('div', 'vaco-stack');
+  var id = VACO.userId();
+  if (!id) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to see your notifications.'));
+    return VACO.mount(body, out);
+  }
+
+  return VACO.api('/api/notifications/' + encodeURIComponent(id)).then(function (data) {
+    var notifications = data.notifications || [];
+    out.appendChild(VACO.card('Your notifications', [
+      VACO.table([
+        { label: 'Type', render: function (n) { return VACO.badge(n.type); } },
+        { label: 'Subject', render: function (n) {
+          var wrap = el('div', 'vaco-stack-sm');
+          wrap.style.gap = '2px';
+          wrap.appendChild(el('strong', null, n.subject));
+          wrap.appendChild(el('span', 'vaco-small vaco-dim', n.message));
+          return wrap;
+        } },
+        { label: '', render: function (n) {
+          if (n.read) return VACO.badge('read');
+          return VACO.button('Mark read', function () {
+            return VACO.post('/api/notifications/' + n.id + '/read', {})
+              .then(function () { VACO.toast('Marked read.'); VACO.render(); });
+          }, 'ghost vaco-btn-sm');
+        } },
+      ], notifications, { empty: 'No notifications yet.' }),
+    ]));
+    VACO.mount(body, out);
+  });
+}
+
 VACO.app({
   id: 'voidmagic',
   name: 'VOID MAGIC',
@@ -388,6 +421,7 @@ VACO.app({
     { id: 'host-console', label: 'Host Console', heading: 'Run the show', render: renderHostConsole },
     { id: 'analytics', label: 'Analytics', heading: 'Creator analytics', render: renderAnalytics },
     { id: 'favorites', label: 'Favorites', heading: 'Creators you follow', render: renderFavorites },
+    { id: 'notifications', label: 'Notifications', heading: 'Your notifications', render: renderNotifications },
   ],
 });
 </script>
