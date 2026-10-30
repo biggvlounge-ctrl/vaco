@@ -358,3 +358,97 @@ if VACO Analytics is down). See `vaco-analytics/dev-docs/phase-5-live-metric-fee
   collapses Joined and Funded into one, since `joinGroupWager` already
   does JOIN+FUND as one atomic settlement — a system that cannot
   observe a joined-not-funded moment should not pretend to track one.
+
+## Frontend coverage pass (30 Oct 2026)
+
+An audit found `public/index.html` making real calls against only 12
+of this app's 67 routes — the original 4 tabs (Casino, Fantasy,
+Sportsbook, Markets) could *view* almost every surface but could only
+ever actually *act* on Mines. Five changes close most of that gap,
+each a real client of the routes named, never a fabricated payload
+shape (every field was checked against the real route handler and its
+`lib/*.js` function before being written, and every flow below was
+exercised live against a running server with a mock Shield session and
+a mock V3 ledger). Consistently left backend-only, by design: anything
+gated to `requireCallingService` (fantasy prop creation, market/event/
+match creation — a trusted-service credential this frontend has no
+login for) or `requireOperator` (every resolve/settle/grade route — a
+human operator credential, deliberately separate from a player session
+so no player, and no compromised service token, can ever grade their
+own bet).
+
+- **Sportsbook tab** — showed events and odds but had no way to
+  actually bet. Each open event now gets a real bet form
+  (`POST /api/sports/:eventId/bet`), showing the odds-locked-in
+  potential payout the moment it's placed. Verified live: a 10-VCoin
+  bet at +195 odds returned `potentialPayout: 29.5` and debited the
+  bettor's V3 balance by exactly 10.
+- **Markets tab** — showed real-world/VDP/VACON-C markets but had no
+  way to trade, and never surfaced VOKEN's own Cvltvre Card markets at
+  all (`GET /api/predictions/voken` existed with no caller). Each
+  source card now gets Buy/Sell forms keyed by market id
+  (`POST /api/markets/:id/buy`, `.../sell`), plus a fourth source card
+  for VOKEN's markets. Verified live: buying 2 YES contracts returned
+  the real demand-driven `price`/`cost`/`fee`; selling 1 back returned
+  `proceeds` with `capped: false`.
+- **Fantasy tab** — could look up a prop and view past entries but
+  never build one (`POST /api/fantasy/entries` existed with no
+  caller). A real picks builder (prop id + more/less direction, 2-6
+  picks, Flex gated to 3+ exactly like `fantasy.js` itself gates it)
+  stakes a real entry; "Your entries" now also shows play type and
+  payout. Verified live: a 3-pick Perfect entry for 10 VCoin posted
+  correctly and debited V3 by exactly 10.
+- **Casino tab** — played only Mines, even though `lib/originals.js`
+  has three real provably-fair games. A game switcher adds Plinko
+  (`POST /api/casino/plinko/start`, `.../drop`) and Hi-Lo
+  (`POST /api/casino/hilo/start`, `.../guess`, `.../cash-out`) onto the
+  same session+round flow and fairness panel Mines already used.
+  Hi-Lo's Higher/Lower buttons disable themselves on a guaranteed-loss
+  guess the same way the server itself rejects it. Verified live
+  against real gold-coin sessions: a Plinko drop resolved bucket 8 at
+  ×0.39 for a 19.50 payout; a Hi-Lo round won a guess (×1.6087) and
+  cashed out for 32.17, both checked against the real round response.
+- **Group Wagers tab, new** — the entire feature had zero frontend
+  callers. Create one (`POST /api/group-wagers`), find/view one by id
+  (`GET /api/group-wagers/:id`, which already merges the group's own
+  fields with its market's live pools and participant count), join a
+  side (`POST /api/group-wagers/:id/join`), and a platform-wide
+  leaderboard (`GET /api/group-wagers/leaderboard`). Wiring the
+  leaderboard card surfaced a real bug in `server.js`: that route was
+  registered *after* the sibling `GET /api/group-wagers/:id`, so
+  Express matched `"leaderboard"` as `:id` first and the real handler
+  was never reachable — every request for it returned
+  `{"error":"no group wager with id leaderboard"}`. Fixed by moving
+  the literal route before the `:id` route. Verified live: creating
+  and joining a group wager both settle exactly as `groupWagers.js`
+  documents, and the leaderboard route now returns `200` with a real
+  (empty, since nothing has settled yet) array instead of a 404.
+
+**Deliberately left for a follow-up round:**
+- **Blackjack** (`lib/originals.js`'s fourth real Originals game) — a
+  real multi-step hand UI (hit/stand, dealer hole-card reveal, natural-
+  blackjack settlement) is a meaningfully bigger build than Plinko/
+  Hi-Lo's single-decision shape, and deserved its own pass rather than
+  being rushed alongside four other tabs.
+- **Group Wager invitations, thread-linking, and side wagers** — the
+  private-invitation accept/view flow and side wagers are each a real,
+  separate feature surface; linking a group's VXLLAGE thread
+  specifically needs the creator's own live VXLLAGE session, which
+  this frontend has no way to forward (`groupWagers.js`'s own header
+  explains why VAGO cannot create that post server-to-server on the
+  creator's behalf).
+- **Group Wager Competitions (Leagues/Tournaments) and BLIND/Before-
+  the-Answer rounds** — each has real create/view/participate routes
+  with no seed data anywhere, so a customer-facing read would show an
+  empty shell with nothing to meaningfully demonstrate; better suited
+  to a pass that also seeds a live example.
+- **Esports lounge** — `esportsStaking.js` is real and tested, but
+  `POST /api/esports/matches` (the only way a match comes to exist) is
+  `requireCallingService`-gated and nothing seeds one, so there is no
+  real match id a player-facing tab could ever stake on today.
+- **AMOE history and generic casino-session/round lookups**
+  (`GET /api/amoe-entry/:userId`, `GET /api/casino/sessions/:id`,
+  `GET /api/casino/rounds/:id`) — each is a real read with no new
+  mechanic behind it; better woven into an existing card (e.g. an AMOE
+  history list on the Casino tab's Gold Coin card) than given its own
+  surface, and left for whichever pass does that polish.
