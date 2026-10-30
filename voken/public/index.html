@@ -363,6 +363,172 @@ function renderCarClubs(body) {
   return out;
 }
 
+// -- Trading, Raffles & Referrals --------------------------------------
+//
+// Three real, previously backend-only mechanics grouped into one tab:
+// peer-to-peer trading, raffle entry, and the referral/spin-to-win
+// growth loop. Raffle and pack-tier *creation* stay operator/service
+// surfaces with no frontend credential (see the Packs tab's own note);
+// entering an existing raffle is a real session action, so that part
+// is here.
+
+function renderTradeResult(container, trade) {
+  var box = el('div', 'vaco-stack-sm');
+  box.appendChild(el('h3', 'vaco-h3', 'Trade #' + trade.tradeId));
+  var head = el('div', 'vaco-row-tight');
+  head.appendChild(el('span', 'vaco-small vaco-dim', trade.fromUserId + ' → ' + trade.toUserId));
+  head.appendChild(VACO.badge(trade.status));
+  box.appendChild(head);
+  box.appendChild(el('p', 'vaco-small vaco-dim', 'Offered: ' + JSON.stringify(trade.cardIdsOffered)));
+  box.appendChild(el('p', 'vaco-small vaco-dim', 'Requested: ' + JSON.stringify(trade.cardIdsRequested)));
+
+  if (trade.status === 'pending') {
+    var row = el('div', 'vaco-row-tight');
+    row.appendChild(VACO.button('Accept (as recipient)', function () {
+      if (!VACO.userId()) throw new Error('Sign in to accept a trade.');
+      return VACO.post('/api/trade/' + trade.tradeId + '/accept', {}).then(function (updated) {
+        VACO.toast('Trade accepted -- editions transferred', 'money');
+        renderTradeResult(container, updated);
+      });
+    }, 'primary'));
+    row.appendChild(VACO.button('Reject (as recipient)', function () {
+      if (!VACO.userId()) throw new Error('Sign in to reject a trade.');
+      return VACO.post('/api/trade/' + trade.tradeId + '/reject', {}).then(function (updated) {
+        renderTradeResult(container, updated);
+      });
+    }));
+    row.appendChild(VACO.button('Cancel (as proposer)', function () {
+      if (!VACO.userId()) throw new Error('Sign in to cancel a trade.');
+      return VACO.post('/api/trade/' + trade.tradeId + '/cancel', { requestedByUserId: VACO.userId() }).then(function (updated) {
+        renderTradeResult(container, updated);
+      });
+    }));
+    box.appendChild(row);
+  }
+
+  VACO.mount(container, box);
+}
+
+function renderTradeSection() {
+  var out = el('div', 'vaco-stack-sm');
+  var result = el('div');
+
+  out.appendChild(VACO.form([
+    { name: 'toUserId', label: 'Trade with (user id)', placeholder: 'alice' },
+    { name: 'offeredCardId', label: 'Your card id', type: 'number' },
+    { name: 'offeredEditionNumber', label: 'Your edition #', type: 'number', value: 1 },
+    { name: 'offeredFormat', label: 'Your format', options: ['digital', 'physical'] },
+    { name: 'requestedCardId', label: 'Their card id', type: 'number' },
+    { name: 'requestedEditionNumber', label: 'Their edition #', type: 'number', value: 1 },
+    { name: 'requestedFormat', label: 'Their format', options: ['digital', 'physical'] },
+  ], function (values) {
+    if (!VACO.userId()) throw new Error('Sign in to propose a trade.');
+    return VACO.post('/api/trade', {
+      fromUserId: VACO.userId(),
+      toUserId: values.toUserId,
+      cardIdsOffered: [{ cardId: values.offeredCardId, editionNumber: values.offeredEditionNumber, format: values.offeredFormat }],
+      cardIdsRequested: [{ cardId: values.requestedCardId, editionNumber: values.requestedEditionNumber, format: values.requestedFormat }],
+    }).then(function (trade) {
+      VACO.toast('Trade #' + trade.tradeId + ' proposed');
+      renderTradeResult(result, trade);
+    });
+  }, 'Propose trade'));
+
+  out.appendChild(VACO.form([{ name: 'tradeId', label: 'Look up a trade id', type: 'number' }], function (values) {
+    return VACO.api('/api/trade/' + encodeURIComponent(values.tradeId)).then(function (trade) {
+      renderTradeResult(result, trade);
+    });
+  }, 'Look up'));
+  out.appendChild(result);
+
+  return VACO.card('Peer-to-peer trading', [out]);
+}
+
+function renderRaffleSection() {
+  var out = el('div', 'vaco-stack-sm');
+  var result = el('div');
+
+  function renderRaffle(raffle) {
+    var box = el('div', 'vaco-stack-sm');
+    var head = el('div', 'vaco-row-tight');
+    head.appendChild(el('span', null, 'Raffle #' + raffle.raffleId + ' for card ' + raffle.cardId));
+    head.appendChild(VACO.badge(raffle.status));
+    box.appendChild(head);
+    box.appendChild(el('p', 'vaco-small vaco-dim', 'Entry method: ' + raffle.entryMethod + ' · ' + raffle.entries.length + ' entrant(s)'));
+    if (raffle.winnerId) box.appendChild(el('p', 'vaco-small', 'Winner: ' + raffle.winnerId));
+    if (raffle.status === 'open') {
+      box.appendChild(VACO.button('Enter raffle', function () {
+        if (!VACO.userId()) throw new Error('Sign in to enter a raffle.');
+        return VACO.post('/api/raffle/' + raffle.raffleId + '/enter', { userId: VACO.userId() }).then(function (updated) {
+          VACO.toast('Entered raffle #' + updated.raffleId);
+          renderRaffle(updated);
+        });
+      }, 'primary'));
+    }
+    VACO.mount(result, box);
+  }
+
+  out.appendChild(VACO.notice('Raffles are created by VOKEN operations -- look up an existing raffle id to enter it.'));
+  out.appendChild(VACO.form([{ name: 'raffleId', label: 'Raffle id', type: 'number' }], function (values) {
+    return VACO.api('/api/raffle/' + encodeURIComponent(values.raffleId)).then(renderRaffle);
+  }, 'Look up'));
+  out.appendChild(result);
+
+  return VACO.card('Raffles', [out]);
+}
+
+function renderReferralsSection() {
+  var out = el('div', 'vaco-stack-sm');
+  var progressOut = el('div', 'vaco-empty', 'Sign in to see your referral progress.');
+  out.appendChild(progressOut);
+
+  function refreshProgress() {
+    var id = VACO.userId();
+    if (!id) return;
+    return VACO.api('/api/referrals/' + encodeURIComponent(id) + '/progress').then(function (p) {
+      var box = el('div', 'vaco-stack-sm');
+      box.appendChild(el('p', null, p.referralCount + ' referral(s) · ' + p.spinsAvailable + ' spin(s) available'));
+      box.appendChild(el('p', 'vaco-small vaco-dim',
+        p.nextTierThreshold
+          ? (p.referralsUntilNextTier + ' more to reach the ' + p.nextTierThreshold + '-referral tier (' + p.progressPercent + '%)')
+          : 'Every tier reached.'));
+      VACO.mount(progressOut, box);
+    });
+  }
+  refreshProgress().catch(function () { /* not signed in yet */ });
+
+  out.appendChild(VACO.form([{ name: 'refereeId', label: 'Referee (user you referred)', placeholder: 'new-user-id' }], function (values) {
+    if (!VACO.userId()) throw new Error('Sign in to record a referral.');
+    return VACO.post('/api/referrals', { referrerId: VACO.userId(), refereeId: values.refereeId }).then(function (result) {
+      VACO.toast(result.tierReached ? ('Tier reached! +' + result.tierReached.bonusVCoin + ' VCoin') : 'Referral recorded');
+      VACO.refreshBalances().then(VACO.renderIdentity);
+      refreshProgress();
+    });
+  }, 'Record referral'));
+
+  var spinOut = el('p', 'vaco-small vaco-dim');
+  out.appendChild(VACO.form([{ name: 'clientSeed', label: 'Client seed (provably-fair)', placeholder: 'any text you choose' }], function (values) {
+    if (!VACO.userId()) throw new Error('Sign in to spin.');
+    return VACO.post('/api/referrals/' + encodeURIComponent(VACO.userId()) + '/spin', { clientSeed: values.clientSeed }).then(function (spin) {
+      spinOut.textContent = 'Result: ' + spin.prizeLabel + ' (server seed hash ' + spin.serverSeedHash.slice(0, 12) + '…, verified: ' + spin.verified + ')';
+      VACO.toast('Spin result: ' + spin.prizeLabel, spin.vcoinWon > 0 ? 'money' : null);
+      VACO.refreshBalances().then(VACO.renderIdentity);
+      refreshProgress();
+    });
+  }, 'Spin'));
+  out.appendChild(spinOut);
+
+  return VACO.card('Referrals & spin-to-win', [out]);
+}
+
+function renderActivity(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(renderTradeSection());
+  out.appendChild(renderRaffleSection());
+  out.appendChild(renderReferralsSection());
+  return out;
+}
+
 // Boot needs the brand and category list before the first render, since
 // both are real server-owned values rather than constants in this file.
 VACO.api('/api/health').then(function (health) {
@@ -388,6 +554,7 @@ VACO.api('/api/health').then(function (health) {
       { id: 'fractional', label: 'Fractional', heading: 'Shares & resale', render: renderFractional },
       { id: 'packs', label: 'Packs', heading: 'Packs & mint guidance', render: renderPacks },
       { id: 'car-clubs', label: 'Car Clubs', heading: 'Culture Car Clubs', render: renderCarClubs },
+      { id: 'activity', label: 'Activity', heading: 'Trading, raffles & referrals', render: renderActivity },
     ],
   });
 });
