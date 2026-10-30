@@ -35,7 +35,7 @@
 // decided server-side.
 
 var el = VACO.el;
-var state = { category: 'vehicles', categories: [], brand: null };
+var state = { category: 'vehicles', categories: [], brand: null, complianceGates: [] };
 
 // -- Auctions ---------------------------------------------------------
 
@@ -529,11 +529,107 @@ function renderActivity(body) {
   return out;
 }
 
+// -- Account: notifications, wallet value, compliance gates -----------
+//
+// Three small, previously backend-only account-level surfaces.
+// Compliance-gate *setting* (`POST /api/compliance-gate/:gateName`) is
+// requireOperator()-gated by direct design -- "not a routine toggle" --
+// so this tab only ever reads a gate's current status, never flips
+// one.
+
+function renderWalletValue(container) {
+  var out = el('div', 'vaco-stack-sm');
+  var result = el('div');
+  out.appendChild(VACO.form([
+    { name: 'ownerId', label: 'Owner id', value: VACO.userId() || '' },
+  ], function (values) {
+    return VACO.api('/api/wallet/' + encodeURIComponent(values.ownerId) + '/value').then(function (wallet) {
+      var box = el('div', 'vaco-stack-sm');
+      box.appendChild(el('p', null, 'Total wallet value: ' + VACO.round(wallet.totalValue) + ' VC'));
+      box.appendChild(VACO.table([
+        { key: 'cardId', label: 'Card' },
+        { key: 'editionsOwned', label: 'Editions', num: true },
+        { label: 'Price/edition', num: true, render: function (r) { return r.marketPricePerEdition === null ? 'unscored' : VACO.round(r.marketPricePerEdition); } },
+        { label: 'Holding value', num: true, render: function (r) { return VACO.round(r.holdingValue); } },
+      ], wallet.holdings, { empty: 'No cards held yet.' }));
+      VACO.mount(result, box);
+    });
+  }, 'Look up'));
+  out.appendChild(result);
+  VACO.mount(container, out);
+}
+
+function renderNotifications(container) {
+  var userId = VACO.userId();
+  if (!userId) {
+    VACO.mount(container, el('div', 'vaco-empty', 'Sign in to see your notifications.'));
+    return;
+  }
+  VACO.api('/api/notifications/' + encodeURIComponent(userId)).then(function (data) {
+    var notifications = data.notifications || [];
+    var box = el('div', 'vaco-stack-sm');
+    if (!notifications.length) {
+      box.appendChild(el('div', 'vaco-empty', 'No notifications yet.'));
+    }
+    notifications.forEach(function (n) {
+      var row = el('div', 'vaco-row-tight');
+      row.appendChild(el('span', n.read ? 'vaco-small vaco-dim' : 'vaco-small', n.message));
+      if (!n.read) {
+        row.appendChild(VACO.button('Mark read', function () {
+          return VACO.post('/api/notifications/' + n.id + '/read', { userId: userId }).then(function () {
+            renderNotifications(container);
+          });
+        }, 'ghost vaco-btn-sm'));
+      } else {
+        row.appendChild(VACO.badge('read'));
+      }
+      box.appendChild(row);
+    });
+    VACO.mount(container, box);
+  }).catch(function (err) { VACO.mount(container, VACO.notice(VACO.escapeHtml(err.message), 'danger')); });
+}
+
+function renderComplianceGates(container) {
+  var out = el('div', 'vaco-stack-sm');
+  var result = el('div');
+  out.appendChild(VACO.form([
+    { name: 'gateName', label: 'Gate', options: state.complianceGates },
+  ], function (values) {
+    return VACO.api('/api/compliance-gate/' + encodeURIComponent(values.gateName)).then(function (data) {
+      VACO.mount(result, VACO.badge(data.gateName + ': ' + (data.cleared ? 'cleared' : 'closed'), data.cleared ? 'money' : 'warn'));
+    });
+  }, 'Check status'));
+  out.appendChild(result);
+  VACO.mount(container, out);
+}
+
+function renderAccount(body) {
+  var out = el('div', 'vaco-stack');
+
+  var notifBox = el('div', 'vaco-empty', 'Loading…');
+  out.appendChild(VACO.card('Notifications', [notifBox]));
+  renderNotifications(notifBox);
+
+  var walletBox = el('div');
+  out.appendChild(VACO.card('Wallet value', ['Sums the real live market price across every edition an owner holds.', walletBox]));
+  renderWalletValue(walletBox);
+
+  var gatesBox = el('div');
+  out.appendChild(VACO.card('Compliance gates', [
+    'Read-only: fractional ownership and influencer-reward gates are held closed pending real legal/founder review, and only an operator credential can ever flip one.',
+    gatesBox,
+  ]));
+  renderComplianceGates(gatesBox);
+
+  return out;
+}
+
 // Boot needs the brand and category list before the first render, since
 // both are real server-owned values rather than constants in this file.
 VACO.api('/api/health').then(function (health) {
   state.categories = health.categories || [];
   state.category = state.categories[0] || 'vehicles';
+  state.complianceGates = health.complianceGates || [];
 
   VACO.app({
     id: 'voken',
@@ -555,6 +651,7 @@ VACO.api('/api/health').then(function (health) {
       { id: 'packs', label: 'Packs', heading: 'Packs & mint guidance', render: renderPacks },
       { id: 'car-clubs', label: 'Car Clubs', heading: 'Culture Car Clubs', render: renderCarClubs },
       { id: 'activity', label: 'Activity', heading: 'Trading, raffles & referrals', render: renderActivity },
+      { id: 'account', label: 'Account', heading: 'Notifications & wallet', render: renderAccount },
     ],
   });
 });
