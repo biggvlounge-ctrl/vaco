@@ -85,6 +85,73 @@ test('costFor is deterministic and reused rather than redrawn at construction ti
 });
 
 // ---------------------------------------------------------------------
+// terrainCostMultiplierFor / real terrain re-centring the cost band
+// ---------------------------------------------------------------------
+
+test('terrainCostMultiplierFor is 1 (no change) with no cities, no terrainClass, or an unknown community', () => {
+  const w = world();
+  assert.equal(construction.terrainCostMultiplierFor(w, 1), 1, 'no w.cities at all');
+  w.cities = [{ id: 10 }];
+  assert.equal(construction.terrainCostMultiplierFor(w, 1), 1, 'city has no real terrainClass');
+  assert.equal(construction.terrainCostMultiplierFor(w, 999), 1, 'no such community');
+});
+
+test('terrainCostMultiplierFor reads the real terrainClass of the community\'s own city', () => {
+  const w = world();
+  w.cities = [{ id: 10, terrainClass: 'mountainous' }];
+  const multiplier = construction.terrainCostMultiplierFor(w, 1);
+  assert.ok(multiplier > 1, 'mountainous terrain should raise construction cost');
+});
+
+test('costFor with a real terrain multiplier scales the drawn cost, never invents a second number', () => {
+  const w = world();
+  w.cities = [{ id: 10, terrainClass: 'mountainous' }];
+  const flat = construction.costFor(w.seed, w.tick, 1);
+  const multiplier = construction.terrainCostMultiplierFor(w, 1);
+  const nudged = construction.costFor(w.seed, w.tick, 1, { costMultiplier: multiplier });
+  assert.ok(nudged > flat, 'mountainous terrain should cost more than the flat-band draw');
+  // Scaling both ends of the same band, not a second invented range.
+  assert.ok(nudged <= construction.RESIDENTIAL_COST_MAX * multiplier);
+});
+
+test('a home built on mountainous terrain costs more than the identical build on flat terrain', () => {
+  const flatWorld = world();
+  flatWorld.cities = [{ id: 10, terrainClass: 'flat' }];
+  person(flatWorld, { id: 1, savings: 1000000, createdTick: WORKING_AGE_CREATED_TICK });
+  const flatBuilt = construction.constructResidentialProperty(flatWorld, {
+    builderId: 1, communityId: 1, cityId: 10, tick: flatWorld.tick,
+  });
+
+  const mountainWorld = world();
+  mountainWorld.cities = [{ id: 10, terrainClass: 'mountainous' }];
+  person(mountainWorld, { id: 1, savings: 1000000, createdTick: WORKING_AGE_CREATED_TICK });
+  const mountainBuilt = construction.constructResidentialProperty(mountainWorld, {
+    builderId: 1, communityId: 1, cityId: 10, tick: mountainWorld.tick,
+  });
+
+  assert.ok(mountainBuilt.value > flatBuilt.value,
+    'the same draw should cost more on real mountainous terrain than on real flat terrain');
+});
+
+test('the pre-filter and the actual build charge the same real terrain-adjusted cost', () => {
+  const seed = 'construct-hit-terrain';
+  const tick = 2000;
+  const w = world({ tick, seed });
+  w.cities = [{ id: 10, terrainClass: 'mountainous' }];
+  const id = findId(seed, tick, construction.BUILD_CHANCE_PER_TICK, true);
+  const multiplier = construction.terrainCostMultiplierFor(w, 1);
+  const realCost = construction.costFor(seed, tick, id, { costMultiplier: multiplier });
+  // Just enough for the real terrain-adjusted cost, not enough for a
+  // second, unadjusted draw of it — if the filter and the build ever
+  // disagreed on the multiplier, one of these two assertions would.
+  person(w, { id, savings: realCost, createdTick: WORKING_AGE_CREATED_TICK });
+
+  const result = construction.runConstruction(w, tick);
+  assert.equal(result.built, 1, 'exactly enough savings for the real terrain-adjusted cost should still build');
+  assert.equal(w.properties[0].value, realCost);
+});
+
+// ---------------------------------------------------------------------
 // runConstruction — the seeded gate, pinned exactly (standing rule 26)
 // ---------------------------------------------------------------------
 

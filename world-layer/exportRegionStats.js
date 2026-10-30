@@ -423,6 +423,85 @@ function exportAncestryPack(worldLayer, options = {}) {
   return { region, source, tracts };
 }
 
+// A region's real Census ACS race shares (table B02001), as a race
+// pack `vacon-c/server/racePacks.js` can read. `imports/
+// censusImport.js`'s own `importAcsTract` is the writer, same source
+// string `exportPopulationPack`/`exportIncomePack` already gate on.
+function exportRacePack(worldLayer, options = {}) {
+  const { region, source = 'sample' } = options;
+  if (!region) {
+    throw new Error('exportRacePack requires options.region — a pack is per-region by definition');
+  }
+
+  const tracts = [];
+  for (const location of worldLayer.locations || []) {
+    const population = location.populationData;
+    if (!population || population.source !== 'us-census-acs' || !population.raceShares) continue;
+    tracts.push({ tractId: population.tractId ?? location.id, shares: population.raceShares });
+  }
+
+  return { region, source, tracts };
+}
+
+// A region's real Census ACS marital-status shares (table B12001,
+// population 15+), as a marital-status pack
+// `vacon-c/server/maritalStatusPacks.js` can read.
+function exportMaritalStatusPack(worldLayer, options = {}) {
+  const { region, source = 'sample' } = options;
+  if (!region) {
+    throw new Error('exportMaritalStatusPack requires options.region — a pack is per-region by definition');
+  }
+
+  const tracts = [];
+  for (const location of worldLayer.locations || []) {
+    const population = location.populationData;
+    if (!population || population.source !== 'us-census-acs' || !population.maritalStatusShares) continue;
+    tracts.push({ tractId: population.tractId ?? location.id, shares: population.maritalStatusShares });
+  }
+
+  return { region, source, tracts };
+}
+
+// A region's real Census ACS disability share (table B18101), as a
+// disability pack `vacon-c/server/disabilityPacks.js` can read. A
+// single real share per tract, not a `shares` object — see that
+// importer's own header on why this one field is not a distribution.
+function exportDisabilityPack(worldLayer, options = {}) {
+  const { region, source = 'sample' } = options;
+  if (!region) {
+    throw new Error('exportDisabilityPack requires options.region — a pack is per-region by definition');
+  }
+
+  const tracts = [];
+  for (const location of worldLayer.locations || []) {
+    const population = location.populationData;
+    if (!population || population.source !== 'us-census-acs' || population.disabilityShare == null) continue;
+    tracts.push({ tractId: population.tractId ?? location.id, disabilityShare: population.disabilityShare });
+  }
+
+  return { region, source, tracts };
+}
+
+// A region's real Census ACS veteran share (table B21001, civilian
+// population 18+), as a veteran pack
+// `vacon-c/server/veteranPacks.js` can read. Same single-share shape
+// as `exportDisabilityPack` just above.
+function exportVeteranPack(worldLayer, options = {}) {
+  const { region, source = 'sample' } = options;
+  if (!region) {
+    throw new Error('exportVeteranPack requires options.region — a pack is per-region by definition');
+  }
+
+  const tracts = [];
+  for (const location of worldLayer.locations || []) {
+    const population = location.populationData;
+    if (!population || population.source !== 'us-census-acs' || population.veteranShare == null) continue;
+    tracts.push({ tractId: population.tractId ?? location.id, veteranShare: population.veteranShare });
+  }
+
+  return { region, source, tracts };
+}
+
 module.exports = {
   RETAIL_CATEGORIES,
   KOPPEN_GROUP_LETTERS,
@@ -442,4 +521,8 @@ module.exports = {
   exportPoliticalPack,
   exportCrimeHotspotPack,
   exportAncestryPack,
+  exportRacePack,
+  exportMaritalStatusPack,
+  exportDisabilityPack,
+  exportVeteranPack,
 };

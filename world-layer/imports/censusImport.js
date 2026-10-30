@@ -78,6 +78,19 @@ const AGE_BANDS = [
   { key: 'elder', from: 65, to: null },
 ];
 
+//: ACS table B02001's own seven race categories, duplicated here for
+//: the cross-boundary reason the header gives, and cross-checked by
+//: `vacon-c/server/racePacks.js`'s own test against this copy.
+const RACE_CATEGORIES = [
+  'white', 'black-or-african-american', 'american-indian-or-alaska-native',
+  'asian', 'native-hawaiian-or-pacific-islander', 'some-other-race', 'two-or-more-races',
+];
+
+//: ACS table B12001's own five marital-status categories for
+//: population 15+, duplicated for the same reason, cross-checked by
+//: `vacon-c/server/maritalStatusPacks.js`'s own test.
+const MARITAL_STATUS_CATEGORIES = ['never-married', 'now-married', 'separated', 'widowed', 'divorced'];
+
 function shareOf(counts, total) {
   if (!total) return null;
   return Math.round((counts / total) * 10000) / 10000;
@@ -133,6 +146,33 @@ function importAcsTract(worldLayer, locationId, record = {}) {
 
   const attainment = record.attainment ? attainmentDistribution(record.attainment) : null;
 
+  // **Four more real shapes, added 30 Oct 2026, same posture as every
+  // one above: a distribution over a PLACE, never a per-person fact.**
+  // `record.raceCounts` (table B02001) and `record.maritalStatusCounts`
+  // (table B12001, population 15+) are multi-category, so they go
+  // through the same `toDistribution` this file already uses for age
+  // and household size. `record.disabilityCounts` (table B18101) and
+  // `record.veteranCounts` (table B21001, civilian population 18+) are
+  // each a single real share — "with a disability" / "veteran" against
+  // their own table's own total — computed with `shareOf` the same way
+  // `giniIndex` below is a single real number rather than a
+  // distribution.
+  const raceShares = record.raceCounts ? toDistribution(record.raceCounts) : null;
+  const maritalStatusShares = record.maritalStatusCounts ? toDistribution(record.maritalStatusCounts) : null;
+  const disabilityShare = record.disabilityCounts
+    ? shareOf(
+      Number(record.disabilityCounts.withDisability) || 0,
+      (Number(record.disabilityCounts.withDisability) || 0)
+        + (Number(record.disabilityCounts.withoutDisability) || 0),
+    )
+    : null;
+  const veteranShare = record.veteranCounts
+    ? shareOf(
+      Number(record.veteranCounts.veteran) || 0,
+      (Number(record.veteranCounts.veteran) || 0) + (Number(record.veteranCounts.nonveteran) || 0),
+    )
+    : null;
+
   setLocationData(worldLayer, locationId, 'populationData', {
     source: 'us-census-acs',
     tractId: record.tractId,
@@ -144,6 +184,10 @@ function importAcsTract(worldLayer, locationId, record = {}) {
     ageBands: record.ageCounts ? toDistribution(record.ageCounts) : null,
     householdSizes: record.householdSizes ? toDistribution(record.householdSizes) : null,
     attainment,
+    raceShares,
+    maritalStatusShares,
+    disabilityShare,
+    veteranShare,
     // **No per-person anything.** See the §9 note in the header: this
     // produces shapes, never people, and nothing here is readable as a
     // trait.
@@ -177,12 +221,19 @@ function importAcsTract(worldLayer, locationId, record = {}) {
 function describeAcsCoverage(worldLayer) {
   const withAcs = (worldLayer.locations || [])
     .filter((l) => l.populationData?.source === 'us-census-acs');
-  const missing = { ageBands: [], householdSizes: [], attainment: [], income: [] };
+  const missing = {
+    ageBands: [], householdSizes: [], attainment: [], income: [],
+    race: [], maritalStatus: [], disability: [], veteranStatus: [],
+  };
   for (const location of withAcs) {
     if (!location.populationData.ageBands) missing.ageBands.push(location.name);
     if (!location.populationData.householdSizes) missing.householdSizes.push(location.name);
     if (!location.populationData.attainment) missing.attainment.push(location.name);
     if (!location.economicData?.medianHouseholdIncome) missing.income.push(location.name);
+    if (!location.populationData.raceShares) missing.race.push(location.name);
+    if (!location.populationData.maritalStatusShares) missing.maritalStatus.push(location.name);
+    if (location.populationData.disabilityShare == null) missing.disability.push(location.name);
+    if (location.populationData.veteranShare == null) missing.veteranStatus.push(location.name);
   }
   return {
     tracts: withAcs.length,
@@ -199,8 +250,10 @@ function fetchAcsTracts() {
     + 'outbound proxy allowlist (403 CONNECT, checked directly 18 Sep 2026). The intended '
     + 'path is the Census Data API — `/data/2022/acs/acs5?get=GROUP(B01001)&for=tract:*&in='
     + 'state:29` and the corresponding tables for household size (B11016), educational '
-    + 'attainment (B15003) and income (B19013) — which needs a free API key. Pass the rows '
-    + 'to importAcsTract(worldLayer, locationId, record).',
+    + 'attainment (B15003), income (B19013), race (B02001), marital status (B12001, '
+    + 'population 15+), disability status (B18101) and veteran status (B21001, civilian '
+    + 'population 18+) — which needs a free API key. Pass the rows to '
+    + 'importAcsTract(worldLayer, locationId, record).',
   );
 }
 
@@ -208,6 +261,8 @@ module.exports = {
   ATTAINMENT_MAP,
   APPROXIMATE_RUNGS,
   AGE_BANDS,
+  RACE_CATEGORIES,
+  MARITAL_STATUS_CATEGORIES,
   toDistribution,
   attainmentDistribution,
   importAcsTract,

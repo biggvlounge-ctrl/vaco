@@ -471,6 +471,25 @@ function generateNPC(options = {}) {
     // supplies one, same posture as every other real demographic
     // field here.
     politicalTypology: options.politicalTypology ?? null,
+    // A real Census ACS race category (table B02001) — see
+    // `racePacks.js`'s own header for why this is a separate field
+    // from `ethnicity` rather than the same question asked twice.
+    // Null unless a caller supplies one.
+    race: options.race ?? null,
+    // A real Census ACS marital-status category (table B12001,
+    // population 15+) — see `maritalStatusPacks.js`'s own header.
+    // Null for a child or a caller who supplies none, same posture
+    // `education` already takes.
+    maritalStatus: options.maritalStatus ?? null,
+    // A real Census ACS disability share (table B18101) — see
+    // `disabilityPacks.js`'s own header. Null (unknown), not `false`,
+    // unless a caller supplies a real boolean.
+    disability: options.disability ?? null,
+    // A real Census ACS veteran share (table B21001, civilian
+    // population 18+) — see `veteranPacks.js`'s own header. Null for
+    // a child or a caller who supplies none, same posture
+    // `maritalStatus` takes.
+    veteranStatus: options.veteranStatus ?? null,
     traits: traitsToSheet(traitRows),
     createdTick: WorldState.tick,
     updatedTick: WorldState.tick,

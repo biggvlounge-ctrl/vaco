@@ -648,7 +648,11 @@ const SOURCES = {
       + 'this project chose; ACS publishes the real ones per tract, free. §9 permits '
       + 'demographic modelling and forbids demographics determining morality, criminality, '
       + 'intelligence or worth — real data does not change that firewall, it only replaces '
-      + 'invented distributions with measured ones.',
+      + 'invented distributions with measured ones. Extended 30 Oct 2026 with four more real '
+      + 'ACS tables — race (B02001), marital status (B12001, population 15+), disability '
+      + '(B18101) and veteran status (B21001, civilian population 18+) — onto four new '
+      + 'per-NPC fields (`vacon-c/server/racePacks.js`, `maritalStatusPacks.js`, '
+      + '`disabilityPacks.js`, `veteranPacks.js`), same firewall discipline.',
   },
   bls: {
     name: 'U.S. Bureau of Labor Statistics',

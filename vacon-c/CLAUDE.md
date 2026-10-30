@@ -1905,6 +1905,56 @@ for those eight would have repeated exactly the mistake the land-cover
 section's original header was written to avoid, just a few paragraphs
 after re-opening it.
 
+**A forty-fifth, closing the four real demographic sources approved in
+an earlier round and left unbuilt as their own "new per-NPC field"
+complexity class — race, marital status, disability and veteran
+status, all real Census ACS tables with no VACON-C reader until now.**
+
+`server/racePacks.js` (table B02001) and `server/maritalStatusPacks.js`
+(table B12001, population 15+) are the categorical `cutsFor` shape
+`ancestryPacks.js`/`religionPacks.js` already established, read onto
+two NEW fields — `npc.race` and `npc.maritalStatus` — rather than
+reused existing ones. **Race is deliberately not folded into
+`npc.ethnicity`**: ACS asks race and ancestry as two separate
+questions, and a person who answers "Mexican" to one and "White" to
+the other is answering both honestly, not contradicting either — the
+same distinction `jewishObservancePacks.js` draws giving branch its
+own field alongside `religion` rather than overloading it.
+`server/disabilityPacks.js` (table B18101) and `server/veteranPacks.js`
+(table B21001, civilian population 18+) are a simpler shape than
+either: ACS reports each as ONE real share, not a vocabulary of more
+than two outcomes, so `hasDisabilityFor`/`hasVeteranStatusFor` are a
+weighted coin flip against a real local rate — the same single-number
+shape `nightLightsPacks.activityMultiplierFor` already takes, not the
+multi-category machinery a real vocabulary needs.
+
+**Marital status and veteran status are gated on the same adult
+threshold `education` already uses, for the same reason.** ACS
+publishes marital status for population 15+ and veteran status for
+the civilian population 18+; this engine has no concept of a married
+or veteran child in any of its own generators, and drawing one would
+assert a fact ACS itself does not measure. Both fields are set `null`
+in the initial `generateNPC` call and resolved only inside the
+existing `if (age >= 18)` block education already uses — `null` for a
+child carries the same meaning `education`'s own header already
+argues for: not "unmarried"/"not a veteran", simply a question that
+does not apply yet. Race and disability carry no such gate — ACS asks
+both at any age, so both are drawn unconditionally in the initial call
+alongside `ethnicity`.
+
+**Same §9 firewall discipline as every per-NPC real field before it,
+and the same proof.** Each of the four new fields gets its own test
+file holding a copy of `test/ethnicity.test.js`'s forbidden-file scan
+— `race-packs.test.js`, `marital-status-packs.test.js`,
+`disability-packs.test.js`, `veteran-packs.test.js` — asserting that
+no generator of crime, policing, wages, mortality, traits or any other
+outcome reads the new field, and that `demographics.js`'s composition
+statistic is the only reader. `world-layer/imports/censusImport.js`'s
+own `importAcsTract` was extended with the same four real ACS tables,
+writing shapes onto a PLACE exactly as it already does for age,
+household size, attainment and income — never a per-person fact, the
+same §9 note that file's own header already carries.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

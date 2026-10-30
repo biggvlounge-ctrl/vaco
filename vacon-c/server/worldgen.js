@@ -120,6 +120,11 @@ const crimeHotspotPacks = require('./crimeHotspotPacks.js');
 const woodPacks = require('./woodPacks.js');
 const landCoverPacks = require('./landCoverPacks.js');
 const nightLightsPacks = require('./nightLightsPacks.js');
+const terrainPacks = require('./terrainPacks.js');
+const racePacks = require('./racePacks.js');
+const maritalStatusPacks = require('./maritalStatusPacks.js');
+const disabilityPacks = require('./disabilityPacks.js');
+const veteranPacks = require('./veteranPacks.js');
 const merchandise = require('./merchandise.js');
 const worldStore = require('./worldStore.js');
 const { hashSeed, seededUnit } = require('./seeded.js');
@@ -388,6 +393,31 @@ function generateWorld(options = {}) {
   } else if (w.nightLightsPack) {
     nightLightsPacks.assertPack(w.nightLightsPack);
   }
+  if (config.terrainPack) {
+    w.terrainPack = terrainPacks.assertPack(config.terrainPack);
+  } else if (w.terrainPack) {
+    terrainPacks.assertPack(w.terrainPack);
+  }
+  if (config.racePack) {
+    w.racePack = racePacks.assertPack(config.racePack);
+  } else if (w.racePack) {
+    racePacks.assertPack(w.racePack);
+  }
+  if (config.maritalStatusPack) {
+    w.maritalStatusPack = maritalStatusPacks.assertPack(config.maritalStatusPack);
+  } else if (w.maritalStatusPack) {
+    maritalStatusPacks.assertPack(w.maritalStatusPack);
+  }
+  if (config.disabilityPack) {
+    w.disabilityPack = disabilityPacks.assertPack(config.disabilityPack);
+  } else if (w.disabilityPack) {
+    disabilityPacks.assertPack(w.disabilityPack);
+  }
+  if (config.veteranPack) {
+    w.veteranPack = veteranPacks.assertPack(config.veteranPack);
+  } else if (w.veteranPack) {
+    veteranPacks.assertPack(w.veteranPack);
+  }
 
   // **`worldState.seed` was read by two modules and set by none.**
   // `infrastructure.advanceInfrastructure` seeds its failure draw on
@@ -517,6 +547,17 @@ function generateWorld(options = {}) {
     // memory only, same posture as `city.politicalLean` just above.
     const realLandCoverClass = landCoverPacks.classFor(landCoverPacks.plotFor(w.landCoverPack, c));
     if (realLandCoverClass !== null) city.landCoverClass = realLandCoverClass;
+
+    // **A real USGS 3DEP terrain classification, when a terrain pack
+    // has one — assigned by the city's own position (§88).** Stored
+    // directly on the city and read at RUNTIME, not just here — see
+    // `terrainPacks.js`'s own header: `construction.js#costFor` reads
+    // `city.terrainClass` on every tick it fires, the same shape
+    // `environment.js#drawWeather` already takes reading
+    // `city.hazardRisk`. In-memory only, same posture as every other
+    // city-level real fact above.
+    const realTerrainClass = terrainPacks.classFor(terrainPacks.plotFor(w.terrainPack, c));
+    if (realTerrainClass !== null) city.terrainClass = realTerrainClass;
 
     // Every city gets weather, and now a climate drawn from where it
     // actually sits (`environment.climateForLatitude`) rather than a
@@ -919,6 +960,15 @@ function generateWorld(options = {}) {
       // one exists on explicit instruction, same posture as
       // `religionCounty` just above.
       const ancestryTract = ancestryPacks.tractFor(w.ancestryPack, tractPosition);
+      // **Four more real tracts, same position, added 30 Oct 2026 —
+      // race, marital status, disability and veteran status, each its
+      // own ACS table and its own new per-NPC field.** See
+      // `racePacks.js`'s own header on why race is a separate field
+      // from `ethnicity` rather than the same question twice.
+      const raceTract = racePacks.tractFor(w.racePack, tractPosition);
+      const maritalStatusTract = maritalStatusPacks.tractFor(w.maritalStatusPack, tractPosition);
+      const disabilityTract = disabilityPacks.tractFor(w.disabilityPack, tractPosition);
+      const veteranTract = veteranPacks.tractFor(w.veteranPack, tractPosition);
       const residents = [];
       for (let p = 0; p < config.populationPerCommunity; p += 1) {
         //: An age structure rather than a uniform draw: weighting the
@@ -986,6 +1036,17 @@ function generateWorld(options = {}) {
           // real field to condition on, unlike `islamicSect`/
           // `jewishObservance` just above.
           politicalTypology: politicalTypologyPacks.groupFor(random.unit('political-typology-real', c, b, p)),
+          // A real Census ACS race category, drawn from the tract's
+          // own shares, when this world was built with a race pack —
+          // null otherwise, same as every other real field here with
+          // no invented vocabulary to fall back to.
+          race: racePacks.raceFor(raceTract, random.unit('race-real', c, b, p)),
+          // A real Census ACS disability share, drawn the same way —
+          // applies at any age, unlike marital status and veteran
+          // status below.
+          disability: disabilityPacks.hasDisabilityFor(disabilityTract, random.unit('disability-real', c, b, p)),
+          maritalStatus: null,   // set below, but only for adults — ACS covers 15+
+          veteranStatus: null,   // set below, but only for adults — ACS covers 18+
           traitValueFor: (def) => Math.round(
             random.range(10, 95, 'trait', c, b, p, def.family, def.name),
           ),
@@ -1049,6 +1110,20 @@ function generateWorld(options = {}) {
                 : level < 0.7 ? 'secondary'
                   : level < 0.85 ? 'vocational'
                     : level < 0.96 ? 'higher' : 'advanced');
+          // A real Census ACS marital-status category, drawn from the
+          // tract's own shares, when this world was built with a
+          // marital-status pack — null otherwise. Gated on the same
+          // adult threshold as education, above, since ACS itself only
+          // covers population 15+ and this engine has no concept of a
+          // married minor in any of its own generators.
+          npc.maritalStatus = maritalStatusPacks.maritalStatusFor(
+            maritalStatusTract, random.unit('marital-status-real', c, b, p),
+          );
+          // A real Census ACS veteran share, drawn the same way — ACS
+          // covers the civilian population 18+, the same threshold.
+          npc.veteranStatus = veteranPacks.hasVeteranStatusFor(
+            veteranTract, random.unit('veteran-status-real', c, b, p),
+          );
         } else {
           npc.education = 'none';
         }

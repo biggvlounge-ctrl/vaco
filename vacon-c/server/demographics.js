@@ -232,6 +232,12 @@ function compositionOf(worldState, residents) {
   const politicalTypology = distributionOf(residents, (n) => n.politicalTypology ?? null);
   const ethnicity = distributionOf(residents, (n) => n.ethnicity ?? null);
   const education = distributionOf(residents, (n) => n.education ?? null);
+  // **Four more real Census ACS dimensions, added 30 Oct 2026, same
+  // shape as every one above: measured here, read nowhere else.**
+  const race = distributionOf(residents, (n) => n.race ?? null);
+  const maritalStatus = distributionOf(residents, (n) => n.maritalStatus ?? null);
+  const disability = distributionOf(residents, (n) => n.disability ?? null);
+  const veteranStatus = distributionOf(residents, (n) => n.veteranStatus ?? null);
 
   return {
     language: {
@@ -337,6 +343,37 @@ function compositionOf(worldState, residents) {
         if (known.length === 0) return null;
         return Math.round((known.reduce((a, b) => a + b, 0) / known.length) * 100) / 100;
       })(),
+    },
+    // **Four more real Census ACS dimensions, added 30 Oct 2026, same
+    // §9 firewall discipline `islamicSect`/`jewishObservance`/
+    // `politicalTypology` already hold — measured here and read
+    // nowhere else, enforced by each pack's own copy of
+    // `test/ethnicity.test.js`'s forbidden-file scan.**
+    race: {
+      distribution: race,
+      diversity: diversityOf(race),
+      dominantShare: dominantShareOf(race),
+    },
+    // `unknown` here covers a child (ACS reports 15+) exactly as it
+    // covers an unrecorded adult — the field does not distinguish,
+    // same as `education`'s own `null` for a child does not claim
+    // the child is uneducated.
+    maritalStatus: {
+      distribution: maritalStatus,
+      diversity: diversityOf(maritalStatus),
+      dominantShare: dominantShareOf(maritalStatus),
+    },
+    disability: {
+      distribution: disability,
+      diversity: diversityOf(disability),
+      dominantShare: dominantShareOf(disability),
+    },
+    // `unknown` here covers a child (ACS reports civilian population
+    // 18+) the same way `maritalStatus` does above.
+    veteranStatus: {
+      distribution: veteranStatus,
+      diversity: diversityOf(veteranStatus),
+      dominantShare: dominantShareOf(veteranStatus),
     },
   };
 }

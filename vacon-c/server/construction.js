@@ -32,6 +32,12 @@
 // house would have cost if `worldgen` had built it at the start. No
 // second number for the same question.
 //
+// **Added 30 Oct 2026: a real USGS terrain reading re-centres and
+// re-spreads that same band**, same reason and same shape as every
+// other pack-driven re-centring in this registry. See
+// `terrainPacks.js`'s own header for why this invented band, of every
+// one in the engine, is the one terrain was asked to feed.
+//
 // **Only residential, and only for an individual.** `businesses.js`
 // already covers an organization acquiring new assets (through
 // investment and its own trading); a business constructing its own
@@ -45,6 +51,7 @@
 const { seededDraw } = require('./seeded.js');
 const economy = require('./economy.js');
 const property = require('./property.js');
+const terrainPacks = require('./terrainPacks.js');
 
 // Reused from `worldgen.js`'s own residential value draw — see the
 // header. Not re-measured here because it is not a new question.
@@ -58,9 +65,31 @@ const BUILD_CHANCE_PER_TICK = 0.0004;
 
 // Deterministic, so the same seed draws the same cost for the same
 // person on the same tick whether it is checked once or ten times.
-function costFor(seed, tick, builderId) {
+//
+// `options.costMultiplier` is `terrainPacks.constructionCostMultiplierFor`'s
+// own real, bounded figure — see `terrainPacks.js`'s own header for why
+// this invented band, specifically, is the one real terrain feeds.
+// Defaults to 1 (no change) so every existing call site is unaffected.
+function costFor(seed, tick, builderId, options = {}) {
+  const { costMultiplier = 1 } = options;
+  const multiplier = Number.isFinite(costMultiplier) ? costMultiplier : 1;
   const draw = seededDraw([seed, 'build-cost', tick, builderId]);
-  return Math.round(RESIDENTIAL_COST_MIN + draw * (RESIDENTIAL_COST_MAX - RESIDENTIAL_COST_MIN));
+  const min = RESIDENTIAL_COST_MIN * multiplier;
+  const max = RESIDENTIAL_COST_MAX * multiplier;
+  return Math.round(min + draw * (max - min));
+}
+
+// The real terrain-based cost multiplier for whichever city a
+// community sits in, or 1 (no change) for a community with no city,
+// a city with no real terrain reading, or no terrain pack at all.
+// Resolved from `city.terrainClass`, set once at generation — see
+// `terrainPacks.js`'s own header on why this is read fresh here
+// rather than carried on the community or cached.
+function terrainCostMultiplierFor(worldState, communityId) {
+  const community = (worldState.communities || []).find((c) => c.id === communityId);
+  if (!community || community.city_id == null) return 1;
+  const city = (worldState.cities || []).find((c) => c.id === community.city_id);
+  return terrainPacks.constructionCostMultiplierFor(city?.terrainClass ?? null);
 }
 
 function constructResidentialProperty(worldState, options = {}) {
@@ -75,7 +104,8 @@ function constructResidentialProperty(worldState, options = {}) {
   const builder = (worldState.npcs || []).find((n) => n.id === builderId);
   if (!builder) throw new Error(`constructResidentialProperty: no entity ${builderId}`);
 
-  const cost = costFor(seed, tick, builderId);
+  const costMultiplier = terrainCostMultiplierFor(worldState, communityId);
+  const cost = costFor(seed, tick, builderId, { costMultiplier });
   const finances = economy.getLatestFinances(worldState, builderId);
   const savings = Number(finances?.savings ?? 0);
   if (savings < cost) {
@@ -133,7 +163,12 @@ function runConstruction(worldState, tick) {
 
   const candidates = eligibleBuilders(worldState, tick)
     .filter((npc) => {
-      const cost = costFor(seed, tick, npc.id);
+      // Same real terrain multiplier `constructResidentialProperty`
+      // will charge below — checked here too so a candidate is never
+      // let through on the flat-terrain price and then charged the
+      // mountainous one.
+      const costMultiplier = terrainCostMultiplierFor(worldState, npc.communityId);
+      const cost = costFor(seed, tick, npc.id, { costMultiplier });
       return Number(economy.getLatestFinances(worldState, npc.id)?.savings ?? 0) >= cost;
     })
     .sort((a, b) => a.id - b.id);
@@ -167,6 +202,7 @@ module.exports = {
   RESIDENTIAL_COST_MAX,
   BUILD_CHANCE_PER_TICK,
   costFor,
+  terrainCostMultiplierFor,
   constructResidentialProperty,
   runConstruction,
 };
