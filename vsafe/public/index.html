@@ -26,6 +26,13 @@
 
 var el = VACO.el;
 
+// The six real sourceApps a check-in may originate from -- lib/safetyCheckIn.js's
+// own SOURCE_APPS, not invented here. There is no seventh "vsafe" option: the
+// doc's own "Not yet built" section names VSAFE's standalone onboarding for
+// non-VACO users as real, unbuilt work, so a standalone VSAFE user must still
+// pick one of the six real originating apps below.
+var SOURCE_APPS = ['cvnvo', 'hvntz', 'void', 'vault-studios', 'vacay', 'vxllage'];
+
 function renderCheckIns(body) {
   var out = el('div', 'vaco-stack');
   out.appendChild(VACO.notice(
@@ -41,36 +48,78 @@ function renderCheckIns(body) {
 
   out.appendChild(VACO.card('Start a check-in', [
     VACO.form([
-      { name: 'minutes', label: 'Check back in', type: 'number', min: 1, value: 60, width: '90px' },
-      { name: 'note', label: 'Context', placeholder: 'where you are going', width: '220px' },
+      { name: 'sourceApp', label: 'Originating app', options: SOURCE_APPS, width: '140px' },
+      { name: 'activityType', label: 'Activity', placeholder: 'date, hunt-checkpoint, ride…', width: '150px' },
+      { name: 'trustedContactIds', label: 'Trusted contacts', placeholder: 'comma-separated user ids', width: '200px' },
+      { name: 'checkInWindowMinutes', label: 'Check back in (minutes)', type: 'number', min: 1, value: 60, width: '90px' },
     ], function (values) {
+      var contacts = (values.trustedContactIds || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
       return VACO.post('/api/check-ins', {
         userId: id,
-        expectedReturnAt: Date.now() + values.minutes * 60000,
-        note: values.note,
+        sourceApp: values.sourceApp,
+        activityType: values.activityType,
+        trustedContactIds: contacts,
+        checkInWindowMinutes: values.checkInWindowMinutes,
       }).then(function (c) {
-        VACO.toast('Check-in ' + c.id + ' armed for ' + values.minutes + ' minutes.');
+        VACO.toast('Check-in ' + c.id + ' armed for ' + values.checkInWindowMinutes + ' minutes.');
         VACO.render();
       });
     }, 'Arm'),
   ]));
 
+  var statusHost = el('div', 'vaco-stack');
+
+  // Real actions, not simulated: Confirm safe and Trigger emergency call the
+  // exact same `confirmSafe`/`triggerEmergency` paths the timer sweep and
+  // CVNVO's own panic button use. Both require the session to be the
+  // check-in's own owner (`requireCheckInOwner`) -- looking up someone else's
+  // check-in id still works (the GET is open), but acting on it will 403.
+  function renderStatusCard(checkInId, status) {
+    var lines = el('div', 'vaco-stack-sm');
+    lines.appendChild(VACO.badge(status.status || 'unknown'));
+    Object.keys(status).forEach(function (k) {
+      if (typeof status[k] === 'object') return;
+      lines.appendChild(el('p', 'vaco-small vaco-dim', k + ': ' + status[k]));
+    });
+
+    var children = [lines];
+    if (status.status === 'active') {
+      var actions = el('div', 'vaco-row-tight');
+      actions.appendChild(VACO.button('Confirm safe', function () {
+        return VACO.post('/api/check-ins/' + checkInId + '/confirm-safe', {}).then(function (updated) {
+          VACO.toast('Check-in ' + checkInId + ' confirmed safe.');
+          renderStatusCard(checkInId, updated);
+        });
+      }, 'primary'));
+      actions.appendChild(VACO.button('Trigger emergency', function () {
+        return VACO.post('/api/check-ins/' + checkInId + '/emergency', {}).then(function (result) {
+          var delivered = result.notification && result.notification.notified;
+          VACO.toast(
+            'Emergency triggered for check-in ' + checkInId
+            + (delivered ? ' — vaco-notify accepted the page.' : ' — notification was NOT delivered.'),
+            delivered ? undefined : 'danger');
+          renderStatusCard(checkInId, result);
+        });
+      }, 'danger'));
+      children.push(actions);
+    } else if (status.status === 'escalated') {
+      children.push(el('p', 'vaco-small vaco-faint', 'Already escalated — nothing further to do here.'));
+    } else if (status.status === 'confirmed-safe') {
+      children.push(el('p', 'vaco-small vaco-faint', 'Already confirmed safe.'));
+    }
+
+    VACO.mount(statusHost, VACO.card('Check-in ' + checkInId, children));
+  }
+
   out.appendChild(VACO.card('Look up a check-in', [
     VACO.form([{ name: 'id', label: 'Check-in id', type: 'number', min: 1, value: 1, width: '100px' }],
       function (values) {
-        return VACO.api('/api/check-ins/' + values.id + '/full-status').then(function (status) {
-          var lines = el('div', 'vaco-stack-sm');
-          lines.appendChild(el('div', 'vaco-row-tight', ''));
-          lines.appendChild(VACO.badge(status.status || 'unknown'));
-          Object.keys(status).forEach(function (k) {
-            if (typeof status[k] === 'object') return;
-            lines.appendChild(el('p', 'vaco-small vaco-dim', k + ': ' + status[k]));
-          });
-          out.appendChild(VACO.card('Check-in ' + values.id, [lines]));
-          VACO.mount(body, out);
+        return VACO.api('/api/check-ins/' + values.id).then(function (status) {
+          renderStatusCard(values.id, status);
         });
       }, 'Status'),
   ]));
+  out.appendChild(statusHost);
 
   return VACO.mount(body, out);
 }
