@@ -252,39 +252,114 @@ function renderReleases(body) {
   return VACO.mount(body, out);
 }
 
+function beatCard(b, onChange) {
+  var lines = el('div', 'vaco-stack-sm');
+  lines.appendChild(el('p', 'vaco-small vaco-dim', 'Listed ' + new Date(b.createdAt).toLocaleDateString()));
+  if (b.previewUrl) {
+    var link = el('a', 'vaco-small', 'Preview');
+    link.href = b.previewUrl;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    lines.appendChild(link);
+  } else {
+    lines.appendChild(el('p', 'vaco-small vaco-faint', 'No preview audio registered yet.'));
+  }
+
+  var row = el('div', 'vaco-row-tight');
+  row.appendChild(VACO.price(b.price, { freeLabel: false }));
+  row.appendChild(el('span', 'vaco-spacer'));
+  var userId = VACO.userId();
+  if (userId && userId === b.producerId) {
+    row.appendChild(VACO.button('Take down', function () {
+      return VACO.post('/api/beats/' + b.id + '/take-down', { producerId: userId })
+        .then(function () { VACO.toast('Took down “' + b.title + '”.'); return onChange(); });
+    }, 'danger'));
+  } else {
+    row.appendChild(VACO.button('License', function () {
+      if (!userId) throw new Error('Sign in to license a beat.');
+      return VACO.post('/api/beats/' + b.id + '/purchase', { buyerId: userId })
+        .then(function () {
+          VACO.toast('Licensed “' + (b.title || b.id) + '”.', 'money');
+          VACO.refreshBalances().then(VACO.renderIdentity);
+          return onChange();
+        });
+    }, 'primary'));
+  }
+  lines.appendChild(row);
+  return VACO.card(b.title || ('Beat ' + b.id), [lines],
+    { trailing: b.licenseType ? VACO.badge(b.licenseType) : null });
+}
+
 function renderBeats(body) {
   var out = el('div', 'vaco-stack');
   out.appendChild(VACO.notice(
     'The beat marketplace: producers license instrumentals, and a purchase moves real VCoin. '
-    + 'Licence terms travel with the purchase rather than living in a DM.'));
+    + 'The producer keeps 100% of every sale — no platform account sits in the payment path.'));
 
-  return VACO.api('/api/beats').then(function (data) {
-    var beats = data.beats || [];
-    if (!beats.length) {
-      out.appendChild(el('div', 'vaco-empty', 'No beats listed yet.'));
-      return VACO.mount(body, out);
-    }
-    out.appendChild(VACO.grid(beats.map(function (b) {
-      var lines = el('div', 'vaco-stack-sm');
-      lines.appendChild(el('p', 'vaco-small vaco-dim',
-        [b.bpm ? b.bpm + ' bpm' : null, b.key, b.genre].filter(Boolean).join(' · ')));
-      var row = el('div', 'vaco-row-tight');
-      row.appendChild(VACO.price(b.priceVcoin || b.price, { freeLabel: false }));
-      row.appendChild(el('span', 'vaco-spacer'));
-      row.appendChild(VACO.button('License', function () {
-        if (!VACO.userId()) throw new Error('Sign in to license a beat.');
-        return VACO.post('/api/beat-purchases', { beatId: b.id, buyerId: VACO.userId() })
-          .then(function () {
-            VACO.toast('Licensed "' + (b.title || b.id) + '".', 'money');
-            VACO.refreshBalances().then(VACO.renderIdentity);
-          });
-      }, 'primary'));
-      lines.appendChild(row);
-      return VACO.card(b.title || ('Beat ' + b.id), [lines],
-        { trailing: b.licenseType ? VACO.badge(b.licenseType) : null });
-    }), true));
-    VACO.mount(body, out);
-  });
+  out.appendChild(VACO.card('List a beat', [
+    VACO.form([
+      { name: 'title', label: 'Title', width: '160px' },
+      { name: 'price', label: 'Price', type: 'number', min: 0.01, step: '0.01', value: 29.99, width: '90px' },
+      { name: 'licenseType', label: 'Licence', options: ['non-exclusive', 'exclusive'] },
+      { name: 'previewUrl', label: 'Preview URL (optional)', placeholder: 'https://…', width: '200px' },
+    ], function (values) {
+      if (!VACO.userId()) throw new Error('Sign in to list a beat.');
+      return VACO.post('/api/beats', {
+        producerId: VACO.userId(), title: values.title, price: values.price,
+        licenseType: values.licenseType, previewUrl: values.previewUrl || null,
+      }).then(function (beat) {
+        VACO.toast('Listed “' + beat.title + '”.', 'money');
+        return loadBeats();
+      });
+    }, 'List'),
+  ]));
+
+  var beatsHost = el('div', 'vaco-stack');
+  out.appendChild(beatsHost);
+
+  out.appendChild(VACO.card('My beat activity', [
+    VACO.button('Show my purchases', function () { return loadMyBeatActivity('buyer'); }, 'sm'),
+    VACO.button('Show my sales', function () { return loadMyBeatActivity('producer'); }, 'sm'),
+  ]));
+
+  var activityHost = el('div', 'vaco-stack');
+  out.appendChild(activityHost);
+
+  function loadBeats() {
+    return VACO.api('/api/beats').then(function (data) {
+      var beats = data.beats || [];
+      if (!beats.length) {
+        VACO.mount(beatsHost, el('div', 'vaco-empty', 'No beats listed yet.'));
+        return;
+      }
+      VACO.mount(beatsHost, VACO.grid(beats.map(function (b) { return beatCard(b, loadBeats); }), true));
+    });
+  }
+
+  function loadMyBeatActivity(role) {
+    var userId = VACO.userId();
+    if (!userId) throw new Error('Sign in to see your own beat activity.');
+    var path = role === 'buyer'
+      ? '/api/beat-purchases/buyer/' + encodeURIComponent(userId)
+      : '/api/beat-purchases/producer/' + encodeURIComponent(userId);
+    return VACO.api(path).then(function (data) {
+      var rows = data.purchases || data.sales || [];
+      VACO.mount(activityHost, VACO.card(role === 'buyer' ? 'My purchases' : 'My sales', [
+        VACO.table(
+          [
+            { key: 'beatTitle', label: 'Beat' },
+            role === 'buyer' ? { key: 'producerId', label: 'Producer' } : { key: 'buyerId', label: 'Buyer' },
+            { key: 'licenseType', label: 'Licence' },
+            { key: 'pricePaid', label: 'Price', num: true, render: function (row) { return VACO.round(row.pricePaid); } },
+          ],
+          rows, { empty: role === 'buyer' ? 'No purchases yet.' : 'No sales yet.' },
+        ),
+      ]));
+    });
+  }
+
+  VACO.mount(body, out);
+  return loadBeats();
 }
 
 function renderDeals(body) {
