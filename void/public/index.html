@@ -1569,6 +1569,126 @@ function renderHubLockers(body) {
   return VACO.mount(body, out);
 }
 
+// -- Staffing & the Affiliate Network -------------------------------------
+//
+// staffing.js (real StaffingPositions over the same marketplace loop)
+// and the Affiliate Network's own station directory had zero frontend
+// exposure. Registering an affiliate station and HUNT Staffing requests
+// are both requireCallingService (an HVNTZ-verification cross-app
+// call) and stay backend-only; this tab covers posting a position,
+// looking one up, and browsing the real affiliate directory.
+function renderStaffing(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Every position here runs through VOID’s own real request → match → accept → complete → pay → rate '
+    + 'marketplace loop, the same one every other vertical uses.'));
+
+  // -- Post a staffing position ------------------------------------
+  var positionResult = el('div', 'vaco-stack-sm');
+  var positionForm = VACO.form([
+    { name: 'businessId', label: 'Business id', value: VACO.userId() || '', width: '140px' },
+    { name: 'positionType', label: 'Position type', placeholder: 'warehouse associate', width: '160px' },
+    { name: 'employmentType', label: 'Employment type',
+      options: ['temporary', 'seasonal', 'on-demand', 'permanent'].map(function (t) { return { label: t, value: t }; }) },
+    { name: 'hourlyRate', label: 'Hourly rate', type: 'number', value: 18, width: '100px' },
+    { name: 'quantity', label: 'Quantity', type: 'number', value: 1, width: '90px' },
+  ], function (values) {
+    if (!VACO.userId()) throw new Error('Sign in to post a staffing position.');
+    return VACO.post('/api/staffing-position', {
+      businessId: values.businessId, positionType: values.positionType, employmentType: values.employmentType,
+      hourlyRate: values.hourlyRate, quantity: values.quantity,
+    }).then(function (position) {
+      VACO.mount(positionResult, VACO.notice(
+        'Position #' + position.id + ' posted, real job #' + position.jobId + ' created.', 'money'));
+    });
+  }, 'Post position');
+  out.appendChild(VACO.card('Post a staffing position', [positionForm, positionResult]));
+
+  var positionLookupResult = el('div', 'vaco-stack-sm');
+  var positionLookupForm = VACO.form([
+    { name: 'positionId', label: 'Position id', type: 'number', width: '100px' },
+  ], function (values) {
+    return VACO.api('/api/staffing-position/' + values.positionId).then(function (position) {
+      VACO.mount(positionLookupResult, VACO.table([
+        { key: 'id', label: 'Position' },
+        { key: 'positionType', label: 'Type' },
+        { key: 'employmentType', label: 'Employment' },
+        { label: 'Rate', num: true, render: function (p) { return VACO.price(p.hourlyRate, { freeLabel: false }); } },
+      ], [position]));
+    });
+  }, 'Look up');
+  out.appendChild(VACO.card('Look up a position', [positionLookupForm, positionLookupResult]));
+
+  var businessPositionsResult = el('div', 'vaco-stack-sm');
+  var businessPositionsForm = VACO.form([
+    { name: 'businessId', label: 'Business id', value: VACO.userId() || '', width: '160px' },
+  ], function (values) {
+    return VACO.api('/api/staffing-positions/business/' + encodeURIComponent(values.businessId)).then(function (data) {
+      VACO.mount(businessPositionsResult, VACO.table([
+        { key: 'id', label: 'Position' },
+        { key: 'positionType', label: 'Type' },
+        { key: 'employmentType', label: 'Employment' },
+        { label: 'Rate', num: true, render: function (p) { return VACO.price(p.hourlyRate, { freeLabel: false }); } },
+      ], data.positions, { empty: 'No open positions for this business.' }));
+    });
+  }, 'Load positions');
+  out.appendChild(VACO.card('A business’s open positions', [businessPositionsForm, businessPositionsResult]));
+
+  // -- HUNT Staffing lookup (read-only; requesting is a service call) ----
+  var huntResult = el('div', 'vaco-stack-sm');
+  var huntForm = VACO.form([
+    { name: 'requestId', label: 'HUNT request id', type: 'number', width: '140px' },
+  ], function (values) {
+    return VACO.api('/api/hunt-staffing/' + values.requestId).then(function (request) {
+      VACO.mount(huntResult, VACO.table([
+        { key: 'id', label: 'Request' },
+        { key: 'businessId', label: 'HVNTZ business' },
+        { key: 'positionType', label: 'Type' },
+        { key: 'urgency', label: 'Urgency' },
+        { label: 'Filled via VOID Staffing', render: function (r) { return r.filledViaVoidStaffing ? 'yes' : 'no'; } },
+      ], [request]));
+    });
+  }, 'Look up');
+  out.appendChild(VACO.card('HUNT Staffing request', [
+    el('p', 'vaco-small vaco-dim', 'A thin HVNTZ-verified layer over the same staffing network. Requesting one is a verified cross-app call made by HVNTZ itself; this looks one up.'),
+    huntForm, huntResult,
+  ]));
+
+  // -- Affiliate Network directory (read-only) -----------------------
+  var affiliatesResult = el('div', 'vaco-stack-sm');
+  var roleSelect = el('select', 'vaco-select');
+  [{ label: 'Any role', value: '' }].concat(
+    ['pickup', 'dropoff', 'locker-host', 'relay', 'verification', 'drone-support'].map(function (r) { return { label: r, value: r }; }),
+  ).forEach(function (opt) {
+    var o = el('option', null, opt.label);
+    o.value = opt.value;
+    roleSelect.appendChild(o);
+  });
+  var roleWrap = el('label', 'vaco-stack-sm');
+  roleWrap.style.gap = '4px';
+  roleWrap.appendChild(el('span', 'vaco-label', 'Role'));
+  roleWrap.appendChild(roleSelect);
+  var affiliateRow = el('div', 'vaco-row');
+  affiliateRow.appendChild(roleWrap);
+  affiliateRow.appendChild(VACO.button('Browse affiliates', function () {
+    var qs = roleSelect.value ? '?role=' + encodeURIComponent(roleSelect.value) : '';
+    return VACO.api('/api/affiliate-stations' + qs).then(function (data) {
+      VACO.mount(affiliatesResult, VACO.table([
+        { key: 'id', label: 'Affiliate' },
+        { key: 'businessId', label: 'Business' },
+        { key: 'role', label: 'Role' },
+        { label: 'HVNTZ-onboarded', render: function (a) { return a.isHvntzOnboarded ? VACO.badge('verified', 'money') : el('span', 'vaco-small vaco-dim', 'self-reported'); } },
+      ], data.affiliates, { empty: 'No affiliate stations registered yet.' }));
+    });
+  }, 'primary'));
+  out.appendChild(VACO.card('Affiliate Network directory', [
+    el('p', 'vaco-small vaco-dim', 'HVNTZ-onboarded affiliates are surfaced first, per the Affiliate Network’s own recruitment-priority rule.'),
+    affiliateRow, affiliatesResult,
+  ]));
+
+  return VACO.mount(body, out);
+}
+
 VACO.app({
   id: 'void',
   name: 'VOID',
@@ -1608,6 +1728,9 @@ VACO.app({
     { id: 'hub-lockers', label: 'Hub & Lockers', heading: 'Walk-up shipments & business lockers',
       blurb: 'Originate a shipment in person at a Hub, and forward-deploy seller inventory into a Hub locker.',
       render: renderHubLockers },
+    { id: 'staffing', label: 'Staffing', heading: 'Staffing positions & the Affiliate Network',
+      blurb: 'Post a real staffing position through the same marketplace loop, and browse the Affiliate Network directory.',
+      render: renderStaffing },
     { id: 'academy', label: 'Academy', heading: 'VOID Academy',
       blurb: 'Real training on how VOID actually pays you, chosen from your own claimed skills.',
       render: renderAcademy },
