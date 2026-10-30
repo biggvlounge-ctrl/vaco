@@ -541,6 +541,85 @@ function renderMeetupVerification(body) {
   return VACO.mount(body, out);
 }
 
+// lib/relationshipSafety.js's own CONCERN_TYPES -- real, recognized
+// domestic-violence-safety-awareness categories.
+var CONCERN_TYPES = ['controlling-behavior', 'isolation-pattern', 'financial-control', 'threats', 'other'];
+
+function renderSafetyWord(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'A safety word is a silent duress code: a correct match genuinely escalates your most recent active check-in '
+    + 'through the exact same emergency path a manual panic button uses — without alerting anyone who might be '
+    + 'coercing you in the moment. <strong>The check below is real, not a simulation</strong> — if you have a real '
+    + 'active check-in, a correct match escalates it for real.', 'warn'));
+
+  var id = VACO.userId();
+  if (!id) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to set a safety word.'));
+    return VACO.mount(body, out);
+  }
+
+  out.appendChild(VACO.card('Set your safety word', [
+    VACO.form([{ name: 'word', label: 'Safety word', placeholder: 'at least 3 characters', width: '170px' }],
+      function (values) {
+        return VACO.post('/api/safety-word', { userId: id, word: values.word }).then(function () {
+          VACO.toast('Safety word set. It is stored as a SHA-256 hash — never plaintext.');
+          VACO.render();
+        });
+      }, 'Set'),
+  ]));
+
+  out.appendChild(VACO.card('Test your safety word', [
+    VACO.form([{ name: 'inputWord', label: 'Word to check', width: '170px' }],
+      function (values) {
+        return VACO.post('/api/safety-word/check', { userId: id, inputWord: values.inputWord }).then(function (r) {
+          if (!r.matched) { VACO.toast('No match.'); return; }
+          VACO.toast(r.escalated
+            ? 'Matched — check-in ' + r.checkInId + ' genuinely escalated.'
+            : 'Matched, but you have no real active check-in to escalate.');
+        });
+      }, 'Check'),
+  ]));
+
+  out.appendChild(VACO.card('Log a private concern', [
+    VACO.form([
+      { name: 'aboutUserId', label: 'About (user id)', width: '140px' },
+      { name: 'concernType', label: 'Type', options: CONCERN_TYPES, width: '170px' },
+      { name: 'details', label: 'Details', placeholder: 'what happened', width: '240px' },
+    ], function (values) {
+      return VACO.post('/api/relationship-safety/concerns', {
+        userId: id, aboutUserId: values.aboutUserId, concernType: values.concernType, details: values.details,
+      }).then(function () {
+        VACO.toast('Concern logged — structurally private, visible only to you.');
+        loadConcerns();
+      });
+    }, 'Log'),
+  ]));
+
+  var concernsNode = el('div', 'vaco-stack-sm');
+  // GET .../concerns/:userId only ever returns the requesting userId's own
+  // entries -- there is no function anywhere in relationshipSafety.js that
+  // lets one user read another's log, so this is genuinely private, not
+  // just hidden by this page.
+  function loadConcerns() {
+    return VACO.api('/api/relationship-safety/concerns/' + encodeURIComponent(id)).then(function (data) {
+      VACO.mount(concernsNode, VACO.table([
+        { key: 'concernType', label: 'Type' },
+        { key: 'aboutUserId', label: 'About' },
+        { key: 'details', label: 'Details' },
+        { key: 'createdAt', label: 'Logged', render: function (c) { return new Date(c.createdAt).toLocaleString(); } },
+      ], data.concerns, { empty: 'No concerns logged.' }));
+    });
+  }
+  out.appendChild(VACO.card('Your concern log (private)', [
+    concernsNode,
+    VACO.button('Refresh', loadConcerns, 'ghost'),
+  ]));
+  loadConcerns();
+
+  return VACO.mount(body, out);
+}
+
 VACO.app({
   id: 'vsafe',
   name: 'VSAFE',
@@ -556,6 +635,7 @@ VACO.app({
     { id: 'calls', label: 'Exit calls', heading: 'Scheduled fake calls', render: renderFakeCalls },
     { id: 'photo-checkins', label: 'Photo check-ins', heading: 'Scheduled photo check-ins', render: renderPhotoCheckIns },
     { id: 'meetup-verification', label: 'Meetup verification', heading: 'Two-sided meetup verification', render: renderMeetupVerification },
+    { id: 'safety-word', label: 'Safety word', heading: 'Safety word & relationship safety', render: renderSafetyWord },
   ],
 });
 </script>
