@@ -315,6 +315,30 @@ function renderNetwork(body) {
           { key: 'radiusKm', label: 'Radius km', num: true },
         ], zones, { empty: 'No no-fly zones registered.' }),
       ]));
+
+      // Real Dijkstra hub-to-hub relay -- hop by real drone leg where
+      // stations (and 'drone-support' affiliates) are close enough,
+      // reporting honestly when no drone-only chain connects them.
+      var relayResult = el('div', 'vaco-stack-sm');
+      var relayForm = VACO.form([
+        { name: 'regionId', label: 'Region', value: 'stl', width: '90px' },
+        { name: 'originStationId', label: 'Origin station', type: 'number', value: 1, width: '110px' },
+        { name: 'destinationStationId', label: 'Destination station', type: 'number', value: 2, width: '140px' },
+        { name: 'maxDroneLegRangeKm', label: 'Max leg range (km)', type: 'number', value: 10, width: '140px' },
+      ], function (values) {
+        var qs = 'regionId=' + encodeURIComponent(values.regionId)
+          + '&originStationId=' + values.originStationId
+          + '&destinationStationId=' + values.destinationStationId
+          + '&maxDroneLegRangeKm=' + values.maxDroneLegRangeKm;
+        return VACO.api('/api/relay-path?' + qs).then(function (result) {
+          VACO.mount(relayResult, result.found
+            ? VACO.notice('Found a ' + result.hopCount + '-hop relay, ' + result.totalDistanceKm
+              + 'km total: ' + result.path.join(' → '), 'money')
+            : VACO.notice('No drone-only relay connects those stations at this leg range — a ground/autonomous handoff is needed.', 'warn'));
+        });
+      }, 'Find relay');
+      out.appendChild(VACO.card('Hub-to-hub drone relay', [relayForm, relayResult]));
+
       VACO.mount(body, out);
     });
   });
@@ -826,6 +850,199 @@ function renderScheduling(body) {
   return VACO.mount(body, out);
 }
 
+// A small textarea field, same visual shape as VACO.form's own
+// labeled inputs, for the handful of real payloads here that are
+// genuinely variable-length arrays (opportunities, stops) rather than
+// a fixed set of fields VACO.form's own schema can express.
+function textareaField(label, defaultValue) {
+  var wrap = el('label', 'vaco-stack-sm');
+  wrap.style.gap = '4px';
+  wrap.appendChild(el('span', 'vaco-label', label));
+  var ta = el('textarea', 'vaco-input');
+  ta.value = defaultValue;
+  ta.rows = 3;
+  ta.style.width = '100%';
+  ta.style.fontFamily = 'monospace';
+  ta.style.fontSize = 'var(--vaco-text-sm)';
+  wrap.appendChild(ta);
+  return { wrap: wrap, el: ta };
+}
+
+// -- Dispatch: Gibson & Kyle's deterministic rules ------------------------
+//
+// Neither Gibson nor Kyle exists as an actual AI agent anywhere in
+// this app -- dispatchIntelligence.js and sequencing.js are the real,
+// testable logic underneath their stated behavior. All had zero
+// frontend exposure. Every POST here is requireSession() (any signed-in
+// user, no actor match) since these compute a result from the request
+// body and read/write no record of their own.
+function renderDispatch(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Neither Gibson nor Kyle is a real AI agent &mdash; these are the deterministic rules underneath their stated '
+    + 'behavior. Sign in to run the calculators below; they read and change nothing.'));
+
+  function requireSignedIn() {
+    if (!VACO.userId()) throw new Error('Sign in to use VOID’s dispatch tools.');
+    return VACO.userId();
+  }
+
+  // -- Air vs. Ground ---------------------------------------------------
+  var airResult = el('div', 'vaco-stack-sm');
+  var airForm = VACO.form([
+    { name: 'hasGroundCapacity', label: 'Ground capacity heading there?',
+      options: [{ label: 'Yes', value: 'true' }, { label: 'No', value: 'false' }] },
+    { name: 'estimatedGroundDeliveryHours', label: 'Ground ETA (hrs)', type: 'number', value: 20, width: '110px' },
+    { name: 'acceptableWindowHours', label: 'Acceptable window (hrs)', type: 'number', value: 48, width: '140px' },
+  ], function (values) {
+    requireSignedIn();
+    return VACO.post('/api/dispatch/air-vs-ground', {
+      hasGroundCapacityHeadingToDestination: values.hasGroundCapacity === 'true',
+      estimatedGroundDeliveryHours: values.estimatedGroundDeliveryHours,
+      acceptableWindowHours: values.acceptableWindowHours,
+    }).then(function (decision) {
+      VACO.mount(airResult, VACO.notice(
+        'Mode: <strong>' + decision.mode.toUpperCase() + '</strong> — ' + VACO.escapeHtml(decision.reason),
+        decision.mode === 'air' ? 'warn' : null));
+    });
+  }, 'Decide');
+  out.appendChild(VACO.card('Air vs. Ground', [airForm, airResult]));
+
+  // -- Load Intelligence -------------------------------------------------
+  var loadResult = el('div', 'vaco-stack-sm');
+  var loadForm = VACO.form([
+    { name: 'passengerCount', label: 'Passengers', type: 'number', value: 2, width: '90px' },
+    { name: 'seatingCapacity', label: 'Seats', type: 'number', value: 4, width: '80px' },
+    { name: 'cargoVolumeUsed', label: 'Cargo used (ft³)', type: 'number', value: 10, width: '120px' },
+    { name: 'cargoCapacity', label: 'Cargo capacity (ft³)', type: 'number', value: 30, width: '140px' },
+  ], function (values) {
+    requireSignedIn();
+    return VACO.post('/api/dispatch/load-intelligence', values).then(function (score) {
+      VACO.mount(loadResult, VACO.table([
+        { label: 'Utilization', num: true, render: function (s) { return s.utilizationScore + '%'; } },
+        { label: 'Seats left', num: true, render: function (s) { return s.availableSeats; } },
+        { label: 'Cargo left', num: true, render: function (s) { return s.availableCargoVolume + ' ft³'; } },
+        { label: 'Room for more?', render: function (s) {
+          return VACO.badge(s.hasCapacityForMoreWork ? 'yes' : 'no', s.hasCapacityForMoreWork ? 'money' : 'warn');
+        } },
+      ], [score]));
+    });
+  }, 'Score');
+  out.appendChild(VACO.card('Load Intelligence', [loadForm, loadResult]));
+
+  // -- Dead-time recommendation (Kyle) -----------------------------------
+  var deadTimeOpps = textareaField('Available opportunities (JSON array)',
+    '[\n  {"verticalId":"courier","estimatedDurationMinutes":20,"payout":18},\n'
+    + '  {"verticalId":"foodDelivery","estimatedDurationMinutes":15,"payout":12}\n]');
+  var deadTimeResult = el('div', 'vaco-stack-sm');
+  var certifiedInput = el('input', 'vaco-input');
+  certifiedInput.placeholder = 'courier, foodDelivery';
+  certifiedInput.style.width = '200px';
+  var deadTimeMinutesInput = el('input', 'vaco-input vaco-num');
+  deadTimeMinutesInput.type = 'number';
+  deadTimeMinutesInput.value = 25;
+  deadTimeMinutesInput.style.width = '90px';
+  var certifiedWrap = el('label', 'vaco-stack-sm');
+  certifiedWrap.style.gap = '4px';
+  certifiedWrap.appendChild(el('span', 'vaco-label', 'Certified verticals (comma-separated)'));
+  certifiedWrap.appendChild(certifiedInput);
+  var minutesWrap = el('label', 'vaco-stack-sm');
+  minutesWrap.style.gap = '4px';
+  minutesWrap.appendChild(el('span', 'vaco-label', 'Dead-time minutes'));
+  minutesWrap.appendChild(deadTimeMinutesInput);
+  var deadTimeRow = el('div', 'vaco-row');
+  deadTimeRow.appendChild(certifiedWrap);
+  deadTimeRow.appendChild(minutesWrap);
+  deadTimeRow.appendChild(VACO.button('Recommend', function () {
+    requireSignedIn();
+    var opportunities;
+    try { opportunities = JSON.parse(deadTimeOpps.el.value); } catch (e) { throw new Error('Opportunities must be valid JSON.'); }
+    var certified = certifiedInput.value.split(',').map(function (s) { return s.trim(); }).filter(function (s) { return s; });
+    return VACO.post('/api/dispatch/dead-time-recommendation', {
+      certifiedVerticals: certified,
+      deadTimeMinutes: Number(deadTimeMinutesInput.value),
+      availableOpportunities: opportunities,
+    }).then(function (rec) {
+      VACO.mount(deadTimeResult, rec
+        ? VACO.notice('Best fit: <strong>' + VACO.escapeHtml(rec.verticalId) + '</strong> — '
+          + rec.estimatedDurationMinutes + 'm, pays ' + rec.payout, 'money')
+        : VACO.notice('Nothing fits this certification and time window.', 'warn'));
+    });
+  }, 'primary'));
+  out.appendChild(VACO.card('Dead-time Recommendation', [
+    el('p', 'vaco-small vaco-dim',
+      'Real demand forecasting (V4’s job) is not built here — this filters to what the driver is certified for and what fits the window, then picks the best real payout.'),
+    deadTimeOpps.wrap, deadTimeRow, deadTimeResult,
+  ]));
+
+  // -- Delivery priority ----------------------------------------------
+  var priorityResult = el('div', 'vaco-stack-sm');
+  var priorityForm = VACO.form([
+    { name: 'orderType', label: 'Order type',
+      options: [{ label: 'Food', value: 'food' }, { label: 'General package', value: 'general-package' }] },
+  ], function (values) {
+    return VACO.api('/api/dispatch/delivery-priority/' + values.orderType).then(function (p) {
+      VACO.mount(priorityResult, VACO.notice(
+        p.orderType + ' tolerates up to <strong>' + p.maxAcceptableDelayMinutes + ' minutes</strong> of delay.'));
+    });
+  }, 'Look up');
+  out.appendChild(VACO.card('Delivery priority', [priorityForm, priorityResult]));
+
+  // -- Demand smoothing (acceptance delay) -------------------------------
+  var delayResult = el('div', 'vaco-stack-sm');
+  var delayForm = VACO.form([
+    { name: 'currentActiveJobCount', label: 'Active jobs in region', type: 'number', value: 12, width: '150px' },
+    { name: 'maxConcurrentJobsPerRegion', label: 'Max concurrent', type: 'number', value: 10, width: '130px' },
+  ], function (values) {
+    requireSignedIn();
+    return VACO.post('/api/dispatch/acceptance-delay', values).then(function (d) {
+      VACO.mount(delayResult, d.isSmoothed
+        ? VACO.notice('Smoothed: new orders staggered by <strong>' + d.delayMinutes + ' minutes</strong>.', 'warn')
+        : VACO.notice('Under capacity — no smoothing applied.'));
+    });
+  }, 'Compute');
+  out.appendChild(VACO.card('Demand smoothing', [delayForm, delayResult]));
+
+  // -- Mixed-transportation sequencing -----------------------------------
+  var stopsField = textareaField('Stops (JSON array)',
+    '[\n  {"type":"passenger"},\n  {"type":"food"},\n  {"type":"package"}\n]');
+  var sequencingResult = el('div', 'vaco-stack-sm');
+  var dedicatedSelect = el('select', 'vaco-select');
+  [{ label: 'Mixed route', value: 'false' }, { label: 'Dedicated delivery route', value: 'true' }].forEach(function (opt) {
+    var o = el('option', null, opt.label);
+    o.value = opt.value;
+    dedicatedSelect.appendChild(o);
+  });
+  var dedicatedWrap = el('label', 'vaco-stack-sm');
+  dedicatedWrap.style.gap = '4px';
+  dedicatedWrap.appendChild(el('span', 'vaco-label', 'Route type'));
+  dedicatedWrap.appendChild(dedicatedSelect);
+  var sequencingRow = el('div', 'vaco-row');
+  sequencingRow.appendChild(dedicatedWrap);
+  sequencingRow.appendChild(VACO.button('Sequence', function () {
+    requireSignedIn();
+    var stops;
+    try { stops = JSON.parse(stopsField.el.value); } catch (e) { throw new Error('Stops must be valid JSON.'); }
+    return VACO.post('/api/sequencing', {
+      stops: stops, isDedicatedDeliveryRoute: dedicatedSelect.value === 'true',
+    }).then(function (result) {
+      var ranked = result.sequenced.map(function (s, i) { return { rank: i + 1, type: s.type, priority: s.priority }; });
+      VACO.mount(sequencingResult, VACO.table([
+        { key: 'rank', label: 'Order', num: true },
+        { key: 'type', label: 'Type' },
+        { key: 'priority', label: 'Priority', num: true },
+      ], ranked));
+    });
+  }, 'primary'));
+  out.appendChild(VACO.card('Mixed-transportation sequencing', [
+    el('p', 'vaco-small vaco-dim',
+      'Food &gt; passenger safety &gt; packages — unless the route is dedicated delivery, where packages hold parity with passenger stops.'),
+    stopsField.wrap, sequencingRow, sequencingResult,
+  ]));
+
+  return VACO.mount(body, out);
+}
+
 VACO.app({
   id: 'void',
   name: 'VOID',
@@ -853,6 +1070,9 @@ VACO.app({
     { id: 'scheduling', label: 'Scheduling', heading: 'Reserve, Hourly, Lanes & Commute',
       blurb: 'Four real booking surfaces, one shared engine.',
       render: renderScheduling },
+    { id: 'dispatch', label: 'Dispatch', heading: 'Gibson & Kyle, deterministically',
+      blurb: 'Air-vs-ground, load intelligence, dead-time recommendations, demand smoothing, and sequencing — the real rules underneath two AI agents that do not exist as agents anywhere in this app.',
+      render: renderDispatch },
     { id: 'academy', label: 'Academy', heading: 'VOID Academy',
       blurb: 'Real training on how VOID actually pays you, chosen from your own claimed skills.',
       render: renderAcademy },
