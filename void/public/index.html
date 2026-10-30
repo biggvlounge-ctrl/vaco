@@ -1043,6 +1043,109 @@ function renderDispatch(body) {
   return VACO.mount(body, out);
 }
 
+// -- Cargo & Loads --------------------------------------------------------
+//
+// loadManagement.js + cargoPricing.js (CLAUDE.md's "Load/pricing"
+// group) had zero frontend exposure: a trip's real passenger/cargo
+// declaration, the real capacity-fit check against a vehicle profile,
+// and the real dynamic cargo-pricing formula were all API-only.
+// Registering a vehicle capacity profile is fleet operations
+// (requireCallingService) and stays backend-only; this tab covers the
+// rider/customer-declarable half.
+function renderCargo(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'A trip’s real passenger count, oversized items, and packages — service animals and included bags are '
+    + 'never counted toward cargo or fees. Declare a trip, then check it fits the vehicle and what it costs.'));
+
+  // -- Vehicle capacity profile lookup --------------------------------
+  var profileResult = el('div', 'vaco-stack-sm');
+  var profileForm = VACO.form([
+    { name: 'vehicleId', label: 'Vehicle id', placeholder: 'vehicle-1', width: '140px' },
+  ], function (values) {
+    return VACO.api('/api/vehicle-capacity-profile/' + encodeURIComponent(values.vehicleId)).then(function (p) {
+      VACO.mount(profileResult, VACO.table([
+        { label: 'Seats', num: true, render: function (r) { return r.seatingCapacity; } },
+        { label: 'Cargo (ft³)', num: true, render: function (r) { return r.cargoCapacityCubicFt; } },
+        { label: 'Max item (ft³)', num: true, render: function (r) { return r.maxPackageSizeCubicFt; } },
+        { label: 'Fold-down seats', render: function (r) { return r.foldDownSeats ? 'yes' : 'no'; } },
+        { label: 'Roof rack/hitch', render: function (r) { return r.hasRoofRackOrHitch ? 'yes' : 'no'; } },
+      ], [p]));
+    });
+  }, 'Look up');
+  out.appendChild(VACO.card('Vehicle capacity profile', [
+    el('p', 'vaco-small vaco-dim', 'Registering a profile is a fleet-operations action; this looks up one already on file.'),
+    profileForm, profileResult,
+  ]));
+
+  // -- Declare a trip ---------------------------------------------------
+  var declareResult = el('div', 'vaco-stack-sm');
+  var oversizedField = textareaField('Oversized items (JSON array, optional)', '[]');
+  var packagesField = textareaField('Packages (JSON array, optional)', '[]');
+  var declareForm = VACO.form([
+    { name: 'tripId', label: 'Trip id', value: 'trip-' + Date.now(), width: '150px' },
+    { name: 'vehicleId', label: 'Vehicle id', placeholder: 'vehicle-1', width: '120px' },
+    { name: 'passengerCount', label: 'Passengers', type: 'number', value: 1, min: 1, width: '90px' },
+    { name: 'carSeatsNeeded', label: 'Car seats needed', type: 'number', value: 0, min: 0, width: '130px' },
+    { name: 'hasServiceAnimal', label: 'Service animal?',
+      options: [{ label: 'No', value: 'false' }, { label: 'Yes', value: 'true' }] },
+  ], function (values) {
+    var oversizedItems, packages;
+    try { oversizedItems = JSON.parse(oversizedField.el.value || '[]'); } catch (e) { throw new Error('Oversized items must be valid JSON.'); }
+    try { packages = JSON.parse(packagesField.el.value || '[]'); } catch (e) { throw new Error('Packages must be valid JSON.'); }
+    return VACO.post('/api/trip-declaration', {
+      tripId: values.tripId, vehicleId: values.vehicleId, passengerCount: values.passengerCount,
+      carSeatsNeeded: values.carSeatsNeeded, hasServiceAnimal: values.hasServiceAnimal === 'true',
+      oversizedItems: oversizedItems, packages: packages,
+    }).then(function (declaration) {
+      fitTripInput.value = declaration.tripId;
+      VACO.mount(declareResult, VACO.notice(
+        'Declared trip <strong>' + VACO.escapeHtml(declaration.tripId) + '</strong> — '
+        + declaration.bagsIncluded + ' bag(s) included automatically. Check fit below.', 'money'));
+    });
+  }, 'Declare trip');
+  out.appendChild(VACO.card('Declare a trip', [
+    declareForm, oversizedField.wrap, packagesField.wrap, declareResult,
+    el('p', 'vaco-small vaco-faint',
+      'Example item: {"type":"surfboard","sizeCubicFt":8}. Example package: {"category":"electronics","sizeCubicFt":3,"weightLbs":20}.'),
+  ]));
+
+  // -- Capacity fit & cargo pricing --------------------------------------
+  var fitResult = el('div', 'vaco-stack-sm');
+  var fitTripInput = el('input', 'vaco-input');
+  fitTripInput.placeholder = 'trip id';
+  fitTripInput.style.width = '160px';
+  var fitRow = el('div', 'vaco-row');
+  var fitWrap = el('label', 'vaco-stack-sm');
+  fitWrap.style.gap = '4px';
+  fitWrap.appendChild(el('span', 'vaco-label', 'Trip id'));
+  fitWrap.appendChild(fitTripInput);
+  fitRow.appendChild(fitWrap);
+  fitRow.appendChild(VACO.button('Check capacity fit', function () {
+    return VACO.api('/api/capacity-fit/' + encodeURIComponent(fitTripInput.value.trim())).then(function (fit) {
+      VACO.mount(fitResult, VACO.notice(
+        fit.fits
+          ? 'Fits the ' + fit.vehicleId + ' vehicle — ' + fit.totalCargoVolume + 'ft³ used.'
+          : 'Does not fit: ' + fit.reasons.join('; '),
+        fit.fits ? 'money' : 'danger'));
+    });
+  }));
+  fitRow.appendChild(VACO.button('Cargo pricing', function () {
+    return VACO.api('/api/cargo-pricing/' + encodeURIComponent(fitTripInput.value.trim())).then(function (pricing) {
+      VACO.mount(fitResult, VACO.table([
+        { label: 'Oversized items', num: true, render: function (p) { return p.oversizedItemCount; } },
+        { label: 'Total weight (lb)', num: true, render: function (p) { return p.totalWeightLbs; } },
+        { label: 'Item fee', num: true, render: function (p) { return VACO.price(p.itemFee, { freeLabel: false }); } },
+        { label: 'Weight fee', num: true, render: function (p) { return VACO.price(p.weightFee, { freeLabel: false }); } },
+        { label: 'Total fee', num: true, render: function (p) { return VACO.price(p.totalFee, { freeLabel: false }); } },
+      ], [pricing]));
+    });
+  }));
+  out.appendChild(VACO.card('Capacity fit & dynamic cargo pricing', [fitRow, fitResult]));
+
+  return VACO.mount(body, out);
+}
+
 VACO.app({
   id: 'void',
   name: 'VOID',
@@ -1073,6 +1176,9 @@ VACO.app({
     { id: 'dispatch', label: 'Dispatch', heading: 'Gibson & Kyle, deterministically',
       blurb: 'Air-vs-ground, load intelligence, dead-time recommendations, demand smoothing, and sequencing — the real rules underneath two AI agents that do not exist as agents anywhere in this app.',
       render: renderDispatch },
+    { id: 'cargo', label: 'Cargo & Loads', heading: 'Passenger, cargo & load management',
+      blurb: 'Declare a trip’s real passengers and cargo, check it fits the vehicle, and see the dynamic cargo fee.',
+      render: renderCargo },
     { id: 'academy', label: 'Academy', heading: 'VOID Academy',
       blurb: 'Real training on how VOID actually pays you, chosen from your own claimed skills.',
       render: renderAcademy },
