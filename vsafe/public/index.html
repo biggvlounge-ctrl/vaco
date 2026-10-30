@@ -793,6 +793,70 @@ function renderContentSafety(body) {
   return VACO.mount(body, out);
 }
 
+function renderAnonymousCalls(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'A real, literal anonymity guarantee: a call session tracks two userIds and which app originated it — '
+    + '<strong>never a phone number</strong>, no field anywhere here stores one.'));
+
+  var id = VACO.userId();
+  if (!id) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to start an anonymous call.'));
+    return VACO.mount(body, out);
+  }
+
+  out.appendChild(VACO.card('Start a call', [
+    VACO.form([
+      { name: 'sourceApp', label: 'Originating app', options: SOURCE_APPS, width: '140px' },
+      { name: 'calleeId', label: 'Call (user id)', width: '140px' },
+      { name: 'contextId', label: 'Context id (optional)', placeholder: 'e.g. match id', width: '150px' },
+    ], function (values) {
+      var payload = { sourceApp: values.sourceApp, callerId: id, calleeId: values.calleeId };
+      if (values.contextId) payload.contextId = values.contextId;
+      return VACO.post('/api/calls', payload).then(function (c) {
+        VACO.toast('Call session ' + c.id + ' started.');
+        VACO.render();
+      });
+    }, 'Start'),
+  ]));
+
+  var lookupHost = el('div', 'vaco-stack');
+
+  // Either party may end the call -- requireCallParty() checks the session
+  // against both callerId and calleeId, so a call one side cannot hang up
+  // is deliberately not how this works.
+  function renderCallCard(callId, session) {
+    var lines = el('div', 'vaco-stack-sm');
+    lines.appendChild(VACO.badge(session.status));
+    Object.keys(session).forEach(function (k) {
+      if (typeof session[k] === 'object') return;
+      lines.appendChild(el('p', 'vaco-small vaco-dim', k + ': ' + session[k]));
+    });
+    var children = [lines];
+    if (session.status === 'active' && (session.callerId === id || session.calleeId === id)) {
+      children.push(VACO.button('End call', function () {
+        return VACO.post('/api/calls/' + callId + '/end', {}).then(function (updated) {
+          VACO.toast('Call ' + callId + ' ended.');
+          renderCallCard(callId, updated);
+        });
+      }, 'danger'));
+    }
+    VACO.mount(lookupHost, VACO.card('Call session ' + callId, children));
+  }
+
+  out.appendChild(VACO.card('Look up / end a call', [
+    VACO.form([{ name: 'id', label: 'Call session id', type: 'number', min: 1, value: 1, width: '120px' }],
+      function (values) {
+        return VACO.api('/api/calls/' + values.id).then(function (session) {
+          renderCallCard(values.id, session);
+        });
+      }, 'Look up'),
+  ]));
+  out.appendChild(lookupHost);
+
+  return VACO.mount(body, out);
+}
+
 VACO.app({
   id: 'vsafe',
   name: 'VSAFE',
@@ -812,6 +876,7 @@ VACO.app({
     { id: 'privacy-blocking', label: 'Privacy & blocking', heading: 'Privacy settings & blocking', render: renderPrivacyBlocking },
     { id: 'screen-time', label: 'Screen time', heading: 'Digital wellbeing', render: renderScreenTime },
     { id: 'content-safety', label: 'Content safety', heading: 'AI monitoring & content moderation', render: renderContentSafety },
+    { id: 'anonymous-calls', label: 'Anonymous calls', heading: 'Communication controls', render: renderAnonymousCalls },
   ],
 });
 </script>
