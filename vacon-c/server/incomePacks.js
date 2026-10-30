@@ -149,14 +149,19 @@ function tractFor(pack, position) {
 // `populationPacks.overdoseBaselineFor` already takes compounding with
 // `healthBaseline` in `mortality.diseasePressure`. Defaults to 1 (no
 // change) so every existing call site is unaffected.
+//
+// `options.landCoverMultiplier` is `landCoverPacks.homeValueMultiplierFor`'s
+// own real, bounded nudge — a THIRD, independent real signal, same
+// compounding shape, same default of 1. Added 30 Oct 2026.
 function valueRangeFor(tract, options = {}) {
-  const { activityMultiplier = 1 } = options;
+  const { activityMultiplier = 1, landCoverMultiplier = 1 } = options;
   const income = Number(tract?.medianHouseholdIncome);
   const gini = Number(tract?.giniIndex);
   const hasIncome = Number.isFinite(income) && income > 0;
   const hasGini = Number.isFinite(gini) && gini >= GINI_BOUNDS[0] && gini <= GINI_BOUNDS[1];
   const hasActivity = Number.isFinite(activityMultiplier) && activityMultiplier !== 1;
-  if (!hasIncome && !hasGini && !hasActivity) return null;
+  const hasLandCover = Number.isFinite(landCoverMultiplier) && landCoverMultiplier !== 1;
+  if (!hasIncome && !hasGini && !hasActivity && !hasLandCover) return null;
 
   const [inventedLow, inventedHigh] = INVENTED_VALUE_RANGE;
   const inventedCentre = (inventedLow + inventedHigh) / 2;
@@ -167,10 +172,12 @@ function valueRangeFor(tract, options = {}) {
   // income-to-value ratio, so the invented band's own shape is what
   // real income scales rather than this module inventing a second one.
   const incomeCentre = hasIncome ? inventedCentre * (income / ORDINARY_MEDIAN_INCOME) : inventedCentre;
-  // A real, independent second signal further scales that centre —
-  // compounding, the same way a second disease baseline compounds
-  // rather than replaces. 1 when none was supplied, so it is a no-op.
-  const centre = incomeCentre * (Number.isFinite(activityMultiplier) ? activityMultiplier : 1);
+  // Two real, independent further signals compound onto that centre —
+  // the same way a second disease baseline compounds rather than
+  // replaces. 1 when neither was supplied, so this is a no-op.
+  const centre = incomeCentre
+    * (Number.isFinite(activityMultiplier) ? activityMultiplier : 1)
+    * (Number.isFinite(landCoverMultiplier) ? landCoverMultiplier : 1);
   // Real inequality widens or narrows the spread around that centre,
   // relative to the flagged ordinary reference.
   const halfWidth = hasGini ? inventedHalfWidth * (gini / ORDINARY_GINI) : inventedHalfWidth;

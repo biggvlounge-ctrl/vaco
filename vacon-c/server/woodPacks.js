@@ -148,21 +148,33 @@ function effectiveTreeCoverPct(plot) {
 // band, re-centred on a real effective tree-cover reading — or null
 // when the plot has none. `worldgen.js` draws within this range
 // exactly as it draws within the invented one.
-function woodSupplyRangeFor(plot) {
+//
+// `options.landCoverMultiplier` is `landCoverPacks.woodMultiplierFor`'s
+// own real, bounded nudge — a SECOND, independent real signal
+// corroborating or damping the GLAD reading above, the same
+// "compound, don't replace" shape `incomePacks.valueRangeFor` already
+// takes with `nightLightsPacks.activityMultiplierFor`. Defaults to 1
+// (no change), and is only applied when a real GLAD reading already
+// produced a centre — land cover alone, with no wood pack, invents
+// nothing.
+function woodSupplyRangeFor(plot, options = {}) {
+  const { landCoverMultiplier = 1 } = options;
   const effective = effectiveTreeCoverPct(plot);
   if (effective === null) return null;
 
   const [inventedLow, inventedHigh] = INVENTED_WOOD_SUPPLY_RANGE;
   const inventedCentre = (inventedLow + inventedHigh) / 2;
   const inventedHalfWidth = (inventedHigh - inventedLow) / 2;
+  const landCover = Number.isFinite(landCoverMultiplier) ? landCoverMultiplier : 1;
 
   // A real zero (non-forest, or forest that was lost) scales the
   // centre to zero rather than to the invented floor — a place with
   // no real standing forest has no real wood supply to report, and a
   // non-zero floor here would quietly re-invent the fact this reading
-  // was built to replace.
-  const centre = inventedCentre * (effective / ORDINARY_TREE_COVER_PCT);
-  const halfWidth = inventedHalfWidth * (effective / ORDINARY_TREE_COVER_PCT);
+  // was built to replace. The land-cover nudge multiplies the same way
+  // zero stays zero either way.
+  const centre = inventedCentre * (effective / ORDINARY_TREE_COVER_PCT) * landCover;
+  const halfWidth = inventedHalfWidth * (effective / ORDINARY_TREE_COVER_PCT) * landCover;
 
   const low = Math.max(0, Math.round(centre - halfWidth));
   const high = Math.max(low, Math.round(centre + halfWidth));

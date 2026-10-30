@@ -1,39 +1,60 @@
 // server/landCoverPacks.js
 //
 // **A real global land-cover classification, stored directly on the
-// city — deliberately NOT wired to any behavioral mechanism, and
-// deliberately NOT reported through `statistics.js` either.**
+// city, and — added 30 Oct 2026 by direct request after the fact was
+// raised that it drove nothing — two narrow, bounded nudges onto two
+// existing mechanisms it corroborates or qualifies. Still deliberately
+// NOT reported through `statistics.js`.**
 //
 // ---------------------------------------------------------------------
-// Why this reports rather than drives anything
+// Why this was reported-only, and what changed
 // ---------------------------------------------------------------------
-// `world-layer/imports/earthenvImport.js`'s own header says this
-// plainly: Consensus Land Cover is "a real, tested transform with no
-// current VACON-C consumer" — checked directly (`grep -rn "forest\|
-// landCover\|vegetation" server/*.js` returns nothing before this
-// file). Every other pack reader in this registry either replaces an
-// invented band (`incomePacks.js`, `woodPacks.js`) or narrows an
-// existing one (`riskPacks.js`). VACON-C has no invented land-cover
-// constant anywhere to replace, and this engine has no terrain or
-// vegetation mechanic for a real class to feed — `usgsImport.js`'s own
-// elevation import is in exactly the same position for the same
-// reason, named in `world-layer/CLAUDE.md`'s own thirtieth standing
-// rule. Inventing a causal link from a real class — a crop yield, a
-// fire-risk multiplier, a building-material cost — would not be
-// closing a gap; it would be fabricating a mechanic this engine was
-// never asked to have.
+// `world-layer/imports/earthenvImport.js`'s own header said this
+// plainly: Consensus Land Cover was "a real, tested transform with no
+// current VACON-C consumer." That was true until two uses were asked
+// for directly, and both were picked because they are the two places
+// this engine already has a mechanism a land-cover class can
+// legitimately speak to without inventing a new one:
 //
-// **Stored directly on the city, not reported through `statistics.js`
-// — `climatePacks.js`'s own `regions.climate_key` is the precedent
-// here, not `politicalPacks.js`'s `political_lean`.** Every unit
-// `statistics.js`'s own catalogue uses is numeric or ordinal (count,
-// currency, index, share, tier, years — checked directly), and a
-// twelve-class categorical label has no honest place in it, the same
-// reasoning `server/migrationPathwayPacks.js`'s own header gives for
-// keeping a categorical `dominantPathway` out of that catalogue too.
-// `city.landCoverClass` is in-memory only, the same known limitation
-// as `city.hazardRisk` and `city.politicalLean`, and nothing reads it
-// to decide anything else about a generated world.
+// - **`woodMultiplierFor`** nudges `woodPacks.woodSupplyRangeFor`'s
+//   own real GLAD tree-cover reading — a forest-classified plot
+//   corroborates "there is real standing wood here" and a non-forest
+//   one damps it, bounded to ±15% so the GLAD percentage (continuous,
+//   and already the primary signal) still does almost all of the
+//   work. This is two real datasets describing the same underlying
+//   fact — forest extent — the same "second, independent real
+//   signal" shape `nightLightsPacks.js` already takes compounding
+//   into `incomePacks.valueRangeFor`, not a new causal claim.
+// - **`homeValueMultiplierFor`** nudges `incomePacks.valueRangeFor`'s
+//   real income-based home-value centre, and only for three classes
+//   with a well-established, one-directional real-estate effect:
+//   `urban-and-built-up` (developed infrastructure and amenities)
+//   raises it; `regularly-flooded-vegetation` (a real flood-plain
+//   discount: flood insurance, building restriction) and
+//   `snow-and-ice`/`barren` (extreme or undeveloped terrain) lower it.
+//   Every other class — forest, shrubland, herbaceous vegetation,
+//   cultivated land — stays at the neutral `1`, because whether a
+//   wooded or rural setting raises or lowers a home's value is not a
+//   well-established one-directional fact the way those three are;
+//   inventing a direction for them would be exactly the mistake this
+//   file's own prior header warned against.
+//
+// Inventing a causal link beyond these two — a crop yield, a fire-risk
+// multiplier, a building-material cost — remains out of scope; nothing
+// here asked for those, and `usgsImport.js`'s own elevation import is
+// still in the position named in `world-layer/CLAUDE.md`'s thirtieth
+// standing rule, real and unconsumed.
+//
+// **Still stored directly on the city, not reported through
+// `statistics.js` — `climatePacks.js`'s own `regions.climate_key` is
+// the precedent here, not `politicalPacks.js`'s `political_lean`.**
+// Every unit `statistics.js`'s own catalogue uses is numeric or
+// ordinal (count, currency, index, share, tier, years — checked
+// directly), and a twelve-class categorical label has no honest place
+// in it, the same reasoning `server/migrationPathwayPacks.js`'s own
+// header gives for keeping a categorical `dominantPathway` out of that
+// catalogue too. `city.landCoverClass` is in-memory only, the same
+// known limitation as `city.hazardRisk` and `city.politicalLean`.
 //
 // ---------------------------------------------------------------------
 // Matched to a city by POSITION, same reason as a county
@@ -123,12 +144,64 @@ function classFor(plot) {
   return LAND_COVER_CLASSES.includes(plot?.classKey) ? plot.classKey : null;
 }
 
+//: The five of twelve published classes a forest canopy actually
+//: describes — duplicated from `woodPacks.js`'s own reasoning, not
+//: from that file, so this module stays self-contained.
+const FOREST_CLASSES = [
+  'evergreen-needleleaf-forest',
+  'evergreen-broadleaf-forest',
+  'deciduous-needleleaf-forest',
+  'deciduous-broadleaf-forest',
+  'mixed-forest',
+];
+
+//: Narrow on purpose — the real GLAD tree-cover percentage
+//: (`woodPacks.effectiveTreeCoverPct`) is the primary, continuous
+//: signal; this is a corroborating or damping NUDGE on top of it, not
+//: a second vote of equal weight.
+const WOOD_MULTIPLIER_BOUNDS = [0.85, 1.15];
+
+// A bounded wood-supply nudge for this class — this file's own header
+// explains why forest classes corroborate (the upper bound) and every
+// other class damps (the lower bound) rather than a continuous scale:
+// there is no published ratio between a land-cover class and a wood
+// yield to scale by. `1` (no change) for a null/unrecognised class.
+function woodMultiplierFor(classKey) {
+  if (!LAND_COVER_CLASSES.includes(classKey)) return 1;
+  return FOREST_CLASSES.includes(classKey) ? WOOD_MULTIPLIER_BOUNDS[1] : WOOD_MULTIPLIER_BOUNDS[0];
+}
+
+//: The two directions this file's header argues are real and
+//: well-established, and nothing else — see that header for why
+//: forest/shrubland/herbaceous/cultivated classes stay neutral.
+const HOME_VALUE_RAISING_CLASSES = ['urban-and-built-up'];
+const HOME_VALUE_LOWERING_CLASSES = ['regularly-flooded-vegetation', 'snow-and-ice', 'barren'];
+const HOME_VALUE_MULTIPLIER_BOUNDS = [0.85, 1.15];
+
+// A bounded home-value nudge for this class — `1` (no change) for a
+// null, unrecognised, or deliberately-neutral class. See this file's
+// own header for which three classes move and why the other nine do
+// not.
+function homeValueMultiplierFor(classKey) {
+  if (!LAND_COVER_CLASSES.includes(classKey)) return 1;
+  if (HOME_VALUE_RAISING_CLASSES.includes(classKey)) return HOME_VALUE_MULTIPLIER_BOUNDS[1];
+  if (HOME_VALUE_LOWERING_CLASSES.includes(classKey)) return HOME_VALUE_MULTIPLIER_BOUNDS[0];
+  return 1;
+}
+
 module.exports = {
   SOURCES,
   LAND_COVER_CLASSES,
+  FOREST_CLASSES,
+  WOOD_MULTIPLIER_BOUNDS,
+  HOME_VALUE_RAISING_CLASSES,
+  HOME_VALUE_LOWERING_CLASSES,
+  HOME_VALUE_MULTIPLIER_BOUNDS,
   validatePack,
   assertPack,
   packFor,
   plotFor,
   classFor,
+  woodMultiplierFor,
+  homeValueMultiplierFor,
 };

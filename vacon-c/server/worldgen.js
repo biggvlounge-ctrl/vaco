@@ -615,7 +615,15 @@ function generateWorld(options = {}) {
     // for home value, rather than this loop inventing a second
     // relationship between a real percentage and this engine's own
     // unit scale.
-    const realWoodSupplyRange = woodPacks.woodSupplyRangeFor(woodPacks.plotFor(w.woodPack, c));
+    // **A real land-cover class's own bounded wood nudge, compounding
+    // onto the GLAD reading above rather than replacing it** —
+    // `landCoverPacks.js`'s own header on why a forest-classified plot
+    // corroborates and every other class damps, ±15% at most.
+    const realWoodLandCoverMultiplier = landCoverPacks.woodMultiplierFor(realLandCoverClass);
+    const realWoodSupplyRange = woodPacks.woodSupplyRangeFor(
+      woodPacks.plotFor(w.woodPack, c),
+      { landCoverMultiplier: realWoodLandCoverMultiplier },
+    );
     for (const resourceType of CITY_RESOURCES) {
       const supply = resourceType === 'wood' && realWoodSupplyRange
         ? Math.round(random.range(realWoodSupplyRange[0], realWoodSupplyRange[1], 'res', c, resourceType))
@@ -794,7 +802,16 @@ function generateWorld(options = {}) {
       // real reading, so this is a pure enrichment.
       const nightLightsPlot = nightLightsPacks.plotFor(w.nightLightsPack, c * config.communitiesPerCity + b);
       const realActivityMultiplier = nightLightsPacks.activityMultiplierFor(nightLightsPlot);
-      const realValueRange = incomePacks.valueRangeFor(incomeTract, { activityMultiplier: realActivityMultiplier });
+      // **A real land-cover class's own bounded home-value nudge, a
+      // THIRD independent real signal compounding onto the same
+      // centre** — `landCoverPacks.js`'s own header on why only
+      // `urban-and-built-up` (raises), `regularly-flooded-vegetation`,
+      // `snow-and-ice` and `barren` (lower) move it, ±15% at most.
+      const realHomeValueLandCoverMultiplier = landCoverPacks.homeValueMultiplierFor(realLandCoverClass);
+      const realValueRange = incomePacks.valueRangeFor(incomeTract, {
+        activityMultiplier: realActivityMultiplier,
+        landCoverMultiplier: realHomeValueLandCoverMultiplier,
+      });
       const homes = [];
       for (let h = 0; h < homeCount; h += 1) {
         homes.push(property.generateProperty(w, {

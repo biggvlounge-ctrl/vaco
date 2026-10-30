@@ -1863,6 +1863,48 @@ real external weight into an internal one. `valueRangeFor`'s new
 is unaffected, checked by running `income-packs.test.js` unchanged
 before adding a line.
 
+**A forty-fourth, closing the question the forty-third rule's own
+land-cover section left open on purpose.** That section declared
+`city.landCoverClass` deliberately unwired — no crop yield, fire-risk
+or building-cost mechanic had been asked for, and inventing one would
+have been fabricating a mechanic nobody requested. Asked directly
+whether to wire it in anyway, into wood supply and home value
+specifically, the answer was yes to both — not a reversal of the
+reasoning, an answer to the one question that reasoning had
+deliberately left open.
+
+Both nudges land the same way every multi-signal pack in this
+registry does: bounded (`±15%`, `WOOD_MULTIPLIER_BOUNDS`/
+`HOME_VALUE_MULTIPLIER_BOUNDS`), compounding onto an existing real
+signal rather than replacing or inventing one, and defaulting to `1`
+so every pre-existing call site is unaffected. `woodPacks.
+woodSupplyRangeFor`'s new `landCoverMultiplier` option and
+`incomePacks.valueRangeFor`'s new one (joining `activityMultiplier` as
+a third independent compounding signal) are both the same shape
+`nightLightsPacks.activityMultiplierFor` already established.
+
+**Only the two directions this file's own reasoning can actually
+defend were built, not a continuous scale for every class.**
+`landCoverPacks.woodMultiplierFor` corroborates on the five real
+forest classes and damps on the other seven — there is no published
+ratio between a land-cover class and a wood yield to scale by, the
+same "no cited ratio" posture `woodPacks.js` itself already takes
+scaling GLAD's own continuous percentage. `landCoverPacks.
+homeValueMultiplierFor` moves exactly three classes:
+`urban-and-built-up` up (real infrastructure and amenities),
+`regularly-flooded-vegetation` down (the documented flood-plain
+discount: insurance cost, building restriction), and `snow-and-ice`/
+`barren` down (extreme or undeveloped terrain). The other eight
+classes — every vegetation class not already forest, plus cultivated
+land — stay at `1`. Whether a wooded or rural setting raises or lowers
+a home's value has no equivalent well-established, one-directional
+real-estate fact the way those three do, and this file's own
+thirty-third rule already names the cost of asserting a causal
+mechanic this project has no research behind: inventing a direction
+for those eight would have repeated exactly the mistake the land-cover
+section's original header was written to avoid, just a few paragraphs
+after re-opening it.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and
