@@ -748,6 +748,51 @@ function renderScreenTime(body) {
   return VACO.mount(body, out);
 }
 
+function renderContentSafety(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Both scanners below are real, deterministic keyword layers — <strong>not language-model calls</strong>, per '
+    + 'this app\'s own no-fake-AI stance — meant to flag content for real human review, never to make an automated '
+    + 'final judgment. AI Monitoring screens live conversation for safety risk; Content Moderation screens standing '
+    + 'content (bios, posts) for TOS-style violations — a different purpose, not a duplicate.', 'warn'));
+
+  var id = VACO.userId();
+  if (!id) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to use these tools.'));
+    return VACO.mount(body, out);
+  }
+
+  var monitorResult = el('div', 'vaco-stack-sm');
+  out.appendChild(VACO.card('AI Monitoring — live conversation risk', [
+    VACO.form([{ name: 'text', label: 'Message text', placeholder: 'paste a message to screen', width: '320px' }],
+      function (values) {
+        return VACO.post('/api/monitor/screen', { text: values.text }).then(function (r) {
+          VACO.mount(monitorResult, [
+            VACO.badge(r.flagged ? r.severity : 'clean', r.flagged ? (r.severity === 'high' ? 'danger' : 'warn') : 'money'),
+            el('p', 'vaco-small vaco-dim', r.reasons.length ? 'Reasons: ' + r.reasons.join(', ') : 'No concerns detected.'),
+          ]);
+        });
+      }, 'Screen'),
+    monitorResult,
+  ]));
+
+  var modResult = el('div', 'vaco-stack-sm');
+  out.appendChild(VACO.card('Content Moderation — standing content', [
+    VACO.form([{ name: 'text', label: 'Post / bio text', placeholder: 'paste standing content to check', width: '320px' }],
+      function (values) {
+        return VACO.post('/api/moderation/check', { text: values.text }).then(function (r) {
+          VACO.mount(modResult, [
+            VACO.badge(r.flagged ? 'flagged' : 'clean', r.flagged ? 'danger' : 'money'),
+            el('p', 'vaco-small vaco-dim', r.reasons.length ? 'Reasons: ' + r.reasons.join(', ') : 'No concerns detected.'),
+          ]);
+        });
+      }, 'Check'),
+    modResult,
+  ]));
+
+  return VACO.mount(body, out);
+}
+
 VACO.app({
   id: 'vsafe',
   name: 'VSAFE',
@@ -766,6 +811,7 @@ VACO.app({
     { id: 'safety-word', label: 'Safety word', heading: 'Safety word & relationship safety', render: renderSafetyWord },
     { id: 'privacy-blocking', label: 'Privacy & blocking', heading: 'Privacy settings & blocking', render: renderPrivacyBlocking },
     { id: 'screen-time', label: 'Screen time', heading: 'Digital wellbeing', render: renderScreenTime },
+    { id: 'content-safety', label: 'Content safety', heading: 'AI monitoring & content moderation', render: renderContentSafety },
   ],
 });
 </script>
