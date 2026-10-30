@@ -171,7 +171,64 @@ pattern `vulture-pods` already uses to reach `vulture-music` and
   config.
 - **A frontend of its own** — `public/index.html`, the same
   profile-and-chat UI that used to live in vaco-shell's "Assistant"
-  tab, now served directly by this app too.
+  tab, now served directly by this app too, plus the Tasks and Calls
+  tabs added in the frontend coverage pass below.
+
+## Frontend coverage pass (30 Oct 2026)
+
+An audit found `public/index.html` making real calls against only 4
+of this app's 30 routes — the one original "Assistant" tab covered
+profile and chat (`GET`/`POST /api/assistant/profile`,
+`GET /api/assistant/history/:userId`, `POST /api/assistant/chat`),
+but two entire feature areas had **zero** frontend exposure at all.
+Two new tabs close that gap, each a real client of the routes named,
+checked against `server.js`'s own route guards and each module's
+real payload/response shape (and its own tests) before being
+written, never a fabricated field.
+
+- **Tasks tab** — `lib/assistantTasks.js`'s whole Muse-style goal/
+  subscription/reminder/suggestion layer had no frontend of its own;
+  it previously only ever reached a user indirectly, through
+  `/api/assistant/chat`'s own connector interception. Creates a goal
+  and completes/cancels it (`POST /api/assistant/goals`,
+  `.../:id/complete`, `.../:id/cancel`) — a kind needing a real
+  connector starts `blocked-no-connector` immediately and only ever
+  offers Cancel, never Complete; lists your own goals
+  (`GET /api/assistant/goals/:userId`). Tracks a subscription and
+  requests its cancellation (`POST /api/assistant/subscriptions`,
+  `.../:id/request-cancellation`, `GET /api/assistant/subscriptions/
+  :userId`) — requesting cancellation flags the record and surfaces
+  the real blocked goal it opens, never pretends to cancel anything.
+  Sets a reminder and acknowledges one (`POST /api/assistant/
+  reminders`, `.../:id/acknowledge`), listing only what's already due
+  (`GET /api/assistant/reminders/:userId/due` — there is no list-all
+  route, and the tab says so rather than implying one). Reads your
+  own proactive suggestions (`GET /api/assistant/suggestions/
+  :userId`). Also shows a connector-configuration notice
+  (`GET /api/connectors/status`, open) explaining why Stripe Issuing/
+  Plaid Sandbox configuration never changes whether a goal can start.
+- **Calls tab** — `lib/assistantCall.js`'s FaceTime-style call flow
+  against V4's own `/api/calls*` surface had no frontend either.
+  Places a call, auto-answered since this assistant is always
+  available (`POST /api/assistant/calls`); lists your own calls with
+  real status badges (`GET /api/assistant/calls`); declines a
+  still-ringing one or ends a connected one, per row
+  (`POST /api/assistant/calls/:id/decline`, `.../:id/end`).
+
+**Deliberately left out, named rather than faked**: every write route
+under `/api/connectors/stripe/*` and `/api/connectors/plaid/*`
+(`requireCallingService()` — a trusted-service credential this
+browser frontend has no login for, the same posture VOID's own
+frontend coverage pass took for its `requireCallingService`/
+`requireOperator` routes); and `POST /api/assistant/calls/:id/events`
+— a real route, but recording a mid-call event is something a live
+audio/video client emits automatically, and no real media transport
+is wired in anywhere in this ecosystem yet, so there is no real
+browser-side event here to generate. `GET /api/assistant/tones` stays
+uncalled too — it is open and real, but returns the same four values
+(`friendly`/`direct`/`professional`/`motivational`) the original tab
+already lists statically, so wiring it up would add a round trip
+without changing what the person sees.
 
 ## Not yet built
 
