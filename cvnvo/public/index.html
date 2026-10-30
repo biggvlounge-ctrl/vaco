@@ -519,6 +519,109 @@ function renderMessages(body) {
   return VACO.mount(body, out);
 }
 
+// -- Nearby: Happn-style proximity + FlashNotes + the rest of BarBuddy --
+//
+// BarBuddy check-in itself lives on the Safety tab (it's the safety
+// entry point this app was built around — see that tab's own card).
+// Everything else lib/proximity.js owns — the real crossing-paths feed,
+// sending a flash note, and the rest of a BarBuddy session (checking
+// out, toggling visibility, seeing who else at a venue opted in) — had
+// no frontend at all, so it lives here as one real client of that one
+// module rather than a second, parallel BarBuddy surface.
+
+function renderNearby(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Happn-style crossings are only ever stored as the real intersection point, never a continuous location trail — '
+    + 'and only when two real coordinate pairs are genuinely within the 250m crossing radius.'));
+
+  var id = VACO.userId();
+  if (!id) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to use proximity and BarBuddy features.'));
+    return VACO.mount(body, out);
+  }
+
+  var grid = el('div', 'safety-grid');
+
+  grid.appendChild(VACO.card('Record a crossing', [
+    el('p', 'vaco-small vaco-dim', 'Rejected server-side if the two coordinate pairs are more than 250m apart.'),
+    VACO.form([
+      { name: 'otherUserId', label: 'Crossed with', placeholder: 'their user id', width: '130px' },
+      { name: 'lat', label: 'Your lat', type: 'number', step: '0.0001', value: 38.627, width: '100px' },
+      { name: 'lng', label: 'Your lng', type: 'number', step: '0.0001', value: -90.1994, width: '100px' },
+      { name: 'otherLat', label: 'Their lat', type: 'number', step: '0.0001', value: 38.6271, width: '100px' },
+      { name: 'otherLng', label: 'Their lng', type: 'number', step: '0.0001', value: -90.1993, width: '100px' },
+    ], function (values) {
+      return VACO.post('/api/proximity', {
+        userId: id, otherUserId: values.otherUserId, lat: values.lat, lng: values.lng, otherLat: values.otherLat, otherLng: values.otherLng,
+      }).then(function (e) { VACO.toast('Crossing recorded — ' + Math.round(e.distanceKm * 1000) + 'm apart.'); });
+    }, 'Record'),
+  ]));
+
+  grid.appendChild(VACO.card('Your crossings', [
+    (function () {
+      var list = el('div', null);
+      list.textContent = 'Loading…';
+      VACO.api('/api/proximity/' + encodeURIComponent(id))
+        .then(function (data) {
+          var feed = data.feed || [];
+          VACO.mount(list, feed.length
+            ? VACO.table([
+              { key: 'otherUserId', label: 'With' },
+              { key: 'distanceKm', label: 'Distance (km)', num: true },
+              { key: 'timestamp', label: 'When', render: function (r) { return new Date(r.timestamp).toLocaleString(); } },
+            ], feed)
+            : el('p', 'vaco-small vaco-faint', 'No crossings yet.'));
+        })
+        .catch(function () { list.textContent = 'Unavailable.'; });
+      return list;
+    }()),
+  ]));
+
+  grid.appendChild(VACO.card('Send a flash note', [
+    el('p', 'vaco-small vaco-dim', 'A real icebreaker sent before any match exists — doesn’t touch your regular conversations.'),
+    VACO.form([
+      { name: 'recipientId', label: 'To', placeholder: 'their user id', width: '130px' },
+      { name: 'text', label: 'Note', placeholder: 'hey, nice crossfit shirt', width: '200px' },
+    ], function (values) {
+      return VACO.post('/api/flash-notes', { senderId: id, recipientId: values.recipientId, text: values.text })
+        .then(function () { VACO.toast('Flash note sent.'); });
+    }, 'Send'),
+  ]));
+
+  var venueOut = el('div', 'vaco-stack-sm');
+  grid.appendChild(VACO.card('BarBuddy venue', [
+    el('p', 'vaco-small vaco-dim',
+      'Check in from the Safety tab first. From here: see who else at the venue opted in, toggle your own visibility, or check out.'),
+    VACO.form([{ name: 'venueId', label: 'Venue', placeholder: 'venue id', width: '130px' }],
+      function (values) {
+        return VACO.api('/api/barbuddy/venues/' + encodeURIComponent(values.venueId)).then(function (v) {
+          var users = v.visibleUsers || [];
+          VACO.mount(venueOut, users.length
+            ? VACO.table([{ key: 'userId', label: 'Visible there now' }], users.map(function (u) { return { userId: u }; }))
+            : el('p', 'vaco-small vaco-faint', 'Nobody visible there right now.'));
+        });
+      }, 'Who’s there'),
+    venueOut,
+    VACO.form([
+      { name: 'venueId', label: 'Venue', placeholder: 'venue id', width: '130px' },
+      { name: 'isVisibleToOthersAtVenue', label: 'Visible to others there?', options: [{ label: 'No', value: 'false' }, { label: 'Yes', value: 'true' }], width: '200px' },
+    ], function (values) {
+      return VACO.post('/api/barbuddy/visibility', {
+        userId: id, venueId: values.venueId, isVisibleToOthersAtVenue: values.isVisibleToOthersAtVenue === 'true',
+      }).then(function () { VACO.toast('Visibility updated.'); });
+    }, 'Set visibility'),
+    VACO.form([{ name: 'venueId', label: 'Venue', placeholder: 'venue id', width: '130px' }],
+      function (values) {
+        return VACO.post('/api/barbuddy/check-out', { userId: id, venueId: values.venueId })
+          .then(function () { VACO.toast('Checked out.'); });
+      }, 'Check out'),
+  ]));
+
+  out.appendChild(grid);
+  return VACO.mount(body, out);
+}
+
 VACO.app({
   id: 'cvnvo',
   name: 'CVNVO',
@@ -534,6 +637,7 @@ VACO.app({
     { id: 'events', label: 'Events', heading: 'Date events', render: renderEvents },
     { id: 'messages', label: 'Messages', heading: 'Matches, messages & calls', render: renderMessages },
     { id: 'safety', label: 'Safety', heading: 'Check-ins & screening', render: renderSafety },
+    { id: 'nearby', label: 'Nearby', heading: 'Proximity & BarBuddy', render: renderNearby },
   ],
 });
 </script>
