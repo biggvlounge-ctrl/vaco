@@ -333,3 +333,91 @@ came back from a real GET. See `dev-docs/phase-3-real-persistence/`.
 - The Event Organizer role (managing multiple creators/venues/security
   for professional event companies and tour operators) — a real,
   confirmed third role in the brief, not built in this phase.
+
+## Frontend coverage pass (30 Oct 2026)
+An audit found `public/index.html` making real calls against only 9 of
+this app's 33 (then) mutating/reading routes — the original 3 tabs
+(Experiences, Bookings, The Door) covered the core MVP loop and the
+digital waiting room, but every Phase 2 slice except the waiting room
+itself had **zero** frontend exposure. This pass adds four new tabs
+and extends two existing ones, bringing real coverage to 25 of 33
+routes. Every field in every new call was checked against the real
+route handler in `server.js` and the real option names in the
+matching `lib/*.js` function before being written — never a guessed
+payload shape.
+
+- **The Door tab (extended)** — gained **Physical check-in**
+  (`POST /api/bookings/:id/check-in`), the in-person counterpart to
+  the digital waiting room already on this tab: a host enters a
+  booking id and the credential issued at booking time, and the
+  server's own real rejection ("the provided credential does not
+  match") surfaces on a wrong code, same discipline as the existing
+  digital flow.
+- **Bookings tab (extended)** — a completed booking's row, which
+  previously dead-ended at "—", now shows a **Summary** action
+  (`GET /api/bookings/:id/post-event-summary`), the MVP's own step 11
+  real receipt.
+- **Host Console tab** — the creator-side control panel Section 29's
+  brief names, for routes a host calls on their own experience
+  (`requireExperienceHost` — the server checks the real host of
+  record, not a body field): **Complete & settle**
+  (`POST /api/experiences/:id/complete`, the real dual payout out of
+  escrow, or a full refund if nobody checked in), **Request a VOID
+  Event Service** (`POST /api/experiences/:id/event-services` across
+  Security/Transport/Space/Staffing/Fulfillment — a real job on VOID's
+  own marketplace) with its own request list
+  (`GET /api/experiences/:id/event-services`), and **Order a physical
+  production run** (`POST /api/experiences/:id/physical-run` — real
+  merch/collectibles through CVLLEX for a specific event).
+- **Analytics tab** — `GET /api/creators/:hostId/analytics` (Phase
+  2's fourth slice). Renders every one of the 12 real computed
+  metrics (bookings, gross revenue, creator earnings using the exact
+  settlement formula, attendance/no-show rate, repeat customers,
+  average order value/duration, bookings by format/type, VOID Event
+  Service usage, peak booking hour) and honestly lists the four the
+  app itself flags as not computable (conversion, geographic demand,
+  venue performance, advertising performance) instead of inventing
+  numbers for them.
+- **Favorites tab** — the half of Customer Profiles (Phase 2's sixth
+  slice) that had no frontend at all: `POST /api/favorites`,
+  `POST /api/favorites/remove`, `GET /api/customers/:customerId/favorites`.
+  (Upcoming/My Experiences, the other half of that slice, was already
+  served by the existing Bookings tab.)
+- **Notifications tab** — `GET /api/notifications/:recipientId` and
+  `POST /api/notifications/:id/read` (Phase 2's third slice). Lists a
+  signed-in user's own notifications and marks one read.
+- **Media tab** — `POST /api/media-orders`,
+  `GET /api/bookings/:id/media-orders`,
+  `POST /api/media-orders/:id/deliver`, and
+  `GET /api/bookings/:id/magic-memory` (Phase 2's seventh slice).
+  Orders MAGIC PHOTO/VIDEO/MEMORY against a booking, lists a booking's
+  orders with a host delivery action that requires a real, non-empty
+  `assetUrl` (deliverMedia's own rule — never a placeholder), and
+  views the assembled Magic Memory package.
+
+**Deliberately left backend-only, and why:**
+- `POST /api/notifications` is `requireCallingService`-guarded (a
+  trusted internal-service credential such as a scheduler, not a user
+  session). This frontend has no login for a service identity, so it
+  stays a real backend capability rather than a fake "admin" form
+  pretending to hold a credential it doesn't have.
+- `POST /api/bookings/:id/verify-arrival` (Geofencing, Phase 2's
+  eighth slice) needs an `Experience.geofence` to actually be set, and
+  the "List an experience" form on the Experiences tab has no
+  geofence fields — every experience created through this frontend
+  today has `geofence: null`, so wiring the arrival check up now would
+  be a real route with no way to exercise it meaningfully. A later
+  pass should add lat/lng/radius fields to experience creation first.
+- `POST /api/waiting-room/:id/exit` (the digital room's own exit step)
+  is a real, simple gap, but genuinely minor next to the above — left
+  for a follow-up alongside the detail-only `GET` routes below rather
+  than padding this pass with a thin one-button tab.
+- Several `GET` routes are real but return detail already folded into
+  a list response elsewhere, so a dedicated UI for them would be a
+  near-duplicate view rather than new coverage: `GET
+  /api/experiences/:id`, `GET /api/bookings/:id`, `GET
+  /api/event-services/:id` (its data already appears in the Host
+  Console's request list), and `GET
+  /api/customers/:customerId/favorites/:creatorId` (a single favorited
+  check the Favorites list already answers for every creator at
+  once).
