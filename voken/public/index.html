@@ -777,6 +777,149 @@ function renderGalleryArt(body) {
   return out;
 }
 
+// -- Creator Hub: applications, assessment, digital profile, family --
+//
+// Four real onboarding/credibility surfaces that had zero frontend
+// exposure. Kenji's own analysis (`POST /api/application/:id/analyze`)
+// and every claim/nomination *review* route are requireOperator()-only
+// -- no frontend credential for either, so this tab submits and looks
+// up, it never decides.
+
+function parseList(raw) {
+  return String(raw || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+}
+
+function renderApplicationSection() {
+  var out = el('div', 'vaco-stack-sm');
+  var result = el('div');
+
+  out.appendChild(VACO.form([
+    { name: 'applicationPath', label: 'Path', options: ['self-initiated-request', 'community-nomination'] },
+    { name: 'nominatedPersonId', label: 'Nominated person id (community-nomination only)', placeholder: 'leave blank otherwise' },
+    { name: 'category', label: 'Category', options: state.categories },
+    { name: 'socialMediaPresence', label: 'Social presence (platform:followers, comma-separated)', placeholder: 'instagram:50000,tiktok:120000' },
+    { name: 'credentials', label: 'Credentials (comma-separated)', placeholder: 'Grammy nominee' },
+  ], function (values) {
+    if (!VACO.userId()) throw new Error('Sign in to submit an application.');
+    var socialMediaPresence = parseList(values.socialMediaPresence).map(function (pair) {
+      var parts = pair.split(':');
+      return { platform: parts[0], followerCount: Number(parts[1]) || 0 };
+    });
+    return VACO.post('/api/application', {
+      applicantId: VACO.userId(),
+      applicationPath: values.applicationPath,
+      nominatedPersonId: values.applicationPath === 'community-nomination' ? (values.nominatedPersonId || null) : undefined,
+      submittedInfo: {
+        category: values.category,
+        socialMediaPresence: socialMediaPresence,
+        credentials: parseList(values.credentials),
+      },
+    }).then(function (application) {
+      VACO.toast('Application #' + application.applicationId + ' submitted');
+      VACO.mount(result, VACO.badge(application.status));
+    });
+  }, 'Submit application'));
+
+  out.appendChild(VACO.form([{ name: 'applicationId', label: 'Look up application id', type: 'number' }], function (values) {
+    return VACO.api('/api/application/' + encodeURIComponent(values.applicationId)).then(function (app) {
+      var box = el('div', 'vaco-stack-sm');
+      box.appendChild(VACO.badge(app.status));
+      box.appendChild(el('p', 'vaco-small vaco-dim', app.applicationPath));
+      if (app.kenjiAnalysisResult) box.appendChild(el('p', 'vaco-small', JSON.stringify(app.kenjiAnalysisResult)));
+      VACO.mount(result, box);
+    });
+  }, 'Look up'));
+  out.appendChild(result);
+
+  return VACO.card('Cvltvre Card applications', [out]);
+}
+
+function renderAssessmentSection() {
+  var out = el('div', 'vaco-stack-sm');
+  var result = el('div');
+
+  out.appendChild(VACO.form([
+    { name: 'occupationCategory', label: 'Occupation', options: ['influencer', 'musician', 'political', 'author', 'athlete', 'other'] },
+    { name: 'realSocialFollowing', label: 'Real social following (all platforms)', type: 'number', value: 0 },
+    { name: 'realPressCoverageCount', label: 'Real press articles', type: 'number', value: 0 },
+    { name: 'realIndustryRecognition', label: 'Formal industry recognition?', options: [{ label: 'No', value: 'false' }, { label: 'Yes', value: 'true' }] },
+  ], function (values) {
+    if (!VACO.userId()) throw new Error('Sign in to request an established-creator assessment.');
+    return VACO.post('/api/established-creator-assessment', {
+      creatorId: VACO.userId(),
+      occupationCategory: values.occupationCategory,
+      realSocialFollowing: Number(values.realSocialFollowing) || 0,
+      realPressCoverageCount: Number(values.realPressCoverageCount) || 0,
+      realIndustryRecognition: values.realIndustryRecognition === 'true',
+    }).then(function (assessment) {
+      VACO.mount(result, VACO.card('External score: ' + assessment.externalScore, [
+        'Suggested starting tier: ' + assessment.suggestedStartingTier,
+      ]));
+    });
+  }, 'Request assessment'));
+  out.appendChild(result);
+
+  return VACO.card('Established-creator assessment', [out]);
+}
+
+function renderDigitalProfileSection() {
+  var out = el('div', 'vaco-stack-sm');
+  var result = el('div');
+  out.appendChild(VACO.form([{ name: 'creatorId', label: 'Creator id', value: VACO.userId() || '' }], function (values) {
+    return VACO.api('/api/creator-digital-profile/' + encodeURIComponent(values.creatorId)).then(function (profile) {
+      var box = el('div', 'vaco-stack-sm');
+      box.appendChild(el('p', null, 'Aggregated engagement score: ' + VACO.round(profile.aggregatedEngagementScore) + ' across ' + profile.cardCount + ' card(s)'));
+      if (profile.risingIndicator) box.appendChild(VACO.badge('rising', 'money'));
+      VACO.mount(result, box);
+    });
+  }, 'Look up'));
+  out.appendChild(result);
+  return VACO.card('Creator digital profile', [out]);
+}
+
+function renderFamilyClaimSection() {
+  var out = el('div', 'vaco-stack-sm');
+  var result = el('div');
+
+  out.appendChild(VACO.form([
+    { name: 'historicSlug', label: 'Historic register slug', placeholder: 'nikola-tesla' },
+    { name: 'relationship', label: 'Relationship', placeholder: 'great-granddaughter' },
+    { name: 'evidence', label: 'Evidence (comma-separated)', placeholder: 'birth certificate, family archive letter' },
+  ], function (values) {
+    if (!VACO.userId()) throw new Error('Sign in to submit a family-representative claim.');
+    return VACO.post('/api/family-representative-claim', {
+      claimantId: VACO.userId(),
+      historicSlug: values.historicSlug,
+      relationship: values.relationship,
+      evidence: parseList(values.evidence),
+    }).then(function (claim) {
+      VACO.toast('Claim #' + claim.claimId + ' submitted');
+      VACO.mount(result, VACO.badge(claim.status));
+    });
+  }, 'Submit claim'));
+
+  out.appendChild(VACO.form([{ name: 'claimId', label: 'Look up claim id', type: 'number' }], function (values) {
+    return VACO.api('/api/family-representative-claim/' + encodeURIComponent(values.claimId)).then(function (claim) {
+      VACO.mount(result, VACO.card('Claim #' + claim.claimId, [
+        VACO.badge(claim.status),
+        claim.relationship + ' of ' + claim.historicSlug,
+      ]));
+    });
+  }, 'Look up'));
+  out.appendChild(result);
+
+  return VACO.card('Family-representative claims', [out]);
+}
+
+function renderCreatorHub(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(renderApplicationSection());
+  out.appendChild(renderAssessmentSection());
+  out.appendChild(renderDigitalProfileSection());
+  out.appendChild(renderFamilyClaimSection());
+  return out;
+}
+
 // Boot needs the brand and category list before the first render, since
 // both are real server-owned values rather than constants in this file.
 VACO.api('/api/health').then(function (health) {
@@ -807,6 +950,7 @@ VACO.api('/api/health').then(function (health) {
       { id: 'activity', label: 'Activity', heading: 'Trading, raffles & referrals', render: renderActivity },
       { id: 'account', label: 'Account', heading: 'Notifications & wallet', render: renderAccount },
       { id: 'gallery-art', label: 'Gallery & Art', heading: 'VADO gallery, art cards & frames', render: renderGalleryArt },
+      { id: 'creator-hub', label: 'Creator Hub', heading: 'Applications, assessment & claims', render: renderCreatorHub },
     ],
   });
 });
