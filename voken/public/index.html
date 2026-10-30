@@ -30,12 +30,14 @@
 // comes from the app's own `/api/brand`, so this page reads it rather
 // than hardcoding either name.
 //
-// Real client of VOKEN's own 64 routes. No pricing, rarity, or auction
-// logic here — bidding, Dutch price decay, and value scoring are all
-// decided server-side.
+// Real client of VOKEN's own 103 routes, across 9 tabs (see the
+// "Frontend coverage pass" section of README.md for which route group
+// each tab covers, and which stay deliberately backend-only). No
+// pricing, rarity, or auction logic here — bidding, Dutch price decay,
+// and value scoring are all decided server-side.
 
 var el = VACO.el;
-var state = { category: 'vehicles', categories: [], brand: null, complianceGates: [], rarityTiers: [], historicSubjectTypes: [] };
+var state = { category: 'vehicles', categories: [], brand: null, complianceGates: [], rarityTiers: [], historicSubjectTypes: [], cardDetailId: null };
 
 // -- Auctions ---------------------------------------------------------
 
@@ -103,6 +105,8 @@ function renderAuctions(body) {
 // -- Cards by category ------------------------------------------------
 
 function renderCards(body) {
+  if (state.cardDetailId !== null) return renderCardDetailView(body, state.cardDetailId);
+
   var out = el('div', 'vaco-stack');
 
   var rail = el('div', 'cat-rail');
@@ -129,14 +133,216 @@ function renderCards(body) {
 
       // The value score is VOKEN's own algorithm, fetched rather than
       // guessed — it is the number the whole marketplace is built on.
+      // (Was a GET against a POST-only route and always failed silently
+      // -- fixed here to the real method, requiring a session the same
+      // way the detail view's own "Score this card" action does.)
       var score = el('p', 'vaco-small vaco-faint', 'scoring…');
       lines.appendChild(score);
-      VACO.api('/api/card/' + c.id + '/value-score')
-        .then(function (v) { score.textContent = 'Value score ' + VACO.round(v.score !== undefined ? v.score : v.valueScore); })
-        .catch(function () { score.textContent = 'No value score yet.'; });
+      if (VACO.userId()) {
+        VACO.post('/api/card/' + c.id + '/value-score', {})
+          .then(function (v) { score.textContent = 'Value score ' + VACO.round(v.combinedRealValueScore); })
+          .catch(function () { score.textContent = 'No value score yet.'; });
+      } else {
+        score.textContent = 'Sign in to see its value score.';
+      }
+
+      lines.appendChild(VACO.button('View details', function () {
+        state.cardDetailId = c.id;
+        VACO.render();
+      }, 'ghost vaco-btn-sm'));
 
       return VACO.card(c.name || ('Card ' + c.id), [art, lines]);
     }), true));
+    VACO.mount(body, out);
+  });
+}
+
+// -- Card detail: the per-card actions beyond browsing -----------------
+//
+// `GET /api/card/:id/full` collapses ~8 separate real calls into one
+// (see cardFullDetail.js), so this is the one real request the detail
+// view needs to open. Every action below is its own real route,
+// grouped here rather than as a separate top-level tab because each
+// one only makes sense in the context of one specific card.
+
+function renderCardDetailView(body, cardId) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.button('← Back to browse', function () { state.cardDetailId = null; VACO.render(); }));
+
+  return VACO.api('/api/card/' + cardId + '/full').then(function (full) {
+    var card = full.card;
+    var lastScore = null; // filled in by "Score this card", consumed by sell-back actions below
+
+    var head = el('div', 'vaco-row-tight');
+    head.appendChild(VACO.badge(card.rarityTier));
+    head.appendChild(VACO.badge(card.tokenizationType));
+    head.appendChild(VACO.badge(card.category));
+    if (card.verifiedBySubject) head.appendChild(VACO.badge('verified', 'money'));
+    out.appendChild(VACO.card('Card #' + card.id, [
+      head,
+      card.subjectPersonId ? ('Subject: ' + card.subjectPersonId) : 'No living subject.',
+      'Market price: ' + (full.marketPrice ? VACO.round(full.marketPrice.marketPrice) + ' VC' : 'not yet scored'),
+      full.vehicleValue ? ('Vehicle value: ' + VACO.round(full.vehicleValue.vehicleCardValue) + ' VC') : null,
+      full.royaltyRecipient ? ('Resale royalty: ' + (full.royaltyRate * 100) + '% to ' + full.royaltyRecipient) : null,
+      'Followers: ' + full.followerCount + ' · Views: ' + full.engagement.views + ' · Likes: ' + full.engagement.likes + ' · Shares: ' + full.engagement.shares,
+    ]));
+
+    // -- Engagement: view fires once per real session automatically
+    // (deduped server-side), like/share/comment are explicit actions.
+    if (VACO.userId()) {
+      VACO.post('/api/card/' + cardId + '/engagement', { type: 'view' }).catch(function () { /* already viewed, or no session -- not worth surfacing */ });
+    }
+    var engagementRow = el('div', 'vaco-row-tight');
+    ['like', 'share', 'comment'].forEach(function (type) {
+      engagementRow.appendChild(VACO.button(type, function () {
+        if (!VACO.userId()) throw new Error('Sign in to ' + type + ' a card.');
+        return VACO.post('/api/card/' + cardId + '/engagement', { type: type }).then(function () {
+          VACO.toast('Recorded a ' + type);
+        });
+      }));
+    });
+    out.appendChild(VACO.card('Engagement', [engagementRow]));
+
+    // -- Follow
+    var followRow = el('div', 'vaco-row-tight');
+    followRow.appendChild(VACO.button('Follow', function () {
+      if (!VACO.userId()) throw new Error('Sign in to follow a card.');
+      return VACO.post('/api/card/' + cardId + '/follow', {}).then(function () { VACO.toast('Following card #' + cardId); });
+    }, 'primary'));
+    followRow.appendChild(VACO.button('Unfollow', function () {
+      if (!VACO.userId()) throw new Error('Sign in to unfollow a card.');
+      return VACO.del('/api/card/' + cardId + '/follow').then(function () { VACO.toast('Unfollowed card #' + cardId); });
+    }));
+    out.appendChild(VACO.card('Follow', [followRow]));
+
+    // -- Verify (only the card's own real subject can succeed)
+    out.appendChild(VACO.card('Verify your identity', [
+      'Only card #' + cardId + "'s own real subject can verify it.",
+      VACO.button('Verify this is me', function () {
+        if (!VACO.userId()) throw new Error('Sign in to verify.');
+        return VACO.post('/api/card/' + cardId + '/verify', { verifierId: VACO.userId() }).then(function () {
+          VACO.toast('Verified');
+          VACO.render();
+        });
+      }, 'primary'),
+    ]));
+
+    // -- Statistics (verified subject, approved family rep, or verified owner only)
+    var statsOut = el('p', 'vaco-small vaco-dim', JSON.stringify(card.statistics));
+    out.appendChild(VACO.card('Statistics', [
+      statsOut,
+      VACO.form([
+        { name: 'key', label: 'Field', placeholder: 'referenceValue' },
+        { name: 'value', label: 'Value', placeholder: '45000' },
+      ], function (values) {
+        if (!VACO.userId()) throw new Error('Sign in to update statistics.');
+        var numeric = Number(values.value);
+        var stat = {};
+        stat[values.key] = Number.isFinite(numeric) && values.value.trim() !== '' ? numeric : values.value;
+        return VACO.post('/api/card/' + cardId + '/statistics', { updaterId: VACO.userId(), statistics: stat }).then(function (updated) {
+          statsOut.textContent = JSON.stringify(updated.statistics);
+          VACO.toast('Statistics updated');
+        });
+      }, 'Update'),
+    ]));
+
+    // -- Transfer an edition you own
+    out.appendChild(VACO.card('Transfer an edition', [
+      VACO.form([
+        { name: 'editionNumber', label: 'Edition #', type: 'number', value: 1 },
+        { name: 'format', label: 'Format', options: ['digital', 'physical'] },
+        { name: 'toOwnerId', label: 'Transfer to (user id)', placeholder: 'bob' },
+      ], function (values) {
+        if (!VACO.userId()) throw new Error('Sign in to transfer an edition you own.');
+        return VACO.post('/api/card/' + cardId + '/transfer', {
+          fromOwnerId: VACO.userId(), editionNumber: Number(values.editionNumber), format: values.format, toOwnerId: values.toOwnerId,
+        }).then(function () { VACO.toast('Edition transferred'); });
+      }, 'Transfer'),
+    ]));
+
+    // -- Sell-back: score, then quote, then sell
+    var sellBackOut = el('p', 'vaco-small vaco-dim', 'Score this card first to enable a sell-back quote.');
+    out.appendChild(VACO.card('Score & sell back', [
+      VACO.button('Score this card (live)', function () {
+        if (!VACO.userId()) throw new Error('Sign in to score a card.');
+        return VACO.post('/api/card/' + cardId + '/value-score', {}).then(function (result) {
+          lastScore = result.combinedRealValueScore;
+          sellBackOut.textContent = 'Combined real value score: ' + VACO.round(lastScore) + ' -- use the form below to quote a sell-back.';
+        });
+      }, 'primary'),
+      sellBackOut,
+      VACO.button('Get sell-back quote', function () {
+        if (!VACO.userId()) throw new Error('Sign in to get a sell-back quote.');
+        if (lastScore === null) throw new Error('Score this card first.');
+        return VACO.post('/api/card/' + cardId + '/sell-back-quote', { combinedRealValueScore: lastScore }).then(function (quote) {
+          sellBackOut.textContent = 'Quote: ' + VACO.round(quote.fairMarketValue) + ' VC (range ' + quote.range.min + '-' + quote.range.max + ')';
+        });
+      }),
+      VACO.form([
+        { name: 'editionNumber', label: 'Edition #', type: 'number', value: 1 },
+        { name: 'format', label: 'Format', options: ['digital', 'physical'] },
+      ], function (values) {
+        if (!VACO.userId()) throw new Error('Sign in to sell back an edition you own.');
+        if (lastScore === null) throw new Error('Score this card first.');
+        return VACO.post('/api/card/' + cardId + '/sell-back', {
+          sellerId: VACO.userId(), editionNumber: Number(values.editionNumber), format: values.format, combinedRealValueScore: lastScore,
+        }).then(function (result) {
+          VACO.toast('Sold back for ' + VACO.round(result.fairMarketValue) + ' VC', 'money');
+          VACO.refreshBalances().then(VACO.renderIdentity);
+        });
+      }, 'Sell back now'),
+    ]));
+
+    // -- Editions, with real serial numbers
+    var editionsOut = el('div', 'vaco-empty', 'Loading…');
+    out.appendChild(VACO.card('Editions', [editionsOut]));
+    VACO.api('/api/card/' + cardId + '/editions').then(function (data) {
+      VACO.mount(editionsOut, VACO.table([
+        { key: 'displayLabel', label: 'Serial' },
+        { key: 'format', label: 'Format' },
+        { key: 'ownerId', label: 'Owner' },
+      ], data.editions));
+    }).catch(VACO.error);
+
+    // -- Commerce: linked merch and real production collectibles
+    if (full.merch.length || full.collectibles.length) {
+      var commerceBody = el('div', 'vaco-stack-sm');
+      if (full.merch.length) {
+        commerceBody.appendChild(VACO.table([
+          { key: 'itemType', label: 'Item' },
+          { label: 'Price', num: true, render: function (r) { return VACO.round(r.currentDynamicPrice); } },
+          { label: 'Remaining', num: true, render: function (r) { return r.remainingSupply + '/' + r.totalSupply; } },
+          { label: '', render: function (r) {
+            return VACO.button('Buy', function () {
+              if (!VACO.userId()) throw new Error('Sign in to buy merch.');
+              return VACO.post('/api/merch/' + r.id + '/purchase', { buyerId: VACO.userId() }).then(function (purchase) {
+                VACO.toast('Bought for ' + VACO.round(purchase.pricePaid) + ' VC', 'money');
+                VACO.refreshBalances().then(VACO.renderIdentity);
+                VACO.render();
+              });
+            }, 'primary vaco-btn-sm');
+          } },
+        ], full.merch));
+      }
+      if (full.collectibles.length) {
+        commerceBody.appendChild(el('p', 'vaco-small vaco-dim', full.collectibles.length + ' real CVLLEX production collectible(s) linked to this subject.'));
+      }
+      out.appendChild(VACO.card('Merch & collectibles', [commerceBody]));
+    }
+
+    // -- Value history
+    if (full.valueHistory.length) {
+      out.appendChild(VACO.card('Value history', [
+        VACO.table([
+          { label: 'Scored at', render: function (r) { return new Date(r.scoredAt || r.at || r.timestamp).toLocaleString(); } },
+          { label: 'Score', num: true, render: function (r) { return VACO.round(r.combinedRealValueScore !== undefined ? r.combinedRealValueScore : r.score); } },
+        ], full.valueHistory.slice(-10)),
+      ]));
+    }
+
+    VACO.mount(body, out);
+  }).catch(function (err) {
+    out.appendChild(VACO.notice(VACO.escapeHtml(err.message), 'danger'));
     VACO.mount(body, out);
   });
 }
