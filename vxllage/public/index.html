@@ -37,6 +37,11 @@ function fmtWhen(ts) {
   return new Date(ts).toLocaleDateString();
 }
 
+function fmtDate(ts) {
+  if (!ts) return '—';
+  return new Date(ts).toLocaleString();
+}
+
 function postCard(post) {
   var card = el('div', 'vaco-card post');
   var head = el('div', 'post-head');
@@ -90,6 +95,101 @@ function renderFeed(body) {
       feed.appendChild(el('div', 'vaco-empty', 'Nothing in the feed yet — post above, or follow someone.'));
     }
     out.appendChild(VACO.card('For you — ' + forYou.length + ' · following ' + following.length, [feed]));
+    VACO.mount(body, out);
+  });
+}
+
+// -- Profile ------------------------------------------------------------
+//
+// Closes profiles.js/follows.js's own gap: a real computed profile
+// (post/following/follower counts, authored posts) plus the real
+// follow graph behind the Feed tab's own For You/Following split —
+// neither had any frontend surface before this.
+
+function renderProfile(body) {
+  var out = el('div', 'vaco-stack');
+  var defaultId = VACO.userId() || '';
+
+  out.appendChild(VACO.card('Open a profile', [
+    VACO.form([
+      { name: 'userId', label: 'User id', placeholder: 'alice', width: '160px', value: defaultId },
+    ], function (values) {
+      return loadProfile(out, body, values.userId);
+    }, 'Load'),
+  ]));
+
+  if (defaultId) return loadProfile(out, body, defaultId);
+  out.appendChild(el('div', 'vaco-empty', 'Enter a user id above — sign in to load and manage your own.'));
+  return VACO.mount(body, out);
+}
+
+function loadProfile(out, body, userId) {
+  userId = String(userId || '').trim();
+  if (!userId) return Promise.resolve();
+  var viewerId = VACO.userId();
+
+  return Promise.all([
+    VACO.api('/api/profile/' + encodeURIComponent(userId)),
+    VACO.api('/api/following/' + encodeURIComponent(userId)),
+    VACO.api('/api/followers/' + encodeURIComponent(userId)),
+    (viewerId && viewerId !== userId)
+      ? VACO.api('/api/follow-status/' + encodeURIComponent(viewerId) + '/' + encodeURIComponent(userId))
+        .catch(function () { return { following: false }; })
+      : Promise.resolve(null),
+  ]).then(function (r) {
+    var profile = r[0];
+    var following = r[1].following || [];
+    var followers = r[2].followers || [];
+    var followStatus = r[3];
+
+    var replacement = el('div', 'vaco-stack');
+
+    var stats = el('div', 'vaco-row-tight');
+    stats.appendChild(VACO.badge(profile.postCount + ' posts'));
+    stats.appendChild(VACO.badge(profile.followingCount + ' following'));
+    stats.appendChild(VACO.badge(profile.followerCount + ' followers'));
+
+    var followAction = null;
+    if (viewerId && viewerId !== userId && followStatus) {
+      followAction = followStatus.following
+        ? VACO.button('Unfollow', function () {
+          return VACO.post('/api/unfollow', { followerId: viewerId, followeeId: userId })
+            .then(function () { VACO.toast('Unfollowed ' + userId); return loadProfile(out, body, userId); });
+        }, 'ghost')
+        : VACO.button('Follow', function () {
+          return VACO.post('/api/follow', { followerId: viewerId, followeeId: userId })
+            .then(function () { VACO.toast('Following ' + userId); return loadProfile(out, body, userId); });
+        }, 'primary');
+    }
+    replacement.appendChild(VACO.card(userId, [stats], { trailing: followAction }));
+
+    replacement.appendChild(VACO.card('Following (' + following.length + ')', [
+      following.length
+        ? el('p', 'vaco-small vaco-dim', following.join(', '))
+        : el('div', 'vaco-empty', 'Not following anyone yet.'),
+    ]));
+    replacement.appendChild(VACO.card('Followers (' + followers.length + ')', [
+      followers.length
+        ? el('p', 'vaco-small vaco-dim', followers.join(', '))
+        : el('div', 'vaco-empty', 'No followers yet.'),
+    ]));
+
+    replacement.appendChild(VACO.card('Posts', [
+      VACO.table([
+        { key: 'id', label: 'Id' },
+        { label: 'Text', render: function (p) { return p.text; } },
+        { label: 'Likes', num: true, render: function (p) { return (p.likedBy || []).length; } },
+        { label: 'Reposts', num: true, render: function (p) { return (p.repostedBy || []).length; } },
+        { label: 'When', render: function (p) { return fmtWhen(p.createdAt); } },
+      ], profile.posts, { empty: 'No posts yet.' }),
+    ]));
+
+    while (out.childNodes.length > 1) out.removeChild(out.lastChild);
+    out.appendChild(replacement);
+    VACO.mount(body, out);
+  }).catch(function (err) {
+    while (out.childNodes.length > 1) out.removeChild(out.lastChild);
+    out.appendChild(VACO.notice('Could not load that profile: ' + VACO.escapeHtml(err.message), 'danger'));
     VACO.mount(body, out);
   });
 }
@@ -236,6 +336,9 @@ VACO.app({
   accentInk: '#04140e',
   tabs: [
     { id: 'feed', label: 'Feed', heading: 'Home', render: renderFeed },
+    { id: 'profile', label: 'Profile', heading: 'Profile',
+      blurb: 'A real, computed profile — post/following/follower counts and a real follow graph, the same one that drives Following in the Feed tab.',
+      render: renderProfile },
     { id: 'villages', label: 'Villages', heading: 'Communities',
       blurb: 'A village is a real community with members, events, Villas, and a boost level bought with VCoin.',
       render: renderVillages },
