@@ -3,6 +3,15 @@
 // **Real median household income and a real Gini index, for a home
 // value band this project chose with no document behind it.**
 //
+// **Added 30 Oct 2026: `valueRangeFor`'s own optional
+// `activityMultiplier`.** `server/nightLightsPacks.js` reads a real
+// VIIRS nighttime-light composite (`world-layer/imports/
+// earthEngineImport.js`) as a second, independent real signal of the
+// same underlying fact income already measures — compounding into
+// this centre the same way `populationPacks.overdoseBaselineFor`
+// compounds with `healthBaseline` in `mortality.diseasePressure`.
+// See `nightLightsPacks.js`'s own header for the full reasoning.
+//
 // ---------------------------------------------------------------------
 // The gap this closes — and the one it closes alongside it
 // ---------------------------------------------------------------------
@@ -130,14 +139,24 @@ function tractFor(pack, position) {
 
 // A real [low, high] home-value range for this tract — the invented
 // band, re-centred on real median income and re-spread by real
-// inequality — or null when the tract has neither figure. `worldgen.js`
-// draws within this range exactly as it draws within the invented one.
-function valueRangeFor(tract) {
+// inequality — or null when the tract has neither figure and no real
+// `activityMultiplier` was supplied either. `worldgen.js` draws within
+// this range exactly as it draws within the invented one.
+//
+// `options.activityMultiplier` is `nightLightsPacks.activityMultiplierFor`'s
+// own real, bounded figure — a SECOND, independent real signal that
+// further scales the centre, the same "compound, don't replace" shape
+// `populationPacks.overdoseBaselineFor` already takes compounding with
+// `healthBaseline` in `mortality.diseasePressure`. Defaults to 1 (no
+// change) so every existing call site is unaffected.
+function valueRangeFor(tract, options = {}) {
+  const { activityMultiplier = 1 } = options;
   const income = Number(tract?.medianHouseholdIncome);
   const gini = Number(tract?.giniIndex);
   const hasIncome = Number.isFinite(income) && income > 0;
   const hasGini = Number.isFinite(gini) && gini >= GINI_BOUNDS[0] && gini <= GINI_BOUNDS[1];
-  if (!hasIncome && !hasGini) return null;
+  const hasActivity = Number.isFinite(activityMultiplier) && activityMultiplier !== 1;
+  if (!hasIncome && !hasGini && !hasActivity) return null;
 
   const [inventedLow, inventedHigh] = INVENTED_VALUE_RANGE;
   const inventedCentre = (inventedLow + inventedHigh) / 2;
@@ -147,7 +166,11 @@ function valueRangeFor(tract) {
   // band's own centre related to its bounds — there is no cited
   // income-to-value ratio, so the invented band's own shape is what
   // real income scales rather than this module inventing a second one.
-  const centre = hasIncome ? inventedCentre * (income / ORDINARY_MEDIAN_INCOME) : inventedCentre;
+  const incomeCentre = hasIncome ? inventedCentre * (income / ORDINARY_MEDIAN_INCOME) : inventedCentre;
+  // A real, independent second signal further scales that centre —
+  // compounding, the same way a second disease baseline compounds
+  // rather than replaces. 1 when none was supplied, so it is a no-op.
+  const centre = incomeCentre * (Number.isFinite(activityMultiplier) ? activityMultiplier : 1);
   // Real inequality widens or narrows the spread around that centre,
   // relative to the flagged ordinary reference.
   const halfWidth = hasGini ? inventedHalfWidth * (gini / ORDINARY_GINI) : inventedHalfWidth;

@@ -1812,6 +1812,57 @@ person) rather than hidden. Same §9 firewall, same `demographics
 .compositionOf` reporting, same in-memory-only posture as every other
 field in this family.
 
+**A forty-third, closing three real sources `world-layer/sources.js`
+had already built and tested as real, declared-consumerless
+transforms — the same category `usgsImport.js` itself sat in before
+this round, and found by asking directly whether those three had a
+real join waiting the way the twenty-seventh rule's trio did.**
+
+**`world-layer/imports/gladImport.js`'s real global forest-cover
+reading closes a comment, not a gap this file invented.**
+`worldgen.js`'s own header already named the problem: the city-
+resource loop's canonical list was once `['food','water','medicine',
+'energy','timber']`, and `timber` "is not a §28 resource type at all
+(the spec says `wood`)" — checked directly before writing
+`server/woodPacks.js`, rather than trusted from that comment, which
+was itself a citation-is-not-presence artefact one layer further in.
+`wood` is real, generated on every city since Phase 1, and drawn from
+an invented `[60, 140]` supply band with no citation. `woodPacks.js`
+re-centres that band on a real tree-cover percentage the same way
+`incomePacks.js` already re-centres home value — and a `lost-forest`
+plot (forest that stood in 2000 and was cleared since) reads as 0%
+effective cover for TODAY rather than its stale baseline, because the
+stock it would describe is gone.
+
+**`world-layer/imports/earthenvImport.js`'s Consensus Land Cover has
+no VACON-C consumer, and `landCoverPacks.js` does not invent one** —
+same posture as `usgsImport.js`'s own elevation import before this
+engine had a terrain mechanic. `city.landCoverClass` is stored
+directly, read by nothing. **Deliberately kept out of
+`statistics.js`, not just out of a behavioral mechanic** — every unit
+that catalogue uses is numeric or ordinal (count, currency, index,
+share, tier, years, checked directly), and a twelve-class label has
+no honest place in it, the same reasoning `migrationPathwayPacks.js`
+already gives for keeping `dominantPathway` out of it too.
+`climatePacks.js`'s own `regions.climate_key` is the real precedent
+for a categorical geographic fact, not `politicalPacks.js`'s
+`political_lean`.
+
+**`world-layer/imports/earthEngineImport.js`'s real VIIRS nighttime-
+light reading compounds into `incomePacks.valueRangeFor`, the same
+shape `populationPacks.overdoseBaselineFor` already takes compounding
+with `healthBaseline` in `mortality.diseasePressure`** — a second,
+independent real signal of the same underlying fact real income
+already measures, not a new relationship to invent.
+`nightLightsPacks.activityMultiplierFor` is bounded
+(`ACTIVITY_MULTIPLIER_BOUNDS`) so a very dark or very bright reading
+narrows the income-based range rather than overwhelming it, the same
+caution `crimeHotspotPacks.weightFor` already applies multiplying a
+real external weight into an internal one. `valueRangeFor`'s new
+`activityMultiplier` option defaults to 1 — every existing call site
+is unaffected, checked by running `income-packs.test.js` unchanged
+before adding a line.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

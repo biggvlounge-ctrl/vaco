@@ -117,6 +117,9 @@ const incomePacks = require('./incomePacks.js');
 const gangPacks = require('./gangPacks.js');
 const politicalPacks = require('./politicalPacks.js');
 const crimeHotspotPacks = require('./crimeHotspotPacks.js');
+const woodPacks = require('./woodPacks.js');
+const landCoverPacks = require('./landCoverPacks.js');
+const nightLightsPacks = require('./nightLightsPacks.js');
 const merchandise = require('./merchandise.js');
 const worldStore = require('./worldStore.js');
 const { hashSeed, seededUnit } = require('./seeded.js');
@@ -370,6 +373,21 @@ function generateWorld(options = {}) {
   } else if (w.crimeHotspotPack) {
     crimeHotspotPacks.assertPack(w.crimeHotspotPack);
   }
+  if (config.woodPack) {
+    w.woodPack = woodPacks.assertPack(config.woodPack);
+  } else if (w.woodPack) {
+    woodPacks.assertPack(w.woodPack);
+  }
+  if (config.landCoverPack) {
+    w.landCoverPack = landCoverPacks.assertPack(config.landCoverPack);
+  } else if (w.landCoverPack) {
+    landCoverPacks.assertPack(w.landCoverPack);
+  }
+  if (config.nightLightsPack) {
+    w.nightLightsPack = nightLightsPacks.assertPack(config.nightLightsPack);
+  } else if (w.nightLightsPack) {
+    nightLightsPacks.assertPack(w.nightLightsPack);
+  }
 
   // **`worldState.seed` was read by two modules and set by none.**
   // `infrastructure.advanceInfrastructure` seeds its failure draw on
@@ -491,6 +509,15 @@ function generateWorld(options = {}) {
     const realPoliticalLean = politicalPacks.leanFor(politicalPacks.countyFor(w.politicalPack, c));
     if (realPoliticalLean !== null) city.politicalLean = realPoliticalLean;
 
+    // **A real published land-cover class, when a land-cover pack has
+    // one — assigned by the city's own position (§88).** Stored
+    // directly on the city, not through `statistics.js` — see
+    // `landCoverPacks.js`'s own header for why (every unit that
+    // catalogue uses is numeric; a twelve-class label is not). In-
+    // memory only, same posture as `city.politicalLean` just above.
+    const realLandCoverClass = landCoverPacks.classFor(landCoverPacks.plotFor(w.landCoverPack, c));
+    if (realLandCoverClass !== null) city.landCoverClass = realLandCoverClass;
+
     // Every city gets weather, and now a climate drawn from where it
     // actually sits (`environment.climateForLatitude`) rather than a
     // uniform pick blind to geography — `cityPosition.lat` is a real
@@ -579,8 +606,20 @@ function generateWorld(options = {}) {
     // `mortality.SURVIVAL_RESOURCES`'s three, and `timber` is not a
     // §28 resource type at all (the spec says `wood`). Three lists,
     // no canon. See server/barter.js#RESOURCE_TYPES.
+    //
+    // **A real [low, high] wood-supply range, when a wood pack covers
+    // this city — assigned by the city's own position (§88).**
+    // `woodPacks.js`'s own header: a real University of Maryland GLAD
+    // forest-cover reading re-centres and re-spreads the invented
+    // `[60, 140]` band exactly the way `incomePacks.js` already does
+    // for home value, rather than this loop inventing a second
+    // relationship between a real percentage and this engine's own
+    // unit scale.
+    const realWoodSupplyRange = woodPacks.woodSupplyRangeFor(woodPacks.plotFor(w.woodPack, c));
     for (const resourceType of CITY_RESOURCES) {
-      const supply = Math.round(random.range(60, 140, 'res', c, resourceType));
+      const supply = resourceType === 'wood' && realWoodSupplyRange
+        ? Math.round(random.range(realWoodSupplyRange[0], realWoodSupplyRange[1], 'res', c, resourceType))
+        : Math.round(random.range(60, 140, 'res', c, resourceType));
       const essential = mortality.SURVIVAL_RESOURCES.includes(resourceType);
       // Essentials sit closer to balance than trade goods: a
       // settlement that cannot feed itself at all does not reach the
@@ -746,7 +785,16 @@ function generateWorld(options = {}) {
       // and re-spread the invented band rather than replacing it with
       // a cited value directly.
       const incomeTract = incomePacks.tractFor(w.incomePack, c * config.communitiesPerCity + b);
-      const realValueRange = incomePacks.valueRangeFor(incomeTract);
+      // **A real VIIRS nighttime-light reading, when a night-lights
+      // pack covers this community — the same position, same reason
+      // as the income tract just above.** A second, independent real
+      // signal that further scales the centre `incomePacks.valueRangeFor`
+      // computes, compounding rather than replacing — see
+      // `nightLightsPacks.js`'s own header. 1 (no change) with no
+      // real reading, so this is a pure enrichment.
+      const nightLightsPlot = nightLightsPacks.plotFor(w.nightLightsPack, c * config.communitiesPerCity + b);
+      const realActivityMultiplier = nightLightsPacks.activityMultiplierFor(nightLightsPlot);
+      const realValueRange = incomePacks.valueRangeFor(incomeTract, { activityMultiplier: realActivityMultiplier });
       const homes = [];
       for (let h = 0; h < homeCount; h += 1) {
         homes.push(property.generateProperty(w, {
