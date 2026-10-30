@@ -1955,6 +1955,38 @@ writing shapes onto a PLACE exactly as it already does for age,
 household size, attainment and income — never a per-person fact, the
 same §9 note that file's own header already carries.
 
+**A forty-sixth, closing the one real source `world-layer/CLAUDE.md`'s
+own thirtieth standing rule named and explicitly deferred as its own
+round: Overture building footprints.** Every other pack in this
+registry is assigned one real row per city or community; a building
+is a fact about ONE structure, and this engine generates far more
+homes than communities, so there was no fixed `c`/`b` multiplier to
+derive a position from. `server/buildingPacks.js` closes it with a
+running count of homes actually built in the generation loop — one
+level finer than every pack before it, still standing rule 8 (§88),
+just counted differently.
+
+**A pack is scoped to ONE real property type, and a building of a
+KNOWN, disagreeing type is refused rather than silently used** — the
+same "a pack is refused, never partly used" discipline every reader
+here holds, applied to the building's OWN recorded fact rather than to
+the pack's shape. A building Overture never classified is tolerated,
+since Overture does not classify every footprint, and that is a real
+property of the source rather than a defect. `world-layer/
+exportRegionStats.js#exportBuildingPack` is the writer that filters a
+region's real buildings down to one type before this reader ever sees
+them.
+
+**Height is read by nothing, and that is declared rather than
+quietly dropped.** Overture carries a real `heightMetres` per building
+and `property.js` has no height column; wiring it in with no consumer
+would be the eleventh standing rule's own trap, so `heightMetresFor`
+exists for a future caller and nothing stores it on a generated
+property this round. `landSize` and `floors` ARE wired, because
+`property.js`'s own existing fields consume them immediately — the
+same "replaces an invented value a real consumer already reads" shape
+every other wired pack in this file takes.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

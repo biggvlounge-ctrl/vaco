@@ -243,8 +243,14 @@ const SOURCES = {
     tiers: ['filler'],
     scale: 'global building footprints',
     wired: 'imports/overtureImport.js',
-    note: 'Footprint, height and class. What `properties.land_size`, `.floors` and `.type` '
-      + 'are currently drawn at random for.',
+    note: '**Closed 30 Oct 2026** — `vacon-c/server/buildingPacks.js` reads a real '
+      + 'footprint/floor count onto `properties.land_size`/`.floors`, one real row per '
+      + 'generated HOME rather than per city or community like every other pack in that '
+      + 'registry, the structural difference `world-layer/CLAUDE.md`\'s own thirtieth rule '
+      + 'named and deferred. A pack is scoped to one real `.type` and refuses a building of '
+      + 'a disagreeing known type. Real `heightMetres` is exposed but not yet stored on a '
+      + 'generated property — declared, not silently dropped: nothing in this engine reads a '
+      + 'building\'s height yet.',
   },
   overtureTransportation: {
     name: 'Overture Maps — Transportation theme',

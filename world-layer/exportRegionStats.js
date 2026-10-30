@@ -502,6 +502,39 @@ function exportVeteranPack(worldLayer, options = {}) {
   return { region, source, tracts };
 }
 
+// A region's real Overture Maps building footprints, filtered to ONE
+// real property type, as a building pack
+// `vacon-c/server/buildingPacks.js` can read. `options.propertyType`
+// is required — see that reader's own header on why a pack may never
+// mix real property types: `imports/overtureImport.js`'s own
+// `importOvertureBuildings` writer records a building of UNKNOWN type
+// as `null`, and those are included here (the reader tolerates them;
+// a KNOWN, disagreeing type is what gets refused on the reading side).
+function exportBuildingPack(worldLayer, options = {}) {
+  const { region, source = 'sample', propertyType } = options;
+  if (!region) {
+    throw new Error('exportBuildingPack requires options.region — a pack is per-region by definition');
+  }
+  if (!propertyType) {
+    throw new Error('exportBuildingPack requires options.propertyType — a building pack is '
+      + 'scoped to one real property type, never mixed');
+  }
+
+  const buildings = [];
+  for (const location of worldLayer.locations || []) {
+    const data = location.buildingData;
+    if (!data || data.source !== 'overture-buildings') continue;
+    if (data.propertyType != null && data.propertyType !== propertyType) continue;
+    const building = { buildingId: location.id, propertyType: data.propertyType };
+    if (data.footprintArea !== null) building.footprintArea = data.footprintArea;
+    if (data.heightMetres !== null) building.heightMetres = data.heightMetres;
+    if (data.numFloors !== null) building.numFloors = data.numFloors;
+    buildings.push(building);
+  }
+
+  return { region, source, propertyType, buildings };
+}
+
 module.exports = {
   RETAIL_CATEGORIES,
   KOPPEN_GROUP_LETTERS,
@@ -525,4 +558,5 @@ module.exports = {
   exportMaritalStatusPack,
   exportDisabilityPack,
   exportVeteranPack,
+  exportBuildingPack,
 };

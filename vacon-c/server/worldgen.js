@@ -125,6 +125,7 @@ const racePacks = require('./racePacks.js');
 const maritalStatusPacks = require('./maritalStatusPacks.js');
 const disabilityPacks = require('./disabilityPacks.js');
 const veteranPacks = require('./veteranPacks.js');
+const buildingPacks = require('./buildingPacks.js');
 const merchandise = require('./merchandise.js');
 const worldStore = require('./worldStore.js');
 const { hashSeed, seededUnit } = require('./seeded.js');
@@ -418,6 +419,11 @@ function generateWorld(options = {}) {
   } else if (w.veteranPack) {
     veteranPacks.assertPack(w.veteranPack);
   }
+  if (config.buildingPack) {
+    w.buildingPack = buildingPacks.assertPack(config.buildingPack);
+  } else if (w.buildingPack) {
+    buildingPacks.assertPack(w.buildingPack);
+  }
 
   // **`worldState.seed` was read by two modules and set by none.**
   // `infrastructure.advanceInfrastructure` seeds its failure draw on
@@ -464,6 +470,15 @@ function generateWorld(options = {}) {
   // the first time and 120 the second. Every step below iterates these
   // instead.
   const made = { communities: [], people: [] };
+
+  // **A running count of homes actually built, across the whole
+  // world — the position a building pack cycles against.**
+  // `buildingPacks.js`'s own header on why this is one level finer
+  // than every other pack's `c`/`c * communitiesPerCity + b`: a real
+  // building is a fact about ONE home, not a city or a community, and
+  // `homeCount` varies per community, so there is no fixed multiplier
+  // to derive this from `c`/`b` the way every coarser pack does.
+  let buildingPosition = 0;
 
   // Languages first: everything that speaks one needs it to exist.
   const languages = config.languages.map((name, i) => demographics.generateLanguage(w, {
@@ -855,18 +870,27 @@ function generateWorld(options = {}) {
       });
       const homes = [];
       for (let h = 0; h < homeCount; h += 1) {
+        // **A real Overture building, when a building pack has one —
+        // assigned by this home's own running position (§88), one
+        // level finer than every other pack.** `landSizeFor`/
+        // `floorsFor` return null for a building with no real
+        // measurement recorded, which is exactly the fallback the
+        // invented draws below already had.
+        const realBuilding = buildingPacks.buildingFor(w.buildingPack, buildingPosition);
+        buildingPosition += 1;
         homes.push(property.generateProperty(w, {
           type: 'residential',
           communityId: community.id,
           cityId: city.id,
-          landSize: Math.round(random.range(120, 900, 'land', c, b, h)),
+          landSize: buildingPacks.landSizeFor(realBuilding)
+            ?? Math.round(random.range(120, 900, 'land', c, b, h)),
           value: Math.round(random.range(
             realValueRange ? realValueRange[0] : 4000,
             realValueRange ? realValueRange[1] : 60000,
             'value', c, b, h,
           )),
           condition: Math.round(random.range(25, 100, 'cond', c, b, h)),
-          floors: 1 + random.int(3, 'floors', c, b, h),
+          floors: buildingPacks.floorsFor(realBuilding) ?? (1 + random.int(3, 'floors', c, b, h)),
           units: 1,
           // **`bedrooms` was not a fact this engine held about anywhere
           // anybody lived.** `units` is how many dwellings a building
