@@ -325,11 +325,13 @@ function renderMarkets(body) {
     VACO.api('/api/predictions/real-world').catch(function () { return { markets: [] }; }),
     VACO.api('/api/predictions/vdp').catch(function () { return { markets: [] }; }),
     VACO.api('/api/predictions/vacancy').catch(function () { return { markets: [] }; }),
+    VACO.api('/api/predictions/voken').catch(function () { return { markets: [] }; }),
   ]).then(function (results) {
-    [['Real-world', results[0]], ['From VDP', results[1]], ['From VACON-C', results[2]]]
+    [['Real-world', results[0]], ['From VDP', results[1]], ['From VACON-C', results[2]],
+     ["From VOKEN's Cvltvre Card market", results[3]]]
       .forEach(function (pair) {
         var markets = pair[1].markets || pair[1] || [];
-        out.appendChild(VACO.card(pair[0], [
+        var children = [
           VACO.table([
             { key: 'question', label: 'Question' },
             { label: 'YES', render: function (r) { return pct(r.yesPrice); } },
@@ -339,10 +341,57 @@ function renderMarkets(body) {
             } },
             { label: 'Status', render: function (r) { return VACO.badge(r.status); } },
           ], markets, { empty: 'No markets from this source yet.' }),
-        ]));
+        ];
+        if (markets.length) {
+          children.push(VACO.userId() ? tradeForms(markets) : el('div', 'vaco-empty', 'Sign in to trade.'));
+        }
+        out.appendChild(VACO.card(pair[0], children));
       });
     VACO.mount(body, out);
   });
+}
+
+// Real peer-to-peer trading, one real route for each direction: buy and
+// sell pari-mutuel contracts on any market listed above by picking its
+// id from the same list the table just rendered. `buyContract` returns
+// `{ price, cost, fee }`; `sellContract` returns `{ price, proceeds,
+// capped }` (capped when a sell asked for more than that side's pool
+// actually holds). Re-renders the whole tab after either so the
+// price/pool columns reflect the trade that was just made.
+function tradeForms(markets) {
+  function fields() {
+    return [
+      { name: 'marketId', label: 'Market', options: markets.map(function (m) {
+        return { value: String(m.id), label: '#' + m.id + ' — ' + String(m.question).slice(0, 44) };
+      }) },
+      { name: 'side', label: 'Side', options: [{ value: 'yes', label: 'YES' }, { value: 'no', label: 'NO' }] },
+      { name: 'quantity', label: 'Qty', type: 'number', min: 1, value: 1, width: '70px' },
+    ];
+  }
+
+  var wrap = el('div', 'vaco-row');
+  wrap.appendChild(VACO.form(fields(), function (values) {
+    return VACO.post('/api/markets/' + values.marketId + '/buy', {
+      userId: VACO.userId(), side: values.side, quantity: values.quantity,
+    }).then(function (result) {
+      VACO.toast('Bought ' + values.quantity + ' ' + values.side.toUpperCase() + ' @ '
+        + VACO.round(result.price) + ' (cost ' + VACO.round(result.cost)
+        + (result.fee ? ' + fee ' + VACO.round(result.fee) : '') + ')', 'money');
+      VACO.refreshBalances().then(VACO.renderIdentity);
+      VACO.render();
+    });
+  }, 'Buy'));
+  wrap.appendChild(VACO.form(fields(), function (values) {
+    return VACO.post('/api/markets/' + values.marketId + '/sell', {
+      userId: VACO.userId(), side: values.side, quantity: values.quantity,
+    }).then(function (result) {
+      VACO.toast('Sold ' + values.quantity + ' ' + values.side.toUpperCase() + ' for '
+        + VACO.round(result.proceeds) + (result.capped ? ' (capped by the pool)' : ''), 'money');
+      VACO.refreshBalances().then(VACO.renderIdentity);
+      VACO.render();
+    });
+  }, 'Sell'));
+  return wrap;
 }
 
 // **The sportsbook, with its odds translated.** This is the whole point
