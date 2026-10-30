@@ -263,6 +263,18 @@ function fairnessCard() {
 
 // -- Fantasy ----------------------------------------------------------
 
+// `fantasy.js`'s own real bounds -- a real entry holds 2 to 6 picks,
+// and Flex play needs at least 3 (DK's own reasoning: a 2-pick miss-one
+// result is too weak to price a payout against).
+var FANTASY_MIN_PICKS = 2;
+var FANTASY_MAX_PICKS = 6;
+var FANTASY_FLEX_MIN_PICKS = 3;
+
+// Picks accumulate here across re-renders, the same module-level-state
+// pattern `game` already uses for Mines -- a half-built entry must
+// survive a tab redraw (e.g. after "Add pick"), not reset to empty.
+var fantasyBuilder = { picks: [], playType: 'perfect', stakeAmount: 10 };
+
 function renderFantasy(body) {
   var out = el('div', 'vaco-stack');
   out.appendChild(VACO.notice(
@@ -279,9 +291,11 @@ function renderFantasy(body) {
 
   var id = VACO.userId();
   if (!id) {
-    out.appendChild(el('div', 'vaco-empty', 'Sign in to see your entries.'));
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to build an entry or see your entries.'));
     return VACO.mount(body, out);
   }
+
+  out.appendChild(entryBuilderCard());
 
   return VACO.api('/api/fantasy/users/' + encodeURIComponent(id) + '/entries')
     .then(function (data) {
@@ -289,13 +303,93 @@ function renderFantasy(body) {
       out.appendChild(VACO.card('Your entries', [
         VACO.table([
           { key: 'id', label: 'Entry' },
+          { label: 'Type', render: function (r) { return r.playType || 'perfect'; } },
           { label: 'Picks', render: function (r) { return (r.picks || []).length; }, num: true },
           { label: 'Stake', num: true, render: function (r) { return VACO.price(r.stakeAmount, { freeLabel: false }); } },
           { label: 'Status', render: function (r) { return VACO.badge(r.status); } },
+          { label: 'Payout', num: true, render: function (r) { return r.payout === null ? '—' : VACO.round(r.payout); } },
         ], entries, { empty: 'No entries yet.' }),
       ]));
       VACO.mount(body, out);
     });
+}
+
+// A real entry builder for `POST /api/fantasy/entries` -- picks are
+// built up by prop id + direction (the real fields `fantasy.js`'s
+// `createFantasyEntry` expects), then staked as one real entry. Perfect
+// pays the full table only on a clean sweep; Flex (3+ picks) still pays
+// a reduced multiplier on exactly one miss. The payout tables themselves
+// live server-side (`PERFECT_PAYOUT_TABLE`/`FLEX_PAYOUT_TABLE`) -- this
+// is deliberately just the picks + stake, never a duplicated multiplier.
+function entryBuilderCard() {
+  var rows = el('div', 'vaco-stack-sm');
+  if (!fantasyBuilder.picks.length) {
+    rows.appendChild(el('p', 'vaco-small vaco-dim', 'No picks added yet — look up a prop id above, then add it below.'));
+  } else {
+    fantasyBuilder.picks.forEach(function (pick, i) {
+      var row = el('div', 'vaco-row-tight');
+      row.appendChild(el('span', 'vaco-small', 'Prop #' + pick.propId + ' — ' + pick.direction));
+      row.appendChild(el('span', 'vaco-spacer'));
+      row.appendChild(VACO.button('Remove', function () {
+        fantasyBuilder.picks.splice(i, 1);
+        VACO.render();
+      }, 'ghost vaco-btn-sm'));
+      rows.appendChild(row);
+    });
+  }
+
+  var addForm = VACO.form([
+    { name: 'propId', label: 'Prop id', type: 'number', min: 1, width: '90px' },
+    { name: 'direction', label: 'Pick', options: [
+      { value: 'more', label: 'More' }, { value: 'less', label: 'Less' },
+    ] },
+  ], function (values) {
+    if (fantasyBuilder.picks.length >= FANTASY_MAX_PICKS) {
+      throw new Error('An entry may hold at most ' + FANTASY_MAX_PICKS + ' picks.');
+    }
+    if (fantasyBuilder.picks.some(function (p) { return p.propId === values.propId; })) {
+      throw new Error('Prop #' + values.propId + ' is already in this entry.');
+    }
+    fantasyBuilder.picks.push({ propId: values.propId, direction: values.direction });
+    VACO.render();
+  }, 'Add pick');
+
+  var submitForm = VACO.form([
+    { name: 'playType', label: 'Play type', options: [
+      { value: 'perfect', label: 'Perfect (all correct)' },
+      { value: 'flex', label: 'Flex (miss one OK, 3+ picks)' },
+    ], value: fantasyBuilder.playType },
+    { name: 'stakeAmount', label: 'Stake', type: 'number', min: 1, value: fantasyBuilder.stakeAmount, width: '90px' },
+  ], function (values) {
+    if (fantasyBuilder.picks.length < FANTASY_MIN_PICKS) {
+      throw new Error('An entry needs at least ' + FANTASY_MIN_PICKS + ' picks.');
+    }
+    if (values.playType === 'flex' && fantasyBuilder.picks.length < FANTASY_FLEX_MIN_PICKS) {
+      throw new Error('Flex play needs at least ' + FANTASY_FLEX_MIN_PICKS + ' picks.');
+    }
+    fantasyBuilder.playType = values.playType;
+    fantasyBuilder.stakeAmount = values.stakeAmount;
+    return VACO.post('/api/fantasy/entries', {
+      userId: VACO.userId(),
+      stakeAmount: values.stakeAmount,
+      playType: values.playType,
+      picks: fantasyBuilder.picks,
+    }).then(function (entry) {
+      VACO.toast('Entry #' + entry.id + ' placed with ' + entry.picks.length + ' picks.', 'money');
+      fantasyBuilder.picks = [];
+      VACO.refreshBalances().then(VACO.renderIdentity);
+      VACO.render();
+    });
+  }, 'Submit entry');
+
+  return VACO.card('Build an entry', [
+    el('p', 'vaco-small vaco-dim',
+      'Add ' + FANTASY_MIN_PICKS + '–' + FANTASY_MAX_PICKS + ' picks by prop id and direction, then stake. '
+      + 'Perfect needs a clean sweep; Flex (3+ picks) still pays a reduced multiplier on exactly one miss.'),
+    rows,
+    addForm,
+    submitForm,
+  ]);
 }
 
 // -- Markets ----------------------------------------------------------
