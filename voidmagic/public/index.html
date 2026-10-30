@@ -337,6 +337,40 @@ function renderAnalytics(body) {
   return VACO.mount(body, out);
 }
 
+function renderFavorites(body) {
+  var out = el('div', 'vaco-stack');
+  var id = VACO.userId();
+  if (!id) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to manage your favorite creators.'));
+    return VACO.mount(body, out);
+  }
+
+  out.appendChild(VACO.card('Favorite a creator', [
+    VACO.form([{ name: 'creatorId', label: 'Creator (host) id', placeholder: 'artist-x', width: '160px' }],
+      function (values) {
+        if (!values.creatorId) throw new Error('Enter a creator id.');
+        return VACO.post('/api/favorites', { customerId: id, creatorId: values.creatorId })
+          .then(function () { VACO.toast('Favorited ' + values.creatorId + '.'); VACO.render(); });
+      }, 'Favorite'),
+  ]));
+
+  return VACO.api('/api/customers/' + encodeURIComponent(id) + '/favorites').then(function (data) {
+    var favorites = data.favorites || [];
+    out.appendChild(VACO.card('Your favorite creators', [
+      VACO.table([
+        { key: 'creatorId', label: 'Creator' },
+        { label: '', render: function (f) {
+          return VACO.button('Remove', function () {
+            return VACO.post('/api/favorites/remove', { customerId: id, creatorId: f.creatorId })
+              .then(function () { VACO.toast('Removed ' + f.creatorId + '.'); VACO.render(); });
+          }, 'ghost vaco-btn-sm');
+        } },
+      ], favorites, { empty: 'No favorites yet.' }),
+    ]));
+    VACO.mount(body, out);
+  });
+}
+
 VACO.app({
   id: 'voidmagic',
   name: 'VOID MAGIC',
@@ -353,6 +387,7 @@ VACO.app({
     { id: 'door', label: 'The Door', heading: 'Waiting room', render: renderWaitingRoom },
     { id: 'host-console', label: 'Host Console', heading: 'Run the show', render: renderHostConsole },
     { id: 'analytics', label: 'Analytics', heading: 'Creator analytics', render: renderAnalytics },
+    { id: 'favorites', label: 'Favorites', heading: 'Creators you follow', render: renderFavorites },
   ],
 });
 </script>
