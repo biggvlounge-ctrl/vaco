@@ -18,6 +18,9 @@
                 padding: var(--vaco-space-2) var(--vaco-space-3);
                 border: 1px solid var(--vaco-border-subtle); border-radius: var(--vaco-radius-sm); }
   .queue-pos { font-variant-numeric: tabular-nums; font-weight: var(--vaco-weight-bold); width: 28px; }
+  .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--vaco-space-3); }
+  .stat { display: flex; flex-direction: column; gap: 2px; }
+  .stat-value { font-size: var(--vaco-text-xl); font-weight: var(--vaco-weight-bold); font-variant-numeric: tabular-nums; }
 </style>
 </head>
 <body class="vaco">
@@ -270,6 +273,70 @@ function renderHostConsole(body) {
   return VACO.mount(body, out);
 }
 
+function renderAnalytics(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Real numbers over your own experiences and bookings — no estimates. Four of the brief\'s own '
+    + 'named metrics (conversion, geographic demand, venue performance, advertising performance) '
+    + 'aren\'t computable from what this app actually tracks, and say so below rather than guessing.'));
+
+  out.appendChild(VACO.card('Look up a creator', [
+    VACO.form([{ name: 'hostId', label: 'Host id', value: VACO.userId() || '', width: '150px' }],
+      function (values) {
+        if (!values.hostId) throw new Error('Enter a host id.');
+        return VACO.api('/api/creators/' + encodeURIComponent(values.hostId) + '/analytics').then(function (a) {
+          while (out.childNodes.length > 2) out.removeChild(out.lastChild);
+
+          var stats = el('div', 'stat-row');
+          function stat(label, value) {
+            var wrap = el('div', 'stat');
+            wrap.appendChild(el('span', 'vaco-small vaco-dim', label));
+            wrap.appendChild(el('span', 'stat-value', value === null || value === undefined ? '—' : String(value)));
+            stats.appendChild(wrap);
+          }
+          stat('Experiences', a.totalExperiences);
+          stat('Bookings', a.totalBookings);
+          stat('Gross revenue', VACO.round(a.grossRevenue));
+          stat('Your earnings', VACO.round(a.creatorEarnings));
+          stat('Avg order', VACO.round(a.averageOrderValue));
+          stat('Attended', a.attendedCount);
+          stat('No-shows', a.noShowCount);
+          stat('Attendance rate', a.attendanceRate === null ? '—' : Math.round(a.attendanceRate * 100) + '%');
+          stat('Repeat customers', a.repeatCustomerCount);
+          stat('Avg duration', a.averageExperienceDurationMinutes === null ? '—' : a.averageExperienceDurationMinutes + 'm');
+          stat('Peak hour (UTC)', a.peakBookingHourUTC === null ? '—' : a.peakBookingHourUTC + ':00');
+          out.appendChild(VACO.card(null, [stats]));
+
+          var byFormat = el('div', 'vaco-row-tight');
+          Object.keys(a.bookingsByFormat).forEach(function (k) {
+            byFormat.appendChild(VACO.badge(k + ': ' + a.bookingsByFormat[k]));
+          });
+          out.appendChild(VACO.card('By format', [byFormat]));
+
+          var byType = el('div', 'vaco-row-tight');
+          Object.keys(a.bookingsByType).forEach(function (k) {
+            byType.appendChild(VACO.badge(k + ': ' + a.bookingsByType[k]));
+          });
+          out.appendChild(VACO.card('By experience type', [byType]));
+
+          var byService = el('div', 'vaco-row-tight');
+          Object.keys(a.eventServiceUsage).forEach(function (k) {
+            byService.appendChild(VACO.badge(k + ': ' + a.eventServiceUsage[k]));
+          });
+          out.appendChild(VACO.card('VOID Event Service usage', [byService]));
+
+          out.appendChild(VACO.card('Not yet computable', [
+            el('p', 'vaco-small vaco-dim', (a.notComputable || []).join(', ') || 'none'),
+          ]));
+
+          VACO.mount(body, out);
+        });
+      }, 'Load'),
+  ]));
+
+  return VACO.mount(body, out);
+}
+
 VACO.app({
   id: 'voidmagic',
   name: 'VOID MAGIC',
@@ -285,6 +352,7 @@ VACO.app({
     { id: 'bookings', label: 'Bookings', heading: 'Your bookings', render: renderBookings },
     { id: 'door', label: 'The Door', heading: 'Waiting room', render: renderWaitingRoom },
     { id: 'host-console', label: 'Host Console', heading: 'Run the show', render: renderHostConsole },
+    { id: 'analytics', label: 'Analytics', heading: 'Creator analytics', render: renderAnalytics },
   ],
 });
 </script>
