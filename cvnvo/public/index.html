@@ -125,31 +125,89 @@ function renderDiscover(body) {
 
 // -- Events -----------------------------------------------------------
 
+// `createDateEvent` (lib/dateEvents.js) only ever reads `participants`,
+// `huntId`, `voidRideId` from its own options -- it has no `title`/
+// `venue` field at all, and never did (checked directly against the
+// module, not assumed). The card below used to send `{hostId, title,
+// venue}`: `requireListedParticipant('participants')` saw no real
+// `participants` array in that body and refused every submission with
+// a 403, and the lookup card below it read `e.title`/`e.venue`, fields
+// that never existed on a real `DateEvent` either. Both are real bugs,
+// not stale copy -- fixed here rather than left in place while new
+// cards were added next to them.
+function splitIds(raw) {
+  return String(raw || '').split(',').map(function (s) { return s.trim(); }).filter(function (s) { return s; });
+}
+
 function renderEvents(body) {
   var out = el('div', 'vaco-stack');
+  var id = VACO.userId();
   out.appendChild(VACO.notice(
-    'Date events are real, RSVP-able, and can be linked to a HVNTZ hunt — '
-    + 'a date that is an activity rather than a drink and an interview.'));
+    'Date events are real, RSVP-able, and can be linked to a real HVNTZ hunt — '
+    + 'a date that is a scavenger-hunt activity rather than a drink and an interview. '
+    + '<code>visibleAttendeeCount</code> is a real, live-derived count of who has RSVP’d '
+    + '<em>and</em> opted into being seen, never a settable field.'));
 
-  out.appendChild(VACO.card('Create a date event', [
-    VACO.form([
-      { name: 'title', label: 'Title', placeholder: 'Trivia at the Fox', width: '200px' },
-      { name: 'venue', label: 'Venue', placeholder: 'where', width: '160px' },
-    ], function (values) {
-      if (!VACO.userId()) throw new Error('Sign in to create an event.');
-      return VACO.post('/api/date-events', {
-        hostId: VACO.userId(), title: values.title, venue: values.venue,
-      }).then(function (e) { VACO.toast('Event ' + e.id + ' created.'); VACO.render(); });
-    }, 'Create'),
-  ]));
+  if (!id) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to create or RSVP to a date event.'));
+  } else {
+    out.appendChild(VACO.card('Create a date event', [
+      el('p', 'vaco-small vaco-dim',
+        'Everyone who will see and RSVP to this event, including you — the real guard on this route checks that you are one of them.'),
+      VACO.form([
+        { name: 'participants', label: 'Participants', placeholder: 'user ids, comma-separated', value: id, width: '220px' },
+        { name: 'huntId', label: 'Hunt id (optional)', placeholder: 'HVNTZ hunt id', width: '140px' },
+        { name: 'voidRideId', label: 'VOID ride id (optional)', placeholder: 'void job id', width: '140px' },
+      ], function (values) {
+        var participants = splitIds(values.participants);
+        if (!participants.includes(id)) throw new Error('You must be one of the participants to create this event.');
+        return VACO.post('/api/date-events', {
+          participants: participants,
+          huntId: values.huntId || null,
+          voidRideId: values.voidRideId || null,
+        }).then(function (e) { VACO.toast('Event #' + e.id + ' created.'); VACO.render(); });
+      }, 'Create'),
+    ]));
 
+    out.appendChild(VACO.card('RSVP to an event', [
+      VACO.form([
+        { name: 'id', label: 'Event id', type: 'number', min: 1, value: 1, width: '90px' },
+        { name: 'visible', label: 'Visible to others?', options: [{ label: 'No — I’m going, just not listed', value: 'false' }, { label: 'Yes — show me in the live count', value: 'true' }], width: '220px' },
+      ], function (values) {
+        return VACO.post('/api/date-events/' + values.id + '/rsvp', { userId: id, visible: values.visible === 'true' })
+          .then(function () { VACO.toast('RSVP recorded.'); });
+      }, 'RSVP'),
+    ]));
+
+    out.appendChild(VACO.card('Link a HVNTZ hunt', [
+      el('p', 'vaco-small vaco-dim', 'Checks the hunt against HVNTZ’s own real hunt lookup — a made-up huntId is rejected, not stored.'),
+      VACO.form([
+        { name: 'id', label: 'Event id', type: 'number', min: 1, value: 1, width: '90px' },
+        { name: 'huntId', label: 'Hunt id', placeholder: 'HVNTZ hunt id', width: '140px' },
+      ], function (values) {
+        return VACO.post('/api/date-events/' + values.id + '/link-hunt', { huntId: values.huntId })
+          .then(function (e) { VACO.toast('Linked — ' + (e.huntTitle || e.huntId)); });
+      }, 'Link'),
+    ]));
+  }
+
+  var lookupResult = el('div', 'vaco-stack-sm');
   out.appendChild(VACO.card('Look up an event', [
     VACO.form([{ name: 'id', label: 'Event id', type: 'number', min: 1, value: 1, width: '90px' }],
       function (values) {
         return VACO.api('/api/date-events/' + values.id).then(function (e) {
-          VACO.toast(e.title + ' — ' + (e.venue || 'venue TBC'));
+          var card = el('div', 'vaco-stack-sm');
+          card.appendChild(el('strong', null, 'Event #' + e.id));
+          card.appendChild(el('p', 'vaco-small vaco-dim', 'Participants: ' + (e.participants || []).join(', ')));
+          var meta = el('div', 'vaco-row-tight');
+          meta.appendChild(VACO.badge(e.huntId ? ('hunt: ' + (e.huntTitle || e.huntId)) : 'no hunt linked', e.huntId ? 'money' : null));
+          meta.appendChild(VACO.badge(e.voidRideId ? ('ride: ' + e.voidRideId) : 'no ride linked', e.voidRideId ? 'money' : null));
+          meta.appendChild(VACO.badge((e.visibleAttendeeCount || 0) + ' visibly going'));
+          card.appendChild(meta);
+          VACO.mount(lookupResult, card);
         });
       }, 'Fetch'),
+    lookupResult,
   ]));
 
   return VACO.mount(body, out);
