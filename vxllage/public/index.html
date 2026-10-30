@@ -42,7 +42,18 @@ function fmtDate(ts) {
   return new Date(ts).toLocaleString();
 }
 
-function postCard(post) {
+// `opts.viewerId` drives real like/repost toggles (lib/posts.js's own
+// `likedBy`/`repostedBy` arrays, not a decorative count) and a
+// `Thread` toggle that opens the real recursive reply tree
+// (GET /api/posts/:id/thread) plus a real reply composer, in place --
+// closing the prototype's own flagged "reply/repost/share buttons --
+// no action" gap. `opts.hideThread` suppresses the toggle for a
+// postCard already rendered *inside* a thread node, so a reply's own
+// card doesn't grow a second, redundant thread control.
+function postCard(post, opts) {
+  var options = opts || {};
+  var viewerId = options.viewerId || null;
+
   var card = el('div', 'vaco-card post');
   var head = el('div', 'post-head');
   head.appendChild(el('span', 'post-author', post.authorId || post.userId || 'someone'));
@@ -52,11 +63,83 @@ function postCard(post) {
   card.appendChild(head);
   card.appendChild(el('p', 'post-body', post.body || post.text || post.content || ''));
 
+  var likedBy = post.likedBy || [];
+  var repostedBy = post.repostedBy || [];
+
   var actions = el('div', 'vaco-row-tight');
-  if (typeof post.replyCount === 'number') actions.appendChild(el('span', 'vaco-small vaco-dim', post.replyCount + ' replies'));
-  if (typeof post.likeCount === 'number') actions.appendChild(el('span', 'vaco-small vaco-dim', post.likeCount + ' likes'));
-  if (actions.childNodes.length) card.appendChild(actions);
+  actions.appendChild(el('span', 'vaco-small vaco-dim', likedBy.length + (likedBy.length === 1 ? ' like' : ' likes')));
+  actions.appendChild(el('span', 'vaco-small vaco-dim', repostedBy.length + (repostedBy.length === 1 ? ' repost' : ' reposts')));
+
+  if (viewerId) {
+    var liked = likedBy.indexOf(viewerId) !== -1;
+    actions.appendChild(VACO.button(liked ? 'Unlike' : 'Like', function () {
+      var path = '/api/posts/' + post.id + (liked ? '/unlike' : '/like');
+      return VACO.post(path, { userId: viewerId })
+        .then(function () { VACO.toast(liked ? 'Unliked.' : 'Liked.'); VACO.render(); });
+    }, liked ? 'ghost' : undefined));
+
+    var reposted = repostedBy.indexOf(viewerId) !== -1;
+    actions.appendChild(VACO.button(reposted ? 'Unrepost' : 'Repost', function () {
+      var path = '/api/posts/' + post.id + (reposted ? '/unrepost' : '/repost');
+      return VACO.post(path, { userId: viewerId })
+        .then(function () { VACO.toast(reposted ? 'Removed repost.' : 'Reposted.'); VACO.render(); });
+    }, reposted ? 'ghost' : undefined));
+  }
+
+  var threadHost = null;
+  if (!options.hideThread) {
+    threadHost = el('div', 'vaco-stack-sm');
+    var loaded = false;
+    var threadBtn = VACO.button('Thread', function () {
+      if (loaded) {
+        VACO.mount(threadHost, []);
+        loaded = false;
+        threadBtn.textContent = 'Thread';
+        return;
+      }
+      return loadThread(threadHost, post.id, viewerId).then(function () {
+        loaded = true;
+        threadBtn.textContent = 'Hide thread';
+      });
+    }, 'ghost');
+    actions.appendChild(threadBtn);
+  }
+
+  card.appendChild(actions);
+  if (threadHost) card.appendChild(threadHost);
   return card;
+}
+
+// Real, recursive reply-tree rendering over GET /api/posts/:id/thread's
+// own `{post, replies: [...]}` shape, plus a real reply composer at
+// every node (`createPost({replyToPostId})`) -- the prototype's own
+// flagged "reply... no action" gap, closed in place rather than as a
+// separate screen.
+function renderThreadNode(node, depth, viewerId, onChange) {
+  var wrap = el('div', 'vaco-stack-sm');
+  if (depth > 0) wrap.style.marginLeft = (depth * 16) + 'px';
+  wrap.appendChild(postCard(node.post, { viewerId: viewerId, hideThread: true }));
+
+  if (viewerId) {
+    wrap.appendChild(VACO.form([
+      { name: 'text', label: 'Reply', placeholder: 'write a reply', width: '260px' },
+    ], function (values) {
+      return VACO.post('/api/posts', { authorId: viewerId, text: values.text, replyToPostId: node.post.id })
+        .then(function () { VACO.toast('Reply posted.'); return onChange(); });
+    }, 'Reply'));
+  }
+
+  (node.replies || []).forEach(function (child) {
+    wrap.appendChild(renderThreadNode(child, depth + 1, viewerId, onChange));
+  });
+  return wrap;
+}
+
+function loadThread(host, postId, viewerId) {
+  return VACO.api('/api/posts/' + postId + '/thread').then(function (thread) {
+    function refresh() { return loadThread(host, postId, viewerId); }
+    VACO.mount(host, renderThreadNode(thread, 0, viewerId, refresh));
+  });
 }
 
 // -- Feed -------------------------------------------------------------
@@ -66,10 +149,10 @@ function renderFeed(body) {
 
   out.appendChild(VACO.card('Post', [
     VACO.form([
-      { name: 'body', label: 'Say something', placeholder: 'what is happening', width: '380px' },
+      { name: 'text', label: 'Say something', placeholder: 'what is happening', width: '380px' },
     ], function (values) {
       if (!VACO.userId()) throw new Error('Sign in to post.');
-      return VACO.post('/api/posts', { authorId: VACO.userId(), body: values.body })
+      return VACO.post('/api/posts', { authorId: VACO.userId(), text: values.text })
         .then(function () { VACO.toast('Posted.'); VACO.render(); });
     }, 'Post'),
   ]));
@@ -86,11 +169,11 @@ function renderFeed(body) {
     VACO.api('/api/feed/for-you/' + encodeURIComponent(id)).catch(function () { return { posts: [] }; }),
     VACO.api('/api/feed/following/' + encodeURIComponent(id)).catch(function () { return { posts: [] }; }),
   ]).then(function (results) {
-    var forYou = results[0].posts || results[0] || [];
-    var following = results[1].posts || results[1] || [];
+    var forYou = results[0].feed || results[0].posts || results[0] || [];
+    var following = results[1].feed || results[1].posts || results[1] || [];
 
     var feed = el('div', 'feed');
-    (forYou.length ? forYou : following).forEach(function (p) { feed.appendChild(postCard(p)); });
+    (forYou.length ? forYou : following).forEach(function (p) { feed.appendChild(postCard(p, { viewerId: id })); });
     if (!feed.childNodes.length) {
       feed.appendChild(el('div', 'vaco-empty', 'Nothing in the feed yet — post above, or follow someone.'));
     }
