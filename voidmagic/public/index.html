@@ -105,6 +105,13 @@ function renderBookings(body) {
         { label: 'Paid', num: true, render: function (b) { return VACO.price(b.amountPaid || b.total, { freeLabel: false }); } },
         { label: 'Status', render: function (b) { return VACO.badge(b.status); } },
         { label: '', render: function (b) {
+          if (b.status === 'completed') {
+            return VACO.button('Summary', function () {
+              return VACO.api('/api/bookings/' + b.id + '/post-event-summary').then(function (s) {
+                VACO.toast('"' + s.experienceTitle + '" with ' + s.hostId + ' — paid ' + VACO.round(s.pricePaid) + '.');
+              });
+            }, 'ghost vaco-btn-sm');
+          }
           if (b.status === 'cancelled') return '—';
           return VACO.button('Cancel', function () {
             return VACO.post('/api/bookings/' + b.id + '/cancel', { customerId: id })
@@ -136,12 +143,25 @@ function renderWaitingRoom(body) {
       }, 'Enter'),
   ]));
 
+  out.appendChild(VACO.card('Physical check-in', [
+    el('p', 'vaco-small vaco-dim',
+      'The in-person counterpart to the digital room above — scan the credential a guest was issued at '
+      + 'booking time. Only the host of that booking may check someone in, and the wrong code is refused.'),
+    VACO.form([
+      { name: 'bookingId', label: 'Booking id', type: 'number', min: 1, value: 1, width: '110px' },
+      { name: 'providedCredential', label: 'Credential', placeholder: 'from the booking confirmation', width: '200px' },
+    ], function (values) {
+      return VACO.post('/api/bookings/' + values.bookingId + '/check-in', { providedCredential: values.providedCredential })
+        .then(function (b) { VACO.toast('Booking ' + b.id + ' checked in.', 'money'); });
+    }, 'Check in'),
+  ]));
+
   out.appendChild(VACO.card('Host controls', [
     el('p', 'vaco-small vaco-dim', 'Verify a guest, then admit them. The order is enforced by the server.'),
     VACO.form([{ name: 'id', label: 'Entry id', type: 'number', min: 1, value: 1, width: '100px' }],
       function (values) {
         return VACO.api('/api/waiting-room/' + values.id).then(function (entry) {
-          while (out.childNodes.length > 3) out.removeChild(out.lastChild);
+          while (out.childNodes.length > 4) out.removeChild(out.lastChild);
           var lines = el('div', 'vaco-stack-sm');
           lines.appendChild(VACO.badge(entry.status));
           lines.appendChild(el('p', 'vaco-small vaco-dim',
