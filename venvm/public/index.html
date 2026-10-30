@@ -348,6 +348,172 @@ function renderGrowth(body) {
   });
 }
 
+// Marketing/Campaign Dashboards (task #59) — lib/brandManagement.js,
+// campaigns.js, assetLibrary.js, mounted under /api/marketing/...
+// Every mutating route here (createBrand, createCampaign,
+// catalogAsset, recordSpend, updateCampaignStatus, ...) is
+// `requireCallingService()` — real internal marketing-tooling routes
+// with no end-consumer session that owns a brand or campaign, the same
+// boundary Scripts/Jobs already hold above. This page can only look
+// things up, same posture, never a fake "admin" control pretending to
+// hold a service credential it doesn't have.
+function renderBrands(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Brands, campaigns, and assets are created by whatever internal marketing system is actually running a brand’s '
+    + 'account — those routes require a trusted-service credential, the same boundary Scripts and Pipeline hold above. '
+    + 'This page can look things up.', 'warn'));
+
+  function renderDashboardBody(dash) {
+    var box = el('div', 'vaco-stack-sm');
+    box.appendChild(el('p', 'vaco-small vaco-dim',
+      'Total spend ' + VACO.round(dash.totalSpend) + ' · ' + dash.assetCount + ' catalogued asset(s)'));
+    box.appendChild(VACO.table([
+      { key: 'id', label: 'Id' },
+      { key: 'name', label: 'Campaign' },
+      { label: 'Status', render: function (c) { return VACO.badge(c.status); } },
+      { label: 'Spend', num: true, render: function (c) { return VACO.round(c.spend); } },
+      { label: 'Remaining', num: true, render: function (c) { return c.remainingBudget === null ? 'unbudgeted' : VACO.round(c.remainingBudget); } },
+    ], dash.campaigns, { empty: 'No campaigns yet.' }));
+    if (dash.upcomingContent && dash.upcomingContent.length) {
+      box.appendChild(el('p', 'vaco-small vaco-dim', 'Upcoming content:'));
+      box.appendChild(VACO.table([
+        { key: 'id', label: 'Id' },
+        { key: 'platform', label: 'Platform' },
+        { label: 'When', render: function (e) { return new Date(e.scheduledAt).toLocaleString(); } },
+      ], dash.upcomingContent, { empty: 'Nothing scheduled.' }));
+    }
+    if (dash.launches && dash.launches.length) {
+      box.appendChild(el('p', 'vaco-small vaco-dim', 'Launch readiness:'));
+      dash.launches.forEach(function (l) {
+        box.appendChild(el('p', 'vaco-small', 'Launch ' + l.launchId + ': ' + l.completedMilestones + '/' + l.totalMilestones
+          + ' milestones (' + Math.round(l.readiness * 100) + '%)' + (l.ready ? ' — ready' : '')));
+      });
+    }
+    var a = dash.analytics;
+    box.appendChild(el('p', 'vaco-small vaco-faint',
+      'Analytics: ' + a.totalEvents + ' event(s) tracked'
+      + (a.clickThroughRate !== null ? ', CTR ' + a.clickThroughRate : '')));
+    return box;
+  }
+
+  var browseResult = el('div', 'vaco-stack-sm');
+  out.appendChild(VACO.card('Browse brands', [
+    VACO.form([{ name: 'ownerApp', label: 'Owner app (optional)', placeholder: 'e.g. dreams', width: '150px' }],
+      function (values) {
+        var path = '/api/marketing/brands' + (values.ownerApp ? '?ownerApp=' + encodeURIComponent(values.ownerApp) : '');
+        return VACO.api(path).then(function (r) {
+          VACO.mount(browseResult, VACO.table([
+            { key: 'id', label: 'Id' },
+            { key: 'name', label: 'Name' },
+            { key: 'ownerApp', label: 'Owner app' },
+          ], r.brands || [], { empty: 'No brands recorded yet.' }));
+        });
+      }, 'Browse'),
+    browseResult,
+  ]));
+
+  var brandResult = el('div', 'vaco-stack-sm');
+  out.appendChild(VACO.card('Brand detail & dashboard', [
+    el('p', 'vaco-small vaco-dim', 'The real, unified Marketing Dashboard rollup — one brand’s campaigns, spend, upcoming content, launch readiness, and analytics, assembled from already-real calls.'),
+    VACO.form([{ name: 'id', label: 'Brand id', type: 'number', min: 1, value: 1, width: '100px' }],
+      function (values) {
+        return VACO.api('/api/marketing/brands/' + values.id).then(function (brand) {
+          return VACO.api('/api/marketing/brands/' + values.id + '/dashboard').then(function (dash) {
+            var box = el('div', 'vaco-stack-sm');
+            box.appendChild(VACO.badge(brand.ownerApp));
+            box.appendChild(el('p', 'vaco-small vaco-dim', brand.voice || 'No voice guidelines recorded.'));
+            box.appendChild(renderDashboardBody(dash));
+            VACO.mount(brandResult, box);
+          });
+        });
+      }, 'Load'),
+    brandResult,
+  ]));
+
+  var brandCampaignsResult = el('div', 'vaco-stack-sm');
+  out.appendChild(VACO.card('Campaigns for a brand', [
+    VACO.form([{ name: 'brandId', label: 'Brand id', type: 'number', min: 1, value: 1, width: '100px' }],
+      function (values) {
+        return VACO.api('/api/marketing/brands/' + values.brandId + '/campaigns').then(function (r) {
+          VACO.mount(brandCampaignsResult, VACO.table([
+            { key: 'id', label: 'Id' },
+            { key: 'name', label: 'Name' },
+            { label: 'Status', render: function (c) { return VACO.badge(c.status); } },
+            { label: 'Budget', num: true, render: function (c) { return c.budget === null ? 'unbudgeted' : VACO.round(c.budget); } },
+          ], r.campaigns || [], { empty: 'No campaigns for this brand yet.' }));
+        });
+      }, 'List'),
+    brandCampaignsResult,
+  ]));
+
+  var campaignResult = el('div', 'vaco-stack-sm');
+  out.appendChild(VACO.card('Campaign detail & dashboard', [
+    el('p', 'vaco-small vaco-dim', 'The real Campaign Dashboard rollup — this campaign’s spend/remaining budget, every real ad with performance, catalogued assets, and any A/B test scoped to it.'),
+    VACO.form([{ name: 'id', label: 'Campaign id', type: 'number', min: 1, value: 1, width: '100px' }],
+      function (values) {
+        return VACO.api('/api/marketing/campaigns/' + values.id).then(function (campaign) {
+          return VACO.api('/api/marketing/campaigns/' + values.id + '/dashboard').then(function (dash) {
+            var box = el('div', 'vaco-stack-sm');
+            box.appendChild(VACO.badge(campaign.status));
+            box.appendChild(el('p', 'vaco-small vaco-dim',
+              'Spend ' + VACO.round(dash.spend) + ' · remaining '
+              + (dash.remainingBudget === null ? 'unbudgeted' : VACO.round(dash.remainingBudget))));
+            box.appendChild(VACO.table([
+              { key: 'id', label: 'Ad id' },
+              { key: 'platform', label: 'Platform' },
+              { label: 'CTR', num: true, render: function (a) { return a.performance.ctr === null ? '—' : a.performance.ctr; } },
+              { label: 'CPA', num: true, render: function (a) { return a.performance.cpa === null ? '—' : VACO.round(a.performance.cpa); } },
+            ], dash.ads || [], { empty: 'No ads under this campaign yet.' }));
+            if (dash.abTests && dash.abTests.length) {
+              box.appendChild(el('p', 'vaco-small vaco-dim', 'A/B tests:'));
+              dash.abTests.forEach(function (t) {
+                box.appendChild(el('p', 'vaco-small', 'Test ' + t.testId + ': leading variant '
+                  + (t.leadingVariant || 'not enough samples yet')));
+              });
+            }
+            VACO.mount(campaignResult, box);
+          });
+        });
+      }, 'Load'),
+    campaignResult,
+  ]));
+
+  var assetsResult = el('div', 'vaco-stack-sm');
+  out.appendChild(VACO.card('Assets for a brand', [
+    el('p', 'vaco-small vaco-dim', 'The real asset-library join: which script/production-job/external url belongs to this brand, and where it has been reused.'),
+    VACO.form([{ name: 'brandId', label: 'Brand id', type: 'number', min: 1, value: 1, width: '100px' }],
+      function (values) {
+        return VACO.api('/api/marketing/brands/' + values.brandId + '/assets').then(function (r) {
+          VACO.mount(assetsResult, VACO.table([
+            { key: 'id', label: 'Id' },
+            { key: 'assetType', label: 'Type' },
+            { label: 'Consuming app', render: function (a) { return a.consumingApp || '—'; } },
+            { label: 'Reused', num: true, render: function (a) { return (a.reusedIn || []).length; } },
+          ], r.assets || [], { empty: 'No assets catalogued for this brand yet.' }));
+        });
+      }, 'List'),
+    assetsResult,
+  ]));
+
+  var assetResult = el('div', 'vaco-stack-sm');
+  out.appendChild(VACO.card('Look up an asset', [
+    VACO.form([{ name: 'id', label: 'Asset id', type: 'number', min: 1, value: 1, width: '100px' }],
+      function (values) {
+        return VACO.api('/api/marketing/assets/' + values.id).then(function (asset) {
+          var box = el('div', 'vaco-stack-sm');
+          box.appendChild(VACO.badge(asset.assetType));
+          box.appendChild(el('p', 'vaco-small vaco-dim', asset.url || 'No external url recorded.'));
+          box.appendChild(el('p', 'vaco-small vaco-faint', 'Reused ' + (asset.reusedIn || []).length + ' time(s).'));
+          VACO.mount(assetResult, box);
+        });
+      }, 'Look up'),
+    assetResult,
+  ]));
+
+  return VACO.mount(body, out);
+}
+
 VACO.app({
   id: 'venvm',
   name: 'VENVM',
@@ -364,6 +530,7 @@ VACO.app({
     { id: 'jobs', label: 'Pipeline', heading: 'Production jobs', render: renderJobs },
     { id: 'consent', label: 'Consent', heading: 'Likeness consent', render: renderConsent },
     { id: 'growth', label: 'Growth', heading: 'Growth programs', render: renderGrowth },
+    { id: 'brands', label: 'Brands', heading: 'Brands & campaigns', render: renderBrands },
   ],
 });
 </script>
