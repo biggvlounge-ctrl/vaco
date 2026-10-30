@@ -128,13 +128,25 @@ each generating its own separate copy.
 > `fetchViirsNightLights`'s own error message says so rather than
 > repeating the 403-CONNECT message every other `fetch*` stub carries.
 >
-> **Cesium OSM Buildings (`sources.js`'s own `cesiumBuildings` entry)
-> stays `wired: null`, and the one open question about it — whether an
-> ion token can be added to this environment — has a real answer now:
-> yes, as a network secret / environment variable in the cloud
-> environment's own settings, picked up by a new session.** No
-> importer exists yet to receive it; adding the token is necessary and
-> not by itself sufficient.
+> **Cesium OSM Buildings is now wired too (`imports/cesiumImport.js`,
+> added 30 Oct 2026).** Genuinely redundant with `overtureBuildings`
+> for the same two already-named fields (footprint, height) — Overture
+> is itself largely sourced from OpenStreetMap, the same vocabulary
+> this importer reads, re-using `overtureImport.js`'s own
+> `propertyTypeFor`. Built anyway because a real, named consumer was
+> already waiting in `sources.js`'s own `SLICE_FIELDS`, and because
+> this file's own "redundant does not mean worthless" rule already
+> covers exactly this case. A real, separate caution of its own: this
+> tileset renders a default visual height for a building with no real
+> OSM height tag, so a caller must say explicitly whether a given
+> building's height is `heightIsMeasured` — never inferred from the
+> tile, and never presented at the same confidence as a real
+> measurement. Blocked at the proxy the ordinary way (403 CONNECT,
+> confirmed directly for all three Cesium hosts), and separately still
+> needs a real ion access token this environment does not have —
+> checked directly: one CAN be added as a network secret /
+> environment variable in the cloud environment's own settings,
+> picked up by a new session.
 
 See `UNIVERSAL_WORLD_LAYER_ARCHITECTURE.md` (project root) for the
 full architecture. For the four things this stack does NOT cover —
@@ -342,6 +354,17 @@ for the full reasoning.
   genuine 401 from Google's own API, with no rejection logged at this
   environment's agent proxy, because no Earth Engine Cloud Project is
   registered here. No current VACON-C consumer.
+- `imports/cesiumImport.js` — Cesium OSM Buildings, closing the one
+  entry in this registry that had been `wired: null` with a real,
+  already-named consumer waiting (`sources.js`'s own `SLICE_FIELDS`
+  lists it alongside `overtureBuildings` for the same two facts).
+  Genuinely redundant with Overture for those two fields, stated
+  plainly rather than hidden — kept because redundant does not mean
+  worthless, and because it reuses `overtureImport.js`'s own
+  `propertyTypeFor` rather than re-deriving a second OSM-tag map. A
+  building's rendered height is recorded with `heightIsMeasured` kept
+  honestly separate from a real OSM height/level tag, never inferred
+  from the tile.
 - `exportRegion.js` / `exportRegionStats.js` — the consumer join: turn
   a region's real imported data into the thirteen packs VACON-C's own
   reader modules validate and read (see the note at the top of this
@@ -453,7 +476,7 @@ to — this paragraph went stale once already (recorded here as "sixteen
 ... five have importers" when the real registry had long since grown
 past that) and the fix is to read it from the file rather than retype
 a number that will go stale the same way again. As of this count:
-34 sources, 32 with a real importer.
+34 sources, 33 with a real importer.
 
 `costModel.automationCoverage()` reports what that covers per tier, and
 `COST_REDUCTION_THROUGH_DATA.md` is the reasoning behind it: how far

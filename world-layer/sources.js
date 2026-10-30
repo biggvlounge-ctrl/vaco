@@ -269,7 +269,7 @@ const SOURCES = {
     fills: ['buildingData'],
     tiers: ['filler'],
     scale: '350+ million buildings globally',
-    wired: null,
+    wired: 'imports/cesiumImport.js',
     note: '**Attribution is not optional under ODbL** and that is a licence obligation on '
       + 'the shipped product, not a build-time detail. Flagged here rather than discovered '
       + 'later.\n'
@@ -278,9 +278,16 @@ const SOURCES = {
       + 'Cesium connector, so the real path is a read-only API token stored as a network '
       + 'secret / environment variable in this cloud environment\'s settings (the session\'s '
       + 'environment menu → Edit → Network secrets, or an environment variable if that '
-      + 'section is not offered) — a new session picks it up once added. Still `wired: '
-      + 'null` because no importer has been written against it yet; the token is the one '
-      + 'real blocker checked, not the only piece of remaining work.',
+      + 'section is not offered) — a new session picks it up once added.\n'
+      + '**Now wired** (`imports/cesiumImport.js`) — the real transform and a `fetch*` that '
+      + 'throws naming both real blockers (the proxy\'s own 403 CONNECT, confirmed directly, '
+      + 'and the still-missing ion token). Genuinely redundant with `overtureBuildings` for '
+      + 'the same two fields — Overture is itself largely sourced from OpenStreetMap, the '
+      + 'same vocabulary this importer reads — built anyway per this file\'s own '
+      + '"redundant does not mean worthless" rule, and because a real, named consumer was '
+      + 'already waiting in `SLICE_FIELDS` below. A rendered height with no real OSM tag '
+      + 'behind it is recorded with `heightIsMeasured: false` rather than presented as a '
+      + 'real measurement — see the importer\'s own header.',
   },
   naturalEarth: {
     name: 'Natural Earth',
