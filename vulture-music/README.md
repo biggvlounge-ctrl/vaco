@@ -351,7 +351,6 @@ beats/purchases/balances came back unchanged). See
   subscription instead of per-release) — a real, deliberate choice was
   made for TuneCore's per-release shape instead; the other real model
   isn't built.
-- Any UI — this phase is the real API and data model only.
 - Vvltvre Flix (Netflix Originals model) and the rest of Vvltvre's own
   umbrella beyond this division and VOID MAGIC.
 - A manager's own commission on the distribution fee itself, or on
@@ -363,3 +362,80 @@ beats/purchases/balances came back unchanged). See
   release's earnings) — this project's recoupment stays scoped to
   either one named release (per-release) or the whole artist
   (blanket), not selective cross-release clawback.
+
+## Frontend coverage pass (30 Oct 2026)
+
+An audit found `public/index.html` making real calls against only 5 of
+this app's 31 routes — and one of those 5 called a route that never
+existed (`POST /api/beat-purchases` on the Beats tab's "License"
+button; the real route is `POST /api/beats/:id/purchase`). Three tabs
+close most of that gap, each a real client of the routes named, never
+a fabricated payload shape — every field was checked against the real
+route handler in `server.js` and its `lib/*.js` function before being
+written. Two invented data shapes, present since this UI's own first
+version, were corrected along the way: a `Release` has no
+`releaseType`/`trackCount`/`collaborators` field (the real fields are
+`format` and `coWriters`, each `{userId, splitPercent}` with
+`splitPercent` a 0–1 fraction, not 0–100), and a `Beat` has no
+`bpm`/`key`/`genre`/`priceVcoin` field (the real fields are `price`
+and `previewUrl`). Consistently left backend-only, by design: anything
+gated to `requireOperator` (a vaco-operator credential — advancing a
+release through `distributing`/`live`, reporting streaming revenue)
+or `requireCallingService` (a trusted-service credential — signing an
+artist to a manager's roster, opening a fresh label deal). This
+frontend has no login for either, so those stay real backend
+capabilities without a fake "admin" UI pretending to hold credentials
+it doesn't have — see `server.js`'s own "Authorization" comment on why
+those two routes specifically are service-only rather than
+actor-guarded.
+
+- **Releases tab** — gained a submission form
+  (`POST /api/releases`), a single-release look-up
+  (`GET /api/releases/:id`), and, on every release card, real actions
+  for its own owning artist: record a play/stream and show the real
+  count (`POST /api/releases/:id/stream`,
+  `GET .../stream-count`), take the release down
+  (`POST .../take-down`), attach a music video — a real Vavlt Stvdios
+  Reel (`POST .../video`), and order a real physical run through
+  CVLLEX (`POST .../physical-run`). The artist summary view also gained
+  the real album and total-stream counts VOKEN's cross-platform score
+  reads (`GET /api/artists/:artistId/album-count`,
+  `.../stream-count`), plus a standalone collaborator-earnings look-up
+  for a co-writer who owns no release themselves
+  (`GET /api/collaborators/:userId/earnings`).
+- **Beats tab** — gained a real listing form for a producer
+  (`POST /api/beats`), a take-down button shown only to that beat's
+  own producer (`POST /api/beats/:id/take-down`), and a "my beat
+  activity" look-up for a signed-in buyer or producer
+  (`GET /api/beat-purchases/buyer/:userId`,
+  `.../producer/:userId`). The existing "License" button's broken
+  route is fixed in the same pass (see above).
+- **Deals tab** — gained a real look-up of an artist's active
+  management deal (`GET /api/artists/:artistId/manager`) and of a
+  manager's own roster and total commission earned
+  (`GET /api/managers/:managerId/roster`, `.../summary`), each able to
+  terminate a deal in place (`POST /api/deals/:id/terminate`, shown to
+  either the artist or the manager, matching the server's own
+  `requireDealParty`). The existing label-deal look-up gained the same
+  real termination action (`POST /api/label-deals/:id/terminate`,
+  shown to either the label or the artist).
+
+**Deliberately left for a follow-up round** (still API-only):
+`POST /api/releases/:id/distributing`/`.../live`/`.../revenue`
+(advancing a release's distribution status and reporting streaming
+revenue are real operator decisions, recorded in vaco-audit — not an
+artist's own self-service action), `POST /api/managers/:managerId/roster`
+and `POST /api/label-deals` (signing an artist to a manager or opening
+a label deal are real two-sided contracts this app has no
+offer/accept flow for yet — see `server.js`'s own "Authorization"
+comment for why both are deliberately refused to everyone rather than
+guessable-but-wrong). A release's own `coWriters` split is set only at
+submission via the API's own `POST /api/releases` body — the
+submission form here keeps the original single-payee (100%) default
+rather than inventing a multi-row collaborator-split editor beyond
+what `VACO.form`'s plain field list can express cleanly; a release
+with real co-writers is still fully visible and actionable (the split
+bar, collaborator-earnings look-up, and every per-release action all
+already handle it) once created through the API directly. See the git
+history for this app's own `public/index.html` for exactly what each
+of the three tabs above calls.
