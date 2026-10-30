@@ -318,6 +318,114 @@ a restart. Live-verified: created a real post, killed the running process,
 restarted it, and confirmed the same real state came back from a real GET.
 See `dev-docs/phase-9-real-persistence/`.
 
+## Frontend coverage pass (30 Oct 2026)
+
+An audit found `public/index.html` making real calls against only 13
+of this app's 64 routes — the original 4 tabs (Feed, Villages,
+Cosmetics, Publishing) covered the newest-built surfaces lightly, but
+the real follow graph, post engagement/threading, search, most of a
+village's own real sub-surfaces, and most of long-form
+publishing/newsletters had little or no frontend exposure. This pass
+adds two new tabs and substantially fills out three existing ones,
+plus fixes several real, pre-existing bugs found while verifying each
+call against `server.js` and its `lib/*.js` handlers live (not
+guessed): every new/changed `VACO.api`/`VACO.post` call below was
+checked against the real route and run against a live server
+(isolated Shield + V3 + VXLLAGE instances) before being counted done.
+
+- **Profile tab (new)** — `lib/profiles.js`'s real computed profile
+  and `lib/follows.js`'s real follow graph (the same graph behind the
+  Feed tab's own For You/Following split) had no frontend at all.
+  Loads any user's profile by id (defaulting to the signed-in user),
+  shows real post/following/follower counts and the real posts table,
+  a real Follow/Unfollow button backed by follow-status, and the real
+  following/follower lists (`GET /api/profile/:userId`,
+  `/api/following/:userId`, `/api/followers/:userId`,
+  `/api/follow-status/:followerId/:followeeId`, `POST /api/follow`,
+  `/api/unfollow`).
+- **Feed tab, real engagement** — `lib/posts.js`'s real like/repost/
+  thread/reply actions had no frontend at all; the composer and feed
+  were also silently broken (see bugs below). Every post card now
+  shows real like/repost counts with a real toggle
+  (`POST /api/posts/:id/like`, `/unlike`, `/repost`, `/unrepost`) and a
+  "Thread" toggle that loads the real recursive reply tree
+  (`GET /api/posts/:id/thread`) with a real reply composer at every
+  node (`POST /api/posts` with `replyToPostId`).
+- **Search tab (new)** — `lib/vxllageSearch.js`'s real case-insensitive
+  search over village names and post text had no frontend at all
+  (`GET /api/search/villages`, `/api/search/posts`).
+- **Villages tab, real per-village detail** — members, Events, Villas
+  (`lib/villageRooms.js`), Channels (`lib/villageChannels.js`, text-
+  only by design), and the Shop (`lib/villageShop.js`) had no frontend
+  beyond the village list and Join. An "Open a village" panel (also
+  reachable from each card) now shows: real members and a real Leave
+  (owner excluded, since they structurally cannot leave their own
+  village); Events with real RSVP/un-RSVP and member-only creation;
+  Villas with real join/leave and member-only claiming (including the
+  real, honest "no transport configured" media shape when joining);
+  text Channels with real messages, a real per-user unread count, and
+  owner-only channel creation; and the Shop's real boost contribution
+  (settling real VCoin through V3) and village-specific cosmetics
+  (owner-only to list, anyone to buy).
+- **Publishing tab, fills out the rest** — previously only listed an
+  author's own articles with no way to publish, read, or manage a
+  newsletter. Adds: publishing an article (free or paywalled with a
+  `requiredTierId`); opening any article by id with the real paywall
+  gate honestly rendered (a notice when `bodyContent` comes back
+  `null`, never a fake blurred preview); subscribing/unsubscribing to
+  another author's newsletter; viewing and adding your own
+  cross-publication recommendations; and sending a newsletter for your
+  own article with the real delivery count. The article viewer also
+  gained a surface-links section (`lib/surfaceLinks.js`) — any
+  viewer sees what an article connects to, and its own real author can
+  link it to a post, another article, or a Villa.
+- **Cosmetics tab, real fix** — Buy/Equip were silently broken (see
+  bugs below); now also shows real equipped state and a real Unequip
+  (`POST /api/avatar-cosmetics/unequip`, backed by
+  `GET /api/users/:userId/avatar-profile`).
+
+**Real, pre-existing bugs found and fixed while verifying these
+calls live** (none were introduced by this pass — each was caught by
+actually running the exact call against a live server and comparing
+the response to what the old code expected):
+- The Feed composer posted `{body: ...}`; `createPost()` requires
+  `text`. Every post from the UI failed outright.
+- `GET /api/feed/for-you/:id` and `/api/feed/following/:id` return
+  `{feed: [...]}`; the old code read `.posts`, got the response object
+  itself back (truthy, but not an array), and threw calling
+  `.forEach` on it — the Feed tab could not actually render a feed.
+- The village card read `v.memberCount` (villages only ever have a
+  real `members` array) and `b.level` from the boost-status response
+  (the real field is `boostLevel`) — both always fell through to a
+  default, so the member count never showed and every village
+  silently showed "boost level 0" regardless of its real level.
+- Avatar cosmetics Buy/Equip sent `{cosmeticId: c.id}`;
+  `purchaseAvatarCosmetic()`/`equipAvatarCosmetic()` both destructure
+  `itemId` — every click failed server-side with "no real catalog item
+  with id undefined." Ownership was also checked against
+  `GET /api/users/:id/cosmetics`, which is the *village-shop*
+  cosmetics catalog (numeric ids) — a disjoint id space from the
+  avatar catalog's string ids, so "owned"/Equip could never actually
+  appear even after a real purchase went through.
+- The Publishing tab's articles table rendered `a.status || 'draft'`;
+  `Article` has no `status` field at all, so every article always
+  showed "draft" regardless of its real paywall state.
+
+**Deliberately left for a follow-up round**, not attempted here:
+- Village-room and post sources for surface links — same real route
+  (`POST /api/surface-links`), same UI shape as the article viewer's,
+  just no existing per-item detail view to hang an author-only form
+  off yet without duplicating the same small form three times. A
+  follow-up that gives Villas and posts their own light detail view
+  should add this alongside, not before.
+- `GET /api/posts/:id` (a single post fetch outside a thread) and
+  `GET /api/health` — trivial and/or not user-facing; already fully
+  exercised indirectly (health implicitly on every boot, single-post
+  fetch via the thread view).
+- Live/Call (Clubhouse-style rooms, Zoom-style calls) and voice
+  channels — unbuilt on the backend (see "Not yet built" below), so
+  there is nothing yet for a frontend to call.
+
 ## Not yet built
 - Voice channels, Live (Clubhouse-style audio rooms), and Call — now
   two real, named comparables per direct instruction (Zoom, for casual
