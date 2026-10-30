@@ -139,6 +139,15 @@ function splitIds(raw) {
   return String(raw || '').split(',').map(function (s) { return s.trim(); }).filter(function (s) { return s; });
 }
 
+// Every check-in/scheduling route across this app takes a real ms
+// timestamp, never a date string — same helper and reasoning as
+// void/public/index.html's own dateInputToMs.
+function dateInputToMs(value) {
+  if (!value) return null;
+  var ms = Date.parse(value);
+  return isNaN(ms) ? null : ms;
+}
+
 function renderEvents(body) {
   var out = el('div', 'vaco-stack');
   var id = VACO.userId();
@@ -268,6 +277,121 @@ function renderSafety(body) {
         .catch(function () { list.textContent = 'Unavailable.'; });
       return list;
     }()),
+  ]));
+
+  // -- First Date Safety: the real check-in that CVNVO keeps its own
+  // dating-specific data on (itinerary, "We Met" feedback, the VOID
+  // ride) while VSAFE owns the actual safety-critical state. None of
+  // this had a frontend before — a full date's worth of real safety
+  // mechanics only reachable by curl.
+
+  grid.appendChild(VACO.card('Start a date check-in', [
+    el('p', 'vaco-small vaco-dim', 'Creates a real VSAFE check-in for a scheduled date tied to one of your matches.'),
+    VACO.form([
+      { name: 'matchId', label: 'Match id', type: 'number', min: 1, value: 1, width: '90px' },
+      { name: 'dateScheduledAt', label: 'Date time', type: 'datetime-local', width: '170px' },
+      { name: 'itinerary', label: 'Itinerary', placeholder: 'Dinner at Union Loafers, then a walk', width: '200px' },
+      { name: 'trustedContactIds', label: 'Trusted contacts', placeholder: 'user ids, comma-separated', width: '170px' },
+      { name: 'checkInWindowMinutes', label: 'Window (min)', type: 'number', min: 10, value: 120, width: '100px' },
+    ], function (values) {
+      var dateScheduledAt = dateInputToMs(values.dateScheduledAt);
+      if (!dateScheduledAt) throw new Error('Pick a real date/time.');
+      return VACO.post('/api/safety/check-ins', {
+        userId: id, matchId: values.matchId, dateScheduledAt: dateScheduledAt,
+        itinerary: values.itinerary, trustedContactIds: splitIds(values.trustedContactIds),
+        checkInWindowMinutes: values.checkInWindowMinutes,
+      }).then(function (c) { VACO.toast('Check-in #' + c.id + ' created — save that id.'); });
+    }, 'Start check-in'),
+  ]));
+
+  var checkInStatusOut = el('div', 'vaco-stack-sm');
+  grid.appendChild(VACO.card('Check-in status', [
+    el('p', 'vaco-small vaco-dim', 'A real, live read from VSAFE plus CVNVO’s own dating-specific extension data.'),
+    VACO.form([{ name: 'id', label: 'Check-in id', type: 'number', min: 1, value: 1, width: '100px' }],
+      function (values) {
+        return VACO.api('/api/safety/check-ins/' + values.id + '/full-status').then(function (c) {
+          var card = el('div', 'vaco-stack-sm');
+          card.appendChild(el('p', 'vaco-small vaco-dim', c.itinerary || '(no itinerary)'));
+          var meta = el('div', 'vaco-row-tight');
+          meta.appendChild(VACO.badge(c.vsafeStatus && c.vsafeStatus.status ? c.vsafeStatus.status : 'unknown'));
+          if (c.actuallyMet !== null) meta.appendChild(VACO.badge(c.actuallyMet ? 'We Met: yes' : 'We Met: no'));
+          if (c.voidRide) meta.appendChild(VACO.badge('ride: ' + c.voidRide.voidJobStatus));
+          card.appendChild(meta);
+          VACO.mount(checkInStatusOut, card);
+        });
+      }, 'Check status'),
+    checkInStatusOut,
+  ]));
+
+  grid.appendChild(VACO.card('“We Met” — confirm safe', [
+    el('p', 'vaco-small vaco-dim',
+      'The real, literal "one user action, two uses": confirms you’re safe with VSAFE, and folds in whether the date happened — real match-quality feedback for future matching.'),
+    VACO.form([
+      { name: 'id', label: 'Check-in id', type: 'number', min: 1, value: 1, width: '100px' },
+      { name: 'actuallyMet', label: 'Did the date happen?', options: [{ label: 'Yes', value: 'true' }, { label: 'No', value: 'false' }], width: '140px' },
+      { name: 'dateRating', label: 'Rating (1–5, optional)', type: 'number', min: 1, max: 5, width: '110px' },
+    ], function (values) {
+      var dateRating = values.dateRating === '' || values.dateRating === undefined ? null : Number(values.dateRating);
+      return VACO.post('/api/safety/check-ins/' + values.id + '/confirm-safe', {
+        actuallyMet: values.actuallyMet === 'true', dateRating: dateRating,
+      }).then(function () { VACO.toast('Confirmed safe.'); });
+    }, 'Confirm safe'),
+  ]));
+
+  grid.appendChild(VACO.card('Attach a VOID ride', [
+    el('p', 'vaco-small vaco-dim', 'Pulls the real driver and status from a VOID transportation job onto this check-in.'),
+    VACO.form([
+      { name: 'id', label: 'Check-in id', type: 'number', min: 1, value: 1, width: '100px' },
+      { name: 'voidJobId', label: 'VOID job id', placeholder: 'void job id', width: '130px' },
+    ], function (values) {
+      return VACO.post('/api/safety/check-ins/' + values.id + '/void-ride', { voidJobId: values.voidJobId })
+        .then(function (c) { VACO.toast('Ride attached — driver ' + (c.voidRide && c.voidRide.driverId)); });
+    }, 'Attach ride'),
+  ]));
+
+  grid.appendChild(VACO.card('Schedule a photo check-in', [
+    el('p', 'vaco-small vaco-dim', 'A missed photo check-in genuinely escalates this same VSAFE check-in.'),
+    VACO.form([
+      { name: 'id', label: 'Check-in id', type: 'number', min: 1, value: 1, width: '100px' },
+      { name: 'intervalMinutes', label: 'Interval (min)', type: 'number', min: 5, value: 30, width: '110px' },
+      { name: 'missedCheckInAction', label: 'If missed', options: [{ label: 'Notify contacts', value: 'notify-contacts' }, { label: 'Escalate emergency', value: 'escalate-emergency' }], width: '160px' },
+    ], function (values) {
+      return VACO.post('/api/safety/check-ins/' + values.id + '/photo-check-in', {
+        intervalMinutes: values.intervalMinutes, missedCheckInAction: values.missedCheckInAction,
+      }).then(function () { VACO.toast('Photo check-in scheduled.'); });
+    }, 'Schedule'),
+  ]));
+
+  grid.appendChild(VACO.card('Submit a photo check-in', [
+    VACO.form([
+      { name: 'id', label: 'Check-in id', type: 'number', min: 1, value: 1, width: '100px' },
+      { name: 'photoUrl', label: 'Photo URL', placeholder: 'https://…', width: '200px' },
+    ], function (values) {
+      return VACO.post('/api/safety/check-ins/' + values.id + '/photo-check-in/submit', { photoUrl: values.photoUrl })
+        .then(function () { VACO.toast('Photo submitted.'); });
+    }, 'Submit'),
+  ]));
+
+  grid.appendChild(VACO.card('Fake call', [
+    el('p', 'vaco-small vaco-dim', 'A real VSAFE fake incoming call, scheduled to ring after a delay — a quiet exit from an uncomfortable date.'),
+    VACO.form([
+      { name: 'callerName', label: 'Caller name', placeholder: 'Mom', value: 'Mom', width: '120px' },
+      { name: 'callerPhotoUrl', label: 'Photo URL (optional)', placeholder: 'https://…', width: '160px' },
+      { name: 'delaySeconds', label: 'Delay (sec)', type: 'number', min: 1, value: 30, width: '100px' },
+    ], function (values) {
+      return VACO.post('/api/safety/fake-call', {
+        userId: id, callerName: values.callerName, callerPhotoUrl: values.callerPhotoUrl || null, delaySeconds: values.delaySeconds,
+      }).then(function () { VACO.toast('Fake call scheduled.'); });
+    }, 'Schedule call'),
+  ]));
+
+  grid.appendChild(VACO.card('Screen time', [
+    el('p', 'vaco-small vaco-dim', 'Records a real VSAFE screen-time session against the daily limit.'),
+    VACO.form([{ name: 'sessionDurationMinutes', label: 'Minutes', type: 'number', min: 1, value: 15, width: '100px' }],
+      function (values) {
+        return VACO.post('/api/safety/screen-time', { userId: id, sessionDurationMinutes: values.sessionDurationMinutes })
+          .then(function (r) { VACO.toast('Recorded' + (r.dailyTotalMinutes !== undefined ? ' — ' + r.dailyTotalMinutes + ' min today' : '') + '.'); });
+      }, 'Record'),
   ]));
 
   out.appendChild(grid);
