@@ -47,6 +47,20 @@ function fmtTime(ts) {
   return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+function fmtDate(ts) {
+  if (!ts) return '—';
+  return new Date(ts).toLocaleDateString();
+}
+
+// A `<input type="date">` value ("2026-11-01") to a ms epoch timestamp,
+// or null if it was left blank -- every booking route across this app
+// takes real ms timestamps, never a date string.
+function dateInputToMs(value) {
+  if (!value) return null;
+  var ms = Date.parse(value);
+  return isNaN(ms) ? null : ms;
+}
+
 // The provider being viewed. Defaults to the signed-in user, because a
 // provider is a user — but stays editable, since a dispatcher looking
 // at someone else's day is a real use of this screen.
@@ -395,6 +409,192 @@ function renderAcademy(body) {
   });
 }
 
+// -- VOID DROP ----------------------------------------------------------
+//
+// Select -> book -> deliver -> deploy -> use -> retrieve -> redeploy.
+// Previously zero frontend exposure at all. Self-service here is the
+// customer side only: approval, dispatch, inspection, and maintenance
+// are real fleet-operations steps gated to a vaco-operator credential
+// this frontend has no login for -- a deliberate scope line (see
+// CLAUDE.md), not an oversight.
+
+function renderDrop(body) {
+  var out = el('div', 'vaco-stack');
+
+  out.appendChild(VACO.notice(
+    'Select &rarr; book &rarr; deliver &rarr; deploy &rarr; use &rarr; retrieve &rarr; redeploy. '
+    + 'A real human operator always approves a booking before a unit moves &mdash; nothing here auto-approves.'));
+
+  return VACO.api('/api/drop/categories').then(function (categoryData) {
+    var cards = (categoryData.categories || []).map(function (c) {
+      var lines = el('div', 'vaco-stack-sm');
+      lines.appendChild(el('p', 'vaco-small vaco-dim', c.description));
+      if (c.uses && c.uses.length) {
+        lines.appendChild(el('p', 'vaco-small vaco-faint', c.uses.slice(0, 4).join(' · ')));
+      }
+      return VACO.card(c.label, [lines], { trailing: el('span', 'vaco-small vaco-dim', c.id) });
+    });
+    out.appendChild(VACO.card('16 named products', [VACO.grid(cards, true)]));
+
+    // -- Book a unit --------------------------------------------------
+    var bookingForm = VACO.form([
+      { name: 'assetId', label: 'Asset', placeholder: 'VOID-DROP-0001', width: '140px' },
+      { name: 'category', label: 'Category', placeholder: 'dropShop', width: '110px' },
+      { name: 'rentalModel', label: 'Rental model', placeholder: 'daily', width: '110px' },
+      { name: 'startDate', label: 'Start', type: 'date', width: '140px' },
+      { name: 'endDate', label: 'End', type: 'date', width: '140px' },
+      { name: 'zoneId', label: 'Zone (optional)', placeholder: 'VOID-ZONE-0001', width: '150px' },
+      { name: 'locationType', label: 'Location type', placeholder: 'residential-driveway', width: '170px' },
+      { name: 'deliveryLat', label: 'Delivery lat', type: 'number', step: 'any', width: '110px' },
+      { name: 'deliveryLng', label: 'Delivery lng', type: 'number', step: 'any', width: '110px' },
+      { name: 'intendedUse', label: 'Intended use', placeholder: 'pop-up retail', width: '150px' },
+    ], function (values) {
+      var customerId = VACO.userId();
+      if (!customerId) throw new Error('Sign in to book a VOID DROP unit.');
+      var startDate = dateInputToMs(values.startDate);
+      var endDate = dateInputToMs(values.endDate);
+      if (!startDate || !endDate) throw new Error('Pick a start and end date.');
+      var payload = {
+        customerId: customerId,
+        assetId: values.assetId,
+        category: values.category,
+        rentalModel: values.rentalModel,
+        startDate: startDate,
+        endDate: endDate,
+        intendedUse: values.intendedUse,
+      };
+      // A zone's own proven site overrides anything typed below --
+      // see voidDropZones.js: registering a zone already is the
+      // real-world proof this site supports drop deliveries.
+      if (values.zoneId) {
+        payload.zoneId = values.zoneId;
+      } else {
+        payload.locationType = values.locationType;
+        payload.deliveryLat = values.deliveryLat;
+        payload.deliveryLng = values.deliveryLng;
+        payload.roadAccessConfirmed = true;
+      }
+      return VACO.post('/api/drop/booking', payload).then(function (booking) {
+        VACO.toast('Booking #' + booking.id + ' is ' + booking.status + ' — awaiting operator approval', 'money');
+        VACO.render();
+      });
+    }, 'Request booking');
+
+    out.appendChild(VACO.card('Book a unit', [
+      el('p', 'vaco-small vaco-dim',
+        'Give a zone id to inherit its already-proven site (road access, location), or fill in a delivery '
+        + 'location yourself. Every booking still needs a real operator’s sign-off before anything ships.'),
+      bookingForm,
+    ]));
+
+    // -- Find a unit near you ------------------------------------------
+    var searchResultsHost = el('div', 'vaco-stack-sm');
+    searchResultsHost.appendChild(el('div', 'vaco-empty', 'Search to see real bookable units nearby.'));
+
+    var searchForm = VACO.form([
+      { name: 'lat', label: 'Lat', type: 'number', step: 'any', value: 38.627, width: '100px' },
+      { name: 'lng', label: 'Lng', type: 'number', step: 'any', value: -90.1994, width: '100px' },
+      { name: 'startDate', label: 'Start', type: 'date', width: '140px' },
+      { name: 'endDate', label: 'End', type: 'date', width: '140px' },
+      { name: 'category', label: 'Category', placeholder: 'any', width: '110px' },
+    ], function (values) {
+      var startDate = dateInputToMs(values.startDate);
+      var endDate = dateInputToMs(values.endDate);
+      if (!startDate || !endDate) throw new Error('Pick a start and end date.');
+      var qs = 'lat=' + encodeURIComponent(values.lat) + '&lng=' + encodeURIComponent(values.lng)
+        + '&startDate=' + startDate + '&endDate=' + endDate
+        + (values.category ? '&category=' + encodeURIComponent(values.category) : '');
+      return VACO.api('/api/drop/assets/nearby?' + qs).then(function (data) {
+        var results = data.results || [];
+        VACO.mount(searchResultsHost, VACO.table([
+          { label: 'Asset', render: function (r) { return r.asset.id; } },
+          { label: 'Category', render: function (r) { return r.asset.category; } },
+          { label: 'Distance', num: true, render: function (r) { return r.distanceKm + ' km'; } },
+          { label: 'Daily rate', num: true, render: function (r) { return VACO.price(r.asset.dailyRate, { freeLabel: false }); } },
+          { label: 'Total (both legs + setup)', num: true, render: function (r) { return VACO.price(r.pricing.totalPrice, { freeLabel: false }); } },
+          { label: '', render: function (r) {
+            return VACO.button('Use for booking', function () {
+              bookingForm.querySelector('[name="assetId"]').value = r.asset.id;
+              bookingForm.querySelector('[name="category"]').value = r.asset.category;
+              bookingForm.querySelector('[name="startDate"]').value = values.startDate;
+              bookingForm.querySelector('[name="endDate"]').value = values.endDate;
+              bookingForm.querySelector('[name="deliveryLat"]').value = values.lat;
+              bookingForm.querySelector('[name="deliveryLng"]').value = values.lng;
+              VACO.toast('Filled the booking form above with ' + r.asset.id);
+            }, 'sm');
+          } },
+        ], results, { empty: 'No bookable unit within range for these dates.' }));
+      });
+    }, 'Search');
+
+    out.appendChild(VACO.card('Find a unit near you', [searchForm, searchResultsHost]));
+
+    // -- Drop Zones: small villages of co-located units ----------------
+    return VACO.api('/api/drop/zones').then(function (zoneData) {
+      var zones = zoneData.zones || [];
+      var occupancyHost = el('div', 'vaco-stack-sm');
+      out.appendChild(VACO.card('Drop Zones', [
+        el('p', 'vaco-small vaco-dim', 'Several real units co-located into a small village or shopping center, with a real integer capacity.'),
+        VACO.table([
+          { key: 'id', label: 'Zone' },
+          { key: 'name', label: 'Name' },
+          { key: 'locationType', label: 'Location type' },
+          { key: 'maxUnits', label: 'Capacity', num: true },
+          { label: 'Status', render: function (z) { return VACO.badge(z.status); } },
+          { label: '', render: function (z) {
+            return VACO.button('Occupancy', function () {
+              return VACO.api('/api/drop/zone/' + encodeURIComponent(z.id) + '/occupancy').then(function (occ) {
+                VACO.mount(occupancyHost, VACO.card('On site at ' + occ.zone.name + ' now — ' + occ.occupiedCount + '/' + occ.capacity, [
+                  VACO.table([
+                    { key: 'bookingId', label: 'Booking' },
+                    { key: 'assetId', label: 'Asset' },
+                    { key: 'category', label: 'Category' },
+                    { label: 'Status', render: function (u) { return VACO.badge(u.status); } },
+                  ], occ.units, { empty: 'Nothing deployed there right now.' }),
+                ]));
+              });
+            }, 'sm');
+          } },
+        ], zones, { empty: 'No drop zones registered yet.' }),
+        occupancyHost,
+      ]));
+
+      var id = VACO.userId();
+      if (!id) {
+        out.appendChild(el('div', 'vaco-empty', 'Sign in to see and manage your own VOID DROP bookings.'));
+        return VACO.mount(body, out);
+      }
+
+      return VACO.api('/api/drop/bookings/user/' + encodeURIComponent(id)).then(function (data) {
+        var bookings = data.bookings || [];
+        out.appendChild(VACO.card('Your bookings', [
+          VACO.table([
+            { key: 'id', label: 'Booking' },
+            { key: 'assetId', label: 'Asset' },
+            { key: 'category', label: 'Category' },
+            { label: 'Dates', render: function (b) { return fmtDate(b.startDate) + ' → ' + fmtDate(b.endDate); } },
+            { label: 'Total', num: true, render: function (b) { return VACO.price(b.pricing.totalPrice, { freeLabel: false }); } },
+            { label: 'Status', render: function (b) { return VACO.badge(b.status); } },
+            { label: '', render: function (b) {
+              if (b.status !== 'pending-approval' && b.status !== 'booked') return null;
+              return VACO.button('Cancel', function () {
+                return VACO.post('/api/drop/booking/' + b.id + '/cancel', {}).then(function () {
+                  VACO.toast('Booking cancelled');
+                  VACO.render();
+                });
+              }, 'sm');
+            } },
+          ], bookings, { empty: 'No bookings yet — book a unit above.' }),
+        ]));
+        return VACO.mount(body, out);
+      });
+    });
+  }).catch(function (err) {
+    out.appendChild(VACO.notice('Could not load VOID DROP: ' + VACO.escapeHtml(err.message), 'danger'));
+    return VACO.mount(body, out);
+  });
+}
+
 VACO.app({
   id: 'void',
   name: 'VOID',
@@ -416,6 +616,9 @@ VACO.app({
       render: renderJobs },
     { id: 'network', label: 'Network', heading: 'Stations & airspace',
       render: renderNetwork },
+    { id: 'drop', label: 'VOID DROP', heading: 'Mobile space rental & deployment',
+      blurb: 'Select a product, book a real physical unit, and watch it move through delivery, deployment, use, and retrieval.',
+      render: renderDrop },
     { id: 'academy', label: 'Academy', heading: 'VOID Academy',
       blurb: 'Real training on how VOID actually pays you, chosen from your own claimed skills.',
       render: renderAcademy },
