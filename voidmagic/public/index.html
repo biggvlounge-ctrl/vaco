@@ -28,13 +28,17 @@
 <script>
 // VOID MAGIC — meet & greet bookings.
 //
-// Real client of its own 33 routes. Refund policy, waiting-room
-// admission, and identity verification at the door are server-decided.
+// A real client of 25 of this app's 33 mutating/reading routes (an
+// audit found only 9 actually wired before this pass — see README's
+// "Frontend coverage pass"). Refund policy, waiting-room admission,
+// and identity verification at the door are all server-decided, never
+// assumed here.
 //
 // **The waiting room is the interesting mechanic and gets its own
 // tab.** A meet & greet fails in one specific way: the wrong person
 // walks up. So admission is a real gate with a real identity check
-// rather than a list a host eyeballs.
+// rather than a list a host eyeballs. Physical check-in (the in-person
+// counterpart) lives in the same tab.
 
 var el = VACO.el;
 
@@ -404,6 +408,95 @@ function renderNotifications(body) {
   });
 }
 
+function renderMedia(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'MAGIC PHOTO/VIDEO are real paid add-ons, charged at order time; the host and platform are only '
+    + 'paid once a real delivered asset exists — never a placeholder. MAGIC MEMORY only packages a '
+    + 'booking that has actually completed.'));
+
+  out.appendChild(VACO.card('Order media for a booking', [
+    VACO.form([
+      { name: 'bookingId', label: 'Booking id', type: 'number', min: 1, value: 1, width: '110px' },
+      { name: 'type', label: 'Type', options: [
+        { value: 'magic-photo', label: 'Magic Photo' },
+        { value: 'magic-video', label: 'Magic Video' },
+        { value: 'magic-memory', label: 'Magic Memory' },
+      ], width: '140px' },
+      { name: 'price', label: 'Price', type: 'number', min: 1, value: 25, width: '90px' },
+    ], function (values) {
+      if (!VACO.userId()) throw new Error('Sign in to order.');
+      return VACO.post('/api/media-orders', {
+        bookingId: values.bookingId, type: values.type, price: values.price, customerId: VACO.userId(),
+      }).then(function (o) {
+        VACO.toast('Media order ' + o.id + ' placed.', 'money');
+        VACO.refreshBalances().then(VACO.renderIdentity);
+      });
+    }, 'Order'),
+  ]));
+
+  var ordersResult = el('div', 'vaco-stack');
+  function loadOrders(bookingId) {
+    return VACO.api('/api/bookings/' + bookingId + '/media-orders').then(function (data) {
+      VACO.mount(ordersResult, VACO.card('Orders for booking ' + bookingId, [
+        VACO.table([
+          { key: 'id', label: 'Order' },
+          { key: 'type', label: 'Type' },
+          { label: 'Status', render: function (o) { return VACO.badge(o.status); } },
+          { label: '', render: function (o) {
+            if (o.status === 'delivered') return '—';
+            return VACO.button('Deliver', function () {
+              var url = window.prompt('Real asset URL for this delivery:');
+              if (!url) throw new Error('Delivery requires a real, non-empty assetUrl.');
+              return VACO.post('/api/media-orders/' + o.id + '/deliver', { assetUrl: url })
+                .then(function () {
+                  VACO.toast('Delivered.', 'money');
+                  VACO.refreshBalances().then(VACO.renderIdentity);
+                  return loadOrders(bookingId);
+                });
+            }, 'primary vaco-btn-sm');
+          } },
+        ], data.mediaOrders || [], { empty: 'No media orders for this booking yet.' }),
+      ]));
+    });
+  }
+  out.appendChild(VACO.card('Orders for a booking', [
+    el('p', 'vaco-small vaco-dim', 'The host delivers against a real, non-empty asset URL — delivery pays the host + platform fee.'),
+    VACO.form([{ name: 'bookingId', label: 'Booking id', type: 'number', min: 1, value: 1, width: '110px' }],
+      function (values) { return loadOrders(values.bookingId); }, 'Load'),
+  ]));
+  out.appendChild(ordersResult);
+
+  var memoryResult = el('div', 'vaco-stack');
+  out.appendChild(VACO.card('Magic Memory package', [
+    VACO.form([{ name: 'bookingId', label: 'Booking id', type: 'number', min: 1, value: 1, width: '110px' }],
+      function (values) {
+        return VACO.api('/api/bookings/' + values.bookingId + '/magic-memory').then(function (pkg) {
+          var lines = el('div', 'vaco-stack-sm');
+          lines.appendChild(el('p', 'vaco-small vaco-dim', pkg.experienceTitle + ' · hosted by ' + pkg.hostId));
+          lines.appendChild(VACO.price(pkg.pricePaid, { freeLabel: false }));
+          if (!pkg.mediaAssets || !pkg.mediaAssets.length) {
+            lines.appendChild(el('div', 'vaco-empty', 'No delivered media yet.'));
+          } else {
+            pkg.mediaAssets.forEach(function (a) {
+              var row = el('div', 'vaco-row-tight');
+              row.appendChild(VACO.badge(a.type));
+              var link = el('a', null, a.assetUrl);
+              link.href = a.assetUrl;
+              link.target = '_blank';
+              row.appendChild(link);
+              lines.appendChild(row);
+            });
+          }
+          VACO.mount(memoryResult, VACO.card('Memory for booking ' + values.bookingId, [lines]));
+        });
+      }, 'View'),
+  ]));
+  out.appendChild(memoryResult);
+
+  return VACO.mount(body, out);
+}
+
 VACO.app({
   id: 'voidmagic',
   name: 'VOID MAGIC',
@@ -422,6 +515,7 @@ VACO.app({
     { id: 'analytics', label: 'Analytics', heading: 'Creator analytics', render: renderAnalytics },
     { id: 'favorites', label: 'Favorites', heading: 'Creators you follow', render: renderFavorites },
     { id: 'notifications', label: 'Notifications', heading: 'Your notifications', render: renderNotifications },
+    { id: 'media', label: 'Media', heading: 'Magic Photo, Video & Memory', render: renderMedia },
   ],
 });
 </script>
