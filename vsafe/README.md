@@ -166,6 +166,87 @@ restart. Live-verified: recorded a real safety check-in, killed the running
 process, restarted it, and confirmed the same real state came back from a
 real GET. See `dev-docs/phase-4-real-persistence/`.
 
+## Frontend coverage pass (30 Oct 2026)
+
+An audit found `public/index.html` making real calls against only 7 of
+this app's 43 routes, and two of those seven were themselves broken --
+the Check-ins "Start a check-in" form posted fields
+(`expectedReturnAt`, `note`) that `createSafetyCheckIn` doesn't read,
+so it 400'd every time; the Exit calls "Schedule one" form had the
+same problem (posted `scheduledFor`, but `scheduleFakeCall` requires a
+real `callerName` and a bounded `delaySeconds`); the Check-ins lookup
+called a `/full-status` route that exists nowhere in `server.js`; and
+the Identity tab's Screen Time summary read `t.totalMinutes` against a
+response field actually named `dailyTotalMinutes`, so it silently
+always showed 0m. All four were fixed as part of this pass, each
+confirmed against the real route and response shape by curling the
+live server directly, not assumed from the handler source alone.
+
+Three of the existing tabs were extended and four new ones added, nine
+real clients in total — every field checked against the real route
+handler and its `lib/*.js` function first, and the create/action pairs
+re-verified live end to end (not just syntax-checked) before each was
+committed:
+
+- **Check-ins tab** — fixed the two bugs above, and added the two real
+  actions this app's own panic-button story depends on: Confirm safe
+  (`POST /api/check-ins/:id/confirm-safe`) and Trigger emergency
+  (`POST /api/check-ins/:id/emergency`), the latter showing the real
+  notification-delivery outcome honestly (vaco-notify unreachable
+  renders as "not delivered," never a false "contacts notified").
+- **Identity tab** — added ID verification submission
+  (`POST /api/id-verification`, all three real KYC steps
+  independently selectable) alongside the existing verified-only
+  badge, the full record (`GET /api/id-verification/:userId`), and a
+  trust-score calculator (`POST /api/trust-score`).
+- **Exit calls tab** — fixed the bugs above, and added the real
+  lifecycle actions it never exposed: Cancel (scheduled-only), Answer
+  and Dismiss (ringing-only), both as a lookup-by-id card and as
+  inline buttons on the Due now table.
+- **Photo check-ins tab** (new) — Phase 3's headline addition had zero
+  frontend exposure. Schedules a real recurring check-in (interval,
+  trusted contacts, `missedCheckInAction`, an optional real link to an
+  existing check-in id), looks one up, submits a photo for the current
+  pending slot, and stops it.
+- **Meetup verification tab** (new) — requests a real, two-sided
+  confirmation tied to an existing check-in, looks one up, and lets a
+  participant who hasn't yet confirmed do so.
+- **Safety word tab** (new) — sets the real duress code
+  (`POST /api/safety-word`, stored as a SHA-256 hash) and tests it
+  (`POST /api/safety-word/check`) as a genuine action, not a
+  simulation: a correct match really escalates the user's most recent
+  active check-in, and the page says so before anyone uses it. Also
+  covers the structurally private relationship-safety concern log
+  (log + view-your-own-only).
+- **Privacy & blocking tab** (new) — editable privacy settings
+  (`POST /api/privacy-settings`, the Identity tab's own summary stayed
+  read-only) plus the real symmetric block list (block, unblock, and a
+  block-status lookup) that had no frontend at all.
+- **Screen time tab** (new) — records a session
+  (`POST /api/screen-time/sessions`), shows the day's real check-in
+  record, and dismisses its prompt -- verified live that a minor
+  account's third dismissal flips `promptSeverity` from `standard` to
+  `reinforced`, the genuinely harder-to-dismiss mechanic the source
+  doc calls for.
+- **Content safety tab** (new) — AI Monitoring and Content Moderation
+  (`POST /api/monitor/screen`, `POST /api/moderation/check`) had no
+  frontend at all. Both are stated directly as real, deterministic
+  keyword layers, not language-model calls, surfacing content for
+  human review rather than making an automated final judgment.
+- **Anonymous calls tab** (new) — communication controls
+  (`POST /api/calls`, `GET /api/calls/:id`, `POST /api/calls/:id/end`)
+  had no frontend at all. Either party can end a call, matching
+  `requireCallParty`'s own rule.
+
+Consistently left backend-only, by design: `POST /api/check-missed`
+and `POST /api/photo-check-ins/check-missed`, both gated to
+`requireCallingService()` — real internal-scheduler sweeps with no
+end-user session to authorize them. This frontend has no service
+credential, so those stay real backend capabilities rather than a fake
+"admin" UI pretending to hold one. `GET /api/health` is introspection
+metadata, not a feature, and stays uncalled by any tab for the same
+reason none of this ecosystem's other frontends expose it.
+
 ## Not yet built
 - Real SMS/push delivery for escalations, and any actual incoming-call
   UI/ringtone behind Fake Call's own real scheduling — the real trigger
