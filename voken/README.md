@@ -1111,3 +1111,133 @@ restart-survival confirmed.
   UNESCO import, a Vavlt Stvdios casino event going live) — every mint
   today is a real, explicit, individually-authorized call, never a
   background job that mints on its own.
+
+## Frontend coverage pass (30 Oct 2026)
+
+An audit found `public/index.html` making real calls against only 8 of
+this app's 103 routes, across 4 tabs (Auctions, Cards, Explore,
+Fractional). Entire feature areas had **zero** frontend exposure.
+Seven new tabs plus a card-detail drill-in close most of that gap,
+each a real client of the routes named — every field was checked
+against the real route handler and its `lib/*.js` function before
+being written, never a guessed payload shape. Consistently left
+backend-only, by design: anything gated to `requireCallingService()`
+(pack-tier/raffle creation — platform inventory) or `requireOperator()`
+(Kenji's analysis, nomination/claim review, raffle drawing, prediction
+markets, compliance-gate setting). This frontend has no login for
+either, so those stay real backend capabilities without a fake
+"admin" UI pretending to hold credentials it doesn't have.
+
+- **Packs tab** — `cardPacks.js` and `mintCountGuidance.js` had no
+  frontend at all. Looks up a pack tier by id, shows its real
+  pre-purchase odds disclosure before buying (`POST
+  /api/pack-tier/:id/odds`), opens it (`POST /api/pack-tier/:id/open`,
+  charges the buyer), and lists the fixed recommended mint counts per
+  rarity tier (`GET /api/mint-count-guidance`). Pack-tier *creation*
+  is `requireCallingService()`-gated with no frontend credential, so a
+  fresh install has no tiers to browse until one is created that way —
+  stated plainly in the tab rather than faked.
+- **Car Clubs tab** — `carClubs.js` had no frontend at all. Creates a
+  club (`POST /api/car-club`), looks one up, joins/leaves as the
+  signed-in session (`POST /api/car-club/:id/join|leave`), and shows
+  its real leaderboard (`GET /api/car-club/:id/leaderboard`, each
+  member's real wallet value across cards and cars).
+- **Activity tab** — `trading.js`, `raffles.js`, and
+  `referralGrowth.js` had no frontend at all. Proposes/looks up/
+  accepts/rejects/cancels a peer-to-peer trade (`POST /api/trade`,
+  `.../accept|reject|cancel`, each real session-matched to the
+  trade's own stored party); looks up and enters an existing raffle
+  (`POST /api/raffle/:id/enter` — creation/drawing stay
+  operator/service-only); shows real referral-tier progress, records
+  a referral, and spins the provably-fair wheel with a user-supplied
+  client seed (`POST /api/referrals`, `.../progress`, `.../spin`).
+- **Account tab** — `cardNotifications.js`, `walletValue.js`, and
+  `complianceGate.js` had no frontend at all. Lists a signed-in user's
+  follow-notifications with mark-read (`GET /api/notifications/
+  :userId`, `POST /api/notifications/:id/read`), looks up any owner's
+  real wallet value (`GET /api/wallet/:ownerId/value`), reads a
+  compliance gate's cleared/closed status (`GET /api/compliance-gate/
+  :gateName` — *setting* one stays `requireOperator()`-only, "not a
+  routine toggle" by design), and reads `/api/brand` directly for an
+  About card.
+- **Gallery & Art tab** — `galleryAccounts.js`, `artCultureCard.js`,
+  `digitalArtFrame.js`, and `vadoExplore.js` had no frontend at all.
+  Registers a VADO gallery account and looks up real art-category
+  holdings (`POST /api/gallery-account`, `GET .../holdings`); mints an
+  art Cvltvre card and toggles its real for-sale status (artist-only,
+  enforced server-side) plus records gallery views (`POST
+  /api/art-card`, `.../for-sale`, `.../view`); registers a digital art
+  frame and loads an owned digital edition onto it, frame-owner-only
+  (`POST /api/art-frame`, `.../load`); browses VADO's Instagram-
+  Explore-style page (`GET /api/vado/explore`).
+- **Creator Hub tab** — `cultureCardApplication.js`,
+  `establishedCreatorAssessment.js`, `creatorDigitalProfile.js`, and
+  `familyRepresentativeClaims.js` had no frontend at all. Submits a
+  self-initiated or community-nomination application and looks one up
+  (`POST /api/application`, `GET /api/application/:id` — Kenji's
+  analysis and nomination review stay operator-only); requests an
+  established-creator assessment and shows the real external score and
+  suggested starting tier (`POST /api/established-creator-assessment`);
+  looks up a creator's aggregated digital-engagement profile (`GET
+  /api/creator-digital-profile/:creatorId`); submits/looks-up a
+  family-representative claim for a historic person's master edition
+  (`POST /api/family-representative-claim`, `GET .../:id` — review
+  stays operator-only).
+- **Historic tab** — `historicRegistry.js`, `historicExplore.js`, and
+  `placeNominations.js` had no frontend at all. Browses the fixed
+  historic register by subject type and ranks entries by real age and
+  recognition count (`GET /api/historic-register`, `.../rank`,
+  `.../:slug`); submits a community place/monument/home nomination,
+  looks one up, and browses already-approved nominations (`POST
+  /api/place-nomination`, `GET .../:id`, `GET .../approved/list` —
+  review stays operator-only); shows the Instagram-Explore-style
+  historic feed ranked by real attention and genuine-significance
+  score (`GET /api/explore/historic`).
+- **Fractional tab, extended** — this tab already existed but only
+  ever showed holdings, and even that used a field
+  (`totalPaid`) the real `getFractionalHoldings()` return shape
+  doesn't have — it always rendered "—". Fixed to the real fields
+  (`shares`, `ownershipFraction`, `sellableShares`) and added this
+  feature's own remaining real routes: creating/looking-up/buying a
+  primary fractional listing (`POST /api/fractional/listing`, `GET
+  .../:id`, `POST .../:id/buy`) and the full secondary resale market
+  (`POST /api/fractional/secondary-listing`, `GET .../:id`, `GET
+  /api/fractional/listing/:id/secondary-listings`, `POST
+  .../:id/cancel`, `POST .../:id/buy`). Both buy paths are honestly
+  gated behind the real `fractional-ownership` compliance flag
+  server-side (held closed pending legal review) — the UI states that
+  plainly rather than hiding it.
+- **Cards tab, card-detail drill-in** — the per-card routes that
+  belong on a card's own detail view rather than a new top-level tab:
+  follow/unfollow (`POST`/`DELETE /api/card/:id/follow`), verify
+  (`POST /api/card/:id/verify`), engagement view/like/share/comment
+  (`POST /api/card/:id/engagement`), statistics update (`POST
+  /api/card/:id/statistics`), transfer (`POST /api/card/:id/transfer`),
+  editions with real serials (`GET /api/card/:id/editions`), live value
+  scoring plus sell-back quote and sell-back (`POST /api/card/:id/
+  value-score`, `.../sell-back-quote`, `.../sell-back`), and merch
+  create/purchase from the card's own linked listings (`POST
+  /api/merch`, `POST /api/merch/:id/purchase`). Opens via the existing
+  `GET /api/card/:id/full` endpoint (one real request instead of ~8).
+  Also fixed a pre-existing bug in the Cards grid's own per-card value
+  score fetch: it called the POST-only `/api/card/:id/value-score`
+  route with a GET, so every card always silently fell back to "No
+  value score yet."
+
+**Left for a follow-up round, deliberately:**
+- Pack-tier and raffle *creation*, raffle drawing, Kenji's analysis,
+  nomination/claim review, and compliance-gate setting all require a
+  service or operator credential this frontend has no login for — see
+  each tab's own note above.
+- `POST /api/card/external`, `POST /api/card/historic`, and `POST
+  /api/card/:id/prediction-market` are operator/verified-owner-only
+  mints and curatorial actions with the same no-credential gap.
+- The per-card prediction-market and `external`/`historic` detail
+  surfaces beyond what the card-detail drill-in already shows — real,
+  but secondary to the higher-traffic actions built this pass.
+- A fresh install genuinely has no pack tiers, raffles, or (until
+  someone exercises the new tabs) car clubs/trades/fractional
+  listings/art frames to browse — `seedDemoData.js` only seeds culture
+  cards and auctions, so several of the new tabs' lookup-by-id forms
+  are honestly empty until a real record exists to look up, exactly as
+  stated in each one.
