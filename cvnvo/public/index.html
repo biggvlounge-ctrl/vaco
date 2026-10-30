@@ -812,6 +812,82 @@ function renderFormats(body) {
   return VACO.mount(body, out);
 }
 
+// -- Snap Map: graduated location privacy + radius search --
+
+function renderSnapMap(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Three real privacy tiers, not a plain on/off toggle: <strong>Ghost Mode</strong> (invisible to everyone), '
+    + '<strong>My Friends</strong> (visible only to your real, active matches — the closest real substitute for a '
+    + 'friend graph this app doesn’t have), and <strong>Select Friends</strong> (visible only to people you name).'));
+
+  var id = VACO.userId();
+  if (!id) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to share or view locations.'));
+    return VACO.mount(body, out);
+  }
+
+  var grid = el('div', 'safety-grid');
+
+  grid.appendChild(VACO.card('Your sharing preference', [
+    VACO.form([
+      { name: 'tier', label: 'Visible to', options: [
+        { label: 'Ghost Mode (nobody)', value: 'ghost-mode' },
+        { label: 'My Friends (active matches)', value: 'my-friends' },
+        { label: 'Select Friends (choose below)', value: 'select-friends' },
+      ], width: '220px' },
+      { name: 'selectedUserIds', label: 'Select Friends list', placeholder: 'user ids, comma-separated', width: '200px' },
+    ], function (values) {
+      return VACO.post('/api/location/sharing-preference', {
+        userId: id, tier: values.tier, selectedUserIds: splitIds(values.selectedUserIds),
+      }).then(function () { VACO.toast('Preference set to ' + values.tier + '.'); });
+    }, 'Save'),
+  ]));
+
+  grid.appendChild(VACO.card('Share your location', [
+    el('p', 'vaco-small vaco-dim', 'Only your latest position is kept — not a trail.'),
+    VACO.form([
+      { name: 'lat', label: 'Lat', type: 'number', step: '0.0001', value: 38.627, width: '110px' },
+      { name: 'lng', label: 'Lng', type: 'number', step: '0.0001', value: -90.1994, width: '110px' },
+    ], function (values) {
+      return VACO.post('/api/location/share', { userId: id, lat: values.lat, lng: values.lng })
+        .then(function () { VACO.toast('Location shared, subject to your privacy tier.'); });
+    }, 'Share'),
+  ]));
+
+  grid.appendChild(VACO.card('Who you can see', [
+    (function () {
+      var list = el('div', null);
+      list.textContent = 'Loading…';
+      VACO.api('/api/location/visible/' + encodeURIComponent(id))
+        .then(function (data) {
+          var locs = data.visibleLocations || [];
+          VACO.mount(list, locs.length
+            ? VACO.table([{ key: 'userId', label: 'User' }, { key: 'lat', label: 'Lat', num: true }, { key: 'lng', label: 'Lng', num: true }], locs)
+            : el('p', 'vaco-small vaco-faint', 'Nobody has shared a visible location with you yet.'));
+        })
+        .catch(function () { list.textContent = 'Unavailable.'; });
+      return list;
+    }()),
+  ]));
+
+  var searchOut = el('div', 'vaco-stack-sm');
+  grid.appendChild(VACO.card('Search nearby (1–100 miles)', [
+    VACO.form([
+      { name: 'lat', label: 'Lat', type: 'number', step: '0.0001', value: 38.627, width: '100px' },
+      { name: 'lng', label: 'Lng', type: 'number', step: '0.0001', value: -90.1994, width: '100px' },
+      { name: 'radiusKm', label: 'Radius (km)', type: 'number', min: 1.61, max: 160.93, step: '0.1', value: 10, width: '110px' },
+    ], function (values) {
+      return VACO.api('/api/location/search?lat=' + values.lat + '&lng=' + values.lng + '&radiusKm=' + values.radiusKm)
+        .then(function (r) { VACO.mount(searchOut, VACO.badge(r.openForContactCount + ' open for contact nearby')); });
+    }, 'Search'),
+    searchOut,
+  ]));
+
+  out.appendChild(grid);
+  return VACO.mount(body, out);
+}
+
 VACO.app({
   id: 'cvnvo',
   name: 'CVNVO',
@@ -829,6 +905,7 @@ VACO.app({
     { id: 'safety', label: 'Safety', heading: 'Check-ins & screening', render: renderSafety },
     { id: 'nearby', label: 'Nearby', heading: 'Proximity & BarBuddy', render: renderNearby },
     { id: 'formats', label: 'Formats', heading: 'Dating formats', render: renderFormats },
+    { id: 'snapmap', label: 'Snap Map', heading: 'Location privacy', render: renderSnapMap },
   ],
 });
 </script>
