@@ -23,6 +23,27 @@
 
 var el = VACO.el;
 
+// -- small shared helpers (same shapes void/public/index.html already
+// uses for a datetime-local input and a human-readable timestamp) --
+function dateInputToMs(value) {
+  if (!value) return null;
+  var ms = Date.parse(value);
+  return isNaN(ms) ? null : ms;
+}
+
+function fmtDateTime(ts) {
+  if (!ts) return '—';
+  return new Date(ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+// `blocked-no-connector` isn't in vaco-ui.js's shared STATUS_KIND map
+// (it is specific to this app), so it renders as a plain, uncoloured
+// badge unless told otherwise. Named here rather than patched into
+// the shared file for one app's one status word.
+function goalStatusBadge(status) {
+  return VACO.badge(status, status === 'blocked-no-connector' ? 'danger' : null);
+}
+
 function renderAssistantMessage(message) {
   var row = el('div', 'vaco-stack-sm');
   var label = message.role === 'user' ? 'You'
@@ -169,6 +190,207 @@ function renderAssistant(body) {
   }).catch(VACO.error);
 }
 
+// -- Tasks: Goals, Subscriptions, Reminders, Suggestions --------------
+//
+// The real, buildable half of a Meta-Muse-style personal agent (see
+// lib/assistantTasks.js's own header and this app's README). Every
+// route here previously had zero frontend caller — the only existing
+// tab only ever drove /api/assistant/profile, /history and /chat.
+// `/api/assistant/chat` already surfaces a blocked goal through a
+// chat reply when a payment/booking/purchase-sounding message is
+// intercepted, but a person who wants their own task list rather than
+// hunting through a chat transcript had no way to see or manage one
+// directly until now.
+
+function buildGoalsTable(goals) {
+  return VACO.table([
+    { key: 'id', label: 'Id' },
+    { key: 'kind', label: 'Kind' },
+    { key: 'description', label: 'Description' },
+    { label: 'Status', render: function (g) {
+      var cell = el('div', 'vaco-stack-sm');
+      cell.appendChild(goalStatusBadge(g.status));
+      if (g.blockedReason) cell.appendChild(el('p', 'vaco-small vaco-dim', g.blockedReason));
+      return cell;
+    } },
+    { label: '', render: function (g) {
+      if (g.status === 'completed' || g.status === 'cancelled') return '—';
+      var row = el('div', 'vaco-row-tight');
+      if (g.status !== 'blocked-no-connector') {
+        row.appendChild(VACO.button('Complete', function () {
+          return VACO.post('/api/assistant/goals/' + g.id + '/complete', {}).then(function () {
+            VACO.toast('Goal #' + g.id + ' completed.', 'money');
+            VACO.render();
+          });
+        }, 'primary vaco-btn-sm'));
+      }
+      row.appendChild(VACO.button('Cancel', function () {
+        return VACO.post('/api/assistant/goals/' + g.id + '/cancel', {}).then(function () {
+          VACO.toast('Goal #' + g.id + ' cancelled.');
+          VACO.render();
+        });
+      }, 'ghost vaco-btn-sm'));
+      return row;
+    } },
+  ], goals, { empty: 'No goals yet — ask for one below, or just tell your assistant in chat.' });
+}
+
+function buildSubscriptionsTable(subscriptions) {
+  return VACO.table([
+    { key: 'id', label: 'Id' },
+    { key: 'name', label: 'Name' },
+    { key: 'amount', label: 'Amount', num: true, render: function (s) { return VACO.price(s.amount); } },
+    { key: 'cadence', label: 'Cadence' },
+    { label: 'Status', render: function (s) {
+      return s.cancellationRequested ? VACO.badge('cancellation requested', 'warn') : VACO.badge('tracked', 'accent');
+    } },
+    { label: '', render: function (s) {
+      if (s.cancellationRequested) return '—';
+      return VACO.button('Request cancellation', function () {
+        return VACO.post('/api/assistant/subscriptions/' + s.id + '/request-cancellation', {}).then(function (result) {
+          VACO.toast('Opened goal #' + result.goal.id + ' — cancelling ' + s.name + ' still needs a real connector.', 'warn');
+          VACO.render();
+        });
+      }, 'danger vaco-btn-sm');
+    } },
+  ], subscriptions, { empty: 'Nothing tracked yet — you enter these yourself, nothing is auto-discovered.' });
+}
+
+function buildRemindersTable(reminders) {
+  return VACO.table([
+    { key: 'text', label: 'Reminder' },
+    { label: 'Due', render: function (r) { return fmtDateTime(r.dueAt); } },
+    { label: '', render: function (r) {
+      return VACO.button('Acknowledge', function () {
+        return VACO.post('/api/assistant/reminders/' + r.id + '/acknowledge', {}).then(function () {
+          VACO.toast('Acknowledged.');
+          VACO.render();
+        });
+      }, 'ghost vaco-btn-sm');
+    } },
+  ], reminders, { empty: 'Nothing due right now.' });
+}
+
+function buildSuggestionsTable(suggestions) {
+  return VACO.table([
+    { label: 'Type', render: function (s) { return VACO.badge(s.kind, 'accent'); } },
+    { key: 'text', label: 'Suggestion' },
+  ], suggestions, { empty: 'Nothing to proactively flag right now — this reads straight off your own goals, subscriptions and reminders, no model call involved.' });
+}
+
+function renderTasks(body) {
+  var out = el('div', 'vaco-stack');
+
+  if (!VACO.session) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in above to manage goals, subscriptions and reminders.'));
+    return VACO.mount(body, out);
+  }
+
+  var userId = VACO.userId();
+
+  var connectorsHost = el('div');
+  out.appendChild(connectorsHost);
+
+  var suggestionsHost = el('div');
+  out.appendChild(VACO.card('Suggestions', [
+    el('p', 'vaco-small vaco-dim', 'Due reminders, blocked goals, and pending cancellations — pulled straight from your own stored data below, nothing generated.'),
+    suggestionsHost,
+  ]));
+
+  out.appendChild(VACO.card('New goal', [
+    el('p', 'vaco-small vaco-dim',
+      'Open-ended — "general" for anything your assistant can just do; a kind like pay-bill, book-appointment, '
+      + 'make-purchase, or cancel-external-subscription starts blocked-no-connector immediately, since none of '
+      + 'those rails exist in this environment yet (see this app\'s README).'),
+    VACO.form([
+      { name: 'kind', label: 'Kind', value: 'general', placeholder: 'general', width: '160px' },
+      { name: 'description', label: 'Description', placeholder: 'What should your assistant do?', width: '280px' },
+    ], function (values) {
+      var description = values.description.trim();
+      if (!description) throw new Error('Describe the goal first.');
+      return VACO.post('/api/assistant/goals', {
+        userId: userId, kind: values.kind.trim() || 'general', description: description,
+      }).then(function (goal) {
+        VACO.toast('Goal #' + goal.id + ' — ' + goal.status, goal.status === 'blocked-no-connector' ? 'warn' : 'money');
+        VACO.render();
+      });
+    }, 'Add goal'),
+  ]));
+  var goalsHost = el('div');
+  out.appendChild(VACO.card('Your goals', [goalsHost]));
+
+  out.appendChild(VACO.card('Track a subscription', [
+    el('p', 'vaco-small vaco-dim', 'User-entered, not auto-discovered — there is no real bank-linking here to find a recurring charge from.'),
+    VACO.form([
+      { name: 'name', label: 'Name', placeholder: 'Streaming Plus', width: '170px' },
+      { name: 'amount', label: 'Amount', type: 'number', value: 10, step: '0.01', width: '100px' },
+      { name: 'cadence', label: 'Cadence', value: 'monthly',
+        options: ['weekly', 'monthly', 'yearly'].map(function (c) { return { label: c, value: c }; }) },
+    ], function (values) {
+      var name = values.name.trim();
+      if (!name) throw new Error('Name the subscription first.');
+      if (!(values.amount > 0)) throw new Error('Amount must be a positive number.');
+      return VACO.post('/api/assistant/subscriptions', {
+        userId: userId, name: name, amount: values.amount, cadence: values.cadence,
+      }).then(function () {
+        VACO.toast('Tracking ' + name + '.', 'money');
+        VACO.render();
+      });
+    }, 'Track'),
+  ]));
+  var subscriptionsHost = el('div');
+  out.appendChild(VACO.card('Your subscriptions', [subscriptionsHost]));
+
+  out.appendChild(VACO.card('New reminder', [
+    VACO.form([
+      { name: 'text', label: 'Reminder', placeholder: 'Call the dentist', width: '220px' },
+      { name: 'dueAt', label: 'Due', type: 'datetime-local', width: '190px' },
+    ], function (values) {
+      var text = values.text.trim();
+      if (!text) throw new Error('Write the reminder text first.');
+      var dueAt = dateInputToMs(values.dueAt);
+      if (!dueAt) throw new Error('Pick a due date and time.');
+      return VACO.post('/api/assistant/reminders', { userId: userId, text: text, dueAt: dueAt }).then(function () {
+        VACO.toast('Reminder set.', 'money');
+        VACO.render();
+      });
+    }, 'Remind me'),
+  ]));
+  var remindersHost = el('div');
+  out.appendChild(VACO.card('Due now', [
+    el('p', 'vaco-small vaco-dim', 'Only reminders already due appear here — there is no "list all" route, so one you just set for later will not show until its time comes.'),
+    remindersHost,
+  ]));
+
+  VACO.mount(body, out);
+
+  return VACO.api('/api/connectors/status').then(function (connectors) {
+    VACO.mount(connectorsHost, VACO.notice(
+      'Sandbox connectors — Stripe Issuing: <strong>' + (connectors.stripeIssuing.configured ? 'configured' : 'not configured')
+      + '</strong>, Plaid Sandbox: <strong>' + (connectors.plaidSandbox.configured ? 'configured' : 'not configured')
+      + '</strong>. Neither is real bill-pay even when configured, and neither changes whether a goal below can start — '
+      + 'see this app\'s README.', 'warn',
+    ));
+  }).catch(function () { /* open route; a failure here is not worth blocking the rest of the tab on */ })
+    .then(function () { return VACO.api('/api/assistant/goals/' + encodeURIComponent(userId)); })
+    .then(function (data) {
+      VACO.mount(goalsHost, buildGoalsTable(data.goals));
+      return VACO.api('/api/assistant/subscriptions/' + encodeURIComponent(userId));
+    })
+    .then(function (data) {
+      VACO.mount(subscriptionsHost, buildSubscriptionsTable(data.subscriptions));
+      return VACO.api('/api/assistant/reminders/' + encodeURIComponent(userId) + '/due');
+    })
+    .then(function (data) {
+      VACO.mount(remindersHost, buildRemindersTable(data.reminders));
+      return VACO.api('/api/assistant/suggestions/' + encodeURIComponent(userId));
+    })
+    .then(function (data) {
+      VACO.mount(suggestionsHost, buildSuggestionsTable(data.suggestions));
+    })
+    .catch(VACO.error);
+}
+
 VACO.app({
   id: 'vaco-assistant',
   name: 'Vaco Assistant',
@@ -180,6 +402,7 @@ VACO.app({
   accentInk: '#0b0912',
   tabs: [
     { id: 'assistant', label: 'Assistant', heading: 'Your Assistant', render: renderAssistant },
+    { id: 'tasks', label: 'Tasks', heading: 'Goals, subscriptions & reminders', render: renderTasks },
   ],
 });
 </script>
