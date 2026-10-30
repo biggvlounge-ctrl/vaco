@@ -381,6 +381,97 @@ function renderFakeCalls(body) {
   });
 }
 
+// lib/photoCheckIn.js's own MISSED_CHECKIN_ACTIONS.
+var MISSED_CHECKIN_ACTIONS = ['notify-contacts', 'escalate-emergency'];
+
+function renderPhotoCheckIns(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'A photo check-in keeps exactly one live scheduled slot: submit on time and the next slot schedules itself; '
+    + 'miss it and the slot resolves to "missed" — or, only if this record is linked to a real, still-active check-in '
+    + 'and set to escalate, genuinely triggers that check-in\'s own emergency path. '
+    + '<strong>A miss with no linked check-in can only ever fall back to notifying contacts</strong> — there is '
+    + 'nothing else real to escalate.', 'warn'));
+
+  var id = VACO.userId();
+  if (!id) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to schedule a photo check-in.'));
+    return VACO.mount(body, out);
+  }
+
+  out.appendChild(VACO.card('Schedule a photo check-in', [
+    VACO.form([
+      { name: 'intervalMinutes', label: 'Every (minutes)', type: 'number', min: 1, value: 60, width: '100px' },
+      { name: 'trustedContactIds', label: 'Trusted contacts', placeholder: 'comma-separated user ids', width: '200px' },
+      { name: 'missedCheckInAction', label: 'If missed', options: MISSED_CHECKIN_ACTIONS, width: '160px' },
+      { name: 'checkInId', label: 'Link to check-in id', type: 'number', min: 1, placeholder: 'blank = none', width: '130px' },
+    ], function (values) {
+      var contacts = (values.trustedContactIds || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+      var payload = {
+        userId: id, intervalMinutes: values.intervalMinutes, trustedContactIds: contacts,
+        missedCheckInAction: values.missedCheckInAction,
+      };
+      if (values.checkInId) payload.checkInId = values.checkInId;
+      return VACO.post('/api/photo-check-ins', payload).then(function (r) {
+        VACO.toast('Photo check-in ' + r.id + ' scheduled — first slot due in ' + values.intervalMinutes + ' minutes.');
+        VACO.render();
+      });
+    }, 'Schedule'),
+  ]));
+
+  var lookupHost = el('div', 'vaco-stack');
+
+  function renderPhotoCard(pcId, record) {
+    var lines = el('div', 'vaco-stack-sm');
+    lines.appendChild(VACO.badge(record.active ? 'active' : 'stopped', record.active ? 'money' : 'danger'));
+    lines.appendChild(el('p', 'vaco-small vaco-dim',
+      'Current slot: ' + record.currentCheckIn.status + ', due ' + new Date(record.currentCheckIn.dueAt).toLocaleString()));
+    lines.appendChild(el('p', 'vaco-small vaco-dim', 'Resolved slots so far: ' + record.history.length));
+    lines.appendChild(el('p', 'vaco-small vaco-dim',
+      'If missed: ' + record.missedCheckInAction
+      + (record.checkInId ? (' (linked to check-in ' + record.checkInId + ')') : ' (not linked to any check-in)')));
+
+    var children = [lines];
+    if (record.active && record.currentCheckIn.status === 'pending') {
+      var row = el('div', 'vaco-row-tight');
+      var photoInput = el('input', 'vaco-input');
+      photoInput.type = 'text';
+      photoInput.placeholder = 'photo URL';
+      photoInput.style.width = '200px';
+      row.appendChild(photoInput);
+      row.appendChild(VACO.button('Submit photo', function () {
+        if (!photoInput.value) throw new Error('A photoUrl is required to submit.');
+        return VACO.post('/api/photo-check-ins/' + pcId + '/submit', { photoUrl: photoInput.value }).then(function (updated) {
+          VACO.toast('Photo check-in ' + pcId + ' submitted on time; next slot scheduled.');
+          renderPhotoCard(pcId, updated);
+        });
+      }, 'primary'));
+      children.push(row);
+    }
+    if (record.active) {
+      children.push(VACO.button('Stop', function () {
+        return VACO.post('/api/photo-check-ins/' + pcId + '/stop', {}).then(function (updated) {
+          VACO.toast('Photo check-in ' + pcId + ' stopped.');
+          renderPhotoCard(pcId, updated);
+        });
+      }, 'ghost'));
+    }
+    VACO.mount(lookupHost, VACO.card('Photo check-in ' + pcId, children));
+  }
+
+  out.appendChild(VACO.card('Look up / manage a photo check-in', [
+    VACO.form([{ name: 'id', label: 'Photo check-in id', type: 'number', min: 1, value: 1, width: '130px' }],
+      function (values) {
+        return VACO.api('/api/photo-check-ins/' + values.id).then(function (record) {
+          renderPhotoCard(values.id, record);
+        });
+      }, 'Look up'),
+  ]));
+  out.appendChild(lookupHost);
+
+  return VACO.mount(body, out);
+}
+
 VACO.app({
   id: 'vsafe',
   name: 'VSAFE',
@@ -394,6 +485,7 @@ VACO.app({
     { id: 'checkins', label: 'Check-ins', heading: 'Timed check-ins', render: renderCheckIns },
     { id: 'identity', label: 'Identity', heading: 'Verification & privacy', render: renderIdentity },
     { id: 'calls', label: 'Exit calls', heading: 'Scheduled fake calls', render: renderFakeCalls },
+    { id: 'photo-checkins', label: 'Photo check-ins', heading: 'Scheduled photo check-ins', render: renderPhotoCheckIns },
   ],
 });
 </script>
