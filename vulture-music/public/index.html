@@ -15,8 +15,17 @@
 <script>
 // Vvltvre Music / Distribution — flat-fee release distribution.
 //
-// Real client of its own 26 routes. Royalty splits, label deal shapes,
+// Real client of its own routes. Royalty splits, label deal shapes,
 // and beat licence terms are all server-decided.
+//
+// **Frontend coverage pass (30 Oct 2026), Releases tab.** The original
+// tab only ever looked up an artist's catalogue; everything else about
+// a release's own real lifecycle (`lib/releases.js`,
+// `lib/streaming.js`) was backend-only. The split bar also rendered
+// fields that don't exist on a real `Release` — `releaseType`,
+// `trackCount`, `collaborators`/`sharePercent`/`share` — the real
+// fields are `format` and `coWriters`, each a `{userId, splitPercent}`
+// with `splitPercent` a 0–1 fraction, not 0–100. Fixed here.
 //
 // **The split bar is the point of this screen.** Unrecouped advances
 // and silent splits are the oldest complaint in music; showing who owns
@@ -25,17 +34,112 @@
 
 var el = VACO.el;
 
-function splitBar(collaborators) {
+function splitBar(coWriters) {
   var bar = el('div', 'split-bar');
   var hues = ['var(--vaco-accent)', 'var(--vaco-info)', 'var(--vaco-money)', 'var(--vaco-warn)'];
-  (collaborators || []).forEach(function (c, i) {
+  (coWriters || []).forEach(function (c, i) {
+    var pct = Math.round((c.splitPercent || 0) * 100);
     var seg = el('div', 'split-seg');
-    seg.style.width = (c.sharePercent || c.share || 0) + '%';
+    seg.style.width = pct + '%';
     seg.style.background = hues[i % hues.length];
-    seg.title = (c.userId || c.name) + ' — ' + (c.sharePercent || c.share || 0) + '%';
+    seg.title = c.userId + ' — ' + pct + '%';
     bar.appendChild(seg);
   });
   return bar;
+}
+
+// -- releases: submit, browse, and act on one --------------------------
+
+// Real `PRODUCTION_ITEM_TYPES` from CVLLEX's own `lib/physicalProduction.js`
+// -- this app forwards the order straight through, so the same real
+// catalog applies (and pressed media -- cd/vinyl/cassette -- carries
+// CVLLEX's own real 100-unit minimum run).
+var PHYSICAL_ITEM_TYPES = [
+  'cd', 'vinyl', 'cassette', 't-shirt', 'hoodie', 'hat',
+  'magazine', 'zine', 'poster', 'canvas-print', 'pin', 'sticker', 'tote-bag', 'phone-case', 'other',
+];
+
+// One release card, used both in the artist catalogue grid and the
+// single-release look-up. `onChange` re-runs whatever load produced
+// the card currently on screen, so an action here refreshes in place.
+function releaseCard(rel, onChange) {
+  var lines = el('div', 'vaco-stack-sm');
+  lines.appendChild(el('p', 'vaco-small vaco-dim',
+    rel.format + ' · ' + (rel.targetPlatforms || []).join(', ')));
+  lines.appendChild(el('p', 'vaco-small vaco-faint',
+    'Distribution fee ' + VACO.round(rel.distributionFee) + ' · artist retains ' + rel.ownershipRetainedPercent + '% of streaming revenue'));
+
+  if (rel.coWriters && rel.coWriters.length) {
+    lines.appendChild(splitBar(rel.coWriters));
+    lines.appendChild(el('p', 'vaco-small vaco-faint',
+      rel.coWriters.map(function (c) { return c.userId + ' ' + Math.round(c.splitPercent * 100) + '%'; }).join(' · ')));
+  }
+
+  var streamLine = el('p', 'vaco-small vaco-faint', 'Streams: —');
+  lines.appendChild(streamLine);
+  VACO.api('/api/releases/' + rel.id + '/stream-count')
+    .then(function (sc) { streamLine.textContent = 'Streams: ' + sc.streamCount; })
+    .catch(function () { /* leave the dash -- not worth a toast */ });
+
+  if (rel.vaultStvdiosPostId) {
+    lines.appendChild(el('p', 'vaco-small vaco-faint', 'Music video attached (Vavlt Stvdios post #' + rel.vaultStvdiosPostId + ')'));
+  }
+  if (rel.physicalProductionOrderIds && rel.physicalProductionOrderIds.length) {
+    lines.appendChild(el('p', 'vaco-small vaco-faint', rel.physicalProductionOrderIds.length + ' physical run(s) ordered via CVLLEX'));
+  }
+
+  var userId = VACO.userId();
+  var isOwner = !!userId && userId === rel.artistId;
+
+  var actions = el('div', 'vaco-row-tight');
+  actions.appendChild(VACO.button('Play', function () {
+    if (!userId) throw new Error('Sign in to record a stream.');
+    return VACO.post('/api/releases/' + rel.id + '/stream', { userId: userId })
+      .then(function () { return VACO.api('/api/releases/' + rel.id + '/stream-count'); })
+      .then(function (sc) {
+        streamLine.textContent = 'Streams: ' + sc.streamCount;
+        VACO.toast('Streamed “' + rel.title + '”.');
+      });
+  }, 'sm'));
+
+  if (isOwner && rel.status === 'live') {
+    actions.appendChild(VACO.button('Take down', function () {
+      var reason = prompt('Reason for taking down "' + rel.title + '" (required):');
+      if (!reason) return Promise.resolve();
+      return VACO.post('/api/releases/' + rel.id + '/take-down', { reason: reason })
+        .then(function () { VACO.toast('Release taken down.'); return onChange(); });
+    }, 'danger'));
+  }
+  lines.appendChild(actions);
+
+  if (isOwner && !rel.vaultStvdiosPostId) {
+    lines.appendChild(VACO.card('Attach a music video', [
+      VACO.form([
+        { name: 'mediaUrl', label: 'Media URL', placeholder: 'https://…', width: '200px' },
+        { name: 'durationSeconds', label: 'Duration (s)', type: 'number', min: 1, value: 180, width: '90px' },
+        { name: 'caption', label: 'Caption', value: rel.title, width: '160px' },
+      ], function (values) {
+        return VACO.post('/api/releases/' + rel.id + '/video', values)
+          .then(function () { VACO.toast('Video attached — posted to Vavlt Stvdios as a Reel.', 'money'); return onChange(); });
+      }, 'Attach'),
+    ]));
+  }
+
+  if (isOwner && rel.status === 'live') {
+    lines.appendChild(VACO.card('Order a physical run (CVLLEX)', [
+      VACO.form([
+        { name: 'itemType', label: 'Item', options: PHYSICAL_ITEM_TYPES, width: '120px' },
+        { name: 'quantity', label: 'Qty', type: 'number', min: 1, value: 100, width: '70px' },
+        { name: 'estimatedUnitCost', label: 'Unit cost', type: 'number', min: 0, step: '0.01', value: 2.5, width: '90px' },
+      ], function (values) {
+        return VACO.post('/api/releases/' + rel.id + '/physical-run', values)
+          .then(function (result) { VACO.toast('Physical run ordered — CVLLEX order #' + result.order.id + '.', 'money'); return onChange(); });
+      }, 'Order run'),
+      el('p', 'vaco-small vaco-faint', 'Pressed media (cd/vinyl/cassette) carries CVLLEX’s real 100-unit minimum run.'),
+    ]));
+  }
+
+  return VACO.card(rel.title || ('Release ' + rel.id), [lines], { trailing: VACO.badge(rel.status) });
 }
 
 function renderReleases(body) {
@@ -44,44 +148,106 @@ function renderReleases(body) {
     'Flat-fee distribution: the artist pays once and keeps the royalties, rather than surrendering a percentage forever. '
     + 'Splits below are real records — every collaborator is paid from the same ledger entry.'));
 
+  out.appendChild(VACO.card('Submit a release', [
+    VACO.form([
+      { name: 'artistId', label: 'Artist', value: VACO.userId() || '', width: '140px' },
+      { name: 'title', label: 'Title', width: '180px' },
+      { name: 'format', label: 'Format', options: ['single', 'album', 'video', 'podcast-episode'] },
+      { name: 'targetPlatforms', label: 'Platforms (comma-separated)', placeholder: 'Spotify, Apple Music', width: '220px' },
+    ], function (values) {
+      if (!VACO.userId()) throw new Error('Sign in to submit a release.');
+      var targetPlatforms = String(values.targetPlatforms || '').split(',')
+        .map(function (s) { return s.trim(); }).filter(Boolean);
+      return VACO.post('/api/releases', {
+        artistId: values.artistId, title: values.title, format: values.format, targetPlatforms: targetPlatforms,
+      }).then(function (release) {
+        VACO.toast('Submitted “' + release.title + '” — flat fee ' + VACO.round(release.distributionFee) + ' charged.', 'money');
+        VACO.refreshBalances().then(VACO.renderIdentity);
+        return loadArtist(release.artistId);
+      });
+    }, 'Submit'),
+  ]));
+
   out.appendChild(VACO.card('Look up an artist', [
     VACO.form([{ name: 'artistId', label: 'Artist', value: VACO.userId() || '', width: '160px' }],
-      function (values) {
-        return Promise.all([
-          VACO.api('/api/artists/' + encodeURIComponent(values.artistId) + '/releases'),
-          VACO.api('/api/artists/' + encodeURIComponent(values.artistId) + '/summary').catch(function () { return null; }),
-        ]).then(function (r) {
-          var releases = r[0].releases || r[0] || [];
-          var summary = r[1];
-          while (out.childNodes.length > 2) out.removeChild(out.lastChild);
-
-          if (summary) {
-            out.appendChild(VACO.card('Summary', [
-              VACO.table(Object.keys(summary).filter(function (k) { return typeof summary[k] !== 'object'; })
-                .map(function (k) { return { key: k, label: k.replace(/([A-Z])/g, ' $1') }; }),
-                [summary]),
-            ]));
-          }
-
-          out.appendChild(VACO.grid(releases.map(function (rel) {
-            var lines = el('div', 'vaco-stack-sm');
-            lines.appendChild(el('p', 'vaco-small vaco-dim', (rel.releaseType || 'release') + ' · ' + (rel.trackCount || 0) + ' tracks'));
-            if (rel.collaborators && rel.collaborators.length) {
-              lines.appendChild(splitBar(rel.collaborators));
-              lines.appendChild(el('p', 'vaco-small vaco-faint',
-                rel.collaborators.map(function (c) {
-                  return (c.userId || c.name) + ' ' + (c.sharePercent || c.share || 0) + '%';
-                }).join(' · ')));
-            }
-            return VACO.card(rel.title || ('Release ' + rel.id), [lines],
-              { trailing: VACO.badge(rel.status) });
-          }), true));
-
-          if (!releases.length) out.appendChild(el('div', 'vaco-empty', 'No releases for that artist yet.'));
-          VACO.mount(body, out);
-        });
-      }, 'Load'),
+      function (values) { return loadArtist(values.artistId); }, 'Load'),
   ]));
+
+  out.appendChild(VACO.card('Look up a release', [
+    VACO.form([{ name: 'id', label: 'Release id', type: 'number', min: 1, value: 1, width: '90px' }],
+      function (values) { return loadRelease(values.id); }, 'Load'),
+  ]));
+
+  out.appendChild(VACO.card('Collaborator earnings', [
+    VACO.form([{ name: 'userId', label: 'User id', value: VACO.userId() || '', width: '160px' }],
+      function (values) { return loadCollaboratorEarnings(values.userId); }, 'Load'),
+  ]));
+
+  // Everything appended from here down is one swappable result panel.
+  var BASE = out.childNodes.length;
+  function clearResults() { while (out.childNodes.length > BASE) out.removeChild(out.lastChild); }
+
+  function loadArtist(artistId) {
+    return Promise.all([
+      VACO.api('/api/artists/' + encodeURIComponent(artistId) + '/releases'),
+      VACO.api('/api/artists/' + encodeURIComponent(artistId) + '/summary').catch(function () { return null; }),
+      VACO.api('/api/artists/' + encodeURIComponent(artistId) + '/album-count').catch(function () { return null; }),
+      VACO.api('/api/artists/' + encodeURIComponent(artistId) + '/stream-count').catch(function () { return null; }),
+    ]).then(function (r) {
+      var releases = r[0].releases || r[0] || [];
+      var summary = r[1];
+      var albumCount = r[2];
+      var totalStreams = r[3];
+      clearResults();
+
+      if (summary) {
+        var extra = [];
+        if (albumCount) extra.push(albumCount.albumCount + ' album(s)');
+        if (totalStreams) extra.push(totalStreams.totalStreamCount + ' total streams across every release');
+        out.appendChild(VACO.card('Summary', [
+          VACO.table(Object.keys(summary).filter(function (k) { return typeof summary[k] !== 'object'; })
+            .map(function (k) { return { key: k, label: k.replace(/([A-Z])/g, ' $1') }; }),
+            [summary]),
+          extra.length ? el('p', 'vaco-small vaco-dim', extra.join(' · ')) : null,
+        ]));
+      }
+
+      out.appendChild(VACO.grid(releases.map(function (rel) {
+        return releaseCard(rel, function () { return loadArtist(artistId); });
+      }), true));
+
+      if (!releases.length) out.appendChild(el('div', 'vaco-empty', 'No releases for that artist yet.'));
+      VACO.mount(body, out);
+    });
+  }
+
+  function loadRelease(id) {
+    return VACO.api('/api/releases/' + id).then(function (rel) {
+      clearResults();
+      out.appendChild(releaseCard(rel, function () { return loadRelease(id); }));
+      VACO.mount(body, out);
+    });
+  }
+
+  function loadCollaboratorEarnings(userId) {
+    return VACO.api('/api/collaborators/' + encodeURIComponent(userId) + '/earnings').then(function (data) {
+      clearResults();
+      out.appendChild(VACO.card('Collaborator earnings — ' + userId, [
+        VACO.table(
+          [
+            { key: 'releaseTitle', label: 'Release' },
+            { key: 'splitPercent', label: 'Split', num: true, render: function (row) { return Math.round(row.splitPercent * 100) + '%'; } },
+            { key: 'grossShare', label: 'Gross', num: true, render: function (row) { return VACO.round(row.grossShare); } },
+            { key: 'managerCommission', label: 'Mgr commission', num: true, render: function (row) { return VACO.round(row.managerCommission); } },
+            { key: 'netShare', label: 'Net', num: true, render: function (row) { return VACO.round(row.netShare); } },
+          ],
+          data.earnings, { empty: 'No cross-release earnings found for that user yet.' },
+        ),
+        el('p', 'vaco-small vaco-dim', 'Total net earnings across every release: ' + VACO.round(data.totalNetEarnings)),
+      ]));
+      VACO.mount(body, out);
+    });
+  }
 
   return VACO.mount(body, out);
 }
