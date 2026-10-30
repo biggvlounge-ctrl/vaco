@@ -188,6 +188,88 @@ function renderWaitingRoom(body) {
   return VACO.mount(body, out);
 }
 
+function renderHostConsole(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Run your own experience: settle it once it has actually happened, and call in VOID\'s own '
+    + 'Security, Transport, Space, Staffing or Fulfillment crews — or a CVLLEX merch run — for a '
+    + 'specific event. Each of these only works for the real host of the experience; the server '
+    + 'checks that, not this page.'));
+
+  out.appendChild(VACO.card('Complete & settle', [
+    el('p', 'vaco-small vaco-dim',
+      'Marks the experience completed and pays the host + platform fee out of escrow for every '
+      + 'attendee. If nobody checked in, every booking is refunded in full instead.'),
+    VACO.form([{ name: 'experienceId', label: 'Experience id', type: 'number', min: 1, value: 1, width: '120px' }],
+      function (values) {
+        return VACO.post('/api/experiences/' + values.experienceId + '/complete', {})
+          .then(function (r) {
+            VACO.toast('Experience ' + r.experience.id + ' completed — ' + r.completedBookings.length + ' booking(s) settled.', 'money');
+            VACO.refreshBalances().then(VACO.renderIdentity);
+          });
+      }, 'Complete'),
+  ]));
+
+  out.appendChild(VACO.card('Request a VOID Event Service', [
+    el('p', 'vaco-small vaco-dim',
+      'A real job on VOID\'s own marketplace — the host pays when VOID marks it complete, not here.'),
+    VACO.form([
+      { name: 'experienceId', label: 'Experience id', type: 'number', min: 1, value: 1, width: '110px' },
+      { name: 'serviceType', label: 'Service', options: [
+        { value: 'security', label: 'Security' },
+        { value: 'transport', label: 'Transport' },
+        { value: 'space', label: 'Space' },
+        { value: 'staffing', label: 'Staffing' },
+        { value: 'fulfillment', label: 'Fulfillment' },
+      ], width: '130px' },
+      { name: 'quantity', label: 'Quantity', type: 'number', min: 1, value: 1, width: '90px' },
+      { name: 'unitPrice', label: 'Unit price', type: 'number', min: 1, value: 50, width: '100px' },
+    ], function (values) {
+      return VACO.post('/api/experiences/' + values.experienceId + '/event-services', {
+        serviceType: values.serviceType, quantity: values.quantity, unitPrice: values.unitPrice,
+      }).then(function (r) {
+        VACO.toast('Requested ' + r.serviceType + ' — VOID job ' + r.voidJobId + '.');
+      });
+    }, 'Request'),
+  ]));
+
+  out.appendChild(VACO.card('Order a physical production run', [
+    el('p', 'vaco-small vaco-dim', 'Real merch/collectibles for this specific event, through CVLLEX.'),
+    VACO.form([
+      { name: 'experienceId', label: 'Experience id', type: 'number', min: 1, value: 1, width: '110px' },
+      { name: 'itemType', label: 'Item type', placeholder: 'poster', width: '130px' },
+      { name: 'quantity', label: 'Quantity', type: 'number', min: 1, value: 50, width: '90px' },
+      { name: 'estimatedUnitCost', label: 'Est. unit cost', type: 'number', min: 0, value: 5, width: '110px' },
+    ], function (values) {
+      return VACO.post('/api/experiences/' + values.experienceId + '/physical-run', {
+        itemType: values.itemType, quantity: values.quantity, estimatedUnitCost: values.estimatedUnitCost,
+      }).then(function (r) {
+        VACO.toast('Production order ' + r.order.id + ' placed for ' + values.quantity + ' ' + values.itemType + '.');
+      });
+    }, 'Order'),
+  ]));
+
+  out.appendChild(VACO.card('Event service requests for an experience', [
+    VACO.form([{ name: 'experienceId', label: 'Experience id', type: 'number', min: 1, value: 1, width: '120px' }],
+      function (values) {
+        return VACO.api('/api/experiences/' + values.experienceId + '/event-services').then(function (data) {
+          while (out.childNodes.length > 5) out.removeChild(out.lastChild);
+          out.appendChild(VACO.card('Requests for experience ' + values.experienceId, [
+            VACO.table([
+              { key: 'id', label: 'Request' },
+              { label: 'Type', render: function (r) { return r.serviceType; } },
+              { label: 'VOID job', render: function (r) { return r.voidJobId; } },
+              { label: 'Status', render: function (r) { return VACO.badge(r.status); } },
+            ], data.requests || [], { empty: 'No event service requests yet.' }),
+          ]));
+          VACO.mount(body, out);
+        });
+      }, 'Load'),
+  ]));
+
+  return VACO.mount(body, out);
+}
+
 VACO.app({
   id: 'voidmagic',
   name: 'VOID MAGIC',
@@ -202,6 +284,7 @@ VACO.app({
     { id: 'experiences', label: 'Experiences', heading: 'What is on offer', render: renderExperiences },
     { id: 'bookings', label: 'Bookings', heading: 'Your bookings', render: renderBookings },
     { id: 'door', label: 'The Door', heading: 'Waiting room', render: renderWaitingRoom },
+    { id: 'host-console', label: 'Host Console', heading: 'Run the show', render: renderHostConsole },
   ],
 });
 </script>
