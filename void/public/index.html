@@ -595,6 +595,237 @@ function renderDrop(body) {
   });
 }
 
+// -- Scheduling: four real surfaces on one engine -----------------------
+//
+// reserveBooking.js, hourlyBooking.js, dedicatedLanes.js, and
+// commuteScheduling.js -- CLAUDE.md's own grouping. None of the four
+// had any frontend exposure. Matching and batch-opening are dispatcher
+// actions (`requireCallingService`) this frontend cannot call -- each
+// panel below does the real customer-side half (book, claim, cancel,
+// join, look up) and is honest where it stops.
+
+function renderScheduling(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Four real booking surfaces, one engine: Reserve (book a ride ahead), Hourly (a driver for a time block), '
+    + 'Dedicated Lanes &amp; Spot Loads (freight), and Commute (recurring carpool batches).'));
+
+  // -- VOID Reserve -------------------------------------------------
+  var reserveResult = el('div', 'vaco-stack-sm');
+  var reserveForm = VACO.form([
+    { name: 'pickupTime', label: 'Pickup', type: 'datetime-local', width: '190px' },
+    { name: 'pickupLocation', label: 'Pickup location', placeholder: '123 Main St', width: '160px' },
+    { name: 'dropoffLocation', label: 'Dropoff location', placeholder: 'Airport', width: '160px' },
+    { name: 'estimatedFare', label: 'Est. fare', type: 'number', value: 35, width: '90px' },
+  ], function (values) {
+    var riderId = VACO.userId();
+    if (!riderId) throw new Error('Sign in to book VOID Reserve.');
+    var pickupTime = dateInputToMs(values.pickupTime);
+    if (!pickupTime) throw new Error('Pick a pickup time.');
+    return VACO.post('/api/reserve-booking', {
+      riderId: riderId, pickupTime: pickupTime,
+      pickupLocation: values.pickupLocation, dropoffLocation: values.dropoffLocation,
+      estimatedFare: values.estimatedFare,
+    }).then(function (booking) {
+      VACO.toast('Reserve booking #' + booking.id + ' scheduled');
+      VACO.mount(reserveResult, VACO.notice(
+        'Booking #' + booking.id + ' is <strong>' + booking.status + '</strong> for ' + fmtTime(booking.pickupTime)
+        + '. Save this id to cancel it later.'));
+    });
+  }, 'Book Reserve');
+
+  var reserveCancelForm = VACO.form([
+    { name: 'bookingId', label: 'Booking id', type: 'number', width: '100px' },
+  ], function (values) {
+    return VACO.post('/api/reserve-booking/' + values.bookingId + '/cancel', {}).then(function (result) {
+      var fee = result.cancellationFeeApplies
+        ? 'a cancellation fee applies (inside the 60-minute free window)'
+        : 'free — outside the 60-minute window';
+      VACO.toast('Booking #' + values.bookingId + ' cancelled — ' + fee);
+    });
+  }, 'Cancel');
+
+  out.appendChild(VACO.card('VOID Reserve — book up to 90 days ahead', [
+    reserveForm, reserveResult,
+    el('p', 'vaco-small vaco-dim', 'Matching is attempted before pickup time, not at it. Free to cancel more than 60 minutes out.'),
+    reserveCancelForm,
+  ]));
+
+  // -- VOID Hourly ----------------------------------------------------
+  var hourlyResult = el('div', 'vaco-stack-sm');
+  var hourlyForm = VACO.form([
+    { name: 'driverId', label: 'Driver', placeholder: 'driver-jordan', width: '120px' },
+    { name: 'blockHours', label: 'Hours (2–8)', type: 'number', min: 2, value: 4, width: '90px' },
+    { name: 'hourlyRate', label: 'Rate/hr', type: 'number', value: 30, width: '80px' },
+    { name: 'overageRatePerMile', label: 'Overage/mi', type: 'number', value: 2, width: '100px' },
+    { name: 'overageRatePerMinute', label: 'Overage/min', type: 'number', value: 1, width: '100px' },
+  ], function (values) {
+    var riderId = VACO.userId();
+    if (!riderId) throw new Error('Sign in to book VOID Hourly.');
+    return VACO.post('/api/hourly-booking', {
+      riderId: riderId, driverId: values.driverId, blockHours: values.blockHours,
+      hourlyRate: values.hourlyRate, overageRatePerMile: values.overageRatePerMile,
+      overageRatePerMinute: values.overageRatePerMinute,
+    }).then(function (booking) {
+      VACO.mount(hourlyResult, VACO.notice(
+        'Booking #' + booking.id + ' booked — ' + booking.blockHours + 'h with ' + booking.driverId + '.'));
+    });
+  }, 'Book Hourly');
+
+  var stopResult = el('div', 'vaco-stack-sm');
+  var stopForm = VACO.form([
+    { name: 'bookingId', label: 'Booking id', type: 'number', width: '90px' },
+    { name: 'location', label: 'Stop', placeholder: 'Grocery store', width: '160px' },
+  ], function (values) {
+    return VACO.post('/api/hourly-booking/' + values.bookingId + '/stop', { location: values.location }).then(function () {
+      VACO.mount(stopResult, VACO.notice('Stop added to booking #' + values.bookingId + '.'));
+    });
+  }, 'Add stop');
+
+  var chargeResult = el('div', 'vaco-stack-sm');
+  var chargeForm = VACO.form([
+    { name: 'bookingId', label: 'Booking id', type: 'number', width: '90px' },
+    { name: 'actualHours', label: 'Actual hours', type: 'number', value: 4, width: '100px' },
+    { name: 'actualMiles', label: 'Actual miles', type: 'number', value: 50, width: '100px' },
+  ], function (values) {
+    var qs = 'actualHours=' + values.actualHours + '&actualMiles=' + values.actualMiles;
+    return VACO.api('/api/hourly-booking/' + values.bookingId + '/charge?' + qs).then(function (charge) {
+      VACO.mount(chargeResult, VACO.table([
+        { label: 'Base', num: true, render: function (c) { return VACO.price(c.baseCharge, { freeLabel: false }); } },
+        { label: 'Mileage overage', num: true, render: function (c) { return VACO.price(c.mileageOverageCharge, { freeLabel: false }); } },
+        { label: 'Time overage', num: true, render: function (c) { return VACO.price(c.timeOverageCharge, { freeLabel: false }); } },
+        { label: 'Total', num: true, render: function (c) { return VACO.price(c.totalCharge, { freeLabel: false }); } },
+      ], [charge]));
+    });
+  }, 'Compute charge');
+
+  out.appendChild(VACO.card('VOID Hourly — the same driver for a time block', [
+    hourlyForm, hourlyResult,
+    el('p', 'vaco-small vaco-dim', 'Multiple stops, one driver. Mileage and time past the included allowance charge separately.'),
+    stopForm, stopResult,
+    chargeForm, chargeResult,
+  ]));
+
+  // -- Dedicated Lanes & Spot Loads -------------------------------------
+  var laneResult = el('div', 'vaco-stack-sm');
+  var laneForm = VACO.form([
+    { name: 'originHubId', label: 'Origin hub', type: 'number', width: '90px' },
+    { name: 'destinationHubId', label: 'Destination hub', type: 'number', width: '110px' },
+    { name: 'recurrenceSchedule', label: 'Schedule', options: [{ label: 'Daily', value: 'daily' }, { label: 'Weekly', value: 'weekly' }] },
+    { name: 'ratePerRun', label: 'Rate/run', type: 'number', value: 200, width: '90px' },
+  ], function (values) {
+    var shipperId = VACO.userId();
+    if (!shipperId) throw new Error('Sign in to post a dedicated lane.');
+    return VACO.post('/api/dedicated-lane', {
+      shipperId: shipperId, originHubId: values.originHubId, destinationHubId: values.destinationHubId,
+      recurrenceSchedule: values.recurrenceSchedule, ratePerRun: values.ratePerRun,
+    }).then(function (lane) {
+      VACO.mount(laneResult, VACO.notice('Lane #' + lane.id + ' is open for a carrier to claim.'));
+    });
+  }, 'Post lane');
+
+  var laneActionResult = el('div', 'vaco-stack-sm');
+  var laneClaimForm = VACO.form([
+    { name: 'laneId', label: 'Lane id', type: 'number', width: '80px' },
+    { name: 'carrierId', label: 'Carrier id', value: VACO.userId() || '', width: '120px' },
+  ], function (values) {
+    return VACO.post('/api/dedicated-lane/' + values.laneId + '/claim', { carrierId: values.carrierId }).then(function (lane) {
+      VACO.mount(laneActionResult, VACO.notice('Lane #' + lane.id + ' claimed by ' + lane.carrierId + '.'));
+    });
+  }, 'Claim lane');
+
+  var laneReleaseForm = VACO.form([
+    { name: 'laneId', label: 'Lane id (yours)', type: 'number', width: '120px' },
+  ], function (values) {
+    return VACO.post('/api/dedicated-lane/' + values.laneId + '/release', {}).then(function () {
+      VACO.mount(laneActionResult, VACO.notice('Lane #' + values.laneId + ' released back to open.'));
+    });
+  }, 'Release lane');
+
+  out.appendChild(VACO.card('Dedicated Lanes — a carrier’s recurring commitment', [
+    laneForm, laneResult, laneClaimForm, laneReleaseForm, laneActionResult,
+  ]));
+
+  var spotResult = el('div', 'vaco-stack-sm');
+  var spotForm = VACO.form([
+    { name: 'originHubId', label: 'Origin hub', type: 'number', width: '90px' },
+    { name: 'destinationHubId', label: 'Destination hub', type: 'number', width: '110px' },
+    { name: 'payout', label: 'Payout', type: 'number', value: 60, width: '90px' },
+  ], function (values) {
+    var shipperId = VACO.userId();
+    if (!shipperId) throw new Error('Sign in to post a spot load.');
+    return VACO.post('/api/spot-load', {
+      shipperId: shipperId, originHubId: values.originHubId, destinationHubId: values.destinationHubId,
+      payout: values.payout,
+    }).then(function (load) {
+      VACO.mount(spotResult, VACO.notice('Spot load #' + load.id + ' posted — one-click "Book It Now" for any carrier.'));
+    });
+  }, 'Post spot load');
+
+  var spotBookResult = el('div', 'vaco-stack-sm');
+  var spotBookForm = VACO.form([
+    { name: 'loadId', label: 'Load id', type: 'number', width: '80px' },
+    { name: 'carrierId', label: 'Carrier id', value: VACO.userId() || '', width: '120px' },
+  ], function (values) {
+    return VACO.post('/api/spot-load/' + values.loadId + '/book', { carrierId: values.carrierId }).then(function (load) {
+      VACO.mount(spotBookResult, VACO.notice('Spot load #' + load.id + ' booked by ' + load.carrierId + '.'));
+    });
+  }, 'Book It Now');
+
+  out.appendChild(VACO.card('Spot Loads — one-off, one-click "Book It Now"', [
+    spotForm, spotResult, spotBookForm, spotBookResult,
+  ]));
+
+  // -- VOID Commute -----------------------------------------------------
+  var commuteJoinResult = el('div', 'vaco-stack-sm');
+  var commuteJoinForm = VACO.form([
+    { name: 'batchId', label: 'Batch id', type: 'number', width: '80px' },
+    { name: 'pickupLat', label: 'Pickup lat', type: 'number', step: 'any', width: '110px' },
+    { name: 'pickupLng', label: 'Pickup lng', type: 'number', step: 'any', width: '110px' },
+  ], function (values) {
+    var riderId = VACO.userId();
+    if (!riderId) throw new Error('Sign in to join a commute batch.');
+    return VACO.post('/api/commute-batch/' + values.batchId + '/request', {
+      riderId: riderId, pickupLat: values.pickupLat, pickupLng: values.pickupLng,
+    }).then(function () {
+      VACO.mount(commuteJoinResult, VACO.notice(
+        'Joined batch #' + values.batchId + '. The real match runs once, at the batch’s own deadline.'));
+    });
+  }, 'Join batch');
+
+  var commuteViewResult = el('div', 'vaco-stack-sm');
+  var commuteViewForm = VACO.form([
+    { name: 'batchId', label: 'Batch id', type: 'number', width: '80px' },
+  ], function (values) {
+    return VACO.api('/api/commute-batch/' + values.batchId).then(function (batch) {
+      var groupsNode = el('div', 'vaco-stack-sm');
+      groupsNode.appendChild(el('p', 'vaco-small vaco-dim',
+        batch.window + ' window · deadline ' + fmtTime(batch.deadline) + ' · status ' + batch.status));
+      if (batch.status === 'accepting') {
+        groupsNode.appendChild(el('p', 'vaco-small', batch.requests.length + ' rider(s) waiting for the deadline match.'));
+      } else {
+        batch.carpoolGroups.forEach(function (group, i) {
+          groupsNode.appendChild(el('p', 'vaco-small', 'Carpool ' + (i + 1) + ': '
+            + group.map(function (r) { return r.riderId; }).join(', ')));
+        });
+        if (batch.unmatchedRiders.length) {
+          groupsNode.appendChild(el('p', 'vaco-small vaco-dim', 'Backup on-demand guaranteed for: '
+            + batch.unmatchedRiders.map(function (r) { return r.riderId; }).join(', ')));
+        }
+      }
+      VACO.mount(commuteViewResult, VACO.card('Batch #' + batch.id, [groupsNode]));
+    });
+  }, 'View batch');
+
+  out.appendChild(VACO.card('VOID Commute — recurring carpool batches', [
+    el('p', 'vaco-small vaco-dim',
+      'A batch is opened by VOID’s own scheduler, not from here. Join one you know the id of, or look one up to see how it matched.'),
+    commuteJoinForm, commuteJoinResult, commuteViewForm, commuteViewResult,
+  ]));
+
+  return VACO.mount(body, out);
+}
+
 VACO.app({
   id: 'void',
   name: 'VOID',
@@ -619,6 +850,9 @@ VACO.app({
     { id: 'drop', label: 'VOID DROP', heading: 'Mobile space rental & deployment',
       blurb: 'Select a product, book a real physical unit, and watch it move through delivery, deployment, use, and retrieval.',
       render: renderDrop },
+    { id: 'scheduling', label: 'Scheduling', heading: 'Reserve, Hourly, Lanes & Commute',
+      blurb: 'Four real booking surfaces, one shared engine.',
+      render: renderScheduling },
     { id: 'academy', label: 'Academy', heading: 'VOID Academy',
       blurb: 'Real training on how VOID actually pays you, chosen from your own claimed skills.',
       render: renderAcademy },
