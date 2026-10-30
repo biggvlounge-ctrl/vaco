@@ -62,7 +62,15 @@ var MINES_BOARD_SIZE = 25;
 // The live round. A module-level object rather than re-fetched each
 // render, because a Mines round is a conversation: the board a player
 // is looking at must be the board they clicked into.
-var game = { session: null, round: null, currency: 'gold-coin', stake: 10, mines: 3 };
+// `kind` picks which Originals game the start form/board below render
+// -- 'mines' (the original build), or 'plinko'/'hilo' (added here,
+// same real session+round flow, same `lib/originals.js` engine).
+var game = { session: null, round: null, currency: 'gold-coin', stake: 10, mines: 3, kind: 'mines' };
+
+// `lib/originals.js`'s own real HILO_CARD_VALUES (Ace low through
+// King) -- also exposed on GET /api/health as `hiloCardValues`, kept
+// here as a literal since it is a fixed game constant, not live data.
+var HILO_CARD_VALUES = 13;
 
 // -- Casino -----------------------------------------------------------
 
@@ -77,6 +85,7 @@ function renderCasino(body) {
   out.appendChild(goldCoinCard());
 
   if (!game.round) {
+    out.appendChild(gameSwitcher());
     out.appendChild(newRoundCard());
   } else {
     out.appendChild(boardCard());
@@ -84,6 +93,33 @@ function renderCasino(body) {
   }
 
   return VACO.mount(body, out);
+}
+
+// Three real Originals games share this one session+round flow —
+// `lib/originals.js`'s own `startMinesRound`/`startPlinkoRound`/
+// `startHiloRound` are siblings, not variants of one game, so this is
+// a switcher between them rather than a parameter on Mines.
+function gameSwitcher() {
+  var row = el('div', 'vaco-row-tight');
+  [['mines', 'Mines'], ['plinko', 'Plinko'], ['hilo', 'Hi-Lo']].forEach(function (pair) {
+    row.appendChild(VACO.button(pair[1], function () {
+      game.kind = pair[0];
+      VACO.render();
+    }, game.kind === pair[0] ? 'primary vaco-btn-sm' : 'ghost vaco-btn-sm'));
+  });
+  return row;
+}
+
+function newRoundCard() {
+  if (game.kind === 'plinko') return plinkoStartCard();
+  if (game.kind === 'hilo') return hiloStartCard();
+  return minesStartCard();
+}
+
+function boardCard() {
+  if (game.round.game === 'plinko') return plinkoBoardCard();
+  if (game.round.game === 'hilo') return hiloBoardCard();
+  return minesBoardCard();
 }
 
 function goldCoinCard() {
@@ -107,7 +143,7 @@ function goldCoinCard() {
   return card;
 }
 
-function newRoundCard() {
+function minesStartCard() {
   return VACO.card('Mines', [
     el('p', 'vaco-small vaco-dim',
       'Reveal tiles one at a time. Every safe tile raises the multiplier; one mine ends the round. Cash out whenever you like.'),
@@ -155,7 +191,78 @@ function startMines(values) {
   });
 }
 
-function boardCard() {
+// A real casino session, shared by every Originals game here — only
+// `gameType: 'originals'` and the stake/currency differ, never the
+// round itself, which each game's own `/api/casino/<game>/start` builds.
+function startOriginalsSession(currency, stakeAmount) {
+  return VACO.post('/api/casino/sessions', {
+    userId: VACO.userId(),
+    gameType: 'originals',
+    currency: currency,
+    stakeAmount: stakeAmount,
+    amoeEntryUsed: false,
+  });
+}
+
+function plinkoStartCard() {
+  return VACO.card('Plinko', [
+    el('p', 'vaco-small vaco-dim',
+      'Drop a ball through a 16-row board. Where it lands sets the multiplier — edges pay more than the center.'),
+    VACO.form([
+      { name: 'currency', label: 'Currency', options: [
+        { value: 'gold-coin', label: 'Gold Coin (free)' },
+        { value: 'vcoin', label: 'VCoin (real)' },
+      ] },
+      { name: 'stakeAmount', label: 'Stake', type: 'number', min: 1, value: game.stake, width: '90px' },
+      { name: 'clientSeed', label: 'Your seed', value: randomSeed(), width: '160px' },
+    ], startPlinko, 'Deal'),
+  ]);
+}
+
+function startPlinko(values) {
+  game.currency = values.currency;
+  game.stake = values.stakeAmount;
+
+  return startOriginalsSession(values.currency, values.stakeAmount).then(function (session) {
+    game.session = session;
+    return VACO.post('/api/casino/plinko/start', { sessionId: session.id, clientSeed: values.clientSeed });
+  }).then(function (round) {
+    game.round = round;
+    VACO.refreshBalances().then(VACO.renderIdentity);
+    VACO.render();
+  });
+}
+
+function hiloStartCard() {
+  return VACO.card('Hi-Lo', [
+    el('p', 'vaco-small vaco-dim',
+      'Guess whether the next card is higher or lower than the one showing. Correct guesses compound the multiplier — cash out any time after your first.'),
+    VACO.form([
+      { name: 'currency', label: 'Currency', options: [
+        { value: 'gold-coin', label: 'Gold Coin (free)' },
+        { value: 'vcoin', label: 'VCoin (real)' },
+      ] },
+      { name: 'stakeAmount', label: 'Stake', type: 'number', min: 1, value: game.stake, width: '90px' },
+      { name: 'clientSeed', label: 'Your seed', value: randomSeed(), width: '160px' },
+    ], startHilo, 'Deal'),
+  ]);
+}
+
+function startHilo(values) {
+  game.currency = values.currency;
+  game.stake = values.stakeAmount;
+
+  return startOriginalsSession(values.currency, values.stakeAmount).then(function (session) {
+    game.session = session;
+    return VACO.post('/api/casino/hilo/start', { sessionId: session.id, clientSeed: values.clientSeed });
+  }).then(function (round) {
+    game.round = round;
+    VACO.refreshBalances().then(VACO.renderIdentity);
+    VACO.render();
+  });
+}
+
+function minesBoardCard() {
   var round = game.round;
   var lost = round.status === 'lost';
   var over = round.status !== 'active';
@@ -208,6 +315,116 @@ function boardCard() {
       'Mine hit — the round is over. The mine positions were fixed before your first click, and the seed below proves it.', 'danger'));
   }
   return VACO.card(null, children);
+}
+
+// Plinko has no player choice once the ball is in play — a round opens
+// `pending`, `POST .../drop` resolves it in one call to `resolved`, and
+// `publicRoundView` only reveals `path`/`bucket`/`multiplier` once it
+// has. There is no board animation here: the real path (a sequence of
+// L/R draws) is shown as the fairness proof it is, not a recreation of
+// the physical board.
+function plinkoBoardCard() {
+  var round = game.round;
+  var over = round.status !== 'pending';
+  var children = [];
+
+  if (!over) {
+    children.push(el('p', 'vaco-small vaco-dim', 'Ball ready — drop it to resolve the round.'));
+    children.push(VACO.button('Drop ball', function () {
+      return VACO.post('/api/casino/plinko/' + round.id + '/drop', {}).then(function (result) {
+        game.round = result;
+        VACO.toast('Landed in bucket ' + result.bucket + ' — ×' + VACO.round(result.multiplier)
+          + ' (' + VACO.round(result.payout) + ')', result.payout > 0 ? 'money' : 'danger');
+        VACO.refreshBalances().then(VACO.renderIdentity);
+        VACO.render();
+      });
+    }, 'primary'));
+  } else {
+    children.push(el('p', 'vaco-mono vaco-small seed', 'Path: ' + (round.path || []).join(' ')));
+    var stats = el('div', 'stat-row');
+    [['Stake', game.stake], ['Bucket', round.bucket], ['Multiplier', '×' + VACO.round(round.multiplier)],
+     ['Payout', VACO.round(round.payout)]].forEach(function (pair) {
+      var s = el('div', 'stat');
+      s.appendChild(el('span', 'vaco-label', pair[0]));
+      s.appendChild(el('span', 'stat-value', pair[1]));
+      stats.appendChild(s);
+    });
+    children.push(stats);
+    children.push(VACO.button('New round', function () {
+      game.round = null;
+      game.session = null;
+      VACO.render();
+    }, 'primary'));
+  }
+  return VACO.card('Plinko', children);
+}
+
+// Hi-Lo is active across several guesses, like Mines — but with one
+// number instead of a board. `round.currentMultiplier > 1` is the real
+// signal at least one correct guess has landed (it starts at exactly 1
+// and only `computeHiloMultiplier` after a win moves it), which is also
+// exactly when `cashOutHilo` itself allows a cash-out, so the button's
+// visibility matches the server's own guard rather than inventing a
+// separate one. The guaranteed-loss guess (e.g. "higher" from 13) is
+// disabled here for the same reason `guessHilo` rejects it server-side.
+function hiloBoardCard() {
+  var round = game.round;
+  var over = round.status !== 'active';
+
+  var head = el('div', 'vaco-row');
+  head.appendChild(el('span', 'multiplier', '×' + VACO.round(round.currentMultiplier || 1)));
+  head.appendChild(el('span', 'vaco-spacer'));
+  head.appendChild(VACO.badge(round.status));
+
+  var current = el('div', 'stat');
+  current.appendChild(el('span', 'vaco-label', 'Current card value (1 = Ace low, ' + HILO_CARD_VALUES + ' = King)'));
+  current.appendChild(el('span', 'stat-value', round.currentValue + ' / ' + HILO_CARD_VALUES));
+
+  var children = [head, current];
+
+  if (!over) {
+    var actions = el('div', 'vaco-row');
+    var higherBtn = VACO.button('Higher', function () {
+      return VACO.post('/api/casino/hilo/' + round.id + '/guess', { direction: 'higher' }).then(function (updated) {
+        game.round = updated;
+        if (updated.status === 'lost') VACO.toast('Wrong guess — round over.', 'danger');
+        VACO.render();
+      });
+    }, 'primary');
+    var lowerBtn = VACO.button('Lower', function () {
+      return VACO.post('/api/casino/hilo/' + round.id + '/guess', { direction: 'lower' }).then(function (updated) {
+        game.round = updated;
+        if (updated.status === 'lost') VACO.toast('Wrong guess — round over.', 'danger');
+        VACO.render();
+      });
+    }, 'primary');
+    if (round.currentValue >= HILO_CARD_VALUES) higherBtn.disabled = true;
+    if (round.currentValue <= 1) lowerBtn.disabled = true;
+    actions.appendChild(higherBtn);
+    actions.appendChild(lowerBtn);
+    if (round.currentMultiplier > 1) {
+      actions.appendChild(VACO.button('Cash out', function () {
+        return VACO.post('/api/casino/hilo/' + round.id + '/cash-out', {}).then(function (result) {
+          game.round = null;
+          game.session = null;
+          VACO.toast('Cashed out ' + VACO.round(result.payout), 'money');
+          VACO.refreshBalances().then(VACO.renderIdentity);
+          VACO.render();
+        });
+      }, 'ghost'));
+    }
+    children.push(actions);
+  } else {
+    children.push(VACO.notice(
+      round.status === 'lost' ? 'Wrong guess — the round is over.' : 'Cashed out.',
+      round.status === 'lost' ? 'danger' : 'money'));
+    children.push(VACO.button('New round', function () {
+      game.round = null;
+      game.session = null;
+      VACO.render();
+    }, 'primary'));
+  }
+  return VACO.card('Hi-Lo', children);
 }
 
 function tile(index, round, over) {
@@ -573,8 +790,8 @@ VACO.app({
   accentDim: '#b07f26',
   accentInk: '#1a1204',
   tabs: [
-    { id: 'casino', label: 'Casino', heading: 'Mines',
-      blurb: 'Real provably-fair game logic, playable. The board is committed before your first click and the seed is published after.',
+    { id: 'casino', label: 'Casino', heading: 'Originals: Mines, Plinko, Hi-Lo',
+      blurb: 'Real provably-fair game logic, playable. Every round’s commitment hash is published before your first move and the seed is revealed once it resolves.',
       render: renderCasino },
     { id: 'fantasy', label: 'Fantasy', heading: 'Player props', render: renderFantasy },
     { id: 'sportsbook', label: 'Sportsbook', heading: 'Events and lines',
