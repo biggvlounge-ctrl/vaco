@@ -189,6 +189,107 @@ function renderFractional(body) {
   });
 }
 
+// -- Packs & mint guidance --------------------------------------------
+//
+// Pack tiers are platform inventory (`requireCallingService()` on
+// create) -- this app has no service credential, so there is no
+// "create a pack tier" form here. What a real session CAN do: look up
+// an existing tier by id, see its real pre-purchase odds disclosure
+// before buying, and open it. A fresh install has no pack tiers at
+// all (seedDemoData.js never creates one) -- this tab is honest about
+// that rather than inventing a tier to browse.
+
+function renderOdds(container, odds) {
+  var box = el('div', 'vaco-stack-sm');
+  if (odds.guaranteeNote) box.appendChild(el('p', 'vaco-small vaco-dim', odds.guaranteeNote));
+  var tiers = Object.keys(odds.bestCardRarityOdds);
+  box.appendChild(VACO.table([
+    { key: 'rarityTier', label: 'Rarity' },
+    { label: 'Best card is exactly this', num: true, render: function (r) { return VACO.round(r.bestCardOdds * 100) + '%'; } },
+    { label: 'At least one of this or better', num: true, render: function (r) { return VACO.round(r.atLeastOdds * 100) + '%'; } },
+  ], tiers.map(function (tier) {
+    return { rarityTier: tier, bestCardOdds: odds.bestCardRarityOdds[tier], atLeastOdds: odds.atLeastOneOfRarityOrBetter[tier] };
+  })));
+  VACO.mount(container, box);
+}
+
+function renderPackTier(container, tier) {
+  var box = el('div', 'vaco-stack-sm');
+  var head = el('div', 'vaco-row-tight');
+  head.appendChild(VACO.badge(tier.tierName));
+  head.appendChild(VACO.price(tier.price, { freeLabel: false }));
+  head.appendChild(el('span', 'vaco-small vaco-dim', tier.cardsPerPack + ' cards/pack'));
+  if (tier.guaranteedMinimumRarity) head.appendChild(VACO.badge('guarantees ' + tier.guaranteedMinimumRarity + '+'));
+  box.appendChild(head);
+  box.appendChild(el('p', 'vaco-small vaco-dim', 'Pool: ' + tier.categoryPool + ' · ' + tier.digitalOrPhysical));
+
+  var oddsOut = el('div');
+  box.appendChild(VACO.form([
+    { name: 'candidateCardIds', label: 'Candidate card ids (comma-separated)', placeholder: '1,2,3' },
+  ], function (values) {
+    var ids = String(values.candidateCardIds || '').split(',').map(function (s) { return Number(s.trim()); }).filter(function (n) { return Number.isFinite(n); });
+    return VACO.post('/api/pack-tier/' + tier.packTierId + '/odds', { candidateCardIds: ids })
+      .then(function (odds) { renderOdds(oddsOut, odds); });
+  }, 'Get odds'));
+  box.appendChild(oddsOut);
+
+  var openOut = el('p', 'vaco-small vaco-dim');
+  box.appendChild(VACO.form([
+    { name: 'buyerId', label: 'Buyer id', value: VACO.userId() || '' },
+    { name: 'candidateCardIds', label: 'Candidate card ids (comma-separated)', placeholder: '1,2,3' },
+  ], function (values) {
+    if (!VACO.userId()) throw new Error('Sign in to open a pack.');
+    var ids = String(values.candidateCardIds || '').split(',').map(function (s) { return Number(s.trim()); }).filter(function (n) { return Number.isFinite(n); });
+    return VACO.post('/api/pack-tier/' + tier.packTierId + '/open', { buyerId: values.buyerId, candidateCardIds: ids })
+      .then(function (result) {
+        VACO.toast('Pack opened -- ' + result.cardsReceived.length + ' card(s) received', 'money');
+        VACO.refreshBalances().then(VACO.renderIdentity);
+        openOut.textContent = result.cardsReceived.map(function (c) {
+          return 'Card ' + c.card.id + ' (' + c.card.rarityTier + ', edition #' + c.edition.editionNumber + ')';
+        }).join('; ');
+      });
+  }, 'Open pack (charges the buyer)'));
+  box.appendChild(openOut);
+
+  VACO.mount(container, box);
+}
+
+function renderPacks(body) {
+  var out = el('div', 'vaco-stack');
+
+  out.appendChild(VACO.notice(
+    'Pack tiers are platform inventory -- VOKEN operations creates them, not a user session. '
+    + 'Look one up by id below to see its real pre-purchase odds and open it.'));
+
+  var guidanceBody = el('div', 'vaco-empty', 'Loading…');
+  out.appendChild(VACO.card('Recommended mint counts by rarity', [
+    'A fixed, deterministic recommendation per rarity tier -- never auto-applied, a lookup only.',
+    guidanceBody,
+  ]));
+  VACO.api('/api/mint-count-guidance').then(function (data) {
+    var byRarity = data.recommendedMintCountsByRarity;
+    VACO.mount(guidanceBody, VACO.table([
+      { key: 'rarityTier', label: 'Rarity' },
+      { label: 'Digital', num: true, render: function (r) { return r.plannedDigitalMintCount; } },
+      { label: 'Physical', num: true, render: function (r) { return r.plannedPhysicalMintCount; } },
+    ], Object.keys(byRarity).map(function (tier) {
+      return { rarityTier: tier, plannedDigitalMintCount: byRarity[tier].plannedDigitalMintCount, plannedPhysicalMintCount: byRarity[tier].plannedPhysicalMintCount };
+    })));
+  });
+
+  var packResult = el('div');
+  out.appendChild(VACO.card('Look up a pack tier', [
+    VACO.form([{ name: 'packTierId', label: 'Pack tier id', type: 'number', placeholder: '1' }], function (values) {
+      return VACO.api('/api/pack-tier/' + encodeURIComponent(values.packTierId)).then(function (tier) {
+        renderPackTier(packResult, tier);
+      });
+    }, 'Look up'),
+    packResult,
+  ]));
+
+  return out;
+}
+
 // Boot needs the brand and category list before the first render, since
 // both are real server-owned values rather than constants in this file.
 VACO.api('/api/health').then(function (health) {
@@ -212,6 +313,7 @@ VACO.api('/api/health').then(function (health) {
       { id: 'cards', label: 'Cards', heading: 'Browse by category', render: renderCards },
       { id: 'explore', label: 'Explore', heading: 'What is moving', render: renderExplore },
       { id: 'fractional', label: 'Fractional', heading: 'Shares & resale', render: renderFractional },
+      { id: 'packs', label: 'Packs', heading: 'Packs & mint guidance', render: renderPacks },
     ],
   });
 });
