@@ -622,6 +622,196 @@ function renderNearby(body) {
   return VACO.mount(body, out);
 }
 
+// -- Dating Formats: Speed/Group Dating, Gift Dating, Long-Distance,
+// Blind Date -- four real, distinct formats sitting on top of the same
+// core matching engine (per this app's own README framing), bundled
+// into one tab the same way void/public/index.html's own "Scheduling"
+// tab bundled that app's four real scheduling surfaces together.
+
+function renderFormats(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Four real, distinct dating formats — Speed/Group Dating, Gift Dating, Long-Distance Mode, and Blind Date — '
+    + 'all reuse the same real compatibility and matching engine underneath, not parallel systems.'));
+
+  var id = VACO.userId();
+  if (!id) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to use any dating format below.'));
+    return VACO.mount(body, out);
+  }
+
+  var grid = el('div', 'safety-grid');
+
+  // -- Speed / Group Dating --
+
+  var speedOut = el('div', 'vaco-stack-sm');
+  grid.appendChild(VACO.card('Speed & Group Dating', [
+    el('p', 'vaco-small vaco-dim', 'Requires every participant to hold a real VACA-verified badge. 2 participants is standard; 3+ is a rotating group slot.'),
+    VACO.form([
+      { name: 'format', label: 'Format', options: [{ label: 'In person', value: 'in-person' }, { label: 'All-FaceTime', value: 'all-facetime' }], width: '140px' },
+      { name: 'participants', label: 'Participants', placeholder: 'user ids, comma-separated', value: id, width: '200px' },
+      { name: 'durationSec', label: 'Duration (sec)', type: 'number', min: 1, value: 180, width: '110px' },
+    ], function (values) {
+      var participants = splitIds(values.participants);
+      if (!participants.includes(id)) throw new Error('You must be one of the participants.');
+      return VACO.post('/api/speed-dates', { format: values.format, participants: participants, durationSec: values.durationSec })
+        .then(function (d) { VACO.toast('Speed date slot #' + d.id + ' scheduled.'); });
+    }, 'Schedule'),
+    VACO.form([{ name: 'id', label: 'Slot id', type: 'number', min: 1, value: 1, width: '90px' }],
+      function (values) {
+        return VACO.api('/api/speed-dates/' + values.id).then(function (s) {
+          var card = el('div', 'vaco-stack-sm');
+          card.appendChild(el('p', 'vaco-small vaco-dim', s.participants.join(', ') + ' — ' + s.durationSec + 's (' + s.format + ')'));
+          if (s.participants.length > 2) {
+            return VACO.api('/api/speed-dates/' + values.id + '/rotation').then(function (r) {
+              card.appendChild(VACO.table([{ key: 'userAId', label: 'A' }, { key: 'userBId', label: 'B' }], r.rounds));
+              VACO.mount(speedOut, card);
+            });
+          }
+          VACO.mount(speedOut, card);
+        });
+      }, 'View slot'),
+    speedOut,
+    VACO.form([
+      { name: 'id', label: 'Slot id', type: 'number', min: 1, value: 1, width: '90px' },
+      { name: 'additionalSec', label: 'Extend by (sec)', type: 'number', min: 1, value: 180, width: '110px' },
+    ], function (values) {
+      return VACO.post('/api/speed-dates/' + values.id + '/extend', { additionalSec: values.additionalSec })
+        .then(function () { VACO.toast('Extended once — a slot can only extend one time.'); });
+    }, 'Extend'),
+  ]));
+
+  // -- Gift Dating --
+
+  var giftThresholdOut = el('div', 'vaco-stack-sm');
+  var giftRequestsOut = el('div', 'vaco-stack-sm');
+  grid.appendChild(VACO.card('Gift Dating', [
+    el('p', 'vaco-small vaco-dim', 'The real, deliberate replacement for a "sugar dating" feature — a recipient-set VCoin minimum before a date request is even created.'),
+    VACO.form([{ name: 'minGiftValueVCoin', label: 'Your minimum (VCoin)', type: 'number', min: 0, value: 50, width: '140px' }],
+      function (values) {
+        return VACO.post('/api/gift-dating/threshold', { userId: id, minGiftValueVCoin: values.minGiftValueVCoin })
+          .then(function () { VACO.toast('Threshold set.'); loadGiftThreshold(); });
+      }, 'Set threshold'),
+    giftThresholdOut,
+    VACO.form([
+      { name: 'recipientId', label: 'Request a date with', placeholder: 'their user id', width: '140px' },
+      { name: 'giftValueVCoin', label: 'Gift (VCoin)', type: 'number', min: 1, value: 50, width: '110px' },
+    ], function (values) {
+      return VACO.post('/api/gift-dating/request', { requesterId: id, recipientId: values.recipientId, giftValueVCoin: values.giftValueVCoin })
+        .then(function (r) { VACO.toast('Request #' + r.id + ' sent — real VCoin transferred.'); });
+    }, 'Send gift + request'),
+    el('p', 'vaco-small vaco-dim', 'Requests you’ve received:'),
+    giftRequestsOut,
+  ]));
+
+  function loadGiftThreshold() {
+    VACO.api('/api/gift-dating/threshold/' + encodeURIComponent(id))
+      .then(function (t) { VACO.mount(giftThresholdOut, VACO.badge('current minimum: ' + t.minGiftValueVCoin + ' VCoin')); })
+      .catch(function () { VACO.mount(giftThresholdOut, el('p', 'vaco-small vaco-faint', 'No threshold set — any gift is accepted.')); });
+  }
+  loadGiftThreshold();
+  VACO.api('/api/gift-dating/requests/' + encodeURIComponent(id))
+    .then(function (data) {
+      var requests = data.requests || [];
+      VACO.mount(giftRequestsOut, requests.length
+        ? VACO.table([
+          { key: 'requesterId', label: 'From' },
+          { key: 'giftValueVCoin', label: 'Gift', num: true },
+        ], requests)
+        : el('p', 'vaco-small vaco-faint', 'None yet.'));
+    })
+    .catch(function () { /* no requests yet */ });
+
+  // -- Long-Distance Mode --
+
+  var ldPinOut = el('div', 'vaco-stack-sm');
+  var ldRoadmapOut = el('div', 'vaco-stack-sm');
+  grid.appendChild(VACO.card('Long-Distance Mode', [
+    el('p', 'vaco-small vaco-dim', 'A Bumble Travel-style pin, one Coffee Meets Bagel-style curated match per real day, and a one-directional "closing the distance" roadmap.'),
+    VACO.form([
+      { name: 'lat', label: 'Lat', type: 'number', step: '0.0001', value: 40.7128, width: '100px' },
+      { name: 'lng', label: 'Lng', type: 'number', step: '0.0001', value: -74.006, width: '100px' },
+      { name: 'isTravelPin', label: 'Travel pin?', options: [{ label: 'No — I live here', value: 'false' }, { label: 'Yes — upcoming travel', value: 'true' }], width: '180px' },
+    ], function (values) {
+      return VACO.post('/api/long-distance/pin', { userId: id, lat: values.lat, lng: values.lng, isTravelPin: values.isTravelPin === 'true' })
+        .then(function () { VACO.toast('Pin set.'); loadLdPin(); });
+    }, 'Set pin'),
+    ldPinOut,
+    VACO.form([{ name: 'candidateIds', label: 'Candidates', placeholder: 'user ids, comma-separated', width: '180px' }],
+      function (values) {
+        return VACO.post('/api/long-distance/daily-match', { userId: id, candidateIds: splitIds(values.candidateIds) })
+          .then(function (m) { VACO.toast('Today’s curated match: ' + m.candidateId + ' (one per real day).'); });
+      }, 'Get daily match'),
+    VACO.form([{ name: 'matchId', label: 'Match id', type: 'number', min: 1, value: 1, width: '90px' }],
+      function (values) {
+        return VACO.api('/api/long-distance/roadmap/' + values.matchId).then(function (r) {
+          VACO.mount(ldRoadmapOut, VACO.badge(r.stage, r.stage === 'closing-distance' ? 'money' : 'warn'));
+        });
+      }, 'View roadmap'),
+    ldRoadmapOut,
+    VACO.form([{ name: 'matchId', label: 'Match id', type: 'number', min: 1, value: 1, width: '90px' }],
+      function (values) {
+        return VACO.post('/api/long-distance/roadmap/' + values.matchId + '/advance', {})
+          .then(function (r) { VACO.toast('Advanced to ' + r.stage + '.'); });
+      }, 'Advance stage'),
+  ]));
+
+  function loadLdPin() {
+    VACO.api('/api/long-distance/pin/' + encodeURIComponent(id))
+      .then(function (p) { VACO.mount(ldPinOut, VACO.badge((p.isTravelPin ? 'travel pin' : 'home pin') + ': ' + p.lat.toFixed(2) + ', ' + p.lng.toFixed(2))); })
+      .catch(function () { VACO.mount(ldPinOut, el('p', 'vaco-small vaco-faint', 'No pin set yet.')); });
+  }
+  loadLdPin();
+
+  // -- Blind Date Mode --
+
+  var blockedOut = el('div', 'vaco-stack-sm');
+  var sessionOut = el('div', 'vaco-stack-sm');
+  grid.appendChild(VACO.card('Blind Date Mode', [
+    el('p', 'vaco-small vaco-dim',
+      'A $20 VCoin date token, one AI-ranked match at a time with photos hidden until 3 real messages, and a block after 2 cancellations in a row.'),
+    blockedOut,
+    VACO.form([], function () {
+      return VACO.post('/api/blind-date/token', { userId: id })
+        .then(function (t) { VACO.toast('Token #' + t.id + ' purchased — 20 VCoin.'); });
+    }, 'Buy a date token (20 VCoin)'),
+    VACO.form([{ name: 'candidateIds', label: 'Candidates', placeholder: 'user ids, comma-separated', width: '180px' }],
+      function (values) {
+        return VACO.post('/api/blind-date/assign', { userId: id, candidateIds: splitIds(values.candidateIds) })
+          .then(function (s) { VACO.toast('Blind date session #' + s.id + ' assigned.'); });
+      }, 'Assign'),
+    VACO.form([{ name: 'id', label: 'Session id', type: 'number', min: 1, value: 1, width: '90px' }],
+      function (values) {
+        return VACO.api('/api/blind-date/' + values.id).then(function (s) {
+          var row = el('div', 'vaco-row-tight');
+          row.appendChild(VACO.badge(s.photosRevealed ? 'photos revealed' : 'photos hidden', s.photosRevealed ? 'money' : 'warn'));
+          if (s.cancelled) row.appendChild(VACO.badge('cancelled', 'danger'));
+          VACO.mount(sessionOut, row);
+        });
+      }, 'View session'),
+    sessionOut,
+    VACO.form([{ name: 'id', label: 'Session id', type: 'number', min: 1, value: 1, width: '90px' }],
+      function (values) {
+        return VACO.post('/api/blind-date/' + values.id + '/reveal', {})
+          .then(function () { VACO.toast('Photos revealed.'); });
+      }, 'Reveal photos'),
+    VACO.form([{ name: 'id', label: 'Session id', type: 'number', min: 1, value: 1, width: '90px' }],
+      function (values) {
+        return VACO.post('/api/blind-date/' + values.id + '/cancel', {})
+          .then(function () { VACO.toast('Cancelled.'); });
+      }, 'Cancel'),
+  ]));
+
+  VACO.api('/api/blind-date/blocked/' + encodeURIComponent(id))
+    .then(function (r) {
+      if (r.blocked) VACO.mount(blockedOut, VACO.badge('temporarily blocked after 2 cancellations in a row', 'danger'));
+    })
+    .catch(function () { /* unknown, say nothing rather than guess */ });
+
+  out.appendChild(grid);
+  return VACO.mount(body, out);
+}
+
 VACO.app({
   id: 'cvnvo',
   name: 'CVNVO',
@@ -638,6 +828,7 @@ VACO.app({
     { id: 'messages', label: 'Messages', heading: 'Matches, messages & calls', render: renderMessages },
     { id: 'safety', label: 'Safety', heading: 'Check-ins & screening', render: renderSafety },
     { id: 'nearby', label: 'Nearby', heading: 'Proximity & BarBuddy', render: renderNearby },
+    { id: 'formats', label: 'Formats', heading: 'Dating formats', render: renderFormats },
   ],
 });
 </script>
