@@ -325,6 +325,63 @@ function renderVillages(body) {
   });
 }
 
+// -- Search -------------------------------------------------------------
+//
+// Closes vxllageSearch.js's own flagged gap: "Search icons (Threads,
+// Villages) -- decorative, no search executes." Real, case-insensitive
+// substring search over village names and post text -- one query box
+// for both, since that is genuinely all two routes do.
+
+function renderSearch(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.card('Search', [
+    VACO.form([
+      { name: 'q', label: 'Query', placeholder: 'search villages and posts', width: '280px' },
+    ], function (values) {
+      return runSearch(out, body, values.q);
+    }, 'Search'),
+  ]));
+  out.appendChild(el('div', 'vaco-empty', 'Villages match by name; posts match by text — both case-insensitive.'));
+  return VACO.mount(body, out);
+}
+
+function runSearch(out, body, q) {
+  q = String(q || '').trim();
+  if (!q) return Promise.resolve();
+  return Promise.all([
+    VACO.api('/api/search/villages?q=' + encodeURIComponent(q)),
+    VACO.api('/api/search/posts?q=' + encodeURIComponent(q)),
+  ]).then(function (r) {
+    var villages = r[0].results || [];
+    var posts = r[1].results || [];
+    var replacement = el('div', 'vaco-stack');
+
+    replacement.appendChild(VACO.card('Villages — ' + villages.length, [
+      VACO.table([
+        { key: 'id', label: 'Id' },
+        { key: 'name', label: 'Name' },
+        { label: 'Members', num: true, render: function (v) { return (v.members || []).length; } },
+      ], villages, { empty: 'No matching villages.' }),
+    ]));
+    replacement.appendChild(VACO.card('Posts — ' + posts.length, [
+      VACO.table([
+        { key: 'id', label: 'Id' },
+        { key: 'authorId', label: 'Author' },
+        { label: 'Text', render: function (p) { return p.text; } },
+        { label: 'When', render: function (p) { return fmtWhen(p.createdAt); } },
+      ], posts, { empty: 'No matching posts.' }),
+    ]));
+
+    while (out.childNodes.length > 1) out.removeChild(out.lastChild);
+    out.appendChild(replacement);
+    VACO.mount(body, out);
+  }).catch(function (err) {
+    while (out.childNodes.length > 1) out.removeChild(out.lastChild);
+    out.appendChild(VACO.notice('Search failed: ' + VACO.escapeHtml(err.message), 'danger'));
+    VACO.mount(body, out);
+  });
+}
+
 // -- Cosmetics --------------------------------------------------------
 
 function renderCosmetics(body) {
@@ -425,6 +482,7 @@ VACO.app({
     { id: 'villages', label: 'Villages', heading: 'Communities',
       blurb: 'A village is a real community with members, events, Villas, and a boost level bought with VCoin.',
       render: renderVillages },
+    { id: 'search', label: 'Search', heading: 'Search', render: renderSearch },
     { id: 'cosmetics', label: 'Cosmetics', heading: 'Avatar shop', render: renderCosmetics },
     { id: 'articles', label: 'Publishing', heading: 'Articles & newsletters', render: renderArticles },
   ],
