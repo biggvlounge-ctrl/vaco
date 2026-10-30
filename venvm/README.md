@@ -238,3 +238,114 @@ this environment (checked directly — no OpenAI/Replicate/ElevenLabs/
 etc key anywhere), so copywriting, image, video, voice, translation,
 SEO, social, email, SMS, and push generation all stay real, labeled
 pending integration points rather than faked.
+
+## Frontend coverage pass (30 Oct 2026)
+
+An audit found `public/index.html` making real calls against only 7 of
+this app's 66 routes — the original 4 tabs (Scripts, Reformat,
+Pipeline, Consent) covered the core production pipeline, but
+`lib/growthPrograms.js` (8 routes) and the entire task #59 Marketing/
+Campaign Dashboard surface (44 routes across 8 modules) had **zero**
+frontend exposure. Three new tabs close most of that gap — 25 more
+routes, every one a real client of the route named, checked against
+its real handler and `lib/*.js` function and then verified live
+against the running server before being written, never a fabricated
+payload shape.
+
+Consistently left backend-only, by design, across every new tab:
+anything gated to `requireCallingService()` (a trusted-service
+credential — creating a brand/campaign/asset/ad/content-calendar
+entry/launch/A/B test, recording spend/metrics/analytics events,
+advancing a campaign's status, converting or rewarding a referral) and
+every `.../generate` route (ad copy, brand voice, campaign
+optimization, content-slot suggestions, launch copy, variant copy,
+analytics insights — all a real, labeled `PendingIntegrationError`, a
+real 501, since no generative model provider is configured anywhere in
+this environment). This frontend has no login for a trusted-service
+credential, so those stay real backend capabilities without a fake
+"admin" UI pretending to hold one.
+
+- **Growth tab** — `lib/growthPrograms.js` had no frontend at all.
+  Unlike the other two new tabs, two of its routes genuinely are
+  reachable from a signed-in person's own session:
+  `POST /api/growth/referral-codes` (`requireActor('ambassadorId')`)
+  lets an ambassador create their own code, and
+  `POST /api/growth/referrals` (`requireActor('referredId')`) lets a
+  new recruit record their own referral — the same
+  "you may only act as yourself" shape the existing Consent tab's
+  grant/revoke already uses. Also looks up a code or referral by id
+  (`GET /api/growth/referral-codes/:code`,
+  `GET /api/growth/referrals/:id`), auto-loads your own real ambassador
+  scorecard when signed in
+  (`GET /api/growth/ambassadors/:ambassadorId/scorecard`), and checks
+  progress on a named growth mission
+  (`GET /api/growth/ambassadors/:ambassadorId/missions/:missionKey`) —
+  with the mission list and ambassador tiers read live from
+  `GET /api/health` rather than hardcoded. Converting and rewarding a
+  referral are operational facts an app observed (a real purchase, a
+  real published video) and stay `requireCallingService()`-only.
+- **Brands tab** — `lib/brandManagement.js`, `campaigns.js`, and
+  `assetLibrary.js` (Brand Management, Campaign Dashboard, Asset
+  Library) had no frontend at all. Browses brands, optionally filtered
+  by `ownerApp` (`GET /api/marketing/brands`); looks up a brand
+  together with the real, unified Marketing Dashboard rollup — its
+  campaigns with spend/remaining budget, upcoming content, launch
+  readiness, and analytics, all assembled from already-real, already-
+  tested functions (`GET /api/marketing/brands/:id`,
+  `GET /api/marketing/brands/:id/dashboard`); lists a brand's campaigns
+  and looks up one campaign together with the real Campaign Dashboard
+  rollup — its ads with real CTR/CPA performance, catalogued assets,
+  and any A/B test scoped to it
+  (`GET /api/marketing/brands/:id/campaigns`,
+  `GET /api/marketing/campaigns/:id`,
+  `GET /api/marketing/campaigns/:id/dashboard`); and lists/looks up
+  assets for a brand (`GET /api/marketing/brands/:id/assets`,
+  `GET /api/marketing/assets/:id`). Creating a brand/campaign/asset,
+  updating guidelines, changing campaign status, and recording spend
+  all stay `requireCallingService()`-only.
+- **Ads & Launches tab** — `lib/adDashboard.js`, `contentCalendar.js`,
+  `productLaunches.js`, `abTesting.js`, and `marketingAnalytics.js`
+  (Ad Dashboard, Content Calendar, Product Launch Manager, AI A/B
+  Testing, AI Analytics) had no frontend at all. Lists a campaign's
+  ads and looks up one ad's real performance totals/ratios
+  (`GET /api/marketing/campaigns/:id/ads`,
+  `GET /api/marketing/ads/:id/performance`); lists a brand's upcoming
+  content and looks up one calendar entry
+  (`GET /api/marketing/brands/:id/content-calendar/upcoming`,
+  `GET /api/marketing/content-calendar/:id`); lists a brand's launches
+  and looks up one launch's real milestone checklist plus derived
+  readiness percentage (`GET /api/marketing/brands/:id/launches`,
+  `GET /api/marketing/launches/:id`,
+  `GET /api/marketing/launches/:id/readiness`); looks up an A/B test's
+  real per-variant assigned/converted/conversion-rate tally and leading
+  variant (`GET /api/marketing/ab-tests/:id`,
+  `GET /api/marketing/ab-tests/:id/results`); and looks up a brand's
+  real analytics summary, optionally scoped to a campaign
+  (`GET /api/marketing/brands/:id/analytics/summary`). Creating an
+  ad/content-calendar entry/launch/A/B test, recording metrics,
+  publishing/cancelling content, completing a milestone, assigning a
+  variant, and recording an analytics event all stay
+  `requireCallingService()`-only.
+
+**Deliberately left for a follow-up round, with reasons:**
+
+- **Every `requireCallingService()` creation/mutation route named
+  above.** This frontend has no trusted-service credential to present,
+  and inventing a fake "admin mode" that always 403s would be worse
+  than the honest gap — the same call `void`'s coverage pass already
+  made for fleet operations and dispatcher routes.
+- **Every `.../generate` route.** All honestly 501 with a real
+  `PendingIntegrationError` today; a button that always fails is not a
+  real control, and this page already shows that posture correctly for
+  Scripts' own `/generate` route.
+- **`POST /api/scripts`, `POST /api/production-jobs`, and their
+  advance-stage routes.** Still `requireCallingService()`-only,
+  unchanged from before this pass — see the Scripts/Pipeline tabs'
+  existing notices.
+- **A per-row "drill in" affordance on the Brands/Ads & Launches list
+  tables** (e.g. clicking a campaign row to pre-fill the detail form
+  below it) would read nicely, but each list and its matching detail
+  lookup already call distinct, real routes today; that refinement is
+  a UX polish on working coverage, not a gap, so it was left for
+  whoever picks this up next rather than rushed in alongside three new
+  tabs in one pass.
