@@ -779,6 +779,172 @@ function sportsBetForm(ev) {
   }, 'Place bet');
 }
 
+// -- Group Wagers -------------------------------------------------------
+
+// §29's own narrow slice: a Group Wager is a creator-owned, named
+// wrapper around one real `predictionMarkets.js` market -- joining is
+// `buyContract`, and `GET /api/group-wagers/:id` already merges the
+// group's own fields with the market's live pools/participant count
+// (`groupWagerView`), so there is no second price to compute here.
+// `viewedGroupWagerId` persists across re-renders the same way `game`
+// and `fantasyBuilder` already do, so "View" and "Join" survive a tab
+// redraw.
+var viewedGroupWagerId = null;
+
+function renderGroupWagers(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'A named, creator-owned wrapper around one real pari-mutuel prediction market — binary (yes/no) '
+    + 'only. Joining is a real trade on that market, solvent by the same construction the Markets tab uses.'));
+
+  if (VACO.userId()) {
+    out.appendChild(createGroupWagerCard());
+  } else {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to create a group wager.'));
+  }
+  out.appendChild(findGroupWagerCard());
+
+  var detailSlot = el('div');
+  out.appendChild(detailSlot);
+  var leaderboardSlot = el('div');
+  out.appendChild(leaderboardSlot);
+
+  var detailPromise = viewedGroupWagerId
+    ? VACO.api('/api/group-wagers/' + viewedGroupWagerId)
+      .then(function (gw) { VACO.mount(detailSlot, groupWagerDetailCard(gw)); })
+      .catch(function (err) {
+        VACO.mount(detailSlot, VACO.notice(
+          'Could not load group wager #' + viewedGroupWagerId + ': ' + VACO.escapeHtml(err.message), 'danger'));
+      })
+    : Promise.resolve();
+
+  // §10's leaderboard, platform-wide (no `ids` = every settled group
+  // wager) -- a pure recomputation over already-resolved markets, never
+  // a second copy of standings.
+  var leaderboardPromise = VACO.api('/api/group-wagers/leaderboard')
+    .then(function (data) {
+      VACO.mount(leaderboardSlot, VACO.card('Leaderboard', [
+        VACO.table([
+          { key: 'userId', label: 'User' },
+          { label: 'W-L', render: function (r) { return r.wins + '-' + r.losses; } },
+          { label: 'Staked', num: true, render: function (r) { return VACO.round(r.totalStaked); } },
+          { label: 'Payout', num: true, render: function (r) { return VACO.round(r.totalPayout); } },
+          { label: 'Net', num: true, render: function (r) { return VACO.round(r.netEarnings); } },
+          { label: 'Streak', num: true, render: function (r) { return r.currentStreak; } },
+        ], data.leaderboard, { empty: 'No settled group wagers yet.' }),
+      ]));
+    })
+    .catch(function () {
+      VACO.mount(leaderboardSlot, VACO.notice('Leaderboard unavailable right now.', 'warn'));
+    });
+
+  return Promise.all([detailPromise, leaderboardPromise]).then(function () { return VACO.mount(body, out); });
+}
+
+// `POST /api/group-wagers` takes { creatorId, name, question, category,
+// source, visibility, entryDeadline, maxParticipants?, invitedUserIds? }
+// -- entryDeadline is a real future timestamp, built here from "closes
+// in N hours" since that is what a creator actually thinks in, not a
+// raw epoch millisecond they would have to compute themselves.
+function createGroupWagerCard() {
+  return VACO.card('Create a group wager', [
+    el('p', 'vaco-small vaco-dim',
+      'Binary (yes/no) only. A private group wager needs at least one invited user id.'),
+    VACO.form([
+      { name: 'name', label: 'Name', width: '200px' },
+      { name: 'question', label: 'Question (yes/no)', width: '240px' },
+      { name: 'category', label: 'Category', value: 'social', width: '100px' },
+      { name: 'entryDeadlineHours', label: 'Closes in (hrs)', type: 'number', min: 1, value: 24, width: '90px' },
+      { name: 'maxParticipants', label: 'Max (optional)', type: 'number', min: 2, width: '90px' },
+      { name: 'visibility', label: 'Visibility', options: [
+        { value: 'open', label: 'Open' }, { value: 'private', label: 'Private' },
+      ] },
+      { name: 'invitedUserIds', label: 'Invite (comma ids, private only)', width: '200px' },
+    ], function (values) {
+      var payload = {
+        creatorId: VACO.userId(),
+        name: values.name,
+        question: values.question,
+        category: values.category,
+        source: 'real-world',
+        visibility: values.visibility,
+        entryDeadline: Date.now() + values.entryDeadlineHours * 60 * 60 * 1000,
+      };
+      if (values.maxParticipants) payload.maxParticipants = values.maxParticipants;
+      if (values.visibility === 'private') {
+        payload.invitedUserIds = String(values.invitedUserIds || '')
+          .split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+      }
+      return VACO.post('/api/group-wagers', payload).then(function (gw) {
+        VACO.toast('Group wager #' + gw.id + ' created.', 'money');
+        viewedGroupWagerId = gw.id;
+        VACO.render();
+      });
+    }, 'Create'),
+  ]);
+}
+
+function findGroupWagerCard() {
+  return VACO.card('Find a group wager', [
+    VACO.form([{ name: 'id', label: 'Group wager id', type: 'number', min: 1, width: '120px' }],
+      function (values) {
+        viewedGroupWagerId = values.id;
+        VACO.render();
+      }, 'View'),
+  ]);
+}
+
+// `groupWagerView` (what `GET /api/group-wagers/:id` returns) merges
+// the group's own fields with the market's already-live pools and
+// participant count -- shown directly rather than re-deriving a price,
+// since no route attaches one for this market and inventing the same
+// virtual-liquidity formula client-side would risk drifting from it.
+function groupWagerDetailCard(gw) {
+  var children = [];
+  if (gw.description) children.push(el('p', 'vaco-small vaco-dim', gw.description));
+  children.push(el('p', 'vaco-dim', 'Question: ' + (gw.market ? gw.market.question : '—')));
+
+  var yesLabel = (gw.teamNames && gw.teamNames.yes) || 'YES';
+  var noLabel = (gw.teamNames && gw.teamNames.no) || 'NO';
+
+  var stats = el('div', 'stat-row');
+  [['Visibility', gw.visibility], ['Status', gw.status], ['Locked', gw.locked ? 'yes' : 'no'],
+    ['Participants', gw.participantCount + (gw.maxParticipants ? ' / ' + gw.maxParticipants : '')],
+    [yesLabel + ' pool', VACO.round(gw.market ? gw.market.yesPool : 0)],
+    [noLabel + ' pool', VACO.round(gw.market ? gw.market.noPool : 0)],
+    ['Closes', new Date(gw.entryDeadline).toLocaleString()]]
+    .forEach(function (pair) {
+      var s = el('div', 'stat');
+      s.appendChild(el('span', 'vaco-label', pair[0]));
+      s.appendChild(el('span', 'stat-value', pair[1]));
+      stats.appendChild(s);
+    });
+  children.push(stats);
+
+  if (!VACO.userId()) {
+    children.push(el('div', 'vaco-empty', 'Sign in to join.'));
+  } else if (gw.locked || gw.status !== 'open') {
+    children.push(el('p', 'vaco-dim', 'This group wager is locked or settled — joining is closed.'));
+  } else {
+    children.push(VACO.form([
+      { name: 'side', label: 'Side', options: [
+        { value: 'yes', label: yesLabel }, { value: 'no', label: noLabel },
+      ] },
+      { name: 'quantity', label: 'Qty', type: 'number', min: 1, value: 1, width: '70px' },
+    ], function (values) {
+      return VACO.post('/api/group-wagers/' + gw.id + '/join', {
+        userId: VACO.userId(), side: values.side, quantity: values.quantity,
+      }).then(function () {
+        VACO.toast('Joined group wager #' + gw.id + '.', 'money');
+        VACO.refreshBalances().then(VACO.renderIdentity);
+        VACO.render();
+      });
+    }, 'Join'));
+  }
+
+  return VACO.card(gw.name, children);
+}
+
 VACO.app({
   id: 'vago',
   name: 'VAGO',
@@ -800,6 +966,9 @@ VACO.app({
     { id: 'markets', label: 'Markets', heading: 'Prediction markets',
       blurb: 'Peer-to-peer contracts where the price is the probability.',
       render: renderMarkets },
+    { id: 'groupwagers', label: 'Group Wagers', heading: 'Group Wagers',
+      blurb: 'A named, creator-owned wrapper around one real prediction market — invite friends, join a side, climb the leaderboard.',
+      render: renderGroupWagers },
   ],
 });
 </script>

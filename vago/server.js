@@ -613,6 +613,25 @@ app.post('/api/group-wagers', requireActor('creatorId'), async (req, res) => {
   }
 });
 
+// §10's Group Leaderboard. `ids` is a comma-separated list of group
+// wager ids to rank across; omitted means every group wager that has
+// ever settled, platform-wide. A creator's own series or one
+// competition's legs are just a narrower `ids` list from the caller.
+//
+// **Registered before `/:id` deliberately.** Express matches routes in
+// registration order, so a literal path declared after a `:id` sibling
+// is unreachable -- every request for literally "leaderboard" was being
+// swallowed by `GET /api/group-wagers/:id` as `Number("leaderboard")`
+// (`NaN`), which `groupWagerView` always resolves to "not found." Found
+// wiring the Group Wagers tab's own leaderboard card to this route and
+// getting `{"error":"no group wager with id leaderboard"}` back.
+app.get('/api/group-wagers/leaderboard', (req, res) => {
+  const ids = req.query.ids
+    ? String(req.query.ids).split(',').map(Number).filter(Number.isFinite)
+    : allSettledGroupWagerIds(store);
+  res.json({ leaderboard: leaderboardFor(store, ids) });
+});
+
 app.get('/api/group-wagers/:id', (req, res) => {
   const view = groupWagerView(store, Number(req.params.id));
   if (!view) return res.status(404).json({ error: `no group wager with id ${req.params.id}` });
@@ -734,17 +753,6 @@ app.get('/api/group-wagers/:id/invitations/:userId', requireSession(), (req, res
 // wager, `GET /api/group-wagers/:id` above included.
 app.get('/api/group-wagers/:id/side-wagers', (req, res) => {
   res.json({ sideWagers: sideWagersOf(store, Number(req.params.id)) });
-});
-
-// §10's Group Leaderboard. `ids` is a comma-separated list of group
-// wager ids to rank across; omitted means every group wager that has
-// ever settled, platform-wide. A creator's own series or one
-// competition's legs are just a narrower `ids` list from the caller.
-app.get('/api/group-wagers/leaderboard', (req, res) => {
-  const ids = req.query.ids
-    ? String(req.query.ids).split(',').map(Number).filter(Number.isFinite)
-    : allSettledGroupWagerIds(store);
-  res.json({ leaderboard: leaderboardFor(store, ids) });
 });
 
 // -- Group Wager Competitions: Leagues (§12) and Tournaments (§11) ---------
