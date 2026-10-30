@@ -739,25 +739,131 @@ function renderArticles(body) {
     + 'sharing one identity with the feed rather than living in a separate product.'));
 
   var id = VACO.userId();
+
+  // Real article detail, honoring the real paywall — GET
+  // /api/articles/:id?viewerId= withholds `bodyContent` unless the
+  // viewer is a confirmed Vavlt Stvdios tier subscriber. Open to
+  // anyone, signed in or not, like the rest of a public feed.
+  var articleHost = el('div', 'vaco-stack');
+  out.appendChild(VACO.card('Open an article', [
+    VACO.form([{ name: 'articleId', label: 'Article id', width: '100px' }], function (values) {
+      return loadArticle(articleHost, values.articleId);
+    }, 'Open'),
+  ]));
+  articleHost.appendChild(el('div', 'vaco-empty', 'Open an article above to read it (paywalled ones withhold the body unless you really have access).'));
+  out.appendChild(articleHost);
+
   if (!id) {
-    out.appendChild(el('div', 'vaco-empty', 'Sign in to see your articles and subscribers.'));
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to publish, see your subscribers, or manage newsletters.'));
     return VACO.mount(body, out);
   }
+
+  out.appendChild(VACO.card('Publish an article', [
+    el('p', 'vaco-small vaco-dim', 'A free article (or one with no requiredTierId) always creates its own announcement post in the Feed.'),
+    VACO.form([
+      { name: 'title', label: 'Title', width: '220px' },
+      { name: 'bodyContent', label: 'Body', placeholder: 'the article itself', width: '320px' },
+      { name: 'isPaywalled', label: 'Paywalled?', options: [
+        { value: 'false', label: 'No — free' },
+        { value: 'true', label: 'Yes — Vavlt Stvdios tier' },
+      ] },
+      { name: 'requiredTierId', label: 'Required tier id (if paywalled)', width: '160px' },
+    ], function (values) {
+      var isPaywalled = values.isPaywalled === 'true';
+      if (isPaywalled && !values.requiredTierId) throw new Error('A paywalled article needs a requiredTierId.');
+      return VACO.post('/api/articles', {
+        authorId: id, title: values.title, bodyContent: values.bodyContent,
+        isPaywalled: isPaywalled, requiredTierId: isPaywalled ? values.requiredTierId : null,
+      }).then(function () { VACO.toast('Article published.'); VACO.render(); });
+    }, 'Publish'),
+  ]));
 
   return Promise.all([
     VACO.api('/api/authors/' + encodeURIComponent(id) + '/articles').catch(function () { return { articles: [] }; }),
     VACO.api('/api/authors/' + encodeURIComponent(id) + '/subscribers').catch(function () { return { subscribers: [] }; }),
+    VACO.api('/api/authors/' + encodeURIComponent(id) + '/recommendations').catch(function () { return { recommendedAuthors: [] }; }),
   ]).then(function (r) {
     var articles = r[0].articles || r[0] || [];
     var subs = r[1].subscribers || r[1] || [];
+    var recommended = r[2].recommendedAuthors || [];
+
     out.appendChild(VACO.card('Your articles — ' + subs.length + ' subscriber(s)', [
       VACO.table([
         { key: 'id', label: 'Id' },
         { key: 'title', label: 'Title' },
-        { label: 'Status', render: function (a) { return VACO.badge(a.status || 'draft'); } },
+        { label: 'Status', render: function (a) { return VACO.badge(a.isPaywalled ? 'paywalled' : 'free'); } },
+        { label: 'Linked post', render: function (a) { return a.linkedToVxllagePost != null ? '#' + a.linkedToVxllagePost : '—'; } },
+        { label: '', render: function (a) {
+          return VACO.button('Send to subscribers', function () {
+            return VACO.post('/api/newsletters/send', { articleId: a.id })
+              .then(function (result) { VACO.toast('Sent to ' + result.deliveryCount + ' subscriber(s).'); });
+          }, 'ghost');
+        } },
       ], articles, { empty: 'No articles yet.' }),
     ]));
+
+    out.appendChild(VACO.card('Your newsletter', [
+      el('p', 'vaco-small vaco-dim', 'Subscribe to another writer, or manage who you recommend to your own new subscribers.'),
+      VACO.form([
+        { name: 'authorId', label: 'Author to subscribe to', width: '160px' },
+        { name: 'deliveryMethod', label: 'Delivery', options: [
+          { value: 'in-app-only', label: 'In-app only' },
+          { value: 'email-notification', label: 'Email notification' },
+        ] },
+      ], function (values) {
+        if (values.authorId === id) throw new Error('You cannot subscribe to your own newsletter.');
+        return VACO.post('/api/newsletters/subscribe', {
+          subscriberId: id, authorId: values.authorId, deliveryMethod: values.deliveryMethod,
+        }).then(function (result) {
+          var recs = result.recommendedAuthors || [];
+          VACO.toast('Subscribed.' + (recs.length ? ' Recommended: ' + recs.join(', ') : ''));
+        });
+      }, 'Subscribe'),
+      VACO.form([
+        { name: 'authorId', label: 'Author to unsubscribe from', width: '160px' },
+      ], function (values) {
+        return VACO.post('/api/newsletters/unsubscribe', { subscriberId: id, authorId: values.authorId })
+          .then(function () { VACO.toast('Unsubscribed.'); });
+      }, 'Unsubscribe'),
+    ]));
+
+    out.appendChild(VACO.card('Authors you recommend — ' + recommended.length, [
+      recommended.length
+        ? el('p', 'vaco-small vaco-dim', recommended.join(', '))
+        : el('div', 'vaco-empty', 'None yet — new subscribers to you see this list automatically.'),
+      VACO.form([
+        { name: 'recommendedAuthorId', label: 'Recommend author', width: '160px' },
+      ], function (values) {
+        return VACO.post('/api/authors/' + encodeURIComponent(id) + '/recommendations', {
+          authorId: id, recommendedAuthorId: values.recommendedAuthorId,
+        }).then(function () { VACO.toast('Recommended.'); VACO.render(); });
+      }, 'Recommend'),
+    ]));
+
     VACO.mount(body, out);
+  });
+}
+
+function loadArticle(host, articleId) {
+  articleId = Number(articleId);
+  if (!articleId) return Promise.resolve();
+  var viewerId = VACO.userId();
+  var path = '/api/articles/' + articleId + (viewerId ? '?viewerId=' + encodeURIComponent(viewerId) : '');
+  return VACO.api(path).then(function (article) {
+    var box = el('div', 'vaco-stack-sm');
+    var head = el('div', 'vaco-row-tight');
+    head.appendChild(el('strong', 'vaco-h3', article.title));
+    if (article.isPaywalled) head.appendChild(VACO.badge('paywalled', article.bodyContent === null ? 'warn' : 'money'));
+    box.appendChild(head);
+    box.appendChild(el('p', 'vaco-small vaco-dim', 'by ' + article.authorId + ' · ' + fmtWhen(article.publishedAt)));
+    if (article.bodyContent === null) {
+      box.appendChild(VACO.notice('This article is paywalled — sign in with a subscribing viewer id to read it.', 'warn'));
+    } else {
+      box.appendChild(el('p', 'post-body', article.bodyContent));
+    }
+    VACO.mount(host, box);
+  }).catch(function (err) {
+    VACO.mount(host, VACO.notice('Could not open that article: ' + VACO.escapeHtml(err.message), 'danger'));
   });
 }
 
