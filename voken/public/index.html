@@ -290,6 +290,79 @@ function renderPacks(body) {
   return out;
 }
 
+// -- Culture Car Clubs -------------------------------------------------
+//
+// "add in groups where people could have car clubs... see who has the
+// most value in the car club through cards and cars." All four
+// mutating routes are real session actions (create/join/leave), so a
+// signed-in user can drive all of this directly.
+
+function renderCarClubLeaderboard(container, clubId) {
+  return VACO.api('/api/car-club/' + clubId + '/leaderboard').then(function (data) {
+    VACO.mount(container, VACO.table([
+      { key: 'rank', label: 'Rank', num: true },
+      { key: 'userId', label: 'Member' },
+      { label: 'Wallet value', num: true, render: function (r) { return VACO.price(r.totalValue, { freeLabel: false }); } },
+    ], data.leaderboard || [], { empty: 'No members yet.' }));
+  });
+}
+
+function renderCarClub(container, club) {
+  var box = el('div', 'vaco-stack-sm');
+  box.appendChild(el('h3', 'vaco-h3', club.name));
+  box.appendChild(el('p', 'vaco-small vaco-dim', 'Created by ' + club.creatorId + ' · ' + club.memberIds.length + ' member(s): ' + club.memberIds.join(', ')));
+
+  var row = el('div', 'vaco-row-tight');
+  row.appendChild(VACO.button('Join', function () {
+    if (!VACO.userId()) throw new Error('Sign in to join a car club.');
+    return VACO.post('/api/car-club/' + club.id + '/join', { userId: VACO.userId() }).then(function (updated) {
+      VACO.toast('Joined ' + updated.name);
+      renderCarClub(container, updated);
+    });
+  }, 'primary'));
+  row.appendChild(VACO.button('Leave', function () {
+    if (!VACO.userId()) throw new Error('Sign in to leave a car club.');
+    return VACO.post('/api/car-club/' + club.id + '/leave', { userId: VACO.userId() }).then(function (updated) {
+      VACO.toast('Left ' + updated.name);
+      renderCarClub(container, updated);
+    });
+  }));
+  box.appendChild(row);
+
+  var leaderboardOut = el('div', 'vaco-empty', 'Loading…');
+  box.appendChild(el('h3', 'vaco-h3', 'Leaderboard -- most value in cards and cars'));
+  box.appendChild(leaderboardOut);
+  renderCarClubLeaderboard(leaderboardOut, club.id).catch(VACO.error);
+
+  VACO.mount(container, box);
+}
+
+function renderCarClubs(body) {
+  var out = el('div', 'vaco-stack');
+  var clubResult = el('div');
+
+  out.appendChild(VACO.card('Create a car club', [
+    VACO.form([{ name: 'name', label: 'Club name', placeholder: 'Midnight Garage' }], function (values) {
+      if (!VACO.userId()) throw new Error('Sign in to create a car club.');
+      return VACO.post('/api/car-club', { name: values.name, creatorId: VACO.userId() }).then(function (club) {
+        VACO.toast('Created car club ' + club.name);
+        renderCarClub(clubResult, club);
+      });
+    }, 'Create'),
+  ]));
+
+  out.appendChild(VACO.card('Look up a car club', [
+    VACO.form([{ name: 'clubId', label: 'Car club id', type: 'number', placeholder: '1' }], function (values) {
+      return VACO.api('/api/car-club/' + encodeURIComponent(values.clubId)).then(function (club) {
+        renderCarClub(clubResult, club);
+      });
+    }, 'Look up'),
+    clubResult,
+  ]));
+
+  return out;
+}
+
 // Boot needs the brand and category list before the first render, since
 // both are real server-owned values rather than constants in this file.
 VACO.api('/api/health').then(function (health) {
@@ -314,6 +387,7 @@ VACO.api('/api/health').then(function (health) {
       { id: 'explore', label: 'Explore', heading: 'What is moving', render: renderExplore },
       { id: 'fractional', label: 'Fractional', heading: 'Shares & resale', render: renderFractional },
       { id: 'packs', label: 'Packs', heading: 'Packs & mint guidance', render: renderPacks },
+      { id: 'car-clubs', label: 'Car Clubs', heading: 'Culture Car Clubs', render: renderCarClubs },
     ],
   });
 });
