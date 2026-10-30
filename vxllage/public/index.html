@@ -672,27 +672,43 @@ function renderCosmetics(body) {
 
   return VACO.api('/api/avatar-cosmetics/catalog').then(function (data) {
     var catalog = data.catalog || [];
-    var owned = [];
     var id = VACO.userId();
 
-    function draw() {
+    // Real single-slot equip state (lib/avatarCosmetics.js), read from
+    // the real avatar profile — **not** /api/users/:id/cosmetics, which
+    // is lib/villageShop.js's own per-village cosmetic ownership (a
+    // disjoint, numeric-id catalog). The old code checked ownership
+    // against that endpoint, so a catalog id like "gold-aura" could
+    // never match and "owned"/"Equip" never appeared even after a real
+    // purchase.
+    function draw(profile) {
+      var owned = (profile && profile.ownedCosmetics) || [];
+      var equippedItemId = profile ? profile.equippedItemId : null;
+
       var cards = catalog.map(function (c) {
-        var isOwned = owned.some(function (o) { return (o.cosmeticId || o.id) === c.id; });
+        var isOwned = owned.some(function (o) { return o.id === c.id; });
+        var isEquipped = equippedItemId === c.id;
         var lines = el('div', 'vaco-stack-sm');
         lines.appendChild(el('div', 'cosmetic-swatch'));
         var row = el('div', 'vaco-row-tight');
         row.appendChild(VACO.price(c.priceVCoin, { freeLabel: false }));
         row.appendChild(el('span', 'vaco-spacer'));
-        if (isOwned) {
+        if (isEquipped) {
+          row.appendChild(VACO.badge('equipped', 'accent'));
+          row.appendChild(VACO.button('Unequip', function () {
+            return VACO.post('/api/avatar-cosmetics/unequip', { userId: id })
+              .then(function () { VACO.toast('Unequipped.'); VACO.render(); });
+          }, 'ghost'));
+        } else if (isOwned) {
           row.appendChild(VACO.badge('owned', 'money'));
           row.appendChild(VACO.button('Equip', function () {
-            return VACO.post('/api/avatar-cosmetics/equip', { userId: id, cosmeticId: c.id })
-              .then(function () { VACO.toast(c.name + ' equipped.'); });
+            return VACO.post('/api/avatar-cosmetics/equip', { userId: id, itemId: c.id })
+              .then(function () { VACO.toast(c.name + ' equipped.'); VACO.render(); });
           }));
         } else {
           row.appendChild(VACO.button('Buy', function () {
             if (!id) throw new Error('Sign in to buy cosmetics.');
-            return VACO.post('/api/avatar-cosmetics/purchase', { userId: id, cosmeticId: c.id })
+            return VACO.post('/api/avatar-cosmetics/purchase', { userId: id, itemId: c.id })
               .then(function () {
                 VACO.toast(c.name + ' purchased.', 'money');
                 VACO.refreshBalances().then(VACO.renderIdentity);
@@ -707,10 +723,10 @@ function renderCosmetics(body) {
       VACO.mount(body, out);
     }
 
-    if (!id) return draw();
-    return VACO.api('/api/users/' + encodeURIComponent(id) + '/cosmetics')
-      .then(function (mine) { owned = mine.cosmetics || mine || []; draw(); })
-      .catch(draw);
+    if (!id) return draw(null);
+    return VACO.api('/api/users/' + encodeURIComponent(id) + '/avatar-profile')
+      .then(draw)
+      .catch(function () { draw(null); });
   });
 }
 
