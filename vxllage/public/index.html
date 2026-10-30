@@ -844,13 +844,26 @@ function renderArticles(body) {
   });
 }
 
+var SURFACE_TYPE_OPTIONS = [
+  { value: 'post', label: 'Post' },
+  { value: 'article', label: 'Article' },
+  { value: 'village-room', label: 'Villa (village room)' },
+];
+
 function loadArticle(host, articleId) {
   articleId = Number(articleId);
   if (!articleId) return Promise.resolve();
   var viewerId = VACO.userId();
   var path = '/api/articles/' + articleId + (viewerId ? '?viewerId=' + encodeURIComponent(viewerId) : '');
-  return VACO.api(path).then(function (article) {
+
+  return Promise.all([
+    VACO.api(path),
+    VACO.api('/api/surface-links?sourceType=article&sourceId=' + articleId).catch(function () { return { links: [] }; }),
+  ]).then(function (r) {
+    var article = r[0];
+    var links = r[1].links || [];
     var box = el('div', 'vaco-stack-sm');
+
     var head = el('div', 'vaco-row-tight');
     head.appendChild(el('strong', 'vaco-h3', article.title));
     if (article.isPaywalled) head.appendChild(VACO.badge('paywalled', article.bodyContent === null ? 'warn' : 'money'));
@@ -861,6 +874,27 @@ function loadArticle(host, articleId) {
     } else {
       box.appendChild(el('p', 'post-body', article.bodyContent));
     }
+
+    // Real "never a dead end" cross-surface connections
+    // (lib/surfaceLinks.js) — any post, article, or Villa this article
+    // points readers toward.
+    box.appendChild(el('p', 'vaco-small vaco-dim',
+      links.length
+        ? 'Connects to: ' + links.map(function (l) { return l.linkedSurfaceType + ' #' + l.linkedSurfaceId; }).join(', ')
+        : 'No linked surfaces yet.'));
+
+    if (viewerId && viewerId === article.authorId) {
+      box.appendChild(VACO.form([
+        { name: 'linkedSurfaceType', label: 'Link to', options: SURFACE_TYPE_OPTIONS },
+        { name: 'linkedSurfaceId', label: 'Id', width: '100px' },
+      ], function (values) {
+        return VACO.post('/api/surface-links', {
+          sourceType: 'article', sourceId: articleId,
+          linkedSurfaceType: values.linkedSurfaceType, linkedSurfaceId: values.linkedSurfaceId,
+        }).then(function () { VACO.toast('Linked.'); return loadArticle(host, articleId); });
+      }, 'Link'));
+    }
+
     VACO.mount(host, box);
   }).catch(function (err) {
     VACO.mount(host, VACO.notice('Could not open that article: ' + VACO.escapeHtml(err.message), 'danger'));
