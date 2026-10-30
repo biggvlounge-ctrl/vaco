@@ -224,6 +224,130 @@ function renderConsent(body) {
   });
 }
 
+// Growth Programs: referrals, ambassador tiers, and growth missions
+// (`lib/growthPrograms.js`, mounted under `/api/growth/...`). Unlike
+// Scripts/Jobs/Marketing below, two of these routes genuinely are
+// reachable from a signed-in person's own session —
+// `POST /api/growth/referral-codes` and `POST /api/growth/referrals`
+// are `requireActor('ambassadorId')`/`requireActor('referredId')`, the
+// same "you may only act as yourself" shape `likeness-consents` above
+// already uses — an ambassador creates their own code, and a new
+// recruit records their own referral. Converting and rewarding a
+// referral are operational facts an app observed (a real purchase, a
+// real published video), gated `requireCallingService()`, so those
+// stay real backend capabilities with no control here, same posture as
+// every other trusted-service-only route on this page.
+function renderGrowth(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'A referral code is created by the ambassador themselves, and a referral is recorded by the new recruit themselves — '
+    + 'both real actions this session can take as the signed-in user. <strong>Converting and rewarding a referral are '
+    + 'operational facts an app observed</strong> (a real purchase, a real published video) — a trusted-service credential '
+    + 'this page has no login for records those, never the ambassador’s or recruit’s own say about themselves.',
+    'warn'));
+
+  return VACO.api('/api/health').then(function (health) {
+    var missionKeys = health.growthMissions || [];
+    var tiers = health.ambassadorTiers || [];
+
+    out.appendChild(VACO.card('Ambassador tiers', [
+      el('p', 'vaco-small vaco-dim', 'Real, named tiers, thresholded on real converted referrals (not raw signups).'),
+      VACO.table([
+        { key: 'tier', label: 'Tier' },
+        { key: 'minConverted', label: 'Min converted', num: true },
+      ], tiers, { empty: 'No tiers defined.' }),
+    ]));
+
+    out.appendChild(VACO.card('Create your referral code', [
+      VACO.form([{ name: 'ambassadorId', label: 'Ambassador (you)', value: VACO.userId() || '', width: '150px' }],
+        function (values) {
+          return VACO.post('/api/growth/referral-codes', values).then(function (entry) {
+            VACO.toast('Code ' + entry.code + ' created for ' + entry.ambassadorId + '.');
+          });
+        }, 'Create code'),
+    ]));
+
+    var codeResult = el('div', 'vaco-stack-sm');
+    out.appendChild(VACO.card('Look up a referral code', [
+      VACO.form([{ name: 'code', label: 'Code', placeholder: 'e.g. ABC12345-1', width: '170px' }],
+        function (values) {
+          return VACO.api('/api/growth/referral-codes/' + encodeURIComponent(values.code)).then(function (entry) {
+            VACO.mount(codeResult, el('p', 'vaco-small vaco-dim',
+              'Ambassador ' + entry.ambassadorId + ', created ' + new Date(entry.createdAt).toLocaleString() + '.'));
+          });
+        }, 'Look up'),
+      codeResult,
+    ]));
+
+    out.appendChild(VACO.card('Record a referral', [
+      el('p', 'vaco-small vaco-dim', 'Your own real signup against someone’s code — the new recruit’s own claim, not the ambassador’s.'),
+      VACO.form([
+        { name: 'code', label: 'Their code', placeholder: 'ambassador’s code', width: '150px' },
+        { name: 'referredId', label: 'You (referredId)', value: VACO.userId() || '', width: '140px' },
+        { name: 'referralType', label: 'Type', options: [
+          { label: 'user', value: 'user' }, { label: 'creator', value: 'creator' }, { label: 'business', value: 'business' },
+        ], width: '110px' },
+      ], function (values) {
+        return VACO.post('/api/growth/referrals', values).then(function (referral) {
+          VACO.toast('Referral ' + referral.id + ' recorded — status ' + referral.status + '.');
+        });
+      }, 'Record'),
+    ]));
+
+    var referralResult = el('div', 'vaco-stack-sm');
+    out.appendChild(VACO.card('Look up a referral', [
+      VACO.form([{ name: 'id', label: 'Referral id', type: 'number', min: 1, value: 1, width: '110px' }],
+        function (values) {
+          return VACO.api('/api/growth/referrals/' + values.id).then(function (referral) {
+            var lines = el('div', 'vaco-stack-sm');
+            lines.appendChild(VACO.badge(referral.status));
+            lines.appendChild(el('p', 'vaco-small vaco-dim',
+              referral.ambassadorId + ' → ' + referral.referredId + ' (' + referral.referralType + ')'));
+            if (referral.rewardAmount) lines.appendChild(el('p', 'vaco-small', 'Reward: ' + VACO.round(referral.rewardAmount)));
+            VACO.mount(referralResult, lines);
+          });
+        }, 'Look up'),
+      referralResult,
+    ]));
+
+    var userId = VACO.userId();
+    var afterScorecard = Promise.resolve();
+    if (userId) {
+      afterScorecard = VACO.api('/api/growth/ambassadors/' + encodeURIComponent(userId) + '/scorecard').then(function (sc) {
+        out.appendChild(VACO.card('Your ambassador scorecard', [
+          VACO.badge(sc.tier),
+          el('p', 'vaco-small vaco-dim',
+            'Total referrals ' + sc.totalReferrals + ' — pending ' + sc.byStatus.pending
+            + ', converted ' + sc.byStatus.converted + ', rewarded ' + sc.byStatus.rewarded
+            + (sc.conversionRate !== null ? ' (conversion rate ' + sc.conversionRate + ')' : '')),
+          el('p', 'vaco-small vaco-dim', 'Reward earned so far: ' + VACO.round(sc.totalRewardEarned)),
+        ]));
+      });
+    }
+
+    return afterScorecard.then(function () {
+      var missionResult = el('div', 'vaco-stack-sm');
+      out.appendChild(VACO.card('Check a growth mission', [
+        VACO.form([
+          { name: 'ambassadorId', label: 'Ambassador', value: userId || '', width: '140px' },
+          { name: 'missionKey', label: 'Mission', options: missionKeys.map(function (k) { return { label: k, value: k }; }), width: '200px' },
+        ], function (values) {
+          return VACO.api('/api/growth/ambassadors/' + encodeURIComponent(values.ambassadorId)
+            + '/missions/' + encodeURIComponent(values.missionKey)).then(function (progress) {
+            var lines = el('div', 'vaco-stack-sm');
+            lines.appendChild(el('p', 'vaco-small', progress.label));
+            lines.appendChild(VACO.badge(progress.complete ? 'completed' : 'pending'));
+            lines.appendChild(el('p', 'vaco-small vaco-dim', progress.currentCount + ' / ' + progress.requiredCount));
+            VACO.mount(missionResult, lines);
+          });
+        }, 'Check'),
+        missionResult,
+      ]));
+      return VACO.mount(body, out);
+    });
+  });
+}
+
 VACO.app({
   id: 'venvm',
   name: 'VENVM',
@@ -239,6 +363,7 @@ VACO.app({
     { id: 'reformat', label: 'Reformat', heading: 'Cross-platform targets', render: renderReformat },
     { id: 'jobs', label: 'Pipeline', heading: 'Production jobs', render: renderJobs },
     { id: 'consent', label: 'Consent', heading: 'Likeness consent', render: renderConsent },
+    { id: 'growth', label: 'Growth', heading: 'Growth programs', render: renderGrowth },
   ],
 });
 </script>
