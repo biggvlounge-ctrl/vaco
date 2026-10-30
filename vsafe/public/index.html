@@ -472,6 +472,75 @@ function renderPhotoCheckIns(body) {
   return VACO.mount(body, out);
 }
 
+function renderMeetupVerification(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'A meetup verification is a real, two-sided confirmation tied to an existing check-in — both participants '
+    + 'independently confirm they are genuinely at the meetup, reducing catfishing/no-show risk. It is distinct from '
+    + 'the check-in timer, which only tracks one person\'s safety after the fact.'));
+
+  var id = VACO.userId();
+  if (!id) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to request a meetup verification.'));
+    return VACO.mount(body, out);
+  }
+
+  out.appendChild(VACO.card('Request a meetup verification', [
+    VACO.form([
+      { name: 'checkInId', label: 'Check-in id', type: 'number', min: 1, value: 1, width: '110px' },
+      { name: 'participantIds', label: 'Participants (include yourself)', placeholder: id + ',other-user', width: '220px' },
+    ], function (values) {
+      // requireMeetupParticipant: the session's own userId must be among
+      // participantIds, or the server refuses this with a 403.
+      var participants = (values.participantIds || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+      return VACO.post('/api/meetup-verifications', {
+        checkInId: values.checkInId, participantIds: participants,
+      }).then(function (v) {
+        VACO.toast('Meetup verification ' + v.id + ' requested.');
+        VACO.render();
+      });
+    }, 'Request'),
+  ]));
+
+  var lookupHost = el('div', 'vaco-stack');
+
+  function renderVerificationCard(vId, v, bothConfirmed) {
+    var lines = el('div', 'vaco-stack-sm');
+    lines.appendChild(VACO.badge(bothConfirmed ? 'both confirmed' : 'awaiting confirmation', bothConfirmed ? 'money' : 'warn'));
+    lines.appendChild(el('p', 'vaco-small vaco-dim', 'Check-in: ' + v.checkInId));
+    lines.appendChild(el('p', 'vaco-small vaco-dim', 'Participants: ' + v.participantIds.join(', ')));
+    var confirmedIds = v.confirmations.map(function (c) { return c.userId; });
+    lines.appendChild(el('p', 'vaco-small vaco-dim', 'Confirmed so far: ' + (confirmedIds.join(', ') || 'none yet')));
+
+    var children = [lines];
+    if (v.participantIds.indexOf(id) !== -1 && confirmedIds.indexOf(id) === -1) {
+      children.push(VACO.button('Confirm I\'m here', function () {
+        return VACO.post('/api/meetup-verifications/' + vId + '/confirm', { userId: id }).then(function (updated) {
+          VACO.toast('Confirmed.');
+          return VACO.api('/api/meetup-verifications/' + vId + '/both-confirmed').then(function (bc) {
+            renderVerificationCard(vId, updated, bc.bothConfirmed);
+          });
+        });
+      }, 'primary'));
+    }
+    VACO.mount(lookupHost, VACO.card('Verification ' + vId, children));
+  }
+
+  out.appendChild(VACO.card('Look up a verification', [
+    VACO.form([{ name: 'id', label: 'Verification id', type: 'number', min: 1, value: 1, width: '110px' }],
+      function (values) {
+        return VACO.api('/api/meetup-verifications/' + values.id).then(function (v) {
+          return VACO.api('/api/meetup-verifications/' + values.id + '/both-confirmed').then(function (bc) {
+            renderVerificationCard(values.id, v, bc.bothConfirmed);
+          });
+        });
+      }, 'Look up'),
+  ]));
+  out.appendChild(lookupHost);
+
+  return VACO.mount(body, out);
+}
+
 VACO.app({
   id: 'vsafe',
   name: 'VSAFE',
@@ -486,6 +555,7 @@ VACO.app({
     { id: 'identity', label: 'Identity', heading: 'Verification & privacy', render: renderIdentity },
     { id: 'calls', label: 'Exit calls', heading: 'Scheduled fake calls', render: renderFakeCalls },
     { id: 'photo-checkins', label: 'Photo check-ins', heading: 'Scheduled photo check-ins', render: renderPhotoCheckIns },
+    { id: 'meetup-verification', label: 'Meetup verification', heading: 'Two-sided meetup verification', render: renderMeetupVerification },
   ],
 });
 </script>
