@@ -679,6 +679,75 @@ function renderPrivacyBlocking(body) {
   return VACO.mount(body, out);
 }
 
+function renderScreenTime(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Real transparency for every account: crossing the daily limit always surfaces a visible prompt, and dismissals '
+    + 'are always counted. Only a known minor account\'s <em>repeated</em> dismissal escalates the prompt to '
+    + '"reinforced" — a genuinely harder-to-dismiss mechanic for teen accounts, not a diluted feature.'));
+
+  var id = VACO.userId();
+  if (!id) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to record a screen-time session.'));
+    return VACO.mount(body, out);
+  }
+
+  out.appendChild(VACO.card('Record a session', [
+    VACO.form([
+      { name: 'appId', label: 'App', placeholder: 'e.g. cvnvo', width: '110px' },
+      { name: 'sessionDurationMinutes', label: 'Minutes', type: 'number', min: 1, value: 30, width: '90px' },
+      { name: 'isMinorAccount', label: 'Minor account', options: ['false', 'true'], width: '110px' },
+    ], function (values) {
+      return VACO.post('/api/screen-time/sessions', {
+        userId: id, appId: values.appId, sessionDurationMinutes: values.sessionDurationMinutes,
+        isMinorAccount: values.isMinorAccount === 'true',
+      }).then(function (r) {
+        VACO.toast('Session recorded — ' + r.dailyTotalMinutes + '/' + r.limitMinutes + ' minutes today'
+          + (r.promptShown ? ' (prompt shown, ' + r.promptSeverity + ').' : '.'));
+        loadToday();
+      });
+    }, 'Record'),
+  ]));
+
+  var todayNode = el('div', 'vaco-stack-sm');
+  todayNode.appendChild(el('p', 'vaco-small vaco-faint', 'No screen-time check-in recorded today.'));
+  var dismissBtnHost = el('div', 'vaco-row-tight');
+
+  // dailyTotalMinutes is a real *derived* sum (never a stored counter), so
+  // it is read from the "Record a session" response rather than re-fetched
+  // here; this card is specifically the day's *check-in* record --
+  // promptShown/promptSeverity/promptDismissalCount -- which genuinely does
+  // not exist until the daily limit has been crossed at least once.
+  function loadToday() {
+    return VACO.api('/api/screen-time/' + encodeURIComponent(id) + '/today').then(function (c) {
+      VACO.mount(todayNode, [
+        VACO.badge(c.promptSeverity, c.promptSeverity === 'reinforced' ? 'danger' : 'warn'),
+        el('p', 'vaco-small vaco-dim', 'Date: ' + c.date),
+        el('p', 'vaco-small vaco-dim', 'Minor account: ' + c.isMinorAccount),
+        el('p', 'vaco-small vaco-dim', 'Prompt shown: ' + c.promptShown),
+        el('p', 'vaco-small vaco-dim', 'Dismissals so far: ' + c.promptDismissalCount),
+      ]);
+      VACO.clear(dismissBtnHost);
+      if (c.promptShown) {
+        dismissBtnHost.appendChild(VACO.button('Dismiss prompt', function () {
+          return VACO.post('/api/screen-time/' + encodeURIComponent(id) + '/dismiss-prompt', {}).then(function () {
+            VACO.toast('Prompt dismissed.');
+            loadToday();
+          });
+        }, 'ghost'));
+      }
+    }).catch(function () {
+      VACO.mount(todayNode, el('p', 'vaco-small vaco-faint', 'No screen-time check-in recorded today.'));
+      VACO.clear(dismissBtnHost);
+    });
+  }
+
+  out.appendChild(VACO.card('Today', [todayNode, dismissBtnHost]));
+  loadToday();
+
+  return VACO.mount(body, out);
+}
+
 VACO.app({
   id: 'vsafe',
   name: 'VSAFE',
@@ -696,6 +765,7 @@ VACO.app({
     { id: 'meetup-verification', label: 'Meetup verification', heading: 'Two-sided meetup verification', render: renderMeetupVerification },
     { id: 'safety-word', label: 'Safety word', heading: 'Safety word & relationship safety', render: renderSafetyWord },
     { id: 'privacy-blocking', label: 'Privacy & blocking', heading: 'Privacy settings & blocking', render: renderPrivacyBlocking },
+    { id: 'screen-time', label: 'Screen time', heading: 'Digital wellbeing', render: renderScreenTime },
   ],
 });
 </script>
