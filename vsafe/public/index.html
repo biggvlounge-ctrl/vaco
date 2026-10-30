@@ -124,6 +124,10 @@ function renderCheckIns(body) {
   return VACO.mount(body, out);
 }
 
+// lib/idVerification.js's own ID_DOCUMENT_TYPES — real KYC document types,
+// all three real steps (document/selfie/liveness) must independently pass.
+var ID_DOCUMENT_TYPES = ['drivers-license', 'passport', 'state-id'];
+
 function renderIdentity(body) {
   var out = el('div', 'vaco-stack');
   var id = VACO.userId();
@@ -151,6 +155,77 @@ function renderIdentity(body) {
         .catch(function () { VACO.mount(node, el('p', 'vaco-small vaco-faint', 'No verification record.')); });
       return node;
     }()),
+    (function () {
+      // The full record (GET /api/id-verification/:userId) -- distinct from
+      // the boolean badge above: shows exactly which of the three real steps
+      // were submitted, not just the final pass/fail.
+      var node = el('div', 'vaco-stack-sm');
+      VACO.api('/api/id-verification/' + encodeURIComponent(id))
+        .then(function (r) {
+          VACO.mount(node, VACO.table(
+            [{ key: 'field', label: 'Field' }, { key: 'value', label: 'Value' }],
+            [
+              { field: 'documentType', value: r.documentType },
+              { field: 'documentSubmitted', value: String(r.documentSubmitted) },
+              { field: 'selfieSubmitted', value: String(r.selfieSubmitted) },
+              { field: 'livenessCheckPassed', value: String(r.livenessCheckPassed) },
+              { field: 'submittedAt', value: new Date(r.submittedAt).toLocaleString() },
+            ]));
+        })
+        .catch(function () { /* no record yet -- the submission form below covers that */ });
+      return node;
+    }()),
+    VACO.form([
+      { name: 'documentType', label: 'Document', options: ID_DOCUMENT_TYPES, width: '130px' },
+      { name: 'documentSubmitted', label: 'Document OK', options: ['true', 'false'], value: 'true', width: '85px' },
+      { name: 'selfieSubmitted', label: 'Selfie OK', options: ['true', 'false'], value: 'true', width: '85px' },
+      { name: 'livenessCheckPassed', label: 'Liveness OK', options: ['true', 'false'], value: 'true', width: '85px' },
+    ], function (values) {
+      // Real KYC rule, enforced server-side (not re-implemented here): all
+      // three must independently pass for `verified` to come back true.
+      return VACO.post('/api/id-verification', {
+        userId: id,
+        documentType: values.documentType,
+        documentSubmitted: values.documentSubmitted === 'true',
+        selfieSubmitted: values.selfieSubmitted === 'true',
+        livenessCheckPassed: values.livenessCheckPassed === 'true',
+      }).then(function (r) {
+        VACO.toast(r.verified
+          ? 'ID verification submitted — all three checks passed, verified.'
+          : 'ID verification submitted — not all checks passed, not verified.');
+        VACO.render();
+      });
+    }, 'Submit verification'),
+  ]));
+
+  var trustNode = el('div', 'vaco-stack-sm');
+  trustNode.appendChild(el('p', 'vaco-small vaco-dim', 'Compute to see your current score.'));
+  grid.appendChild(VACO.card('Trust score', [
+    trustNode,
+    VACO.form([
+      { name: 'accountAgeDays', label: 'Account age (days)', type: 'number', min: 0, value: 0, width: '110px' },
+      { name: 'reportedIncidentCount', label: 'Reported incidents', type: 'number', min: 0, value: 0, width: '110px' },
+    ], function (values) {
+      // A real, bounded [0,100] aggregate -- this app supplies accountAgeDays
+      // and reportedIncidentCount itself (trustSignals.js never touches
+      // CVNVO's Yap directly, per its own header), so these are entered here
+      // rather than looked up automatically.
+      return VACO.post('/api/trust-score', {
+        userId: id,
+        accountAgeDays: values.accountAgeDays,
+        reportedIncidentCount: values.reportedIncidentCount,
+      }).then(function (t) {
+        VACO.mount(trustNode, [
+          el('p', 'big', String(t.trustScore)),
+          VACO.table([{ key: 'k', label: 'Component' }, { key: 'v', label: 'Value' }], [
+            { k: 'idVerified', v: String(t.idVerified) },
+            { k: 'idBonus', v: t.idBonus },
+            { k: 'ageBonus', v: t.ageBonus },
+            { k: 'incidentPenalty', v: t.incidentPenalty },
+          ]),
+        ]);
+      });
+    }, 'Compute'),
   ]));
 
   grid.appendChild(VACO.card('Screen time today', [
@@ -159,11 +234,12 @@ function renderIdentity(body) {
       node.appendChild(el('p', 'big', '…'));
       VACO.api('/api/screen-time/' + encodeURIComponent(id) + '/daily-total')
         .then(function (t) {
-          var mins = t.totalMinutes !== undefined ? t.totalMinutes : (t.minutes || 0);
+          var mins = t.dailyTotalMinutes !== undefined ? t.dailyTotalMinutes : 0;
           VACO.mount(node, [
             el('p', 'big', mins + 'm'),
             el('p', 'vaco-small vaco-dim',
-              'Tracked so a dating or social app can nudge toward a break rather than optimise for time-on-app.'),
+              'Tracked so a dating or social app can nudge toward a break rather than optimise for time-on-app. '
+              + 'Record sessions and manage prompts on the Screen Time tab.'),
           ]);
         })
         .catch(function () { VACO.mount(node, el('p', 'vaco-small vaco-faint', 'No screen time recorded today.')); });
