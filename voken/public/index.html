@@ -35,7 +35,7 @@
 // decided server-side.
 
 var el = VACO.el;
-var state = { category: 'vehicles', categories: [], brand: null, complianceGates: [] };
+var state = { category: 'vehicles', categories: [], brand: null, complianceGates: [], rarityTiers: [] };
 
 // -- Auctions ---------------------------------------------------------
 
@@ -624,12 +624,166 @@ function renderAccount(body) {
   return out;
 }
 
+// -- Gallery accounts, Art cards & frames, VADO explore ----------------
+
+function renderGalleryAccountSection() {
+  var out = el('div', 'vaco-stack-sm');
+  var result = el('div');
+
+  out.appendChild(VACO.form([
+    { name: 'displayName', label: 'Display name', placeholder: 'optional' },
+  ], function (values) {
+    if (!VACO.userId()) throw new Error('Sign in to register a gallery account.');
+    return VACO.post('/api/gallery-account', { userId: VACO.userId(), displayName: values.displayName || undefined })
+      .then(function (account) {
+        VACO.toast('Gallery account #' + account.id + ' registered');
+        VACO.mount(result, el('p', 'vaco-small', 'Account #' + account.id + ' -- ' + account.displayName));
+      });
+  }, 'Register gallery account'));
+
+  out.appendChild(VACO.form([
+    { name: 'userId', label: 'Holdings for user id', value: VACO.userId() || '' },
+  ], function (values) {
+    return VACO.api('/api/gallery-account/' + encodeURIComponent(values.userId) + '/holdings').then(function (data) {
+      VACO.mount(result, VACO.table([
+        { key: 'cardId', label: 'Card' },
+        { key: 'editionNumber', label: 'Edition', num: true },
+        { key: 'format', label: 'Format' },
+      ], data.holdings, { empty: 'No art holdings yet.' }));
+    });
+  }, 'Look up holdings'));
+  out.appendChild(result);
+
+  return VACO.card('Gallery accounts', [out]);
+}
+
+function renderArtRecord(container, record) {
+  var box = el('div', 'vaco-stack-sm');
+  box.appendChild(el('p', null, 'Card ' + record.cardId + ' by ' + record.artistId));
+  box.appendChild(el('p', 'vaco-small vaco-dim',
+    (record.physicalOriginalExists ? 'Physical original exists. ' : 'Digital only. ')
+    + record.digitalEditionCount + ' digital edition(s). ' + record.viewCount + ' view(s).'));
+  box.appendChild(VACO.badge(record.isForSale ? 'for sale' : 'not for sale', record.isForSale ? 'money' : null));
+
+  var row = el('div', 'vaco-row-tight');
+  row.appendChild(VACO.button('Record a view', function () {
+    if (!VACO.userId()) throw new Error('Sign in to view this piece.');
+    return VACO.post('/api/art-card/' + record.cardId + '/view', {}).then(function (updated) {
+      renderArtRecord(container, updated);
+    });
+  }));
+  row.appendChild(VACO.button(record.isForSale ? 'Unlist' : 'List for sale', function () {
+    if (!VACO.userId()) throw new Error('Sign in as the artist to change for-sale status.');
+    return VACO.post('/api/art-card/' + record.cardId + '/for-sale', { isForSale: !record.isForSale }).then(function (updated) {
+      renderArtRecord(container, updated);
+    });
+  }, 'primary'));
+  box.appendChild(row);
+  box.appendChild(el('p', 'vaco-small vaco-faint', 'For-sale toggling only succeeds when you are signed in as this card’s own real artist.'));
+
+  VACO.mount(container, box);
+}
+
+function renderArtCardSection() {
+  var out = el('div', 'vaco-stack-sm');
+  var result = el('div');
+
+  out.appendChild(VACO.form([
+    { name: 'rarityTier', label: 'Rarity tier', options: state.rarityTiers },
+    { name: 'digitalEditionCount', label: 'Digital edition count', type: 'number', value: 10 },
+    { name: 'physicalOriginalExists', label: 'Physical original exists?', options: [{ label: 'No', value: 'false' }, { label: 'Yes', value: 'true' }] },
+  ], function (values) {
+    if (!VACO.userId()) throw new Error('Sign in to mint an art Cvltvre card.');
+    return VACO.post('/api/art-card', {
+      artistId: VACO.userId(),
+      rarityTier: values.rarityTier,
+      digitalEditionCount: Number(values.digitalEditionCount),
+      physicalOriginalExists: values.physicalOriginalExists === 'true',
+    }).then(function (created) {
+      VACO.toast('Art card minted as card #' + created.card.id);
+      renderArtRecord(result, created.artRecord);
+    });
+  }, 'Mint art card'));
+
+  out.appendChild(VACO.form([{ name: 'cardId', label: 'Look up art card id', type: 'number' }], function (values) {
+    return VACO.api('/api/art-card/' + encodeURIComponent(values.cardId)).then(function (record) {
+      renderArtRecord(result, record);
+    });
+  }, 'Look up'));
+  out.appendChild(result);
+
+  return VACO.card('Art Cvltvre cards', [out]);
+}
+
+function renderArtFrame(container, frame) {
+  var box = el('div', 'vaco-stack-sm');
+  box.appendChild(el('p', null, 'Frame #' + frame.frameId + ' owned by ' + frame.ownerId + ' (' + frame.screenTechnology + ')'));
+  box.appendChild(el('p', 'vaco-small vaco-dim', frame.loadedArtCardId ? ('Showing card ' + frame.loadedArtCardId) : 'Nothing loaded.'));
+  box.appendChild(VACO.form([{ name: 'artCardId', label: 'Load art card id', type: 'number' }], function (values) {
+    if (!VACO.userId()) throw new Error('Sign in as this frame\'s owner to load art onto it.');
+    return VACO.post('/api/art-frame/' + frame.frameId + '/load', { requesterId: VACO.userId(), artCardId: Number(values.artCardId) })
+      .then(function (updated) { renderArtFrame(container, updated); });
+  }, 'Load'));
+  VACO.mount(container, box);
+}
+
+function renderArtFrameSection() {
+  var out = el('div', 'vaco-stack-sm');
+  var result = el('div');
+
+  out.appendChild(VACO.button('Register a digital art frame', function () {
+    if (!VACO.userId()) throw new Error('Sign in to register a frame.');
+    return VACO.post('/api/art-frame', { ownerId: VACO.userId() }).then(function (frame) {
+      VACO.toast('Frame #' + frame.frameId + ' registered');
+      renderArtFrame(result, frame);
+    });
+  }, 'primary'));
+
+  out.appendChild(VACO.form([{ name: 'frameId', label: 'Look up frame id', type: 'number' }], function (values) {
+    return VACO.api('/api/art-frame/' + encodeURIComponent(values.frameId)).then(function (frame) {
+      renderArtFrame(result, frame);
+    });
+  }, 'Look up'));
+  out.appendChild(result);
+
+  return VACO.card('Digital art frames', [out]);
+}
+
+function renderVadoExploreSection() {
+  var box = el('div', 'vaco-empty', 'Loading…');
+  VACO.api('/api/vado/explore').then(function (data) {
+    var out = el('div', 'vaco-stack');
+    (data.sections || []).forEach(function (section) {
+      out.appendChild(VACO.card(section.section.replace(/-/g, ' '), [
+        VACO.table([
+          { key: 'contentId', label: 'Card' },
+          { label: 'Attention score', num: true, render: function (r) { return VACO.round(r.attentionScore); } },
+          { label: 'For sale', render: function (r) { return r.isForSale ? VACO.badge('for sale', 'money') : '—'; } },
+          { key: 'galleryViewCount', label: 'Views', num: true },
+        ], section.cards, { empty: 'Nothing here yet.' }),
+      ]));
+    });
+    VACO.mount(box, out);
+  }).catch(function (err) { VACO.mount(box, VACO.notice(VACO.escapeHtml(err.message), 'danger')); });
+  return VACO.card('VADO explore', [box]);
+}
+
+function renderGalleryArt(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(renderGalleryAccountSection());
+  out.appendChild(renderArtCardSection());
+  out.appendChild(renderArtFrameSection());
+  out.appendChild(renderVadoExploreSection());
+  return out;
+}
+
 // Boot needs the brand and category list before the first render, since
 // both are real server-owned values rather than constants in this file.
 VACO.api('/api/health').then(function (health) {
   state.categories = health.categories || [];
   state.category = state.categories[0] || 'vehicles';
   state.complianceGates = health.complianceGates || [];
+  state.rarityTiers = health.rarityTiers || [];
 
   VACO.app({
     id: 'voken',
@@ -652,6 +806,7 @@ VACO.api('/api/health').then(function (health) {
       { id: 'car-clubs', label: 'Car Clubs', heading: 'Culture Car Clubs', render: renderCarClubs },
       { id: 'activity', label: 'Activity', heading: 'Trading, raffles & referrals', render: renderActivity },
       { id: 'account', label: 'Account', heading: 'Notifications & wallet', render: renderAccount },
+      { id: 'gallery-art', label: 'Gallery & Art', heading: 'VADO gallery, art cards & frames', render: renderGalleryArt },
     ],
   });
 });
