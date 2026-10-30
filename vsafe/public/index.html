@@ -278,21 +278,100 @@ function renderFakeCalls(body) {
     return VACO.mount(body, out);
   }
 
+  // lib/fakeCall.js requires a real, caller-supplied name (no default
+  // identity is fabricated) and a bounded delaySeconds (5-300s).
   out.appendChild(VACO.card('Schedule one', [
-    VACO.form([{ name: 'minutes', label: 'In', type: 'number', min: 1, value: 15, width: '80px' }],
-      function (values) {
-        return VACO.post('/api/fake-calls', {
-          userId: id, scheduledFor: Date.now() + values.minutes * 60000,
-        }).then(function () { VACO.toast('Fake call scheduled.'); VACO.render(); });
-      }, 'Schedule'),
+    VACO.form([
+      { name: 'callerName', label: 'Caller name', placeholder: 'who it appears to be', width: '160px' },
+      { name: 'delaySeconds', label: 'Ring in (5-300s)', type: 'number', min: 5, value: 15, width: '110px' },
+      { name: 'callerPhotoUrl', label: 'Photo URL (optional)', placeholder: 'https://…', width: '180px' },
+    ], function (values) {
+      var payload = { userId: id, callerName: values.callerName, delaySeconds: values.delaySeconds };
+      if (values.callerPhotoUrl) payload.callerPhotoUrl = values.callerPhotoUrl;
+      return VACO.post('/api/fake-calls', payload).then(function (c) {
+        VACO.toast('Fake call ' + c.id + ' scheduled from "' + c.callerName + '" in ' + values.delaySeconds + 's.');
+        VACO.render();
+      });
+    }, 'Schedule'),
   ]));
 
+  var lookupHost = el('div', 'vaco-stack');
+
+  // Real, deterministic polling: a status badge plus whichever action is
+  // real for that status -- 'scheduled' can only be cancelled, 'ringing'
+  // can only be answered or dismissed, every other status is terminal.
+  function renderFakeCallCard(callId, call) {
+    var lines = el('div', 'vaco-stack-sm');
+    lines.appendChild(VACO.badge(call.status || 'unknown'));
+    Object.keys(call).forEach(function (k) {
+      if (typeof call[k] === 'object' || call[k] === null) return;
+      lines.appendChild(el('p', 'vaco-small vaco-dim', k + ': ' + call[k]));
+    });
+
+    var children = [lines];
+    var actions = el('div', 'vaco-row-tight');
+    if (call.status === 'scheduled') {
+      actions.appendChild(VACO.button('Cancel', function () {
+        return VACO.post('/api/fake-calls/' + callId + '/cancel', {}).then(function (updated) {
+          VACO.toast('Fake call ' + callId + ' cancelled.');
+          renderFakeCallCard(callId, updated);
+        });
+      }, 'ghost'));
+      children.push(actions);
+    } else if (call.status === 'ringing') {
+      actions.appendChild(VACO.button('Answer', function () {
+        return VACO.post('/api/fake-calls/' + callId + '/answer', {}).then(function (updated) {
+          VACO.toast('Fake call ' + callId + ' answered.');
+          renderFakeCallCard(callId, updated);
+        });
+      }, 'primary'));
+      actions.appendChild(VACO.button('Dismiss', function () {
+        return VACO.post('/api/fake-calls/' + callId + '/dismiss', {}).then(function (updated) {
+          VACO.toast('Fake call ' + callId + ' dismissed.');
+          renderFakeCallCard(callId, updated);
+        });
+      }, 'ghost'));
+      children.push(actions);
+    }
+    VACO.mount(lookupHost, VACO.card('Fake call ' + callId, children));
+  }
+
+  out.appendChild(VACO.card('Look up / manage a fake call', [
+    VACO.form([{ name: 'id', label: 'Fake call id', type: 'number', min: 1, value: 1, width: '100px' }],
+      function (values) {
+        return VACO.api('/api/fake-calls/' + values.id).then(function (call) {
+          renderFakeCallCard(values.id, call);
+        });
+      }, 'Look up'),
+  ]));
+  out.appendChild(lookupHost);
+
+  // getDueFakeCalls transitions any real due call from 'scheduled' to
+  // 'ringing' as a side effect of this read -- the real poll shape every
+  // "is it time yet" client in this app uses.
   return VACO.api('/api/fake-calls/due/' + encodeURIComponent(id)).then(function (data) {
-    var due = data.calls || data || [];
+    var due = data.due || [];
     out.appendChild(VACO.card('Due now', [
       VACO.table([
         { key: 'id', label: 'Id' },
-        { key: 'scheduledFor', label: 'Scheduled', render: function (c) { return new Date(c.scheduledFor).toLocaleTimeString(); } },
+        { key: 'callerName', label: 'Caller' },
+        { key: 'scheduledFor', label: 'Scheduled', render: function (c) { return new Date(c.scheduledAt).toLocaleTimeString(); } },
+        {
+          key: 'actions', label: '', render: function (c) {
+            var row = el('div', 'vaco-row-tight');
+            row.appendChild(VACO.button('Answer', function () {
+              return VACO.post('/api/fake-calls/' + c.id + '/answer', {}).then(function () {
+                VACO.toast('Fake call ' + c.id + ' answered.'); VACO.render();
+              });
+            }, 'primary vaco-btn-sm'));
+            row.appendChild(VACO.button('Dismiss', function () {
+              return VACO.post('/api/fake-calls/' + c.id + '/dismiss', {}).then(function () {
+                VACO.toast('Fake call ' + c.id + ' dismissed.'); VACO.render();
+              });
+            }, 'ghost vaco-btn-sm'));
+            return row;
+          },
+        },
       ], due, { empty: 'Nothing due.' }),
     ]));
     VACO.mount(body, out);
