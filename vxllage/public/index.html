@@ -357,6 +357,68 @@ function renderVillages(body) {
 // village — the real "channel/event/member/boost concepts... worth
 // keeping" per VXLLAGE_CLAUDE.md's SS0, kept to one flat detail panel
 // rather than the old prototype's own nested six-tab sub-app.
+// A channel's messages + unread count + post/mark-read, loaded on
+// demand rather than for every channel up front — the real per-user
+// read marker (lib/villageChannels.js's `markChannelRead`/
+// `getUnreadCount`), never a decorative badge.
+function channelCard(channel, viewerId, onChange) {
+  var card = el('div', 'vaco-card vaco-stack-sm');
+  var head = el('div', 'vaco-row-tight');
+  head.appendChild(el('strong', 'vaco-small', '#' + channel.name));
+  if (viewerId) {
+    var unread = VACO.badge('…');
+    head.appendChild(unread);
+    VACO.api('/api/channels/' + channel.id + '/unread/' + encodeURIComponent(viewerId))
+      .then(function (u) { unread.textContent = u.unreadCount + ' unread'; })
+      .catch(function () { unread.textContent = 'unread unknown'; });
+  }
+  card.appendChild(head);
+
+  var msgHost = el('div', 'vaco-stack-sm');
+  var loaded = false;
+  var toggle = VACO.button('Messages', function () {
+    if (loaded) {
+      VACO.mount(msgHost, []);
+      loaded = false;
+      toggle.textContent = 'Messages';
+      return;
+    }
+    return loadChannelMessages(msgHost, channel.id, viewerId).then(function () {
+      loaded = true;
+      toggle.textContent = 'Hide messages';
+    });
+  }, 'ghost');
+  card.appendChild(toggle);
+  card.appendChild(msgHost);
+  return card;
+}
+
+function loadChannelMessages(host, channelId, viewerId) {
+  return VACO.api('/api/channels/' + channelId + '/messages').then(function (data) {
+    var messages = data.messages || [];
+    var box = el('div', 'vaco-stack-sm');
+    box.appendChild(VACO.table([
+      { key: 'authorId', label: 'From' },
+      { label: 'Text', render: function (m) { return m.text; } },
+      { label: 'When', render: function (m) { return fmtWhen(m.createdAt); } },
+    ], messages, { empty: 'No messages yet.' }));
+
+    if (viewerId) {
+      box.appendChild(VACO.form([
+        { name: 'text', label: 'Message', placeholder: 'say something', width: '220px' },
+      ], function (values) {
+        return VACO.post('/api/channels/' + channelId + '/messages', { userId: viewerId, text: values.text })
+          .then(function () { return loadChannelMessages(host, channelId, viewerId); });
+      }, 'Send'));
+      box.appendChild(VACO.button('Mark read', function () {
+        return VACO.post('/api/channels/' + channelId + '/read', { userId: viewerId })
+          .then(function () { VACO.toast('Marked read.'); });
+      }, 'ghost'));
+    }
+    VACO.mount(host, box);
+  });
+}
+
 function loadVillageDetail(host, villageId) {
   villageId = Number(villageId);
   if (!villageId) return Promise.resolve();
@@ -367,11 +429,21 @@ function loadVillageDetail(host, villageId) {
     VACO.api('/api/villages/' + villageId + '/members'),
     VACO.api('/api/villages/' + villageId + '/events'),
     VACO.api('/api/villages/' + villageId + '/rooms'),
+    VACO.api('/api/villages/' + villageId + '/channels'),
+    VACO.api('/api/villages/' + villageId + '/boost'),
+    VACO.api('/api/villages/' + villageId + '/cosmetics'),
+    viewerId
+      ? VACO.api('/api/users/' + encodeURIComponent(viewerId) + '/cosmetics').catch(function () { return { cosmetics: [] }; })
+      : Promise.resolve({ cosmetics: [] }),
   ]).then(function (r) {
     var village = r[0];
     var members = r[1].members || [];
     var events = r[2].events || [];
     var rooms = r[3].rooms || [];
+    var channels = r[4].channels || [];
+    var boost = r[5];
+    var villageCosmetics = r[6].cosmetics || [];
+    var ownedCosmetics = r[7].cosmetics || [];
 
     function refresh() { return loadVillageDetail(host, villageId); }
 
@@ -455,6 +527,77 @@ function loadVillageDetail(host, villageId) {
       }, 'Claim a Villa'));
     }
     replacement.appendChild(VACO.card('Villas', roomChildren));
+
+    // Channels — deliberately text-only (lib/villageChannels.js's own
+    // header: voice needs real shared audio infra that doesn't exist
+    // anywhere yet). Owner-only to create, matching requireVillageOwner()
+    // server-side.
+    var channelChildren = channels.length
+      ? channels.map(function (c) { return channelCard(c, viewerId, refresh); })
+      : [el('div', 'vaco-empty', 'No channels yet.')];
+    if (isOwner) {
+      channelChildren.push(VACO.form([
+        { name: 'name', label: 'Channel name', placeholder: 'general', width: '180px' },
+      ], function (values) {
+        return VACO.post('/api/channels', { villageId: villageId, name: values.name })
+          .then(function () { VACO.toast('Channel created.'); return refresh(); });
+      }, 'Create channel'));
+    }
+    replacement.appendChild(VACO.card('Channels', channelChildren));
+
+    // Shop — the real boost economy + village-specific cosmetics
+    // (lib/villageShop.js), every purchase a real VCoin settlement
+    // through V3, paid to the village's own owner.
+    var boostLines = el('div', 'vaco-stack-sm');
+    boostLines.appendChild(el('p', 'vaco-small',
+      boost.totalBoostVCoin + ' VCoin raised · level ' + boost.boostLevel
+      + (boost.nextLevelAt ? ' · ' + boost.vCoinToNextLevel + ' to level ' + (boost.boostLevel + 1) : ' · max level')));
+    var boostChildren = [boostLines];
+    if (viewerId) {
+      boostChildren.push(VACO.form([
+        { name: 'amountVCoin', label: 'Boost amount', type: 'number', min: '1', width: '120px' },
+      ], function (values) {
+        return VACO.post('/api/villages/' + villageId + '/boost', { boosterId: viewerId, amountVCoin: values.amountVCoin })
+          .then(function () {
+            VACO.toast('Boosted ' + village.name + '.', 'money');
+            VACO.refreshBalances().then(VACO.renderIdentity);
+            return refresh();
+          });
+      }, 'Boost'));
+    }
+    replacement.appendChild(VACO.card('Boost', boostChildren));
+
+    var cosmeticChildren = [villageCosmetics.length
+      ? VACO.table([
+        { key: 'id', label: 'Id' },
+        { key: 'name', label: 'Name' },
+        { label: 'Price', num: true, render: function (c) { return VACO.price(c.priceVCoin, { freeLabel: false }); } },
+        { label: '', render: function (c) {
+          if (!viewerId) return '';
+          var owned = ownedCosmetics.some(function (o) { return o.id === c.id; });
+          if (owned) return VACO.badge('owned', 'money');
+          return VACO.button('Buy', function () {
+            return VACO.post('/api/cosmetics/' + c.id + '/purchase', { buyerId: viewerId })
+              .then(function () {
+                VACO.toast(c.name + ' purchased.', 'money');
+                VACO.refreshBalances().then(VACO.renderIdentity);
+                return refresh();
+              });
+          }, 'primary');
+        } },
+      ], villageCosmetics, { empty: 'No cosmetics listed yet.' })
+      : el('div', 'vaco-empty', 'No cosmetics listed yet.')];
+    if (isOwner) {
+      cosmeticChildren.push(VACO.form([
+        { name: 'name', label: 'Name', placeholder: 'Village Pin', width: '160px' },
+        { name: 'priceVCoin', label: 'Price (VCoin)', type: 'number', min: '1', width: '110px' },
+      ], function (values) {
+        return VACO.post('/api/villages/' + villageId + '/cosmetics', {
+          creatorId: viewerId, name: values.name, priceVCoin: values.priceVCoin,
+        }).then(function () { VACO.toast('Cosmetic listed.'); return refresh(); });
+      }, 'List a cosmetic'));
+    }
+    replacement.appendChild(VACO.card('Village cosmetics', cosmeticChildren));
 
     VACO.mount(host, replacement);
   }).catch(function (err) {
