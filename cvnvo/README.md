@@ -452,3 +452,112 @@ arrives eventually." See `dev-docs/phase-13-real-time-messages/`.
   pipeline exists anywhere in this ecosystem.
 - A separate, real friend graph for Snap Map's own "My Friends" tier —
   a real active Match is used as the closest existing substitute.
+
+## Frontend coverage pass (30 Oct 2026)
+An audit found `public/index.html` making real calls against only 8 of
+this app's 59 routes — the original 3 tabs (Discover, Events, Safety)
+covered profile creation/viewing, compatibility scoring, a bare-bones
+event create/lookup, BarBuddy check-in, and reliability/flash-notes
+reads, but entire feature areas named throughout this file's own
+"What's here" section had **zero** frontend exposure. Two real,
+pre-existing bugs were found and fixed along the way, and four new
+tabs plus the existing Events/Safety tabs close the rest of the gap —
+every field in every new call checked against the real `lib/*.js`
+function it reaches, several confirmed live against a running server
+with real seeded profiles, never a fabricated payload shape.
+Consistently left backend-only, by design: `POST /api/matches/generate`
+and `POST /api/matches` (`requireCallingService()` — a trusted-service
+credential for batch matching runs), and `GET /api/health`. This
+frontend has no login for a service credential and no operator role,
+so those stay real backend capabilities rather than a fake "admin" UI
+pretending to hold one — the same posture `void/README.md`'s own
+frontend coverage pass took for VOID's dispatcher-only routes.
+
+- **Two real bugs fixed, not just new coverage.** The Events tab's
+  "Create a date event" form sent `{hostId, title, venue}` to
+  `POST /api/date-events`, but `lib/dateEvents.js`'s `createDateEvent`
+  only ever reads `{participants, huntId, voidRideId}` — `DateEvent`
+  has no `title`/`venue` field and never did. Every real submission
+  403'd (`requireListedParticipant('participants')` saw no real array
+  in the body), and the lookup card below it read `e.title`/`e.venue`,
+  fields that never existed on a real `DateEvent` response either.
+  Both fixed to match the real shape, and the **Events** tab gained
+  real RSVP (`POST /api/date-events/:id/rsvp`, which moves the real,
+  live-derived `visibleAttendeeCount`) and Hunts Dates linking
+  (`POST /api/date-events/:id/link-hunt`, a real, live HVNTZ hunt
+  lookup — a made-up `huntId` is rejected, not stored).
+- **Safety tab, extended** — eight real, previously backend-only
+  routes added to the existing tab rather than a new one, since this
+  is the same First Date Safety / VSAFE surface that tab already
+  anchors: starting a real VSAFE check-in for a date
+  (`POST /api/safety/check-ins`), its real combined live status
+  (`GET .../full-status`), the real "We Met" loop — one user action,
+  two uses — confirming safe with VSAFE while folding in
+  `actuallyMet`/`dateRating` (`POST .../confirm-safe`), attaching a
+  real VOID ride's driver/status (`POST .../void-ride`), VSAFE's
+  Phase 3 Photo Check-ins linked to this same check-in
+  (`POST .../photo-check-in`, `.../submit`), and the two VSAFE Extras
+  pass-throughs (`POST /api/safety/fake-call`,
+  `POST /api/safety/screen-time`).
+- **Messages tab** — `lib/messages.js` (Your Turn Limits, real message
+  screening) and `lib/communicationControls.js` (anonymous calling)
+  had no frontend at all. Looks up a match's real compatibility score/
+  type/expiry/unanswered count (`GET /api/matches/:id`), loads and
+  sends real, screened messages (`GET`/`POST /api/matches/:id/messages`),
+  checks your own real turn-limit status
+  (`GET /api/users/:userId/turn-limit-status`), previews the real
+  deterministic screen without sending
+  (`POST /api/messages/screen`), and starts/checks/ends a real,
+  phone-number-free call session (`POST /api/calls`,
+  `GET /api/calls/:id`, `POST /api/calls/:id/end`).
+- **Nearby tab** — the rest of `lib/proximity.js` (BarBuddy check-in
+  itself stays on the Safety tab, this app's own established safety
+  entry point) had no frontend at all. Records a real Happn-style
+  crossing, rejected server-side past the real 250m radius, and shows
+  the real chronological feed (`POST`/`GET /api/proximity`), sends a
+  pre-match FlashNote (`POST /api/flash-notes`), and rounds out a
+  BarBuddy session — checking out, toggling venue visibility, seeing
+  who else opted in (`POST /api/barbuddy/check-out`,
+  `POST /api/barbuddy/visibility`, `GET /api/barbuddy/venues/:venueId`).
+- **Formats tab** — `lib/speedDating.js`, `lib/giftDating.js`,
+  `lib/longDistance.js`, and `lib/blindDate.js` had no frontend at
+  all, bundled into one tab the way `void/public/index.html`'s own
+  Scheduling tab bundled that app's four scheduling surfaces. Speed/
+  Group Dating: schedules a slot requiring every participant's real
+  VACA-verified badge, views a slot, extends it once, and views a
+  group slot's real round-robin rotation
+  (`POST /api/speed-dates`, `GET /api/speed-dates/:id`,
+  `POST /api/speed-dates/:id/extend`, `GET .../rotation`). Gift
+  Dating: sets your own real minimum, sends a real-VCoin gift with a
+  date request, and views requests you've received
+  (`POST /api/gift-dating/threshold`, `GET .../threshold/:userId`,
+  `POST /api/gift-dating/request`, `GET /api/gift-dating/requests/:userId`).
+  Long-Distance Mode: sets a Bumble Travel-style pin, gets today's real
+  rate-limited curated match, and views/advances the real one-
+  directional closing-distance roadmap (`POST /api/long-distance/pin`,
+  `GET .../pin/:userId`, `POST .../daily-match`,
+  `GET .../roadmap/:matchId`, `POST .../roadmap/:matchId/advance`).
+  Blind Date: buys a real 20-VCoin date token, gets an AI-ranked
+  assignment, views a session, reveals photos once 3 real messages
+  exist, cancels, and checks the real 2-cancellation block
+  (`POST /api/blind-date/token`, `.../assign`, `GET /api/blind-date/:id`,
+  `POST .../:id/reveal`, `.../:id/cancel`, `GET .../blocked/:userId`).
+- **Snap Map tab** — the location-privacy half of `lib/dateEvents.js`
+  (the `DateEvent`/Hunts Dates half lives on the Events tab) had no
+  frontend at all. Sets the real three-tier Ghost Mode/My Friends/
+  Select Friends preference, shares your latest position (never a
+  trail), views who has made themselves visible to you, and searches
+  a real 1–100 mile radius for a real open-for-contact count
+  (`POST /api/location/sharing-preference`, `POST /api/location/share`,
+  `GET /api/location/visible/:viewerId`, `GET /api/location/search`).
+
+**One deliberate, minor omission**: `GET /api/safety/check-ins/:id`
+(the plain local-only read) has no separate card — the Safety tab's
+"Check-in status" card calls `.../full-status` instead, which returns
+every field the plain route does plus VSAFE's own live status, so a
+second, strictly-weaker card would add a route checked off without
+adding a real capability.
+
+This leaves 55 of this app's 59 routes reachable from the UI, with the
+remaining four being `GET /api/health` and the two service-credential-
+gated batch-matching routes named above.
