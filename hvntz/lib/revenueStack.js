@@ -117,6 +117,12 @@ function createHvntzStore() {
     cvnvoPlacements: [],
     hunts: [],
     nextHuntId: 1,
+    // `lib/mysteryHunt.js` — deliberately a PARALLEL array, never
+    // nested on a `hunts` entry: `GET /api/hunt/:huntId` returns a
+    // hunt's own record directly, and a hidden mystery solution living
+    // on that same object would be one response away from spoiling
+    // itself.
+    mysteryHunts: [],
     adSubmissions: [],
     nextAdSubmissionId: 1,
     networks: [],

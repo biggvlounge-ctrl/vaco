@@ -120,6 +120,33 @@ curl http://localhost:8792/api/franchise-list/1
   simply didn't exist before (only creation was ever exposed) —
   closing CVNVO's own separately-flagged BarBuddy validation gap too
   (see `../cvnvo/README.md`'s own matching entry).
+- `lib/mysteryHunt.js` — **Mystery Hunts: a real Clue-style deduction
+  layer over the checkpoint mechanic above**, added 30 Oct 2026 by
+  direct request to bring the board game's own structure into a real
+  scavenger/Easter-egg hunt. A hidden, three-slot solution
+  (`who`/`what`/`where`); a real per-checkpoint clue stated as either
+  the true value or an explicit red herring — checked against the
+  real hidden answer the moment it's added, so it can never be
+  mislabeled; and a real team accusation, checked against that same
+  hidden answer, never guessed at. **Never nested on the `hunt`
+  object `GET /api/hunt/:huntId` already returns directly** — this
+  module's state lives in a parallel `store.mysteryHunts` entry per
+  hunt, so the existing route can never leak the solution. Teams
+  share clues (the real deduction tension the board game depends on);
+  a solo player's own reveals stay their own. **Keeps the actual
+  board-game rule**: a wrong accusation eliminates that team from
+  *winning*, not from playing — every other team keeps revealing
+  clues and collecting checkpoint bounties exactly as before.
+  Deliberately invents no bonus payout for solving it — the existing
+  bounty mechanic already covers real money at a checkpoint, and no
+  source material specifies a mystery-solved reward. Wired into
+  `POST /api/hunt/:huntId/checkin` (a successful check-in also shares
+  that checkpoint's real clue, if it has one, with the hunter's own
+  team) plus five new routes: `POST .../mystery/solution` and
+  `POST .../checkpoint/:id/mystery-clue` (sponsor-only, same real-
+  ownership shape as creating the hunt itself), `POST .../mystery/team`,
+  `GET .../mystery/status`, `GET .../mystery/known-facts/:userId`, and
+  `POST .../mystery/accusation`.
 - `lib/explore.js` — HVNTZ Explore Page (Phase 3): a real, deterministic
   ranking combining location score (real Haversine distance) and
   attention score (checkpoint count/budget use for hunts, trade count

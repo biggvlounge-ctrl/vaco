@@ -40,6 +40,10 @@ const {
   linkCheckpointNetwork, unlinkCheckpointNetwork, checkpointLiveNetwork,
   checkInAtCheckpoint, getHuntProgress, recommendBreak,
 } = require('./lib/hunts');
+const {
+  createMysteryTeam, getMysteryTeam, setMysterySolution, addMysteryClue,
+  revealCluesFor, knownFacts, makeAccusation, mysteryStatus,
+} = require('./lib/mysteryHunt');
 const { getExplorePage } = require('./lib/explore');
 const {
   submitAdContent, getAdSubmission, reviewAdSubmission, getAdSubmissions, runAdSubmission,
@@ -343,6 +347,24 @@ const requireCheckpointBusinessOwner = () => requireBusinessOwner((req) => {
   const checkpoint = getCheckpoint(hunt, Number(req.params.checkpointId));
   return checkpoint ? checkpoint.businessId : null;
 }, 'checkpoint');
+
+// **Only a hunt's own real sponsor may set its hidden mystery solution
+// or author a checkpoint's mystery clue** — same real-ownership shape
+// as `requireBusinessOwner`, checked against `hunt.sponsorId` (the
+// party who funds the hunt and already created it) rather than any
+// business, since a mystery's clues span every checkpoint's host
+// business, not one.
+function requireHuntSponsor() {
+  const session = requireSession();
+  return (req, res, next) => session(req, res, () => {
+    const hunt = getHunt(store, Number(req.params.huntId));
+    if (!hunt) return res.status(404).json({ error: `no hunt with id ${req.params.huntId}` });
+    if (hunt.sponsorId !== req.sessionUserId) {
+      return res.status(403).json({ error: 'only this hunt\'s own sponsor may act on its mystery' });
+    }
+    return next();
+  });
+}
 
 // A network belongs to the business that is its Hub.
 const requireNetworkBusinessOwner = () => requireBusinessOwner((req) => {
@@ -687,15 +709,78 @@ app.get('/api/hunt/:huntId/checkpoint/:checkpointId/live-network', (req, res) =>
 
 app.post('/api/hunt/:huntId/checkin', requireActor('userId'), async (req, res) => {
   try {
+    const huntId = Number(req.params.huntId);
     const result = await checkInAtCheckpoint(store, {
       ...req.body,
-      huntId: Number(req.params.huntId),
+      huntId,
       settleFn: settleVCoin,
       // Real and optional -- only actually calls Vavlt Stvdios when
       // the caller supplied a real photoUrl in the request body.
       postToVavltStvdios,
     });
+    // Real and optional -- `revealCluesFor` returns null for a
+    // checkpoint with no mystery clue, same honest shape `liveNetwork`
+    // already has for a checkpoint with no Network. Shares the clue
+    // with the checking-in user's own real team, not just themselves.
+    result.mysteryClue = revealCluesFor(store, {
+      huntId, checkpointId: Number(req.body.checkpointId), userId: req.body.userId,
+    });
     res.status(201).json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// --- Mystery Hunts: a real Clue-style deduction layer over the
+// checkpoint mechanic above. See `lib/mysteryHunt.js`'s own header.
+
+app.post('/api/hunt/:huntId/mystery/solution', requireHuntSponsor(), (req, res) => {
+  try {
+    res.status(201).json(setMysterySolution(store, { ...req.body, huntId: Number(req.params.huntId) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/hunt/:huntId/checkpoint/:checkpointId/mystery-clue', requireHuntSponsor(), (req, res) => {
+  try {
+    res.status(201).json(addMysteryClue(store, {
+      ...req.body, huntId: Number(req.params.huntId), checkpointId: Number(req.params.checkpointId),
+    }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/hunt/:huntId/mystery/team', requireActor('creatorId'), (req, res) => {
+  try {
+    const { creatorId, ...rest } = req.body || {};
+    const memberUserIds = Array.isArray(rest.memberUserIds) ? rest.memberUserIds : [];
+    // The real creator is always on their own team, whether or not
+    // they remembered to list themselves.
+    if (!memberUserIds.includes(creatorId)) memberUserIds.push(creatorId);
+    res.status(201).json(createMysteryTeam(store, { ...rest, memberUserIds, huntId: Number(req.params.huntId) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/hunt/:huntId/mystery/status', (req, res) => {
+  res.json(mysteryStatus(store, Number(req.params.huntId)));
+});
+
+// A real user's own known facts -- never the hidden solution, only
+// what has actually been revealed to their own team. Open, no
+// session required, same posture as the progress route just below:
+// a user checking their own known facts is not a privileged action
+// against anyone else's data.
+app.get('/api/hunt/:huntId/mystery/known-facts/:userId', (req, res) => {
+  res.json({ facts: knownFacts(store, { huntId: Number(req.params.huntId), userId: req.params.userId }) });
+});
+
+app.post('/api/hunt/:huntId/mystery/accusation', requireActor('userId'), (req, res) => {
+  try {
+    res.status(201).json(makeAccusation(store, { ...req.body, huntId: Number(req.params.huntId) }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
