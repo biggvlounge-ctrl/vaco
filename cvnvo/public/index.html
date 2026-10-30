@@ -398,6 +398,127 @@ function renderSafety(body) {
   return VACO.mount(body, out);
 }
 
+// -- Messages & Calls ---------------------------------------------------
+
+function renderMessages(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Every message is real-screened before delivery (external-contact solicitation, phone numbers, links, '
+    + 'character flooding). Once a user owes a reply on too many conversations at once — Your Turn Limits — '
+    + 'new matches pause for them until they catch up.'));
+
+  var id = VACO.userId();
+  if (!id) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to view matches and send messages.'));
+    return VACO.mount(body, out);
+  }
+
+  var grid = el('div', 'safety-grid');
+
+  grid.appendChild(VACO.card('Your turn-limit status', [
+    (function () {
+      var value = el('p', 'vaco-body', 'Loading…');
+      VACO.api('/api/users/' + encodeURIComponent(id) + '/turn-limit-status')
+        .then(function (r) {
+          value.textContent = r.unansweredConversationCount + ' of ' + r.maxUnansweredConversations
+            + ' unanswered conversations' + (r.overTurnLimit ? ' — new matches are paused.' : '.');
+        })
+        .catch(function () { value.textContent = 'Unavailable.'; });
+      return value;
+    }()),
+  ]));
+
+  var matchOut = el('div', 'vaco-stack-sm');
+  grid.appendChild(VACO.card('Look up a match', [
+    VACO.form([{ name: 'id', label: 'Match id', type: 'number', min: 1, value: 1, width: '90px' }],
+      function (values) {
+        return VACO.api('/api/matches/' + values.id).then(function (m) {
+          var card = el('div', 'vaco-stack-sm');
+          var row = el('div', 'match-row');
+          row.appendChild(el('div', 'score-ring', Math.round(m.compatibilityScore)));
+          row.appendChild(el('strong', null, m.userAId + ' & ' + m.userBId));
+          card.appendChild(row);
+          var meta = el('div', 'vaco-row-tight');
+          meta.appendChild(VACO.badge(m.matchType));
+          meta.appendChild(VACO.badge(Date.now() < m.expiresAt ? 'active' : 'expired'));
+          meta.appendChild(VACO.badge(m.unansweredCount + ' unanswered'));
+          if (m.awaitingReplyFromUserId) meta.appendChild(el('span', 'vaco-small vaco-dim', 'awaiting: ' + m.awaitingReplyFromUserId));
+          card.appendChild(meta);
+          VACO.mount(matchOut, card);
+        });
+      }, 'Fetch'),
+    matchOut,
+  ]));
+
+  var messagesOut = el('div', 'vaco-stack-sm');
+  messagesOut.appendChild(el('p', 'vaco-small vaco-faint', 'Load a conversation to see its messages.'));
+  grid.appendChild(VACO.card('Conversation', [
+    VACO.form([{ name: 'matchId', label: 'Match id', type: 'number', min: 1, value: 1, width: '90px' }],
+      function (values) {
+        return VACO.api('/api/matches/' + values.matchId + '/messages').then(function (data) {
+          var messages = data.messages || [];
+          VACO.mount(messagesOut, messages.length
+            ? VACO.table([
+              { key: 'senderId', label: 'From' },
+              { key: 'text', label: 'Message' },
+              { key: 'flagged', label: 'Flagged', render: function (m) { return m.flagged ? VACO.badge('flagged: ' + m.reasons.join(', '), 'danger') : el('span', 'vaco-small vaco-faint', '—'); } },
+            ], messages)
+            : el('p', 'vaco-small vaco-faint', 'No messages yet.'));
+        });
+      }, 'Load'),
+    messagesOut,
+    VACO.form([
+      { name: 'matchId', label: 'Match id', type: 'number', min: 1, value: 1, width: '90px' },
+      { name: 'text', label: 'Message', placeholder: 'say something', width: '220px' },
+    ], function (values) {
+      return VACO.post('/api/matches/' + values.matchId + '/messages', { senderId: id, text: values.text })
+        .then(function (m) {
+          VACO.toast(m.flagged ? 'Sent — but flagged: ' + m.reasons.join(', ') : 'Sent.');
+        });
+    }, 'Send'),
+  ]));
+
+  var screenOut = el('div', 'vaco-stack-sm');
+  grid.appendChild(VACO.card('Screen a message', [
+    el('p', 'vaco-small vaco-dim', 'Runs the same real, deterministic scan every message gets, without actually sending anything.'),
+    VACO.form([{ name: 'text', label: 'Draft text', placeholder: 'type a draft', width: '220px' }],
+      function (values) {
+        return VACO.post('/api/messages/screen', { text: values.text }).then(function (r) {
+          VACO.mount(screenOut, r.flagged
+            ? VACO.badge('flagged: ' + r.reasons.join(', '), 'danger')
+            : VACO.badge('clean', 'money'));
+        });
+      }, 'Check'),
+    screenOut,
+  ]));
+
+  var callOut = el('div', 'vaco-stack-sm');
+  grid.appendChild(VACO.card('Anonymous call', [
+    el('p', 'vaco-small vaco-dim', 'A real call-session record — never a phone number — tracking who called whom on which match.'),
+    VACO.form([
+      { name: 'matchId', label: 'Match id', type: 'number', min: 1, value: 1, width: '90px' },
+      { name: 'calleeId', label: 'Call', placeholder: 'their user id', width: '140px' },
+    ], function (values) {
+      return VACO.post('/api/calls', { matchId: values.matchId, callerId: id, calleeId: values.calleeId })
+        .then(function (c) { VACO.toast('Call #' + c.id + ' started — save that id to end it.'); });
+    }, 'Start call'),
+    VACO.form([{ name: 'id', label: 'Call id', type: 'number', min: 1, value: 1, width: '90px' }],
+      function (values) {
+        return VACO.api('/api/calls/' + values.id).then(function (c) {
+          VACO.mount(callOut, VACO.badge(c.status, c.status === 'active' ? 'warn' : null));
+        });
+      }, 'Check status'),
+    callOut,
+    VACO.form([{ name: 'id', label: 'Call id', type: 'number', min: 1, value: 1, width: '90px' }],
+      function (values) {
+        return VACO.post('/api/calls/' + values.id + '/end', {}).then(function () { VACO.toast('Call ended.'); });
+      }, 'End call'),
+  ]));
+
+  out.appendChild(grid);
+  return VACO.mount(body, out);
+}
+
 VACO.app({
   id: 'cvnvo',
   name: 'CVNVO',
@@ -411,6 +532,7 @@ VACO.app({
   tabs: [
     { id: 'discover', label: 'Discover', heading: 'People', render: renderDiscover },
     { id: 'events', label: 'Events', heading: 'Date events', render: renderEvents },
+    { id: 'messages', label: 'Messages', heading: 'Matches, messages & calls', render: renderMessages },
     { id: 'safety', label: 'Safety', heading: 'Check-ins & screening', render: renderSafety },
   ],
 });
