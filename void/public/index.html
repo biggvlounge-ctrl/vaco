@@ -1146,6 +1146,291 @@ function renderCargo(body) {
   return VACO.mount(body, out);
 }
 
+// -- Bookings: Pet Care + the generic 25-vertical service engine ----------
+//
+// petCare.js (pets, meet-and-greet gate, recurring walks) and
+// serviceEngine.js (the shared lifecycle every non-petCare/laundry
+// vertical books through) had zero frontend exposure -- the Services
+// tab only ever showed the catalog, never let anyone actually book.
+function renderBookings(body) {
+  var out = el('div', 'vaco-stack');
+  var id = VACO.userId();
+  out.appendChild(VACO.notice(
+    'Pet Care has its own real domain depth (a pet’s vet contact, a meet-and-greet gate before a first booking). '
+    + 'The 23 other verticals share one generic lifecycle below.'));
+  if (!id) out.appendChild(el('div', 'vaco-empty', 'Sign in to register pets, subjects, and bookings.'));
+
+  // ====================== Pet Care ======================
+  var petsHost = el('div', 'vaco-stack-sm');
+  petsHost.appendChild(el('div', 'vaco-empty', 'Sign in to see your pets.'));
+
+  function refreshPets() {
+    if (!VACO.userId()) return Promise.resolve();
+    return VACO.api('/api/petcare/owner/' + encodeURIComponent(VACO.userId()) + '/pets').then(function (pets) {
+      VACO.mount(petsHost, VACO.table([
+        { key: 'id', label: 'Pet' },
+        { key: 'name', label: 'Name' },
+        { key: 'species', label: 'Species' },
+        { key: 'breed', label: 'Breed' },
+      ], pets, { empty: 'No pets registered yet.' }));
+    });
+  }
+
+  var petForm = VACO.form([
+    { name: 'name', label: 'Name', placeholder: 'Biscuit', width: '120px' },
+    { name: 'species', label: 'Species',
+      options: ['dog', 'cat', 'bird', 'rabbit', 'reptile', 'other'].map(function (s) { return { label: s, value: s }; }) },
+    { name: 'breed', label: 'Breed (optional)', width: '120px' },
+    { name: 'weightKg', label: 'Weight kg (optional)', type: 'number', width: '140px' },
+  ], function (values) {
+    if (!VACO.userId()) throw new Error('Sign in to register a pet.');
+    var payload = { ownerId: VACO.userId(), name: values.name, species: values.species };
+    if (values.breed) payload.breed = values.breed;
+    if (values.weightKg) payload.weightKg = values.weightKg;
+    return VACO.post('/api/petcare/pet', payload).then(function (pet) {
+      VACO.toast(pet.name + ' registered (pet #' + pet.id + ')', 'money');
+      return refreshPets();
+    });
+  }, 'Register pet');
+
+  out.appendChild(VACO.card('Your pets', [petForm, petsHost]));
+
+  var preferredHost = el('div', 'vaco-stack-sm');
+  out.appendChild(VACO.card('Preferred pet care providers', [
+    VACO.button('Load', function () {
+      if (!VACO.userId()) throw new Error('Sign in first.');
+      return VACO.api('/api/petcare/owner/' + encodeURIComponent(VACO.userId()) + '/preferred-providers').then(function (preferred) {
+        VACO.mount(preferredHost, VACO.table([
+          { key: 'providerId', label: 'Provider' },
+          { key: 'completedBookings', label: 'Completed', num: true },
+          { label: 'Last booked', render: function (p) { return fmtDate(p.lastAt); } },
+        ], preferred, { empty: 'No completed pet care bookings yet.' }));
+      });
+    }),
+    preferredHost,
+  ]));
+
+  var petBookingResult = el('div', 'vaco-stack-sm');
+  var petBookingForm = VACO.form([
+    { name: 'petId', label: 'Pet id', type: 'number', width: '80px' },
+    { name: 'providerId', label: 'Provider', placeholder: 'provider id', width: '130px' },
+    { name: 'service', label: 'Service',
+      options: ['walk', 'drop-in', 'daycare', 'boarding', 'grooming', 'training'].map(function (s) { return { label: s, value: s }; }) },
+    { name: 'scheduledFor', label: 'When', type: 'datetime-local', width: '190px' },
+    { name: 'isMeetAndGreet', label: 'Meet-and-greet?',
+      options: [{ label: 'No — real booking', value: 'false' }, { label: 'Yes — free intro', value: 'true' }] },
+    { name: 'price', label: 'Price (unless meet-and-greet)', type: 'number', value: 25, width: '160px' },
+  ], function (values) {
+    if (!VACO.userId()) throw new Error('Sign in to book pet care.');
+    var scheduledFor = dateInputToMs(values.scheduledFor);
+    if (!scheduledFor) throw new Error('Pick a date and time.');
+    var isMeetAndGreet = values.isMeetAndGreet === 'true';
+    var payload = {
+      ownerId: VACO.userId(), petId: values.petId, providerId: values.providerId,
+      service: values.service, scheduledFor: scheduledFor, isMeetAndGreet: isMeetAndGreet,
+    };
+    if (!isMeetAndGreet) payload.price = values.price;
+    return VACO.post('/api/petcare/booking', payload).then(function (booking) {
+      VACO.mount(petBookingResult, VACO.notice('Booking #' + booking.id + ' requested — confirm it below once the provider accepts.', 'money'));
+    });
+  }, 'Book');
+  out.appendChild(VACO.card('Book pet care', [
+    el('p', 'vaco-small vaco-dim',
+      'A provider’s first booking with a new pet is refused until a completed meet-and-greet is on record — book that first if you have not met.'),
+    petBookingForm, petBookingResult,
+  ]));
+
+  var petManageResult = el('div', 'vaco-stack-sm');
+  var petManageIdInput = el('input', 'vaco-input vaco-num');
+  petManageIdInput.type = 'number';
+  petManageIdInput.style.width = '90px';
+  var petManageWrap = el('label', 'vaco-stack-sm');
+  petManageWrap.style.gap = '4px';
+  petManageWrap.appendChild(el('span', 'vaco-label', 'Booking id'));
+  petManageWrap.appendChild(petManageIdInput);
+  var petManageRow = el('div', 'vaco-row');
+  petManageRow.appendChild(petManageWrap);
+  petManageRow.appendChild(VACO.button('Confirm', function () {
+    return VACO.post('/api/petcare/booking/' + petManageIdInput.value + '/confirm', {}).then(function (b) {
+      VACO.mount(petManageResult, VACO.notice('Booking #' + b.id + ' is now ' + b.status + '.'));
+    });
+  }));
+  petManageRow.appendChild(VACO.button('Complete', function () {
+    return VACO.post('/api/petcare/booking/' + petManageIdInput.value + '/complete', {}).then(function (b) {
+      VACO.mount(petManageResult, VACO.notice('Booking #' + b.id + ' completed and settled.', 'money'));
+    });
+  }));
+  petManageRow.appendChild(VACO.button('Cancel', function () {
+    return VACO.post('/api/petcare/booking/' + petManageIdInput.value + '/cancel', {}).then(function (b) {
+      VACO.mount(petManageResult, VACO.notice('Booking #' + b.id + ' cancelled.', 'warn'));
+    });
+  }));
+  out.appendChild(VACO.card('Manage a pet care booking', [petManageRow, petManageResult]));
+
+  var petRecurringResult = el('div', 'vaco-stack-sm');
+  var petRecurringForm = VACO.form([
+    { name: 'petId', label: 'Pet id', type: 'number', width: '80px' },
+    { name: 'providerId', label: 'Provider', placeholder: 'provider id', width: '130px' },
+    { name: 'service', label: 'Service',
+      options: ['walk', 'drop-in', 'daycare', 'boarding', 'grooming', 'training'].map(function (s) { return { label: s, value: s }; }) },
+    { name: 'firstScheduledFor', label: 'First occurrence', type: 'datetime-local', width: '190px' },
+    { name: 'intervalDays', label: 'Every N days', type: 'number', value: 7, width: '110px' },
+    { name: 'occurrences', label: 'Occurrences', type: 'number', value: 4, width: '100px' },
+    { name: 'price', label: 'Price each', type: 'number', value: 25, width: '100px' },
+  ], function (values) {
+    if (!VACO.userId()) throw new Error('Sign in to book a recurring series.');
+    var firstScheduledFor = dateInputToMs(values.firstScheduledFor);
+    if (!firstScheduledFor) throw new Error('Pick a first occurrence.');
+    return VACO.post('/api/petcare/recurring', {
+      petId: values.petId, providerId: values.providerId, service: values.service,
+      firstScheduledFor: firstScheduledFor, intervalDays: values.intervalDays,
+      occurrences: values.occurrences, price: values.price,
+    }).then(function (result) {
+      VACO.mount(petRecurringResult, VACO.notice(
+        result.bookings.length + ' bookings created (ids ' + result.bookings.map(function (b) { return b.id; }).join(', ') + ').', 'money'));
+    });
+  }, 'Book series');
+  out.appendChild(VACO.card('Recurring pet care', [petRecurringForm, petRecurringResult]));
+
+  // ====================== Generic service bookings ======================
+  var subjectsHost = el('div', 'vaco-stack-sm');
+  subjectsHost.appendChild(el('div', 'vaco-empty', 'Load to see your subjects for a vertical.'));
+  var subjectVerticalInput = el('input', 'vaco-input');
+  subjectVerticalInput.placeholder = 'cleaning';
+  subjectVerticalInput.style.width = '110px';
+  var subjectLookupWrap = el('label', 'vaco-stack-sm');
+  subjectLookupWrap.style.gap = '4px';
+  subjectLookupWrap.appendChild(el('span', 'vaco-label', 'Vertical'));
+  subjectLookupWrap.appendChild(subjectVerticalInput);
+  var subjectLookupRow = el('div', 'vaco-row');
+  subjectLookupRow.appendChild(subjectLookupWrap);
+  subjectLookupRow.appendChild(VACO.button('Load my subjects', function () {
+    if (!VACO.userId()) throw new Error('Sign in first.');
+    return VACO.api('/api/service/owner/' + encodeURIComponent(VACO.userId()) + '/subjects'
+      + (subjectVerticalInput.value.trim() ? '?verticalId=' + encodeURIComponent(subjectVerticalInput.value.trim()) : ''))
+      .then(function (subjects) {
+        VACO.mount(subjectsHost, VACO.table([
+          { key: 'id', label: 'Subject' },
+          { key: 'verticalId', label: 'Vertical' },
+          { key: 'label', label: 'Label' },
+        ], subjects, { empty: 'No subjects registered.' }));
+      });
+  }));
+
+  var subjectResult = el('div', 'vaco-stack-sm');
+  var subjectForm = VACO.form([
+    { name: 'verticalId', label: 'Vertical', placeholder: 'cleaning', width: '110px' },
+    { name: 'label', label: 'Label', placeholder: '2BR apartment', width: '160px' },
+    { name: 'accessNotes', label: 'Access notes (optional)', width: '170px' },
+  ], function (values) {
+    if (!VACO.userId()) throw new Error('Sign in to register a subject.');
+    var payload = { ownerId: VACO.userId(), verticalId: values.verticalId, label: values.label };
+    if (values.accessNotes) payload.accessNotes = values.accessNotes;
+    return VACO.post('/api/service/subject', payload).then(function (subject) {
+      VACO.mount(subjectResult, VACO.notice('Subject #' + subject.id + ' (' + subject.verticalId + ') registered.', 'money'));
+    });
+  }, 'Register subject');
+
+  out.appendChild(VACO.card('Subjects — the thing a service is performed on/for', [
+    el('p', 'vaco-small vaco-dim',
+      'A lawn, a car, a student — whatever the vertical requires, kept between bookings. Some verticals need no subject at all.'),
+    subjectForm, subjectResult, subjectLookupRow, subjectsHost,
+  ]));
+
+  var serviceBookingResult = el('div', 'vaco-stack-sm');
+  var serviceBookingForm = VACO.form([
+    { name: 'verticalId', label: 'Vertical', placeholder: 'cleaning', width: '110px' },
+    { name: 'providerId', label: 'Provider', placeholder: 'provider id', width: '120px' },
+    { name: 'service', label: 'Service', placeholder: 'standard-clean', width: '130px' },
+    { name: 'subjectId', label: 'Subject id (optional)', type: 'number', width: '150px' },
+    { name: 'scheduledFor', label: 'When', type: 'datetime-local', width: '190px' },
+    { name: 'quotedTotal', label: 'Quoted total (optional)', type: 'number', width: '160px' },
+  ], function (values) {
+    if (!VACO.userId()) throw new Error('Sign in to book a service.');
+    var scheduledFor = dateInputToMs(values.scheduledFor);
+    if (!scheduledFor) throw new Error('Pick a date and time.');
+    var payload = {
+      customerId: VACO.userId(), verticalId: values.verticalId, providerId: values.providerId,
+      service: values.service, scheduledFor: scheduledFor,
+    };
+    if (values.subjectId) payload.subjectId = values.subjectId;
+    if (values.quotedTotal) payload.quotedTotal = values.quotedTotal;
+    return VACO.post('/api/service/booking', payload).then(function (booking) {
+      VACO.mount(serviceBookingResult, VACO.notice(
+        'Booking #' + booking.id + ' (' + booking.archetype + ') is <strong>' + booking.status + '</strong>.', 'money'));
+    });
+  }, 'Book');
+  out.appendChild(VACO.card('Book a service (any of the 23 other verticals)', [
+    el('p', 'vaco-small vaco-dim',
+      'One shared lifecycle across recurring, round-trip, appointment, and quote archetypes — see the Services tab for which archetype each vertical uses.'),
+    serviceBookingForm, serviceBookingResult,
+  ]));
+
+  var serviceManageResult = el('div', 'vaco-stack-sm');
+  var serviceBookingIdInput = el('input', 'vaco-input vaco-num');
+  serviceBookingIdInput.type = 'number';
+  serviceBookingIdInput.style.width = '90px';
+  var serviceToInput = el('input', 'vaco-input');
+  serviceToInput.placeholder = 'e.g. confirmed, assessed, completed';
+  serviceToInput.style.width = '180px';
+  var serviceActualTotalInput = el('input', 'vaco-input vaco-num');
+  serviceActualTotalInput.type = 'number';
+  serviceActualTotalInput.placeholder = 'actual total (if assessing/quoting)';
+  serviceActualTotalInput.style.width = '200px';
+  function labeled(label, inputEl) {
+    var wrap = el('label', 'vaco-stack-sm');
+    wrap.style.gap = '4px';
+    wrap.appendChild(el('span', 'vaco-label', label));
+    wrap.appendChild(inputEl);
+    return wrap;
+  }
+  var serviceManageRow = el('div', 'vaco-row');
+  serviceManageRow.appendChild(labeled('Booking id', serviceBookingIdInput));
+  serviceManageRow.appendChild(labeled('Advance to', serviceToInput));
+  serviceManageRow.appendChild(labeled('Actual total', serviceActualTotalInput));
+  serviceManageRow.appendChild(VACO.button('Advance', function () {
+    var payload = { to: serviceToInput.value.trim() };
+    if (serviceActualTotalInput.value) payload.actualTotal = Number(serviceActualTotalInput.value);
+    return VACO.post('/api/service/booking/' + serviceBookingIdInput.value + '/advance', payload).then(function (b) {
+      VACO.mount(serviceManageResult, VACO.notice('Booking #' + b.id + ' is now ' + b.status + '.'));
+    });
+  }, 'primary'));
+  var serviceManageRow2 = el('div', 'vaco-row');
+  serviceManageRow2.appendChild(VACO.button('Approve over-cap total', function () {
+    return VACO.post('/api/service/booking/' + serviceBookingIdInput.value + '/approve-over-cap', {}).then(function (b) {
+      VACO.mount(serviceManageResult, VACO.notice('Over-cap total approved for booking #' + b.id + '.'));
+    });
+  }));
+  serviceManageRow2.appendChild(VACO.button('Cancel booking', function () {
+    return VACO.post('/api/service/booking/' + serviceBookingIdInput.value + '/cancel', {}).then(function (result) {
+      VACO.mount(serviceManageResult, VACO.notice('Booking #' + result.booking.id + ' cancelled.', 'warn'));
+    });
+  }));
+  out.appendChild(VACO.card('Manage a service booking', [
+    el('p', 'vaco-small vaco-dim',
+      'Each archetype has its own real lifecycle (e.g. a quote goes requested → surveyed → quoted → accepted → in-progress → completed); an illegal jump is refused.'),
+    serviceManageRow, serviceManageRow2, serviceManageResult,
+  ]));
+
+  var myBookingsHost = el('div', 'vaco-stack-sm');
+  out.appendChild(VACO.card('Your service bookings', [
+    VACO.button('Load', function () {
+      if (!VACO.userId()) throw new Error('Sign in first.');
+      return VACO.api('/api/service/customer/' + encodeURIComponent(VACO.userId()) + '/bookings').then(function (bookings) {
+        VACO.mount(myBookingsHost, VACO.table([
+          { key: 'id', label: 'Booking' },
+          { key: 'verticalId', label: 'Vertical' },
+          { key: 'service', label: 'Service' },
+          { label: 'Status', render: function (b) { return VACO.badge(b.status); } },
+        ], bookings, { empty: 'No service bookings yet.' }));
+      });
+    }),
+    myBookingsHost,
+  ]));
+
+  return VACO.mount(body, out);
+}
+
 VACO.app({
   id: 'void',
   name: 'VOID',
@@ -1179,6 +1464,9 @@ VACO.app({
     { id: 'cargo', label: 'Cargo & Loads', heading: 'Passenger, cargo & load management',
       blurb: 'Declare a trip’s real passengers and cargo, check it fits the vehicle, and see the dynamic cargo fee.',
       render: renderCargo },
+    { id: 'bookings', label: 'Bookings', heading: 'Pet Care & the 23-vertical service engine',
+      blurb: 'Register pets and subjects, book a service, and move a booking through its own real lifecycle.',
+      render: renderBookings },
     { id: 'academy', label: 'Academy', heading: 'VOID Academy',
       blurb: 'Real training on how VOID actually pays you, chosen from your own claimed skills.',
       render: renderAcademy },
