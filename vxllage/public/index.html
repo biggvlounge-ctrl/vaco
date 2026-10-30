@@ -279,6 +279,11 @@ function loadProfile(out, body, userId) {
 
 // -- Villages ---------------------------------------------------------
 
+var VILLAGE_ROOM_TYPES = [
+  { value: 'clubhouse-audio', label: 'Clubhouse-style audio' },
+  { value: 'discord-hangout', label: 'Discord-style hangout' },
+];
+
 function renderVillages(body) {
   var out = el('div', 'vaco-stack');
 
@@ -293,35 +298,167 @@ function renderVillages(body) {
     }, 'Create'),
   ]));
 
+  // Real, persistent per-village detail (members, Events, Villas) —
+  // loaded into this one host rather than a new tab per village,
+  // deliberately keeping Villages the lighter, secondary layer per
+  // VXLLAGE_CLAUDE.md's SS0 "shrink" correction, not a six-tab
+  // sub-app the way the old prototype's buildVillageDetail() was.
+  var detailHost = el('div', 'vaco-stack');
+
   return VACO.api('/api/villages').then(function (data) {
     var villages = data.villages || [];
-    if (!villages.length) {
+    if (villages.length) {
+      out.appendChild(VACO.grid(villages.map(function (v) {
+        var lines = el('div', 'vaco-stack-sm');
+        lines.appendChild(el('p', 'vaco-small vaco-dim', v.description || ''));
+        var meta = el('div', 'vaco-row-tight');
+        meta.appendChild(VACO.badge((v.members || []).length + ' members'));
+
+        // Boost level is bought with VCoin and is a real, server-computed
+        // tier, so it is fetched rather than derived from a member count.
+        var boost = VACO.badge('boost …');
+        meta.appendChild(boost);
+        VACO.api('/api/villages/' + v.id + '/boost')
+          .then(function (b) { boost.textContent = 'boost level ' + (b.boostLevel || 0); })
+          .catch(function () { boost.textContent = 'boost unknown'; });
+
+        lines.appendChild(meta);
+        var rowBtns = el('div', 'vaco-row-tight');
+        rowBtns.appendChild(VACO.button('Join', function () {
+          if (!VACO.userId()) throw new Error('Sign in to join.');
+          return VACO.post('/api/villages/' + v.id + '/join', { userId: VACO.userId() })
+            .then(function () { VACO.toast('Joined ' + v.name); VACO.render(); });
+        }));
+        rowBtns.appendChild(VACO.button('Open', function () {
+          return loadVillageDetail(detailHost, v.id);
+        }, 'ghost'));
+        lines.appendChild(rowBtns);
+        return VACO.card(v.name, [lines]);
+      }), true));
+    } else {
       out.appendChild(el('div', 'vaco-empty', 'No villages yet — start the first one above.'));
-      return VACO.mount(body, out);
     }
-    out.appendChild(VACO.grid(villages.map(function (v) {
-      var lines = el('div', 'vaco-stack-sm');
-      lines.appendChild(el('p', 'vaco-small vaco-dim', v.description || ''));
-      var meta = el('div', 'vaco-row-tight');
-      if (typeof v.memberCount === 'number') meta.appendChild(VACO.badge(v.memberCount + ' members'));
 
-      // Boost level is bought with VCoin and is a real, server-computed
-      // tier, so it is fetched rather than derived from a member count.
-      var boost = VACO.badge('boost …');
-      meta.appendChild(boost);
-      VACO.api('/api/villages/' + v.id + '/boost')
-        .then(function (b) { boost.textContent = 'boost level ' + (b.level !== undefined ? b.level : 0); })
-        .catch(function () { boost.textContent = 'boost unknown'; });
+    out.appendChild(VACO.card('Open a village', [
+      VACO.form([{ name: 'villageId', label: 'Village id', width: '100px' }], function (values) {
+        return loadVillageDetail(detailHost, values.villageId);
+      }, 'Open'),
+    ]));
+    detailHost.appendChild(el('div', 'vaco-empty',
+      'Open a village above (or click "Open" on a card) to see its real members, events, and Villas.'));
+    out.appendChild(detailHost);
 
-      lines.appendChild(meta);
-      lines.appendChild(VACO.button('Join', function () {
-        if (!VACO.userId()) throw new Error('Sign in to join.');
-        return VACO.post('/api/villages/' + v.id + '/join', { userId: VACO.userId() })
-          .then(function () { VACO.toast('Joined ' + v.name); VACO.render(); });
-      }));
-      return VACO.card(v.name, [lines]);
-    }), true));
     VACO.mount(body, out);
+  });
+}
+
+// Members, Events (real derived going-count, real RSVP), and Villas
+// (lib/villageRooms.js's real, permanent, creator-owned rooms) for one
+// village — the real "channel/event/member/boost concepts... worth
+// keeping" per VXLLAGE_CLAUDE.md's SS0, kept to one flat detail panel
+// rather than the old prototype's own nested six-tab sub-app.
+function loadVillageDetail(host, villageId) {
+  villageId = Number(villageId);
+  if (!villageId) return Promise.resolve();
+  var viewerId = VACO.userId();
+
+  return Promise.all([
+    VACO.api('/api/villages/' + villageId),
+    VACO.api('/api/villages/' + villageId + '/members'),
+    VACO.api('/api/villages/' + villageId + '/events'),
+    VACO.api('/api/villages/' + villageId + '/rooms'),
+  ]).then(function (r) {
+    var village = r[0];
+    var members = r[1].members || [];
+    var events = r[2].events || [];
+    var rooms = r[3].rooms || [];
+
+    function refresh() { return loadVillageDetail(host, villageId); }
+
+    var isMember = !!viewerId && members.some(function (m) { return m.userId === viewerId; });
+    var isOwner = village.ownerId === viewerId;
+
+    var replacement = el('div', 'vaco-stack');
+
+    var headActions = null;
+    if (isMember && !isOwner) {
+      headActions = VACO.button('Leave', function () {
+        return VACO.post('/api/villages/' + villageId + '/leave', { userId: viewerId })
+          .then(function () { VACO.toast('Left ' + village.name + '.'); return refresh(); });
+      }, 'ghost');
+    }
+    replacement.appendChild(VACO.card(village.name + ' — owner ' + village.ownerId, [
+      el('p', 'vaco-small vaco-dim', members.length + ' real member(s)'),
+    ], { trailing: headActions }));
+
+    replacement.appendChild(VACO.card('Members', [
+      VACO.table([
+        { key: 'userId', label: 'User' },
+        { key: 'role', label: 'Role' },
+        { label: 'Joined', render: function (m) { return fmtDate(m.joinedAt); } },
+      ], members, { empty: 'No members.' }),
+    ]));
+
+    var eventChildren = [VACO.table([
+      { key: 'id', label: 'Id' },
+      { key: 'title', label: 'Title' },
+      { label: 'When', render: function (e) { return fmtDate(e.scheduledAt); } },
+      { label: 'Going', num: true, render: function (e) { return (e.attendees || []).length; } },
+      { label: '', render: function (e) {
+        if (!viewerId) return '';
+        var going = (e.attendees || []).indexOf(viewerId) !== -1;
+        return VACO.button(going ? 'Un-RSVP' : 'RSVP', function () {
+          var path = '/api/village-events/' + e.id + (going ? '/unrsvp' : '/rsvp');
+          return VACO.post(path, { userId: viewerId })
+            .then(function () { VACO.toast(going ? 'RSVP removed.' : 'RSVP’d.'); return refresh(); });
+        }, going ? 'ghost' : undefined);
+      } },
+    ], events, { empty: 'No events yet.' })];
+    if (isMember) {
+      eventChildren.push(VACO.form([
+        { name: 'title', label: 'Title', width: '200px' },
+        { name: 'scheduledAt', label: 'When', type: 'datetime-local', width: '200px' },
+      ], function (values) {
+        var scheduledAt = values.scheduledAt ? new Date(values.scheduledAt).getTime() : NaN;
+        if (!Number.isInteger(scheduledAt)) throw new Error('Pick a date and time.');
+        return VACO.post('/api/village-events', { villageId: villageId, title: values.title, scheduledAt: scheduledAt })
+          .then(function () { VACO.toast('Event scheduled.'); return refresh(); });
+      }, 'Schedule event'));
+    }
+    replacement.appendChild(VACO.card('Events', eventChildren));
+
+    var roomChildren = [VACO.table([
+      { key: 'id', label: 'Id' },
+      { label: 'Type', render: function (rm) { return rm.roomType; } },
+      { key: 'ownerId', label: 'Owner' },
+      { label: 'Recurs', render: function (rm) { return rm.scheduledRecurrence || '—'; } },
+      { label: 'In room', num: true, render: function (rm) { return (rm.activeParticipants || []).length; } },
+      { label: '', render: function (rm) {
+        if (!viewerId) return '';
+        var inRoom = (rm.activeParticipants || []).indexOf(viewerId) !== -1;
+        return VACO.button(inRoom ? 'Leave' : 'Join', function () {
+          var path = '/api/village-rooms/' + rm.id + (inRoom ? '/leave' : '/join');
+          return VACO.post(path, { userId: viewerId })
+            .then(function () { VACO.toast(inRoom ? 'Left the Villa.' : 'Joined the Villa.'); return refresh(); });
+        }, inRoom ? 'ghost' : undefined);
+      } },
+    ], rooms, { empty: 'No Villas yet.' })];
+    if (isMember) {
+      roomChildren.push(VACO.form([
+        { name: 'roomType', label: 'Type', options: VILLAGE_ROOM_TYPES },
+        { name: 'scheduledRecurrence', label: 'Recurs (optional)', placeholder: 'weekly Thursdays 7pm', width: '220px' },
+      ], function (values) {
+        return VACO.post('/api/village-rooms', {
+          villageId: villageId, ownerId: viewerId, roomType: values.roomType,
+          scheduledRecurrence: values.scheduledRecurrence || null,
+        }).then(function () { VACO.toast('Villa claimed.'); return refresh(); });
+      }, 'Claim a Villa'));
+    }
+    replacement.appendChild(VACO.card('Villas', roomChildren));
+
+    VACO.mount(host, replacement);
+  }).catch(function (err) {
+    VACO.mount(host, VACO.notice('Could not open that village: ' + VACO.escapeHtml(err.message), 'danger'));
   });
 }
 
