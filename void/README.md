@@ -481,3 +481,114 @@ live-verified the three nearby orders land on one real drone route
 (3 stops, real nearest-neighbor + 2-opt sequencing) while the distant
 order gets its own separate route — Gibson's real dispatch
 optimization visibly demonstrable on boot, not one isolated ride.
+
+## Frontend coverage pass (30 Oct 2026)
+
+An audit found `public/index.html` making real calls against only 13
+of this app's (then) 200 routes — the original 5 tabs (My Day,
+Services, Jobs, Network, Academy) covered the generic cross-vertical
+loop and training, but entire feature areas had **zero** frontend
+exposure at all. Seven new tabs close most of that gap, each a real
+client of the routes named, never a fabricated payload shape (every
+field was checked against the real route handler and its `lib/*.js`
+function before being written). Consistently left backend-only, by
+design, across every new tab: anything gated to `requireCallingService`
+(a trusted-service credential — fleet operations like registering a
+vehicle/vessel, dispatcher matching, drone-route building) or
+`requireOperator` (a vaco-operator credential — approvals, custody
+events, skill verification). This frontend has no login for either,
+so those stay real backend capabilities without a fake "admin" UI
+pretending to hold credentials it doesn't have.
+
+- **VOID DROP tab** — `voidDropCategories.js`/`voidDropAssets.js`/
+  `voidDropBooking.js`/`voidDropZones.js` had no frontend at all.
+  Browses the 16 real product categories (`GET /api/drop/categories`),
+  searches real bookable units near a point and date range with a real
+  two-leg delivery+retrieval quote (`GET /api/drop/assets/nearby`),
+  books a unit directly or into a Drop Zone (`POST /api/drop/booking`),
+  browses zones and their real live occupancy (`GET /api/drop/zones`,
+  `GET /api/drop/zone/:id/occupancy`), and lists/cancels your own
+  bookings (`GET /api/drop/bookings/user/:userId`,
+  `POST /api/drop/booking/:id/cancel`). Approval, dispatch, inspection,
+  and maintenance are real operator actions and stay backend-only.
+- **Scheduling tab** — `reserveBooking.js`, `hourlyBooking.js`,
+  `dedicatedLanes.js`, `commuteScheduling.js` (this file's own "four
+  surfaces on one engine" group) had no frontend at all. Books/cancels
+  VOID Reserve (`POST /api/reserve-booking`, `.../cancel`); books VOID
+  Hourly, adds stops, and computes the real mileage/time overage charge
+  (`POST /api/hourly-booking`, `.../stop`, `GET .../charge`); posts,
+  claims, and releases a Dedicated Lane and posts/books a Spot Load
+  (`POST /api/dedicated-lane`, `.../claim`, `.../release`,
+  `POST /api/spot-load`, `.../book`); joins an existing Commute batch
+  and views how it matched (`POST /api/commute-batch/:id/request`,
+  `GET /api/commute-batch/:id`). Opening a batch and driver-matching
+  are dispatcher-only and stay backend-only.
+- **Dispatch tab** — `dispatchIntelligence.js` and `sequencing.js`, the
+  deterministic rules underneath Gibson and Kyle (neither of which is
+  a real AI agent anywhere in this app), had no frontend at all. Real-
+  time calculators for Air vs. Ground, Load Intelligence, Kyle's Dead-
+  time Recommendation, delivery-priority lookup, demand smoothing, and
+  mixed-transportation sequencing (`POST /api/dispatch/air-vs-ground`,
+  `.../load-intelligence`, `.../dead-time-recommendation`,
+  `GET .../delivery-priority/:orderType`, `POST .../acceptance-delay`,
+  `POST /api/sequencing`). The existing **Network** tab also gained a
+  hub-to-hub drone relay finder (`GET /api/relay-path`, real Dijkstra
+  over `multiModalRelay.js`) — building a drone route itself
+  (`POST /api/drone-route`, `.../group`) stays backend-only.
+- **Cargo & Loads tab** — `loadManagement.js` + `cargoPricing.js` had
+  no frontend at all. Looks up a vehicle capacity profile, declares a
+  trip's real passengers/service-animal/car-seats/oversized-items/
+  packages, checks the real capacity fit, and computes the real
+  dynamic cargo fee (`GET /api/vehicle-capacity-profile/:id`,
+  `POST /api/trip-declaration`, `GET /api/capacity-fit/:tripId`,
+  `GET /api/cargo-pricing/:tripId`). Registering a vehicle profile is
+  fleet operations and stays backend-only.
+- **Bookings tab** — `petCare.js` and `serviceEngine.js` had no
+  frontend at all; the existing **Services** tab only ever showed the
+  static catalog, never let anyone book. Registers pets and lists
+  them, shows preferred pet care providers, books/confirms/completes/
+  cancels a pet care booking, and books a recurring series
+  (`POST /api/petcare/pet`, `GET .../pets`,
+  `GET .../preferred-providers`, `POST /api/petcare/booking`,
+  `.../confirm`, `.../complete`, `.../cancel`,
+  `POST /api/petcare/recurring`) — plus, for the other 23 verticals:
+  registers/lists subjects, books a service, advances it through its
+  own real per-archetype lifecycle, approves an over-cap total,
+  cancels, and books a recurring series
+  (`POST /api/service/subject`, `GET .../subjects`,
+  `POST /api/service/booking`, `.../advance`, `.../approve-over-cap`,
+  `.../cancel`, `POST /api/service/recurring`,
+  `GET /api/service/customer/:id/bookings`).
+- **Hub & Lockers tab** — `hubOrigination.js` and `businessLockers.js`
+  had no frontend at all. Originates a shipment in person at a Hub and
+  looks one up (`POST /api/hub-shipment`, `GET /api/hub-shipment/:id`);
+  registers a seller's business locker, lists your own, forward-deploys
+  inventory into one, and views its real drone-loading history
+  (`POST /api/business-locker`, `GET /api/business-lockers/seller/:id`,
+  `POST /api/seller-inventory-placement`,
+  `GET /api/business-locker/:id/loading-events`). Deciding air-vs-
+  ground fulfillment and loading a drone from a locker are staffed
+  fleet-operations actions and stay backend-only.
+- **Staffing tab** — `staffing.js`'s real `StaffingPosition`s and the
+  Affiliate Network's own station directory had no frontend at all.
+  Posts a position through the same marketplace loop, looks one up,
+  browses a business's open positions, looks up a HUNT Staffing
+  request, and browses the Affiliate Network directory by role, with
+  HVNTZ-onboarded affiliates surfaced first
+  (`POST /api/staffing-position`, `GET /api/staffing-position/:id`,
+  `GET /api/staffing-positions/business/:id`,
+  `GET /api/hunt-staffing/:id`, `GET /api/affiliate-stations`).
+  Registering an affiliate station and requesting HUNT Staffing are
+  real HVNTZ-verification cross-app calls and stay backend-only.
+
+**Deliberately left for a follow-up round** (still API-only):
+VOID DSP fleet management, VOID Direct manifests, Regulated Delivery
+Boxes, Mobile Drone Docking Vehicles/Dual Mobility Coordination/
+Launchpad Drivers, TaaS subscriptions, delivery-method selection, the
+Locker Network's own register/deposit + Locker-to-Door flow, and the
+provider-skill verification/suspension/two-person-approval workflow —
+each either requires a trusted-service or operator credential this
+frontend has no login for, or (DSP, mobile docking, TaaS) has no real
+seed data yet to make a customer-facing read meaningful. See the git
+history for this app's own `public/index.html` for exactly what each
+of the seven tabs above calls.
