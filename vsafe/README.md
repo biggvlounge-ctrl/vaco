@@ -182,11 +182,10 @@ always showed 0m. All four were fixed as part of this pass, each
 confirmed against the real route and response shape by curling the
 live server directly, not assumed from the handler source alone.
 
-Three of the existing tabs were extended and four new ones added, nine
-real clients in total — every field checked against the real route
-handler and its `lib/*.js` function first, and the create/action pairs
-re-verified live end to end (not just syntax-checked) before each was
-committed:
+Three of the existing tabs were extended and seven new ones added, ten
+tabs in total — every field checked against the real route handler and
+its `lib/*.js` function first, and the create/action pairs re-verified
+live end to end (not just syntax-checked) before each was committed:
 
 - **Check-ins tab** — fixed the two bugs above, and added the two real
   actions this app's own panic-button story depends on: Confirm safe
