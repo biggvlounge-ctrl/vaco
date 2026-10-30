@@ -391,6 +391,78 @@ function renderTasks(body) {
     .catch(VACO.error);
 }
 
+// -- Calls: FaceTime-style calls with your own assistant ---------------
+//
+// The same ring -> connect -> text-fallback flow V4 already built for
+// its named executive agents, reachable here for your own personal
+// assistant too (see lib/assistantCall.js's own header). Zero
+// frontend caller before this — v4-proxy's own Calls tab is the
+// reference for this shape (VACO.table + badge + per-row action).
+
+function renderCalls(body) {
+  var out = el('div', 'vaco-stack');
+
+  if (!VACO.session) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in above to call your assistant.'));
+    return VACO.mount(body, out);
+  }
+
+  var userId = VACO.userId();
+
+  out.appendChild(VACO.notice(
+    'Auto-answered — your own assistant is always available, so there is no ring to miss. Real audio/video is not '
+    + 'wired in anywhere in this ecosystem yet, so a connected call falls back to this app\'s own chat transcript.',
+    'warn',
+  ));
+
+  out.appendChild(VACO.card('Call your assistant', [
+    VACO.form([
+      { name: 'topic', label: 'Topic (optional)', placeholder: 'what do you want to talk about?', width: '240px' },
+    ], function (values) {
+      return VACO.post('/api/assistant/calls', {
+        userId: userId, topic: values.topic.trim() || null,
+      }).then(function (call) {
+        var mediaNote = call.media && call.media.reason ? ' — ' + call.media.reason : '';
+        VACO.toast('Call #' + call.id + ' — ' + call.status + mediaNote, 'money');
+        VACO.render();
+      });
+    }, 'Call'),
+  ]));
+
+  var callsHost = el('div');
+  out.appendChild(VACO.card('Your calls', [callsHost]));
+
+  VACO.mount(body, out);
+
+  return VACO.api('/api/assistant/calls').then(function (data) {
+    var calls = (Array.isArray(data) ? data : data.calls || []).slice().sort(function (a, b) { return b.id - a.id; });
+    VACO.mount(callsHost, VACO.table([
+      { key: 'id', label: 'Id' },
+      { key: 'topic', label: 'Topic' },
+      { label: 'Status', render: function (c) { return VACO.badge(c.status); } },
+      { label: '', render: function (c) {
+        if (c.status === 'ringing') {
+          return VACO.button('Decline', function () {
+            return VACO.post('/api/assistant/calls/' + c.id + '/decline', {}).then(function () {
+              VACO.toast('Declined.');
+              VACO.render();
+            });
+          }, 'danger vaco-btn-sm');
+        }
+        if (c.status === 'connected') {
+          return VACO.button('End', function () {
+            return VACO.post('/api/assistant/calls/' + c.id + '/end', {}).then(function () {
+              VACO.toast('Call ended.');
+              VACO.render();
+            });
+          }, 'ghost vaco-btn-sm');
+        }
+        return '—';
+      } },
+    ], calls, { empty: 'No calls yet — place one above.' }));
+  }).catch(VACO.error);
+}
+
 VACO.app({
   id: 'vaco-assistant',
   name: 'Vaco Assistant',
@@ -403,6 +475,7 @@ VACO.app({
   tabs: [
     { id: 'assistant', label: 'Assistant', heading: 'Your Assistant', render: renderAssistant },
     { id: 'tasks', label: 'Tasks', heading: 'Goals, subscriptions & reminders', render: renderTasks },
+    { id: 'calls', label: 'Calls', heading: 'Call your assistant', render: renderCalls },
   ],
 });
 </script>
