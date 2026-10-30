@@ -514,6 +514,179 @@ function renderBrands(body) {
   return VACO.mount(body, out);
 }
 
+// Ad Dashboard, Content Calendar, Product Launch Manager, and AI A/B
+// Testing/Analytics (task #59's remaining Marketing/Campaign Dashboard
+// modules) — lib/adDashboard.js, contentCalendar.js,
+// productLaunches.js, abTesting.js, marketingAnalytics.js, mounted
+// under /api/marketing/... Same posture as the Brands tab: every
+// mutating route (createAd, recordAdMetrics, scheduleContent,
+// markPublished, createLaunch, completeMilestone, createAbTest,
+// assignVariant, recordAnalyticsEvent, ...) is
+// `requireCallingService()`-only, so this page only looks things up.
+// Every `.../generate` route across all these modules (ad copy,
+// content-slot suggestions, launch copy, variant copy, analytics
+// insights) is a real, labeled `PendingIntegrationError` — a real 501,
+// never a fabricated 200 — because no generative model provider is
+// configured anywhere in this environment; not given a control here
+// either, for the same reason Scripts' own generate button isn't one.
+function renderAdsLaunches(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Ads, content slots, launches, and A/B tests are created and advanced by whatever internal marketing system is '
+    + 'actually running the campaign — those routes require a trusted-service credential. Every <code>.../generate</code> '
+    + 'route in this area (ad copy, content-slot suggestions, launch copy, variant copy, analytics insight) also '
+    + 'honestly 501s: no generative model provider is configured in this environment. This page can look things up.',
+    'warn'));
+
+  var adsResult = el('div', 'vaco-stack-sm');
+  out.appendChild(VACO.card('Ads for a campaign', [
+    VACO.form([{ name: 'campaignId', label: 'Campaign id', type: 'number', min: 1, value: 1, width: '110px' }],
+      function (values) {
+        return VACO.api('/api/marketing/campaigns/' + values.campaignId + '/ads').then(function (r) {
+          VACO.mount(adsResult, VACO.table([
+            { key: 'id', label: 'Ad id' },
+            { key: 'platform', label: 'Platform' },
+          ], r.ads || [], { empty: 'No ads under this campaign yet.' }));
+        });
+      }, 'List'),
+    adsResult,
+  ]));
+
+  var adPerfResult = el('div', 'vaco-stack-sm');
+  out.appendChild(VACO.card('Ad performance', [
+    el('p', 'vaco-small vaco-dim', 'Real totals summed from every reported metrics snapshot, plus real CTR/CPA/conversion-rate — honestly — when a ratio’s denominator is zero.'),
+    VACO.form([{ name: 'id', label: 'Ad id', type: 'number', min: 1, value: 1, width: '100px' }],
+      function (values) {
+        return VACO.api('/api/marketing/ads/' + values.id + '/performance').then(function (p) {
+          var box = el('div', 'vaco-stack-sm');
+          box.appendChild(el('p', 'vaco-small vaco-dim',
+            p.impressions + ' impressions · ' + p.clicks + ' clicks · ' + p.conversions + ' conversions · spend ' + VACO.round(p.spend)));
+          box.appendChild(el('p', 'vaco-small',
+            'CTR ' + (p.ctr === null ? '—' : p.ctr) + ' · CPA ' + (p.cpa === null ? '—' : VACO.round(p.cpa))
+            + ' · conversion rate ' + (p.conversionRate === null ? '—' : p.conversionRate)));
+          VACO.mount(adPerfResult, box);
+        });
+      }, 'Look up'),
+    adPerfResult,
+  ]));
+
+  var upcomingResult = el('div', 'vaco-stack-sm');
+  out.appendChild(VACO.card('Upcoming content for a brand', [
+    VACO.form([{ name: 'brandId', label: 'Brand id', type: 'number', min: 1, value: 1, width: '100px' }],
+      function (values) {
+        return VACO.api('/api/marketing/brands/' + values.brandId + '/content-calendar/upcoming').then(function (r) {
+          VACO.mount(upcomingResult, VACO.table([
+            { key: 'id', label: 'Id' },
+            { key: 'platform', label: 'Platform' },
+            { label: 'When', render: function (e) { return new Date(e.scheduledAt).toLocaleString(); } },
+          ], r.upcoming || [], { empty: 'Nothing scheduled for this brand yet.' }));
+        });
+      }, 'List'),
+    upcomingResult,
+  ]));
+
+  var entryResult = el('div', 'vaco-stack-sm');
+  out.appendChild(VACO.card('Look up a content calendar entry', [
+    VACO.form([{ name: 'id', label: 'Entry id', type: 'number', min: 1, value: 1, width: '100px' }],
+      function (values) {
+        return VACO.api('/api/marketing/content-calendar/' + values.id).then(function (entry) {
+          var box = el('div', 'vaco-stack-sm');
+          box.appendChild(VACO.badge(entry.status));
+          box.appendChild(el('p', 'vaco-small vaco-dim', entry.platform + ' — ' + new Date(entry.scheduledAt).toLocaleString()));
+          VACO.mount(entryResult, box);
+        });
+      }, 'Look up'),
+    entryResult,
+  ]));
+
+  var launchesResult = el('div', 'vaco-stack-sm');
+  out.appendChild(VACO.card('Launches for a brand', [
+    VACO.form([{ name: 'brandId', label: 'Brand id', type: 'number', min: 1, value: 1, width: '100px' }],
+      function (values) {
+        return VACO.api('/api/marketing/brands/' + values.brandId + '/launches').then(function (r) {
+          VACO.mount(launchesResult, VACO.table([
+            { key: 'id', label: 'Id' },
+            { key: 'productName', label: 'Product' },
+          ], r.launches || [], { empty: 'No launches for this brand yet.' }));
+        });
+      }, 'List'),
+    launchesResult,
+  ]));
+
+  var launchResult = el('div', 'vaco-stack-sm');
+  out.appendChild(VACO.card('Launch detail & readiness', [
+    el('p', 'vaco-small vaco-dim', 'Readiness is a real, derived percentage of milestones actually marked complete — never stored and left to go stale.'),
+    VACO.form([{ name: 'id', label: 'Launch id', type: 'number', min: 1, value: 1, width: '100px' }],
+      function (values) {
+        return VACO.api('/api/marketing/launches/' + values.id).then(function (launch) {
+          return VACO.api('/api/marketing/launches/' + values.id + '/readiness').then(function (r) {
+            var box = el('div', 'vaco-stack-sm');
+            box.appendChild(el('p', 'vaco-small', launch.productName));
+            box.appendChild(VACO.badge(r.ready ? 'ready' : 'in-progress'));
+            box.appendChild(el('p', 'vaco-small vaco-dim', r.completedMilestones + ' / ' + r.totalMilestones + ' milestones (' + Math.round(r.readiness * 100) + '%)'));
+            var list = el('ul', 'vaco-small vaco-dim');
+            (launch.milestones || []).forEach(function (m) {
+              list.appendChild(el('li', null, (m.done ? '✓ ' : '— ') + m.label));
+            });
+            box.appendChild(list);
+            VACO.mount(launchResult, box);
+          });
+        });
+      }, 'Load'),
+    launchResult,
+  ]));
+
+  var abTestResult = el('div', 'vaco-stack-sm');
+  out.appendChild(VACO.card('A/B test detail & results', [
+    el('p', 'vaco-small vaco-dim', 'Assignment is a real, stable hash — the same subject always lands on the same variant. A leading variant is only named once every variant has reached its minimum real sample size.'),
+    VACO.form([{ name: 'id', label: 'Test id', type: 'number', min: 1, value: 1, width: '100px' }],
+      function (values) {
+        return VACO.api('/api/marketing/ab-tests/' + values.id).then(function (test) {
+          return VACO.api('/api/marketing/ab-tests/' + values.id + '/results').then(function (r) {
+            var box = el('div', 'vaco-stack-sm');
+            box.appendChild(el('p', 'vaco-small', test.name));
+            box.appendChild(VACO.table([
+              { key: 'key', label: 'Variant' },
+              { key: 'assigned', label: 'Assigned', num: true },
+              { key: 'converted', label: 'Converted', num: true },
+              { label: 'Conv. rate', num: true, render: function (v) { return v.conversionRate === null ? '—' : v.conversionRate; } },
+            ], r.variants || [], { empty: 'No variants.' }));
+            box.appendChild(el('p', 'vaco-small vaco-dim',
+              r.leadingVariant ? 'Leading variant: ' + r.leadingVariant : 'No leading variant yet — below minimum sample size (' + r.minSampleSize + ').'));
+            VACO.mount(abTestResult, box);
+          });
+        });
+      }, 'Load'),
+    abTestResult,
+  ]));
+
+  var analyticsResult = el('div', 'vaco-stack-sm');
+  out.appendChild(VACO.card('Analytics summary for a brand', [
+    VACO.form([
+      { name: 'brandId', label: 'Brand id', type: 'number', min: 1, value: 1, width: '100px' },
+      { name: 'campaignId', label: 'Campaign id (optional)', type: 'number', min: 1, width: '140px' },
+    ], function (values) {
+      var path = '/api/marketing/brands/' + values.brandId + '/analytics/summary'
+        + (values.campaignId ? '?campaignId=' + values.campaignId : '');
+      return VACO.api(path).then(function (s) {
+        var box = el('div', 'vaco-stack-sm');
+        box.appendChild(el('p', 'vaco-small vaco-dim', s.totalEvents + ' real event(s) tracked'));
+        box.appendChild(VACO.table([
+          { key: 'type', label: 'Event type' },
+          { key: 'count', label: 'Count', num: true },
+        ], Object.keys(s.byEventType || {}).map(function (k) { return { type: k, count: s.byEventType[k] }; }),
+          { empty: 'No events recorded yet.' }));
+        box.appendChild(el('p', 'vaco-small vaco-faint',
+          'Click-through rate: ' + (s.clickThroughRate === null ? 'no real views to divide by yet' : s.clickThroughRate)));
+        VACO.mount(analyticsResult, box);
+      });
+    }, 'Load'),
+    analyticsResult,
+  ]));
+
+  return VACO.mount(body, out);
+}
+
 VACO.app({
   id: 'venvm',
   name: 'VENVM',
@@ -531,6 +704,7 @@ VACO.app({
     { id: 'consent', label: 'Consent', heading: 'Likeness consent', render: renderConsent },
     { id: 'growth', label: 'Growth', heading: 'Growth programs', render: renderGrowth },
     { id: 'brands', label: 'Brands', heading: 'Brands & campaigns', render: renderBrands },
+    { id: 'ads-launches', label: 'Ads & Launches', heading: 'Ads, content & launches', render: renderAdsLaunches },
   ],
 });
 </script>
