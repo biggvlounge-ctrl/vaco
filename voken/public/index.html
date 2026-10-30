@@ -35,7 +35,7 @@
 // decided server-side.
 
 var el = VACO.el;
-var state = { category: 'vehicles', categories: [], brand: null, complianceGates: [], rarityTiers: [] };
+var state = { category: 'vehicles', categories: [], brand: null, complianceGates: [], rarityTiers: [], historicSubjectTypes: [] };
 
 // -- Auctions ---------------------------------------------------------
 
@@ -920,6 +920,138 @@ function renderCreatorHub(body) {
   return out;
 }
 
+// -- Historic register & community nominations -------------------------
+//
+// Only places/monuments/homes can be community-nominated
+// (`placeNominations.js`'s own `NOMINABLE_SUBJECT_TYPES`) -- a
+// person/invention/book nomination goes through the Creator Hub's
+// `community-nomination` application path instead. Reviewing either
+// kind is requireOperator()-only; this tab submits and browses.
+
+var NOMINABLE_SUBJECT_TYPES = ['place', 'monument', 'home'];
+
+function renderHistoricBrowseSection() {
+  var out = el('div', 'vaco-stack-sm');
+  var result = el('div', 'vaco-empty', 'Loading…');
+
+  function load(subjectType, ranked) {
+    var path = ranked ? '/api/historic-register/rank' : '/api/historic-register';
+    var query = subjectType ? ('?subjectType=' + encodeURIComponent(subjectType)) : '';
+    return VACO.api(path + query).then(function (data) {
+      var rows = data.ranked || data.entries;
+      VACO.mount(result, VACO.table(ranked ? [
+        { key: 'rank', label: 'Rank', num: true },
+        { key: 'name', label: 'Name' },
+        { key: 'subjectType', label: 'Type' },
+        { key: 'ageYears', label: 'Age (years)', num: true },
+        { key: 'rarityScore', label: 'Recognitions', num: true },
+      ] : [
+        { key: 'slug', label: 'Slug' },
+        { key: 'name', label: 'Name' },
+        { key: 'subjectType', label: 'Type' },
+        { key: 'era', label: 'Era' },
+      ], rows));
+    });
+  }
+
+  out.appendChild(VACO.form([
+    { name: 'subjectType', label: 'Subject type', options: [{ label: 'All', value: '' }].concat(state.historicSubjectTypes) },
+  ], function (values) { return load(values.subjectType || null, false); }, 'Browse'));
+  out.appendChild(VACO.button('Rank by age & recognition', function () { return load(null, true); }));
+  out.appendChild(result);
+
+  var entryOut = el('div');
+  out.appendChild(VACO.form([{ name: 'slug', label: 'Look up a slug', placeholder: 'nikola-tesla' }], function (values) {
+    return VACO.api('/api/historic-register/' + encodeURIComponent(values.slug)).then(function (entry) {
+      VACO.mount(entryOut, VACO.card(entry.name, [
+        entry.era + ' -- ' + entry.summary,
+        entry.recognitions.length ? ('Recognitions: ' + entry.recognitions.join(', ')) : 'No recorded recognitions.',
+      ]));
+    });
+  }, 'Look up'));
+  out.appendChild(entryOut);
+
+  load(null, false).catch(VACO.error);
+  return VACO.card('Fixed historic register', [out]);
+}
+
+function renderPlaceNominationSection() {
+  var out = el('div', 'vaco-stack-sm');
+  var result = el('div');
+
+  out.appendChild(VACO.form([
+    { name: 'subjectType', label: 'Subject type', options: NOMINABLE_SUBJECT_TYPES },
+    { name: 'name', label: 'Name', placeholder: 'The Lighthouse of Alexandria' },
+    { name: 'era', label: 'Era', placeholder: 'c. 3rd century BCE' },
+    { name: 'earliestYear', label: 'Earliest year (negative for BCE)', type: 'number' },
+    { name: 'summary', label: 'Summary', placeholder: 'One real paragraph' },
+    { name: 'recognitions', label: 'Recognitions (comma-separated)', placeholder: 'UNESCO World Heritage Site' },
+  ], function (values) {
+    if (!VACO.userId()) throw new Error('Sign in to nominate a place.');
+    return VACO.post('/api/place-nomination', {
+      nominatorId: VACO.userId(),
+      subjectType: values.subjectType,
+      name: values.name,
+      era: values.era,
+      earliestYear: Number(values.earliestYear),
+      summary: values.summary,
+      recognitions: parseList(values.recognitions),
+    }).then(function (nomination) {
+      VACO.toast('Nomination #' + nomination.nominationId + ' submitted');
+      VACO.mount(result, VACO.badge(nomination.status));
+    });
+  }, 'Nominate a place'));
+
+  out.appendChild(VACO.form([{ name: 'nominationId', label: 'Look up nomination id', type: 'number' }], function (values) {
+    return VACO.api('/api/place-nomination/' + encodeURIComponent(values.nominationId)).then(function (nomination) {
+      VACO.mount(result, VACO.card(nomination.name, [VACO.badge(nomination.status), nomination.summary]));
+    });
+  }, 'Look up'));
+  out.appendChild(result);
+
+  var approvedOut = el('div');
+  out.appendChild(VACO.button('Browse approved community nominations', function () {
+    return VACO.api('/api/place-nomination/approved/list').then(function (data) {
+      VACO.mount(approvedOut, VACO.table([
+        { key: 'slug', label: 'Slug' },
+        { key: 'name', label: 'Name' },
+        { key: 'subjectType', label: 'Type' },
+      ], data.entries, { empty: 'No approved community nominations yet.' }));
+    });
+  }));
+  out.appendChild(approvedOut);
+
+  return VACO.card('Community place nominations', [out]);
+}
+
+function renderHistoricExploreSection() {
+  var box = el('div', 'vaco-empty', 'Loading…');
+  VACO.api('/api/explore/historic').then(function (data) {
+    var out = el('div', 'vaco-stack');
+    (data.sections || []).forEach(function (section) {
+      if (!section.cards.length) return;
+      out.appendChild(VACO.card(section.subjectType, [
+        VACO.table([
+          { label: 'Name', render: function (r) { return r.historicFact ? r.historicFact.name : ('Card ' + r.contentId); } },
+          { label: 'Attention', num: true, render: function (r) { return VACO.round(r.attentionScore); } },
+          { label: 'Genuine significance', num: true, render: function (r) { return VACO.round(r.genuineSignificanceScore); } },
+        ], section.cards),
+      ]));
+    });
+    if (!out.childNodes.length) out.appendChild(el('div', 'vaco-empty', 'No historic cards minted yet.'));
+    VACO.mount(box, out);
+  }).catch(function (err) { VACO.mount(box, VACO.notice(VACO.escapeHtml(err.message), 'danger')); });
+  return VACO.card('Historic explore', [box]);
+}
+
+function renderHistoric(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(renderHistoricBrowseSection());
+  out.appendChild(renderPlaceNominationSection());
+  out.appendChild(renderHistoricExploreSection());
+  return out;
+}
+
 // Boot needs the brand and category list before the first render, since
 // both are real server-owned values rather than constants in this file.
 VACO.api('/api/health').then(function (health) {
@@ -927,6 +1059,7 @@ VACO.api('/api/health').then(function (health) {
   state.category = state.categories[0] || 'vehicles';
   state.complianceGates = health.complianceGates || [];
   state.rarityTiers = health.rarityTiers || [];
+  state.historicSubjectTypes = health.historicSubjectTypes || [];
 
   VACO.app({
     id: 'voken',
@@ -951,6 +1084,7 @@ VACO.api('/api/health').then(function (health) {
       { id: 'account', label: 'Account', heading: 'Notifications & wallet', render: renderAccount },
       { id: 'gallery-art', label: 'Gallery & Art', heading: 'VADO gallery, art cards & frames', render: renderGalleryArt },
       { id: 'creator-hub', label: 'Creator Hub', heading: 'Applications, assessment & claims', render: renderCreatorHub },
+      { id: 'historic', label: 'Historic', heading: 'Historic register & nominations', render: renderHistoric },
     ],
   });
 });
