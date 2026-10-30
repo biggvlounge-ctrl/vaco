@@ -15,17 +15,31 @@
 <script>
 // Vvltvre Music / Distribution — flat-fee release distribution.
 //
-// Real client of its own routes. Royalty splits, label deal shapes,
+// Real client of its own 22 routes. Royalty splits, label deal shapes,
 // and beat licence terms are all server-decided.
 //
-// **Frontend coverage pass (30 Oct 2026), Releases tab.** The original
-// tab only ever looked up an artist's catalogue; everything else about
-// a release's own real lifecycle (`lib/releases.js`,
-// `lib/streaming.js`) was backend-only. The split bar also rendered
-// fields that don't exist on a real `Release` — `releaseType`,
-// `trackCount`, `collaborators`/`sharePercent`/`share` — the real
-// fields are `format` and `coWriters`, each a `{userId, splitPercent}`
-// with `splitPercent` a 0–1 fraction, not 0–100. Fixed here.
+// **Frontend coverage pass (30 Oct 2026).** The original 3 tabs made
+// only 5 real calls, and one of those — the Beats tab's "License"
+// button — called `POST /api/beat-purchases`, a route that never
+// existed in `server.js` (the real route is
+// `POST /api/beats/:id/purchase`); fixed. Every new call below was
+// checked against `server.js` and its `lib/*.js` handler before being
+// written, and two invented data shapes were corrected along the way:
+// a `Release` has no `releaseType`/`trackCount`/`collaborators` field
+// (the real fields are `format` and `coWriters`, each a
+// `{userId, splitPercent}` with `splitPercent` a 0–1 fraction, not
+// 0–100), and a `Beat` has no `bpm`/`key`/`genre`/`priceVcoin` field
+// (the real fields are `price` and `previewUrl`).
+//
+// Still backend-only, by design, across every new tab: this frontend
+// has no login for either credential a handful of real routes need —
+// `requireOperator` (advancing a release through `distributing`/
+// `live`, reporting streaming revenue: real operator decisions,
+// recorded in vaco-audit) or `requireCallingService` (signing an
+// artist to a manager's roster, opening a fresh label deal: real
+// two-sided contracts this app has no offer/accept flow for yet — see
+// `server.js`'s own "Authorization" comment on why both stay
+// service-only rather than actor-guarded).
 //
 // **The split bar is the point of this screen.** Unrecouped advances
 // and silent splits are the oldest complaint in music; showing who owns
@@ -365,24 +379,116 @@ function renderBeats(body) {
 function renderDeals(body) {
   var out = el('div', 'vaco-stack');
   out.appendChild(VACO.notice(
-    'Label deals are modelled as real shapes — distribution, profit-share, and full label deals differ in '
-    + 'recoupment and ownership, and the difference is in the data rather than a PDF.'));
+    'Label deals and personal-management deals are real, separate shapes — a label’s advance/recoupment/share '
+    + 'differs from a manager’s straight commission, and the difference lives in the data rather than a PDF.'));
 
-  out.appendChild(VACO.card('Look up a deal', [
-    VACO.form([{ name: 'id', label: 'Deal id', type: 'number', min: 1, value: 1, width: '90px' }],
-      function (values) {
-        return VACO.api('/api/label-deals/' + values.id).then(function (deal) {
-          var rows = Object.keys(deal)
-            .filter(function (k) { return typeof deal[k] !== 'object'; })
-            .map(function (k) { return { field: k.replace(/([A-Z])/g, ' $1'), value: String(deal[k]) }; });
-          while (out.childNodes.length > 2) out.removeChild(out.lastChild);
-          out.appendChild(VACO.card('Deal ' + values.id, [
-            VACO.table([{ key: 'field', label: 'Term' }, { key: 'value', label: 'Value' }], rows),
-          ]));
-          VACO.mount(body, out);
-        });
-      }, 'Load'),
+  out.appendChild(VACO.card('Look up an artist’s manager', [
+    VACO.form([{ name: 'artistId', label: 'Artist', value: VACO.userId() || '', width: '160px' }],
+      function (values) { return loadManagerDeal(values.artistId); }, 'Load'),
   ]));
+
+  out.appendChild(VACO.card('Look up a manager', [
+    VACO.form([{ name: 'managerId', label: 'Manager id', width: '160px' }],
+      function (values) { return loadManagerRoster(values.managerId); }, 'Load'),
+  ]));
+
+  out.appendChild(VACO.card('Look up a label deal', [
+    VACO.form([{ name: 'id', label: 'Deal id', type: 'number', min: 1, value: 1, width: '90px' }],
+      function (values) { return loadLabelDeal(values.id); }, 'Load'),
+  ]));
+
+  var BASE = out.childNodes.length;
+  function clearResults() { while (out.childNodes.length > BASE) out.removeChild(out.lastChild); }
+
+  function dealTable(deal) {
+    var rows = Object.keys(deal).filter(function (k) { return typeof deal[k] !== 'object'; })
+      .map(function (k) { return { field: k.replace(/([A-Z])/g, ' $1'), value: String(deal[k]) }; });
+    return VACO.table([{ key: 'field', label: 'Term' }, { key: 'value', label: 'Value' }], rows);
+  }
+
+  // Either side of a management deal may end it -- `requireDealParty`
+  // on the server accepts the manager or the artist, so this button
+  // shows for either, matching server.js's own comment on the route.
+  function loadManagerDeal(artistId) {
+    return VACO.api('/api/artists/' + encodeURIComponent(artistId) + '/manager').then(function (data) {
+      clearResults();
+      var deal = data.deal;
+      if (!deal) {
+        out.appendChild(el('div', 'vaco-empty', artistId + ' has no active management deal.'));
+      } else {
+        var userId = VACO.userId();
+        var children = [dealTable(deal)];
+        if (deal.status === 'active' && userId && (userId === deal.artistId || userId === deal.managerId)) {
+          var actions = el('div', 'vaco-row-tight');
+          actions.appendChild(VACO.button('Terminate', function () {
+            var reason = prompt('Reason for ending this management deal (required):');
+            if (!reason) return Promise.resolve();
+            return VACO.post('/api/deals/' + deal.id + '/terminate', { reason: reason })
+              .then(function () { VACO.toast('Management deal terminated.'); return loadManagerDeal(artistId); });
+          }, 'danger'));
+          children.push(actions);
+        }
+        out.appendChild(VACO.card('Management deal #' + deal.id, children));
+      }
+      VACO.mount(body, out);
+    });
+  }
+
+  function loadManagerRoster(managerId) {
+    return Promise.all([
+      VACO.api('/api/managers/' + encodeURIComponent(managerId) + '/roster'),
+      VACO.api('/api/managers/' + encodeURIComponent(managerId) + '/summary'),
+    ]).then(function (r) {
+      clearResults();
+      var roster = r[0].roster || [];
+      var summary = r[1];
+      var userId = VACO.userId();
+      var columns = [
+        { key: 'artistId', label: 'Artist' },
+        { key: 'commissionPercent', label: 'Commission', num: true, render: function (row) { return Math.round(row.commissionPercent * 100) + '%'; } },
+        { key: 'startedAt', label: 'Signed', render: function (row) { return new Date(row.startedAt).toLocaleDateString(); } },
+      ];
+      // Only the manager themself gets a per-row Terminate action --
+      // the server would refuse anyone else's attempt anyway, but
+      // there is no reason to show a button that always 403s.
+      if (userId && userId === managerId) {
+        columns.push({ key: 'id', label: '', render: function (row) {
+          return VACO.button('Terminate', function () {
+            var reason = prompt('Reason for ending the deal with ' + row.artistId + ' (required):');
+            if (!reason) return Promise.resolve();
+            return VACO.post('/api/deals/' + row.id + '/terminate', { reason: reason })
+              .then(function () { VACO.toast('Deal terminated.'); return loadManagerRoster(managerId); });
+          }, 'danger');
+        } });
+      }
+      out.appendChild(VACO.card('Manager ' + managerId, [
+        el('p', 'vaco-small vaco-dim',
+          summary.rosterSize + ' active artist(s) · ' + VACO.round(summary.totalCommissionEarned) + ' total commission earned'),
+        VACO.table(columns, roster, { empty: 'No active artists on this roster.' }),
+      ]));
+      VACO.mount(body, out);
+    });
+  }
+
+  function loadLabelDeal(id) {
+    return VACO.api('/api/label-deals/' + id).then(function (deal) {
+      clearResults();
+      var userId = VACO.userId();
+      var children = [dealTable(deal)];
+      if (deal.status !== 'terminated' && userId && (userId === deal.artistId || userId === deal.labelId)) {
+        var actions = el('div', 'vaco-row-tight');
+        actions.appendChild(VACO.button('Terminate', function () {
+          var reason = prompt('Reason for ending this label deal (required):');
+          if (!reason) return Promise.resolve();
+          return VACO.post('/api/label-deals/' + id + '/terminate', { reason: reason })
+            .then(function () { VACO.toast('Label deal terminated.'); return loadLabelDeal(id); });
+        }, 'danger'));
+        children.push(actions);
+      }
+      out.appendChild(VACO.card('Deal ' + id, children));
+      VACO.mount(body, out);
+    });
+  }
 
   return VACO.mount(body, out);
 }
@@ -400,7 +506,7 @@ VACO.app({
   tabs: [
     { id: 'releases', label: 'Releases', heading: 'Catalogue & splits', render: renderReleases },
     { id: 'beats', label: 'Beats', heading: 'Beat marketplace', render: renderBeats },
-    { id: 'deals', label: 'Deals', heading: 'Label deals', render: renderDeals },
+    { id: 'deals', label: 'Deals', heading: 'Label & management deals', render: renderDeals },
   ],
 });
 </script>
