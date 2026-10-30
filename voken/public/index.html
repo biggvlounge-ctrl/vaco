@@ -370,29 +370,135 @@ function renderExplore(body) {
 
 // -- Fractional -------------------------------------------------------
 
+function renderSecondaryListingsForListing(container, fractionalListingId) {
+  return VACO.api('/api/fractional/listing/' + fractionalListingId + '/secondary-listings').then(function (data) {
+    VACO.mount(container, VACO.table([
+      { key: 'id', label: 'Id' },
+      { key: 'sellerId', label: 'Seller' },
+      { key: 'shareCount', label: 'Shares', num: true },
+      { label: 'Price/share', num: true, render: function (r) { return VACO.round(r.pricePerShare); } },
+      { label: '', render: function (r) {
+        var row = el('div', 'vaco-row-tight');
+        row.appendChild(VACO.button('Buy', function () {
+          if (!VACO.userId()) throw new Error('Sign in to buy secondary shares.');
+          return VACO.post('/api/fractional/secondary-listing/' + r.id + '/buy', { buyerId: VACO.userId() }).then(function (result) {
+            VACO.toast('Bought ' + result.secondaryListing.shareCount + ' share(s) for ' + VACO.round(result.amountPaid) + ' VC', 'money');
+            VACO.refreshBalances().then(VACO.renderIdentity);
+            renderSecondaryListingsForListing(container, fractionalListingId);
+          });
+        }, 'primary vaco-btn-sm'));
+        row.appendChild(VACO.button('Cancel (seller only)', function () {
+          if (!VACO.userId()) throw new Error('Sign in as the seller to cancel this listing.');
+          return VACO.post('/api/fractional/secondary-listing/' + r.id + '/cancel', { requesterId: VACO.userId() }).then(function () {
+            renderSecondaryListingsForListing(container, fractionalListingId);
+          });
+        }, 'ghost vaco-btn-sm'));
+        return row;
+      } },
+    ], data.secondaryListings, { empty: 'No open secondary listings for this fractional listing.' }));
+  });
+}
+
+function renderFractionalListing(container, listing) {
+  var box = el('div', 'vaco-stack-sm');
+  var head = el('div', 'vaco-row-tight');
+  head.appendChild(el('span', null, 'Listing #' + listing.id + ' -- card ' + listing.cardId));
+  head.appendChild(VACO.badge(listing.status));
+  box.appendChild(head);
+  box.appendChild(el('p', 'vaco-small vaco-dim', listing.soldShares + '/' + listing.totalShares + ' shares sold at ' + VACO.round(listing.pricePerShare) + ' VC each'));
+
+  var buyOut = el('p', 'vaco-small vaco-dim');
+  box.appendChild(VACO.form([{ name: 'shareCount', label: 'Shares to buy', type: 'number', value: 1 }], function (values) {
+    if (!VACO.userId()) throw new Error('Sign in to buy shares.');
+    return VACO.post('/api/fractional/listing/' + listing.id + '/buy', { buyerId: VACO.userId(), shareCount: Number(values.shareCount) })
+      .then(function (purchase) {
+        VACO.toast('Bought ' + purchase.sharesPurchased + ' share(s) for ' + VACO.round(purchase.amountPaid) + ' VC', 'money');
+        VACO.refreshBalances().then(VACO.renderIdentity);
+        renderFractionalListing(container, purchase.listing);
+      });
+  }, 'Buy shares (primary)'));
+  box.appendChild(buyOut);
+
+  box.appendChild(el('h3', 'vaco-h3', 'Secondary market'));
+  box.appendChild(VACO.form([
+    { name: 'shareCount', label: 'Shares to list', type: 'number', value: 1 },
+    { name: 'pricePerShare', label: 'Price/share', type: 'number' },
+  ], function (values) {
+    if (!VACO.userId()) throw new Error('Sign in to list your shares.');
+    return VACO.post('/api/fractional/secondary-listing', {
+      sellerId: VACO.userId(), fractionalListingId: listing.id, shareCount: Number(values.shareCount), pricePerShare: Number(values.pricePerShare),
+    }).then(function (secondary) {
+      VACO.toast('Secondary listing #' + secondary.id + ' created');
+      renderSecondaryListingsForListing(secondaryOut, listing.id);
+    });
+  }, 'List shares for resale'));
+
+  var secondaryOut = el('div', 'vaco-empty', 'Loading…');
+  box.appendChild(secondaryOut);
+  renderSecondaryListingsForListing(secondaryOut, listing.id).catch(VACO.error);
+
+  VACO.mount(container, box);
+}
+
 function renderFractional(body) {
   var out = el('div', 'vaco-stack');
   out.appendChild(VACO.notice(
     'Fractional ownership splits one high-value card into shares. The <strong>secondary market</strong> '
-    + 'is where those shares change hands after the initial offering — a real resale market, not a resale claim.'));
+    + 'is where those shares change hands after the initial offering — a real resale market, not a resale claim. '
+    + 'Buying (primary or secondary) is gated behind VOKEN’s own fractional-ownership compliance flag, which is '
+    + 'held closed pending real legal review -- listing and holdings lookups are ungated.'));
 
   var id = VACO.userId();
-  if (!id) {
-    out.appendChild(el('div', 'vaco-empty', 'Sign in to see your holdings.'));
-    return VACO.mount(body, out);
-  }
-  return VACO.api('/api/fractional/holdings/' + encodeURIComponent(id)).then(function (data) {
-    var holdings = data.holdings || data;
+  if (id) {
     out.appendChild(VACO.card('Your shares', [
-      VACO.table([
-        { key: 'listingId', label: 'Listing' },
-        { key: 'cardId', label: 'Card' },
-        { key: 'shares', label: 'Shares', num: true },
-        { label: 'Paid', num: true, render: function (r) { return VACO.price(r.totalPaid, { freeLabel: false }); } },
-      ], holdings, { empty: 'You hold no fractional shares.' }),
+      (function () {
+        var holdingsBox = el('div', 'vaco-empty', 'Loading…');
+        VACO.api('/api/fractional/holdings/' + encodeURIComponent(id)).then(function (data) {
+          VACO.mount(holdingsBox, VACO.table([
+            { key: 'listingId', label: 'Listing' },
+            { key: 'cardId', label: 'Card' },
+            { key: 'shares', label: 'Shares', num: true },
+            { label: 'Ownership', num: true, render: function (r) { return VACO.round(r.ownershipFraction * 100) + '%'; } },
+            { label: 'Sellable now', num: true, render: function (r) { return r.sellableShares; } },
+          ], data.holdings, { empty: 'You hold no fractional shares.' }));
+        }).catch(VACO.error);
+        return holdingsBox;
+      }()),
     ]));
-    VACO.mount(body, out);
-  });
+  } else {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to see your holdings.'));
+  }
+
+  var listingResult = el('div');
+  out.appendChild(VACO.card('List an edition you own', [
+    VACO.form([
+      { name: 'cardId', label: 'Card id', type: 'number' },
+      { name: 'editionNumber', label: 'Edition #', type: 'number', value: 1 },
+      { name: 'format', label: 'Format', options: ['digital', 'physical'] },
+      { name: 'totalShares', label: 'Total shares', type: 'number', value: 10 },
+      { name: 'pricePerShare', label: 'Price/share', type: 'number' },
+    ], function (values) {
+      if (!VACO.userId()) throw new Error('Sign in to fractionalize an edition you own.');
+      return VACO.post('/api/fractional/listing', {
+        sellerId: VACO.userId(), cardId: Number(values.cardId), editionNumber: Number(values.editionNumber), format: values.format,
+        totalShares: Number(values.totalShares), pricePerShare: Number(values.pricePerShare),
+      }).then(function (listing) {
+        VACO.toast('Fractional listing #' + listing.id + ' created');
+        renderFractionalListing(listingResult, listing);
+      });
+    }, 'Create listing'),
+  ]));
+
+  out.appendChild(VACO.card('Look up a fractional listing', [
+    VACO.form([{ name: 'listingId', label: 'Listing id', type: 'number' }], function (values) {
+      return VACO.api('/api/fractional/listing/' + encodeURIComponent(values.listingId)).then(function (listing) {
+        renderFractionalListing(listingResult, listing);
+      });
+    }, 'Look up'),
+    listingResult,
+  ]));
+
+  return VACO.mount(body, out);
 }
 
 // -- Packs & mint guidance --------------------------------------------
