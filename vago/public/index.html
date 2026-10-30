@@ -387,10 +387,36 @@ function renderSportsbook(body) {
             + ' / NO ' + pct(ev.market.noPrice)
             + '. It opened at the fair line above; every move since is real stake disagreeing with the book.'));
         }
+        if (ev.status === 'open') {
+          children.push(VACO.userId() ? sportsBetForm(ev) : el('div', 'vaco-empty', 'Sign in to place a bet.'));
+        }
         out.appendChild(VACO.card(ev.description + (ev.status === 'open' ? '' : ' (settled)'), children));
       });
       VACO.mount(body, out);
     });
+}
+
+// A real house-odds bet, locked in at the posted line the instant it is
+// placed (`sportsbook.js`'s own rule — a bet's payout never changes
+// even if the line moves afterward). `POST /api/sports/:eventId/bet`
+// takes { userId, outcomeId, stakeVCoin } and returns the bet with its
+// `potentialPayout` already computed from American-odds math.
+function sportsBetForm(ev) {
+  return VACO.form([
+    { name: 'outcomeId', label: 'Pick', options: ev.outcomes.map(function (o) {
+      return { value: o.outcomeId, label: o.label + ' (' + (o.odds > 0 ? '+' + o.odds : o.odds) + ')' };
+    }) },
+    { name: 'stakeVCoin', label: 'Stake (VCoin)', type: 'number', min: 1, value: 10, width: '110px' },
+  ], function (values) {
+    return VACO.post('/api/sports/' + ev.eventId + '/bet', {
+      userId: VACO.userId(),
+      outcomeId: values.outcomeId,
+      stakeVCoin: values.stakeVCoin,
+    }).then(function (bet) {
+      VACO.toast('Bet placed on ' + bet.outcomeId + ' — potential payout ' + VACO.round(bet.potentialPayout), 'money');
+      VACO.refreshBalances().then(VACO.renderIdentity);
+    });
+  }, 'Place bet');
 }
 
 VACO.app({
