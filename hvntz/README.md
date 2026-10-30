@@ -147,6 +147,16 @@ curl http://localhost:8792/api/franchise-list/1
   ownership shape as creating the hunt itself), `POST .../mystery/team`,
   `GET .../mystery/status`, `GET .../mystery/known-facts/:userId`, and
   `POST .../mystery/accusation`.
+- `public/index.html` — the Mystery Hunts backend above had no
+  frontend surface at all until a new **Mystery** tab, added
+  30 Oct 2026 right after it. Loads a hunt by id, shows its real
+  status (clue/team/accusation counts, solved or not), a signed-in
+  hunter's own **known facts** table (never the hidden solution —
+  only what their team has actually had revealed to them), a form to
+  create a team, an accusation form while the mystery is still open,
+  and — only for the hunt's own real sponsor, enforced server-side by
+  the same `requireHuntSponsor()` check the routes already use — tools
+  to set the hidden solution and add a clue to a checkpoint.
 - `lib/explore.js` — HVNTZ Explore Page (Phase 3): a real, deterministic
   ranking combining location score (real Haversine distance) and
   attention score (checkpoint count/budget use for hunts, trade count

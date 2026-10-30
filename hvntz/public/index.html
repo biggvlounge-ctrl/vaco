@@ -87,6 +87,174 @@ function loadHunt(out, body, huntId) {
   });
 }
 
+// Mystery Hunts: a real Clue-style deduction layer over the
+// checkpoint mechanic above (lib/mysteryHunt.js). Never shows the
+// hidden solution itself -- `GET /api/hunt/:huntId/mystery/status`
+// and `.../known-facts/:userId` are both built server-side to make
+// that impossible, not just discreet about it here.
+var MYSTERY_SLOTS = [
+  { value: 'who', label: 'Who' },
+  { value: 'what', label: 'What' },
+  { value: 'where', label: 'Where' },
+];
+
+function renderMystery(body) {
+  var out = el('div', 'vaco-stack');
+
+  out.appendChild(VACO.card('Open a hunt’s mystery', [
+    VACO.form([{ name: 'huntId', label: 'Hunt id', width: '120px', value: '1' }], function (values) {
+      return loadMystery(out, body, values.huntId);
+    }, 'Load'),
+  ]));
+
+  out.appendChild(el('div', 'vaco-empty', 'Enter a hunt id above to see its mystery.'));
+  return VACO.mount(body, out);
+}
+
+function loadMystery(out, body, huntId) {
+  var userId = VACO.userId();
+  return Promise.all([
+    VACO.api('/api/hunt/' + encodeURIComponent(huntId)),
+    VACO.api('/api/hunt/' + encodeURIComponent(huntId) + '/mystery/status'),
+    userId
+      ? VACO.api('/api/hunt/' + encodeURIComponent(huntId) + '/mystery/known-facts/' + encodeURIComponent(userId))
+        .catch(function () { return null; })
+      : Promise.resolve(null),
+  ]).then(function (r) {
+    var hunt = r[0], status = r[1], knownFacts = r[2];
+    var replacement = el('div', 'vaco-stack');
+
+    var statusLines = el('div', 'vaco-stack-sm');
+    statusLines.appendChild(el('p', 'vaco-small vaco-dim', hunt.title || ('Hunt ' + huntId)));
+    if (!status.hasMystery) {
+      statusLines.appendChild(el('p', 'vaco-small', 'This hunt has no mystery set up yet.'));
+    } else {
+      statusLines.appendChild(el('p', 'vaco-small',
+        status.totalClues + ' real clue(s) placed · ' + status.totalTeams + ' team(s) · '
+        + status.totalAccusations + ' real accusation(s) made so far'));
+    }
+    replacement.appendChild(VACO.card('Mystery status', [statusLines], {
+      trailing: VACO.badge(!status.hasMystery ? 'none' : (status.solved ? 'solved' : 'open')),
+    }));
+
+    if (!userId) {
+      replacement.appendChild(VACO.notice(
+        'Sign in to see your team’s known facts, form a team, or make an accusation.', 'warn'));
+    } else {
+      // Never the hidden solution -- only what has actually been
+      // revealed to this user's own real team so far.
+      replacement.appendChild(VACO.card('Your known facts', [
+        el('p', 'vaco-small vaco-dim',
+          'What your team has actually uncovered by checking in — never the hidden answer itself.'),
+        VACO.table([
+          { label: 'Slot', render: function (f) {
+            return (MYSTERY_SLOTS.filter(function (s) { return s.value === f.slot; })[0] || {}).label || f.slot;
+          } },
+          { key: 'value', label: 'Value' },
+          { label: 'Red herring?', render: function (f) { return f.isRedHerring ? 'Yes' : 'No'; } },
+        ], (knownFacts && knownFacts.facts) || [], {
+          empty: 'No clues revealed yet — check in at a checkpoint to learn something real.',
+        }),
+      ]));
+
+      replacement.appendChild(VACO.card('Form a team', [
+        el('p', 'vaco-small vaco-dim',
+          'Every clue any teammate reveals is shared with the whole team — that sharing is the real deduction.'),
+        VACO.form([
+          { name: 'name', label: 'Team name', width: '160px' },
+          { name: 'otherMembers', label: 'Other members (comma-separated user ids)', width: '240px' },
+        ], function (values) {
+          var members = String(values.otherMembers || '').split(',')
+            .map(function (s) { return s.trim(); }).filter(Boolean);
+          return VACO.post('/api/hunt/' + encodeURIComponent(huntId) + '/mystery/team', {
+            creatorId: userId, name: values.name, memberUserIds: members,
+          }).then(function () {
+            VACO.toast('Team created');
+            return loadMystery(out, body, huntId);
+          });
+        }, 'Create team'),
+      ]));
+
+      if (status.hasMystery && !status.solved) {
+        replacement.appendChild(VACO.card('Make an accusation', [
+          el('p', 'vaco-small vaco-dim',
+            'A wrong guess means your team can no longer win this mystery — but you keep collecting checkpoint bounties either way.'),
+          VACO.form([
+            { name: 'who', label: 'Who', width: '140px' },
+            { name: 'what', label: 'What', width: '140px' },
+            { name: 'where', label: 'Where', width: '140px' },
+          ], function (values) {
+            return VACO.post('/api/hunt/' + encodeURIComponent(huntId) + '/mystery/accusation', {
+              userId: userId,
+              guess: { who: values.who, what: values.what, where: values.where },
+            }).then(function (result) {
+              VACO.toast(result.correct ? 'Correct — mystery solved!' : 'Not correct — your team is out of the running.',
+                result.correct ? undefined : 'warn');
+              return loadMystery(out, body, huntId);
+            });
+          }, 'Accuse'),
+        ]));
+      }
+
+      if (!status.solved) {
+        var checkpoints = hunt.checkpoints || [];
+        var checkpointOptions = checkpoints.map(function (c) {
+          return { value: c.id, label: 'Checkpoint ' + c.id + ' — ' + c.clue };
+        });
+        var sponsorChildren = [
+          el('p', 'vaco-small vaco-dim',
+            'Only this hunt’s own real sponsor may set the solution or author a clue — enforced server-side.'),
+        ];
+        if (!status.hasMystery) {
+          sponsorChildren.push(VACO.form([
+            { name: 'who', label: 'Who', width: '140px' },
+            { name: 'what', label: 'What', width: '140px' },
+            { name: 'where', label: 'Where', width: '140px' },
+          ], function (values) {
+            return VACO.post('/api/hunt/' + encodeURIComponent(huntId) + '/mystery/solution', values)
+              .then(function () {
+                VACO.toast('Hidden solution set');
+                return loadMystery(out, body, huntId);
+              });
+          }, 'Set hidden solution'));
+        } else {
+          sponsorChildren.push(el('p', 'vaco-small', 'The hidden solution is already set and locked.'));
+        }
+        if (checkpointOptions.length) {
+          sponsorChildren.push(VACO.form([
+            { name: 'checkpointId', label: 'Checkpoint', options: checkpointOptions },
+            { name: 'slot', label: 'Slot', options: MYSTERY_SLOTS },
+            { name: 'value', label: 'Value', width: '140px' },
+            { name: 'isRedHerring', label: 'Red herring?', options: [
+              { value: 'false', label: 'No — it’s true' },
+              { value: 'true', label: 'Yes — red herring' },
+            ] },
+          ], function (values) {
+            return VACO.post(
+              '/api/hunt/' + encodeURIComponent(huntId) + '/checkpoint/' + encodeURIComponent(values.checkpointId) + '/mystery-clue',
+              { slot: values.slot, value: values.value, isRedHerring: values.isRedHerring === 'true' },
+            ).then(function () {
+              VACO.toast('Clue added');
+              return loadMystery(out, body, huntId);
+            });
+          }, 'Add clue'));
+        } else {
+          sponsorChildren.push(el('p', 'vaco-small vaco-dim', 'Add checkpoints to this hunt first.'));
+        }
+        replacement.appendChild(VACO.card('Sponsor tools', sponsorChildren));
+      }
+    }
+
+    while (out.childNodes.length > 1) out.removeChild(out.lastChild);
+    out.appendChild(replacement);
+    VACO.mount(body, out);
+  }).catch(function (err) {
+    while (out.childNodes.length > 1) out.removeChild(out.lastChild);
+    out.appendChild(VACO.notice('No hunt found: ' + VACO.escapeHtml(err.message), 'danger'));
+    VACO.mount(body, out);
+  });
+}
+
 function renderRevenue(body) {
   return VACO.api('/api/revenue-events').then(function (data) {
     var events = data.events || data.revenueEvents || data || [];
@@ -266,6 +434,8 @@ VACO.app({
     { id: 'hunts', label: 'Hunts', heading: 'Hunt progress',
       blurb: 'Progress, and a real break recommendation when the pace warrants one.', render: renderHunts },
     { id: 'business', label: 'Business', heading: 'Businesses & neighbours', render: renderBusiness },
+    { id: 'mystery', label: 'Mystery', heading: 'Mystery hunts',
+      blurb: 'A Clue-style whodunit layered on a real hunt: a hidden solution, clues revealed at checkpoints, and accusations.', render: renderMystery },
     { id: 'revenue', label: 'Revenue', heading: 'The revenue stack', render: renderRevenue },
     { id: 'training', label: 'Training', heading: 'Hunts Academy',
       blurb: 'How a business owner actually makes money through HVNTZ, and how to learn it.', render: renderTraining },
