@@ -37,7 +37,7 @@
 // and value scoring are all decided server-side.
 
 var el = VACO.el;
-var state = { category: 'vehicles', categories: [], brand: null, complianceGates: [], rarityTiers: [], historicSubjectTypes: [], cardDetailId: null };
+var state = { category: 'vehicles', categories: [], brand: null, complianceGates: [], rarityTiers: [], historicSubjectTypes: [], merchItemTypes: [], cardDetailId: null };
 
 // -- Auctions ---------------------------------------------------------
 
@@ -180,6 +180,7 @@ function renderCardDetailView(body, cardId) {
     if (card.verifiedBySubject) head.appendChild(VACO.badge('verified', 'money'));
     out.appendChild(VACO.card('Card #' + card.id, [
       head,
+      card.historicFact ? (card.historicFact.name + ' — ' + card.historicFact.era) : null,
       card.subjectPersonId ? ('Subject: ' + card.subjectPersonId) : 'No living subject.',
       'Market price: ' + (full.marketPrice ? VACO.round(full.marketPrice.marketPrice) + ' VC' : 'not yet scored'),
       full.vehicleValue ? ('Vehicle value: ' + VACO.round(full.vehicleValue.vehicleCardValue) + ' VC') : null,
@@ -305,30 +306,40 @@ function renderCardDetailView(body, cardId) {
     }).catch(VACO.error);
 
     // -- Commerce: linked merch and real production collectibles
-    if (full.merch.length || full.collectibles.length) {
-      var commerceBody = el('div', 'vaco-stack-sm');
-      if (full.merch.length) {
-        commerceBody.appendChild(VACO.table([
-          { key: 'itemType', label: 'Item' },
-          { label: 'Price', num: true, render: function (r) { return VACO.round(r.currentDynamicPrice); } },
-          { label: 'Remaining', num: true, render: function (r) { return r.remainingSupply + '/' + r.totalSupply; } },
-          { label: '', render: function (r) {
-            return VACO.button('Buy', function () {
-              if (!VACO.userId()) throw new Error('Sign in to buy merch.');
-              return VACO.post('/api/merch/' + r.id + '/purchase', { buyerId: VACO.userId() }).then(function (purchase) {
-                VACO.toast('Bought for ' + VACO.round(purchase.pricePaid) + ' VC', 'money');
-                VACO.refreshBalances().then(VACO.renderIdentity);
-                VACO.render();
-              });
-            }, 'primary vaco-btn-sm');
-          } },
-        ], full.merch));
-      }
-      if (full.collectibles.length) {
-        commerceBody.appendChild(el('p', 'vaco-small vaco-dim', full.collectibles.length + ' real CVLLEX production collectible(s) linked to this subject.'));
-      }
-      out.appendChild(VACO.card('Merch & collectibles', [commerceBody]));
+    var commerceBody = el('div', 'vaco-stack-sm');
+    commerceBody.appendChild(VACO.table([
+      { key: 'itemType', label: 'Item' },
+      { label: 'Price', num: true, render: function (r) { return VACO.round(r.currentDynamicPrice); } },
+      { label: 'Remaining', num: true, render: function (r) { return r.remainingSupply + '/' + r.totalSupply; } },
+      { label: '', render: function (r) {
+        return VACO.button('Buy', function () {
+          if (!VACO.userId()) throw new Error('Sign in to buy merch.');
+          return VACO.post('/api/merch/' + r.id + '/purchase', { buyerId: VACO.userId() }).then(function (purchase) {
+            VACO.toast('Bought for ' + VACO.round(purchase.pricePaid) + ' VC', 'money');
+            VACO.refreshBalances().then(VACO.renderIdentity);
+            VACO.render();
+          });
+        }, 'primary vaco-btn-sm');
+      } },
+    ], full.merch, { empty: 'No merch linked to this card yet.' }));
+    if (full.collectibles.length) {
+      commerceBody.appendChild(el('p', 'vaco-small vaco-dim', full.collectibles.length + ' real CVLLEX production collectible(s) linked to this subject.'));
     }
+    commerceBody.appendChild(VACO.form([
+      { name: 'itemType', label: 'Item type', options: state.merchItemTypes },
+      { name: 'totalSupply', label: 'Total supply', type: 'number', value: 100 },
+      { name: 'basePrice', label: 'Base price', type: 'number' },
+    ], function (values) {
+      if (!VACO.userId()) throw new Error('Sign in to create a merch listing.');
+      return VACO.post('/api/merch', {
+        creatorId: VACO.userId(), itemType: values.itemType, totalSupply: Number(values.totalSupply),
+        basePrice: Number(values.basePrice), linkedCultureCardId: cardId,
+      }).then(function () {
+        VACO.toast('Merch listing created');
+        VACO.render();
+      });
+    }, 'Create merch linked to this card'));
+    out.appendChild(VACO.card('Merch & collectibles', [commerceBody]));
 
     // -- Value history
     if (full.valueHistory.length) {
@@ -918,6 +929,12 @@ function renderComplianceGates(container) {
 function renderAccount(body) {
   var out = el('div', 'vaco-stack');
 
+  var brandBox = el('div', 'vaco-empty', 'Loading…');
+  out.appendChild(VACO.card('About', [brandBox]));
+  VACO.api('/api/brand').then(function (brand) {
+    VACO.mount(brandBox, el('p', 'vaco-small vaco-dim', brand.name + ' (powered by ' + brand.poweredBy + '): ' + brand.tagline));
+  }).catch(VACO.error);
+
   var notifBox = el('div', 'vaco-empty', 'Loading…');
   out.appendChild(VACO.card('Notifications', [notifBox]));
   renderNotifications(notifBox);
@@ -1372,6 +1389,7 @@ VACO.api('/api/health').then(function (health) {
   state.complianceGates = health.complianceGates || [];
   state.rarityTiers = health.rarityTiers || [];
   state.historicSubjectTypes = health.historicSubjectTypes || [];
+  state.merchItemTypes = health.merchItemTypes || [];
 
   VACO.app({
     id: 'voken',
