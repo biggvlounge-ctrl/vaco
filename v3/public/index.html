@@ -268,6 +268,181 @@ function renderMortgage(body) {
   return VACO.mount(body, out);
 }
 
+// -- VASH Insurance -------------------------------------------------------
+//
+// Same gap as VASH Mortgage: a real quote/purchase/claim lifecycle
+// (`lib/vashInsurance.js`) with no frontend at all before this. The
+// pool that pays claims is a real VCoin account funded only by real
+// premiums — a claim larger than the pool has actually collected
+// fails with the ledger's own honest "Insufficient VCoin balance"
+// (confirmed live against a running server), never a fabricated
+// bottomless payout.
+
+function renderInsurance(body) {
+  var out = el('div', 'vaco-stack');
+  var state = { credential: '' };
+
+  out.appendChild(VACO.notice(
+    '<strong>A real quote/premium/claim administration system, not a licensed carrier or MGA.</strong> '
+    + 'Premiums and payouts are real VCoin moved through V3\'s own ledger — a claim can never pay out more than '
+    + 'the pool has actually collected in premiums, the same honest failure any other transfer gets.', 'warn'));
+
+  var quoteResult = el('div');
+  out.appendChild(VACO.card('Get a quote', [
+    VACO.form([
+      { name: 'policyType', label: 'Type', options: [{ label: 'Home', value: 'home' }, { label: 'Vehicle', value: 'vehicle' }], width: '110px' },
+      { name: 'coverageAmount', label: 'Coverage', type: 'number', min: 1, value: 50000, width: '120px' },
+    ], function (values) {
+      return VACO.api('/api/vash-insurance/quote?policyType=' + encodeURIComponent(values.policyType)
+        + '&coverageAmount=' + encodeURIComponent(values.coverageAmount)).then(function (quote) {
+        quoteResult.innerHTML = '';
+        quoteResult.appendChild(VACO.table([{ key: 'field', label: 'Field' }, { key: 'value', label: 'Value' }], [
+          { field: 'Annual premium', value: VACO.round(quote.annualPremium) },
+          { field: 'Monthly premium', value: VACO.round(quote.monthlyPremium) },
+        ]));
+      });
+    }, 'Quote'),
+    quoteResult,
+  ]));
+
+  var purchaseResult = el('div');
+  out.appendChild(VACO.card('Purchase a policy', [
+    el('p', 'vaco-small vaco-dim', 'Charges the full annual premium up front, into the real pool that pays claims.'),
+    VACO.form([
+      { name: 'policyholderId', label: 'Policyholder', value: VACO.userId() || '', width: '130px' },
+      { name: 'policyType', label: 'Type', options: [{ label: 'Home', value: 'home' }, { label: 'Vehicle', value: 'vehicle' }], width: '110px' },
+      { name: 'coverageAmount', label: 'Coverage', type: 'number', min: 1, value: 50000, width: '110px' },
+      { name: 'propertyOrVehicleDescription', label: 'Description', placeholder: '123 Main St / 2019 Civic', width: '200px' },
+    ], function (values) {
+      return VACO.post('/api/vash-insurance/purchase', values).then(function (policy) {
+        VACO.toast('Policy #' + policy.id + ' active — premium ' + VACO.round(policy.annualPremium) + ' charged.', 'money');
+        VACO.refreshBalances().then(VACO.renderIdentity);
+        purchaseResult.innerHTML = '';
+        purchaseResult.appendChild(VACO.table([{ key: 'field', label: 'Field' }, { key: 'value', label: 'Value' }], [
+          { field: 'Policy #', value: policy.id },
+          { field: 'Coverage', value: VACO.round(policy.coverageAmount) },
+          { field: 'Annual premium', value: VACO.round(policy.annualPremium) },
+        ]));
+      });
+    }, 'Purchase'),
+    purchaseResult,
+  ]));
+
+  var policyLookup = el('div');
+  var policyActions = el('div');
+  out.appendChild(VACO.card('Policy', [
+    VACO.form([{ name: 'id', label: 'Policy #', type: 'number', min: 1, width: '110px' }],
+      function (values) {
+        return VACO.api('/api/vash-insurance/policy/' + values.id).then(function (policy) {
+          policyLookup.innerHTML = '';
+          var head = el('div', 'vaco-row-tight');
+          head.appendChild(VACO.badge(policy.status));
+          head.appendChild(el('span', 'vaco-small vaco-dim', policy.propertyOrVehicleDescription));
+          policyLookup.appendChild(head);
+          policyLookup.appendChild(VACO.table([{ key: 'field', label: 'Field' }, { key: 'value', label: 'Value' }], [
+            { field: 'Policyholder', value: policy.policyholderId },
+            { field: 'Type', value: policy.policyType },
+            { field: 'Coverage', value: VACO.round(policy.coverageAmount) },
+            { field: 'Annual premium', value: VACO.round(policy.annualPremium) },
+          ]));
+        });
+      }, 'Load'),
+    policyLookup,
+    VACO.form([
+      { name: 'id', label: 'Policy #', type: 'number', min: 1, width: '110px' },
+      { name: 'policyholderId', label: 'Policyholder', value: VACO.userId() || '', width: '130px' },
+    ], function (values) {
+      return VACO.post('/api/vash-insurance/policy/' + values.id + '/cancel', { policyholderId: values.policyholderId })
+        .then(function () { VACO.toast('Policy #' + values.id + ' cancelled.', 'warn'); });
+    }, 'Cancel policy'),
+    policyActions,
+  ]));
+
+  var claimResult = el('div');
+  out.appendChild(VACO.card('File a claim', [
+    VACO.form([
+      { name: 'policyId', label: 'Policy #', type: 'number', min: 1, width: '100px' },
+      { name: 'policyholderId', label: 'Policyholder', value: VACO.userId() || '', width: '130px' },
+      { name: 'description', label: 'Description', placeholder: 'what happened', width: '200px' },
+      { name: 'amountRequested', label: 'Amount', type: 'number', min: 1, width: '110px' },
+    ], function (values) {
+      return VACO.post('/api/vash-insurance/claim', values).then(function (claim) {
+        VACO.toast('Claim #' + claim.id + ' filed — requested ' + VACO.round(claim.amountRequested) + '.', 'money');
+        claimResult.innerHTML = '';
+        claimResult.appendChild(VACO.badge(claim.status));
+      });
+    }, 'File claim'),
+    claimResult,
+  ]));
+
+  var claimLookup = el('div');
+  out.appendChild(VACO.card('Claim', [
+    VACO.form([{ name: 'id', label: 'Claim #', type: 'number', min: 1, width: '110px' }],
+      function (values) {
+        return VACO.api('/api/vash-insurance/claim/' + values.id).then(function (claim) {
+          claimLookup.innerHTML = '';
+          var head = el('div', 'vaco-row-tight');
+          head.appendChild(VACO.badge(claim.status));
+          head.appendChild(el('span', 'vaco-small vaco-dim', claim.description));
+          claimLookup.appendChild(head);
+          claimLookup.appendChild(VACO.table([{ key: 'field', label: 'Field' }, { key: 'value', label: 'Value' }], [
+            { field: 'Policy #', value: claim.policyId },
+            { field: 'Requested', value: VACO.round(claim.amountRequested) },
+            { field: 'Approved', value: claim.amountApproved !== null ? VACO.round(claim.amountApproved) : '—' },
+            { field: 'Reviewed by', value: claim.reviewedBy || '—' },
+          ]));
+        });
+      }, 'Load'),
+    claimLookup,
+  ]));
+
+  out.appendChild(VACO.card('Adjuster decision', [
+    el('p', 'vaco-small vaco-dim',
+      'Approve, deny, and pay each decide an outcome somebody loses — a real operator credential, not just a '
+      + 'session, same posture as VASH Mortgage\'s underwriting.'),
+    VACO.form([{ name: 'credential', label: 'X-Operator-Credential', placeholder: 'from vaco-operator', width: '220px' }],
+      function (values) { state.credential = values.credential; VACO.toast('Credential set for this session.'); }, 'Use this credential'),
+    VACO.form([
+      { name: 'id', label: 'Claim #', type: 'number', min: 1, width: '100px' },
+      { name: 'reviewedBy', label: 'Reviewed by', placeholder: 'your operator name', width: '150px' },
+      { name: 'amountApproved', label: 'Amount approved', type: 'number', min: 1, width: '130px' },
+    ], function (values) {
+      if (!state.credential) { VACO.toast('Set an operator credential first.', 'warn'); return Promise.resolve(); }
+      return VACO.api('/api/vash-insurance/claim/' + values.id + '/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Operator-Credential': state.credential },
+        body: JSON.stringify({ reviewedBy: values.reviewedBy, amountApproved: values.amountApproved }),
+      }).then(function (claim) { VACO.toast('Claim #' + claim.id + ' approved for ' + VACO.round(claim.amountApproved) + '.', 'money'); });
+    }, 'Approve'),
+    VACO.form([
+      { name: 'id', label: 'Claim #', type: 'number', min: 1, width: '100px' },
+      { name: 'reviewedBy', label: 'Reviewed by', placeholder: 'your operator name', width: '150px' },
+      { name: 'reason', label: 'Reason', placeholder: 'why', width: '180px' },
+    ], function (values) {
+      if (!state.credential) { VACO.toast('Set an operator credential first.', 'warn'); return Promise.resolve(); }
+      return VACO.api('/api/vash-insurance/claim/' + values.id + '/deny', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Operator-Credential': state.credential },
+        body: JSON.stringify({ reviewedBy: values.reviewedBy, reason: values.reason }),
+      }).then(function () { VACO.toast('Claim #' + values.id + ' denied.', 'warn'); });
+    }, 'Deny'),
+    VACO.form([{ name: 'id', label: 'Claim #', type: 'number', min: 1, width: '100px' }],
+      function (values) {
+        if (!state.credential) { VACO.toast('Set an operator credential first.', 'warn'); return Promise.resolve(); }
+        return VACO.api('/api/vash-insurance/claim/' + values.id + '/pay', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Operator-Credential': state.credential },
+          body: JSON.stringify({}),
+        }).then(function (result) {
+          VACO.toast('Claim #' + result.claim.id + ' paid — ' + VACO.round(result.transaction.amount) + ' VCoin.', 'money');
+          VACO.refreshBalances().then(VACO.renderIdentity);
+        });
+      }, 'Pay claim'),
+  ]));
+
+  return VACO.mount(body, out);
+}
+
 function renderSystem(body) {
   return VACO.api('/api/health').then(function (health) {
     var out = el('div', 'vaco-stack');
@@ -352,6 +527,7 @@ VACO.app({
     { id: 'wallet', label: 'Accounts', heading: 'Balances & history', render: renderWallet },
     { id: 'transfer', label: 'Move money', heading: 'Transfer & cash out', render: renderTransfer },
     { id: 'mortgage', label: 'Mortgage', heading: 'VASH Mortgage', render: renderMortgage },
+    { id: 'insurance', label: 'Insurance', heading: 'VASH Insurance', render: renderInsurance },
     { id: 'system', label: 'System', heading: 'Ledger configuration', render: renderSystem },
   ],
 });
