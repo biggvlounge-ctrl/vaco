@@ -247,6 +247,64 @@ function renderMaps(body) {
       routeResult,
     ]));
 
+    var sightingResult = el('div');
+    out.appendChild(VACO.card('Record a sighting', [
+      el('p', 'vaco-small vaco-dim',
+        'What any app reports when it sees a user at a place — the raw signal behind crossings and foot traffic. '
+        + 'Only a point and a time; never continuous location history.'),
+      VACO.form([
+        { name: 'userId', label: 'User', value: VACO.userId() || '', width: '110px' },
+        { name: 'lat', label: 'Lat', type: 'number', step: 'any', value: 38.6270, width: '110px' },
+        { name: 'lng', label: 'Lng', type: 'number', step: 'any', value: -90.1994, width: '110px' },
+      ], function (values) {
+        return VACO.post('/api/maps/sighting', { userId: values.userId, lat: values.lat, lng: values.lng, sourceApp: 'v4-proxy' })
+          .then(function () { VACO.toast('Sighting recorded.'); });
+      }, 'Record'),
+      sightingResult,
+    ]));
+
+    var crossingsResult = el('div');
+    out.appendChild(VACO.card('Find my crossings', [
+      el('p', 'vaco-small vaco-dim',
+        'Who you crossed paths with — close in space AND close in time. What Kevin’s system prompt promises '
+        + 'CVNVO. Only works for your own signed-in user; the backend verifies that.'),
+      VACO.form([
+        { name: 'userId', label: 'User', value: VACO.userId() || '', width: '110px' },
+        { name: 'radiusKm', label: 'Radius (km)', type: 'number', step: 'any', value: 0.5, width: '110px' },
+        { name: 'windowMinutes', label: 'Window (min)', type: 'number', step: 'any', value: 30, width: '110px' },
+      ], function (values) {
+        return VACO.post('/api/maps/crossings', values).then(function (crossings) {
+          var rows = Array.isArray(crossings) ? crossings : (crossings.crossings || []);
+          VACO.mount(crossingsResult, VACO.table([
+            { key: 'userId', label: 'User' },
+            { label: 'Distance (km)', render: function (c) { return VACO.round(c.distanceKm); } },
+            { key: 'minutesApart', label: 'Min apart' },
+          ], rows, { empty: 'No crossings in that window.' }));
+        });
+      }, 'Find'),
+      crossingsResult,
+    ]));
+
+    var footTrafficResult = el('div');
+    out.appendChild(VACO.card('Foot traffic near a point', [
+      el('p', 'vaco-small vaco-dim',
+        'What DREA’s system prompt promises DREAMS for dynamic screen pricing. Self-reported from sightings — '
+        + 'not independently audited, and the response says so.'),
+      VACO.form([
+        { name: 'lat', label: 'Lat', type: 'number', step: 'any', value: 38.6270, width: '110px' },
+        { name: 'lng', label: 'Lng', type: 'number', step: 'any', value: -90.1994, width: '110px' },
+        { name: 'radiusKm', label: 'Radius (km)', type: 'number', step: 'any', value: 0.2, width: '110px' },
+      ], function (values) {
+        return VACO.post('/api/maps/foot-traffic', values).then(function (r) {
+          VACO.mount(footTrafficResult, [
+            el('p', 'vaco-small', r.sightings + ' sighting(s), ' + r.uniqueUsers + ' unique user(s) within ' + r.radiusKm + ' km.'),
+            el('p', 'vaco-small vaco-dim', r.measurement),
+          ]);
+        });
+      }, 'Check'),
+      footTrafficResult,
+    ]));
+
     VACO.mount(body, out);
 
     // A world-spanning box turns the real viewport query into "every
