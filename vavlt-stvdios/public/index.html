@@ -452,27 +452,110 @@ function renderSessions(body) {
 }
 
 // -- Casino events ----------------------------------------------------
+//
+// The minimal real slice `casinoEvents.js` builds on top of a host's
+// own channel and (optionally) their own broadcaster screen session.
+// Reading and joining were the only real client this had -- scheduling
+// an event, taking it live/ending it, leaving, and the composed detail
+// read (host channel + screen session + live attendee count) had none.
+
+var CASINO_EVENT_TYPE_OPTIONS = [
+  { label: 'Tournament', value: 'tournament' },
+  { label: 'Game night', value: 'game-night' },
+  { label: 'VIP room', value: 'vip-room' },
+  { label: 'Creator show', value: 'creator-show' },
+];
+
+function renderEventDetail(eventId, host) {
+  VACO.mount(host, el('p', 'vaco-small vaco-dim', 'Loading…'));
+  return VACO.api('/api/casino-events/' + eventId).then(function (event) {
+    var wrap = el('div', 'vaco-stack-sm');
+    wrap.appendChild(el('p', 'vaco-small vaco-dim',
+      'Host channel: ' + (event.hostChannel ? event.hostChannel.name : event.hostChannelId)
+      + (event.hostChannel ? (event.hostChannel.isLive ? ' (live)' : ' (offline)') : '')));
+    if (event.screenSession) {
+      wrap.appendChild(el('p', 'vaco-small vaco-dim',
+        'Screen session ' + event.screenSession.id + ' — ' + (event.screenSession.channelIds || []).length + ' screens'));
+    }
+    wrap.appendChild(el('p', 'vaco-small vaco-dim', 'Live attendees right now: ' + event.activeAttendeeCount));
+    VACO.mount(host, wrap);
+  });
+}
 
 function renderEvents(body) {
+  var userId = VACO.userId();
+  var out = el('div', 'vaco-stack');
+  var detailHost = el('div', 'vaco-stack-sm');
+
   return VACO.api('/api/casino-events').then(function (data) {
     var events = data.events || data.casinoEvents || [];
-    return VACO.card('Streamed casino events', [
+
+    var table = VACO.table([
+      { key: 'id', label: 'Id' },
+      { key: 'title', label: 'Event' },
+      { key: 'eventType', label: 'Type' },
+      { key: 'hostId', label: 'Host' },
+      { label: 'Status', render: function (r) { return VACO.badge(r.status); } },
+      { label: '', render: function (r) {
+        var cell = el('div', 'vaco-row-tight');
+        cell.appendChild(VACO.button('Detail', function () { return renderEventDetail(r.id, detailHost); }, 'sm'));
+        if (userId && r.hostId === userId && r.status === 'scheduled') {
+          cell.appendChild(VACO.button('Go live', function () {
+            return VACO.post('/api/casino-events/' + r.id + '/go-live', {}).then(function () {
+              VACO.toast('Event is live.'); VACO.render();
+            });
+          }, 'sm'));
+        } else if (userId && r.hostId === userId && r.status === 'live') {
+          cell.appendChild(VACO.button('End', function () {
+            return VACO.post('/api/casino-events/' + r.id + '/end', {}).then(function () {
+              VACO.toast('Event ended.'); VACO.render();
+            });
+          }, 'sm'));
+        } else if (userId && r.status !== 'ended') {
+          cell.appendChild(VACO.button('Join', function () {
+            return VACO.post('/api/casino-events/' + r.id + '/join', { userId: userId })
+              .then(function () { VACO.toast('Joined ' + r.title); VACO.render(); });
+          }, 'sm'));
+          cell.appendChild(VACO.button('Leave', function () {
+            return VACO.post('/api/casino-events/' + r.id + '/leave', { userId: userId })
+              .then(function () { VACO.toast('Left ' + r.title); VACO.render(); });
+          }, 'sm'));
+        }
+        return cell;
+      } },
+    ], events, { empty: 'No casino events scheduled.' });
+
+    out.appendChild(VACO.card('Streamed casino events', [
       el('p', 'vaco-small vaco-dim',
         'Watch-together events tied to VAGO. Joining is real state — the attendee list is who is actually in the room.'),
-      VACO.table([
-        { key: 'id', label: 'Id' },
-        { key: 'title', label: 'Event' },
-        { key: 'hostId', label: 'Host' },
-        { label: 'Status', render: function (r) { return VACO.badge(r.status); } },
-        { label: '', render: function (r) {
-          return VACO.button('Join', function () {
-            if (!VACO.userId()) throw new Error('Sign in to join.');
-            return VACO.post('/api/casino-events/' + r.id + '/join', { userId: VACO.userId() })
-              .then(function () { VACO.toast('Joined ' + r.title); VACO.render(); });
-          }, 'sm');
-        } },
-      ], events, { empty: 'No casino events scheduled.' }),
-    ]);
+      table,
+      detailHost,
+    ]));
+
+    if (!userId) {
+      out.appendChild(el('div', 'vaco-empty', 'Sign in to host your own casino event.'));
+      return VACO.mount(body, out);
+    }
+
+    return VACO.api('/api/owners/' + encodeURIComponent(userId) + '/channels').then(function (chData) {
+      var channels = chData.channels || [];
+      var formOrEmpty;
+      if (!channels.length) {
+        formOrEmpty = el('div', 'vaco-empty', 'Create a channel on the Channels tab first — every event broadcasts through one you own.');
+      } else {
+        formOrEmpty = VACO.form([
+          { name: 'title', label: 'Title', placeholder: "Friday Night Hold'em", width: '190px' },
+          { name: 'eventType', label: 'Type', options: CASINO_EVENT_TYPE_OPTIONS },
+          { name: 'hostChannelId', label: 'Host channel', options: channels.map(function (c) { return { label: c.name, value: c.id }; }) },
+        ], function (values) {
+          return VACO.post('/api/casino-events', {
+            hostId: userId, title: values.title, eventType: values.eventType, hostChannelId: Number(values.hostChannelId),
+          }).then(function () { VACO.toast('Event scheduled.'); VACO.render(); });
+        }, 'Schedule event');
+      }
+      out.appendChild(VACO.card('Host a casino event', [formOrEmpty]));
+      VACO.mount(body, out);
+    });
   });
 }
 
