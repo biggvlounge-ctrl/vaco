@@ -68,6 +68,36 @@ function watchTitle(titleId, host) {
     .catch(VACO.error);
 }
 
+function formatDate(ms) {
+  return ms ? new Date(ms).toLocaleDateString() : '—';
+}
+
+// A real, dedicated client of `GET /api/titles/:id`. The catalog
+// listing already carries every one of these fields (`getCatalog`
+// spreads the full record), but the per-id route is the real lookup
+// VOKEN and any future deep link into a single title would use, and
+// it is never called from this app at all otherwise -- so "Details"
+// below fetches it fresh rather than reusing the catalog's own copy.
+function renderTitleDetail(record) {
+  var out = el('div', 'vaco-stack-sm');
+  out.appendChild(el('p', 'vaco-small vaco-dim', 'Creator: ' + record.creatorId));
+  out.appendChild(el('p', 'vaco-small vaco-dim',
+    record.type + ' · ownership retained by creator: ' + record.ownershipRetainedPercent + '%'));
+
+  if (record.acquisitionType === 'exclusive-original') {
+    out.appendChild(el('p', 'vaco-small',
+      (record.isExclusive === false ? 'Exclusivity window ended ' : 'Exclusive until ') + formatDate(record.exclusiveUntil)));
+    out.appendChild(el('p', 'vaco-small vaco-dim', 'Acquisition fee paid to creator: ' + VACO.round(record.acquisitionFee)));
+  } else if (record.acquisitionType === 'licensed') {
+    out.appendChild(el('p', 'vaco-small',
+      (record.isLicenseActive === false ? 'License ended ' : 'Licensed through ') + formatDate(record.licenseExpiresAt)));
+    out.appendChild(el('p', 'vaco-small vaco-dim', 'License fee paid to licensor: ' + VACO.round(record.licenseFee)));
+  } else if (record.acquisitionType === 'studio-produced') {
+    out.appendChild(el('p', 'vaco-small vaco-dim', 'Studio-produced · project ' + record.studioProjectId));
+  }
+  return out;
+}
+
 function renderCatalog(body) {
   return VACO.api('/api/catalog').then(function (data) {
     var titles = data.catalog || [];
@@ -92,6 +122,21 @@ function renderCatalog(body) {
       var playerHost = el('div', 'vaco-stack-sm');
       card.appendChild(VACO.button('Watch', function () { watchTitle(t.id, playerHost); }));
       card.appendChild(playerHost);
+
+      var detailHost = el('div', 'vaco-stack-sm');
+      var detailsOpen = false;
+      card.appendChild(VACO.button('Details', function () {
+        if (detailsOpen) {
+          VACO.mount(detailHost, []);
+          detailsOpen = false;
+          return undefined;
+        }
+        return VACO.api('/api/titles/' + t.id).then(function (record) {
+          VACO.mount(detailHost, renderTitleDetail(record));
+          detailsOpen = true;
+        });
+      }, 'ghost'));
+      card.appendChild(detailHost);
 
       grid.appendChild(card);
     });
