@@ -61,6 +61,11 @@ const FREE_LISTINGS = {
   voken: 'transacts',
   cvltvre: 'transacts',
   vado: 'transacts',
+  // Charges a real customer for a real limited physical run on its own
+  // `/api/production-orders` — same bucket as voken/vulture-music: it
+  // earns inside itself, so charging admission at the door too would be
+  // charging the same customer twice.
+  cvllex: 'transacts',
   vago: 'transacts',
   vxllage: 'transacts',
   cvnvo: 'transacts',
@@ -86,6 +91,10 @@ const FREE_LISTINGS = {
   'vaco-notify': 'infrastructure',
   'vash-tap': 'infrastructure',
   'vaco-passport': 'infrastructure',
+  // Extracted out of this very shell on 15 Oct 2026 (see registry.js's
+  // own entry) so every app can reach it, not only this one — a service
+  // other apps call, not a second thing to sell alongside them.
+  'vaco-assistant': 'infrastructure',
   // Same shape as v3/shield/v4-proxy above: no UI of its own
   // (`registry.js`'s own description says so), a service the `vdp`
   // listing's own client calls, not a second thing to sell alongside
