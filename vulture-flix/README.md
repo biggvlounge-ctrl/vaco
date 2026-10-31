@@ -217,6 +217,76 @@ own honest `502` failure path. See
 `dev-docs/phase-6-studio-produced-titles/` and
 `../vulture-studios/README.md`.
 
+## Frontend coverage pass (31 Oct 2026)
+
+An audit found `public/index.html` making real calls against only 7 of
+this app's 19 routes. The existing two tabs (Catalogue, Account) cover
+the core subscribe/watch loop, including the real `<video>`-playing
+"Watch" action wired to vaco-media — that stays exactly as it was.
+Three real gaps are closed below, each checked against the real route
+handler in `server.js` and its `lib/titles.js`/`lib/subscriptions.js`
+function before being written, never a guessed payload shape.
+Consistently left backend-only, by design: every route gated to
+`requireCallingService` — `POST /api/titles`, `POST /api/titles/
+licensed`, `POST /api/titles/studio-produced`, `POST /api/titles/:id/
+streaming`, `POST /api/titles/:id/remove`, `POST /api/titles/:id/
+physical-run`. These are the platform's own catalog-management
+decisions (see `server.js`'s own "the catalog is the platform's, the
+viewing is the user's" comment), take a trusted-service credential
+this browser frontend has no way to hold, and a fake "studio admin"
+UI pretending to hold one would be worse than no UI at all. Also left
+alone: the plain `POST /api/titles/:id/watch` — a real route, but a
+strict subset of what `POST /api/titles/:id/stream` already does (the
+same access checks, plus a real concurrency-slot session and a
+playback credential), so the existing "Watch" button already is this
+app's real client of the better of the two.
+
+- **Bug fix, Account tab** — `renderAccount()` read the full
+  `GET /api/subscriptions/:userId` response envelope
+  (`{userId, subscription, isActive}`) as if it *were* the subscription
+  record. That envelope is always truthy (`subscription` is `null`,
+  not absent, for someone who never subscribed), so the "no
+  subscription, here's the Subscribe form" branch never ran — the
+  Subscribe form was dead code and this app's frontend could not
+  actually subscribe anyone. Also fixed: the tier `<select>` offered an
+  invalid `'basic'` option (the real tiers are `ad-supported`/
+  `standard`/`premium`, confirmed against `SUBSCRIPTION_TIERS`), and
+  the stream-slot display's concurrency limit read fields
+  (`streams.maxConcurrent`, `sub.maxConcurrentStreams`) no route
+  anywhere in this app returns — it now reads the real
+  `tierMaxSimultaneousStreams` from `GET /api/health`.
+- **Cancel subscription** (`POST /api/subscriptions/:userId/cancel`) —
+  had no frontend at all. An active subscriber now sees a "Cancel
+  subscription" button in the Account tab; a cancelled subscriber sees
+  a "Re-subscribe" card (reusing the existing, already-real
+  `POST /api/subscriptions` renewal/reactivation path).
+- **Title details** (`GET /api/titles/:id`) — registered in
+  `server.js`, never called from this app's own frontend. Each
+  catalog card gets a "Details" toggle showing the creator, ownership-
+  retained percent, and the acquisition-type-specific economics the
+  catalog cards don't surface on their own: an exclusive original's
+  exclusivity window and the real acquisition fee paid to its creator,
+  a licensed title's license window and licensor fee, or a
+  studio-produced title's cross-reference project id.
+- **Creators tab** (`GET /api/creators/:creatorId/titles`,
+  `GET /api/creators/:creatorId/view-count`) — neither had any
+  frontend. The view-count route was added by direct instruction so
+  VOKEN's cross-platform achievement score can read a creator's real
+  total view count live; this tab is the human-readable counterpart —
+  look up a creatorId, see their real total view count (every watch
+  event across every title with that creatorId, exclusive, licensed,
+  and studio-produced alike) and a table of their titles.
+
+Verified live against the real running server (file-backed store, no
+Postgres): `GET /api/health`, `GET /api/creators/:id/titles`,
+`GET /api/creators/:id/view-count`, and the 404 shape of
+`GET /api/titles/:id` for an unknown id all confirmed against this
+frontend's own expectations; `POST /api/titles` confirmed genuinely
+refusing with `401 serviceAuth` when called with no service
+credential, confirming the backend-only routes really do require one.
+25/25 existing plain-Node tests still pass — this pass touched only
+`public/index.html`.
+
 ## Not yet built
 - Any UI — this phase is the real API and data model only.
 - Real content delivery/streaming infrastructure — `watchTitle` is a
