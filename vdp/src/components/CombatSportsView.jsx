@@ -11,12 +11,13 @@
 // is the gate before calling VAGO, and rookie eligibility is the gate
 // before VOKEN. None of them are called from here.
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   DISTRICT_NAME, MATCH_FORMATS, SKILL_LEVELS, CombatError,
   createMatch, startMatch, recordResult, assertBookable,
   broadcastChannels, predictionMarketEligibility, isRookieEligible, describeMatch,
 } from "../lib/combatSports.js";
+import { MOVES } from "../lib/liveWrestling.js";
 
 // A real opening card, one per format, spanning the progression so the
 // street-tier refusal is visible rather than theoretical.
@@ -45,7 +46,192 @@ const TIER_TONE = {
   street: "#8a8a8a", amateur: "#5b7fa6", "semi-pro": "#a6742f", professional: "#8c3f5b",
 };
 
-export default function CombatSportsView({ session }) {
+const VDP_API_URL = import.meta.env?.VITE_VDP_API_URL || "http://localhost:8827";
+
+const MOVE_LABELS = {
+  strike: ["Strike", "Quick — beats Grapple"],
+  grapple: ["Grapple", "Control — beats High-Risk"],
+  highRisk: ["High-Risk (top rope)", "Big damage, beats Strike — a Reversal punishes it hard"],
+  reversal: ["Reversal", "Nullifies Strike/Grapple, hard-counters a High-Risk"],
+  pinAttempt: ["Pin Attempt", "Wins outright if their health is low enough — fails exposed otherwise"],
+  submissionAttempt: ["Submission Attempt", "Wins outright if their stamina is low enough — fails exposed otherwise"],
+};
+
+function Meter({ label, value }) {
+  return (
+    <div style={{ marginBottom: 4 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#666" }}>
+        <span>{label}</span><span>{value}</span>
+      </div>
+      <div style={{ height: 6, background: "#eee", borderRadius: 3 }}>
+        <div style={{ height: 6, width: `${value}%`, background: value > 40 ? "#2b7a4b" : "#8c3f5b", borderRadius: 3 }} />
+      </div>
+    </div>
+  );
+}
+
+// -- Live wrestling: two real players, one real-time match --------------
+//
+// By direct instruction ("people can wrestle other players live too"),
+// with the mechanic given directly too: a turn-based move exchange.
+// This is the one part of this view that is genuinely real-time and
+// server-backed -- the rest of the view above is a local, in-browser
+// demo card (see this file's own original header). Real-time delivery
+// comes from `wrestlingUpdates`, read from WorldView's one shared
+// WebSocket connection (see its own header) rather than this
+// component opening a second one; a manual refresh still works if a
+// frame was missed.
+function LiveWrestlingPanel({ session, wrestlingUpdates }) {
+  const [matchIdInput, setMatchIdInput] = useState("");
+  const [watchingId, setWatchingId] = useState(null);
+  const [live, setLive] = useState(null);
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async (id) => {
+    setError(null);
+    try {
+      const res = await fetch(`${VDP_API_URL}/api/combat-sports/matches/${encodeURIComponent(id)}/live`);
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || `load failed (${res.status})`);
+      setLive(body);
+      setWatchingId(id);
+    } catch (err) {
+      setError(err.message);
+    }
+  }, []);
+
+  // A pushed frame for the match this player is already watching
+  // updates the view without them having to re-click Watch.
+  useEffect(() => {
+    if (!watchingId) return;
+    const update = wrestlingUpdates?.[watchingId];
+    if (update?.live) setLive(update.live);
+  }, [wrestlingUpdates, watchingId]);
+
+  const myWrestlerId = session?.userId && live?.wrestlers && live.wrestlers[session.userId] ? session.userId : null;
+  const myTurn = myWrestlerId && live?.status === "live" && (live.waitingOn || []).includes(myWrestlerId);
+
+  async function sendMove(move) {
+    if (!watchingId || !myWrestlerId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`${VDP_API_URL}/api/combat-sports/matches/${encodeURIComponent(watchingId)}/live/move`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.sessionToken}` },
+        body: JSON.stringify({ wrestlerId: myWrestlerId, move }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || `move failed (${res.status})`);
+      setLive(body);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function sendForfeit() {
+    if (!watchingId || !myWrestlerId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`${VDP_API_URL}/api/combat-sports/matches/${encodeURIComponent(watchingId)}/live/forfeit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.sessionToken}` },
+        body: JSON.stringify({ wrestlerId: myWrestlerId }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || `forfeit failed (${res.status})`);
+      setLive(body);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section style={{ marginTop: 24, borderTop: "2px solid #ddd", paddingTop: 16 }}>
+      <h4 style={{ margin: "0 0 4px" }}>Live Wrestling</h4>
+      <p style={{ color: "#666", margin: "0 0 12px", fontSize: 13 }}>
+        Two real players, one real-time match — a turn-based move exchange on a real, already-booked
+        one-on-one or cage-match card. Booking and opening the live feed is a promoter action (done
+        server-side); once it's open, watch by its match id and, if you're one of the two wrestlers
+        on the card, pick your move each round.
+      </p>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+        <input
+          placeholder="match-1"
+          value={matchIdInput}
+          onChange={(e) => setMatchIdInput(e.target.value)}
+          style={{ padding: "4px 8px" }}
+        />
+        <button disabled={!matchIdInput || busy} onClick={() => load(matchIdInput)}>Watch</button>
+      </div>
+
+      {error && <p style={{ color: "crimson", fontSize: 13 }}>{error}</p>}
+
+      {live && (
+        <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 8 }}>
+            <strong>{live.matchId}</strong>
+            <span style={{ color: "#666" }}>
+              {live.status === "live" ? `Round ${live.round}` : `Finished — ${live.winnerId} won by ${live.endedBy}`}
+            </span>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 12 }}>
+            {Object.entries(live.wrestlers || {}).map(([id, s]) => (
+              <div key={id}>
+                <div style={{ fontSize: 13, marginBottom: 4 }}>
+                  {id}{id === myWrestlerId ? " (you)" : ""}
+                  {live.status === "live" && (live.waitingOn || []).includes(id) && (
+                    <span style={{ color: "#8a5a00", fontSize: 11 }}> — picking…</span>
+                  )}
+                </div>
+                <Meter label="Health" value={s.health} />
+                <Meter label="Stamina" value={s.stamina} />
+              </div>
+            ))}
+          </div>
+
+          {myTurn && (
+            <div>
+              <p style={{ fontSize: 12, color: "#666", margin: "0 0 6px" }}>Your move:</p>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                {MOVES.map((move) => (
+                  <button key={move} disabled={busy} onClick={() => sendMove(move)} title={MOVE_LABELS[move][1]}>
+                    {MOVE_LABELS[move][0]}
+                  </button>
+                ))}
+              </div>
+              <button
+                disabled={busy}
+                onClick={sendForfeit}
+                style={{ marginTop: 8, color: "#8c3f5b" }}
+              >
+                Forfeit
+              </button>
+            </div>
+          )}
+
+          {myWrestlerId && !myTurn && live.status === "live" && (
+            <p style={{ fontSize: 12, color: "#666" }}>Move submitted — waiting on your opponent.</p>
+          )}
+
+          {!myWrestlerId && live.status === "live" && (
+            <p style={{ fontSize: 12, color: "#666" }}>Spectating — you're not one of the two wrestlers on this card.</p>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+export default function CombatSportsView({ session, wrestlingUpdates }) {
   const [card, setCard] = useState(seedCard);
   const [error, setError] = useState(null);
 
@@ -142,6 +328,8 @@ export default function CombatSportsView({ session }) {
           );
         })}
       </div>
+
+      <LiveWrestlingPanel session={session} wrestlingUpdates={wrestlingUpdates} />
     </section>
   );
 }

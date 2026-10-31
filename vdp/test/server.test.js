@@ -303,3 +303,95 @@ test('connecting to /ws/world sends a real snapshot with the live npc population
   assert.equal(snapshot.npcs.length, EXPECTED_BOOT_NPC_COUNT);
   ws.close();
 });
+
+// -- live wrestling: two real players, one real-time match ----------------
+//
+// `live/start` is requireCallingService -- the same local, no-Shield
+// check `library/record` above already proves works end to end, so
+// this suite can run the full booking-through-going-live path for
+// real. `live/move`/`live/forfeit` are requireActor -- this suite can
+// only prove their refusal shapes (same split every requireActor route
+// above takes); the full two-player match-to-completion path, over a
+// real Shield session, was verified manually this session and is
+// recorded in VDP_COMBAT_SPORTS_DISTRICT.md.
+
+const svc = { 'X-Service-Name': 'venvs', 'X-Service-Token': 'test-venvs-token' };
+
+// Fresh, never-repeated participant ids per call -- none of these test
+// matches ever resolve (that would need a real live match played out),
+// so reusing a pair would make `assertBookable` correctly refuse the
+// next booking ("already in a live match"), the exact real collision
+// this session's own manual verification hit first.
+let liveMatchCounter = 0;
+async function bookLiveSinglesMatch() {
+  liveMatchCounter += 1;
+  const booked = await post('/api/combat-sports/matches', {
+    matchFormat: 'one-on-one', combatSportType: 'wrestling', skillLevel: 'street',
+    participantIds: [`ada-${liveMatchCounter}`, `bo-${liveMatchCounter}`],
+  }, svc);
+  const match = await booked.json();
+  await post(`/api/combat-sports/matches/${match.matchId}/start`, {}, svc);
+  return { matchId: match.matchId, wrestlerId: `ada-${liveMatchCounter}` };
+}
+
+test('GET /api/combat-sports/matches/:id/live 404s before any live match has started', { skip: SKIP }, async () => {
+  const { matchId } = await bookLiveSinglesMatch();
+  const res = await fetch(`${BASE}/api/combat-sports/matches/${matchId}/live`);
+  assert.equal(res.status, 404);
+});
+
+test('live/start succeeds end-to-end with a real trusted-service credential, seeding both wrestlers at full health', { skip: SKIP }, async () => {
+  const { matchId, wrestlerId } = await bookLiveSinglesMatch();
+  const res = await post(`/api/combat-sports/matches/${matchId}/live/start`, {}, svc);
+  assert.equal(res.status, 201);
+  const live = await res.json();
+  assert.equal(live.wrestlers[wrestlerId].health, 100);
+  assert.equal(Object.keys(live.wrestlers).length, 2);
+  assert.equal(live.waitingOn.length, 2);
+
+  const read = await (await fetch(`${BASE}/api/combat-sports/matches/${matchId}/live`)).json();
+  assert.deepEqual(read, live);
+});
+
+test('live/start is refused without a real service credential', { skip: SKIP }, async () => {
+  const { matchId } = await bookLiveSinglesMatch();
+  const res = await post(`/api/combat-sports/matches/${matchId}/live/start`, {});
+  assert.equal(res.status, 401);
+});
+
+test('live/start twice on the same match is refused -- a live match cannot be opened over itself', { skip: SKIP }, async () => {
+  const { matchId } = await bookLiveSinglesMatch();
+  await post(`/api/combat-sports/matches/${matchId}/live/start`, {}, svc);
+  const second = await post(`/api/combat-sports/matches/${matchId}/live/start`, {}, svc);
+  assert.equal(second.status, 400);
+});
+
+test('live/move with no credential at all is refused WITHOUT reaching Shield', { skip: SKIP }, async () => {
+  const { matchId, wrestlerId } = await bookLiveSinglesMatch();
+  await post(`/api/combat-sports/matches/${matchId}/live/start`, {}, svc);
+  const res = await post(`/api/combat-sports/matches/${matchId}/live/move`, { wrestlerId, move: 'strike' });
+  assert.equal(res.status, 401);
+});
+
+test('live/move with a real bearer token asks Shield -- real 502 when it is unreachable, never a silent pass for who gets to move', { skip: SKIP }, async () => {
+  const { matchId, wrestlerId } = await bookLiveSinglesMatch();
+  await post(`/api/combat-sports/matches/${matchId}/live/start`, {}, svc);
+  const res = await post(`/api/combat-sports/matches/${matchId}/live/move`,
+    { wrestlerId, move: 'strike' }, { Authorization: 'Bearer some-token' });
+  assert.equal(res.status, 502, 'requireActor must ask Shield before a move is ever accepted on a real wrestler\'s behalf');
+});
+
+test('live/forfeit with no credential at all is refused WITHOUT reaching Shield', { skip: SKIP }, async () => {
+  const { matchId, wrestlerId } = await bookLiveSinglesMatch();
+  await post(`/api/combat-sports/matches/${matchId}/live/start`, {}, svc);
+  const res = await post(`/api/combat-sports/matches/${matchId}/live/forfeit`, { wrestlerId });
+  assert.equal(res.status, 401);
+});
+
+test('live/forfeit with a real bearer token asks Shield -- real 502 when it is unreachable', { skip: SKIP }, async () => {
+  const { matchId, wrestlerId } = await bookLiveSinglesMatch();
+  await post(`/api/combat-sports/matches/${matchId}/live/start`, {}, svc);
+  const res = await post(`/api/combat-sports/matches/${matchId}/live/forfeit`,
+    { wrestlerId }, { Authorization: 'Bearer some-token' });
+  assert.equal(res.status, 502, 'requireActor must ask Shield before a forfeit can ever end a real match');
+});

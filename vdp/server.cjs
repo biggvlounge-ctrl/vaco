@@ -341,6 +341,7 @@ let store = createVdpStore();
   const civilizationTradeLib = await import('./src/lib/civilizationTrade.js');
   const civilizationSportsLib = await import('./src/lib/civilizationSports.js');
   const combatSportsLib = await import('./src/lib/combatSports.js');
+  const liveWrestlingLib = await import('./src/lib/liveWrestling.js');
   const leaderboardsLib = await import('./src/lib/leaderboards.js');
   const teamSportsLib = await import('./src/lib/teamSports.js');
   const teamStandingsLib = await import('./src/lib/teamStandings.js');
@@ -554,6 +555,12 @@ let store = createVdpStore();
       // other pure, stateless library module in `src/lib` is given a
       // home here rather than inside the library itself.
       if (!store.combatSports) store.combatSports = { matches: [], nextMatchId: 1 };
+      // `liveWrestling.js` is deliberately storage-agnostic too, the
+      // same reason `combatSports.js`'s own matches live on
+      // `store.combatSports` rather than inside that module. Keyed by
+      // matchId directly -- a live wrestling match is a real-time
+      // overlay on one real `combatSports` match, not its own booking.
+      if (!store.liveWrestling) store.liveWrestling = {};
       if (!store.leaderboards) store.leaderboards = leaderboardsLib.createLeaderboardsStore();
       // `teamSports.js` is deliberately storage-agnostic, the same
       // real reason `combatSports.js`'s own matches live on
@@ -2970,6 +2977,100 @@ let store = createVdpStore();
         kind: 'combat-sports', text: `${req.body.winnerIds.join(', ')} won the ${match.combatSportType} card "${match.matchId}"`,
       });
       res.status(200).json(match);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // -- Live wrestling: two real players, one real-time match --------------
+  //
+  // By direct instruction ("people can wrestle other players live
+  // too"), with the mechanic itself also given directly: a turn-based
+  // move exchange, not an instant simulation. `liveWrestling.js` is
+  // the referee; this is the one place its "ended" fact is fed to
+  // `combatSports.recordResult`, the same seam the operator-declared
+  // `/result` route above already uses -- a live match settles through
+  // the exact same leaderboard/news pipeline, not a second one.
+  //
+  // **Starting a live broadcast is operational**, the same footing as
+  // booking and starting the underlying card -- a promoter opens the
+  // live feed, not either fighter. **Submitting a move is not**: it is
+  // the one real thing a specific, identified player does themselves,
+  // so it is `requireActor('wrestlerId')`, proven against a real Shield
+  // session -- never the raw WebSocket, which (see `onMessage` above,
+  // `move`/`chat`) trusts a caller-claimed id for cosmetic world state
+  // and is the wrong trust model for who actually wins a match.
+  app.post('/api/combat-sports/matches/:id/live/start', requireCallingService(), (req, res) => {
+    const match = store.combatSports.matches.find((m) => m.matchId === req.params.id);
+    if (!match) return res.status(404).json({ error: `no match ${req.params.id}` });
+    if (store.liveWrestling[req.params.id]) {
+      return res.status(400).json({ error: `live wrestling is already running for match ${req.params.id}` });
+    }
+    try {
+      const liveMatch = liveWrestlingLib.startLiveMatch(match);
+      store.liveWrestling[req.params.id] = liveMatch;
+      const described = liveWrestlingLib.describeLiveMatch(liveMatch);
+      broadcast({ type: 'wrestling-live-start', matchId: match.matchId, live: described });
+      res.status(201).json(described);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/combat-sports/matches/:id/live', (req, res) => {
+    const liveMatch = store.liveWrestling[req.params.id];
+    if (!liveMatch) return res.status(404).json({ error: `no live wrestling match for ${req.params.id}` });
+    res.json(liveWrestlingLib.describeLiveMatch(liveMatch));
+  });
+
+  // Settling a live match's real result onto the card it belongs to --
+  // same two calls (`recordResult`, `recordMatchResult`) the operator-
+  // declared `/result` route above makes, called from the one place a
+  // live match's own winner becomes known, rather than requiring a
+  // promoter to separately re-declare what the players already decided.
+  function settleLiveMatch(match, liveMatch) {
+    combatSportsLib.recordResult(match, [liveMatch.winnerId]);
+    leaderboardsLib.recordMatchResult(store.leaderboards, match);
+    newsLib.recordEvent(store.news, {
+      kind: 'combat-sports',
+      text: `${liveMatch.winnerId} won the ${match.combatSportType} card "${match.matchId}" live, by ${liveMatch.endedBy}`,
+    });
+  }
+
+  app.post('/api/combat-sports/matches/:id/live/move', requireActor('wrestlerId'), (req, res) => {
+    const match = store.combatSports.matches.find((m) => m.matchId === req.params.id);
+    if (!match) return res.status(404).json({ error: `no match ${req.params.id}` });
+    const liveMatch = store.liveWrestling[req.params.id];
+    if (!liveMatch) return res.status(404).json({ error: `no live wrestling match for ${req.params.id}` });
+    try {
+      const { resolved } = liveWrestlingLib.submitMove(liveMatch, req.body.wrestlerId, req.body.move);
+      const described = liveWrestlingLib.describeLiveMatch(liveMatch);
+      if (resolved) {
+        broadcast({ type: 'wrestling-round', matchId: match.matchId, live: described, round: liveMatch.log[liveMatch.log.length - 1] });
+        if (liveMatch.status === 'finished') {
+          settleLiveMatch(match, liveMatch);
+          broadcast({ type: 'wrestling-match-over', matchId: match.matchId, live: described });
+        }
+      } else {
+        broadcast({ type: 'wrestling-move-submitted', matchId: match.matchId, wrestlerId: req.body.wrestlerId });
+      }
+      res.status(200).json(described);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/combat-sports/matches/:id/live/forfeit', requireActor('wrestlerId'), (req, res) => {
+    const match = store.combatSports.matches.find((m) => m.matchId === req.params.id);
+    if (!match) return res.status(404).json({ error: `no match ${req.params.id}` });
+    const liveMatch = store.liveWrestling[req.params.id];
+    if (!liveMatch) return res.status(404).json({ error: `no live wrestling match for ${req.params.id}` });
+    try {
+      liveWrestlingLib.forfeitMatch(liveMatch, req.body.wrestlerId);
+      settleLiveMatch(match, liveMatch);
+      const described = liveWrestlingLib.describeLiveMatch(liveMatch);
+      broadcast({ type: 'wrestling-match-over', matchId: match.matchId, live: described });
+      res.status(200).json(described);
     } catch (err) {
       res.status(400).json({ error: err.message });
     }

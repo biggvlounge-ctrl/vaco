@@ -296,6 +296,12 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
   // `CallPanel.jsx` for what happens with it.
   const [activeCall, setActiveCall] = useState(null);
   const [callUnavailable, setCallUnavailable] = useState(null);
+  // The latest real-time frame from a live wrestling match, by
+  // matchId -- CombatSportsView reads this rather than opening a
+  // second WebSocket connection of its own. "VDP's world is ONE
+  // shared channel" (messageSocket.cjs's own header), so every
+  // real-time consumer reads from this one.
+  const [wrestlingUpdates, setWrestlingUpdates] = useState({});
   // Pure/static given the current real feature set -- recomputed on
   // every render rather than memoized, since AMENITY_SOURCES never
   // changes within a session.
@@ -389,6 +395,12 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
         // moment -- stale by the time a real call actually ends.
         if (msg.type === "call-ended") {
           setActiveCall((current) => (current && current.callId === msg.callId ? null : current));
+        }
+        if (
+          (msg.type === "wrestling-live-start" || msg.type === "wrestling-round" || msg.type === "wrestling-match-over")
+          && msg.matchId
+        ) {
+          setWrestlingUpdates((current) => ({ ...current, [msg.matchId]: msg }));
         }
       };
 
@@ -860,7 +872,7 @@ export default function WorldView({ session, degvchiStore, foodDistrictStore, on
             <VenusResortView session={session} />
           )}
           {enteredDistrict.contentType === 'vdp-native' && enteredDistrict.id === 'combat-sports' && (
-            <CombatSportsView session={session} />
+            <CombatSportsView session={session} wrestlingUpdates={wrestlingUpdates} />
           )}
           {enteredDistrict.contentType === 'vdp-native' && enteredDistrict.id === 'vavlt' && (
             <VavltView session={session} />
