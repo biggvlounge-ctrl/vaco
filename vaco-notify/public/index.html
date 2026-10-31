@@ -91,6 +91,57 @@ function renderNotifications(body) {
   });
 }
 
+// `GET /api/notifications/undelivered` had no frontend at all. The
+// Status tab only ever showed a *count* (`health.undeliveredAlerts`);
+// this is the real list behind that number — the one an operator
+// actually needs to act on, not just be alarmed by.
+function renderUndelivered(body) {
+  var state = { minSeverity: 'alert' };
+
+  function load() {
+    return VACO.api('/api/notifications/undelivered?minSeverity=' + encodeURIComponent(state.minSeverity))
+      .then(function (data) {
+        var out = el('div', 'vaco-stack');
+        out.appendChild(VACO.notice(
+          'Everything below was raised and <strong>no channel accepted it</strong> — the exact failure '
+          + 'this service exists to end. A clean list at "alert" or above means the service is doing its '
+          + 'job; a non-empty one means a safety or money escalation went unheard.'));
+
+        out.appendChild(VACO.card('Filter', [
+          VACO.form([
+            { name: 'minSeverity', label: 'From severity', options: ['alert', 'critical', 'signal'], value: state.minSeverity },
+          ], function (values) {
+            state.minSeverity = values.minSeverity;
+            return load();
+          }, 'Apply'),
+        ]));
+
+        if (data.undelivered.length === 0) {
+          out.appendChild(VACO.notice('Nothing undelivered at or above "' + state.minSeverity + '".', 'money'));
+        } else {
+          out.appendChild(VACO.card(data.undelivered.length + ' undelivered', [
+            VACO.table([
+              { key: 'id', label: 'ID' },
+              { key: 'app', label: 'App' },
+              { key: 'severity', label: 'Severity', render: function (row) { return sevBadge(row.severity); } },
+              { key: 'title', label: 'Title' },
+              { key: 'createdAt', label: 'When', render: function (row) { return new Date(row.createdAt).toLocaleString(); } },
+              { key: 'reason', label: 'Why', render: function (row) {
+                return row.deliveries.length === 0
+                  ? 'no subscription matched'
+                  : row.deliveries.length + ' channel(s) attempted, all failed';
+              } },
+            ], data.undelivered),
+          ]));
+        }
+
+        return VACO.mount(body, out);
+      });
+  }
+
+  return load();
+}
+
 function renderSubscriptions(body) {
   var out = el('div', 'vaco-stack');
   out.appendChild(VACO.notice(
@@ -150,6 +201,7 @@ VACO.app({
   tabs: [
     { id: 'status', label: 'Status', heading: 'Delivery', render: renderStatus },
     { id: 'sent', label: 'Sent', heading: 'Recent notifications', render: renderNotifications },
+    { id: 'undelivered', label: 'Undelivered', heading: 'Nobody got this', render: renderUndelivered },
     { id: 'subs', label: 'Subscriptions', heading: 'Who hears what', render: renderSubscriptions },
   ],
 });
