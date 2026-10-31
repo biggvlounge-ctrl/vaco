@@ -138,6 +138,120 @@ function renderManage(body) {
   return VACO.mount(body, out);
 }
 
+function escrowHoldCard(hold) {
+  var lines = el('div', 'vaco-stack-sm');
+  lines.appendChild(el('p', 'vaco-small vaco-dim',
+    'payer ' + hold.payerId + ' -> payee ' + hold.payeeId
+    + (hold.reason ? ' · ' + hold.reason : '')));
+  var stats = el('div', 'stat-row');
+  [['Amount', VACO.round(hold.amount)],
+   ['Opened', hold.createdAt ? new Date(hold.createdAt).toLocaleString() : '—'],
+   ['Settled', hold.settledAt ? new Date(hold.settledAt).toLocaleString() : '—']].forEach(function (pair) {
+    var s = el('div', 'stat');
+    s.appendChild(el('span', 'vaco-label', pair[0]));
+    s.appendChild(el('span', 'stat-value', pair[1]));
+    stats.appendChild(s);
+  });
+  lines.appendChild(stats);
+  return VACO.card('Escrow hold #' + hold.id, [lines], { trailing: VACO.badge(hold.status) });
+}
+
+function escrowActionsFor(hold, onChanged) {
+  if (hold.status !== 'held') return null;
+  var row = el('div', 'vaco-row-tight');
+  row.appendChild(VACO.button('Release to payee', function () {
+    return VACO.post('/api/escrow/' + encodeURIComponent(hold.id) + '/release', {}).then(function (updated) {
+      VACO.toast('Hold #' + updated.id + ' released', 'money');
+      return onChanged(updated);
+    });
+  }, 'primary vaco-btn-sm'));
+  row.appendChild(VACO.button('Refund to payer', function () {
+    return VACO.post('/api/escrow/' + encodeURIComponent(hold.id) + '/refund', {}).then(function (updated) {
+      VACO.toast('Hold #' + updated.id + ' refunded', 'warn');
+      return onChanged(updated);
+    });
+  }, 'ghost vaco-btn-sm'));
+  return row;
+}
+
+function renderEscrowLookup(out, result, businessId) {
+  return VACO.api('/api/passports/' + encodeURIComponent(businessId) + '/escrow')
+    .then(function (body) {
+      var holds = body.escrowHolds || [];
+      var list = el('div', 'vaco-stack-sm');
+      if (!holds.length) {
+        list.appendChild(el('div', 'vaco-empty', 'No escrow holds for business ' + businessId + ' yet.'));
+      } else {
+        holds.forEach(function (hold) {
+          var card = escrowHoldCard(hold);
+          var actions = escrowActionsFor(hold, function (updated) {
+            return renderEscrowLookup(out, result, businessId);
+          });
+          if (actions) card.appendChild(actions);
+          list.appendChild(card);
+        });
+      }
+      VACO.mount(result, list);
+    })
+    .catch(function (err) {
+      VACO.mount(result, VACO.notice('Could not load escrow holds: ' + VACO.escapeHtml(err.message), 'danger'));
+    });
+}
+
+function renderEscrow(body) {
+  var out = el('div', 'vaco-stack');
+  var result = el('div', 'vaco-stack-sm');
+
+  out.appendChild(VACO.card('Escrow holds for a business', [
+    'Level 3 only — a business must have real, verified V3 network activity before it may hold anyone\'s money in trust.',
+    VACO.form([{ name: 'businessId', label: 'Business id', type: 'number', value: 9001, width: '110px' }],
+      function (values) { return renderEscrowLookup(out, result, values.businessId); }, 'Load holds'),
+  ]));
+
+  if (VACO.userId()) {
+    out.appendChild(VACO.card('Open a new hold', [
+      'Opens by charging the payer into escrow right away, real money moved through V3\'s own settlement — '
+      + 'only the Level-3 business\'s own HVNTZ owner may open one.',
+      VACO.form([
+        { name: 'businessId', label: 'Business id', type: 'number', value: 9001, width: '110px' },
+        { name: 'payerId', label: 'Payer user id', type: 'text', placeholder: 'who is paying', width: '140px' },
+        { name: 'payeeId', label: 'Payee user id', type: 'text', placeholder: 'who gets paid', width: '140px' },
+        { name: 'amount', label: 'Amount', type: 'number', value: 10, width: '100px' },
+        { name: 'reason', label: 'Reason (optional)', type: 'text', placeholder: 'e.g. order #42', width: '160px' },
+      ], function (values) {
+        return VACO.post('/api/passports/' + encodeURIComponent(values.businessId) + '/escrow', {
+          payerId: values.payerId, payeeId: values.payeeId, amount: values.amount,
+          reason: values.reason || null,
+        }).then(function (hold) {
+          VACO.toast('Escrow hold #' + hold.id + ' opened', 'money');
+          return renderEscrowLookup(out, result, values.businessId);
+        });
+      }, 'Open hold'),
+    ]));
+  } else {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in as a Level-3 business\'s own owner to open a hold.'));
+  }
+
+  out.appendChild(VACO.card('Look up one hold by id', [
+    VACO.form([{ name: 'id', label: 'Hold id', type: 'number', value: 1, width: '100px' }],
+      function (values) {
+        return VACO.api('/api/escrow/' + encodeURIComponent(values.id)).then(function (hold) {
+          var card = escrowHoldCard(hold);
+          var actions = escrowActionsFor(hold, function () {
+            return VACO.api('/api/escrow/' + encodeURIComponent(values.id)).then(function (updated) {
+              VACO.mount(result, escrowHoldCard(updated));
+            });
+          });
+          if (actions) card.appendChild(actions);
+          VACO.mount(result, card);
+        });
+      }, 'Look up'),
+  ]));
+
+  out.appendChild(result);
+  return VACO.mount(body, out);
+}
+
 VACO.app({
   id: 'vaco-passport',
   name: 'VACO Passport',
@@ -151,6 +265,9 @@ VACO.app({
     { id: 'passport', label: 'Passport', heading: 'Business Passports',
       blurb: 'Register, VACA-verify, real V3 activity — Levels 1 through 3, end to end.', render: renderPassport },
     { id: 'manage', label: 'Manage', heading: 'Register, verify, advance', render: renderManage },
+    { id: 'escrow', label: 'Escrow', heading: 'Level 3 escrow holds',
+      blurb: 'Hold a customer\'s payment in trust and release or refund it later — real money, moved through V3\'s own settlement, never a second ledger.',
+      render: renderEscrow },
   ],
 });
 </script>
