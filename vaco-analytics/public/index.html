@@ -76,28 +76,76 @@ function sparkline(values) {
 }
 
 function renderDashboard(body) {
-  return VACO.api('/api/dashboard').then(function (data) {
+  // `GET /api/health` was never called from this page at all. It is
+  // cheap and real (`{ ok, apps }` from the same store this tab already
+  // reads), so it rides along as a one-line status strip rather than
+  // needing its own tab.
+  return Promise.all([
+    VACO.api('/api/dashboard'),
+    VACO.api('/api/health').catch(function () { return null; }),
+  ]).then(function (results) {
+    var data = results[0];
+    var health = results[1];
     var apps = data.apps || [];
-    if (!apps.length) {
-      return el('div', 'vaco-empty',
-        'Nothing ingested yet. An empty dashboard means no app has pushed a real event — not that anything is broken.');
-    }
 
     var out = el('div', 'vaco-stack');
+    if (health) {
+      out.appendChild(el('p', 'vaco-small vaco-dim',
+        (health.ok ? 'Service reporting normally' : 'Service degraded') + ' · '
+        + (health.apps || []).length + ' app(s) with real ingested metrics.'));
+    }
+
+    if (!apps.length) {
+      out.appendChild(el('div', 'vaco-empty',
+        'Nothing ingested yet. An empty dashboard means no app has pushed a real event — not that anything is broken.'));
+      return out;
+    }
+
+    // The sparkline below has always existed in this file, drawing
+    // `m.series` — but `GET /api/dashboard` (`getEcosystemSnapshot`)
+    // never returns a `series` field, only the aggregate `{count, sum,
+    // avg, min, max, latest}`. So every sparkline was dead code: the
+    // `if (m.series ...)` guard was always false. The real per-event
+    // history already exists at `GET /api/metrics/:app?metric=&limit=`
+    // — this app's second-most-basic route, and (before this) the only
+    // one of the seven with no caller anywhere in this file. One fetch
+    // per real series (skipping single-point series; a line needs two
+    // points), fetched in parallel and failed soft: a metric whose
+    // history fetch errors still shows its real numbers, just no spark.
+    var seriesFetches = [];
     apps.forEach(function (app) {
-      var grid = el('div', 'metric-grid');
       (app.metrics || []).forEach(function (m) {
-        var cell = el('div', 'metric');
-        cell.appendChild(el('span', 'vaco-label', m.metric));
-        cell.appendChild(el('span', 'metric-value', VACO.round(m.sum !== undefined ? m.sum : m.latest)));
-        cell.appendChild(el('span', 'vaco-small vaco-faint',
-          m.count + ' event(s) · latest ' + VACO.round(m.latest)));
-        if (m.series && m.series.length > 1) cell.appendChild(sparkline(m.series));
-        grid.appendChild(cell);
+        if (m.count < 2) return;
+        seriesFetches.push(
+          VACO.api('/api/metrics/' + encodeURIComponent(app.app)
+            + '?metric=' + encodeURIComponent(m.metric) + '&limit=20')
+            .then(function (res) {
+              // The route returns newest-first (`getMetrics`'s own
+              // sort); a sparkline reads left-to-right as time, so this
+              // reverses to chronological order.
+              m.series = (res.events || []).map(function (e) { return e.value; }).reverse();
+            })
+            .catch(function () { /* no spark for this one metric; the rest of the cell still renders */ })
+        );
       });
-      out.appendChild(VACO.card(app.app, [grid]));
     });
-    return out;
+
+    return Promise.all(seriesFetches).then(function () {
+      apps.forEach(function (app) {
+        var grid = el('div', 'metric-grid');
+        (app.metrics || []).forEach(function (m) {
+          var cell = el('div', 'metric');
+          cell.appendChild(el('span', 'vaco-label', m.metric));
+          cell.appendChild(el('span', 'metric-value', VACO.round(m.sum !== undefined ? m.sum : m.latest)));
+          cell.appendChild(el('span', 'vaco-small vaco-faint',
+            m.count + ' event(s) · latest ' + VACO.round(m.latest)));
+          if (m.series && m.series.length > 1) cell.appendChild(sparkline(m.series));
+          grid.appendChild(cell);
+        });
+        out.appendChild(VACO.card(app.app, [grid]));
+      });
+      return out;
+    });
   });
 }
 
@@ -108,16 +156,55 @@ function renderAlerts(body) {
     + 'There is <strong>no notification channel connected</strong> — an alert is raised and recorded here, '
     + 'and nobody is paged.', 'warn'));
 
-  return VACO.api('/api/intelligence/alerts').then(function (data) {
-    var alerts = data.alerts || data || [];
-    out.appendChild(VACO.card('Open alerts', [
-      VACO.table([
-        { key: 'app', label: 'App' },
-        { key: 'metric', label: 'Metric' },
-        { label: 'Severity', render: function (a) { return VACO.badge(a.severity || 'info'); } },
-        { key: 'message', label: 'What happened' },
-      ], alerts, { empty: 'No alerts. Either everything is fine, or nothing has been evaluated.' }),
-    ]));
+  // `GET /api/intelligence/alerts` has always supported `?app=` and
+  // `?routedTo=` (`server.js` reads both straight off `req.query`), but
+  // nothing here ever sent either — every load fetched the entire
+  // alert list. `routedTo`'s three real values come straight from
+  // `intelligence.js`'s own `ALERT_ROUTES` table, not invented here.
+  var resultsCard = VACO.card('Open alerts', [el('div', 'vaco-empty', 'Loading…')]);
+
+  // Also real: an open alert's actual shape (`evaluateMetric` in
+  // `intelligence.js`) has no `severity` or `message` field — those
+  // two columns were always rendering the fallback ('info' badge,
+  // em-dash) no matter what was raised. `routedTo`, `reason`, `zScore`
+  // and `occurrences` are the fields the handler really writes.
+  function load(filters) {
+    var query = [];
+    if (filters && filters.app) query.push('app=' + encodeURIComponent(filters.app));
+    if (filters && filters.routedTo) query.push('routedTo=' + encodeURIComponent(filters.routedTo));
+    var path = '/api/intelligence/alerts' + (query.length ? '?' + query.join('&') : '');
+    return VACO.api(path).then(function (data) {
+      var alerts = data.alerts || data || [];
+      var fresh = VACO.card('Open alerts', [
+        VACO.table([
+          { key: 'app', label: 'App' },
+          { key: 'metric', label: 'Metric' },
+          { label: 'Routed to', render: function (a) { return VACO.badge(a.routedTo || 'unrouted', a.routedTo ? 'accent' : 'warn'); } },
+          { key: 'reason', label: 'Why' },
+          { key: 'zScore', label: 'Z-score', num: true },
+          { key: 'occurrences', label: 'Occurrences', num: true },
+          { label: 'Last seen', render: function (a) { return a.lastSeenAt ? new Date(a.lastSeenAt).toLocaleString() : '—'; } },
+        ], alerts, { empty: 'No alerts. Either everything is fine, or nothing has been evaluated.' }),
+      ]);
+      out.replaceChild(fresh, resultsCard);
+      resultsCard = fresh;
+    });
+  }
+
+  out.appendChild(VACO.card('Filter', [
+    VACO.form([
+      { name: 'app', label: 'App', placeholder: 'void (optional)', width: '140px' },
+      { name: 'routedTo', label: 'Routed to', options: [
+        { label: 'Any', value: '' },
+        { label: 'Leslie (financial)', value: 'Leslie' },
+        { label: 'Deskins (compliance)', value: 'Deskins' },
+        { label: 'Qvan (security)', value: 'Qvan' },
+      ], width: '180px' },
+    ], function (values) { return load(values); }, 'Filter'),
+  ]));
+  out.appendChild(resultsCard);
+
+  return load().then(function () {
     VACO.mount(body, out);
   });
 }
@@ -137,23 +224,51 @@ function renderIngest(body) {
     }, 'Ingest'),
   ]));
 
-  out.appendChild(VACO.card('Look up one app', [
-    VACO.form([{ name: 'app', label: 'App', placeholder: 'void', width: '140px' }],
-      function (values) {
-        return VACO.api('/api/metrics/' + encodeURIComponent(values.app) + '/summary').then(function (s) {
-          while (out.childNodes.length > 2) out.removeChild(out.lastChild);
-          var rows = (s.metrics || []).map(function (m) { return m; });
-          out.appendChild(VACO.card(values.app, [
-            VACO.table([
-              { key: 'metric', label: 'Metric' },
-              { key: 'count', label: 'Events', num: true },
-              { key: 'sum', label: 'Sum', num: true },
-              { key: 'latest', label: 'Latest', num: true },
-            ], rows, { empty: 'Nothing ingested for that app.' }),
-          ]));
-          VACO.mount(body, out);
-        });
-      }, 'Load'),
+  // **This was already broken.** `GET /api/metrics/:app/summary` requires
+  // a `?metric=` query parameter (`server.js`: `if (!metric) return
+  // res.status(400)...`) and answers with one metric's real summary
+  // object — `{app, metric, count, sum, avg, min, max, latest}` — never
+  // a `{metrics: [...]}` list. This form called the route with no metric
+  // at all and then read a field (`s.metrics`) the response never has, so
+  // every real lookup 400'd before the mismatched field could even
+  // matter. Fixed to ask for the metric the route actually requires, and
+  // to read the real returned fields — and, since a summary alone omits
+  // the shape of what happened, paired with its sibling route,
+  // `GET /api/metrics/:app?metric=&limit=`, for the real recent events
+  // (previously the one route of the app's seven with no caller anywhere
+  // in this file; the dashboard's sparklines now also use it, above).
+  out.appendChild(VACO.card('Look up one app + metric', [
+    el('p', 'vaco-small vaco-dim',
+      'The real summary and the most recent raw events for one app’s one metric.'),
+    VACO.form([
+      { name: 'app', label: 'App', placeholder: 'void', width: '140px' },
+      { name: 'metric', label: 'Metric', placeholder: 'jobs_completed', width: '170px' },
+    ], function (values) {
+      var query = '?metric=' + encodeURIComponent(values.metric);
+      return Promise.all([
+        VACO.api('/api/metrics/' + encodeURIComponent(values.app) + '/summary' + query),
+        VACO.api('/api/metrics/' + encodeURIComponent(values.app) + query + '&limit=20'),
+      ]).then(function (results) {
+        var summary = results[0];
+        var history = results[1];
+        while (out.childNodes.length > 2) out.removeChild(out.lastChild);
+        out.appendChild(VACO.card(values.app + ' · ' + values.metric, [
+          VACO.table([
+            { key: 'count', label: 'Events', num: true },
+            { key: 'sum', label: 'Sum', num: true },
+            { key: 'avg', label: 'Avg', num: true },
+            { key: 'min', label: 'Min', num: true },
+            { key: 'max', label: 'Max', num: true },
+            { key: 'latest', label: 'Latest', num: true },
+          ], [summary], { empty: 'Nothing ingested for that app/metric.' }),
+          VACO.table([
+            { label: 'When', render: function (e) { return new Date(e.timestamp).toLocaleString(); } },
+            { key: 'value', label: 'Value', num: true },
+          ], history.events || [], { empty: 'No individual events recorded.' }),
+        ]));
+        VACO.mount(body, out);
+      });
+    }, 'Load'),
   ]));
 
   return VACO.mount(body, out);
