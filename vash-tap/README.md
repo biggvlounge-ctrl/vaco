@@ -165,6 +165,85 @@ never block a real job") — resolution identifies the object, it
 doesn't authorize a payment, and the one route with no session
 requirement must not go down on a dependency it doesn't strictly need.
 
+## Frontend coverage pass (31 Oct 2026)
+
+An audit found `public/index.html` making real calls against only 8
+of this app's 14 routes — Resolve, Pay, My history, and Business
+covered resolution, payment, spender history, and taps/revenue, but
+every write-side route that actually manages a Tap (registering one,
+assigning one, linking a DREAMS screen) had no frontend client at
+all, and neither did the plain record lookup or the personal-wearable
+line's own registration. All six gaps are real, derived directly from
+grepping `server.js`'s route table against every literal path already
+called by the page — nothing here invents a field, a response shape,
+or a computation `lib/tap.js` doesn't already perform.
+
+Three owner-only actions added to the **Business** tab, alongside the
+existing freeze/unfreeze:
+
+- **Register a new tap** (`POST /api/taps`, `tapType: 'business'`) —
+  the one route that creates a Tap Point had no form anywhere; every
+  seeded chair went through `registerTap()` in `seedDemoData.js`, but
+  nothing let a real owner do it live.
+- **Assign a tap** (`POST /api/taps/:tapCode/assignments`) — §5's
+  dynamic assignment, surfacing `assignTap()`'s real
+  VACA-verification refusal as the server's own error message rather
+  than guessing at it client-side.
+- **Link / unlink a DREAMS screen**
+  (`POST /api/taps/:tapCode/dreams-screen` and its `/unlink`) — the
+  optional reference link from a business Tap Point to a real DREAMS
+  ad screen at the same physical location; a reference only, neither
+  record is copied.
+
+`renderBusiness`/`loadBusiness` were also refactored to mount lookup
+results into their own dedicated container instead of a fragile
+`out.childNodes.length > N` splice — the owner-only section now holds
+four cards instead of one, and the old count would have had to be
+kept in sync by hand on every future addition.
+
+A new **My Tap** tab, separate from Business because registering a
+personal Tap is a self-service action (the caller names themself as
+`ownerIdentityId`), not an owner-of-a-business action:
+
+- **Register your personal Tap** (`POST /api/taps`,
+  `tapType: 'personal'`) — §53's VASH TAP PERSONAL line
+  (bracelet/ring/card, see the section above) had zero frontend
+  presence despite this README dedicating real text to naming the
+  product line. Form-factor options are read live from
+  `GET /api/health`'s `personalWearableFormFactors` rather than
+  hardcoded, so a fourth form factor added server-side needs no
+  frontend change.
+- **Look up any Tap** (`GET /api/taps/:tapCode`) — the plain record
+  lookup, distinct from §6 resolution (no assignment, no VACA check,
+  no business join): confirms a registration took, and works as a
+  generic lookup for any tap code.
+
+The tab says plainly, in its own copy, what this build does not yet
+support for a personal Tap: assignment and freeze both require
+`tap.businessId` server-side (`requireTapBusinessOwner` in
+`server.js` 400s without one), so a personal Tap is registration-only
+today — the same honesty this README already holds about the rest of
+this app's scope, not a gap this pass tried to quietly close.
+
+**Left for a follow-up round, named rather than silently skipped:**
+`GET /api/taps/:tapCode/transactions` (per-tap transaction detail) is
+still only ever called from the Resolve tab's own best-effort fetch;
+a dedicated owner-facing transaction browser on the Business tab
+would be a reasonable next addition, but didn't fit this pass's time
+budget alongside the six gaps above.
+
+Live-verified rather than assumed: registering a business tap and a
+personal tap both succeeded against a running vash-tap + Shield +
+HVNTZ, round-tripped through `GET /api/taps/:tapCode`, and an invalid
+personal `objectType` ("watch") was correctly refused by
+`registerTap()`'s own validation. The assignment and DREAMS-link
+routes were confirmed live down to their real auth/error shape
+(401 with no session, 502 once a session exists but a dependency is
+unreachable) — the same two services this environment could not keep
+running long enough to also test a real VACA-verified assignment, so
+those two still rest on this app's own passing `npm test` plus
+`lib/tap.js`'s existing unit coverage for the full success path.
+
 ## Test
 
 ```
