@@ -363,32 +363,116 @@ function renderTwins(body) {
     VACO.api('/api/surfaces').catch(function () { return null; }),
   ]).then(function (r) {
     var twins = r[0].twins || r[0] || [];
+    // Real response fields only — GET /api/twins returns
+    // {agentId, preferredFraming, voiceProfile, embodied}, never a
+    // `displayName` or a live `animationState` (that only exists per
+    // call, in lib/agentCall.js). The table previously asked for both
+    // and silently rendered em dashes for every row.
     out.appendChild(VACO.card('Twins', [
       VACO.table([
         { key: 'agentId', label: 'Agent' },
-        { key: 'displayName', label: 'Name' },
-        { label: 'Animation', render: function (t) { return VACO.badge(t.animationState || 'idle'); } },
+        { key: 'preferredFraming', label: 'Preferred framing' },
+        { key: 'voiceProfile', label: 'Voice' },
+        { label: 'Embodied', render: function (t) { return t.embodied === false ? VACO.badge('background service', 'warn') : VACO.badge('presenter', 'money'); } },
       ], twins, { empty: 'No twins registered.' }),
     ]));
 
+    var statesList = [];
+    var eventsList = [];
     if (r[1]) {
-      var states = r[1].states || r[1] || [];
+      statesList = r[1].states || [];
+      eventsList = r[1].events || [];
       out.appendChild(VACO.card('Animation states', [
         el('p', 'vaco-small vaco-dim', 'The state machine a renderer would drive, if one existed.'),
-        el('p', 'vaco-mono vaco-small', (Array.isArray(states) ? states : Object.keys(states)).join(' · ')),
+        el('p', 'vaco-mono vaco-small', statesList.join(' · ')),
       ]));
     }
 
+    var surfaceIds = [];
     if (r[2]) {
       var surfaces = r[2].surfaces || r[2] || [];
+      surfaceIds = (Array.isArray(surfaces) ? surfaces : []).map(function (s) { return typeof s === 'string' ? s : s.id; });
       out.appendChild(VACO.card('Surfaces', [
         el('p', 'vaco-small vaco-dim', 'Where a twin can appear across the ecosystem.'),
         VACO.table([
           { key: 'id', label: 'Surface', render: function (s) { return typeof s === 'string' ? s : (s.id || s.name); } },
-          { key: 'description', label: 'What it is', render: function (s) { return typeof s === 'string' ? '—' : (s.description || '—'); } },
+          { key: 'label', label: 'Label' },
+          { label: 'Max framing', render: function (s) { return typeof s === 'string' ? '—' : (s.maxFraming || '—'); } },
+          { label: 'Video', render: function (s) { return typeof s === 'string' ? '—' : (s.supportsVideo ? 'yes' : 'no'); } },
         ], Array.isArray(surfaces) ? surfaces : []),
       ]));
     }
+
+    var lookupResult = el('div');
+    out.appendChild(VACO.card('Look up a twin profile', [
+      el('p', 'vaco-small vaco-dim',
+        'Resolving a twin never invents an agent — an id with no explicit profile gets V4’s default '
+        + 'presentation rather than a 404. Try an agent id from the table above, or any other string.'),
+      VACO.form([
+        { name: 'agentId', label: 'Agent id', placeholder: 'qvan', width: '150px' },
+      ], function (values) {
+        return VACO.api('/api/twins/' + encodeURIComponent(values.agentId)).then(function (twin) {
+          VACO.mount(lookupResult, VACO.table([
+            { key: 'agentId', label: 'Agent' },
+            { key: 'preferredFraming', label: 'Preferred framing' },
+            { key: 'voiceProfile', label: 'Voice' },
+            { label: 'Embodied', render: function (t) { return String(t.embodied); } },
+          ], [twin]));
+        });
+      }, 'Look up'),
+      lookupResult,
+    ]));
+
+    var presentationResult = el('div');
+    out.appendChild(VACO.card('Resolve a presentation', [
+      el('p', 'vaco-small vaco-dim',
+        'What a given surface actually lets a twin show — clamped to the surface’s ceiling, and to '
+        + 'audio-only on CarPlay whenever the vehicle is moving (or its motion state is not provided — the '
+        + 'unknown state is treated as moving, not as "no").'),
+      VACO.form([
+        { name: 'agentId', label: 'Agent id', placeholder: 'qvan', width: '110px' },
+        { name: 'surfaceId', label: 'Surface', options: surfaceIds.length ? surfaceIds : ['web'], width: '120px' },
+        { name: 'requestedFraming', label: 'Requested framing',
+          options: ['head-and-shoulders', 'full-body', 'avatar-static', 'none'], width: '150px' },
+        { name: 'vehicleMoving', label: 'Vehicle moving',
+          options: [{ label: 'not provided', value: '' }, { label: 'true', value: 'true' }, { label: 'false', value: 'false' }],
+          width: '120px' },
+      ], function (values) {
+        var body = { surfaceId: values.surfaceId, requestedFraming: values.requestedFraming };
+        if (values.vehicleMoving !== '') body.vehicleMoving = values.vehicleMoving === 'true';
+        return VACO.post('/api/twins/' + encodeURIComponent(values.agentId) + '/presentation', body).then(function (p) {
+          VACO.mount(presentationResult, [
+            el('p', 'vaco-small',
+              'Framing: ' + p.framing + ' · Video: ' + (p.video ? 'yes' : 'no')
+              + ' · Audio primary: ' + (p.audioPrimary ? 'yes' : 'no') + ' · Interaction: ' + p.interactionModel),
+            el('p', 'vaco-small vaco-dim',
+              (p.degraded ? 'Degraded from requested framing. ' : '')
+              + (p.degradedForSafety ? 'Degraded for driver safety. ' : '')
+              + (p.assumedMoving ? 'Vehicle motion was not provided; assumed moving. ' : '')
+              + (p.notes && p.notes.length ? p.notes.join(' ') : '')),
+          ]);
+        });
+      }, 'Resolve'),
+      presentationResult,
+    ]));
+
+    var advanceResult = el('div');
+    out.appendChild(VACO.card('Drive the animation state machine', [
+      el('p', 'vaco-small vaco-dim',
+        'A real state machine, not a list of names — an illegal transition (e.g. "absent" straight to '
+        + '"speaking") is refused rather than silently clamped.'),
+      VACO.form([
+        { name: 'currentState', label: 'Current state', options: statesList.length ? statesList : ['absent'], width: '140px' },
+        { name: 'event', label: 'Event', options: eventsList.length ? eventsList : ['call-connected'], width: '200px' },
+      ], function (values) {
+        return VACO.post('/api/twins/animation/advance', values).then(function (step) {
+          VACO.mount(advanceResult, el('p', 'vaco-small',
+            step.previousState + ' → ' + step.state + ' (clip: ' + (step.clip || 'none') + (step.changed ? '' : ', unchanged') + ')'));
+        });
+      }, 'Advance'),
+      advanceResult,
+    ]));
+
     VACO.mount(body, out);
   });
 }
