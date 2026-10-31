@@ -34,10 +34,15 @@
 <script src="/vaco-ui.js"></script>
 <script>
 // Vavlt Stvdios — multi-channel streaming, the IG-style content layer,
-// and the eight-screen interactive session.
+// the eight-screen interactive session, casino events, and the
+// referral/growth mechanic.
 //
-// Real client of its own 57 routes. Grouping rules, tip splits, and
-// session state are server-side.
+// A real client of the great majority of this app's own routes --
+// see README.md's own "Frontend coverage pass" for the tab-by-tab
+// breakdown of what each one calls and what deliberately stays
+// backend-only. Grouping rules, tip splits, and session state are
+// all server-side; nothing here fabricates a payload shape that
+// wasn't checked against server.js and its lib/*.js handler first.
 
 var el = VACO.el;
 
