@@ -59,6 +59,14 @@ function appCard(app) {
   ], { trailing: statusBadge(app) });
 }
 
+function selfHealthCard(health) {
+  var count = health.subAppCount;
+  return VACO.card('Vex Trading itself', [
+    el('p', 'app-note', 'Service "' + health.service + '" · ' + count
+      + ' sub-app' + (count === 1 ? '' : 's') + ' registered in this shell’s own registry.'),
+  ], { trailing: VACO.badge(health.ok ? 'Shell up' : 'Shell down', health.ok ? 'money' : 'danger') });
+}
+
 function renderApps(body) {
   var out = el('div', 'vaco-stack');
   out.appendChild(VACO.notice(
@@ -67,8 +75,13 @@ function renderApps(body) {
     + '<strong>Vex Business</strong> is the internal futures-research platform — its live-trading '
     + 'interlock is disabled by default and is never bypassed from here.', 'warn'));
 
-  return VACO.api('/api/apps').then(function (data) {
-    out.appendChild(VACO.grid(data.apps.map(appCard)));
+  // The shell has its own /api/health too, distinct from each sub-app's
+  // probed reachability below -- this is "is the launcher itself up",
+  // not "are the apps it points at up". Fetched alongside /api/apps
+  // rather than in series, since neither depends on the other.
+  return Promise.all([VACO.api('/api/health'), VACO.api('/api/apps')]).then(function (results) {
+    out.appendChild(selfHealthCard(results[0]));
+    out.appendChild(VACO.grid(results[1].apps.map(appCard)));
     return VACO.mount(body, out);
   });
 }

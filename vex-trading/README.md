@@ -49,6 +49,21 @@ curl http://localhost:8817/api/apps
   showing the real live up/down status and a link out to the sub-app's
   actual UI.
 
+## Frontend coverage pass (31 Oct 2026)
+An audit found this app's three real routes (`/api/health`,
+`/api/apps`, `/api/apps/:id`) with only two of them called from
+`public/index.html` — the Apps tab already drove `/api/apps` and the
+Detail tab already drove `/api/apps/:id`, but nothing on the page ever
+called the shell's own `/api/health`. Closed that one real gap rather
+than inventing a tab for it: the Apps tab now fetches `/api/health`
+alongside `/api/apps` (`Promise.all`, since neither call depends on
+the other) and renders a small "Vex Trading itself" card above the
+sub-app grid, showing exactly the fields the handler returns —
+`service`, `subAppCount`, and an up/down badge off `ok` — so the page
+also answers "is the launcher itself up," not just "are the two apps
+it points at up." Nothing invented: no price, fill, or settlement
+data appears anywhere on this page, because this app has none to show.
+
 ## Live-verified
 Booted `vex` (up) and `vex-trading` together with `vex-business`'s API
 deliberately still down: `GET /api/apps` correctly reported VEX
