@@ -305,11 +305,67 @@ function joinScreenSession(session, host) {
     .then(function (join) { VACO.mount(host, VACO.joinPanel(join)); });
 }
 
+// Managing an existing session's screens: `addScreenToSession` enforces
+// a broadcaster session's channels must be the session's own owner, but
+// a viewer session has no such constraint -- combining channels across
+// unrelated owners is the entire MultiTwitch/ViewGrid gap this closes.
+// So the real pool to add from differs by `sessionType`: the owner's
+// own channels for a broadcaster session, any currently-live channel
+// for a viewer session.
+function renderSessionManage(session, userId, host) {
+  VACO.mount(host, el('p', 'vaco-small vaco-dim', 'Loading…'));
+  var poolCall = session.sessionType === 'broadcaster'
+    ? VACO.api('/api/owners/' + encodeURIComponent(userId) + '/channels')
+    : VACO.api('/api/channels/live');
+
+  return Promise.all([VACO.api('/api/screen-sessions/' + session.id), poolCall]).then(function (results) {
+    var detail = results[0];
+    var pool = results[1].channels || [];
+    var wrap = el('div', 'vaco-stack-sm');
+
+    wrap.appendChild(VACO.table([
+      { key: 'id', label: 'Channel' },
+      { key: 'name', label: 'Name' },
+      { key: 'ownerId', label: 'Owner' },
+      { label: '', render: function (c) {
+        return VACO.button('Remove', function () {
+          return VACO.del('/api/screen-sessions/' + session.id + '/screens/' + c.id)
+            .then(function () { VACO.toast('Screen removed.'); return renderSessionManage(session, userId, host); });
+        }, 'sm');
+      } },
+    ], (detail.screens || []).filter(Boolean), { empty: 'No screens in this session.' }));
+
+    var included = detail.channelIds || [];
+    var addable = pool.filter(function (c) { return included.indexOf(c.id) === -1; });
+    if (addable.length && included.length < 8) {
+      var row = el('div', 'vaco-row-tight');
+      var select = el('select', 'vaco-select');
+      addable.forEach(function (c) {
+        var opt = el('option', null, (c.name || ('Channel ' + c.id)) + ' — ' + c.ownerId);
+        opt.value = c.id;
+        select.appendChild(opt);
+      });
+      row.appendChild(select);
+      row.appendChild(VACO.button('Add screen', function () {
+        return VACO.post('/api/screen-sessions/' + session.id + '/screens', { channelId: Number(select.value) })
+          .then(function () { VACO.toast('Screen added.'); return renderSessionManage(session, userId, host); });
+      }, 'sm'));
+      wrap.appendChild(row);
+    } else if (!addable.length) {
+      wrap.appendChild(el('p', 'vaco-small vaco-dim',
+        session.sessionType === 'broadcaster' ? 'No more of your own channels to add.' : 'No other live channels to add right now.'));
+    }
+    VACO.mount(host, wrap);
+  });
+}
+
 function renderSessions(body) {
   var userId = VACO.userId();
   var out = el('div', 'vaco-stack');
   out.appendChild(VACO.notice(
-    'Bundle 1-8 of your own channels into a real screen session and join it. '
+    'Bundle 1-8 channels into a real screen session and join it. A <strong>broadcaster</strong> session must use '
+    + 'only your own channels (e.g. one venue\'s 8 camera angles); a <strong>viewer</strong> session freely mixes '
+    + 'any live channels from any owners into your own personal multi-view -- the real MultiTwitch/ViewGrid gap. '
     + 'The session and join credential are real; whether a feed actually connects '
     + 'depends on a live-media transport this ecosystem has not configured yet.', 'warn'));
 
@@ -321,12 +377,20 @@ function renderSessions(body) {
   var picker = el('div', 'vaco-stack-sm');
   var checkboxes = [];
   var createHost = el('div', 'vaco-stack-sm');
+  var sessionType = 'broadcaster';
 
-  return VACO.api('/api/owners/' + encodeURIComponent(userId) + '/channels').then(function (data) {
-    var channels = data.channels || [];
-    if (!channels.length) {
-      picker.appendChild(el('div', 'vaco-empty', 'You have no channels yet — create one first.'));
-    } else {
+  function loadPicker() {
+    VACO.clear(picker);
+    checkboxes = [];
+    var poolCall = sessionType === 'broadcaster'
+      ? VACO.api('/api/owners/' + encodeURIComponent(userId) + '/channels')
+      : VACO.api('/api/channels/live');
+    return poolCall.then(function (data) {
+      var channels = data.channels || [];
+      if (!channels.length) {
+        picker.appendChild(el('div', 'vaco-empty', sessionType === 'broadcaster' ? 'You have no channels yet — create one on the Channels tab first.' : 'No channels are live right now.'));
+        return;
+      }
       channels.forEach(function (c) {
         var row = el('label', 'vaco-row-tight');
         var box = el('input', null);
@@ -334,35 +398,53 @@ function renderSessions(body) {
         box.value = c.id;
         checkboxes.push(box);
         row.appendChild(box);
-        row.appendChild(el('span', 'vaco-small', c.name || ('Channel ' + c.id)));
+        row.appendChild(el('span', 'vaco-small', (c.name || ('Channel ' + c.id)) + (sessionType === 'viewer' ? ' — ' + c.ownerId : '')));
         picker.appendChild(row);
       });
-      picker.appendChild(VACO.button('Create session', function () {
-        var channelIds = checkboxes.filter(function (b) { return b.checked; }).map(function (b) { return Number(b.value); });
-        if (!channelIds.length) throw new Error('Pick at least one channel.');
-        return VACO.post('/api/screen-sessions', {
-          ownerId: userId, sessionType: 'broadcaster', channelIds: channelIds,
-        }).then(function (session) {
-          VACO.toast('Screen session ' + session.id + ' created.');
-          joinScreenSession(session, createHost);
-        });
-      }));
-    }
-    out.appendChild(VACO.card('New session', [picker, createHost]));
+    });
+  }
 
+  var typeRow = el('div', 'vaco-row-tight');
+  var typeSelect = el('select', 'vaco-select');
+  [{ label: 'Broadcaster (my own channels)', value: 'broadcaster' }, { label: 'Viewer (mix any live channels)', value: 'viewer' }].forEach(function (opt) {
+    var o = el('option', null, opt.label); o.value = opt.value; typeSelect.appendChild(o);
+  });
+  typeSelect.addEventListener('change', function () { sessionType = typeSelect.value; loadPicker(); });
+  typeRow.appendChild(el('span', 'vaco-label', 'Session type'));
+  typeRow.appendChild(typeSelect);
+
+  var createBtn = VACO.button('Create session', function () {
+    var channelIds = checkboxes.filter(function (b) { return b.checked; }).map(function (b) { return Number(b.value); });
+    if (!channelIds.length) throw new Error('Pick at least one channel.');
+    return VACO.post('/api/screen-sessions', {
+      ownerId: userId, sessionType: sessionType, channelIds: channelIds,
+    }).then(function (session) {
+      VACO.toast('Screen session ' + session.id + ' created.');
+      joinScreenSession(session, createHost);
+    });
+  }, 'primary');
+
+  return loadPicker().then(function () {
+    out.appendChild(VACO.card('New session', [typeRow, picker, createBtn, createHost]));
     return VACO.api('/api/owners/' + encodeURIComponent(userId) + '/screen-sessions').catch(function () { return null; });
   }).then(function (existing) {
     var sessions = (existing && (existing.sessions || existing.screenSessions || existing)) || [];
     if (sessions.length) {
+      var manageHost = el('div', 'vaco-stack-sm');
       // No stored session here carries a joinable credential — vaco-media
       // issues one fresh at creation, not a reusable one kept on the
-      // record — so this list is real history, not a "Join" surface.
+      // record — so this list is real history plus real screen
+      // management (add/remove), not a "Join" surface.
       out.appendChild(VACO.card('Your past sessions', [
         VACO.table([
           { key: 'id', label: 'Id' },
           { key: 'sessionType', label: 'Type' },
           { label: 'Screens', render: function (s) { return (s.channelIds || []).length; } },
+          { label: '', render: function (s) {
+            return VACO.button('Manage', function () { return renderSessionManage(s, userId, manageHost); }, 'sm');
+          } },
         ], sessions, { empty: 'No sessions yet.' }),
+        manageHost,
       ]));
     }
     VACO.mount(body, out);
