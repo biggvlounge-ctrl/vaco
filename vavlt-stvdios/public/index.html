@@ -819,6 +819,240 @@ function renderVideos(body) {
   });
 }
 
+// -- Studio (post, notes, highlights, tiers, profile card) --------------
+//
+// The whole creator-tool side of the IG layer had no frontend at all:
+// posting content, adding a Note, bundling a highlight, pricing a
+// subscription tier (and subscribing to someone else's), and the
+// profile-card upsert. Closes:
+//
+//   POST /api/posts
+//   POST /api/posts/:id/notes
+//   POST /api/highlights
+//   POST /api/tiers
+//   GET  /api/creators/:creatorId/tiers
+//   POST /api/tiers/:id/subscribe
+//   POST /api/profile-cards
+//   GET  /api/profile-cards/:userId
+
+function renderProfileCard(card, host) {
+  var wrap = el('div', 'vaco-stack-sm');
+  if (card.photoUrl) {
+    var img = el('img', null);
+    img.src = card.photoUrl;
+    img.style.width = '96px';
+    img.style.borderRadius = 'var(--vaco-radius-sm)';
+    wrap.appendChild(img);
+  }
+  if (card.bio) wrap.appendChild(el('p', 'vaco-small vaco-dim', card.bio));
+  wrap.appendChild(el('p', 'vaco-small', 'QR: ' + card.qrCodeUrl));
+  VACO.mount(host, wrap);
+}
+
+function renderStudio(body) {
+  var userId = VACO.userId();
+  var out = el('div', 'vaco-stack');
+  if (!userId) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to create content, tiers, and your profile card.'));
+    return VACO.mount(body, out);
+  }
+
+  out.appendChild(VACO.card('Post content', [
+    el('p', 'vaco-small vaco-dim',
+      'Photo/Reel need a Media URL; Carousel needs 1-20 comma-separated Media URLs; '
+      + 'a Reel needs a duration under 20 minutes (1200s). Give a tier id to post it locked.'),
+    VACO.form([
+      { name: 'postType', label: 'Type', options: [
+        { label: 'Photo', value: 'photo' }, { label: 'Reel', value: 'reel' }, { label: 'Carousel', value: 'carousel' },
+      ] },
+      { name: 'mediaUrl', label: 'Media URL', placeholder: 'https://… (photo/reel)', width: '190px' },
+      { name: 'mediaUrls', label: 'Media URLs', placeholder: 'comma-separated (carousel)', width: '190px' },
+      { name: 'durationSeconds', label: 'Duration (s)', type: 'number', width: '100px' },
+      { name: 'caption', label: 'Caption', placeholder: 'optional', width: '160px' },
+      { name: 'isStory', label: 'Story?', options: [{ label: 'No', value: '' }, { label: 'Yes', value: 'yes' }] },
+      { name: 'requiredTierId', label: 'Locked — tier id', type: 'number', placeholder: 'optional', width: '110px' },
+    ], function (values) {
+      var payload = { authorId: userId, postType: values.postType, caption: values.caption || '', isStory: values.isStory === 'yes' };
+      if (values.postType === 'carousel') {
+        payload.mediaUrls = String(values.mediaUrls || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+      } else {
+        payload.mediaUrl = values.mediaUrl;
+        if (values.postType === 'reel') payload.durationSeconds = values.durationSeconds;
+      }
+      if (values.requiredTierId) { payload.isLocked = true; payload.requiredTierId = values.requiredTierId; }
+      return VACO.post('/api/posts', payload).then(function (post) {
+        VACO.toast('Posted — id ' + post.id + '.');
+      });
+    }, 'Post'),
+  ]));
+
+  out.appendChild(VACO.card('Add a note to one of your posts', [
+    el('p', 'vaco-small vaco-dim', 'A real 60-character status on a post, visible for 3 days.'),
+    VACO.form([
+      { name: 'postId', label: 'Post id', type: 'number', width: '90px' },
+      { name: 'text', label: 'Note', placeholder: 'up to 60 characters', width: '200px' },
+    ], function (values) {
+      return VACO.post('/api/posts/' + values.postId + '/notes', { authorId: userId, text: values.text }).then(function () {
+        VACO.toast('Note added.');
+      });
+    }, 'Add note'),
+  ]));
+
+  out.appendChild(VACO.card('Create a highlight', [
+    el('p', 'vaco-small vaco-dim', 'Bundle your own story posts into a named, non-expiring highlight.'),
+    VACO.form([
+      { name: 'title', label: 'Title', placeholder: 'e.g. Behind the Bar', width: '150px' },
+      { name: 'storyPostIds', label: 'Story post ids', placeholder: 'comma-separated', width: '170px' },
+    ], function (values) {
+      var ids = String(values.storyPostIds || '').split(',')
+        .map(function (s) { return Number(s.trim()); }).filter(function (n) { return Number.isFinite(n); });
+      return VACO.post('/api/highlights', { authorId: userId, title: values.title, storyPostIds: ids }).then(function () {
+        VACO.toast('Highlight created.');
+      });
+    }, 'Create'),
+  ]));
+
+  var tiersHost = el('div', 'vaco-stack-sm');
+  function loadTiers() {
+    return VACO.api('/api/creators/' + encodeURIComponent(userId) + '/tiers').then(function (data) {
+      VACO.mount(tiersHost, VACO.table([
+        { key: 'id', label: 'Id' },
+        { key: 'tierName', label: 'Tier' },
+        { key: 'priceVCoin', label: 'Price', num: true },
+        { label: 'Subscribers', render: function (t) { return (t.subscribers || []).length; } },
+      ], data.tiers || [], { empty: 'No tiers yet.' }));
+    });
+  }
+  out.appendChild(VACO.card('Your subscription tiers', [
+    el('p', 'vaco-small vaco-dim', 'The real 80/20 creator/platform split applies whenever someone subscribes.'),
+    VACO.form([
+      { name: 'tierName', label: 'Tier name', placeholder: 'e.g. VIP', width: '130px' },
+      { name: 'priceVCoin', label: 'Price (VCoin)', type: 'number', width: '110px' },
+      { name: 'benefits', label: 'Benefits', placeholder: 'comma-separated, optional', width: '190px' },
+    ], function (values) {
+      var benefits = values.benefits
+        ? String(values.benefits).split(',').map(function (s) { return s.trim(); }).filter(Boolean) : [];
+      return VACO.post('/api/tiers', {
+        creatorId: userId, tierName: values.tierName, priceVCoin: values.priceVCoin, benefits: benefits,
+      }).then(function () { VACO.toast('Tier created.'); return loadTiers(); });
+    }, 'Create tier'),
+    tiersHost,
+  ]));
+
+  out.appendChild(VACO.card('Subscribe to a tier', [
+    el('p', 'vaco-small vaco-dim', 'Enter someone else\'s (or your own creator page\'s) tier id to subscribe.'),
+    VACO.form([
+      { name: 'tierId', label: 'Tier id', type: 'number', width: '90px' },
+    ], function (values) {
+      return VACO.post('/api/tiers/' + values.tierId + '/subscribe', { userId: userId }).then(function (result) {
+        VACO.toast('Subscribed — ' + result.creatorShare + ' to the creator, ' + result.platformShare + ' to the platform.', 'money');
+        VACO.refreshBalances().then(VACO.renderIdentity);
+      });
+    }, 'Subscribe'),
+  ]));
+
+  var cardHost = el('div', 'vaco-stack-sm');
+  out.appendChild(VACO.card('Your profile card', [
+    VACO.form([
+      { name: 'photoUrl', label: 'Photo URL', placeholder: 'optional', width: '170px' },
+      { name: 'bio', label: 'Bio', placeholder: 'optional', width: '190px' },
+      { name: 'links', label: 'Links', placeholder: 'comma-separated URLs, optional', width: '190px' },
+    ], function (values) {
+      var links = values.links ? String(values.links).split(',').map(function (s) { return s.trim(); }).filter(Boolean) : [];
+      return VACO.post('/api/profile-cards', {
+        userId: userId, photoUrl: values.photoUrl || null, bio: values.bio || '', links: links,
+      }).then(function (card) { VACO.toast('Profile card saved.'); renderProfileCard(card, cardHost); });
+    }, 'Save'),
+    cardHost,
+  ]));
+
+  return loadTiers().then(function () {
+    return VACO.api('/api/profile-cards/' + encodeURIComponent(userId)).catch(function () { return null; });
+  }).then(function (card) {
+    if (card) renderProfileCard(card, cardHost);
+    VACO.mount(body, out);
+  });
+}
+
+// -- Growth (referrals & spin-to-win) -----------------------------------
+//
+// A real Temu-style referral mechanic (escalating tiers, a progress
+// bar, a provably-fair spin) had zero frontend at all. Closes:
+//
+//   POST /api/referrals
+//   GET  /api/referrals/:userId/progress
+//   POST /api/referrals/:userId/spin
+
+function renderGrowth(body) {
+  var userId = VACO.userId();
+  var out = el('div', 'vaco-stack');
+  if (!userId) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to track referrals and spin.'));
+    return VACO.mount(body, out);
+  }
+
+  out.appendChild(VACO.notice(
+    'Invite someone — once they\'re recorded as your referral it counts toward escalating tiers at 1/3/5/10 '
+    + 'referrals, each paying a real VCoin bonus and banking real spins.', 'warn'));
+
+  out.appendChild(VACO.card('Record a referral', [
+    VACO.form([
+      { name: 'refereeId', label: 'Referee user id', placeholder: 'who you invited', width: '190px' },
+    ], function (values) {
+      return VACO.post('/api/referrals', { referrerId: userId, refereeId: values.refereeId }).then(function (result) {
+        if (result.tierReached) {
+          VACO.toast('Tier ' + result.tierReached.threshold + ' reached! +' + result.tierReached.bonusVCoin + ' VCoin.', 'money');
+          VACO.refreshBalances().then(VACO.renderIdentity);
+        } else {
+          VACO.toast('Referral recorded.');
+        }
+        VACO.render();
+      });
+    }, 'Record'),
+  ]));
+
+  return VACO.api('/api/referrals/' + encodeURIComponent(userId) + '/progress').then(function (progress) {
+    var bar = el('div', 'vaco-stack-sm');
+    bar.appendChild(el('p', 'vaco-small vaco-dim',
+      progress.referralCount + ' referral' + (progress.referralCount === 1 ? '' : 's')
+      + (progress.nextTierThreshold
+        ? (' — ' + progress.referralsUntilNextTier + ' more to the next tier (' + progress.nextTierThreshold + ')')
+        : ' — every tier reached')));
+
+    var track = el('div');
+    track.style.height = '8px';
+    track.style.background = 'var(--vaco-bg-raised)';
+    track.style.borderRadius = 'var(--vaco-radius-pill)';
+    track.style.overflow = 'hidden';
+    track.style.width = '100%';
+    var fill = el('div');
+    fill.style.height = '100%';
+    fill.style.width = progress.progressPercent + '%';
+    fill.style.background = 'var(--vaco-accent)';
+    track.appendChild(fill);
+    bar.appendChild(track);
+
+    bar.appendChild(el('p', 'vaco-small vaco-dim',
+      progress.spinsAvailable + ' spin' + (progress.spinsAvailable === 1 ? '' : 's') + ' available'));
+
+    var spinHost = el('div', 'vaco-stack-sm');
+    if (progress.spinsAvailable > 0) {
+      bar.appendChild(VACO.button('Spin to win', function () {
+        var clientSeed = 'web-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+        return VACO.post('/api/referrals/' + encodeURIComponent(userId) + '/spin', { clientSeed: clientSeed }).then(function (spin) {
+          VACO.mount(spinHost, el('p', 'vaco-small', 'You won: ' + spin.prizeLabel + ' (provably-fair verified: ' + spin.verified + ')'));
+          if (spin.vcoinWon > 0) VACO.refreshBalances().then(VACO.renderIdentity);
+          VACO.render();
+        });
+      }, 'primary'));
+    }
+    bar.appendChild(spinHost);
+
+    out.appendChild(VACO.card('Your progress', [bar]));
+    VACO.mount(body, out);
+  });
+}
+
 VACO.app({
   id: 'vavlt-stvdios',
   name: 'Vavlt Stvdios',
@@ -837,6 +1071,8 @@ VACO.app({
     { id: 'feed', label: 'Feed', heading: 'Content', render: renderFeed },
     { id: 'discover', label: 'Discover', heading: 'Stories, Reels, creators & places', render: renderDiscover },
     { id: 'videos', label: 'Videos', heading: 'On-demand, long-form', render: renderVideos },
+    { id: 'studio', label: 'Studio', heading: 'Post, tiers & your profile card', render: renderStudio },
+    { id: 'growth', label: 'Growth', heading: 'Referrals & spin-to-win', render: renderGrowth },
   ],
 });
 </script>
