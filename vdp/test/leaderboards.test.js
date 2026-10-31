@@ -5,7 +5,8 @@ import assert from 'node:assert/strict';
 
 import {
   createLeaderboardsStore, recordFor, recordMatchResult, winRate,
-  disciplineLeaders, leagueLeaders,
+  disciplineLeaders, leagueLeaders, opponentCount, knockouts, finishes,
+  ratingLeaders, risingLeaders,
 } from '../src/lib/leaderboards.js';
 import { createMatch, startMatch, recordResult } from '../src/lib/combatSports.js';
 
@@ -98,4 +99,95 @@ test('disciplineLeaders/leagueLeaders respect a real limit', () => {
   }
   assert.equal(disciplineLeaders(store, 'boxing', { limit: 5 }).length, 5);
   assert.equal(leagueLeaders(store, { limit: 3 }).length, 3);
+});
+
+test('recordMatchResult with a method credits winsByMethod, and knockouts/finishes read it', () => {
+  const store = createLeaderboardsStore();
+  const match = finishedMatch({ matchId: 'm1', sport: 'boxing', participantIds: ['alice', 'bob'], winnerIds: ['alice'] });
+  recordMatchResult(store, match, { method: 'stoppage' });
+  const alice = recordFor(store, 'alice');
+  assert.deepEqual(alice.winsByMethod, { stoppage: 1 });
+  assert.equal(knockouts(alice), 1);
+  assert.equal(finishes(alice), 1);
+
+  const bob = recordFor(store, 'bob');
+  assert.deepEqual(bob.winsByMethod, {}, 'a loser is credited no method');
+  assert.equal(knockouts(bob), 0);
+});
+
+test('a plain decision (no method given) never counts as a finish', () => {
+  const store = createLeaderboardsStore();
+  recordMatchResult(store, finishedMatch({ matchId: 'm1', sport: 'boxing', participantIds: ['alice', 'bob'], winnerIds: ['alice'] }));
+  const alice = recordFor(store, 'alice');
+  assert.deepEqual(alice.winsByMethod, { decision: 1 });
+  assert.equal(finishes(alice), 0);
+});
+
+test('opponentCount tracks real distinct opponents faced, win or lose', () => {
+  const store = createLeaderboardsStore();
+  recordMatchResult(store, finishedMatch({ matchId: 'm1', sport: 'boxing', participantIds: ['alice', 'bob'], winnerIds: ['alice'] }));
+  recordMatchResult(store, finishedMatch({ matchId: 'm2', sport: 'boxing', participantIds: ['alice', 'bob'], winnerIds: ['bob'] }));
+  recordMatchResult(store, finishedMatch({ matchId: 'm3', sport: 'boxing', participantIds: ['alice', 'carol'], winnerIds: ['alice'] }));
+  assert.equal(opponentCount(recordFor(store, 'alice')), 2, 'alice has faced bob and carol');
+});
+
+test('a 1v1 win moves Elo rating by exactly the textbook pairwise amount', () => {
+  const store = createLeaderboardsStore();
+  recordMatchResult(store, finishedMatch({ matchId: 'm1', sport: 'boxing', participantIds: ['alice', 'bob'], winnerIds: ['alice'] }));
+  const alice = recordFor(store, 'alice');
+  const bob = recordFor(store, 'bob');
+  // Equal starting ratings (1000 each): expected score is exactly 0.5
+  // for both, so K=32 moves the winner up and the loser down by
+  // exactly 16, the real textbook result for two equally-rated
+  // players.
+  assert.equal(alice.rating, 1016);
+  assert.equal(bob.rating, 984);
+});
+
+test('a big underdog upset moves rating more than a win over an equal opponent', () => {
+  const store = createLeaderboardsStore();
+  // Give carol a real rating edge over dave first.
+  for (let i = 0; i < 6; i += 1) {
+    recordMatchResult(store, finishedMatch({ matchId: `seed${i}`, sport: 'boxing', participantIds: ['carol', 'dave'], winnerIds: ['carol'] }));
+  }
+  const carolBefore = recordFor(store, 'carol').rating;
+  // dave upsets the now-higher-rated carol.
+  recordMatchResult(store, finishedMatch({ matchId: 'upset', sport: 'boxing', participantIds: ['carol', 'dave'], winnerIds: ['dave'] }));
+  const carolAfter = recordFor(store, 'carol').rating;
+  assert.ok(carolBefore - carolAfter > 16, 'losing to a real underdog costs more than losing to an equal');
+});
+
+test('ratingLeaders ranks by real rating, never an unranked (0-fight) record', () => {
+  const store = createLeaderboardsStore();
+  recordMatchResult(store, finishedMatch({ matchId: 'm1', sport: 'boxing', participantIds: ['alice', 'bob'], winnerIds: ['alice'] }));
+  const leaders = ratingLeaders(store);
+  assert.equal(leaders[0].fighterId, 'alice');
+  assert.ok(leaders[0].rating > leaders[1].rating);
+  assert.equal(leaders.find((l) => l.fighterId === 'ghost'), undefined);
+});
+
+test('risingLeaders surfaces a real recent winning streak ahead of a long-faded one', () => {
+  const store = createLeaderboardsStore();
+  // alice: 3 old wins, then 3 recent losses -- faded.
+  for (let i = 0; i < 3; i += 1) {
+    recordMatchResult(store, finishedMatch({ matchId: `a-win${i}`, sport: 'boxing', participantIds: ['alice', 'punchbag'], winnerIds: ['alice'] }));
+  }
+  for (let i = 0; i < 3; i += 1) {
+    recordMatchResult(store, finishedMatch({ matchId: `a-loss${i}`, sport: 'boxing', participantIds: ['alice', 'punchbag'], winnerIds: ['punchbag'] }));
+  }
+  // bob: 3 recent real wins -- on the come up.
+  for (let i = 0; i < 3; i += 1) {
+    recordMatchResult(store, finishedMatch({ matchId: `b-win${i}`, sport: 'boxing', participantIds: ['bob', 'punchbag2'], winnerIds: ['bob'] }));
+  }
+  const rising = risingLeaders(store, { minFights: 3 });
+  assert.equal(rising[0].fighterId, 'bob');
+  const alice = rising.find((r) => r.fighterId === 'alice');
+  assert.ok(alice.gain < rising[0].gain, 'a fighter who just lost three straight is not on the come up');
+});
+
+test('risingLeaders excludes a fighter below the minimum real fight count', () => {
+  const store = createLeaderboardsStore();
+  recordMatchResult(store, finishedMatch({ matchId: 'm1', sport: 'boxing', participantIds: ['rookie', 'punchbag'], winnerIds: ['rookie'] }));
+  const rising = risingLeaders(store, { minFights: 3 });
+  assert.equal(rising.find((r) => r.fighterId === 'rookie'), undefined);
 });

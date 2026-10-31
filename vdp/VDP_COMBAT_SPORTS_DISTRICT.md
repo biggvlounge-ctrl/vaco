@@ -290,3 +290,192 @@ after the round resolved, not assumed from the formula alone.
   module never calls `combatSports.recordResult`" note above), and
   giving the declared-result path the same training-awareness is real,
   separate work.
+
+## Real statistics and rating -- filed and built 31 Oct 2026
+
+Per direct instruction: "all tribes, organization, users, NPCs should
+all have statistics and rating on their combat, even if it's not in
+professional settings. How many fights, how many wins, how many
+knockouts, how many opponents, how many their rating... on the come
+up, on the rise."
+
+`leaderboards.js` already accumulated wins/losses per discipline and
+across the league. Four real additions, all reading facts a match
+already produces, none invented beyond flagged, retunable defaults:
+
+- **A winning method breakdown** (`winsByMethod`) -- pin/submission/
+  stoppage/forfeit/decision, read straight from `liveWrestling.js`'s
+  own `endedBy` for a live match (the two live-settlement call sites
+  in `server.cjs` now pass it through) or defaulted to `decision` for
+  an operator-declared result with no live engine behind it.
+  `knockouts()` reads `stoppage`; `finishes()` is every win that was
+  not a plain decision.
+- **Real opponents faced** (`opponents`), a distinct count from wins
+  plus losses -- "how many opponents" answered directly rather than
+  approximated.
+- **A real Elo rating** (K=32, starting 1000 -- the real, standard
+  chess/FIDE defaults, not tuned ones). Classic Elo is two-player;
+  `combatSports.js` allows bigger rosters (tag-team, royal-rumble), so
+  the extension here (`teamEloUpdate`) rates each fighter against the
+  *average* rating of the opposing side -- exact textbook Elo whenever
+  both sides have one fighter, a real, bounded extension otherwise
+  (one rating change per fighter regardless of roster size, never nine
+  for a one-sided royal rumble).
+- **"On the come up"** (`risingLeaders`) -- ranked by real rating
+  gained over a real recent window of fights (`ratingLog`, capped at
+  20 entries), read directly rather than an invented momentum score.
+  `window` (5) and `minFights` (3) are flagged, invented defaults.
+
+This module stays generic over what a "fighter" id names, which is
+what lets a tribe, gang, org, or city get the exact same accumulation
+a player already gets -- see Conflicts below.
+
+### Verification
+
+`leaderboards.test.js` grew from 7 to 15 tests (method/finish
+tracking, opponent counts, an exact textbook-Elo assertion for two
+equally-rated fighters, an underdog-upset-moves-more-than-an-even-win
+assertion, `ratingLeaders`, and two `risingLeaders` cases). The
+`teamEloUpdate` function was mutation-verified (zeroed out the
+winners' real rating delta, watched a rating-exactness test go red,
+restored it) per `dev-docs/STANDING_INSTRUCTION_TEST_VERIFICATION.md`.
+
+## Conflicts: disputes and street/turf fights -- filed and built 31 Oct 2026
+
+Per direct instruction: "tribes, organization, gangs, cities,
+cultures, families can choose to fight to settle disputes. And also,
+these things can be done just on turf as well... It could be a 2-on-2,
+a 1-versus-3, 5-versus-5, 10-versus-10. It could be any uneven
+handicap on the streets. No rules, but the same type of things apply.
+And people can also predict on street fights as well... bystanders or
+users can bet on street fights or confrontations or conflicts going
+on in the community as well... they can predict on everything. Will
+there be a fight? Will there be an invasion?"
+
+A new module, `src/lib/conflicts.js` -- deliberately **not**
+`combatSports.js`. That module owns the sanctioned individual career
+ladder, and its own header already records a considered compliance
+decision: street-tier bouts there settle no money, because "an
+unlicensed underground-fight economy is a different compliance object
+than a sanctioned one" (`SETTLING_TIERS` excludes `street`). A dispute
+between two tribes, or a no-rules turf fight with no career or
+referee at stake, is a different real thing again -- an event between
+groups, not a fighter's sanctioned bout -- so it is its own object
+rather than reopening that decision. `combatSports.js` is untouched.
+
+**Mechanic: a real gauntlet, not a new combat engine.** Each side is
+an ordered queue of fighters. The current front fighter of each side
+fights one real duel -- `liveWrestling.js`, the exact same turn-based
+engine two individual players already use, reused via a minimal
+synthetic "match" object (`server.cjs`'s own `syntheticDuelMatch`)
+built from nothing but the four fields that function actually reads.
+The loser is eliminated from their side's queue; the winner stays in
+and faces the other side's next fighter. A side whose queue empties
+has lost the whole conflict -- what makes a 12-versus-8 handicap a
+real, run-able thing instead of a special case: the smaller side
+simply has fewer fighters left to lose. No format/headcount rule
+exists here at all, by design -- "no rules" is the direct instruction,
+and the only real constraints are the ones that make a gauntlet
+well-formed (each side needs at least one fighter, nobody fights for
+both).
+
+**Predictions are open from the moment a conflict exists**, with no
+tier gate at all -- the opposite of `combatSports.js`'s conservative
+default, and a deliberate one: the direct instruction is explicit that
+bystanders should be able to bet on exactly this. `server.cjs`'s
+`/api/conflicts/:id/start` opens a real VAGO market the same way a
+sanctioned match's `/start` route does. A further route,
+`/api/predictions/open`, takes the instruction's own "will there be an
+invasion? will anything be predicted on?" literally: `openVagoMarket`
+already accepts a free-text question with no required link to a
+native object, so this route hands that capability straight through
+for a speculative community event that may not even have a conflict
+object yet.
+
+**Group-level statistics reuse `leaderboards.js`, not a second stat
+system.** `recordConflictResult` credits every individual who fought
+for either side (discipline `conflict:<kind>`, so a tribal dispute
+never mixes into a sanctioned boxing record) and, when both sides name
+a real `groupId` (a tribe/gang/org/city, not an ad hoc street crew),
+the two groups themselves a head-to-head result (discipline
+`conflict:group`) -- the exact same `applyResult` accumulation a
+player already gets, given to a tribe with nothing invented for it.
+
+### War escalation
+
+Per direct instruction (same day): "after so many people are involved
+in a street confrontation, and for so long... once people have took
+injuries, and so many people are involved, and so much of them, it
+could be considered a war between two different factions."
+
+Three real, compounding factors, not one: real injuries (every
+resolved duel is a real loser -- `conflict.log.length` already counts
+this, nothing new to track), real headcount (both sides' starting
+rosters), and real elapsed time since the conflict went live
+(`conflict.startedAt`). All three must hold at once
+(`assessWarEscalation`); the thresholds themselves
+(`WAR_THRESHOLDS` -- 3 injuries, 6 total participants, 10 real
+minutes) are flagged, invented defaults, the one place to retune them.
+
+A war is not a different object: `escalateToWar` just sets
+`conflict.escalation` on the same two-faction conflict, refusing early
+(nothing invents a war that has not crossed the threshold) and late
+(a decided conflict has nothing left to escalate), idempotent once
+already a war. `recordConflictResult` then credits an escalated
+conflict under its own `conflict:war` discipline instead of
+`conflict:<kind>` -- a faction's real war record, separate from its
+ordinary dispute record.
+
+### Server wiring
+
+`server.cjs`: `store.conflicts` (list + id counter) and
+`store.conflictDuels` (the current live duel per conflict, a separate
+namespace from `store.liveWrestling` so a synthetic duel id can never
+collide with a real combat-sports matchId). Routes: `GET /api/conflicts`
+and `/:id`; `POST /api/conflicts` (declare, `requireCallingService`);
+`POST /api/conflicts/:id/start` (opens the first duel + the VAGO
+market); `POST /api/conflicts/:id/duel/move` and `/duel/forfeit`
+(`requireActor('wrestlerId')`, same trust split as sanctioned live
+wrestling -- the raw WebSocket is never trusted for who wins a real
+duel); on a duel resolving, the next pair's duel starts automatically
+if the conflict is still live, or `settleConflictIfFinished` runs
+`recordConflictResult` + a real news event if a side's queue is now
+empty; `POST /api/conflicts/:id/forfeit-side` (a whole side conceding,
+operational); `POST /api/conflicts/:id/escalate`. Two new top-level
+leaderboard routes, `GET /api/leaderboards/rating` and `/rising`,
+registered outside `/api/combat-sports/leaderboards/:sport` on purpose
+so "rating"/"rising" can never be swallowed as a literal sport name by
+that param route. `POST /api/predictions/open` is the fully open-ended
+market route described above.
+
+### Verification
+
+`test/conflicts.test.js` (new, 23 tests) covers side validation,
+uneven handicaps up to a real 12-vs-8, the gauntlet's winner-stays/
+loser-eliminated mechanics, forfeits, prediction eligibility (always
+open while undecided), `recordConflictResult`'s individual and group
+crediting (including the ad-hoc-street-crew no-group case), and the
+full war-escalation conjunction (each factor alone is insufficient,
+idempotency, refusal once decided). Two real logic bugs were
+mutation-verified away per
+`dev-docs/STANDING_INSTRUCTION_TEST_VERIFICATION.md`: swapping which
+side's queue is eliminated on a win (caught by 5 tests going red), and
+loosening the war-threshold conjunction from AND to OR (caught by 2).
+`test/leaderboards.test.js` grew to 15 (see above).
+`test/server.test.js` gained 9 new tests against the real spawned
+server, run end to end through a complete real path with no mocking:
+declare a real 2-vs-1 conflict, start it (opens a real duel), forfeit
+side B, and confirm `recordConflictResult` actually landed in
+`/api/leaderboards/rating` for the winning tribe's own real `groupId`
+-- 903 tests across the full VDP suite, all passing.
+
+**Left for a follow-up round, deliberately:** the duel-by-duel
+`POST .../duel/move` continuation path (each resolved duel
+automatically opening the next one) is exercised directly by
+`conflicts.test.js`'s own `recordDuelResult` tests, but not against a
+live Shield over real HTTP in this round -- the same honest gap
+`live/move`'s own full two-player path has, per that route's existing
+comment ("verified manually... recorded in VDP_COMBAT_SPORTS_
+DISTRICT.md"). A mixed-discipline conflict (boxer side versus wrestler
+side) is not addressed; every duel in a gauntlet still goes through
+`liveWrestling.js` regardless of what the conflict's `kind` says.

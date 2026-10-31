@@ -343,6 +343,7 @@ let store = createVdpStore();
   const combatSportsLib = await import('./src/lib/combatSports.js');
   const liveWrestlingLib = await import('./src/lib/liveWrestling.js');
   const leaderboardsLib = await import('./src/lib/leaderboards.js');
+  const conflictsLib = await import('./src/lib/conflicts.js');
   const teamSportsLib = await import('./src/lib/teamSports.js');
   const teamStandingsLib = await import('./src/lib/teamStandings.js');
   const rankingsLib = await import('./src/lib/rankings.js');
@@ -562,6 +563,16 @@ let store = createVdpStore();
       // overlay on one real `combatSports` match, not its own booking.
       if (!store.liveWrestling) store.liveWrestling = {};
       if (!store.leaderboards) store.leaderboards = leaderboardsLib.createLeaderboardsStore();
+      // `conflicts.js` is deliberately storage-agnostic too, the same
+      // reason every other pure library module in this file gets its
+      // real state homed here rather than inside the module. Each
+      // live conflict's *current duel* is a real `liveWrestling.js`
+      // match, keyed by conflictId on `store.conflictDuels` -- a
+      // separate namespace from `store.liveWrestling` (sanctioned
+      // cards) so a conflict's synthetic one-on-one duel id can never
+      // collide with a real combat-sports matchId.
+      if (!store.conflicts) store.conflicts = { list: [], nextConflictId: 1 };
+      if (!store.conflictDuels) store.conflictDuels = {};
       // `teamSports.js` is deliberately storage-agnostic, the same
       // real reason `combatSports.js`'s own matches live on
       // `store.combatSports` rather than inside that module.
@@ -3123,6 +3134,293 @@ let store = createVdpStore();
   // no further segment the `:sport` route could shadow).
   app.get('/api/combat-sports/leaderboards', (_req, res) => {
     res.json({ leaders: leaderboardsLib.leagueLeaders(store.leaderboards) });
+  });
+
+  // Real rating standing and "on the come up" -- both span every
+  // record `leaderboards.js` holds (sanctioned fighters, conflict
+  // participants, and the tribes/orgs/gangs/cities themselves), so
+  // these live at the top level rather than under `/combat-sports`,
+  // which the two routes above are. Registered under their own path
+  // (not `/api/combat-sports/leaderboards/rating`) specifically so
+  // "rating"/"rising" can never be swallowed by the `:sport` param
+  // route above as a literal sport name.
+  app.get('/api/leaderboards/rating', (_req, res) => {
+    res.json({ leaders: leaderboardsLib.ratingLeaders(store.leaderboards) });
+  });
+  app.get('/api/leaderboards/rising', (_req, res) => {
+    res.json({ leaders: leaderboardsLib.risingLeaders(store.leaderboards) });
+  });
+
+  // -- Conflicts: disputes and street/turf fights -------------------------
+  //
+  // Per direct instruction (31 Oct 2026): "tribes, organization,
+  // gangs, cities, cultures, families can choose to fight to settle
+  // disputes... the same setup applies... in regular street fights...
+  // any uneven handicap... no rules." `conflicts.js` is the referee
+  // for who is fighting and the gauntlet state; this is the one place
+  // its real duels are fed through the exact same `liveWrestling.js`
+  // engine two sanctioned individual fighters already use -- see
+  // `conflicts.js`'s own header on why this is not `combatSports.js`.
+  //
+  // **Why a duel here is a synthetic one-on-one "match."**
+  // `liveWrestling.startLiveMatch` only ever reads four fields off the
+  // object it is handed (`matchId`, `matchFormat`, `status`,
+  // `participantIds`) -- it was built against `combatSports.js`'s real
+  // match shape, but nothing about it is actually coupled to a
+  // sanctioned card existing. Building that same minimal shape here
+  // reuses the exact engine without teaching either module about the
+  // other.
+  function syntheticDuelMatch(conflict, fighterA, fighterB) {
+    return {
+      matchId: `${conflict.conflictId}:round-${conflict.log.length + 1}`,
+      matchFormat: 'one-on-one',
+      status: 'live',
+      participantIds: [fighterA, fighterB],
+    };
+  }
+
+  // The same real "they can get bigger, they can work out" read every
+  // sanctioned live match already does -- a conflict duel trains and
+  // benefits from the exact same Athletics/Combat skills, never a
+  // second attribute system.
+  function attributesFor(fighterIds) {
+    const attributesByWrestler = {};
+    for (const fighterId of fighterIds) {
+      const fighter = ensurePlayer(fighterId);
+      attributesByWrestler[fighterId] = { combat: fighter.skills.Combat, athletics: fighter.skills.Athletics };
+    }
+    return attributesByWrestler;
+  }
+
+  // Every id already committed to a live sanctioned match or another
+  // live conflict duel -- the same "no second fixture list" posture
+  // `combatSports.assertBookable` already takes, extended across both
+  // real sources of a live duel this app now has.
+  function busyParticipantIds() {
+    const busy = new Set();
+    for (const live of store.combatSports.matches) {
+      if (live.status === 'live') for (const p of live.participantIds) busy.add(p);
+    }
+    for (const liveMatch of Object.values(store.liveWrestling)) {
+      if (liveMatch.status === 'live') for (const p of Object.keys(liveMatch.wrestlers)) busy.add(p);
+    }
+    for (const conflict of store.conflicts.list) {
+      if (conflict.status === 'live') {
+        for (const p of conflict.sideA.participantIds) busy.add(p);
+        for (const p of conflict.sideB.participantIds) busy.add(p);
+      }
+    }
+    return [...busy];
+  }
+
+  app.get('/api/conflicts', (_req, res) => {
+    res.json({ conflicts: store.conflicts.list.map(conflictsLib.describeConflict) });
+  });
+
+  app.get('/api/conflicts/:id', (req, res) => {
+    const conflict = store.conflicts.list.find((c) => c.conflictId === req.params.id);
+    if (!conflict) return res.status(404).json({ error: `no conflict ${req.params.id}` });
+    res.json(conflictsLib.describeConflict(conflict));
+  });
+
+  // Declaring a dispute/street fight is operational, the same footing
+  // as booking a sanctioned card -- no single participant books the
+  // whole conflict, a promoter/narrator/game-master does.
+  app.post('/api/conflicts', requireCallingService(), (req, res) => {
+    try {
+      const conflictId = `conflict-${store.conflicts.nextConflictId++}`;
+      const conflict = conflictsLib.createConflict({ ...req.body, conflictId });
+      conflictsLib.assertBookable(conflict, busyParticipantIds());
+      store.conflicts.list.push(conflict);
+      newsLib.recordEvent(store.news, {
+        kind: 'conflict',
+        text: `a real ${conflict.kind} was declared: ${conflict.sideA.label} versus ${conflict.sideB.label}`
+          + (conflict.reason ? ` over ${conflict.reason}` : ''),
+      });
+      res.status(201).json(conflictsLib.describeConflict(conflict));
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // Starting a conflict opens its first real duel and, per direct
+  // instruction ("bystanders or users can bet on street fights or
+  // confrontations or conflicts... predict on everything"), a real
+  // VAGO market -- unlike sanctioned combat sports, with no tier gate
+  // at all (`predictionEligibility` is open the moment a conflict
+  // exists and is not yet decided; see `conflicts.js`'s own header on
+  // why street-tier sports stay ungated here deliberately).
+  app.post('/api/conflicts/:id/start', requireCallingService(), async (req, res) => {
+    const conflict = store.conflicts.list.find((c) => c.conflictId === req.params.id);
+    if (!conflict) return res.status(404).json({ error: `no conflict ${req.params.id}` });
+    try {
+      conflictsLib.startConflict(conflict);
+      const { sideAFighter, sideBFighter } = conflictsLib.currentDuel(conflict);
+      const duelMatch = syntheticDuelMatch(conflict, sideAFighter, sideBFighter);
+      const liveDuel = liveWrestlingLib.startLiveMatch(duelMatch, { attributesByWrestler: attributesFor([sideAFighter, sideBFighter]) });
+      store.conflictDuels[conflict.conflictId] = liveDuel;
+
+      const eligibility = conflictsLib.predictionEligibility(conflict);
+      if (eligibility.eligible) {
+        const market = await openVagoMarket({
+          question: `Will ${conflict.sideA.label} defeat ${conflict.sideB.label} in this ${conflict.kind}`
+            + `${conflict.reason ? ` over ${conflict.reason}` : ''}?`,
+          category: 'conflict',
+          creatorId: jobsLib.PLANETARY_GOVERNORS_PAYROLL,
+        });
+        conflict.vagoMarketId = market ? market.id : null;
+      } else {
+        conflict.vagoMarketId = null;
+      }
+
+      const described = conflictsLib.describeConflict(conflict);
+      broadcast({ type: 'conflict-live-start', conflictId: conflict.conflictId, conflict: described, duel: liveWrestlingLib.describeLiveMatch(liveDuel) });
+      res.status(201).json({ conflict: described, duel: liveWrestlingLib.describeLiveMatch(liveDuel) });
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // Settling the whole conflict once a side's queue is actually
+  // empty -- the group/individual accumulation `leaderboards.js`'s
+  // own `recordConflictResult` already does, called from the one real
+  // place a conflict's outcome becomes known, same seam combat sports
+  // already uses for its own settlement.
+  function settleConflictIfFinished(conflict) {
+    if (conflict.status === 'finished') {
+      leaderboardsLib.recordConflictResult(store.leaderboards, conflict);
+      newsLib.recordEvent(store.news, {
+        kind: 'conflict',
+        text: `${conflict.sideA.label} ${conflict.winningSide === 'A' ? 'defeated' : 'fell to'} ${conflict.sideB.label}`
+          + ` in their ${conflict.escalation ? 'war' : conflict.kind} (${conflict.resolution})`,
+      });
+    }
+  }
+
+  // A move in the *current duel* -- the one real thing an identified
+  // fighter does themselves, the same `requireActor` trust split
+  // every other live-wrestling route already draws (see that route's
+  // own header on why the raw WebSocket is the wrong trust model for
+  // this).
+  app.post('/api/conflicts/:id/duel/move', requireActor('wrestlerId'), (req, res) => {
+    const conflict = store.conflicts.list.find((c) => c.conflictId === req.params.id);
+    if (!conflict) return res.status(404).json({ error: `no conflict ${req.params.id}` });
+    const liveDuel = store.conflictDuels[conflict.conflictId];
+    if (!liveDuel) return res.status(404).json({ error: `no live duel for conflict ${req.params.id}` });
+    try {
+      const { resolved } = liveWrestlingLib.submitMove(liveDuel, req.body.wrestlerId, req.body.move);
+      if (!resolved) {
+        broadcast({ type: 'conflict-move-submitted', conflictId: conflict.conflictId, wrestlerId: req.body.wrestlerId });
+        return res.status(200).json({ conflict: conflictsLib.describeConflict(conflict), duel: liveWrestlingLib.describeLiveMatch(liveDuel) });
+      }
+      broadcast({ type: 'conflict-round', conflictId: conflict.conflictId, duel: liveWrestlingLib.describeLiveMatch(liveDuel) });
+      if (liveDuel.status === 'finished') {
+        conflictsLib.recordDuelResult(conflict, liveDuel.winnerId);
+        delete store.conflictDuels[conflict.conflictId];
+        if (conflict.status === 'live') {
+          // The gauntlet continues -- the next real duel between
+          // whoever is now at the front of each side.
+          const { sideAFighter, sideBFighter } = conflictsLib.currentDuel(conflict);
+          const duelMatch = syntheticDuelMatch(conflict, sideAFighter, sideBFighter);
+          const nextDuel = liveWrestlingLib.startLiveMatch(duelMatch, { attributesByWrestler: attributesFor([sideAFighter, sideBFighter]) });
+          store.conflictDuels[conflict.conflictId] = nextDuel;
+          broadcast({ type: 'conflict-next-duel', conflictId: conflict.conflictId, duel: liveWrestlingLib.describeLiveMatch(nextDuel) });
+        } else {
+          settleConflictIfFinished(conflict);
+          broadcast({ type: 'conflict-over', conflictId: conflict.conflictId, conflict: conflictsLib.describeConflict(conflict) });
+        }
+      }
+      res.status(200).json({ conflict: conflictsLib.describeConflict(conflict), duel: liveWrestlingLib.describeLiveMatch(liveDuel) });
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/conflicts/:id/duel/forfeit', requireActor('wrestlerId'), (req, res) => {
+    const conflict = store.conflicts.list.find((c) => c.conflictId === req.params.id);
+    if (!conflict) return res.status(404).json({ error: `no conflict ${req.params.id}` });
+    const liveDuel = store.conflictDuels[conflict.conflictId];
+    if (!liveDuel) return res.status(404).json({ error: `no live duel for conflict ${req.params.id}` });
+    try {
+      liveWrestlingLib.forfeitMatch(liveDuel, req.body.wrestlerId);
+      conflictsLib.recordDuelResult(conflict, liveDuel.winnerId);
+      delete store.conflictDuels[conflict.conflictId];
+      if (conflict.status === 'live') {
+        const { sideAFighter, sideBFighter } = conflictsLib.currentDuel(conflict);
+        const duelMatch = syntheticDuelMatch(conflict, sideAFighter, sideBFighter);
+        const nextDuel = liveWrestlingLib.startLiveMatch(duelMatch, { attributesByWrestler: attributesFor([sideAFighter, sideBFighter]) });
+        store.conflictDuels[conflict.conflictId] = nextDuel;
+        broadcast({ type: 'conflict-next-duel', conflictId: conflict.conflictId, duel: liveWrestlingLib.describeLiveMatch(nextDuel) });
+      } else {
+        settleConflictIfFinished(conflict);
+        broadcast({ type: 'conflict-over', conflictId: conflict.conflictId, conflict: conflictsLib.describeConflict(conflict) });
+      }
+      res.status(200).json(conflictsLib.describeConflict(conflict));
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // A whole side conceding -- operational, the promoter/narrator's
+  // call, not an individual fighter's (that is `duel/forfeit` above).
+  app.post('/api/conflicts/:id/forfeit-side', requireCallingService(), (req, res) => {
+    const conflict = store.conflicts.list.find((c) => c.conflictId === req.params.id);
+    if (!conflict) return res.status(404).json({ error: `no conflict ${req.params.id}` });
+    try {
+      conflictsLib.forfeitSide(conflict, req.body.sideKey);
+      delete store.conflictDuels[conflict.conflictId];
+      settleConflictIfFinished(conflict);
+      const described = conflictsLib.describeConflict(conflict);
+      broadcast({ type: 'conflict-over', conflictId: conflict.conflictId, conflict: described });
+      res.status(200).json(described);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // Per direct instruction (31 Oct 2026): "it could be considered a
+  // war between two different factions" once real injuries, headcount,
+  // and duration cross the threshold `conflicts.js` checks --
+  // operational, the same footing as declaring the conflict itself.
+  app.post('/api/conflicts/:id/escalate', requireCallingService(), (req, res) => {
+    const conflict = store.conflicts.list.find((c) => c.conflictId === req.params.id);
+    if (!conflict) return res.status(404).json({ error: `no conflict ${req.params.id}` });
+    try {
+      conflictsLib.escalateToWar(conflict);
+      newsLib.recordEvent(store.news, {
+        kind: 'conflict',
+        text: `${conflict.sideA.label} and ${conflict.sideB.label}'s ${conflict.kind} has escalated into open war`,
+      });
+      const described = conflictsLib.describeConflict(conflict);
+      broadcast({ type: 'conflict-escalated', conflictId: conflict.conflictId, conflict: described });
+      res.status(200).json(described);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // A fully open-ended prediction market -- per direct instruction,
+  // "will there be a fight? will there be an invasion? will anything
+  // be predicted on?" `openVagoMarket` already takes a free-text
+  // question with no required link to a native VDP object (every
+  // other call site above hands it one anyway, because there is
+  // always a real match/conflict to ask about) -- this route is the
+  // one place that fact is used directly, for a speculative community
+  // event that may not even have a conflict object yet.
+  app.post('/api/predictions/open', requireCallingService(), async (req, res) => {
+    try {
+      const { question, category = 'community', openingYesPrice } = req.body || {};
+      if (!question || typeof question !== 'string' || !question.trim()) {
+        throw new Error('a prediction needs a real question');
+      }
+      const market = await openVagoMarket({
+        question: question.trim(), category, creatorId: jobsLib.PLANETARY_GOVERNORS_PAYROLL, openingYesPrice,
+      });
+      if (!market) return res.status(502).json({ error: 'VAGO did not open the market' });
+      res.status(201).json(market);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
   });
 
   // --- Team Sports: basketball, football, and any other real team

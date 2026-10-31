@@ -405,3 +405,104 @@ test('live/forfeit with a real bearer token asks Shield -- real 502 when it is u
     { wrestlerId }, { Authorization: 'Bearer some-token' });
   assert.equal(res.status, 502, 'requireActor must ask Shield before a forfeit can ever end a real match');
 });
+
+// -- conflicts: disputes and street/turf fights ----------------------------
+//
+// Declaring/starting/forfeit-side/escalate are all requireCallingService,
+// the same local no-Shield check proven above, so this suite runs a
+// real conflict all the way through settlement. `duel/move` and
+// `duel/forfeit` are requireActor -- same split as live wrestling
+// above, so only their refusal shapes are proven here.
+
+let conflictCounter = 0;
+async function declareConflict(overrides = {}) {
+  conflictCounter += 1;
+  const res = await post('/api/conflicts', {
+    kind: 'dispute', reason: 'turf',
+    sideA: { groupId: `tribe-ashwood-${conflictCounter}`, label: `Ashwood ${conflictCounter}`, participantIds: [`ash1-${conflictCounter}`, `ash2-${conflictCounter}`] },
+    sideB: { groupId: `tribe-redrock-${conflictCounter}`, label: `Redrock ${conflictCounter}`, participantIds: [`red1-${conflictCounter}`] },
+    ...overrides,
+  }, svc);
+  return res.json();
+}
+
+test('POST /api/conflicts is refused without a real service credential', { skip: SKIP }, async () => {
+  const res = await post('/api/conflicts', {
+    kind: 'street-fight', sideA: { participantIds: ['x1'] }, sideB: { participantIds: ['x2'] },
+  });
+  assert.equal(res.status, 401);
+});
+
+test('a conflict allows a real uneven handicap (2 versus 1) and is readable back by id', { skip: SKIP }, async () => {
+  const declared = await declareConflict();
+  assert.equal(declared.sideA.startingCount, 2);
+  assert.equal(declared.sideB.startingCount, 1);
+  assert.equal(declared.status, 'scheduled');
+
+  const read = await (await fetch(`${BASE}/api/conflicts/${declared.conflictId}`)).json();
+  assert.equal(read.conflictId, declared.conflictId);
+});
+
+test('starting a conflict opens its first real duel and lists it in GET /api/conflicts', { skip: SKIP }, async () => {
+  const declared = await declareConflict();
+  const started = await (await post(`/api/conflicts/${declared.conflictId}/start`, {}, svc)).json();
+  assert.equal(started.conflict.status, 'live');
+  assert.ok(started.duel.wrestlers);
+  assert.equal(Object.keys(started.duel.wrestlers).length, 2);
+
+  const list = await (await fetch(`${BASE}/api/conflicts`)).json();
+  assert.ok(list.conflicts.some((c) => c.conflictId === declared.conflictId));
+});
+
+test('duel/move with no credential at all is refused WITHOUT reaching Shield', { skip: SKIP }, async () => {
+  const declared = await declareConflict();
+  await post(`/api/conflicts/${declared.conflictId}/start`, {}, svc);
+  const res = await post(`/api/conflicts/${declared.conflictId}/duel/move`, { wrestlerId: 'any-wrestler', move: 'strike' });
+  assert.equal(res.status, 401);
+});
+
+test('duel/forfeit with a real bearer token asks Shield -- real 502 when it is unreachable', { skip: SKIP }, async () => {
+  const declared = await declareConflict();
+  await post(`/api/conflicts/${declared.conflictId}/start`, {}, svc);
+  const res = await post(`/api/conflicts/${declared.conflictId}/duel/forfeit`,
+    { wrestlerId: 'someone' }, { Authorization: 'Bearer some-token' });
+  assert.equal(res.status, 502, 'requireActor must ask Shield before a forfeit can ever end a real duel');
+});
+
+test('forfeiting a whole side settles the conflict and credits real leaderboard records for every fighter and both groups', { skip: SKIP }, async () => {
+  const declared = await declareConflict();
+  await post(`/api/conflicts/${declared.conflictId}/start`, {}, svc);
+  const settled = await (await post(`/api/conflicts/${declared.conflictId}/forfeit-side`, { sideKey: 'B' }, svc)).json();
+  assert.equal(settled.status, 'finished');
+  assert.equal(settled.winningSide, 'A');
+  assert.equal(settled.resolution, 'forfeit');
+
+  const rating = await (await fetch(`${BASE}/api/leaderboards/rating`)).json();
+  assert.ok(rating.leaders.some((l) => l.fighterId === declared.sideA.groupId), 'the winning tribe itself gets a real rating record');
+});
+
+test('escalate refuses a conflict that has not crossed the real war threshold', { skip: SKIP }, async () => {
+  const declared = await declareConflict();
+  await post(`/api/conflicts/${declared.conflictId}/start`, {}, svc);
+  const res = await post(`/api/conflicts/${declared.conflictId}/escalate`, {}, svc);
+  assert.equal(res.status, 400);
+});
+
+test('GET /api/leaderboards/rising starts empty and never 500s on an empty store', { skip: SKIP }, async () => {
+  // This runs early enough in a fresh suite run that it is a real
+  // smoke test of the route existing and returning a real shape, not
+  // a claim about contents (other tests in this file populate the
+  // store concurrently in a shared server).
+  const res = await fetch(`${BASE}/api/leaderboards/rising`);
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.ok(Array.isArray(body.leaders));
+});
+
+test('POST /api/predictions/open requires a real question and 502s honestly when VAGO is unreachable', { skip: SKIP }, async () => {
+  const missingQuestion = await post('/api/predictions/open', {}, svc);
+  assert.equal(missingQuestion.status, 400);
+
+  const res = await post('/api/predictions/open', { question: 'Will there be an invasion of Redrock?' }, svc);
+  assert.equal(res.status, 502, 'VAGO is not running in this suite -- a real, honest failure, never a fabricated market');
+});
