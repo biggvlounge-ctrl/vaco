@@ -175,6 +175,67 @@ restart. Live-verified: routed a real agent request through the network,
 killed the running process, restarted it, and confirmed the same real state
 came back from a real GET. See `dev-docs/phase-3-real-persistence/`.
 
+## Frontend coverage pass (31 Oct 2026)
+
+An audit found `public/index.html` making real calls against only 4 of
+this app's 7 registered routes — `GET /api/agents`, `POST /api/route`,
+`GET /api/route/history`, and `POST /api/agents/:id/invoke`, each
+cross-checked directly against `server.js` and the `lib/*.js` function
+behind it before anything below was written.
+
+- **Status tab** — `GET /api/health` had no frontend at all. Shows the
+  network's own real liveness (`ok`, `agentCount`, `invocations`) and,
+  honestly, the trusted-service allowlist's current posture straight
+  from `serviceAuth.describe()`: its mode (`off`/`observe`/`enforce`),
+  which service names are allowlisted, and which unauthenticated
+  callers it has actually seen (names and counts only — never a token,
+  because `describe()` itself never returns one). Mirrors Shield's own
+  `kv`/`kv-cell` health-card pattern (`shield/public/index.html`'s
+  `renderContract`) rather than inventing a new one.
+- **Agents tab, full profile** — `GET /api/agents/:id` had no frontend
+  at all; the list view only ever showed a role line. Each card now
+  has a real "Full profile" button that fetches that agent's own
+  single-record route directly (not reused from the list response) and
+  shows its full, untruncated `systemPrompt`.
+
+**Four real bugs fixed along the way**, found by checking the exact
+field names the frontend read against what the route handlers (and
+`lib/orchestrator.js`) actually return — none were gaps in coverage,
+all were already-covered routes silently showing nothing or failing:
+- The Agents tab read `a.represents` for the app badge; the real field
+  on an agent record is `app`. The badge never rendered. Also added
+  the previously-unshown `tier`.
+- The Route tab read `m.matched` for the keywords that caused a match;
+  `routeQuery`'s real return shape names that field `keywords`. The
+  "matched: ..." line — the one piece of UI that makes a deterministic
+  router's own reasoning inspectable instead of a black box — never
+  rendered.
+- The History tab read `h.matchedAgents` for the "Routed to" column; a
+  logged entry (`recordRouting`) actually carries `routedTo` (one agent
+  id) and a `fallback` flag. The column showed "—" for every real row.
+- **Invoke was broken outright.** The button posted `{ query }` to
+  `POST /api/agents/:id/invoke`, which requires a non-empty `messages`
+  array (`[{role, content}]`, the same shape `v4-proxy`'s own
+  `/api/agent` takes). Every click 400'd before the request ever
+  reached `v4-proxy`, and the UI's own catch handler blamed the missing
+  Anthropic key for a failure that was actually a malformed payload.
+  Fixed to send `{ messages: [{ role: 'user', content: <question> }] }`
+  — verified live: the same query now reaches the real 502 from an
+  unreachable `v4-proxy` instead of the old client-side 400.
+
+**Deliberately left backend-only**: `GET /api/agents/invocations`.
+It requires a trusted-service credential (`X-Service-Name` +
+`X-Service-Token`) checked inline against `req.callingService`, by
+design — it names internal callers, which `server.js`'s own comment
+says plainly is not public information. This frontend has no login for
+a service credential (nor should it: embedding one in client-side JS
+would defeat the entire point of the allowlist), so this stays a real,
+unexposed backend capability rather than a fake "admin" UI pretending
+to hold a credential it doesn't have — same posture this session's
+other frontend-coverage passes already took for `requireCallingService`
+/`requireOperator`-gated routes (see `void/README.md`'s own "Frontend
+coverage pass").
+
 ## Not yet built
 - Real LLM-backed routing (MIA's own routing is real but deterministic
   keyword scoring, not a model call — a deliberate choice, not a gap,
