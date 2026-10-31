@@ -48,6 +48,23 @@ function renderAgents(body) {
       // dead code; removed rather than left pretending to do something.
       if (a.app) lines.appendChild(VACO.badge(a.app));
       if (a.tier) lines.appendChild(el('p', 'vaco-small vaco-faint', 'tier: ' + a.tier));
+
+      var detailHost = el('div', 'vaco-stack-sm');
+      lines.appendChild(detailHost);
+      // GET /api/agents/:id -- previously never called from here. The
+      // list above already carries the full record, but this fetches
+      // the single-agent route directly rather than reusing it, so the
+      // route itself is exercised and verified, not just assumed to
+      // match what the list returned.
+      lines.appendChild(VACO.button('Full profile', function () {
+        return VACO.api('/api/agents/' + encodeURIComponent(a.id)).then(function (full) {
+          VACO.mount(detailHost, [
+            el('p', 'vaco-label', 'System prompt'),
+            el('p', 'vaco-small vaco-dim', full.systemPrompt || '—'),
+          ]);
+        });
+      }, 'ghost vaco-btn-sm'));
+
       grid.appendChild(VACO.card(a.name || a.id, [lines]));
     });
     if (!agents.length) return el('div', 'vaco-empty', 'No agents registered.');
