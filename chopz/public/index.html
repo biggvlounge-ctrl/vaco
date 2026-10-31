@@ -78,7 +78,7 @@ function renderFeed(body) {
       var cell = el('div', 'vaco-stack-sm');
       var reel = el('div', 'reel');
       reel.appendChild(el('strong', null, v.creatorId || ''));
-      reel.appendChild(el('span', 'vaco-small', v.caption || ''));
+      reel.appendChild(el('span', 'vaco-small vaco-dim', v.mediaUrl || ''));
       cell.appendChild(reel);
 
       var playerHost = el('div', 'vaco-stack-sm');
@@ -93,9 +93,15 @@ function renderFeed(body) {
         // trusting the tag on the video.
         VACO.post('/chopz/videos/' + v.id + '/verify-linked-product', {})
           .then(function (r) {
-            var ok = r.verified !== undefined ? r.verified : r.valid;
+            // The route returns the real, updated video record itself
+            // (see POST /chopz/videos/:id/verify-linked-product in
+            // server.js) -- `linkedProductVerified` is the field it
+            // actually sets, not `verified`/`valid`.
+            var ok = r.linkedProductVerified === true;
             badge.className = 'vaco-badge ' + (ok ? 'vaco-badge-money' : 'vaco-badge-danger');
-            badge.textContent = ok ? 'product verified' : 'product not found';
+            badge.textContent = ok
+              ? 'product verified' + (r.linkedProductPrice !== undefined ? ' · $' + r.linkedProductPrice : '')
+              : 'product not found';
           })
           .catch(function () { badge.textContent = 'verification unavailable'; });
       } else {
@@ -115,7 +121,7 @@ function renderPost(body) {
       'Tagging a product is checked against CHOPZ SHOP. An id that does not exist there is refused rather than stored.'),
     VACO.form([
       { name: 'creatorId', label: 'Creator', value: VACO.userId() || '', width: '130px' },
-      { name: 'caption', label: 'Caption', placeholder: 'what it is', width: '240px' },
+      { name: 'mediaUrl', label: 'Media URL', placeholder: 'https://cdn/clip.mp4', width: '240px' },
       { name: 'linkedProductId', label: 'Product id', placeholder: 'optional', width: '110px' },
     ], function (values) {
       if (!values.linkedProductId) delete values.linkedProductId;

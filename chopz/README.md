@@ -82,6 +82,50 @@ restart. Live-verified: uploaded a real video, killed the running process,
 restarted it, and confirmed the same real state came back from a real GET.
 See `dev-docs/phase-4-real-persistence/`.
 
+## Frontend coverage pass (31 Oct 2026)
+
+Audited `public/index.html` against every route `server.js` registers.
+Result: 4 of 6 routes were already real frontend clients (`POST
+/chopz/videos`, `GET /chopz/videos`, `POST
+/chopz/videos/:id/verify-linked-product`, `POST
+/chopz/videos/:id/play`, the last from the earlier video-player work).
+The two left uncalled are not a gap: `GET /api/health` is an
+operational check, not a UI surface, and `GET /chopz/videos/:id`
+returns no field the list response (`GET /chopz/videos`) doesn't
+already include, so a separate per-item fetch would add a network
+call with no new data to show. **No new tab was added** — manufacturing
+one here would be coverage theater, not a real gap.
+
+What the audit *did* find, cross-checked against `lib/videos.js` and
+the route handlers directly (never guessed): the two already-wired
+calls were silently broken.
+
+- **The Post form never sent `mediaUrl`.** `createChopzVideo` (see
+  `lib/videos.js`) throws `'createChopzVideo requires a mediaUrl'`
+  when it's missing — so every submission of the Post tab's form was
+  refused with a 400, every time, since it posted a `caption` field
+  instead, which isn't part of the real `ChopzVideo` model and was
+  silently dropped by `createChopzVideo` even when present. Fixed: the
+  form now has a real `Media URL` field wired to the model's actual
+  `mediaUrl`; the fake `caption` field (and the feed's rendering of
+  `v.caption`, a field that never existed on a stored video) is gone,
+  replaced with the real `mediaUrl` on each card.
+- **The verified-product badge checked the wrong field.** `POST
+  /chopz/videos/:id/verify-linked-product` returns the real, updated
+  video record itself (see the route in `server.js` and
+  `verifyLinkedProduct` in `lib/videos.js`), whose real field is
+  `linkedProductVerified` — not `verified` or `valid`, which the
+  frontend was checking and which never exist on that response. So the
+  badge read "product not found" unconditionally, even right after a
+  real, successful verification. Fixed: checks `linkedProductVerified`
+  directly, and now also surfaces the real verified price
+  (`linkedProductPrice`) the verification call stores.
+
+Both bugs were in calls this app already counted as "covered" —
+confirming a route is *called* isn't confirming it *works*; this pass
+checked the actual payload/response shape against the real handler for
+both.
+
 ## Not yet built
 - Everything else TikTok's own feed has beyond a bare video record:
   likes/comments/shares/duets/For You ranking, live shopping formats,
