@@ -285,6 +285,70 @@ function loadBusiness(results, businessId) {
   });
 }
 
+function renderPersonal(body) {
+  var userId = VACO.userId();
+  if (!userId) {
+    return VACO.mount(body, el('div', 'vaco-empty',
+      'Sign in to register your own personal Tap — a wearable or card tied to your own identity, not a business.'));
+  }
+
+  var out = el('div', 'vaco-stack');
+  var results = el('div', 'vaco-stack');
+
+  // GET /api/health — read here for the real, current form-factor
+  // catalog (PERSONAL_WEARABLE_FORM_FACTORS) rather than hardcoding
+  // the three names, so a form factor added to the backend later shows
+  // up here with no frontend change.
+  return VACO.api('/api/health').then(function (health) {
+    var formFactors = health.personalWearableFormFactors || ['bracelet', 'ring', 'card'];
+    out.appendChild(VACO.card('Register your personal Tap', [
+      'VASH TAP PERSONAL — a wearable or card tied to your own identity, no business involved. ' +
+        'Registration-only in this build: no assignment, freeze, or payment lifecycle exists yet for a personal Tap (see the README).',
+      VACO.form([
+        { name: 'objectType', label: 'Form factor', value: formFactors[0], options: formFactors },
+      ], function (values) {
+        return VACO.post('/api/taps', {
+          tapType: 'personal',
+          ownerIdentityId: userId,
+          objectType: values.objectType,
+        }).then(function (tap) {
+          VACO.toast('Registered ' + tap.tapCode, 'money');
+          return loadTapLookup(results, tap.tapCode);
+        });
+      }, 'Register'),
+    ]));
+
+    // GET /api/taps/:tapCode — the plain record lookup, distinct from
+    // §6 resolution: no assignment, no VACA check, no business join,
+    // just the Tap's own stored fields. Doubles as "did my registration
+    // above actually take" and as a generic lookup for any tap code.
+    out.appendChild(VACO.card('Look up any Tap', [
+      VACO.form([{ name: 'tapCode', label: 'Tap code', value: '', width: '140px' }], function (values) {
+        return loadTapLookup(results, values.tapCode);
+      }, 'Look up'),
+    ]));
+
+    out.appendChild(results);
+    results.appendChild(el('div', 'vaco-empty', 'Register above, or enter any Tap code to see its raw record.'));
+    return VACO.mount(body, out);
+  });
+}
+
+function loadTapLookup(results, tapCode) {
+  return VACO.api('/api/taps/' + encodeURIComponent(tapCode))
+    .then(function (tap) {
+      var lines = el('div', 'vaco-stack-sm');
+      lines.appendChild(el('p', 'vaco-small vaco-dim', tap.tapType
+        + (tap.objectType ? ' · ' + tap.objectType : '')
+        + (tap.ownerIdentityId ? ' · owned by ' + tap.ownerIdentityId : '')
+        + (tap.businessId ? ' · business ' + tap.businessId : '')));
+      VACO.mount(results, VACO.card(tap.tapCode, [lines], { trailing: VACO.badge(tap.status) }));
+    })
+    .catch(function (err) {
+      VACO.mount(results, VACO.notice('Could not load ' + VACO.escapeHtml(tapCode) + ': ' + VACO.escapeHtml(err.message), 'danger'));
+    });
+}
+
 VACO.app({
   id: 'vash-tap',
   name: 'VASH TAP',
@@ -302,6 +366,8 @@ VACO.app({
     { id: 'history', label: 'My history', heading: 'Your tap history',
       blurb: 'Every payment you have made through any Tap — complete, yours alone.', render: renderHistory },
     { id: 'business', label: 'Business', heading: 'Business taps & revenue', render: renderBusiness },
+    { id: 'personal', label: 'My Tap', heading: 'Your personal Tap',
+      blurb: 'VASH TAP PERSONAL — a bracelet, ring, or card tied to your own identity, not a business.', render: renderPersonal },
   ],
 });
 </script>
