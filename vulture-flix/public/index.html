@@ -232,6 +232,53 @@ function renderAccount(body) {
   });
 }
 
+// Real client of `GET /api/creators/:creatorId/titles` and
+// `GET /api/creators/:creatorId/view-count` -- neither had any
+// frontend at all. The view-count route exists specifically so VOKEN's
+// cross-platform achievement score can read a creator's real total
+// view count live (see server.js's own comment on that route); this
+// tab is the human-readable counterpart, a creator looking up their
+// own real reach and every title tied to their creatorId -- exclusive,
+// licensed, and studio-produced alike.
+function renderCreators(body) {
+  var out = el('div', 'vaco-stack');
+  var resultHost = el('div', 'vaco-stack');
+
+  out.appendChild(VACO.card('Look up a creator', [
+    VACO.form([{ name: 'creatorId', label: 'Creator ID', placeholder: 'e.g. studio-1' }],
+      function (values) {
+        var creatorId = (values.creatorId || '').trim();
+        if (!creatorId) { VACO.toast('Enter a creator ID.', 'danger'); return undefined; }
+        return Promise.all([
+          VACO.api('/api/creators/' + encodeURIComponent(creatorId) + '/titles'),
+          VACO.api('/api/creators/' + encodeURIComponent(creatorId) + '/view-count'),
+        ]).then(function (r) {
+          var titles = r[0].titles || [];
+          var totalViewCount = r[1].totalViewCount;
+
+          var section = el('div', 'vaco-stack');
+          var viewLine = el('div', 'vaco-row-tight');
+          viewLine.appendChild(VACO.badge(totalViewCount + ' total view' + (totalViewCount === 1 ? '' : 's'), 'accent'));
+          viewLine.appendChild(el('p', 'vaco-small vaco-dim',
+            'Every real watch event across every title with this creatorId — exclusive, licensed, and studio-produced alike.'));
+          section.appendChild(VACO.card(creatorId, [viewLine]));
+
+          section.appendChild(VACO.table([
+            { key: 'title', label: 'Title' },
+            { key: 'type', label: 'Type' },
+            { key: 'acquisitionType', label: 'Acquisition' },
+            { key: 'status', label: 'Status', render: function (t) { return VACO.badge(t.status); } },
+          ], titles, { empty: 'No titles for this creator.' }));
+
+          VACO.mount(resultHost, section);
+        });
+      }, 'Look up'),
+  ]));
+  out.appendChild(resultHost);
+
+  return VACO.mount(body, out);
+}
+
 VACO.app({
   id: 'vulture-flix',
   name: 'Vvltvre Flix',
@@ -246,6 +293,9 @@ VACO.app({
       blurb: 'Exclusive originals sit alongside licensed titles. The distinction is real — they carry different rights and different economics.',
       render: renderCatalog },
     { id: 'account', label: 'Account', heading: 'Subscription & streams', render: renderAccount },
+    { id: 'creators', label: 'Creators', heading: 'Creator reach',
+      blurb: 'Look up a creatorId to see their real total view count and every title tied to them — originals, licensed, and studio-produced alike.',
+      render: renderCreators },
   ],
 });
 </script>
