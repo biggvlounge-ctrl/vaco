@@ -25,8 +25,13 @@
 <script>
 // DREAMS — the ad and screen network.
 //
-// Real client of its own 22 routes. Revenue splits per screen and
-// offline-cache behaviour are server-side.
+// Real client of its own 24 routes -- every route with a legitimate
+// end-user or screen-owner caller. The remaining 7 (GET /api/health,
+// and the service-credential-only impression/scan/sale/offline-play
+// reporters and the government emergency-broadcast push/clear) have no
+// session to present and are correctly never called from here; see
+// server.js's own requireCallingService commentary. Revenue splits per
+// screen and offline-cache behaviour are server-side.
 //
 // **Two honest limits, stated on the surface.** There is no physical
 // screen hardware anywhere in this ecosystem — a screen here is a
@@ -387,6 +392,70 @@ function renderOffline(body) {
   });
 }
 
+// -- Government emergency broadcast override ---------------------------
+//
+// `POST /api/emergency-broadcast` and its `/clear` are
+// requireCallingService-guarded -- the AI-run government has no end-
+// user session to present, so there is genuinely no "push a broadcast"
+// button for this frontend to offer. What *was* missing is the real,
+// public read side: GET /api/emergency-broadcast (status + history) and
+// GET /api/screens/:id/content (the one universal "what is this screen
+// showing right now" resolver, which an active broadcast overrides).
+// Neither route needs a session; both had zero frontend before this.
+function renderEmergency(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'A government push overrides every screen at once with one message — weather, a wanted/missing-person '
+    + 'alert, or an off-grid search. Issuing or clearing one is service-credential-only; this view is read-only.',
+    'warn'));
+
+  return VACO.api('/api/emergency-broadcast').then(function (data) {
+    if (data.active) {
+      var a = data.active;
+      out.appendChild(VACO.card('Active broadcast', [
+        VACO.badge(a.type, 'danger'),
+        el('p', 'vaco-body', a.message),
+        el('p', 'vaco-small vaco-dim', 'Issued by ' + a.issuedBy + ' at ' + new Date(a.issuedAt).toLocaleString()),
+      ]));
+    } else {
+      out.appendChild(VACO.card('No active broadcast', [
+        el('p', 'vaco-small vaco-dim', 'Every screen defers to its own ordinary content or offline fallback.'),
+      ]));
+    }
+
+    out.appendChild(VACO.card('History', [
+      VACO.table([
+        { key: 'id', label: 'Id' },
+        { key: 'type', label: 'Type', render: function (b) { return VACO.badge(b.type, 'danger'); } },
+        { key: 'message', label: 'Message' },
+        { key: 'issuedBy', label: 'Issued by' },
+        { label: 'Issued', render: function (b) { return new Date(b.issuedAt).toLocaleString(); } },
+        { label: 'Cleared', render: function (b) { return b.clearedAt ? new Date(b.clearedAt).toLocaleString() : '—'; } },
+      ], data.history || [], { empty: 'No broadcast has ever been issued.' }),
+    ]));
+
+    // resolveScreenContent -- the one real per-screen "what should it
+    // show right now" question, service- and broadcast-aware.
+    out.appendChild(VACO.card('What is a screen showing right now?', [
+      VACO.form([{ name: 'screenId', label: 'Screen id', type: 'number', min: 1, width: '100px' }],
+        function (values) {
+          return VACO.api('/api/screens/' + values.screenId + '/content').then(function (resolved) {
+            if (resolved.action === 'serve-emergency-broadcast') {
+              VACO.toast('Screen ' + resolved.screenId + ' is showing the emergency broadcast: '
+                + resolved.broadcast.message);
+            } else if (resolved.action === 'blank') {
+              VACO.toast('Screen ' + resolved.screenId + ' would go blank: ' + resolved.reason);
+            } else {
+              VACO.toast('Screen ' + resolved.screenId + ' is serving cached creative ' + resolved.creative.creativeId + '.');
+            }
+          });
+        }, 'Check'),
+    ]));
+
+    return VACO.mount(body, out);
+  });
+}
+
 VACO.app({
   id: 'dreams',
   name: 'DREAMS',
@@ -402,6 +471,7 @@ VACO.app({
     { id: 'advertisers', label: 'Advertisers', heading: 'Self-serve campaigns', render: renderAdvertisers },
     { id: 'campaign', label: 'New Campaign', heading: 'The self-serve flow', render: renderCampaignFlow },
     { id: 'offline', label: 'Offline', heading: 'Cached playback', render: renderOffline },
+    { id: 'emergency', label: 'Emergency', heading: 'Government broadcast override', render: renderEmergency },
   ],
 });
 </script>
