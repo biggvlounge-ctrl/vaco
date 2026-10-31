@@ -59,6 +59,18 @@ function renderScreens(body) {
     }, 'Register'),
   ]));
 
+  // Real screen lookup -- GET /api/screens/:id. The grid below only ever
+  // shows *active* screens (listActiveScreens), so a deactivated screen
+  // has nowhere else to be checked on.
+  out.appendChild(VACO.card('Look up a screen', [
+    VACO.form([{ name: 'id', label: 'Screen id', type: 'number', min: 1, width: '110px' }],
+      function (values) {
+        return VACO.api('/api/screens/' + values.id).then(function (s) {
+          VACO.toast('Screen ' + s.id + ' (' + s.locationName + '): ' + s.status + '.');
+        });
+      }, 'Look up'),
+  ]));
+
   return VACO.api('/api/screens').then(function (data) {
     var screens = data.screens || [];
     if (!screens.length) {
@@ -98,6 +110,18 @@ function renderScreens(body) {
           lines.appendChild(split);
         }
 
+        // Real "go dark" control -- POST /api/screens/:id/deactivate,
+        // requireScreenOwner-guarded server-side (both the session and
+        // deactivateScreen itself check screenOwnerId). Only the signed-in
+        // owner sees it on their own screen; there was no frontend path to
+        // this route at all before.
+        if (VACO.userId() && s.screenOwnerId === VACO.userId()) {
+          lines.appendChild(VACO.button('Deactivate', function () {
+            return VACO.post('/api/screens/' + s.id + '/deactivate', { screenOwnerId: VACO.userId() })
+              .then(function () { VACO.toast('Screen ' + s.id + ' deactivated.'); VACO.render(); });
+          }, 'ghost'));
+        }
+
         return VACO.card(s.locationName || ('Screen ' + s.id), [lines],
           { trailing: VACO.badge('70% to venue') });
       }), true));
@@ -130,18 +154,27 @@ function renderAdvertisers(body) {
   out.appendChild(VACO.card('Look up an advertiser', [
     VACO.form([{ name: 'id', label: 'Advertiser id', placeholder: 'owner1', width: '150px' }],
       function (values) {
-        return VACO.api('/api/advertisers/' + values.id + '/campaigns').then(function (data) {
-          var campaigns = data.campaigns || [];
-          while (out.childNodes.length > 3) out.removeChild(out.lastChild);
-          out.appendChild(VACO.card('Campaigns', [
-            VACO.table([
-              { key: 'id', label: 'Id' },
-              { key: 'name', label: 'Campaign' },
-              { label: 'Budget', num: true, render: function (c) { return VACO.price(c.budget, { freeLabel: false }); } },
-              { label: 'Status', render: function (c) { return VACO.badge(c.status); } },
-            ], campaigns, { empty: 'No campaigns for this advertiser.' }),
-          ]));
-          VACO.mount(body, out);
+        // GET /api/advertisers/:id -- the real profile (businessName,
+        // createdAt). The lookup here used to go straight to campaigns and
+        // never fetched the advertiser record itself at all.
+        return VACO.api('/api/advertisers/' + values.id).then(function (advertiser) {
+          return VACO.api('/api/advertisers/' + values.id + '/campaigns').then(function (data) {
+            var campaigns = data.campaigns || [];
+            while (out.childNodes.length > 3) out.removeChild(out.lastChild);
+            out.appendChild(VACO.card(advertiser.businessName || advertiser.advertiserId, [
+              el('p', 'vaco-small vaco-dim', 'Advertiser id: ' + advertiser.advertiserId
+                + ' · signed up ' + new Date(advertiser.createdAt).toLocaleDateString()),
+            ]));
+            out.appendChild(VACO.card('Campaigns', [
+              VACO.table([
+                { key: 'id', label: 'Id' },
+                { key: 'name', label: 'Campaign' },
+                { label: 'Budget', num: true, render: function (c) { return VACO.price(c.budget, { freeLabel: false }); } },
+                { label: 'Status', render: function (c) { return VACO.badge(c.status); } },
+              ], campaigns, { empty: 'No campaigns for this advertiser.' }),
+            ]));
+            VACO.mount(body, out);
+          });
         });
       }, 'Load'),
   ]));
@@ -178,7 +211,9 @@ function renderCampaignFlow(body) {
     lines.appendChild(VACO.badge(c.status));
     lines.appendChild(el('p', 'vaco-small vaco-dim', c.name + ' · screens: ' + (c.screenIds || []).length
       + ' · creative: ' + (c.creativeUrl || c.creativeText ? 'set' : 'none')
-      + ' · budget: ' + (c.budget || 'none') + ' · incentive: ' + (c.incentive ? c.incentive.type : 'none')));
+      + ' · budget: ' + (c.budget || 'none') + ' · incentive: ' + (c.incentive ? c.incentive.type : 'none')
+      + ' · per-scan: ' + (c.costPerScan || 'not set') + ' · sale commission: '
+      + (c.saleCommissionRate ? Math.round(c.saleCommissionRate * 100) + '%' : 'not set')));
 
     if (c.status === 'live') {
       lines.appendChild(VACO.notice('This campaign is live.', 'money'));
@@ -199,15 +234,36 @@ function renderCampaignFlow(body) {
           .then(function () { return refresh(c.id); });
       }, 'Upload creative'));
 
-    lines.appendChild(VACO.button('Generate creative text (AI)', function () {
-      return VACO.post('/api/campaigns/' + c.id + '/generate-creative', {}).then(function () { return refresh(c.id); });
-    }, 'ghost'));
+    // generateCreativeText (lib/campaigns.js) requires a real `brief` --
+    // this used to post an empty body and would 400 on every real call.
+    lines.appendChild(VACO.form([{ name: 'brief', label: 'Creative brief (AI)', placeholder: 'What should the ad say?', width: '220px' }],
+      function (values) {
+        return VACO.post('/api/campaigns/' + c.id + '/generate-creative', { brief: values.brief })
+          .then(function () { return refresh(c.id); });
+      }, 'Generate creative (AI)'));
 
     lines.appendChild(VACO.form([{ name: 'budget', label: 'Budget', type: 'number', min: 1, width: '110px' }],
       function (values) {
         return VACO.post('/api/campaigns/' + c.id + '/budget', { budget: values.budget })
           .then(function () { return refresh(c.id); });
       }, 'Set budget'));
+
+    // Real opt-in pricing for scan/sale revenue (README's "Scan and sale
+    // revenue" section) -- setScanPricing/setSaleCommission in
+    // lib/campaigns.js. Both optional, both draft-only, same as budget
+    // and incentive above; recordScan/recordSale on the device side
+    // refuse to run until these are set.
+    lines.appendChild(VACO.form([{ name: 'costPerScan', label: 'Cost per scan', type: 'number', min: 0.01, step: '0.01', width: '120px' }],
+      function (values) {
+        return VACO.post('/api/campaigns/' + c.id + '/scan-pricing', { costPerScan: values.costPerScan })
+          .then(function () { return refresh(c.id); });
+      }, 'Set scan pricing'));
+
+    lines.appendChild(VACO.form([{ name: 'saleCommissionRate', label: 'Sale commission (0–1)', type: 'number', min: 0.01, max: 1, step: '0.01', width: '140px' }],
+      function (values) {
+        return VACO.post('/api/campaigns/' + c.id + '/sale-commission', { saleCommissionRate: values.saleCommissionRate })
+          .then(function () { return refresh(c.id); });
+      }, 'Set sale commission'));
 
     lines.appendChild(VACO.form([
       { name: 'type', label: 'Incentive', options: ['percent-off', 'amount-off', 'coupon'] },
