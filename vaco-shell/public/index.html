@@ -123,6 +123,7 @@
     <nav class="vaco-tabs" id="tabs" style="border-bottom: 0;" role="tablist">
       <button class="vaco-tab" role="tab" data-view="store" aria-selected="true">App Store</button>
       <button class="vaco-tab" role="tab" data-view="merch" aria-selected="false">Merch</button>
+      <button class="vaco-tab" role="tab" data-view="earnings" aria-selected="false">Earnings</button>
       <button class="vaco-tab" role="tab" data-view="library" aria-selected="false">Library</button>
       <button class="vaco-tab" role="tab" data-view="ecosystem" aria-selected="false">Ecosystem</button>
       <button class="vaco-tab" role="tab" data-view="insight" aria-selected="false">Insight</button>
@@ -193,6 +194,58 @@
 
       <h2 class="vaco-h2" style="margin-top: var(--vaco-space-4);">Your orders</h2>
       <div id="ordersBox"></div>
+    </div>
+  </section>
+
+  <!-- ================= Earnings ================= -->
+  <section class="view" data-view="earnings">
+    <div class="vaco-stack">
+      <h1 class="vaco-h1">Earnings</h1>
+      <p class="vaco-body vaco-dim" style="max-width: 62ch;">
+        What the store and the merch storefront have paid out, pulled live from
+        the real ledgers behind each — <code class="vaco-mono vaco-small">GET /api/store/publishers/:publisherId</code>
+        and <code class="vaco-mono vaco-small">GET /api/merch/brands/:appBrandId/earnings</code>.
+      </p>
+      <div class="vaco-notice">
+        <div>
+          Both lookups are public reads with no publisher or brand login of
+          their own — anyone who knows the id can look up its earnings, same
+          as the real routes behind them. There is no publisher/brand account
+          system in this ecosystem yet, so this is a direct, honest lookup
+          rather than a dashboard behind a sign-in it would be wrong to imply.
+        </div>
+      </div>
+
+      <div class="vaco-grid vaco-grid-wide">
+        <div class="vaco-card">
+          <h2 class="vaco-h3" style="margin-top: 0;">App Store · publisher payouts</h2>
+          <p class="vaco-small vaco-dim">
+            Gross VCoin earned and store fees withheld across every listing a
+            publisher owns, net of refunds.
+          </p>
+          <form class="vaco-row" id="publisherEarningsForm">
+            <input class="vaco-input" id="publisherIdInput" style="flex: 1; min-width: 160px;"
+                   placeholder="publisher id" />
+            <button class="vaco-btn vaco-btn-primary" type="submit">Look up</button>
+          </form>
+          <div id="publisherEarningsResult" style="margin-top: var(--vaco-space-3);"></div>
+        </div>
+
+        <div class="vaco-card">
+          <h2 class="vaco-h3" style="margin-top: 0;">Merch · brand payouts</h2>
+          <p class="vaco-small vaco-dim">
+            Units sold, fulfilment cost, brand payout, and the platform's cut
+            across every non-cancelled order for one app brand.
+          </p>
+          <form class="vaco-row" id="brandEarningsForm">
+            <select class="vaco-select" id="brandIdSelect" style="flex: 1; min-width: 160px;">
+              <option value="">Choose a brand…</option>
+            </select>
+            <button class="vaco-btn vaco-btn-primary" type="submit">Look up</button>
+          </form>
+          <div id="brandEarningsResult" style="margin-top: var(--vaco-space-3);"></div>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -900,6 +953,103 @@
     box.appendChild(wrap);
   }
 
+  // -- Earnings ----------------------------------------------------------
+  //
+  // Two real, unauthenticated lookups — `GET /api/store/publishers/:publisherId`
+  // and `GET /api/merch/brands/:appBrandId/earnings` — neither of which the
+  // page called before. There is no publisher/brand account system in this
+  // ecosystem (see lib/appStore.js, lib/merchStore.js), so this is a direct
+  // id-in, numbers-out lookup rather than a dashboard behind a sign-in that
+  // does not exist.
+
+  function renderEarningsBrandOptions() {
+    const select = document.getElementById('brandIdSelect');
+    if (!select) return;
+    const current = select.value;
+    // First option ("Choose a brand…") stays; everything after is rebuilt
+    // from the real brand list this page already fetched for the Merch tab,
+    // so the two surfaces can never disagree about which brands exist.
+    while (select.options.length > 1) select.remove(1);
+    for (const brand of state.brands) {
+      const option = document.createElement('option');
+      option.value = brand.appBrandId;
+      option.textContent = `${brandLabel(brand.appBrandId)} (${brand.appBrandId})`;
+      select.appendChild(option);
+    }
+    if (current) select.value = current;
+  }
+
+  // One small table of label/value pairs — used by both lookups below so a
+  // VCoin field and a plain count render identically either place.
+  function statTable(rows) {
+    const wrap = el('div', 'vaco-table-wrap');
+    const table = el('table', 'vaco-table');
+    const body = el('tbody');
+    for (const [label, value] of rows) {
+      const row = el('tr');
+      row.appendChild(el('td', null, label));
+      row.appendChild(el('td', 'vaco-num vaco-mono', value));
+      body.appendChild(row);
+    }
+    table.appendChild(body);
+    wrap.appendChild(table);
+    return wrap;
+  }
+
+  document.getElementById('publisherEarningsForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const publisherId = document.getElementById('publisherIdInput').value.trim();
+    if (!publisherId) return;
+    const box = document.getElementById('publisherEarningsResult');
+    box.innerHTML = '';
+    box.appendChild(el('p', 'vaco-small vaco-dim', 'Looking up…'));
+    try {
+      const earnings = await api(`/api/store/publishers/${encodeURIComponent(publisherId)}`);
+      box.innerHTML = '';
+      if (!earnings.listings) {
+        box.appendChild(el('div', 'vaco-empty', `"${publisherId}" has no listings in the store.`));
+        return;
+      }
+      box.appendChild(statTable([
+        ['Listings', String(earnings.listings)],
+        ['Gross VCoin', String(earnings.grossVcoin)],
+        ['Store fees withheld', String(earnings.storeFees)],
+        ['Net to publisher', String(earnings.netVcoin)],
+      ]));
+    } catch (err) {
+      box.innerHTML = '';
+      box.appendChild(el('div', 'vaco-empty', err.message));
+    }
+  });
+
+  document.getElementById('brandEarningsForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const appBrandId = document.getElementById('brandIdSelect').value;
+    if (!appBrandId) return;
+    const box = document.getElementById('brandEarningsResult');
+    box.innerHTML = '';
+    box.appendChild(el('p', 'vaco-small vaco-dim', 'Looking up…'));
+    try {
+      const earnings = await api(`/api/merch/brands/${encodeURIComponent(appBrandId)}/earnings`);
+      box.innerHTML = '';
+      if (!earnings.orders) {
+        box.appendChild(el('div', 'vaco-empty', `${brandLabel(appBrandId)} has no non-cancelled orders yet.`));
+        return;
+      }
+      box.appendChild(statTable([
+        ['Orders', String(earnings.orders)],
+        ['Units sold', String(earnings.unitsSold)],
+        ['Gross VCoin', String(earnings.grossVcoin)],
+        ['Fulfilment cost', String(earnings.fulfilmentCost)],
+        ['Brand payout', String(earnings.brandPayout)],
+        ['Platform fees', String(earnings.platformFees)],
+      ]));
+    } catch (err) {
+      box.innerHTML = '';
+      box.appendChild(el('div', 'vaco-empty', err.message));
+    }
+  });
+
   // -- Library ---------------------------------------------------------
 
   function renderLibrary() {
@@ -1323,6 +1473,7 @@
     renderIdentity();
     renderStore();
     renderMerch();
+    renderEarningsBrandOptions();
     renderLibrary();
     renderApps();
     renderAssistant();
