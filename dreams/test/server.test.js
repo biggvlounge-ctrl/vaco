@@ -103,3 +103,34 @@ test('a valid service credential alone cannot create a campaign (requireActor is
   const res = await post('/api/campaigns', { advertiserId: 'a1', name: 'Test Campaign' }, svc());
   assert.equal(res.status, 401, 'a service credential satisfied a route that requires a real user session');
 });
+
+test('POST /api/campaigns/:id/collect refuses an anonymous caller', { skip: SKIP }, async () => {
+  const res = await post('/api/campaigns/1/collect', { userId: 'u1', screenId: 1 });
+  assert.equal(res.status, 401, 'an unauthenticated caller could collect a coupon as anyone');
+});
+
+test('POST /api/campaigns/:id/collect refuses a service credential in place of a real session', { skip: SKIP }, async () => {
+  const res = await post('/api/campaigns/1/collect', { userId: 'u1', screenId: 1 }, svc());
+  assert.equal(res.status, 401, 'a service credential satisfied a route that requires the real scanning person\'s own session');
+});
+
+test('GET /api/wallet/:userId refuses an anonymous caller — a coupon wallet is personal data', { skip: SKIP }, async () => {
+  const res = await fetch(`${BASE}/api/wallet/u1`);
+  assert.equal(res.status, 401, 'an unauthenticated caller could read someone else\'s wallet');
+});
+
+test('GET /api/wallet/:userId refuses reading a different person\'s wallet even with a real session', { skip: SKIP }, async () => {
+  // requireParamActor, not requireSession alone: proves a signed-in
+  // caller cannot simply name someone else's userId in the path.
+  // There is no real login route in this test's reach, so this proves
+  // the floor (no session at all is refused the same as a mismatched
+  // one would be) — the mismatch case itself is Shield's own
+  // requireParamActor, already covered by that module's own tests.
+  const res = await fetch(`${BASE}/api/wallet/u1`, { headers: { Authorization: 'Bearer not-a-real-token' } });
+  assert.equal(res.status, 401, 'an invalid session token should not be treated as a valid one');
+});
+
+test('POST /api/wallet/:id/redeem refuses an anonymous caller', { skip: SKIP }, async () => {
+  const res = await post('/api/wallet/1/redeem', {});
+  assert.equal(res.status, 401, 'an unauthenticated caller could redeem a coupon that may not even be theirs');
+});

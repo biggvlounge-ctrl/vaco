@@ -45,6 +45,9 @@ const {
   EMERGENCY_BROADCAST_TYPES, pushEmergencyBroadcast, getActiveEmergencyBroadcast,
   clearEmergencyBroadcast, listEmergencyBroadcasts, resolveScreenContent,
 } = require('./lib/emergencyBroadcast');
+const {
+  collectIncentive, getWalletEntry, listWalletForUser, redeemIncentive,
+} = require('./lib/wallet');
 
 const { createServiceAuth } = require('./lib/serviceAuth.cjs');
 const { traceMiddleware, traceHeaders } = require('./lib/tracing.cjs');const app = express();
@@ -138,6 +141,29 @@ async function settleVCoin(legs, meta = {}) {
   return body;
 }
 
+// A plain read of the real VASH balance V3 owns -- "connect the
+// Dreams wallet to VASH so you can see both", by direct instruction.
+// DREAMS keeps no VASH data of its own and never will: this calls
+// V3's own `GET /api/vash/balance/:userId` live, the same read-only
+// client shape `venvs/src/lib/v3Client.js` already uses, rather than
+// growing a second copy of VASH anywhere.
+//
+// **Fails soft, deliberately.** A coupon wallet should not go blank
+// because V3 is briefly unreachable -- the real coupons are DREAMS'
+// own data and should still render; `vashError` says why the balance
+// is missing instead of silently showing 0, which would be a real
+// balance a reader could mistake for a true one.
+async function readVashBalance(userId) {
+  try {
+    const res = await fetch(`${V3_API_URL}/api/vash/balance/${encodeURIComponent(userId)}`);
+    if (!res.ok) throw new Error(`V3 answered ${res.status}`);
+    const body = await res.json();
+    return { vashBalance: body.vashBalance, vashError: null };
+  } catch (err) {
+    return { vashBalance: null, vashError: err.message };
+  }
+}
+
 // Real, live call into V4's own interface layer -- same pattern
 // vacon/server.js and venvm/server.js already established. DREAMS
 // only ever supplies a real systemPrompt + the caller's real
@@ -179,7 +205,7 @@ async function pushMetric(metric, value) {
 }
 
 const {
-  requireActor, requireSession, requireCallingService,
+  requireActor, requireSession, requireParamActor, requireCallingService,
 } = require('./lib/shieldAuth.cjs');
 
 // -- Authorization ------------------------------------------------------
@@ -215,6 +241,22 @@ function requireScreenOwner() {
     if (!screen) return res.status(404).json({ error: `no screen with id ${req.params.id}` });
     if (screen.screenOwnerId !== req.sessionUserId) {
       return res.status(403).json({ error: 'only the owner of this screen may act on it' });
+    }
+    return next();
+  });
+}
+
+// A wallet entry names a thing, not an actor -- same reasoning as
+// requireCampaignAdvertiser/requireScreenOwner above: resolve it and
+// compare its stored owner, because the route param cannot be trusted
+// to say who it belongs to.
+function requireWalletOwner() {
+  const session = requireSession();
+  return (req, res, next) => session(req, res, () => {
+    const entry = getWalletEntry(store, Number(req.params.id));
+    if (!entry) return res.status(404).json({ error: `no wallet entry with id ${req.params.id}` });
+    if (entry.userId !== req.sessionUserId) {
+      return res.status(403).json({ error: 'only the person who collected this item may redeem it' });
     }
     return next();
   });
@@ -451,6 +493,48 @@ app.post('/api/campaigns/:id/scan', requireCallingService(), async (req, res) =>
       );
     }
     res.status(201).json(scan);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// -- The Dreams Wallet ---------------------------------------------------
+//
+// See lib/wallet.js's own header for why this is deliberately separate
+// from the billing-only `recordScan` above. `requireActor('userId')`,
+// not `requireCallingService()`: this is the one real-person half of a
+// physical scan, by direct instruction -- the phone that scanned the
+// screen's QR code is signed into a real Shield session, the same
+// identity model every other end-user action in this ecosystem uses.
+app.post('/api/campaigns/:id/collect', requireActor('userId'), (req, res) => {
+  try {
+    const campaignId = Number(req.params.id);
+    res.status(201).json(collectIncentive(store, {
+      ...req.body,
+      campaignId,
+      campaign: getCampaign(store, campaignId),
+    }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Only the wallet's own owner may read it -- a personal coupon list is
+// personal data, the same posture every other per-user read in this
+// ecosystem takes.
+app.get('/api/wallet/:userId', requireParamActor('userId'), async (req, res) => {
+  const { vashBalance, vashError } = await readVashBalance(req.params.userId);
+  res.json({
+    userId: req.params.userId,
+    entries: listWalletForUser(store, req.params.userId),
+    vashBalance,
+    vashError,
+  });
+});
+
+app.post('/api/wallet/:id/redeem', requireWalletOwner(), (req, res) => {
+  try {
+    res.json(redeemIncentive(store, { userId: req.sessionUserId, entryId: Number(req.params.id) }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

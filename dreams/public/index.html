@@ -456,6 +456,96 @@ function renderEmergency(body) {
   });
 }
 
+// -- The Dreams Wallet --------------------------------------------------
+//
+// What a real person collects by scanning a real screen -- separate
+// from the service-credential-only `recordScan` that bills the
+// advertiser and screen owner above. See server.js/lib/wallet.js's own
+// header for why the two never call each other. "Connect the Dreams
+// wallet to VASH so you can see both": GET /api/wallet/:userId already
+// returns a live VASH balance alongside the real coupons, read from
+// V3 server-side -- this view just renders both halves of that one
+// response, rather than this frontend making its own second call to V3.
+function renderWallet(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Scan a live campaign’s screen (its own id, and the screen’s id) to collect the deal it’s giving '
+    + 'away — one per person per campaign; scanning the same one again shows “already collected” rather '
+    + 'than granting a second copy. Redeeming just marks your own copy used, like tearing a paper coupon — it '
+    + 'does not apply anywhere automatically.'));
+
+  out.appendChild(VACO.card('Collect a deal', [
+    VACO.form([
+      { name: 'campaignId', label: 'Campaign id', type: 'number', min: 1, width: '120px' },
+      { name: 'screenId', label: 'Screen id', type: 'number', min: 1, width: '110px' },
+    ], function (values) {
+      var userId = VACO.userId();
+      return VACO.post('/api/campaigns/' + values.campaignId + '/collect', { userId: userId, screenId: values.screenId })
+        .then(function () { VACO.toast('Collected.', 'money'); return loadWallet(); });
+    }, 'Collect'),
+  ]));
+
+  var walletBox = el('div', null);
+  out.appendChild(walletBox);
+
+  function incentiveLabel(incentive) {
+    if (incentive.type === 'coupon') return 'Coupon: ' + incentive.code;
+    if (incentive.type === 'percent-off') return incentive.value + '% off';
+    return incentive.value + ' off';
+  }
+
+  function loadWallet() {
+    var userId = VACO.userId();
+    if (!userId) {
+      VACO.mount(walletBox, VACO.notice('Sign in to see your own wallet.', 'warn'));
+      return Promise.resolve();
+    }
+    return VACO.api('/api/wallet/' + encodeURIComponent(userId)).then(function (data) {
+      var vashLine;
+      if (data.vashError) {
+        vashLine = el('p', 'vaco-small vaco-dim', 'VASH balance unavailable right now (' + data.vashError + ').');
+      } else {
+        // VACO.price returns a <span> node, not text -- el()'s third
+        // argument sets textContent, so passing it there stringified
+        // the node itself ("[object HTMLSpanElement]") instead of
+        // rendering it. It has to be appended as a child.
+        vashLine = el('p', 'split-value');
+        vashLine.appendChild(VACO.price(data.vashBalance, { freeLabel: false }));
+      }
+      var vashCard = VACO.card('VASH balance', [vashLine]);
+
+      var rows = (data.entries || []).map(function (e) {
+        return {
+          id: e.id,
+          deal: incentiveLabel(e.incentive),
+          campaign: e.campaignId,
+          collected: new Date(e.collectedAt).toLocaleString(),
+          status: e.redeemedAt
+            ? VACO.badge('redeemed ' + new Date(e.redeemedAt).toLocaleDateString())
+            : VACO.button('Redeem', function () {
+                return VACO.post('/api/wallet/' + e.id + '/redeem', {})
+                  .then(function () { VACO.toast('Marked used.'); return loadWallet(); });
+              }, 'ghost'),
+        };
+      });
+
+      var walletCard = VACO.card('My coupons & deals', [
+        VACO.table([
+          { key: 'deal', label: 'Deal' },
+          { key: 'campaign', label: 'Campaign' },
+          { key: 'collected', label: 'Collected' },
+          { key: 'status', label: '' },
+        ], rows, { empty: 'Nothing collected yet — scan a live campaign’s screen above.' }),
+      ]);
+
+      VACO.mount(walletBox, [vashCard, walletCard]);
+    });
+  }
+
+  loadWallet();
+  return VACO.mount(body, out);
+}
+
 VACO.app({
   id: 'dreams',
   name: 'DREAMS',
@@ -472,6 +562,7 @@ VACO.app({
     { id: 'campaign', label: 'New Campaign', heading: 'The self-serve flow', render: renderCampaignFlow },
     { id: 'offline', label: 'Offline', heading: 'Cached playback', render: renderOffline },
     { id: 'emergency', label: 'Emergency', heading: 'Government broadcast override', render: renderEmergency },
+    { id: 'wallet', label: 'Wallet', heading: 'Deals you’ve collected', render: renderWallet },
   ],
 });
 </script>

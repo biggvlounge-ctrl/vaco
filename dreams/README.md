@@ -213,6 +213,72 @@ screen-owner session to present — see `requireCallingService` in
   credential-only, no end-user session), so this tab is deliberately
   a status view, not a control panel.
 
+## The Dreams Wallet (31 Oct 2026)
+
+**What a real person collects by scanning a real screen — new
+`lib/wallet.js`, new Wallet tab.** Every DREAMS campaign already has
+to give something away before it can go live (`setIncentive` — a
+coupon code or a percent/amount off; `launchCampaign` refuses to run
+without one). What was missing was anywhere for the person who
+scanned to actually keep it.
+
+**Deliberately separate from `recordScan`.** That function is a
+service-credential, anonymous billing event — a screen or kiosk
+backend reports "a scan happened" so the advertiser and screen owner
+get paid; it has never known *who* scanned. The wallet is the other
+half: a real person, signed into a real Shield session (the same
+identity model every other end-user action in this ecosystem already
+uses), collects the campaign's own incentive by scanning. The two can
+both happen from the same physical scan, by two different real
+actors, and `collectIncentive` never calls or depends on `recordScan`
+— whether an advertiser owes scan-pricing revenue is a separate
+question from whether a person is owed a coupon.
+
+**One collected item per person per campaign, by direct instruction.**
+Scanning the same campaign's screen again answers "already collected"
+rather than minting a second coupon — closes the obvious free-coupon-
+farming case.
+
+**Redeeming is a status flag, by direct instruction — not a real
+checkout integration.** A person marks their own coupon "used",
+exactly like tearing a paper coupon. Nothing here talks to VENVS or
+any other checkout; that would be real, separate, later work.
+
+**Routes:** `POST /api/campaigns/:id/collect` (`requireActor('userId')`
+— the real scanning person's own session, never a service credential),
+`GET /api/wallet/:userId` (`requireParamActor('userId')` — only the
+owner may read their own wallet), `POST /api/wallet/:id/redeem`
+(a new `requireWalletOwner()` guard, same ownership-resolution shape
+as `requireCampaignAdvertiser`/`requireScreenOwner`).
+
+**"Connect the Dreams wallet to VASH so you can see both" — by direct
+instruction.** `GET /api/wallet/:userId` also returns a live
+`vashBalance`, read server-side from V3's own `GET
+/api/vash/balance/:userId` (the same read-only client shape
+`venvs/src/lib/v3Client.js` already uses) — DREAMS keeps no VASH data
+of its own and never will. Fails soft: if V3 is briefly unreachable
+the real coupons still render, with `vashError` saying why the
+balance is missing rather than silently showing 0 (a real balance a
+reader could mistake for a true one).
+
+**Verification performed:** `test/wallet.test.js` (collecting,
+duplicate refusal, screen-not-on-campaign refusal, a non-live campaign
+refusal, redemption, double-redemption refusal, cross-user redemption
+refusal, per-user listing) and new guard-proof tests in
+`test/server.test.js` (anonymous refusal on all three new routes, a
+service credential refused where a real session is required) — 60/60
+passing. Also run live against a real Shield + V3 + DREAMS stack: a
+real session, a real live campaign, collect → duplicate-refused →
+wallet read (with a genuine live VASH balance) → redeem →
+double-redeem-refused → a different signed-in person refused read
+access to someone else's wallet — all over real HTTP, not just
+asserted in a unit test. The frontend's Wallet tab was driven in a
+real headless browser end to end (collect, the "already collected"
+refusal, redeem, the VASH balance rendering) — which is also how a
+real bug was caught and fixed: `VACO.price()` returns a `<span>` node,
+not text, and the balance card's first draft stringified that node
+("[object HTMLSpanElement]") instead of rendering it.
+
 ## Not yet built
 - **DREA's full placement intelligence** — `HVNTZ_COMPLETE_REVENUE_STACK.md`
   specifies extensive real logic for DREA (contextual venue matching,

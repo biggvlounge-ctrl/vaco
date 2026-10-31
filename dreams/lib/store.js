@@ -21,6 +21,10 @@ function createDreamsStore() {
     emergencyBroadcasts: [],
     nextEmergencyBroadcastId: 1,
     activeEmergencyBroadcastId: null,
+    // The Dreams Wallet -- see lib/wallet.js's own header for why this
+    // is deliberately separate from `scans` above.
+    walletEntries: [],
+    nextWalletEntryId: 1,
   };
 }
 
