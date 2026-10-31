@@ -103,6 +103,61 @@ restart. Live-verified: submitted a real identity verification, killed the
 running process, restarted it, and confirmed the same real state came back
 from a real GET. See `dev-docs/phase-3-real-persistence/`.
 
+## Frontend coverage pass (31 Oct 2026)
+An audit found `public/index.html` making real calls against only 7 of
+this app's 12 routes — the two original tabs (Lookup, Review) covered
+the submit/approve/reject/lookup loop, but the real local blockchain
+ledger (`lib/blockchain.js`) and public-chain anchoring
+(`lib/publicChainAnchor.js`) had no frontend exposure at all, only
+reachable by curl. A new **Chain** tab closes that, a real client of
+the remaining four routes, every field checked against the real route
+handler first:
+
+- `GET /api/chain` — the chain itself plus its real integrity verdict
+  (`verifyChainIntegrity`), rendered as a table (block index, decision
+  timestamp, claim type/status/grade, truncated hash) with a refresh
+  button.
+- `GET /api/chain/block/:index` — looks up one block by index and
+  shows its hash, previous hash, and real decision payload.
+- `GET /api/chain/posture` — whether public-chain anchoring is
+  configured (it is not, by default — no funded wallet or RPC
+  provider exists yet).
+- `POST /api/verifications/:id/anchor-on-chain` — operator-gated
+  (`vaca:verify`); the form takes an `X-Operator-Credential` the same
+  way `cvnvo/yap`'s moderation tab already does, since this route has
+  no service-token fallback. Posts the verification's own block hash
+  as a transaction on a real public chain once one is configured;
+  until then it honestly refuses (never fabricates a transaction
+  hash), and that refusal surfaces as the real error message.
+
+The tab's own copy is deliberately careful about what this chain is
+and is not, per `lib/blockchain.js`'s own header: a real,
+cryptographically-linked chain of every approve/reject decision, with
+no peer network and no consensus — one ledger inside VACA, not a
+distributed one. Public anchoring is a separate, genuinely different
+thing from that local chain, and the page never implies one is live
+until `describeChainPosture()` says so.
+
+**Left alone, not a gap this pass closes:** the existing Review tab's
+Approve/Reject buttons (pre-existing code, not touched here) call
+`requireOperator`-gated routes without sending
+`X-Operator-Credential` at all, so they 401 against a real
+vaco-operator the same way an anonymous caller would. The new Chain
+tab's own anchor form does send the header and was verified against a
+real running server; the Review tab's gap is a separate, pre-existing
+issue worth a follow-up pass, not introduced or fixed here.
+
+**Verified** against a running server (service-auth and operator-auth
+relaxed to exercise the plumbing, since no vaco-operator/vaco-audit
+instance was available in this environment): submit → approve →
+`GET /api/chain` showed the one real block; `GET /api/chain/block/0`
+returned its real hash/previousHash/data; `GET /api/chain/posture`
+reported the real, honest unconfigured state; and
+`anchor-on-chain` against an undecided verification returned the real
+"has not been decided yet" refusal rather than a fabricated success.
+vaca's own 38-test suite (`node --test test/*.test.js`) passes
+unchanged.
+
 ## Not yet built
 - Real reviewer/dashboard UI for working a verification queue — this
   phase is the real API and data model only.
