@@ -486,39 +486,104 @@ function renderCalls(body) {
     + '<strong>No audio or video is carried</strong>; there is no media transport in this ecosystem.', 'warn'));
 
   out.appendChild(VACO.card('Place a call', [
+    el('p', 'vaco-small vaco-dim',
+      '(This form previously posted "fromUserId"/"toAgentId" — placeCall and requireActor both want '
+      + '"userId"/"agentId"; every call placement was refused with a 400. Fixed here.)'),
     VACO.form([
-      { name: 'fromUserId', label: 'From', value: VACO.userId() || '', width: '130px' },
-      { name: 'toAgentId', label: 'To agent', placeholder: 'agent id', width: '140px' },
+      { name: 'userId', label: 'From', value: VACO.userId() || '', width: '130px' },
+      { name: 'agentId', label: 'To agent', placeholder: 'agent id', width: '140px' },
+      { name: 'topic', label: 'Topic (optional)', placeholder: 'what the call is about', width: '200px' },
     ], function (values) {
-      return VACO.post('/api/calls', values).then(function (c) {
+      var payload = { userId: values.userId, agentId: values.agentId };
+      if (values.topic) payload.topic = values.topic;
+      return VACO.post('/api/calls', payload).then(function (c) {
         VACO.toast('Call ' + c.id + ' — ' + c.status);
         VACO.render();
       });
     }, 'Call'),
   ]));
 
-  return VACO.api('/api/calls').then(function (data) {
-    var calls = data.calls || data || [];
+  return Promise.all([
+    VACO.api('/api/calls'),
+    VACO.api('/api/twins/animation/states').catch(function () { return null; }),
+  ]).then(function (r) {
+    var calls = r[0].calls || r[0] || [];
+    // Same event vocabulary the Twins tab's state-machine simulator
+    // uses — sourced from the real route rather than copied, so the
+    // two tabs cannot silently drift onto different lists.
+    var eventsList = r[1] && r[1].events ? r[1].events : [
+      'call-connected', 'user-started-speaking', 'user-stopped-speaking', 'agent-response-pending',
+      'agent-started-speaking', 'agent-emphasis', 'agent-stopped-speaking', 'call-ended',
+    ];
+
     out.appendChild(VACO.card('Calls', [
       VACO.table([
         { key: 'id', label: 'Id' },
-        { key: 'fromUserId', label: 'From' },
-        { key: 'toAgentId', label: 'To' },
+        { key: 'userId', label: 'User' },
+        { key: 'agentId', label: 'Agent' },
         { label: 'Status', render: function (c) { return VACO.badge(c.status); } },
         { label: '', render: function (c) {
-          if (c.status !== 'ringing') return '—';
           var row = el('div', 'vaco-row-tight');
-          row.appendChild(VACO.button('Answer', function () {
-            return VACO.post('/api/calls/' + c.id + '/answer', {})
-              .then(function () { VACO.toast('Answered.'); VACO.render(); });
-          }, 'primary vaco-btn-sm'));
-          row.appendChild(VACO.button('Decline', function () {
-            return VACO.post('/api/calls/' + c.id + '/decline', {})
-              .then(function () { VACO.toast('Declined — a fallback message is produced.'); VACO.render(); });
-          }, 'danger vaco-btn-sm'));
+          if (c.status === 'ringing') {
+            row.appendChild(VACO.button('Answer', function () {
+              return VACO.post('/api/calls/' + c.id + '/answer', {})
+                .then(function () { VACO.toast('Answered.'); VACO.render(); });
+            }, 'primary vaco-btn-sm'));
+            row.appendChild(VACO.button('Decline', function () {
+              return VACO.post('/api/calls/' + c.id + '/decline', {})
+                .then(function () { VACO.toast('Declined — a fallback message is produced.'); VACO.render(); });
+            }, 'danger vaco-btn-sm'));
+          } else if (c.status === 'connected') {
+            row.appendChild(VACO.button('End', function () {
+              return VACO.post('/api/calls/' + c.id + '/end', {})
+                .then(function () { VACO.toast('Call ended.'); VACO.render(); });
+            }, 'danger vaco-btn-sm'));
+          } else {
+            row.appendChild(el('span', 'vaco-dim vaco-small', '—'));
+          }
           return row;
         } },
       ], calls, { empty: 'No calls yet.' }),
+    ]));
+
+    var eventResult = el('div');
+    out.appendChild(VACO.card('Send a call event', [
+      el('p', 'vaco-small vaco-dim',
+        'Streams a real conversation event into a connected call, advancing the twin’s animation state — '
+        + 'only works while the call is "connected"; the server refuses it otherwise.'),
+      VACO.form([
+        { name: 'callId', label: 'Call id', type: 'number', width: '100px' },
+        { name: 'event', label: 'Event', options: eventsList, width: '220px' },
+      ], function (values) {
+        return VACO.post('/api/calls/' + values.callId + '/events', { event: values.event }).then(function (r2) {
+          VACO.mount(eventResult, el('p', 'vaco-small',
+            r2.previousState + ' → ' + r2.state + ' (clip: ' + (r2.clip || 'none') + (r2.changed ? '' : ', unchanged') + ')'));
+          VACO.render();
+        });
+      }, 'Send'),
+      eventResult,
+    ]));
+
+    var detailResult = el('div');
+    out.appendChild(VACO.card('Call details', [
+      VACO.form([
+        { name: 'callId', label: 'Call id', type: 'number', width: '100px' },
+      ], function (values) {
+        return VACO.api('/api/calls/' + values.callId).then(function (c) {
+          VACO.mount(detailResult, [
+            el('p', 'vaco-small',
+              'Agent ' + c.agentId + ' · surface ' + c.surfaceId + ' · animation ' + c.animationState
+              + ' · framing ' + (c.presentation ? c.presentation.framing : '—')),
+            el('p', 'vaco-small vaco-dim', c.topic ? 'Topic: ' + c.topic : 'No topic given.'),
+            VACO.table([
+              { key: 'event', label: 'Event' },
+              { key: 'state', label: 'State' },
+              { key: 'clip', label: 'Clip' },
+            ], c.events || [], { empty: 'No events recorded yet.' }),
+          ]);
+        });
+      }, 'View'),
+      detailResult,
     ]));
 
     return VACO.api('/api/fallback-messages').then(function (fb) {
