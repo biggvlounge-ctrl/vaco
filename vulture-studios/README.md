@@ -306,10 +306,35 @@ With those fixes alone, this tab now has 3 real, genuinely-correct
 calls (`GET /api/projects`, `GET /api/projects/:id/equity`,
 `POST /api/projects/:id/invest`) instead of 4 calls, one unreachable
 for any real user and two of the remaining three silently
-mis-rendering what they got back. `POST /api/projects`,
-`/start-production`, `/complete`, `/distribute`, and `/revenue` stay
-real, deliberate backend-only capabilities (service/operator credentials
-this frontend has no login for), per the first bullet above.
+mis-rendering what they got back.
+
+### New coverage: project detail + per-investor revenue
+**New, genuine coverage added**, both using fields the backend already
+returns but the frontend never surfaced:
+- **Project detail, lazily** — each card gained a "Details" button that
+  calls the previously-uncalled `GET /api/projects/:id` on first click
+  (not fetched upfront for every card) and renders the project's real
+  synopsis, its real lifecycle timeline (`createdAt`/`fundedAt`/
+  `productionStartedAt`/`completedAt` — only the stages actually
+  reached, never a placeholder for one that hasn't happened), its real
+  distribution status (`distributionApp`/`distributionTitleId`, mapped
+  to "Vvltvre Flix"/"Vvltvre Music" by name) or an honest "not yet
+  distributed", and `finalAssetUrl` as a real link when set or an
+  honest "not yet available" note when null — never a fake player.
+- **Per-investor revenue received** — `getProjectEquity` already
+  returns each investor's real `totalRevenueReceived`, computed from
+  every payout they've actually been sent; the cap table's own caption
+  now shows it next to each investor's stake once it's non-zero,
+  closing a second real, invisible-until-now gap in the one call this
+  tab already made.
+
+Now 4 real calls (`GET /api/projects`, `GET /api/projects/:id`,
+`GET /api/projects/:id/equity`, `POST /api/projects/:id/invest`), all
+of them genuinely correct against the real backend and genuinely
+rendering what they return. `POST /api/projects`, `/start-production`,
+`/complete`, `/distribute`, and `/revenue` stay real, deliberate
+backend-only capabilities (service/operator credentials this frontend
+has no login for), per the previous section.
 
 ## Not yet built
 - A VDP district (a real Studios lot/backlot district, the same

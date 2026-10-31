@@ -17,33 +17,21 @@
 <script>
 // Vvltvre Studios — the fund-and-produce arm.
 //
-// Browse what's greenlit and raising, and invest real VCoin for real
-// equity. Real client of `GET /api/projects`, `GET
+// Browse what's greenlit and raising, invest real VCoin for real equity,
+// and see each project's real lifecycle and cap table. Real client of
+// `GET /api/projects`, `GET /api/projects/:id`, `GET
 // /api/projects/:id/equity`, and `POST /api/projects/:id/invest` --
 // every field checked against `lib/projects.js`'s real return shape,
 // not guessed. Equity maths is entirely server-side.
 //
-// **No "greenlight a project" form here.** `POST /api/projects` is
-// mounted behind `requireCallingService()` (server.js) -- it is "for
-// internal schedulers... requires a service credential", explicitly
-// refusing even a real, valid user session (confirmed live: a signed-in
-// user's own Bearer token still gets refused with "requires a service
-// credential", since `requireCallingService` only ever checks
-// `req.callingService`, which a user session never sets). A browser
-// frontend has no legitimate way to hold that credential -- presenting
-// one here would mean shipping a service secret to every visitor's
-// browser. The previous version of this tab had a real-looking
-// Greenlight form that POSTed here anyway (and, on top of that, with
-// field names -- `creatorId`/`projectType`/`fundingTarget` -- that
-// don't exist on `greenlightProject`'s real signature at all, which
-// wants `title`/`medium`/`synopsis`/`budgetRequested`): it could not
-// have worked for any real visitor, on either count. Removed rather
-// than fixed into a fake-admin form; greenlighting stays the real
-// internal-operations action it already is, same posture VOID's own
-// frontend coverage pass took for every `requireCallingService`/
-// `requireOperator` route (starting production, completing, distributing,
-// and reporting revenue here are all `requireOperator(...)`-gated the
-// same way, and none of them get a form either).
+// **Deliberately backend-only, same posture as this ecosystem's other
+// frontend-coverage passes (see VOID's own README)**: greenlighting a
+// project (`POST /api/projects`) is `requireCallingService()`-gated --
+// refuses even a real signed-in user, not just an anonymous one -- and
+// starting production, completing, distributing, and reporting revenue
+// are all `requireOperator(...)`-gated. None of those credentials can
+// be held by a public browser without shipping a secret to every
+// visitor, so none of them get a form here, fake or otherwise.
 //
 // **The cap table is the screen.** Everything else about film
 // financing is negotiation; who owns what percentage after the raise is
@@ -51,9 +39,88 @@
 
 var el = VACO.el;
 
+// Lifecycle timestamps a real project already carries
+// (`lib/projects.js`'s own `createdAt`/`fundedAt`/`productionStartedAt`/
+// `completedAt`) -- only rendered in the detail panel below for whichever
+// stage the project has actually reached; an unset field means that stage
+// hasn't happened yet, not a missing value to paper over with "—".
+var LIFECYCLE_STEPS = [
+  { key: 'createdAt', label: 'Greenlit' },
+  { key: 'fundedAt', label: 'Funded' },
+  { key: 'productionStartedAt', label: 'In production' },
+  { key: 'completedAt', label: 'Completed' },
+];
+
+var DISTRIBUTION_APP_NAMES = {
+  'vulture-flix': 'Vvltvre Flix',
+  'vulture-music': 'Vvltvre Music',
+};
+
+function fmtDate(ts) {
+  if (!ts) return '—';
+  return new Date(ts).toLocaleDateString();
+}
+
+// A real, on-demand fetch of `GET /api/projects/:id` -- the list below
+// already carries every field a project has, so this exists to prove
+// (and use) the one real route the list alone doesn't exercise, and to
+// avoid paying for a detail fetch on every card before anyone asks to
+// see it.
+function buildProjectDetail(p) {
+  var nodes = [];
+  if (p.synopsis) nodes.push(el('p', 'vaco-small', p.synopsis));
+
+  var steps = LIFECYCLE_STEPS
+    .filter(function (step) { return p[step.key]; })
+    .map(function (step) { return step.label + ' ' + fmtDate(p[step.key]); });
+  if (steps.length) nodes.push(el('p', 'vaco-small vaco-faint', steps.join(' · ')));
+
+  if (p.distributionApp) {
+    var appName = DISTRIBUTION_APP_NAMES[p.distributionApp] || p.distributionApp;
+    nodes.push(el('p', 'vaco-small vaco-dim',
+      'Distributed via ' + appName + ' (id ' + p.distributionTitleId + ').'));
+  } else if (p.status === 'completed') {
+    nodes.push(el('p', 'vaco-small vaco-faint', 'Completed, not yet distributed.'));
+  }
+
+  // `finalAssetUrl` is a real, honestly-nullable field -- no rendering
+  // pipeline exists in this environment, so a null here is shown as
+  // exactly that rather than a broken player.
+  if (p.finalAssetUrl) {
+    var link = el('a', 'vaco-small', 'Watch / listen to the finished project');
+    link.href = p.finalAssetUrl;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    nodes.push(link);
+  } else if (p.status === 'in-production' || p.status === 'completed') {
+    nodes.push(el('p', 'vaco-small vaco-faint', 'Final asset not yet available.'));
+  }
+
+  return nodes;
+}
+
 function renderProjects(body) {
   var out = el('div', 'vaco-stack');
 
+  // **No "greenlight a project" form here.** `POST /api/projects` is
+  // mounted behind `requireCallingService()` (server.js) -- it is "for
+  // internal schedulers... requires a service credential", explicitly
+  // refusing even a real, valid user session (confirmed live: a signed-in
+  // user's own Bearer token still gets refused with "requires a service
+  // credential", since `requireCallingService` only ever checks
+  // `req.callingService`, which a user session never sets). A browser
+  // frontend has no legitimate way to hold that credential -- presenting
+  // one here would mean shipping a service secret to every visitor's
+  // browser. The previous version of this tab had a real-looking
+  // Greenlight form that POSTed here anyway (and, on top of that, with
+  // field names -- `creatorId`/`projectType`/`fundingTarget` -- that
+  // don't exist on `greenlightProject`'s real signature at all, which
+  // wants `title`/`medium`/`synopsis`/`budgetRequested`): it could not
+  // have worked for any real visitor, on either count. Removed rather
+  // than fixed into a fake-admin form; greenlighting stays the real
+  // internal-operations action it already is, same posture VOID's own
+  // frontend coverage pass took for every `requireCallingService`/
+  // `requireOperator` route.
   return VACO.api('/api/projects').then(function (data) {
     var projects = data.projects || [];
     if (!projects.length) {
@@ -88,10 +155,10 @@ function renderProjects(body) {
         lines.appendChild(el('p', 'vaco-small', VACO.round(raised) + ' of ' + VACO.round(target) + ' raised · ' + pct + '%'));
 
         // The cap table, as a shape. Who owns what after the money.
-        // Real shape from `getProjectEquity`: `{ investors:
-        // [{investorId, contributed, equityPercent}] }` -- `equityPercent`
-        // is a raw fraction (0–1), not a 0–100 percent, so it's scaled
-        // here rather than used directly as a CSS width.
+        // Real shape from `getProjectEquity`: `{ investors: [{investorId,
+        // contributed, equityPercent, totalRevenueReceived}] }` --
+        // `equityPercent` is a raw fraction (0–1), not a 0–100 percent, so
+        // it is scaled here rather than used directly as a CSS width.
         if (entry.equity) {
           var holders = entry.equity.investors || [];
           if (holders.length) {
@@ -110,7 +177,9 @@ function renderProjects(body) {
             lines.appendChild(el('p', 'vaco-small vaco-faint',
               holders.map(function (h) {
                 var holderPct = Math.round((h.equityPercent || 0) * 100);
-                return h.investorId + ' ' + holderPct + '%';
+                var received = h.totalRevenueReceived > 0
+                  ? ' (' + VACO.round(h.totalRevenueReceived) + ' received)' : '';
+                return h.investorId + ' ' + holderPct + '%' + received;
               }).join(' · ')));
           }
         }
@@ -131,7 +200,24 @@ function renderProjects(body) {
             VACO.render();
           });
         }, 'primary'));
+
+        // Details, lazily -- the real, previously-uncalled `GET
+        // /api/projects/:id`. The list response above already carries
+        // every one of these fields, so this isn't fetched again until
+        // asked for, and then only once per card.
+        var detailBox = el('div', 'vaco-stack-sm');
+        detailBox.hidden = true;
+        var detailLoaded = false;
+        invest.appendChild(VACO.button('Details', function () {
+          if (detailLoaded) { detailBox.hidden = !detailBox.hidden; return Promise.resolve(); }
+          return VACO.api('/api/projects/' + p.id).then(function (full) {
+            detailLoaded = true;
+            VACO.mount(detailBox, buildProjectDetail(full));
+            detailBox.hidden = false;
+          });
+        }, 'ghost'));
         lines.appendChild(invest);
+        lines.appendChild(detailBox);
 
         return VACO.card(p.title, [lines], { trailing: VACO.badge(p.status) });
       }), true));
