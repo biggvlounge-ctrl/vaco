@@ -240,6 +240,77 @@ only, never committed).
 ecosystem uses) wraps `server.js`'s own store — `data/store.json`
 (port 8815) — so a real project's state survives a restart.
 
+## Frontend coverage pass (31 Oct 2026)
+An audit against this app's own 10 real routes found `public/index.html`
+making only 4 real calls, and one of those four — the "Greenlight a
+project" form — could never actually have worked for any real visitor,
+on two independent counts, both confirmed live rather than assumed:
+
+- **Wrong field names.** The form posted
+  `{creatorId, title, projectType, fundingTarget}`. `greenlightProject`'s
+  real signature (`lib/projects.js`) wants `{title, medium, synopsis,
+  budgetRequested}` — there is no `creatorId` on a project at all
+  (`greenlightProject` names no owner; the studio greenlights,
+  investors buy in afterwards, per this file's own "What's here"
+  section above), and `medium` must be one of `PROJECT_MEDIUMS`
+  (`film`/`tv`/`music`/`podcast`), not the form's
+  `film`/`series`/`album`/`podcast`.
+- **The route refuses a real user outright, regardless of field
+  names.** `POST /api/projects` is mounted behind
+  `requireCallingService()` — "this route is for internal schedulers...
+  requires a service credential", with no session fallback. Live-
+  confirmed against a real running instance: a request carrying a real,
+  correctly-shaped body and a real signed-in session's own Bearer token
+  is refused with exactly that error, while the identical body with a
+  real `X-Service-Name`/`X-Service-Token` pair succeeds and creates the
+  project. A browser frontend has no legitimate way to hold that
+  service credential — presenting one would mean shipping a service
+  secret to every visitor — so there is no correct way to fix this form
+  into a working one. **Removed rather than patched**, same posture
+  VOID's own frontend-coverage pass took for every
+  `requireCallingService`/`requireOperator` route: greenlighting stays
+  the real internal-operations action it already is, with no fake-admin
+  UI pretending to hold a credential it doesn't have. The same applies
+  to `start-production`, `complete`, `distribute`, and `revenue`, all
+  `requireOperator(...)`-gated — none of the four get a frontend form
+  either, and none did before this pass.
+
+**The remaining three real calls were themselves rendering real data
+incorrectly** — the equity call and the cap table it feeds were already
+wired, but silently broken:
+- The cap table read `equity.holders`/`equity.equityHolders`, which
+  don't exist. `getProjectEquity`'s real field is `investors`. Since
+  the fallback chain always bottomed out at `[]`, **the cap table never
+  rendered a single segment for any project, ever**, despite the equity
+  call succeeding every time.
+- Having fixed the field name, `equityPercent` turned out to be a raw
+  fraction (0–1, not 0–100) — confirmed live against a real two-investor
+  split (700/300 of a 1000 budget → `equityPercent: 0.7` and `0.3`
+  exactly, not `70`/`30`). The previous code used it directly as a CSS
+  `width` percentage and as the displayed number, which would have shown
+  a sliver of a bar and "0.7%" instead of "70%" the moment the field
+  name bug above was fixed on its own.
+- The raise progress bar read `p.raisedAmount` (doesn't exist, real
+  field is `amountRaised`) and `p.fundingTarget` (doesn't exist, real
+  field is `budgetRequested`) — the target always fell back to the
+  literal number `1`, so the bar would have jumped to (and visually
+  capped at) 100% after the very first unit of real investment.
+- The project summary line read `p.projectType`/`p.creatorId`, neither
+  of which exist (`medium`, and no owner field at all — see above).
+
+All four are fixed in place, verified against `lib/projects.js`'s real
+return shapes and against a real populated store (not just the empty-
+store default).
+
+With those fixes alone, this tab now has 3 real, genuinely-correct
+calls (`GET /api/projects`, `GET /api/projects/:id/equity`,
+`POST /api/projects/:id/invest`) instead of 4 calls, one unreachable
+for any real user and two of the remaining three silently
+mis-rendering what they got back. `POST /api/projects`,
+`/start-production`, `/complete`, `/distribute`, and `/revenue` stay
+real, deliberate backend-only capabilities (service/operator credentials
+this frontend has no login for), per the first bullet above.
+
 ## Not yet built
 - A VDP district (a real Studios lot/backlot district, the same
   pattern every other Vvltvre division and the beat marketplace

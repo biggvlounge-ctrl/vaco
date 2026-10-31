@@ -17,9 +17,33 @@
 <script>
 // Vvltvre Studios — the fund-and-produce arm.
 //
-// Greenlight a project, raise real financing for real equity, produce,
-// then distribute into Vvltvre Flix or Vvltvre Music. Real client of
-// its own 10 routes; equity maths is server-side.
+// Browse what's greenlit and raising, and invest real VCoin for real
+// equity. Real client of `GET /api/projects`, `GET
+// /api/projects/:id/equity`, and `POST /api/projects/:id/invest` --
+// every field checked against `lib/projects.js`'s real return shape,
+// not guessed. Equity maths is entirely server-side.
+//
+// **No "greenlight a project" form here.** `POST /api/projects` is
+// mounted behind `requireCallingService()` (server.js) -- it is "for
+// internal schedulers... requires a service credential", explicitly
+// refusing even a real, valid user session (confirmed live: a signed-in
+// user's own Bearer token still gets refused with "requires a service
+// credential", since `requireCallingService` only ever checks
+// `req.callingService`, which a user session never sets). A browser
+// frontend has no legitimate way to hold that credential -- presenting
+// one here would mean shipping a service secret to every visitor's
+// browser. The previous version of this tab had a real-looking
+// Greenlight form that POSTed here anyway (and, on top of that, with
+// field names -- `creatorId`/`projectType`/`fundingTarget` -- that
+// don't exist on `greenlightProject`'s real signature at all, which
+// wants `title`/`medium`/`synopsis`/`budgetRequested`): it could not
+// have worked for any real visitor, on either count. Removed rather
+// than fixed into a fake-admin form; greenlighting stays the real
+// internal-operations action it already is, same posture VOID's own
+// frontend coverage pass took for every `requireCallingService`/
+// `requireOperator` route (starting production, completing, distributing,
+// and reporting revenue here are all `requireOperator(...)`-gated the
+// same way, and none of them get a form either).
 //
 // **The cap table is the screen.** Everything else about film
 // financing is negotiation; who owns what percentage after the raise is
@@ -30,26 +54,10 @@ var el = VACO.el;
 function renderProjects(body) {
   var out = el('div', 'vaco-stack');
 
-  out.appendChild(VACO.card('Greenlight a project', [
-    el('p', 'vaco-small vaco-dim',
-      'A greenlit project can raise. The target is what it needs; equity is what an investor receives for funding it.'),
-    VACO.form([
-      { name: 'title', label: 'Title', placeholder: 'working title', width: '190px' },
-      { name: 'projectType', label: 'Type', options: ['film', 'series', 'album', 'podcast'] },
-      { name: 'fundingTarget', label: 'Target', type: 'number', min: 1, value: 5000, width: '110px' },
-    ], function (values) {
-      if (!VACO.userId()) throw new Error('Sign in to greenlight a project.');
-      return VACO.post('/api/projects', {
-        creatorId: VACO.userId(), title: values.title,
-        projectType: values.projectType, fundingTarget: values.fundingTarget,
-      }).then(function (p) { VACO.toast('Project ' + p.id + ' greenlit.'); VACO.render(); });
-    }, 'Greenlight'),
-  ]));
-
   return VACO.api('/api/projects').then(function (data) {
     var projects = data.projects || [];
     if (!projects.length) {
-      out.appendChild(el('div', 'vaco-empty', 'No projects yet — greenlight the first one above.'));
+      out.appendChild(el('div', 'vaco-empty', 'No projects are greenlit yet.'));
       return VACO.mount(body, out);
     }
 
@@ -63,10 +71,14 @@ function renderProjects(body) {
       out.appendChild(VACO.grid(loaded.map(function (entry) {
         var p = entry.project;
         var lines = el('div', 'vaco-stack-sm');
-        lines.appendChild(el('p', 'vaco-small vaco-dim', p.projectType + ' · by ' + p.creatorId));
+        // Real fields on the project record (`lib/projects.js`) --
+        // `medium`, not `projectType`; there is no `creatorId` at all
+        // (`greenlightProject` names no owner — the studio greenlights,
+        // investors buy in afterwards, per this app's own README).
+        lines.appendChild(el('p', 'vaco-small vaco-dim', p.medium));
 
-        var raised = p.raisedAmount || p.amountRaised || 0;
-        var target = p.fundingTarget || 1;
+        var raised = p.amountRaised || 0;
+        var target = p.budgetRequested || 1;
         var pct = Math.min(100, Math.round((raised / target) * 100));
         var track = el('div', 'raise-track');
         var fill = el('div', 'raise-fill');
@@ -76,23 +88,29 @@ function renderProjects(body) {
         lines.appendChild(el('p', 'vaco-small', VACO.round(raised) + ' of ' + VACO.round(target) + ' raised · ' + pct + '%'));
 
         // The cap table, as a shape. Who owns what after the money.
+        // Real shape from `getProjectEquity`: `{ investors:
+        // [{investorId, contributed, equityPercent}] }` -- `equityPercent`
+        // is a raw fraction (0–1), not a 0–100 percent, so it's scaled
+        // here rather than used directly as a CSS width.
         if (entry.equity) {
-          var holders = entry.equity.holders || entry.equity.equityHolders || [];
+          var holders = entry.equity.investors || [];
           if (holders.length) {
             var hues = ['var(--vaco-accent)', 'var(--vaco-info)', 'var(--vaco-money)', 'var(--vaco-warn)'];
             var cap = el('div', 'cap-table');
             holders.forEach(function (h, i) {
+              var holderPct = Math.round((h.equityPercent || 0) * 100);
               var seg = el('div', 'cap-seg');
-              seg.style.width = (h.equityPercent || h.percent || 0) + '%';
+              seg.style.width = holderPct + '%';
               seg.style.background = hues[i % hues.length];
-              seg.title = (h.investorId || h.userId) + ' — ' + (h.equityPercent || h.percent || 0) + '%';
+              seg.title = h.investorId + ' — ' + holderPct + '%';
               cap.appendChild(seg);
             });
             lines.appendChild(el('span', 'vaco-label', 'Cap table'));
             lines.appendChild(cap);
             lines.appendChild(el('p', 'vaco-small vaco-faint',
               holders.map(function (h) {
-                return (h.investorId || h.userId) + ' ' + (h.equityPercent || h.percent || 0) + '%';
+                var holderPct = Math.round((h.equityPercent || 0) * 100);
+                return h.investorId + ' ' + holderPct + '%';
               }).join(' · ')));
           }
         }
