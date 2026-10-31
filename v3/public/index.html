@@ -139,6 +139,135 @@ function renderTransfer(body) {
   return VACO.mount(body, out);
 }
 
+// -- VASH Mortgage -------------------------------------------------------
+//
+// A real, VCoin-denominated loan-administration system with no
+// frontend at all before this — `POST /api/vash-mortgage/apply`
+// through `.../payment` existed only as curl-reachable routes. See
+// `lib/vashMortgage.js`'s own header for what this honestly is (real
+// amortization, a real underwriting decision, real payments settled
+// through V3's own ledger) and is not (a licensed mortgage lender).
+
+function mortgageDetailCard(application) {
+  var box = el('div', 'vaco-stack-sm');
+  var head = el('div', 'vaco-row-tight');
+  head.appendChild(VACO.badge(application.status));
+  head.appendChild(el('span', 'vaco-small vaco-dim', application.propertyAddress));
+  box.appendChild(head);
+  box.appendChild(VACO.table([{ key: 'field', label: 'Field' }, { key: 'value', label: 'Value' }], [
+    { field: 'Application #', value: application.id },
+    { field: 'Borrower', value: application.borrowerId },
+    { field: 'Principal', value: VACO.round(application.principal) },
+    { field: 'Rate', value: application.annualRatePercent + '%/yr' },
+    { field: 'Term', value: application.termYears + ' years' },
+    { field: 'Monthly payment', value: application.monthlyPayment !== null ? VACO.round(application.monthlyPayment) : '—' },
+    { field: 'Remaining balance', value: application.remainingBalance !== null ? VACO.round(application.remainingBalance) : '—' },
+    {
+      field: 'Payments made',
+      value: application.paymentsMade.length + (application.schedule ? ' of ' + application.schedule.length + ' months' : ''),
+    },
+  ]));
+  if (application.reviewedBy) {
+    box.appendChild(el('p', 'vaco-small vaco-dim',
+      'Reviewed by ' + application.reviewedBy + (application.reviewNotes ? ' — ' + application.reviewNotes : '') + '.'));
+  }
+  return box;
+}
+
+function renderMortgage(body) {
+  var out = el('div', 'vaco-stack');
+  var state = { credential: '' };
+
+  out.appendChild(VACO.notice(
+    '<strong>A real loan-administration system, not a licensed mortgage lender.</strong> Amortization, '
+    + 'underwriting decisions, and payments are real and settle through V3\'s own VCoin ledger — there is no '
+    + 'real house, no real bank, and no NMLS/state lending licence behind it.', 'warn'));
+
+  var applyResult = el('div');
+  out.appendChild(VACO.card('Apply for a mortgage', [
+    el('p', 'vaco-small vaco-dim', 'Up to 120,000 VCoin, a 5 or 10 year term — calls POST /api/vash-mortgage/apply.'),
+    VACO.form([
+      { name: 'borrowerId', label: 'Borrower', value: VACO.userId() || '', width: '130px' },
+      { name: 'propertyAddress', label: 'Property address', placeholder: '123 Main St', width: '200px' },
+      { name: 'principal', label: 'Principal', type: 'number', min: 1, value: 60000, width: '110px' },
+      { name: 'annualRatePercent', label: 'Rate %/yr', type: 'number', min: 0, step: '0.1', value: 3, width: '90px' },
+      { name: 'termYears', label: 'Term', options: [{ label: '5 years', value: '5' }, { label: '10 years', value: '10' }], width: '100px' },
+    ], function (values) {
+      values.termYears = Number(values.termYears);
+      return VACO.post('/api/vash-mortgage/apply', values).then(function (application) {
+        VACO.toast('Application #' + application.id + ' submitted — pending review.', 'money');
+        applyResult.innerHTML = '';
+        applyResult.appendChild(mortgageDetailCard(application));
+      });
+    }, 'Apply'),
+    applyResult,
+  ]));
+
+  var lookupResult = el('div');
+  out.appendChild(VACO.card('Look up an application', [
+    VACO.form([{ name: 'id', label: 'Application #', type: 'number', min: 1, width: '120px' }],
+      function (values) {
+        return VACO.api('/api/vash-mortgage/' + values.id).then(function (application) {
+          lookupResult.innerHTML = '';
+          lookupResult.appendChild(mortgageDetailCard(application));
+        });
+      }, 'Load'),
+    lookupResult,
+  ]));
+
+  out.appendChild(VACO.card('Make a payment', [
+    el('p', 'vaco-small vaco-dim',
+      'Settles through the exact same VCoin ledger as any other transfer — only an approved application accepts one.'),
+    VACO.form([
+      { name: 'id', label: 'Application #', type: 'number', min: 1, width: '110px' },
+      { name: 'borrowerId', label: 'Borrower', value: VACO.userId() || '', width: '130px' },
+      { name: 'amount', label: 'Amount', type: 'number', min: 1, width: '110px' },
+    ], function (values) {
+      var id = values.id;
+      return VACO.post('/api/vash-mortgage/' + id + '/payment', { borrowerId: values.borrowerId, amount: values.amount })
+        .then(function (result) {
+          VACO.toast('Paid ' + VACO.round(values.amount) + ' — remaining balance ' + VACO.round(result.application.remainingBalance) + '.', 'money');
+          VACO.refreshBalances().then(VACO.renderIdentity);
+        });
+    }, 'Pay'),
+  ]));
+
+  out.appendChild(VACO.card('Underwriting decision', [
+    el('p', 'vaco-small vaco-dim',
+      'Approve or deny decides an outcome somebody loses, so it needs a real operator credential, not just a '
+      + 'session — same posture as VACA\'s verification review.'),
+    VACO.form([{ name: 'credential', label: 'X-Operator-Credential', placeholder: 'from vaco-operator', width: '220px' }],
+      function (values) { state.credential = values.credential; VACO.toast('Credential set for this session.'); }, 'Use this credential'),
+    VACO.form([
+      { name: 'id', label: 'Application #', type: 'number', min: 1, width: '110px' },
+      { name: 'reviewedBy', label: 'Reviewed by', placeholder: 'your operator name', width: '160px' },
+    ], function (values) {
+      if (!state.credential) { VACO.toast('Set an operator credential first.', 'warn'); return Promise.resolve(); }
+      return VACO.api('/api/vash-mortgage/' + values.id + '/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Operator-Credential': state.credential },
+        body: JSON.stringify({ reviewedBy: values.reviewedBy }),
+      }).then(function (application) {
+        VACO.toast('Application #' + application.id + ' approved — monthly payment ' + VACO.round(application.monthlyPayment) + '.', 'money');
+      });
+    }, 'Approve'),
+    VACO.form([
+      { name: 'id', label: 'Application #', type: 'number', min: 1, width: '110px' },
+      { name: 'reviewedBy', label: 'Reviewed by', placeholder: 'your operator name', width: '160px' },
+      { name: 'reason', label: 'Reason', placeholder: 'why', width: '200px' },
+    ], function (values) {
+      if (!state.credential) { VACO.toast('Set an operator credential first.', 'warn'); return Promise.resolve(); }
+      return VACO.api('/api/vash-mortgage/' + values.id + '/deny', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Operator-Credential': state.credential },
+        body: JSON.stringify({ reviewedBy: values.reviewedBy, reason: values.reason }),
+      }).then(function () { VACO.toast('Application #' + values.id + ' denied.', 'warn'); });
+    }, 'Deny'),
+  ]));
+
+  return VACO.mount(body, out);
+}
+
 function renderSystem(body) {
   return VACO.api('/api/health').then(function (health) {
     var out = el('div', 'vaco-stack');
@@ -222,6 +351,7 @@ VACO.app({
   tabs: [
     { id: 'wallet', label: 'Accounts', heading: 'Balances & history', render: renderWallet },
     { id: 'transfer', label: 'Move money', heading: 'Transfer & cash out', render: renderTransfer },
+    { id: 'mortgage', label: 'Mortgage', heading: 'VASH Mortgage', render: renderMortgage },
     { id: 'system', label: 'System', heading: 'Ledger configuration', render: renderSystem },
   ],
 });
