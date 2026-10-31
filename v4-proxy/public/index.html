@@ -64,6 +64,17 @@ var el = VACO.el;
 
 // -- Maps -------------------------------------------------------------
 
+// Mirrors lib/maps.js's PLACE_KINDS exactly. Not fetched from the
+// server because there is no route that returns the enum itself —
+// registerPlace just throws a 400 naming the valid kinds if this list
+// ever drifts. Kept small and visible here rather than silently
+// guessed.
+var PLACE_KINDS = ['station', 'business', 'screen', 'property', 'venue', 'storefront', 'user', 'other'];
+// A world-spanning box, so "list every registered place" is a real
+// call to the real viewport query (POST /api/maps/bounds) rather than
+// a route invented for the purpose.
+var WORLD_BOUNDS = { northLat: 90, southLat: -90, eastLng: 180, westLng: -180 };
+
 // Projects lat/lng into the box by simple linear scaling of the bounding
 // box. Deliberately not a real projection: at city scale the distortion
 // is invisible, and pretending to Mercator would imply a fidelity the
@@ -128,10 +139,14 @@ function renderMaps(body) {
     out.appendChild(VACO.card('Register a place', [
       el('p', 'vaco-small vaco-dim',
         'Any app can register a place. Coordinates outside a valid range are refused — '
-        + 'which is what catches a swapped lat/lng before it becomes a route to nowhere.'),
+        + 'which is what catches a swapped lat/lng before it becomes a route to nowhere. '
+        + '(This form previously left out "kind" and "sourceApp" — both required by '
+        + 'registerPlace — so every submission failed with a 400. Fixed here.)'),
       VACO.form([
         { name: 'placeId', label: 'Id', placeholder: 'union-station', width: '150px' },
         { name: 'name', label: 'Name', placeholder: 'Union Station', width: '160px' },
+        { name: 'kind', label: 'Kind', options: PLACE_KINDS, width: '130px' },
+        { name: 'sourceApp', label: 'Source app', value: 'v4-proxy', width: '110px' },
         { name: 'lat', label: 'Lat', type: 'number', step: 'any', value: 38.6270, width: '110px' },
         { name: 'lng', label: 'Lng', type: 'number', step: 'any', value: -90.1994, width: '110px' },
       ], function (values) {
@@ -153,8 +168,126 @@ function renderMaps(body) {
       }, 'Measure'),
     ]));
 
+    var placesCard = VACO.card('Registered places', [
+      el('div', 'vaco-empty', 'Loading…'),
+    ]);
+    out.appendChild(placesCard);
+
+    var nearbyResult = el('div');
+    out.appendChild(VACO.card('Find nearby places', [
+      el('p', 'vaco-small vaco-dim', 'The query every app currently reimplements on its own — what is near here.'),
+      VACO.form([
+        { name: 'lat', label: 'Lat', type: 'number', step: 'any', value: 38.6270, width: '110px' },
+        { name: 'lng', label: 'Lng', type: 'number', step: 'any', value: -90.1994, width: '110px' },
+        { name: 'radiusKm', label: 'Radius (km)', type: 'number', step: 'any', value: 25, width: '110px' },
+        { name: 'kind', label: 'Kind', options: [{ label: 'any', value: '' }].concat(PLACE_KINDS), width: '120px' },
+      ], function (values) {
+        var query = { lat: values.lat, lng: values.lng, radiusKm: values.radiusKm };
+        if (values.kind) query.kind = values.kind;
+        return VACO.post('/api/maps/nearby', query).then(function (places) {
+          var rows = Array.isArray(places) ? places : (places.places || []);
+          VACO.mount(nearbyResult, renderPlacesTable(rows, 'distanceKm'));
+        });
+      }, 'Search'),
+      nearbyResult,
+    ]));
+
+    var lookupResult = el('div');
+    out.appendChild(VACO.card('Look up a place by id', [
+      VACO.form([
+        { name: 'placeId', label: 'Id', placeholder: 'union-station', width: '160px' },
+      ], function (values) {
+        return VACO.api('/api/maps/place/' + encodeURIComponent(values.placeId)).then(function (place) {
+          VACO.mount(lookupResult, VACO.table([
+            { key: 'placeId', label: 'Id' },
+            { key: 'name', label: 'Name' },
+            { key: 'kind', label: 'Kind' },
+            { key: 'sourceApp', label: 'Source' },
+            { key: 'lat', label: 'Lat' },
+            { key: 'lng', label: 'Lng' },
+          ], [place]));
+        });
+      }, 'Look up'),
+      lookupResult,
+    ]));
+
+    var routeResult = el('div');
+    out.appendChild(VACO.card('Plan a route', [
+      el('p', 'vaco-small vaco-dim',
+        'Great-circle legs in the order given — this does not optimise stop order (VOID already has a real '
+        + 'TSP solver for that); it is cumulative distance and time for a fixed plan.'),
+      VACO.form([
+        { name: 'stop1Lat', label: 'Stop 1 lat', type: 'number', step: 'any', value: 38.6270, width: '100px' },
+        { name: 'stop1Lng', label: 'Stop 1 lng', type: 'number', step: 'any', value: -90.1994, width: '100px' },
+        { name: 'stop2Lat', label: 'Stop 2 lat', type: 'number', step: 'any', value: 38.6500, width: '100px' },
+        { name: 'stop2Lng', label: 'Stop 2 lng', type: 'number', step: 'any', value: -90.2400, width: '100px' },
+        { name: 'stop3Lat', label: 'Stop 3 lat (optional)', type: 'number', step: 'any', value: '', width: '100px' },
+        { name: 'stop3Lng', label: 'Stop 3 lng (optional)', type: 'number', step: 'any', value: '', width: '100px' },
+      ], function (values) {
+        var stops = [
+          { lat: values.stop1Lat, lng: values.stop1Lng, label: 'Stop 1' },
+          { lat: values.stop2Lat, lng: values.stop2Lng, label: 'Stop 2' },
+        ];
+        if (values.stop3Lat !== '' && values.stop3Lng !== '') {
+          stops.push({ lat: values.stop3Lat, lng: values.stop3Lng, label: 'Stop 3' });
+        }
+        return VACO.post('/api/maps/route', { stops: stops }).then(function (r) {
+          VACO.mount(routeResult, [
+            VACO.table([
+              { key: 'from', label: 'From' },
+              { key: 'to', label: 'To' },
+              { key: 'distanceKm', label: 'km' },
+              { key: 'travelMinutes', label: 'min' },
+            ], r.legs, { empty: 'No legs.' }),
+            el('p', 'vaco-small vaco-dim',
+              'Total: ' + r.totalDistanceKm + ' km, ' + r.totalTravelMinutes + ' min. ' + r.estimateBasis),
+          ]);
+        });
+      }, 'Plan route'),
+      routeResult,
+    ]));
+
     VACO.mount(body, out);
+
+    // A world-spanning box turns the real viewport query into "every
+    // registered place" — same route a map UI would call for its
+    // visible rectangle, just with a rectangle that covers everything.
+    return VACO.post('/api/maps/bounds', WORLD_BOUNDS).then(function (places) {
+      var rows = Array.isArray(places) ? places : (places.places || []);
+      VACO.mount(placesCard, [
+        el('p', 'vaco-small vaco-dim', rows.length + ' place(s) registered across the ecosystem.'),
+        renderPlacesTable(rows, null, true),
+      ]);
+    }).catch(function (err) {
+      var msg = err && err.status === 401
+        ? 'Sign in to view and manage registered places — listing and removing a place both require a session.'
+        : 'Could not load registered places: ' + (err && err.message);
+      VACO.mount(placesCard, VACO.notice(VACO.escapeHtml(msg), 'warn'));
+    });
   });
+}
+
+// columns common to both the nearby-search result and the full
+// registered-places list; `extraKey` adds a distance column when one
+// is available, and `withRemove` adds the real DELETE action.
+function renderPlacesTable(places, extraKey, withRemove) {
+  var columns = [
+    { key: 'name', label: 'Name' },
+    { key: 'kind', label: 'Kind' },
+    { key: 'sourceApp', label: 'Source' },
+  ];
+  if (extraKey) {
+    columns.push({ label: 'Distance (km)', render: function (p) { return VACO.round(p[extraKey]); } });
+  }
+  if (withRemove) {
+    columns.push({ label: '', render: function (p) {
+      return VACO.button('Remove', function () {
+        return VACO.del('/api/maps/place/' + encodeURIComponent(p.placeId))
+          .then(function () { VACO.toast('Removed.'); VACO.render(); });
+      }, 'danger vaco-btn-sm');
+    } });
+  }
+  return VACO.table(columns, places, { empty: 'No places found.' });
 }
 
 // -- Twins ------------------------------------------------------------
