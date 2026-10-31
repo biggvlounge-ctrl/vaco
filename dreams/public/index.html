@@ -306,20 +306,84 @@ function renderCampaignFlow(body) {
 }
 
 function renderOffline(body) {
+  var out = el('div', 'vaco-stack');
+
+  // Real screen-owner sync -- POST /api/screens/:id/cache/sync
+  // (requireScreenOwner-guarded). syncScreenCache's real signature is
+  // `{ screenId, creatives: [{creativeId, campaignId}], capacity }`; no
+  // frontend path to this existed at all, so an owner's player could
+  // never actually be given a cache through the UI.
+  out.appendChild(VACO.card('Sync a screen’s cache (owner)', [
+    el('p', 'vaco-small vaco-dim',
+      'What your screen should hold locally for a connectivity loss. Enter creatives as '
+      + 'creativeId:campaignId pairs, comma-separated.'),
+    VACO.form([
+      { name: 'screenId', label: 'Screen id', type: 'number', min: 1, width: '100px' },
+      { name: 'creatives', label: 'Creatives', placeholder: 'cr1:5,cr2:5', width: '220px' },
+      { name: 'capacity', label: 'Capacity', type: 'number', min: 1, width: '90px' },
+    ], function (values) {
+      var creatives = String(values.creatives || '').split(',').map(function (pair) {
+        var parts = pair.split(':');
+        return { creativeId: (parts[0] || '').trim(), campaignId: Number(parts[1]) };
+      }).filter(function (c) { return c.creativeId; });
+      var payload = { creatives: creatives };
+      if (values.capacity) payload.capacity = values.capacity;
+      return VACO.post('/api/screens/' + values.screenId + '/cache/sync', payload)
+        .then(function (cache) {
+          VACO.toast('Screen ' + values.screenId + ' cache synced: ' + cache.creatives.length + ' creative(s)'
+            + (cache.droppedForCapacity ? ', ' + cache.droppedForCapacity + ' dropped for capacity' : '') + '.');
+        });
+    }, 'Sync cache'),
+  ]));
+
+  out.appendChild(VACO.card('Check a screen’s cache', [
+    VACO.form([{ name: 'screenId', label: 'Screen id', type: 'number', min: 1, width: '100px' }],
+      function (values) {
+        return VACO.api('/api/screens/' + values.screenId + '/cache').then(function (cache) {
+          VACO.toast('Screen ' + cache.screenId + ': ' + cache.creatives.length + '/' + cache.capacity
+            + ' cached, synced ' + new Date(cache.syncedAt).toLocaleString() + '.');
+        });
+      }, 'Check'),
+  ]));
+
+  // GET /api/screens/:id/offline-content -- resolveOfflineContent's real
+  // "what should this screen show right now" answer, including the
+  // honest `blank` case (no cache, or cache too stale to bill for).
+  out.appendChild(VACO.card('Preview offline fallback', [
+    el('p', 'vaco-small vaco-dim',
+      'What a disconnected screen would actually show right now, from its own cache.'),
+    VACO.form([{ name: 'screenId', label: 'Screen id', type: 'number', min: 1, width: '100px' }],
+      function (values) {
+        return VACO.api('/api/screens/' + values.screenId + '/offline-content').then(function (resolved) {
+          VACO.toast(resolved.action === 'blank'
+            ? 'Screen ' + resolved.screenId + ' would go blank: ' + resolved.reason
+            : 'Screen ' + resolved.screenId + ' would serve cached creative ' + resolved.creative.creativeId
+              + ' (cache ' + resolved.cacheAgeHours + 'h old).');
+        });
+      }, 'Preview'),
+  ]));
+
   return VACO.api('/api/offline-plays').then(function (data) {
     var plays = data.plays || data.offlinePlays || [];
-    return VACO.card('Offline plays', [
+    out.appendChild(VACO.card('Offline plays', [
       el('p', 'vaco-small vaco-dim',
         'A screen that loses its connection keeps playing from cache and reports what it played when it comes back. '
         + 'Those reports land here. Nothing here polls a device — there is no device.'),
+      // Matches getOfflinePlays' real per-play record shape exactly --
+      // {id, screenId, campaignId, creativeId, playedAt, reportedAt,
+      // reportingLagMs}. The previous `playCount` column read a field
+      // this record has never had, so it always rendered "—".
       VACO.table([
         { key: 'screenId', label: 'Screen' },
         { key: 'campaignId', label: 'Campaign' },
-        { key: 'playCount', label: 'Plays', num: true },
+        { key: 'creativeId', label: 'Creative' },
+        { label: 'Reporting lag', render: function (p) {
+          return Number.isFinite(p.reportingLagMs) ? Math.round(p.reportingLagMs / 1000) + 's' : '—'; } },
         { key: 'reportedAt', label: 'Reported', render: function (p) {
           return p.reportedAt ? new Date(p.reportedAt).toLocaleString() : '—'; } },
       ], plays, { empty: 'No offline plays reported.' }),
-    ]);
+    ]));
+    return VACO.mount(body, out);
   });
 }
 
