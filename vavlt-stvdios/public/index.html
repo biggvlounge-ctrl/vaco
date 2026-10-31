@@ -621,6 +621,152 @@ function renderFeed(body) {
     });
 }
 
+// -- Discover (Stories/Reels rails, follow, creator lookup, map search) --
+//
+// Stories, Reels, Explore, Follows, author-scoped listings, and Map
+// Search all had real server-side implementations and zero real
+// frontend client of their own -- Feed above only ever reads
+// `/api/feed` (falling back to `/api/explore`). Closes:
+//
+//   GET  /api/stories
+//   GET  /api/reels
+//   GET  /api/authors/:authorId/posts
+//   GET  /api/authors/:authorId/highlights
+//   GET  /api/authors/:authorId/videos
+//   GET  /api/follows/status
+//   POST /api/follows
+//   POST /api/follows/remove
+//   GET  /api/map-search
+
+function renderStoryStrip(stories, host) {
+  if (!stories.length) { VACO.mount(host, el('div', 'vaco-empty', 'No active stories right now — they expire after 24 hours.')); return; }
+  VACO.mount(host, VACO.grid(stories.map(function (p) {
+    var lines = el('div', 'vaco-stack-sm');
+    lines.appendChild(postMedia(p));
+    lines.appendChild(el('p', 'vaco-small vaco-dim', p.authorId));
+    return VACO.card(null, [lines]);
+  })));
+}
+
+function renderReelRail(reels, host) {
+  if (!reels.length) { VACO.mount(host, el('div', 'vaco-empty', 'No reels yet.')); return; }
+  VACO.mount(host, VACO.grid(reels.map(function (p) {
+    var lines = el('div', 'vaco-stack-sm');
+    lines.appendChild(postMedia(p));
+    lines.appendChild(el('p', 'vaco-small vaco-dim', p.authorId + ' · ' + (p.durationSeconds || '?') + 's'));
+    return VACO.card(null, [lines]);
+  }), true));
+}
+
+// A real creator lookup: their posts (gated the same as Feed, via
+// `viewerId`), their highlights, their long-form videos, and -- if
+// signed in -- a real follow/unfollow control reading real graph
+// state from `GET /api/follows/status` first, never guessed.
+function renderCreatorLookup(authorId, viewerId, host) {
+  if (!authorId) throw new Error('Enter a creator id.');
+  VACO.mount(host, el('p', 'vaco-small vaco-dim', 'Loading…'));
+  var qs = viewerId ? ('?viewerId=' + encodeURIComponent(viewerId)) : '';
+  return Promise.all([
+    VACO.api('/api/authors/' + encodeURIComponent(authorId) + '/posts' + qs),
+    VACO.api('/api/authors/' + encodeURIComponent(authorId) + '/highlights'),
+    VACO.api('/api/authors/' + encodeURIComponent(authorId) + '/videos' + qs),
+    viewerId ? VACO.api('/api/follows/status?followerId=' + encodeURIComponent(viewerId) + '&followedId=' + encodeURIComponent(authorId)) : Promise.resolve(null),
+  ]).then(function (results) {
+    var posts = results[0].posts || [];
+    var highlights = results[1].highlights || [];
+    var videos = results[2].videos || [];
+    var followStatus = results[3];
+    var wrap = el('div', 'vaco-stack-sm');
+
+    if (viewerId && viewerId !== authorId) {
+      var isFollowing = !!(followStatus && followStatus.isFollowing);
+      wrap.appendChild(VACO.button(isFollowing ? 'Unfollow' : 'Follow', function () {
+        var path = isFollowing ? '/api/follows/remove' : '/api/follows';
+        return VACO.post(path, { followerId: viewerId, followedId: authorId }).then(function () {
+          VACO.toast(isFollowing ? 'Unfollowed.' : 'Followed.');
+          return renderCreatorLookup(authorId, viewerId, host);
+        });
+      }, isFollowing ? 'ghost' : 'primary'));
+    }
+
+    wrap.appendChild(el('p', 'vaco-label', 'Posts (' + posts.length + ')'));
+    wrap.appendChild(posts.length ? VACO.grid(posts.map(function (p) {
+      var lines = el('div', 'vaco-stack-sm');
+      lines.appendChild(postMedia(p));
+      lines.appendChild(el('p', 'vaco-small vaco-dim', p.caption || ''));
+      return VACO.card(null, [lines]);
+    })) : el('div', 'vaco-empty', 'No posts.'));
+
+    wrap.appendChild(el('p', 'vaco-label', 'Highlights (' + highlights.length + ')'));
+    wrap.appendChild(VACO.table([
+      { key: 'id', label: 'Id' },
+      { key: 'title', label: 'Title' },
+      { label: 'Stories', render: function (h) { return (h.storyPostIds || []).length; } },
+    ], highlights, { empty: 'No highlights.' }));
+
+    wrap.appendChild(el('p', 'vaco-label', 'Videos (' + videos.length + ')'));
+    wrap.appendChild(VACO.table([
+      { key: 'id', label: 'Id' },
+      { key: 'title', label: 'Title' },
+      { label: 'Locked', render: function (v) { return v.isLocked ? VACO.badge('locked tier', 'warn') : '—'; } },
+    ], videos, { empty: 'No videos.' }));
+
+    VACO.mount(host, wrap);
+  });
+}
+
+function renderDiscover(body) {
+  var userId = VACO.userId();
+  var out = el('div', 'vaco-stack');
+
+  var storiesHost = el('div', 'vaco-stack-sm');
+  out.appendChild(VACO.card('Stories', [storiesHost]));
+
+  var reelsHost = el('div', 'vaco-stack-sm');
+  out.appendChild(VACO.card('Reels', [reelsHost]));
+
+  var lookupHost = el('div', 'vaco-stack-sm');
+  out.appendChild(VACO.card('Look up a creator', [
+    el('p', 'vaco-small vaco-dim', 'Their posts, highlights, and long-form videos — plus a real follow/unfollow control if you\'re signed in.'),
+    VACO.form([
+      { name: 'authorId', label: 'Creator id', placeholder: 'e.g. leon-carter', width: '180px' },
+    ], function (values) {
+      return renderCreatorLookup(values.authorId, userId, lookupHost);
+    }, 'Look up'),
+    lookupHost,
+  ]));
+
+  var mapHost = el('div', 'vaco-stack-sm');
+  out.appendChild(VACO.card('Map search', [
+    el('p', 'vaco-small vaco-dim', 'Location-based business discovery — the same bridge HVNTZ syncs its own listings into.'),
+    VACO.form([
+      { name: 'lat', label: 'Lat', type: 'number', step: 'any', value: 38.63, width: '90px' },
+      { name: 'lng', label: 'Lng', type: 'number', step: 'any', value: -90.2, width: '90px' },
+      { name: 'radiusKm', label: 'Radius (km)', type: 'number', value: 25, width: '90px' },
+      { name: 'category', label: 'Category', placeholder: 'optional', width: '120px' },
+    ], function (values) {
+      var qs = 'lat=' + values.lat + '&lng=' + values.lng + '&radiusKm=' + values.radiusKm
+        + (values.category ? '&category=' + encodeURIComponent(values.category) : '');
+      return VACO.api('/api/map-search?' + qs).then(function (data) {
+        VACO.mount(mapHost, VACO.table([
+          { key: 'businessId', label: 'Business' },
+          { key: 'category', label: 'Category' },
+          { label: 'Distance (km)', render: function (r) { return VACO.round(r.distanceKm); } },
+        ], data.results || [], { empty: 'No listings in range.' }));
+      });
+    }, 'Search'),
+    mapHost,
+  ]));
+
+  return VACO.api('/api/stories').then(function (data) {
+    renderStoryStrip(data.stories || [], storiesHost);
+    return VACO.api('/api/reels');
+  }).then(function (data) {
+    renderReelRail(data.reels || [], reelsHost);
+    VACO.mount(body, out);
+  });
+}
+
 // -- Videos (long-form, on-demand) --------------------------------------
 //
 // `mediaUrl` is real and caller-supplied at creation, the same honest
@@ -689,6 +835,7 @@ VACO.app({
     { id: 'sessions', label: 'Sessions', heading: 'Live screen sessions', render: renderSessions },
     { id: 'events', label: 'Events', heading: 'Casino streams', render: renderEvents },
     { id: 'feed', label: 'Feed', heading: 'Content', render: renderFeed },
+    { id: 'discover', label: 'Discover', heading: 'Stories, Reels, creators & places', render: renderDiscover },
     { id: 'videos', label: 'Videos', heading: 'On-demand, long-form', render: renderVideos },
   ],
 });
