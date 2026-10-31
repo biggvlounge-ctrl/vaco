@@ -162,9 +162,11 @@ function renderHistory(body) {
 
 function renderBusiness(body) {
   var out = el('div', 'vaco-stack');
+  var results = el('div', 'vaco-stack');
+
   out.appendChild(VACO.card('Look up a business', [
     VACO.form([{ name: 'businessId', label: 'Business id', type: 'number', value: 9001, width: '110px' }],
-      function (values) { return loadBusiness(out, body, values.businessId); }, 'Load'),
+      function (values) { return loadBusiness(results, values.businessId); }, 'Load'),
   ]));
 
   if (VACO.userId()) {
@@ -179,20 +181,85 @@ function renderBusiness(body) {
           .then(function () { VACO.toast(values.tapCode + ' unfrozen', 'money'); });
       }, 'Unfreeze'),
     ]));
+
+    // POST /api/taps — previously unreachable from any frontend: the
+    // one route that creates a Tap Point had no form anywhere. Scoped
+    // to business Taps here, matching this card's own owner-only
+    // section; a personal wearable registers itself on the My Tap tab,
+    // since that is a self-service action, not an owner action.
+    out.appendChild(VACO.card('Register a new tap', [
+      'Owner-only — registers a new Tap Point for a business you own, the same registerTap() every seeded chair went through.',
+      VACO.form([
+        { name: 'businessId', label: 'Business id', type: 'number', value: 9001, width: '110px' },
+        { name: 'objectType', label: 'Object (e.g. "Chair 6")', value: '', width: '170px' },
+      ], function (values) {
+        return VACO.post('/api/taps', {
+          tapType: 'business',
+          businessId: values.businessId,
+          objectType: values.objectType || null,
+        }).then(function (tap) {
+          VACO.toast('Registered ' + tap.tapCode, 'money');
+        });
+      }, 'Register'),
+    ]));
+
+    // POST /api/taps/:tapCode/assignments — §5's dynamic assignment,
+    // also never reachable from the UI. The identity must be
+    // VACA-verified or this refuses with the real reason, surfaced the
+    // same way every other form here surfaces a server error.
+    out.appendChild(VACO.card('Assign a tap', [
+      'Owner-only — who currently answers for this Tap. assignTap() requires the assignee to be VACA-verified.',
+      VACO.form([
+        { name: 'tapCode', label: 'Tap code', value: 'VT-000001', width: '140px' },
+        { name: 'assignedIdentityId', label: 'Assignee identity id', value: '', width: '170px' },
+      ], function (values) {
+        return VACO.post('/api/taps/' + encodeURIComponent(values.tapCode) + '/assignments', {
+          assignedIdentityId: values.assignedIdentityId,
+        }).then(function (assignment) {
+          VACO.toast(values.tapCode + ' assigned to ' + assignment.assignedIdentityId, 'money');
+        });
+      }, 'Assign'),
+    ]));
+
+    // POST /api/taps/:tapCode/dreams-screen (+ /unlink) — a reference
+    // link to a real DREAMS screen at the same physical location.
+    // Business taps only; linkDreamsScreen() itself refuses anything
+    // else, so a wrong tapCode surfaces that real message rather than
+    // this form pretending to validate it first.
+    out.appendChild(VACO.card('Link a DREAMS screen', [
+      'Owner-only, business taps only — names a real DREAMS screen at the same physical location. A reference only: neither record is copied.',
+      VACO.form([
+        { name: 'tapCode', label: 'Tap code', value: 'VT-000001', width: '140px' },
+        { name: 'dreamsScreenId', label: 'DREAMS screen id', value: '', width: '140px' },
+      ], function (values) {
+        return VACO.post('/api/taps/' + encodeURIComponent(values.tapCode) + '/dreams-screen', {
+          dreamsScreenId: values.dreamsScreenId,
+        }).then(function (tap) {
+          VACO.toast(values.tapCode + ' linked to screen ' + tap.dreamsScreenId, 'money');
+        });
+      }, 'Link'),
+      VACO.form([
+        { name: 'tapCode', label: 'Tap code', value: 'VT-000001', width: '140px' },
+      ], function (values) {
+        return VACO.post('/api/taps/' + encodeURIComponent(values.tapCode) + '/dreams-screen/unlink', {})
+          .then(function () { VACO.toast(values.tapCode + ' unlinked', 'warn'); });
+      }, 'Unlink'),
+    ]));
   }
 
-  out.appendChild(el('div', 'vaco-empty', 'Enter a business id above — try 9001, HUNT Barber Shop.'));
+  out.appendChild(results);
+  results.appendChild(el('div', 'vaco-empty', 'Enter a business id above — try 9001, HUNT Barber Shop.'));
   return VACO.mount(body, out);
 }
 
-function loadBusiness(out, body, businessId) {
+function loadBusiness(results, businessId) {
   return Promise.all([
     VACO.api('/api/business/' + encodeURIComponent(businessId) + '/taps'),
     VACO.api('/api/business/' + encodeURIComponent(businessId) + '/revenue').catch(function () { return null; }),
   ]).then(function (r) {
     var taps = r[0].taps || [], revenue = r[1];
-    var replacement = el('div', 'vaco-stack');
-    replacement.appendChild(VACO.card('Taps at business ' + businessId, [
+    var cards = [];
+    cards.push(VACO.card('Taps at business ' + businessId, [
       VACO.table([
         { key: 'tapCode', label: 'Tap' },
         { key: 'tapType', label: 'Type' },
@@ -200,7 +267,7 @@ function loadBusiness(out, body, businessId) {
       ], taps, { empty: 'No Taps registered for this business yet.' }),
     ]));
     if (revenue) {
-      replacement.appendChild(VACO.card('Revenue by tap', [
+      cards.push(VACO.card('Revenue by tap', [
         el('p', 'vaco-small vaco-dim', 'Tap -> transaction -> revenue, attributed per Tap — visible only to this business\'s owner.'),
         VACO.table([
           { key: 'tapCode', label: 'Tap' },
@@ -210,15 +277,11 @@ function loadBusiness(out, body, businessId) {
         ], revenue.byTap || [], { empty: 'No revenue recorded yet.' }),
       ]));
     } else {
-      replacement.appendChild(el('div', 'vaco-empty', 'Sign in as this business\'s owner to see its revenue.'));
+      cards.push(el('div', 'vaco-empty', 'Sign in as this business\'s owner to see its revenue.'));
     }
-    while (out.childNodes.length > 2) out.removeChild(out.lastChild);
-    out.appendChild(replacement);
-    VACO.mount(body, out);
+    VACO.mount(results, cards);
   }).catch(function (err) {
-    while (out.childNodes.length > 2) out.removeChild(out.lastChild);
-    out.appendChild(VACO.notice('Could not load business ' + businessId + ': ' + VACO.escapeHtml(err.message), 'danger'));
-    VACO.mount(body, out);
+    VACO.mount(results, VACO.notice('Could not load business ' + businessId + ': ' + VACO.escapeHtml(err.message), 'danger'));
   });
 }
 
