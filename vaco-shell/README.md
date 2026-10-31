@@ -183,3 +183,82 @@ specialist-relay/general-chat behavior itself re-verified in
   disabled tile — once VACON-C gets a real API layer (see its own
   README's own flagged, ready-to-do gap), its tile here should be
   updated to a real `url`, not rebuilt from scratch.
+
+## Frontend coverage pass (31 Oct 2026)
+
+A fresh audit against `server.js` found `public/index.html` already a
+real, extensive client — identity/session (`/api/session`,
+`/api/register`, `/api/login`), the App Store, Merch, Library,
+Ecosystem launcher, Insight, the personal assistant proxy (including
+its call flow), and Explore all make real calls already, each checked
+against its own route and `lib/*.js` function rather than assumed.
+What was genuinely missing: two real read routes with no frontend at
+all, and one real write route the Library never called.
+
+- **Earnings tab** — `GET /api/store/publishers/:publisherId`
+  (App Store publisher payouts: listings, gross VCoin, store fees
+  withheld, net to publisher) and `GET /api/merch/brands/:appBrandId/earnings`
+  (merch brand payouts: orders, units sold, gross VCoin, fulfilment
+  cost, brand payout, platform fees) had zero frontend exposure. Both
+  are real, unauthenticated reads — there is no publisher or brand
+  account system anywhere in this ecosystem (`lib/appStore.js`,
+  `lib/merchStore.js` — a listing's `publisherId` and a merch
+  product's `appBrandId` are plain strings, not logins) — so this is a
+  direct id-in/numbers-out lookup, with the page saying plainly that
+  the lookup itself is public, rather than a dashboard pretending to
+  sit behind a sign-in that was never built. The brand dropdown is
+  populated from the same `/api/merch/brands` list the Merch tab
+  already fetches, so the two tabs cannot disagree about which brands
+  exist. Live-verified against a running `vaco-shell` + `shield`: both
+  routes answer with the real shapes this tab renders, including the
+  real all-zero response for a publisher/brand id that owns nothing.
+- **Library: Uninstall** — `POST /api/store/uninstall` had no
+  frontend. `lib/appStore.js`'s own rule, held by
+  `test/appStore.test.js`'s own "uninstalling is not refunding" case,
+  is that uninstalling is bookkeeping only: access and any money paid
+  both survive it. The new "Uninstall" button on an owned, accessible
+  Library entry calls the real route and, once `uninstalledAt` comes
+  back set, the card shows an "Uninstalled" badge *alongside* "Active"
+  rather than hiding the entry or implying access was revoked — the
+  honest reflection of what the backend actually does, confirmed live
+  (install → uninstall → re-read the library: `access.allowed` stays
+  `true` throughout).
+
+**Also fixed in the same pass, found while booting a clean instance to
+verify the above**: `lib/seedStore.js` had no pricing decision for
+`vaco-assistant` or `cvllex`, so `seedStore()` threw on any fresh store
+(no existing `data/store.json`) and the whole app refused every
+request — caught by this app's own `scripts/test/store-pricing.test.mjs`,
+which was already failing before this pass. `vaco-assistant` is now
+priced `infrastructure` (a service other apps call, same bucket as
+`v4-proxy`/`v4-search`); `cvllex` is priced `transacts` (it charges
+real customers for real physical runs on its own routes, same bucket
+as `voken`/`vulture-music`).
+
+**Deliberately left for later, and why:**
+- `GET /api/apps/:id`, `GET /api/store/listings/:appId`,
+  `GET /api/bundles(/:name)`, `GET /api/constellations(/:name)`,
+  `GET /api/merch/products/:productId`, `GET /api/merch/orders/:id`,
+  `GET /api/store/access/:userId/:appId` are real but low-value as
+  dedicated frontend surfaces: each answers a strict subset of data the
+  page already renders from a list endpoint it calls (`/api/apps`,
+  `/api/store/listings`, `/api/merch/products`, `/api/store/library`),
+  so a one-off detail view would mostly restate what is already on
+  screen.
+- `POST /api/store/listings`, `DELETE /api/store/listings/:appId`,
+  `POST /api/merch/products`, `DELETE /api/merch/products/:productId`,
+  `POST /api/merch/orders/:id/submit`, `POST /api/merch/orders/:id/advance`,
+  `POST /api/merch/products/:productId/physical-run` all require
+  `requireCallingService()` — a trusted-service credential, not a
+  Shield session. This frontend has no login for one, so a publisher-
+  admin UI here would have to fake holding a credential it does not
+  have; those stay real, working backend-only capabilities instead.
+- `POST /api/store/refund` requires `requireOperator('vaco-shell:reversal')`
+  — a separate vaco-operator credential this page's own session cannot
+  satisfy. The Library's existing "Refund" button calls it anyway (pre-
+  existing, not added this pass) and will 403 against a real deployment
+  with that guard enforced; flagged here rather than silently left to be
+  discovered, since fixing it is either a real operator-credential UI
+  (this page has none) or a product decision about whether a user's own
+  refund request should route through one, not a frontend gap to close
+  by guessing.
