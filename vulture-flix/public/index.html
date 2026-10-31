@@ -108,11 +108,22 @@ function renderAccount(body) {
   }
 
   return Promise.all([
+    // `GET /api/subscriptions/:userId` always answers 200 with
+    // `{ userId, subscription, isActive }` -- `subscription` is `null`
+    // for someone who never subscribed. The response envelope itself
+    // is therefore always truthy; the real subscription record is the
+    // nested `subscription` field, read below as `sub`.
     VACO.api('/api/subscriptions/' + encodeURIComponent(id)).catch(function () { return null; }),
     VACO.api('/api/users/' + encodeURIComponent(id) + '/active-streams').catch(function () { return null; }),
     VACO.api('/api/users/' + encodeURIComponent(id) + '/watch-history').catch(function () { return null; }),
+    // The real, named per-tier concurrency limits -- `GET /api/health`
+    // is the only route that exposes `tierMaxSimultaneousStreams`, so
+    // the stream-slot display below can show the caller's *real* tier
+    // limit instead of guessing at a field no route ever returns.
+    VACO.api('/api/health').catch(function () { return null; }),
   ]).then(function (r) {
-    var sub = r[0], streams = r[1], history = r[2];
+    var subResp = r[0], streams = r[1], history = r[2], health = r[3];
+    var sub = subResp && subResp.subscription;
 
     if (sub) {
       var lines = el('div', 'vaco-stack-sm');
@@ -122,7 +133,8 @@ function renderAccount(body) {
 
       if (streams) {
         var used = (streams.activeStreams || streams.streams || []).length;
-        var max = streams.maxConcurrent || sub.maxConcurrentStreams || 1;
+        var tierLimits = (health && health.tierMaxSimultaneousStreams) || {};
+        var max = tierLimits[sub.tier] || 1;
         var slots = el('div', 'stream-slots');
         for (var i = 0; i < max; i++) {
           slots.appendChild(el('div', 'slot' + (i < used ? ' slot-used' : '')));
@@ -130,11 +142,26 @@ function renderAccount(body) {
         lines.appendChild(slots);
         lines.appendChild(el('p', 'vaco-small', used + ' of ' + max + ' streams in use'));
       }
+
+      if (sub.status === 'active') {
+        lines.appendChild(VACO.button('Cancel subscription', function () {
+          return VACO.post('/api/subscriptions/' + encodeURIComponent(id) + '/cancel', {})
+            .then(function () {
+              VACO.toast('Subscription cancelled.', 'warn');
+              VACO.render();
+            });
+        }, 'ghost'));
+      } else {
+        lines.appendChild(VACO.badge(sub.status));
+      }
       out.appendChild(VACO.card('Subscription', [lines]));
-    } else {
-      out.appendChild(VACO.card('No subscription', [
+    }
+
+    if (!sub || sub.status !== 'active') {
+      var tierOptions = (health && health.subscriptionTiers) || ['ad-supported', 'standard', 'premium'];
+      out.appendChild(VACO.card(sub ? 'Re-subscribe' : 'No subscription', [
         el('p', 'vaco-small vaco-dim', 'Subscribe to watch. Payment moves real VCoin through V3.'),
-        VACO.form([{ name: 'tier', label: 'Tier', options: ['basic', 'standard', 'premium'] }],
+        VACO.form([{ name: 'tier', label: 'Tier', options: tierOptions }],
           function (values) {
             return VACO.post('/api/subscriptions', { userId: id, tier: values.tier })
               .then(function () {
