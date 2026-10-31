@@ -119,6 +119,41 @@ works standalone once seeded.
 | `GET /api/passports/:businessId` | none | fails soft to `business: null` if HVNTZ is unreachable |
 | `POST /api/passports/:businessId/verify` | session, HVNTZ business owner | Level 1→2 — calls VACA's real, already-generic verification |
 | `POST /api/passports/:businessId/network-activity` | session, HVNTZ business owner | Level 2→3 — reads V3's real transaction history, never a second copy |
+| `POST /api/passports/:businessId/escrow` | session, HVNTZ business owner | Level 3 only — opens a hold, charging the payer into escrow through V3's real `/api/vcoin/settle` |
+| `GET /api/passports/:businessId/escrow` | none | lists a business's real escrow holds |
+| `GET /api/escrow/:id` | none | one hold by id |
+| `POST /api/escrow/:id/release` | session, owner of the hold's business | pays the payee out of escrow |
+| `POST /api/escrow/:id/refund` | session, owner of the hold's business | pays the payer back out of escrow |
+
+## Frontend coverage pass (31 Oct 2026)
+
+An audit found `public/index.html` making real calls against only 4 of
+this app's 10 routes — the Passport and Manage tabs covered register →
+verify → assess (Levels 1-3), but `lib/escrow.js`'s entire Level 3
+capability (five routes: open, list, get-by-id, release, refund) had
+**zero** frontend exposure. One new tab closes that gap.
+
+- **Escrow tab** — lists a business's real escrow holds
+  (`GET /api/passports/:businessId/escrow`), looks up a single hold by
+  id (`GET /api/escrow/:id`), opens a new hold for a signed-in
+  business owner by charging a real payer into V3 escrow
+  (`POST /api/passports/:businessId/escrow` — `payerId`/`payeeId` as
+  plain V3 userId strings, `amount`, optional `reason`, matching
+  `lib/escrow.js`'s own `openEscrowHold` signature exactly), and
+  releases or refunds a held hold back out
+  (`POST /api/escrow/:id/release`, `POST /api/escrow/:id/refund`).
+  Every held hold's two action buttons call these directly — the
+  server, not the page, enforces that only the business's real HVNTZ
+  owner may release or refund its own hold, and that only a real
+  Level 3 ("network") business may open one at all
+  (`requireNetworkLevelBusiness`). The list/get-by-id reads are public,
+  same "resolution identifies, it does not authorize" posture the rest
+  of this app's routes already hold to — anyone can see a hold's
+  status, only the real owner can act on it.
+
+`GET /api/health` stays without a UI, same as every other app's own
+health probe in this ecosystem — it is an operational endpoint, not a
+feature.
 
 ## Why some things fail with 502, not a hang
 
