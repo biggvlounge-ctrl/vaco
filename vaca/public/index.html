@@ -17,7 +17,9 @@
 // VACA — identity and authenticity verification.
 //
 // The third component of V3, and the service six other apps read before
-// they trust a claim. Real client of its own 8 routes.
+// they trust a claim. Real client of its own 12 routes: the submit/
+// review/lookup loop, plus the local blockchain ledger (its integrity
+// check, per-block lookup, and public-chain anchoring posture/action).
 //
 // **Approval is a human act here, not an algorithm.** VACA records a
 // verification request, and someone approves or rejects it. Nothing on
@@ -34,6 +36,12 @@ function gradeColour(grade) {
   if (g.charAt(0) === 'B') return 'var(--vaco-accent)';
   if (g.charAt(0) === 'C') return 'var(--vaco-warn)';
   return 'var(--vaco-danger)';
+}
+
+function shortHash(h) {
+  if (!h) return '—';
+  var s = String(h);
+  return s.length > 18 ? s.slice(0, 10) + '…' + s.slice(-6) : s;
 }
 
 function renderLookup(body) {
@@ -138,6 +146,109 @@ function renderQueue(body) {
   return VACO.mount(body, out);
 }
 
+function renderChain(body) {
+  var out = el('div', 'vaco-stack');
+
+  out.appendChild(VACO.notice(
+    '<strong>This is a real local chain, not a distributed one.</strong> Every approve/reject decision VACA '
+    + 'makes is appended here as a real block, cryptographically linked to the block before it — altering any '
+    + 'past block changes every hash after it, and that is detectable below. There is no peer network and no '
+    + 'consensus protocol; it is one ledger, inside VACA. Posting a block\'s hash to a real public chain '
+    + '(Ethereum, Polygon, etc.) is a separate, genuinely different thing, configured only once a funded '
+    + 'wallet and RPC provider exist — nothing here fabricates a transaction.', 'warn'));
+
+  var postureCard = el('div');
+  out.appendChild(postureCard);
+
+  function loadPosture() {
+    return VACO.api('/api/chain/posture').then(function (p) {
+      VACO.mount(postureCard, VACO.card('Public-chain anchoring', [
+        VACO.badge(p.configured ? 'configured' : 'not configured', p.configured ? 'money' : 'warn'),
+        el('p', 'vaco-small vaco-dim', p.note),
+      ]));
+    });
+  }
+
+  var chainCard = el('div');
+  out.appendChild(chainCard);
+
+  function loadChain() {
+    return VACO.api('/api/chain').then(function (r) {
+      var chain = (r.chain || []).slice().reverse();
+      var integrity = r.integrity || {};
+      var header = el('div', 'vaco-row-tight');
+      header.appendChild(VACO.badge(
+        integrity.valid ? 'chain intact' : 'broken at block ' + integrity.brokenAtIndex,
+        integrity.valid ? 'money' : 'danger'));
+      header.appendChild(el('span', 'vaco-small vaco-dim',
+        chain.length + ' block' + (chain.length === 1 ? '' : 's') + ' recorded'));
+
+      VACO.mount(chainCard, VACO.card('Chain', [
+        header,
+        VACO.table([
+          { key: 'index', label: 'Block', num: true },
+          { label: 'When', render: function (b) { return new Date(b.timestamp).toLocaleString(); } },
+          { label: 'Decision', render: function (b) {
+            var d = b.data || {};
+            return (d.claimType || '—') + ' · ' + (d.status || '—') + (d.grade ? ' (' + d.grade + ')' : '');
+          } },
+          { label: 'Hash', render: function (b) { return el('span', 'vaco-mono vaco-small', shortHash(b.hash)); } },
+        ], chain, { empty: 'No decisions recorded yet — approve or reject a verification to append the first block.' }),
+      ], { trailing: VACO.button('Refresh', function () { return loadChain(); }) }));
+    });
+  }
+
+  var blockResult = el('div');
+  out.appendChild(VACO.card('Look up one block', [
+    el('p', 'vaco-small vaco-dim',
+      'Each block is addressed by its index — the same index a verification\'s own blockIndex field records.'),
+    VACO.form([{ name: 'index', label: 'Block index', type: 'number', min: 0, value: 0, width: '120px' }],
+      function (values) {
+        return VACO.api('/api/chain/block/' + values.index).then(function (b) {
+          var lines = el('div', 'vaco-stack-sm');
+          lines.appendChild(el('p', 'vaco-small', 'Block ' + b.index + ' · ' + new Date(b.timestamp).toLocaleString()));
+          lines.appendChild(el('p', 'vaco-mono vaco-small vaco-dim', 'hash: ' + b.hash));
+          lines.appendChild(el('p', 'vaco-mono vaco-small vaco-dim', 'previous: ' + b.previousHash));
+          lines.appendChild(el('pre', 'vaco-mono vaco-small', JSON.stringify(b.data, null, 2)));
+          VACO.mount(blockResult, lines);
+        });
+      }, 'Look up'),
+    blockResult,
+  ]));
+
+  var anchorResult = el('div');
+  out.appendChild(VACO.card('Anchor a decision on a public chain', [
+    el('p', 'vaco-small vaco-dim',
+      'Operator-gated. Posts this verification\'s own block hash as a real, minimal transaction on a real '
+      + 'public chain — real gas, every call. Requires VACA_CHAIN_RPC_URL and VACA_CHAIN_PRIVATE_KEY to be set '
+      + 'on the server first; until then this honestly refuses rather than making up a transaction hash, and '
+      + 'the verification must already be approved or rejected (it needs a block to anchor).'),
+    VACO.form([
+      { name: 'credential', label: 'X-Operator-Credential', placeholder: 'from vaco-operator', width: '200px' },
+      { name: 'id', label: 'Verification id', type: 'number', min: 1, value: 1, width: '120px' },
+    ], function (values) {
+      if (!values.credential) { VACO.toast('An operator credential is required to anchor.', 'warn'); return Promise.resolve(); }
+      return VACO.api('/api/verifications/' + values.id + '/anchor-on-chain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Operator-Credential': values.credential },
+        body: JSON.stringify({}),
+      }).then(function (r) {
+        VACO.toast(
+          r.chainConfigured ? 'Anchored: ' + shortHash(r.anchor.txHash) : 'Anchor call returned, but no real chain is configured.',
+          r.chainConfigured ? 'money' : 'warn');
+        VACO.mount(anchorResult, el('pre', 'vaco-mono vaco-small', JSON.stringify(r, null, 2)));
+        loadChain();
+      });
+    }, 'Anchor'),
+    anchorResult,
+  ]));
+
+  loadPosture();
+  loadChain();
+
+  return VACO.mount(body, out);
+}
+
 VACO.app({
   id: 'vaca',
   name: 'VACA',
@@ -151,6 +262,7 @@ VACO.app({
   tabs: [
     { id: 'lookup', label: 'Lookup', heading: 'Check a subject', render: renderLookup },
     { id: 'queue', label: 'Review', heading: 'Verification requests', render: renderQueue },
+    { id: 'chain', label: 'Chain', heading: 'Local chain & public anchoring', render: renderChain },
   ],
 });
 </script>
