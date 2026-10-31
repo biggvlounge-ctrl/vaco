@@ -96,28 +96,49 @@ function renderNewOrder(body) {
 
 function renderMyOrders(body) {
   var out = el('div', 'vaco-stack');
-  out.appendChild(el('div', null));
+  var stats = el('div', null);
+  var list = el('div', 'vaco-stack');
+  out.appendChild(stats);
+  out.appendChild(list);
   VACO.mount(body, out);
+
+  // The real cross-vault "units actually sold" number for this
+  // creator -- GET /api/creators/:creatorId/units-redeemed, same
+  // number VOKEN's own cross-platform achievement score reads live
+  // (see README.md). A redemption, not a vaulted unit, so this never
+  // overstates unsold inventory as if it had already sold. Purely
+  // informational, so a failed fetch just leaves it blank rather than
+  // blocking the order list below.
+  function loadStats() {
+    if (!VACO.session) { VACO.clear(stats); return; }
+    VACO.api('/api/creators/' + encodeURIComponent(VACO.userId()) + '/units-redeemed')
+      .then(function (r) {
+        VACO.mount(stats, el('p', 'vaco-small vaco-dim',
+          'Real units sold (redeemed) across every vault you’ve opened: ' + r.totalUnitsRedeemed));
+      })
+      .catch(function () { VACO.clear(stats); });
+  }
 
   function load() {
     if (!VACO.session) {
-      out.appendChild(el('div', 'vaco-empty', 'Sign in to see your production orders.'));
+      VACO.mount(list, el('div', 'vaco-empty', 'Sign in to see your production orders.'));
       return;
     }
     VACO.api('/api/production-orders/creator/' + encodeURIComponent(VACO.userId()))
       .then(function (r) {
-        while (out.lastChild) out.removeChild(out.lastChild);
         var orders = r.orders || [];
         if (orders.length === 0) {
-          out.appendChild(el('div', 'vaco-empty', 'No production orders yet — place one from the Order tab.'));
+          VACO.mount(list, el('div', 'vaco-empty', 'No production orders yet — place one from the Order tab.'));
           return;
         }
-        orders.forEach(function (o) { out.appendChild(orderRow(o)); });
+        VACO.clear(list);
+        orders.forEach(function (o) { list.appendChild(orderRow(o)); });
       })
-      .catch(function (err) { out.appendChild(VACO.notice(VACO.escapeHtml(err.message), 'danger')); });
+      .catch(function (err) { VACO.mount(list, VACO.notice(VACO.escapeHtml(err.message), 'danger')); });
   }
-  renderMyOrders.refresh = load;
+  renderMyOrders.refresh = function () { load(); loadStats(); };
   load();
+  loadStats();
 }
 
 function renderRedeem(body) {

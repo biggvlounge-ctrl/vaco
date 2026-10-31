@@ -158,6 +158,25 @@ npm test
 `test/physicalProduction.test.js` and `test/vault.test.js` cover both
 modules against injected fake cross-app functions — no network.
 
+## Frontend coverage pass (31 Oct 2026)
+
+An audit found `public/index.html` making 8 real calls against 6 of
+this app's 9 routes — the only route with genuinely zero frontend
+exposure was `GET /api/creators/:creatorId/units-redeemed`, the real
+cross-vault "units actually sold" number added for VOKEN's
+cross-platform achievement score to read live. The **My orders** tab
+now also calls it directly for the signed-in creator and shows the
+real total above their order list, so a creator can see their own
+real sales figure in this app too, not only have VOKEN read it behind
+the scenes. No new route, no new payload shape — a real client of the
+one route this app already exposed but never called. The other two
+routes (`GET /api/health`, `GET /api/production-orders/:id`) stay
+backend-only, by design: the former is an ops/liveness check, not a
+user-facing action, and the latter exists for VOKEN to call back into
+unauthenticated to verify order ownership before minting (see the
+table below) — not a lookup a creator's own browser has any reason to
+make directly.
+
 ## Routes
 
 | Route | Auth | Notes |
