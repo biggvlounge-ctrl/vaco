@@ -173,6 +173,37 @@ function renderSystem(body) {
           })),
       ]));
     }
+
+    var reconCard = el('div');
+    out.appendChild(reconCard);
+    reconCard.appendChild(VACO.card('Reconciliation', [
+      el('p', 'vaco-small vaco-dim',
+        'The question a banking or BaaS partner asks first: does the transaction history explain every '
+        + 'balance? Unauthenticated read — same posture as a balance lookup.'),
+      VACO.button('Run reconciliation', function () {
+        return VACO.api('/api/vcoin/reconciliation').then(function (r) {
+          var body = [
+            VACO.table([{ key: 'field', label: 'Field' }, { key: 'value', label: 'Value' }], [
+              { field: 'Accounts', value: r.accounts },
+              { field: 'Ledger entries', value: r.entries },
+              { field: 'Balanced', value: r.balanced ? 'yes' : 'no' },
+            ]),
+          ];
+          if (!r.balanced) {
+            body.push(el('p', 'vaco-small', 'Discrepancies — stored balance does not match what the history explains:'));
+            body.push(VACO.table([
+              { key: 'userId', label: 'Account' },
+              { key: 'expected', label: 'Expected', num: true },
+              { key: 'actual', label: 'Actual', num: true },
+              { key: 'drift', label: 'Drift', num: true },
+            ], r.discrepancies));
+          }
+          reconCard.innerHTML = '';
+          reconCard.appendChild(VACO.card('Reconciliation — ' + (r.balanced ? 'balanced' : r.discrepancies.length + ' discrepancy(s)'), body));
+        });
+      }, 'primary'),
+    ]));
+
     return out;
   });
 }
