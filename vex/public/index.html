@@ -34,25 +34,99 @@ function renderGates(body) {
     + 'not flagged. <strong>Nothing here connects to a real regulator or broker-dealer</strong> — the gate '
     + 'model is real, the regulatory relationship is not.', 'warn'));
 
+  // A dedicated result slot, not the old trim-by-count on `out` --
+  // this tab now has several persistent cards below it (System
+  // status, the operator gate-setter), so deleting "everything past
+  // index 2" would delete those instead of just the previous check's
+  // result.
+  var gateResult = el('div', null);
   out.appendChild(VACO.card('Check a gate', [
     VACO.form([{ name: 'gateName', label: 'Gate', placeholder: 'gate name', width: '200px' }],
       function (values) {
         return VACO.api('/api/compliance-gate/' + encodeURIComponent(values.gateName)).then(function (gate) {
-          while (out.childNodes.length > 2) out.removeChild(out.lastChild);
           var row = el('div', 'gate');
           row.appendChild(el('span', 'gate-name', values.gateName));
           row.appendChild(el('span', 'vaco-spacer'));
-          row.appendChild(gate.open || gate.passed
+          // `isComplianceCleared` returns `{gateName, cleared}` --
+          // this read `gate.open || gate.passed`, neither of which the
+          // route has ever sent, so the badge showed "closed" even
+          // when the gate was genuinely cleared. A status read that
+          // always says closed is worse than no status at all in a
+          // brokerage app.
+          row.appendChild(gate.cleared
             ? VACO.badge('open', 'money')
             : VACO.badge('closed', 'danger'));
-          out.appendChild(VACO.card('Gate status', [row,
-            el('p', 'vaco-small vaco-dim', gate.reason || gate.description || '')]));
-          VACO.mount(body, out);
+          VACO.mount(gateResult, VACO.card('Gate status', [row]));
         });
       }, 'Check'),
+    gateResult,
   ]));
 
+  var statusResult = el('div', null);
+  out.appendChild(VACO.card('System status', [
+    el('p', 'vaco-small vaco-dim',
+      'The real net-capital model, order types, and gate names this server knows about — from GET /api/health.'),
+    VACO.button('Load status', function () {
+      return VACO.api('/api/health').then(function (h) {
+        var rows = [
+          { field: 'service', value: h.service },
+          { field: 'net capital models', value: (h.netCapitalModels || []).join(', ') },
+          { field: 'order types', value: (h.orderTypes || []).join(', ') },
+          { field: 'gates', value: (h.gates || []).join(', ') },
+        ];
+        VACO.mount(statusResult, VACO.table([{ key: 'field', label: 'Field' }, { key: 'value', label: 'Value' }], rows));
+      });
+    }),
+    statusResult,
+  ]));
+
+  out.appendChild(renderOperatorGate());
+
   return VACO.mount(body, out);
+}
+
+// -- Operator: set a compliance gate -----------------------------------
+//
+// `POST /api/compliance-gate/:gateName` is requireOperator('vex:compliance')
+// -- the real admin action that is "not a routine toggle" per
+// lib/complianceGate.js's own header: it fires only after actual
+// broker-dealer registration/legal work clears. There is no operator
+// login in this frontend (same as every other app's operator tooling
+// in this ecosystem) -- a real X-Operator-Credential from vaco-operator
+// is pasted in by hand, the same shape cvnvo/yap's moderation tab
+// already uses for its own operator-only routes.
+function renderOperatorGate() {
+  var state = { credential: '' };
+  var resultBox = el('div', null);
+
+  var card = VACO.card('Set a gate (operator only)', [
+    VACO.notice(
+      'This is the real brokerage interlock, not a demo toggle. Clearing it here clears it for every order '
+      + 'this server will accept. A real human operator credential is required — there is no fallback, and a '
+      + 'service token is explicitly refused by this route.', 'danger'),
+    VACO.form([{ name: 'credential', label: 'X-Operator-Credential', placeholder: 'from vaco-operator', width: '220px' }],
+      function (values) {
+        state.credential = values.credential;
+        VACO.toast('Credential set for this session (not stored).');
+      }, 'Use this credential'),
+    VACO.form([
+      { name: 'gateName', label: 'Gate', value: 'vex-brokerage', width: '160px' },
+      { name: 'cleared', label: 'Status', options: [{ label: 'Clear (open)', value: 'true' }, { label: 'Hold (closed)', value: 'false' }] },
+      { name: 'reason', label: 'Reason', placeholder: 'why', width: '220px' },
+    ], function (values) {
+      if (!state.credential) { VACO.toast('Set an operator credential first.', 'warn'); return Promise.resolve(); }
+      return VACO.api('/api/compliance-gate/' + encodeURIComponent(values.gateName), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Operator-Credential': state.credential },
+        body: JSON.stringify({ cleared: values.cleared === 'true', reason: values.reason || null }),
+      }).then(function (result) {
+        VACO.toast('Gate ' + result.gateName + ' is now ' + (result.cleared ? 'open' : 'closed') + '.', result.cleared ? 'money' : 'warn');
+        VACO.mount(resultBox, el('pre', 'vaco-mono vaco-small', JSON.stringify(result, null, 2)));
+      });
+    }, 'Set gate'),
+    resultBox,
+  ]);
+  return card;
 }
 
 function renderAccount(body) {
