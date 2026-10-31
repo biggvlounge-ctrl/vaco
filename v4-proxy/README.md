@@ -93,3 +93,105 @@ does not include auth (no user accounts exist yet per the CLAUDE.md
 gaps), persistent logging, or per-user quotas. Add those once real
 auth exists — right now every request is anonymous, same as the rest
 of the prototype.
+
+## Frontend coverage pass (31 Oct 2026)
+
+An audit found `public/index.html` making real calls against only 11
+of this app's 28 routes. All three existing tabs (Maps, Twins, Calls)
+kept their original shape; this pass filled in the real routes each
+one left uncalled, plus two pre-existing bugs that meant part of the
+*existing* coverage never actually worked. Every new call was checked
+against its real `lib/*.js` function signature and the live server's
+actual response shape (via `curl`, service-credential auth) before
+being wired — no field name or payload shape here was guessed.
+
+**Two pre-existing bugs, fixed as part of this pass** (both verified
+directly against `lib/maps.js` / `lib/agentCall.js` before being
+touched):
+
+- **Maps tab, "Register a place"** posted only `placeId`/`name`/`lat`/
+  `lng`. `registerPlace()` also requires `kind` (one of
+  `lib/maps.js`'s `PLACE_KINDS`) and `sourceApp` — every submission was
+  failing with a 400. Added both fields.
+- **Calls tab, "Place a call"** posted `fromUserId`/`toAgentId`.
+  `placeCall()` and the route's own `requireActor("userId")` guard
+  both want `userId`/`agentId` — every call placement was refused with
+  a 400, which meant the whole rest of the Calls tab (the table,
+  Answer/Decline) had nothing real to operate on. Fixed the field
+  names and added the real optional `topic` field.
+
+**Maps tab** — `lib/maps.js` had seven routes with no frontend caller:
+
+- `POST /api/maps/nearby` — "Find nearby places" radius search.
+- `POST /api/maps/bounds` — used two ways: a real "Registered places"
+  list (a world-spanning box turns the real viewport query into "every
+  place", rather than inventing a list-all route) with a real
+  `DELETE /api/maps/place/:id` action per row, and available as the
+  underlying viewport query itself.
+- `GET /api/maps/place/:id` — "Look up a place by id".
+- `POST /api/maps/route` — "Plan a route", a 2–3 stop form showing
+  real cumulative leg distance/time and the response's own
+  "not road routing" disclaimer.
+- `POST /api/maps/sighting` — "Record a sighting", the raw signal
+  behind crossings and foot traffic.
+- `POST /api/maps/crossings` — "Find my crossings" (what Kevin's
+  system prompt promises CVNVO; the backend enforces that the
+  signed-in session matches the `userId` being queried).
+- `POST /api/maps/foot-traffic` — "Foot traffic near a point" (what
+  DREA's system prompt promises DREAMS), shown with the response's own
+  "self-reported, not independently audited" disclaimer rather than
+  presenting it as verified measurement.
+
+**Twins tab** — `lib/twinProfiles.js` / `lib/surfaces.js` had three
+routes with no frontend caller, plus an existing table asking for
+fields the real response never returns:
+
+- The existing "Twins" table asked for `displayName`/`animationState`
+  columns; `GET /api/twins` only ever returns
+  `agentId`/`preferredFraming`/`voiceProfile`/`embodied` — every row
+  was silently rendering em dashes. Replaced with the real fields, and
+  added real columns (`label`/`maxFraming`/`video`) to the existing
+  "Surfaces" table.
+- `GET /api/twins/:agentId` — "Look up a twin profile", demonstrating
+  that an unknown agent id resolves to V4's default presentation
+  rather than a 404 (resolving a twin never invents an agent).
+- `POST /api/twins/:agentId/presentation` — "Resolve a presentation",
+  showing the real surface clamping live: TV Play permits full-body,
+  FaceTime/web clamp to head-and-shoulders, and CarPlay drops to
+  audio-only whenever the vehicle is moving *or* its motion state is
+  left unspecified (treated as moving, not as "no").
+- `POST /api/twins/animation/advance` — "Drive the animation state
+  machine", a real transition simulator. An illegal transition (e.g.
+  `absent` straight to `speaking`) comes back as the real 400 naming
+  the legal options, not a silent clamp.
+
+**Calls tab** — `lib/agentCall.js` had three routes with no frontend
+caller:
+
+- `GET /api/calls/:id` — "Call details": agent, surface, resolved
+  framing, live animation state, topic, and the real per-call event
+  timeline.
+- `POST /api/calls/:id/events` — "Send a call event", streaming a real
+  conversation event into a connected call and showing the resulting
+  animation-state transition. Shares its event vocabulary with the
+  Twins tab's simulator by fetching `GET /api/twins/animation/states`
+  rather than hardcoding a second copy that could drift.
+- `POST /api/calls/:id/end` — an "End" button on a connected call's
+  row (the table previously only had actions for `ringing` calls).
+
+**Deliberately left backend-only** — three routes, for reasons
+specific to each, not a sweep running out of time:
+
+- `POST /api/agent` — by design, per this file's own "Wiring the
+  frontend to it" section above: the frontend doesn't call this proxy
+  directly any more, VACON does (`POST /api/agents/:id/invoke`). Adding
+  a direct caller here would route around that layering, not close a
+  gap.
+- `POST /api/calls/sweep-timeouts` — guarded by
+  `requireCallingService()`, not a user session; it's a scheduler job
+  that sweeps every ringing call in the store, not something a signed-
+  in person's own session can reasonably authorize. This app's
+  frontend has no service-credential login, same posture `void`'s own
+  frontend-coverage pass took for its `requireOperator`-gated routes.
+- `GET /api/health` — infrastructure, not an app feature; no other
+  app in this sweep surfaces its own health check in its tabs either.
