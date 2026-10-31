@@ -92,12 +92,20 @@ function renderTrade(body) {
     + 'the order is refused before any money moves.'));
 
   out.appendChild(VACO.card('Place an order', [
+    // Field names here must match `lib/brokerage.js`'s real
+    // `placeTradeOrder({ accountId, cardId, orderType, quantity,
+    // pricePerUnit })` exactly. This previously sent `side` and
+    // `limitPrice`, which the handler has never read — every order
+    // landed on the server as `orderType: undefined`, which fails the
+    // `ORDER_TYPES.includes(orderType)` check and refuses the trade.
+    // The Trade tab could not place a single order until this was
+    // corrected.
     VACO.form([
       { name: 'accountId', label: 'Account', width: '130px' },
-      { name: 'side', label: 'Side', options: ['buy', 'sell'] },
+      { name: 'orderType', label: 'Side', options: ['buy', 'sell'] },
       { name: 'cardId', label: 'Card', width: '110px' },
       { name: 'quantity', label: 'Qty', type: 'number', min: 1, value: 1, width: '80px' },
-      { name: 'limitPrice', label: 'Limit', type: 'number', min: 1, value: 100, width: '100px' },
+      { name: 'pricePerUnit', label: 'Price/unit', type: 'number', min: 1, value: 100, width: '110px' },
     ], function (values) {
       return VACO.post('/api/order', values).then(function (order) {
         VACO.toast('Order ' + order.id + ' — ' + order.status, 'money');
@@ -108,6 +116,27 @@ function renderTrade(body) {
         VACO.mount(body, out);
       });
     }, 'Place order'),
+  ]));
+
+  // Its own result slot, not a trim-by-count on `out` -- "Place an
+  // order" above appends a result card of its own on every submit and
+  // never removes one, so `out`'s child count is not stable, and
+  // reusing that trick here would delete this very card instead of
+  // just the previous lookup's result.
+  var orderResult = el('div', null);
+  out.appendChild(VACO.card('Look up an order', [
+    VACO.form([{ name: 'id', label: 'Order id', width: '140px' }],
+      function (values) {
+        return VACO.api('/api/order/' + encodeURIComponent(values.id)).then(function (o) {
+          var rows = Object.keys(o)
+            .filter(function (k) { return typeof o[k] !== 'object'; })
+            .map(function (k) { return { field: k.replace(/([A-Z])/g, ' $1'), value: String(o[k]) }; });
+          VACO.mount(orderResult, VACO.card('Order ' + values.id, [
+            VACO.table([{ key: 'field', label: 'Field' }, { key: 'value', label: 'Value' }], rows),
+          ]));
+        });
+      }, 'Load'),
+    orderResult,
   ]));
 
   return VACO.mount(body, out);
