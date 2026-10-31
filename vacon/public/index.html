@@ -10,6 +10,9 @@
   .match-bar { height: 6px; border-radius: var(--vaco-radius-pill); background: var(--vaco-surface-hover); overflow: hidden; }
   .match-fill { height: 100%; background: var(--vaco-accent); }
   .keyword { font-family: var(--vaco-font-mono); font-size: var(--vaco-text-xs); }
+  .kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--vaco-space-3); }
+  .kv-cell { display: flex; flex-direction: column; }
+  .kv-value { font-size: var(--vaco-text-lg); font-weight: var(--vaco-weight-bold); font-variant-numeric: tabular-nums; }
 </style>
 </head>
 <body class="vaco">
@@ -141,6 +144,56 @@ function renderHistory(body) {
   });
 }
 
+// GET /api/health -- previously never called from here. Shows the
+// network's own real liveness/config: agent count, how many
+// invocations have actually happened, and the trusted-service
+// allowlist's own posture (mode + which callers it has seen without a
+// credential). Never shows a token -- `serviceAuth.describe()` itself
+// never returns one, by design (see lib/serviceAuth.cjs).
+function renderStatus(body) {
+  return VACO.api('/api/health').then(function (health) {
+    var out = el('div', 'vaco-stack');
+
+    var kv = el('div', 'kv');
+    Object.keys(health).forEach(function (k) {
+      if (typeof health[k] === 'object') return;
+      var cell = el('div', 'kv-cell');
+      cell.appendChild(el('span', 'vaco-label', k.replace(/([A-Z])/g, ' $1')));
+      cell.appendChild(el('span', 'kv-value', String(health[k])));
+      kv.appendChild(cell);
+    });
+    out.appendChild(VACO.card('Network status', [kv]));
+
+    var auth = health.serviceAuth || {};
+    var authLines = el('div', 'vaco-stack-sm');
+    authLines.appendChild(el('p', 'vaco-small vaco-dim',
+      'Reads here are open. Writes — routing a request, invoking an agent — require either a signed-in '
+      + 'session or a trusted-service credential (X-Service-Name + X-Service-Token). This is the real '
+      + 'posture this network enforces, not a description of one.'));
+    authLines.appendChild(VACO.badge(auth.mode || 'unknown', auth.mode === 'enforce' ? 'money' : 'warn'));
+    if (auth.allowlistedServices && auth.allowlistedServices.length) {
+      authLines.appendChild(el('p', 'vaco-small vaco-faint',
+        'Allowlisted services: ' + auth.allowlistedServices.join(', ')));
+    }
+    out.appendChild(VACO.card('Service authorization', [authLines]));
+
+    if (auth.unauthenticatedCallers && auth.unauthenticatedCallers.length) {
+      out.appendChild(VACO.card('Unauthenticated callers seen', [
+        el('p', 'vaco-small vaco-dim',
+          'Names and counts only, never tokens — a real caller here needs wiring, not necessarily a threat.'),
+        VACO.table([
+          { key: 'name', label: 'Name' },
+          { key: 'count', label: 'Count', num: true },
+          { label: 'Last seen', render: function (c) {
+            return c.lastSeenAt ? new Date(c.lastSeenAt).toLocaleString() : '—'; } },
+        ], auth.unauthenticatedCallers),
+      ]));
+    }
+
+    return out;
+  });
+}
+
 VACO.app({
   id: 'vacon',
   name: 'VACON',
@@ -154,6 +207,7 @@ VACO.app({
     { id: 'route', label: 'Route', heading: 'Ask MIA', render: renderRoute },
     { id: 'agents', label: 'Agents', heading: 'The executive agents', render: renderAgents },
     { id: 'history', label: 'History', heading: 'Routing audit trail', render: renderHistory },
+    { id: 'status', label: 'Status', heading: 'Network status', render: renderStatus },
   ],
 });
 </script>
