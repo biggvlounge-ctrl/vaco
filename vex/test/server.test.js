@@ -103,3 +103,22 @@ test('POST /api/order refuses an anonymous caller', { skip: SKIP }, async () => 
   const res = await post('/api/order', { accountId: 1, symbol: 'TEST', quantity: 1 });
   assert.equal(res.status, 401, 'an unauthenticated caller could place an order against someone else\'s brokerage account');
 });
+
+test('GET /api/coin/price is readable with no credential at all', { skip: SKIP }, async () => {
+  const res = await fetch(`${BASE}/api/coin/price`);
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.symbol, 'VXC');
+  assert.ok(Number.isFinite(body.price));
+});
+
+test('POST /api/coin/orders refuses an anonymous caller', { skip: SKIP }, async () => {
+  const res = await post('/api/coin/orders', { accountId: 1, orderType: 'buy', coinAmount: 10 });
+  assert.equal(res.status, 401, 'an unauthenticated caller could place a VXC order against someone else\'s account');
+});
+
+test('GET /api/health reports the VXC symbol and order types', { skip: SKIP }, async () => {
+  const health = await (await fetch(`${BASE}/api/health`)).json();
+  assert.equal(health.coinSymbol, 'VXC');
+  assert.deepEqual(health.coinOrderTypes, ['buy', 'sell']);
+});

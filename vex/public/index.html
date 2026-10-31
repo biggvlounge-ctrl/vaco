@@ -216,6 +216,95 @@ function renderTrade(body) {
   return VACO.mount(body, out);
 }
 
+// -- VXC: a second, separate tradeable coin -----------------------------
+//
+// Not a card trade. VXC trades against lib/coinMarket.js's own
+// platform-held liquidity pool — a constant-product market maker, the
+// same mechanism real decentralized exchanges use — so its price moves
+// purely from real buy/sell flow in this pool, never from a fame score
+// like VOKEN's cards and never from a fixed rate like VCoin/VASH. See
+// coinMarket.js's own header for why VXC is a new asset rather than
+// letting VCoin itself float.
+function renderCoin(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'VXC trades against a platform-held liquidity pool, not against another trader’s order. A buy/sell is '
+    + 'quoted and filled in the same call — the quote already includes this order’s own price impact ("slippage"), '
+    + 'it is not a snapshot of some earlier price. Gated the same way card trading is, by a separate compliance '
+    + 'gate (<code>vex-coin-trading</code>) on the Compliance tab — clearing <code>vex-brokerage</code> does not '
+    + 'clear this one.'));
+
+  var priceBox = el('div', null);
+  function loadPrice() {
+    return VACO.api('/api/coin/price').then(function (p) {
+      var rows = [
+        { field: 'price (VCoin per VXC)', value: String(p.price) },
+        { field: 'pool VXC reserve', value: String(p.coinReserve) },
+        { field: 'pool VCoin reserve', value: String(p.vcoinReserve) },
+      ];
+      VACO.mount(priceBox, VACO.table([{ key: 'field', label: 'Field' }, { key: 'value', label: 'Value' }], rows));
+    });
+  }
+  out.appendChild(VACO.card('VXC price', [
+    VACO.button('Refresh', loadPrice),
+    priceBox,
+  ]));
+  loadPrice();
+
+  out.appendChild(VACO.card('Buy / sell VXC', [
+    // Field names must match lib/coinMarket.js's real
+    // placeCoinOrder({ accountId, orderType, coinAmount }) exactly —
+    // the account's owner, not a typed userId, decides who the trade
+    // settles for (requireAccountOwner('accountId') on the server).
+    VACO.form([
+      { name: 'accountId', label: 'Account', width: '130px' },
+      { name: 'orderType', label: 'Side', options: ['buy', 'sell'] },
+      { name: 'coinAmount', label: 'VXC amount', type: 'number', min: 0.000001, value: 100, width: '130px' },
+    ], function (values) {
+      return VACO.post('/api/coin/orders', values).then(function (order) {
+        VACO.toast('Order ' + order.id + ' filled — ' + order.vcoinAmount + ' VCoin, new price ' + order.priceAfter, 'money');
+        VACO.refreshBalances().then(VACO.renderIdentity);
+        loadPrice();
+        out.appendChild(VACO.card('Order ' + order.id, [
+          el('pre', 'vaco-mono vaco-small', JSON.stringify(order, null, 2)),
+        ]));
+        VACO.mount(body, out);
+      });
+    }, 'Place order'),
+  ]));
+
+  var holdingsResult = el('div', null);
+  out.appendChild(VACO.card('My VXC holdings', [
+    VACO.form([{ name: 'accountId', label: 'Account id', width: '140px' }],
+      function (values) {
+        return VACO.api('/api/coin/holdings/' + encodeURIComponent(values.accountId)).then(function (h) {
+          VACO.mount(holdingsResult, VACO.card('Account ' + values.accountId, [
+            el('p', 'vaco-mono', h.balance + ' ' + h.symbol),
+          ]));
+        });
+      }, 'Load'),
+    holdingsResult,
+  ]));
+
+  var coinOrderResult = el('div', null);
+  out.appendChild(VACO.card('Look up a VXC order', [
+    VACO.form([{ name: 'id', label: 'Order id', width: '140px' }],
+      function (values) {
+        return VACO.api('/api/coin/orders/' + encodeURIComponent(values.id)).then(function (o) {
+          var rows = Object.keys(o)
+            .filter(function (k) { return typeof o[k] !== 'object'; })
+            .map(function (k) { return { field: k.replace(/([A-Z])/g, ' $1'), value: String(o[k]) }; });
+          VACO.mount(coinOrderResult, VACO.card('Order ' + values.id, [
+            VACO.table([{ key: 'field', label: 'Field' }, { key: 'value', label: 'Value' }], rows),
+          ]));
+        });
+      }, 'Load'),
+    coinOrderResult,
+  ]));
+
+  return VACO.mount(body, out);
+}
+
 VACO.app({
   id: 'vex',
   name: 'VEX',
@@ -230,6 +319,7 @@ VACO.app({
     { id: 'gates', label: 'Compliance', heading: 'Gates', render: renderGates },
     { id: 'account', label: 'Accounts', heading: 'Brokerage accounts', render: renderAccount },
     { id: 'trade', label: 'Trade', heading: 'Place an order', render: renderTrade },
+    { id: 'coin', label: 'VXC', heading: 'VXC coin market', render: renderCoin },
   ],
 });
 </script>

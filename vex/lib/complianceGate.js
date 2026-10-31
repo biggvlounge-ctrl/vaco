@@ -6,11 +6,18 @@
 // Source of truth: VOKEN_ARCHITECTURE.md's original real, confirmed
 // requirement -- VEX's brokerage trading is built now, its live-money
 // trigger stays off until real broker-dealer legal review clears it.
+//
+// 'vex-coin-trading' is a second, separate gate for VXC (see
+// lib/coinMarket.js) -- deliberately not folded into 'vex-brokerage'.
+// Trading a platform-native digital coin against VCoin is a different
+// regulatory question (money transmission / virtual-asset posture)
+// from brokering real Cvltvre Card editions (securities/broker-dealer
+// posture); clearing one must never silently clear the other.
 
-const GATES = ['vex-brokerage'];
+const GATES = ['vex-brokerage', 'vex-coin-trading'];
 
 function createComplianceGateState() {
-  return { 'vex-brokerage': false };
+  return { 'vex-brokerage': false, 'vex-coin-trading': false };
 }
 
 function isComplianceCleared(store, gateName) {

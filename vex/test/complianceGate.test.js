@@ -132,14 +132,26 @@ test('the brokerage gate is closed out of the box', () => {
     'a brokerage gate that defaults open is a business-ending default');
 });
 
-test('only vex-brokerage is a VEX gate — fractional-ownership stayed in VOKEN', () => {
-  assert.deepStrictEqual(gate.GATES, ['vex-brokerage']);
+test('vex-brokerage and vex-coin-trading are VEX\'s own gates — fractional-ownership stayed in VOKEN', () => {
+  assert.deepStrictEqual(gate.GATES, ['vex-brokerage', 'vex-coin-trading']);
 
   const store = createVexStore();
   // VADO's own gate. Asking VEX about it is a bug in the caller, and
   // answering `false` would hide that bug behind a plausible-looking
   // refusal.
   assert.throws(() => gate.isComplianceCleared(store, 'fractional-ownership'), /invalid gateName/);
+});
+
+test('vex-coin-trading is closed out of the box, separately from vex-brokerage', () => {
+  const store = createVexStore();
+  // VXC trading is a different regulatory posture from card brokerage
+  // (see lib/complianceGate.js's own header) and must not be clearable
+  // by the same switch, nor default open just because the other gate
+  // might already be cleared.
+  assert.strictEqual(gate.isComplianceCleared(store, 'vex-coin-trading'), false);
+  gate.setComplianceStatus(store, 'vex-brokerage', true);
+  assert.strictEqual(gate.isComplianceCleared(store, 'vex-coin-trading'), false,
+    'clearing vex-brokerage must not clear vex-coin-trading');
 });
 
 test('an unknown gate name throws rather than reading as closed', () => {

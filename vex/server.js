@@ -24,6 +24,9 @@ const { GATES, isComplianceCleared, setComplianceStatus } = require('./lib/compl
 const {
   NET_CAPITAL_MODELS, ORDER_TYPES, openBrokerAccount, getBrokerAccount, placeTradeOrder, getTradeOrder,
 } = require('./lib/brokerage');
+const {
+  COIN_SYMBOL, ORDER_TYPES: COIN_ORDER_TYPES, getCoinPrice, getCoinHolding, getCoinOrder, placeCoinOrder,
+} = require('./lib/coinMarket');
 
 const { requireActor, requireSession } = require('./lib/shieldAuth.cjs');
 const { createServiceAuth } = require('./lib/serviceAuth.cjs');
@@ -154,7 +157,15 @@ async function settleVCoin(legs, meta = {}) {
 }
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, service: 'vex', netCapitalModels: NET_CAPITAL_MODELS, orderTypes: ORDER_TYPES, gates: GATES });
+  res.json({
+    ok: true,
+    service: 'vex',
+    netCapitalModels: NET_CAPITAL_MODELS,
+    orderTypes: ORDER_TYPES,
+    gates: GATES,
+    coinSymbol: COIN_SYMBOL,
+    coinOrderTypes: COIN_ORDER_TYPES,
+  });
 });
 
 app.get('/api/compliance-gate/:gateName', (req, res) => {
@@ -227,6 +238,39 @@ app.get('/api/order/:id', (req, res) => {
   const order = getTradeOrder(store, Number(req.params.id));
   if (!order) return res.status(404).json({ error: `no trade order with id ${req.params.id}` });
   res.json(order);
+});
+
+// -- VXC: a second, separate tradeable coin -----------------------------
+//
+// Deliberately NOT the card-trading path above. VXC trades against the
+// pool in lib/coinMarket.js (a constant-product market maker), not
+// against another user's order and not against VOKEN's own card
+// catalog. See that file's header for why VXC exists as its own asset
+// rather than letting VCoin itself float.
+app.get('/api/coin/price', (_req, res) => {
+  const { coinReserve, vcoinReserve } = store.coinMarket;
+  res.json({ symbol: COIN_SYMBOL, price: getCoinPrice(store), coinReserve, vcoinReserve });
+});
+
+app.post('/api/coin/orders', requireAccountOwner('accountId'), async (req, res) => {
+  try {
+    const account = getBrokerAccount(store, Number(req.body.accountId));
+    res.status(201).json(await placeCoinOrder(store, { ...req.body, userId: account.userId, settleFn: settleVCoin }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/coin/orders/:id', (req, res) => {
+  const order = getCoinOrder(store, Number(req.params.id));
+  if (!order) return res.status(404).json({ error: `no coin order with id ${req.params.id}` });
+  res.json(order);
+});
+
+app.get('/api/coin/holdings/:accountId', (req, res) => {
+  const account = getBrokerAccount(store, Number(req.params.accountId));
+  if (!account) return res.status(404).json({ error: `no broker account with id ${req.params.accountId}` });
+  res.json({ accountId: account.id, symbol: COIN_SYMBOL, balance: getCoinHolding(store, account.userId) });
 });
 
 app.listen(PORT, () => {
