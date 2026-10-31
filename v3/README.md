@@ -115,6 +115,68 @@ real VCoin between two users, killed the running process, restarted
 it, and confirmed both real balances came back unchanged from a real
 GET. See `dev-docs/phase-3-real-persistence/`.
 
+## Frontend coverage pass (31 Oct 2026)
+An audit found `public/index.html` making real calls against only 6 of
+V3's 22 real routes — the original 3 tabs (Accounts, Move money,
+System) covered balances, history, transfer, and cashout, but two
+entire feature areas (`lib/vashMortgage.js`, `lib/vashInsurance.js`,
+14 routes between them) had **zero** frontend exposure, and
+`GET /api/vcoin/reconciliation` was readable only by curl. Every field
+on every new call was checked against the real route handler and its
+`lib/*.js` function before being written, not guessed from a route
+name — and every route that moves real VCoin was verified live against
+a running server, not just read in code.
+
+- **Reconciliation, added to the System tab.** A button runs
+  `GET /api/vcoin/reconciliation` — the real whole-ledger audit
+  (`lib/vcoin.js`'s `reconcile`) answering "does the transaction
+  history explain every stored balance?" It is an unauthenticated
+  read, same posture as a balance lookup, so it loads on demand rather
+  than on every visit, since it walks the full transaction list.
+- **Mortgage tab** — `lib/vashMortgage.js` had no frontend at all.
+  Applies for a mortgage (`POST /api/vash-mortgage/apply`), looks one
+  up (`GET /api/vash-mortgage/:id`), makes a real payment against the
+  real amortization schedule (`POST /api/vash-mortgage/:id/payment`),
+  and — gated behind an X-Operator-Credential field, the same posture
+  `cvnvo/yap`'s moderation queue already uses — approves or denies an
+  application (`POST /api/vash-mortgage/:id/approve`, `.../deny`).
+  Live-verified: apply → approve → a 579.36 payment moved the exact
+  real VCoin both ways (borrower `1000 → 420.64`, the platform lender
+  account `1000 → 1579.36`), `remainingBalance` updated to `59420.64`,
+  and reconciliation reported `balanced: true` afterward.
+- **Insurance tab** — `lib/vashInsurance.js` had no frontend at all.
+  Gets a quote (`GET /api/vash-insurance/quote`, unauthenticated —
+  same real posture any insurer's own quote tool takes), purchases a
+  policy (`POST /api/vash-insurance/purchase`), looks up a
+  policy/claim, cancels a policy, files a claim
+  (`POST /api/vash-insurance/claim`), and — gated behind an
+  X-Operator-Credential field — approves, denies, or pays a claim
+  (`.../claim/:id/approve`, `.../deny`, `.../pay`). Live-verified:
+  purchasing a 50,000-coverage home policy charged the exact quoted
+  250 premium into the real pool account; a claim approved for more
+  than the pool had actually collected in premiums failed with the
+  ledger's own honest `"Insufficient VCoin balance"` — confirmed this
+  is real, documented behavior (the module's own header: "a claim can
+  never pay out more than the pool has actually collected in
+  premiums"), not a bug to design around — while a claim within the
+  pool's real balance paid out correctly (pool `1250 → 350`,
+  policyholder `750 → 1650`), with reconciliation staying balanced
+  throughout.
+
+**Deliberately left backend-only**, consistent with how every other
+app's own coverage pass has handled the same two cases (see `void`'s
+own "Frontend coverage pass" section):
+- `POST /api/vcoin/settle` — gated by `requireCallingService()`
+  specifically (`X-Service-Name`/`X-Service-Token`), because a
+  settlement's own fee split is a platform decision, never something
+  an end user composes on their own behalf. This frontend has no
+  service-credential login, so it stays a real backend capability
+  rather than a UI that pretends to hold a secret it doesn't have.
+- Every `requireOperator(...)` route still needs a real credential
+  from `vaco-operator` pasted into the X-Operator-Credential field by
+  hand — there is no operator login flow here, same as every other
+  app's own operator-gated routes.
+
 ## Not yet built
 - Shield (the ecosystem-wide session/auth layer) — now its own real,
   separate app (`../shield/`), not folded into this one. **Historical
