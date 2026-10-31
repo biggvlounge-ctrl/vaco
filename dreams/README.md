@@ -162,6 +162,57 @@ distinguishable `"completion failed: ..."` prefix, which the route
 matches on reliably — confirmed with a real v4-proxy-down request
 returning the correct 502 afterward.
 
+## Frontend coverage pass (31 Oct 2026)
+
+An audit found `public/index.html` making real calls against only 14
+of this app's 31 routes — the original 4 tabs (Screens, Advertisers,
+New Campaign, Offline) covered the core self-serve loop, but several
+real, already-built features had no frontend exposure at all. Every
+call below was checked against the real route in `server.js` and the
+real handler signature in its `lib/*.js` function before being
+written — never a guessed field name. 24 of 31 routes are now real
+frontend clients; the remaining 7 (`GET /api/health`, the service-
+credential-only impression/scan/sale/offline-play reporters, and the
+government's emergency-broadcast push/clear) are correctly left
+backend-only, since none of them has a legitimate end-user or
+screen-owner session to present — see `requireCallingService` in
+`server.js`.
+
+- **Scan & sale pricing, in the New Campaign flow** — `setScanPricing`
+  and `setSaleCommission` (the "Scan and sale revenue" feature above)
+  had no frontend at all. Two new form steps sit next to budget and
+  incentive; the campaign status line now also shows the real
+  per-scan cost and sale-commission rate once set.
+- **A pre-existing dead call, fixed in passing** — "Generate creative
+  text (AI)" posted an empty body, but `generateCreativeText` requires
+  a real `brief`; every real click 400'd. Now a brief field feeds the
+  real field.
+- **Screen lookup and deactivation, in the Screens tab** — `GET
+  /api/screens/:id` (a screen the active-only list won't show once
+  deactivated) and `POST /api/screens/:id/deactivate`, shown only to
+  the signed-in owner on their own screen tile — the one screen-owner
+  control that had no frontend path at all.
+- **Advertiser profile, in the Advertisers tab** — `GET
+  /api/advertisers/:id` is now fetched alongside the existing
+  campaigns lookup, so looking up an advertiser shows their real
+  `businessName` and signup date instead of jumping straight to
+  campaigns.
+- **Offline-cache owner tools, in the Offline tab** — `POST
+  /api/screens/:id/cache/sync` (the real owner-facing sync step from
+  `lib/offlineCache.js`), `GET /api/screens/:id/cache`, and `GET
+  /api/screens/:id/offline-content` (the real "what would this screen
+  show right now" resolver, including the honest `blank` case). None
+  of the three had any frontend before. The offline-plays table's
+  `playCount` column, which read a field `getOfflinePlays`' real
+  per-play record has never had, was also corrected to the record's
+  real fields (`creativeId`, reporting lag).
+- **New Emergency tab, read-only** — `GET /api/emergency-broadcast`
+  (active status + history) and `GET /api/screens/:id/content`
+  (`resolveScreenContent`'s real, broadcast-aware resolver). Pushing
+  or clearing a broadcast stays backend-only by design (service-
+  credential-only, no end-user session), so this tab is deliberately
+  a status view, not a control panel.
+
 ## Not yet built
 - **DREA's full placement intelligence** — `HVNTZ_COMPLETE_REVENUE_STACK.md`
   specifies extensive real logic for DREA (contextual venue matching,
