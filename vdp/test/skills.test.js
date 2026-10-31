@@ -4,8 +4,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  SKILL_NAMES, JOB_SHIFT_GAIN, TEXTBOOK_GAIN, CONVERSATION_GAIN,
-  createSkills, gainFromShift, gainFromTextbook, gainFromConversation, fadeSkills,
+  SKILL_NAMES, JOB_SHIFT_GAIN, TEXTBOOK_GAIN, CONVERSATION_GAIN, WORKOUT_GAIN, GYM_TRAINABLE_SKILLS,
+  createSkills, gainFromShift, gainFromTextbook, gainFromConversation, gainFromWorkout, fadeSkills,
 } from '../src/lib/skills.js';
 
 test('a fresh skill sheet starts every named skill at zero', () => {
@@ -18,6 +18,21 @@ test('each real source applies its own real gain amount', () => {
   assert.equal(gainFromShift(skills, 'Business'), JOB_SHIFT_GAIN);
   assert.equal(gainFromTextbook(skills, 'Crafting'), TEXTBOOK_GAIN);
   assert.equal(gainFromConversation(skills, 'Communication'), CONVERSATION_GAIN);
+  assert.equal(gainFromWorkout(skills, 'Athletics'), WORKOUT_GAIN);
+});
+
+test('a real gym workout is a fourth source for the same two physical skills, not a new stat system', () => {
+  assert.deepEqual(GYM_TRAINABLE_SKILLS, ['Athletics', 'Combat']);
+  const skills = createSkills();
+  gainFromWorkout(skills, 'Combat');
+  assert.equal(skills.Combat, WORKOUT_GAIN);
+});
+
+test('a workout clamps at 100 like every other real gain', () => {
+  const skills = createSkills();
+  skills.Athletics = 99.5;
+  gainFromWorkout(skills, 'Athletics');
+  assert.equal(skills.Athletics, 100);
 });
 
 test('a skill clamps at 100 and never goes negative', () => {

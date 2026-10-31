@@ -3007,7 +3007,20 @@ let store = createVdpStore();
       return res.status(400).json({ error: `live wrestling is already running for match ${req.params.id}` });
     }
     try {
-      const liveMatch = liveWrestlingLib.startLiveMatch(match);
+      // "they can get bigger, they can work out... incorporate working
+      // out and lifting weights" -- each wrestler's real, current
+      // Athletics/Combat skill (trainable via POST /api/gym/workout,
+      // same real reinforce-and-fade shape every other skill source
+      // already has) is read once, here, and seeds this one match's
+      // real attributes. `participantIds` on a `one-on-one`/
+      // `cage-match` card are real VDP player userIds, the same id
+      // `ensurePlayer` already resolves.
+      const attributesByWrestler = {};
+      for (const wrestlerId of match.participantIds) {
+        const wrestler = ensurePlayer(wrestlerId);
+        attributesByWrestler[wrestlerId] = { combat: wrestler.skills.Combat, athletics: wrestler.skills.Athletics };
+      }
+      const liveMatch = liveWrestlingLib.startLiveMatch(match, { attributesByWrestler });
       store.liveWrestling[req.params.id] = liveMatch;
       const described = liveWrestlingLib.describeLiveMatch(liveMatch);
       broadcast({ type: 'wrestling-live-start', matchId: match.matchId, live: described });
@@ -3071,6 +3084,29 @@ let store = createVdpStore();
       const described = liveWrestlingLib.describeLiveMatch(liveMatch);
       broadcast({ type: 'wrestling-match-over', matchId: match.matchId, live: described });
       res.status(200).json(described);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // -- The gym: a real action, a real reason to train ---------------------
+  //
+  // "they can get bigger, they can work out... incorporate working out
+  // and lifting weights" (direct instruction). Not a new stat system --
+  // `Athletics`/`Combat` are already real skills (`skills.js`); a
+  // workout is a fourth real source for either of them, same bounded,
+  // decaying shape every other source already has. What makes it worth
+  // doing: `live/start` below reads these same two skills to seed a
+  // wrestler's real match attributes.
+  app.post('/api/gym/workout', requireActor('userId'), (req, res) => {
+    try {
+      const { userId, skillName } = req.body || {};
+      if (!skillsLib.GYM_TRAINABLE_SKILLS.includes(skillName)) {
+        throw new Error(`a gym workout trains ${skillsLib.GYM_TRAINABLE_SKILLS.join(' or ')}, not "${skillName}"`);
+      }
+      const player = ensurePlayer(userId);
+      const newValue = skillsLib.gainFromWorkout(player.skills, skillName);
+      res.json({ userId, skillName, newValue, skills: player.skills });
     } catch (err) {
       res.status(400).json({ error: err.message });
     }

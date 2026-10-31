@@ -50,6 +50,21 @@ export const TEXTBOOK_GAIN = 12;
 export const CONVERSATION_GAIN = 0.8;
 export const SKILL_FADE_PER_TICK = 0.05;
 
+// A real gym session -- "they can get bigger, they can work out...
+// incorporate working out and lifting weights" (direct instruction).
+// Not a new, parallel stat system: `Athletics` and `Combat` are
+// already real skills here, and a workout is simply a fourth real
+// source for either of them, same bounded-bump-not-ratchet shape as
+// the other three, same `fadeSkills` decay on the same tick. Scoped
+// to physical training, not every skill -- `GYM_TRAINABLE_SKILLS`
+// names the two a workout can actually move; `gainFromWorkout` itself
+// stays generic (it is the exact same `bump` every other source
+// calls), the restriction lives at the one real call site
+// (`POST /api/gym/workout` in server.cjs) the same way every other
+// route-level restriction in this app already works.
+export const WORKOUT_GAIN = 1.2;
+export const GYM_TRAINABLE_SKILLS = ['Athletics', 'Combat'];
+
 function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
@@ -95,6 +110,10 @@ export function gainFromTextbook(skills, name) {
 
 export function gainFromConversation(skills, name) {
   return bump(skills, name, CONVERSATION_GAIN);
+}
+
+export function gainFromWorkout(skills, name) {
+  return bump(skills, name, WORKOUT_GAIN);
 }
 
 // Slow fade toward 0, same per-tick shape as `npcs.js`'s `fadeHabits`

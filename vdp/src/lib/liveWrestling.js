@@ -25,6 +25,20 @@
 // one place that feeds it to `combatSports.recordResult`, exactly the
 // way it already does for an operator-declared result.
 //
+// **Training affects the match, by direct instruction ("they can get
+// bigger, they can work out... incorporate working out and lifting
+// weights").** Not a second stat system: `startLiveMatch`'s own
+// `attributesByWrestler` reads the same real `Athletics`/`Combat`
+// skills `skills.js` already has, real sources a player bumps by
+// working out (`gainFromWorkout`) or any of the other three real
+// sources that skill already had. Combat training raises a wrestler's
+// own `strengthBonus` -- a real, bounded bonus to the damage THEY
+// deal; Athletics training raises their `staminaDiscount` -- a real,
+// bounded discount on the stamina cost THEY pay. Deliberately not a
+// bonus to a wrestler's own max health: training makes you hit harder
+// and gas out slower, not literally unkillable, and the health pool
+// stays the one number every wrestler starts level on.
+//
 // **Every number below is a flagged, invented balance choice, not a
 // transcription of real wrestling rules or a confirmed design
 // document.** Same discipline `cardMarketPrice.js`'s own constants
@@ -72,6 +86,45 @@ function clashDamage(move) {
   return Math.round(BASE_DAMAGE[move] / 2);
 }
 
+// Real, bounded training bonuses -- see this file's own header for
+// why they scale damage dealt and stamina spent rather than max
+// health. Flagged, invented numbers, same as every other constant
+// above: a maxed-out skill (100) is a real, meaningful edge, not a
+// small flavor bonus, but training can never make a wrestler's own
+// moves free or guarantee a kill the opponent's health total doesn't
+// already allow.
+export const MAX_STRENGTH_BONUS = 0.3;
+export const MAX_STAMINA_DISCOUNT = 0.3;
+
+// `skills` is the caller's own real `{ combat, athletics }` reading --
+// this module stays storage-agnostic about where that number lives,
+// the same posture `combatSports.js` already takes about fighter data
+// generally. Missing/omitted reads as untrained (0), not an error:
+// a wrestler who has never touched a gym is a real, valid wrestler.
+function deriveAttributes(skills = {}) {
+  const combat = clamp(skills.combat ?? 0, 0, 100);
+  const athletics = clamp(skills.athletics ?? 0, 0, 100);
+  return {
+    strengthBonus: (combat / 100) * MAX_STRENGTH_BONUS,
+    staminaDiscount: (athletics / 100) * MAX_STAMINA_DISCOUNT,
+  };
+}
+
+// Stamina spent by a real, specific wrestler -- their own training
+// (not their opponent's) decides how far it is discounted.
+function chargeStamina(state, move) {
+  state.stamina = clamp(state.stamina - STAMINA_COST[move] * (1 - state.staminaDiscount), 0, STARTING_STAMINA);
+}
+
+// Damage dealt BY `attackerState` TO `defenderState` -- the
+// attacker's own training decides how far `baseAmount` is scaled up;
+// the defender's training has no say in how hard they get hit (that
+// would double-count Athletics as both a stamina discount and a
+// damage shield, which this module deliberately does not do).
+function dealDamage(attackerState, defenderState, baseAmount) {
+  defenderState.health = clamp(defenderState.health - baseAmount * (1 + attackerState.strengthBonus), 0, STARTING_HEALTH);
+}
+
 export class WrestlingError extends Error {}
 
 function requireString(value, field, action) {
@@ -91,7 +144,15 @@ function clamp(n, min, max) {
 // must already be `startMatch`'d (a live wrestling round makes no
 // sense ahead of the broadcast/prediction-market machinery that
 // `combatSports.js`'s own `startMatch` already gates).
-export function startLiveMatch(match) {
+// `options.attributesByWrestler` is an optional real
+// `{ [wrestlerId]: { combat, athletics } }` map -- the caller's own
+// reading of each wrestler's real skills (`server.cjs` passes
+// `player.skills.Combat`/`.Athletics`). Omitted entirely, every
+// wrestler starts untrained (0/0), identical to this function's
+// behavior before training existed -- every existing caller and test
+// that never passed this option sees exactly the same numbers it
+// always has.
+export function startLiveMatch(match, options = {}) {
   const a = "startLiveMatch";
   if (!match) throw new WrestlingError(`${a} requires a match`);
   if (match.matchFormat !== "one-on-one" && match.matchFormat !== "cage-match") {
@@ -103,12 +164,13 @@ export function startLiveMatch(match) {
   if (match.status !== "live") {
     throw new WrestlingError(`${a}: match ${match.matchId} is "${match.status}", not live`);
   }
+  const attributesByWrestler = options.attributesByWrestler || {};
   const [a1, a2] = match.participantIds;
   return {
     matchId: match.matchId,
     wrestlers: {
-      [a1]: { health: STARTING_HEALTH, stamina: STARTING_STAMINA },
-      [a2]: { health: STARTING_HEALTH, stamina: STARTING_STAMINA },
+      [a1]: { health: STARTING_HEALTH, stamina: STARTING_STAMINA, ...deriveAttributes(attributesByWrestler[a1]) },
+      [a2]: { health: STARTING_HEALTH, stamina: STARTING_STAMINA, ...deriveAttributes(attributesByWrestler[a2]) },
     },
     round: 1,
     pendingMoves: {},
@@ -146,8 +208,8 @@ function resolveRound(liveMatch, idA, moveA, idB, moveB) {
   const startB = { ...stateB };
 
   // Stamina is spent by both, regardless of what happens next.
-  stateA.stamina = clamp(stateA.stamina - STAMINA_COST[moveA], 0, STARTING_STAMINA);
-  stateB.stamina = clamp(stateB.stamina - STAMINA_COST[moveB], 0, STARTING_STAMINA);
+  chargeStamina(stateA, moveA);
+  chargeStamina(stateB, moveB);
 
   const finisherA = FINISHER_MOVES.includes(moveA);
   const finisherB = FINISHER_MOVES.includes(moveB);
@@ -176,9 +238,9 @@ function resolveRound(liveMatch, idA, moveA, idB, moveB) {
       // this round, it connects clean, no clash reduction -- you
       // cannot defend a strike while trying to lock in a submission.
       if (finisherA && OFFENSIVE_MOVES.includes(moveB)) {
-        stateA.health = clamp(stateA.health - BASE_DAMAGE[moveB], 0, STARTING_HEALTH);
+        dealDamage(stateB, stateA, BASE_DAMAGE[moveB]);
       } else if (finisherB && OFFENSIVE_MOVES.includes(moveA)) {
-        stateB.health = clamp(stateB.health - BASE_DAMAGE[moveA], 0, STARTING_HEALTH);
+        dealDamage(stateA, stateB, BASE_DAMAGE[moveA]);
       }
       // Both attempted finishers against someone not yet ready, or a
       // finisher against a reversal: nothing connects this round.
@@ -218,7 +280,9 @@ function resolveOffense(stateA, moveA, stateB, moveB) {
     const [attackerMove, attackerState] = moveA === "reversal" ? [moveB, stateB] : [moveA, stateA];
     if (attackerMove === "highRisk") {
       // The hard punish: a read top-rope move is turned back on its
-      // own wrestler, for its own full base damage.
+      // own wrestler, for its own full base damage -- self-inflicted,
+      // not scaled by the reverser's own strength (they didn't throw
+      // the move that hurt the attacker, the botch did).
       attackerState.health = clamp(attackerState.health - BASE_DAMAGE.highRisk, 0, STARTING_HEALTH);
     }
     // A reversed strike or grapple lands on nobody -- the point of
@@ -226,16 +290,16 @@ function resolveOffense(stateA, moveA, stateB, moveB) {
     return null;
   }
   if (moveA === moveB) {
-    stateA.health = clamp(stateA.health - clashDamage(moveA), 0, STARTING_HEALTH);
-    stateB.health = clamp(stateB.health - clashDamage(moveB), 0, STARTING_HEALTH);
+    dealDamage(stateA, stateB, clashDamage(moveA));
+    dealDamage(stateB, stateA, clashDamage(moveB));
     return null;
   }
   // The triangle. Exactly one direction can be true for two distinct
   // offensive moves.
   if (BEATS[moveA] === moveB) {
-    stateB.health = clamp(stateB.health - (BASE_DAMAGE[moveA] + TRIANGLE_BONUS), 0, STARTING_HEALTH);
+    dealDamage(stateA, stateB, BASE_DAMAGE[moveA] + TRIANGLE_BONUS);
   } else {
-    stateA.health = clamp(stateA.health - (BASE_DAMAGE[moveB] + TRIANGLE_BONUS), 0, STARTING_HEALTH);
+    dealDamage(stateB, stateA, BASE_DAMAGE[moveB] + TRIANGLE_BONUS);
   }
   return null;
 }

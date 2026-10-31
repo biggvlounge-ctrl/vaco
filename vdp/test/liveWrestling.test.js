@@ -8,6 +8,7 @@ import assert from "node:assert";
 
 import {
   MOVES, STARTING_HEALTH, STARTING_STAMINA, PIN_HEALTH_THRESHOLD, SUBMISSION_STAMINA_THRESHOLD,
+  MAX_STRENGTH_BONUS, MAX_STAMINA_DISCOUNT,
   WrestlingError, startLiveMatch, submitMove, forfeitMatch, describeLiveMatch,
 } from "../src/lib/liveWrestling.js";
 
@@ -17,10 +18,10 @@ function singlesMatch(over = {}) {
 
 // -- Starting a live match -------------------------------------------
 
-test("starting a live match seeds both wrestlers at full health and stamina", () => {
+test("starting a live match seeds both wrestlers at full health and stamina, untrained by default", () => {
   const live = startLiveMatch(singlesMatch());
-  assert.deepEqual(live.wrestlers.ada, { health: STARTING_HEALTH, stamina: STARTING_STAMINA });
-  assert.deepEqual(live.wrestlers.bo, { health: STARTING_HEALTH, stamina: STARTING_STAMINA });
+  assert.deepEqual(live.wrestlers.ada, { health: STARTING_HEALTH, stamina: STARTING_STAMINA, strengthBonus: 0, staminaDiscount: 0 });
+  assert.deepEqual(live.wrestlers.bo, { health: STARTING_HEALTH, stamina: STARTING_STAMINA, strengthBonus: 0, staminaDiscount: 0 });
   assert.equal(live.round, 1);
   assert.equal(live.status, "live");
 });
@@ -42,7 +43,7 @@ test("a round does not resolve until both wrestlers have submitted", () => {
   const first = submitMove(live, "ada", "strike");
   assert.equal(first.resolved, false);
   assert.equal(live.round, 1, "the round should not advance on one submission");
-  assert.deepEqual(live.wrestlers.ada, { health: STARTING_HEALTH, stamina: STARTING_STAMINA }, "stamina should not be spent until the round resolves");
+  assert.deepEqual(live.wrestlers.ada, { health: STARTING_HEALTH, stamina: STARTING_STAMINA, strengthBonus: 0, staminaDiscount: 0 }, "stamina should not be spent until the round resolves");
 });
 
 test("the second submission resolves the round for both", () => {
@@ -255,6 +256,60 @@ test("describeLiveMatch reports no one waited-on once the match is finished", ()
 });
 
 // -- Determinism (no hidden randomness) ---------------------------------
+
+// -- Training: Athletics/Combat change a real match -------------------
+
+test("a maxed-out Combat skill seeds the real, bounded max strength bonus; untrained seeds zero", () => {
+  const trained = startLiveMatch(singlesMatch(), { attributesByWrestler: { ada: { combat: 100 } } });
+  assert.equal(trained.wrestlers.ada.strengthBonus, MAX_STRENGTH_BONUS);
+  assert.equal(trained.wrestlers.bo.strengthBonus, 0, "an opponent with no attributes passed in should be untrained");
+});
+
+test("a maxed-out Athletics skill seeds the real, bounded max stamina discount", () => {
+  const trained = startLiveMatch(singlesMatch(), { attributesByWrestler: { ada: { athletics: 100 } } });
+  assert.equal(trained.wrestlers.ada.staminaDiscount, MAX_STAMINA_DISCOUNT);
+});
+
+test("Combat training deals real, measurably more damage than an untrained wrestler throwing the identical winning move", () => {
+  const untrained = startLiveMatch(singlesMatch());
+  submitMove(untrained, "ada", "strike");
+  submitMove(untrained, "bo", "grapple");
+  const untrainedDamage = STARTING_HEALTH - untrained.wrestlers.bo.health;
+
+  const trained = startLiveMatch(singlesMatch(), { attributesByWrestler: { ada: { combat: 100 } } });
+  submitMove(trained, "ada", "strike");
+  submitMove(trained, "bo", "grapple");
+  const trainedDamage = STARTING_HEALTH - trained.wrestlers.bo.health;
+
+  assert.ok(trainedDamage > untrainedDamage, `trained ada should deal more than untrained ada's ${untrainedDamage}, got ${trainedDamage}`);
+  assert.equal(trainedDamage, Math.round(untrainedDamage * (1 + MAX_STRENGTH_BONUS)));
+});
+
+test("Athletics training spends real, measurably less stamina than an untrained wrestler throwing the identical move", () => {
+  const untrained = startLiveMatch(singlesMatch());
+  submitMove(untrained, "ada", "strike");
+  submitMove(untrained, "bo", "reversal");
+  const untrainedCost = STARTING_STAMINA - untrained.wrestlers.ada.stamina;
+
+  const trained = startLiveMatch(singlesMatch(), { attributesByWrestler: { ada: { athletics: 100 } } });
+  submitMove(trained, "ada", "strike");
+  submitMove(trained, "bo", "reversal");
+  const trainedCost = STARTING_STAMINA - trained.wrestlers.ada.stamina;
+
+  assert.ok(trainedCost < untrainedCost, `trained ada should spend less than untrained ada's ${untrainedCost}, got ${trainedCost}`);
+  assert.equal(trainedCost, untrainedCost * (1 - MAX_STAMINA_DISCOUNT));
+});
+
+test("training affects only its own wrestler's output, never the opponent's", () => {
+  const live = startLiveMatch(singlesMatch(), { attributesByWrestler: { ada: { combat: 100, athletics: 100 } } });
+  submitMove(live, "ada", "strike");
+  submitMove(live, "bo", "grapple");
+  assert.equal(live.wrestlers.bo.strengthBonus, 0);
+  assert.equal(live.wrestlers.bo.staminaDiscount, 0);
+  // bo's own stamina cost for grapple (a losing move here) must be the
+  // real, un-discounted cost -- ada's training should not leak onto it.
+  assert.equal(STARTING_STAMINA - live.wrestlers.bo.stamina, 15);
+});
 
 test("the same two moves against the same state always resolve the same way", () => {
   const liveA = startLiveMatch(singlesMatch());

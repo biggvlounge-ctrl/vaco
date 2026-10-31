@@ -230,6 +230,16 @@ test('attending school with a real bearer token asks Shield -- real 502 when it 
   assert.equal(res.status, 502, 'requireActor must ask Shield even for a free action');
 });
 
+test('a gym workout with no credential is refused WITHOUT reaching Shield', { skip: SKIP }, async () => {
+  const res = await post('/api/gym/workout', { userId: 'alice', skillName: 'Athletics' });
+  assert.equal(res.status, 401);
+});
+
+test('a gym workout with a real bearer token asks Shield -- real 502 when it is unreachable, never a silent skill bump', { skip: SKIP }, async () => {
+  const res = await post('/api/gym/workout', { userId: 'alice', skillName: 'Athletics' }, { Authorization: 'Bearer some-token' });
+  assert.equal(res.status, 502, 'requireActor must ask Shield before training anyone\'s real skill');
+});
+
 test('GET /api/school/attendances/:studentId lists a real, empty-by-default array', { skip: SKIP }, async () => {
   const body = await (await fetch(`${BASE}/api/school/attendances/never-attended`)).json();
   assert.deepEqual(body.attendances, []);

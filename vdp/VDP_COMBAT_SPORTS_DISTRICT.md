@@ -210,7 +210,83 @@ not just the mover's own.
 - No timeout/auto-forfeit if a wrestler simply never submits a move —
   `forfeitMatch` exists for a player to concede, but nothing currently
   calls it on an opponent's behalf after a stall. Real, later work.
-- No wrestler-specific stats (strength, agility, etc.) — every
-  wrestler starts identical; the match is decided by move choice and
-  stamina management alone. A real stat system is a genuinely separate
-  feature, not something this section invents a placeholder for.
+
+---
+
+## Training — filed and **built** 2026-10-31
+
+**"incorporate the training, the statistics, and everything where they
+can improve by doing certain actions. They can get bigger, they can
+work out. Incorporate working out and lifting weights." (direct
+instruction), answered the same day the "no wrestler-specific stats"
+gap above was named.**
+
+**Not a second, parallel stat system.** `Athletics` and `Combat` were
+already real, existing skills in `skills.js`, already rising from
+three real sources (a matching job shift, a textbook, a relevant
+conversation) and already decaying on the same real fade-per-tick
+`npcs.js`'s habits use. A workout is a fourth real source for either
+of them -- `WORKOUT_GAIN` (1.2, flagged/invented like the other three
+gain constants) via `gainFromWorkout`, reachable at `POST
+/api/gym/workout` (`requireActor('userId')`), restricted to
+`GYM_TRAINABLE_SKILLS` (`Athletics`, `Combat`) at that one route --
+training is physical, not a shortcut to `Business` or `Crafting`.
+
+**And it actually changes a live match**, which is the real
+difference between a stat that is tracked and a stat that matters.
+`liveWrestling.js`'s `startLiveMatch` takes an optional, real
+`attributesByWrestler` map; `server.cjs`'s `live/start` route reads
+each wrestler's own current `Combat`/`Athletics` and seeds it. Combat
+training raises `strengthBonus` -- a real, bounded (`MAX_STRENGTH_BONUS`,
+0.3 at a maxed-out 100) multiplier on the damage THAT wrestler deals.
+Athletics training raises `staminaDiscount` -- a real, bounded
+(`MAX_STAMINA_DISCOUNT`, 0.3) discount on the stamina cost THAT
+wrestler pays. Deliberately not a bonus to a wrestler's own max
+health: training makes you hit harder and gas out slower, not
+literally unkillable, and the health pool stays the one number every
+wrestler starts level on regardless of training.
+
+Omitting `attributesByWrestler` entirely (every existing caller before
+this) seeds every wrestler at 0/0 -- untrained, identical to this
+module's own behavior before training existed.
+
+### Verification
+
+`test/skills.test.js` gained 3 tests for the new real source.
+`test/liveWrestling.test.js` gained 5 (seeding the real bounded max at
+a maxed skill, an untrained opponent staying at zero, a trained
+wrestler measurably dealing more damage and spending measurably less
+stamina than an identical untrained wrestler throwing the identical
+move, and training never leaking onto the opponent's own numbers) --
+31 total in that file now, all passing. Two of the module's own new
+formulas (`dealDamage`'s strength scaling, `chargeStamina`'s
+discount) were mutation-verified per
+`dev-docs/STANDING_INSTRUCTION_TEST_VERIFICATION.md`: each was
+deliberately disabled and the exact training-impact test that should
+catch it was watched failing, then restored. `test/server.test.js`
+gained 2 guard-proof tests for the new route -- 863 tests across the
+full suite, all passing.
+
+Also run live against a real spawned Shield + VDP: a real player
+trained `Combat` to 49.2 across 41 real `POST /api/gym/workout` calls,
+went live against an untrained opponent, and the live match's own
+response showed the exact real seeded bonus
+(`49.2 / 100 * 0.3 = 0.1476`) -- then a real strike landed for
+exactly `20 * 1.1476 = 22.952` damage against the untrained wrestler's
+real plain `20`, confirmed by reading the match state before and
+after the round resolved, not assumed from the formula alone.
+
+### Left for a follow-up round, deliberately
+
+- No wrestler-specific stats beyond `Athletics`/`Combat` (e.g. a
+  separate "size" or "conditioning" attribute) -- the two skills this
+  session already had covered the real ask ("get bigger... work out
+  and lift weights") without inventing a third.
+- Training currently only seeds a *live* wrestling match. An
+  operator-declared (non-live) `combatSports.js` result still takes a
+  bare `winnerIds` array and does not read either skill -- a
+  deliberate, unaddressed gap, not a silent inconsistency: the two
+  paths were already independent (see this document's own "this
+  module never calls `combatSports.recordResult`" note above), and
+  giving the declared-result path the same training-awareness is real,
+  separate work.
