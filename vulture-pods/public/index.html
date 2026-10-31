@@ -20,6 +20,8 @@
   .ep-row { display: flex; align-items: center; gap: var(--vaco-space-3); padding: var(--vaco-space-2) 0;
             border-top: 1px solid var(--vaco-border-subtle); }
   .ep-row:first-child { border-top: 0; }
+  .ep-block { padding: var(--vaco-space-3) 0; border-top: 1px solid var(--vaco-border-subtle); }
+  .ep-block:first-child { border-top: 0; }
 </style>
 </head>
 <body class="vaco">
@@ -27,8 +29,9 @@
 <script>
 // Vvltvre Pods — shows, episodes, and subscriptions.
 //
-// Real client of its own 17 routes. Listen counts and subscription
-// state are server-owned.
+// Real client of its own 15 routes (of 18 total — see the three left
+// as follow-up below), up from 6 before this coverage pass. Listen
+// counts and subscription state are server-owned.
 //
 // **A real "Play" action, wired to vaco-media (15 Oct 2026).** Pressing
 // play is a real listen record, gated by the same subscription check
@@ -40,6 +43,32 @@
 // anywhere in this ecosystem yet, so today every click shows that
 // honest note; the moment `VACO_MEDIA_STORAGE=s3` points at a real
 // bucket, the exact same code plays the real file.
+//
+// **Frontend coverage pass (31 Oct 2026).** Every creator-side route
+// this app already had was backend-only: a show could only be created,
+// an episode only drafted/published/video-attached, by `curl`. Added
+// the real "Studio" tab below, a real client of `POST /api/shows`,
+// `GET /api/creators/:creatorId/shows`, `POST /api/episodes`,
+// `POST /api/episodes/:id/publish`, `POST /api/episodes/:id/video`,
+// `GET /api/episodes/:id/listen-count`, and
+// `GET /api/creators/:creatorId/listen-count`. Also closed two real
+// bugs this exposed in the existing Shows/Library tabs rather than
+// leaving a newly-reachable path broken: (1) the browse rail's
+// category list was a hand-typed guess (included `'music'`, which
+// isn't one of the server's real `SHOW_CATEGORIES`, and was missing
+// `'culture'`/`'education'`/`'fiction'`/`'other'`/`'technology'`) —
+// now pulled live from `GET /api/health`'s own `showCategories`; (2)
+// the real Subscribe button called `POST /api/shows/:id/subscribe`
+// with no `tierId`, which `subscribeToShow` has required since this
+// project's own Phase 4 — it always 400'd for every tiered show and
+// could never actually succeed. It now only renders for a show that
+// actually has a real paid tier, and lets the listener pick one.
+// Added a real Unsubscribe action to the Library tab
+// (`POST /api/shows/:id/unsubscribe`), the one half of that pair the
+// Library tab didn't have. Left for a follow-up round, as thin,
+// narrow-utility reads whose data a list route the app already calls
+// already returns in full: `GET /api/shows/:id`,
+// `GET /api/episodes/:id`, and `GET /api/shows/:id/subscribers/:userId`.
 
 var el = VACO.el;
 
@@ -63,7 +92,21 @@ function playEpisode(episodeId, host) {
     })
     .catch(VACO.error);
 }
-var state = { category: null, categories: ['comedy', 'news', 'true-crime', 'sports', 'music', 'business'] };
+
+var state = { category: null };
+
+// Real `SHOW_CATEGORIES`, read live from `GET /api/health` rather than
+// hand-typed — see the dated note above for the real mismatch this
+// closes (a stale local list that included an invalid category and
+// was missing five real ones).
+var categoriesCache = null;
+function loadCategories() {
+  if (categoriesCache) return Promise.resolve(categoriesCache);
+  return VACO.api('/api/health').then(function (health) {
+    categoriesCache = health.showCategories || [];
+    return categoriesCache;
+  });
+}
 
 function fmtDuration(seconds) {
   if (!seconds) return '—';
@@ -72,65 +115,84 @@ function fmtDuration(seconds) {
 }
 
 function renderShows(body) {
-  var out = el('div', 'vaco-stack');
+  return loadCategories().then(function (categories) {
+    var out = el('div', 'vaco-stack');
 
-  var rail = el('div', 'vaco-row-tight');
-  state.categories.forEach(function (cat) {
-    var btn = el('button', 'vaco-btn vaco-btn-sm' + (cat === state.category ? ' vaco-btn-primary' : ''), cat);
-    btn.addEventListener('click', function () { state.category = cat; VACO.render(); });
-    rail.appendChild(btn);
-  });
-  out.appendChild(rail);
+    var rail = el('div', 'vaco-row-tight');
+    categories.forEach(function (cat) {
+      var btn = el('button', 'vaco-btn vaco-btn-sm' + (cat === state.category ? ' vaco-btn-primary' : ''), cat);
+      btn.addEventListener('click', function () { state.category = cat; VACO.render(); });
+      rail.appendChild(btn);
+    });
+    out.appendChild(rail);
 
-  if (!state.category) {
-    out.appendChild(el('div', 'vaco-empty', 'Pick a category to browse.'));
-    return VACO.mount(body, out);
-  }
-
-  return VACO.api('/api/shows/category/' + encodeURIComponent(state.category)).then(function (data) {
-    var shows = data.shows || [];
-    if (!shows.length) {
-      out.appendChild(el('div', 'vaco-empty', 'No shows in "' + state.category + '" yet.'));
+    if (!state.category) {
+      out.appendChild(el('div', 'vaco-empty', 'Pick a category to browse.'));
       return VACO.mount(body, out);
     }
-    out.appendChild(VACO.grid(shows.map(function (s) {
-      var lines = el('div', 'vaco-stack-sm');
-      var cover = el('div', 'cover');
-      cover.textContent = state.category;
-      lines.appendChild(cover);
-      lines.appendChild(el('p', 'vaco-small vaco-dim', s.description || ''));
 
-      var episodes = el('div', null);
-      episodes.textContent = 'Loading episodes…';
-      lines.appendChild(episodes);
-      VACO.api('/api/shows/' + s.id + '/episodes').then(function (r) {
-        var eps = r.episodes || [];
-        if (!eps.length) { episodes.textContent = 'No episodes yet.'; return; }
-        VACO.clear(episodes);
-        eps.slice(0, 5).forEach(function (ep) {
-          var row = el('div', 'ep-row');
-          var text = el('div', 'vaco-stack-sm');
-          text.appendChild(el('strong', 'vaco-small', ep.title));
-          text.appendChild(el('span', 'vaco-small vaco-faint',
-            fmtDuration(ep.durationSeconds) + ' · ' + (ep.listenCount || 0) + ' listens'));
-          row.appendChild(text);
-          row.appendChild(el('span', 'vaco-spacer'));
-          var playerHost = el('div', 'vaco-stack-sm');
-          row.appendChild(VACO.button('Play', function () { playEpisode(ep.id, playerHost); }, 'sm'));
-          episodes.appendChild(row);
-          episodes.appendChild(playerHost);
-        });
-      }).catch(function () { episodes.textContent = 'Episodes unavailable.'; });
+    return VACO.api('/api/shows/category/' + encodeURIComponent(state.category)).then(function (data) {
+      var shows = data.shows || [];
+      if (!shows.length) {
+        out.appendChild(el('div', 'vaco-empty', 'No shows in "' + state.category + '" yet.'));
+        return VACO.mount(body, out);
+      }
+      out.appendChild(VACO.grid(shows.map(function (s) {
+        var lines = el('div', 'vaco-stack-sm');
+        var cover = el('div', 'cover');
+        cover.textContent = state.category;
+        lines.appendChild(cover);
+        lines.appendChild(el('p', 'vaco-small vaco-dim', s.description || ''));
 
-      lines.appendChild(VACO.button('Subscribe', function () {
-        if (!VACO.userId()) throw new Error('Sign in to subscribe.');
-        return VACO.post('/api/shows/' + s.id + '/subscribe', { userId: VACO.userId() })
-          .then(function () { VACO.toast('Subscribed to ' + s.title); });
-      }));
+        var episodes = el('div', null);
+        episodes.textContent = 'Loading episodes…';
+        lines.appendChild(episodes);
+        VACO.api('/api/shows/' + s.id + '/episodes').then(function (r) {
+          var eps = r.episodes || [];
+          if (!eps.length) { episodes.textContent = 'No episodes yet.'; return; }
+          VACO.clear(episodes);
+          eps.slice(0, 5).forEach(function (ep) {
+            var row = el('div', 'ep-row');
+            var text = el('div', 'vaco-stack-sm');
+            text.appendChild(el('strong', 'vaco-small', ep.title));
+            text.appendChild(el('span', 'vaco-small vaco-faint',
+              fmtDuration(ep.durationSeconds) + ' · ' + (ep.listenCount || 0) + ' listens'));
+            row.appendChild(text);
+            row.appendChild(el('span', 'vaco-spacer'));
+            var playerHost = el('div', 'vaco-stack-sm');
+            row.appendChild(VACO.button('Play', function () { playEpisode(ep.id, playerHost); }, 'sm'));
+            episodes.appendChild(row);
+            episodes.appendChild(playerHost);
+          });
+        }).catch(function () { episodes.textContent = 'Episodes unavailable.'; });
 
-      return VACO.card(s.title || ('Show ' + s.id), [lines]);
-    }), true));
-    VACO.mount(body, out);
+        // Real tier-aware subscribe: `subscribeToShow` (Phase 4) requires
+        // a real `tierId` matching one of this show's own
+        // `subscriptionTiers` — a show with none genuinely cannot be
+        // subscribed to (most real podcasts are free), so no button is
+        // shown rather than one that can only ever 400.
+        if (s.subscriptionTiers && s.subscriptionTiers.length) {
+          lines.appendChild(VACO.form([
+            {
+              name: 'tierId', label: 'Tier',
+              options: s.subscriptionTiers.map(function (t) { return { label: t.name + ' — ' + t.priceVCoin, value: t.id }; }),
+            },
+          ], function (values) {
+            if (!VACO.userId()) throw new Error('Sign in to subscribe.');
+            return VACO.post('/api/shows/' + s.id + '/subscribe', { userId: VACO.userId(), tierId: Number(values.tierId) })
+              .then(function () {
+                VACO.toast('Subscribed to ' + s.title + '.', 'money');
+                return VACO.refreshBalances().then(VACO.renderIdentity);
+              });
+          }, 'Subscribe'));
+        } else {
+          lines.appendChild(el('p', 'vaco-small vaco-faint', 'Free — no paid tier on this show.'));
+        }
+
+        return VACO.card(s.title || ('Show ' + s.id), [lines]);
+      }), true));
+      VACO.mount(body, out);
+    });
   });
 }
 
@@ -154,9 +216,29 @@ function renderLibrary(body) {
     var subs = (r[0] && (r[0].subscriptions || r[0])) || [];
     var history = (r[1] && (r[1].history || r[1].listenHistory || r[1])) || [];
     out.appendChild(VACO.card('Subscriptions', [
-      VACO.table([{ key: 'showId', label: 'Show' }, { key: 'subscribedAt', label: 'Since',
-        render: function (s) { return s.subscribedAt ? new Date(s.subscribedAt).toLocaleDateString() : '—'; } }],
-        subs, { empty: 'No subscriptions yet.' }),
+      VACO.table([
+        { key: 'showId', label: 'Show' },
+        { key: 'tierId', label: 'Tier' },
+        {
+          key: 'subscribedAt', label: 'Since',
+          render: function (s) { return s.startedAt ? new Date(s.startedAt).toLocaleDateString() : '—'; },
+        },
+        { key: 'status', label: 'Status', render: function (s) { return VACO.badge(s.status); } },
+        {
+          key: 'actions', label: '',
+          // Real `POST /api/shows/:id/unsubscribe` — this tab already
+          // listed subscriptions but had no way to end one; Subscribe
+          // (Shows tab) and Unsubscribe are now both real, reachable
+          // actions.
+          render: function (s) {
+            if (s.status !== 'active') return null;
+            return VACO.button('Unsubscribe', function () {
+              return VACO.post('/api/shows/' + s.showId + '/unsubscribe', { userId: id })
+                .then(function () { VACO.toast('Unsubscribed.'); VACO.render(); });
+            }, 'sm');
+          },
+        },
+      ], subs, { empty: 'No subscriptions yet.' }),
     ]));
     out.appendChild(VACO.card('Listen history', [
       VACO.table([{ key: 'episodeId', label: 'Episode' }, { key: 'listenedAt', label: 'When',
@@ -164,6 +246,185 @@ function renderLibrary(body) {
         history, { empty: 'Nothing listened to yet.' }),
     ]));
     VACO.mount(body, out);
+  });
+}
+
+// -- Studio: the real creator-side surface -------------------------------
+//
+// Every one of these routes already existed and was backend-only
+// (`createShow`, `createEpisode`, `publishEpisode`, `attachEpisodeVideo`
+// all pre-date this tab). This is a real client of them, not a new
+// product surface: create a show, draft episodes under it, publish a
+// draft (the real cross-app call into `vulture-music`'s own
+// `POST /api/releases`), and optionally attach a video (the real
+// length-aware route into Vavlt Stvdios).
+
+function episodeStudioRow(episode, show, onChange) {
+  var block = el('div', 'ep-block vaco-stack-sm');
+
+  var head = el('div', 'vaco-row-tight');
+  head.appendChild(el('strong', 'vaco-small', 'Ep ' + episode.episodeNumber + ' — ' + episode.title));
+  head.appendChild(VACO.badge(episode.status));
+  if (episode.requiresSubscription) head.appendChild(VACO.badge('subscriber-only', 'accent'));
+  block.appendChild(head);
+
+  var meta = el('p', 'vaco-small vaco-faint', fmtDuration(episode.durationSeconds));
+  block.appendChild(meta);
+  VACO.api('/api/episodes/' + episode.id + '/listen-count').then(function (lc) {
+    meta.textContent = fmtDuration(episode.durationSeconds) + ' · ' + lc.listenCount + ' listens';
+  }).catch(function () { /* count stays duration-only */ });
+
+  if (episode.status === 'draft') {
+    var publishRow = el('div', 'vaco-row-tight');
+    publishRow.appendChild(VACO.button('Publish', function () {
+      return VACO.post('/api/episodes/' + episode.id + '/publish', {})
+        .then(function (published) {
+          VACO.toast('Published “' + published.title + '” — distributed to vulture-music.', 'money');
+          return onChange();
+        });
+    }, 'sm primary'));
+    block.appendChild(publishRow);
+  }
+
+  // Attaching video is independent of publish state (mirrors
+  // `vulture-music`'s own `attachMusicVideo`) — a short episode routes
+  // to a real Vavlt Stvdios Reel, a long one to real long-form Video;
+  // `server.js` picks which based on `durationSeconds`, Vavlt Stvdios'
+  // own validation enforces the real cap either way.
+  if (!episode.vaultStvdiosPostId) {
+    block.appendChild(VACO.form([
+      { name: 'mediaUrl', label: 'Video URL', placeholder: 'https://…', width: '160px' },
+      { name: 'durationSeconds', label: 'Duration (s)', type: 'number', min: 1, value: episode.durationSeconds || 300, width: '90px' },
+      { name: 'caption', label: 'Caption', value: episode.title, width: '140px' },
+    ], function (values) {
+      return VACO.post('/api/episodes/' + episode.id + '/video', values)
+        .then(function (updated) {
+          VACO.toast('Video attached as a ' + (updated.vaultStvdiosContentType || 'reel') + ' on Vavlt Stvdios.', 'money');
+          return onChange();
+        });
+    }, 'Attach video'));
+  } else {
+    block.appendChild(el('p', 'vaco-small vaco-faint', 'Video attached (' + episode.vaultStvdiosContentType + ')'));
+  }
+
+  return block;
+}
+
+function showStudioCard(show) {
+  var lines = el('div', 'vaco-stack-sm');
+  lines.appendChild(el('p', 'vaco-small vaco-dim', show.description || ''));
+  if (show.subscriptionTiers && show.subscriptionTiers.length) {
+    lines.appendChild(el('p', 'vaco-small vaco-faint', 'Tiers: '
+      + show.subscriptionTiers.map(function (t) { return t.name + ' (' + t.priceVCoin + ')'; }).join(', ')));
+  } else {
+    lines.appendChild(el('p', 'vaco-small vaco-faint', 'Free show — no paid tier.'));
+  }
+
+  var episodesHost = el('div', 'vaco-stack');
+  episodesHost.appendChild(el('p', 'vaco-small vaco-dim', 'Loading episodes…'));
+  lines.appendChild(episodesHost);
+
+  function refresh() {
+    return VACO.api('/api/shows/' + show.id + '/episodes').then(function (r) {
+      var episodes = r.episodes || [];
+      VACO.clear(episodesHost);
+      if (!episodes.length) episodesHost.appendChild(el('div', 'vaco-empty', 'No episodes yet.'));
+      episodes.forEach(function (ep) { episodesHost.appendChild(episodeStudioRow(ep, show, refresh)); });
+
+      // An episode can only be gated behind a subscription this show
+      // actually has (`createEpisode`'s own real guard) — the "access"
+      // field is only offered at all when a real tier exists.
+      var episodeFields = [
+        { name: 'title', label: 'Episode title', width: '160px' },
+        { name: 'episodeNumber', label: '#', type: 'number', min: 1, value: episodes.length + 1, width: '56px' },
+        { name: 'durationSeconds', label: 'Duration (s)', type: 'number', min: 1, value: 1800, width: '100px' },
+      ];
+      if (show.subscriptionTiers.length) {
+        episodeFields.push({
+          name: 'requiresSubscription', label: 'Access',
+          options: [{ label: 'Free', value: 'false' }, { label: 'Subscriber-only', value: 'true' }],
+        });
+      }
+      episodesHost.appendChild(VACO.form(episodeFields, function (values) {
+        return VACO.post('/api/episodes', {
+          showId: show.id,
+          title: values.title,
+          episodeNumber: values.episodeNumber,
+          durationSeconds: values.durationSeconds,
+          requiresSubscription: values.requiresSubscription === 'true',
+        }).then(function () {
+          VACO.toast('Episode added as a draft.');
+          return refresh();
+        });
+      }, 'Add episode'));
+    });
+  }
+
+  refresh();
+
+  return VACO.card(show.title || ('Show ' + show.id), [lines], { trailing: VACO.badge(show.category, 'accent') });
+}
+
+function renderStudio(body) {
+  var creatorId = VACO.userId();
+  if (!creatorId) {
+    return VACO.mount(body, el('div', 'vaco-empty', 'Sign in to run a show.'));
+  }
+
+  return loadCategories().then(function (categories) {
+    var out = el('div', 'vaco-stack');
+    out.appendChild(VACO.notice(
+      'Create a show, draft episodes under it, then publish — publishing is a real cross-app call into '
+      + 'vulture-music\'s own distribution economics. Most shows are free; a show only needs a paid tier if '
+      + 'it will gate bonus episodes behind one.'));
+
+    out.appendChild(VACO.card('Create a show', [
+      VACO.form([
+        { name: 'title', label: 'Title', width: '160px' },
+        { name: 'description', label: 'Description', width: '200px' },
+        { name: 'category', label: 'Category', options: categories },
+        { name: 'tierName', label: 'Paid tier name (optional)', placeholder: 'Supporter', width: '130px' },
+        { name: 'tierPrice', label: 'Tier price', type: 'number', min: 0.01, step: '0.01', width: '80px' },
+      ], function (values) {
+        var subscriptionTiers = (values.tierName && values.tierPrice)
+          ? [{ name: values.tierName, priceVCoin: values.tierPrice }]
+          : [];
+        return VACO.post('/api/shows', {
+          creatorId: creatorId,
+          title: values.title,
+          description: values.description,
+          category: values.category,
+          subscriptionTiers: subscriptionTiers,
+        }).then(function (show) {
+          VACO.toast('Created “' + show.title + '”.', 'money');
+          return loadMyShows();
+        });
+      }, 'Create show'),
+    ]));
+
+    var showsHost = el('div', 'vaco-stack');
+    out.appendChild(showsHost);
+
+    function loadMyShows() {
+      return Promise.all([
+        VACO.api('/api/creators/' + encodeURIComponent(creatorId) + '/shows'),
+        VACO.api('/api/creators/' + encodeURIComponent(creatorId) + '/listen-count').catch(function () { return null; }),
+      ]).then(function (r) {
+        var shows = r[0].shows || [];
+        VACO.clear(showsHost);
+        if (r[1]) {
+          showsHost.appendChild(el('p', 'vaco-small vaco-dim',
+            'Total listens across every show you own: ' + r[1].totalListenCount));
+        }
+        if (!shows.length) {
+          showsHost.appendChild(el('div', 'vaco-empty', "You haven't created a show yet."));
+          return;
+        }
+        shows.forEach(function (show) { showsHost.appendChild(showStudioCard(show)); });
+      });
+    }
+
+    return loadMyShows().then(function () { return VACO.mount(body, out); });
   });
 }
 
@@ -179,6 +440,7 @@ VACO.app({
   tabs: [
     { id: 'shows', label: 'Shows', heading: 'Browse', render: renderShows },
     { id: 'library', label: 'Library', heading: 'Your subscriptions', render: renderLibrary },
+    { id: 'studio', label: 'Studio', heading: 'Run your show', render: renderStudio },
   ],
 });
 </script>

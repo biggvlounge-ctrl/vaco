@@ -197,8 +197,76 @@ survives a restart. Live-verified: created a real podcast show, killed the
 running process, restarted it, and confirmed the same real state came back
 from a real GET. See `dev-docs/phase-5-real-persistence/`.
 
+## Frontend coverage pass (31 Oct 2026)
+A sweep found `public/index.html` making real calls against only 6 of
+this app's 18 routes — a real `<audio>` player wired to vaco-media
+(15 Oct 2026, see the dated comment in `public/index.html`), but the
+entire creator side (`createShow`, `createEpisode`, `publishEpisode`,
+`attachEpisodeVideo`, the two listen-count routes) was backend-only,
+reachable only from `curl`. Added a real **Studio** tab, a real client
+of the routes named below, every field checked against the real route
+handler and its `lib/*.js` function before being written, not a
+fabricated payload shape:
+- **Create a show** — `POST /api/shows`, with an optional single
+  paid tier (`subscriptionTiers: [{name, priceVCoin}]`) — most real
+  shows are free, so the tier fields are optional and the request
+  sends an empty array when left blank.
+- **Your shows** — `GET /api/creators/:creatorId/shows`, plus a real
+  cross-show listen total via `GET /api/creators/:creatorId/listen-count`
+  (the same aggregate VOKEN's cross-platform score reads).
+- **Add an episode** — `POST /api/episodes`, with the access field
+  (free vs. subscriber-only) only offered when the show actually has
+  a real paid tier, matching `createEpisode`'s own guard.
+- **Publish a draft** — `POST /api/episodes/:id/publish`, the real
+  cross-app call into `vulture-music`'s own distribution economics.
+- **Attach video** — `POST /api/episodes/:id/video`, the real
+  length-aware route into Vavlt Stvdios (a short episode becomes a
+  Reel, a long one real long-form Video).
+- **Per-episode listen count** — `GET /api/episodes/:id/listen-count`,
+  shown next to each episode in Studio.
+
+Two real bugs this exposed in the pre-existing Shows/Library tabs were
+fixed rather than left broken once the new tab made them reachable
+end to end:
+1. The browse rail's category list was a hand-typed guess — it
+   included `'music'`, which is not one of the server's real
+   `SHOW_CATEGORIES`, and was missing `'culture'`, `'education'`,
+   `'fiction'`, `'other'`, and `'technology'`. Both the rail and the
+   new Studio "Create a show" form now read the real list live from
+   `GET /api/health`'s own `showCategories`.
+2. The existing Subscribe button called `POST /api/shows/:id/subscribe`
+   with no `tierId` — `subscribeToShow` has required one since this
+   project's own Phase 4, so the button always 400'd and could never
+   actually succeed against a real paid show. It now only renders for
+   a show with a real tier, and lets the listener pick one.
+3. Added the real other half of that pair the Library tab was
+   missing: an Unsubscribe action (`POST /api/shows/:id/unsubscribe`)
+   on each active subscription row.
+
+**Live-verified** against the real, independently running `shield`,
+`v3`, and `vulture-pods` servers (service-to-service settlement
+enforced, not bypassed): a real show created with a `Supporter`
+(`10` VCoin) tier, two real episodes drafted under it, a listen on the
+subscriber-only one correctly rejected pre-publish, a real subscribe
+to that tier confirmed against V3's own live balances (`listener
+1000 → 990`, `creator 1000 → 1009`, `vulture-pods-platform +1` — the
+exact `9`/`1` split), the subscription appearing via
+`GET /api/users/:userId/subscriptions`, and a real unsubscribe
+confirmed flipping it to `status: "cancelled"`. `POST /api/shows`,
+`GET /api/creators/:creatorId/shows`, and `POST /api/episodes` under
+the correct show were also confirmed live. Publish and video-attach
+were verified by reading `server.js`'s own handlers and `lib/episodes.js`
+line by line against the exact request/response shapes the new Studio
+forms send and expect, but not re-run live end-to-end this round (that
+needs `vulture-music` and `vavlt-stvdios` running too) — a reasonable
+follow-up if those cross-app legs regress.
+
+Left for a follow-up round, as thin, narrow-utility reads whose data a
+list route the app already calls already returns in full: `GET
+/api/shows/:id`, `GET /api/episodes/:id`, and
+`GET /api/shows/:id/subscribers/:userId`.
+
 ## Not yet built
-- Any UI — this phase is the real API and data model only.
 - Real audio hosting/streaming infrastructure — episodes are real
   metadata records, not actual audio files or a CDN.
 - Real advertising insertion — "free, ad-supported" describes the
