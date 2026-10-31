@@ -87,6 +87,157 @@ function renderLive(body) {
   });
 }
 
+// -- Channels (create, go live/end, chat, tips) -----------------------
+//
+// The multi-channel core itself had no frontend at all -- Live/Wall
+// only ever READ channels seedDemoData had already created and put
+// live. This closes that: creating a channel (and, optionally, the
+// channel group it joins), going live/ending a stream you own, a
+// channel's own independent chat (postMessage/getMessages), and the
+// real per-channel and per-person tip totals.
+
+var GROUPING_TYPE_OPTIONS = [
+  { label: 'Same location, multiple rooms', value: 'same-location-multi-room' },
+  { label: 'Same brand, multiple locations', value: 'same-brand-multi-location' },
+  { label: 'Same role, multiple locations', value: 'same-role-multi-location' },
+];
+
+function renderChannelChat(channel, host) {
+  VACO.mount(host, el('p', 'vaco-small vaco-dim', 'Loading chat…'));
+  return VACO.api('/api/channels/' + channel.id + '/chat').then(function (data) {
+    var messages = data.messages || [];
+    var wrap = el('div', 'vaco-stack-sm');
+    var log = el('div', 'vaco-stack-sm');
+    if (!messages.length) log.appendChild(el('div', 'vaco-empty', 'No messages yet.'));
+    messages.slice(-8).forEach(function (m) {
+      var line = el('p', 'vaco-small');
+      line.appendChild(el('strong', null, m.userId + ': '));
+      line.appendChild(document.createTextNode(m.text));
+      log.appendChild(line);
+    });
+    wrap.appendChild(log);
+
+    if (VACO.userId()) {
+      var row = el('div', 'vaco-row-tight');
+      var input = el('input', 'vaco-input');
+      input.placeholder = 'Say something…';
+      input.style.width = '180px';
+      input.setAttribute('aria-label', 'Chat message');
+      row.appendChild(input);
+      row.appendChild(VACO.button('Send', function () {
+        var text = input.value.trim();
+        if (!text) throw new Error('Type a message first.');
+        return VACO.post('/api/channels/' + channel.id + '/chat', { userId: VACO.userId(), text: text })
+          .then(function () { input.value = ''; return renderChannelChat(channel, host); });
+      }, 'sm'));
+      wrap.appendChild(row);
+    }
+    VACO.mount(host, wrap);
+  });
+}
+
+function renderChannelTips(channel, host) {
+  VACO.mount(host, el('p', 'vaco-small vaco-dim', 'Loading tips…'));
+  return VACO.api('/api/channels/' + channel.id + '/tips').then(function (data) {
+    VACO.mount(host, VACO.table([
+      { key: 'tipperId', label: 'From' },
+      { key: 'recipientPersonId', label: 'To' },
+      { key: 'amountVCoin', label: 'VCoin', num: true },
+    ], data.tips || [], { empty: 'No tips on this channel yet.' }));
+  });
+}
+
+function renderOwnedChannelCard(channel) {
+  var lines = el('div', 'vaco-stack-sm');
+  var meta = el('div', 'vaco-row-tight');
+  meta.appendChild(VACO.badge(channel.groupingType));
+  if (channel.parentGroupId) meta.appendChild(el('span', 'vaco-small vaco-dim', 'group ' + channel.parentGroupId));
+  lines.appendChild(meta);
+  lines.appendChild(el('p', 'vaco-small vaco-dim', channel.streamUrl));
+
+  lines.appendChild(VACO.button(channel.isLive ? 'End stream' : 'Go live', function () {
+    var action = channel.isLive ? 'end' : 'live';
+    return VACO.post('/api/channels/' + channel.id + '/' + action, {}).then(function () {
+      VACO.toast(channel.isLive ? 'Stream ended.' : 'You are live.');
+      VACO.render();
+    });
+  }, channel.isLive ? 'danger' : 'primary'));
+
+  var chatHost = el('div', 'vaco-stack-sm');
+  var tipsHost = el('div', 'vaco-stack-sm');
+  var toggles = el('div', 'vaco-row-tight');
+  toggles.appendChild(VACO.button('Chat', function () { return renderChannelChat(channel, chatHost); }, 'sm'));
+  toggles.appendChild(VACO.button('Tips', function () { return renderChannelTips(channel, tipsHost); }, 'sm'));
+  lines.appendChild(toggles);
+  lines.appendChild(chatHost);
+  lines.appendChild(tipsHost);
+
+  return VACO.card(channel.name, [lines], { trailing: channel.isLive ? VACO.badge('live', 'danger') : VACO.badge('offline') });
+}
+
+function renderChannels(body) {
+  var userId = VACO.userId();
+  var out = el('div', 'vaco-stack');
+
+  if (!userId) {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to create and manage channels.'));
+    return VACO.mount(body, out);
+  }
+
+  out.appendChild(VACO.card('New channel group', [
+    el('p', 'vaco-small vaco-dim',
+      'Optional, and only needed before creating the channels that join it — e.g. a club\'s rooms or a franchise\'s locations. '
+      + 'Note the new group\'s id so you can pass it below.'),
+    VACO.form([
+      { name: 'groupingBasis', label: 'Grouping basis', options: GROUPING_TYPE_OPTIONS },
+    ], function (values) {
+      return VACO.post('/api/channel-groups', values).then(function (g) {
+        VACO.toast('Channel group ' + g.id + ' created.');
+      });
+    }, 'Create group'),
+  ]));
+
+  out.appendChild(VACO.card('New channel', [
+    VACO.form([
+      { name: 'name', label: 'Name', placeholder: 'e.g. Front Door Cam', width: '180px' },
+      { name: 'streamUrl', label: 'Stream URL', placeholder: 'rtmp://…', width: '200px' },
+      { name: 'groupingType', label: 'Grouping type', options: GROUPING_TYPE_OPTIONS },
+      { name: 'parentGroupId', label: 'Group id', type: 'number', placeholder: 'optional', width: '90px' },
+    ], function (values) {
+      var payload = { ownerId: userId, name: values.name, streamUrl: values.streamUrl, groupingType: values.groupingType };
+      if (values.parentGroupId) payload.parentGroupId = Number(values.parentGroupId);
+      return VACO.post('/api/channels', payload).then(function () {
+        VACO.toast('Channel created.');
+        VACO.render();
+      });
+    }, 'Create channel'),
+  ]));
+
+  return VACO.api('/api/owners/' + encodeURIComponent(userId) + '/channels').then(function (data) {
+    var channels = data.channels || [];
+    if (channels.length) {
+      out.appendChild(VACO.grid(channels.map(renderOwnedChannelCard), true));
+    } else {
+      out.appendChild(el('div', 'vaco-empty', 'You own no channels yet — create one above.'));
+    }
+
+    var lookupHost = el('div', 'vaco-stack-sm');
+    out.appendChild(VACO.card('Tip earnings lookup', [
+      el('p', 'vaco-small vaco-dim', 'A tip pays the specific person on camera, not necessarily the channel owner — look up anyone\'s real total.'),
+      VACO.form([
+        { name: 'personId', label: 'Person id', placeholder: 'e.g. leon-carter', width: '180px' },
+      ], function (values) {
+        return VACO.api('/api/people/' + encodeURIComponent(values.personId) + '/tips').then(function (result) {
+          VACO.mount(lookupHost, el('p', 'vaco-small', result.personId + ' has earned ' + result.totalTipsVCoin + ' VCoin in tips.'));
+        });
+      }, 'Look up'),
+      lookupHost,
+    ]));
+
+    VACO.mount(body, out);
+  });
+}
+
 // -- The wall ---------------------------------------------------------
 
 function renderWall(body) {
@@ -368,6 +519,7 @@ VACO.app({
   accentInk: '#0d0618',
   tabs: [
     { id: 'live', label: 'Live', heading: 'On air now', render: renderLive },
+    { id: 'channels', label: 'Channels', heading: 'Create & manage your channels', render: renderChannels },
     { id: 'wall', label: 'The Wall', heading: 'Eight-screen sessions', render: renderWall },
     { id: 'sessions', label: 'Sessions', heading: 'Live screen sessions', render: renderSessions },
     { id: 'events', label: 'Events', heading: 'Casino streams', render: renderEvents },
