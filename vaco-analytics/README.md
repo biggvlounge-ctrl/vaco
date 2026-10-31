@@ -41,6 +41,11 @@ curl http://localhost:8790/api/dashboard
   for the source doc's Geckoboard recommendation (no hosted Geckoboard
   account exists here); polls `/api/dashboard` every 5s. Open
   `http://localhost:8790/wallboard.html` after `npm start`.
+- `public/index.html` — the real interactive app (not the always-on
+  wallboard above): three tabs, Dashboard/Alerts/Ingest, built on the
+  shared `VACO.app`/`VACO.api`/`VACO.form`/`VACO.table`/`VACO.card`
+  runtime every app in this repo uses. See "Frontend coverage pass"
+  below for exactly which real routes each tab calls.
 - `intelligence.js` — the Proactive Ecosystem Intelligence Layer's
   three-agent loop: Data Collection reuses `metricsStore.js`'s
   `events` directly (no separate pipeline); `computeBaseline()` /
@@ -95,6 +100,74 @@ then killed VACO Analytics and confirmed a VAGO cash-out still completed
 normally (in ~14ms) with no error surfaced. See
 `dev-docs/phase-5-live-metric-feeds/` and
 `dev-docs/phase-6-more-live-metric-feeds/`.
+
+## Frontend coverage pass (31 Oct 2026)
+`public/index.html` made real calls against only 4 of this app's 7
+routes. The missing route wasn't a missing tab so much as dead code
+already sitting in the file waiting for it — and two of the four
+"covered" calls were themselves silently broken. Every field below
+was checked against `server.js`, `metricsStore.js` and
+`intelligence.js` and curl-verified against a running instance before
+being written; nothing here is a guessed shape.
+
+- **Dashboard sparklines, wired for real.** The dashboard tab has
+  always had a `sparkline(m.series)` call and a real SVG renderer for
+  it — but `GET /api/dashboard` (`getEcosystemSnapshot`) only ever
+  returns the aggregate `{count, sum, avg, min, max, latest}`, never a
+  `series` field, so the `if (m.series...)` guard was always false and
+  the spark never drew. `GET /api/metrics/:app?metric=&limit=` — this
+  app's second-most-basic route, and (before this) the one of the
+  seven with zero callers anywhere in this file — carries the real
+  per-event history that was missing. The dashboard now fetches each
+  real series (skipping single-point ones; a line needs two points),
+  reverses it to chronological order (the route answers newest-first),
+  and hands it to the sparkline code that was already there.
+- **`GET /api/health` strip.** Also never called from the UI at all.
+  Now a one-line status on the Dashboard tab ("Service reporting
+  normally · N app(s) with real ingested metrics") rather than its own
+  tab, since it is one cheap field read off the same store.
+- **Ingest tab, "Look up one app" — fixed, not just extended.** This
+  called `GET /api/metrics/:app/summary` with no `metric` query
+  param. The route requires one (`server.js`:
+  `if (!metric) return res.status(400)...`), so every real lookup
+  400'd. It then read `s.metrics` on the response, a field the real
+  return value (a single `{app, metric, count, sum, avg, min, max,
+  latest}` object, never a list) doesn't have — a second, independent
+  mismatch that the first bug was masking. Fixed to ask for app *and*
+  metric (what the route actually requires) and, since a summary alone
+  doesn't show what happened, paired it with the real recent events
+  from `GET /api/metrics/:app?metric=&limit=` in the same card.
+- **Alerts tab — real fields, plus the filters the route already
+  took.** The table read `a.severity` and `a.message`; the real alert
+  shape (`evaluateMetric` in `intelligence.js`) has neither field, so
+  every row rendered the fallback badge and an em-dash no matter what
+  was actually raised. Replaced with the fields the handler really
+  writes — `routedTo`, `reason`, `zScore`, `occurrences`, `lastSeenAt`
+  — and added an App / Routed-to filter form, since
+  `GET /api/intelligence/alerts` has always read `?app=` and
+  `?routedTo=` off `req.query` with no UI ever sending either.
+  `routedTo`'s three options (Leslie/Deskins/Qvan) come straight from
+  `intelligence.js`'s own `ALERT_ROUTES` table.
+
+**Left backend-only, by design:** `POST /api/intelligence/evaluate`.
+`requireCallingService()` explicitly requires a service credential —
+"not a user session" is in the route's own 403 message — and this app
+has no login to hold one. Same posture already taken for
+service-credential-gated routes elsewhere in this sweep (see void's
+own "Frontend coverage pass" in `void/README.md`): a real backend
+capability stays real rather than getting a fake admin button that
+pretends to hold a credential the page doesn't have.
+
+**Found, not fixed this round:** `POST /api/metrics/ingest` is also
+now `requireCallingService()`-gated server-side (added after this
+tab's "Push a metric" form was written), and a browser cannot present
+`X-Service-Name`/`X-Service-Token` without baking a secret into the
+page. The form as written will 403 in a deployment where that mode is
+`enforce` (this app's default). Left open rather than papered over: a
+server-side proxy credential or relabeling that one form as
+backend-only is a real auth-posture call, not a frontend-coverage
+one, and belongs in a follow-up pass that actually owns that
+decision.
 
 ## Not yet built
 - Real ClickHouse/VeloDB backing (infrastructure this sandbox can't
