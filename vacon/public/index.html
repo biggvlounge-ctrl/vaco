@@ -37,11 +37,14 @@ function renderAgents(body) {
     agents.forEach(function (a) {
       var lines = el('div', 'vaco-stack-sm');
       lines.appendChild(el('p', 'vaco-small vaco-dim', a.role || a.description || ''));
-      if (a.represents) lines.appendChild(VACO.badge(a.represents));
-      if (a.domainKeywords && a.domainKeywords.length) {
-        lines.appendChild(el('span', 'vaco-label', 'Domain'));
-        lines.appendChild(el('p', 'keyword vaco-faint', a.domainKeywords.slice(0, 10).join(' · ')));
-      }
+      // Fixed: the real record's field is `app` (the app this agent
+      // represents), not `represents` -- this badge never rendered
+      // before. `domainKeywords` never existed on an agent record at
+      // all (that data lives server-side only, in
+      // lib/orchestrator.js's own DOMAIN_KEYWORDS), so that branch was
+      // dead code; removed rather than left pretending to do something.
+      if (a.app) lines.appendChild(VACO.badge(a.app));
+      if (a.tier) lines.appendChild(el('p', 'vaco-small vaco-faint', 'tier: ' + a.tier));
       grid.appendChild(VACO.card(a.name || a.id, [lines]));
     });
     if (!agents.length) return el('div', 'vaco-empty', 'No agents registered.');
@@ -77,12 +80,22 @@ function renderRoute(body) {
           bar.appendChild(fill);
           lines.appendChild(bar);
           lines.appendChild(el('p', 'vaco-small vaco-dim', 'score ' + (m.score || 0)));
-          if (m.matched && m.matched.length) {
-            lines.appendChild(el('p', 'keyword vaco-faint', 'matched: ' + m.matched.join(', ')));
+          // Fixed: the real route returns the matched words as
+          // `keywords`, not `matched` -- this never rendered before,
+          // which defeated the whole point of showing a deterministic
+          // router's own reasoning instead of a black box.
+          if (m.keywords && m.keywords.length) {
+            lines.appendChild(el('p', 'keyword vaco-faint', 'matched: ' + m.keywords.join(', ')));
           }
           lines.appendChild(VACO.button('Invoke', function () {
+            // Fixed: the real route requires a `messages` array
+            // (`[{role, content}]`, the same shape v4-proxy itself
+            // takes), not a bare `query` string -- every click here
+            // used to 400 before the request ever reached v4-proxy,
+            // and the catch below blamed the missing API key for a
+            // failure that was actually a malformed payload.
             return VACO.post('/api/agents/' + encodeURIComponent(m.agentId || m.id) + '/invoke',
-              { query: values.query })
+              { messages: [{ role: 'user', content: values.query }] })
               .then(function (r) {
                 VACO.toast('Agent replied.');
                 lines.appendChild(el('pre', 'vaco-mono vaco-small',
@@ -113,8 +126,13 @@ function renderHistory(body) {
         'Every routing decision the network has made. This is the audit trail that makes a deterministic router worth having.'),
       VACO.table([
         { key: 'query', label: 'Question' },
+        // Fixed: a logged entry carries `routedTo` (one agent id) and
+        // a `fallback` flag (lib/orchestrator.js's own `recordRouting`),
+        // not a `matchedAgents` array -- this column showed nothing
+        // but "—" for every real row before.
         { label: 'Routed to', render: function (h) {
-          return (h.matchedAgents || []).map(function (m) { return m.agentId || m.id; }).join(', ') || '—'; } },
+          if (!h.routedTo) return '—';
+          return h.routedTo + (h.fallback ? ' (fallback)' : ''); } },
         { key: 'at', label: 'When', render: function (h) {
           var t = h.at || h.createdAt;
           return t ? new Date(t).toLocaleString() : '—'; } },
