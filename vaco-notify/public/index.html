@@ -142,47 +142,173 @@ function renderUndelivered(body) {
   return load();
 }
 
+// Changing who gets paged is an administrative act (`requireOperator`
+// on both the real POST and DELETE routes) -- it needs a real
+// X-Operator-Credential, not a session token, same as the credential
+// widget `cvnvo/yap`'s Moderate tab already established for exactly
+// this situation. The previous version of this tab sent an
+// `operatorId` field in the POST body; `subscribe()` never reads that
+// field and the guard checks a header, so that form 401'd against any
+// deployment actually enforcing it. Fixed here along with adding the
+// DELETE route (unsubscribe), which had no frontend at all.
 function renderSubscriptions(body) {
   var out = el('div', 'vaco-stack');
+  var state = { credential: '' };
+
   out.appendChild(VACO.notice(
     'A subscription is <strong>who hears about what</strong>. Deliberately not a broadcast: '
     + 'an ad-budget alert and a safety escalation should not land in the same place by default. '
     + 'A pager that cries wolf gets muted, and then the real one is missed.'));
 
-  return VACO.api('/api/subscriptions').then(function (data) {
-    out.appendChild(VACO.card('Current subscriptions', [
-      VACO.table([
-        { key: 'name', label: 'Name' },
-        { key: 'channel', label: 'Channel' },
-        { key: 'minSeverity', label: 'From severity' },
-        { key: 'apps', label: 'Apps' },
-      ], data.subscriptions.map(function (s) {
-        return {
-          name: s.name, channel: s.channel, minSeverity: s.minSeverity,
-          apps: s.apps ? s.apps.join(', ') : 'all',
-        };
-      })),
-    ]));
+  out.appendChild(VACO.notice(
+    'Adding or removing a subscription changes who gets paged, so every change here needs a real '
+    + 'operator credential from vaco-operator (X-Operator-Credential) -- a session alone is not enough.', 'warn'));
 
-    out.appendChild(VACO.card('Add a subscription', [
+  out.appendChild(VACO.card('Operator credential', [
+    VACO.form([{ name: 'credential', label: 'X-Operator-Credential', placeholder: 'from vaco-operator', width: '220px' }],
+      function (values) { state.credential = values.credential; VACO.toast('Credential set for this session.'); }, 'Use this credential'),
+  ]));
+
+  function authedHeaders() {
+    return { 'Content-Type': 'application/json', 'X-Operator-Credential': state.credential };
+  }
+
+  var listCard = el('div');
+  out.appendChild(listCard);
+
+  function unsubscribeOne(name) {
+    if (!state.credential) { VACO.toast('Set an operator credential first.', 'warn'); return Promise.resolve(); }
+    if (!window.confirm('Remove subscription "' + name + '"? It stops hearing about new alerts immediately.')) return Promise.resolve();
+    return VACO.api('/api/subscriptions/' + encodeURIComponent(name), { method: 'DELETE', headers: authedHeaders() })
+      .then(function () { VACO.toast('Removed "' + name + '".'); return loadList(); });
+  }
+
+  function loadList() {
+    return VACO.api('/api/subscriptions').then(function (data) {
+      VACO.mount(listCard, VACO.card('Current subscriptions', [
+        VACO.table([
+          { key: 'name', label: 'Name' },
+          { key: 'channel', label: 'Channel' },
+          { key: 'minSeverity', label: 'From severity' },
+          { key: 'apps', label: 'Apps' },
+          { key: 'remove', label: '', render: function (row) {
+            return VACO.button('Remove', function () { return unsubscribeOne(row.name); }, 'ghost vaco-btn-sm');
+          } },
+        ], data.subscriptions.map(function (s) {
+          return {
+            name: s.name, channel: s.channel, minSeverity: s.minSeverity,
+            apps: s.apps ? s.apps.join(', ') : 'all',
+          };
+        })),
+      ]));
+    });
+  }
+
+  out.appendChild(VACO.card('Add a subscription', [
+    VACO.form([
+      { name: 'name', label: 'Name', width: '140px' },
+      { name: 'channel', label: 'Channel', options: ['console', 'file', 'webhook'] },
+      { name: 'target', label: 'Target (webhook URL)', width: '220px' },
+      { name: 'minSeverity', label: 'From', options: ['alert', 'critical', 'signal'] },
+    ], function (values) {
+      if (!state.credential) { VACO.toast('Set an operator credential first.', 'warn'); return Promise.resolve(); }
+      var payload = { name: values.name, channel: values.channel, minSeverity: values.minSeverity };
+      if (values.target) payload.target = values.target;
+      return VACO.api('/api/subscriptions', { method: 'POST', headers: authedHeaders(), body: JSON.stringify(payload) })
+        .then(function (s) {
+          VACO.toast('Subscribed "' + s.name + '".');
+          return loadList();
+        });
+    }, 'Subscribe'),
+  ]));
+
+  out.appendChild(buildWebpushCard(state, authedHeaders, function () { return loadList(); }));
+
+  return loadList().then(function () { return VACO.mount(body, out); });
+}
+
+// `GET /api/webpush/public-key` and the entire `webpush` channel had
+// zero frontend presence -- not even an explanation of why. This is
+// the real browser-side half of `lib/notify.js`'s webpush adapter:
+// register the service worker (`/sw.js`), subscribe this browser via
+// the real PushManager API using the server's real VAPID public key,
+// and hand the real PushSubscription straight to
+// `POST /api/subscriptions` as `target` -- the exact shape
+// `subscribe()` validates (`{ endpoint, keys: { p256dh, auth } }`).
+function buildWebpushCard(state, authedHeaders, reloadList) {
+  var container = el('div');
+  var supported = 'serviceWorker' in navigator && 'PushManager' in window;
+
+  if (!supported) {
+    container.appendChild(VACO.card('Browser push (webpush)', [
+      el('p', 'vaco-small vaco-dim', 'This browser does not support push notifications.'),
+    ]));
+    return container;
+  }
+
+  function renderUnconfigured() {
+    VACO.mount(container, VACO.card('Browser push (webpush)', [
+      el('p', 'vaco-small vaco-dim',
+        'Not configured on this deployment -- no VAPID_PUBLIC_KEY set. Run '
+        + '"npm run generate-vapid-keys" and set VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY to enable '
+        + 'push straight to a browser, no vendor account needed.'),
+    ]));
+  }
+
+  function renderConfigured(publicKey) {
+    VACO.mount(container, VACO.card('Browser push (webpush)', [
+      el('p', 'vaco-small vaco-dim',
+        'Subscribes THIS browser directly to real RFC 8030/8291 web push -- delivery lands in the '
+        + "OS notification tray, no vendor account beyond the deployment's own VAPID keypair."),
       VACO.form([
-        { name: 'operatorId', label: 'Operator', value: VACO.userId() || '', width: '140px' },
         { name: 'name', label: 'Name', width: '140px' },
-        { name: 'channel', label: 'Channel', options: ['console', 'file', 'webhook'] },
-        { name: 'target', label: 'Target (webhook URL)', width: '220px' },
         { name: 'minSeverity', label: 'From', options: ['alert', 'critical', 'signal'] },
       ], function (values) {
-        var payload = { operatorId: values.operatorId, name: values.name, channel: values.channel, minSeverity: values.minSeverity };
-        if (values.target) payload.target = values.target;
-        return VACO.post('/api/subscriptions', payload).then(function (s) {
-          VACO.toast('Subscribed "' + s.name + '".');
-          return renderSubscriptions(body);
-        });
-      }, 'Subscribe'),
+        if (!state.credential) { VACO.toast('Set an operator credential first.', 'warn'); return Promise.resolve(); }
+        if (!values.name) { VACO.toast('Name this subscription first.', 'warn'); return Promise.resolve(); }
+        return navigator.serviceWorker.register('/sw.js')
+          .then(function () { return navigator.serviceWorker.ready; })
+          .then(function (registration) {
+            return registration.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: urlBase64ToUint8Array(publicKey),
+            });
+          })
+          .then(function (pushSubscription) {
+            var payload = {
+              name: values.name, channel: 'webpush', minSeverity: values.minSeverity,
+              target: pushSubscription.toJSON(),
+            };
+            return VACO.api('/api/subscriptions', { method: 'POST', headers: authedHeaders(), body: JSON.stringify(payload) });
+          })
+          .then(function (s) {
+            VACO.toast('This browser now subscribed as "' + s.name + '".');
+            return reloadList();
+          });
+      }, 'Enable push in this browser'),
     ]));
+  }
 
-    return VACO.mount(body, out);
+  VACO.api('/api/webpush/public-key').then(function (data) {
+    renderConfigured(data.publicKey);
+  }).catch(function () {
+    renderUnconfigured();
   });
+
+  return container;
+}
+
+// Standard VAPID applicationServerKey conversion -- pushManager.subscribe
+// takes a Uint8Array, the server hands back a URL-safe base64 string.
+function urlBase64ToUint8Array(base64String) {
+  var padding = '='.repeat((4 - base64String.length % 4) % 4);
+  var base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  var rawData = window.atob(base64);
+  var outputArray = new Uint8Array(rawData.length);
+  for (var i = 0; i < rawData.length; i += 1) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
 }
 
 VACO.app({
