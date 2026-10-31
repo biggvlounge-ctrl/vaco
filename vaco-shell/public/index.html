@@ -1083,10 +1083,39 @@
           const days = Math.max(0, Math.ceil((entry.expiresAt - Date.now()) / 86400000));
           foot.appendChild(el('span', 'vaco-badge', `renews in ${days}d`));
         }
+        // Uninstalling is not refunding (lib/appStore.js's own real rule):
+        // access and any money paid both survive it. So this is shown as an
+        // extra, honest fact alongside "Active" — never in place of it — and
+        // there is nothing to "reinstall" into, because nothing was revoked.
+        if (entry.uninstalledAt) {
+          foot.appendChild(el('span', 'vaco-badge vaco-badge-warn', 'Uninstalled'));
+        }
       } else {
         foot.appendChild(el('span', 'vaco-badge vaco-badge-danger', entry.access.reason));
       }
       foot.appendChild(el('span', 'vaco-spacer'));
+
+      if (entry.access.allowed && !entry.uninstalledAt) {
+        const uninstallBtn = el('button', 'vaco-btn vaco-btn-ghost vaco-btn-sm', 'Uninstall');
+        uninstallBtn.title = 'Marks it removed. Your access and anything you paid are unaffected.';
+        uninstallBtn.onclick = async () => {
+          uninstallBtn.disabled = true;
+          try {
+            await api('/api/store/uninstall', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId: state.session.userId, appId: entry.appId }),
+            });
+            await refreshUser();
+            renderAll();
+            toast(`${entry.name || entry.appId} uninstalled — you keep access and anything you paid.`);
+          } catch (err) {
+            toast(err.message, 'danger');
+            uninstallBtn.disabled = false;
+          }
+        };
+        foot.appendChild(uninstallBtn);
+      }
 
       if (entry.pricePaid > 0 && entry.access.allowed) {
         const refundBtn = el('button', 'vaco-btn vaco-btn-danger vaco-btn-sm', 'Refund');
