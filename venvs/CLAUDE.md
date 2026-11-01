@@ -84,6 +84,19 @@ monolith this brief used to describe. Real structure:
 It runs for real (`npm install && npm run dev`) and has been verified
 in a browser — the original "never actually run" caveat is resolved.
 
+**`server.cjs` (Phase 14, 31 Oct 2026) is this app's first real
+backend.** Before it, `MarketplaceView.jsx` called `createMarketplace()`
+fresh on every mount — a registered seller vanished on the next page
+load, because there was genuinely nowhere for it to persist. Now a
+real Express server (`lib/` holds CJS copies of the shared Shield/
+service-auth/persistence infrastructure, same split `vdp/server.cjs`
+already uses for its own ESM `src/lib`) gives `marketplace.js`'s own
+`registerSeller`/`listProduct`/`getSellerStorefront`/`checkout` a real
+persisted store and real Shield-authenticated routes. See this app's
+own README's "Phase 14" section for the full route list and
+verification record. `MarketplaceView.jsx` itself has not been
+rewired to call it yet — that remains real, separate frontend work.
+
 ---
 
 ## 3. Stack
@@ -136,8 +149,11 @@ VEX/VADO districts render real VOKEN API clients directly.
 ## 5. Genuinely not built
 
 - **Multiplayer / shared-world state.** Real accounts and a real
-  ledger exist now, but there's no shared live world here (and the
-  world itself is VDP's concern).
+  ledger exist now, but there's no shared live *walkable* world here
+  (and that world itself is VDP's concern). Marketplace itself is a
+  real exception as of Phase 14: `server.cjs` gives it a real,
+  persisted, multi-user store — a seller one account registers is
+  visible to every other account, which was not true before.
 - **Ingram catalog integration.** `VENVS_PUBLISHING_ADDITION.md`
   identifies Ingram Content Group as the real path to an existing
   backlist catalog (millions of titles, 30,000+ publishers) with real
@@ -147,10 +163,16 @@ VEX/VADO districts render real VOKEN API clients directly.
 - **AI-narrated audiobooks.** Named as a real differentiator in the
   source doc; not built.
 - **HVNTZ POS integration.** Named in
-  `VENVS_SHOPIFY_INTEGRATION.md` — real HVNTZ businesses running VENVS
-  as an actual point of sale, unifying in-person and online sales.
-  Genuinely unbuilt, and the strongest real differentiator left in
-  that doc (HVNTZ already has real onboarded physical businesses).
+  `VENVS_SHOPIFY_INTEGRATION.md` — a physical register at a real HVNTZ
+  business ringing up an in-person sale through this same ledger,
+  unifying in-person and online sales. Still genuinely unbuilt, and
+  still the strongest real differentiator left in that doc. **Not the
+  same thing** as what Phase 14 built: a Hunts business (or a Vault
+  Studios creator) now has a real, working *online* storefront
+  (`HVNTZ`'s and `vavlt-stvdios`'s own "Storefront" tabs, calling this
+  app's real `POST /api/marketplace/sellers` directly) — that closes
+  "tie Hunts/Vault Studios accounts to a real storefront," a separate,
+  smaller ask than an actual point-of-sale terminal.
 - **Health/lifestyle stats** — deliberately not built and should stay
   that way; the source spec itself says this should remain pure
   gameplay rather than resemble real wellness tracking.
@@ -173,13 +195,24 @@ ecosystem, POS). `README.md` carries the full phase-by-phase record.
 
 The original build order (run it, split `App.jsx`, wire V3, wire
 Shield) is **complete** — steps 1–4 all shipped across Phases 1–13.
-Genuinely useful next steps, roughly by leverage:
+Phase 14 (31 Oct 2026) gave this app its first real backend and a
+working Hunts/Vault Studios storefront path. Genuinely useful next
+steps, roughly by leverage:
 
-1. **HVNTZ POS integration** — real onboarded physical businesses
-   using VENVS as an actual point of sale, unifying in-person and
-   online sales. The strongest genuinely-differentiated item left in
-   the Shopify doc.
-2. ~~**Publishing → VOID fulfillment.**~~ **Done.**
+1. **Rewire `MarketplaceView.jsx` itself** to call the new
+   `server.cjs` instead of `createMarketplace()`'s ephemeral local
+   state — VENVS's own in-app Marketplace tab still shows the old
+   hardcoded demo sellers, even though the real backend now exists.
+2. **HVNTZ POS integration** — a physical register at a real HVNTZ
+   business ringing up an in-person sale through this same ledger,
+   unifying in-person and online sales. The strongest genuinely-
+   differentiated item left in the Shopify doc, and distinct from the
+   online storefront Phase 14 already built (see §5 above).
+3. Wire `markChopzEligible`/`publishToChopzShop`, `requestFulfillment`,
+   and `checkAbandonedCarts`/`generateRecoveryOffer` to real routes on
+   `server.cjs` — all three are real, tested functions in
+   `marketplace.js` with no HTTP route yet.
+4. ~~**Publishing → VOID fulfillment.**~~ **Done.**
    `purchaseBook` now records a real order, and
    `requestBookFulfillment` routes physical book orders to VOID through
    the same injected-`voidRequestFn` shape `marketplace.js` uses.
@@ -191,7 +224,7 @@ Genuinely useful next steps, roughly by leverage:
    `publishBook` already draws for royalties. Neither this nor
    Marketplace's fulfillment is wired into a component yet — both are
    lib-level, at parity.
-3. **Ingram catalog** — high value, but blocked on a real commercial
+5. **Ingram catalog** — high value, but blocked on a real commercial
    agreement and real API credentials, not on code. Don't stub it.
 
 Already done, don't redo: abandoned cart recovery

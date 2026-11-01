@@ -376,6 +376,96 @@ function loadTraining(out, body, businessId) {
   });
 }
 
+// A real storefront on VENVS, tied to this user's own account. Per
+// direct instruction (31 Oct 2026, correcting an earlier mis-scoped
+// plan): "the merchant storefront... was for hunts and vault studios
+// for users." VENVS's own real backend (`POST /api/marketplace/
+// sellers`) is cross-origin from here, so the Shield bearer token is
+// attached by hand rather than by `VACO.api`'s own same-origin-only
+// auto-attach (see that function's own header on why it withholds the
+// token from an absolute URL by default) -- deliberate here, the same
+// SSO-token-reuse trust VDP's own Publisher iframe embed into VENVS
+// already relies on.
+function venvsAuthedPost(path, body) {
+  return VACO.api(VACO.VENVS_URL + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + VACO.session.sessionToken },
+    body: JSON.stringify(body),
+  });
+}
+
+function renderStorefront(body) {
+  var out = el('div', 'vaco-stack');
+  var userId = VACO.userId();
+
+  if (!userId) {
+    out.appendChild(VACO.notice('Sign in to open or manage a real storefront on VENVS.', 'warn'));
+    return VACO.mount(body, out);
+  }
+
+  out.appendChild(VACO.card('Open a VENVS storefront', [
+    el('p', 'vaco-small vaco-dim',
+      'Any Hunts business can sell real goods through VENVS’s Amazon-style marketplace, under its own '
+      + 'branded storefront — the same mechanism Vault Studios creators use.'),
+    VACO.form([{ name: 'name', label: 'Storefront name', width: '220px' }], function (values) {
+      return venvsAuthedPost('/api/marketplace/sellers', { ownerId: userId, name: values.name })
+        .then(function (seller) {
+          VACO.toast('Storefront opened: ' + seller.name);
+          return loadStorefront(out, body, seller.id);
+        });
+    }, 'Open storefront'),
+  ]));
+
+  out.appendChild(VACO.card('Already have a storefront?', [
+    VACO.form([{ name: 'sellerId', label: 'Storefront id', width: '140px' }], function (values) {
+      return loadStorefront(out, body, values.sellerId);
+    }, 'Load'),
+  ]));
+
+  return VACO.mount(body, out);
+}
+
+function loadStorefront(out, body, sellerId) {
+  var userId = VACO.userId();
+  return VACO.api(VACO.VENVS_URL + '/api/marketplace/sellers/' + encodeURIComponent(sellerId)).then(function (store) {
+    var replacement = el('div', 'vaco-stack');
+    var isOwner = store.seller.ownerId === userId;
+
+    replacement.appendChild(VACO.card(store.seller.name, [
+      VACO.table([
+        { key: 'title', label: 'Product' },
+        { label: 'Price', num: true, render: function (p) { return VACO.price(p.price); } },
+        { key: 'category', label: 'Category' },
+      ], store.products, { empty: 'Nothing listed yet.' }),
+    ], { trailing: VACO.badge(isOwner ? 'your storefront' : 'view only') }));
+
+    if (isOwner) {
+      replacement.appendChild(VACO.card('List a product', [
+        VACO.form([
+          { name: 'title', label: 'Title', width: '200px' },
+          { name: 'price', label: 'Price (VCoin)', width: '120px' },
+          { name: 'category', label: 'Category', width: '140px' },
+        ], function (values) {
+          return venvsAuthedPost('/api/marketplace/sellers/' + encodeURIComponent(sellerId) + '/products', {
+            ownerId: userId, title: values.title, price: Number(values.price), category: values.category || null,
+          }).then(function () {
+            VACO.toast('Product listed');
+            return loadStorefront(out, body, sellerId);
+          });
+        }, 'List product'),
+      ]));
+    }
+
+    while (out.childNodes.length > 2) out.removeChild(out.lastChild);
+    out.appendChild(replacement);
+    VACO.mount(body, out);
+  }).catch(function (err) {
+    while (out.childNodes.length > 2) out.removeChild(out.lastChild);
+    out.appendChild(VACO.notice('Could not load that storefront: ' + VACO.escapeHtml(err.message), 'danger'));
+    VACO.mount(body, out);
+  });
+}
+
 function renderBusiness(body) {
   var out = el('div', 'vaco-stack');
   out.appendChild(VACO.card('Look up a business', [
@@ -434,6 +524,8 @@ VACO.app({
     { id: 'hunts', label: 'Hunts', heading: 'Hunt progress',
       blurb: 'Progress, and a real break recommendation when the pace warrants one.', render: renderHunts },
     { id: 'business', label: 'Business', heading: 'Businesses & neighbours', render: renderBusiness },
+    { id: 'storefront', label: 'Storefront', heading: 'Your VENVS storefront',
+      blurb: 'Open a real, branded storefront on VENVS and sell under your own account.', render: renderStorefront },
     { id: 'mystery', label: 'Mystery', heading: 'Mystery hunts',
       blurb: 'A Clue-style whodunit layered on a real hunt: a hidden solution, clues revealed at checkpoints, and accusations.', render: renderMystery },
     { id: 'revenue', label: 'Revenue', heading: 'The revenue stack', render: renderRevenue },

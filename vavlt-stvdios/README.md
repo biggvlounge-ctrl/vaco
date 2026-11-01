@@ -534,3 +534,22 @@ different task from closing a frontend-coverage gap, flagged directly
 rather than silently worked around; the new Channels tab's tip-ledger
 and tip-earnings-lookup views at least give a real, correct way to see
 tip totals in the meantime.
+
+
+## VENVS storefront tie-in (31 Oct 2026)
+
+Per direct instruction, correcting an earlier mis-scoped plan: "the
+merchant storefront... was for hunts and vault studios for users." A
+real `Storefront` tab (`public/index.html`) lets a signed-in creator
+open a real, persisted branded storefront on VENVS and list merch,
+calling VENVS's own new backend (`POST /api/marketplace/sellers`,
+`/products`) directly with a manually-attached Shield bearer token —
+`VACO.api`'s automatic same-origin token attachment does not apply
+across origins, by design, so this is the one deliberate place that
+token is handed to another app, the same SSO-token-reuse trust VDP's
+own Publisher iframe embed into VENVS already relies on. See
+`../venvs/README.md`'s "Phase 14" section for the backend side and the
+full verification record (a real end-to-end browser run against real
+spawned Shield + V3 + VENVS, confirmed against HVNTZ's identical tab
+with screenshots at each step — the two tabs share the same
+implementation pattern).

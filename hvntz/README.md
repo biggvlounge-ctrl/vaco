@@ -406,3 +406,23 @@ none tracked anywhere in this ecosystem, so honestly absent rather
 than approximated); any role
 beyond hub-owner vs. invited member; recurring per-person schedules;
 and temporary/archivable multi-business event networks.
+
+
+## VENVS storefront tie-in (31 Oct 2026)
+
+Per direct instruction, correcting an earlier mis-scoped plan: "the
+merchant storefront... was for hunts and vault studios for users." A
+real `Storefront` tab (`public/index.html`) lets a signed-in Hunts
+user open a real, persisted branded storefront on VENVS and list
+products, calling VENVS's own new backend (`POST /api/marketplace/
+sellers`, `/products`) directly with a manually-attached Shield bearer
+token — `VACO.api`'s automatic same-origin token attachment does not
+apply across origins, by design, so this is the one deliberate place
+that token is handed to another app, the same SSO-token-reuse trust
+VDP's own Publisher iframe embed into VENVS already relies on. See
+`../venvs/README.md`'s "Phase 14" section for the backend side and the
+full verification record (a real end-to-end browser run against real
+spawned Shield + V3 + VENVS + this app, screenshotted at each step).
+This is a real online storefront, not the full HVNTZ **POS**
+integration (a physical register ringing up an in-person sale) —
+that remains a separate, larger, still-unbuilt piece.

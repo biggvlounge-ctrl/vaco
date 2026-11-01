@@ -225,14 +225,21 @@ time that file gets rewritten for an unrelated reason.
   Population tiers, living NPCs, My Assets dashboard, Live World
   News, multiplayer/shared-world state** — all now VDP's scope, not
   this project's. See `../vdp/README.md`.
-- Marketplace: VENVM app ecosystem and HVNTZ POS integration — still
-  not built HERE, but the parenthetical this line used to carry
-  ("neither system exists in this session") is out of date and was
-  removed on re-check: `../venvm/` and `../hvntz/` are both real, built
-  apps now, with 14 and 40 routes respectively. What is missing is
-  VENVS's integration with them, not the systems themselves. Also
-  unbuilt: seller onboarding, inventory management, scheduled
-  abandonment sweeps.
+- Marketplace: **a real backend now exists (Phase 14)** — register as
+  a seller, list a product, browse, cart, and check out for real
+  VCoin all persist and move real money, closing the gap this bullet
+  used to describe (a seller registered in the browser vanished on
+  the next page load). Still genuinely unbuilt: the full HVNTZ **POS**
+  integration specifically (a physical register ringing up an
+  in-person sale through this same ledger, not just a Hunts business
+  having an online storefront — that distinction is the real
+  remaining gap), the VENVM app ecosystem, CHOPZ SHOP cross-posting
+  wired to a route (`markChopzEligible`/`publishToChopzShop` exist in
+  `src/lib/marketplace.js`, real and tested, just not reachable over
+  HTTP yet), VOID physical fulfillment wired to a route
+  (`requestFulfillment`, same situation), abandoned-cart recovery
+  wired to a route (`checkAbandonedCarts`/`generateRecoveryOffer`,
+  same situation), and seller onboarding/inventory management UI.
 - Publishing: no Ingram API integration (just a flag on a manually-
   published book), no subscription-pool UI, no full tab UI (search,
   skill tags, cover art). **VOID fulfillment routing IS now built** —
@@ -256,3 +263,74 @@ time that file gets rewritten for an unrelated reason.
   `v3`/`shield` services (see `../v3/README.md`'s "Ecosystem cutover"),
   not `venvs-mock-backend` — this app was one of the real callers
   switched over.
+
+## Phase 14: VENVS's first real backend — Marketplace storefronts (31 Oct 2026)
+
+Per direct instruction, correcting an earlier mis-scoped plan: "the
+merchant storefront... was for hunts and vault studios for users."
+`src/lib/marketplace.js`'s branded-storefront system
+(`registerSeller`/`listProduct`/`getSellerStorefront`/`checkout`) has
+existed, real and fully tested, since Phase 3 — with nowhere real to
+live. `MarketplaceView.jsx` called `createMarketplace()` fresh on
+every component mount and seeded it with hardcoded demo sellers; a
+seller a real user registered vanished on the next page load, because
+this app had **no backend at all** until now — confirmed directly
+(`package.json` had only `dev`/`build`/`preview` scripts, no
+`express`/`cors`/`dotenv` dependency, and no server file anywhere in
+the repo).
+
+**`server.cjs`** is that real backend — the same CJS-server-over-ESM-
+`src/lib`-split `vdp/server.cjs` already uses, for the same reason:
+`src/lib/marketplace.js` stays real ESM, loaded with a dynamic
+`import()`, while the server itself and the shared auth/persistence
+infrastructure (`lib/persistence.cjs`, `lib/storeBackend.cjs`,
+`lib/serviceAuth.cjs`, `lib/shieldAuth.cjs`, `lib/tracing.cjs`) are
+CommonJS copies of VDP's own already-working copies. Per
+`sync-shared-runtime.sh`'s own documented convention, VENVS and VDP
+are both deliberately hand-maintained exceptions to that script's
+auto-synced target lists rather than entries in them.
+
+**Real routes, narrower than `marketplace.js`'s full surface,
+deliberately:** `POST /api/marketplace/sellers` (`requireActor
+('ownerId')` — any Shield-authenticated account, not narrowed to
+Hunts/Vault Studios specifically, because Shield carries no per-app
+account flag to narrow by), `GET /api/marketplace/sellers/:id`,
+`GET /api/marketplace/products`, `POST /api/marketplace/sellers/:id/
+products` (an inline resolve-then-compare ownership guard — the
+`ownerId` must match both the real Shield session and the seller
+record's own stored owner), `POST /api/marketplace/carts`,
+`POST /api/marketplace/carts/:id/items`, `GET /api/marketplace/
+carts/:id`, `POST /api/marketplace/checkout`, `GET /api/marketplace/
+orders/:id`. CHOPZ SHOP cross-posting, VOID fulfillment, and
+abandoned-cart recovery are real existing functions in
+`marketplace.js` not yet wired to a route — see "Not yet built" above.
+
+**Both legs of `checkout` move real VCoin through one trusted-service
+call to V3** (`transferVCoin`, this app's own service credential),
+mirroring the two-layer split `marketplace.js`'s own header already
+documents: a browser may rightly instruct its own purchase (Shield
+already proved who is asking, via `requireActor('buyerId')`, before
+this handler is ever reached) but must never be trusted to instruct a
+platform-paid seller payout directly.
+
+### Verification
+
+`test/server.test.js` (new, 11 tests) spawns the real process against
+unreachable Shield/V3, proving every mutating route 401s with no
+credential and 502s honestly once Shield is reached but unreachable —
+there is no `requireCallingService` escape hatch in this app the way
+VDP's booking routes have, since every real action here (open a
+storefront, list a product, check out) has exactly one accountable
+human. `test/venvs.test.js`'s existing 71 tests (`marketplace.js`
+itself, untouched) continue to pass. The real success path was run
+end to end against real spawned Shield + V3 + this server: registered
+`hunts-biz-1` as a seller named "Hunts Hardware," listed a $40 "Real
+Hammer," browsed it back, and checked it out as `buyer-1` — VCoin
+moved for real (buyer 1000 → 960, seller 1000 → 1040), the ownership
+guard was confirmed live (a third account was refused 403 attempting
+to list a product under another seller's storefront), and the store
+survived as a real `data/store.json` on disk. The same real flow was
+then driven through a real headless browser against HVNTZ's new
+Storefront tab (see that app's own README) — sign in, open a
+storefront, list a product, see it rendered back — with a screenshot
+taken at each step.

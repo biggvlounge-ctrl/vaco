@@ -51,6 +51,10 @@
   VACO.V3_URL = global.VACO_V3_URL || 'http://localhost:8811';
   VACO.SHELL_URL = global.VACO_SHELL_URL || 'http://localhost:8789';
   VACO.MEDIA_URL = global.VACO_MEDIA_URL || 'http://localhost:8821';
+  // VENVS's own real backend (31 Oct 2026) -- used by any app whose
+  // user can open a real VENVS storefront (see HVNTZ's and Vavlt
+  // Stvdios' own "Storefront" tabs).
+  VACO.VENVS_URL = global.VACO_VENVS_URL || 'http://localhost:8829';
 
   // -- fetch ------------------------------------------------------------
 
