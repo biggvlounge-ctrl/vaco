@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   enterDatingVillage, leaveDatingVillage, getDatingVillageFeed, sendDatingVillageFlashNote,
+  LOCATION_PRIVACY_TIERS, setSnapMapPrivacy, shareSnapMapLocation, getSnapMapVisibleUsers,
 } from "../lib/datingVillage.js";
 
 // CVNVO's real Dating Village, inhabited inside VDP -- a real BarBuddy
@@ -18,6 +19,48 @@ export default function DatingVillageView({ session }) {
   const [flashText, setFlashText] = useState("");
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState(null);
+
+  const [snapMapTier, setSnapMapTier] = useState("ghost-mode");
+  const [snapMapShared, setSnapMapShared] = useState(false);
+  const [snapMapVisible, setSnapMapVisible] = useState([]);
+  const [snapMapError, setSnapMapError] = useState(null);
+  const [snapMapBusy, setSnapMapBusy] = useState(false);
+
+  const refreshSnapMap = useCallback(() => {
+    getSnapMapVisibleUsers(session.userId).then(setSnapMapVisible).catch((err) => setSnapMapError(err.message));
+  }, [session.userId]);
+
+  useEffect(() => {
+    refreshSnapMap();
+  }, [refreshSnapMap]);
+
+  const handleSetSnapMapTier = async (tier) => {
+    setSnapMapBusy(true);
+    setSnapMapError(null);
+    try {
+      await setSnapMapPrivacy(session.userId, tier);
+      setSnapMapTier(tier);
+      refreshSnapMap();
+    } catch (err) {
+      setSnapMapError(err.message);
+    } finally {
+      setSnapMapBusy(false);
+    }
+  };
+
+  const handleShareSnapMapLocation = async () => {
+    setSnapMapBusy(true);
+    setSnapMapError(null);
+    try {
+      await shareSnapMapLocation(session.userId);
+      setSnapMapShared(true);
+      refreshSnapMap();
+    } catch (err) {
+      setSnapMapError(err.message);
+    } finally {
+      setSnapMapBusy(false);
+    }
+  };
 
   const refreshFeed = useCallback(() => {
     getDatingVillageFeed(session.userId).then(setFeed).catch((err) => setActionError(err.message));
@@ -96,6 +139,38 @@ export default function DatingVillageView({ session }) {
             {" "}({event.distanceKm}km apart)
           </p>
         ))}
+      </div>
+
+      <div style={{ marginTop: 12, borderTop: "1px dashed #ccc", paddingTop: 8 }}>
+        <p style={{ fontSize: 13, fontWeight: "bold", margin: "0 0 4px" }}>Snap Map</p>
+        <p style={{ fontSize: 11, color: "#888", margin: "0 0 6px" }}>
+          Who can see where you are: Ghost Mode (no one), My Friends (an active match only), or Select Friends
+          (only who you choose).
+        </p>
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+          {LOCATION_PRIVACY_TIERS.map((tier) => (
+            <button
+              key={tier}
+              onClick={() => handleSetSnapMapTier(tier)}
+              disabled={snapMapBusy}
+              style={{ fontWeight: tier === snapMapTier ? "bold" : "normal" }}
+            >
+              {tier}
+            </button>
+          ))}
+          <button onClick={handleShareSnapMapLocation} disabled={snapMapBusy}>
+            {snapMapShared ? "Update my location" : "Share my location"}
+          </button>
+        </div>
+
+        <p style={{ fontSize: 12, margin: "8px 0 2px" }}>
+          Visible to you right now ({snapMapVisible.length}):
+        </p>
+        {snapMapVisible.length === 0 && <p style={{ fontSize: 12, color: "#888" }}>No one visible to you yet.</p>}
+        {snapMapVisible.map((loc) => (
+          <p key={loc.userId} style={{ fontSize: 12, margin: "2px 0" }}>{loc.userId}</p>
+        ))}
+        {snapMapError && <p style={{ color: "crimson" }}>Error: {snapMapError}</p>}
       </div>
 
       {actionError && <p style={{ color: "crimson" }}>Error: {actionError}</p>}

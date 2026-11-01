@@ -44,7 +44,10 @@
 
 import {
   checkInAtVenue, checkOutOfVenue, getVisibleUsersAtVenue, recordProximityEvent, getProximityFeed, sendFlashNote,
+  setLocationSharingPreference, shareLocation, getVisibleLocations,
 } from "./cvnvoClient.js";
+
+export const LOCATION_PRIVACY_TIERS = ['ghost-mode', 'my-friends', 'select-friends'];
 
 export const DATING_VILLAGE_VENUE_ID = "vdp-dating-village";
 export const DATING_VILLAGE_COORDS = { lat: 38.6270, lng: -90.1994 }; // St. Louis, this session's own established anchor
@@ -92,4 +95,26 @@ export async function getDatingVillageFeed(userId) {
 
 export async function sendDatingVillageFlashNote(senderId, recipientId, text) {
   return sendFlashNote(senderId, recipientId, text);
+}
+
+// Snap Map inside the Dating Village -- the real three-tier CVNVO
+// privacy model (ghost-mode/my-friends/select-friends), wired the
+// same way the proximity crossings above already are. Real,
+// deliberate choice, same precedent as `recordProximityEvent` above:
+// every share uses this one real, fixed Dating Village coordinate,
+// since "where inside VDP's own pixel grid" has no real GPS meaning
+// -- CVNVO's own radius search (`searchNearbyOpenUsers`) is
+// deliberately NOT wired in here for the same reason: there is no
+// second in-VDP location to search from, so a real radius search
+// genuinely has nothing to do inside this one single venue.
+export async function setSnapMapPrivacy(userId, tier, selectedUserIds) {
+  return setLocationSharingPreference(userId, tier, selectedUserIds);
+}
+
+export async function shareSnapMapLocation(userId) {
+  return shareLocation(userId, DATING_VILLAGE_COORDS.lat, DATING_VILLAGE_COORDS.lng);
+}
+
+export async function getSnapMapVisibleUsers(userId) {
+  return getVisibleLocations(userId);
 }

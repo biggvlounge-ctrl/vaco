@@ -453,6 +453,25 @@ arrives eventually." See `dev-docs/phase-13-real-time-messages/`.
 - A separate, real friend graph for Snap Map's own "My Friends" tier —
   a real active Match is used as the closest existing substitute.
 
+## Snap Map test coverage (1 Nov 2026)
+
+`lib/dateEvents.js`'s own Snap Map functions (`setLocationSharingPreference`,
+`shareLocation`, `getVisibleLocationsFor`, `searchNearbyOpenUsers`) had
+no test coverage anywhere in this repo, despite being a real
+privacy-enforcement surface — a wrong tier here leaks a real user's
+location to someone who shouldn't see it. Found and closed while
+wiring VDP's own Dating Village onto these exact functions (see
+`vdp/README.md`'s own matching entry). `test/dateEvents.test.js` (new,
+12 tests): the real default (no stored preference is Ghost Mode, not
+"visible"), each of the three tiers' real enforcement (including an
+EXPIRED match not counting as "my-friends" and select-friends never
+falling back to a match), the viewer never seeing their own shared
+location, re-sharing updating in place rather than duplicating, the
+real radius-search band, and validation. Full suite: 35/35.
+Mutation-verified: breaking the select-friends list check turned
+exactly the one test built to catch that leak red; restored and
+reconfirmed green.
+
 ## Frontend coverage pass (30 Oct 2026)
 An audit found `public/index.html` making real calls against only 8 of
 this app's 59 routes — the original 3 tabs (Discover, Events, Safety)

@@ -1369,11 +1369,12 @@ VOKEN's real `/api/brand` endpoint — not hardcoded text.
   real village is wired in (VDP's own, auto-created); a player can't
   browse or join a *different*, pre-existing VXLLAGE village from
   inside VDP.
-- Dating Village: only real Happn-style proximity crossings and
-  FlashNotes are wired in — the other seven CVNVO dating-format
+- Dating Village: real Happn-style proximity crossings, FlashNotes,
+  and Snap Map location sharing (see "Snap Map inside the Dating
+  Village" below) are wired in — the other six CVNVO dating-format
   extensions (Speed Dating, Long-Distance Mode, Blind Date, Group
-  Dating, Gift Dating, Snap Map location sharing, Hunts Dates) exist as
-  real CVNVO APIs but have no VDP-district surface of their own yet.
+  Dating, Gift Dating, Hunts Dates) exist as real CVNVO APIs but have
+  no VDP-district surface of their own yet.
   ~~VDP's own hardcoded single-user login meant two real distinct
   players couldn't be tested together~~ — stale: real Shield register/
   login and the shared WebSocket world (see "Jobs/Careers..." above)
@@ -1428,3 +1429,53 @@ now sets the four accent tokens as an inline `style=""` attribute on
 `<html>` for the same reason — verified after the fix, under both
 light and dark `prefers-color-scheme` emulation, that VDP's own teal
 (`#4fa8a0`) held in both.
+
+## Snap Map inside the Dating Village (1 Nov 2026)
+
+Closes one of the seven CVNVO dating-format extensions this project's
+own README named as real APIs with no VDP-district surface yet —
+Snap Map, CVNVO's real three-tier location-privacy model (ghost-mode/
+my-friends/select-friends), per `CVNVO_DATING_COMPARABLES.md`'s own
+Snap Map research named in `cvnvo/lib/dateEvents.js`'s own header.
+
+`cvnvoClient.js` gains `setLocationSharingPreference`/`shareLocation`/
+`getVisibleLocations`, thin wrappers over CVNVO's own real routes,
+the same posture every other cross-app client in this project already
+takes. `datingVillage.js` wraps those into `setSnapMapPrivacy`/
+`shareSnapMapLocation`/`getSnapMapVisibleUsers` — real, deliberate
+choice, same precedent the proximity crossings above already set: a
+share always uses the Dating Village's one real, fixed coordinate,
+since "where inside VDP's own pixel grid" has no real GPS meaning.
+CVNVO's own radius search (`searchNearbyOpenUsers`) is deliberately
+**not** wired in here — there is no second in-VDP location to search
+from, so a real radius search has nothing to do inside one single
+venue.
+
+`DatingVillageView.jsx` gained a real Snap Map panel: a tier picker,
+a "share my location" button, and a live "visible to you right now"
+list, fetched the moment the district loads.
+
+**Found and closed while building this**: `cvnvo/lib/dateEvents.js`'s
+own Snap Map functions had no test coverage anywhere in that repo
+despite being a real privacy-enforcement surface. See
+`cvnvo/README.md`'s own matching entry for the 12 new tests this added
+there (including a mutation-verified check that a `select-friends`
+leak to a non-listed user is actually caught).
+
+### Verification
+
+VDP's own `npm run build` currently fails on an unrelated, pre-existing
+missing dependency (`livekit-client`, declared in `package.json` but
+not installed in this environment) — confirmed via `git stash` that
+the same failure occurs with none of this change present. Both edited
+files individually pass a real esbuild JSX/syntax check. VDP's own
+`node --test test/*.test.js` suite: 951/951, unchanged (these
+cross-app client files have never had coverage there — Vite-only
+`import.meta.env` makes them untestable under plain Node, the same
+limitation every other `*Client.js` in this project already carries).
+Live-verified the exact real flow the new UI triggers, against real
+spawned Shield + CVNVO servers: one real session set its tier to
+`select-friends` naming a second real session, shared its location,
+confirmed the named session sees it, confirmed an unnamed third
+session does not, and confirmed the real no-credential 401 on the
+sharing-preference route.

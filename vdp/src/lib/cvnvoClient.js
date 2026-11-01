@@ -61,3 +61,26 @@ export async function sendFlashNote(senderId, recipientId, text) {
     body: JSON.stringify({ senderId, recipientId, text }),
   });
 }
+
+// Snap Map / location privacy -- CVNVO's own real three-tier model
+// (ghost-mode/my-friends/select-friends), not a plain on/off toggle.
+export async function setLocationSharingPreference(userId, tier, selectedUserIds = []) {
+  return requestJson("/api/location/sharing-preference", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...sessionHeaders() },
+    body: JSON.stringify({ userId, tier, selectedUserIds }),
+  });
+}
+
+export async function shareLocation(userId, lat, lng) {
+  return requestJson("/api/location/share", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...sessionHeaders() },
+    body: JSON.stringify({ userId, lat, lng }),
+  });
+}
+
+export async function getVisibleLocations(viewerId) {
+  const body = await requestJson(`/api/location/visible/${encodeURIComponent(viewerId)}`);
+  return body.visibleLocations;
+}
