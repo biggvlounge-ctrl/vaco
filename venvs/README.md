@@ -420,3 +420,57 @@ real `Order #1: 18.5 VCoin`, the Chop Shop promote button appeared
 only on the two products the signed-in seller actually owned, and the
 abandoned-cart button's honest not-yet-swept message rendered
 correctly for a fresh cart — screenshotted at each step.
+
+## Phase 15: real HVNTZ POS — a physical register through the same ledger (1 Nov 2026)
+
+Per direct instruction, closing the real gap Phase 14's own docs
+flagged as "the strongest genuinely-differentiated item left in the
+Shopify doc": a real HVNTZ business ringing up an in-person sale
+through this same Marketplace ledger, "unifying in-person and online
+sales."
+
+**This does not re-move money.** VASH TAP already has a real,
+working physical-to-digital payment path — `POST /api/taps/:tapCode/pay`
+— where a customer's own physical Tap (wristband/ring/card) resolves
+to their real Shield session and authorizes a real VCoin transfer.
+Re-implementing that here would be the exact duplicate-payment-path
+mistake this ecosystem's own settlement sweep already removed
+everywhere else. What was genuinely missing was recording an
+already-settled in-person sale as a real order, in the exact same
+list an online checkout produces.
+
+**`src/lib/marketplace.js` gains two real functions**: `recordPosSale`
+(checks and spends real inventory exactly like `checkout` does, then
+writes a real order with `channel: 'pos'`, `cartId: null`,
+`fulfillmentStatus: 'not-applicable'` — handed to the customer on the
+spot, the same real distinction `requestBookFulfillment` already draws
+for an ebook) and `ordersForSeller` (every real order a seller has,
+online or in-person, the real unified view this phase exists to
+produce — `checkout`'s own orders now also carry `channel: 'online'`
+for the same reason). New routes: `POST /api/marketplace/sellers/:id/
+pos-sale` (`requireActor('ownerId')`, the same resolve-then-compare
+ownership guard every other seller-only action here already uses) and
+`GET /api/marketplace/sellers/:id/orders`.
+
+**HVNTZ's own Storefront tab gets two new real cards**, visible only
+to a storefront's own owner: "Ring up an in-person sale" (pick a real
+product from the real catalog, a quantity, an optional customer id)
+and "Order history — online and in-person, unified" (every real order,
+tagged by real channel).
+
+### Verification
+
+`test/venvs.test.js` grew by 5 (`recordPosSale`'s ownership guard,
+empty/non-positive/unknown-product refusals, real limited-edition
+stock spend parity with online checkout, and `ordersForSeller` mixing
+one real online order with two real POS orders across two sellers) —
+mutation-verified per `dev-docs/STANDING_INSTRUCTION_TEST_VERIFICATION.md`
+(disabling the cross-seller ownership check was caught). `test/
+server.test.js` grew by 3 (guard-refusal shapes, a real empty-store
+smoke test for the new orders route). 85 tests across this app's own
+suite, all passing. Run live against real spawned Shield + V3 + this
+server + HVNTZ: a real headless browser signed in as `seller-hardware`,
+opened their real storefront inside HVNTZ, rang up 2 real Claw Hammers
+for walk-in customer `walk-in-customer-1`, and the real order history
+table showed `Order #1 · pos · 37 VC · walk-in-customer-1` —
+screenshotted.

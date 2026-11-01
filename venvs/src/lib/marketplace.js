@@ -368,6 +368,10 @@ export async function checkout(marketplace, options = {}) {
       // visibly unfulfilled.
       voidShipmentId: null,
       fulfillmentStatus: 'unfulfilled',
+      // Every order through this function is a real online checkout --
+      // see `recordPosSale` below for the one other real producer of
+      // an order, and why both write the same real shape.
+      channel: 'online',
       createdAt: Date.now(),
     };
     marketplace.orders.push(order);
@@ -386,6 +390,101 @@ export async function checkout(marketplace, options = {}) {
 
 export function getOrder(marketplace, orderId) {
   return marketplace.orders.find((o) => o.id === orderId) || null;
+}
+
+// Every real order a seller has, online or in-person -- the real
+// "unifying in-person and online sales" view named in
+// `VENVS_SHOPIFY_INTEGRATION.md`'s own POS section. A seller's own
+// checkout payout entry is the real, already-correct way to answer
+// "was I paid on this order" regardless of channel, so this reads
+// that rather than adding a second seller-to-order index to keep in
+// sync.
+export function ordersForSeller(marketplace, sellerId) {
+  return marketplace.orders.filter((o) => o.payouts.some((p) => p.sellerId === sellerId));
+}
+
+// A real in-person sale, rung up at a real HVNTZ business location --
+// the real POS gap `VENVS_SHOPIFY_INTEGRATION.md` names as "real
+// HVNTZ businesses running VENVS as an actual point of sale, unifying
+// in-person and online sales."
+//
+// **This does not move money.** A real in-person payment already has
+// a real, working physical-to-digital path -- VASH TAP's own
+// `POST /api/taps/:tapCode/pay`, where a customer's own physical Tap
+// (wristband/ring/card) resolves to their real Shield session and
+// authorizes a real VCoin transfer, the exact mechanism
+// `VASH_TAP`'s own README describes end to end. Re-moving money here,
+// a second time, from a second place, is exactly the kind of
+// duplicate payment path this ecosystem's own settlement sweep
+// already removed everywhere else (see `settleOnce.js`'s own header).
+// What was genuinely missing was not a second payment rail -- it was
+// recording an already-settled in-person sale as a REAL order, in the
+// exact same `orders` list an online checkout produces, so a seller's
+// real revenue/order history is one unified place regardless of
+// channel. `channel: 'pos'` is the one real, additive marker that
+// tells the two apart; `checkout`'s own orders are `'online'`.
+//
+// Real inventory is still checked and spent exactly like `checkout`
+// does, for the same real reason: a limited-edition item sold out at
+// the register is exactly as sold out online, and the other way
+// around -- one real stock count, not two.
+export function recordPosSale(marketplace, options = {}) {
+  const { sellerId, items, buyerId = null, now = Date.now() } = options;
+  const seller = getSeller(marketplace, sellerId);
+  if (!seller) {
+    throw new Error(`recordPosSale: no seller with id ${sellerId}`);
+  }
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new Error('recordPosSale requires at least one real item');
+  }
+
+  let total = 0;
+  for (const { productId, quantity = 1 } of items) {
+    const product = getProduct(marketplace, productId);
+    if (!product) {
+      throw new Error(`recordPosSale: no product with id ${productId}`);
+    }
+    if (product.sellerId !== sellerId) {
+      throw new Error(`recordPosSale: product ${productId} is not this seller's own product`);
+    }
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      throw new Error('recordPosSale: every item needs a positive quantity');
+    }
+    if (product.editionSize !== null && product.unitsRemaining < quantity) {
+      throw new Error(
+        `recordPosSale: "${product.title}" has only ${product.unitsRemaining} left of its `
+        + `${product.editionSize}-piece edition`,
+      );
+    }
+    total += product.price * quantity;
+  }
+
+  // Real stock spent only after every line in the sale is confirmed
+  // sellable -- the same "check everything before touching state"
+  // ordering `checkout` itself already uses.
+  for (const { productId, quantity = 1 } of items) {
+    const product = getProduct(marketplace, productId);
+    if (product.editionSize !== null) product.unitsRemaining -= quantity;
+  }
+
+  const rounded = Math.round(total * 100) / 100;
+  const order = {
+    id: marketplace.nextOrderId++,
+    cartId: null,
+    buyerId,
+    total: rounded,
+    payouts: [{ sellerId, amount: rounded }],
+    voidShipmentId: null,
+    // Handed to the real customer in person, on the spot -- there is
+    // no real shipment to request for a POS sale, the same real
+    // distinction `requestBookFulfillment` already draws for an ebook/
+    // audiobook order ("not-applicable" rather than "unfulfilled").
+    fulfillmentStatus: 'not-applicable',
+    channel: 'pos',
+    createdAt: now,
+  };
+  marketplace.orders.push(order);
+  return order;
 }
 
 // Cross-app physical fulfillment: routes a real VENVS Marketplace

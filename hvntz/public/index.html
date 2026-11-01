@@ -454,6 +454,52 @@ function loadStorefront(out, body, sellerId) {
           });
         }, 'List product'),
       ]));
+
+      // Real point of sale: a physical register at this real Hunts
+      // business ringing up an in-person sale through the same
+      // VENVS ledger an online order already uses — "unifying
+      // in-person and online sales," per direct instruction. The real
+      // payment itself happens over VASH TAP (a customer's own
+      // physical Tap authorizing a real VCoin transfer); this rings
+      // up what was sold, under the exact same storefront and product
+      // catalog, so it shows up in the same real order history below
+      // regardless of channel.
+      if (store.products.length > 0) {
+        var productOptions = store.products.map(function (p) {
+          return { value: p.id, label: p.title + ' ($' + p.price.toFixed(2) + ')' };
+        });
+        replacement.appendChild(VACO.card('Ring up an in-person sale', [
+          el('p', 'vaco-small vaco-dim',
+            'Payment itself happens over VASH TAP at the register — this records the real sale under this '
+            + 'same storefront, alongside online orders.'),
+          VACO.form([
+            { name: 'productId', label: 'Product', options: productOptions },
+            { name: 'quantity', label: 'Qty', width: '70px', value: '1' },
+            { name: 'buyerId', label: 'Customer (optional)', width: '150px' },
+          ], function (values) {
+            return venvsAuthedPost('/api/marketplace/sellers/' + encodeURIComponent(sellerId) + '/pos-sale', {
+              ownerId: userId,
+              items: [{ productId: Number(values.productId), quantity: Number(values.quantity || 1) }],
+              buyerId: values.buyerId || null,
+            }).then(function (order) {
+              VACO.toast('Sale rung up — order #' + order.id);
+              return loadStorefront(out, body, sellerId);
+            });
+          }, 'Ring up sale'),
+        ]));
+      }
+
+      var ordersHost = el('div', 'vaco-stack-sm');
+      replacement.appendChild(VACO.card('Order history — online and in-person, unified', [ordersHost]));
+      VACO.api(VACO.VENVS_URL + '/api/marketplace/sellers/' + encodeURIComponent(sellerId) + '/orders')
+        .then(function (data) {
+          VACO.mount(ordersHost, VACO.table([
+            { key: 'id', label: 'Order' },
+            { label: 'Channel', render: function (o) { return VACO.badge(o.channel); } },
+            { label: 'Total', num: true, render: function (o) { return VACO.price(o.total); } },
+            { label: 'Buyer', render: function (o) { return o.buyerId || '—'; } },
+          ], data.orders || [], { empty: 'No orders yet, online or in-person.' }));
+        }).catch(function () { /* real, honest no-op — see this file's own storefront-load error handling above */ });
     }
 
     while (out.childNodes.length > 2) out.removeChild(out.lastChild);

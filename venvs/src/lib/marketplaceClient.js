@@ -112,6 +112,21 @@ export async function publishToChopzShop(productId, { ownerId }) {
   return handle(res);
 }
 
+export async function recordPosSale(sellerId, { ownerId, items, buyerId }) {
+  const res = await fetch(`${VENVS_API_URL}/api/marketplace/sellers/${encodeURIComponent(sellerId)}/pos-sale`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...sessionHeaders() },
+    body: JSON.stringify({ ownerId, items, buyerId }),
+  });
+  return handle(res);
+}
+
+export async function getSellerOrders(sellerId) {
+  const res = await fetch(`${VENVS_API_URL}/api/marketplace/sellers/${encodeURIComponent(sellerId)}/orders`);
+  const body = await handle(res);
+  return body.orders;
+}
+
 export async function getRecoveryOffer(cartId, { discountPercent } = {}) {
   const qs = discountPercent !== undefined ? `?discountPercent=${encodeURIComponent(discountPercent)}` : '';
   const res = await fetch(`${VENVS_API_URL}/api/marketplace/carts/${encodeURIComponent(cartId)}/recovery-offer${qs}`);

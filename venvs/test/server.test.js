@@ -195,3 +195,25 @@ test('GET recovery-offer refuses a cart that does not exist', { skip: SKIP }, as
   const res = await fetch(`${BASE}/api/marketplace/carts/999999/recovery-offer`);
   assert.equal(res.status, 400);
 });
+
+// -- POS: a real HVNTZ business ringing up an in-person sale ---------------
+
+test('ringing up a POS sale with no credential at all is refused WITHOUT reaching Shield', { skip: SKIP }, async () => {
+  const res = await post('/api/marketplace/sellers/1/pos-sale', {
+    ownerId: 'seller-hardware', items: [{ productId: 1, quantity: 1 }],
+  });
+  assert.equal(res.status, 401);
+});
+
+test('ringing up a POS sale with a real bearer token asks Shield -- real 502 when it is unreachable', { skip: SKIP }, async () => {
+  const res = await post('/api/marketplace/sellers/1/pos-sale',
+    { ownerId: 'seller-hardware', items: [{ productId: 1, quantity: 1 }] }, { Authorization: 'Bearer some-token' });
+  assert.equal(res.status, 502);
+});
+
+test('GET seller orders lists the real, unified order history -- starts empty, never 500s', { skip: SKIP }, async () => {
+  const res = await fetch(`${BASE}/api/marketplace/sellers/1/orders`);
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.ok(Array.isArray(body.orders));
+});

@@ -426,3 +426,30 @@ spawned Shield + V3 + VENVS + this app, screenshotted at each step).
 This is a real online storefront, not the full HVNTZ **POS**
 integration (a physical register ringing up an in-person sale) —
 that remains a separate, larger, still-unbuilt piece.
+
+
+## VENVS POS tie-in (1 Nov 2026)
+
+The POS piece flagged as unbuilt above is now real. Inside the same
+`Storefront` tab, once a signed-in owner's storefront is loaded, two
+new cards appear alongside the existing "list a product" form:
+
+- **"Ring up an in-person sale"** — pick a product already listed on
+  the storefront, a quantity, and an optional walk-in buyer id, and
+  it calls VENVS's own new `POST /api/marketplace/sellers/:id/
+  pos-sale` directly (same manually-attached Shield bearer token
+  pattern as the rest of this tab). This does not move any VCoin on
+  its own — a real register still settles payment through VASH TAP
+  the same way any other in-person tap-to-pay already does in this
+  ecosystem; this route only records the resulting sale as a real
+  order against the seller's own ledger history.
+- **"Order history — online and in-person, unified"** — calls VENVS's
+  new `GET /api/marketplace/sellers/:id/orders` and lists every order
+  for this storefront with a channel badge (`online` vs `pos`), so a
+  Hunts business sees one real history instead of two disconnected
+  ones.
+
+See `../venvs/README.md`'s "Phase 15" section for the full design
+rationale and the live verification record (a real end-to-end
+Playwright run against real spawned Shield + V3 + VENVS + this app,
+ringing up a real sale and confirming it in the order history).

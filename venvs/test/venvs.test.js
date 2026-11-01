@@ -41,7 +41,7 @@ import {
   browseProducts, getSellerStorefront, createCart, getCart, addToCart,
   checkout, getOrder, requestFulfillment, checkAbandonedCarts,
   generateRecoveryOffer, PLATFORM_USER_ID,
-  markChopzEligible, publishToChopzShop,
+  markChopzEligible, publishToChopzShop, recordPosSale, ordersForSeller,
 } from '../src/lib/marketplace.js';
 
 import {
@@ -422,6 +422,59 @@ test('a limited edition cannot be oversold by two concurrent checkouts of the la
   const fulfilled = results.filter((r) => r.status === 'fulfilled');
   assert.equal(fulfilled.length, 1, 'a one-piece edition was sold to more than one concurrent buyer');
   assert.equal(getProduct(m, piece.id).unitsRemaining, 0);
+});
+
+// -- recordPosSale / ordersForSeller (real POS, 1 Nov 2026) ----------------
+
+test('recordPosSale records a real order without moving money a second time', () => {
+  const { m, a, p1 } = shopFixture();
+  const order = recordPosSale(m, { sellerId: a.id, items: [{ productId: p1.id, quantity: 2 }], buyerId: 'walk-in-1' });
+  assert.equal(order.total, 80);
+  assert.deepEqual(order.payouts, [{ sellerId: a.id, amount: 80 }]);
+  assert.equal(order.channel, 'pos');
+  assert.equal(order.fulfillmentStatus, 'not-applicable');
+  assert.equal(order.cartId, null);
+});
+
+test('recordPosSale refuses a product that is not this seller\'s own', () => {
+  const { m, a, p2 } = shopFixture(); // p2 belongs to seller b
+  assert.throws(() => recordPosSale(m, { sellerId: a.id, items: [{ productId: p2.id, quantity: 1 }] }), /not this seller's own product/);
+});
+
+test('recordPosSale refuses an empty sale, a non-positive quantity, and an unknown product', () => {
+  const { m, a, p1 } = shopFixture();
+  assert.throws(() => recordPosSale(m, { sellerId: a.id, items: [] }), /at least one real item/);
+  assert.throws(() => recordPosSale(m, { sellerId: a.id, items: [{ productId: p1.id, quantity: 0 }] }), /positive quantity/);
+  assert.throws(() => recordPosSale(m, { sellerId: a.id, items: [{ productId: 999999, quantity: 1 }] }), /no product with id/);
+});
+
+test('recordPosSale spends real limited-edition stock, the same as an online checkout', () => {
+  const { m, a } = shopFixture();
+  const piece = listProduct(m, { sellerId: a.id, title: 'Numbered Piece', price: 100, editionSize: 2 });
+  recordPosSale(m, { sellerId: a.id, items: [{ productId: piece.id, quantity: 1 }] });
+  assert.equal(getProduct(m, piece.id).unitsRemaining, 1);
+  recordPosSale(m, { sellerId: a.id, items: [{ productId: piece.id, quantity: 1 }] });
+  assert.equal(getProduct(m, piece.id).unitsRemaining, 0);
+  assert.throws(
+    () => recordPosSale(m, { sellerId: a.id, items: [{ productId: piece.id, quantity: 1 }] }),
+    /only 0 left/,
+  );
+});
+
+test('ordersForSeller unifies real online and in-person orders in one place', async () => {
+  const { m, a, b, p1, p2 } = shopFixture();
+  const transferFn = ledger();
+  const cart = createCart(m, { buyerId: 'online-buyer' });
+  addToCart(m, cart.id, p1.id);
+  await checkout(m, { cartId: cart.id, transferFn, payoutFn: transferFn });
+  recordPosSale(m, { sellerId: a.id, items: [{ productId: p1.id, quantity: 1 }], buyerId: 'walk-in-2' });
+  recordPosSale(m, { sellerId: b.id, items: [{ productId: p2.id, quantity: 1 }] });
+
+  const aOrders = ordersForSeller(m, a.id);
+  assert.equal(aOrders.length, 2, 'seller a has one real online order and one real POS order');
+  assert.ok(aOrders.some((o) => o.channel === 'online'));
+  assert.ok(aOrders.some((o) => o.channel === 'pos'));
+  assert.equal(ordersForSeller(m, b.id).length, 1);
 });
 
 // ===========================================================================

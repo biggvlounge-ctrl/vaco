@@ -321,6 +321,42 @@ async function registerWithChopzShop(sellerOwnerId, name, price, category, affil
     res.json(order);
   });
 
+  // -- Point of sale: a real HVNTZ business ringing up an in-person sale ---
+  //
+  // Per direct instruction, "make sure people's hunts and vault
+  // accounts are tied to a... merch connection" and
+  // `VENVS_SHOPIFY_INTEGRATION.md`'s own named POS gap: "real HVNTZ
+  // businesses running VENVS as an actual point of sale, unifying
+  // in-person and online sales." Real payment already has a real
+  // physical-to-digital path -- VASH TAP's own `POST /api/taps/
+  // :tapCode/pay`, a customer's own physical Tap resolving to their
+  // real Shield session -- so this route does not move money a second
+  // time; it records an already-settled in-person sale as a real
+  // order, in the exact same list an online checkout produces. The
+  // ownership guard is the same resolve-then-compare shape every other
+  // seller-only action in this file already uses.
+  app.post('/api/marketplace/sellers/:id/pos-sale', requireActor('ownerId'), (req, res) => {
+    try {
+      const seller = marketplaceLib.getSeller(store.marketplace, Number(req.params.id));
+      if (!seller) return res.status(404).json({ error: `no seller with id ${req.params.id}` });
+      if (seller.ownerId !== req.body.ownerId) {
+        return res.status(403).json({ error: "only this storefront's own owner can ring up a sale for it" });
+      }
+      const order = marketplaceLib.recordPosSale(store.marketplace, {
+        sellerId: seller.id, items: req.body.items, buyerId: req.body.buyerId || null,
+      });
+      res.status(201).json(order);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // Every real order this seller has, online or in-person -- the real
+  // unified view the POS feature above exists to produce.
+  app.get('/api/marketplace/sellers/:id/orders', (req, res) => {
+    res.json({ orders: marketplaceLib.ordersForSeller(store.marketplace, Number(req.params.id)) });
+  });
+
   // -- CHOPZ SHOP cross-posting ---------------------------------------------
   //
   // A seller opts specific items in (not the whole catalogue) and sets

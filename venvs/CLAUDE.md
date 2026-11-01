@@ -162,17 +162,14 @@ VEX/VADO districts render real VOKEN API clients directly.
   to stub one as though it were live.
 - **AI-narrated audiobooks.** Named as a real differentiator in the
   source doc; not built.
-- **HVNTZ POS integration.** Named in
-  `VENVS_SHOPIFY_INTEGRATION.md` — a physical register at a real HVNTZ
-  business ringing up an in-person sale through this same ledger,
-  unifying in-person and online sales. Still genuinely unbuilt, and
-  still the strongest real differentiator left in that doc. **Not the
-  same thing** as what Phase 14 built: a Hunts business (or a Vault
-  Studios creator) now has a real, working *online* storefront
-  (`HVNTZ`'s and `vavlt-stvdios`'s own "Storefront" tabs, calling this
-  app's real `POST /api/marketplace/sellers` directly) — that closes
-  "tie Hunts/Vault Studios accounts to a real storefront," a separate,
-  smaller ask than an actual point-of-sale terminal.
+- ~~**HVNTZ POS integration.**~~ **Done (Phase 15).** A real HVNTZ
+  business now rings up an in-person sale through this same ledger —
+  `recordPosSale`/`ordersForSeller` in `src/lib/marketplace.js`, the
+  `POST /api/marketplace/sellers/:id/pos-sale` and
+  `GET /api/marketplace/sellers/:id/orders` routes, and the "Ring up
+  an in-person sale" / "Order history" cards in `hvntz/public/
+  index.html`'s own Storefront tab. See this app's own README's
+  "Phase 15" section for the full design and verification record.
 - **Health/lifestyle stats** — deliberately not built and should stay
   that way; the source spec itself says this should remain pure
   gameplay rather than resemble real wellness tracking.
@@ -198,15 +195,11 @@ Shield) is **complete** — steps 1–4 all shipped across Phases 1–13.
 Phase 14 (31 Oct 2026, both same-day passes) gave this app its first
 real backend, a working Hunts/Vault Studios storefront path, real
 CHOPZ/VOID/abandoned-cart routes, and rewired `MarketplaceView.jsx`
-itself onto the real backend. Genuinely useful next steps, roughly by
-leverage:
+itself onto the real backend. Phase 15 (1 Nov 2026) gave HVNTZ a real
+point-of-sale path through that same backend (see §5 above).
+Genuinely useful next steps, roughly by leverage:
 
-1. **HVNTZ POS integration** — a physical register at a real HVNTZ
-   business ringing up an in-person sale through this same ledger,
-   unifying in-person and online sales. The strongest genuinely-
-   differentiated item left in the Shopify doc, and distinct from the
-   online storefront Phase 14 already built (see §5 above).
-2. **Real VOID fulfillment authorization.** `requestFulfillment` is
+1. **Real VOID fulfillment authorization.** `requestFulfillment` is
    wired and real, but refuses honestly against a real VOID: that
    service's `POST /api/job` wants the real seller's own Shield
    session (`requireActor('customerId')`), which neither this call nor
@@ -215,7 +208,7 @@ leverage:
    marketplace creating a job on a seller's behalf, or a per-seller
    confirmation step this app does not have yet — a real,
    cross-app design question, not a one-file patch.
-3. ~~**Publishing → VOID fulfillment.**~~ **Done.**
+2. ~~**Publishing → VOID fulfillment.**~~ **Done.**
    `purchaseBook` now records a real order, and
    `requestBookFulfillment` routes physical book orders to VOID through
    the same injected-`voidRequestFn` shape `marketplace.js` uses.
@@ -227,7 +220,7 @@ leverage:
    `publishBook` already draws for royalties. Neither this nor
    Marketplace's fulfillment is wired into a component yet — both are
    lib-level, at parity.
-4. **Ingram catalog** — high value, but blocked on a real commercial
+3. **Ingram catalog** — high value, but blocked on a real commercial
    agreement and real API credentials, not on code. Don't stub it.
 
 Already done, don't redo: abandoned cart recovery
