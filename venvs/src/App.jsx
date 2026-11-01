@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { login, getCurrentSession, logout, adoptToken } from "./lib/shieldAuth.js";
 import { getVCoinBalance, cashOutToVash, getVashBalance } from "./lib/v3Client.js";
-import { createCatalog, publishBook } from "./lib/catalog.js";
 import { createShop, listProduct } from "./lib/shop.js";
 import PublishingView from "./components/PublishingView.jsx";
 import MarketplaceView from "./components/MarketplaceView.jsx";
@@ -48,84 +47,6 @@ import ShopView from "./components/ShopView.jsx";
 // can deep-link directly to Publisher; with no param, this renders
 // VENVS's own real tab switcher.
 
-const SEED_CATALOG = (catalog) => {
-  publishBook(catalog, {
-    title: "Cherokee St After Dark",
-    authorId: "author-1",
-    format: "ebook",
-    listPrice: 5.99,
-    deliveryFee: 0.15,
-  });
-  publishBook(catalog, {
-    title: "An Existing Backlist Title",
-    authorId: "ingram-catalog",
-    format: "ebook",
-    listPrice: 8.99,
-    source: "ingram",
-  });
-  // Real, existing, already-published titles accessed through the
-  // Ingram backlist path (`VENVS_PUBLISHING_ADDITION.md`'s own "clean
-  // division": Ingram for the existing catalog, not new self-published
-  // work) -- not invented titles, and not self-published (so no
-  // author royalty leg this app doesn't yet pay out). Tagged for
-  // VDP's library effect: a practical textbook names the real skill
-  // it teaches; an influence/philosophy book names the belief it
-  // moves (`vdp/src/lib/beliefs.js`'s real six-type enum).
-  publishBook(catalog, {
-    title: "The Complete Home Cook",
-    authorId: "ingram-catalog",
-    format: "ebook",
-    listPrice: 12.99,
-    source: "ingram",
-    skillSubject: "Crafting",
-  });
-  publishBook(catalog, {
-    title: "The Carpenter's Handbook",
-    authorId: "ingram-catalog",
-    format: "ebook",
-    listPrice: 14.99,
-    source: "ingram",
-    skillSubject: "Construction",
-  });
-  publishBook(catalog, {
-    title: "The Secret",
-    authorId: "ingram-catalog",
-    format: "ebook",
-    listPrice: 9.99,
-    source: "ingram",
-    beliefTopic: "positive-thinking",
-    beliefType: "philosophical",
-  });
-  publishBook(catalog, {
-    title: "The Bible",
-    authorId: "ingram-catalog",
-    format: "ebook",
-    listPrice: 4.99,
-    source: "ingram",
-    beliefTopic: "faith",
-    beliefType: "religious",
-  });
-  publishBook(catalog, {
-    title: "Meditations",
-    authorId: "ingram-catalog",
-    format: "ebook",
-    listPrice: 2.99,
-    source: "ingram",
-    beliefTopic: "stoicism",
-    beliefType: "philosophical",
-  });
-  publishBook(catalog, {
-    title: "Tao Te Ching",
-    authorId: "ingram-catalog",
-    format: "ebook",
-    listPrice: 2.99,
-    source: "ingram",
-    beliefTopic: "taoism",
-    beliefType: "philosophical",
-  });
-  return catalog;
-};
-
 const SEED_SHOP = (shop) => {
   listProduct(shop, { title: "VENVS Branded Mug", price: 14.99, category: "merch" });
   listProduct(shop, { title: "VENVS Founders Hoodie", price: 48.0, category: "apparel" });
@@ -150,7 +71,6 @@ export default function App() {
   const [vashBalance, setVashBalance] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [catalog] = useState(() => SEED_CATALOG(createCatalog()));
   const [shop] = useState(() => SEED_SHOP(createShop()));
 
   // A deep-linked `?view=` (VDP's iframe embed use case) locks the tab
@@ -304,7 +224,7 @@ export default function App() {
 
           {activeTab === 'shop' && <ShopView session={session} shop={shop} onPurchase={notifyStateChange} />}
           {activeTab === 'marketplace' && <MarketplaceView session={session} onPurchase={notifyStateChange} />}
-          {activeTab === 'publisher' && <PublishingView session={session} catalog={catalog} onPurchase={notifyStateChange} />}
+          {activeTab === 'publisher' && <PublishingView session={session} onPurchase={notifyStateChange} />}
         </div>
       )}
 

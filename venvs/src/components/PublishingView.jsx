@@ -1,53 +1,45 @@
-import { useState } from "react";
-import { getCatalog, purchaseBook } from "../lib/catalog.js";
-import { transferVCoin } from "../lib/v3Client.js";
-import { sessionHeaders } from "../lib/shieldAuth.js";
+import { useState, useEffect } from "react";
+import { listBooks, purchaseBook } from "../lib/publishingClient.js";
 
-// VDP's own server (new as of this phase — see `vdp/server.cjs`),
-// reached directly from this browser with the buyer's own real
-// Shield session, the same cross-origin shape every other
-// `*Client.js` in this ecosystem already uses. VDP's own
-// `/api/library/record` route requires exactly that -- the buyer
-// acting as themselves -- per its own header.
-const VDP_API_URL = import.meta.env?.VITE_VDP_API_URL || "http://localhost:8827";
+// Phase 17 (1 Nov 2026): rewired from a local, in-memory
+// `createCatalog()` -- reset on every component mount, so a title
+// published and a purchase made both vanished on reload and were
+// never visible to any other session -- to `publishingClient.js`'s
+// real HTTP calls against `server.cjs`'s own real, persisted
+// backend. Mirrors `MarketplaceView.jsx`'s own Phase 14 rewire
+// exactly. The demo catalog (the same 7 titles `App.jsx`'s old
+// `SEED_CATALOG` used to build client-side) is now seeded server-side,
+// once, at boot.
+//
+// **Also fixes a real, pre-existing bug found while rewiring this**:
+// the old `handleBuy` called `purchaseBook` with a `transferFn` but
+// no `payoutFn` at all. `purchaseBook` throws immediately
+// (`requirePayoutFn`'s own guard) whenever the book owes its author a
+// royalty -- which every self-published title here does -- since a
+// browser must never be trusted to instruct the platform's own payout
+// leg. Only the royalty-free Ingram titles could ever have been
+// bought from this view before. The real backend now supplies both
+// legs itself, server-side, the same two-layer split checkout already
+// uses for Marketplace.
 
-// Phase 2 demo, fixed in Phase 8: takes the real catalog store as a
-// prop rather than creating its own on mount. Phase 7's regression
-// pass found that the standalone instance (rendered directly below)
-// and the instance WorldView renders on entering the Publisher
-// building were previously two separate stores with independent
-// state -- a real bug, confirmed and screenshotted, not assumed.
-// `catalog` is now created once in App.jsx and passed to both
-// instances, so a purchase made in either one is visible in both.
-
-export default function PublishingView({ session, catalog, onPurchase }) {
-  const books = getCatalog(catalog);
-
+export default function PublishingView({ session, onPurchase }) {
+  const [books, setBooks] = useState([]);
+  const [loadError, setLoadError] = useState(null);
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState(null);
   const [lastPurchase, setLastPurchase] = useState(null);
 
-  const transferFn = (from, to, amount, reason) =>
-    transferVCoin({ fromUserId: from, toUserId: to, amount, reason });
+  const loadBooks = () => listBooks().then(setBooks).catch((err) => setLoadError(err.message));
 
-  const libraryRecordFn = async (payload) => {
-    const res = await fetch(`${VDP_API_URL}/api/library/record`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...sessionHeaders() },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      throw new Error(body.error || `library/record failed (${res.status})`);
-    }
-    return res.json();
-  };
+  useEffect(() => {
+    loadBooks();
+  }, []);
 
   const handleBuy = async (bookId) => {
     setBusy(bookId);
     setError(null);
     try {
-      const result = await purchaseBook(catalog, { bookId, buyerId: session.userId, transferFn, libraryRecordFn });
+      const result = await purchaseBook(bookId, { buyerId: session.userId });
       setLastPurchase(result);
       await onPurchase();
     } catch (err) {
@@ -60,6 +52,7 @@ export default function PublishingView({ session, catalog, onPurchase }) {
   return (
     <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16, marginTop: 12 }}>
       <h2 style={{ fontSize: 16, margin: "0 0 8px 0" }}>Publishing</h2>
+      {loadError && <p style={{ color: "crimson" }}>Could not load the catalog: {loadError}</p>}
       {books.map((book) => (
         <div
           key={book.id}

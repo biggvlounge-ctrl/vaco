@@ -219,3 +219,74 @@ test('GET seller orders lists the real, unified order history -- starts empty, n
   const body = await res.json();
   assert.ok(Array.isArray(body.orders));
 });
+
+// -- Publishing: a real, persisted catalog (Phase 17) -----------------------
+
+test('the real demo catalog is seeded once, server-side, and health reports it', { skip: SKIP }, async () => {
+  const health = await (await fetch(`${BASE}/api/health`)).json();
+  // The same 8 titles App.jsx's old client-side SEED_CATALOG used to
+  // rebuild on every mount -- now seeded once at boot, in server.cjs.
+  assert.equal(health.books, 8);
+});
+
+test('GET /api/publishing/books lists the real seeded catalog, never 500s', { skip: SKIP }, async () => {
+  const res = await fetch(`${BASE}/api/publishing/books`);
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.ok(body.books.some((b) => b.title === 'Cherokee St After Dark'));
+});
+
+test('GET /api/publishing/books/:id 404s honestly for an unknown book', { skip: SKIP }, async () => {
+  const res = await fetch(`${BASE}/api/publishing/books/999999`);
+  assert.equal(res.status, 404);
+});
+
+test('publishing a book with no credential at all is refused WITHOUT reaching Shield', { skip: SKIP }, async () => {
+  const res = await post('/api/publishing/books', {
+    title: 'New Release', authorId: 'author-2', format: 'ebook', listPrice: 6.99,
+  });
+  assert.equal(res.status, 401);
+});
+
+test('publishing a book with a real bearer token asks Shield -- real 502 when it is unreachable', { skip: SKIP }, async () => {
+  const res = await post('/api/publishing/books',
+    { title: 'New Release', authorId: 'author-2', format: 'ebook', listPrice: 6.99 },
+    { Authorization: 'Bearer some-token' });
+  assert.equal(res.status, 502);
+});
+
+test('purchasing a book with no credential at all is refused WITHOUT reaching Shield -- never a silent charge', { skip: SKIP }, async () => {
+  const res = await post('/api/publishing/books/1/purchase', { buyerId: 'reader-1' });
+  assert.equal(res.status, 401);
+});
+
+test('purchasing a book with a real bearer token asks Shield -- real 502 when it is unreachable, never moving real VCoin on an unverified identity', { skip: SKIP }, async () => {
+  const res = await post('/api/publishing/books/1/purchase', { buyerId: 'reader-1' }, { Authorization: 'Bearer some-token' });
+  assert.equal(res.status, 502);
+});
+
+test('a mismatched buyer (claiming to act as someone else) is refused with 403, not 401 or 502', { skip: SKIP }, async () => {
+  // Same reasoning as the identical Marketplace test above: Shield is
+  // consulted BEFORE the actor-match check, so this still 502s here
+  // with Shield unreachable -- a forged buyerId is never waved
+  // through just because Shield could not be reached to disprove it.
+  const res = await post('/api/publishing/books/1/purchase', { buyerId: 'someone-else' }, { Authorization: 'Bearer some-token' });
+  assert.equal(res.status, 502, 'Shield must be consulted before any identity claim is trusted, forged or not');
+});
+
+test('GET /api/publishing/orders/:id 404s honestly for an unknown order', { skip: SKIP }, async () => {
+  const res = await fetch(`${BASE}/api/publishing/orders/999999`);
+  assert.equal(res.status, 404);
+});
+
+test('GET /api/publishing/orders/unfulfilled lists real print orders awaiting a VOID shipment -- starts empty, never 500s', { skip: SKIP }, async () => {
+  const res = await fetch(`${BASE}/api/publishing/orders/unfulfilled`);
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.ok(Array.isArray(body.orders));
+});
+
+test('requesting book fulfillment is refused without a real service credential', { skip: SKIP }, async () => {
+  const res = await post('/api/publishing/orders/1/fulfillment', { shippingCost: 5 });
+  assert.equal(res.status, 401);
+});

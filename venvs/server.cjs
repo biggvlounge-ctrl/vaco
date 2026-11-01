@@ -53,6 +53,7 @@ const PORT = process.env.PORT || 8829;
 const V3_API_URL = process.env.V3_API_URL || 'http://localhost:8811';
 const VOID_API_URL = process.env.VOID_API_URL || 'http://localhost:8793';
 const CHOPZ_SHOP_API_URL = process.env.CHOPZ_SHOP_API_URL || 'http://localhost:8801';
+const VDP_API_URL = process.env.VDP_API_URL || 'http://localhost:8827';
 
 // `start-ecosystem.sh` generates a single `VACO_SERVICE_TOKEN` and
 // exports it for every child process; each app supplies its own name
@@ -148,12 +149,33 @@ async function registerWithChopzShop(sellerOwnerId, name, price, category, affil
   return body;
 }
 
+// `src/lib/catalog.js`'s own `libraryRecordFn` injection point --
+// VDP's real `POST /api/library/record` route
+// (`actorOrService(requireActor('buyerId'))`) wants either the real
+// buyer's own Shield session or a trusted service credential. The
+// buyer's own session already reached THIS route
+// (`requireActor('buyerId')` below already validated it), so this
+// forwards the SAME bearer token rather than minting a second
+// identity -- the exact precedent `registerWithChopzShop` above
+// already set for the identical cross-app shape.
+async function recordLibraryEffect(payload, authHeader) {
+  const res = await fetch(`${VDP_API_URL}/api/library/record`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: authHeader },
+    body: JSON.stringify(payload),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || `recordLibraryEffect failed (${res.status})`);
+  return body;
+}
+
 (async () => {
   const marketplaceLib = await import('./src/lib/marketplace.js');
   const svmikoDegvchiLib = await import('./src/lib/svmikoDegvchi.js');
+  const catalogLib = await import('./src/lib/catalog.js');
 
   function createVenvsStore() {
-    return { marketplace: marketplaceLib.createMarketplace() };
+    return { marketplace: marketplaceLib.createMarketplace(), catalog: catalogLib.createCatalog() };
   }
 
   let store = createVenvsStore();
@@ -184,6 +206,44 @@ async function registerWithChopzShop(sellerOwnerId, name, price, category, affil
         marketplaceLib.listProduct(store.marketplace, { sellerId: vinyl.id, title: 'Local Pressing LP', price: 22.0, category: 'music' });
         svmikoDegvchiLib.seedSvmikoDegvchiStorefronts(store.marketplace);
       }
+
+      // Same real demo catalog `App.jsx`'s own `SEED_CATALOG` used to
+      // build fresh, client-side, on every page load (Phase 17) --
+      // moved here so it persists across restarts instead of
+      // vanishing, the same `books.length === 0` first-boot-only guard
+      // the marketplace seed above already uses.
+      if (store.catalog.books.length === 0) {
+        catalogLib.publishBook(store.catalog, {
+          title: 'Cherokee St After Dark', authorId: 'author-1', format: 'ebook', listPrice: 5.99, deliveryFee: 0.15,
+        });
+        catalogLib.publishBook(store.catalog, {
+          title: 'An Existing Backlist Title', authorId: 'ingram-catalog', format: 'ebook', listPrice: 8.99, source: 'ingram',
+        });
+        catalogLib.publishBook(store.catalog, {
+          title: 'The Complete Home Cook', authorId: 'ingram-catalog', format: 'ebook', listPrice: 12.99,
+          source: 'ingram', skillSubject: 'Crafting',
+        });
+        catalogLib.publishBook(store.catalog, {
+          title: "The Carpenter's Handbook", authorId: 'ingram-catalog', format: 'ebook', listPrice: 14.99,
+          source: 'ingram', skillSubject: 'Construction',
+        });
+        catalogLib.publishBook(store.catalog, {
+          title: 'The Secret', authorId: 'ingram-catalog', format: 'ebook', listPrice: 9.99,
+          source: 'ingram', beliefTopic: 'positive-thinking', beliefType: 'philosophical',
+        });
+        catalogLib.publishBook(store.catalog, {
+          title: 'The Bible', authorId: 'ingram-catalog', format: 'ebook', listPrice: 4.99,
+          source: 'ingram', beliefTopic: 'faith', beliefType: 'religious',
+        });
+        catalogLib.publishBook(store.catalog, {
+          title: 'Meditations', authorId: 'ingram-catalog', format: 'ebook', listPrice: 2.99,
+          source: 'ingram', beliefTopic: 'stoicism', beliefType: 'philosophical',
+        });
+        catalogLib.publishBook(store.catalog, {
+          title: 'Tao Te Ching', authorId: 'ingram-catalog', format: 'ebook', listPrice: 2.99,
+          source: 'ingram', beliefTopic: 'taoism', beliefType: 'philosophical',
+        });
+      }
     },
   });
 
@@ -192,6 +252,7 @@ async function registerWithChopzShop(sellerOwnerId, name, price, category, affil
       ok: true, service: 'venvs',
       sellers: store.marketplace.sellers.length,
       products: store.marketplace.products.length,
+      books: store.catalog.books.length,
     });
   });
 
@@ -432,6 +493,107 @@ async function registerWithChopzShop(sellerOwnerId, name, price, category, affil
     try {
       const discountPercent = req.query.discountPercent !== undefined ? Number(req.query.discountPercent) : undefined;
       res.json(marketplaceLib.generateRecoveryOffer(store.marketplace, Number(req.params.id), { discountPercent }));
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // -- Publishing: a real, persisted catalog ------------------------------
+  //
+  // Closes this app's own flagged gap: `PublishingView.jsx` called
+  // `createCatalog()` fresh on every mount and seeded it client-side --
+  // every published title and every purchase vanished on reload, and
+  // no other browser tab or session ever saw either. Same real-backend
+  // treatment Marketplace got in Phase 14, for the exact same reason.
+  //
+  // Any real Shield-authenticated account can publish, same "one
+  // identity, no app-specific signup" posture `POST /api/marketplace/
+  // sellers` above already takes -- `publishBook`'s own signature has
+  // no app-of-origin field to narrow by.
+  app.post('/api/publishing/books', requireActor('authorId'), (req, res) => {
+    try {
+      res.status(201).json(catalogLib.publishBook(store.catalog, req.body));
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/publishing/books', (req, res) => {
+    const { format, source } = req.query;
+    res.json({ books: catalogLib.getCatalog(store.catalog, { format, source }) });
+  });
+
+  app.get('/api/publishing/books/:id', (req, res) => {
+    const book = catalogLib.getBook(store.catalog, Number(req.params.id));
+    if (!book) return res.status(404).json({ error: `no book with id ${req.params.id}` });
+    res.json(book);
+  });
+
+  // Real checkout. The buyer's own leg is already authorised by Shield
+  // (`requireActor('buyerId')`) before this handler is ever reached --
+  // same two-layer shape `POST /api/marketplace/checkout` above
+  // already uses, and for the same reason: `purchaseBook` itself
+  // refuses to run without a real `payoutFn` whenever a self-published
+  // title owes its author a royalty (`requirePayoutFn`'s own guard),
+  // so a flow that would charge the buyer and never pay the author
+  // never starts rather than settling half.
+  app.post('/api/publishing/books/:id/purchase', requireActor('buyerId'), async (req, res) => {
+    try {
+      const result = await catalogLib.purchaseBook(store.catalog, {
+        bookId: Number(req.params.id),
+        buyerId: req.body.buyerId,
+        transferFn: transferVCoin,
+        payoutFn: transferVCoin,
+        // Optional: VDP's own library effect (a skill improved, a
+        // belief shifted) is a signal, not money -- `purchaseBook`
+        // already runs it AFTER the sale is recorded and returns its
+        // failure rather than throwing, the same "fail soft on
+        // signals, hard on money" line this ecosystem draws
+        // everywhere else. Forwarding the real bearer token this
+        // route itself already validated, not a service credential --
+        // see `recordLibraryEffect`'s own header above.
+        libraryRecordFn: (payload) => recordLibraryEffect(payload, req.headers.authorization),
+      });
+      res.status(201).json(result);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // Real print orders still needing a VOID shipment -- the same
+  // "compute fresh every call" read Marketplace's own abandoned-cart
+  // detection already is, scoped to print the same way
+  // `listUnfulfilledBookOrders` itself already is.
+  //
+  // **Must be declared before `GET /api/publishing/orders/:id` below**
+  // -- caught live in this same pass, the exact same route-ordering
+  // bug fixed over in vaca's own reviewer-queue route earlier today:
+  // Express matches by declaration order, and a bare `:id` param was
+  // swallowing literal requests to `.../unfulfilled` too.
+  app.get('/api/publishing/orders/unfulfilled', (_req, res) => {
+    res.json({ orders: catalogLib.listUnfulfilledBookOrders(store.catalog) });
+  });
+
+  app.get('/api/publishing/orders/:id', (req, res) => {
+    const order = catalogLib.getBookOrder(store.catalog, Number(req.params.id));
+    if (!order) return res.status(404).json({ error: `no order with id ${req.params.id}` });
+    res.json(order);
+  });
+
+  // Operational, same posture as `POST /api/marketplace/orders/:id/
+  // fulfillment` above: a real VOID courier job, requested by a
+  // trusted backend rather than the buyer or the shipping author/
+  // platform directly. `requestBookFulfillment` itself works out who
+  // ships it (the author for a self-published title, VENVS itself for
+  // an Ingram one) and calls `voidRequestFn(shipperId, shippingCost)`
+  // -- the exact same `createVoidShipment` already wired above, no
+  // separate client needed.
+  app.post('/api/publishing/orders/:id/fulfillment', requireCallingService(), async (req, res) => {
+    try {
+      const order = await catalogLib.requestBookFulfillment(store.catalog, {
+        orderId: Number(req.params.id), shippingCost: req.body.shippingCost, voidRequestFn: createVoidShipment,
+      });
+      res.status(200).json(order);
     } catch (err) {
       res.status(400).json({ error: err.message });
     }

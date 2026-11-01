@@ -253,8 +253,12 @@ time that file gets rewritten for an unrelated reason.
   published book), no subscription-pool UI, no full tab UI (search,
   skill tags, cover art). **VOID fulfillment routing IS now built** —
   `catalog.js`'s `requestBookFulfillment` routes physical book orders
-  through the same client Marketplace uses; this line used to list it
-  as missing.
+  through the same client Marketplace uses. **A real, persisted
+  backend and a real frontend wired to it are also now built**
+  (Phase 17) — this used to list both as missing lib-level-only gaps;
+  publishing a title, buying one (with a real royalty payout), and
+  reading the order back now all survive a reload and are visible to
+  every session, not just the one that created them.
 - VEX/VADO: no longer this project's scope — see `../voken/README.md`.
 - ~~Real cross-origin Shield SSO for the VDP→VENVS **iframe embed**~~
   — **BUILT, and this entry was stale.** It claimed "a user still sees
@@ -563,3 +567,82 @@ confirming SA VIOR and VIC VALENCIAGO seed with their corrected
 products, and one confirming the 3 undecided brands are honestly
 unseeded, not seeded with an invented identity. `test/server.test.js`'s
 health-seed count moved from 18 to 16. Full suite: 87/87.
+
+## Phase 17: Publishing gets a real, persisted backend (1 Nov 2026)
+
+Closes this app's own flagged gap: `src/lib/catalog.js`'s real
+publish/purchase/royalty/fulfillment logic (existed since Phase 2,
+fully tested at the lib level) had nowhere real to live --
+`PublishingView.jsx` called `createCatalog()` fresh on every component
+mount and re-seeded it from `App.jsx`'s own client-side `SEED_CATALOG`
+— every title published and every purchase made vanished on the next
+reload, and no other browser tab or session ever saw either. The exact
+same gap Marketplace had before Phase 14, closed the exact same way:
+`server.cjs` now owns a real, persisted `store.catalog`, seeded once
+at boot with the same 8 demo titles `SEED_CATALOG` used to rebuild
+every time (moved server-side, not duplicated).
+
+New routes, mirroring Marketplace's own shape: `POST /api/publishing/
+books` (`requireActor('authorId')` -- any real Shield-authenticated
+account can publish, same "no app-specific signup" posture seller
+registration already takes), `GET /api/publishing/books` (optional
+`format`/`source` filters), `GET /api/publishing/books/:id`,
+`POST /api/publishing/books/:id/purchase` (`requireActor('buyerId')`),
+`GET /api/publishing/orders/:id`, `GET /api/publishing/orders/
+unfulfilled`, and `POST /api/publishing/orders/:id/fulfillment`
+(`requireCallingService()`, reusing the exact same `createVoidShipment`
+client Marketplace's own fulfillment route already calls --
+`requestBookFulfillment` works out who ships it, author or VENVS
+itself, the same self-published-vs-Ingram line `publishBook` already
+draws for royalties).
+
+`purchaseBook`'s own `payoutFn` requirement is now satisfied
+server-side: both the buyer's leg and the platform's royalty payout
+go through `transferVCoin` against V3, the same two-layer split
+Marketplace's `checkout` already uses and for the identical reason —
+a browser must never be trusted to instruct the platform's own payout.
+VDP's library effect (a skill improved, a belief shifted) is wired
+through a new `recordLibraryEffect`, forwarding the buyer's own
+already-validated bearer token to VDP's `POST /api/library/record`
+rather than minting a second identity — the exact precedent
+`registerWithChopzShop` already set for the same cross-app shape.
+
+`src/lib/publishingClient.js` (new) is the one real browser
+implementation calling this backend, mirroring
+`marketplaceClient.js`'s exact conventions. `PublishingView.jsx` is
+rewired onto it; `App.jsx` no longer builds or seeds a local catalog
+at all.
+
+**Two real, pre-existing bugs found and fixed while building this:**
+- `PublishingView.jsx`'s old `handleBuy` called `purchaseBook` with a
+  `transferFn` but no `payoutFn`. `purchaseBook` throws immediately
+  (`requirePayoutFn`'s own guard) whenever a title owes its author a
+  royalty — which every self-published title here does. Only the
+  royalty-free Ingram titles could ever have been bought from this
+  view before this phase; every self-published purchase was broken.
+- `server.cjs`: `GET /api/publishing/orders/:id` was declared before
+  `GET /api/publishing/orders/unfulfilled` and swallowed it (Express
+  matches by declaration order, `:id` matching the literal string
+  `unfulfilled`) — the exact same route-ordering bug independently
+  found and fixed in `vaca`'s own reviewer-queue route earlier the
+  same day. Fixed by declaring `/unfulfilled` first.
+
+### Verification
+
+`test/server.test.js` grew by 13 Publishing-route tests (seeded-count
+smoke test, 404 shapes, the same no-credential/unreachable-Shield/
+mismatched-actor refusal shapes every other mutating route in this
+suite already asserts). Full suite: 98/98 (62 lib + 31 server + 5
+Shield-auth). Mutation-verified: reverting the route-ordering fix
+turned exactly the `unfulfilled` test red; restored and reconfirmed
+green. Live-verified against real spawned Shield + V3 + this server:
+published a new self-published title as a real author, confirmed a
+forged `authorId` is refused 403; bought the self-published demo title
+as a real buyer — the buyer's balance dropped by the list price and
+the author's balance rose by the real computed royalty, the exact
+payout path that was broken before this phase; bought a second,
+skill-tagged Ingram title with VDP deliberately unreachable and
+confirmed the purchase still completed with an honest
+`libraryEffectError: "fetch failed"` rather than failing the sale —
+the same "fail soft on signals, hard on money" line this ecosystem
+draws everywhere else.

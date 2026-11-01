@@ -229,10 +229,20 @@ Genuinely useful next steps, roughly by leverage:
    (`listUnfulfilledBookOrders`) never fills with files nobody can
    post. Self-published titles ship from their author; Ingram titles
    ship from VENVS, following the same wholesale-vs-self-publish line
-   `publishBook` already draws for royalties. Neither this nor
-   Marketplace's fulfillment is wired into a component yet — both are
-   lib-level, at parity.
-3. **Ingram catalog** — high value, but blocked on a real commercial
+   `publishBook` already draws for royalties.
+3. ~~**Publishing: wire `catalog.js` into a real backend and
+   component.**~~ **Done (Phase 17, 1 Nov 2026).** `server.cjs` now
+   owns a real, persisted catalog with `POST/GET /api/publishing/
+   books`, `POST .../purchase`, `GET .../orders/:id`,
+   `GET .../orders/unfulfilled`, and `POST .../orders/:id/fulfillment`.
+   `PublishingView.jsx` is rewired onto a new `publishingClient.js`,
+   the same split `marketplaceClient.js` already draws. Found and
+   fixed live while building this: the old view's purchase handler
+   never supplied `payoutFn`, so every self-published purchase (any
+   title owing its author a royalty) threw before this phase — only
+   royalty-free Ingram titles could ever be bought. See this app's own
+   README's "Phase 17" section for the full record.
+4. **Ingram catalog** — high value, but blocked on a real commercial
    agreement and real API credentials, not on code. Don't stub it.
 
 Already done, don't redo: abandoned cart recovery
