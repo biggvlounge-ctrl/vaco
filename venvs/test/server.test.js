@@ -90,19 +90,23 @@ const post = (p, body, headers = {}) => fetch(BASE + p, {
   body: JSON.stringify(body ?? {}),
 });
 
-test('the server starts and serves health with a real, empty marketplace', { skip: SKIP }, async () => {
+const svc = { 'X-Service-Name': 'venvs', 'X-Service-Token': 'test-venvs-token' };
+
+test('the server starts, serves health, and has already seeded the real demo storefronts once', { skip: SKIP }, async () => {
   const health = await (await fetch(`${BASE}/api/health`)).json();
   assert.equal(health.ok, true);
   assert.equal(health.service, 'venvs');
-  assert.equal(health.sellers, 0);
-  assert.equal(health.products, 0);
+  // 2 demo sellers (Cherokee Hardware, Riverfront Vinyl) + 12 real
+  // SVMIKO DEGVCHI storefronts -- see server.cjs's own onReady seed.
+  assert.equal(health.sellers, 14);
+  assert.ok(health.products > 0);
 });
 
-test('GET /api/marketplace/products starts real and empty, never 500s on an empty store', { skip: SKIP }, async () => {
+test('GET /api/marketplace/products lists the real seeded catalog, never 500s', { skip: SKIP }, async () => {
   const res = await fetch(`${BASE}/api/marketplace/products`);
   assert.equal(res.status, 200);
   const body = await res.json();
-  assert.deepEqual(body.products, []);
+  assert.ok(body.products.some((p) => p.title === 'Claw Hammer'));
 });
 
 test('GET /api/marketplace/sellers/:id 404s honestly for an unknown seller', { skip: SKIP }, async () => {
@@ -157,4 +161,37 @@ test('a mismatched actor (claiming to act as someone else) is refused with 403, 
   const res = await post('/api/marketplace/sellers',
     { ownerId: 'someone-else', name: 'X' }, { Authorization: 'Bearer some-token' });
   assert.equal(res.status, 502, 'Shield must be consulted before any identity claim is trusted, forged or not');
+});
+
+// -- CHOPZ SHOP cross-posting, VOID fulfillment, abandoned-cart recovery ---
+
+test('marking a product chopz-eligible with no credential at all is refused WITHOUT reaching Shield', { skip: SKIP }, async () => {
+  const res = await post('/api/marketplace/products/1/chopz-eligible', { ownerId: 'seller-hardware', affiliateCommissionPercent: 0.15 });
+  assert.equal(res.status, 401);
+});
+
+test('publishing to chopz with a real bearer token asks Shield -- real 502 when it is unreachable', { skip: SKIP }, async () => {
+  const res = await post('/api/marketplace/products/1/publish-to-chopz',
+    { ownerId: 'seller-hardware' }, { Authorization: 'Bearer some-token' });
+  assert.equal(res.status, 502);
+});
+
+test('requesting fulfillment is refused without a real service credential', { skip: SKIP }, async () => {
+  const res = await post('/api/marketplace/orders/1/fulfillment', { shippingCostPerSeller: 5 });
+  assert.equal(res.status, 401);
+});
+
+test('sweeping abandoned carts is refused without a real service credential', { skip: SKIP }, async () => {
+  const refused = await post('/api/marketplace/abandoned-carts/sweep', {});
+  assert.equal(refused.status, 401);
+});
+
+test('sweeping abandoned carts with a real service credential runs the real detection logic (none stale yet in a fresh store)', { skip: SKIP }, async () => {
+  const swept = await (await post('/api/marketplace/abandoned-carts/sweep', {}, svc)).json();
+  assert.ok(Array.isArray(swept.abandoned));
+});
+
+test('GET recovery-offer refuses a cart that does not exist', { skip: SKIP }, async () => {
+  const res = await fetch(`${BASE}/api/marketplace/carts/999999/recovery-offer`);
+  assert.equal(res.status, 400);
 });

@@ -195,24 +195,27 @@ ecosystem, POS). `README.md` carries the full phase-by-phase record.
 
 The original build order (run it, split `App.jsx`, wire V3, wire
 Shield) is **complete** — steps 1–4 all shipped across Phases 1–13.
-Phase 14 (31 Oct 2026) gave this app its first real backend and a
-working Hunts/Vault Studios storefront path. Genuinely useful next
-steps, roughly by leverage:
+Phase 14 (31 Oct 2026, both same-day passes) gave this app its first
+real backend, a working Hunts/Vault Studios storefront path, real
+CHOPZ/VOID/abandoned-cart routes, and rewired `MarketplaceView.jsx`
+itself onto the real backend. Genuinely useful next steps, roughly by
+leverage:
 
-1. **Rewire `MarketplaceView.jsx` itself** to call the new
-   `server.cjs` instead of `createMarketplace()`'s ephemeral local
-   state — VENVS's own in-app Marketplace tab still shows the old
-   hardcoded demo sellers, even though the real backend now exists.
-2. **HVNTZ POS integration** — a physical register at a real HVNTZ
+1. **HVNTZ POS integration** — a physical register at a real HVNTZ
    business ringing up an in-person sale through this same ledger,
    unifying in-person and online sales. The strongest genuinely-
    differentiated item left in the Shopify doc, and distinct from the
    online storefront Phase 14 already built (see §5 above).
-3. Wire `markChopzEligible`/`publishToChopzShop`, `requestFulfillment`,
-   and `checkAbandonedCarts`/`generateRecoveryOffer` to real routes on
-   `server.cjs` — all three are real, tested functions in
-   `marketplace.js` with no HTTP route yet.
-4. ~~**Publishing → VOID fulfillment.**~~ **Done.**
+2. **Real VOID fulfillment authorization.** `requestFulfillment` is
+   wired and real, but refuses honestly against a real VOID: that
+   service's `POST /api/job` wants the real seller's own Shield
+   session (`requireActor('customerId')`), which neither this call nor
+   CHOPZ SHOP's own already-shipped identical one sends. A real fix
+   needs either VOID's own route to accept a service credential for a
+   marketplace creating a job on a seller's behalf, or a per-seller
+   confirmation step this app does not have yet — a real,
+   cross-app design question, not a one-file patch.
+3. ~~**Publishing → VOID fulfillment.**~~ **Done.**
    `purchaseBook` now records a real order, and
    `requestBookFulfillment` routes physical book orders to VOID through
    the same injected-`voidRequestFn` shape `marketplace.js` uses.
@@ -224,7 +227,7 @@ steps, roughly by leverage:
    `publishBook` already draws for royalties. Neither this nor
    Marketplace's fulfillment is wired into a component yet — both are
    lib-level, at parity.
-5. **Ingram catalog** — high value, but blocked on a real commercial
+4. **Ingram catalog** — high value, but blocked on a real commercial
    agreement and real API credentials, not on code. Don't stub it.
 
 Already done, don't redo: abandoned cart recovery

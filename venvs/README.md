@@ -229,17 +229,26 @@ time that file gets rewritten for an unrelated reason.
   a seller, list a product, browse, cart, and check out for real
   VCoin all persist and move real money, closing the gap this bullet
   used to describe (a seller registered in the browser vanished on
-  the next page load). Still genuinely unbuilt: the full HVNTZ **POS**
-  integration specifically (a physical register ringing up an
-  in-person sale through this same ledger, not just a Hunts business
-  having an online storefront — that distinction is the real
-  remaining gap), the VENVM app ecosystem, CHOPZ SHOP cross-posting
-  wired to a route (`markChopzEligible`/`publishToChopzShop` exist in
-  `src/lib/marketplace.js`, real and tested, just not reachable over
-  HTTP yet), VOID physical fulfillment wired to a route
-  (`requestFulfillment`, same situation), abandoned-cart recovery
-  wired to a route (`checkAbandonedCarts`/`generateRecoveryOffer`,
-  same situation), and seller onboarding/inventory management UI.
+  the next page load). **`MarketplaceView.jsx` itself is now rewired
+  to the real backend too** (Phase 14, same-day follow-on) — the
+  in-app Marketplace tab shows the real, persisted catalog rather than
+  ephemeral demo state. **CHOPZ SHOP cross-posting, VOID fulfillment,
+  and abandoned-cart recovery are now real routes too** (same
+  follow-on): `POST .../chopz-eligible`/`.../publish-to-chopz`,
+  `POST .../orders/:id/fulfillment`, `POST .../abandoned-carts/sweep`,
+  `GET .../carts/:id/recovery-offer`. One real, checked-live limit on
+  fulfillment specifically: VOID's own `POST /api/job` is
+  `requireActor('customerId')`, wanting the real seller's own Shield
+  session — neither this call nor CHOPZ SHOP's own already-shipped
+  identical one (`chopz/chopz-shop/server.js`) sends it, so a real
+  multi-seller order cannot cleanly be fulfilled in one request as
+  written; it refuses honestly (VOID's own real refusal message)
+  rather than faking a shipment. Still genuinely unbuilt: the full
+  HVNTZ **POS** integration specifically (a physical register ringing
+  up an in-person sale through this same ledger, not just a Hunts
+  business having an online storefront — that distinction is the real
+  remaining gap), the VENVM app ecosystem, and seller onboarding/
+  inventory management UI.
 - Publishing: no Ingram API integration (just a flag on a manually-
   published book), no subscription-pool UI, no full tab UI (search,
   skill tags, cover art). **VOID fulfillment routing IS now built** —
@@ -334,3 +343,80 @@ then driven through a real headless browser against HVNTZ's new
 Storefront tab (see that app's own README) — sign in, open a
 storefront, list a product, see it rendered back — with a screenshot
 taken at each step.
+
+## Phase 14 (continued, same day): CHOPZ/VOID/abandoned-cart routes, demo seed, and the real frontend rewire
+
+Closing out Phase 14's own "not yet wired to a route" list, and the
+in-app Marketplace tab that still showed ephemeral demo state after
+the backend above landed:
+
+**Real demo data now seeds server-side, once.** `server.cjs`'s own
+`attachStore` `onReady` registers Cherokee Hardware Co., Riverfront
+Vinyl, and SVMIKO DEGVCHI's 12 real storefronts into the real
+persisted store the first time it is ever empty — `MarketplaceView.jsx`
+no longer calls `createMarketplace()`/`seedSvmikoDegvchiStorefronts`
+itself on every mount. Confirmed idempotent live: a restart against an
+already-seeded store reports the same real 14 sellers/20 products,
+never doubled.
+
+**Three more real route groups**, all reusing `marketplace.js`'s own
+already-tested functions, none re-implemented: `POST /api/marketplace/
+products/:id/chopz-eligible` and `.../publish-to-chopz` (both
+`requireActor('ownerId')`, with the same resolve-then-compare
+ownership guard `.../products` already uses — only a product's own
+real seller may promote it); `POST /api/marketplace/orders/:id/
+fulfillment` (`requireCallingService()` — a real order can span
+several sellers, no single body field is "the one acting human", the
+same reasoning VDP's `conflicts.js` group-level routes already
+document); `POST /api/marketplace/abandoned-carts/sweep`
+(`requireCallingService()` — real detection runs on a schedule, never
+a browser's own say-so) and `GET /api/marketplace/carts/:id/
+recovery-offer` (a pure, side-effect-free derivation, open the same
+way `venues.js`'s own `eventFinance` is over in VDP).
+
+**A real, checked-live limitation on fulfillment, not papered over.**
+VOID's own `POST /api/job` is `requireActor('customerId')` — it wants
+the real seller's own Shield session, not a service credential.
+Reading CHOPZ SHOP's own real, already-shipped `requestVoidCourierJob`
+(`chopz/chopz-shop/server.js`) confirms it has exactly the same gap:
+neither call sends that session. This is a real, pre-existing
+ecosystem limitation surfaced by actually exercising the route against
+a live VOID, not introduced by this change — `requestFulfillment`
+still fails safe, surfacing VOID's own real refusal message as an
+honest 400 rather than recording a shipment that was never created.
+
+**`MarketplaceView.jsx` is rewired to the real backend.** New
+`src/lib/marketplaceClient.js` (same `import.meta.env` + `sessionHeaders()`
+conventions as `v3Client.js`/`voidClient.js`) replaces every direct
+call into `src/lib/marketplace.js`. The CHOPZ promote button now only
+renders for a product the signed-in session actually owns — checked
+client-side against the real seller directory
+(`GET /api/marketplace/sellers`, new) before ever attempting a request
+the server would refuse anyway. The abandoned-cart demo keeps its real
+two-cart shape but can no longer backdate a server-held cart's own
+`lastActivityAt` from the browser (there is no route for that, by
+design — a buyer does not get to declare their own cart "old"); it
+honestly explains that real detection runs on a scheduled sweep, not a
+button click, when asked before that sweep has run.
+
+### Verification
+
+`test/server.test.js` grew by 6 more tests (guard-refusal shapes for
+all three new route groups, plus a real sweep-and-recovery-offer round
+trip against the real spawned backend) — 77 tests in this app's own
+suite, all passing (`venvs.test.js`'s pre-existing 71 and
+`shieldAuth.test.js`'s 5 both untouched and still green). Run live
+against real spawned Shield + V3 + VOID + this server: a real stale
+cart was created, added to, and — given a real simulated `now` 45
+minutes ahead — correctly swept as abandoned and given a real 15%
+recovery offer ($18.50 → $15.72); a real order's fulfillment request
+against a live VOID produced VOID's own real, honest refusal rather
+than a fake shipment, exactly as documented above. The full rewired
+frontend was driven through a real headless browser against the real
+Vite dev server and real backend: the Marketplace tab rendered all 14
+real sellers and 20 real products (including all 12 SVMIKO DEGVCHI
+storefronts), a real "Claw Hammer" add-to-cart-and-checkout produced a
+real `Order #1: 18.5 VCoin`, the Chop Shop promote button appeared
+only on the two products the signed-in seller actually owned, and the
+abandoned-cart button's honest not-yet-swept message rendered
+correctly for a fresh cart — screenshotted at each step.

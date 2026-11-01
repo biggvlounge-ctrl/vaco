@@ -46,11 +46,13 @@ require('dotenv/config');
 
 const { attachStore } = require('./lib/storeBackend.cjs');
 const { createServiceAuth } = require('./lib/serviceAuth.cjs');
-const { requireActor } = require('./lib/shieldAuth.cjs');
+const { requireActor, requireCallingService } = require('./lib/shieldAuth.cjs');
 const { traceMiddleware } = require('./lib/tracing.cjs');
 
 const PORT = process.env.PORT || 8829;
 const V3_API_URL = process.env.V3_API_URL || 'http://localhost:8811';
+const VOID_API_URL = process.env.VOID_API_URL || 'http://localhost:8793';
+const CHOPZ_SHOP_API_URL = process.env.CHOPZ_SHOP_API_URL || 'http://localhost:8801';
 
 // `start-ecosystem.sh` generates a single `VACO_SERVICE_TOKEN` and
 // exports it for every child process; each app supplies its own name
@@ -98,8 +100,57 @@ async function transferVCoin(fromUserId, toUserId, amount, reason) {
   return res.json();
 }
 
+// The real server-to-server client this app's own `src/lib/
+// voidClient.js` could not be, server-side: that file reads
+// `import.meta.env`, which only exists under Vite and throws in plain
+// Node. Same real contract (`VOID_SERVICE_VERTICALS_COMPARABLES.md`'s
+// own "courier" vertical, quantity 1, `unitPrice` the quoted shipping
+// cost), reused rather than re-derived -- and the exact same shape
+// CHOPZ SHOP's own already-shipped `requestVoidCourierJob`
+// (`chopz/chopz-shop/server.js`) already uses, including this file's
+// own real, checked-live limitation: VOID's `POST /api/job` is
+// `requireActor('customerId')`, which wants the real seller's own
+// Shield session, not a service credential or no credential at all.
+// Neither this call nor CHOPZ SHOP's own identical one sends that
+// session -- confirmed by reading CHOPZ SHOP's real source, not
+// assumed -- so a real order spanning multiple sellers' own separate
+// sessions cannot cleanly be fulfilled in one request as written here
+// either. `requestFulfillment` still refuses honestly (a real 400
+// with VOID's own real refusal message) rather than silently
+// recording a shipment that was never actually created -- see
+// `POST /api/marketplace/orders/:id/fulfillment`'s own header below.
+async function createVoidShipment(sellerId, shippingCost) {
+  const res = await fetch(`${VOID_API_URL}/api/job`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ verticalId: 'courier', customerId: sellerId, quantity: 1, unitPrice: shippingCost }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || `createVoidShipment failed (${res.status})`);
+  return body;
+}
+
+// Same real gap: `src/lib/chopzClient.js` also reads `import.meta.env`
+// and cannot run here. CHOPZ SHOP's own `POST /chopz-shop/products` is
+// `requireActor('sellerId')` -- it demands the real seller's own
+// Shield session, not a service credential, so this forwards the
+// SAME `Authorization` header the incoming request already carried
+// (and that `requireActor('ownerId')` on the route below already
+// validated) rather than minting a second identity for one call.
+async function registerWithChopzShop(sellerOwnerId, name, price, category, affiliateCommissionPercent, authHeader) {
+  const res = await fetch(`${CHOPZ_SHOP_API_URL}/chopz-shop/products`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: authHeader },
+    body: JSON.stringify({ sellerId: sellerOwnerId, name, price, category, affiliateCommissionPercent }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || `registerWithChopzShop failed (${res.status})`);
+  return body;
+}
+
 (async () => {
   const marketplaceLib = await import('./src/lib/marketplace.js');
+  const svmikoDegvchiLib = await import('./src/lib/svmikoDegvchi.js');
 
   function createVenvsStore() {
     return { marketplace: marketplaceLib.createMarketplace() };
@@ -110,7 +161,30 @@ async function transferVCoin(fromUserId, toUserId, amount, reason) {
     appKey: 'venvs',
     createDefault: createVenvsStore,
     filePath: path.join(__dirname, 'data', 'store.json'),
-    onReady: (loaded) => { store = loaded; },
+    onReady: (loaded) => {
+      store = loaded;
+      // Real, named storefronts this ecosystem already committed to
+      // (`MarketplaceView.jsx`'s own former demo data, and Phase 11's
+      // real SVMIKO DEGVCHI fashion house) -- seeded once, into the
+      // real persisted store, rather than recreated in memory on
+      // every browser tab's own mount. `sellers.length === 0` is the
+      // real "never seeded yet" check -- a restart against an
+      // already-seeded store must never duplicate these.
+      if (store.marketplace.sellers.length === 0) {
+        const hardware = marketplaceLib.registerSeller(store.marketplace, {
+          name: 'Cherokee Hardware Co.', ownerId: 'seller-hardware',
+          theme: { color: '#2a7d4f', banner: 'Est. 1962 — Cherokee St' },
+        });
+        const vinyl = marketplaceLib.registerSeller(store.marketplace, {
+          name: 'Riverfront Vinyl', ownerId: 'seller-vinyl',
+          theme: { color: '#a8452e', banner: 'New & used pressings' },
+        });
+        marketplaceLib.listProduct(store.marketplace, { sellerId: hardware.id, title: 'Claw Hammer', price: 18.5, category: 'tools' });
+        marketplaceLib.listProduct(store.marketplace, { sellerId: hardware.id, title: 'Exterior Paint (1gal)', price: 34.0, category: 'paint' });
+        marketplaceLib.listProduct(store.marketplace, { sellerId: vinyl.id, title: 'Local Pressing LP', price: 22.0, category: 'music' });
+        svmikoDegvchiLib.seedSvmikoDegvchiStorefronts(store.marketplace);
+      }
+    },
   });
 
   app.get('/api/health', (_req, res) => {
@@ -139,6 +213,12 @@ async function transferVCoin(fromUserId, toUserId, amount, reason) {
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
+  });
+
+  // Every real storefront, for a unified seller directory -- the real
+  // list `MarketplaceView.jsx` shows above its product browse list.
+  app.get('/api/marketplace/sellers', (_req, res) => {
+    res.json({ sellers: store.marketplace.sellers });
   });
 
   app.get('/api/marketplace/sellers/:id', (req, res) => {
@@ -239,6 +319,86 @@ async function transferVCoin(fromUserId, toUserId, amount, reason) {
     const order = marketplaceLib.getOrder(store.marketplace, Number(req.params.id));
     if (!order) return res.status(404).json({ error: `no order with id ${req.params.id}` });
     res.json(order);
+  });
+
+  // -- CHOPZ SHOP cross-posting ---------------------------------------------
+  //
+  // A seller opts specific items in (not the whole catalogue) and sets
+  // what a creator earns per sale -- the same resolve-then-compare
+  // ownership check `POST .../products` above already uses, since
+  // only a product's own real seller may do either.
+  app.post('/api/marketplace/products/:id/chopz-eligible', requireActor('ownerId'), (req, res) => {
+    try {
+      const product = marketplaceLib.getProduct(store.marketplace, Number(req.params.id));
+      if (!product) return res.status(404).json({ error: `no product with id ${req.params.id}` });
+      const seller = marketplaceLib.getSeller(store.marketplace, product.sellerId);
+      if (!seller || seller.ownerId !== req.body.ownerId) {
+        return res.status(403).json({ error: "only this product's own seller can mark it chopz-eligible" });
+      }
+      res.status(200).json(marketplaceLib.markChopzEligible(store.marketplace, product.id, req.body.affiliateCommissionPercent));
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // Registers the real product over in CHOPZ SHOP under the seller's
+  // own real payout identity (`ownerId`), forwarding the SAME Shield
+  // bearer token this route itself already validated -- see
+  // `registerWithChopzShop`'s own header above for why that token,
+  // not a service credential, is what CHOPZ SHOP's own route needs.
+  app.post('/api/marketplace/products/:id/publish-to-chopz', requireActor('ownerId'), async (req, res) => {
+    try {
+      const product = marketplaceLib.getProduct(store.marketplace, Number(req.params.id));
+      if (!product) return res.status(404).json({ error: `no product with id ${req.params.id}` });
+      const seller = marketplaceLib.getSeller(store.marketplace, product.sellerId);
+      if (!seller || seller.ownerId !== req.body.ownerId) {
+        return res.status(403).json({ error: "only this product's own seller can publish it to CHOPZ SHOP" });
+      }
+      const updated = await marketplaceLib.publishToChopzShop(store.marketplace, product.id, {
+        chopzRegisterFn: (sellerOwnerId, name, price, category, affiliateCommissionPercent) => registerWithChopzShop(
+          sellerOwnerId, name, price, category, affiliateCommissionPercent, req.headers.authorization,
+        ),
+      });
+      res.status(200).json(updated);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // -- VOID physical fulfillment --------------------------------------------
+  //
+  // Operational -- a real order can span several sellers, each a
+  // separate real VOID courier job, and no single buyer/seller field
+  // is "the one acting human" for the whole order, the same reasoning
+  // `conflicts.js`'s own group-level routes already document over in
+  // VDP.
+  app.post('/api/marketplace/orders/:id/fulfillment', requireCallingService(), async (req, res) => {
+    try {
+      const order = await marketplaceLib.requestFulfillment(store.marketplace, {
+        orderId: Number(req.params.id), shippingCostPerSeller: req.body.shippingCostPerSeller, voidRequestFn: createVoidShipment,
+      });
+      res.status(200).json(order);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // -- Abandoned-cart recovery -----------------------------------------------
+  app.post('/api/marketplace/abandoned-carts/sweep', requireCallingService(), (req, res) => {
+    const abandoned = marketplaceLib.checkAbandonedCarts(store.marketplace, req.body || {});
+    res.status(200).json({ abandoned });
+  });
+
+  // A pure, read-only derivation (no money moves, nothing stored) --
+  // the same "compute fresh every call" posture `venues.js`'s own
+  // `eventFinance` already takes over in VDP.
+  app.get('/api/marketplace/carts/:id/recovery-offer', (req, res) => {
+    try {
+      const discountPercent = req.query.discountPercent !== undefined ? Number(req.query.discountPercent) : undefined;
+      res.json(marketplaceLib.generateRecoveryOffer(store.marketplace, Number(req.params.id), { discountPercent }));
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
   });
 
   app.listen(PORT, () => {
