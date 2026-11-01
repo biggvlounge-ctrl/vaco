@@ -148,6 +148,41 @@ VDP's own avatar-wearable economy.
 
 ---
 
+**Corrected, same session (1 Nov 2026) — the real 17-brand roster.**
+Given directly, the same day as the 16-brand list above:
+
+- **VIC VALENCIAGO**: "similar to the Balenciaga brand, luxury,
+  simple." The 16-brand update's own name-only guess (avant-garde/
+  deconstructed/oversized) is **withdrawn**, replaced with a real,
+  restrained minimalist positioning. The custom crossbar-free ∧ in its
+  two A's stays — that detail was separately confirmed, not part of
+  the withdrawn guess — now used sparingly as one real signature mark
+  rather than a loud sculptural motif.
+- **SA VIOR**: "like our Christian Dior." The 16-brand update's own
+  name-only guess (ecclesiastical/"savior"/halo-ring) is
+  **withdrawn**, replaced with a French-couture-inspired positioning
+  built from Dior's own real defining signature, the 1947 Bar Suit
+  (structured, cinched waist over a sculpted hip).
+- **THRONES AND BONES** and **MYSTERY AND MASTERY**: "I have not
+  figured out yet." Both real, confirmed brand names, genuinely
+  undecided rather than merely unsent — reverted to the same real "to
+  be established" placeholder (no flagship product, real-skipped at
+  seeding) VvLGARI itself once carried before its own positioning
+  existed. The 16-brand update's own name-only guesses for both are
+  withdrawn, not kept as an unused fallback.
+- **CVLT**: a genuinely new, 17th brand — "we also will add one
+  called Cult, C-V-L-T," its own real, confirmed vowel-dropped
+  spelling. No positioning given yet either, so it joins THRONES AND
+  BONES and MYSTERY AND MASTERY on the same placeholder.
+
+The real roster is now 17 brands. 14 have a real, open storefront in
+VENVS (3 real-skipped: THRONES AND BONES, MYSTERY AND MASTERY, CVLT)
+and a matching real virtual wearable in VDP's own avatar-wearable
+economy (19 real pieces across those same 14 brands, since SVRPENTS
+Stone carries 2 and VvLGARI carries 5).
+
+---
+
 ## Implementation status (added when this file was placed into the repo)
 
 **Superseded 22 Oct 2026 — read the section above first.** Everything

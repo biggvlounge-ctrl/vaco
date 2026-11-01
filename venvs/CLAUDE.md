@@ -121,13 +121,12 @@ rewired to call it yet — that remains real, separate frontend work.
   with the real KDP/ACX-derived royalty math in
   `src/lib/royalties.js` (70% band at $2.99–$9.99, 35% outside;
   print at 60% minus print cost), per `VENVS_PUBLISHING_ADDITION.md`.
-- **SVMIKO DEGVCHI Fashion House** — the fashion *house* and its 16
+- **SVMIKO DEGVCHI Fashion House** — the fashion *house* and its 17
   real sub-brands (updated 22 Oct 2026 from the original 13, then
-  again 1 Nov 2026 from 12 to 16 — several renamed, one retired pair
-  dropped, five new brands added across the two updates; see
-  `src/lib/svmikoDegvchi.js`'s own header) live here as real branded
-  sellers inside the Marketplace storefront system
-  (`src/lib/svmikoDegvchi.js`). All 16 now have a real, open
+  twice more on 1 Nov 2026 — first 12 to 16, then corrected/extended
+  to 17; see `src/lib/svmikoDegvchi.js`'s own header) live here as
+  real branded sellers inside the Marketplace storefront system
+  (`src/lib/svmikoDegvchi.js`). 14 of the 17 have a real, open
   storefront — VvLGARI's own positioning was given directly on 22 Oct
   2026 (a luxury accessories house: cologne, perfume, sunglasses, and a
   handbag for each of men and women) and is no longer "to be
@@ -136,16 +135,20 @@ rewired to call it yet — that remains real, separate frontend work.
   emerald-inlay bone chain, alongside its flagship jacket) — a later
   correction gave it genuine natural stone/gemstone inlay as part of
   its own material signature. Both SVRPENTS Stone and VvLGARI list
-  more than one item under their single real storefront; the other 14
-  carry one each. The 4 newest brands (THRONES AND BONES, MYSTERY AND
-  MASTERY, SA VIOR, VIC VALENCIAGO) have real, confirmed names but no
-  real positioning sent for them — their `positioning`/
-  `signatureElement`/`flagshipProducts` are this module's own flagged,
-  interpretive derivation from the name alone, same posture already
-  held for every other brand's invented price/signature-product
-  detail, open to correction the moment real positioning is given.
-  Note the split: the **brands/storefronts** are VENVS commerce; the
-  **avatar wearables** economy is VDP's.
+  more than one item under their single real storefront; 12 others
+  carry one each. SA VIOR and VIC VALENCIAGO have real, confirmed
+  positioning now too, given directly the same day as a correction to
+  this module's own earlier name-only guesses: SA VIOR is "like our
+  Christian Dior" (French-couture-inspired, a Bar-Suit-style cinched
+  waist), VIC VALENCIAGO is "similar to the Balenciaga brand, luxury,
+  simple" (restrained minimalism, not the module's earlier avant-garde
+  guess). THRONES AND BONES, MYSTERY AND MASTERY, and CVLT (the 17th
+  brand) are real, confirmed names with **no** positioning — the first
+  two confirmed directly as genuinely undecided ("I have not figured
+  out yet"), not merely unsent — so all three carry `flagshipProducts:
+  []` and are honestly real-skipped at seeding rather than given an
+  invented identity. Note the split: the **brands/storefronts** are
+  VENVS commerce; the **avatar wearables** economy is VDP's.
 
 **Not here anymore** (don't re-add): the walkable world, CHOPZ
 District, avatar wearables → all in `../vdp/`. VEX (trading floor)

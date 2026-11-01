@@ -73,20 +73,23 @@
 // genuinely separate processes; this is a real, intentional naming
 // convention match, not a functional link).
 //
-// **Updated 1 Nov 2026 to the real 16-brand roster**, the same real
-// update `venvs/src/lib/svmikoDegvchi.js` took (see that module's own
-// header for the full real rename/positioning record): STONE BONES ->
-// SVRPENTS Stone and BOULÉVARD XCHANGE -> BOVLEVARD Xchange (BX) are
-// renamed in place, slug moving with the rename per this file's own
-// precedent (Devil in Details -> STONE BONES already did the same);
-// four genuinely new brands (THRONES AND BONES, MYSTERY AND MASTERY,
-// SA VIOR, VIC VALENCIAGO) each get one real virtual wearable, at the
-// same ~15.5x physical-to-virtual price ratio this file's own existing
-// rows already hold (price divided and rounded, not re-derived from
-// nothing). Their real-world `positioning` lives only in VENVS's own
-// module; this file carries just the one virtual item each needs, the
-// same "clothing" category every other single-item brand already
-// uses.
+// **Updated 1 Nov 2026 to the real 16-brand roster, then corrected
+// the same session** -- the same real update `venvs/src/lib/
+// svmikoDegvchi.js` took (see that module's own header for the full
+// real rename/positioning/correction record). STONE BONES -> SVRPENTS
+// Stone and BOULÉVARD XCHANGE -> BOVLEVARD Xchange (BX) are renamed in
+// place, slug moving with the rename per this file's own precedent
+// (Devil in Details -> STONE BONES already did the same). SA VIOR and
+// VIC VALENCIAGO each get one real virtual wearable matching their
+// real, confirmed positioning (Christian Dior and Balenciaga echoes,
+// respectively), at the same ~15.5x physical-to-virtual price ratio
+// this file's own existing rows already hold. THRONES AND BONES and
+// MYSTERY AND MASTERY (confirmed directly as genuinely undecided --
+// "I have not figured out yet") and the house's 17th brand, CVLT (no
+// positioning given at all), carry no row here at all -- same real
+// absence-means-nothing-to-sell-yet convention this list already
+// held for VvLGARI before its own positioning existed, not three rows
+// with an invented identity.
 
 import { registerWearable } from './degvchi.js';
 
@@ -110,10 +113,8 @@ export const SUB_BRAND_WEARABLES = [
   { slug: 'vvlgari', name: 'VvLGARI Virtual Aviator Sunglasses', category: 'accessories', price: 19 },
   { slug: 'vvlgari', name: "VvLGARI Virtual Women's Structured Tote", category: 'accessories', price: 42 },
   { slug: 'vvlgari', name: "VvLGARI Virtual Men's Weekender Bag", category: 'accessories', price: 38 },
-  { slug: 'thrones-and-bones', name: 'THRONES AND BONES Virtual Ivory Throne-Back Cape Coat', category: 'clothing', price: 45 },
-  { slug: 'mystery-and-mastery', name: 'MYSTERY AND MASTERY Virtual Reversible Veiled-Embroidery Coat', category: 'clothing', price: 38 },
-  { slug: 'sa-vior', name: 'SA VIOR Virtual Halo-Ring Cassock Overcoat', category: 'clothing', price: 36 },
-  { slug: 'vic-valenciago', name: 'VIC VALENCIAGO Virtual ∧-Monogram Sculptural Overcoat', category: 'clothing', price: 42 },
+  { slug: 'sa-vior', name: 'SA VIOR Virtual Structured Bar-Silhouette Jacket', category: 'clothing', price: 35 },
+  { slug: 'vic-valenciago', name: 'VIC VALENCIAGO Virtual ∧-Mark Minimalist Wool Coat', category: 'clothing', price: 42 },
 ];
 
 // Matches VENVS's own `ownerIdFor()` exactly -- kept as a real,

@@ -574,12 +574,28 @@ test('SVRPENTS Stone carries two real items -- a jacket and a separate jewelry-g
   assert.ok(categories.includes('accessories'), 'the chain should be its own standalone accessory, not folded into the jacket');
 });
 
-test('the 4 newest brands (THRONES AND BONES, MYSTERY AND MASTERY, SA VIOR, VIC VALENCIAGO) each carry one real virtual item', () => {
-  for (const slug of ['thrones-and-bones', 'mystery-and-mastery', 'sa-vior', 'vic-valenciago']) {
+test('SA VIOR and VIC VALENCIAGO (real positioning given 1 Nov 2026) each carry one real virtual item', () => {
+  // SA VIOR's real positioning is "like our Christian Dior"; VIC
+  // VALENCIAGO's is "similar to the Balenciaga brand, luxury, simple"
+  // -- both confirmed directly, replacing this file's own earlier,
+  // withdrawn name-only guesses.
+  for (const slug of ['sa-vior', 'vic-valenciago']) {
     const items = SUB_BRAND_WEARABLES.filter((i) => i.slug === slug);
     assert.equal(items.length, 1, `${slug} should carry exactly one real virtual item`);
     assert.ok(items[0].price > 0);
     assert.ok(WEARABLE_CATEGORIES.includes(items[0].category));
+  }
+});
+
+test('THRONES AND BONES, MYSTERY AND MASTERY, and CVLT carry no virtual item yet', () => {
+  // Confirmed directly (1 Nov 2026): THRONES AND BONES and MYSTERY
+  // AND MASTERY are genuinely undecided ("I have not figured out
+  // yet"), and CVLT (the house's 17th brand) has no positioning given
+  // at all -- none of the three has a real product in VENVS either,
+  // so none gets a row here, the same real absence this list already
+  // held for VvLGARI before its own positioning existed.
+  for (const slug of ['thrones-and-bones', 'mystery-and-mastery', 'cvlt']) {
+    assert.equal(SUB_BRAND_WEARABLES.filter((i) => i.slug === slug).length, 0);
   }
 });
 

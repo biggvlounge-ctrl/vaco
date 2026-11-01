@@ -55,19 +55,25 @@
 // is that it IS the same brand continuing under a new name) rather
 // than staying frozen on the old spelling.
 //
-// **The 4 new brands' `positioning`/`signatureElement`/
-// `flagshipProducts` below are this module's own flagged,
-// interpretive derivation from the name alone** -- asked directly
-// whether real positioning existed for them, the answer was "I'll
-// give you the details," and what actually arrived next was the
-// name/spelling list above, not positioning. Rather than leave four
-// real, confirmed brand names sitting with no storefront (worse than
-// a flagged guess, per this file's own standing rule that an unseeded
-// brand is worse than a seeded one), each gets one real flagship
-// product whose aesthetic is read directly off its own name -- same
-// "flagged, interpretive" posture already held for every invented
-// price/signature-product name in this file, open to a real
-// correction the moment actual positioning is given.
+// **Updated again, same session (1 Nov 2026) — real positioning given
+// for 2 of the 4 new brands, a 17th brand added, 2 still open.**
+// VIC VALENCIAGO is confirmed directly: "similar to the Balenciaga
+// brand, luxury, simple" -- sleek minimalism, not the sculptural/
+// oversized avant-garde reading this file originally derived from the
+// name alone (replaced below). SA VIOR is confirmed directly: "like
+// our Christian Dior" -- French-couture-inspired structured elegance,
+// replacing this file's own original ecclesiastical/"savior" reading
+// (also replaced below; the name itself stays SA VIOR, only the
+// positioning it was read from the name is wrong). THRONES AND BONES
+// and MYSTERY AND MASTERY are confirmed directly as genuinely
+// undecided -- "I have not figured out yet" -- so both are reverted
+// to the same real "positioning to be established" placeholder
+// VvLGARI itself once carried (`flagshipProducts: []`, skipped at
+// seeding by `seedSvmikoDegvchiStorefronts`'s own existing skip path,
+// not force-fed an invented identity a second time). CVLT (its own
+// real, confirmed vowel-dropped spelling of "CULT") is a genuinely
+// new, 17th brand with no positioning given yet either, so it joins
+// them on the same placeholder.
 
 import { registerSeller, listProduct } from './marketplace.js';
 
@@ -236,71 +242,77 @@ export const SUB_BRANDS = [
   {
     slug: 'thrones-and-bones',
     name: 'THRONES AND BONES',
-    // Flagged, interpretive derivation from the name alone (see this
-    // file's own header) -- read as regal/dynastic power ("thrones")
-    // paired with mortality ("bones"), distinguished from SVRPENTS
-    // Stone's own bone-hardware signature by working in material and
-    // silhouette instead: bone-white ivory leather and a throne's own
-    // high-backed structure, rather than cast bone-shaped hardware.
-    positioning: 'Regal/dynastic luxury -- architectural, throne-backed '
-      + 'silhouettes (structured high collars, cape-back coats) in a '
-      + 'bone-white ivory palette with real bone-inlay seam trim -- '
-      + 'power and permanence, rendered in material rather than hardware.',
-    signatureElement: "Bone-white ivory leather with bone-inlay seam trim, throne-backed (structured high-collar, cape-back) silhouette construction",
-    flagshipProducts: [
-      { title: 'THRONES AND BONES Ivory Throne-Back Cape Coat', price: 700, category: 'luxury-outerwear' },
-    ],
+    // Confirmed directly (1 Nov 2026): "I have not figured out yet."
+    // A prior version of this file guessed a regal/bone-white
+    // positioning from the name alone; that guess is withdrawn, not
+    // kept as a fallback, now that the real answer is "undecided"
+    // rather than "unsent" -- the same real "to be established"
+    // placeholder VvLGARI itself once carried, see this file's own
+    // header.
+    positioning: 'Positioning to be established.',
+    signatureElement: 'To be established',
+    // No flagship product yet -- see `seedSvmikoDegvchiStorefronts`'s
+    // own skip path, the same real mechanism VvLGARI's own
+    // placeholder once used.
+    flagshipProducts: [],
   },
   {
     slug: 'mystery-and-mastery',
     name: 'MYSTERY AND MASTERY',
-    // Flagged, interpretive derivation from the name alone -- read as
-    // concealment ("mystery") paired with visible technical craft
-    // ("mastery"): a garment that reveals its own hand-finished
-    // embroidery only up close or when unlayered.
-    positioning: 'Artisan mystique -- concealment and craft as one idea: '
-      + 'hooded, high-opacity silhouettes, plain from the outside, that '
-      + 'reveal elaborate hand-finished embroidery only up close or when '
-      + 'reversed/unlayered.',
-    signatureElement: 'Reversible hooded outerwear -- plain and opaque from outside, hand-embroidery revealed on the reverse/underside',
-    flagshipProducts: [
-      { title: 'MYSTERY AND MASTERY Reversible Veiled-Embroidery Coat', price: 590, category: 'luxury-outerwear' },
-    ],
+    // Confirmed directly (1 Nov 2026): "I have not figured out yet."
+    // Same withdrawal as THRONES AND BONES immediately above -- a
+    // prior guessed positioning is removed, not kept as a fallback.
+    positioning: 'Positioning to be established.',
+    signatureElement: 'To be established',
+    flagshipProducts: [],
   },
   {
     slug: 'sa-vior',
     name: 'SA VIOR',
-    // Flagged, interpretive derivation from the name alone -- read
-    // directly as "savior," given an ecclesiastical/redemption
-    // positioning: cassock-inspired silhouettes, a halo/cross motif
-    // reworked as real hardware, and a monochrome white-and-gold
-    // palette.
-    positioning: 'Ecclesiastical/redemption luxury -- cassock-inspired '
-      + 'silhouettes, halo and cross motifs reworked as real hardware, '
-      + 'a monochrome white-and-gold palette.',
-    signatureElement: 'Halo-ring hardware and cross-seam construction in a white-and-gold palette',
+    // Real positioning confirmed directly (1 Nov 2026): "like our
+    // Christian Dior" -- replacing a prior, withdrawn ecclesiastical/
+    // "savior" reading of the name that turned out wrong. Dior's own
+    // real defining signature, the 1947 "Bar Suit": a structured,
+    // cinched-waist jacket built over a sculpted hip, the real
+    // comparable this brand's own flagship piece is built from.
+    positioning: "French-couture-inspired luxury -- the house's own "
+      + 'answer to Christian Dior: structured, feminine silhouettes, a '
+      + 'cinched waist over a sculpted hip, and refined luxury fabrics.',
+    signatureElement: "Structured, cinched-waist tailoring over a sculpted hip -- the house's own Bar-Suit-inspired silhouette",
     flagshipProducts: [
-      { title: 'SA VIOR Halo-Ring Cassock Overcoat', price: 560, category: 'luxury-outerwear' },
+      { title: 'SA VIOR Structured Bar-Silhouette Jacket', price: 540, category: 'luxury-outerwear' },
     ],
   },
   {
     slug: 'vic-valenciago',
     name: 'VIC VALENCIAGO',
-    // Flagged, interpretive derivation from the name alone -- a clear
-    // echo of Balenciaga's own real avant-garde/deconstructed-
-    // tailoring positioning, with the real, confirmed detail given
-    // directly (1 Nov 2026): the two A's in VALENCIAGO use a custom
-    // crossbar-free ∧, carried here as its own Unicode glyph in `name`
-    // (U+2227, LOGICAL AND) since no image asset exists for the real
-    // custom typographic mark.
-    positioning: "Avant-garde deconstructed tailoring -- the house's own "
-      + 'homage to high-fashion minimalism: sculptural draping, oversized '
-      + 'silhouettes, and a custom crossbar-free ∧ wordmark used as both '
-      + 'branding and a literal embossed/stitched motif.',
-    signatureElement: 'Custom crossbar-free ∧ monogram, embossed/stitched directly into sculptural, oversized silhouettes',
+    // Real positioning confirmed directly (1 Nov 2026): "similar to
+    // the Balenciaga brand, luxury, simple" -- replacing a prior,
+    // withdrawn avant-garde/deconstructed/oversized reading of the
+    // name that turned out wrong; the real signature is restraint,
+    // not sculptural excess. The two A's in VALENCIAGO use a custom
+    // crossbar-free ∧ (confirmed directly, 1 Nov 2026), carried here
+    // as its own Unicode glyph in `name` (U+2227, LOGICAL AND) since
+    // no image asset exists for the real custom typographic mark.
+    positioning: "Luxury, simple -- the house's own echo of Balenciaga's "
+      + 'own sleek minimalism: precise, restrained tailoring over '
+      + 'ornament, with the custom crossbar-free ∧ wordmark used '
+      + 'sparingly as its one real signature mark.',
+    signatureElement: 'Custom crossbar-free ∧ wordmark, used sparingly as a single embossed mark on otherwise restrained, minimalist tailoring',
     flagshipProducts: [
-      { title: 'VIC VALENCIAGO ∧-Monogram Sculptural Overcoat', price: 650, category: 'avant-garde-luxury' },
+      { title: 'VIC VALENCIAGO ∧-Mark Minimalist Wool Coat', price: 650, category: 'luxury-outerwear' },
     ],
+  },
+  {
+    // A genuinely new, 17th brand, given directly (1 Nov 2026): "We
+    // also will add one called Cult, C-V-L-T" -- its own real,
+    // confirmed vowel-dropped spelling, same house convention as
+    // SVMIKO/SVRPENTS/BOVLEVARD. No positioning given yet.
+    slug: 'cvlt',
+    name: 'CVLT',
+    positioning: 'Positioning to be established.',
+    signatureElement: 'To be established',
+    flagshipProducts: [],
   },
 ];
 
@@ -313,7 +325,9 @@ export function ownerIdFor(slug) {
 }
 
 // Every brand in `SUB_BRANDS` is real identity; not every brand is
-// guaranteed to have a real product -- today all sixteen do, but the
+// guaranteed to have a real product -- today 14 of the 17 do (THRONES
+// AND BONES, MYSTERY AND MASTERY, and CVLT are genuinely undecided
+// and real-skipped), but the
 // skip stays real rather than removed, for the same reason a brand
 // might arrive again with its positioning still "to be established."
 // Opening a storefront with nothing to sell is a worse state than not

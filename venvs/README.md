@@ -518,3 +518,48 @@ real spawned server, confirmed `/api/health` reports 18 sellers, and
 `GET /api/marketplace/products` lists `THRONES AND BONES Ivory
 Throne-Back Cape Coat`, `SA VIOR Halo-Ring Cassock Overcoat`, and the
 other two new flagship products by name.
+
+## Phase 16, corrected (same session, 1 Nov 2026): real positioning for 2 of the 4, a 17th brand, and 2 withdrawn to "to be established"
+
+This phase's own name-only guesses above did not survive contact with
+the real answer. Given directly, the same day:
+
+- **VIC VALENCIAGO**: "similar to the Balenciaga brand, luxury,
+  simple." This phase's own original guess (avant-garde/deconstructed/
+  oversized) is **withdrawn**, not kept as a fallback -- replaced with
+  a real, restrained minimalist positioning; the ∧-monogram detail
+  stays (it was separately confirmed, not part of the guess), now used
+  sparingly rather than as a loud sculptural motif. Flagship product
+  renamed to the ∧-Mark Minimalist Wool Coat.
+- **SA VIOR**: "like our Christian Dior." This phase's own original
+  guess (ecclesiastical/"savior"/halo-ring) is **withdrawn**, replaced
+  with a French-couture-inspired positioning built from Dior's own
+  real defining signature, the 1947 Bar Suit (structured, cinched
+  waist over a sculpted hip). Flagship product renamed to the
+  Structured Bar-Silhouette Jacket.
+- **THRONES AND BONES** and **MYSTERY AND MASTERY**: "I have not
+  figured out yet." Both real, confirmed brand names, genuinely
+  undecided rather than merely unsent -- reverted to the same real "to
+  be established" placeholder (`flagshipProducts: []`) VvLGARI itself
+  once carried, which `seedSvmikoDegvchiStorefronts`'s own pre-existing
+  skip path already handles correctly; this phase's own name-only
+  guesses for both are withdrawn, not left in as an unused fallback.
+- **CVLT**: a genuinely new, 17th brand -- "we also will add one
+  called Cult, C-V-L-T" -- joining the other two on the same
+  "to be established" placeholder, since no positioning was given for
+  it either.
+
+The real roster is now 17 brands, 14 with a real seeded storefront (3
+real-skipped: THRONES AND BONES, MYSTERY AND MASTERY, CVLT).
+`server.cjs`'s own seed is unchanged code, same as the uncorrected
+Phase 16 above -- the new count falls out of the catalogue changing.
+
+### Verification
+
+`test/venvs.test.js`: the "all brands seed" test now asserts the real
+skip list (`['cvlt', 'mystery-and-mastery', 'thrones-and-bones']`)
+instead of an empty one; the "4 newest brands" test is split into one
+confirming SA VIOR and VIC VALENCIAGO seed with their corrected
+products, and one confirming the 3 undecided brands are honestly
+unseeded, not seeded with an invented identity. `test/server.test.js`'s
+health-seed count moved from 18 to 16. Full suite: 87/87.

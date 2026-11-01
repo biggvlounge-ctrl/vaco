@@ -765,23 +765,25 @@ test('seeding registers every sub-brand WITH a real flagship product as a real s
   // validation, it would throw here rather than when a shopper first
   // opened the storefront.
   //
-  // All sixteen brands now carry at least one real `flagshipProducts`
-  // entry — VvLGARI's own positioning (cologne, perfume, sunglasses,
-  // and handbags for men and women, given directly 22 Oct 2026) is no
-  // longer "to be established," so nothing is skipped today. The skip
-  // path itself (`seeded.skipped`) stays real in the source module for
-  // the case of a future brand with no product yet, and is checked
-  // here as empty rather than deleted from the assertion entirely.
+  // 14 of the 17 brands carry at least one real `flagshipProducts`
+  // entry today — THRONES AND BONES, MYSTERY AND MASTERY, and CVLT
+  // are genuinely undecided ("I have not figured out yet" / no
+  // positioning given at all) and real-skipped, the same real "to be
+  // established" path VvLGARI itself once used before its own real
+  // positioning was given directly.
   const brandsWithProduct = SUB_BRANDS.filter((b) => b.flagshipProducts && b.flagshipProducts.length > 0);
   const totalProducts = SUB_BRANDS.reduce((sum, b) => sum + (b.flagshipProducts ? b.flagshipProducts.length : 0), 0);
   const m = createMarketplace();
   const seeded = seedSvmikoDegvchiStorefronts(m);
 
   assert.equal(seeded.length, brandsWithProduct.length);
-  assert.equal(seeded.length, SUB_BRANDS.length, 'every sub-brand has a real product now, including VvLGARI');
   assert.equal(m.sellers.length, brandsWithProduct.length);
   assert.equal(m.products.length, totalProducts, 'VvLGARI alone lists five products under one storefront');
-  assert.equal(seeded.skipped.length, 0, 'nothing should be pending a real product any more');
+  assert.deepEqual(
+    seeded.skipped.map((s) => s.brand).sort(),
+    ['cvlt', 'mystery-and-mastery', 'thrones-and-bones'],
+    'exactly the 3 brands with no positioning yet should be skipped, no others',
+  );
 
   for (const seller of m.sellers) {
     const front = getSellerStorefront(m, seller.id);
@@ -858,20 +860,37 @@ test('every other seeded SVMIKO DEGVCHI product stays genuinely unlimited', () =
   }
 });
 
-test('the 4 newest brands (THRONES AND BONES, MYSTERY AND MASTERY, SA VIOR, VIC VALENCIAGO) each seed a real storefront', () => {
-  // Real, confirmed brand names with no real positioning sent for
-  // them -- svmikoDegvchi.js derives flagged, interpretive positioning
-  // from each name itself rather than leaving them unseeded; this is
-  // the real, end-to-end proof that each one actually seeds.
+test('SA VIOR and VIC VALENCIAGO (real positioning given 1 Nov 2026) each seed a real storefront', () => {
+  // SA VIOR's real positioning is "like our Christian Dior"; VIC
+  // VALENCIAGO's is "similar to the Balenciaga brand, luxury, simple"
+  // -- both confirmed directly, replacing this file's own earlier,
+  // withdrawn name-only guesses. This is the real, end-to-end proof
+  // each one actually seeds with its corrected product.
   const m = createMarketplace();
   seedSvmikoDegvchiStorefronts(m);
-  for (const name of ['THRONES AND BONES', 'MYSTERY AND MASTERY', 'SA VIOR', 'VIC VALENCIAGO']) {
+  for (const name of ['SA VIOR', 'VIC VALENCIAGO']) {
     const seller = m.sellers.find((s) => s.name === name);
     assert.ok(seller, `${name} should have its own real storefront`);
     const front = getSellerStorefront(m, seller.id);
     assert.equal(front.products.length, 1);
     assert.ok(front.products[0].price > 0);
   }
+});
+
+test('THRONES AND BONES, MYSTERY AND MASTERY, and CVLT are honestly real-skipped, not seeded with an invented identity', () => {
+  // Confirmed directly (1 Nov 2026): THRONES AND BONES and MYSTERY
+  // AND MASTERY are genuinely undecided ("I have not figured out
+  // yet"), and CVLT (the house's 17th brand, also confirmed directly)
+  // has no positioning given at all. None of the three should have a
+  // real storefront -- an unseeded brand is an honest "not ready,"
+  // not a worse state than a seeded one with a guessed identity (same
+  // standing rule this file's own header already states).
+  const m = createMarketplace();
+  const seeded = seedSvmikoDegvchiStorefronts(m);
+  for (const name of ['THRONES AND BONES', 'MYSTERY AND MASTERY', 'CVLT']) {
+    assert.equal(m.sellers.find((s) => s.name === name), undefined, `${name} should not have a storefront yet`);
+  }
+  assert.equal(seeded.skipped.length, 3);
 });
 
 test('a seeded storefront can actually take an order end to end', () => {
