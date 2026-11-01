@@ -337,6 +337,42 @@ restart. Live-verified: registered a real business, killed the running
 process, restarted it, and confirmed the same real state came back from a
 real GET. See `dev-docs/phase-8-real-persistence/`.
 
+## Hunt discovery: search and intensity filters (1 Nov 2026)
+
+Closes the "no hunt discovery beyond the Explore Page's ranked feed —
+no text search or category filters over hunts" gap below. There is no
+separate "category" field anywhere in this model or any source doc —
+`intensityLevel` (leisurely/moderate/action-based, already on every
+hunt) is the real classification, so it is the real filter rather
+than inventing one. `title` is the only real text field a hunt has,
+so that is what a search term matches against (case-insensitive
+substring).
+
+`searchHunts(store, { query, intensityLevel })` (new, `lib/hunts.js`)
+and `GET /api/hunts/search` (new, plural and distinct from the
+singular `/api/hunt/:huntId` so there is no route-ordering ambiguity
+between a literal path and a numeric id — the same bug class fixed
+the same day over in `vaca` and `venvs`). Read-only, same unguarded
+posture every other hunt read already has. The frontend's Hunts tab
+gained a "Discover hunts" search card (title text + an intensity
+dropdown) above the existing "Open a hunt" id-lookup card, with each
+result's "Open" button loading it the same way typing its id already
+does.
+
+### Verification
+
+`test/huntSearch.test.js` (new, 6 tests): no-filter list, substring
+title matching, a query matching nothing, the intensity filter alone,
+both filters composed, and an invalid intensity level refused rather
+than silently matching nothing. Full suite: 136/136. Mutation-verified:
+breaking the title-match condition turned exactly the two
+query-matching tests red; restored and reconfirmed green. Live-
+verified against a real spawned server (the seeded demo hunt "Rivers
+& Mounds: A St. Louis Origins Hunt"): a plain list, a matching text
+query, a non-matching query (empty list, not an error), the real
+intensity filter, and an invalid intensity level's honest 400 all
+confirmed over HTTP.
+
 ## Not yet built
 - Drone routing/dispatch algorithms (explicitly priced as separate,
   genuinely novel Tier-A work in the pricing doc — not attempted).
@@ -356,8 +392,6 @@ real GET. See `dev-docs/phase-8-real-persistence/`.
   exist there as working code yet.
 - No drone routing between hunt checkpoints, no hunt time limits or
   scheduling — hunts (Phase 3) are budget-bounded, not clock-bounded.
-- No hunt discovery beyond the Explore Page's ranked feed — no text
-  search or category filters over hunts.
 - No analytics time-windowing (daily/weekly breakdowns) — Screen
   Analytics (Phase 4) is an all-time rollup; no source doc specifies a
   reporting period.

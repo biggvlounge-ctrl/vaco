@@ -23,8 +23,43 @@
 
 var el = VACO.el;
 
+// Real discovery -- closes this project's own flagged "no hunt
+// discovery beyond the Explore Page's ranked feed" gap. Searches by
+// title (plain substring) and/or the real intensityLevel a hunt
+// already carries; clicking a result loads it the same way typing
+// its id into "Open a hunt" below already does.
+function renderHuntSearchResults(container, out, body) {
+  return function (values) {
+    var params = [];
+    if (values.q) params.push('q=' + encodeURIComponent(values.q));
+    if (values.intensityLevel) params.push('intensityLevel=' + encodeURIComponent(values.intensityLevel));
+    return VACO.api('/api/hunts/search' + (params.length ? '?' + params.join('&') : '')).then(function (r) {
+      var hunts = r.hunts || [];
+      VACO.mount(container, VACO.table([
+        { key: 'title', label: 'Hunt' },
+        { key: 'intensityLevel', label: 'Intensity' },
+        { key: 'remainingBudget', label: 'Budget left', num: true },
+        { key: 'actions', label: '', render: function (h) {
+          return VACO.button('Open', function () { return loadHunt(out, body, h.id); }, 'sm');
+        } },
+      ], hunts, { empty: 'No hunts match.' }));
+    });
+  };
+}
+
 function renderHunts(body) {
   var out = el('div', 'vaco-stack');
+
+  var resultsHost = el('div', 'vaco-stack-sm');
+  out.appendChild(VACO.card('Discover hunts', [
+    VACO.form([
+      { name: 'q', label: 'Search title', placeholder: 'e.g. downtown', width: '200px' },
+      { name: 'intensityLevel', label: 'Intensity', options: [
+        { label: 'Any intensity', value: '' }, 'leisurely', 'moderate', 'action-based',
+      ], width: '160px' },
+    ], renderHuntSearchResults(resultsHost, out, body), 'Search'),
+    resultsHost,
+  ]));
 
   out.appendChild(VACO.card('Open a hunt', [
     VACO.form([{ name: 'huntId', label: 'Hunt id', width: '120px', value: '1' }], function (values) {

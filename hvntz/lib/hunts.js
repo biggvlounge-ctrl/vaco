@@ -343,10 +343,37 @@ function recommendBreak(store, options = {}) {
   };
 }
 
+// The real hunt-discovery gap this project's own README flagged: "no
+// hunt discovery beyond the Explore Page's ranked feed — no text
+// search or category filters over hunts." There is no separate
+// "category" field anywhere in this model or any source doc — the
+// real, already-existing `intensityLevel` (leisurely/moderate/
+// action-based) is the only classification a hunt actually carries,
+// so it is the real filter rather than inventing a fabricated
+// category nothing else in this app recognizes. `title` is the only
+// real text field a hunt has, so that is what a search term matches
+// against — case-insensitive substring, the same plain-text search
+// shape this ecosystem's other "no search yet" gaps have closed with
+// (e.g. CVLLEX's own item lookup).
+function searchHunts(store, options = {}) {
+  const { query, intensityLevel } = options;
+  if (intensityLevel !== undefined && !HUNT_INTENSITY_LEVELS.includes(intensityLevel)) {
+    throw new Error(`searchHunts: invalid intensityLevel "${intensityLevel}" (expected one of ${HUNT_INTENSITY_LEVELS.join(', ')})`);
+  }
+
+  const normalizedQuery = query ? query.trim().toLowerCase() : null;
+  return store.hunts.filter((hunt) => {
+    if (normalizedQuery && !hunt.title.toLowerCase().includes(normalizedQuery)) return false;
+    if (intensityLevel && hunt.intensityLevel !== intensityLevel) return false;
+    return true;
+  });
+}
+
 module.exports = {
   HUNT_INTENSITY_LEVELS,
   createHunt,
   getHunt,
+  searchHunts,
   addCheckpoint,
   getCheckpoint,
   linkCheckpointNetwork,

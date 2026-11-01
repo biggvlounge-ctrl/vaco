@@ -36,7 +36,7 @@ const {
 } = require('./lib/neighborProgram');
 const { PACKAGE_TIERS, setCvnvoPlacement, getCvnvoPlacement } = require('./lib/cvnvoPlacement');
 const {
-  HUNT_INTENSITY_LEVELS, createHunt, getHunt, addCheckpoint, getCheckpoint,
+  HUNT_INTENSITY_LEVELS, createHunt, getHunt, searchHunts, addCheckpoint, getCheckpoint,
   linkCheckpointNetwork, unlinkCheckpointNetwork, checkpointLiveNetwork,
   checkInAtCheckpoint, getHuntProgress, recommendBreak,
 } = require('./lib/hunts');
@@ -662,6 +662,20 @@ app.get('/api/hunt/:huntId', (req, res) => {
   const hunt = getHunt(store, Number(req.params.huntId));
   if (!hunt) return res.status(404).json({ error: `no hunt with id ${req.params.huntId}` });
   res.json(hunt);
+});
+
+// Closes this project's own flagged "no hunt discovery beyond the
+// Explore Page's ranked feed — no text search or category filters
+// over hunts" gap. Plural `/api/hunts`, distinct from the singular
+// `/api/hunt` above, so there is no route-ordering ambiguity between
+// a literal `search` path and a numeric `:huntId` one. Read-only,
+// same unguarded posture every other hunt read already has.
+app.get('/api/hunts/search', (req, res) => {
+  try {
+    res.json({ hunts: searchHunts(store, { query: req.query.q, intensityLevel: req.query.intensityLevel }) });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 app.post('/api/hunt/:huntId/checkpoint', requireBodyBusinessOwner(), (req, res) => {
