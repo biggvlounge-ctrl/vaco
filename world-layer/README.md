@@ -452,15 +452,60 @@ of silently creating a stray property.
 }
 ```
 
+## Routing/pathfinding between transport nodes (1 Nov 2026)
+
+Closes the "routing/pathfinding between transport nodes" gap below.
+No source doc gives a connectivity graph between transport nodes —
+`transportation.js`'s own header says they are "unified" bundled
+records, each tied to one location, with no road-segment/edge list
+anywhere. `routing.js` (new) builds the graph from fields that already
+real-exist rather than inventing a fabricated fuel-range formula: two
+operational nodes are connected when they share at least one real
+`vehicleType` (free-form, no fixed enum — confirmed directly), weighted
+by the real haversine great-circle distance between their locations.
+A car-only node and a boat-only node are **not** directly connected —
+a real path between them must pass through an intermodal hub that
+supports both, which is what makes the pathfinding genuinely
+non-trivial rather than a straight-line distance check. A destroyed/
+damaged node, or one under a caller-named unsafe `controlStatus`, is
+never routed through — feeding the architecture doc's own "Powers
+collapse mobility... VOID routing" line honestly rather than as an
+unbacked claim.
+
+`findRoute(worldLayer, { fromLocationId, toLocationId,
+avoidControlStatuses })` runs a real Dijkstra over that graph and
+returns `{ reachable: true, nodePath, totalDistanceKm }` or
+`{ reachable: false, reason }` — never silently returning a partial
+or fabricated route.
+
+### Verification
+
+`test/routing.test.js` (new, 10 tests): a direct route with the real
+computed distance, a forced multi-hop route through an intermodal hub,
+an honestly-unreachable pair with no bridging node, a destroyed node
+excluded even as the shortest hop, `avoidControlStatuses` excluding a
+node (both the no-op and the made-unreachable cases), missing nodes at
+either endpoint, the zero-distance same-location case, unknown
+location ids refused, and `haversineDistanceKm` checked against a
+real, known real-world distance (St. Louis–Kansas City, ~380km). Full
+suite: 322/322 (the pre-existing `buildEstimate.js` module-count check
+updated honestly to the real, re-counted 43 modules / 9,763 lines, not
+a stale 42/9,375). Mutation-verified: removing the vehicle-type
+compatibility check turned exactly the three tests that depend on
+real graph structure red; restored and reconfirmed green. Live-
+verified via the real public API the way a consuming app (VACON-C,
+VENVS) actually calls it: `require('world-layer').findRoute(...)`
+against a real car→airport→plane scenario, correctly routed through
+the intermodal airport node with the real computed distance.
+
 ## Not yet built
 - The live UNESCO/Wikidata fetch itself (`fetchUnescoSites()` is a
   stub — this environment cannot reach that network), and any Cesium/
   NRHP/Overture Maps import at all (same network constraint applies).
 - Supply chain resolution against `supplyNeeds`; property system
-  (explicitly deferred, same as VACON-C's own `CLAUDE.md`); routing/
-  pathfinding between transport nodes; actual pass/fail resolution of
-  `spreadProbability` into a real propagation outcome; automatic
-  reuse-vs-generate decisions in the Asset Library.
+  (explicitly deferred, same as VACON-C's own `CLAUDE.md`); actual
+  pass/fail resolution of `spreadProbability` into a real propagation
+  outcome; automatic reuse-vs-generate decisions in the Asset Library.
 - Deriving a location's `populationData`/`economicData` slices from
   `getNPCsAtLocation()`/business data — currently separate,
   manually-reconciled things.

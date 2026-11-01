@@ -3,6 +3,7 @@ module.exports = {
   ...require('./npcGenesis'),
   ...require('./commerce'),
   ...require('./transportation'),
+  ...require('./routing'),
   ...require('./propagation'),
   ...require('./assetLibrary'),
   ...require('./imports/unescoImport'),
