@@ -27,7 +27,7 @@ import {
   getApps,
   getEcosystemSnapshot,
 } from "./metricsStore.js";
-import { evaluateMetric, getAlerts } from "./intelligence.js";
+import { evaluateMetric, evaluateAllMetrics, getAlerts } from "./intelligence.js";
 import { attachStore } from "./storeBackend.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -256,6 +256,43 @@ app.get("/api/intelligence/alerts", (req, res) => {
   const { app: appId, routedTo } = req.query;
   res.json({ alerts: getAlerts(store, { app: appId, routedTo }) });
 });
+
+// -- The real scheduled/continuous evaluation loop -----------------------
+//
+// Closes this project's own flagged "evaluateMetric() runs on demand
+// via the API, not on a timer" gap. Same real shape VOID's own
+// retry-sweep/ride-pass-renewal loops already use: a directly
+// callable, `requireCallingService()`-gated route (so this is
+// testable without waiting out a real interval) and a `setInterval`
+// that calls the identical function on a real cadence. See
+// `evaluateAllMetrics`'s own header in intelligence.js for why this
+// sweep pages on a real anomaly but never guesses a routing category.
+async function runScheduledEvaluation() {
+  const results = evaluateAllMetrics(store);
+  const anomalies = results.filter((r) => r.isAnomaly && !r.suppressed);
+  for (const result of anomalies) await notifyAnomaly(result);
+  return { evaluated: results.length, anomalies: anomalies.length };
+}
+
+app.post("/api/intelligence/evaluate-all", requireCallingService(), async (_req, res) => {
+  try {
+    res.json(await runScheduledEvaluation());
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+const EVALUATION_SWEEP_INTERVAL_MS = Number(process.env.VACO_ANALYTICS_EVAL_INTERVAL_MS) || 5 * 60 * 1000;
+setInterval(async () => {
+  try {
+    const result = await runScheduledEvaluation();
+    if (result.anomalies > 0) {
+      console.log(`[evaluation-sweep] evaluated ${result.evaluated} metric(s), ${result.anomalies} anomalous`);
+    }
+  } catch (err) {
+    console.error(`[evaluation-sweep] failed: ${err.message}`);
+  }
+}, EVALUATION_SWEEP_INTERVAL_MS).unref();
 
 app.listen(PORT, () => {
   console.log(`VACO Analytics listening on http://localhost:${PORT}`);

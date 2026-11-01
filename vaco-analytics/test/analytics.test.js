@@ -33,7 +33,7 @@ import {
   getApps, getMetricNames, getEcosystemSnapshot,
 } from '../metricsStore.js';
 import {
-  computeBaseline, detectAnomaly, routeAlert, evaluateMetric, getAlerts, ALERT_ROUTES,
+  computeBaseline, detectAnomaly, routeAlert, evaluateMetric, evaluateAllMetrics, getAlerts, ALERT_ROUTES,
 } from '../intelligence.js';
 
 // A store with `values` ingested for one app/metric, one tick apart, so
@@ -521,4 +521,38 @@ test('the baseline is the recent normal, not every reading ever taken', () => {
   assert.ok(out.baseline.mean > 295 && out.baseline.mean < 305,
     `the baseline reports ${out.baseline.mean} as normal; the metric has been at ~300 for an hour`);
   assert.equal(out.baseline.count, 50, 'the window is not the window the constant says it is');
+});
+
+// -- evaluateAllMetrics — the real scheduled/continuous evaluation loop ---
+
+test('evaluateAllMetrics sweeps every real (app, metric) pair exactly once, not zero and not twice', () => {
+  const store = createMetricsStore();
+  [100, 101, 99, 100].forEach((v, i) => ingestMetric(store, { app: 'A', metric: 'm1', value: v, timestamp: 100 + i }));
+  [1, 2, 3, 4].forEach((v, i) => ingestMetric(store, { app: 'A', metric: 'm2', value: v, timestamp: 200 + i }));
+  [7, 8, 9, 10].forEach((v, i) => ingestMetric(store, { app: 'B', metric: 'm1', value: v, timestamp: 300 + i }));
+
+  const results = evaluateAllMetrics(store);
+  assert.equal(results.length, 3, 'three real (app, metric) pairs exist');
+  const seen = results.map((r) => `${r.app}\u0000${r.metric}`);
+  assert.equal(new Set(seen).size, 3, 'a pair was swept more than once');
+  assert.ok(seen.includes('A\u0000m1') && seen.includes('A\u0000m2') && seen.includes('B\u0000m1'));
+});
+
+test('evaluateAllMetrics finds a real anomaly and files it, unrouted -- the sweep does not know a category', () => {
+  const store = storeWith([100, 102, 98, 101, 4000]);
+  const results = evaluateAllMetrics(store);
+  assert.equal(results.length, 1);
+  assert.equal(results[0].isAnomaly, true);
+  assert.equal(results[0].routedTo, null, 'the sweep must not guess a routing category');
+  assert.equal(store.alerts.length, 1, 'the sweep still files the real alert record');
+});
+
+test('evaluateAllMetrics on an empty store sweeps nothing and does not throw', () => {
+  const store = createMetricsStore();
+  assert.deepStrictEqual(evaluateAllMetrics(store), []);
+});
+
+test('evaluateAllMetrics refuses a store that is not one', () => {
+  assert.throws(() => evaluateAllMetrics(null), /requires a metricsStore/);
+  assert.throws(() => evaluateAllMetrics({}), /requires a metricsStore/);
 });

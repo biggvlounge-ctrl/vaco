@@ -169,6 +169,40 @@ backend-only is a real auth-posture call, not a frontend-coverage
 one, and belongs in a follow-up pass that actually owns that
 decision.
 
+## Scheduled evaluation loop (1 Nov 2026)
+
+Closes the "evaluateMetric() runs on demand via the API, not on a
+timer" gap below — `evaluateAllMetrics` (new, `intelligence.js`)
+sweeps every real `(app, metric)` pair the store has ever seen and
+runs the identical `evaluateMetric` logic on each, deliberately with
+no routing category (there is no stored mapping from a metric name to
+the category it belongs to — inventing one would be a fabricated
+classifier, not a real feature; an anomaly it finds still files and
+pages, just `routedTo: null`, the same honest shape a manual call
+with no category already produces).
+
+Same real shape VOID's own retry-sweep/ride-pass-renewal loops already
+use: a directly callable, `requireCallingService()`-gated route
+(`POST /api/intelligence/evaluate-all`, testable without waiting out a
+real interval) and a `setInterval` on a real cadence
+(`VACO_ANALYTICS_EVAL_INTERVAL_MS`, default 5 minutes) calling the
+identical function.
+
+### Verification
+
+`test/analytics.test.js` grew by 4 (every real pair swept exactly
+once — not zero, not twice; a real anomaly files unrouted; an empty
+store sweeps nothing without throwing; the store-shape guard). Full
+suite: 43/43. Mutation-verified: breaking the pair-enumeration logic
+turned exactly the two pair-sweep tests red; restored and reconfirmed
+green. Live-verified against a real spawned server: ingested real
+metrics for two (app, metric) pairs under a real service credential,
+ran the sweep with no credential (401) and with one (found and filed
+2 real, unrouted anomalies), confirmed a second immediate sweep found
+the same 2 pairs but reported 0 new anomalies (the ongoing-episode
+suppression already in `evaluateMetric` holding, not re-filing a
+duplicate alert).
+
 ## Not yet built
 - Real ClickHouse/VeloDB backing (infrastructure this sandbox can't
   provision or reach).
@@ -176,12 +210,14 @@ decision.
   self-hosted substitute, not the actual product).
 - Historical charting/sparklines and the per-app drill-down view on
   the wallboard.
-- A scheduled/continuous evaluation loop — `evaluateMetric()` runs on
-  demand via the API, not on a timer.
 - Real integration with the named tools the doc mentions (Spellbook,
   ComplyAdvantage, Ascent, Workiva) — `routedTo` is just an
   identifying string.
-- Auth/access control on the ingest endpoint.
+- **Correction**: this list used to also say "auth/access control on
+  the ingest endpoint" was missing. It wasn't — see this file's own
+  "Frontend coverage pass" section just above, which already documents
+  `POST /api/metrics/ingest` as `requireCallingService()`-gated.
+  Stale line, removed.
 - Only 6 of the ecosystem's real revenue-bearing apps feed live metrics
   in so far (vago, chopz-shop, vulture-music, void, vulture-flix,
   voken) — the same fail-soft `pushMetric` pattern extends cleanly to

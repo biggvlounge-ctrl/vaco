@@ -192,6 +192,42 @@ export function evaluateMetric(store, app, metric, options = {}) {
   return result;
 }
 
+// The real scheduled/continuous evaluation loop this project's own
+// README named as missing -- `evaluateMetric` only ran on demand, one
+// (app, metric) pair per call, with the category supplied by whoever
+// called it. This is the orchestration layer that sweeps every known
+// pair without a human naming each one.
+//
+// **Deliberately no category here.** `routeAlert`'s whole three-entry
+// table only knows a category because a caller supplied one -- there
+// is no stored mapping anywhere from a metric name to the category it
+// belongs to, and inventing one would be a fabricated classifier, not
+// a real feature. A pair this sweep flags is a real anomaly and is
+// still paged through `notifyAnomaly`; it just carries `routedTo:
+// null` the same honest way a manual call with no category already
+// does, rather than guessing an owner.
+export function evaluateAllMetrics(store, options = {}) {
+  if (!store || !Array.isArray(store.events)) {
+    throw new Error('evaluateAllMetrics requires a metricsStore');
+  }
+  const { threshold } = options;
+
+  // Same (app, metric) enumeration metricsStore.js's own
+  // getApps/getMetricNames already compute -- inlined here rather
+  // than imported, since this module has never depended on
+  // metricsStore.js and a one-line Set-dedupe is cheaper than adding
+  // that coupling for two calls.
+  const pairs = new Set();
+  for (const e of store.events) pairs.add(`${e.app}\u0000${e.metric}`);
+
+  const results = [];
+  for (const key of pairs) {
+    const [app, metric] = key.split('\u0000');
+    results.push(evaluateMetric(store, app, metric, { threshold }));
+  }
+  return results;
+}
+
 export function getAlerts(store, options = {}) {
   if (!store || !Array.isArray(store.alerts)) {
     throw new Error('getAlerts requires a metricsStore');
