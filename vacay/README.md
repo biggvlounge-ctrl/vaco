@@ -230,6 +230,67 @@ restart. Live-verified: created a real stay listing, killed the running
 process, restarted it, and confirmed the same real state came back from a
 real GET. See `dev-docs/phase-13-real-persistence/`.
 
+## Flight + Stay + Car bundles, and a VOID Ride Pack tie-in (1 Nov 2026)
+
+Per direct instruction: a real Priceline-style bundle ("a flight, a
+hotel, and a rental car... or an Airbnb-style rental, a Turo-style
+rental, and a flight... between VACAY, pretty much"), plus an
+optional tie-in to a real VOID Ride Pack for use during the trip
+("connected to VOID for rides while you're gone... pay for a certain
+amount of rides").
+
+`/api/flights/bundles` (`lib/flights/routes.js`) was a real flight+
+stay bundle only; it now takes two further, fully optional legs on
+the same request:
+- **`car`** — a real Auto-section rental, either real kind this app
+  already has: `kind: "vehicle"` (the Turo-style peer fleet, via
+  `rentals.js`'s own `bookRental`) or `kind: "fleet"` (VACAY's own
+  Hertz/Enterprise-style fleet, via `fleetRentals.js`'s own
+  `bookFleetRental`). Either one makes this a genuine flight+hotel+car
+  bundle — which "hotel" vs. "Airbnb-style" means is already unified
+  one level down, in the stay's own `hostType`, so the bundle itself
+  never has to choose between them.
+- **`ridePack`** — optionally also buys the traveller a real VOID
+  Ride Pack (`{ planId }`) through a real cross-app call into VOID's
+  own new `POST /api/ride-pass/purchase` (see `../void/README.md`'s
+  own "Phase 19"), forwarding the traveller's real Shield session —
+  the same `createDropBookingFn`-style auth-forwarding this app
+  already uses for VOID DROP bookings, not the older, no-auth
+  `requestVoidJob` shape its own transportation/cleaning calls use.
+  The *other* half of that same instruction — a standalone, ongoing
+  VOID ride subscription independent of any one trip (the Uber One/
+  Lyft Pass comparable) — is VOID's own product, reachable directly
+  from VOID on its own merits; this bundle only ever purchases a pass,
+  the same as any other leg, never auto-subscribes anyone to anything
+  recurring.
+
+Neither new leg receives `bundleDiscountApplied` — that discount is
+specifically the flight's own merchant-of-record margin funding a
+price cut on itself, not a markdown this app can hand out on a peer
+owner's rental earnings or a cross-app VOID purchase it doesn't
+control the margin on. The orchestration itself was lifted out of the
+route handler into an exported, directly-testable `bookBundle`
+function in the same file, rather than tested only through HTTP.
+
+### Verification
+8 new unit tests in `test/bundles.test.js` (flight+stay alone; a Turo-
+style car leg; a VACAY-fleet car leg — proven to hit
+`fleetRentals.js`, not `rentals.js`, by mutation; an unknown `car.kind`
+refused before any real charge; a ride pack purchase forwarding the
+real `Authorization` header; a ride pack refused when unconfigured; a
+failed ride pack purchase leaving the already-booked flight/stay in
+place — the same honestly-flagged non-atomic gap as before, just not
+newly introduced; and a full four-leg bundle whose total charge to the
+traveller conserves exactly against the sum of its three real VACAY-
+side legs). Full VACAY suite: 42/42. Mutation-verified the `car.kind`
+dispatch specifically: forced it to always call `bookRental`,
+confirmed only the fleet-dispatch test went red, restored, confirmed
+green again. Live-verified: booted a real VACAY server (Shield/V3/
+VOID pointed at closed ports, same posture as this app's own
+money-moving tests) and confirmed `/api/flights/meta` now reports the
+real `bundleCarKinds`, and a bundle request with no credential is
+refused with a real 401 before reaching anyone.
+
 ## Not yet built
 - VPLAN itinerary generation — doesn't exist as code anywhere yet.
 - The real, evidence-based differentiation opportunities the
@@ -245,7 +306,8 @@ real GET. See `dev-docs/phase-13-real-persistence/`.
 - Real DSP/map-based search across any section. Real distributed-
   transaction safety for `/api/flights/bundles` (still not a true
   atomic transaction, just a smaller failure window now that it's
-  in-process — see `lib/flights/routes.js`'s own header).
+  in-process — see `lib/flights/routes.js`'s own header — and now
+  possibly four legs deep rather than two, same unchanged gap).
 - CarGurus' own real market-average computation — `marketAveragePrice`
   is honestly caller-supplied, not computed from any real aggregated
   data (none exists in this session).

@@ -184,6 +184,33 @@ async function requestVoidHourlyBooking(riderId, driverId, blockHours, hourlyRat
   return res.json();
 }
 
+// A real cross-app purchase, not a read -- VOID's own new
+// `POST /api/ride-pass/purchase` is `requireActor('customerId')`, so
+// this forwards the real traveller's own Shield session exactly the
+// same way `createDropBookingFn` already does, rather than the
+// older, no-auth `requestVoidJob` shape above (that gap is VOID's
+// own pre-existing `POST /api/job` limitation, flagged in VENVS's own
+// VOID-fulfillment work this session -- not repeated here).
+async function purchaseVoidRidePackFn(args, authHeader) {
+  const res = await fetch(`${VOID_API_URL}/api/ride-pass/purchase`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(authHeader ? { Authorization: authHeader } : {}),
+    },
+    body: JSON.stringify(args),
+  });
+  const text = await res.text();
+  let body;
+  try { body = JSON.parse(text); } catch { body = { error: text || `purchaseVoidRidePackFn failed (${res.status})` }; }
+  if (!res.ok) {
+    const err = new Error(body.error || `purchaseVoidRidePackFn failed (${res.status})`);
+    err.status = res.status;
+    throw err;
+  }
+  return body;
+}
+
 // A plain catalog read -- VOID's own `/api/drop/assets/nearby` needs
 // no session (same posture as `/api/verticals`/`/api/store/listings`
 // elsewhere), so this presents no credential of its own.
@@ -267,7 +294,7 @@ app.use('/api/bookings', lazyRouter(() => createBookingsRouter({
 app.use('/api/home', lazyRouter(() => createHomeRouter({ store: store.home, settleVCoin })));
 app.use('/api/auto', lazyRouter(() => createAutoRouter({ store: store.auto, settleVCoin })));
 app.use('/api/flights', lazyRouter(() => createFlightsRouter({
-  store: store.flights, bookingsStore: store.bookings, settleVCoin, createBooking,
+  store: store.flights, bookingsStore: store.bookings, autoStore: store.auto, settleVCoin, createBooking, purchaseVoidRidePackFn,
 })));
 
 app.listen(PORT, () => {

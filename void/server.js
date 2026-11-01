@@ -29,6 +29,10 @@ const {
   reportFailedDelivery, retryDelivery, sweepFailedDeliveries, cancelJob, getJobsForVertical, getJobsForUser,
 } = require('./lib/marketplace');
 const {
+  listRidePassPlans, purchaseRidePass, getRidePass, listRidePassesForCustomer,
+  redeemRidePassForJob, cancelRidePassAutoRenew, sweepRidePassRenewals,
+} = require('./lib/ridePass');
+const {
   declareTrip, getTripDeclaration, registerVehicleCapacityProfile, getVehicleCapacityProfile, checkCapacityFit,
 } = require('./lib/loadManagement');
 const { computeDynamicCargoPricing } = require('./lib/cargoPricing');
@@ -231,6 +235,14 @@ const requireJobParty = () => requireRecordParty(
 );
 const requireJobCustomer = () => requireRecordParty(
   'job', (req) => getJob(store, Number(req.params.id)), (j) => j.customerId,
+);
+// Only the pass's own holder may redeem it or turn off its
+// auto-renewal -- a job's other party (the provider) can still
+// trigger /complete itself, per requireJobParty below, but the pass
+// drawn down by that completion is always the job's own customer's,
+// enforced again inside redeemRidePassForJob itself.
+const requireRidePassHolder = () => requireRecordParty(
+  'ride pass', (req) => getRidePass(store, Number(req.params.id)), (p) => p.customerId,
 );
 // A drop booking has a customer and, once approved, the asset's real
 // operator -- both may read it; only the customer side is exposed for
@@ -625,13 +637,27 @@ app.post('/api/job/:id/accept', requireJobParty(), (req, res) => {
   }
 });
 
+// An optional `ridePassId` in the body redeems a Transportation ride
+// against a VOID Ride Pass instead of charging the rider directly --
+// see lib/ridePass.js's own header for why this reuses completeJob
+// rather than forking a second completion path. Either job party may
+// still trigger this (same requireJobParty guard as a direct
+// completion); which pass gets drawn down is always re-verified
+// against the job's own real customerId inside redeemRidePassForJob,
+// not just trusted from the body.
 app.post('/api/job/:id/complete', requireJobParty(), async (req, res) => {
   try {
-    const job = await completeJob(store, { jobId: Number(req.params.id), settleFn: settleVCoin });
+    const jobId = Number(req.params.id);
+    if (req.body && req.body.ridePassId) {
+      const { job } = await redeemRidePassForJob(store, { passId: Number(req.body.ridePassId), jobId, settleFn: settleVCoin });
+      await pushMetric('job_platform_fee', job.platformFee);
+      return res.json(job);
+    }
+    const job = await completeJob(store, { jobId, settleFn: settleVCoin });
     await pushMetric('job_platform_fee', job.platformFee);
-    res.json(job);
+    return res.json(job);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return res.status(400).json({ error: err.message });
   }
 });
 
@@ -1817,6 +1843,64 @@ setInterval(() => {
     console.log(`[retry-sweep] retried ${result.retried.length} job(s): ${result.retried.join(', ') || 'none'}${result.errors.length ? `; ${result.errors.length} error(s)` : ''}`);
   }
 }, RETRY_SWEEP_INTERVAL_MS).unref();
+
+// -- VOID Ride Pass: prepaid ride packs + monthly ride subscriptions --
+// See lib/ridePass.js's own header for the real escrow-then-redeem
+// design and why redemption rides on completeJob rather than forking
+// a parallel one.
+app.get('/api/ride-pass/plans', (_req, res) => {
+  res.json({ plans: listRidePassPlans() });
+});
+
+app.post('/api/ride-pass/purchase', requireActor('customerId'), async (req, res) => {
+  try {
+    res.status(201).json(await purchaseRidePass(store, { ...req.body, settleFn: settleVCoin }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/ride-pass/:id', (req, res) => {
+  const pass = getRidePass(store, Number(req.params.id));
+  if (!pass) return res.status(404).json({ error: `no ride pass with id ${req.params.id}` });
+  res.json(pass);
+});
+
+app.get('/api/customers/:customerId/ride-passes', (req, res) => {
+  res.json({ ridePasses: listRidePassesForCustomer(store, req.params.customerId) });
+});
+
+app.post('/api/ride-pass/:id/cancel-auto-renew', requireRidePassHolder(), (req, res) => {
+  try {
+    res.json(cancelRidePassAutoRenew(store, Number(req.params.id)));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Same real-sweep shape as /api/jobs/sweep-failed-deliveries just
+// above: no user session could authorise a cross-customer billing
+// sweep, so it is a service-only operator surface, real and directly
+// callable (not just the interval below) for genuine testability.
+app.post('/api/ride-pass/sweep-renewals', requireCallingService(), async (_req, res) => {
+  try {
+    res.json(await sweepRidePassRenewals(store, { settleFn: settleVCoin }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+const RIDE_PASS_SWEEP_INTERVAL_MS = 60 * 60 * 1000; // real hourly billing-cycle check
+setInterval(async () => {
+  try {
+    const result = await sweepRidePassRenewals(store, { settleFn: settleVCoin });
+    if (result.renewed.length > 0 || result.expired.length > 0 || result.lapsed.length > 0) {
+      console.log(`[ride-pass-sweep] renewed ${result.renewed.length}, expired ${result.expired.length}, lapsed ${result.lapsed.length}`);
+    }
+  } catch (err) {
+    console.error(`[ride-pass-sweep] failed: ${err.message}`);
+  }
+}, RIDE_PASS_SWEEP_INTERVAL_MS).unref();
 
 // -- Provider profiles: the spine of every service app ----------------
 // Individuals and businesses register once, declare skills across

@@ -72,6 +72,16 @@ that genuinely batch through the real routing engine.
 - **Lockers & hubs** — `voidLocker.js`, `lockerToDoor.js`,
   `hubOrigination.js`, `businessLockers.js` (forward-deployed seller
   inventory).
+- **VOID Ride Pass** — `ridePass.js`: prepaid ride packs and monthly
+  ride subscriptions against the Transportation vertical (the real
+  Uber Ride Pass/Uber One/Lyft Pass comparable). Real escrow-then-
+  redeem design (a dedicated `void-ride-pass-escrow` account funded at
+  purchase, redemption reroutes `completeJob`'s own settleFn rather
+  than forking a second job system — standing rule 1 still holds), a
+  real dollar-balance guardrail alongside the ride-count cap, and a
+  real renew/cancel/sweep lifecycle for the subscription plans. See
+  `README.md`'s "Phase 19" for the full design and verification
+  record.
 - **Drivers** — `driverFleet.js` (gig + DSP tiers),
   `mobileDocking.js` (mobile drone docks, Launchpad Drivers).
 - **Cross-app** — `externalIntegration.js` (VOID Direct + Affiliate

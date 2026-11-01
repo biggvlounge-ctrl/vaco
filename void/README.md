@@ -592,3 +592,93 @@ frontend has no login for, or (DSP, mobile docking, TaaS) has no real
 seed data yet to make a customer-facing read meaningful. See the git
 history for this app's own `public/index.html` for exactly what each
 of the seven tabs above calls.
+
+## Phase 19: VOID Ride Pass -- prepaid ride packs and a monthly ride subscription (1 Nov 2026)
+
+Per direct instruction: "a certain amount of rides for a certain
+amount of dollars... or basically a subscription through VOID... pay
+a certain amount a month for VOID rides... I think Uber and Lyft have
+something like that." This is VOID's own first real customer-facing
+subscription/prepaid product against the Transportation vertical --
+`lib/ridePass.js`.
+
+**The real design, not just a discount flag.** A pass is a real,
+separate escrow account (`void-ride-pass-escrow`), funded in full at
+purchase time -- the exact same escrow-then-settle idiom this app's
+own `completeJob` already established for every vertical, just with
+the pass itself as the payer of record. Redeeming a ride does not
+fork a second job system (standing rule 1 below still holds): it
+calls the real, unmodified `completeJob` from `marketplace.js` and
+only reroutes the `settleFn` it hands it, so the provider payout/
+platform fee split is computed in exactly the one place it has always
+lived.
+
+Two real plan shapes, both in `RIDE_PASS_PLANS` (flagged interpretive,
+same as this app's own `cargoPricing.js` constants -- no source doc
+prices VOID rides, since Transportation jobs are priced per-trip by
+whoever requests them):
+- **Prepaid packs** (`pack-5`, `pack-10`) -- one charge, N rides, a
+  real validity window, no renewal.
+- **Monthly subscriptions** (`monthly-15`, `monthly-30`) -- a real
+  recurring billing cycle, auto-renewing by default, the Uber One/
+  Lyft Pass comparable.
+
+**A real financial guardrail beyond the ride count**: every pass
+tracks both `creditsRemaining` (how many more rides) AND
+`balanceRemaining` (how much real money is actually still in escrow
+for it). A ride only redeems against the pass if both are sufficient
+-- an unusually expensive ride can run a pass out of real money before
+it runs out of nominal "rides," and redemption is honestly refused
+rather than letting the escrow account go negative. The rider simply
+pays that one ride directly instead, the same fallback Uber/Lyft's
+own "ran out of included rides" behavior has.
+
+**Subscriptions renew for real, and cancel for real.**
+`renewRidePassCycle` charges the next cycle and resets both counters
+(no rollover, same as Uber One/Lyft Pass's own monthly allotments).
+`cancelRidePassAutoRenew` stops future billing without cutting the
+cycle already paid for short. `sweepRidePassRenewals` is the same
+real background-job-runner pattern this app's own
+`sweepFailedDeliveries` already established: finds every due
+subscription and either renews it, expires it cleanly (auto-renew was
+off), or marks it honestly `lapsed` (the renewal charge itself failed)
+-- never a zombie "active" pass with no further rides. Wired to both
+a real, directly-callable route (`POST /api/ride-pass/sweep-renewals`,
+service-only) and an hourly `setInterval`, same shape as the existing
+15-minute retry sweep.
+
+New routes, all in `server.js`: `GET /api/ride-pass/plans`,
+`POST /api/ride-pass/purchase` (`requireActor('customerId')`),
+`GET /api/ride-pass/:id`, `GET /api/customers/:customerId/ride-passes`,
+`POST /api/ride-pass/:id/cancel-auto-renew` (pass-holder only), and
+redemption rides on the existing job-completion route itself: an
+optional `ridePassId` in `POST /api/job/:id/complete`'s own body
+reroutes that one completion through `redeemRidePassForJob` instead
+of a direct charge -- not a new completion path, the same one every
+other Transportation job already uses.
+
+**The other half of the founder's own instruction** -- VACAY
+optionally buying a traveller a ride pack as part of a flight+stay(+
+car) bundle, "connected to VOID for rides while you're gone" -- is
+VACAY's own cross-app call into `POST /api/ride-pass/purchase`; see
+`../vacay/README.md`'s own matching phase entry for that side.
+
+### Verification
+
+19 new unit tests in `test/ridePass.test.js` (purchase, redemption --
+happy path and every real refusal: wrong vertical, wrong holder, no
+credits, insufficient balance, expired pack, ended cycle -- renewal,
+cancel-auto-renew, and all three real sweep outcomes), full suite
+214/214 green. Mutation-verified the balance-overage guard specifically
+(the one check standing between a pass and an overdrawn escrow
+account): broke `job.totalPrice > pass.balanceRemaining` to always
+pass, confirmed exactly the overage-refusal test went red, restored,
+confirmed the full suite green again. Live-verified against a real
+spawned server (Shield/V3 pointed at closed ports, same posture as
+this app's own `test/server.test.js`): `/api/ride-pass/plans` lists
+the real catalog; purchase with no credential refuses with a real 401
+before ever reaching Shield; purchase with a bearer token but Shield
+unreachable 502s rather than silently trusting the claim;
+`sweep-renewals` refuses without a real service credential and runs
+cleanly with one; an unknown pass 404s; a customer with no passes
+lists an honest empty array.

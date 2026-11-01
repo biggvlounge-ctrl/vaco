@@ -16,6 +16,11 @@ function createVoidStore() {
     nextRouteId: 1,
     jobs: [],
     nextJobId: 1,
+    // VOID Ride Pass -- prepaid ride packs and monthly ride
+    // subscriptions against the transportation vertical. See
+    // lib/ridePass.js.
+    ridePasses: [],
+    nextRidePassId: 1,
     // Provider profiles: who can do what, and when. See
     // lib/providerProfiles.js -- skills live on the provider rather
     // than the provider living inside a vertical, which is what makes
