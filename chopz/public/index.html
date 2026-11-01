@@ -85,6 +85,68 @@ function renderFeed(body) {
       cell.appendChild(VACO.button('Play', function () { playChopzVideo(v.id, playerHost); }, 'sm'));
       cell.appendChild(playerHost);
 
+      var engagement = v.engagement || { likeCount: 0, commentCount: 0, shareCount: 0 };
+      var engagementRow = el('div', 'vaco-row-tight');
+      var likeBtn = VACO.button('♥ ' + engagement.likeCount, function () {
+        var userId = VACO.userId();
+        if (!userId) { VACO.toast('Sign in to like.', 'danger'); return; }
+        return VACO.post('/chopz/videos/' + v.id + '/like', { userId: userId }).then(function (r) {
+          likeBtn.textContent = '♥ ' + r.likeCount;
+        });
+      }, 'sm');
+      engagementRow.appendChild(likeBtn);
+
+      var shareBtn = VACO.button('share · ' + engagement.shareCount, function () {
+        var userId = VACO.userId();
+        if (!userId) { VACO.toast('Sign in to share.', 'danger'); return; }
+        return VACO.post('/chopz/videos/' + v.id + '/share', { userId: userId }).then(function (r) {
+          shareBtn.textContent = 'share · ' + r.shareCount;
+          VACO.toast('Shared.', 'money');
+        });
+      }, 'sm');
+      engagementRow.appendChild(shareBtn);
+      cell.appendChild(engagementRow);
+
+      var commentsHost = el('div', 'vaco-stack-sm');
+      function refreshComments() {
+        return VACO.api('/chopz/videos/' + v.id + '/comments').then(function (r) {
+          var comments = r.comments || [];
+          var list = el('div', 'vaco-stack-sm');
+          comments.forEach(function (c) {
+            var line = el('p', 'vaco-small');
+            var who = el('strong', null, c.authorId + ': ');
+            line.appendChild(who);
+            line.appendChild(document.createTextNode(c.text));
+            list.appendChild(line);
+          });
+          if (!comments.length) list.appendChild(el('p', 'vaco-small vaco-dim', 'No comments yet.'));
+
+          var input = document.createElement('input');
+          input.className = 'vaco-input';
+          input.placeholder = 'Add a comment…';
+          var addBtn = VACO.button('Post', function () {
+            var userId = VACO.userId();
+            if (!userId) { VACO.toast('Sign in to comment.', 'danger'); return; }
+            if (!input.value) return;
+            return VACO.post('/chopz/videos/' + v.id + '/comments', { authorId: userId, text: input.value })
+              .then(function () { input.value = ''; return refreshComments(); });
+          }, 'sm');
+          var inputRow = el('div', 'vaco-row-tight');
+          inputRow.appendChild(input);
+          inputRow.appendChild(addBtn);
+
+          VACO.mount(commentsHost, [list, inputRow]);
+          commentsToggle.textContent = comments.length + ' comment' + (comments.length === 1 ? '' : 's');
+        });
+      }
+      var commentsToggle = VACO.button(
+        engagement.commentCount + ' comment' + (engagement.commentCount === 1 ? '' : 's'),
+        refreshComments,
+        'sm',
+      );
+      cell.appendChild(commentsToggle);
+      cell.appendChild(commentsHost);
+
       var meta = el('div', 'vaco-row-tight');
       if (v.linkedProductId) {
         var badge = VACO.badge('product ' + v.linkedProductId, 'warn');

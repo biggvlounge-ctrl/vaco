@@ -126,11 +126,56 @@ confirming a route is *called* isn't confirming it *works*; this pass
 checked the actual payload/response shape against the real handler for
 both.
 
+## Engagement: likes, comments, shares (1 Nov 2026)
+
+Closes the first real slice of this project's own flagged "everything
+else TikTok's own feed has beyond a bare video record" gap —
+deliberately the smallest real slice again, the same scoping
+`lib/videos.js`'s own header already used: duets (a real
+video-composition feature) and For You ranking (a real recommendation
+algorithm) are each their own, separately large builds and stay out
+of scope here.
+
+`lib/engagement.js` (new): `toggleLike`/`hasLiked`/`getLikeCount` (a
+real toggle — one `(videoId, userId)` pair, liking twice un-likes),
+`addComment`/`listComments`/`getCommentCount` (permanent, newest
+first), `recordShare`/`getShareCount` (fire-and-forget, deliberately
+**not** deduplicated like a like — sharing twice is a second real
+share), and `getEngagementSummary` for the combined feed-card shape.
+
+New routes: `POST/GET /chopz/videos/:id/like`, `GET
+/chopz/videos/:id/likes` (optional `?viewerId=` to also report whether
+that viewer has liked it), `POST/GET /chopz/videos/:id/comments`,
+`POST /chopz/videos/:id/share` — `like`/`comments`/`share` all
+`requireActor`-gated the same way `/play` already is. `GET
+/chopz/videos` and `GET /chopz/videos/:id` now both embed a real
+`engagement` object inline, so a feed never round-trips three extra
+calls per card just to show its counts.
+
+The frontend (`public/index.html`) gained a like button with a live
+count, a share button with a live count, and an expandable comment
+list with a real post-a-comment form, on every feed card.
+
+### Verification
+
+`test/engagement.test.js` (new, 10 tests): the toggle behavior, per-
+(video, user) scoping, comment ordering/scoping, the fire-and-forget
+share count, and the combined summary (including a fresh video's
+honest all-zero summary). Full suite: 18/18. Mutation-verified: a
+broken toggle-off branch turned exactly the toggle test red; restored
+and reconfirmed green. Live-verified against real spawned Shield +
+this server: published a video as a real author, liked/commented/
+shared it as a real second session, confirmed the counts on both the
+single-video and list routes matched, confirmed liking again un-likes
+(count back to 0), and confirmed both the no-credential refusal (401)
+and the unknown-video refusal (400, honest message) on the real
+`/like` route.
+
 ## Not yet built
-- Everything else TikTok's own feed has beyond a bare video record:
-  likes/comments/shares/duets/For You ranking, live shopping formats,
-  the four real ad formats named in `CHOPZ_TIKTOK_COMPARABLES.md`.
-  This phase deliberately scoped to the smallest real slice: the
-  `ChopzVideo` record and its link into CHOPZ SHOP's commerce layer.
+- Duets (real video-composition/response clips) and For You ranking (a
+  real recommendation algorithm) — each a separately large build, not
+  started.
+- Live shopping formats and the four real ad formats named in
+  `CHOPZ_TIKTOK_COMPARABLES.md`.
 - The VENVM/Storytime engine integration the user's intro message
   asked about — no source material exists anywhere for it yet.

@@ -23,6 +23,9 @@ const path = require('path');
 const { attachStore } = require('./lib/storeBackend');
 const { createMediaClient } = require('./lib/mediaClient.cjs');
 const { createChopzVideo, getChopzVideo, verifyLinkedProduct } = require('./lib/videos');
+const {
+  toggleLike, hasLiked, addComment, listComments, recordShare, getEngagementSummary,
+} = require('./lib/engagement');
 
 const app = express();
 
@@ -122,14 +125,67 @@ app.post('/chopz/videos', requireActor('creatorId'), async (req, res) => {
 // Listing. The resource could be created and fetched by id but never
 // enumerated, so no browsable surface could exist without already
 // knowing an id. Same gap found in five apps on this pass.
+//
+// Each video carries its real engagement counts inline -- the shape
+// a feed actually needs (TikTok's own feed never makes a viewer
+// round-trip per clip just to see the like/comment/share counts).
 app.get('/chopz/videos', (_req, res) => {
-  res.json({ videos: store.videos });
+  res.json({ videos: store.videos.map((v) => ({ ...v, engagement: getEngagementSummary(store, v.id) })) });
 });
 
 app.get('/chopz/videos/:id', (req, res) => {
   const video = getChopzVideo(store, Number(req.params.id));
   if (!video) return res.status(404).json({ error: `no video with id ${req.params.id}` });
-  res.json(video);
+  res.json({ ...video, engagement: getEngagementSummary(store, video.id) });
+});
+
+// -- Engagement: likes, comments, shares ---------------------------------
+// See lib/engagement.js's own header for the real scoping decision
+// (likes/comments/shares now; duets and For You ranking are their own
+// separately large builds, left for later).
+
+// A real toggle -- liking twice is unliking, the same "one real state,
+// not a counter a caller can push past 1" shape `hasLiked` itself
+// reads back.
+app.post('/chopz/videos/:id/like', requireActor('userId'), (req, res) => {
+  try {
+    res.json(toggleLike(store, { videoId: Number(req.params.id), userId: req.body.userId }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/chopz/videos/:id/likes', (req, res) => {
+  const videoId = Number(req.params.id);
+  const { viewerId } = req.query;
+  res.json({
+    likeCount: getEngagementSummary(store, videoId).likeCount,
+    liked: viewerId ? hasLiked(store, videoId, viewerId) : null,
+  });
+});
+
+app.post('/chopz/videos/:id/comments', requireActor('authorId'), (req, res) => {
+  try {
+    res.status(201).json(addComment(store, {
+      videoId: Number(req.params.id), authorId: req.body.authorId, text: req.body.text,
+    }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/chopz/videos/:id/comments', (req, res) => {
+  res.json({ comments: listComments(store, Number(req.params.id)) });
+});
+
+// Fire-and-forget, deliberately not deduplicated -- see
+// lib/engagement.js's own header for why a share is not a like.
+app.post('/chopz/videos/:id/share', requireActor('userId'), (req, res) => {
+  try {
+    res.json(recordShare(store, { videoId: Number(req.params.id), userId: req.body.userId }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 app.post('/chopz/videos/:id/verify-linked-product', requireVideoCreator(), async (req, res) => {

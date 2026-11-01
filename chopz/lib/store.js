@@ -6,6 +6,10 @@ function createChopzStore() {
   return {
     videos: [],
     nextVideoId: 1,
+    likes: [],
+    comments: [],
+    nextCommentId: 1,
+    shares: [],
   };
 }
 
