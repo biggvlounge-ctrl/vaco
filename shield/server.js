@@ -36,8 +36,13 @@ require('dotenv/config');
 const { createShieldStore } = require('./lib/store');
 const path = require('path');
 const { attachStore } = require('./lib/storeBackend');
-const { SESSION_LIFETIME_MS, createSession, getSession } = require('./lib/sessions');
+const {
+  SESSION_LIFETIME_MS, createSession, getSession, revokeSession,
+} = require('./lib/sessions');
 const { MIN_PASSWORD_LENGTH, registerCredentials, verifyCredentials } = require('./lib/credentials');
+const { checkLockout, recordFailedLogin, recordSuccessfulLogin } = require('./lib/loginThrottle');
+const { requestEmailVerification, confirmEmailVerification } = require('./lib/emailVerification');
+const { requestPasswordReset, confirmPasswordReset } = require('./lib/passwordReset');
 const { traceMiddleware } = require('./lib/tracing.cjs');
 
 const app = express();
@@ -96,7 +101,11 @@ app.post('/api/shield/register', (req, res) => {
   try {
     const { userId, password } = req.body || {};
     registerCredentials(store, { userId, password });
-    res.status(201).json(createSession(store, { userId }));
+    // Real token issuance, no real mailer behind it -- see
+    // emailVerification.js's own header for why this returns the
+    // token directly instead of pretending an email went out.
+    const { verificationToken } = requestEmailVerification(store, { userId });
+    res.status(201).json({ ...createSession(store, { userId }), emailVerificationToken: verificationToken });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -105,9 +114,17 @@ app.post('/api/shield/register', (req, res) => {
 // audit-route-guards: open -- exchanges credentials for a session; requiring one would be circular
 app.post('/api/shield/login', (req, res) => {
   const { userId, password } = req.body || {};
+  if (typeof userId !== 'string') return res.status(400).json({ error: 'userId is required' });
+
+  const lockout = checkLockout(store, userId);
+  if (lockout.lockedOut) {
+    return res.status(429).json({ error: 'too many failed login attempts', retryAfterMs: lockout.retryAfterMs });
+  }
   if (!verifyCredentials(store, { userId, password })) {
+    recordFailedLogin(store, userId);
     return res.status(401).json({ error: 'invalid userId or password' });
   }
+  recordSuccessfulLogin(store, userId);
   res.json(createSession(store, { userId }));
 });
 
@@ -115,6 +132,48 @@ app.get('/api/shield/session/:token', (req, res) => {
   const session = getSession(store, req.params.token);
   if (!session) return res.status(404).json({ valid: false });
   res.json(session);
+});
+
+// Real server-side logout -- closes this project's own previously-
+// flagged "nothing here invalidates a token before its real 24-hour
+// expiry" gap. Presenting the real token is itself the proof needed
+// to revoke it; see sessions.js's own header on `revokeSession`.
+// audit-route-guards: open -- the token itself IS the credential being revoked; requiring a session to revoke a session is circular
+app.post('/api/shield/session/:token/revoke', (req, res) => {
+  const result = revokeSession(store, req.params.token);
+  if (!result) return res.status(404).json({ error: `no valid session with token "${req.params.token}"` });
+  res.json(result);
+});
+
+// -- Email verification (additive, real token lifecycle; no real
+// mailer exists -- see emailVerification.js's own header) -------------
+app.post('/api/shield/verify-email/confirm', (req, res) => {
+  try {
+    res.json(confirmEmailVerification(store, req.body || {}));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// -- Password reset (additive, real token lifecycle; no real mailer
+// exists -- see passwordReset.js's own header) ------------------------
+
+// audit-route-guards: open -- requesting a reset must work for someone who is LOCKED OUT of their own account; requiring a session here would defeat the entire feature
+app.post('/api/shield/password-reset/request', (req, res) => {
+  try {
+    res.status(201).json(requestPasswordReset(store, req.body || {}));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// audit-route-guards: open -- the reset token itself is the real credential proving this request is authorized, same as the revoke route above
+app.post('/api/shield/password-reset/confirm', (req, res) => {
+  try {
+    res.json(confirmPasswordReset(store, req.body || {}));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 app.listen(PORT, () => {

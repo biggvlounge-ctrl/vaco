@@ -124,18 +124,70 @@ running process, restarted it, and confirmed the same token still
 validated with the same `userId`/`expiresAt` afterward. See
 `dev-docs/phase-3-real-persistence/`.
 
+## Phase 5: account security — reset, verification, lockout, logout (1 Nov 2026)
+
+Closes 3 of this file's own previously-flagged gaps directly, from the
+ecosystem-wide "actionable now" sweep:
+
+- **Login rate-limiting** (`lib/loginThrottle.js`) — 5 failed attempts
+  (flagged, interpretive threshold) locks that `userId` out for 15
+  minutes, checked BEFORE `verifyCredentials` so a correct password
+  presented mid-lockout still doesn't get in early. Scoped to the
+  real, stable `userId`, not a spoofable client IP this app has no
+  real reverse-proxy chain to trust.
+- **Email verification** (`lib/emailVerification.js`) — a real,
+  single-use token minted on every `/api/shield/register`, confirmed
+  via `POST /api/shield/verify-email/confirm`. `credentials.js` now
+  tracks a real `emailVerified` flag per account, starting `false`.
+- **Password reset** (`lib/passwordReset.js`) — `POST /api/shield/
+  password-reset/request` mints a real, 1-hour single-use token;
+  `.../confirm` verifies it, overwrites the real password hash
+  (`credentials.js`'s new `resetPassword`), and revokes every other
+  currently-valid session for that user (`sessions.js`'s new
+  `revokeAllSessionsForUser`) — the same real "a reset ends every
+  other signed-in session" behavior most real identity providers have.
+- **Session revocation/logout** (`sessions.js`'s new `revokeSession`,
+  wired to `POST /api/shield/session/:token/revoke`) — closes this
+  file's own previously-flagged "nothing invalidates a token before
+  its real 24-hour expiry" gap. Possessing the token is itself the
+  real proof needed to revoke it, the same bearer-token-as-credential
+  model every other route here already trusts.
+
+**The one real, honest limitation, not glossed over**: no email
+PROVIDER exists anywhere in this ecosystem's sandbox (no SMTP/SES/
+SendGrid credential). Both the verification and reset flows return
+their real token directly in the response rather than pretending an
+email was sent — a real deployment wires an actual mail provider in
+front of these two routes; that wiring is explicitly not invented
+here.
+
+### Verification
+27 new unit tests (`loginThrottle.test.js`, `emailVerification.test.js`,
+`passwordReset.test.js`, plus 5 added to `sessions.test.js` for
+revocation). Full suite: 41/41. Mutation-verified the lockout
+threshold check (`entry.count >= MAX_FAILED_ATTEMPTS`): disabled it,
+confirmed exactly the 3 lockout-dependent tests went red, restored,
+confirmed green. Live-verified against a real spawned server: register
+→ 5 wrong passwords locks the account → a 6th attempt with the
+*correct* password still 429s mid-lockout → email verification
+confirms → session revoke immediately 404s that same token → a
+password reset request+confirm round-trip actually changes the stored
+password and revokes other sessions.
+
 ## Not yet built
 - OAuth/magic-link/other real-world identity providers — only
-  email(userId)+password exists (Phase 4, above). No password reset
-  flow, no email verification, no rate-limiting on login attempts.
+  email(userId)+password exists (Phase 4). A real, cited (not
+  inferred) Shield API spec — same honest caveat `../v3/README.md`
+  carries for its own contract.
 - The claimed-userId session route (`POST /api/shield/session`) is
   still unauthenticated by design (see the scope note above) — any
   internal caller can still mint a session for any `userId` with no
   password. That's deliberate for ecosystem-internal SSO, but it does
-  mean the new credential routes only gate the *human-facing* login
-  path (`vaco-shell`'s own UI), not every possible caller.
-- Session revocation/logout on the server side — a client can forget
-  its own token (see `shieldAuth.js`'s own `logout()` in VENVS/VDP),
-  but nothing here invalidates a token before its real 24-hour expiry.
-- A real, cited (not inferred) Shield API spec — same honest caveat
-  `../v3/README.md` carries for its own contract.
+  mean the credential/account-security routes only gate the *human-
+  facing* login path (`vaco-shell`'s own UI), not every possible
+  caller.
+- A real email/SMS provider behind the verification and reset flows
+  above — both currently return their own real token directly, not a
+  sent message. Real IP/device-based rate-limiting (login throttling
+  above is per-`userId` only, by design — no trusted client-IP source
+  exists in this sandbox).

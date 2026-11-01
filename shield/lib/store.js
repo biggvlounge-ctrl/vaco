@@ -10,7 +10,10 @@
 function createShieldStore() {
   return {
     sessions: {}, // token -> { userId, expiresAt }
-    credentials: {}, // userId -> { passwordHash, createdAt }
+    credentials: {}, // userId -> { passwordHash, createdAt, emailVerified }
+    loginAttempts: {}, // userId -> { count, lockedUntil }
+    emailVerifications: {}, // token -> { userId, expiresAt }
+    passwordResets: {}, // token -> { userId, expiresAt }
   };
 }
 

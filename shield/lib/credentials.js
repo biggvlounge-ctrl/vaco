@@ -64,7 +64,7 @@ function registerCredentials(store, options = {}) {
   if (Object.hasOwn(store.credentials, userId)) {
     throw new Error(`registerCredentials: userId "${userId}" is already registered`);
   }
-  store.credentials[userId] = { passwordHash: hashPassword(password), createdAt: now };
+  store.credentials[userId] = { passwordHash: hashPassword(password), createdAt: now, emailVerified: false };
   return { userId };
 }
 
@@ -76,6 +76,24 @@ function verifyCredentials(store, options = {}) {
   return verifyPassword(password, record.passwordHash);
 }
 
+// The real other half of `passwordReset.js`'s own flow: once a reset
+// token is confirmed valid, this is what actually overwrites the
+// stored hash. Kept here, not in passwordReset.js, for the same
+// reason `hashPassword` lives here -- password storage is this
+// module's own concern; passwordReset.js only owns the token
+// lifecycle around it.
+function resetPassword(store, options = {}) {
+  const { userId, newPassword } = options;
+  if (typeof userId !== 'string' || !Object.hasOwn(store.credentials, userId)) {
+    throw new Error(`resetPassword: no credentials registered for userId "${userId}"`);
+  }
+  if (!newPassword || newPassword.length < MIN_PASSWORD_LENGTH) {
+    throw new Error(`resetPassword requires a password of at least ${MIN_PASSWORD_LENGTH} characters`);
+  }
+  store.credentials[userId].passwordHash = hashPassword(newPassword);
+  return { userId };
+}
+
 module.exports = {
-  MIN_PASSWORD_LENGTH, registerCredentials, verifyCredentials,
+  MIN_PASSWORD_LENGTH, registerCredentials, verifyCredentials, resetPassword,
 };

@@ -68,8 +68,41 @@ function getSession(store, token, now = Date.now()) {
   return { valid: true, userId: session.userId, expiresAt: session.expiresAt };
 }
 
+// Real server-side logout, closing this file's own previously-flagged
+// gap ("nothing here invalidates a token before its real 24-hour
+// expiry"). Possessing the token IS the proof needed to revoke it --
+// the same bearer-token-as-credential model every other route in this
+// ecosystem already trusts (`Authorization: Bearer <token>`), so no
+// separate actor check is layered on top here; the route that exposes
+// this already requires the real token to reach it at all.
+function revokeSession(store, token, now = Date.now()) {
+  const session = getSession(store, token, now);
+  if (!session) return null;
+  delete store.sessions[token];
+  return { revoked: true, userId: session.userId };
+}
+
+// The real other half of `passwordReset.js`'s own security practice:
+// a password reset should not leave every session minted under the
+// OLD password still valid. Revokes every real, currently-valid
+// session for one userId in a single pass -- same hasOwn-guarded
+// object-as-map traversal `getSession` itself already uses.
+function revokeAllSessionsForUser(store, userId, now = Date.now()) {
+  const revoked = [];
+  for (const token of Object.keys(store.sessions)) {
+    const session = store.sessions[token];
+    if (session && session.userId === userId && session.expiresAt >= now) {
+      delete store.sessions[token];
+      revoked.push(token);
+    }
+  }
+  return { revokedCount: revoked.length };
+}
+
 module.exports = {
   SESSION_LIFETIME_MS,
   createSession,
   getSession,
+  revokeSession,
+  revokeAllSessionsForUser,
 };

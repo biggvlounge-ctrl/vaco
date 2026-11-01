@@ -1,7 +1,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createShieldStore } = require('../lib/store');
-const { SESSION_LIFETIME_MS, createSession, getSession } = require('../lib/sessions');
+const {
+  SESSION_LIFETIME_MS, createSession, getSession, revokeSession, revokeAllSessionsForUser,
+} = require('../lib/sessions');
 
 test('createSession requires a real userId', () => {
   const store = createShieldStore();
@@ -66,4 +68,53 @@ test('getSession still resolves one millisecond before the real expiry', () => {
   const { sessionToken } = createSession(store, { userId: 'alice', now });
   const session = getSession(store, sessionToken, now + SESSION_LIFETIME_MS - 1);
   assert.equal(session.valid, true);
+});
+
+// -- revokeSession / revokeAllSessionsForUser (real server-side logout) --
+
+test('revokeSession invalidates a real, currently-valid token immediately', () => {
+  const store = createShieldStore();
+  const { sessionToken } = createSession(store, { userId: 'alice' });
+  const result = revokeSession(store, sessionToken);
+  assert.deepEqual(result, { revoked: true, userId: 'alice' });
+  assert.equal(getSession(store, sessionToken), null, 'a revoked token must stop validating');
+});
+
+test('revokeSession returns null for a token that was never issued or already expired', () => {
+  const store = createShieldStore();
+  assert.equal(revokeSession(store, 'shield_nobody_deadbeef'), null);
+
+  const now = Date.now();
+  const { sessionToken } = createSession(store, { userId: 'alice', now });
+  assert.equal(revokeSession(store, sessionToken, now + SESSION_LIFETIME_MS + 1), null,
+    'an already-expired token should not report a fresh revocation');
+});
+
+test('revokeSession does not disturb a different user\'s own session', () => {
+  const store = createShieldStore();
+  const { sessionToken: aliceToken } = createSession(store, { userId: 'alice' });
+  const { sessionToken: bobToken } = createSession(store, { userId: 'bob' });
+  revokeSession(store, aliceToken);
+  assert.equal(getSession(store, bobToken).valid, true);
+});
+
+test('revokeAllSessionsForUser revokes every real session for that user, and only that user', () => {
+  const store = createShieldStore();
+  const a1 = createSession(store, { userId: 'alice' }).sessionToken;
+  const a2 = createSession(store, { userId: 'alice' }).sessionToken;
+  const bobToken = createSession(store, { userId: 'bob' }).sessionToken;
+
+  const { revokedCount } = revokeAllSessionsForUser(store, 'alice');
+  assert.equal(revokedCount, 2);
+  assert.equal(getSession(store, a1), null);
+  assert.equal(getSession(store, a2), null);
+  assert.equal(getSession(store, bobToken).valid, true, 'a different user\'s session must survive');
+});
+
+test('revokeAllSessionsForUser does not count an already-expired session', () => {
+  const store = createShieldStore();
+  const now = Date.now();
+  createSession(store, { userId: 'alice', now });
+  const { revokedCount } = revokeAllSessionsForUser(store, 'alice', now + SESSION_LIFETIME_MS + 1);
+  assert.equal(revokedCount, 0);
 });
