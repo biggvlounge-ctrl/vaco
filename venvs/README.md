@@ -474,3 +474,47 @@ opened their real storefront inside HVNTZ, rang up 2 real Claw Hammers
 for walk-in customer `walk-in-customer-1`, and the real order history
 table showed `Order #1 · pos · 37 VC · walk-in-customer-1` —
 screenshotted.
+
+## Phase 16: SVMIKO DEGVCHI's real 16-brand roster (1 Nov 2026)
+
+Given directly as "the current 16-line fashion portfolio, with the
+latest spelling changes included." `src/lib/svmikoDegvchi.js` moves
+from 12 real sub-brands to 16: two existing brands are respelled/
+renamed in place (STONE BONES → SVRPENTS Stone — confirmed directly as
+a rename of the same brand, same storefront, same two real products,
+same positioning; BOULÉVARD XCHANGE → BOVLEVARD Xchange (BX)), and
+four are genuinely new (THRONES AND BONES, MYSTERY AND MASTERY, SA
+VIOR, VIC VALENCIAGO — the latter's two A's using a custom
+crossbar-free ∧, carried as its own Unicode glyph since no image asset
+exists for the real custom mark).
+
+**The 4 new brands' positioning is this module's own flagged,
+interpretive derivation from the name alone**, same posture already
+held for every other brand's invented price/signature-product detail
+in this file — asked directly whether real positioning existed for
+them, what arrived was the name/spelling list above, not positioning,
+so each reads its own aesthetic off its own name (THRONES AND BONES:
+regal/dynastic power in a bone-white ivory palette, distinguished from
+SVRPENTS Stone's own bone-hardware signature by working in material/
+silhouette instead of cast hardware; MYSTERY AND MASTERY: concealment
+paired with visible hand-finished craft, a reversible hooded coat;
+SA VIOR: ecclesiastical/redemption luxury, halo-ring hardware in
+white-and-gold; VIC VALENCIAGO: avant-garde deconstructed tailoring, a
+clear Balenciaga echo, its own ∧ monogram embossed into the garment) —
+open to a real correction the moment actual positioning is given.
+
+`server.cjs`'s own seed is unchanged code — it already calls
+`seedSvmikoDegvchiStorefronts` once, so the new count (16 real brand
+storefronts instead of 12, 18 sellers total with the two non-SVMIKO
+demo sellers) just falls out of the catalogue growing.
+
+### Verification
+
+`test/venvs.test.js`: renamed the two STONE BONES-specific tests to
+SVRPENTS Stone, added a new test confirming all 4 new brands seed a
+real one-product storefront each. `test/server.test.js`'s health-seed
+count moved from 14 to 18. Full suite: 86/86. Live-verified: booted a
+real spawned server, confirmed `/api/health` reports 18 sellers, and
+`GET /api/marketplace/products` lists `THRONES AND BONES Ivory
+Throne-Back Cape Coat`, `SA VIOR Halo-Ring Cassock Overcoat`, and the
+other two new flagship products by name.

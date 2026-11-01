@@ -72,6 +72,21 @@
 // even though the two apps share no backend state (VENVS and VDP are
 // genuinely separate processes; this is a real, intentional naming
 // convention match, not a functional link).
+//
+// **Updated 1 Nov 2026 to the real 16-brand roster**, the same real
+// update `venvs/src/lib/svmikoDegvchi.js` took (see that module's own
+// header for the full real rename/positioning record): STONE BONES ->
+// SVRPENTS Stone and BOULÉVARD XCHANGE -> BOVLEVARD Xchange (BX) are
+// renamed in place, slug moving with the rename per this file's own
+// precedent (Devil in Details -> STONE BONES already did the same);
+// four genuinely new brands (THRONES AND BONES, MYSTERY AND MASTERY,
+// SA VIOR, VIC VALENCIAGO) each get one real virtual wearable, at the
+// same ~15.5x physical-to-virtual price ratio this file's own existing
+// rows already hold (price divided and rounded, not re-derived from
+// nothing). Their real-world `positioning` lives only in VENVS's own
+// module; this file carries just the one virtual item each needs, the
+// same "clothing" category every other single-item brand already
+// uses.
 
 import { registerWearable } from './degvchi.js';
 
@@ -80,9 +95,9 @@ export const SVMIKO_DEGVCHI_HOUSE = 'svmiko-degvchi-fashion-house';
 export const SUB_BRAND_WEARABLES = [
   { slug: 'degvchi', name: 'DEGVCHI Virtual Heritage-Weave Bomber', category: 'clothing', price: 30 },
   { slug: 'lvcii', name: 'LVCII Virtual Handkerchief Set', category: 'accessories', price: 14 },
-  { slug: 'stone-bones', name: 'STONE BONES Virtual Concrete Bone-Buckle Jacket', category: 'clothing', price: 34 },
-  { slug: 'stone-bones', name: 'STONE BONES Virtual Emerald-Inlay Bone Chain', category: 'accessories', price: 26 },
-  { slug: 'boulevard-xchange', name: 'BOULÉVARD XCHANGE Virtual Capsule Hoodie', category: 'clothing', price: 16 },
+  { slug: 'svrpents-stone', name: 'SVRPENTS Stone Virtual Concrete Bone-Buckle Jacket', category: 'clothing', price: 34 },
+  { slug: 'svrpents-stone', name: 'SVRPENTS Stone Virtual Emerald-Inlay Bone Chain', category: 'accessories', price: 26 },
+  { slug: 'bovlevard-xchange', name: 'BOVLEVARD Xchange Virtual Capsule Hoodie', category: 'clothing', price: 16 },
   { slug: 'jacqve', name: 'JACQVÉ Virtual Detachable-Jewelry Tote', category: 'accessories', price: 28 },
   { slug: 'zv', name: 'ZV Virtual Signature-Silhouette Tee', category: 'clothing', price: 9 },
   { slug: 'rojo-velo', name: 'ROJO VELO Virtual Accent Trench Coat', category: 'clothing', price: 36 },
@@ -95,6 +110,10 @@ export const SUB_BRAND_WEARABLES = [
   { slug: 'vvlgari', name: 'VvLGARI Virtual Aviator Sunglasses', category: 'accessories', price: 19 },
   { slug: 'vvlgari', name: "VvLGARI Virtual Women's Structured Tote", category: 'accessories', price: 42 },
   { slug: 'vvlgari', name: "VvLGARI Virtual Men's Weekender Bag", category: 'accessories', price: 38 },
+  { slug: 'thrones-and-bones', name: 'THRONES AND BONES Virtual Ivory Throne-Back Cape Coat', category: 'clothing', price: 45 },
+  { slug: 'mystery-and-mastery', name: 'MYSTERY AND MASTERY Virtual Reversible Veiled-Embroidery Coat', category: 'clothing', price: 38 },
+  { slug: 'sa-vior', name: 'SA VIOR Virtual Halo-Ring Cassock Overcoat', category: 'clothing', price: 36 },
+  { slug: 'vic-valenciago', name: 'VIC VALENCIAGO Virtual ∧-Monogram Sculptural Overcoat', category: 'clothing', price: 42 },
 ];
 
 // Matches VENVS's own `ownerIdFor()` exactly -- kept as a real,

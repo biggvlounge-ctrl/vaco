@@ -765,7 +765,7 @@ test('seeding registers every sub-brand WITH a real flagship product as a real s
   // validation, it would throw here rather than when a shopper first
   // opened the storefront.
   //
-  // All twelve brands now carry at least one real `flagshipProducts`
+  // All sixteen brands now carry at least one real `flagshipProducts`
   // entry — VvLGARI's own positioning (cologne, perfume, sunglasses,
   // and handbags for men and women, given directly 22 Oct 2026) is no
   // longer "to be established," so nothing is skipped today. The skip
@@ -812,17 +812,18 @@ test('VvLGARI carries all five of its real products under one storefront', () =>
   assert.ok(categories.includes('luxury-handbags-women'));
 });
 
-test('STONE BONES carries both its flagship jacket and its emerald-inlay bone chain', () => {
-  // The natural-stone/gemstone correction gave STONE BONES a second
-  // real product -- a standalone jewelry-grade accessory distinct
-  // from its flagship outerwear, the same "more than one item under
-  // one brand" shape VvLGARI already has.
+test('SVRPENTS Stone carries both its flagship jacket and its emerald-inlay bone chain', () => {
+  // The natural-stone/gemstone correction gave this brand (renamed
+  // from STONE BONES, 1 Nov 2026 -- same storefront, same products)
+  // a second real product -- a standalone jewelry-grade accessory
+  // distinct from its flagship outerwear, the same "more than one
+  // item under one brand" shape VvLGARI already has.
   const m = createMarketplace();
   seedSvmikoDegvchiStorefronts(m);
-  const stoneBonesSeller = m.sellers.find((s) => s.name === 'STONE BONES');
-  assert.ok(stoneBonesSeller, 'STONE BONES should have its own real storefront');
+  const svrpentsStoneSeller = m.sellers.find((s) => s.name === 'SVRPENTS Stone');
+  assert.ok(svrpentsStoneSeller, 'SVRPENTS Stone should have its own real storefront');
 
-  const front = getSellerStorefront(m, stoneBonesSeller.id);
+  const front = getSellerStorefront(m, svrpentsStoneSeller.id);
   assert.equal(front.products.length, 2, 'the concrete bone-buckle jacket and the emerald-inlay bone chain');
   const titles = front.products.map((p) => p.title);
   assert.ok(titles.some((t) => t.includes('Bone-Buckle Jacket')));
@@ -831,7 +832,7 @@ test('STONE BONES carries both its flagship jacket and its emerald-inlay bone ch
   assert.ok(categories.includes('luxury-outerwear'));
   assert.ok(categories.includes('luxury-accessories'));
 
-  // Every real STONE BONES piece is a limited run, not just priced
+  // Every real SVRPENTS Stone piece is a limited run, not just priced
   // like one -- seeding must carry `editionSize` through to the real
   // product, not drop it on the way from `svmikoDegvchi.js` into
   // `listProduct`.
@@ -843,17 +844,33 @@ test('STONE BONES carries both its flagship jacket and its emerald-inlay bone ch
 });
 
 test('every other seeded SVMIKO DEGVCHI product stays genuinely unlimited', () => {
-  // STONE BONES is the one brand with limited runs today; nothing
+  // SVRPENTS Stone is the one brand with limited runs today; nothing
   // about seeding should impose that on a brand that never asked for
   // it.
   const m = createMarketplace();
   const seeded = seedSvmikoDegvchiStorefronts(m);
-  const nonStoneBonesProducts = seeded
-    .filter((s) => s.brand !== 'stone-bones')
+  const nonSvrpentsStoneProducts = seeded
+    .filter((s) => s.brand !== 'svrpents-stone')
     .flatMap((s) => s.products);
-  for (const product of nonStoneBonesProducts) {
+  for (const product of nonSvrpentsStoneProducts) {
     assert.equal(product.editionSize, null, `${product.title} should not have an edition cap`);
     assert.equal(product.unitsRemaining, null);
+  }
+});
+
+test('the 4 newest brands (THRONES AND BONES, MYSTERY AND MASTERY, SA VIOR, VIC VALENCIAGO) each seed a real storefront', () => {
+  // Real, confirmed brand names with no real positioning sent for
+  // them -- svmikoDegvchi.js derives flagged, interpretive positioning
+  // from each name itself rather than leaving them unseeded; this is
+  // the real, end-to-end proof that each one actually seeds.
+  const m = createMarketplace();
+  seedSvmikoDegvchiStorefronts(m);
+  for (const name of ['THRONES AND BONES', 'MYSTERY AND MASTERY', 'SA VIOR', 'VIC VALENCIAGO']) {
+    const seller = m.sellers.find((s) => s.name === name);
+    assert.ok(seller, `${name} should have its own real storefront`);
+    const front = getSellerStorefront(m, seller.id);
+    assert.equal(front.products.length, 1);
+    assert.ok(front.products[0].price > 0);
   }
 });
 

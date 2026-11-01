@@ -101,6 +101,53 @@ Status: all 12 branded storefronts are open in VENVS's system.
 
 ---
 
+**Updated 1 Nov 2026 — the real 16-brand roster, superseding the
+12-brand roster above.** Given directly as "the current 16-line
+fashion portfolio, with the latest spelling changes included":
+
+1. DEGVCHI
+2. LVCII
+3. SVRPENTS Stone (renamed from STONE BONES — confirmed directly as a
+   rename of the same brand: same storefront, same two real products,
+   same positioning, just the new name)
+4. BOVLEVARD Xchange (BX) (respelled from BOULÉVARD XCHANGE)
+5. JACQVÉ
+6. ZV
+7. ROJO VELO
+8. VEDELLÍN
+9. VAISON
+10. ANCÓR
+11. 7EVEN
+12. VvLGARI
+13. THRONES AND BONES (genuinely new)
+14. MYSTERY AND MASTERY (genuinely new)
+15. SA VIOR (genuinely new)
+16. VIC VALENCIAGO (genuinely new — the two A's in VALENCIAGO use a
+    custom crossbar-free ∧, given directly)
+
+Parent fashion house: SUMIKO DEGVCHI (also respelled from SVMIKO in
+the same handoff; kept as SVMIKO in this codebase's own module/file
+names and most prose, since nothing has yet renamed the house itself
+at the code level — flagged here rather than silently renamed).
+
+**The 4 new brands' real positioning was never sent.** Asked directly
+whether real positioning/signature details existed for THRONES AND
+BONES, MYSTERY AND MASTERY, SA VIOR, and VIC VALENCIAGO, the answer
+was "I'll give you the details" — what arrived next was this exact
+name/spelling list, not positioning. `venvs/src/lib/svmikoDegvchi.js`
+and `vdp/src/lib/svmikoDegvchiWearables.js` therefore derive each new
+brand's positioning/signature product directly from its own name,
+flagged as this codebase's own interpretive read (same posture held
+for every other invented price/signature detail in this file), open
+to a real correction the moment actual positioning is given.
+
+Status: all 16 branded storefronts are open in VENVS's system; the
+same 16 brands also have one real virtual wearable each (21 total
+real pieces, since SVRPENTS Stone carries 2 and VvLGARI carries 5) in
+VDP's own avatar-wearable economy.
+
+---
+
 ## Implementation status (added when this file was placed into the repo)
 
 **Superseded 22 Oct 2026 — read the section above first.** Everything

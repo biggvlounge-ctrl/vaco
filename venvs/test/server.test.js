@@ -96,9 +96,9 @@ test('the server starts, serves health, and has already seeded the real demo sto
   const health = await (await fetch(`${BASE}/api/health`)).json();
   assert.equal(health.ok, true);
   assert.equal(health.service, 'venvs');
-  // 2 demo sellers (Cherokee Hardware, Riverfront Vinyl) + 12 real
+  // 2 demo sellers (Cherokee Hardware, Riverfront Vinyl) + 16 real
   // SVMIKO DEGVCHI storefronts -- see server.cjs's own onReady seed.
-  assert.equal(health.sellers, 14);
+  assert.equal(health.sellers, 18);
   assert.ok(health.products > 0);
 });
 

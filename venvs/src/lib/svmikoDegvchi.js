@@ -38,6 +38,36 @@
 // real visual/asset design work -- no image assets exist in this
 // session to render them, so `theme` carries their real textual
 // description only, not a fabricated graphic.
+//
+// **Updated 1 Nov 2026 to the real 16-brand roster**, given directly
+// as "the current 16-line fashion portfolio, with the latest spelling
+// changes included": two of the existing twelve are respelled/renamed
+// in place (STONE BONES → SVRPENTS Stone -- confirmed directly as a
+// rename, not a new entity: same storefront, same two real products,
+// same positioning, just the new name; BOULÉVARD XCHANGE → BOVLEVARD
+// Xchange (BX)), and four are genuinely new (THRONES AND BONES,
+// MYSTERY AND MASTERY, SA VIOR, VIC VALENCIAGO -- the latter's two A's
+// using a custom crossbar-free ∧, carried here as its own Unicode
+// glyph in `name` since no image asset exists for it). Per the same
+// rename precedent this file's own header already set for Devil in
+// Details → STONE BONES, a renamed brand's `slug` moves with it (the
+// payout account is derived from the slug, and the point of a rename
+// is that it IS the same brand continuing under a new name) rather
+// than staying frozen on the old spelling.
+//
+// **The 4 new brands' `positioning`/`signatureElement`/
+// `flagshipProducts` below are this module's own flagged,
+// interpretive derivation from the name alone** -- asked directly
+// whether real positioning existed for them, the answer was "I'll
+// give you the details," and what actually arrived next was the
+// name/spelling list above, not positioning. Rather than leave four
+// real, confirmed brand names sitting with no storefront (worse than
+// a flagged guess, per this file's own standing rule that an unseeded
+// brand is worse than a seeded one), each gets one real flagship
+// product whose aesthetic is read directly off its own name -- same
+// "flagged, interpretive" posture already held for every invented
+// price/signature-product name in this file, open to a real
+// correction the moment actual positioning is given.
 
 import { registerSeller, listProduct } from './marketplace.js';
 
@@ -65,8 +95,12 @@ export const SUB_BRANDS = [
     ],
   },
   {
-    slug: 'stone-bones',
-    name: 'STONE BONES',
+    slug: 'svrpents-stone',
+    name: 'SVRPENTS Stone',
+    // Renamed from STONE BONES, 1 Nov 2026 -- confirmed directly as a
+    // rename of the existing brand (same storefront, same two real
+    // products, same positioning), not a new entity, so everything
+    // below carries over unchanged except the name/slug themselves.
     // The house's own real comparable, given directly: Chrome Hearts --
     // gothic/sculptural luxury hardware worn as jewelry-grade accessory
     // rather than plain trim. The brand's own two-word name carries
@@ -90,7 +124,7 @@ export const SUB_BRANDS = [
     // then on is exactly what "traded" means here -- a prior buyer
     // reselling it peer to peer through this same Marketplace, the
     // same `registerSeller`/`listProduct` mechanism any reseller uses,
-    // nothing STONE BONES-specific.
+    // nothing SVRPENTS Stone-specific.
     positioning: "Dark/sculptural luxury -- the house's own answer to "
       + 'Chrome Hearts: bone-shaped hardware, cast in stone and '
       + 'concrete and accented with genuine natural stones and colored '
@@ -99,17 +133,17 @@ export const SUB_BRANDS = [
       + 'also be traded.',
     signatureElement: 'Bone-shaped hardware (buckles, charms, chain links) -- cast in stone/concrete, accented with real natural stones and colored gemstones -- not chrome or silver; every piece an original, limited-run design',
     flagshipProducts: [
-      { title: 'STONE BONES Concrete Bone-Buckle Jacket', price: 520, category: 'luxury-outerwear', editionSize: 150 },
-      { title: 'STONE BONES Emerald-Inlay Bone Chain', price: 380, category: 'luxury-accessories', editionSize: 75 },
+      { title: 'SVRPENTS Stone Concrete Bone-Buckle Jacket', price: 520, category: 'luxury-outerwear', editionSize: 150 },
+      { title: 'SVRPENTS Stone Emerald-Inlay Bone Chain', price: 380, category: 'luxury-accessories', editionSize: 75 },
     ],
   },
   {
-    slug: 'boulevard-xchange',
-    name: 'BOULÉVARD XCHANGE',
+    slug: 'bovlevard-xchange',
+    name: 'BOVLEVARD Xchange (BX)',
     positioning: 'Luxury streetwear.',
     signatureElement: 'Cultural exchange',
     flagshipProducts: [
-      { title: 'BOULÉVARD XCHANGE Cultural Capsule Hoodie', price: 165, category: 'luxury-streetwear' },
+      { title: 'BOVLEVARD Xchange Cultural Capsule Hoodie', price: 165, category: 'luxury-streetwear' },
     ],
   },
   {
@@ -199,6 +233,75 @@ export const SUB_BRANDS = [
       { title: "VvLGARI Men's Leather Weekender Bag", price: 580, category: 'luxury-handbags-men' },
     ],
   },
+  {
+    slug: 'thrones-and-bones',
+    name: 'THRONES AND BONES',
+    // Flagged, interpretive derivation from the name alone (see this
+    // file's own header) -- read as regal/dynastic power ("thrones")
+    // paired with mortality ("bones"), distinguished from SVRPENTS
+    // Stone's own bone-hardware signature by working in material and
+    // silhouette instead: bone-white ivory leather and a throne's own
+    // high-backed structure, rather than cast bone-shaped hardware.
+    positioning: 'Regal/dynastic luxury -- architectural, throne-backed '
+      + 'silhouettes (structured high collars, cape-back coats) in a '
+      + 'bone-white ivory palette with real bone-inlay seam trim -- '
+      + 'power and permanence, rendered in material rather than hardware.',
+    signatureElement: "Bone-white ivory leather with bone-inlay seam trim, throne-backed (structured high-collar, cape-back) silhouette construction",
+    flagshipProducts: [
+      { title: 'THRONES AND BONES Ivory Throne-Back Cape Coat', price: 700, category: 'luxury-outerwear' },
+    ],
+  },
+  {
+    slug: 'mystery-and-mastery',
+    name: 'MYSTERY AND MASTERY',
+    // Flagged, interpretive derivation from the name alone -- read as
+    // concealment ("mystery") paired with visible technical craft
+    // ("mastery"): a garment that reveals its own hand-finished
+    // embroidery only up close or when unlayered.
+    positioning: 'Artisan mystique -- concealment and craft as one idea: '
+      + 'hooded, high-opacity silhouettes, plain from the outside, that '
+      + 'reveal elaborate hand-finished embroidery only up close or when '
+      + 'reversed/unlayered.',
+    signatureElement: 'Reversible hooded outerwear -- plain and opaque from outside, hand-embroidery revealed on the reverse/underside',
+    flagshipProducts: [
+      { title: 'MYSTERY AND MASTERY Reversible Veiled-Embroidery Coat', price: 590, category: 'luxury-outerwear' },
+    ],
+  },
+  {
+    slug: 'sa-vior',
+    name: 'SA VIOR',
+    // Flagged, interpretive derivation from the name alone -- read
+    // directly as "savior," given an ecclesiastical/redemption
+    // positioning: cassock-inspired silhouettes, a halo/cross motif
+    // reworked as real hardware, and a monochrome white-and-gold
+    // palette.
+    positioning: 'Ecclesiastical/redemption luxury -- cassock-inspired '
+      + 'silhouettes, halo and cross motifs reworked as real hardware, '
+      + 'a monochrome white-and-gold palette.',
+    signatureElement: 'Halo-ring hardware and cross-seam construction in a white-and-gold palette',
+    flagshipProducts: [
+      { title: 'SA VIOR Halo-Ring Cassock Overcoat', price: 560, category: 'luxury-outerwear' },
+    ],
+  },
+  {
+    slug: 'vic-valenciago',
+    name: 'VIC VALENCIAGO',
+    // Flagged, interpretive derivation from the name alone -- a clear
+    // echo of Balenciaga's own real avant-garde/deconstructed-
+    // tailoring positioning, with the real, confirmed detail given
+    // directly (1 Nov 2026): the two A's in VALENCIAGO use a custom
+    // crossbar-free ∧, carried here as its own Unicode glyph in `name`
+    // (U+2227, LOGICAL AND) since no image asset exists for the real
+    // custom typographic mark.
+    positioning: "Avant-garde deconstructed tailoring -- the house's own "
+      + 'homage to high-fashion minimalism: sculptural draping, oversized '
+      + 'silhouettes, and a custom crossbar-free ∧ wordmark used as both '
+      + 'branding and a literal embossed/stitched motif.',
+    signatureElement: 'Custom crossbar-free ∧ monogram, embossed/stitched directly into sculptural, oversized silhouettes',
+    flagshipProducts: [
+      { title: 'VIC VALENCIAGO ∧-Monogram Sculptural Overcoat', price: 650, category: 'avant-garde-luxury' },
+    ],
+  },
 ];
 
 // Real, deterministic seller ownerId per brand -- no founder identity
@@ -210,7 +313,7 @@ export function ownerIdFor(slug) {
 }
 
 // Every brand in `SUB_BRANDS` is real identity; not every brand is
-// guaranteed to have a real product -- today all twelve do, but the
+// guaranteed to have a real product -- today all sixteen do, but the
 // skip stays real rather than removed, for the same reason a brand
 // might arrive again with its positioning still "to be established."
 // Opening a storefront with nothing to sell is a worse state than not

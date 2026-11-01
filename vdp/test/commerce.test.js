@@ -559,18 +559,28 @@ test('VvLGARI carries five real items, all still paying the same account', () =>
   assert.equal(new Set(names).size, names.length, 'VvLGARI lists the same item twice');
 });
 
-test('STONE BONES carries two real items -- a jacket and a separate jewelry-grade piece', () => {
-  // The natural-stone/gemstone correction gave STONE BONES a real,
-  // standalone accessory distinct from its flagship jacket, the same
-  // "more than one item under one brand" shape VvLGARI already has.
-  const stoneBonesItems = SUB_BRAND_WEARABLES.filter((i) => i.slug === 'stone-bones');
-  assert.equal(stoneBonesItems.length, 2, 'the concrete bone-buckle jacket and the emerald-inlay bone chain');
-  for (const item of stoneBonesItems) {
-    assert.equal(creatorIdFor(item.slug), creatorIdFor('stone-bones'));
+test('SVRPENTS Stone carries two real items -- a jacket and a separate jewelry-grade piece', () => {
+  // The natural-stone/gemstone correction gave this brand (renamed
+  // from STONE BONES, 1 Nov 2026 -- same products) a real, standalone
+  // accessory distinct from its flagship jacket, the same "more than
+  // one item under one brand" shape VvLGARI already has.
+  const svrpentsStoneItems = SUB_BRAND_WEARABLES.filter((i) => i.slug === 'svrpents-stone');
+  assert.equal(svrpentsStoneItems.length, 2, 'the concrete bone-buckle jacket and the emerald-inlay bone chain');
+  for (const item of svrpentsStoneItems) {
+    assert.equal(creatorIdFor(item.slug), creatorIdFor('svrpents-stone'));
   }
-  const categories = stoneBonesItems.map((i) => i.category);
+  const categories = svrpentsStoneItems.map((i) => i.category);
   assert.ok(categories.includes('clothing'), 'the jacket should still be clothing');
   assert.ok(categories.includes('accessories'), 'the chain should be its own standalone accessory, not folded into the jacket');
+});
+
+test('the 4 newest brands (THRONES AND BONES, MYSTERY AND MASTERY, SA VIOR, VIC VALENCIAGO) each carry one real virtual item', () => {
+  for (const slug of ['thrones-and-bones', 'mystery-and-mastery', 'sa-vior', 'vic-valenciago']) {
+    const items = SUB_BRAND_WEARABLES.filter((i) => i.slug === slug);
+    assert.equal(items.length, 1, `${slug} should carry exactly one real virtual item`);
+    assert.ok(items[0].price > 0);
+    assert.ok(WEARABLE_CATEGORIES.includes(items[0].category));
+  }
 });
 
 test('seeding registers every sub-brand item into a real DEGVCHI store', () => {

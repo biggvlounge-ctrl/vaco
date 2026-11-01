@@ -331,14 +331,16 @@ ecosystem (this app included) with one command.
   across Roblox's validated 3-category structure, bought with real
   VCoin, a real "one equipped item per category" mechanic.
 - `src/lib/svmikoDegvchiWearables.js` — **SVMIKO DEGVCHI Avatar
-  Wearables (Phase 2)**: the other real half of the SVMIKO DEGVCHI
-  handoff ("first real clothing lines for VENVS *and* VDP") — one real
-  virtual piece per sub-brand (13 total), mapped honestly to
-  `degvchi.js`'s three real categories (`cosmetics` left unused, no
-  brand's real description centers on it). Real, independently-
-  reasoned virtual price scale (not VENVS's physical prices divided by
-  a constant), preserving the same real luxury-vs-streetwear tiering.
-  Real cross-app identity link: `creatorId` matches VENVS's own
+  Wearables (Phase 2, updated 1 Nov 2026 to the real 16-brand roster)**:
+  the other real half of the SVMIKO DEGVCHI handoff ("first real
+  clothing lines for VENVS *and* VDP") — one or more real virtual
+  pieces per sub-brand (21 items across 16 brands today), mapped
+  honestly to `degvchi.js`'s three real categories (`cosmetics` used
+  by VvLGARI's own fragrance line, the one brand whose real
+  description centers on it). Real, independently-reasoned virtual
+  price scale (not VENVS's physical prices divided by a constant),
+  preserving the same real luxury-vs-streetwear tiering. Real
+  cross-app identity link: `creatorId` matches VENVS's own
   `ownerIdFor()` convention exactly, crediting the same real brand
   entity in both apps.
 - `src/lib/foodDistrict.js` / `src/components/FoodDistrictView.jsx` —
@@ -1140,6 +1142,12 @@ same class of bug, and re-introduced here (and, it turned out,
 independently re-introduced in VENVS's own `App.jsx` too) when each
 shell was rewritten. Both fixed; re-verified live. See `dev-docs/` for
 the full record.
+
+**Updated 1 Nov 2026**: the roster above has since grown to 16 real
+sub-brands/21 real pieces, matching VENVS's own 16-brand update —
+`src/lib/svmikoDegvchiWearables.js`'s own header has the full record;
+this phase's own "13"/"20" figures above are its original,
+historically-accurate counts at the time, left as-is.
 
 **Phase 3 (Food District flagships)**: 17 plain-Node checks (11 unique
 brands, unique slugs, every menu item priced, 10 brands confirmed-name
