@@ -38,7 +38,7 @@
 
 export const DISTRICT_NAME = "Combat Sports District";
 
-export const MATCH_FORMATS = ["royal-rumble", "tag-team", "cage-match", "one-on-one"];
+export const MATCH_FORMATS = ["royal-rumble", "tag-team", "cage-match", "one-on-one", "handicap"];
 
 // Ordered, because it is a progression path -- the source document's
 // own "a real complete progression path," not four unrelated labels.
@@ -54,6 +54,14 @@ export const FORMAT_RULES = {
   "cage-match": { min: 2, max: 2, teamSize: null },
   "tag-team": { min: 4, max: 8, teamSize: 2 },
   "royal-rumble": { min: 3, max: 30, teamSize: null },
+  // Per direct instruction: "we can do handicap matches, 4 versus 2,
+  // 1 versus 3, 6 versus 4, 12 versus 8." Unlike "tag-team" above,
+  // `teamSize` stays null -- the whole point of a handicap is that the
+  // two sides are NOT required to be equal. `sideAIds`/`sideBIds` (see
+  // `createMatch`) are what actually constrains this format; headcount
+  // here is only the real floor (the smallest real handicap, 1 versus
+  // 2) and an invented, flagged ceiling.
+  handicap: { min: 3, max: 40, teamSize: null },
 };
 
 export class CombatError extends Error {}
@@ -69,11 +77,64 @@ export function tierRank(skillLevel) {
   return SKILL_LEVELS.indexOf(skillLevel);
 }
 
+// Per direct instruction: "they could do mixed fighting, where it
+// could be a boxer fights a wrestler, or MMA, however they choose."
+// `combatSportType` stays the card's own single real label (every
+// other module in this district reads it as one string -- the
+// discipline a leaderboard buckets by, the headline a broadcast
+// names), so a mixed card is not a second combatSportType shape
+// bolted beside it: it is derived. One discipline named for every
+// fighter and they all agree -> that discipline, same as before this
+// existed. More than one real discipline among them -> the real,
+// honest label "mixed", not a guess at which one "wins" the card's
+// own name.
+function deriveCombatSportType(disciplineByParticipant, roster, a) {
+  if (!disciplineByParticipant || typeof disciplineByParticipant !== "object") {
+    throw new CombatError(`${a}: disciplineByParticipant must be an object of participantId -> discipline`);
+  }
+  const keys = Object.keys(disciplineByParticipant);
+  if (keys.length !== roster.length || !roster.every((p) => keys.includes(p))) {
+    throw new CombatError(`${a}: disciplineByParticipant must name a real discipline for every, and only, a participant on the card`);
+  }
+  const disciplines = new Set();
+  for (const participantId of roster) {
+    const discipline = requireString(disciplineByParticipant[participantId], `disciplineByParticipant.${participantId}`, a).toLowerCase();
+    disciplines.add(discipline);
+  }
+  return disciplines.size === 1 ? [...disciplines][0] : "mixed";
+}
+
+// Per direct instruction: "we can do handicap matches, 4 versus 2, 1
+// versus 3, 6 versus 4, 12 versus 8." Two real sides, deliberately NOT
+// required to be equal -- `FORMAT_RULES.handicap.teamSize` is null for
+// exactly this reason. Every participant must stand on exactly one
+// side; nobody is on both, and nobody is on neither.
+function validateHandicapSides(sideAIds, sideBIds, roster, a) {
+  if (!Array.isArray(sideAIds) || !Array.isArray(sideBIds)) {
+    throw new CombatError(`${a}: a handicap match requires sideAIds and sideBIds arrays`);
+  }
+  const sideA = sideAIds.map((p) => requireString(String(p ?? ""), "sideAIds entry", a));
+  const sideB = sideBIds.map((p) => requireString(String(p ?? ""), "sideBIds entry", a));
+  if (sideA.length === 0 || sideB.length === 0) {
+    throw new CombatError(`${a}: a handicap match needs at least one fighter on each side`);
+  }
+  const overlap = sideA.filter((p) => sideB.includes(p));
+  if (overlap.length > 0) {
+    throw new CombatError(`${a}: ${overlap.join(", ")} ${overlap.length === 1 ? "is" : "are"} listed on both sides`);
+  }
+  const combined = new Set([...sideA, ...sideB]);
+  if (combined.size !== roster.length || !roster.every((p) => combined.has(p))) {
+    throw new CombatError(`${a}: sideAIds and sideBIds together must account for every, and only, a participant on the card`);
+  }
+  return { sideAIds: sideA, sideBIds: sideB };
+}
+
 export function createMatch(options = {}) {
   const a = "createMatch";
   const {
     matchId, matchFormat, combatSportType, skillLevel,
-    participantIds = [], scheduledAt = null,
+    participantIds = [], scheduledAt = null, disciplineByParticipant = null,
+    sideAIds = null, sideBIds = null,
   } = options;
 
   if (!MATCH_FORMATS.includes(matchFormat)) {
@@ -84,9 +145,6 @@ export function createMatch(options = {}) {
   }
 
   const id = requireString(matchId, "matchId", a);
-  // Open by design, validated for being real rather than for being on
-  // a list. Lower-cased so "Boxing" and "boxing" are one discipline.
-  const sport = requireString(combatSportType, "combatSportType", a).toLowerCase();
 
   if (!Array.isArray(participantIds)) {
     throw new CombatError(`${a}: participantIds must be an array`);
@@ -99,6 +157,14 @@ export function createMatch(options = {}) {
   if (unique.size !== roster.length) {
     throw new CombatError(`${a}: the same fighter appears twice on the card`);
   }
+
+  // Open by design, validated for being real rather than for being on
+  // a list. Lower-cased so "Boxing" and "boxing" are one discipline.
+  // Derived from `disciplineByParticipant` for a real mixed card
+  // rather than required, when that is given.
+  const sport = disciplineByParticipant
+    ? deriveCombatSportType(disciplineByParticipant, roster, a)
+    : requireString(combatSportType, "combatSportType", a).toLowerCase();
 
   const rules = FORMAT_RULES[matchFormat];
   if (roster.length < rules.min || roster.length > rules.max) {
@@ -113,12 +179,24 @@ export function createMatch(options = {}) {
     );
   }
 
+  let sides = { sideAIds: null, sideBIds: null };
+  if (matchFormat === "handicap") {
+    sides = validateHandicapSides(sideAIds, sideBIds, roster, a);
+  } else if (sideAIds !== null || sideBIds !== null) {
+    throw new CombatError(`${a}: sideAIds/sideBIds are only real for a "handicap" match`);
+  }
+
   return {
     matchId: id,
     matchFormat,
     combatSportType: sport,
+    disciplineByParticipant: disciplineByParticipant
+      ? Object.fromEntries(roster.map((p) => [p, disciplineByParticipant[p].toLowerCase().trim()]))
+      : null,
     skillLevel,
     participantIds: roster,
+    sideAIds: sides.sideAIds,
+    sideBIds: sides.sideBIds,
     scheduledAt,
     status: "scheduled",
     winnerIds: null,

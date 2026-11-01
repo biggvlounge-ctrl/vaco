@@ -116,6 +116,23 @@ export const JOBS = {
     title: 'Combat Sports Trainer', districtId: 'combat-sports', skill: 'Athletics',
     payrollAccountId: 'combat-sports-payroll', payPerShift: 22,
   },
+  // **Referee and announcer (31 Oct 2026), per direct instruction**:
+  // "somebody could be an announcer or a referee in sports." Real paid
+  // roles, the same `combat-trainer`'s own shape above -- not a new
+  // mechanic, a real shift a player clocks into at the district that
+  // already has its own real payroll account. `referee`'s skill is
+  // Combat (reading a live bout, the same skill a fighter trains);
+  // `announcer`'s is Communication (calling the action), the same
+  // skill `teacher` below already uses for the district with the
+  // closest real analogue.
+  referee: {
+    title: 'Combat Sports Referee', districtId: 'combat-sports', skill: 'Combat',
+    payrollAccountId: 'combat-sports-payroll', payPerShift: 20,
+  },
+  announcer: {
+    title: 'Combat Sports Announcer', districtId: 'combat-sports', skill: 'Communication',
+    payrollAccountId: 'combat-sports-payroll', payPerShift: 18,
+  },
   'boutique-stylist': {
     title: 'DEGVCHI Boutique Stylist', districtId: 'fashion', skill: 'Art',
     payrollAccountId: 'fashion-district-payroll', payPerShift: 17,

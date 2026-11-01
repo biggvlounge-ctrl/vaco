@@ -327,6 +327,35 @@ test('connecting to /ws/world sends a real snapshot with the live npc population
 
 const svc = { 'X-Service-Name': 'venvs', 'X-Service-Token': 'test-venvs-token' };
 
+test('a real uneven handicap card books, starts, and settles end to end over HTTP', { skip: SKIP }, async () => {
+  const sideA = ['big-1', 'big-2', 'big-3'];
+  const sideB = ['small-1'];
+  const booked = await (await post('/api/combat-sports/matches', {
+    matchFormat: 'handicap', combatSportType: 'wrestling', skillLevel: 'amateur',
+    participantIds: [...sideA, ...sideB], sideAIds: sideA, sideBIds: sideB,
+  }, svc)).json();
+  assert.deepEqual(booked.sideAIds, sideA);
+  assert.deepEqual(booked.sideBIds, sideB);
+
+  await post(`/api/combat-sports/matches/${booked.matchId}/start`, {}, svc);
+  const settled = await (await post(`/api/combat-sports/matches/${booked.matchId}/result`, { winnerIds: sideB }, svc)).json();
+  assert.deepEqual(settled.winnerIds, sideB);
+  assert.equal(settled.status, 'finished');
+});
+
+test('a real mixed-discipline card books and settles end to end over HTTP', { skip: SKIP }, async () => {
+  const booked = await (await post('/api/combat-sports/matches', {
+    matchFormat: 'one-on-one', skillLevel: 'amateur', participantIds: ['boxer-1', 'wrestler-1'],
+    disciplineByParticipant: { 'boxer-1': 'boxing', 'wrestler-1': 'wrestling' },
+  }, svc)).json();
+  assert.equal(booked.combatSportType, 'mixed');
+  assert.deepEqual(booked.disciplineByParticipant, { 'boxer-1': 'boxing', 'wrestler-1': 'wrestling' });
+
+  await post(`/api/combat-sports/matches/${booked.matchId}/start`, {}, svc);
+  const settled = await (await post(`/api/combat-sports/matches/${booked.matchId}/result`, { winnerIds: ['boxer-1'] }, svc)).json();
+  assert.equal(settled.status, 'finished');
+});
+
 // Fresh, never-repeated participant ids per call -- none of these test
 // matches ever resolve (that would need a real live match played out),
 // so reusing a pair would make `assertBookable` correctly refuse the
@@ -505,4 +534,83 @@ test('POST /api/predictions/open requires a real question and 502s honestly when
 
   const res = await post('/api/predictions/open', { question: 'Will there be an invasion of Redrock?' }, svc);
   assert.equal(res.status, 502, 'VAGO is not running in this suite -- a real, honest failure, never a fabricated market');
+});
+
+// -- venues: a real promoter renting a real gym or stadium -----------------
+
+test('GET /api/venues lists the real, named catalog', { skip: SKIP }, async () => {
+  const body = await (await fetch(`${BASE}/api/venues`)).json();
+  assert.ok(body.venues.some((v) => v.id === 'combat-sports-gym'));
+  assert.ok(body.venues.some((v) => v.id === 'downtown-stadium'));
+});
+
+test('GET /api/venues/bookings/:id 404s honestly for an unknown booking', { skip: SKIP }, async () => {
+  const res = await fetch(`${BASE}/api/venues/bookings/999999`);
+  assert.equal(res.status, 404);
+});
+
+test('booking a venue with no credential at all is refused WITHOUT reaching Shield', { skip: SKIP }, async () => {
+  const res = await post('/api/venues/bookings', { promoterId: 'promoter-1', venueId: 'combat-sports-gym' });
+  assert.equal(res.status, 401);
+});
+
+test('booking a venue with a real bearer token asks Shield -- real 502 when it is unreachable, never a silent charge for renting it', { skip: SKIP }, async () => {
+  const res = await post('/api/venues/bookings',
+    { promoterId: 'promoter-1', venueId: 'combat-sports-gym' }, { Authorization: 'Bearer some-token' });
+  assert.equal(res.status, 502);
+});
+
+test('setting a ticket price with no credential at all is refused WITHOUT reaching Shield', { skip: SKIP }, async () => {
+  const res = await post('/api/venues/bookings/1/ticket-price', { promoterId: 'promoter-1', price: 25 });
+  assert.equal(res.status, 401);
+});
+
+test('buying a ticket with a real bearer token asks Shield -- real 502 when it is unreachable, never moving real VCoin on an unverified identity', { skip: SKIP }, async () => {
+  const res = await post('/api/venues/bookings/1/tickets',
+    { buyerId: 'fan-1' }, { Authorization: 'Bearer some-token' });
+  assert.equal(res.status, 502);
+});
+
+// -- promotions: the real ownership ladder ---------------------------------
+
+test('POST /api/promotions is refused without a real service credential', { skip: SKIP }, async () => {
+  const res = await post('/api/promotions', { promotionId: 'p1', name: 'X', ownerId: 'owner-1', sport: 'wrestling' });
+  assert.equal(res.status, 401);
+});
+
+test('founding a promotion, signing a fighter, reading its record, and selling it all work end to end, for real, with a service credential', { skip: SKIP }, async () => {
+  const promo = await (await post('/api/promotions', {
+    promotionId: 'p-e2e', name: 'Iron Fist Wrestling', ownerId: 'owner-e2e', ownerType: 'player', sport: 'wrestling',
+  }, svc)).json();
+  assert.equal(promo.promotionId, 'p-e2e');
+
+  const read = await (await fetch(`${BASE}/api/promotions/p-e2e`)).json();
+  assert.equal(read.name, 'Iron Fist Wrestling');
+
+  const signed = await (await post('/api/promotions/p-e2e/sign', { fighterId: 'fighter-e2e' }, svc)).json();
+  assert.ok(signed.rosterIds.includes('fighter-e2e'));
+
+  const fighterStatus = await (await fetch(`${BASE}/api/fighters/fighter-e2e/promotion`)).json();
+  assert.equal(fighterStatus.independent, false);
+  assert.equal(fighterStatus.promotion.promotionId, 'p-e2e');
+
+  const record = await (await fetch(`${BASE}/api/promotions/p-e2e/record`)).json();
+  assert.equal(record.rosterSize, 1);
+
+  const byOwner = await (await fetch(`${BASE}/api/promotions/owners/owner-e2e`)).json();
+  assert.ok(byOwner.promotions.some((p) => p.promotionId === 'p-e2e'));
+
+  const sold = await (await post('/api/promotions/p-e2e/sell', { newOwnerId: 'gang-ashwood', newOwnerType: 'organization' }, svc)).json();
+  assert.equal(sold.ownerId, 'gang-ashwood');
+
+  const released = await (await post('/api/promotions/p-e2e/release', { fighterId: 'fighter-e2e' }, svc)).json();
+  assert.equal(released.rosterIds.length, 0);
+  const nowIndependent = await (await fetch(`${BASE}/api/fighters/fighter-e2e/promotion`)).json();
+  assert.equal(nowIndependent.independent, true);
+});
+
+test('GET /api/fighters/:id/promotion reports a real never-signed fighter as independent', { skip: SKIP }, async () => {
+  const body = await (await fetch(`${BASE}/api/fighters/never-signed-fighter/promotion`)).json();
+  assert.equal(body.independent, true);
+  assert.equal(body.promotion, null);
 });

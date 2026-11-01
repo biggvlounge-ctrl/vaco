@@ -241,3 +241,109 @@ test("describeMatch surfaces why predictions are closed rather than just that th
   assert.match(d.predictions, /do not settle/);
   assert.equal(describeMatch(singles()).predictions, "open");
 });
+
+// -- Mixed-discipline matches ---------------------------------------------
+//
+// Per direct instruction: "they could do mixed fighting, where it
+// could be a boxer fights a wrestler, or MMA, however they choose."
+
+test("a single discipline named for everyone is the same real card as passing combatSportType directly", () => {
+  const m = createMatch({
+    matchId: "m1", matchFormat: "one-on-one", skillLevel: "professional",
+    participantIds: ["ada", "bo"], disciplineByParticipant: { ada: "boxing", bo: "Boxing" },
+  });
+  assert.equal(m.combatSportType, "boxing");
+  assert.deepEqual(m.disciplineByParticipant, { ada: "boxing", bo: "boxing" });
+});
+
+test("a real mix of disciplines derives the honest combatSportType \"mixed\"", () => {
+  const m = createMatch({
+    matchId: "m1", matchFormat: "one-on-one", skillLevel: "professional",
+    participantIds: ["ada", "bo"], disciplineByParticipant: { ada: "boxing", bo: "wrestling" },
+  });
+  assert.equal(m.combatSportType, "mixed");
+  assert.deepEqual(m.disciplineByParticipant, { ada: "boxing", bo: "wrestling" });
+});
+
+test("disciplineByParticipant must name every participant, and only participants", () => {
+  assert.throws(() => createMatch({
+    matchId: "m1", matchFormat: "one-on-one", skillLevel: "professional",
+    participantIds: ["ada", "bo"], disciplineByParticipant: { ada: "boxing" },
+  }), CombatError);
+  assert.throws(() => createMatch({
+    matchId: "m1", matchFormat: "one-on-one", skillLevel: "professional",
+    participantIds: ["ada", "bo"], disciplineByParticipant: { ada: "boxing", bo: "wrestling", carol: "mma" },
+  }), CombatError);
+});
+
+test("a match with no disciplineByParticipant still requires combatSportType, exactly as before", () => {
+  assert.throws(() => createMatch({
+    matchId: "m1", matchFormat: "one-on-one", skillLevel: "professional", participantIds: ["ada", "bo"],
+  }), /combatSportType/);
+});
+
+// -- Handicap matches -------------------------------------------------------
+//
+// Per direct instruction: "we can do handicap matches, 4 versus 2, 1
+// versus 3, 6 versus 4, 12 versus 8."
+
+test("a real uneven handicap -- 12 versus 8 -- is a well-formed card", () => {
+  const sideA = fighters(12, "big");
+  const sideB = fighters(8, "small");
+  const m = createMatch({
+    matchId: "m1", matchFormat: "handicap", combatSportType: "wrestling", skillLevel: "professional",
+    participantIds: [...sideA, ...sideB], sideAIds: sideA, sideBIds: sideB,
+  });
+  assert.equal(m.sideAIds.length, 12);
+  assert.equal(m.sideBIds.length, 8);
+});
+
+test("a handicap match refuses when the sides do not account for exactly the real roster", () => {
+  const a = "createMatch";
+  assert.throws(() => createMatch({
+    matchId: "m1", matchFormat: "handicap", combatSportType: "wrestling", skillLevel: "professional",
+    participantIds: ["a1", "a2", "b1"], sideAIds: ["a1"], sideBIds: ["b1"],
+  }), /every, and only, a participant/, a);
+});
+
+test("a handicap match refuses the same fighter listed on both sides", () => {
+  assert.throws(() => createMatch({
+    matchId: "m1", matchFormat: "handicap", combatSportType: "wrestling", skillLevel: "professional",
+    participantIds: ["a1", "a2", "b1"], sideAIds: ["a1", "a2"], sideBIds: ["a2", "b1"],
+  }), /listed on both sides/);
+});
+
+test("a handicap match refuses an empty side -- that is not a handicap, it is a bye", () => {
+  assert.throws(() => createMatch({
+    matchId: "m1", matchFormat: "handicap", combatSportType: "wrestling", skillLevel: "professional",
+    participantIds: ["a1", "a2", "b1"], sideAIds: [], sideBIds: ["a1", "a2", "b1"],
+  }), /at least one fighter on each side/);
+});
+
+test("sideAIds/sideBIds are refused on any non-handicap format -- they would mean nothing there", () => {
+  assert.throws(() => createMatch({
+    matchId: "m1", matchFormat: "one-on-one", combatSportType: "boxing", skillLevel: "professional",
+    participantIds: ["ada", "bo"], sideAIds: ["ada"], sideBIds: ["bo"],
+  }), /only real for a "handicap" match/);
+});
+
+test("a non-handicap match's sideAIds/sideBIds are null, and a handicap match's are real arrays", () => {
+  assert.equal(singles().sideAIds, null);
+  const m = createMatch({
+    matchId: "m1", matchFormat: "handicap", combatSportType: "wrestling", skillLevel: "professional",
+    participantIds: ["a1", "b1", "b2"], sideAIds: ["a1"], sideBIds: ["b1", "b2"],
+  });
+  assert.deepEqual(m.sideAIds, ["a1"]);
+  assert.deepEqual(m.sideBIds, ["b1", "b2"]);
+});
+
+test("recordResult settles a handicap match the same real way as any other -- one side's own ids as winnerIds", () => {
+  const m = createMatch({
+    matchId: "m1", matchFormat: "handicap", combatSportType: "wrestling", skillLevel: "professional",
+    participantIds: ["a1", "b1", "b2"], sideAIds: ["a1"], sideBIds: ["b1", "b2"],
+  });
+  startMatch(m);
+  recordResult(m, ["b1", "b2"]);
+  assert.deepEqual(m.winnerIds, ["b1", "b2"]);
+  assert.equal(m.status, "finished");
+});

@@ -479,3 +479,142 @@ comment ("verified manually... recorded in VDP_COMBAT_SPORTS_
 DISTRICT.md"). A mixed-discipline conflict (boxer side versus wrestler
 side) is not addressed; every duel in a gauntlet still goes through
 `liveWrestling.js` regardless of what the conflict's `kind` says.
+
+## The sports economy, the ownership ladder, mixed fighting, and handicap cards — filed and built 31 Oct–1 Nov 2026
+
+Per direct instruction: "somebody could be an announcer or a referee
+in sports. Somebody could be a promoter, rent the gym out or the
+stadium... make sure it also shows... revenue, finance, cost. Also add
+in wrestling teams, wrestling organizations from top to bottom, where
+you have like a similar to how baseball has its owners, all the way
+down to independent wrestlers, to people in gangs. Gangs can have a
+wrestling team... Also, they could do mixed fighting, where it could
+be a boxer fights a wrestler, or MMA... Also, we can do handicap
+matches, 4 versus 2, 1 versus 3, 6 versus 4, 12 versus 8."
+
+### Referee, announcer, and promoter
+
+`referee` and `announcer` are two new entries in `src/lib/jobs.js`,
+real shift work at the Combat Sports District's own real payroll
+account (`combat-sports-payroll`) — the exact same shape
+`combat-trainer` already had, nothing new in the engine. A promoter is
+a genuinely different real thing: an entrepreneur who pays a real cost
+to use a space for one event rather than clocking into a shift, so it
+gets its own new module, `src/lib/venues.js`, rather than a forced fit
+into the shift engine. `VENUES` is a small, flagged-invented catalog
+(a cheap gym, an expensive stadium — the two the instruction names by
+name). `bookVenue` charges the promoter the real rental cost up front
+(claim-before-pay, same ordering every other real payment in this
+district already uses); `setTicketPrice`/`sellTicket` let the promoter
+sell real tickets, capped at the venue's own real capacity, money
+moving buyer-to-promoter directly; `eventFinance` is the real revenue/
+cost/net-profit view the instruction asked for, derived fresh from the
+booking every call, never cached.
+
+### Promotions: the ownership ladder
+
+New module, `src/lib/promotions.js`. **Not `teamSports.js`'s
+`createTeam`** — checked directly, that function has no owner field at
+all, confirming the gap. A promotion here is the franchise: who owns
+it (`ownerId`, with a free `ownerType` label — player, organization,
+civilization, or independent, deliberately unvalidated against
+`organizations.js`/`civilizations.js` themselves, the same
+unvalidated-group-id posture `conflicts.js`'s own `groupId` already
+takes) and who is signed to it (`rosterIds`, real exclusivity — a
+fighter is signed to at most one promotion at a time, and not being
+signed anywhere is the real, first-class "independent" state, not an
+absence). `transferOwnership` is the real baseball-style sale —
+identity and roster survive, only who owns it changes.
+`promotionRecord` sums the real win/loss record of every signed
+fighter, read fresh from `leaderboards.js` every call rather than
+duplicated and risking drift. Management routes
+(`POST /api/promotions`, `/sign`, `/release`, `/sell`) are
+`requireCallingService()`, the same footing `conflicts.js`'s own
+declare/forfeit-side routes already take — an owner can be a gang or a
+tribe, not only one Shield session, so there is no single body field
+that is always "the acting human."
+
+### Mixed-discipline matches
+
+`combatSports.js`'s `createMatch` gains an optional
+`disciplineByParticipant` (participantId -> discipline). When given,
+it REPLACES the requirement to pass `combatSportType` directly — the
+card's own single real label is derived rather than asserted: every
+fighter named the same real discipline reduces to exactly the old
+behavior (the same `combatSportType` a caller would have passed
+directly); a genuine mix derives the honest label `"mixed"`, never a
+guess at which discipline "wins" the card's own name. Every other
+module in this district still reads `match.combatSportType` as one
+string — nothing downstream needed to change.
+
+### Handicap matches
+
+A new `MATCH_FORMATS` entry, `"handicap"`, with `FORMAT_RULES.teamSize`
+left `null` on purpose — unlike `"tag-team"`, the whole point is that
+the two sides are NOT required to be equal. `createMatch` takes
+`sideAIds`/`sideBIds` for this one format only (refused on every other
+format, so they can never silently mean nothing); the two sides must
+be disjoint and must together account for every, and only, a real
+participant on the card. A real 12-versus-8 is exactly as well-formed
+as a 1-versus-2. **No new resolution engine was built for this** —
+sanctioned `tag-team`/`royal-rumble` cards already have no real live
+engine either (only `one-on-one`/`cage-match` do, via
+`liveWrestling.js`); a handicap card settles the same operator-
+declared way those two already do, `recordResult(match, winnerIds)`
+with one whole side's own ids as the winner. Building a second live
+gauntlet engine for sanctioned cards, when `conflicts.js` already has
+one for disputes/street fights, would have been real duplication for
+no real gap — `conflicts.js`'s own gauntlet remains the only
+genuinely *live, playable* handicap mechanic in this district.
+
+### Verification
+
+New `test/venues.test.js` (12 tests) and `test/promotions.test.js` (12
+tests), both fully passing and mutation-verified per
+`dev-docs/STANDING_INSTRUCTION_TEST_VERIFICATION.md` (venues: the
+real ticket-capacity cap, caught an off-by-one overselling by exactly
+one seat; promotions: the cross-promotion signing-exclusivity check,
+which also surfaced a real gap in the test suite itself — the original
+tests never covered signing the *same* fighter to the *same* roster
+twice, a mutation that still passed every existing test; a new test
+was added and *that* one caught it, exactly the "a test you have never
+seen fail is not evidence" case this discipline exists for).
+`test/combatSports.test.js` grew from 25 to 36 (mixed-discipline
+derivation — including a mutation-caught case where "mixed" was always
+returned regardless of real agreement — and the full handicap-side
+validation, including a mutation-caught case where the both-sides
+overlap check was disabled). `test/server.test.js` grew by 9 more
+(venue guard-refusal shapes, a full real promotions round trip against
+the spawned server, and a full real handicap card and mixed-discipline
+card each booked/started/settled over real HTTP) — 949 tests across
+the full VDP suite, all passing.
+
+Also run live against real spawned Shield + V3 + VDP: a real promoter
+booked the real gym (1000 → 800 VCoin), set a $25 ticket price, a real
+fan bought one (promoter 800 → 825, fan 1000 → 975), and
+`GET /api/venues/bookings/:id/finance` reported the real honest loss
+(`-175`) a single ticket against a $200 rental actually produces. A
+referee clocked in and out of a real shift for real pay
+(`skill: Combat`, `grossPay: 20`, real income tax deducted). A
+promotion was founded, a fighter signed (confirmed independent before,
+not-independent after), its real record read, sold to a different
+owner, and the fighter released back to independent — all over real
+HTTP against the real spawned server.
+
+### Left for a follow-up round, deliberately
+
+- No real ticket/gate-revenue tie-in for `combatSports.js`'s existing
+  VAGO prediction markets or `conflicts.js`'s own ones — `venues.js`'s
+  finance view is its own, separate real number, not yet merged into
+  either.
+- A promotion's own roster is not yet checked against
+  `combatSports.assertSameTier`/`FORMAT_RULES` when a card is booked
+  — a promotion could in principle field a mismatched-tier card today,
+  the same way an unaffiliated independent roster already could before
+  this phase; real, pre-existing scope, not introduced here.
+- `civilizationSports.js`'s own culture-level
+  `favoredCombatSports`/`homeVenue` fields are not yet wired to
+  `promotions.js` — a civilization fielding a team today still does so
+  by passing its own id as a promotion's `ownerId`/`ownerType:
+  "civilization"` by hand, not through any automatic culture-driven
+  roster.

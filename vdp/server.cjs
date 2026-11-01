@@ -344,6 +344,8 @@ let store = createVdpStore();
   const liveWrestlingLib = await import('./src/lib/liveWrestling.js');
   const leaderboardsLib = await import('./src/lib/leaderboards.js');
   const conflictsLib = await import('./src/lib/conflicts.js');
+  const venuesLib = await import('./src/lib/venues.js');
+  const promotionsLib = await import('./src/lib/promotions.js');
   const teamSportsLib = await import('./src/lib/teamSports.js');
   const teamStandingsLib = await import('./src/lib/teamStandings.js');
   const rankingsLib = await import('./src/lib/rankings.js');
@@ -573,6 +575,8 @@ let store = createVdpStore();
       // collide with a real combat-sports matchId.
       if (!store.conflicts) store.conflicts = { list: [], nextConflictId: 1 };
       if (!store.conflictDuels) store.conflictDuels = {};
+      if (!store.venues) store.venues = venuesLib.createVenueStore();
+      if (!store.promotions) store.promotions = promotionsLib.createPromotionsStore();
       // `teamSports.js` is deliberately storage-agnostic, the same
       // real reason `combatSports.js`'s own matches live on
       // `store.combatSports` rather than inside that module.
@@ -3418,6 +3422,156 @@ let store = createVdpStore();
       });
       if (!market) return res.status(502).json({ error: 'VAGO did not open the market' });
       res.status(201).json(market);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // -- Venues: a real promoter renting a real gym or stadium ---------------
+  //
+  // Per direct instruction: "somebody could be a promoter, rent the
+  // gym out or the stadium... make sure it also shows... revenue,
+  // finance, cost." `venues.js` is the referee for the real catalog,
+  // the real rental charge, and the real finance derivation; this is
+  // just where its money-moving calls get a real `transferVCoin`.
+  app.get('/api/venues', (_req, res) => {
+    res.json({ venues: venuesLib.listVenues() });
+  });
+
+  // Booking is the one real thing a specific, identified promoter does
+  // themselves -- `requireActor('promoterId')`, the same trust split
+  // every other player-initiated spend in this app already uses.
+  app.post('/api/venues/bookings', requireActor('promoterId'), async (req, res) => {
+    try {
+      const booking = await venuesLib.bookVenue(store.venues, {
+        ...req.body, transferFn: transferVCoin,
+      });
+      newsLib.recordEvent(store.news, {
+        kind: 'venue', text: `${req.body.promoterId} booked ${venuesLib.getVenue(booking.venueId).name}`
+          + (booking.label ? ` for "${booking.label}"` : ''),
+      });
+      res.status(201).json(booking);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/venues/bookings/:id', (req, res) => {
+    const booking = venuesLib.getBooking(store.venues, Number(req.params.id));
+    if (!booking) return res.status(404).json({ error: `no booking ${req.params.id}` });
+    res.json(booking);
+  });
+
+  app.get('/api/venues/promoters/:id/bookings', (req, res) => {
+    res.json({ bookings: venuesLib.bookingsByPromoter(store.venues, req.params.id) });
+  });
+
+  app.post('/api/venues/bookings/:id/ticket-price', requireActor('promoterId'), (req, res) => {
+    try {
+      const booking = venuesLib.setTicketPrice(store.venues, Number(req.params.id), req.body.promoterId, req.body.price);
+      res.status(200).json(booking);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/venues/bookings/:id/tickets', requireActor('buyerId'), async (req, res) => {
+    try {
+      const booking = await venuesLib.sellTicket(store.venues, Number(req.params.id), {
+        buyerId: req.body.buyerId, transferFn: transferVCoin,
+      });
+      res.status(201).json(booking);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // "Make sure it also shows... revenue, finance, cost" -- the real
+  // derived view, read fresh every call, never cached.
+  app.get('/api/venues/bookings/:id/finance', (req, res) => {
+    try {
+      res.json(venuesLib.eventFinance(store.venues, Number(req.params.id)));
+    } catch (err) {
+      res.status(404).json({ error: err.message });
+    }
+  });
+
+  // -- Promotions: the real ownership ladder --------------------------------
+  //
+  // Per direct instruction: "wrestling teams, wrestling organizations
+  // from top to bottom, where you have like a similar to how baseball
+  // has its owners, all the way down to independent wrestlers, to
+  // people in gangs. Gangs can have a wrestling team... Organizations
+  // can. Tribes can have representatives." `promotions.js` is the
+  // referee for who owns what and who is signed where;
+  // `requireCallingService()` here for the same reason `conflicts.js`'s
+  // own declare/forfeit-side routes already take it: an owner can be a
+  // gang, a tribe, or a civilization, not only a single Shield session
+  // -- there is no one body field that is always "the acting human."
+  app.get('/api/promotions', (_req, res) => {
+    res.json({ promotions: promotionsLib.listPromotions(store.promotions) });
+  });
+
+  app.get('/api/promotions/:id', (req, res) => {
+    const promotion = promotionsLib.getPromotion(store.promotions, req.params.id);
+    if (!promotion) return res.status(404).json({ error: `no promotion "${req.params.id}"` });
+    res.json(promotion);
+  });
+
+  app.get('/api/promotions/:id/record', (req, res) => {
+    try {
+      res.json(promotionsLib.promotionRecord(store.promotions, req.params.id, store.leaderboards, leaderboardsLib.recordFor));
+    } catch (err) {
+      res.status(404).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/promotions/owners/:ownerId', (req, res) => {
+    res.json({ promotions: promotionsLib.promotionsByOwner(store.promotions, req.params.ownerId) });
+  });
+
+  app.get('/api/fighters/:id/promotion', (req, res) => {
+    const promotion = promotionsLib.promotionFor(store.promotions, req.params.id);
+    res.json({ fighterId: req.params.id, independent: promotion === null, promotion });
+  });
+
+  app.post('/api/promotions', requireCallingService(), (req, res) => {
+    try {
+      const promotion = promotionsLib.createPromotion(store.promotions, req.body);
+      newsLib.recordEvent(store.news, {
+        kind: 'promotions', text: `${promotion.ownerId} founded a new ${promotion.sport} promotion: ${promotion.name}`,
+      });
+      res.status(201).json(promotion);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/promotions/:id/sign', requireCallingService(), (req, res) => {
+    try {
+      const promotion = promotionsLib.signFighter(store.promotions, req.params.id, req.body.fighterId);
+      newsLib.recordEvent(store.news, { kind: 'promotions', text: `${req.body.fighterId} signed with ${promotion.name}` });
+      res.status(200).json(promotion);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/promotions/:id/release', requireCallingService(), (req, res) => {
+    try {
+      const promotion = promotionsLib.releaseFighter(store.promotions, req.params.id, req.body.fighterId);
+      newsLib.recordEvent(store.news, { kind: 'promotions', text: `${req.body.fighterId} is now independent, released by ${promotion.name}` });
+      res.status(200).json(promotion);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/promotions/:id/sell', requireCallingService(), (req, res) => {
+    try {
+      const promotion = promotionsLib.transferOwnership(store.promotions, req.params.id, req.body.newOwnerId, req.body.newOwnerType);
+      newsLib.recordEvent(store.news, { kind: 'promotions', text: `${promotion.name} was sold to ${promotion.ownerId}` });
+      res.status(200).json(promotion);
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
