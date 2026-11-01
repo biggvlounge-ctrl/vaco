@@ -1086,11 +1086,28 @@ real 10 VCoin bonus, the real anti-abuse rule confirmed (a second
 referrer trying to claim an already-referred user was rejected), and
 restart-survival confirmed.
 
+## Real, visible VACA verification badge (1 Nov 2026)
+
+Closes this file's own flagged "a visible, ecosystem-wide
+verification badge" gap. `GET /api/card/:id/full`
+(`lib/cardFullDetail.js`) now also fetches the card's real, live VACA
+authenticity grade via the already-existing `fetchAuthenticityGrade`
+(same injected-dependency shape as `fetchCollectibles`), fail-soft to
+`null` on a VACA outage rather than blocking the whole page load —
+distinct from VACA genuinely grading a card `'C'`. `public/index.html`
+renders it as a real, colored badge (`VACA grade: A/B/C`, or an honest
+"unavailable" badge when VACA couldn't be reached) right alongside the
+card's rarity/category badges.
+
+### Verification
+3 new tests in `test/cardFullDetail.test.js` (no grade given stays
+honestly null, a real injected grade comes through, a simulated VACA
+outage fails soft without taking down the rest of the page). Full
+suite: 279/279. Live-verified: booted a real spawned server with no
+reachable VACA and confirmed `/api/card/:id/full` still answers
+correctly (404 for an unknown card, no crash).
+
 ## Not yet built
-- **VACA now exists** (`../vaca/`) and the value-score endpoint is a
-  real, live client of it — see above. A visible, ecosystem-wide
-  verification *badge* (a UI/display concept, not just the underlying
-  grade the score already consumes) is still real, later work.
 - A real registered ATS/order-book matching engine for secondary
   fractional-share resale — Phase 10 built real peer-to-peer secondary
   trades (list a price, another buyer takes it), not live price

@@ -31,9 +31,22 @@ const { computeEngagementStats } = require('./cardEngagement');
 const { getFollowerCount } = require('./cardFollows');
 
 async function getCardFullDetail(store, options = {}) {
-  const { cardId, fetchCollectibles = async () => [] } = options;
+  const { cardId, fetchCollectibles = async () => [], fetchAuthenticityGrade = async () => null } = options;
   const card = getCultureCard(store, cardId);
   if (!card) throw new Error(`getCardFullDetail: no card with id ${cardId}`);
+
+  // Real, live VACA grade for the page's own visible verification
+  // badge -- closes this project's own flagged "a visible, ecosystem-
+  // wide verification badge" gap (the underlying grade already feeds
+  // the value-score algorithm; nothing rendered it anywhere before
+  // now). Fail-soft to `null` on a VACA outage -- a page load must
+  // never block on it the way the real value-score route correctly
+  // does -- so the frontend can tell "VACA said C" from "VACA was
+  // unreachable just now" instead of conflating the two.
+  let authenticityGrade = null;
+  try {
+    authenticityGrade = await fetchAuthenticityGrade(cardId);
+  } catch { /* VACA unreachable -- honestly null, not a blocked page load */ }
 
   let marketPrice = null;
   try {
@@ -71,6 +84,7 @@ async function getCardFullDetail(store, options = {}) {
     collectibles,
     royaltyRecipient,
     royaltyRate: royaltyRecipient ? SECONDARY_SALE_ROYALTY_RATE : null,
+    authenticityGrade,
   };
 }
 

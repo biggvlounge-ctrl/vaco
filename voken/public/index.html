@@ -178,6 +178,19 @@ function renderCardDetailView(body, cardId) {
     head.appendChild(VACO.badge(card.tokenizationType));
     head.appendChild(VACO.badge(card.category));
     if (card.verifiedBySubject) head.appendChild(VACO.badge('verified', 'money'));
+    // Real VACA authenticity grade, live from ../vaca/ (server.js's
+    // own fetchAuthenticityGrade, now surfaced through this page's
+    // full-detail load) -- a visible badge for the grade the
+    // value-score endpoint already consumes, closing this project's
+    // own flagged "a visible, ecosystem-wide verification badge" gap.
+    // `null` means VACA could not be reached just now, not that it
+    // graded the card 'C' -- the two are kept visibly distinct.
+    if (full.authenticityGrade) {
+      var gradeKind = full.authenticityGrade === 'A' ? 'money' : (full.authenticityGrade === 'B' ? 'warn' : 'danger');
+      head.appendChild(VACO.badge('VACA grade: ' + full.authenticityGrade, gradeKind));
+    } else {
+      head.appendChild(VACO.badge('VACA grade unavailable'));
+    }
     out.appendChild(VACO.card('Card #' + card.id, [
       head,
       card.historicFact ? (card.historicFact.name + ' — ' + card.historicFact.era) : null,

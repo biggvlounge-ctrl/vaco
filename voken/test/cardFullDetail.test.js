@@ -122,3 +122,32 @@ test('getCardFullDetail refuses an unknown card', async () => {
   const store = createVokenStore();
   await assert.rejects(() => getCardFullDetail(store, { cardId: 999999 }), /no card with id 999999/);
 });
+
+// -- authenticityGrade: the real, visible VACA verification badge --------
+
+test('with no real fetchAuthenticityGrade given, the page honestly shows null, not a guessed grade', async () => {
+  const store = createVokenStore();
+  const card = mintMusicCard(store);
+  const detail = await getCardFullDetail(store, { cardId: card.id });
+  assert.equal(detail.authenticityGrade, null);
+});
+
+test('a real, injected fetchAuthenticityGrade supplies the real grade on the page', async () => {
+  const store = createVokenStore();
+  const card = mintMusicCard(store);
+  const fetchAuthenticityGrade = async (cardId) => {
+    assert.equal(cardId, card.id);
+    return 'A';
+  };
+  const detail = await getCardFullDetail(store, { cardId: card.id, fetchAuthenticityGrade });
+  assert.equal(detail.authenticityGrade, 'A');
+});
+
+test('a VACA outage fails the page soft -- authenticityGrade is honestly null, the rest of the page still loads', async () => {
+  const store = createVokenStore();
+  const card = mintMusicCard(store);
+  const fetchAuthenticityGrade = async () => { throw new Error('VACA unreachable'); };
+  const detail = await getCardFullDetail(store, { cardId: card.id, fetchAuthenticityGrade });
+  assert.equal(detail.authenticityGrade, null);
+  assert.equal(detail.card.id, card.id, 'the rest of the page must not be taken down by a VACA outage');
+});

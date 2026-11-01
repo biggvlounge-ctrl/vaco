@@ -521,7 +521,9 @@ app.get('/api/card/:id/commerce', async (req, res) => {
 // whole page when they don't yet apply.
 app.get('/api/card/:id/full', async (req, res) => {
   try {
-    res.json(await getCardFullDetail(store, { cardId: Number(req.params.id), fetchCollectibles: fetchRealCreatorCollectibles }));
+    res.json(await getCardFullDetail(store, {
+      cardId: Number(req.params.id), fetchCollectibles: fetchRealCreatorCollectibles, fetchAuthenticityGrade,
+    }));
   } catch (err) {
     res.status(404).json({ error: err.message });
   }
