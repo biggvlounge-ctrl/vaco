@@ -6,17 +6,15 @@
 // to a related space."
 //
 // Source of truth: that doc's own `VxllageSurfaceLink { sourceType,
-// sourceId, linkedSurfaceType, linkedSurfaceId }`, with one real,
-// necessary narrowing: the doc's own type union includes
-// "community-thread," but no `Community` entity exists anywhere in
-// this codebase -- only `Village` (see `villages.js`'s own header on
-// the real "shrink" correction this app already went through).
-// Checked directly rather than assumed: `SURFACE_TYPES` below is the
-// doc's own list minus that one undocumented, unbuilt entity, flagged
-// here rather than silently accepting a link type nothing can ever
-// actually point at.
+// sourceId, linkedSurfaceType, linkedSurfaceId }`.
+//
+// **Updated (1 Nov 2026): "community-thread" is real now.** A real,
+// minimal `Community` entity (`communities.js`) closes the gap this
+// file's own header used to flag -- the doc's own type union named
+// "community-thread," and nothing existed for one to belong to.
+// `SURFACE_TYPES` now matches the doc's list in full.
 
-const SURFACE_TYPES = ['post', 'article', 'village-room'];
+const SURFACE_TYPES = ['post', 'article', 'village-room', 'community-thread'];
 
 // Real, deliberate normalization -- `sourceId`/`linkedSurfaceId` are
 // stored as canonical strings. Every id they can reference (a post id,

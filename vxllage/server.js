@@ -55,6 +55,9 @@ const {
   recommendAuthor, getRecommendationsForAuthor, sendNewsletter,
 } = require('./lib/newsletters');
 const { SURFACE_TYPES, createSurfaceLink, getLinksForSurface } = require('./lib/surfaceLinks');
+const {
+  createCommunity, getCommunity, listCommunities, createCommunityThread, getCommunityThread, listThreadsForCommunity,
+} = require('./lib/communities');
 const { traceMiddleware } = require('./lib/tracing.cjs');
 
 const app = express();
@@ -318,16 +321,18 @@ function requireArticleAuthor() {
 }
 
 // A surface link attaches one surface to another, so the actor must own
-// the **source**. All three surface types resolve to an owner: posts and
-// articles by `authorId`, village rooms by `ownerId`. An unknown type is
-// refused rather than allowed — a new surface type must be taught to
-// this resolver before it can be linked from.
+// the **source**. All four surface types resolve to an owner: posts,
+// articles, and community threads by `authorId`, village rooms by
+// `ownerId`. An unknown type is refused rather than allowed — a new
+// surface type must be taught to this resolver before it can be
+// linked from.
 function requireSourceSurfaceOwner() {
   const session = requireSession();
   const RESOLVERS = {
     post: (id) => store.posts.find((x) => String(x.id) === id)?.authorId,
     article: (id) => store.articles.find((x) => String(x.id) === id)?.authorId,
     'village-room': (id) => store.villageRooms.find((x) => String(x.id) === id)?.ownerId,
+    'community-thread': (id) => store.communityThreads.find((x) => String(x.id) === id)?.authorId,
   };
   return (req, res, next) => session(req, res, () => {
     const { sourceType, sourceId } = req.body || {};
@@ -640,6 +645,46 @@ app.post('/api/newsletters/send', requireArticleAuthor(), (req, res) => {
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+});
+
+// -- Communities (closes surfaceLinks.js's own previously-flagged
+// "no Community entity for community-thread to point at" gap) --
+// Deliberately open, not member-gated -- see communities.js's own
+// header on why this is a lighter layer than Village.
+app.post('/api/communities', requireActor('creatorId'), (req, res) => {
+  try {
+    res.status(201).json(createCommunity(store, req.body || {}));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/communities', (_req, res) => {
+  res.json({ communities: listCommunities(store) });
+});
+
+app.get('/api/communities/:id', (req, res) => {
+  const community = getCommunity(store, Number(req.params.id));
+  if (!community) return res.status(404).json({ error: `no community with id ${req.params.id}` });
+  res.json(community);
+});
+
+app.post('/api/communities/:id/threads', requireActor('authorId'), (req, res) => {
+  try {
+    res.status(201).json(createCommunityThread(store, { ...req.body, communityId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/communities/:id/threads', (req, res) => {
+  res.json({ threads: listThreadsForCommunity(store, Number(req.params.id)) });
+});
+
+app.get('/api/community-threads/:id', (req, res) => {
+  const thread = getCommunityThread(store, Number(req.params.id));
+  if (!thread) return res.status(404).json({ error: `no community thread with id ${req.params.id}` });
+  res.json(thread);
 });
 
 // -- Surface links --

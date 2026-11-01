@@ -436,17 +436,39 @@ the response to what the old code expected):
   infra either), not built here. The real distinction between the two
   Call surfaces isn't specified anywhere yet; not invented ahead of a
   real spec.
-- Real per-route identity matching — `requireSession()` proves a
-  caller holds a real, valid Shield session, but doesn't yet cross-check
-  that session's own `userId` against whichever body field a given
-  route treats as the acting user. A real, separate follow-up (see
-  `lib/shieldAuth.js`'s own header for why it wasn't folded into this
-  same pass).
 - Real email delivery for `email-notification` newsletter subscribers —
   the real recipient list and trigger are computed; actual delivery is
   separate infrastructure, the same posture as VSAFE's/CVNVO's own
   safety-escalation gaps.
-- The `Community` entity the combined architecture doc's own
-  `VxllageSurfaceLink` type union references (`"community-thread"`) —
-  confirmed to not exist anywhere in this codebase; excluded from
-  `SURFACE_TYPES` rather than silently accepted as a real link target.
+
+## Real per-route identity matching and a real Community entity (1 Nov 2026)
+
+Closes the two real gaps this file used to flag here:
+
+- **Per-route identity matching is done.** Every mutating route now
+  sits behind either `requireActor(field)` (the body names the acting
+  user directly) or one of four real ownership-lookup guards
+  (`requireVillageMember`, `requireVillageOwner`, `requireArticleAuthor`,
+  `requireSourceSurfaceOwner`) that resolve a stored record's own real
+  owner and compare it to the session — `dev-docs/AUTH_HARDENING.md`
+  §4's own "known limitation" is closed, not still open. No route is
+  left on bare `requireSession()` alone.
+- **`Community` is real now** (`lib/communities.js`), closing
+  `surfaceLinks.js`'s own flagged gap: the combined architecture doc's
+  `VxllageSurfaceLink` type union names `"community-thread"`, and
+  nothing existed for one to belong to. Deliberately NOT a second
+  Village — `villages.js`'s own "shrink" correction already drew that
+  line — a Community here is a lighter, open discussion space (real
+  `createCommunity`/`createCommunityThread`, no channels, no rooms, no
+  membership roles; anyone may start a thread). `SURFACE_TYPES` now
+  includes `community-thread` in full, and `requireSourceSurfaceOwner`
+  resolves a thread's own real `authorId`.
+
+### Verification
+8 new tests in `test/communities.test.js` (community/thread creation
+and refusals, per-community thread scoping, and a real surface link
+created to/from a community thread). Full suite: 24/24. Live-verified
+against real spawned Shield + this server: created a community and a
+thread, linked a post to it as the thread's own author (201), and
+confirmed a different signed-in user attempting the same link gets a
+real 403.

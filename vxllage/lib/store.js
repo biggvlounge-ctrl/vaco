@@ -38,6 +38,13 @@ function createVxllageStore() {
     crossPublicationRecommendations: [],
     surfaceLinks: [],
     nextSurfaceLinkId: 1,
+    // Closes `surfaceLinks.js`'s own previously-flagged gap: the
+    // combined architecture doc's `VxllageSurfaceLink` type union
+    // names "community-thread," but no `Community` entity existed.
+    communities: [],
+    nextCommunityId: 1,
+    communityThreads: [],
+    nextCommunityThreadId: 1,
   };
 }
 
