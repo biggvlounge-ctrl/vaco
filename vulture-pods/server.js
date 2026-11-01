@@ -30,6 +30,7 @@ const {
 } = require('./lib/shows');
 const {
   EPISODE_STATUSES, createEpisode, getEpisode, listEpisodesForShow, publishEpisode, attachEpisodeVideo,
+  setEpisodeShowNotes, setEpisodeTranscript, addEpisodeChapter,
 } = require('./lib/episodes');
 const {
   PLATFORM_TAKE_PERCENT, subscribeToShow, cancelShowSubscription, isSubscribedToShow, listSubscriptionsForUser,
@@ -335,6 +336,37 @@ app.post('/api/episodes/:id/video', requireEpisodeShowCreator(), async (req, res
       authorization: req.headers.authorization,
     });
     res.status(201).json(attachEpisodeVideo(store, { episodeId, vaultStvdiosPostId: post.id, contentType: post.contentType }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Show notes, transcript, and chapters -- closes this project's own
+// previously-flagged "beyond the real, minimal metadata fields built
+// here" gap. All three are the show's creator own real content,
+// settable/addable at any point in the episode's life, same guard as
+// the publish/video routes above.
+app.post('/api/episodes/:id/show-notes', requireEpisodeShowCreator(), (req, res) => {
+  try {
+    res.json(setEpisodeShowNotes(store, { episodeId: Number(req.params.id), showNotes: req.body.showNotes }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/episodes/:id/transcript', requireEpisodeShowCreator(), (req, res) => {
+  try {
+    res.json(setEpisodeTranscript(store, { episodeId: Number(req.params.id), transcript: req.body.transcript }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/episodes/:id/chapters', requireEpisodeShowCreator(), (req, res) => {
+  try {
+    res.status(201).json(addEpisodeChapter(store, {
+      episodeId: Number(req.params.id), title: req.body.title, startSeconds: req.body.startSeconds,
+    }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

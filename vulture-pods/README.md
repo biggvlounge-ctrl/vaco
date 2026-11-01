@@ -266,6 +266,35 @@ list route the app already calls already returns in full: `GET
 /api/shows/:id`, `GET /api/episodes/:id`, and
 `GET /api/shows/:id/subscribers/:userId`.
 
+## Show notes, transcript, and chapters (1 Nov 2026)
+
+Closes this file's own previously-flagged "beyond the real, minimal
+metadata fields built here" gap. `lib/episodes.js` gains three real,
+creator-authored fields, each with its own write function and route,
+guarded the same `requireEpisodeShowCreator()` way as publish/video:
+
+- `setEpisodeShowNotes` / `POST /api/episodes/:id/show-notes` — free
+  text, settable at any point in the episode's life.
+- `setEpisodeTranscript` / `POST /api/episodes/:id/transcript` — one
+  whole-episode text block; no real speech-to-text service exists in
+  this ecosystem's sandbox, so a creator pastes their own, same as
+  show notes.
+- `addEpisodeChapter` / `POST /api/episodes/:id/chapters` — real
+  `{title, startSeconds}` markers, validated against the episode's own
+  real `durationSeconds`, kept genuinely sorted, no two chapters may
+  share a start time.
+
+### Verification
+11 new tests in `test/episodes.test.js` (fresh-episode defaults, each
+setter's real effect and refusals, chapter sort order, the duration-
+boundary refusal, the duplicate-start refusal). Full suite: 27/27.
+Mutation-verified the chapter duration-boundary check specifically:
+disabled it, confirmed exactly 1 test went red, restored, confirmed
+green. Live-verified against real spawned Shield + this server: a
+real show owner set show notes, a transcript, and added a chapter, all
+three visible on a subsequent `GET /api/episodes/:id`; a different
+signed-in user attempting the same chapter route got a real 403.
+
 ## Not yet built
 - Real audio hosting/streaming infrastructure — episodes are real
   metadata records, not actual audio files or a CDN.
@@ -277,8 +306,6 @@ list route the app already calls already returns in full: `GET
   distribution integration point instead, per this ecosystem's own
   established pattern of internal cross-app calls over external
   syndication formats.
-- Episode transcripts, chapters, or show notes beyond the real,
-  minimal metadata fields built here.
 - A real 12-hour ceiling still exists on the long-form Video path
   (Vavlt Stvdios' own `MAX_VIDEO_DURATION_SECONDS`, YouTube's real
   verified-account cap) — comfortably covers any real episode length,

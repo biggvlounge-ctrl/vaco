@@ -37,6 +37,17 @@ const { getShow } = require('./shows');
 
 const EPISODE_STATUSES = ['draft', 'published'];
 
+// Closes this project's own previously-flagged gap ("episode
+// transcripts, chapters, or show notes beyond the real, minimal
+// metadata fields built here"). All three are plain text/data this
+// project is the real system of record for -- no external transcript
+// service or chapter-parsing tool exists anywhere in this ecosystem's
+// sandbox, so these are real, creator-authored fields (the same real
+// RSS <podcast:transcript>/<podcast:chapters> namespaces podcast apps
+// actually use, minus the literal RSS/XML this project's own README
+// already deliberately skips in favor of internal cross-app calls).
+const MAX_CHAPTER_TITLE_LENGTH = 200;
+
 function createEpisode(store, options = {}) {
   const {
     showId, title, episodeNumber, durationSeconds, requiresSubscription = false,
@@ -67,6 +78,9 @@ function createEpisode(store, options = {}) {
     vultureMusicReleaseId: null,
     vaultStvdiosPostId: null,
     vaultStvdiosContentType: null,
+    showNotes: null,
+    transcript: null,
+    chapters: [],
     createdAt: Date.now(),
     publishedAt: null,
   };
@@ -128,11 +142,76 @@ function attachEpisodeVideo(store, options = {}) {
   return episode;
 }
 
+// Show notes are free-form, creator-written text (episode description,
+// links, credits) -- real and settable at any point in an episode's
+// life, draft or published, same as a real podcast host editing their
+// own show notes before or after release.
+function setEpisodeShowNotes(store, options = {}) {
+  const { episodeId, showNotes } = options;
+  const episode = getEpisode(store, episodeId);
+  if (!episode) throw new Error(`setEpisodeShowNotes: no episode with id ${episodeId}`);
+  if (typeof showNotes !== 'string' || showNotes.trim().length === 0) {
+    throw new Error('setEpisodeShowNotes requires a non-empty showNotes string');
+  }
+  episode.showNotes = showNotes;
+  return episode;
+}
+
+// A transcript is one real, whole-episode text block -- this project
+// is the system of record for it (no real speech-to-text service
+// exists in this ecosystem's sandbox to generate one; a creator
+// pastes their own, same as show notes).
+function setEpisodeTranscript(store, options = {}) {
+  const { episodeId, transcript } = options;
+  const episode = getEpisode(store, episodeId);
+  if (!episode) throw new Error(`setEpisodeTranscript: no episode with id ${episodeId}`);
+  if (typeof transcript !== 'string' || transcript.trim().length === 0) {
+    throw new Error('setEpisodeTranscript requires a non-empty transcript string');
+  }
+  episode.transcript = transcript;
+  return episode;
+}
+
+// Chapters are real timestamp markers into the episode's own real
+// `durationSeconds` -- validated against it, not an arbitrary
+// unbounded number, and kept genuinely sorted so a player can walk
+// them in order without re-sorting itself. Two chapters cannot share
+// a start time; the real, meaningful content of a chapter list is
+// that each one marks a distinct moment.
+function addEpisodeChapter(store, options = {}) {
+  const { episodeId, title, startSeconds } = options;
+  const episode = getEpisode(store, episodeId);
+  if (!episode) throw new Error(`addEpisodeChapter: no episode with id ${episodeId}`);
+  if (typeof title !== 'string' || title.trim().length === 0) {
+    throw new Error('addEpisodeChapter requires a non-empty title');
+  }
+  if (title.length > MAX_CHAPTER_TITLE_LENGTH) {
+    throw new Error(`addEpisodeChapter: title exceeds ${MAX_CHAPTER_TITLE_LENGTH} characters`);
+  }
+  if (!Number.isInteger(startSeconds) || startSeconds < 0) {
+    throw new Error('addEpisodeChapter requires a non-negative integer startSeconds');
+  }
+  if (startSeconds >= episode.durationSeconds) {
+    throw new Error(`addEpisodeChapter: startSeconds ${startSeconds} is at or past this episode's own durationSeconds (${episode.durationSeconds})`);
+  }
+  if (episode.chapters.some((c) => c.startSeconds === startSeconds)) {
+    throw new Error(`addEpisodeChapter: episode ${episodeId} already has a chapter starting at ${startSeconds}s`);
+  }
+
+  episode.chapters.push({ title, startSeconds });
+  episode.chapters.sort((a, b) => a.startSeconds - b.startSeconds);
+  return episode;
+}
+
 module.exports = {
   EPISODE_STATUSES,
+  MAX_CHAPTER_TITLE_LENGTH,
   createEpisode,
   getEpisode,
   listEpisodesForShow,
   publishEpisode,
   attachEpisodeVideo,
+  setEpisodeShowNotes,
+  setEpisodeTranscript,
+  addEpisodeChapter,
 };
