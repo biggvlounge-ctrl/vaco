@@ -88,7 +88,7 @@ function renderLookup(body) {
         out.appendChild(VACO.card('Verification history', [
           VACO.table([
             { key: 'id', label: 'Id' },
-            { key: 'verificationType', label: 'Type' },
+            { key: 'claimType', label: 'Type' },
             { label: 'Status', render: function (v) { return VACO.badge(v.status); } },
             { key: 'createdAt', label: 'Requested', render: function (v) {
               return v.createdAt ? new Date(v.createdAt).toLocaleString() : '—'; } },
@@ -102,17 +102,103 @@ function renderLookup(body) {
   return VACO.mount(body, out);
 }
 
+// Closes this project's own flagged "real reviewer/dashboard UI for
+// working a verification queue" gap. Real, oldest-first queue of
+// every pending request, with inline Approve/Reject right in the
+// table -- no more guessing an id to review one. `requireOperator`
+// gates the route itself; this frontend has no operator login of its
+// own, same posture every other operator-only surface in this
+// ecosystem's frontends already takes (works as-is when
+// VACO_OPERATOR_MODE is off, refused honestly otherwise).
+// `approveVerification` requires a real `reviewedBy` always, and a
+// real `grade` from this exact set whenever `claimType === 'authenticity'`
+// -- fetched live from /api/health rather than hardcoded, same "never
+// guess a payload shape" discipline the rest of this frontend follows.
+var authenticityGradesCache = null;
+function authenticityGrades() {
+  if (authenticityGradesCache) return Promise.resolve(authenticityGradesCache);
+  return VACO.api('/api/health').then(function (h) {
+    authenticityGradesCache = h.authenticityGrades || ['A', 'B', 'C'];
+    return authenticityGradesCache;
+  });
+}
+
+function renderPendingQueue(container) {
+  return VACO.api('/api/verifications/pending').then(function (body) {
+    var rows = body.verifications || [];
+    container.innerHTML = '';
+    container.appendChild(VACO.table([
+      { key: 'id', label: 'Id' },
+      { key: 'subjectType', label: 'Subject type' },
+      { key: 'subjectId', label: 'Subject' },
+      { key: 'claimType', label: 'Verification' },
+      {
+        key: 'actions', label: 'Decision', render: function (row) {
+          var isAuthenticity = row.claimType === 'authenticity';
+          var actions = el('div', 'vaco-row-tight');
+          var gradeSelect = null;
+          if (isAuthenticity) {
+            gradeSelect = document.createElement('select');
+            gradeSelect.className = 'vaco-select';
+            authenticityGrades().then(function (grades) {
+              grades.forEach(function (g) {
+                var opt = document.createElement('option');
+                opt.value = g; opt.textContent = g;
+                gradeSelect.appendChild(opt);
+              });
+            });
+            actions.appendChild(gradeSelect);
+          }
+          actions.appendChild(VACO.button('Approve', function () {
+            if (!VACO.userId()) throw new Error('Sign in as the reviewer to approve.');
+            var payload = { reviewedBy: VACO.userId() };
+            if (isAuthenticity) payload.grade = gradeSelect.value;
+            return VACO.post('/api/verifications/' + row.id + '/approve', payload).then(function () {
+              VACO.toast('Approved ' + row.id + '.', 'money');
+              return renderPendingQueue(container);
+            });
+          }, 'primary'));
+          actions.appendChild(VACO.button('Reject', function () {
+            if (!VACO.userId()) throw new Error('Sign in as the reviewer to reject.');
+            var reason = window.prompt('Reason for rejecting verification ' + row.id + ':');
+            if (!reason) return; // cancelled, or an empty reason -- rejectVerification refuses either way
+            return VACO.post('/api/verifications/' + row.id + '/reject', { reviewedBy: VACO.userId(), reason: reason }).then(function () {
+              VACO.toast('Rejected ' + row.id + '.', 'danger');
+              return renderPendingQueue(container);
+            });
+          }, 'danger'));
+          return actions;
+        },
+      },
+    ], rows, { empty: 'No pending verifications -- the queue is empty.' }));
+  }).catch(function (err) {
+    container.innerHTML = '';
+    container.appendChild(el('p', 'vaco-small vaco-dim', 'Could not load the queue: ' + err.message));
+  });
+}
+
 function renderQueue(body) {
   var out = el('div', 'vaco-stack');
 
+  var queueContainer = el('div', 'vaco-stack-sm');
+  out.appendChild(VACO.card('Review queue', [queueContainer]));
+  renderPendingQueue(queueContainer);
+
   out.appendChild(VACO.card('Submit a verification request', [
+    // Real, matching `submitVerification`'s actual fields
+    // (`claimType`/`evidence`) -- this form used to send
+    // `verificationType` and no `evidence` at all, which
+    // `submitVerification` always refuses ("requires evidence"). A
+    // real, pre-existing bug found and fixed while building the
+    // review queue above, not left in place alongside it.
     VACO.form([
       { name: 'subjectType', label: 'Type', options: ['user', 'business', 'creator', 'listing'] },
       { name: 'subjectId', label: 'Subject', value: VACO.userId() || '', width: '140px' },
-      { name: 'verificationType', label: 'Verification', placeholder: 'identity', width: '140px' },
+      { name: 'claimType', label: 'Claim', placeholder: 'identity', width: '140px' },
+      { name: 'evidence', label: 'Evidence', placeholder: 'photographs of the certificate of authenticity' },
     ], function (values) {
       return VACO.post('/api/verifications', values)
-        .then(function (v) { VACO.toast('Verification ' + v.id + ' submitted for review.'); });
+        .then(function (v) { VACO.toast('Verification ' + v.id + ' submitted for review.'); return renderPendingQueue(queueContainer); });
     }, 'Submit'),
   ]));
 
@@ -126,15 +212,29 @@ function renderQueue(body) {
           var lines = el('div', 'vaco-stack-sm');
           lines.appendChild(VACO.badge(v.status));
           lines.appendChild(el('p', 'vaco-small vaco-dim',
-            v.subjectType + ' ' + v.subjectId + ' · ' + (v.verificationType || '')));
+            v.subjectType + ' ' + v.subjectId + ' · ' + (v.claimType || '')));
           var actions = el('div', 'vaco-row-tight');
           actions.appendChild(VACO.button('Approve', function () {
-            return VACO.post('/api/verifications/' + values.id + '/approve', {})
-              .then(function () { VACO.toast('Approved.', 'money'); });
+            // Same real fields as the queue above -- `reviewedBy` is
+            // always required, `grade` only for an authenticity claim.
+            // This panel used to POST an empty body, which
+            // `approveVerification` always refused.
+            if (!VACO.userId()) throw new Error('Sign in as the reviewer to approve.');
+            var payload = { reviewedBy: VACO.userId() };
+            if (v.claimType === 'authenticity') {
+              var grade = window.prompt('Authenticity grade for verification ' + values.id + ':');
+              if (!grade) return;
+              payload.grade = grade;
+            }
+            return VACO.post('/api/verifications/' + values.id + '/approve', payload)
+              .then(function () { VACO.toast('Approved.', 'money'); return renderPendingQueue(queueContainer); });
           }, 'primary'));
           actions.appendChild(VACO.button('Reject', function () {
-            return VACO.post('/api/verifications/' + values.id + '/reject', {})
-              .then(function () { VACO.toast('Rejected.', 'danger'); });
+            if (!VACO.userId()) throw new Error('Sign in as the reviewer to reject.');
+            var reason = window.prompt('Reason for rejecting verification ' + values.id + ':');
+            if (!reason) return;
+            return VACO.post('/api/verifications/' + values.id + '/reject', { reviewedBy: VACO.userId(), reason: reason })
+              .then(function () { VACO.toast('Rejected.', 'danger'); return renderPendingQueue(queueContainer); });
           }, 'danger'));
           lines.appendChild(actions);
           out.appendChild(VACO.card('Verification ' + values.id, [lines]));

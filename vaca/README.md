@@ -158,9 +158,72 @@ reported the real, honest unconfigured state; and
 vaca's own 38-test suite (`node --test test/*.test.js`) passes
 unchanged.
 
+## Reviewer queue (1 Nov 2026)
+
+Closes the "real reviewer/dashboard UI for working a verification
+queue" gap above. `GET /api/verifications/pending` (new, operator-gated
+the same `vaca:verify` way approve/reject already are) returns every
+`pending` claim across every subject, oldest first — a real FIFO
+reviewer queue, not a per-subject history. Backed by
+`listPendingVerifications(store)` in `lib/verifications.js`.
+
+The frontend's "Review queue" card (`public/index.html`) renders this
+list with inline Approve/Reject right in the table: Approve shows a
+grade `<select>` only for an `authenticity` claim, populated live from
+`/api/health`'s own `authenticityGrades` rather than hardcoded; Reject
+prompts for a reason. Both require `VACO.userId()` to be set, since
+`reviewedBy` is a real, required field, not a formality.
+
+**Three real, pre-existing bugs found and fixed while building this**,
+each one independently verified live against a spawned server:
+
+- **Route-ordering bug**: `GET /api/verifications/:id` was declared
+  before the new `/pending` route. Express matches by declaration
+  order, so `GET /api/verifications/pending` was being swallowed by the
+  `:id` route (`pending` as a literal id) and always 404'd. Fixed by
+  moving `/pending` above `/:id` in `server.js`.
+- **`lib/operatorAuth.cjs`'s `off` mode never set `req.operator`**, it
+  just called `next()`. Every route that reads
+  `req.operator.operatorName` unconditionally (the decision log on
+  approve/reject) crashed instead of running locally with
+  `VACO_OPERATOR_MODE=off`. Fixed to set the same
+  `{ operatorName: 'unverified', ... }` stub the existing
+  observe/unreachable branch already uses. **This file is duplicated
+  verbatim across 13 apps in this ecosystem** (voken, vaco-notify,
+  hvntz, vulture-music, vaco-shell, vulture-studios, vaca, vago, void,
+  vacon-c, v3, cvnvo/yap, vex) — the same one-line fix was applied to
+  every copy, since it is the same bug with the same fix everywhere it
+  occurs. A regression test lives in `vaca/test/operatorAuth.test.js`.
+- **Frontend contract drift**: the submit form sent `verificationType`
+  (not a real field — `submitVerification` takes `claimType`) and never
+  sent `evidence` at all, which `submitVerification` always refuses.
+  The approve/reject buttons, in both the queue and the older
+  lookup-by-id panel, POSTed empty bodies — `approveVerification`
+  requires `reviewedBy` always and `grade` for an authenticity claim;
+  `rejectVerification` requires `reviewedBy` and `reason`. None of this
+  frontend's review actions could ever have succeeded against the real
+  backend before this pass. All fixed in `public/index.html`.
+
+### Verification
+- `node --test test/*.test.js`: 42/42 passing (3 new tests for
+  `listPendingVerifications`, 1 new test for the `operatorAuth.cjs`
+  `off`-mode fix).
+- Mutation-verified: breaking `listPendingVerifications`'s
+  `status === 'pending'` filter turned exactly the two queue-contents
+  tests red; breaking the `operatorAuth.cjs` fix turned exactly the new
+  `operatorAuth.test.js` test red. Both restored and reconfirmed green.
+- Live-verified against a real spawned server
+  (`VACO_OPERATOR_MODE=off VACO_SERVICE_AUTH_MODE=off
+  VACO_AUDIT_MODE=observe node server.js`): submitted an authenticity
+  claim and an identity claim, confirmed both appeared in
+  `GET /api/verifications/pending` oldest-first, approved the
+  authenticity claim with a real grade, rejected the identity claim
+  with a real reason, confirmed both left the pending queue, and
+  confirmed `GET /api/authenticity-grade/...` returned the real
+  approved grade. Also exercised the fixed lookup-by-id panel's
+  approve path with the same real payload shape.
+
 ## Not yet built
-- Real reviewer/dashboard UI for working a verification queue — this
-  phase is the real API and data model only.
 - Wiring VACA into VEX (VOKEN's own trading floor) or anywhere else in
   the ecosystem "VACA-verified" is referenced but not yet backed by a
   real call.

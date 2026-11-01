@@ -103,6 +103,16 @@ function listVerificationsForSubject(store, subjectType, subjectId) {
     .sort((a, b) => b.createdAt - a.createdAt);
 }
 
+// The real reviewer queue -- closes this project's own flagged "real
+// reviewer/dashboard UI for working a verification queue" gap. Oldest
+// first: a real review queue is worked FIFO, not newest-first the way
+// a single subject's own history (above) reads most usefully.
+function listPendingVerifications(store) {
+  return store.verifications
+    .filter((v) => v.status === 'pending')
+    .sort((a, b) => a.createdAt - b.createdAt);
+}
+
 function requirePending(store, verificationId, action) {
   const verification = getVerification(store, verificationId);
   if (!verification) throw new Error(`${action}: no verification with id ${verificationId}`);
@@ -201,6 +211,7 @@ module.exports = {
   submitVerification,
   getVerification,
   listVerificationsForSubject,
+  listPendingVerifications,
   approveVerification,
   rejectVerification,
   getAuthenticityGrade,

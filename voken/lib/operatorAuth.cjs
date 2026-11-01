@@ -59,7 +59,16 @@ function createOperatorAuth(options = {}) {
     }
 
     return async function operatorGuard(req, res, next) {
-      if (mode === 'off') return next();
+      if (mode === 'off') {
+        // Bypassed, but the route must still see a `req.operator` it can
+        // log a decision against -- `decidedBy: req.operator.operatorName`
+        // is the whole reason this field exists, and a route that reads it
+        // unconditionally should not crash just because local/off mode
+        // skipped the real check. Same stub shape the unreachable-in-
+        // observe-mode branch below already uses.
+        req.operator = { operatorName: 'unverified', scope, mode: 'off' };
+        return next();
+      }
 
       const credential = req.headers['x-operator-credential'];
       if (!credential) {

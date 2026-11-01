@@ -23,7 +23,7 @@ const path = require('path');
 const { attachStore } = require('./lib/storeBackend');
 const {
   VERIFICATION_STATUSES, AUTHENTICITY_GRADES, submitVerification, getVerification,
-  listVerificationsForSubject, approveVerification, rejectVerification, getAuthenticityGrade,
+  listVerificationsForSubject, listPendingVerifications, approveVerification, rejectVerification, getAuthenticityGrade,
   isIdentityVerified,
 } = require('./lib/verifications');
 const { getChain, getBlock, verifyChainIntegrity } = require('./lib/blockchain');
@@ -105,6 +105,23 @@ app.post('/api/verifications', (req, res) => {
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+});
+
+// The real reviewer queue, across every subject -- closes this
+// project's own flagged "real reviewer/dashboard UI for working a
+// verification queue" gap. Gated the same `vaca:verify` way as the
+// approve/reject decision it feeds: a cross-subject list of who is
+// awaiting verification is reviewer-facing, not self-service the way
+// a single subject's own history is.
+//
+// **Must be declared before `GET /api/verifications/:id` below.**
+// Express matches routes in declaration order, and `:id` is a bare
+// param -- it was matching literal requests to `.../pending` too,
+// which meant this route never ran at all. Caught live: a GET here
+// returned the generic "no verification with id pending" 404 the
+// id-lookup route produces for a non-numeric id, not the queue.
+app.get('/api/verifications/pending', requireOperator('vaca:verify'), (_req, res) => {
+  res.json({ verifications: listPendingVerifications(store) });
 });
 
 app.get('/api/verifications/:id', (req, res) => {

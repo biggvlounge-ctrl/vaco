@@ -308,3 +308,31 @@ test('a numeric subjectId still resolves through the string-keyed read path', ()
   assert.strictEqual(v.listVerificationsForSubject(store, 'voken-card', '42').length, 1);
   assert.strictEqual(typeof claim.subjectId, 'string', 'the stored subjectId must be normalized, not left as the number that arrived');
 });
+
+// -- listPendingVerifications: the real reviewer queue -------------------
+
+test('listPendingVerifications returns only pending claims, oldest first', () => {
+  const store = createVacaStore();
+  const c1 = submit(store, { subjectId: 'card-1', now: NOW });
+  const c2 = submit(store, { subjectId: 'card-2', now: NOW + HOUR });
+  const c3 = submit(store, { subjectId: 'card-3', now: NOW + 2 * HOUR });
+  v.approveVerification(store, { verificationId: c2.id, reviewedBy: 'reviewer-1', grade: 'A', now: NOW + 3 * HOUR });
+
+  const pending = v.listPendingVerifications(store);
+  assert.deepStrictEqual(pending.map((p) => p.id), [c1.id, c3.id],
+    'an already-decided claim must not reappear in the queue, and the rest stay oldest-first');
+});
+
+test('listPendingVerifications is empty when nothing is pending', () => {
+  const store = createVacaStore();
+  assert.deepStrictEqual(v.listPendingVerifications(store), []);
+});
+
+test('a rejected claim does not reappear in the pending queue either', () => {
+  const store = createVacaStore();
+  const claim = submit(store, { now: NOW });
+  v.rejectVerification(store, {
+    verificationId: claim.id, reviewedBy: 'reviewer-1', reason: 'duplicate claim', now: NOW + HOUR,
+  });
+  assert.deepStrictEqual(v.listPendingVerifications(store), []);
+});
