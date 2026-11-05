@@ -21,11 +21,22 @@ gaps" mode, since the user's "CONTINUE" arrived before either the
 naming collision or the missing VENVM/Storytime doc (see below) was
 explicitly resolved.
 
-**Still missing, still flagged**: nothing anywhere in this session
-documents "VENVM" or a "Storytime engine," which the user's own intro
-message asked about directly (how CHOPZ connects to VENVM's Storytime
-engine and existing video production tools). No such connection is
-built here — there's nothing real to build it from yet.
+**Still missing, still flagged, corrected reasoning (5 Nov 2026)**: real
+source *does* document VENVM's Storytime engine —
+`venvm/VENVM_INTERNAL_OPERATING_SYSTEM_EXPANSION.md` (item 5, "CHOPZ
+Storytime Engine (VENVM-powered)") and
+`venvm/VENVM_MARKETING_DTC_CAPABILITIES.md` both describe a real
+Script → AI Scene Builder → Voice → Character Gen → Animation →
+Publishing pipeline. Checked directly rather than assumed: that same
+doc's own "Implementation status" table says only one of its four
+synthesized capabilities is real (`venvm/lib/scriptEngine.js`, short-
+form video scripts) — Photo-Grounded Scene Generation, AI Human Twin
+generation, and Gaussian Splatting are each its own "Not built," named
+against real external services (Seedance 2.5, Kling 3.0, Runway
+Gen-4.5, Nerfstudio 3DGS, Sudowrite's Muse model) this environment has
+no access to. The real reason this integration isn't built here is
+this ecosystem's standing no-fake-media-generation stance, not a
+missing spec.
 
 Source docs: `VXLLAGE_CHOPZ_VACAY_ARCHITECTURE.md` (CHOPZ section).
 
@@ -319,4 +330,7 @@ count.
 - Live shopping formats and the four real ad formats named in
   `CHOPZ_TIKTOK_COMPARABLES.md`.
 - The VENVM/Storytime engine integration the user's intro message
-  asked about — no source material exists anywhere for it yet.
+  asked about — real source material exists (see above), but building
+  it would mean fabricating the AI scene/character/animation generation
+  this ecosystem's real external-service integrations don't actually
+  have here, not inventing a spec from nothing.
