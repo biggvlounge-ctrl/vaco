@@ -141,3 +141,45 @@ export async function getGiftRequestsForUser(userId) {
   const body = await requestJson(`/api/gift-dating/requests/${encodeURIComponent(userId)}`);
   return body.requests;
 }
+
+// Blind Date Mode -- CVNVO's own real, deterministic AI-ranked
+// assignment (no simulated LLM call, see `blindDate.js`'s own
+// header), gated behind a real 20-VCoin date token.
+export async function purchaseBlindDateToken(userId) {
+  return requestJson("/api/blind-date/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...sessionHeaders() },
+    body: JSON.stringify({ userId }),
+  });
+}
+
+export async function assignBlindDate(userId, candidateIds) {
+  return requestJson("/api/blind-date/assign", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...sessionHeaders() },
+    body: JSON.stringify({ userId, candidateIds }),
+  });
+}
+
+export async function getBlindDateSession(sessionId) {
+  return requestJson(`/api/blind-date/${encodeURIComponent(sessionId)}`);
+}
+
+export async function revealBlindDatePhotos(sessionId) {
+  return requestJson(`/api/blind-date/${encodeURIComponent(sessionId)}/reveal`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...sessionHeaders() },
+  });
+}
+
+export async function cancelBlindDate(sessionId) {
+  return requestJson(`/api/blind-date/${encodeURIComponent(sessionId)}/cancel`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...sessionHeaders() },
+  });
+}
+
+export async function isUserBlockedFromBlindDating(userId) {
+  const body = await requestJson(`/api/blind-date/blocked/${encodeURIComponent(userId)}`);
+  return body.blocked;
+}

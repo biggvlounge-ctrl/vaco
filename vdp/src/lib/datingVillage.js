@@ -47,6 +47,7 @@ import {
   setLocationSharingPreference, shareLocation, getVisibleLocations,
   scheduleSpeedDate, getSpeedDateSlot, extendSpeedDate, getSpeedDateRotation,
   setGiftThreshold, getGiftThreshold, requestDateWithGift, getGiftRequestsForUser,
+  purchaseBlindDateToken, assignBlindDate, getBlindDateSession, revealBlindDatePhotos, cancelBlindDate, isUserBlockedFromBlindDating,
 } from "./cvnvoClient.js";
 
 export const LOCATION_PRIVACY_TIERS = ['ghost-mode', 'my-friends', 'select-friends'];
@@ -166,4 +167,32 @@ export async function requestDatingVillageDateWithGift(requesterId, recipientId,
 
 export async function getDatingVillageGiftRequests(userId) {
   return getGiftRequestsForUser(userId);
+}
+
+// Blind Date Mode, inside the Dating Village -- real, deliberate
+// choice, same posture as Speed Dating above: the candidate pool is
+// the real players `enterDatingVillage` already found checked in
+// here right now, not a separate global matchmaking pool.
+export async function purchaseDatingVillageBlindDateToken(userId) {
+  return purchaseBlindDateToken(userId);
+}
+
+export async function assignDatingVillageBlindDate(userId, candidateIds) {
+  return assignBlindDate(userId, candidateIds);
+}
+
+export async function getDatingVillageBlindDateSession(sessionId) {
+  return getBlindDateSession(sessionId);
+}
+
+export async function revealDatingVillageBlindDatePhotos(sessionId) {
+  return revealBlindDatePhotos(sessionId);
+}
+
+export async function cancelDatingVillageBlindDate(sessionId) {
+  return cancelBlindDate(sessionId);
+}
+
+export async function isDatingVillageUserBlockedFromBlindDating(userId) {
+  return isUserBlockedFromBlindDating(userId);
 }

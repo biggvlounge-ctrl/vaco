@@ -1371,9 +1371,9 @@ VOKEN's real `/api/brand` endpoint — not hardcoded text.
   inside VDP.
 - Dating Village: real Happn-style proximity crossings, FlashNotes,
   Snap Map location sharing (see "Snap Map inside the Dating Village"
-  below), Speed Dating/Group Dating, and Gift Dating (see their own
-  sections below) are wired in — the remaining three CVNVO dating-
-  format extensions (Long-Distance Mode, Blind Date, Hunts Dates)
+  below), Speed Dating/Group Dating, Gift Dating, and Blind Date Mode
+  (see their own sections below) are wired in — the remaining two
+  CVNVO dating-format extensions (Long-Distance Mode, Hunts Dates)
   exist as real CVNVO APIs but have no VDP-district surface of their
   own yet.
   ~~VDP's own hardcoded single-user login meant two real distinct
@@ -1588,3 +1588,51 @@ and V3's own real ledger shows it — the requester's balance moved
 the recipient's real, live `GET /api/gift-dating/requests/:userId`
 list. This is a genuinely stronger verification than Speed Dating's
 own entry above got, since Gift Dating needs no VACA-verified badge.
+
+## Blind Date Mode inside the Dating Village (5 Nov 2026)
+
+Closes a fourth CVNVO dating-format extension this project's own
+README named as a real API with no VDP-district surface yet — Blind
+Date Mode, CVNVO's own real, deterministic AI-ranked one-at-a-time
+assignment (no simulated LLM call, per this session's consistent
+no-fake-AI stance — see `cvnvo/lib/blindDate.js`'s own header), gated
+behind a real 20-VCoin date token and a real photo-reveal condition
+(3 real messages). CVNVO's server side was already fully built — this
+closes the VDP-side gap only.
+
+`cvnvoClient.js` gains `purchaseBlindDateToken`/`assignBlindDate`/
+`getBlindDateSession`/`revealBlindDatePhotos`/`cancelBlindDate`/
+`isUserBlockedFromBlindDating`, thin wrappers over CVNVO's own real
+`/api/blind-date` routes. `datingVillage.js` wraps those into the
+`DatingVillage`-prefixed equivalents — same real, deliberate choice as
+every other format above: the candidate pool is the real players
+`enterDatingVillage` already found checked in here right now, not a
+separate global matchmaking pool.
+
+`DatingVillageView.jsx` gained a real Blind Date panel: a blocked-
+status warning, a "buy a date token" button, a candidate-pool picker
+over the real checked-in players, an "assign" button, and — once
+assigned — a reveal/cancel pair with the real session's own
+`photosRevealed`/`cancelled` state shown honestly.
+
+### Verification
+
+Both edited files individually pass a real esbuild JSX/syntax check.
+VDP's own `node --test test/*.test.js` suite: 951/951, unchanged (same
+pre-existing Vite-only `import.meta.env` limitation as every other
+`*Client.js` in this project). CVNVO's own suite: 35/35, unchanged (no
+CVNVO code was touched).
+
+Live-verified the full real happy path end to end, against real
+spawned Shield + V3 + VACA + CVNVO servers: two real Shield accounts
+registered real CVNVO profiles (CVNVO's own `POST /api/profiles` call
+to a real, reachable VACA for the honest `verifiedBadge` answer); an
+assignment attempt with no token was correctly refused; a real 20-VCoin
+token purchase moved the requester's real V3 balance 1000 → 980; the
+real assignment produced a real `aiAssignedMatchId`; an early reveal
+attempt was correctly refused with CVNVO's own exact "0/3 messages"
+error; and a real cancel correctly left the requester not yet blocked
+(1 of the real 2-cancellation limit). This closes the one gap Speed
+Dating's own entry above explicitly could not reach — a full, real,
+VACA-backed profile — since Blind Date Mode needs no verified badge,
+only a real profile record to exist.

@@ -4,6 +4,8 @@ import {
   LOCATION_PRIVACY_TIERS, setSnapMapPrivacy, shareSnapMapLocation, getSnapMapVisibleUsers,
   scheduleDatingVillageSpeedDate, extendDatingVillageSpeedDate, getDatingVillageSpeedDateRotation,
   setDatingVillageGiftThreshold, getDatingVillageGiftThreshold, requestDatingVillageDateWithGift, getDatingVillageGiftRequests,
+  purchaseDatingVillageBlindDateToken, assignDatingVillageBlindDate, revealDatingVillageBlindDatePhotos,
+  cancelDatingVillageBlindDate, isDatingVillageUserBlockedFromBlindDating,
 } from "../lib/datingVillage.js";
 
 // CVNVO's real Dating Village, inhabited inside VDP -- a real BarBuddy
@@ -42,6 +44,13 @@ export default function DatingVillageView({ session }) {
   const [giftRequests, setGiftRequests] = useState([]);
   const [giftError, setGiftError] = useState(null);
   const [giftBusy, setGiftBusy] = useState(false);
+
+  const [blindDateToken, setBlindDateToken] = useState(null);
+  const [blindDateCandidates, setBlindDateCandidates] = useState([]);
+  const [blindDateSession, setBlindDateSession] = useState(null);
+  const [blindDateBlocked, setBlindDateBlocked] = useState(false);
+  const [blindDateError, setBlindDateError] = useState(null);
+  const [blindDateBusy, setBlindDateBusy] = useState(false);
 
   const refreshSnapMap = useCallback(() => {
     getSnapMapVisibleUsers(session.userId).then(setSnapMapVisible).catch((err) => setSnapMapError(err.message));
@@ -93,6 +102,10 @@ export default function DatingVillageView({ session }) {
       .catch((err) => setGiftError(err.message));
     refreshGiftRequests();
   }, [session.userId, refreshGiftRequests]);
+
+  useEffect(() => {
+    isDatingVillageUserBlockedFromBlindDating(session.userId).then(setBlindDateBlocked).catch((err) => setBlindDateError(err.message));
+  }, [session.userId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -188,6 +201,64 @@ export default function DatingVillageView({ session }) {
       setGiftError(err.message);
     } finally {
       setGiftBusy(false);
+    }
+  };
+
+  const toggleBlindDateCandidate = (userId) => {
+    setBlindDateCandidates((prev) => (prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]));
+  };
+
+  const handlePurchaseBlindDateToken = async () => {
+    setBlindDateBusy(true);
+    setBlindDateError(null);
+    try {
+      setBlindDateToken(await purchaseDatingVillageBlindDateToken(session.userId));
+    } catch (err) {
+      setBlindDateError(err.message);
+    } finally {
+      setBlindDateBusy(false);
+    }
+  };
+
+  // Real, deliberate choice: the candidate pool is who's really here
+  // right now, not a separate global matchmaking pool.
+  const handleAssignBlindDate = async () => {
+    if (blindDateCandidates.length === 0) return;
+    setBlindDateBusy(true);
+    setBlindDateError(null);
+    try {
+      setBlindDateSession(await assignDatingVillageBlindDate(session.userId, blindDateCandidates));
+    } catch (err) {
+      setBlindDateError(err.message);
+    } finally {
+      setBlindDateBusy(false);
+    }
+  };
+
+  const handleRevealBlindDatePhotos = async () => {
+    if (!blindDateSession) return;
+    setBlindDateBusy(true);
+    setBlindDateError(null);
+    try {
+      setBlindDateSession(await revealDatingVillageBlindDatePhotos(blindDateSession.id));
+    } catch (err) {
+      setBlindDateError(err.message);
+    } finally {
+      setBlindDateBusy(false);
+    }
+  };
+
+  const handleCancelBlindDate = async () => {
+    if (!blindDateSession) return;
+    setBlindDateBusy(true);
+    setBlindDateError(null);
+    try {
+      setBlindDateSession(await cancelDatingVillageBlindDate(blindDateSession.id));
+      setBlindDateBlocked(await isDatingVillageUserBlockedFromBlindDating(session.userId));
+    } catch (err) {
+      setBlindDateError(err.message);
+    } finally {
+      setBlindDateBusy(false);
     }
   };
 
@@ -384,6 +455,56 @@ export default function DatingVillageView({ session }) {
           <p key={r.id} style={{ fontSize: 12, margin: "2px 0" }}>{r.requesterId} sent {r.giftValueVCoin} VCoin</p>
         ))}
         {giftError && <p style={{ color: "crimson" }}>Error: {giftError}</p>}
+      </div>
+
+      <div style={{ marginTop: 12, borderTop: "1px dashed #ccc", paddingTop: 8 }}>
+        <p style={{ fontSize: 13, fontWeight: "bold", margin: "0 0 4px" }}>Blind Date Mode</p>
+        <p style={{ fontSize: 11, color: "#888", margin: "0 0 6px" }}>
+          A real 20-VCoin date token, then a deterministic AI-ranked assignment from who's checked in here — photos stay hidden until 3 real messages happen.
+        </p>
+        {blindDateBlocked && (
+          <p style={{ fontSize: 12, color: "crimson" }}>Temporarily blocked after too many consecutive cancellations.</p>
+        )}
+
+        {!blindDateSession && (
+          <>
+            <button onClick={handlePurchaseBlindDateToken} disabled={blindDateBusy || blindDateBlocked || !!blindDateToken}>
+              {blindDateToken ? "Token purchased" : "Buy a date token (20 VCoin)"}
+            </button>
+            {visibleUsers.length > 0 && (
+              <div style={{ marginTop: 6 }}>
+                <p style={{ fontSize: 12, margin: "0 0 2px" }}>Candidate pool (here right now):</p>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {visibleUsers.map((userId) => (
+                    <label key={userId} style={{ fontSize: 12 }}>
+                      <input type="checkbox" checked={blindDateCandidates.includes(userId)} onChange={() => toggleBlindDateCandidate(userId)} />
+                      {" "}{userId}
+                    </label>
+                  ))}
+                </div>
+                <button onClick={handleAssignBlindDate} disabled={blindDateBusy || blindDateCandidates.length === 0 || !blindDateToken} style={{ marginTop: 4 }}>
+                  Get my blind date assignment
+                </button>
+              </div>
+            )}
+          </>
+        )}
+
+        {blindDateSession && (
+          <div style={{ fontSize: 12 }}>
+            <p style={{ margin: "2px 0" }}>
+              Session #{blindDateSession.id} — {blindDateSession.photosRevealed ? "photos revealed" : "photos hidden until real conversation happens"}
+              {blindDateSession.cancelled ? " (cancelled)" : ""}
+            </p>
+            {!blindDateSession.cancelled && !blindDateSession.photosRevealed && (
+              <div style={{ display: "flex", gap: 4, marginTop: 4 }}>
+                <button onClick={handleRevealBlindDatePhotos} disabled={blindDateBusy}>Try to reveal photos</button>
+                <button onClick={handleCancelBlindDate} disabled={blindDateBusy}>Cancel this date</button>
+              </div>
+            )}
+          </div>
+        )}
+        {blindDateError && <p style={{ color: "crimson" }}>Error: {blindDateError}</p>}
       </div>
 
       {actionError && <p style={{ color: "crimson" }}>Error: {actionError}</p>}
