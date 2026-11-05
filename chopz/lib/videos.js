@@ -22,12 +22,35 @@
 // CVNVO's own `voidFetchFn`/Hunts Dates pattern: validate live, store
 // the real response, never trust the caller's bare claim), not forced
 // into the upload path itself.
+//
+// **Duets (added 5 Nov 2026), and exactly what this app can honestly
+// claim about them.** A real TikTok Duet is a new video the real
+// TikTok CLIENT composites client-side (split-screen, the original
+// playing alongside the new recording) before it is ever uploaded --
+// by the time a Duet reaches TikTok's own servers, it is already one
+// ordinary video file. This app has no real video-composition
+// pipeline (and, per `vaco-media`'s own posture across this whole
+// ecosystem, never pretends to), so it does not fabricate one either
+// -- a Duet here is the same real thing a Duet is everywhere else in
+// this codebase's own media story: an ordinary `ChopzVideo`, with
+// `mediaUrl` pointing at whatever file the creator's own tooling
+// already produced, plus one new, real, honest relationship field
+// (`duetOfVideoId`) recording which existing video it duets. UNLIKE
+// `linkedProductId` (a genuinely cross-app reference this app
+// deliberately does not validate synchronously), `duetOfVideoId`
+// references this SAME app's own local store, so there is no reason
+// to defer the check the way there is for CHOPZ SHOP -- it is
+// validated synchronously, the same as any other local foreign-key
+// reference in this codebase.
 
 function createChopzVideo(store, options = {}) {
-  const { creatorId, mediaUrl, linkedProductId = null, now = Date.now() } = options;
+  const { creatorId, mediaUrl, linkedProductId = null, duetOfVideoId = null, now = Date.now() } = options;
 
   if (!creatorId) throw new Error('createChopzVideo requires a creatorId');
   if (!mediaUrl) throw new Error('createChopzVideo requires a mediaUrl');
+  if (duetOfVideoId !== null && !getChopzVideo(store, duetOfVideoId)) {
+    throw new Error(`createChopzVideo: no video with id ${duetOfVideoId} to duet`);
+  }
 
   const video = {
     id: store.nextVideoId++,
@@ -35,6 +58,7 @@ function createChopzVideo(store, options = {}) {
     mediaUrl,
     linkedProductId,
     linkedProductVerified: false,
+    duetOfVideoId,
     createdAt: now,
   };
   store.videos.push(video);
@@ -43,6 +67,16 @@ function createChopzVideo(store, options = {}) {
 
 function getChopzVideo(store, videoId) {
   return store.videos.find((v) => v.id === videoId) || null;
+}
+
+// Real TikTok feature: "View X duets" on the original's own card.
+// Newest first, the same read order this ecosystem's other
+// comment-shaped feeds already use for "what's happened to this
+// lately."
+function getDuetsOf(store, videoId) {
+  return store.videos
+    .filter((v) => v.duetOfVideoId === videoId)
+    .sort((a, b) => b.createdAt - a.createdAt);
 }
 
 async function verifyLinkedProduct(store, options = {}) {
@@ -61,4 +95,4 @@ async function verifyLinkedProduct(store, options = {}) {
   return video;
 }
 
-module.exports = { createChopzVideo, getChopzVideo, verifyLinkedProduct };
+module.exports = { createChopzVideo, getChopzVideo, getDuetsOf, verifyLinkedProduct };

@@ -16,7 +16,7 @@ const assert = require('node:assert');
 
 const { createChopzStore } = require('../lib/store');
 const {
-  createChopzVideo: publishVideo, getChopzVideo: getVideo, verifyLinkedProduct,
+  createChopzVideo: publishVideo, getChopzVideo: getVideo, getDuetsOf, verifyLinkedProduct,
 } = require('../lib/videos');
 
 const listVideos = (store) => store.videos;
@@ -38,6 +38,55 @@ test('a video without a creator or a url is refused', () => {
   assert.throws(() => publishVideo(store, { mediaUrl: 'https://x.test/v.mp4' }));
   assert.throws(() => publishVideo(store, { creatorId: 'ada' }));
   assert.equal(listVideos(store).length, 0, 'a refused video was still stored');
+});
+
+// -- Duets: a real local relationship, no fabricated composition --------
+
+test('a video carries no duetOfVideoId by default, present and null, not absent', () => {
+  const store = createChopzStore();
+  const video = publishVideo(store, { creatorId: 'ada', mediaUrl: 'https://example.test/v.mp4' });
+  assert.equal(video.duetOfVideoId, null);
+});
+
+test('a video can real-duet an existing video, and the relationship is retrievable both ways', () => {
+  const store = createChopzStore();
+  const original = publishVideo(store, { creatorId: 'ada', mediaUrl: 'https://example.test/original.mp4' });
+  const duet = publishVideo(store, {
+    creatorId: 'rio', mediaUrl: 'https://example.test/duet.mp4', duetOfVideoId: original.id,
+  });
+
+  assert.equal(duet.duetOfVideoId, original.id);
+  const duets = getDuetsOf(store, original.id);
+  assert.equal(duets.length, 1);
+  assert.equal(duets[0].id, duet.id);
+});
+
+test('duetting a video that does not exist is refused, and nothing is stored', () => {
+  const store = createChopzStore();
+  assert.throws(
+    () => publishVideo(store, { creatorId: 'rio', mediaUrl: 'https://example.test/duet.mp4', duetOfVideoId: 9999 }),
+    /no video with id 9999/,
+  );
+  assert.equal(listVideos(store).length, 0, 'a refused duet was still stored');
+});
+
+test('getDuetsOf reports newest first and is scoped to its own original -- it does not leak another video\'s duets', () => {
+  const store = createChopzStore();
+  const originalA = publishVideo(store, { creatorId: 'ada', mediaUrl: 'https://example.test/a.mp4', now: 1000 });
+  const originalB = publishVideo(store, { creatorId: 'kai', mediaUrl: 'https://example.test/b.mp4', now: 1000 });
+  publishVideo(store, { creatorId: 'rio', mediaUrl: 'https://example.test/d1.mp4', duetOfVideoId: originalA.id, now: 2000 });
+  const secondDuet = publishVideo(store, { creatorId: 'sam', mediaUrl: 'https://example.test/d2.mp4', duetOfVideoId: originalA.id, now: 3000 });
+
+  const duets = getDuetsOf(store, originalA.id);
+  assert.equal(duets.length, 2);
+  assert.equal(duets[0].id, secondDuet.id, 'the newest duet must read first');
+  assert.equal(getDuetsOf(store, originalB.id).length, 0, 'an unrelated video must report no duets');
+});
+
+test('a video with no real duets reports an honest empty list, not an error', () => {
+  const store = createChopzStore();
+  const video = publishVideo(store, { creatorId: 'ada', mediaUrl: 'https://example.test/v.mp4' });
+  assert.deepStrictEqual(getDuetsOf(store, video.id), []);
 });
 
 // -- The gate CHOPZ SHOP trusts ------------------------------------------

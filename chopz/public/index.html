@@ -67,6 +67,13 @@ function buildVideoCard(v) {
       reel.appendChild(el('span', 'vaco-small vaco-dim', v.mediaUrl || ''));
       cell.appendChild(reel);
 
+      // A real, local relationship -- no fabricated video composition,
+      // see lib/videos.js's own header. Duets are an ordinary video
+      // with one extra field.
+      if (v.duetOfVideoId) {
+        cell.appendChild(VACO.badge('duet of #' + v.duetOfVideoId, 'warn'));
+      }
+
       // Only present on a For You card -- the real score breakdown
       // GET /chopz/for-you returns, not fabricated client-side.
       if (v.forYou) {
@@ -144,6 +151,46 @@ function buildVideoCard(v) {
       );
       cell.appendChild(commentsToggle);
       cell.appendChild(commentsHost);
+
+      // -- Duets: a real local relationship, posted as an ordinary new
+      // video with duetOfVideoId set. No real split-screen composition
+      // happens here or anywhere in this app -- see lib/videos.js's own
+      // header for exactly why, and what this honestly is instead.
+      var duetsHost = el('div', 'vaco-stack-sm');
+      function refreshDuets() {
+        return VACO.api('/chopz/videos/' + v.id + '/duets').then(function (r) {
+          var duets = r.duets || [];
+          var list = el('div', 'vaco-stack-sm');
+          duets.forEach(function (d) {
+            list.appendChild(el('p', 'vaco-small', d.creatorId + ' duetted this · ' + d.mediaUrl));
+          });
+          if (!duets.length) list.appendChild(el('p', 'vaco-small vaco-dim', 'No duets yet.'));
+
+          var input = document.createElement('input');
+          input.className = 'vaco-input';
+          input.placeholder = 'Your duet\'s media URL…';
+          var duetBtn = VACO.button('Post duet', function () {
+            var userId = VACO.userId();
+            if (!userId) { VACO.toast('Sign in to duet.', 'danger'); return; }
+            if (!input.value) return;
+            return VACO.post('/chopz/videos', { creatorId: userId, mediaUrl: input.value, duetOfVideoId: v.id })
+              .then(function () { input.value = ''; VACO.toast('Duet posted.', 'money'); return refreshDuets(); });
+          }, 'sm');
+          var inputRow = el('div', 'vaco-row-tight');
+          inputRow.appendChild(input);
+          inputRow.appendChild(duetBtn);
+
+          VACO.mount(duetsHost, [list, inputRow]);
+          duetsToggle.textContent = duets.length + ' duet' + (duets.length === 1 ? '' : 's');
+        });
+      }
+      var duetsToggle = VACO.button(
+        (v.duetCount || 0) + ' duet' + (v.duetCount === 1 ? '' : 's'),
+        refreshDuets,
+        'sm',
+      );
+      cell.appendChild(duetsToggle);
+      cell.appendChild(duetsHost);
 
       var meta = el('div', 'vaco-row-tight');
       if (v.linkedProductId) {

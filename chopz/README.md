@@ -171,6 +171,59 @@ single-video and list routes matched, confirmed liking again un-likes
 and the unknown-video refusal (400, honest message) on the real
 `/like` route.
 
+## Duets (5 Nov 2026)
+
+Closes this project's own flagged "Duets (real video-composition/
+response clips)" gap, with the honest limitation stated up front: a
+real TikTok Duet's split-screen composition happens client-side, on
+the real app, before upload. By the time it reaches TikTok's own
+servers it is already one ordinary video file. This app has no real
+video-composition pipeline (consistent with `vaco-media`'s posture
+across this whole ecosystem) and does not fabricate one — a Duet here
+is an ordinary `ChopzVideo`, plus one new, real, honest relationship
+field (`duetOfVideoId`).
+
+**Validated synchronously, unlike `linkedProductId`.** `linkedProductId`
+references CHOPZ SHOP, a genuinely separate app, so this project
+deliberately defers that check. `duetOfVideoId` references this same
+app's own local store, so there is no reason to defer it — it is
+checked against a real existing video the same way any other local
+foreign-key reference in this codebase is, and a duet of an unknown
+video is refused outright, storing nothing.
+
+`lib/videos.js` gained `getDuetsOf` (every real video that duets a
+given one, newest first — the real "View X duets" feature). New route:
+`GET /chopz/videos/:id/duets`. `GET /chopz/videos` and `GET
+/chopz/videos/:id` both now embed a real `duetCount` alongside
+`engagement`, same inline-shape discipline as everything else a feed
+card needs in one call.
+
+The frontend gained a "duet of #N" badge on a duet's own card, a real
+duet count/list toggle (the same pattern comments already use), and an
+inline "Post duet" mini-form that posts a new video with
+`duetOfVideoId` set — no cross-tab state plumbing, the duet happens
+right on the original's own card.
+
+### Verification
+
+`test/videos.test.js` grew by 5: a fresh video's honestly-null
+`duetOfVideoId`; a real duet recorded and retrievable both directions;
+duetting an unknown video refused with nothing stored; `getDuetsOf`
+ordering newest-first and correctly scoped (not leaking another
+video's duets); and an honest empty list for a video with none. Full
+suite: 34/34 → 39/39. Mutation-verified: replacing the existence
+check with `if (false)` turned exactly the "duetting a video that
+does not exist" test red (12/13 in that file); restored, 39/39 green
+across the full suite.
+
+Live-verified against a real spawned Shield + this server: posted a
+real original video as one real creator, posted a real duet of it as
+a second real creator, confirmed `GET /chopz/videos/:id/duets`
+returned exactly that one real duet, confirmed a duet naming a
+nonexistent video id was refused (400, honest message, nothing
+stored), and confirmed the real video list reported `duetCount: 1` on
+the original and `0` on the duet itself.
+
 ## For You ranking (5 Nov 2026)
 
 Closes this project's own flagged "For You ranking (a real
@@ -254,8 +307,13 @@ video with no real registered media asset recorded no play at all
 count.
 
 ## Not yet built
-- Duets (real video-composition/response clips) — a separately large
-  build, not started.
+- ~~Duets (real video-composition/response clips)~~ **Done (5 Nov
+  2026), with one honest limitation stated directly rather than
+  faked — see "Duets" below.** This app has no real split-screen
+  video-composition pipeline, and never pretends to; a real Duet's
+  composition happens client-side on the real TikTok app before
+  upload, so this closes the real, local relationship a Duet actually
+  is at the data layer, not a fabricated rendering step.
 - ~~For You ranking (a real recommendation algorithm)~~ **Done (5 Nov
   2026) — see "For You ranking" below.**
 - Live shopping formats and the four real ad formats named in

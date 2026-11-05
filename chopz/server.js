@@ -22,7 +22,7 @@ const { createChopzStore } = require('./lib/store');
 const path = require('path');
 const { attachStore } = require('./lib/storeBackend');
 const { createMediaClient } = require('./lib/mediaClient.cjs');
-const { createChopzVideo, getChopzVideo, verifyLinkedProduct } = require('./lib/videos');
+const { createChopzVideo, getChopzVideo, getDuetsOf, verifyLinkedProduct } = require('./lib/videos');
 const {
   toggleLike, hasLiked, addComment, listComments, recordShare, recordPlay, getEngagementSummary,
 } = require('./lib/engagement');
@@ -131,13 +131,25 @@ app.post('/chopz/videos', requireActor('creatorId'), async (req, res) => {
 // a feed actually needs (TikTok's own feed never makes a viewer
 // round-trip per clip just to see the like/comment/share counts).
 app.get('/chopz/videos', (_req, res) => {
-  res.json({ videos: store.videos.map((v) => ({ ...v, engagement: getEngagementSummary(store, v.id) })) });
+  res.json({
+    videos: store.videos.map((v) => ({
+      ...v, engagement: getEngagementSummary(store, v.id), duetCount: getDuetsOf(store, v.id).length,
+    })),
+  });
 });
 
 app.get('/chopz/videos/:id', (req, res) => {
   const video = getChopzVideo(store, Number(req.params.id));
   if (!video) return res.status(404).json({ error: `no video with id ${req.params.id}` });
-  res.json({ ...video, engagement: getEngagementSummary(store, video.id) });
+  res.json({ ...video, engagement: getEngagementSummary(store, video.id), duetCount: getDuetsOf(store, video.id).length });
+});
+
+// Real TikTok feature: "View X duets" -- every real video that duets
+// this one, newest first.
+app.get('/chopz/videos/:id/duets', (req, res) => {
+  const videoId = Number(req.params.id);
+  if (!getChopzVideo(store, videoId)) return res.status(404).json({ error: `no video with id ${videoId}` });
+  res.json({ duets: getDuetsOf(store, videoId) });
 });
 
 // -- Engagement: likes, comments, shares ---------------------------------
@@ -191,7 +203,7 @@ app.get('/chopz/for-you', (req, res) => {
     const feed = getForYouFeed(store, {
       viewerId: viewerId || null,
       ...(limit !== undefined ? { limit } : {}),
-    }).map((v) => ({ ...v, engagement: getEngagementSummary(store, v.id) }));
+    }).map((v) => ({ ...v, engagement: getEngagementSummary(store, v.id), duetCount: getDuetsOf(store, v.id).length }));
     res.json({ videos: feed });
   } catch (err) {
     res.status(400).json({ error: err.message });
