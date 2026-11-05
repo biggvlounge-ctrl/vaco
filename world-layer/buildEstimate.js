@@ -48,8 +48,8 @@ const BUILD_SCOPE = {
     statistics: 123,
   },
   worldLayer: {
-    modules: 43,
-    lines: 9763,
+    modules: 45,
+    lines: 9963,
     sources: 34,
     importers: 33,
   },

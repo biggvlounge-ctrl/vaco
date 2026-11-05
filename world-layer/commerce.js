@@ -15,6 +15,36 @@ const { getNPC, assignRole } = require('./npcGenesis');
 
 const SECURITY_LEVELS = ['none', 'low', 'medium', 'high'];
 
+// **`supplyNeeds`/`suppliesResources` real shape, decided here.**
+// `supplyNeeds` existed as a bare `[]` default with no validation and,
+// checked directly, no caller anywhere in this repo ever passed it —
+// free to give it a real shape without breaking anything. Each entry
+// is `{ resourceType, quantity }`: `resourceType` is the same
+// open-ended, no-closed-enum string `vacon-c/server/economy.js`'s own
+// `generateResource` already uses for `resources.resource_type` (its
+// own comment names `timber` as one real example) — reused as a
+// vocabulary convention, never imported, since apps don't `require`
+// across the directory boundary. `suppliesResources` is a new,
+// necessary, symmetric field: resolving a supply chain means knowing
+// what a business can actually provide, not only what it needs, and
+// no such field existed anywhere. `{ resourceType, capacity }` mirrors
+// `supplyNeeds`'s own shape rather than inventing a different one.
+// See `supplyChain.js` for the real resolution logic built on top of
+// both.
+function validateResourceList(list, fieldName, amountField) {
+  if (!Array.isArray(list)) {
+    throw new Error(`generateBusiness: ${fieldName} must be an array`);
+  }
+  for (const entry of list) {
+    if (!entry || typeof entry !== 'object' || typeof entry.resourceType !== 'string' || !entry.resourceType) {
+      throw new Error(`generateBusiness: every ${fieldName} entry requires a string resourceType`);
+    }
+    if (typeof entry[amountField] !== 'number' || entry[amountField] < 0) {
+      throw new Error(`generateBusiness: every ${fieldName} entry requires a non-negative numeric ${amountField}`);
+    }
+  }
+}
+
 function generateBusiness(worldLayer, options = {}) {
   const {
     locationId,
@@ -23,6 +53,7 @@ function generateBusiness(worldLayer, options = {}) {
     building = null,
     economicValue = 0,
     supplyNeeds = [],
+    suppliesResources = [],
     securityRequirement = 'none',
   } = options;
 
@@ -39,6 +70,8 @@ function generateBusiness(worldLayer, options = {}) {
   if (typeof economicValue !== 'number' || economicValue < 0) {
     throw new Error('generateBusiness requires a non-negative numeric economicValue');
   }
+  validateResourceList(supplyNeeds, 'supplyNeeds', 'quantity');
+  validateResourceList(suppliesResources, 'suppliesResources', 'capacity');
   if (!SECURITY_LEVELS.includes(securityRequirement)) {
     throw new Error(
       `generateBusiness: invalid securityRequirement "${securityRequirement}" (expected one of ${SECURITY_LEVELS.join(', ')})`
@@ -57,6 +90,7 @@ function generateBusiness(worldLayer, options = {}) {
     employees: [],
     economicValue,
     supplyNeeds,
+    suppliesResources,
     securityRequirement,
     createdTick: worldLayer.tick,
   };

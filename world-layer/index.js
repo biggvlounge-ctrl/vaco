@@ -4,6 +4,8 @@ module.exports = {
   ...require('./commerce'),
   ...require('./transportation'),
   ...require('./routing'),
+  ...require('./derivedLocationData'),
+  ...require('./supplyChain'),
   ...require('./propagation'),
   ...require('./assetLibrary'),
   ...require('./imports/unescoImport'),

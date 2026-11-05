@@ -502,15 +502,77 @@ the intermodal airport node with the real computed distance.
 - The live UNESCO/Wikidata fetch itself (`fetchUnescoSites()` is a
   stub — this environment cannot reach that network), and any Cesium/
   NRHP/Overture Maps import at all (same network constraint applies).
-- Supply chain resolution against `supplyNeeds`; property system
-  (explicitly deferred, same as VACON-C's own `CLAUDE.md`); actual
-  pass/fail resolution of `spreadProbability` into a real propagation
-  outcome; automatic reuse-vs-generate decisions in the Asset Library.
-- Deriving a location's `populationData`/`economicData` slices from
+- ~~Supply chain resolution against `supplyNeeds`~~ — closed (5 Nov
+  2026, see below). Property system is still explicitly deferred, same
+  as VACON-C's own `CLAUDE.md`; actual pass/fail resolution of
+  `spreadProbability` into a real propagation outcome and automatic
+  reuse-vs-generate decisions in the Asset Library remain open.
+- ~~Deriving a location's `populationData`/`economicData` slices from
   `getNPCsAtLocation()`/business data — currently separate,
-  manually-reconciled things.
+  manually-reconciled things.~~ Closed (5 Nov 2026, see below).
 - Postgres wiring (schema exists, no driver code yet — will follow
   `vacon-c/server/db.js` + `migrate.js`'s pattern when that's next).
+
+## Location-data derivation + supply chain resolution (5 Nov 2026)
+
+Two of this file's own long-standing "Not yet built" gaps, closed
+together since both read the same real NPC/business records.
+
+**`derivedLocationData.js`** — `deriveLocationPopulationData()` and
+`deriveLocationEconomicData()` compute a Location's `populationData`/
+`economicData` slices as real aggregates over its real NPCs
+(`getNPCsAtLocation()`) and businesses (`getBusinessesAtLocation()`):
+population count, occupation/economicRole/migrationStatus
+distributions, and an average age — real-derived only from `age`,
+checked directly as the one field every actual `demographics` object
+in this codebase ever sets (no fixed demographics schema exists
+anywhere to bucket by, so nothing else is fabricated). Economic side:
+business count, total `economicValue`, total employment, and
+industry/security-requirement distributions. `syncLocationDataFromNPCs()`
+actually writes both back via the real `setLocationData()`, closing
+the "currently separate, manually-reconciled things" gap directly
+rather than leaving a read-only report nothing calls.
+
+**`supplyChain.js` + a real shape for `supplyNeeds`/`suppliesResources`.**
+`supplyNeeds` was a bare, unvalidated `[]` default with zero callers
+anywhere in this repo — free to give it a real structure. Each entry
+is now `{ resourceType, quantity }`, `resourceType` reusing the same
+open-ended string convention `vacon-c/server/economy.js`'s own
+`generateResource`/`resource_type` already established (as a
+vocabulary choice only — apps don't `require` across the directory
+boundary). `suppliesResources` (`{ resourceType, capacity }`) is a new,
+necessary, symmetric field on `Business`: resolving a chain means
+knowing what a business can supply, not only what it needs, and no
+such field existed. `resolveSupplyChain()` sums the real capacity of
+every OTHER business that supplies a matching resource and is actually
+reachable — reusing `routing.js`'s own `findRoute()` rather than a
+second routing concept, with same-location always reachable with no
+transport node required — against the real required quantity:
+`'met'`, `'partial'`, or `'unmet'`, never a fabricated percentage.
+
+`test/derivedLocationData.test.js` (new, 13 tests; full suite
+322 → 335, all passing): real aggregation from real NPC/business
+records (never counting a different location's NPC), a real `null`
+average age with no real ages rather than a fabricated 0, the derived
+slices actually landing on the `Location` via `setLocationData()`,
+shape validation on `supplyNeeds`/`suppliesResources`, met/partial/
+unmet resolution, and — the one most worth stating directly — a real
+supplier with real capacity is NOT counted unless `findRoute()` says
+it is actually reachable, confirmed by connecting two previously-
+unreachable locations with real transport nodes mid-test and watching
+the same need flip from `unmet` to `met`. Mutation-verified: forcing
+`isReachableFrom()` to always return true turned exactly that
+reachability test red; restored and reconfirmed green. Live-verified
+via this package's own public API (`require('world-layer')`, no HTTP
+server exists here): a furniture maker's real `timber` need resolved
+`unmet` with no supplier, stayed `unmet` once a real sawmill existed
+but no transport connected the two locations, and flipped to `met`
+once real road nodes were added at both ends — then
+`syncLocationDataFromNPCs()` correctly wrote back a 2-NPC population
+aggregate and a $500 economic aggregate onto the real `Location`
+record. `buildEstimate.js`'s own module-count check updated honestly
+to the real, re-counted 45 modules / 9,963 lines (two new top-level
+files), matching this file's own "counted, not estimated" rule.
 
 ## Data sources — added 18 Sep 2026, recounted 29 Oct 2026
 
