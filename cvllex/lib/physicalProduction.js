@@ -59,10 +59,20 @@
 // bound print goods; Qrates covers pressed music media. 'other' stays
 // as the honest escape hatch for a real good this list doesn't yet
 // name, not a stand-in for "whatever."
+//
+// **'book' added (1 Nov 2026)** to close this module's own
+// long-named gap: "VENVS's Publishing arm models print-on-demand
+// *economics* for books but never names who presses them." Grounded
+// in the same already-cited Lulu/Doxzoo comparable this file's header
+// names above -- Lulu's real business is print-on-demand BOOK
+// publishing specifically, an even more direct match than the
+// magazine/zine entries already here, not a new comparable invented
+// for the occasion. No minimum run, same as every other print-on-
+// demand good in this list.
 const PRODUCTION_ITEM_TYPES = [
   't-shirt', 'hoodie', 'hat',
   'cd', 'vinyl', 'cassette',
-  'magazine', 'zine', 'poster', 'canvas-print',
+  'book', 'magazine', 'zine', 'poster', 'canvas-print',
   'pin', 'sticker', 'tote-bag', 'phone-case',
   'other',
 ];

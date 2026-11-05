@@ -54,6 +54,7 @@ const V3_API_URL = process.env.V3_API_URL || 'http://localhost:8811';
 const VOID_API_URL = process.env.VOID_API_URL || 'http://localhost:8793';
 const CHOPZ_SHOP_API_URL = process.env.CHOPZ_SHOP_API_URL || 'http://localhost:8801';
 const VDP_API_URL = process.env.VDP_API_URL || 'http://localhost:8827';
+const CVLLEX_API_URL = process.env.CVLLEX_API_URL || 'http://localhost:8822';
 
 // `start-ecosystem.sh` generates a single `VACO_SERVICE_TOKEN` and
 // exports it for every child process; each app supplies its own name
@@ -166,6 +167,39 @@ async function recordLibraryEffect(payload, authHeader) {
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.error || `recordLibraryEffect failed (${res.status})`);
+  return body;
+}
+
+// The real bridge from a VENVS book to a real CVLLEX collectible run
+// -- "a special edition version of books in the physical... a signed
+// version, a copy with special art on the front" (direct request),
+// closing CVLLEX's own README's named gap: "VENVS's Publishing arm
+// models print-on-demand economics for books but never names who
+// presses them." CVLLEX's own `POST /api/production-orders` is
+// `actorOrService(requireActor('creatorId'))` -- the real author's
+// own session already reached THIS route (`requireActor('authorId')`
+// below already validated it), so this forwards the SAME bearer
+// token, the exact precedent `recordLibraryEffect`/
+// `registerWithChopzShop` above already set.
+async function createCvllexProductionOrder(payload, authHeader) {
+  const res = await fetch(`${CVLLEX_API_URL}/api/production-orders`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: authHeader },
+    body: JSON.stringify(payload),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || `createCvllexProductionOrder failed (${res.status})`);
+  return body;
+}
+
+// A real, live lookup rather than trusting a caller-supplied vaultId
+// -- the same "never trust a bare claim, verify live" discipline
+// `chopz`'s own `verifyLinkedProduct` already established, named
+// directly as this exact pattern in CVLLEX's own README.
+async function fetchCvllexVault(vaultId) {
+  const res = await fetch(`${CVLLEX_API_URL}/api/vault/${vaultId}`);
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || `fetchCvllexVault failed (${res.status})`);
   return body;
 }
 
@@ -527,6 +561,57 @@ async function recordLibraryEffect(payload, authHeader) {
     const book = catalogLib.getBook(store.catalog, Number(req.params.id));
     if (!book) return res.status(404).json({ error: `no book with id ${req.params.id}` });
     res.json(book);
+  });
+
+  // -- Collectible editions: a real CVLLEX run of this book ---------------
+  //
+  // "A special edition version of books in the physical... a signed
+  // version, a copy with special art on the front" (direct request),
+  // closing CVLLEX's own README's own named gap. The resolve-then-
+  // compare ownership check here is the same shape every other
+  // seller-only action in this file already uses -- only a book's own
+  // real author may order a collectible run of it.
+  app.post('/api/publishing/books/:id/collectible-edition', requireActor('authorId'), async (req, res) => {
+    try {
+      const book = catalogLib.getBook(store.catalog, Number(req.params.id));
+      if (!book) return res.status(404).json({ error: `no book with id ${req.params.id}` });
+      if (book.authorId !== req.body.authorId) {
+        return res.status(403).json({ error: "only this book's own author may order a collectible edition of it" });
+      }
+      const order = await createCvllexProductionOrder({
+        creatorId: req.body.authorId,
+        itemType: 'book',
+        quantity: req.body.quantity,
+        estimatedUnitCost: req.body.estimatedUnitCost,
+        vendorNote: req.body.vendorNote,
+      }, req.headers.authorization);
+      res.status(201).json(order);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // Links a real, already-vaulted CVLLEX collectible run (produced,
+  // then minted as a real Cvltvre Card -- both CVLLEX's own, separate
+  // steps, performed over there first) back onto its real VENVS book.
+  // The vault is fetched live from CVLLEX rather than trusted on the
+  // caller's bare claim -- the same discipline `chopz`'s own
+  // `verifyLinkedProduct` already established for an identical shape.
+  app.post('/api/publishing/books/:id/collectible-edition/link-vault', requireActor('authorId'), async (req, res) => {
+    try {
+      const book = catalogLib.getBook(store.catalog, Number(req.params.id));
+      if (!book) return res.status(404).json({ error: `no book with id ${req.params.id}` });
+      if (book.authorId !== req.body.authorId) {
+        return res.status(403).json({ error: "only this book's own author may link a collectible edition to it" });
+      }
+      const vault = await fetchCvllexVault(Number(req.body.vaultId));
+      if (vault.creatorId !== req.body.authorId) {
+        return res.status(403).json({ error: 'that CVLLEX vault was not ordered by this book\'s own author' });
+      }
+      res.status(201).json(catalogLib.linkCollectibleEdition(store.catalog, { bookId: book.id, vaultId: vault.id }));
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
   });
 
   // Real checkout. The buyer's own leg is already authorised by Shield

@@ -47,6 +47,7 @@ import {
 import {
   createCatalog, publishBook, getBook, getCatalog, purchaseBook,
   getBookOrder, listUnfulfilledBookOrders, requestBookFulfillment,
+  linkCollectibleEdition,
   PLATFORM_USER_ID as PUBLISHING_PLATFORM,
 } from '../src/lib/catalog.js';
 import { createShop, listProduct as listShopProduct, buyNow } from '../src/lib/shop.js';
@@ -1198,4 +1199,36 @@ test('every mutating V3 call in this app sends the session', () => {
   const unauthenticated = posts.filter((p) => !p.includes('sessionHeaders()'));
   assert.deepEqual(unauthenticated, [],
     'a mutating V3 call is built without the Shield session, so it will 401 against the real V3');
+});
+
+// ===========================================================================
+// Collectible editions -- the real CVLLEX bridge for a book
+// ===========================================================================
+
+test('linkCollectibleEdition records the real vault once, on the real book', () => {
+  const catalog = createCatalog();
+  const book = publishBook(catalog, { title: 'Signed Edition', authorId: 'author-1', format: 'ebook', listPrice: 5.99 });
+  assert.equal(getBook(catalog, book.id).collectibleEditionVaultId, null, 'a fresh book has no collectible edition yet');
+
+  const updated = linkCollectibleEdition(catalog, { bookId: book.id, vaultId: 42 });
+  assert.equal(updated.collectibleEditionVaultId, 42);
+  assert.equal(getBook(catalog, book.id).collectibleEditionVaultId, 42);
+});
+
+test('linkCollectibleEdition refuses a second vault for the same book', () => {
+  const catalog = createCatalog();
+  const book = publishBook(catalog, { title: 'Signed Edition', authorId: 'author-1', format: 'ebook', listPrice: 5.99 });
+  linkCollectibleEdition(catalog, { bookId: book.id, vaultId: 42 });
+  assert.throws(
+    () => linkCollectibleEdition(catalog, { bookId: book.id, vaultId: 99 }),
+    /already has a collectible edition/,
+  );
+  assert.equal(getBook(catalog, book.id).collectibleEditionVaultId, 42, 'the original link must survive a rejected second one');
+});
+
+test('linkCollectibleEdition refuses an unknown book or a missing vaultId', () => {
+  const catalog = createCatalog();
+  const book = publishBook(catalog, { title: 'X', authorId: 'author-1', format: 'ebook', listPrice: 5.99 });
+  assert.throws(() => linkCollectibleEdition(catalog, { bookId: 9999, vaultId: 1 }), /no book with id/);
+  assert.throws(() => linkCollectibleEdition(catalog, { bookId: book.id }), /requires a vaultId/);
 });

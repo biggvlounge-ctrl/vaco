@@ -118,6 +118,12 @@ export function publishBook(catalog, options = {}) {
     skillSubject: skillSubject || null,
     beliefTopic: beliefTopic || null,
     beliefType: beliefType || null,
+    // Set once a real CVLLEX vault exists for this title -- see
+    // `linkCollectibleEdition` below. `null` until then, the same
+    // "VOKEN's own `linkedCultureCardId` on every merch listing"
+    // pattern CVLLEX's own README names as the real precedent this
+    // follows.
+    collectibleEditionVaultId: null,
     createdAt: Date.now(),
   };
   catalog.books.push(book);
@@ -126,6 +132,36 @@ export function publishBook(catalog, options = {}) {
 
 export function getBook(catalog, bookId) {
   return catalog.books.find((b) => b.id === bookId) || null;
+}
+
+// The real bridge from a VENVS book to a real CVLLEX collectible run
+// of it -- "a special edition version of books in the physical,
+// where it's only a scarce amount... a signed version, a copy with
+// special art on the front" (direct request), closing CVLLEX's own
+// README's named gap: "VENVS's Publishing arm models print-on-demand
+// economics for books but never names who presses them."
+//
+// This module does not place the real CVLLEX production order or
+// mint the real Cvltvre Card itself -- that is CVLLEX's and VOKEN's
+// own job, server-side, the same cross-app-call-not-cross-app-import
+// shape every other real integration in this ecosystem already uses.
+// This function only records the real link once CVLLEX confirms a
+// vault exists, so VENVS's own book page can show it.
+//
+// One real collectible edition per book, by design: CVLLEX itself
+// mints one Cvltvre Card per vault, not one per unit, and a book with
+// two active vaults would have no honest way to say which one a
+// buyer's redemption is against.
+export function linkCollectibleEdition(catalog, options = {}) {
+  const { bookId, vaultId } = options;
+  const book = getBook(catalog, bookId);
+  if (!book) throw new Error(`linkCollectibleEdition: no book with id ${bookId}`);
+  if (!vaultId) throw new Error('linkCollectibleEdition requires a vaultId');
+  if (book.collectibleEditionVaultId !== null) {
+    throw new Error(`linkCollectibleEdition: book ${bookId} already has a collectible edition (vault ${book.collectibleEditionVaultId})`);
+  }
+  book.collectibleEditionVaultId = vaultId;
+  return book;
 }
 
 export function getCatalog(catalog, options = {}) {

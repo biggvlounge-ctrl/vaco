@@ -190,3 +190,59 @@ make directly.
 | `GET /api/vault/:id` | none | |
 | `POST /api/vault/:id/redeem` | session, must be `redeemerId` | requests a real VOID courier shipment; assigns a real claim-order serial number; accepts an optional `specification` engraving note |
 | `GET /api/creators/:creatorId/units-redeemed` | none | the real cross-vault total units a creator has actually sold — read live by VOKEN's cross-platform achievement score |
+
+## Real VENVS Publishing bridge: collectible book editions (1 Nov 2026)
+
+Closes this project's own long-named gap, by direct request — "a
+special edition version of books in the physical, where it's only a
+scarce amount sent out... a signed version, a copy with special art
+on the front" — tokenized through VOKEN (dictated as "Vulcan"; see
+this file's own "On the name" note above and
+`dev-docs/VACO_CONSTELLATIONS.md` — there is no Vulcan anywhere in
+this ecosystem, it is VOKEN).
+
+`'book'` is now a real `PRODUCTION_ITEM_TYPES` entry, grounded in the
+same already-cited Lulu/Doxzoo comparable this file's own header
+names — Lulu's real business is print-on-demand **book** publishing
+specifically, an even more direct match than the magazine/zine
+entries already here. No minimum run, same as every other
+print-on-demand good.
+
+VENVS's own Publishing arm (`venvs/server.cjs`) now has the real other
+half: `POST /api/publishing/books/:id/collectible-edition`
+(`requireActor('authorId')`, ownership-checked against the book's own
+real author) places the real CVLLEX order on the author's behalf,
+forwarding their own Shield session — the same cross-app-call, not
+cross-app-import, shape every real integration in this ecosystem
+already uses. Once the author advances and vaults that order here (a
+real Cvltvre Card minted via VOKEN, both CVLLEX's own existing,
+separate steps), `POST /api/publishing/books/:id/collectible-edition/
+link-vault` records the real link back onto the VENVS book —
+fetching the real vault live from CVLLEX first (`GET /api/vault/:id`)
+and refusing if its `creatorId` doesn't match the book's own author,
+rather than trusting a caller's bare claim.
+
+### Verification
+
+CVLLEX: `test/physicalProduction.test.js` grew by one real test
+(a signed/special-edition book order with a real `vendorNote`); the
+existing minimum-run test already covers `book` generically via its
+own parametrized loop. Full suite: 27/27. VENVS:
+`test/venvs.test.js` grew by 3 (`linkCollectibleEdition`'s real
+one-vault-per-book guard, mutation-verified -- removing the guard
+turned exactly that test red, restored and reconfirmed green);
+`test/server.test.js` grew by 6 (the same no-credential/unreachable-
+Shield/mismatched-actor refusal shapes every other mutating route in
+that suite already asserts). Full VENVS suite: 107/107.
+
+Live-verified end to end against real spawned Shield + VOKEN + CVLLEX
++ VENVS servers: a real author ordered a signed/special-edition
+collectible run of their own self-published VENVS book, advanced it
+through CVLLEX's real `ordered -> in-production -> produced` status
+progression, vaulted it (minting a real Cvltvre Card via VOKEN), and
+linked the real vault back onto the VENVS book — confirmed the book
+record now carries the real `collectibleEditionVaultId`. Also
+confirmed both real refusals: a stranger cannot order a collectible
+edition of someone else's book (403), and a different real author
+cannot link someone else's real vault onto their own book (403, the
+vault's own `creatorId` checked live against the linking author).

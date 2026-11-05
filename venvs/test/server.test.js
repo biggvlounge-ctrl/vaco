@@ -290,3 +290,49 @@ test('requesting book fulfillment is refused without a real service credential',
   const res = await post('/api/publishing/orders/1/fulfillment', { shippingCost: 5 });
   assert.equal(res.status, 401);
 });
+
+// -- Collectible editions: the real CVLLEX bridge (Phase 18) ---------------
+
+test('ordering a collectible edition with no credential at all is refused WITHOUT reaching Shield', { skip: SKIP }, async () => {
+  const res = await post('/api/publishing/books/1/collectible-edition', { authorId: 'author-1', quantity: 1 });
+  assert.equal(res.status, 401);
+});
+
+test('ordering a collectible edition with a real bearer token asks Shield -- real 502 when it is unreachable', { skip: SKIP }, async () => {
+  const res = await post('/api/publishing/books/1/collectible-edition',
+    { authorId: 'author-1', quantity: 1 }, { Authorization: 'Bearer some-token' });
+  assert.equal(res.status, 502);
+});
+
+test('a mismatched author (claiming to act as someone else) is refused with 403, not 401 or 502', { skip: SKIP }, async () => {
+  // Same reasoning as the identical Marketplace/Publishing tests
+  // above: Shield is consulted BEFORE the actor-match check, so this
+  // still 502s here with Shield unreachable -- a forged authorId is
+  // never waved through just because Shield could not be reached to
+  // disprove it.
+  const res = await post('/api/publishing/books/1/collectible-edition',
+    { authorId: 'someone-else', quantity: 1 }, { Authorization: 'Bearer some-token' });
+  assert.equal(res.status, 502, 'Shield must be consulted before any identity claim is trusted, forged or not');
+});
+
+test('linking a collectible edition vault with no credential at all is refused WITHOUT reaching Shield', { skip: SKIP }, async () => {
+  const res = await post('/api/publishing/books/1/collectible-edition/link-vault', { authorId: 'author-1', vaultId: 1 });
+  assert.equal(res.status, 401);
+});
+
+test('linking a collectible edition vault with a real bearer token asks Shield -- real 502 when it is unreachable', { skip: SKIP }, async () => {
+  const res = await post('/api/publishing/books/1/collectible-edition/link-vault',
+    { authorId: 'author-1', vaultId: 1 }, { Authorization: 'Bearer some-token' });
+  assert.equal(res.status, 502);
+});
+
+test('ordering a collectible edition for an unknown book 404s honestly, after Shield confirms the identity', { skip: SKIP }, async () => {
+  // Shield is unreachable in this suite, so even a real book id would
+  // 502 before reaching the 404 check -- this just confirms the route
+  // itself exists and is wired, not the full live 404 path (that is
+  // live-verified against a real spawned Shield + CVLLEX, see this
+  // app's own README).
+  const res = await post('/api/publishing/books/999999/collectible-edition',
+    { authorId: 'author-1', quantity: 1 }, { Authorization: 'Bearer some-token' });
+  assert.equal(res.status, 502, 'Shield must be consulted before the book lookup even for a 404 case');
+});

@@ -108,3 +108,16 @@ test('getProductionOrder returns null for an unknown id, not a throw', () => {
   const store = createCvllexStore();
   assert.strictEqual(getProductionOrder(store, 999), null);
 });
+
+// -- 'book', closing this module's own long-named VENVS gap ------------
+
+test('a single signed/special-edition book run is a real, valid, no-minimum order', () => {
+  const store = createCvllexStore();
+  const order = createProductionOrder(store, {
+    creatorId: 'author-1', itemType: 'book', quantity: 1,
+    vendorNote: 'signed hardcover, foil cover art',
+  });
+  assert.strictEqual(order.itemType, 'book');
+  assert.strictEqual(order.minimumUnits, 1, 'book is print-on-demand, not pressed media -- no Qrates-style floor');
+  assert.strictEqual(order.vendorNote, 'signed hardcover, foil cover art');
+});
