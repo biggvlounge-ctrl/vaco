@@ -48,6 +48,7 @@ import {
   scheduleSpeedDate, getSpeedDateSlot, extendSpeedDate, getSpeedDateRotation,
   setGiftThreshold, getGiftThreshold, requestDateWithGift, getGiftRequestsForUser,
   purchaseBlindDateToken, assignBlindDate, getBlindDateSession, revealBlindDatePhotos, cancelBlindDate, isUserBlockedFromBlindDating,
+  createDateEvent, getDateEvent, rsvpToDateEvent, linkHuntToDateEvent,
 } from "./cvnvoClient.js";
 
 export const LOCATION_PRIVACY_TIERS = ['ghost-mode', 'my-friends', 'select-friends'];
@@ -195,4 +196,24 @@ export async function cancelDatingVillageBlindDate(sessionId) {
 
 export async function isDatingVillageUserBlockedFromBlindDating(userId) {
   return isUserBlockedFromBlindDating(userId);
+}
+
+// Hunts Dates, inside the Dating Village -- real, deliberate choice,
+// same posture as every other format above: the invited participants
+// are real players `enterDatingVillage` already found checked in
+// here right now, not a separate invite flow.
+export async function createDatingVillageDateEvent(participants) {
+  return createDateEvent(participants);
+}
+
+export async function getDatingVillageDateEvent(eventId) {
+  return getDateEvent(eventId);
+}
+
+export async function rsvpToDatingVillageDateEvent(eventId, userId, visible) {
+  return rsvpToDateEvent(eventId, userId, visible);
+}
+
+export async function linkDatingVillageHuntToDateEvent(eventId, huntId) {
+  return linkHuntToDateEvent(eventId, huntId);
 }

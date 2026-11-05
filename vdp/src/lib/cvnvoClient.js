@@ -183,3 +183,34 @@ export async function isUserBlockedFromBlindDating(userId) {
   const body = await requestJson(`/api/blind-date/blocked/${encodeURIComponent(userId)}`);
   return body.blocked;
 }
+
+// Hunts Dates -- a date structured as a real HVNTZ scavenger hunt,
+// via CVNVO's own real DateEvent entity (see `dateEvents.js`'s own
+// header: `huntId` is checked live against HVNTZ, not caller-declared).
+export async function createDateEvent(participants) {
+  return requestJson("/api/date-events", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...sessionHeaders() },
+    body: JSON.stringify({ participants }),
+  });
+}
+
+export async function getDateEvent(eventId) {
+  return requestJson(`/api/date-events/${encodeURIComponent(eventId)}`);
+}
+
+export async function rsvpToDateEvent(eventId, userId, visible) {
+  return requestJson(`/api/date-events/${encodeURIComponent(eventId)}/rsvp`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...sessionHeaders() },
+    body: JSON.stringify({ userId, visible }),
+  });
+}
+
+export async function linkHuntToDateEvent(eventId, huntId) {
+  return requestJson(`/api/date-events/${encodeURIComponent(eventId)}/link-hunt`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...sessionHeaders() },
+    body: JSON.stringify({ huntId }),
+  });
+}

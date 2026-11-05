@@ -1371,11 +1371,13 @@ VOKEN's real `/api/brand` endpoint — not hardcoded text.
   inside VDP.
 - Dating Village: real Happn-style proximity crossings, FlashNotes,
   Snap Map location sharing (see "Snap Map inside the Dating Village"
-  below), Speed Dating/Group Dating, Gift Dating, and Blind Date Mode
-  (see their own sections below) are wired in — the remaining two
-  CVNVO dating-format extensions (Long-Distance Mode, Hunts Dates)
-  exist as real CVNVO APIs but have no VDP-district surface of their
-  own yet.
+  below), Speed Dating/Group Dating, Gift Dating, Blind Date Mode, and
+  Hunts Dates (see their own sections below) are wired in — the one
+  remaining CVNVO dating-format extension, Long-Distance Mode, exists
+  as a real CVNVO API but has no VDP-district surface of its own yet
+  — and arguably shouldn't: it's explicitly about people who are *not*
+  in the same place, which sits oddly inside a venue district whose
+  whole premise is "who's here right now."
   ~~VDP's own hardcoded single-user login meant two real distinct
   players couldn't be tested together~~ — stale: real Shield register/
   login and the shared WebSocket world (see "Jobs/Careers..." above)
@@ -1636,3 +1638,46 @@ error; and a real cancel correctly left the requester not yet blocked
 Dating's own entry above explicitly could not reach — a full, real,
 VACA-backed profile — since Blind Date Mode needs no verified badge,
 only a real profile record to exist.
+
+## Hunts Dates inside the Dating Village (5 Nov 2026)
+
+Closes a fifth CVNVO dating-format extension this project's own
+README named as a real API with no VDP-district surface yet — Hunts
+Dates, a date structured as a real HVNTZ scavenger hunt, via CVNVO's
+own real `DateEvent` entity (`huntId` checked live against HVNTZ's
+own `GET /api/hunt/:huntId`, never caller-declared — see
+`cvnvo/lib/dateEvents.js`'s own header). CVNVO's server side was
+already fully built — this closes the VDP-side gap only.
+
+`cvnvoClient.js` gains `createDateEvent`/`getDateEvent`/
+`rsvpToDateEvent`/`linkHuntToDateEvent`, thin wrappers over CVNVO's
+own real `/api/date-events` routes. `datingVillage.js` wraps those
+into the `DatingVillage`-prefixed equivalents — same real, deliberate
+choice as every other format above: invited participants are the real
+players `enterDatingVillage` already found checked in here right now.
+
+`DatingVillageView.jsx` gained a real Hunts Dates panel: an invite
+picker over the real checked-in players, a "create date event"
+button, a real "show I'm going" RSVP checkbox against the event's own
+real, derived `visibleAttendeeCount` (never a stored field that could
+desync), and a real hunt-id input that links the event to an actual
+HVNTZ hunt once CVNVO itself has confirmed it exists.
+
+### Verification
+
+Both edited files individually pass a real esbuild JSX/syntax check.
+VDP's own `node --test test/*.test.js` suite: 951/951, unchanged (same
+pre-existing Vite-only `import.meta.env` limitation as every other
+`*Client.js` in this project). CVNVO's own suite: 35/35, unchanged (no
+CVNVO code was touched).
+
+Live-verified the full real happy path end to end, against real
+spawned Shield + CVNVO + HVNTZ servers: a real Shield account created
+a real date event inviting a second real account, RSVP'd visible
+(confirmed in the event's own live `GET` as a real derived
+`visibleAttendeeCount: 1`), a link attempt against a fake hunt id was
+correctly refused with CVNVO's own exact "no hunt with id" error, and
+linking the real seeded HVNTZ hunt (id 1, "Rivers & Mounds: A St.
+Louis Origins Hunt") succeeded — the event's own live record now
+carries the real `huntTitle`, fetched live from HVNTZ, not supplied by
+the caller.

@@ -6,6 +6,7 @@ import {
   setDatingVillageGiftThreshold, getDatingVillageGiftThreshold, requestDatingVillageDateWithGift, getDatingVillageGiftRequests,
   purchaseDatingVillageBlindDateToken, assignDatingVillageBlindDate, revealDatingVillageBlindDatePhotos,
   cancelDatingVillageBlindDate, isDatingVillageUserBlockedFromBlindDating,
+  createDatingVillageDateEvent, rsvpToDatingVillageDateEvent, linkDatingVillageHuntToDateEvent,
 } from "../lib/datingVillage.js";
 
 // CVNVO's real Dating Village, inhabited inside VDP -- a real BarBuddy
@@ -51,6 +52,13 @@ export default function DatingVillageView({ session }) {
   const [blindDateBlocked, setBlindDateBlocked] = useState(false);
   const [blindDateError, setBlindDateError] = useState(null);
   const [blindDateBusy, setBlindDateBusy] = useState(false);
+
+  const [huntDatePicked, setHuntDatePicked] = useState([]);
+  const [huntDateEvent, setHuntDateEvent] = useState(null);
+  const [huntIdInput, setHuntIdInput] = useState("");
+  const [huntDateVisible, setHuntDateVisible] = useState(true);
+  const [huntDateError, setHuntDateError] = useState(null);
+  const [huntDateBusy, setHuntDateBusy] = useState(false);
 
   const refreshSnapMap = useCallback(() => {
     getSnapMapVisibleUsers(session.userId).then(setSnapMapVisible).catch((err) => setSnapMapError(err.message));
@@ -259,6 +267,57 @@ export default function DatingVillageView({ session }) {
       setBlindDateError(err.message);
     } finally {
       setBlindDateBusy(false);
+    }
+  };
+
+  const toggleHuntDatePicked = (userId) => {
+    setHuntDatePicked((prev) => (prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]));
+  };
+
+  // Real, deliberate choice, same posture as every other format above:
+  // invited participants are who's really here right now.
+  const handleCreateDateEvent = async () => {
+    if (huntDatePicked.length === 0) return;
+    setHuntDateBusy(true);
+    setHuntDateError(null);
+    try {
+      const event = await createDatingVillageDateEvent([session.userId, ...huntDatePicked]);
+      setHuntDateEvent(event);
+      setHuntDatePicked([]);
+    } catch (err) {
+      setHuntDateError(err.message);
+    } finally {
+      setHuntDateBusy(false);
+    }
+  };
+
+  const handleRsvpToDateEvent = async () => {
+    if (!huntDateEvent) return;
+    setHuntDateBusy(true);
+    setHuntDateError(null);
+    try {
+      await rsvpToDatingVillageDateEvent(huntDateEvent.id, session.userId, huntDateVisible);
+      setHuntDateEvent((prev) => ({ ...prev, visibleAttendeeCount: (prev.visibleAttendeeCount || 0) + (huntDateVisible ? 1 : 0) }));
+    } catch (err) {
+      setHuntDateError(err.message);
+    } finally {
+      setHuntDateBusy(false);
+    }
+  };
+
+  // Real, live cross-app validation: CVNVO itself looks the hunt up
+  // against HVNTZ's own GET /api/hunt/:huntId before linking it, not a
+  // caller-declared id.
+  const handleLinkHunt = async () => {
+    if (!huntDateEvent || !huntIdInput) return;
+    setHuntDateBusy(true);
+    setHuntDateError(null);
+    try {
+      setHuntDateEvent(await linkDatingVillageHuntToDateEvent(huntDateEvent.id, Number(huntIdInput)));
+    } catch (err) {
+      setHuntDateError(err.message);
+    } finally {
+      setHuntDateBusy(false);
     }
   };
 
@@ -505,6 +564,57 @@ export default function DatingVillageView({ session }) {
           </div>
         )}
         {blindDateError && <p style={{ color: "crimson" }}>Error: {blindDateError}</p>}
+      </div>
+
+      <div style={{ marginTop: 12, borderTop: "1px dashed #ccc", paddingTop: 8 }}>
+        <p style={{ fontSize: 13, fontWeight: "bold", margin: "0 0 4px" }}>Hunts Dates</p>
+        <p style={{ fontSize: 11, color: "#888", margin: "0 0 6px" }}>
+          Turn this date into a real HVNTZ scavenger hunt — the hunt id is checked live against HVNTZ, not just trusted.
+        </p>
+
+        {!huntDateEvent && visibleUsers.length > 0 && (
+          <div>
+            <p style={{ fontSize: 12, margin: "0 0 2px" }}>Invite who's here right now:</p>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {visibleUsers.map((userId) => (
+                <label key={userId} style={{ fontSize: 12 }}>
+                  <input type="checkbox" checked={huntDatePicked.includes(userId)} onChange={() => toggleHuntDatePicked(userId)} />
+                  {" "}{userId}
+                </label>
+              ))}
+            </div>
+            <button onClick={handleCreateDateEvent} disabled={huntDateBusy || huntDatePicked.length === 0} style={{ marginTop: 4 }}>
+              Create date event
+            </button>
+          </div>
+        )}
+
+        {huntDateEvent && (
+          <div style={{ fontSize: 12 }}>
+            <p style={{ margin: "2px 0" }}>
+              Date event #{huntDateEvent.id} — {huntDateEvent.participants.length} invited, {huntDateEvent.visibleAttendeeCount ?? 0} visibly going
+              {huntDateEvent.huntId ? ` — linked to hunt "${huntDateEvent.huntTitle}"` : ""}
+            </p>
+            <div style={{ display: "flex", gap: 4, alignItems: "center", marginTop: 4 }}>
+              <label>
+                <input type="checkbox" checked={huntDateVisible} onChange={(e) => setHuntDateVisible(e.target.checked)} />
+                {" "}show I'm going
+              </label>
+              <button onClick={handleRsvpToDateEvent} disabled={huntDateBusy}>RSVP</button>
+            </div>
+            {!huntDateEvent.huntId && (
+              <div style={{ display: "flex", gap: 4, marginTop: 4 }}>
+                <input
+                  type="number" placeholder="Real HVNTZ hunt id" value={huntIdInput}
+                  onChange={(e) => setHuntIdInput(e.target.value)}
+                  style={{ width: 120 }}
+                />
+                <button onClick={handleLinkHunt} disabled={huntDateBusy || !huntIdInput}>Link hunt</button>
+              </div>
+            )}
+          </div>
+        )}
+        {huntDateError && <p style={{ color: "crimson" }}>Error: {huntDateError}</p>}
       </div>
 
       {actionError && <p style={{ color: "crimson" }}>Error: {actionError}</p>}
