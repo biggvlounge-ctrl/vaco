@@ -62,9 +62,14 @@ curl "http://localhost:8789/api/insight?query=hunt%20sponsor%20budget"
 ## What's here
 - `lib/registry.js` — the real app registry: 24 entries, each checked
   directly against that app's own `server.js`/README for its real dev
-  port, not guessed. `url: null` for VACON-C specifically, since its
-  own README says plainly it has real engine logic but zero HTTP
-  routes yet — rendered as a disabled tile rather than a dead link.
+  port, not guessed. ~~`url: null` for VACON-C specifically...~~
+  **Stale — checked directly, 5 Nov 2026.** `vacon-c`'s entry already
+  carries a real `url: 'http://localhost:8809'`, not `null`; its tile
+  is not disabled. `server.js` there is real (Phase 11 onward — see
+  `../vacon-c/README.md`'s own "Real `/api/*` routes now exist" and
+  `CLAUDE.md`'s extensive log since) and answers `GET /api/health`
+  live. This line described the pre-Phase-11 state and was never
+  updated once that shipped.
 - `lib/insight.js` — the real "shared agent layer" surface named
   directly in `VAGO_CLAUDE.md`'s own gap list ("needs a real call into
   Shell's shared agent layer (V4's Command Center / MIA), not a
@@ -179,10 +184,12 @@ specialist-relay/general-chat behavior itself re-verified in
 - Auth/rate-limiting on this app's own endpoints — same posture as VACON
   and the rest of this prototype-stage ecosystem (no user accounts
   exist yet beyond the shared Shield session).
-- A visible representation of VACON-C inside the launcher beyond a
-  disabled tile — once VACON-C gets a real API layer (see its own
-  README's own flagged, ready-to-do gap), its tile here should be
-  updated to a real `url`, not rebuilt from scratch.
+- ~~A visible representation of VACON-C inside the launcher beyond a
+  disabled tile...~~ **Done — this was stale too, same correction as
+  the "What's here" bullet above.** VACON-C has had a real API layer
+  since its own Phase 11, and `registry.js`'s `vacon-c` entry already
+  carries that real `url`, not `null` — the tile this bullet was
+  waiting on already renders live, nothing left to update.
 
 ## Frontend coverage pass (31 Oct 2026)
 
