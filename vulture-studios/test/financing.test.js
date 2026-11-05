@@ -368,3 +368,148 @@ test('the same investor investing twice is charged twice, not replayed for free'
   assert.equal(settleFn.of(projects.VULTURE_STUDIOS_PRODUCTION_ACCOUNT), 400,
     'a second, identical-looking investment must really charge again');
 });
+
+// ===========================================================================
+// Real production financing safeguards: funding deadlines, a minimum
+// ticket, and refunds for a round that misses its own deadline.
+// ===========================================================================
+
+test('fundingDeadlineAt and minimumInvestmentAmount are honestly absent by default, and validated when given', () => {
+  const store = createVultureStudiosStore();
+  const plain = greenlit(store, 1000);
+  assert.equal(plain.fundingDeadlineAt, null);
+  assert.equal(plain.minimumInvestmentAmount, null);
+
+  assert.throws(
+    () => projects.greenlightProject(store, {
+      title: 'X', medium: 'film', synopsis: 'Y', budgetRequested: 100, fundingDeadlineAt: NOW - 1, now: NOW,
+    }),
+    /future/,
+  );
+  assert.throws(
+    () => projects.greenlightProject(store, {
+      title: 'X', medium: 'film', synopsis: 'Y', budgetRequested: 100, minimumInvestmentAmount: -5, now: NOW,
+    }),
+    /positive number/,
+  );
+});
+
+test('a minimum ticket refuses a small investment but never blocks the one that completes the round', async () => {
+  const store = createVultureStudiosStore();
+  const project = projects.greenlightProject(store, {
+    title: 'X', medium: 'film', synopsis: 'Y', budgetRequested: 1000, minimumInvestmentAmount: 100, now: NOW,
+  });
+  const settleFn = idempotentLedger();
+
+  await assert.rejects(
+    projects.investInProject(store, { projectId: project.id, investorId: 'ada', amount: 50, settleFn, now: NOW }),
+    /minimum investment/,
+  );
+
+  await projects.investInProject(store, { projectId: project.id, investorId: 'ada', amount: 950, settleFn, now: NOW });
+  // Only 50 left -- below the 100 floor, but it's the whole remainder,
+  // so a real backer finishing the round must not be blocked by it.
+  await projects.investInProject(store, { projectId: project.id, investorId: 'rio', amount: 50, settleFn, now: NOW });
+  assert.equal(projects.getProject(store, project.id).status, 'funded');
+});
+
+test('investing past a real funding deadline is refused outright, even before anything has formally expired', async () => {
+  const store = createVultureStudiosStore();
+  const project = projects.greenlightProject(store, {
+    title: 'X', medium: 'film', synopsis: 'Y', budgetRequested: 1000, fundingDeadlineAt: NOW + 1000, now: NOW,
+  });
+  const settleFn = idempotentLedger();
+
+  await assert.rejects(
+    projects.investInProject(store, { projectId: project.id, investorId: 'ada', amount: 100, settleFn, now: NOW + 2000 }),
+    /deadline has passed/,
+  );
+  assert.equal(store.investments.length, 0, 'the refused attempt must not have moved any money');
+});
+
+test('a project that misses its real deadline refunds every real investor their exact contribution', async () => {
+  const store = createVultureStudiosStore();
+  const project = projects.greenlightProject(store, {
+    title: 'X', medium: 'film', synopsis: 'Y', budgetRequested: 1000, fundingDeadlineAt: NOW + 1000, now: NOW,
+  });
+  const settleFn = ledger({ ada: 1000, rio: 1000 });
+
+  await projects.investInProject(store, { projectId: project.id, investorId: 'ada', amount: 300, settleFn, now: NOW });
+  await projects.investInProject(store, { projectId: project.id, investorId: 'rio', amount: 150, settleFn, now: NOW + 500 });
+  assert.equal(settleFn.of(projects.VULTURE_STUDIOS_PRODUCTION_ACCOUNT), 450);
+
+  const expired = await projects.expireProjectFunding(store, { projectId: project.id, payoutFn: settleFn, now: NOW + 2000 });
+
+  assert.equal(expired.status, 'expired');
+  assert.equal(expired.expiredAt, NOW + 2000);
+  assert.equal(settleFn.of('ada'), 1000, 'ada must be made whole -- she started at 1000, invested 300, and got it back');
+  assert.equal(settleFn.of('rio'), 1000, 'rio must be made whole -- he started at 1000, invested 150, and got it back');
+  assert.equal(settleFn.of(projects.VULTURE_STUDIOS_PRODUCTION_ACCOUNT), 0, 'the production account must be drained back to zero');
+});
+
+test('expireProjectFunding refuses a project that is not greenlit, has no deadline, or has not reached it yet', async () => {
+  const store = createVultureStudiosStore();
+  const settleFn = idempotentLedger();
+
+  const noDeadline = greenlit(store, 1000);
+  await assert.rejects(
+    projects.expireProjectFunding(store, { projectId: noDeadline.id, payoutFn: settleFn, now: NOW }),
+    /no fundingDeadlineAt/,
+  );
+
+  const notYet = projects.greenlightProject(store, {
+    title: 'X', medium: 'film', synopsis: 'Y', budgetRequested: 1000, fundingDeadlineAt: NOW + 1000, now: NOW,
+  });
+  await assert.rejects(
+    projects.expireProjectFunding(store, { projectId: notYet.id, payoutFn: settleFn, now: NOW }),
+    /hasn't passed yet/,
+  );
+
+  const funded = await fundedProject(store, settleFn, [{ investorId: 'ada', amount: 1000 }]);
+  await assert.rejects(
+    projects.expireProjectFunding(store, { projectId: funded.id, payoutFn: settleFn, now: NOW + 10000 }),
+    /only a "greenlit" round can expire/,
+  );
+});
+
+test('a second expiry attempt on an already-expired project is refused, not re-refunded', async () => {
+  const store = createVultureStudiosStore();
+  const project = projects.greenlightProject(store, {
+    title: 'X', medium: 'film', synopsis: 'Y', budgetRequested: 1000, fundingDeadlineAt: NOW + 1000, now: NOW,
+  });
+  const settleFn = idempotentLedger();
+  await projects.investInProject(store, { projectId: project.id, investorId: 'ada', amount: 200, settleFn, now: NOW });
+
+  await projects.expireProjectFunding(store, { projectId: project.id, payoutFn: settleFn, now: NOW + 2000 });
+  await assert.rejects(
+    projects.expireProjectFunding(store, { projectId: project.id, payoutFn: settleFn, now: NOW + 3000 }),
+    /only a "greenlit" round can expire/,
+  );
+  assert.equal(settleFn.of('ada'), 200, 'refunded exactly once, not twice');
+});
+
+test('sweepExpiredFunding expires every real project past its deadline and leaves everything else untouched', async () => {
+  const store = createVultureStudiosStore();
+  const settleFn = idempotentLedger();
+
+  const late = projects.greenlightProject(store, {
+    title: 'Late', medium: 'film', synopsis: 'Y', budgetRequested: 1000, fundingDeadlineAt: NOW + 1000, now: NOW,
+  });
+  await projects.investInProject(store, { projectId: late.id, investorId: 'ada', amount: 400, settleFn, now: NOW });
+
+  const notDue = projects.greenlightProject(store, {
+    title: 'Not due', medium: 'film', synopsis: 'Y', budgetRequested: 1000, fundingDeadlineAt: NOW + 50000, now: NOW,
+  });
+  await projects.investInProject(store, { projectId: notDue.id, investorId: 'rio', amount: 400, settleFn, now: NOW });
+
+  const noDeadline = greenlit(store, 1000);
+
+  const result = await projects.sweepExpiredFunding(store, { payoutFn: settleFn, now: NOW + 2000 });
+
+  assert.equal(result.expired.length, 1);
+  assert.equal(result.expired[0].id, late.id);
+  assert.equal(result.failed.length, 0);
+  assert.equal(settleFn.of('ada'), 400, 'the late project\'s investor was refunded');
+  assert.equal(projects.getProject(store, notDue.id).status, 'greenlit', 'not yet due must be untouched');
+  assert.equal(projects.getProject(store, noDeadline.id).status, 'greenlit', 'no deadline at all must be untouched');
+});

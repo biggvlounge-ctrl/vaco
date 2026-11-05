@@ -346,11 +346,104 @@ has no login for), per the previous section.
   (`x: 300, y: 1700`). Live-verified with a real Playwright pass
   against real running Shield/V3/Vvltvre Music/Vvltvre Studios servers
   — see `vdp/dev-docs/phase-15-vulture-studios-district/`.
-- Real production financing safeguards a real studio would have —
-  refunds if a project fails to reach full funding by a deadline, a
-  minimum-investment floor, secondary resale of an investor's stake
-  before the project completes (VOKEN's own fractional-share resale
-  module is the real, existing precedent for that last one, not
-  reused here yet).
+- ~~Real production financing safeguards... refunds if a project
+  fails to reach full funding by a deadline, a minimum-investment
+  floor...~~ **Both done (5 Nov 2026) — see "Real production
+  financing safeguards" below.** Secondary resale of an investor's
+  stake before the project completes is still genuinely open (VOKEN's
+  own fractional-share resale module remains the real, existing
+  precedent, not reused here yet) — a separate, larger piece of work
+  from the two closed this round.
 - Real content delivery/rendering — `finalAssetUrl` is a real,
   honestly-nullable pointer, not an actual production pipeline.
+
+## Real production financing safeguards (5 Nov 2026)
+
+Closes two of this file's own three self-flagged financing-safeguard
+gaps. The third (secondary resale of a stake before completion) stays
+open — a real resale market is a separate, larger piece of design
+than a deadline/floor check, left for its own round.
+
+**No invented global constant.** No source doc here names a specific
+deadline length or a specific minimum-ticket size, and picking one
+out of thin air would be exactly the trap `vacon-c/CLAUDE.md`'s own
+standing rules catalogue repeatedly: "a threshold picked from what a
+number sounds like is a guess." So `fundingDeadlineAt` and
+`minimumInvestmentAmount` are real, optional, caller-supplied fields
+on `greenlightProject` — the studio sets its own real terms per
+project, the same "caller decides, this file enforces" shape
+`venvs/lib/marketplace.js`'s `editionSize` and `hvntz/lib/hunts.js`'s
+`startsAt`/`timeLimitMinutes` already take. Both default to `null` —
+present and honestly absent, not silently omitted — and a project
+with neither behaves exactly as it always has: open-ended financing,
+any amount.
+
+**The floor never blocks the investment that finishes the round.** A
+real backer completing the last $5 of a $10,000 raise under a $500
+minimum ticket is exactly what a real minimum investment should never
+refuse — `investInProject`'s new check only applies below the floor
+when the amount is also less than the round's real remaining budget.
+
+**Refunds reuse the real per-investor contribution totals that
+already existed for equity.** `expireProjectFunding` (new) refunds
+every real investor exactly what they put in, via
+`getInvestorContributions` — the same real totals `getProjectEquity`
+already computed, not a second, parallel bookkeeping path. Only
+reachable while a round is still `greenlit` with a real
+`fundingDeadlineAt` that has actually passed and less than full
+funding raised; a round that reached `funded` already transitioned
+the moment `investInProject` claimed it, so the two paths never
+compete. `investInProject` itself also refuses any new investment
+once the real deadline has passed, even before anything has formally
+marked the project `expired` — the same "refuse before it reaches a
+cart" posture `venvs/lib/marketplace.js`'s delisted-product guard
+already takes.
+
+**A deterministic rule, not an operator's judgment call.** Unlike
+`start-production`/`complete`/`distribute`/`revenue` (all
+`requireOperator`-gated with a `decisionLog` entry, because a human is
+deciding something), expiring a missed deadline is the same kind of
+automatic rule HVNTZ's own hunt-time-limit expiry and VACO Analytics'
+own scheduled evaluation sweep already are: `POST
+/api/projects/:id/expire-funding` and `POST
+/api/projects/expire-funding-sweep` are both `requireCallingService()`-
+gated with no decision log entry, plus a `setInterval` on a real
+cadence (`VULTURE_STUDIOS_FUNDING_SWEEP_INTERVAL_MS`, default 10
+minutes) calling the identical sweep function — the directly-callable
+routes are what tests (and a real deployment's own orchestration)
+call without waiting out the real interval.
+
+### Verification
+
+`test/financing.test.js` grew by 7: `fundingDeadlineAt`/
+`minimumInvestmentAmount` honestly absent by default and validated
+when given; the floor refusing a small investment but never the one
+that completes the round; investing past a real deadline refused
+outright; a project missing its deadline refunding every real
+investor their exact contribution; `expireProjectFunding` refusing a
+project that isn't greenlit, has no deadline, or hasn't reached it
+yet; a second expiry attempt refused rather than re-refunding; and
+`sweepExpiredFunding` expiring only the real projects actually past
+their own deadline. Full suite: 16/16 → 23/23.
+
+Mutation-verified both new guards independently: replacing the
+minimum-investment floor's top-off exception with a bare `false`
+turned exactly the floor test red (19/20 passing); replacing the
+funding-deadline check in `investInProject` with a bare `false`
+turned exactly the deadline test red (19/20 passing); both restored
+and reconfirmed 23/23 green.
+
+Live-verified against a real spawned stack (Shield + V3 + this app,
+no mocks, real service credentials both directions): greenlit a real
+project with a real $100 floor and a real deadline a few seconds out;
+confirmed a $50 investment was refused for being below the floor;
+invested a real $900 and confirmed real VCoin actually moved (a real
+investor's V3 balance dropped from 1000 to 100); confirmed a further
+investment was refused once the real deadline passed; called
+`expire-funding` and confirmed the project moved to `expired` and the
+real investor's V3 balance returned to exactly 1000 — a real,
+exact refund, not an approximation. Separately verified the sweep
+route end to end: refused with no credential (401), and with one,
+found and refunded the one real project past its deadline while
+leaving an unexpired project and a project with no deadline at all
+untouched.

@@ -37,7 +37,8 @@ const { createOperatorAuth } = require('./lib/operatorAuth.cjs');
 const { traceMiddleware } = require('./lib/tracing.cjs');
 const {
   PROJECT_MEDIUMS, PROJECT_STATUSES, VULTURE_STUDIOS_PRODUCTION_ACCOUNT, greenlightProject, getProject, listProjects,
-  investInProject, getProjectEquity, getInvestorCoWriterSplits, startProduction, completeProject,
+  investInProject, getProjectEquity, getInvestorCoWriterSplits, expireProjectFunding, sweepExpiredFunding,
+  startProduction, completeProject,
   recordDistribution, reportProjectRevenue,
 } = require('./lib/projects');
 
@@ -290,6 +291,30 @@ app.post('/api/projects/:id/invest', requireActor('investorId'), async (req, res
   }
 });
 
+// Real refunds, not an operator judgment call -- a deterministic rule
+// (deadline passed + round not full), same posture as HVNTZ's own
+// time-limit expiry and VACO Analytics' own scheduled evaluation
+// sweep: `requireCallingService()`, not `requireOperator()`, and no
+// decisionLog entry, because nobody is deciding anything here, the
+// clock already did.
+app.post('/api/projects/:id/expire-funding', requireCallingService(), async (req, res) => {
+  try {
+    const project = await expireProjectFunding(store, { projectId: Number(req.params.id), payoutFn: settleVCoin });
+    await pushMetric('project_funding_expired', project.amountRaised);
+    res.json(project);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/projects/expire-funding-sweep', requireCallingService(), async (req, res) => {
+  const result = await sweepExpiredFunding(store, { payoutFn: settleVCoin });
+  for (const project of result.expired) {
+    await pushMetric('project_funding_expired', project.amountRaised);
+  }
+  res.json(result);
+});
+
 app.post('/api/projects/:id/start-production', requireOperator('vulture-studios:state'), async (req, res) => {
   try {
     await decisionLog.record({
@@ -422,6 +447,22 @@ app.post('/api/projects/:id/revenue', requireOperator('vulture-studios:settle'),
     res.status(400).json({ error: err.message });
   }
 });
+
+// Same shape as VOID MAGIC's own event-service poll and VACO
+// Analytics' own evaluation sweep: the directly callable route above
+// is what tests call; this is what a real deployment calls on its own
+// real cadence.
+const FUNDING_SWEEP_INTERVAL_MS = Number(process.env.VULTURE_STUDIOS_FUNDING_SWEEP_INTERVAL_MS) || 10 * 60 * 1000;
+setInterval(async () => {
+  try {
+    const result = await sweepExpiredFunding(store, { payoutFn: settleVCoin });
+    if (result.expired.length > 0) {
+      console.log(`[funding-sweep] ${result.expired.length} project(s) expired and refunded`);
+    }
+  } catch (err) {
+    console.error(`[funding-sweep] failed: ${err.message}`);
+  }
+}, FUNDING_SWEEP_INTERVAL_MS).unref();
 
 app.listen(PORT, () => {
   console.log(`Vvltvre Studios listening on http://localhost:${PORT}`);

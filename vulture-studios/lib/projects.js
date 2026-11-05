@@ -22,7 +22,7 @@
 const { settleOnce } = require('./settleOnce');
 
 const PROJECT_MEDIUMS = ['film', 'tv', 'music', 'podcast'];
-const PROJECT_STATUSES = ['greenlit', 'funded', 'in-production', 'completed'];
+const PROJECT_STATUSES = ['greenlit', 'funded', 'in-production', 'completed', 'expired'];
 
 const VULTURE_STUDIOS_PRODUCTION_ACCOUNT = 'vulture-studios-production';
 const VULTURE_STUDIOS_REVENUE_ACCOUNT = 'vulture-studios-revenue-intake';
@@ -31,9 +31,24 @@ function round(n) {
   return Math.round(n * 100) / 100;
 }
 
+// `fundingDeadlineAt`/`minimumInvestmentAmount` are real, optional,
+// caller-supplied fields -- no document anywhere names a specific
+// deadline length or a specific minimum-ticket size for this project,
+// and inventing one global constant would be a guess with nothing
+// behind it (the same trap VACON-C's own CLAUDE.md names repeatedly:
+// "a threshold picked from what a number sounds like is a guess").
+// Instead the studio sets its own real terms per project at
+// greenlight time, the same "caller decides, this file enforces"
+// shape `editionSize` already takes in `venvs/lib/marketplace.js` and
+// `startsAt`/`timeLimitMinutes` take in `hvntz/lib/hunts.js`. Both
+// default to `null` -- present and honestly absent, not silently
+// omitted -- and a project with neither behaves exactly as it always
+// has: open-ended financing, any amount.
 function greenlightProject(store, options = {}) {
   const {
-    title, medium, synopsis, budgetRequested, now = Date.now(),
+    title, medium, synopsis, budgetRequested,
+    fundingDeadlineAt = null, minimumInvestmentAmount = null,
+    now = Date.now(),
   } = options;
 
   if (!title) throw new Error('greenlightProject requires a title');
@@ -43,6 +58,16 @@ function greenlightProject(store, options = {}) {
   if (!synopsis) throw new Error('greenlightProject requires a synopsis');
   if (!Number.isFinite(budgetRequested) || budgetRequested <= 0) {
     throw new Error('greenlightProject requires a positive budgetRequested');
+  }
+  if (fundingDeadlineAt !== null) {
+    if (!Number.isFinite(fundingDeadlineAt) || fundingDeadlineAt <= now) {
+      throw new Error('greenlightProject: fundingDeadlineAt, when given, must be a real timestamp in the future');
+    }
+  }
+  if (minimumInvestmentAmount !== null) {
+    if (!Number.isFinite(minimumInvestmentAmount) || minimumInvestmentAmount <= 0) {
+      throw new Error('greenlightProject: minimumInvestmentAmount, when given, must be a positive number');
+    }
   }
 
   const project = {
@@ -56,10 +81,13 @@ function greenlightProject(store, options = {}) {
     finalAssetUrl: null,
     distributionApp: null,
     distributionTitleId: null,
+    fundingDeadlineAt,
+    minimumInvestmentAmount,
     createdAt: now,
     fundedAt: null,
     productionStartedAt: null,
     completedAt: null,
+    expiredAt: null,
   };
   store.projects.push(project);
   return project;
@@ -93,11 +121,26 @@ async function investInProject(store, options = {}) {
   if (project.status !== 'greenlit') {
     throw new Error(`investInProject: project ${projectId} is "${project.status}", financing is only open while "greenlit"`);
   }
+  // A deadline that has already passed refuses new money outright,
+  // even before anything has formally marked the project "expired" --
+  // the same "refuse before it reaches a cart" posture
+  // `venvs/lib/marketplace.js`'s delisted-product guard takes, applied
+  // here to a financing round rather than a listing.
+  if (project.fundingDeadlineAt !== null && now >= project.fundingDeadlineAt) {
+    throw new Error(`investInProject: project ${projectId}'s funding deadline has passed`);
+  }
   if (!investorId) throw new Error('investInProject requires an investorId');
   if (!Number.isFinite(amount) || amount <= 0) throw new Error('investInProject requires a positive amount');
   const remaining = round(project.budgetRequested - project.amountRaised);
   if (amount > remaining) {
     throw new Error(`investInProject: amount ${amount} exceeds project ${projectId}'s remaining budget ${remaining}`);
+  }
+  // The floor applies to an ordinary investment, not to the one that
+  // finishes the round -- a real backer completing the last $5 of a
+  // $10,000 raise under a $500 minimum ticket is exactly what a real
+  // minimum should never block.
+  if (project.minimumInvestmentAmount !== null && amount < project.minimumInvestmentAmount && amount !== remaining) {
+    throw new Error(`investInProject: amount ${amount} is below project ${projectId}'s minimum investment of ${project.minimumInvestmentAmount}`);
   }
   if (typeof settleFn !== 'function') {
     throw new Error('investInProject requires a settleFn(legs, meta)');
@@ -227,6 +270,76 @@ function requireStatus(store, projectId, expectedStatus, action) {
   return project;
 }
 
+// Real refunds -- a project whose own financing round misses its own
+// real deadline returns every real investor's real contribution
+// rather than leaving it stranded in the production account. Only
+// reachable while still "greenlit": a project that reached full
+// funding already transitioned to "funded" the moment `investInProject`
+// claimed it, so this never competes with that path, and "funded"/
+// "in-production"/"completed"/"expired" are all refused here as
+// not-applicable rather than silently no-op'd.
+async function expireProjectFunding(store, options = {}) {
+  const { projectId, payoutFn, now = Date.now() } = options;
+
+  const project = getProject(store, projectId);
+  if (!project) throw new Error(`expireProjectFunding: no project with id ${projectId}`);
+  if (project.status !== 'greenlit') {
+    throw new Error(`expireProjectFunding: project ${projectId} is "${project.status}", only a "greenlit" round can expire`);
+  }
+  if (project.fundingDeadlineAt === null) {
+    throw new Error(`expireProjectFunding: project ${projectId} has no fundingDeadlineAt set`);
+  }
+  if (now < project.fundingDeadlineAt) {
+    throw new Error(`expireProjectFunding: project ${projectId}'s funding deadline hasn't passed yet`);
+  }
+  if (typeof payoutFn !== 'function') {
+    throw new Error('expireProjectFunding requires a payoutFn(legs, meta)');
+  }
+
+  const byInvestor = getInvestorContributions(store, projectId);
+  const legs = [...byInvestor.entries()]
+    .filter(([, contributed]) => contributed > 0)
+    .map(([investorId, contributed]) => ({
+      fromUserId: VULTURE_STUDIOS_PRODUCTION_ACCOUNT,
+      toUserId: investorId,
+      amount: contributed,
+      reason: `vulture_studios_funding_refund:${projectId}:${investorId}`,
+    }));
+
+  return settleOnce(project, { status: 'expired', expiredAt: now }, async () => {
+    if (legs.length > 0) {
+      await payoutFn(legs, { reason: `vulture_studios_funding_refund:${projectId}` });
+    }
+    return project;
+  });
+}
+
+// Sweeps every real project whose own deadline has passed without
+// reaching full funding -- same "directly callable, testable without
+// waiting out a real interval, plus a setInterval on a real cadence"
+// shape `hvntz/lib/eventServices.js`'s `pollEventServiceJobStatuses`
+// and `vaco-analytics/intelligence.js`'s `evaluateAllMetrics` already
+// take. One project failing never stops the sweep for the rest --
+// each is caught independently so a real failure on one real refund
+// is visible rather than silently swallowing every project after it.
+async function sweepExpiredFunding(store, options = {}) {
+  const { payoutFn, now = Date.now() } = options;
+  const candidates = store.projects.filter(
+    (p) => p.status === 'greenlit' && p.fundingDeadlineAt !== null && now >= p.fundingDeadlineAt,
+  );
+
+  const expired = [];
+  const failed = [];
+  for (const project of candidates) {
+    try {
+      expired.push(await expireProjectFunding(store, { projectId: project.id, payoutFn, now }));
+    } catch (err) {
+      failed.push({ projectId: project.id, error: err.message });
+    }
+  }
+  return { expired, failed };
+}
+
 function startProduction(store, options = {}) {
   const { projectId, now = Date.now() } = options;
   const project = requireStatus(store, projectId, 'funded', 'startProduction');
@@ -354,6 +467,8 @@ module.exports = {
   investInProject,
   getProjectEquity,
   getInvestorCoWriterSplits,
+  expireProjectFunding,
+  sweepExpiredFunding,
   startProduction,
   completeProject,
   recordDistribution,
