@@ -945,6 +945,242 @@ function groupWagerDetailCard(gw) {
   return VACO.card(gw.name, children);
 }
 
+// -- Group Wager Competitions: Leagues and Tournaments -------------------
+
+// `competitionView` (what `GET /api/competitions/:id` returns) already
+// merges the competition's own fields with `pointsStandings` -- a pure
+// recomputation over each leg's real, already-resolved group wager, so
+// there is no second standings calculation to do here. `advance` and
+// `finish` are operator-gated (`vago:settle`) and get no button here,
+// matching this file's own zero-operator-exposure precedent already
+// established for `/api/group-wagers/:id/resolve`.
+var viewedCompetitionId = null;
+
+function renderCompetitions(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'A real League or Tournament: cumulative points across real group wagers (no seeded bracket). '
+    + 'A leg is just naming an existing group wager -- settling it is still done through Group Wagers.'));
+
+  if (VACO.userId()) {
+    out.appendChild(createCompetitionCard());
+  } else {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to create a competition.'));
+  }
+  out.appendChild(findCompetitionCard());
+
+  var detailSlot = el('div');
+  out.appendChild(detailSlot);
+
+  var detailPromise = viewedCompetitionId
+    ? VACO.api('/api/competitions/' + viewedCompetitionId)
+      .then(function (c) { VACO.mount(detailSlot, competitionDetailCard(c)); })
+      .catch(function (err) {
+        VACO.mount(detailSlot, VACO.notice(
+          'Could not load competition #' + viewedCompetitionId + ': ' + VACO.escapeHtml(err.message), 'danger'));
+      })
+    : Promise.resolve();
+
+  return detailPromise.then(function () { return VACO.mount(body, out); });
+}
+
+function createCompetitionCard() {
+  return VACO.card('Create a competition', [
+    VACO.form([
+      { name: 'name', label: 'Name', width: '200px' },
+      { name: 'format', label: 'Format', options: [
+        { value: 'league', label: 'League' }, { value: 'tournament', label: 'Tournament' },
+      ] },
+      { name: 'description', label: 'Description (optional)', width: '220px' },
+    ], function (values) {
+      var payload = { creatorId: VACO.userId(), name: values.name, format: values.format };
+      if (values.description) payload.description = values.description;
+      return VACO.post('/api/competitions', payload).then(function (c) {
+        VACO.toast('Competition #' + c.id + ' created.', 'money');
+        viewedCompetitionId = c.id;
+        VACO.render();
+      });
+    }, 'Create'),
+  ]);
+}
+
+function findCompetitionCard() {
+  return VACO.card('Find a competition', [
+    VACO.form([{ name: 'id', label: 'Competition id', type: 'number', min: 1, width: '120px' }],
+      function (values) {
+        viewedCompetitionId = values.id;
+        VACO.render();
+      }, 'View'),
+  ]);
+}
+
+function competitionDetailCard(c) {
+  var children = [];
+  if (c.description) children.push(el('p', 'vaco-small vaco-dim', c.description));
+
+  var stats = el('div', 'stat-row');
+  [['Format', c.format], ['Status', c.status], ['Legs', c.legs.length],
+    ['Winner', c.winnerUserId || '—']]
+    .forEach(function (pair) {
+      var s = el('div', 'stat');
+      s.appendChild(el('span', 'vaco-label', pair[0]));
+      s.appendChild(el('span', 'stat-value', pair[1]));
+      stats.appendChild(s);
+    });
+  children.push(stats);
+
+  children.push(VACO.table([
+    { key: 'userId', label: 'User' },
+    { label: 'Points', num: true, render: function (r) { return r.points; } },
+    { label: 'W-L', render: function (r) { return r.wins + '-' + r.losses; } },
+    { label: 'Eliminated', render: function (r) { return r.eliminated ? 'yes' : 'no'; } },
+  ], c.standings, { empty: 'No settled legs yet -- standings fill in as legs resolve.' }));
+
+  if (VACO.userId() && String(VACO.userId()) === String(c.creatorId) && c.status === 'open') {
+    children.push(VACO.form([
+      { name: 'groupWagerId', label: 'Group wager id', type: 'number', min: 1, width: '140px' },
+      { name: 'round', label: 'Round (tournament only)', type: 'number', min: 1, width: '140px' },
+    ], function (values) {
+      var payload = { groupWagerId: values.groupWagerId };
+      if (values.round) payload.round = values.round;
+      return VACO.post('/api/competitions/' + c.id + '/legs', payload).then(function () {
+        VACO.toast('Leg added to competition #' + c.id + '.', 'money');
+        VACO.render();
+      });
+    }, 'Add leg'));
+  }
+
+  return VACO.card(c.name, children);
+}
+
+// -- BLIND and Before-the-Answer ------------------------------------------
+
+// `blindRoundView` (what `GET /api/blind-rounds/:id` returns) is the
+// round plus `determineWinners`, computed fresh the same way every other
+// VAGO detail view here avoids a second stored copy. `resolve` is
+// operator-gated (`vago:settle` -- §18's own "the AI must not alter the
+// answer based on the participants' bets" guard) and gets no button here.
+var viewedBlindRoundId = null;
+
+function renderBlindRounds(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Predict blind, with no visible odds or pool while entries are open. BLIND asks for the real '
+    + 'outcome; Before-the-Answer asks for a number. Winner-take-all, split on a tie.'));
+
+  if (VACO.userId()) {
+    out.appendChild(createBlindRoundCard());
+  } else {
+    out.appendChild(el('div', 'vaco-empty', 'Sign in to create a blind round.'));
+  }
+  out.appendChild(findBlindRoundCard());
+
+  var detailSlot = el('div');
+  out.appendChild(detailSlot);
+
+  var detailPromise = viewedBlindRoundId
+    ? VACO.api('/api/blind-rounds/' + viewedBlindRoundId)
+      .then(function (r) { VACO.mount(detailSlot, blindRoundDetailCard(r)); })
+      .catch(function (err) {
+        VACO.mount(detailSlot, VACO.notice(
+          'Could not load blind round #' + viewedBlindRoundId + ': ' + VACO.escapeHtml(err.message), 'danger'));
+      })
+    : Promise.resolve();
+
+  return detailPromise.then(function () { return VACO.mount(body, out); });
+}
+
+function createBlindRoundCard() {
+  return VACO.card('Create a blind round', [
+    VACO.form([
+      { name: 'format', label: 'Format', options: [
+        { value: 'blind', label: 'BLIND' }, { value: 'before-the-answer', label: 'Before-the-Answer' },
+      ] },
+      { name: 'proposition', label: 'Proposition', width: '260px' },
+      { name: 'answerType', label: 'Answer type', options: [
+        { value: 'exact', label: 'Exact (text)' }, { value: 'numeric', label: 'Numeric' },
+      ] },
+      { name: 'entryAmount', label: 'Entry (VCoin)', type: 'number', min: 0.01, value: 5, width: '100px' },
+      { name: 'entryDeadlineHours', label: 'Closes in (hrs)', type: 'number', min: 1, value: 24, width: '90px' },
+      { name: 'maxParticipants', label: 'Max (optional)', type: 'number', min: 2, width: '90px' },
+    ], function (values) {
+      var payload = {
+        creatorId: VACO.userId(),
+        format: values.format,
+        proposition: values.proposition,
+        answerType: values.answerType,
+        entryAmount: values.entryAmount,
+        entryDeadline: Date.now() + values.entryDeadlineHours * 60 * 60 * 1000,
+      };
+      if (values.maxParticipants) payload.maxParticipants = values.maxParticipants;
+      return VACO.post('/api/blind-rounds', payload).then(function (r) {
+        VACO.toast('Blind round #' + r.id + ' created.', 'money');
+        viewedBlindRoundId = r.id;
+        VACO.render();
+      });
+    }, 'Create'),
+  ]);
+}
+
+function findBlindRoundCard() {
+  return VACO.card('Find a blind round', [
+    VACO.form([{ name: 'id', label: 'Blind round id', type: 'number', min: 1, width: '120px' }],
+      function (values) {
+        viewedBlindRoundId = values.id;
+        VACO.render();
+      }, 'View'),
+  ]);
+}
+
+function blindRoundDetailCard(r) {
+  var children = [];
+  children.push(el('p', 'vaco-dim', 'Proposition: ' + r.proposition));
+
+  var stats = el('div', 'stat-row');
+  [['Format', r.format], ['Answer type', r.answerType], ['Status', r.status],
+    ['Entry', VACO.round(r.entryAmount)], ['Pool', VACO.round(r.pool)],
+    ['Answers', r.answers.length + (r.maxParticipants ? ' / ' + r.maxParticipants : '')],
+    ['Closes', new Date(r.entryDeadline).toLocaleString()]]
+    .forEach(function (pair) {
+      var s = el('div', 'stat');
+      s.appendChild(el('span', 'vaco-label', pair[0]));
+      s.appendChild(el('span', 'stat-value', pair[1]));
+      stats.appendChild(s);
+    });
+  children.push(stats);
+
+  if (r.status === 'resolved') {
+    children.push(el('p', 'vaco-dim', 'Real answer: ' + r.realAnswer));
+    var winnerRows = (r.winners || []).map(function (userId) {
+      var a = r.answers.find(function (ans) { return ans.userId === userId; });
+      return { userId: userId, answer: a ? a.answer : '—' };
+    });
+    children.push(VACO.table([
+      { key: 'userId', label: 'Winner' },
+      { key: 'answer', label: 'Answer' },
+    ], winnerRows, { empty: 'No winners.' }));
+  } else if (!VACO.userId()) {
+    children.push(el('div', 'vaco-empty', 'Sign in to submit an answer.'));
+  } else if (r.locked) {
+    children.push(el('p', 'vaco-dim', 'This blind round is locked -- the entry deadline has passed.'));
+  } else {
+    children.push(VACO.form([
+      { name: 'answer', label: r.answerType === 'numeric' ? 'Your number' : 'Your answer', width: '160px' },
+    ], function (values) {
+      var answer = r.answerType === 'numeric' ? Number(values.answer) : values.answer;
+      return VACO.post('/api/blind-rounds/' + r.id + '/answers', {
+        userId: VACO.userId(), answer: answer,
+      }).then(function () {
+        VACO.toast('Answer submitted to blind round #' + r.id + '.', 'money');
+        VACO.refreshBalances().then(VACO.renderIdentity);
+        VACO.render();
+      });
+    }, 'Submit answer'));
+  }
+
+  return VACO.card('Blind round #' + r.id, children);
+}
+
 VACO.app({
   id: 'vago',
   name: 'VAGO',
@@ -969,6 +1205,12 @@ VACO.app({
     { id: 'groupwagers', label: 'Group Wagers', heading: 'Group Wagers',
       blurb: 'A named, creator-owned wrapper around one real prediction market — invite friends, join a side, climb the leaderboard.',
       render: renderGroupWagers },
+    { id: 'competitions', label: 'Competitions', heading: 'Leagues & Tournaments',
+      blurb: 'Cumulative points across real group wagers — no seeded bracket, no second wagering engine.',
+      render: renderCompetitions },
+    { id: 'blind', label: 'BLIND', heading: 'BLIND & Before-the-Answer',
+      blurb: 'Predict blind, with no visible odds or pool while entries are open.',
+      render: renderBlindRounds },
   ],
 });
 </script>

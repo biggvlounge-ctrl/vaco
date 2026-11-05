@@ -45,15 +45,20 @@
 // freeze's binary-only group wager can support -- `teamNames` below is
 // a display label over that existing mechanic, not a new one.
 //
-// **Still not built: tournaments, leagues, BLIND, Before-the-Answer,
-// or QVAN-based group-risk monitoring.** Each of those needs a
-// subsystem invented from nothing -- a bracket/standings engine, a
-// shared-proposition pooling mechanic, a real risk-analysis layer --
-// which is the gap this session's own audits keep finding and keep
-// refusing to paper over. (The leaderboard this header used to list
-// here is built too, in `groupWagerLeaderboard.js` — a pure
+// **Stale — checked directly, 5 Nov 2026.** This paragraph used to say
+// tournaments, leagues, BLIND and Before-the-Answer were still not
+// built. All four are real: tournaments/leagues in
+// `groupWagerCompetitions.js` (cumulative points over real, already-
+// resolved group wagers, no seeded bracket), BLIND/Before-the-Answer in
+// `blindPredictions.js` (free-form answer pool, winner-take-all/split-
+// tie payout) -- both now also wired into `public/index.html` with real
+// seed data, see `../README.md`'s "Competitions and BLIND, seeded and
+// wired (5 Nov 2026)". The leaderboard this header already corrected
+// itself on is built too, in `groupWagerLeaderboard.js` — a pure
 // recomputation over data this file and `predictionMarkets.js` already
-// carry, never a second copy of standings.)
+// carry, never a second copy of standings. Only QVAN-based group-risk
+// monitoring remains genuinely unbuilt: no real spec for it exists
+// anywhere in this ecosystem.
 //
 // **The invitation state machine, added 25 Sep 2026, is different.**
 // It needs no external subsystem -- only a richer status on data this

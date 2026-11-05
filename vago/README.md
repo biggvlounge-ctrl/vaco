@@ -342,13 +342,24 @@ if VACO Analytics is down). See `vaco-analytics/dev-docs/phase-5-live-metric-fee
   far.
 - A named VAGO agent — unlike Gibson (VOID) or Kenji (VOKEN), no
   VAGO-specific agent is confirmed in any of the three source docs.
-- Group Wager side wagers, team roles, a leaderboard, and QVAN-based
+- ~~Group Wager side wagers, team roles, a leaderboard, and QVAN-based
   group-risk monitoring — the §29 audit found no substrate for any of
   them anywhere in the ecosystem, and each needs a subsystem invented
-  from nothing (a bracket/standings engine, a wager-to-wager
-  relationship, a real risk-analysis layer) rather than something to
-  extend. Multi-outcome group wagers are also out of scope:
-  `predictionMarkets.js` is binary only.
+  from nothing...~~ **Stale — checked directly, 5 Nov 2026.** Side
+  wagers (`parentGroupWagerId`), team roles (`teamNames` over the
+  existing yes/no sides), and the leaderboard (`groupWagerLeaderboard.js`,
+  a pure recomputation) are all real and built — see `lib/groupWagers.js`
+  and `lib/groupWagerLeaderboard.js`. So are Competitions (Leagues/
+  Tournaments, `lib/groupWagerCompetitions.js`) and BLIND/
+  Before-the-Answer (`lib/blindPredictions.js`), each real and now also
+  wired into `public/index.html` with real seed data — see "Competitions
+  and BLIND, seeded and wired (5 Nov 2026)" below. Only QVAN-based
+  group-risk monitoring remains genuinely unbuilt: no real spec for it
+  exists anywhere in this ecosystem (checked `v4-proxy/
+  QVAN_SECURITY_RESILIENCE_SCOPE.md` directly — no mention of group-wager
+  risk monitoring at all), so there is nothing yet to extend rather than
+  invent from nothing. Multi-outcome group wagers are also still out of
+  scope: `predictionMarkets.js` is binary only.
 - **The invitation state machine, added 25 Sep 2026, is real** —
   `lib/groupWagers.js`'s `inviteToGroupWager`/`markInvitationViewed`,
   three real per-invitee states (`invited -> viewed -> funded`) plus
@@ -437,11 +448,10 @@ own bet).
   this frontend has no way to forward (`groupWagers.js`'s own header
   explains why VAGO cannot create that post server-to-server on the
   creator's behalf).
-- **Group Wager Competitions (Leagues/Tournaments) and BLIND/Before-
+- ~~**Group Wager Competitions (Leagues/Tournaments) and BLIND/Before-
   the-Answer rounds** — each has real create/view/participate routes
-  with no seed data anywhere, so a customer-facing read would show an
-  empty shell with nothing to meaningfully demonstrate; better suited
-  to a pass that also seeds a live example.
+  with no seed data anywhere...~~ **Closed, 5 Nov 2026** — see
+  "Competitions and BLIND, seeded and wired" below.
 - **Esports lounge** — `esportsStaking.js` is real and tested, but
   `POST /api/esports/matches` (the only way a match comes to exist) is
   `requireCallingService`-gated and nothing seeds one, so there is no
@@ -452,3 +462,54 @@ own bet).
   mechanic behind it; better woven into an existing card (e.g. an AMOE
   history list on the Casino tab's Gold Coin card) than given its own
   surface, and left for whichever pass does that polish.
+
+## Competitions and BLIND, seeded and wired (5 Nov 2026)
+
+Closes the one gap this file's own previous "Deliberately left for a
+follow-up round" note named honestly: `lib/groupWagerCompetitions.js`
+(Leagues/Tournaments) and `lib/blindPredictions.js` (BLIND/Before-the-
+Answer) had real create/view/participate routes and zero frontend
+callers and zero seed data, so a fresh boot showed either nothing or an
+empty shell.
+
+- **Two new tabs in `public/index.html`** — Competitions (create a
+  league or tournament, find/view one by id, the creator adds a leg
+  naming an existing group wager) and BLIND (create a BLIND or
+  Before-the-Answer round, find/view one by id, submit an answer).
+  Built against the exact real payload shapes `server.js`'s own routes
+  take, not an invented shape — `competitionView`/`blindRoundView`
+  already merge each record with its live standings/winners, so
+  neither tab computes a second copy. `advance`/`finish`/`resolve` stay
+  backend-only: each is `requireOperator('vago:settle')`-gated, and
+  `public/index.html` already carries zero frontend exposure for any
+  operator-gated action anywhere in this app (checked directly — no
+  match for "operator" anywhere in the file before this pass), so no
+  button was added for them here either.
+- **Real seed data, `lib/seedDemoData.js`'s new `seedCompetitions`/
+  `seedBlindRounds`** — a real League with one leg actually resolved
+  (through the real `resolveGroupWager`, bypassing only the same
+  operator-gated HTTP route every other seed function here already
+  bypasses) so `pointsStandings` shows a real non-zero-points row on
+  first boot, plus one open leg; a real resolved BLIND round with a
+  real winner, plus a real open Before-the-Answer round with one
+  submitted answer. Both guarded by the same emptiness check every
+  other seed function in this file already uses, so a persisted
+  `data/store.json` is never touched and restarting twice never
+  double-seeds.
+- **Tests** — `test/seedDemoData.test.js` (new, 3 tests): the seeded
+  league shows a real non-zero points row, the seeded BLIND round is
+  resolved with a real winner while Before-the-Answer stays open with
+  one answer, and seeding twice never double-seeds. Full suite: 134 →
+  137 tests, all passing. Mutation-verified: deleting the
+  `seedCompetitions` idempotency guard turned the double-seed test red
+  (1 competition expected, 2 seen); restoring it returned the suite to
+  green.
+- **Live-verified** against a real spawned Shield + V3 + VAGO stack
+  (real Shield sessions, real V3 settlement with the service-token
+  allowlist wired both directions): created a real tournament, added a
+  leg naming a real group wager, confirmed a non-creator gets a real
+  403 adding a leg; created a real BLIND round and submitted a real
+  answer to it; confirmed the seeded League (`GET /api/competitions/1`)
+  shows real standings (`demo-maya`: 1 point, 1-0) and the seeded BLIND
+  round (`GET /api/blind-rounds/1`) is resolved with `winners:
+  ["demo-maya"]`.

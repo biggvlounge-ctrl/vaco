@@ -38,7 +38,9 @@ const { submitAmoeEntry } = require('./amoe');
 const { startCasinoSession } = require('./casinoSession');
 const { createPredictionMarket, buyContract } = require('./predictionMarkets');
 const { createSportsEvent, eventProbabilities, placeSportsBet } = require('./sportsbook');
-const { createGroupWager, joinGroupWager } = require('./groupWagers');
+const { createGroupWager, joinGroupWager, resolveGroupWager } = require('./groupWagers');
+const { createCompetition, addLeg } = require('./groupWagerCompetitions');
+const { createBlindRound, submitAnswer, resolveBlindRound } = require('./blindPredictions');
 
 const DEMO_USERS = ['demo-user', 'demo-maya', 'demo-carlos', 'demo-priya'];
 const VAGO_EDITORIAL = 'vago-editorial';
@@ -244,6 +246,90 @@ async function seedGroupWagers(store, { settleFn }) {
   }
 }
 
+// A real League, seeded through the exact same createCompetition/addLeg
+// functions server.js's own routes call -- one leg's underlying group
+// wager is actually resolved (via the real resolveGroupWager, bypassing
+// only the operator-gated HTTP route the same way every seed function
+// here already bypasses route-level gates), so pointsStandings has at
+// least one real, non-zero-points row the moment a presenter opens this
+// tab -- not an empty standings table. The second leg is left open, so
+// the same tab also shows what a pending leg looks like.
+async function seedCompetitions(store, { settleFn }) {
+  if (store.competitions.length > 0) return;
+
+  try {
+    const competition = createCompetition(store, {
+      creatorId: 'demo-user',
+      name: 'Demo League — Weekend Picks',
+      format: 'league',
+      description: 'A real league: cumulative points across real group wagers, no seeded bracket.',
+    });
+
+    const settledLeg = await createGroupWager(store, {
+      creatorId: 'demo-user',
+      name: 'League Leg 1 — Cardinals vs. Cubs',
+      visibility: 'open',
+      entryDeadline: Date.now() + 24 * 60 * 60 * 1000,
+      question: 'Will the Cardinals win tonight?',
+      category: 'sports',
+      source: 'real-world',
+    });
+    await joinGroupWager(store, { groupWagerId: settledLeg.id, userId: 'demo-maya', side: 'yes', quantity: 10, settleFn });
+    await joinGroupWager(store, { groupWagerId: settledLeg.id, userId: 'demo-carlos', side: 'no', quantity: 8, settleFn });
+    await resolveGroupWager(store, { groupWagerId: settledLeg.id, outcome: 'yes', settleFn });
+    addLeg(store, { competitionId: competition.id, groupWagerId: settledLeg.id });
+
+    const openLeg = await createGroupWager(store, {
+      creatorId: 'demo-user',
+      name: 'League Leg 2 — Bulls vs. Lakers',
+      visibility: 'open',
+      entryDeadline: Date.now() + 48 * 60 * 60 * 1000,
+      question: "Will the Bulls win their next game?",
+      category: 'sports',
+      source: 'real-world',
+    });
+    await joinGroupWager(store, { groupWagerId: openLeg.id, userId: 'demo-priya', side: 'yes', quantity: 5, settleFn });
+    addLeg(store, { competitionId: competition.id, groupWagerId: openLeg.id });
+  } catch (err) {
+    console.warn(`seedDemoData: skipped the demo competition — ${err.message}`);
+  }
+}
+
+// One real, resolved BLIND round (so determineWinners/payout has
+// something to show) and one real, still-open Before-the-Answer round
+// (so the submit flow has somewhere to go) -- both through the exact
+// same createBlindRound/submitAnswer/resolveBlindRound functions
+// server.js's own routes call.
+async function seedBlindRounds(store, { settleFn }) {
+  if (store.blindRounds.length > 0) return;
+
+  try {
+    const blind = createBlindRound(store, {
+      creatorId: 'demo-user',
+      format: 'blind',
+      proposition: 'Who wins tonight — predict blind, no visible odds or pool?',
+      answerType: 'exact',
+      entryAmount: 5,
+      entryDeadline: Date.now() + 24 * 60 * 60 * 1000,
+    });
+    await submitAnswer(store, { blindRoundId: blind.id, userId: 'demo-maya', answer: 'Cardinals', settleFn });
+    await submitAnswer(store, { blindRoundId: blind.id, userId: 'demo-carlos', answer: 'Cubs', settleFn });
+    await resolveBlindRound(store, { blindRoundId: blind.id, realAnswer: 'Cardinals', settleFn });
+
+    const beforeTheAnswer = createBlindRound(store, {
+      creatorId: 'demo-user',
+      format: 'before-the-answer',
+      proposition: "How many total points will be scored in tonight's game?",
+      answerType: 'numeric',
+      entryAmount: 5,
+      entryDeadline: Date.now() + 24 * 60 * 60 * 1000,
+    });
+    await submitAnswer(store, { blindRoundId: beforeTheAnswer.id, userId: 'demo-priya', answer: 212, settleFn });
+  } catch (err) {
+    console.warn(`seedDemoData: skipped the demo blind round — ${err.message}`);
+  }
+}
+
 // Called once at server boot (`server.js`), guarded per-array by a
 // real emptiness check -- a persisted `data/store.json` loaded with
 // real markets/sessions is never touched, and restarting the server
@@ -256,6 +342,8 @@ async function seedDemoData(store, { settleFn }) {
   await seedSportsEvents(store, { settleFn });
   await seedCasinoSessions(store, { settleFn });
   await seedGroupWagers(store, { settleFn });
+  await seedCompetitions(store, { settleFn });
+  await seedBlindRounds(store, { settleFn });
 }
 
 module.exports = { seedDemoData, DEMO_USERS };
