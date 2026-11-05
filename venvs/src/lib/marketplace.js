@@ -135,8 +135,33 @@ export function listProduct(marketplace, options = {}) {
     chopzEligible: false,
     chopzCommissionPercent: 0,
     chopzShopProductId: null,
+    // A seller's own on/off switch for a listing -- "inventory
+    // management" means being able to take something down without
+    // deleting its id out from under an order history that still
+    // references it (`getOrder`/`ordersForSeller` read products by
+    // id). Present and true on every product from creation, same
+    // "never absent" posture as the two fields above.
+    active: true,
   };
   marketplace.products.push(product);
+  return product;
+}
+
+// A product's own seller takes it off the real storefront and the
+// unified browse list without deleting it -- past orders, CHOPZ
+// cross-posting state, and the id itself all stay intact, so a
+// delisted item can always be relisted later with its real history
+// unchanged. No separate "deleted" state exists, by design: nothing
+// in this ecosystem actually erases a sold product's record.
+export function setProductActive(marketplace, productId, active) {
+  const product = getProduct(marketplace, productId);
+  if (!product) {
+    throw new Error(`setProductActive: no product with id ${productId}`);
+  }
+  if (typeof active !== 'boolean') {
+    throw new Error('setProductActive requires a boolean active value');
+  }
+  product.active = active;
   return product;
 }
 
@@ -200,11 +225,18 @@ export function getProduct(marketplace, productId) {
   return marketplace.products.find((p) => p.id === productId) || null;
 }
 
-// Unified, Amazon-style browse across every seller.
+// Unified, Amazon-style browse across every seller. Delisted products
+// (`active: false`) are excluded by default -- a buyer browsing should
+// not see something its own seller took down -- unless the caller is
+// the seller themself looking at their own real inventory
+// (`includeInactive: true`), the one case that needs to see a delisted
+// item in order to relist it.
 export function browseProducts(marketplace, options = {}) {
-  const { category, sellerId } = options;
+  const { category, sellerId, includeInactive = false } = options;
   return marketplace.products.filter(
-    (p) => (category ? p.category === category : true) && (sellerId ? p.sellerId === sellerId : true)
+    (p) => (category ? p.category === category : true)
+      && (sellerId ? p.sellerId === sellerId : true)
+      && (includeInactive ? true : p.active !== false)
   );
 }
 
@@ -248,8 +280,17 @@ export function addToCart(marketplace, cartId, productId, quantity = 1) {
   if (cart.status !== 'active') {
     throw new Error(`addToCart: cart ${cartId} is ${cart.status}, not active`);
   }
-  if (!getProduct(marketplace, productId)) {
+  const product = getProduct(marketplace, productId);
+  if (!product) {
     throw new Error(`addToCart: no product with id ${productId}`);
+  }
+  // Same "refuse before it reaches a cart" posture as the sold-out
+  // edition-size guard in checkout() below -- a delisted product is
+  // not purchasable, but it keeps its id and history, so this is a
+  // hard refusal here rather than a silent disappearance from a cart
+  // that already held it.
+  if (product.active === false) {
+    throw new Error(`addToCart: "${product.title}" has been delisted by its seller`);
   }
   if (!Number.isFinite(quantity) || quantity <= 0) {
     throw new Error('addToCart requires a positive quantity');

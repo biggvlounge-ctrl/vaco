@@ -243,12 +243,17 @@ time that file gets rewritten for an unrelated reason.
   identical one (`chopz/chopz-shop/server.js`) sends it, so a real
   multi-seller order cannot cleanly be fulfilled in one request as
   written; it refuses honestly (VOID's own real refusal message)
-  rather than faking a shipment. Still genuinely unbuilt: the full
-  HVNTZ **POS** integration specifically (a physical register ringing
-  up an in-person sale through this same ledger, not just a Hunts
-  business having an online storefront — that distinction is the real
-  remaining gap), the VENVM app ecosystem, and seller onboarding/
-  inventory management UI.
+  rather than faking a shipment. ~~Still genuinely unbuilt: the full
+  HVNTZ **POS** integration specifically...~~ **Stale — this was done
+  in Phase 15** (`recordPosSale`/`ordersForSeller`, `POST .../pos-sale`,
+  `GET .../orders`; see "Phase 15" below). This bullet was never
+  updated when that shipped. ~~...and seller onboarding/inventory
+  management UI.~~ **Also done (5 Nov 2026) — see "Phase 20" below.**
+  `registerSeller`/`listProduct` were real, tested, server-routed
+  functions with no caller anywhere in this file; `MarketplaceView.jsx`
+  now has real forms for both, plus a delist/relist control backed by
+  a new `active` flag on every product. Genuinely still unbuilt: the
+  VENVM app ecosystem (VENVM doesn't exist anywhere in this session).
 - Publishing: no Ingram API integration (just a flag on a manually-
   published book), no subscription-pool UI. **Search, skill tags, and
   cover art ARE now built** — see "Publishing: search, skill/belief
@@ -744,3 +749,83 @@ esbuild JSX/syntax check. Live-verified against a real spawned server:
 seeded "Cherokee St After Dark" title, `?query=a&format=ebook`
 composed both filters correctly (5 of the 8 seeded titles), and every
 real book record now carries the new `coverArtUrl: null` field.
+
+## Phase 20: Marketplace — seller onboarding + inventory management UI (5 Nov 2026)
+
+Closes a gap this file's own "Not yet built" section named but had
+never acted on: `registerSeller` and `listProduct` were real, tested,
+server-routed functions (`POST /api/marketplace/sellers`, `POST
+/api/marketplace/sellers/:id/products`) that `MarketplaceView.jsx`
+never called — every seller a real user could see was seeded
+server-side at boot, and there was no form anywhere in the app to
+become one or list a product under it.
+
+**What's new:**
+- `MarketplaceView.jsx` — a "Become a seller" form (name only, same
+  minimal `registerSeller` signature this app already had) and, for
+  each storefront the signed-in session owns, a "List a new product"
+  form (title/price/optional category/optional edition size) and a
+  "My inventory" panel.
+- **Delist/relist, the real missing half of "inventory management."**
+  A seller could list a product but never take one down — there was
+  no way to stop selling something without it vanishing from order
+  history too, since `getOrder`/`ordersForSeller` read products by
+  id. `marketplace.js` gets a plain boolean `active` field (`true` on
+  every product from creation, same "never absent" posture as
+  `chopzEligible`/`chopzShopProductId`) and a new
+  `setProductActive(marketplace, productId, active)`. No "deleted"
+  state exists, by design — nothing in this ecosystem actually erases
+  a sold product's real record.
+  - `browseProducts` (the public, unified browse list) excludes a
+    delisted product by default; a new `includeInactive` option lets
+    a seller's own inventory view see it anyway, so a delisted item
+    can be found again and relisted.
+  - `addToCart` refuses a delisted product outright — same
+    "refuse before it reaches a cart" posture the sold-out
+    `editionSize` guard already uses just below it in `checkout`.
+  - New routes, same resolve-then-compare ownership guard every other
+    seller-only action in `server.cjs` already uses (seller's stored
+    `ownerId` checked against the real Shield-verified `ownerId` in
+    the body, not just the claimed identity alone): `POST
+    /api/marketplace/sellers/:id/inventory` (a seller's full real
+    inventory, delisted items included — POST rather than GET because
+    `requireActor` reads the claimed identity from a body a GET
+    request cannot reliably carry) and `POST
+    /api/marketplace/products/:id/active` (the actual delist/relist
+    toggle).
+  - New client wrappers in `marketplaceClient.js`:
+    `getOwnInventory(sellerId, ownerId)`, `setProductActive(productId,
+    { ownerId, active })`.
+
+### Verification
+
+`test/venvs.test.js` grew by 2: a product is active by default and
+survives a delist/relist round trip without a new id, excluded from
+`browseProducts()` while delisted but still visible with
+`includeInactive: true`; and a delisted product refuses `addToCart`
+(leaving no partial cart line) while a relisted one can be added
+again. `test/server.test.js` grew by 4, mirroring the existing
+chopz-eligible tests' shape: the new inventory and active-toggle
+routes both refuse with no credential at all WITHOUT reaching Shield,
+and both ask Shield (real 502 when it's unreachable) with a real
+bearer token. Full suite: 111/111 → 117/117.
+
+Mutation-verified both new checks independently: replacing
+`addToCart`'s delist guard with `if (false)` turned exactly the
+delist-refusal test red (69/70); restored, 70/70 green. Replacing
+`browseProducts`'s active filter with a bare `true` turned exactly the
+delist/relist test red (69/70); restored, 117/117 green across the
+full suite.
+
+Live-verified against a real spawned stack (Shield + V3 + this app, no
+mocks): created a real Shield session, registered a real seller
+("Live Test Storefront"), listed a real product ("Hand-thrown Mug",
+$22, `active: true` from creation). Confirmed it appeared in `GET
+/api/marketplace/products`; delisted it and confirmed it disappeared
+from that same public list while `POST .../inventory` still showed it
+(now `active: false`); confirmed `POST .../carts/:id/items` refused to
+add it ("has been delisted by its seller"); relisted it and confirmed
+it reappeared in the public list and could be added to a cart; and
+confirmed a second real session claiming a different `ownerId` got a
+real 403 ("only this product's own seller can change its listing
+status") when it tried to delist the first seller's product.

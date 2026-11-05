@@ -357,6 +357,48 @@ async function fetchCvllexVault(vaultId) {
     }
   });
 
+  // A seller's own full real inventory, delisted items included --
+  // distinct from the public `GET /api/marketplace/products` browse
+  // list (which hides a delisted product on purpose, see
+  // `browseProducts`'s own header in marketplace.js). POST rather than
+  // GET because the ownership check this route needs is the same
+  // resolve-then-compare shape every other seller-only action in this
+  // file already uses, and `requireActor` reads the claimed identity
+  // out of a body a GET request cannot reliably carry.
+  app.post('/api/marketplace/sellers/:id/inventory', requireActor('ownerId'), (req, res) => {
+    try {
+      const seller = marketplaceLib.getSeller(store.marketplace, Number(req.params.id));
+      if (!seller) return res.status(404).json({ error: `no seller with id ${req.params.id}` });
+      if (seller.ownerId !== req.body.ownerId) {
+        return res.status(403).json({ error: "only this storefront's own owner can view its full inventory" });
+      }
+      res.json({
+        products: marketplaceLib.browseProducts(store.marketplace, { sellerId: seller.id, includeInactive: true }),
+      });
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // Delist/relist -- a product keeps its id, its order history, and
+  // any CHOPZ cross-posting state either way; only whether it shows up
+  // in the public browse list and can be freshly added to a cart
+  // changes. Same resolve-then-compare ownership guard as
+  // chopz-eligible/publish-to-chopz below.
+  app.post('/api/marketplace/products/:id/active', requireActor('ownerId'), (req, res) => {
+    try {
+      const product = marketplaceLib.getProduct(store.marketplace, Number(req.params.id));
+      if (!product) return res.status(404).json({ error: `no product with id ${req.params.id}` });
+      const seller = marketplaceLib.getSeller(store.marketplace, product.sellerId);
+      if (!seller || seller.ownerId !== req.body.ownerId) {
+        return res.status(403).json({ error: "only this product's own seller can change its listing status" });
+      }
+      res.status(200).json(marketplaceLib.setProductActive(store.marketplace, product.id, req.body.active));
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
   app.post('/api/marketplace/carts', requireActor('buyerId'), (req, res) => {
     try {
       res.status(201).json(marketplaceLib.createCart(store.marketplace, req.body));

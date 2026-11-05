@@ -59,6 +59,25 @@ export async function listProduct(sellerId, { ownerId, title, price, category, e
   return handle(res);
 }
 
+export async function getOwnInventory(sellerId, ownerId) {
+  const res = await fetch(`${VENVS_API_URL}/api/marketplace/sellers/${encodeURIComponent(sellerId)}/inventory`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...sessionHeaders() },
+    body: JSON.stringify({ ownerId }),
+  });
+  const body = await handle(res);
+  return body.products;
+}
+
+export async function setProductActive(productId, { ownerId, active }) {
+  const res = await fetch(`${VENVS_API_URL}/api/marketplace/products/${encodeURIComponent(productId)}/active`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...sessionHeaders() },
+    body: JSON.stringify({ ownerId, active }),
+  });
+  return handle(res);
+}
+
 export async function createCart({ buyerId }) {
   const res = await fetch(`${VENVS_API_URL}/api/marketplace/carts`, {
     method: 'POST',

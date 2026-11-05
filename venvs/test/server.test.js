@@ -220,6 +220,30 @@ test('GET seller orders lists the real, unified order history -- starts empty, n
   assert.ok(Array.isArray(body.orders));
 });
 
+// -- Seller inventory management: delist/relist + own-inventory view ------
+
+test('viewing a seller\'s own inventory with no credential at all is refused WITHOUT reaching Shield', { skip: SKIP }, async () => {
+  const res = await post('/api/marketplace/sellers/1/inventory', { ownerId: 'seller-hardware' });
+  assert.equal(res.status, 401);
+});
+
+test('viewing a seller\'s own inventory with a real bearer token asks Shield -- real 502 when it is unreachable', { skip: SKIP }, async () => {
+  const res = await post('/api/marketplace/sellers/1/inventory',
+    { ownerId: 'seller-hardware' }, { Authorization: 'Bearer some-token' });
+  assert.equal(res.status, 502);
+});
+
+test('delisting a product with no credential at all is refused WITHOUT reaching Shield', { skip: SKIP }, async () => {
+  const res = await post('/api/marketplace/products/1/active', { ownerId: 'seller-hardware', active: false });
+  assert.equal(res.status, 401);
+});
+
+test('delisting a product with a real bearer token asks Shield -- real 502 when it is unreachable', { skip: SKIP }, async () => {
+  const res = await post('/api/marketplace/products/1/active',
+    { ownerId: 'seller-hardware', active: false }, { Authorization: 'Bearer some-token' });
+  assert.equal(res.status, 502);
+});
+
 // -- Publishing: a real, persisted catalog (Phase 17) -----------------------
 
 test('the real demo catalog is seeded once, server-side, and health reports it', { skip: SKIP }, async () => {

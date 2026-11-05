@@ -42,6 +42,7 @@ import {
   checkout, getOrder, requestFulfillment, checkAbandonedCarts,
   generateRecoveryOffer, PLATFORM_USER_ID,
   markChopzEligible, publishToChopzShop, recordPosSale, ordersForSeller,
+  setProductActive,
 } from '../src/lib/marketplace.js';
 
 import {
@@ -201,6 +202,38 @@ test('products are browsable and a storefront shows only its own seller', () => 
   assert.ok(front.products.every((p) => p.sellerId === a.id), 'another seller\'s stock leaked in');
   assert.equal(getProduct(m, 9999), null, 'an unknown id is null, not undefined');
   assert.equal(getSeller(m, 9999), null);
+});
+
+test('a product is active by default and a seller can delist/relist it without losing its id', () => {
+  const { m, p1 } = shopFixture();
+  assert.equal(p1.active, true, 'every product should read as active, not absent, from creation');
+
+  setProductActive(m, p1.id, false);
+  assert.equal(getProduct(m, p1.id).active, false, 'the same product, not a new one');
+  assert.equal(browseProducts(m).some((p) => p.id === p1.id), false, 'a delisted product must not show up in the public browse list');
+  assert.equal(
+    browseProducts(m, { includeInactive: true }).some((p) => p.id === p1.id), true,
+    'the seller\'s own management view must still be able to see it',
+  );
+
+  setProductActive(m, p1.id, true);
+  assert.equal(browseProducts(m).some((p) => p.id === p1.id), true, 'relisting must bring it back to the public list');
+
+  assert.throws(() => setProductActive(m, 9999, false), /no product with id/);
+  assert.throws(() => setProductActive(m, p1.id, 'yes'), /boolean active value/);
+});
+
+test('a delisted product refuses to be added to a cart, but a relisted one can be again', () => {
+  const { m, p1 } = shopFixture();
+  const cart = createCart(m, { buyerId: 'buyer' });
+
+  setProductActive(m, p1.id, false);
+  assert.throws(() => addToCart(m, cart.id, p1.id, 1), /delisted/);
+  assert.equal(cart.items.length, 0, 'the refused add must not leave a partial line');
+
+  setProductActive(m, p1.id, true);
+  addToCart(m, cart.id, p1.id, 1);
+  assert.equal(cart.items.length, 1);
 });
 
 test('a cart accumulates quantity rather than duplicating a line', () => {
