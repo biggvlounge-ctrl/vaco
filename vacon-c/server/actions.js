@@ -65,14 +65,22 @@ const justice = require('./justice.js');
 // Data, not a switch. Each action names the modes it is available in,
 // the parameters it requires, and the one call it makes.
 //
-// `modes` is here because Leader and Simulation modes are deferred by
-// CLAUDE.md, not because they are unimplemented details: an action list
-// that silently offered a Leader verb would be advertising a mode
-// nobody can enter.
+// `modes` is here because Leader and Simulation modes were deferred by
+// CLAUDE.md, not because they were unimplemented details: an action
+// list that silently offered a Leader verb would have advertised a
+// mode nobody could enter. Leader mode reopened the scope by explicit
+// instruction (see `leadership.js`'s own header) — every existing verb
+// below now lists `'leader'` too, because a leader is still a person
+// who can accept missions, hold meetings, adopt a routine and so on;
+// `direct-mission` and `broadcast-message` are the two genuinely new
+// verbs Leader mode adds, and they list `'leader'` alone, for the same
+// reason this comment gave before: a citizen has no subordinates to
+// direct and no outlet to broadcast through. Simulation mode is still
+// deferred and still untouched.
 const ACTIONS = {
   'accept-mission': {
     summary: 'Take on an available mission.',
-    modes: ['citizen'],
+    modes: ['citizen', 'leader'],
     requires: ['missionId'],
     verbs: ['acceptMission'],
     run: (verbs, actorId, body) => ({
@@ -83,7 +91,7 @@ const ACTIONS = {
 
   'resolve-mission': {
     summary: 'Complete, fail or abandon a mission you are holding.',
-    modes: ['citizen'],
+    modes: ['citizen', 'leader'],
     requires: ['missionId', 'outcome'],
     verbs: ['resolveMission'],
     run: (verbs, actorId, body) => verbs.resolveMission(body.missionId, {
@@ -97,7 +105,7 @@ const ACTIONS = {
 
   'adopt-routine': {
     summary: 'Add a recurring event to your own schedule.',
-    modes: ['citizen'],
+    modes: ['citizen', 'leader'],
     requires: ['eventType', 'frequency'],
     verbs: ['addScheduleEvent'],
     run: (verbs, actorId, body) => verbs.addScheduleEvent(actorId, {
@@ -110,7 +118,7 @@ const ACTIONS = {
 
   'practise-habit': {
     summary: 'Reinforce a habit of your own, for better or worse.',
-    modes: ['citizen'],
+    modes: ['citizen', 'leader'],
     requires: ['name'],
     verbs: ['reinforceHabit'],
     run: (verbs, actorId, body) => verbs.reinforceHabit(actorId, body.name, {
@@ -133,7 +141,7 @@ const ACTIONS = {
   // the same mistake `enter-contest` refuses.
   'call-meeting': {
     summary: 'Sit down with people you know — to plan, negotiate, teach or recruit.',
-    modes: ['citizen'],
+    modes: ['citizen', 'leader'],
     requires: ['attendeeIds'],
     verbs: ['holdMeeting'],
     run: (verbs, actorId, body) => verbs.holdMeeting(actorId, {
@@ -151,7 +159,7 @@ const ACTIONS = {
   // when a world has climbed to neither era yet.
   'send-message': {
     summary: 'Tell one specific person something you know — by letter or by phone, however far away they are.',
-    modes: ['citizen'],
+    modes: ['citizen', 'leader'],
     requires: ['toEntityId'],
     verbs: ['sendMessage'],
     run: (verbs, actorId, body) => verbs.sendMessage(actorId, {
@@ -165,7 +173,7 @@ const ACTIONS = {
   // takeover key a consequence beyond a line in the history.
   'repurpose-property': {
     summary: 'Change what a building you hold is for. Its history stays with it.',
-    modes: ['citizen'],
+    modes: ['citizen', 'leader'],
     requires: ['propertyId', 'toType'],
     verbs: ['repurposeProperty'],
     run: (verbs, actorId, body) => verbs.repurposeProperty(actorId, {
@@ -184,7 +192,7 @@ const ACTIONS = {
   // see the requirement first.
   'assess-takeover': {
     summary: 'See what it would take for your tribe to hold a place, and your odds.',
-    modes: ['citizen'],
+    modes: ['citizen', 'leader'],
     requires: ['scale', 'locationId'],
     verbs: ['assessTakeover'],
     run: (verbs, actorId, body) => ({
@@ -196,7 +204,7 @@ const ACTIONS = {
 
   'attempt-takeover': {
     summary: 'Try to take control of a place, with your tribe behind you.',
-    modes: ['citizen'],
+    modes: ['citizen', 'leader'],
     requires: ['scale', 'locationId'],
     verbs: ['attemptTakeover'],
     // The tribe is NOT a parameter. `engine.tribeIdFor` reads it off
@@ -221,7 +229,7 @@ const ACTIONS = {
   // before they spend what they are carrying.
   'break-down': {
     summary: 'Take something you carry apart for what it is made of.',
-    modes: ['citizen'],
+    modes: ['citizen', 'leader'],
     requires: ['itemName'],
     verbs: ['breakDownItem'],
     run: (verbs, actorId, body) => verbs.breakDownItem(actorId, {
@@ -232,7 +240,7 @@ const ACTIONS = {
 
   'strip-building': {
     summary: 'Strip an empty building for materials. It will not survive many visits.',
-    modes: ['citizen'],
+    modes: ['citizen', 'leader'],
     requires: ['propertyId'],
     verbs: ['stripBuilding'],
     run: (verbs, actorId, body) => verbs.stripBuilding(actorId, {
@@ -246,7 +254,7 @@ const ACTIONS = {
   // searching and worth nothing to a scrapper.
   'search-location': {
     summary: 'Search a landmark for what is still inside it.',
-    modes: ['citizen'],
+    modes: ['citizen', 'leader'],
     requires: ['propertyId'],
     verbs: ['searchLocation'],
     run: (verbs, actorId, body) => verbs.searchLocation(actorId, {
@@ -256,7 +264,7 @@ const ACTIONS = {
 
   'make-thing': {
     summary: 'Make something from the materials you carry.',
-    modes: ['citizen'],
+    modes: ['citizen', 'leader'],
     requires: ['product'],
     verbs: ['makeThing', 'canMakeThing'],
     run: (verbs, actorId, body) => (
@@ -277,7 +285,7 @@ const ACTIONS = {
   // pair, confirm it against real state first.
   study: {
     summary: 'Study from a book you carry, a place in your city, or somebody nearby.',
-    modes: ['citizen'],
+    modes: ['citizen', 'leader'],
     requires: ['source', 'field'],
     verbs: ['studySource'],
     run: (verbs, actorId, body) => verbs.studySource(actorId, {
@@ -295,7 +303,7 @@ const ACTIONS = {
   // (savings, what the seller actually holds) and returns why.
   trade: {
     summary: 'Trade with somebody nearby for what they hold — or check the price first.',
-    modes: ['citizen'],
+    modes: ['citizen', 'leader'],
     requires: ['sellerId', 'itemName'],
     verbs: ['tradeWith', 'quoteTrade'],
     run: (verbs, actorId, body) => (
@@ -319,7 +327,7 @@ const ACTIONS = {
   // each tick, proportional to the actor's own stake.
   invest: {
     summary: 'Put money you hold into a business, a person\'s education, or another real target.',
-    modes: ['citizen'],
+    modes: ['citizen', 'leader'],
     requires: ['targetEntityId', 'category', 'amount'],
     verbs: ['investInTarget'],
     run: (verbs, actorId, body) => verbs.investInTarget(actorId, {
@@ -329,7 +337,7 @@ const ACTIONS = {
 
   'enter-contest': {
     summary: 'Compete against a named opponent.',
-    modes: ['citizen'],
+    modes: ['citizen', 'leader'],
     requires: ['opponentId'],
     verbs: ['resolveContest'],
     run: (verbs, actorId, body) => verbs.resolveContest({
@@ -338,6 +346,41 @@ const ACTIONS = {
       participantIds: [actorId, Number(body.opponentId)],
       discipline: body.discipline,
       contestId: body.contestId ?? null,
+    }),
+  },
+
+  // -- Leader mode's two genuinely new verbs — see leadership.js's own
+  // header for the full design and why each one is NOT guaranteed to
+  // succeed just because the actor holds the seat.
+
+  'direct-mission': {
+    summary: 'Order one of your own organization\'s members onto a real mission.',
+    modes: ['leader'],
+    requires: ['organizationId', 'subordinateEntityId'],
+    verbs: ['directMission'],
+    run: (verbs, actorId, body) => verbs.directMission(actorId, {
+      organizationId: Number(body.organizationId),
+      subordinateEntityId: Number(body.subordinateEntityId),
+      objective: body.objective ?? null,
+      reward: body.reward ?? null,
+      artifactId: body.artifactId != null ? Number(body.artifactId) : null,
+      locationId: body.locationId != null ? Number(body.locationId) : null,
+    }),
+  },
+
+  'broadcast-message': {
+    summary: 'Put a real fact in front of your own outlet\'s audience.',
+    modes: ['leader'],
+    requires: ['organizationId', 'factContent'],
+    verbs: ['broadcastMessage'],
+    run: (verbs, actorId, body) => verbs.broadcastMessage(actorId, {
+      organizationId: Number(body.organizationId),
+      factContent: body.factContent,
+      factType: body.factType ?? 'known',
+      subjectEntityId: body.subjectEntityId != null ? Number(body.subjectEntityId) : null,
+      communityId: body.communityId != null ? Number(body.communityId) : null,
+      cityId: body.cityId != null ? Number(body.cityId) : null,
+      channel: body.channel ?? null,
     }),
   },
 };

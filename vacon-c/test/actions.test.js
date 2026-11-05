@@ -77,7 +77,8 @@ test('every verb an action names is one the engine actually supplies', () => {
   assert.deepEqual(
     actions.REQUIRED_VERBS,
     ['acceptMission', 'addScheduleEvent', 'assessTakeover', 'attemptTakeover',
-      'breakDownItem', 'canMakeThing', 'holdMeeting', 'investInTarget', 'makeThing', 'quoteTrade',
+      'breakDownItem', 'broadcastMessage', 'canMakeThing', 'directMission', 'holdMeeting',
+      'investInTarget', 'makeThing', 'quoteTrade',
       'reinforceHabit', 'repurposeProperty', 'resolveContest', 'searchLocation', 'sendMessage',
       'stripBuilding', 'resolveMission', 'studySource', 'tradeWith'].sort(),
   );
@@ -95,10 +96,30 @@ test('the action list is a real menu, not a list of names', () => {
 });
 
 test('no action is offered for a mode nobody can enter', () => {
-  // CLAUDE.md defers Leader and Simulation modes. Advertising a verb
-  // for either would be advertising the mode.
-  assert.deepEqual(engine.listActions('leader'), []);
+  // CLAUDE.md still defers Simulation mode. Advertising a verb for it
+  // would be advertising a mode nobody can enter.
   assert.deepEqual(engine.listActions('simulation'), []);
+});
+
+test('leader mode was reopened by explicit instruction, and its menu proves it', () => {
+  // Leader mode is no longer deferred (see leadership.js's own header
+  // and CLAUDE.md's forty-seventh standing rule) — the old assertion
+  // here (`listActions('leader')` is `[]`) tested the PREVIOUS scope
+  // decision and would now be asserting something false by design.
+  // Every citizen verb carries over (a leader is still a person who can
+  // accept a mission or hold a meeting), plus the two genuinely new
+  // leader-only verbs.
+  const citizenMenu = engine.listActions('citizen').map((a) => a.action).sort();
+  const leaderMenu = engine.listActions('leader').map((a) => a.action).sort();
+  for (const action of citizenMenu) {
+    assert.ok(leaderMenu.includes(action), `leader mode lost the citizen verb "${action}"`);
+  }
+  assert.ok(leaderMenu.includes('direct-mission'));
+  assert.ok(leaderMenu.includes('broadcast-message'));
+  // Neither new verb is offered in citizen mode — a citizen has no
+  // subordinates to direct and no outlet to broadcast through.
+  assert.ok(!citizenMenu.includes('direct-mission'));
+  assert.ok(!citizenMenu.includes('broadcast-message'));
 });
 
 // ---------------------------------------------------------------------------

@@ -89,14 +89,24 @@ GET  /api/culture/:tierEntityId           — Culture DNA trait sheet for a Fami
 
 ## Phase 3 — Player Experience endpoints
 
+**Leader mode built 5 Nov 2026** (`server/leadership.js`), reopened by
+explicit instruction after being deferred since Day 1 — see
+`CLAUDE.md`'s forty-seventh standing rule. `leader-dashboard` below is
+built exactly as named here; `promote-to-leader` was not in this
+original plan and is added because something has to move a player from
+Citizen to Leader mode, gated on the player's own linked entity already,
+really holding an `organizations.leader_id` seat. Simulation mode's
+`simulation-controls` stays unbuilt and deferred.
+
 ```
 POST /api/players                         — { mode, linkedEntityId } -> create a player reference
 GET  /api/players/:id                     — player detail, joined with linked NPC or Organization
 POST /api/players/:id/action              — generic player action dispatcher, routes to the right Key/decision
 
 GET  /api/players/:id/citizen-dashboard   — Citizen mode: career, relationships, family, property summary
+POST /api/players/:id/promote-to-leader   — Citizen -> Leader, granted only if the linked entity already leads a real organization
 GET  /api/players/:id/leader-dashboard    — Leader mode: organization management view
-GET  /api/players/:id/simulation-controls  — Simulation mode: world variable adjustment endpoints
+GET  /api/players/:id/simulation-controls  — Simulation mode: world variable adjustment endpoints — still deferred
 
 GET  /api/missions/available/:entityId    — missions available to a specific player's linked entity
 ```

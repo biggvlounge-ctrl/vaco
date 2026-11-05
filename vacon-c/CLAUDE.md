@@ -50,16 +50,19 @@ NPC/Individual traits, Organization full trait sheet, Family
 demand economy, the 11-phase tick pipeline, Territory/Community,
 Artifact/Mission (already built), Citizen-mode binding.
 
-**Explicitly deferred — do not touch**: Leader/Simulation/Multiplayer
-modes, Transportation, subscription tiers, ecosystem link-outs,
-anything gambling-adjacent.
+**Explicitly deferred — do not touch**: Simulation/Multiplayer modes,
+Transportation, subscription tiers, ecosystem link-outs, anything
+gambling-adjacent.
 
 **Property was on that list and is not any more.** Phase 2 was opened
 on 29 Aug 2026 and the Property Engine is built (`server/property.js`).
-Nothing else moved off the deferred list — in particular, gambling and
-casino systems (#291-305) stay closed pending compliance review, which
-is a legal gate rather than a scope decision, and the API map's own
-"What NOT to build" says the same.
+**Leader mode was on that list and is not any more either** — reopened
+by explicit human instruction on 5 Nov 2026; see the forty-seventh
+standing rule below for the real design and what it deliberately
+diverges from. Nothing else moved off the deferred list — in
+particular, gambling and casino systems (#291-305) stay closed pending
+compliance review, which is a legal gate rather than a scope decision,
+and the API map's own "What NOT to build" says the same.
 
 ## Phase 2 — complete except what is deferred
 Property Engine, Community/City depth, Culture DNA, and Named Flow
@@ -253,8 +256,9 @@ The takeover verbs extend that one level up: a player takes a building
 the API can be asked to do. A meeting works the same way — the actor is
 added to their own attendee list rather than being nameable in it.
 
-Leader-dashboard and simulation-controls remain unbuilt because Leader
-and Simulation modes are deferred above — not because they were missed.
+**Leader-dashboard is built — see the forty-seventh standing rule.**
+Simulation-controls remains unbuilt because Simulation mode is still
+deferred above — not because it was missed.
 
 ## Definition of done for Phase 1
 A drought-style cascade running through at least 4 of the 10 locked
@@ -1986,6 +1990,59 @@ property this round. `landSize` and `floors` ARE wired, because
 `property.js`'s own existing fields consume them immediately — the
 same "replaces an invented value a real consumer already reads" shape
 every other wired pack in this file takes.
+
+**A forty-seventh, and it is the only one of these that reopens a
+locked scope line rather than finding a gap inside it.** Leader mode —
+named in this file's own "Locked Day 1 / Phase 1 scope" section as
+"Explicitly deferred — do not touch" since the project began — was
+reopened by explicit human instruction on 5 Nov 2026, scoped to exactly
+what was asked for: one embodied avatar throughout, who can direct or
+influence other characters once that avatar actually holds a real seat
+of authority.
+
+The schema's own one-line plan for the mode (`players.linked_entity_id`'s
+comment: "organization for Leader mode") was never built against — a
+plan, not a shipped contract — and this build deliberately diverges
+from it, on instruction: `linked_entity_id` stays an NPC in Leader mode
+too, same as Citizen mode. The player does not become an abstract
+organization; they stay the one person they always were, who now holds
+a real seat. "Leader" and "influencer" are not new concepts either —
+both are `organizations.leader_id`, already real, already written at
+generation, already moved by `control.js` on takeover and cleared by
+`succession.js` on death, read live rather than cached on the player
+record (the ninth standing rule, applied to authority instead of
+traits). `server/leadership.js` is the new module and its own header
+carries the rest of the design, including the one real decision that
+had to be made rather than found: directing a subordinate is a real
+probability draw against their own `relationships.loyalty`, never a
+guaranteed command, for the same reason meetings.js's own header gives
+for not inventing a persuasion modifier — a mechanic that always
+succeeds asserts something nobody measured.
+
+`server/actions.js`'s existing 17 verbs all gained `'leader'` alongside
+`'citizen'` in their `modes` array — a leader is still a person who can
+accept a mission or hold a meeting — and two genuinely new verbs,
+`direct-mission` and `broadcast-message`, are `'leader'`-only, because a
+citizen has no subordinates to direct and no outlet to broadcast
+through. `GET /api/players/:id/leader-dashboard` is
+`VACANCY_API_ENDPOINT_MAP.md`'s own named, never-built route, built for
+the first time here. A directed mission is still the one real mission
+state machine `missions.js` already has — `directMission` composes
+`generateMission` then `acceptMission` rather than fabricating an
+already-accepted row by hand, so it still pays through the one real
+`payReward` path and still obeys "a mission is never about nothing."
+
+**A known, stated limitation, not a silent gap**: there is no automatic
+demotion back to Citizen mode when a leader is overthrown, succeeded, or
+their organization dissolves. `getLeaderDashboard` re-checks
+`organizations.leader_id` live on every call and throws a clear, specific
+error the moment it no longer holds, rather than showing stale command —
+but `player.mode` itself stays `'leader'` until something explicit moves
+it. Wiring that into `succession.js`'s own `leader_id`-clearing path is
+real, separate, future work.
+
+Simulation and Multiplayer modes remain deferred and untouched — only
+the one mode named in the instruction was reopened.
 
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`

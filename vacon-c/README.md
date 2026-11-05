@@ -127,6 +127,21 @@ curl http://localhost:8809/api/health
 curl -X POST http://localhost:8809/api/npc/generate -H "Content-Type: application/json" -d '{"name":"Marcus Whitfield"}'
 ```
 
+## Leader mode (5 Nov 2026)
+Reopened by explicit instruction after being deferred since the
+project began — see `CLAUDE.md`'s own forty-seventh standing rule for
+the full design. One embodied avatar throughout: becoming a leader
+means your Citizen-mode NPC already, really holds a seat
+(`organizations.leader_id`), never a second kind of player.
+`POST /api/players/:id/promote-to-leader` grants it;
+`GET /api/players/:id/leader-dashboard` is the observe side. A leader
+can `direct-mission` (order one of their own organization's real
+members onto a real mission — compliance is a real draw against that
+person's own loyalty, never guaranteed) and, if they lead a `media`
+organization, `broadcast-message` (put a real fact in front of their
+outlet's real audience) through the same `POST /api/players/:id/action`
+dispatcher every other player verb already uses.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

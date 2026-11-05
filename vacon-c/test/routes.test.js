@@ -840,15 +840,24 @@ test('a citizen can be created and read back', { skip: SKIP }, async () => {
   assert.equal(detail.npc.id, npc.npc.id, 'player detail joins the linked NPC');
 });
 
-test('a player must bind to a real NPC, and only Citizen mode exists', { skip: SKIP }, async () => {
+test('a player must bind to a real NPC, and every player starts in Citizen mode', { skip: SKIP }, async () => {
   const missing = await openPost('/players', { linkedEntityId: 999999 });
   assert.equal(missing.status, 400);
   assert.match((await missing.json()).error, /not an existing NPC/);
 
+  // Leader mode is real now (reopened by explicit instruction — see
+  // leadership.js's own header) but it is EARNED, never claimed at
+  // creation — this used to say "deferred", which stopped being true
+  // the moment promote-to-leader existed. Simulation mode has no such
+  // door at all and stays genuinely deferred.
   const npc = await (await openPost('/npc/generate')).json();
   const leader = await openPost('/players', { linkedEntityId: npc.npc.id, mode: 'leader' });
   assert.equal(leader.status, 400);
-  assert.match((await leader.json()).error, /deferred|not supported/);
+  assert.match((await leader.json()).error, /cannot be claimed at creation/);
+
+  const sim = await openPost('/players', { linkedEntityId: npc.npc.id, mode: 'simulation' });
+  assert.equal(sim.status, 400);
+  assert.match((await sim.json()).error, /explicitly deferred/);
 });
 
 test('the citizen dashboard reaches every system the cascade touches', { skip: SKIP }, async () => {

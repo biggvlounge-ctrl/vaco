@@ -749,11 +749,13 @@ app.get('/api/entities/:id/holdings', (req, res) => {
 // reachable only from inside the process — the one part of the locked
 // Phase 1 scope that could not be demonstrated to anybody.
 //
-// Two of the remaining four Phase 3 routes are still NOT built, and
-// are not oversights: leader-dashboard and simulation-controls serve
-// Leader and Simulation modes, which CLAUDE.md defers explicitly ("do
-// not touch"). A dashboard for a mode nobody can enter is not a route,
-// it is a decoration.
+// Of the remaining four Phase 3 routes: leader-dashboard is built now
+// too (see `promote-to-leader`/`leader-dashboard` below, and
+// leadership.js's own header — Leader mode was reopened by explicit
+// instruction on 5 Nov 2026). simulation-controls stays NOT built,
+// and that is not an oversight: it serves Simulation mode, which
+// CLAUDE.md still defers explicitly. A dashboard for a mode nobody can
+// enter is not a route, it is a decoration.
 //
 // The other two ARE built now. This comment used to say of the
 // dispatcher: "a generic action dispatcher with no specification of
@@ -772,10 +774,25 @@ app.get('/api/players', (_req, res) => {
 // audit-route-guards: open -- binds a session to a simulated citizen, no real-world principal
 app.post('/api/players', (req, res) => {
   const body = req.body || {};
+  // Every player starts in Citizen mode, always — Leader mode is real
+  // now (see leadership.js's own header) but it is EARNED, never
+  // claimed at creation: `POST /api/players/:id/promote-to-leader` is
+  // the only door into it, and it checks the linked entity's own real
+  // `organizations.leader_id` before letting anyone through. A caller
+  // naming `mode: 'leader'` here would skip that check entirely.
+  // Simulation and Multiplayer have no such door at all yet — they
+  // stay explicitly deferred.
+  if (body.mode === 'leader') {
+    return res.status(400).json({
+      error: 'mode "leader" cannot be claimed at creation — every player starts in citizen mode, '
+        + 'then POST /api/players/:id/promote-to-leader grants it once the linked entity '
+        + 'actually, really holds a seat (organizations.leader_id).',
+    });
+  }
   if (body.mode && body.mode !== 'citizen') {
     return res.status(400).json({
-      error: `mode "${body.mode}" is not supported — Citizen is the only mode built `
-        + '(Leader/Simulation/Multiplayer are explicitly deferred).',
+      error: `mode "${body.mode}" is not supported — Simulation and Multiplayer are `
+        + 'explicitly deferred (CLAUDE.md).',
     });
   }
   try {
@@ -828,6 +845,30 @@ app.post('/api/players/:id/action', (req, res) => {
 app.get('/api/players/:id/citizen-dashboard', (req, res) => {
   try {
     return res.json(engine.getCitizenDashboard(Number(req.params.id)));
+  } catch (err) {
+    return res.status(404).json({ error: err.message });
+  }
+});
+
+// Leader mode — see leadership.js's own header. Granted, not requested
+// into: promotion checks live `organizations.leader_id`, never a
+// caller-supplied claim, which is why this is its own route rather than
+// a body flag on an existing one.
+// audit-route-guards: open -- promotion is gated on the player's own linked entity already holding a real leader_id, never on a caller-supplied claim
+app.post('/api/players/:id/promote-to-leader', (req, res) => {
+  try {
+    return res.json(engine.promoteToLeader(Number(req.params.id)));
+  } catch (err) {
+    const status = /no player with id/.test(err.message) ? 404 : 400;
+    return res.status(status).json({ error: err.message });
+  }
+});
+
+// `VACANCY_API_ENDPOINT_MAP.md`'s own named route, built for the first
+// time here — "Leader mode: organization management view."
+app.get('/api/players/:id/leader-dashboard', (req, res) => {
+  try {
+    return res.json(engine.getLeaderDashboard(Number(req.params.id)));
   } catch (err) {
     return res.status(404).json({ error: err.message });
   }

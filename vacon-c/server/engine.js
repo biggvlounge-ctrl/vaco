@@ -64,6 +64,7 @@ const economy = require('./economy.js');
 const investments = require('./investments.js');
 const tick = require('./tick.js');
 const players = require('./players.js');
+const leadership = require('./leadership.js');
 const territory = require('./territory.js');
 const missions = require('./missions.js');
 const property = require('./property.js');
@@ -782,6 +783,28 @@ function getCitizenDashboard(playerId) {
   return players.getCitizenDashboard(WorldState, playerId);
 }
 
+// Leader mode — see leadership.js's own header for the full design.
+// promoteToLeader/getLeaderDashboard are player-id-keyed, same
+// convention as generatePlayer/getCitizenDashboard just above.
+function promoteToLeader(playerId) {
+  return leadership.promoteToLeader(WorldState, playerId);
+}
+
+function getLeaderDashboard(playerId) {
+  return leadership.getLeaderDashboard(WorldState, playerId);
+}
+
+// entity-id-keyed, same convention as holdMeeting/attemptTakeover below
+// — a player acts as themselves, through the actor the dispatcher
+// already resolved from their own player record.
+function directMission(entityId, options = {}) {
+  return leadership.directMission(WorldState, entityId, options);
+}
+
+function broadcastMessage(entityId, options = {}) {
+  return leadership.broadcastMessage(WorldState, entityId, options);
+}
+
 // ---------------------------------------------------------------------------
 // Territory/Community (block-tier)
 // ---------------------------------------------------------------------------
@@ -920,6 +943,8 @@ function describeBehavior(entityId) {
 const ACTION_VERBS = {
   acceptMission: (...args) => acceptMission(...args),
   resolveMission: (...args) => resolveMission(...args),
+  directMission: (...args) => directMission(...args),
+  broadcastMessage: (...args) => broadcastMessage(...args),
   addScheduleEvent: (...args) => addScheduleEvent(...args),
   reinforceHabit: (...args) => reinforceHabit(...args),
   resolveContest: (...args) => resolveContest(...args),
@@ -1565,6 +1590,8 @@ module.exports = {
   advanceTick,
   generatePlayer,
   getCitizenDashboard,
+  promoteToLeader,
+  getLeaderDashboard,
   generateCity,
   generateCommunity,
   generateTerritoryBlock,
