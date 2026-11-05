@@ -337,10 +337,15 @@ backend-only capabilities (service/operator credentials this frontend
 has no login for), per the previous section.
 
 ## Not yet built
-- A VDP district (a real Studios lot/backlot district, the same
-  pattern every other Vvltvre division and the beat marketplace
-  already got) — not yet built as of Phase 1/2; see VDP's own
-  dev-docs once it lands.
+- ~~A VDP district...~~ **Done — checked directly, 5 Nov 2026, and
+  this bullet had simply never been updated.** `vdp/src/components/
+  VultureStudiosView.jsx` is a real, live client of this app's own
+  fund-and-produce engine (greenlight/invest/equity/start-production/
+  complete/distribute/report-revenue, no financing logic of its own),
+  placed in the world on the same row as the Beat Marketplace district
+  (`x: 300, y: 1700`). Live-verified with a real Playwright pass
+  against real running Shield/V3/Vvltvre Music/Vvltvre Studios servers
+  — see `vdp/dev-docs/phase-15-vulture-studios-district/`.
 - Real production financing safeguards a real studio would have —
   refunds if a project fails to reach full funding by a deadline, a
   minimum-investment floor, secondary resale of an investor's stake
