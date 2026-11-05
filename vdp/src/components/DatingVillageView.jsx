@@ -3,6 +3,7 @@ import {
   enterDatingVillage, leaveDatingVillage, getDatingVillageFeed, sendDatingVillageFlashNote,
   LOCATION_PRIVACY_TIERS, setSnapMapPrivacy, shareSnapMapLocation, getSnapMapVisibleUsers,
   scheduleDatingVillageSpeedDate, extendDatingVillageSpeedDate, getDatingVillageSpeedDateRotation,
+  setDatingVillageGiftThreshold, getDatingVillageGiftThreshold, requestDatingVillageDateWithGift, getDatingVillageGiftRequests,
 } from "../lib/datingVillage.js";
 
 // CVNVO's real Dating Village, inhabited inside VDP -- a real BarBuddy
@@ -33,6 +34,14 @@ export default function DatingVillageView({ session }) {
   const [speedDateRotation, setSpeedDateRotation] = useState(null);
   const [speedDateError, setSpeedDateError] = useState(null);
   const [speedDateBusy, setSpeedDateBusy] = useState(false);
+
+  const [giftThreshold, setGiftThresholdState] = useState(null);
+  const [giftThresholdInput, setGiftThresholdInput] = useState("0");
+  const [giftTarget, setGiftTarget] = useState(null);
+  const [giftAmountInput, setGiftAmountInput] = useState("");
+  const [giftRequests, setGiftRequests] = useState([]);
+  const [giftError, setGiftError] = useState(null);
+  const [giftBusy, setGiftBusy] = useState(false);
 
   const refreshSnapMap = useCallback(() => {
     getSnapMapVisibleUsers(session.userId).then(setSnapMapVisible).catch((err) => setSnapMapError(err.message));
@@ -73,6 +82,17 @@ export default function DatingVillageView({ session }) {
   const refreshFeed = useCallback(() => {
     getDatingVillageFeed(session.userId).then(setFeed).catch((err) => setActionError(err.message));
   }, [session.userId]);
+
+  const refreshGiftRequests = useCallback(() => {
+    getDatingVillageGiftRequests(session.userId).then(setGiftRequests).catch((err) => setGiftError(err.message));
+  }, [session.userId]);
+
+  useEffect(() => {
+    getDatingVillageGiftThreshold(session.userId)
+      .then((t) => { setGiftThresholdState(t); setGiftThresholdInput(String(t.minGiftValueVCoin)); })
+      .catch((err) => setGiftError(err.message));
+    refreshGiftRequests();
+  }, [session.userId, refreshGiftRequests]);
 
   useEffect(() => {
     let cancelled = false;
@@ -138,6 +158,36 @@ export default function DatingVillageView({ session }) {
       setSpeedDateError(err.message);
     } finally {
       setSpeedDateBusy(false);
+    }
+  };
+
+  const handleSetGiftThreshold = async () => {
+    const minGiftValueVCoin = Number(giftThresholdInput);
+    if (!Number.isFinite(minGiftValueVCoin) || minGiftValueVCoin < 0) return;
+    setGiftBusy(true);
+    setGiftError(null);
+    try {
+      setGiftThresholdState(await setDatingVillageGiftThreshold(session.userId, minGiftValueVCoin));
+    } catch (err) {
+      setGiftError(err.message);
+    } finally {
+      setGiftBusy(false);
+    }
+  };
+
+  const handleRequestDateWithGift = async () => {
+    const giftValueVCoin = Number(giftAmountInput);
+    if (!giftTarget || !Number.isFinite(giftValueVCoin) || giftValueVCoin <= 0) return;
+    setGiftBusy(true);
+    setGiftError(null);
+    try {
+      await requestDatingVillageDateWithGift(session.userId, giftTarget, giftValueVCoin);
+      setGiftTarget(null);
+      setGiftAmountInput("");
+    } catch (err) {
+      setGiftError(err.message);
+    } finally {
+      setGiftBusy(false);
     }
   };
 
@@ -286,6 +336,54 @@ export default function DatingVillageView({ session }) {
           </div>
         )}
         {speedDateError && <p style={{ color: "crimson" }}>Error: {speedDateError}</p>}
+      </div>
+
+      <div style={{ marginTop: 12, borderTop: "1px dashed #ccc", paddingTop: 8 }}>
+        <p style={{ fontSize: 13, fontWeight: "bold", margin: "0 0 4px" }}>Gift Dating</p>
+        <p style={{ fontSize: 11, color: "#888", margin: "0 0 6px" }}>
+          A real VCoin minimum, not a sugar-dating feature — a request only goes through once the gift meets it.
+        </p>
+        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+          <span style={{ fontSize: 12 }}>Your minimum gift:</span>
+          <input
+            type="number" min="0" value={giftThresholdInput}
+            onChange={(e) => setGiftThresholdInput(e.target.value)}
+            style={{ width: 70 }}
+          />
+          <button onClick={handleSetGiftThreshold} disabled={giftBusy}>Save</button>
+          {giftThreshold && <span style={{ fontSize: 11, color: "#888" }}>(current: {giftThreshold.minGiftValueVCoin})</span>}
+        </div>
+
+        {visibleUsers.length > 0 && (
+          <div style={{ marginTop: 8 }}>
+            <p style={{ fontSize: 12, margin: "0 0 2px" }}>Request a date with a gift:</p>
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+              {visibleUsers.map((userId) => (
+                <button key={userId} onClick={() => setGiftTarget(userId)} style={{ fontWeight: giftTarget === userId ? "bold" : "normal" }}>
+                  {userId}
+                </button>
+              ))}
+            </div>
+            {giftTarget && (
+              <div style={{ display: "flex", gap: 4, marginTop: 4 }}>
+                <input
+                  type="number" min="1" placeholder="VCoin amount" value={giftAmountInput}
+                  onChange={(e) => setGiftAmountInput(e.target.value)}
+                  style={{ width: 100 }}
+                />
+                <button onClick={handleRequestDateWithGift} disabled={giftBusy || !giftAmountInput}>Send gift + request</button>
+                <button onClick={() => setGiftTarget(null)} disabled={giftBusy}>Cancel</button>
+              </div>
+            )}
+          </div>
+        )}
+
+        <p style={{ fontSize: 12, margin: "8px 0 2px" }}>Gift requests you've received ({giftRequests.length}):</p>
+        {giftRequests.length === 0 && <p style={{ fontSize: 12, color: "#888" }}>None yet.</p>}
+        {giftRequests.map((r) => (
+          <p key={r.id} style={{ fontSize: 12, margin: "2px 0" }}>{r.requesterId} sent {r.giftValueVCoin} VCoin</p>
+        ))}
+        {giftError && <p style={{ color: "crimson" }}>Error: {giftError}</p>}
       </div>
 
       {actionError && <p style={{ color: "crimson" }}>Error: {actionError}</p>}

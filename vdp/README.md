@@ -1371,11 +1371,11 @@ VOKEN's real `/api/brand` endpoint — not hardcoded text.
   inside VDP.
 - Dating Village: real Happn-style proximity crossings, FlashNotes,
   Snap Map location sharing (see "Snap Map inside the Dating Village"
-  below), and Speed Dating/Group Dating (see "Speed Dating and Group
-  Dating inside the Dating Village" below) are wired in — the
-  remaining four CVNVO dating-format extensions (Long-Distance Mode,
-  Blind Date, Gift Dating, Hunts Dates) exist as real CVNVO APIs but
-  have no VDP-district surface of their own yet.
+  below), Speed Dating/Group Dating, and Gift Dating (see their own
+  sections below) are wired in — the remaining three CVNVO dating-
+  format extensions (Long-Distance Mode, Blind Date, Hunts Dates)
+  exist as real CVNVO APIs but have no VDP-district surface of their
+  own yet.
   ~~VDP's own hardcoded single-user login meant two real distinct
   players couldn't be tested together~~ — stale: real Shield register/
   login and the shared WebSocket world (see "Jobs/Careers..." above)
@@ -1541,3 +1541,50 @@ to this wiring task's actual scope, the same proportionate-effort call
 made elsewhere in this session. The code path itself is a direct,
 unmodified pass-through to CVNVO's own already-built, already-shaped
 routes, read directly from `cvnvo/server.js` rather than guessed.
+
+## Gift Dating inside the Dating Village (5 Nov 2026)
+
+Closes a third CVNVO dating-format extension this project's own
+README named as a real API with no VDP-district surface yet — Gift
+Dating, CVNVO's own real, deliberate replacement for a sugar-dating
+feature its source doc recommends against building (see
+`cvnvo/lib/giftDating.js`'s own header): a recipient sets their own
+real minimum VCoin gift, and a date request is only created once a
+real gift meeting it is actually sent. CVNVO's server side was already
+fully built — this closes the VDP-side gap only.
+
+`cvnvoClient.js` gains `setGiftThreshold`/`getGiftThreshold`/
+`requestDateWithGift`/`getGiftRequestsForUser`, thin wrappers over
+CVNVO's own real `/api/gift-dating` routes. `datingVillage.js` wraps
+those into `setDatingVillageGiftThreshold`/
+`getDatingVillageGiftThreshold`/`requestDatingVillageDateWithGift`/
+`getDatingVillageGiftRequests` — same real, deliberate choice as Speed
+Dating above: a gift-gated request targets one of the players
+`enterDatingVillage` already found really checked in here right now.
+
+`DatingVillageView.jsx` gained a real Gift Dating panel: a minimum-
+gift input the player sets for themselves, a picker over the other
+real checked-in players with a VCoin-amount field to send a gift and
+request a date, and a live list of gift requests the player has
+actually received.
+
+### Verification
+
+Both edited files individually pass a real esbuild JSX/syntax check.
+VDP's own `node --test test/*.test.js` suite: 951/951, unchanged (same
+pre-existing Vite-only `import.meta.env` limitation as every other
+`*Client.js` in this project). CVNVO's own suite: 35/35, unchanged (no
+CVNVO code was touched).
+
+Live-verified the full real happy path end to end, against real
+spawned Shield + V3 + CVNVO servers (with matching
+`VACO_SERVICE_TOKENS` configured on V3 and CVNVO so CVNVO's own
+`transferVCoin` could reach V3 for real): two real Shield accounts
+registered; the recipient set a real 50-VCoin minimum; the requester's
+attempt with a 10-VCoin gift was correctly refused with CVNVO's own
+exact threshold error; the requester's real 75-VCoin gift succeeded,
+and V3's own real ledger shows it — the requester's balance moved
+1000 → 925, the recipient's 1000 → 1075 — and the request appears in
+the recipient's real, live `GET /api/gift-dating/requests/:userId`
+list. This is a genuinely stronger verification than Speed Dating's
+own entry above got, since Gift Dating needs no VACA-verified badge.

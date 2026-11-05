@@ -46,6 +46,7 @@ import {
   checkInAtVenue, checkOutOfVenue, getVisibleUsersAtVenue, recordProximityEvent, getProximityFeed, sendFlashNote,
   setLocationSharingPreference, shareLocation, getVisibleLocations,
   scheduleSpeedDate, getSpeedDateSlot, extendSpeedDate, getSpeedDateRotation,
+  setGiftThreshold, getGiftThreshold, requestDateWithGift, getGiftRequestsForUser,
 } from "./cvnvoClient.js";
 
 export const LOCATION_PRIVACY_TIERS = ['ghost-mode', 'my-friends', 'select-friends'];
@@ -145,4 +146,24 @@ export async function extendDatingVillageSpeedDate(slotId, additionalSec) {
 // a clear error, surfaced as-is rather than guarded twice here.
 export async function getDatingVillageSpeedDateRotation(slotId) {
   return getSpeedDateRotation(slotId);
+}
+
+// Gift Dating, inside the Dating Village -- real, deliberate choice,
+// same posture as Speed Dating above: a gift-gated date request is
+// sent to one of the players `enterDatingVillage` already found
+// really checked in here right now, not a separate matchmaking flow.
+export async function setDatingVillageGiftThreshold(userId, minGiftValueVCoin) {
+  return setGiftThreshold(userId, minGiftValueVCoin);
+}
+
+export async function getDatingVillageGiftThreshold(userId) {
+  return getGiftThreshold(userId);
+}
+
+export async function requestDatingVillageDateWithGift(requesterId, recipientId, giftValueVCoin) {
+  return requestDateWithGift(requesterId, recipientId, giftValueVCoin);
+}
+
+export async function getDatingVillageGiftRequests(userId) {
+  return getGiftRequestsForUser(userId);
 }

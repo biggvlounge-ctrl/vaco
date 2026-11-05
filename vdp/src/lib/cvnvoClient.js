@@ -112,3 +112,32 @@ export async function getSpeedDateRotation(slotId) {
   const body = await requestJson(`/api/speed-dates/${encodeURIComponent(slotId)}/rotation`);
   return body.rounds;
 }
+
+// Gift Dating -- CVNVO's own real, deliberate replacement for a sugar-
+// dating feature its own source doc recommends against building (see
+// `giftDating.js`'s own header): a recipient sets a real minimum
+// VCoin gift, a date request must meet it before it's even created.
+export async function setGiftThreshold(userId, minGiftValueVCoin) {
+  return requestJson("/api/gift-dating/threshold", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...sessionHeaders() },
+    body: JSON.stringify({ userId, minGiftValueVCoin }),
+  });
+}
+
+export async function getGiftThreshold(userId) {
+  return requestJson(`/api/gift-dating/threshold/${encodeURIComponent(userId)}`);
+}
+
+export async function requestDateWithGift(requesterId, recipientId, giftValueVCoin) {
+  return requestJson("/api/gift-dating/request", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...sessionHeaders() },
+    body: JSON.stringify({ requesterId, recipientId, giftValueVCoin }),
+  });
+}
+
+export async function getGiftRequestsForUser(userId) {
+  const body = await requestJson(`/api/gift-dating/requests/${encodeURIComponent(userId)}`);
+  return body.requests;
+}
