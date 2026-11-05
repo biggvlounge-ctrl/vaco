@@ -250,8 +250,9 @@ time that file gets rewritten for an unrelated reason.
   remaining gap), the VENVM app ecosystem, and seller onboarding/
   inventory management UI.
 - Publishing: no Ingram API integration (just a flag on a manually-
-  published book), no subscription-pool UI, no full tab UI (search,
-  skill tags, cover art). **VOID fulfillment routing IS now built** —
+  published book), no subscription-pool UI. **Search, skill tags, and
+  cover art ARE now built** — see "Publishing: search, skill/belief
+  tags, and cover art" below. **VOID fulfillment routing IS now built** —
   `catalog.js`'s `requestBookFulfillment` routes physical book orders
   through the same client Marketplace uses. **A real, persisted
   backend and a real frontend wired to it are also now built**
@@ -700,3 +701,46 @@ the VENVS book — confirmed live. Also confirmed both real refusals: a
 stranger cannot order a collectible edition of someone else's book,
 and a different real author cannot link someone else's real vault
 onto their own book. See CVLLEX's own README for its matching entry.
+
+## Phase 19: Publishing — search, skill/belief tags, and cover art (5 Nov 2026)
+
+Closes this project's own flagged "no full tab UI (search, skill
+tags, cover art)" gap. `title` is the only real free-text field a book
+carries (no description field exists in this catalog's own schema),
+so `getCatalog`'s new `query` option matches against it —
+case-insensitive substring, the same plain-text search shape this
+ecosystem's other "no search yet" gaps have closed with (e.g. HVNTZ's
+own `searchHunts`). It composes with the existing `format`/`source`
+filters rather than replacing them.
+
+`coverArtUrl` is a new, real, honestly-nullable, caller-supplied field
+on `publishBook` — same class of gap as DREAMS' own `creativeUrl`/
+Vault Studios' `streamUrl`; no real image-hosting integration exists
+anywhere in this ecosystem, so this names a URL rather than fabricating
+one.
+
+`PublishingView.jsx` gained the real tab UI itself: a search box and
+format/source dropdowns (wired to filters the backend already
+supported but this view never exposed), a small cover-art thumbnail
+(or an honest placeholder box when `coverArtUrl` is null), and a
+"teaches: X" / "religious: faith" tag rendered from the book's own
+existing `skillSubject`/`beliefTopic`/`beliefType` fields — "skill
+tags" in the plural the flagged gap used, but this catalog's own real
+schema (per `catalog.js`'s own header) gives a book exactly one tag,
+never both, so that's what's rendered rather than inventing a
+multi-tag field this schema doesn't have.
+
+### Verification
+
+`test/venvs.test.js` grew by 3 (case-insensitive substring search,
+search composing with an existing filter, and the real nullable
+`coverArtUrl`). `test/server.test.js` grew by 1 (`GET
+/api/publishing/books?query=` against the real seeded catalog). Full
+suite: 107/107 → 111/111. Mutation-verified: replacing the search
+condition with a bare `true` turned exactly the search test red;
+restored and reconfirmed green. Both edited frontend files pass a real
+esbuild JSX/syntax check. Live-verified against a real spawned server:
+`GET /api/publishing/books?query=cherokee` returned only the real
+seeded "Cherokee St After Dark" title, `?query=a&format=ebook`
+composed both filters correctly (5 of the 8 seeded titles), and every
+real book record now carries the new `coverArtUrl: null` field.

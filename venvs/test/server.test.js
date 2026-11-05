@@ -236,6 +236,14 @@ test('GET /api/publishing/books lists the real seeded catalog, never 500s', { sk
   assert.ok(body.books.some((b) => b.title === 'Cherokee St After Dark'));
 });
 
+test('GET /api/publishing/books?query= searches the real seeded catalog by title', { skip: SKIP }, async () => {
+  const res = await fetch(`${BASE}/api/publishing/books?query=cherokee`);
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.ok(body.books.length > 0);
+  assert.ok(body.books.every((b) => b.title.toLowerCase().includes('cherokee')));
+});
+
 test('GET /api/publishing/books/:id 404s honestly for an unknown book', { skip: SKIP }, async () => {
   const res = await fetch(`${BASE}/api/publishing/books/999999`);
   assert.equal(res.status, 404);

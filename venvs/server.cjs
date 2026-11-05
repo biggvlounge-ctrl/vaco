@@ -553,8 +553,8 @@ async function fetchCvllexVault(vaultId) {
   });
 
   app.get('/api/publishing/books', (req, res) => {
-    const { format, source } = req.query;
-    res.json({ books: catalogLib.getCatalog(store.catalog, { format, source }) });
+    const { format, source, query } = req.query;
+    res.json({ books: catalogLib.getCatalog(store.catalog, { format, source, query }) });
   });
 
   app.get('/api/publishing/books/:id', (req, res) => {

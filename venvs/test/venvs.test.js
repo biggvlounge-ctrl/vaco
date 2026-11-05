@@ -734,6 +734,37 @@ test('the catalogue filters by format and by source', () => {
   assert.equal(getBook(catalog, 9999), null);
 });
 
+// Closes this project's own flagged "no full tab UI (search, skill
+// tags, cover art)" gap -- the real search half.
+test('the catalogue search matches the title case-insensitively, as a substring', () => {
+  const catalog = createCatalog();
+  publishBook(catalog, { title: 'The Complete Home Cook', authorId: 'a', format: 'ebook', listPrice: 5 });
+  publishBook(catalog, { title: 'Crafting for Beginners', authorId: 'a', format: 'ebook', listPrice: 5 });
+  assert.equal(getCatalog(catalog, { query: 'home' }).length, 1);
+  assert.equal(getCatalog(catalog, { query: 'HOME' }).length, 1);
+  assert.equal(getCatalog(catalog, { query: 'nonexistent' }).length, 0);
+});
+
+test('search composes with the format/source filters, not just alone', () => {
+  const catalog = createCatalog();
+  publishBook(catalog, { title: 'Crafting for Beginners', authorId: 'a', format: 'ebook', listPrice: 5 });
+  publishBook(catalog, {
+    title: 'Crafting for Experts', authorId: 'a', format: 'print', listPrice: 20, printingCost: 4,
+  });
+  assert.equal(getCatalog(catalog, { query: 'crafting' }).length, 2);
+  assert.equal(getCatalog(catalog, { query: 'crafting', format: 'ebook' }).length, 1);
+});
+
+test('publishBook records a real, honestly-nullable coverArtUrl', () => {
+  const catalog = createCatalog();
+  const withCover = publishBook(catalog, {
+    title: 'Illustrated', authorId: 'a', format: 'ebook', listPrice: 5, coverArtUrl: 'https://example.com/cover.jpg',
+  });
+  const withoutCover = publishBook(catalog, { title: 'Plain', authorId: 'a', format: 'ebook', listPrice: 5 });
+  assert.equal(withCover.coverArtUrl, 'https://example.com/cover.jpg');
+  assert.equal(withoutCover.coverArtUrl, null);
+});
+
 test('a shop purchase charges the listed price and nothing else', () => {
   const shop = createShop();
   const product = listShopProduct(shop, { title: 'Hoodie', price: 45, sellerId: 's1' });

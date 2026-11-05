@@ -26,10 +26,11 @@ export async function publishBook(options) {
   return handle(res);
 }
 
-export async function listBooks({ format, source } = {}) {
+export async function listBooks({ format, source, query } = {}) {
   const params = new URLSearchParams();
   if (format) params.set('format', format);
   if (source) params.set('source', source);
+  if (query) params.set('query', query);
   const qs = params.toString();
   const res = await fetch(`${VENVS_API_URL}/api/publishing/books${qs ? `?${qs}` : ''}`);
   const body = await handle(res);

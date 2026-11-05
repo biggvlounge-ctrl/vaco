@@ -29,11 +29,20 @@ export default function PublishingView({ session, onPurchase }) {
   const [error, setError] = useState(null);
   const [lastPurchase, setLastPurchase] = useState(null);
 
-  const loadBooks = () => listBooks().then(setBooks).catch((err) => setLoadError(err.message));
+  // Closes this project's own flagged "no full tab UI (search, skill
+  // tags, cover art)" gap -- real filters against the same
+  // format/source `getCatalog` already supported server-side but this
+  // view never exposed, plus the new real text search.
+  const [query, setQuery] = useState("");
+  const [format, setFormat] = useState("");
+  const [source, setSource] = useState("");
+
+  const loadBooks = () => listBooks({ query, format, source }).then(setBooks).catch((err) => setLoadError(err.message));
 
   useEffect(() => {
     loadBooks();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, format, source]);
 
   const handleBuy = async (bookId) => {
     setBusy(bookId);
@@ -52,7 +61,29 @@ export default function PublishingView({ session, onPurchase }) {
   return (
     <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16, marginTop: 12 }}>
       <h2 style={{ fontSize: 16, margin: "0 0 8px 0" }}>Publishing</h2>
+
+      <div style={{ display: "flex", gap: 4, marginBottom: 8, flexWrap: "wrap" }}>
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search titles…"
+          style={{ flex: 1, minWidth: 120 }}
+        />
+        <select value={format} onChange={(e) => setFormat(e.target.value)}>
+          <option value="">Any format</option>
+          <option value="ebook">Ebook</option>
+          <option value="print">Print</option>
+          <option value="audiobook">Audiobook</option>
+        </select>
+        <select value={source} onChange={(e) => setSource(e.target.value)}>
+          <option value="">Any source</option>
+          <option value="self_published">Self-published</option>
+          <option value="ingram">Ingram catalog</option>
+        </select>
+      </div>
+
       {loadError && <p style={{ color: "crimson" }}>Could not load the catalog: {loadError}</p>}
+      {books.length === 0 && !loadError && <p style={{ fontSize: 12, color: "#888" }}>No titles match.</p>}
       {books.map((book) => (
         <div
           key={book.id}
@@ -64,11 +95,23 @@ export default function PublishingView({ session, onPurchase }) {
             borderTop: "1px solid #eee",
           }}
         >
-          <div>
-            <div>{book.title}</div>
-            <div style={{ fontSize: 12, color: "#666" }}>
-              ${book.listPrice.toFixed(2)} ·{" "}
-              {book.source === "ingram" ? "Ingram catalog" : `royalty ${(book.royalty.rate * 100).toFixed(0)}%`}
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {book.coverArtUrl ? (
+              <img src={book.coverArtUrl} alt="" style={{ width: 32, height: 44, objectFit: "cover", borderRadius: 2 }} />
+            ) : (
+              <div style={{ width: 32, height: 44, background: "#eee", borderRadius: 2, flexShrink: 0 }} />
+            )}
+            <div>
+              <div>{book.title}</div>
+              <div style={{ fontSize: 12, color: "#666" }}>
+                ${book.listPrice.toFixed(2)} ·{" "}
+                {book.source === "ingram" ? "Ingram catalog" : `royalty ${(book.royalty.rate * 100).toFixed(0)}%`}
+              </div>
+              {(book.skillSubject || book.beliefTopic) && (
+                <span style={{ fontSize: 11, background: "#eef", color: "#446", borderRadius: 4, padding: "1px 5px" }}>
+                  {book.skillSubject ? `teaches: ${book.skillSubject}` : `${book.beliefType}: ${book.beliefTopic}`}
+                </span>
+              )}
             </div>
           </div>
           <button onClick={() => handleBuy(book.id)} disabled={busy === book.id}>

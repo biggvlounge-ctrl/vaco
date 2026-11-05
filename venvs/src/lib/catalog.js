@@ -63,6 +63,12 @@ export function publishBook(catalog, options = {}) {
     skillSubject,
     beliefTopic,
     beliefType,
+    // Real, honestly-nullable, caller-supplied field -- same class of
+    // gap as DREAMS' own `creativeUrl`/Vault Studios' `streamUrl`. No
+    // real image-hosting integration exists anywhere in this
+    // ecosystem, so this names a URL rather than fabricating a host
+    // for one.
+    coverArtUrl = null,
   } = options;
 
   if (!title) {
@@ -118,6 +124,7 @@ export function publishBook(catalog, options = {}) {
     skillSubject: skillSubject || null,
     beliefTopic: beliefTopic || null,
     beliefType: beliefType || null,
+    coverArtUrl: coverArtUrl || null,
     // Set once a real CVLLEX vault exists for this title -- see
     // `linkCollectibleEdition` below. `null` until then, the same
     // "VOKEN's own `linkedCultureCardId` on every merch listing"
@@ -164,10 +171,20 @@ export function linkCollectibleEdition(catalog, options = {}) {
   return book;
 }
 
+// Closes this project's own flagged "no full tab UI (search, skill
+// tags, cover art)" gap -- the real search half. `title` is the only
+// real free-text field every book carries (no description field
+// exists in this catalog's own schema), so that is what a query
+// matches against -- case-insensitive substring, the same plain-text
+// search shape this ecosystem's other "no search yet" gaps have
+// closed with (e.g. HVNTZ's own `searchHunts`).
 export function getCatalog(catalog, options = {}) {
-  const { format, source } = options;
+  const { format, source, query } = options;
+  const normalizedQuery = query ? query.trim().toLowerCase() : null;
   return catalog.books.filter(
-    (b) => (format ? b.format === format : true) && (source ? b.source === source : true)
+    (b) => (format ? b.format === format : true)
+      && (source ? b.source === source : true)
+      && (normalizedQuery ? b.title.toLowerCase().includes(normalizedQuery) : true)
   );
 }
 
