@@ -218,8 +218,9 @@ duplicate alert).
   "Frontend coverage pass" section just above, which already documents
   `POST /api/metrics/ingest` as `requireCallingService()`-gated.
   Stale line, removed.
-- Only 6 of the ecosystem's real revenue-bearing apps feed live metrics
+- Only 7 of the ecosystem's real revenue-bearing apps feed live metrics
   in so far (vago, chopz-shop, vulture-music, void, vulture-flix,
-  voken) — the same fail-soft `pushMetric` pattern extends cleanly to
+  voken, vacay — see VACAY's own README for its `stay_platform_fee`
+  wiring) — the same fail-soft `pushMetric` pattern extends cleanly to
   any other app that wants to report a real number.
 - No VDP district or other UI surface linking to the wallboard yet.

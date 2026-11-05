@@ -80,7 +80,7 @@ function requireGuest(getBooking, label) {
 function createBookingsRouter(deps) {
   const {
     store, settleVCoin, requestVoidJob, requestVoidHourlyBooking,
-    searchDropStaysFn, createDropBookingFn,
+    searchDropStaysFn, createDropBookingFn, pushMetric = async () => {},
   } = deps;
   const router = express.Router();
 
@@ -237,7 +237,12 @@ function createBookingsRouter(deps) {
 
   router.post('/:id/complete', requireStayParty(), async (req, res) => {
     try {
-      res.json(await completeStay(store, { bookingId: Number(req.params.id), settleFn: settleVCoin }));
+      const booking = await completeStay(store, { bookingId: Number(req.params.id), settleFn: settleVCoin });
+      // Real platform revenue, same fail-soft telemetry posture as
+      // vago/server.js's own pushMetric -- never holds up the real
+      // settlement that already happened.
+      await pushMetric('stay_platform_fee', booking.platformFee);
+      res.json(booking);
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
@@ -245,9 +250,14 @@ function createBookingsRouter(deps) {
 
   router.post('/:id/cancel', requireStayParty(), async (req, res) => {
     try {
-      res.json(await cancelBooking(store, {
+      const booking = await cancelBooking(store, {
         bookingId: Number(req.params.id), cancellingUserId: req.sessionUserId, settleFn: settleVCoin,
-      }));
+      });
+      // A late GUEST cancellation still realizes the platform fee
+      // (same settlement shape as a completed stay); a host
+      // cancellation or an on-time refund realizes none.
+      if (booking.platformFee) await pushMetric('stay_platform_fee', booking.platformFee);
+      res.json(booking);
     } catch (err) {
       res.status(400).json({ error: err.message });
     }

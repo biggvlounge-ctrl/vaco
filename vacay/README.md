@@ -367,3 +367,30 @@ with check-in 2 hours out, the host (not the guest) cancelled it, and
 the guest's real V3 balance returned to its original 1000 VCoin while
 the host's stayed at 0 — confirmed via `GET /api/vcoin/balance/:userId`
 on both accounts, not just the response body.
+
+## Real VACO Analytics telemetry for Stays (5 Nov 2026)
+
+Closes VACO Analytics' own flagged gap: "only 6 of the ecosystem's
+real revenue-bearing apps feed live metrics in so far... the same
+fail-soft `pushMetric` pattern extends cleanly to any other app."
+VACAY is now the 7th. `server.js` gains the same real,
+fail-soft `pushMetric(metric, value)` `vago/server.js` already
+established (a real platform-fee event is never held up by VACO
+Analytics being down), injected into the Stays bookings router and
+fired as `stay_platform_fee` at both real points Stays actually
+realizes platform revenue: `completeStay` and a late guest
+cancellation (a host cancellation or an on-time refund realizes none,
+so neither fires one). Scoped to Stays only, as the flagship
+sub-product — the other three (Home, Auto, Flights) can follow the
+identical pattern later.
+
+### Verification
+
+Full suite: 46/46, unchanged (the metric push is a side effect at the
+route layer, not inside the pure, plain-Node-loadable lib functions
+`test/money.test.js` exercises directly). Live-verified end to end
+against real spawned Shield + V3 + VACO Analytics + VACAY servers: a
+real host listed a stay, a real guest booked and the host completed
+it, and `GET /api/metrics/vacay` on the real spawned VACO Analytics
+server showed the real resulting event — `stay_platform_fee: 55.8`,
+exactly the booking's own real 15.5%-of-360 platform fee.

@@ -68,6 +68,24 @@ function serviceHeaders() {
 }
 
 const VOID_API_URL = process.env.VOID_API_URL || 'http://localhost:8793';
+const VACO_ANALYTICS_URL = process.env.VACO_ANALYTICS_URL || 'http://localhost:8790';
+
+// Real, fail-soft telemetry -- closes VACO Analytics' own flagged
+// "only 6 of the ecosystem's real revenue-bearing apps feed live
+// metrics in so far" gap by making VACAY the 7th. Same posture as
+// vago/server.js's own `pushMetric`: a real platform-fee collection is
+// never held up by VACO Analytics being down.
+async function pushMetric(metric, value) {
+  try {
+    await fetch(`${VACO_ANALYTICS_URL}/api/metrics/ingest`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...serviceHeaders() },
+      body: JSON.stringify({ app: 'vacay', metric, value }),
+    });
+  } catch {
+    // real, honest no-op -- VACO Analytics is optional telemetry, not a dependency.
+  }
+}
 // -- The store, and which backend holds it ----------------------------
 //
 // `let`, not `const`: with DATABASE_URL set VACAY's store lives in
@@ -289,7 +307,7 @@ function lazyRouter(build) {
 
 app.use('/api/bookings', lazyRouter(() => createBookingsRouter({
   store: store.bookings, settleVCoin, requestVoidJob, requestVoidHourlyBooking,
-  searchDropStaysFn, createDropBookingFn,
+  searchDropStaysFn, createDropBookingFn, pushMetric,
 })));
 app.use('/api/home', lazyRouter(() => createHomeRouter({ store: store.home, settleVCoin })));
 app.use('/api/auto', lazyRouter(() => createAutoRouter({ store: store.auto, settleVCoin })));
