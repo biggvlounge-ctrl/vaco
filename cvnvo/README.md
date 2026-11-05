@@ -153,12 +153,16 @@ curl -X POST http://localhost:8798/api/proximity -H "Content-Type: application/j
   floor, flagged directly rather than silently hardcoded.
 - `lib/messages.js` — **real messages + Your Turn Limits (Phase 4)**,
   Hinge's real named anti-ghosting mechanic. No message/conversation
-  storage existed anywhere in this codebase before this file — checked
-  directly first, not assumed; `messageSafety.js`'s own `screenMessage`
-  was a real, pure scanning function with no caller that ever
-  persisted anything. `sendMessage` is the first real place a message
-  is stored, real-screened on every send per the doc's own "AI spam/
-  scam filtering runs on every conversation." Each match tracks a real
+  storage existed anywhere in this codebase before this file. Each
+  message is real-screened on every send per the doc's own "AI spam/
+  scam filtering runs on every conversation" -- **migrated 2026-11-05**
+  from a local `messageSafety.js` duplicate (now deleted) to a real
+  injected `vsafeScreenMessageFn(text)` that calls VSAFE's own open
+  `POST /api/monitor/screen` (`lib/aiMonitoring.js`'s `screenContent`,
+  which already generalized that exact pattern plus a real threat/
+  self-harm category this app's local copy never had). `sendMessage`
+  is async now and fails closed -- with VSAFE unreachable, nothing is
+  stored, never a silent unscreened pass-through. Each match tracks a real
   `awaitingReplyFromUserId` (whose turn it is) and `unansweredCount`
   (how many messages have piled up waiting) — sending the awaited
   reply resets the stall and flips the turn; messaging again without
@@ -184,12 +188,13 @@ curl -X POST http://localhost:8798/api/proximity -H "Content-Type: application/j
   different real track records.
 - `lib/communicationControls.js` — real anonymous call-session
   tracking; no phone number field exists anywhere in its shape.
-- `lib/messageSafety.js` — the doc's "AI spam/scam filtering"/
-  "Relationship Guardian AI," built as the real, deterministic,
-  rule-based scan underneath that description (contact-solicitation
-  patterns, phone-number-shaped content, links, character flooding) —
-  per this session's consistent no-fake-AI stance, explicitly not a
-  language-model call.
+  **Deliberately still a real, local duplicate of VSAFE's own copy**,
+  checked directly rather than assumed: `server.js`'s own
+  `requireCallParty()` guard does a synchronous local
+  `store.callSessions.find(...)` lookup, so calling VSAFE's remote
+  version instead would mean rebuilding that guard as async first — a
+  real architectural change, unlike the message-screening migration
+  below.
 - `lib/proximity.js` — **Happn-style proximity + BarBuddy + FlashNotes
   (Phase 7)**. `recordProximityEvent` only ever stores a real
   intersection point when two real coordinate pairs are genuinely
@@ -580,3 +585,48 @@ adding a real capability.
 This leaves 55 of this app's 59 routes reachable from the UI, with the
 remaining four being `GET /api/health` and the two service-credential-
 gated batch-matching routes named above.
+
+## Real message-screening dedup with VSAFE (5 Nov 2026)
+
+VSAFE's own `lib/aiMonitoring.js` had already generalized this app's
+local `lib/messageSafety.js` scan (contact-solicitation patterns,
+phone-number-shaped content, links, character flooding) into its real,
+shared `screenContent` -- plus a real, distinct threat/self-harm
+category this app's copy never had -- behind the open
+`POST /api/monitor/screen`, reachable but never actually called from
+here. Checked directly rather than assumed: `vsafe/README.md`'s own
+"Not yet built" list named migrating both this file and
+`communicationControls.js` to that real shared version, so each half
+was investigated on its own merits rather than closed as one item.
+
+**`messageSafety.js` is now gone.** `lib/messages.js`'s `sendMessage`
+is async now and takes a real, injected `vsafeScreenMessageFn(text)` --
+the same cross-app-call shape `server.js` already used for VSAFE's
+check-ins, photo check-ins, fake calls and screen time -- backed by a
+new `vsafeScreenMessage` client that calls VSAFE's real
+`/api/monitor/screen`. The standalone `POST /api/messages/screen`
+preview route forwards to the same client. Stored messages now carry a
+real `severity` field (`'none' | 'medium' | 'high'`) VSAFE's richer
+classifier returns, surfaced in the Messages tab's flagged badge.
+
+**`communicationControls.js` stays a real, deliberate duplicate.**
+`server.js`'s own `requireCallParty()` guard does a synchronous local
+`store.callSessions.find(...)` lookup -- migrating the call-session
+logic itself would mean rebuilding that guard as async first, a real
+architectural change the message-screening half never needed.
+
+`test/messages.test.js` (new, 5 tests; full suite 77 -> 82, all
+passing): the injected fn is required rather than silently optional,
+the real flagged/severity/reasons VSAFE returns are stored as-is (never
+a fabricated verdict), a high-severity message is still delivered
+(VSAFE flags for real human review -- this layer never silently
+blocks), and Your Turn Limits tracking is untouched by the migration.
+Mutation-verified: hardcoding `severity` to `'high'` regardless of
+VSAFE's real answer turned the real-data test red; restored and
+reconfirmed green. Live-verified against a real spawned Shield + VSAFE
++ CVNVO stack: a real Shield session sending through
+`POST /api/matches/:id/messages` got real `flagged`/`severity`/
+`reasons` back from VSAFE's own classifier (`whatsapp`/phone-number
+text correctly flagged `medium`), and killing the VSAFE process made
+the send fail closed (`fetch failed`, no message stored) rather than
+silently falling back to an unscreened pass-through.

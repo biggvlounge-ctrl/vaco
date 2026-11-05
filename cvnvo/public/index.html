@@ -461,7 +461,7 @@ function renderMessages(body) {
             ? VACO.table([
               { key: 'senderId', label: 'From' },
               { key: 'text', label: 'Message' },
-              { key: 'flagged', label: 'Flagged', render: function (m) { return m.flagged ? VACO.badge('flagged: ' + m.reasons.join(', '), 'danger') : el('span', 'vaco-small vaco-faint', '—'); } },
+              { key: 'flagged', label: 'Flagged', render: function (m) { return m.flagged ? VACO.badge('flagged (' + m.severity + '): ' + m.reasons.join(', '), 'danger') : el('span', 'vaco-small vaco-faint', '—'); } },
             ], messages)
             : el('p', 'vaco-small vaco-faint', 'No messages yet.'));
         });
@@ -473,19 +473,19 @@ function renderMessages(body) {
     ], function (values) {
       return VACO.post('/api/matches/' + values.matchId + '/messages', { senderId: id, text: values.text })
         .then(function (m) {
-          VACO.toast(m.flagged ? 'Sent — but flagged: ' + m.reasons.join(', ') : 'Sent.');
+          VACO.toast(m.flagged ? 'Sent — but flagged (' + m.severity + '): ' + m.reasons.join(', ') : 'Sent.');
         });
     }, 'Send'),
   ]));
 
   var screenOut = el('div', 'vaco-stack-sm');
   grid.appendChild(VACO.card('Screen a message', [
-    el('p', 'vaco-small vaco-dim', 'Runs the same real, deterministic scan every message gets, without actually sending anything.'),
+    el('p', 'vaco-small vaco-dim', 'Runs the same real, deterministic scan every message gets (via VSAFE), without actually sending anything.'),
     VACO.form([{ name: 'text', label: 'Draft text', placeholder: 'type a draft', width: '220px' }],
       function (values) {
         return VACO.post('/api/messages/screen', { text: values.text }).then(function (r) {
           VACO.mount(screenOut, r.flagged
-            ? VACO.badge('flagged: ' + r.reasons.join(', '), 'danger')
+            ? VACO.badge('flagged (' + r.severity + '): ' + r.reasons.join(', '), 'danger')
             : VACO.badge('clean', 'money'));
         });
       }, 'Check'),

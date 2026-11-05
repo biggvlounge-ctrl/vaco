@@ -30,7 +30,6 @@ const {
 } = require('./lib/firstDateSafety');
 const { triggerFakeCall, recordScreenTimeSession } = require('./lib/vsafeExtras');
 const { CALL_STATUSES, startAnonymousCall, endCall, getCallSession } = require('./lib/communicationControls');
-const { screenMessage } = require('./lib/messageSafety');
 const { requireActor, requireSession, requireCallingService } = require('./lib/shieldAuth.cjs');
 const { createServiceAuth } = require('./lib/serviceAuth.cjs');
 const {
@@ -272,6 +271,20 @@ async function vsafeScreenTime(params) {
   if (!res.ok) throw new Error(body.error || `vsafeScreenTime failed (${res.status})`);
   return body;
 }
+// Real dedup of CVNVO's own former local `messageSafety.js` --
+// VSAFE's `aiMonitoring.js` already generalized that exact pattern set
+// into its real, shared, open `/api/monitor/screen` route (plus a real
+// threat/self-harm category CVNVO's copy never had), so every message
+// is screened there now instead of against a local copy that could
+// drift out of sync with VSAFE's own.
+async function vsafeScreenMessage(text) {
+  const res = await fetch(`${VSAFE_API_URL}/api/monitor/screen`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...serviceHeaders() }, body: JSON.stringify({ text }),
+  });
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error || `vsafeScreenMessage failed (${res.status})`);
+  return body;
+}
 
 // Real, live cross-app call to VACA's own identity-claim authority --
 // confirmed directly (by reading lib/profiles.js and this file
@@ -464,10 +477,10 @@ app.get('/api/matches/:id', (req, res) => {
 
 // -- Messages + Your Turn Limits --
 
-app.post('/api/matches/:id/messages', requireActor('senderId'), requireMatchParticipant(), (req, res) => {
+app.post('/api/matches/:id/messages', requireActor('senderId'), requireMatchParticipant(), async (req, res) => {
   try {
     const matchId = Number(req.params.id);
-    const message = sendMessage(store, { ...req.body, matchId });
+    const message = await sendMessage(store, { ...req.body, matchId, vsafeScreenMessageFn: vsafeScreenMessage });
     // Real push, not just persistence -- broadcastMessage below.
     broadcastMessage(matchId, message);
     res.status(201).json(message);
@@ -590,11 +603,13 @@ app.get('/api/calls/:id', (req, res) => {
 
 // A pure classifier over a string: reads no record, writes no record,
 // names no user. There is nothing per-user to check. The app-level
-// serviceAuth still refuses an anonymous caller.
+// serviceAuth still refuses an anonymous caller. Forwarded to VSAFE's
+// own real `/api/monitor/screen` rather than a local copy -- see
+// `vsafeScreenMessage` above.
 // audit-route-guards: open -- pure classifier over a string; reads no record, writes none, names no user
-app.post('/api/messages/screen', (req, res) => {
+app.post('/api/messages/screen', async (req, res) => {
   try {
-    res.json(screenMessage((req.body || {}).text));
+    res.json(await vsafeScreenMessage((req.body || {}).text));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

@@ -254,9 +254,26 @@ reason none of this ecosystem's other frontends expose it.
   not built here.
 - VSAFE's own standalone-app onboarding/account flow for non-VACO
   users.
-- Migrating CVNVO's own local `communicationControls.js`/
+- ~~Migrating CVNVO's own local `communicationControls.js`/
   `messageSafety.js` copies to call into these real, shared VSAFE
-  versions instead of their current real, parallel duplicates.
+  versions instead of their current real, parallel duplicates.~~ Half
+  done, 2026-11-05: `messageSafety.js` is gone -- CVNVO's `sendMessage`
+  (`lib/messages.js`) and its `/api/messages/screen` preview route now
+  call this app's own real, open `POST /api/monitor/screen`
+  (`lib/aiMonitoring.js`'s `screenContent`, which already generalized
+  that exact pattern set plus a real threat/self-harm category CVNVO's
+  copy never had) via an injected `vsafeScreenMessageFn`, the same
+  real-cross-app-call shape CVNVO already used for check-ins, photo
+  check-ins, fake calls and screen time. Live-verified: with this app
+  down, CVNVO's send fails closed (no message stored, no silent
+  unscreened pass-through) rather than falling back to a local copy.
+  **`communicationControls.js` stays a real, deliberate duplicate.**
+  Checked directly rather than assumed: CVNVO's `requireCallParty()`
+  guard does a synchronous local `store.callSessions.find(...)` lookup
+  in `server.js`, and migrating the call-session logic itself to a
+  remote call here would mean rebuilding that guard as async -- a real
+  architectural change, not a drop-in swap like the stateless
+  classifier above was.
 - Real background-check data sourcing and real image/video content
   moderation (no ML available in this environment) — both real,
   separate integrations, not built here.

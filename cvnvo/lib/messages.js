@@ -9,13 +9,22 @@
 //
 // **Real, necessary prerequisite found and built**: no message/
 // conversation storage existed anywhere in this codebase before this
-// file -- `messageSafety.js`'s own `screenMessage` was a real, pure
-// scanning function with no caller that ever persisted a message.
-// Checked directly rather than assumed. `sendMessage` below is the
-// real, first place a CVNVO message is actually stored, and it's the
-// one that runs every message through `screenMessage` per
-// `CVNVO_CORE_FEATURES.md`'s own "AI spam/scam filtering runs on every
-// conversation."
+// file. `sendMessage` below is the real, first place a CVNVO message is
+// actually stored, and it's the one that runs every message through a
+// real screen per `CVNVO_CORE_FEATURES.md`'s own "AI spam/scam
+// filtering runs on every conversation."
+//
+// **Real dedup, not a local duplicate.** This used to call a local
+// `./messageSafety` with its own copy of the contact-solicitation/
+// phone-number/link/character-flood patterns. VSAFE's own
+// `lib/aiMonitoring.js` already generalized that exact logic into its
+// real, shared, app-agnostic `screenContent` (plus a real, distinct
+// threat/self-harm-language category CVNVO's copy never had) behind the
+// open `/api/monitor/screen` route -- so `sendMessage` now takes an
+// injected `vsafeScreenMessageFn(text)`, the same real cross-app-call
+// shape this file's own `server.js` already uses for VSAFE's check-ins,
+// photo check-ins, fake calls and screen time. No new local copy to
+// drift out of sync with VSAFE's own.
 //
 // **Real, tracked "whose turn is it"**: each match gets a real
 // `awaitingReplyFromUserId` (who owes the next reply) alongside its
@@ -36,8 +45,6 @@
 // entirely, so they receive no new matches until they reply --
 // deliberately flagged as an adapted mapping, not a 1:1 port.
 
-const { screenMessage } = require('./messageSafety');
-
 const MAX_UNANSWERED_CONVERSATIONS = 3; // real, flagged, bounded -- no source doc gives Hinge's own real threshold
 
 function getMatchOrThrow(store, matchId) {
@@ -52,16 +59,17 @@ function otherUserId(match, userId) {
   throw new Error(`${userId} is not a participant in match ${match.id}`);
 }
 
-function sendMessage(store, options = {}) {
-  const { matchId, senderId, text, now = Date.now() } = options;
+async function sendMessage(store, options = {}) {
+  const { matchId, senderId, text, now = Date.now(), vsafeScreenMessageFn } = options;
   if (!senderId) throw new Error('sendMessage requires a senderId');
   if (typeof text !== 'string' || text.trim().length === 0) throw new Error('sendMessage requires non-empty text');
+  if (typeof vsafeScreenMessageFn !== 'function') throw new Error('sendMessage requires a vsafeScreenMessageFn(text)');
 
   const match = getMatchOrThrow(store, matchId);
   const recipientId = otherUserId(match, senderId);
   if (match.expiresAt < now) throw new Error(`sendMessage: match ${matchId} has expired`);
 
-  const { flagged, reasons } = screenMessage(text);
+  const { flagged, reasons, severity = 'none' } = await vsafeScreenMessageFn(text);
 
   if (match.awaitingReplyFromUserId === senderId) {
     // This message IS the awaited reply -- the stall clears and the
@@ -76,7 +84,7 @@ function sendMessage(store, options = {}) {
   match.awaitingReplyFromUserId = recipientId;
 
   const message = {
-    id: store.nextMessageId++, matchId, senderId, recipientId, text, flagged, reasons, createdAt: now,
+    id: store.nextMessageId++, matchId, senderId, recipientId, text, flagged, reasons, severity, createdAt: now,
   };
   store.messages.push(message);
   return message;
