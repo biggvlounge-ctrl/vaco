@@ -38,6 +38,15 @@ function registerScreen(store, options = {}) {
     locationAddress,
     status: 'active',
     createdAt: now,
+    // Real cross-link to an actual HVNTZ business location -- this
+    // project's own README flagged the gap directly: "the two systems
+    // are integrated at the revenue-share concept level... but not at
+    // the data level yet." Null until linked; linking is optional and
+    // separate from registration, the same real "a checkpoint is often
+    // built before its host business has a Network yet" shape HVNTZ's
+    // own `linkCheckpointNetwork` already established.
+    hvntzBusinessId: null,
+    hvntzLocationId: null,
   };
   store.screens.push(screen);
   return screen;
@@ -76,6 +85,38 @@ function getScreenRevenue(store, screenId) {
   };
 }
 
+// Real, live cross-app validation against HVNTZ's own real location --
+// `hvntzLocationFetchFn` is the same injected-client pattern this
+// session uses everywhere else (`transferFn`, `voidFetchFn`,
+// `huntFetchFn`). The location's own `businessId` is read live from
+// HVNTZ, never taken as a caller-declared pair that could claim a
+// mismatched business/location.
+async function linkHvntzBusinessLocation(store, options = {}) {
+  const { screenId, hvntzLocationId, hvntzLocationFetchFn } = options;
+  const screen = getScreen(store, screenId);
+  if (!screen) throw new Error(`linkHvntzBusinessLocation: no screen with id ${screenId}`);
+  if (!hvntzLocationId) throw new Error('linkHvntzBusinessLocation requires a hvntzLocationId');
+  if (typeof hvntzLocationFetchFn !== 'function') {
+    throw new Error('linkHvntzBusinessLocation requires a hvntzLocationFetchFn(hvntzLocationId)');
+  }
+
+  const location = await hvntzLocationFetchFn(hvntzLocationId);
+  if (!location) throw new Error(`linkHvntzBusinessLocation: HVNTZ returned no location for id ${hvntzLocationId}`);
+
+  screen.hvntzLocationId = location.id;
+  screen.hvntzBusinessId = location.businessId;
+  return screen;
+}
+
+function unlinkHvntzBusinessLocation(store, options = {}) {
+  const { screenId } = options;
+  const screen = getScreen(store, screenId);
+  if (!screen) throw new Error(`unlinkHvntzBusinessLocation: no screen with id ${screenId}`);
+  screen.hvntzLocationId = null;
+  screen.hvntzBusinessId = null;
+  return screen;
+}
+
 module.exports = {
   SCREEN_STATUSES,
   registerScreen,
@@ -83,4 +124,6 @@ module.exports = {
   listActiveScreens,
   deactivateScreen,
   getScreenRevenue,
+  linkHvntzBusinessLocation,
+  unlinkHvntzBusinessLocation,
 };

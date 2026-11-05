@@ -34,6 +34,7 @@ const { createDreamsStore } = require('./lib/store');
 const { attachStore } = require('./lib/storeBackend');
 const {
   SCREEN_STATUSES, registerScreen, getScreen, listActiveScreens, deactivateScreen, getScreenRevenue,
+  linkHvntzBusinessLocation, unlinkHvntzBusinessLocation,
 } = require('./lib/screens');
 const { signUpAdvertiser, getAdvertiser } = require('./lib/advertisers');
 const {
@@ -62,6 +63,22 @@ app.use(traceMiddleware());
 app.use(express.static(path.join(__dirname, 'public')));
 const PORT = process.env.PORT || 8814;
 const V3_API_URL = process.env.V3_API_URL || 'http://localhost:8811';
+const HVNTZ_API_URL = process.env.HVNTZ_API_URL || 'http://localhost:8792';
+
+// Real, live cross-app lookup -- the real data-level half of the
+// cross-link this project's own README flagged as missing ("the two
+// systems are integrated at the revenue-share concept level... but
+// not at the data level yet"). Reads the real location straight from
+// HVNTZ; its own real `businessId` is what actually gets stored, not
+// a caller-declared pair.
+async function fetchHvntzLocation(hvntzLocationId) {
+  const res = await fetch(`${HVNTZ_API_URL}/api/location/${encodeURIComponent(hvntzLocationId)}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `fetchHvntzLocation failed (${res.status})`);
+  }
+  return res.json();
+}
 
 // V3 requires every mutating caller to be either a user session or a
 // known internal service. This app settles server-to-server, with no
@@ -305,6 +322,28 @@ app.post('/api/screens/:id/deactivate', requireScreenOwner(), async (req, res) =
 
 app.get('/api/screens/:id/revenue', (req, res) => {
   res.json(getScreenRevenue(store, Number(req.params.id)));
+});
+
+// Real cross-link to an actual HVNTZ business location -- closes
+// this project's own flagged "integrated at the revenue-share concept
+// level... but not at the data level yet" gap. `requireScreenOwner()`
+// because this is the screen's own metadata, same guard as deactivate.
+app.post('/api/screens/:id/link-hvntz-location', requireScreenOwner(), async (req, res) => {
+  try {
+    res.json(await linkHvntzBusinessLocation(store, {
+      ...req.body, screenId: Number(req.params.id), hvntzLocationFetchFn: fetchHvntzLocation,
+    }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/screens/:id/unlink-hvntz-location', requireScreenOwner(), (req, res) => {
+  try {
+    res.json(unlinkHvntzBusinessLocation(store, { screenId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 app.post('/api/advertisers', requireActor('advertiserId'), (req, res) => {

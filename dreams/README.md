@@ -294,11 +294,52 @@ not text, and the balance card's first draft stringified that node
 - No real image/video creative hosting — `creativeUrl` is a real,
   honestly-nullable, caller-supplied field, same class of gap as Vault
   Studios' own `streamUrl`.
-- No cross-link between a DREAMS screen and a real HVNTZ business
-  location — the two systems are integrated at the revenue-share
-  concept level (per the source docs) but not at the data level yet.
 - No VDP district or other UI surface for DREAMS yet.
 - Smart Benches, Smart Tables, Smart Mirrors, Viral Pack, and every
   other real physical-format extension named in
   `HVNTZ_COMPLETE_REVENUE_STACK.md` — real, later work, explicitly
   out of scope for this first, core phase.
+
+## Real DREAMS screen ↔ HVNTZ business location cross-link (5 Nov 2026)
+
+Closes this project's own flagged gap: "the two systems are integrated
+at the revenue-share concept level (per the source docs) but not at
+the data level yet." A screen now carries real, optional
+`hvntzBusinessId`/`hvntzLocationId` fields — `null` until linked,
+same "optional, not forced on every screen" posture as VOID DROP's own
+`hasDreamsScreen` cross-link.
+
+`linkHvntzBusinessLocation(store, { screenId, hvntzLocationId,
+hvntzLocationFetchFn })` (new, `lib/screens.js`) reads the real
+location straight from HVNTZ (`GET /api/location/:id`, injected as
+`hvntzLocationFetchFn`, the same cross-app pattern this ecosystem uses
+everywhere) and stores its own real `businessId` — never a
+caller-declared pair that could claim a mismatched business/location.
+`unlinkHvntzBusinessLocation` clears both fields. `POST
+/api/screens/:id/link-hvntz-location` and `POST
+/api/screens/:id/unlink-hvntz-location` (new), both
+`requireScreenOwner()`-gated — this is the screen's own metadata, same
+guard as deactivation.
+
+### Verification
+
+`test/hvntzLink.test.js` (new, 8 tests): no link by default, the
+`hvntzLocationFetchFn` requirement, refusal for an unknown screen,
+refusal when HVNTZ returns no location, the real businessId stored
+from a live fetch, a caller-declared `hvntzBusinessId` correctly
+ignored in favor of the real one (mutation-verified: making the code
+prefer a caller-supplied value over the live HVNTZ answer turned
+exactly that test red; restored and reconfirmed green), unlink
+clearing both fields, and unlink's own unknown-screen refusal. Full
+suite: 67/68 (one pre-existing, unrelated failure in
+`test/server.test.js` — a Shield-unreachable 502-vs-401 case,
+confirmed via `git stash` to fail identically with this change
+removed).
+
+Live-verified against real spawned Shield + HVNTZ + DREAMS servers: a
+real screen registered with both fields `null`; a link attempt
+against a nonexistent HVNTZ location id was correctly refused with
+HVNTZ's own exact "no location with id" error; linking the real seeded
+HVNTZ location (id 1) populated the screen's own live record with the
+real `businessId` (1) read from HVNTZ, not supplied by the caller; and
+unlinking cleared both fields back to `null`.
