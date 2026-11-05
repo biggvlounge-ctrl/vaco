@@ -455,9 +455,9 @@ integrations, actual AI agents) or blocked on a system that doesn't
 exist elsewhere in this session yet (`venvs`'s CHOPZ Digital Twin
 system).
 
-**Connected Network Layer — Phases 1-3, Phase 4's core revenue engine,
-six of §18's thirteen analytics metrics, and a §3/§39 screen-session
-link, see `lib/networkConnections.js`, `lib/hunts.js`,
+**Connected Network Layer — Phases 1-4, six of §18's thirteen
+analytics metrics, and a §3/§39 screen-session link, see
+`lib/networkConnections.js`, `lib/hunts.js`,
 `lib/revenueShareAgreements.js` and `lib/networkAnalytics.js`.** A
 Node's own accept/decline, its one-person-one-Channel Vault Studios
 stream reference, a checkpoint's connection to its own business's
@@ -465,24 +465,112 @@ Network, a configurable percentage/fixed-amount revenue-sharing
 Agreement — including §17's own "time-limited agreements" shape
 (`expiresAt`, computed-live `isAgreementExpired`) — a real
 growth-analytics rollup (network size, active nodes/creators/streams,
-Hunt participation, revenue distributed and attributed per payee), and
-a Network's own link to a real Vault Studios `'viewer'` screen session
-(up to 8 channels from its Nodes' unrelated owners) are all real. Not
-yet built, per its own §40 audit finding no substrate for any of it
-anywhere in the repo: HVNTZ *creating or actively composing* that
-screen session on a business's behalf (Vault Studios' own
-`POST /api/screen-sessions` requires the real owner's own session, no
-service-credential path — a business creates it directly in Vault
-Studios today; only linking an existing one is built here); six of
-§17's remaining named split shapes (tiered
-percentages, performance bonuses, event/Hunt/creator-specific split
-overrides, sponsor-funded rewards — `percentage`, `fixed-amount` and
-time-limited are built); §18's other seven named metrics (viewers,
+Hunt participation, revenue distributed and attributed per payee), a
+Network's own link to a real Vault Studios `'viewer'` screen session
+(up to 8 channels from its Nodes' unrelated owners), ~~any role beyond
+hub-owner vs. invited member~~, ~~recurring per-person schedules~~ and
+~~temporary/archivable multi-business event networks~~ are all real —
+see "Phase 4: roles, schedules, temporary/multi-business networks"
+below for the last three, closed 5 Nov 2026. Not yet built, per its
+own §40 audit finding no substrate for any of it anywhere in the repo:
+HVNTZ *creating or actively composing* that screen session on a
+business's behalf (Vault Studios' own `POST /api/screen-sessions`
+requires the real owner's own session, no service-credential path — a
+business creates it directly in Vault Studios today; only linking an
+existing one is built here); six of §17's remaining named split shapes
+(tiered percentages, performance bonuses, event/Hunt/creator-specific
+split overrides, sponsor-funded rewards — `percentage`, `fixed-amount`
+and time-limited are built); §18's other seven named metrics (viewers,
 watch time, conversions, subscriptions, advertising, sponsorship —
 none tracked anywhere in this ecosystem, so honestly absent rather
-than approximated); any role
-beyond hub-owner vs. invited member; recurring per-person schedules;
-and temporary/archivable multi-business event networks.
+than approximated).
+
+## Phase 4: roles, schedules, temporary/multi-business networks (5 Nov 2026)
+
+Closes the three gaps this file's own "Connected Network Layer"
+paragraph used to name as unbuilt, each scoped directly to what the
+freeze doc (`dev-docs/on-deck/HVNTZ_CONNECTED_NETWORK_FREEZE.md`)
+actually describes, not invented — see `lib/networkConnections.js`'s
+own header for the full reasoning behind each scope line.
+
+- **§7's role permissions, deliberately bounded to two.** §7 names far
+  more roles/permissions than this app enforces anywhere (streaming,
+  Hunt management, monetization, camera access — none gate on a Node's
+  identity yet). `NODE_ROLES = ['member', 'moderator']` gates exactly
+  the two real permissions this module already has: who can invite a
+  node, and who can disconnect one. A moderator is a real, active node
+  the Hub owner has specifically promoted (`setNodeRole`, owner-only);
+  `isNetworkModerator` is checked live against the exact network every
+  time, never cached, and never carries over to a different network
+  the same person also belongs to.
+- **§7's recurring per-person schedule.** `NodeSchedule` is a real
+  weekly window — `dayOfWeek` (0-6, UTC) plus `startMinute`/
+  `endMinute` within that day — set by the node's own identity, the
+  same "the invited person decides for themselves" posture
+  `respondToInvitation`/`linkVavltChannel` already hold.
+  `isNodeScheduledNow` evaluates live against real UTC day/minute,
+  never a cached flag. A same-day window only, flagged directly: no
+  invented overnight-spanning wraparound.
+- **§21 Temporary Event Networks.** `createNetwork` takes an optional,
+  caller-supplied `expiresAt` (never an invented global constant, same
+  discipline `vulture-studios`' own `fundingDeadlineAt` holds) and a
+  real `isTemporary` flag. `archiveNetwork`/`sweepExpiredNetworks`
+  mirror `vulture-studios/lib/projects.js`'s own
+  `expireProjectFunding`/`sweepExpiredFunding` shape exactly — the
+  sweep is a real, deterministic internal-scheduler route
+  (`requireCallingService()`), never an operator judgment. Archiving a
+  network leaves its real Nodes and their Hub business untouched, per
+  §21's own words.
+- **§22 Multi-Business Networks, read literally.** "A Network does not
+  have to belong to one business... Each participating business
+  remains independently identifiable" is NOT shared ownership of the
+  Hub — the Hub stays one real business, untouched. `NetworkBusinessMembership`
+  is a second business *joining* a Network, the exact same invite →
+  accept/decline/remove state machine this file already proved out for
+  people (`inviteNode`/`respondToInvitation`/`removeNode`), here for
+  businesses: the Hub owner (or a moderator) invites, the invited
+  business's own owner answers for themselves.
+
+**Routes, all guarded and verified against a real spawned Shield +
+VACA + HVNTZ stack** (`node scripts/audit-route-guards.mjs --app
+hvntz`: 47 guarded, 0 unguarded): `POST /api/network-nodes/:nodeId/role`
+(owner-only — a moderator cannot promote anyone, including themselves);
+`POST`/`GET /api/network-nodes/:nodeId/schedules` and
+`POST /api/node-schedules/:scheduleId/remove` (the node's own
+identity); `POST /api/networks/:id/archive` (owner-only);
+`POST /api/networks/expire-sweep` (service-credential only); and
+`POST /api/networks/:id/business-memberships`,
+`POST /api/network-business-memberships/:membershipId/respond`,
+`POST /api/network-business-memberships/:membershipId/remove`. The
+existing `POST /api/networks/:id/nodes` and
+`POST /api/network-nodes/:nodeId/remove` routes are now
+owner-**or**-moderator, delegating exactly the two permissions a
+moderator holds.
+
+**A genuine pre-existing bug found and fixed along the way, live-
+verifying the above.** `POST /api/networks`'s own guard checked
+`req.body.businessId`, but `createNetwork` only ever reads
+`hubBusinessId` — the one field this route's real body actually
+carries was never the field the guard checked. No existing coverage
+could have caught it: every test of this module before Phase 4 called
+`lib/networkConnections.js` directly, never issued a real HTTP request
+against this route (confirmed directly — `grep` for `'/api/networks'`
+across `test/*.js` turned up nothing before this phase). Fixed to key
+on the real field.
+
+`test/networkRolesSchedulesMultiBusiness.test.js` (new, 28 tests; full
+suite 142 → 170, all passing). Mutation-verified: hardcoding
+`isNetworkModerator` to always return `true` turned exactly the three
+tests built to catch a moderator-permission bypass red; restored and
+reconfirmed green. Live-verified end-to-end against a real spawned
+Shield + VACA + HVNTZ stack: a real VACA-verified identity promoted to
+moderator successfully invited and removed another node, an unrelated
+session was refused with a real 403, a node's own schedule was added/
+listed/removed (and an owner trying to set it for them was refused), a
+temporary network was archived both explicitly and via the real
+service-credential sweep route, and a second business's owner accepted
+a real membership invitation that a different account could not accept
+on their behalf.
 
 
 ## VENVS storefront tie-in (31 Oct 2026)

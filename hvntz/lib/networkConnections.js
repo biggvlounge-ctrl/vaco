@@ -4,10 +4,52 @@
 // Connected Network §40 audit"). Phase 1 (§47) is a Network Hub (a real
 // HVNTZ business, never a second business model — §41's own
 // instruction), Network Nodes (people that business invites), and a
-// real invite -> accept/decline state machine. No revenue-sharing
-// engine, and no role system beyond hub-owner vs. invited member — the
-// audit found no substrate for either anywhere in the repo, and each
-// is its own undertaking, not this module's job.
+// real invite -> accept/decline state machine.
+//
+// **Phase 3 (5 Nov 2026) — roles, schedules, temporary/multi-business
+// networks, closing three gaps this file's own header used to name as
+// unbuilt.** Each is scoped directly to what the freeze doc's own §7,
+// §21 and §22 actually describe, not invented:
+//
+// - **§7's named role permissions.** §7 lists far more roles/
+//   permissions than this app has any real enforcement point for
+//   today (streaming, Hunt management, monetization, camera access —
+//   none of those gate on a Node's identity anywhere in this
+//   ecosystem yet). Building a role for permissions nothing checks
+//   would be a label, not a role. The two permissions §7 names that
+//   THIS module already enforces for real are "who can invite
+//   additional nodes" and "who can disconnect a node" — both
+//   currently hub-owner-only. `NODE_ROLES` is deliberately just
+//   `['member', 'moderator']`: a moderator is a real, active node the
+//   Hub owner has specifically promoted, who can now also invite and
+//   remove nodes — the Hub owner delegating exactly the two real
+//   permissions that exist, nothing more.
+// - **§7's "schedule" field, read against per-person availability.**
+//   `hunts.js`'s own `startsAt`/`timeLimitMinutes` is a one-off
+//   absolute window, not recurring — no existing shape to reuse.
+//   `NodeSchedule` is a real, minimal recurring weekly window
+//   (`dayOfWeek` 0-6 UTC, `startMinute`/`endMinute` within that day),
+//   set by the Node's own identity (their own expected availability
+//   to be live, the same "the invited person, not the business"
+//   posture `respondToInvitation`/`linkVavltChannel` already hold).
+// - **§21 Temporary Event Networks** — real, bounded: an optional
+//   caller-supplied `expiresAt` (never an invented global constant,
+//   same discipline `vulture-studios`' `fundingDeadlineAt` holds) and
+//   a real `archiveNetwork`/`sweepExpiredNetworks` pair, mirroring
+//   `vulture-studios/lib/projects.js`'s own `expireProjectFunding`/
+//   `sweepExpiredFunding` shape.
+// - **§22 Multi-Business Networks** — read literally: "A Network does
+//   not have to belong to one business... Each participating business
+//   remains independently identifiable." That is NOT shared ownership
+//   of the Hub (the Hub stays one real business, untouched) — it is
+//   additional businesses *joining* a Network as members, each kept
+//   as its own separate, identifiable business record. Built as
+//   `NetworkBusinessMembership`, the exact same invite -> accept/
+//   decline/remove state machine this file already proved out for
+//   people, just for businesses: the Hub owner invites, the invited
+//   business's own owner accepts or declines for themselves (same
+//   "the invited party answers for themselves" posture as
+//   `respondToInvitation`).
 //
 // **Not a second identity system.** §19's own rule: "Do not create
 // duplicate accounts if the person already exists in VACA." Inviting a
@@ -55,6 +97,9 @@
 const { getBusiness } = require('./revenueStack');
 
 const NETWORK_NODE_STATUSES = ['invited', 'active', 'declined', 'removed'];
+const NETWORK_STATUSES = ['active', 'archived'];
+const NODE_ROLES = ['member', 'moderator'];
+const NETWORK_BUSINESS_STATUSES = ['invited', 'active', 'declined', 'removed'];
 
 function findNetwork(store, networkId) {
   return store.networks.find((n) => n.id === networkId) || null;
@@ -68,10 +113,18 @@ function findNode(store, nodeId) {
 // same store `registerBusiness` already writes to, not assumed from an
 // id. §41's own instruction: "First inspect the current... database
 // architecture. Reuse existing... Business... where applicable."
+//
+// §21's Temporary Event Networks: `expiresAt` is optional and
+// caller-supplied, never an invented global constant — a network with
+// no `expiresAt` behaves exactly as before (permanent until explicitly
+// archived).
 function createNetwork(store, options = {}) {
-  const { hubBusinessId, name, now = Date.now() } = options;
+  const { hubBusinessId, name, isTemporary = false, expiresAt = null, now = Date.now() } = options;
   if (!hubBusinessId) throw new Error('createNetwork requires a hubBusinessId');
   if (!name) throw new Error('createNetwork requires a name');
+  if (expiresAt !== null && !Number.isFinite(expiresAt)) {
+    throw new Error('createNetwork: expiresAt must be a numeric timestamp when provided');
+  }
   const business = getBusiness(store, Number(hubBusinessId));
   if (!business) throw new Error(`createNetwork: no business with id ${hubBusinessId}`);
 
@@ -80,11 +133,40 @@ function createNetwork(store, options = {}) {
     hubBusinessId: business.id,
     name,
     status: 'active',
+    isTemporary: Boolean(isTemporary),
+    expiresAt,
+    archivedAt: null,
     screenSessionId: null,
     createdAt: now,
   };
   store.networks.push(network);
   return network;
+}
+
+// §21: archives a network explicitly. The underlying Hub business and
+// its Nodes are untouched — "archived while the underlying businesses
+// and creators remain active," per the doc's own words.
+function archiveNetwork(store, options = {}) {
+  const { networkId, now = Date.now() } = options;
+  const network = findNetwork(store, networkId);
+  if (!network) throw new Error(`archiveNetwork: no network ${networkId}`);
+  if (network.status === 'archived') throw new Error(`archiveNetwork: network ${networkId} is already archived`);
+  network.status = 'archived';
+  network.archivedAt = now;
+  return network;
+}
+
+// Real, deterministic sweep — the same shape as
+// `vulture-studios/lib/projects.js`'s `sweepExpiredFunding`: finds
+// every real network past its own real `expiresAt` and archives it,
+// never a fabricated "time's up" judgment.
+function sweepExpiredNetworks(store, options = {}) {
+  const { now = Date.now() } = options;
+  const expired = store.networks.filter((n) => n.status === 'active' && n.expiresAt !== null && n.expiresAt <= now);
+  for (const network of expired) {
+    archiveNetwork(store, { networkId: network.id, now });
+  }
+  return expired.map((n) => n.id);
 }
 
 // §19's node invitation, VACA-deduped. Refuses a second live
@@ -117,6 +199,7 @@ async function inviteNode(store, options = {}) {
     networkId,
     identityId: invitedIdentityId,
     status: 'invited',
+    role: 'member',
     invitedBy,
     invitedAt: now,
     respondedAt: null,
@@ -153,6 +236,32 @@ function removeNode(store, options = {}) {
   node.status = 'removed';
   node.respondedAt = node.respondedAt ?? now;
   return node;
+}
+
+// §7's role delegation — the Hub owner only (never a moderator
+// promoting another node, or themselves), same as this file's header
+// says: a moderator gets the two real invite/remove permissions
+// delegated to them, not the power to delegate further.
+function setNodeRole(store, options = {}) {
+  const { nodeId, role, now = Date.now() } = options;
+  const node = findNode(store, nodeId);
+  if (!node) throw new Error(`setNodeRole: no node ${nodeId}`);
+  if (!NODE_ROLES.includes(role)) {
+    throw new Error(`setNodeRole: role must be one of ${NODE_ROLES.join(', ')}`);
+  }
+  if (node.status !== 'active') {
+    throw new Error(`setNodeRole: node ${nodeId} must be active to hold a role (status=${node.status})`);
+  }
+  node.role = role;
+  node.roleSetAt = now;
+  return node;
+}
+
+// Checked live against this exact network every time — never assumed
+// from a moderator role held on a different network.
+function isNetworkModerator(store, networkId, identityId) {
+  return store.networkNodes.some((n) => n.networkId === networkId
+    && n.status === 'active' && n.role === 'moderator' && String(n.identityId) === String(identityId));
 }
 
 // §4/§8's person-based streaming: a Node's stream is a reference to
@@ -248,6 +357,8 @@ function networkView(store, networkId) {
     nodes,
     activeNodeCount: nodes.filter((n) => n.status === 'active').length,
     invitedNodeCount: nodes.filter((n) => n.status === 'invited').length,
+    moderatorNodeCount: nodes.filter((n) => n.status === 'active' && n.role === 'moderator').length,
+    businesses: businessesForNetwork(store, networkId),
   };
 }
 
@@ -255,14 +366,165 @@ function networksForBusiness(store, hubBusinessId) {
   return store.networks.filter((n) => n.hubBusinessId === hubBusinessId);
 }
 
+// -- NodeSchedule: real, recurring weekly availability --------------------
+//
+// Minutes-since-midnight UTC, not a wall-clock string or a timezone --
+// a real, simple, bounded choice, flagged directly rather than quietly
+// assumed: this does not account for the Node's own local timezone,
+// the same scope line `vdp`'s own tick-based scheduling holds
+// elsewhere in this ecosystem. A same-day window only (no
+// overnight-spanning window) — a Node wanting an overnight slot adds
+// two entries (e.g. 22:00-23:59 and 00:00-02:00) rather than this
+// module inventing a wraparound case nothing asked for.
+const MINUTES_PER_DAY = 24 * 60;
+
+function findNodeSchedule(store, scheduleId) {
+  return store.nodeSchedules.find((s) => s.id === scheduleId) || null;
+}
+
+function addNodeSchedule(store, options = {}) {
+  const { nodeId, dayOfWeek, startMinute, endMinute, now = Date.now() } = options;
+  const node = findNode(store, nodeId);
+  if (!node) throw new Error(`addNodeSchedule: no node ${nodeId}`);
+  if (node.status !== 'active') {
+    throw new Error(`addNodeSchedule: node ${nodeId} must be active to hold a schedule (status=${node.status})`);
+  }
+  if (!Number.isInteger(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) {
+    throw new Error('addNodeSchedule: dayOfWeek must be an integer 0-6 (Sunday-Saturday, UTC)');
+  }
+  if (!Number.isInteger(startMinute) || startMinute < 0 || startMinute >= MINUTES_PER_DAY) {
+    throw new Error(`addNodeSchedule: startMinute must be an integer 0-${MINUTES_PER_DAY - 1}`);
+  }
+  if (!Number.isInteger(endMinute) || endMinute <= startMinute || endMinute > MINUTES_PER_DAY) {
+    throw new Error(`addNodeSchedule: endMinute must be an integer greater than startMinute and at most ${MINUTES_PER_DAY}`);
+  }
+
+  const schedule = {
+    id: store.nextNodeScheduleId++, nodeId, dayOfWeek, startMinute, endMinute, createdAt: now,
+  };
+  store.nodeSchedules.push(schedule);
+  return schedule;
+}
+
+function removeNodeSchedule(store, options = {}) {
+  const { scheduleId } = options;
+  const schedule = findNodeSchedule(store, scheduleId);
+  if (!schedule) throw new Error(`removeNodeSchedule: no schedule ${scheduleId}`);
+  store.nodeSchedules = store.nodeSchedules.filter((s) => s.id !== scheduleId);
+  return { removed: true, scheduleId };
+}
+
+function schedulesForNode(store, nodeId) {
+  return store.nodeSchedules.filter((s) => s.nodeId === nodeId);
+}
+
+// Real, live-evaluated "is this person expected to be on right now,"
+// never a cached flag that could drift from the real schedule entries.
+function isNodeScheduledNow(store, nodeId, now = Date.now()) {
+  const d = new Date(now);
+  const dayOfWeek = d.getUTCDay();
+  const minuteOfDay = d.getUTCHours() * 60 + d.getUTCMinutes();
+  return schedulesForNode(store, nodeId).some(
+    (s) => s.dayOfWeek === dayOfWeek && minuteOfDay >= s.startMinute && minuteOfDay < s.endMinute,
+  );
+}
+
+// -- NetworkBusinessMembership: §22 Multi-Business Networks ---------------
+//
+// A second business *joining* an existing Network, never a second Hub
+// and never shared ownership of the first — see this file's header.
+// Same invite -> accept/decline/remove shape `inviteNode`/
+// `respondToInvitation`/`removeNode` already proved out for people,
+// here for businesses: the Hub owner invites, the invited business's
+// own owner accepts or declines for themselves.
+function findNetworkBusinessMembership(store, membershipId) {
+  return store.networkBusinessMemberships.find((m) => m.id === membershipId) || null;
+}
+
+function inviteBusinessToNetwork(store, options = {}) {
+  const { networkId, businessId, invitedBy = null, now = Date.now() } = options;
+  const network = findNetwork(store, networkId);
+  if (!network) throw new Error(`inviteBusinessToNetwork: no network ${networkId}`);
+  if (!businessId) throw new Error('inviteBusinessToNetwork requires a businessId');
+  const business = getBusiness(store, Number(businessId));
+  if (!business) throw new Error(`inviteBusinessToNetwork: no business with id ${businessId}`);
+  if (business.id === network.hubBusinessId) {
+    throw new Error(`inviteBusinessToNetwork: business ${businessId} is this network's own Hub, not a member to invite`);
+  }
+
+  const alreadyLive = store.networkBusinessMemberships.some((m) => m.networkId === networkId
+    && m.businessId === business.id && m.status !== 'declined' && m.status !== 'removed');
+  if (alreadyLive) {
+    throw new Error(`inviteBusinessToNetwork: business ${businessId} already has a live membership on network ${networkId}`);
+  }
+
+  const membership = {
+    id: store.nextNetworkBusinessMembershipId++,
+    networkId,
+    businessId: business.id,
+    status: 'invited',
+    invitedBy,
+    invitedAt: now,
+    respondedAt: null,
+  };
+  store.networkBusinessMemberships.push(membership);
+  return membership;
+}
+
+// The invited business's own owner answers for their own business —
+// same "the invited party, not the Hub, decides" posture as
+// `respondToInvitation`.
+function respondToBusinessInvitation(store, options = {}) {
+  const { membershipId, response, now = Date.now() } = options;
+  const membership = findNetworkBusinessMembership(store, membershipId);
+  if (!membership) throw new Error(`respondToBusinessInvitation: no membership ${membershipId}`);
+  if (membership.status !== 'invited') {
+    throw new Error(`respondToBusinessInvitation: membership ${membershipId} is not awaiting a response (status=${membership.status})`);
+  }
+  if (response !== 'accepted' && response !== 'declined') {
+    throw new Error('respondToBusinessInvitation: response must be "accepted" or "declined"');
+  }
+  membership.status = response === 'accepted' ? 'active' : 'declined';
+  membership.respondedAt = now;
+  return membership;
+}
+
+// The Hub owner's own call, any point in a membership's life — same
+// shape as `removeNode`.
+function removeBusinessFromNetwork(store, options = {}) {
+  const { membershipId, now = Date.now() } = options;
+  const membership = findNetworkBusinessMembership(store, membershipId);
+  if (!membership) throw new Error(`removeBusinessFromNetwork: no membership ${membershipId}`);
+  if (membership.status === 'removed') {
+    throw new Error(`removeBusinessFromNetwork: membership ${membershipId} is already removed`);
+  }
+  membership.status = 'removed';
+  membership.respondedAt = membership.respondedAt ?? now;
+  return membership;
+}
+
+// Each participating business "remains independently identifiable,"
+// per §22's own words — a real, flat list of this network's own member
+// businesses, never merged into the Hub's own record.
+function businessesForNetwork(store, networkId) {
+  return store.networkBusinessMemberships.filter((m) => m.networkId === networkId);
+}
+
 module.exports = {
   NETWORK_NODE_STATUSES,
+  NETWORK_STATUSES,
+  NODE_ROLES,
+  NETWORK_BUSINESS_STATUSES,
   findNetwork,
   findNode,
   createNetwork,
+  archiveNetwork,
+  sweepExpiredNetworks,
   inviteNode,
   respondToInvitation,
   removeNode,
+  setNodeRole,
+  isNetworkModerator,
   linkVavltChannel,
   unlinkVavltChannel,
   linkNetworkScreenSession,
@@ -271,4 +533,14 @@ module.exports = {
   nodesForIdentity,
   networkView,
   networksForBusiness,
+  findNodeSchedule,
+  addNodeSchedule,
+  removeNodeSchedule,
+  schedulesForNode,
+  isNodeScheduledNow,
+  findNetworkBusinessMembership,
+  inviteBusinessToNetwork,
+  respondToBusinessInvitation,
+  removeBusinessFromNetwork,
+  businessesForNetwork,
 };

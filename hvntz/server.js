@@ -53,10 +53,13 @@ const {
   listCourses, getCourse, enrollBusiness, completeCourse, getBusinessProgress, getRecommendedCourses,
 } = require('./lib/training');
 const {
-  NETWORK_NODE_STATUSES, findNetwork, findNode, createNetwork, inviteNode,
-  respondToInvitation, removeNode, linkVavltChannel, unlinkVavltChannel,
+  NETWORK_NODE_STATUSES, NODE_ROLES, findNetwork, findNode, createNetwork, archiveNetwork, sweepExpiredNetworks,
+  inviteNode, respondToInvitation, removeNode, setNodeRole, isNetworkModerator,
+  linkVavltChannel, unlinkVavltChannel,
   linkNetworkScreenSession, unlinkNetworkScreenSession,
   nodesForIdentity, networkView, networksForBusiness,
+  addNodeSchedule, removeNodeSchedule, schedulesForNode, findNodeSchedule,
+  findNetworkBusinessMembership, inviteBusinessToNetwork, respondToBusinessInvitation, removeBusinessFromNetwork,
 } = require('./lib/networkConnections');
 const {
   SPLIT_TYPES, AGREEMENT_STATUSES, findRevenueShareAgreement, createRevenueShareAgreement,
@@ -402,6 +405,90 @@ const requireNodeIdentity = () => (req, res, next) => {
     if (!node) return res.status(404).json({ error: `no network node ${req.params.nodeId}` });
     if (String(node.identityId) !== String(req.sessionUserId)) {
       return res.status(403).json({ error: 'only the invited person may respond to their own invitation' });
+    }
+    return next();
+  });
+};
+
+// §7's two real, delegated permissions (invite additional nodes,
+// disconnect a node) — the Hub owner, OR a real, active node this Hub
+// has specifically promoted to moderator. See
+// `lib/networkConnections.js`'s own header for why those two and not
+// the rest of §7's named list.
+const requireNetworkBusinessOwnerOrModerator = () => (req, res, next) => {
+  const session = requireSession();
+  return session(req, res, () => {
+    const network = findNetwork(store, Number(req.params.id));
+    if (!network) return res.status(404).json({ error: `no network with id ${req.params.id}` });
+    const ownerId = businessOwnerOf(store, network.hubBusinessId);
+    if (ownerId === req.sessionUserId || isNetworkModerator(store, network.id, req.sessionUserId)) {
+      return next();
+    }
+    return res.status(403).json({ error: "only this network's hub owner or a moderator node may act on it" });
+  });
+};
+// Same composition, one hop through the node to its network — for
+// routes named by `:nodeId` rather than `:id`.
+const requireNodeNetworkBusinessOwnerOrModerator = () => (req, res, next) => {
+  const session = requireSession();
+  return session(req, res, () => {
+    const node = findNode(store, Number(req.params.nodeId));
+    if (!node) return res.status(404).json({ error: `no network node ${req.params.nodeId}` });
+    const network = findNetwork(store, node.networkId);
+    if (!network) return res.status(404).json({ error: `no network with id ${node.networkId}` });
+    const ownerId = businessOwnerOf(store, network.hubBusinessId);
+    if (ownerId === req.sessionUserId || isNetworkModerator(store, network.id, req.sessionUserId)) {
+      return next();
+    }
+    return res.status(403).json({ error: "only this network's hub owner or a moderator node may act on it" });
+  });
+};
+
+// A schedule belongs to a node; only that same real person may add or
+// remove their own availability — same posture as `requireNodeIdentity`.
+const requireScheduleNodeIdentity = () => (req, res, next) => {
+  const session = requireSession();
+  return session(req, res, () => {
+    const schedule = findNodeSchedule(store, Number(req.params.scheduleId));
+    if (!schedule) return res.status(404).json({ error: `no node schedule ${req.params.scheduleId}` });
+    const node = findNode(store, schedule.nodeId);
+    if (!node) return res.status(404).json({ error: `no network node ${schedule.nodeId}` });
+    if (String(node.identityId) !== String(req.sessionUserId)) {
+      return res.status(403).json({ error: 'only this node\'s own identity may manage its own schedule' });
+    }
+    return next();
+  });
+};
+
+// §22: the INVITED BUSINESS's own owner answers for their own
+// business — same "the invited party decides for themselves" posture
+// as `requireNodeIdentity`, at the business level instead of the
+// person level.
+const requireInvitedBusinessOwner = () => (req, res, next) => {
+  const session = requireSession();
+  return session(req, res, () => {
+    const membership = findNetworkBusinessMembership(store, Number(req.params.membershipId));
+    if (!membership) return res.status(404).json({ error: `no network business membership ${req.params.membershipId}` });
+    const ownerId = businessOwnerOf(store, membership.businessId);
+    if (ownerId !== req.sessionUserId) {
+      return res.status(403).json({ error: 'only the invited business\'s own owner may answer this invitation' });
+    }
+    return next();
+  });
+};
+// §22: removing a member business is the Hub owner's own call, same
+// shape as `requireNodeNetworkBusinessOwner` one hop through the
+// membership to its network.
+const requireMembershipNetworkBusinessOwner = () => (req, res, next) => {
+  const session = requireSession();
+  return session(req, res, () => {
+    const membership = findNetworkBusinessMembership(store, Number(req.params.membershipId));
+    if (!membership) return res.status(404).json({ error: `no network business membership ${req.params.membershipId}` });
+    const network = findNetwork(store, membership.networkId);
+    if (!network) return res.status(404).json({ error: `no network with id ${membership.networkId}` });
+    const ownerId = businessOwnerOf(store, network.hubBusinessId);
+    if (ownerId !== req.sessionUserId) {
+      return res.status(403).json({ error: "only this network's own hub owner may remove a member business" });
     }
     return next();
   });
@@ -985,7 +1072,13 @@ app.get('/api/training/recommended/:businessId', requireParamBusinessOwner('busi
 // real, VACA-verified identity that business has invited and who has
 // (or has not yet) accepted for themselves.
 
-app.post('/api/networks', requireBodyBusinessOwner(), (req, res) => {
+// A genuine pre-existing bug, found live-verifying the routes below:
+// this guard checked `req.body.businessId`, but `createNetwork` only
+// ever reads `hubBusinessId` -- so the one real field this route's own
+// body actually carries was never the one the guard was checking, and
+// no existing test (lib-level only, never over real HTTP) could have
+// caught it. `requireBusinessOwner` directly, keyed on the real field.
+app.post('/api/networks', requireBusinessOwner((req) => (req.body || {}).hubBusinessId, 'business'), (req, res) => {
   try {
     res.status(201).json(createNetwork(store, req.body || {}));
   } catch (err) {
@@ -1003,7 +1096,7 @@ app.get('/api/business/:businessId/networks', (req, res) => {
   res.json({ networks: networksForBusiness(store, Number(req.params.businessId)) });
 });
 
-app.post('/api/networks/:id/nodes', requireNetworkBusinessOwner(), async (req, res) => {
+app.post('/api/networks/:id/nodes', requireNetworkBusinessOwnerOrModerator(), async (req, res) => {
   const { invitedIdentityId } = req.body || {};
   if (!invitedIdentityId) {
     return res.status(400).json({ error: 'this route requires an invitedIdentityId' });
@@ -1033,9 +1126,94 @@ app.post('/api/network-nodes/:nodeId/respond', requireNodeIdentity(), (req, res)
   }
 });
 
-app.post('/api/network-nodes/:nodeId/remove', requireNodeNetworkBusinessOwner(), (req, res) => {
+app.post('/api/network-nodes/:nodeId/remove', requireNodeNetworkBusinessOwnerOrModerator(), (req, res) => {
   try {
     res.json(removeNode(store, { nodeId: Number(req.params.nodeId) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// §7's role delegation itself stays the Hub owner's own call, never a
+// moderator's -- see `setNodeRole`'s own comment.
+app.post('/api/network-nodes/:nodeId/role', requireNodeNetworkBusinessOwner(), (req, res) => {
+  try {
+    res.json(setNodeRole(store, { nodeId: Number(req.params.nodeId), role: (req.body || {}).role }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// §7's real, recurring per-person availability -- the node's own
+// identity sets their own schedule, same posture as `respond`.
+app.post('/api/network-nodes/:nodeId/schedules', requireNodeIdentity(), (req, res) => {
+  try {
+    const { dayOfWeek, startMinute, endMinute } = req.body || {};
+    res.status(201).json(addNodeSchedule(store, { nodeId: Number(req.params.nodeId), dayOfWeek, startMinute, endMinute }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/network-nodes/:nodeId/schedules', (req, res) => {
+  res.json({ schedules: schedulesForNode(store, Number(req.params.nodeId)) });
+});
+
+app.post('/api/node-schedules/:scheduleId/remove', requireScheduleNodeIdentity(), (req, res) => {
+  try {
+    res.json(removeNodeSchedule(store, { scheduleId: Number(req.params.scheduleId) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// §21 Temporary Event Networks -- an explicit archive, the Hub owner's
+// own call, any point in the network's life.
+app.post('/api/networks/:id/archive', requireNetworkBusinessOwner(), (req, res) => {
+  try {
+    res.json(archiveNetwork(store, { networkId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// The real, deterministic sweep -- an internal scheduler's own call,
+// never an operator judgment, same posture as
+// `vulture-studios`'s own `expire-funding-sweep`.
+app.post('/api/networks/expire-sweep', requireCallingService(), (req, res) => {
+  res.json({ archivedNetworkIds: sweepExpiredNetworks(store) });
+});
+
+// §22 Multi-Business Networks -- a second business joining this
+// Network, never a second Hub. The Hub owner invites (or a moderator
+// node, the same delegated permission as inviting a person).
+app.post('/api/networks/:id/business-memberships', requireNetworkBusinessOwnerOrModerator(), (req, res) => {
+  try {
+    res.status(201).json(inviteBusinessToNetwork(store, {
+      networkId: Number(req.params.id),
+      businessId: (req.body || {}).businessId,
+      invitedBy: req.sessionUserId,
+    }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// The invited business's own owner answers for themselves -- see
+// `requireInvitedBusinessOwner`'s own comment.
+app.post('/api/network-business-memberships/:membershipId/respond', requireInvitedBusinessOwner(), (req, res) => {
+  try {
+    res.json(respondToBusinessInvitation(store, {
+      membershipId: Number(req.params.membershipId), response: (req.body || {}).response,
+    }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/network-business-memberships/:membershipId/remove', requireMembershipNetworkBusinessOwner(), (req, res) => {
+  try {
+    res.json(removeBusinessFromNetwork(store, { membershipId: Number(req.params.membershipId) }));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
