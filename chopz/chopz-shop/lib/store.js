@@ -11,6 +11,8 @@ function createChopzShopStore() {
     affiliateClicks: [],
     orders: [],
     nextOrderId: 1,
+    liveShoppingEvents: [],
+    nextLiveShoppingEventId: 1,
   };
 }
 

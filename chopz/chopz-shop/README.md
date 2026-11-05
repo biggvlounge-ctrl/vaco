@@ -138,14 +138,109 @@ Every real cart checkout pushes a real `checkout_revenue` metric to
 VACO Analytics (fail-soft — a real checkout is never held up if VACO
 Analytics is down). See `vaco-analytics/dev-docs/phase-5-live-metric-feeds/`.
 
+## Live Shopping Events (5 Nov 2026)
+
+Closes this file's own flagged gap: `CHOPZ_TIKTOK_COMPARABLES.md`
+names "live shopping" as a real, cited TikTok Shop engagement driver
+("10-15x more engagement than static posts; brands running weekly
+livestreams see 3-5x higher conversion"), and this README's own
+earlier "Implementation status" section had already done the real
+analysis — "Vavlt Stvdios has real live channels and CHOPZ SHOP has
+real products, so the pieces exist in separate apps; nothing connects
+them... that is the obvious next thing here." This is that connection.
+
+`lib/liveShoppingEvents.js` (new): `createLiveShoppingEvent` schedules
+a real event under a seller's own real Vavlt Stvdios channel —
+verified LIVE via a real cross-app call (`GET /api/channels/:id`),
+never trusted on the caller's claim, the same "never trust a bare
+claim" discipline `dreams/server.js`'s own `fetchHvntzLocation`
+already takes. Every featured product must be real and must actually
+belong to that same seller. `goLiveShoppingEvent`/`endLiveShoppingEvent`
+carry the event through `scheduled` → `live` → `ended`, gated to the
+event's own seller. `getLiveShoppingEventSales` reports real, measured
+orders/GMV for the event — never a fabricated engagement-lift
+percentage; see "Not yet built" below for exactly what that would
+need and doesn't have.
+
+**No new checkout path.** `orders.js#createOrder` gained an optional
+`liveShoppingEventId` — the exact same real atomic checkout, just
+tagged with which real live event (if any) a purchase came through,
+the same attribution shape `affiliateLinkId` already takes. Only
+qualifies when the event is genuinely `live` and genuinely features
+that exact product; an order with neither check satisfied is refused
+before any money moves.
+
+New routes: `POST /chopz-shop/live-shopping-events`, `GET
+/chopz-shop/live-shopping-events` (+`:id`), `POST .../:id/go-live`,
+`POST .../:id/end` (both seller-gated), `GET .../:id/sales`.
+
+### Verification
+
+`test/liveShoppingEvents.test.js` (new, 11 tests): real channel
+ownership verified live (and refused when it belongs to someone
+else, or doesn't exist); a seller cannot feature a product they don't
+own or schedule with an empty product list; the real
+scheduled→live→ended progression refuses to skip or reverse; a real
+purchase attributed to a live event through the unchanged checkout;
+refused when the event isn't live or doesn't feature that product; an
+ordinary order's honest `liveShoppingEventId: null`; real sales
+aggregation excluding orders not through the event; and real
+sellerId/status filtering. Full suite: 23/23 → 34/34.
+
+Mutation-verified both of the riskiest checks independently:
+replacing the channel-ownership comparison with `if (false)` turned
+exactly the ownership-refusal test red (10/11 in that file); replacing
+the featured-product check in `createOrder` the same way turned
+exactly that attribution test red; both restored, 34/34 green across
+the full suite.
+
+Live-verified against a real spawned stack (Shield + V3 + Vavlt
+Stvdios + this app, no mocks): registered a real Vavlt Stvdios channel
+owned by a real seller, created a real product, scheduled a real live
+shopping event against that real channel, confirmed a purchase was
+refused while the event was still `scheduled`, confirmed a stranger
+could not go live on someone else's event (403), went live as the
+real seller, completed a real purchase attributed to the event
+(real VCoin split three ways, unaffected), confirmed the real sales
+aggregate (`orderCount: 1, gmv: 30`), ended the event, and separately
+confirmed the channel-ownership check refuses on its own (a seller
+claiming someone else's real channel for their own real product was
+refused with the real "channel ... is not owned by ..." message).
+
 ## Not yet built
-- Live shopping (TikTok Shop's real 10-15x-engagement driver) and the
-  four real ad formats named in the comparable doc.
-- True all-or-nothing cart transactions — `createCartCheckout`'s own
-  items settle sequentially and a partial failure leaves earlier items
-  real and placed rather than rolled back (see its own header); real
-  distributed-transaction infrastructure would be required for a
-  stronger guarantee.
+- ~~Live shopping...~~ **Done (5 Nov 2026) — see "Live Shopping
+  Events" below.** Real Vavlt Stvdios channels and real CHOPZ SHOP
+  products are now genuinely connected, closing this file's own
+  earlier "Implementation status" analysis of the gap.
+- **The four real ad formats named in the comparable doc — checked
+  directly, and declined rather than built.** Unlike live shopping,
+  this file's own earlier analysis never identified a clear, existing
+  cross-app seam for these the way it did for channels+products.
+  Building them for real would mean bootstrapping a seller through
+  VENVM's real `Brand` → `Campaign` → `Ad` hierarchy
+  (`venvm/lib/campaigns.js`/`adDashboard.js`) with no existing
+  onboarding path from a CHOPZ SHOP seller into a VENVM brand — a real
+  cross-app identity/onboarding design question, not a format-tagging
+  one, and the kind of invented bootstrapping flow this session's own
+  discipline declines to build unasked. `venvm/lib/adDashboard.js`'s
+  own `createAd` already has a free-form `platform` field (which
+  social network — "tiktok," not which format); a `format` field could
+  be added the same way once that onboarding question is actually
+  answered.
+- Real, measured engagement/conversion LIFT from a live shopping
+  event — `getLiveShoppingEventSales` reports real orders/GMV for a
+  real event, honestly, but proving TikTok's own cited "10-15x
+  engagement, 3-5x conversion" figures would require a real control
+  group (an equivalent non-live sales period) this app has no
+  mechanism to define or isolate.
+- True all-or-nothing cart transactions — **checked again directly,
+  5 Nov 2026, and confirmed this is a deliberate design decision, not
+  a forgotten gap**: `createCartCheckout`'s own header and
+  `test/money.test.js`'s own "cart items settle sequentially" test
+  argue, correctly, that batching every item into one settlement would
+  make one seller's shortfall block every other seller's already-valid
+  payment in the same cart — worse than the current per-item atomicity,
+  not better. Left exactly as is.
 - Category rates beyond the two the comparable doc actually cites
   (general, apparel) — any other category name falls back to the
   general rate rather than a fabricated, more specific number.

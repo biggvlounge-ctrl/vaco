@@ -26,6 +26,10 @@ const {
   CHOPZ_ESCROW_ACCOUNT, DEFAULT_FEE_PERCENT, createOrder, getOrder, requestFulfillment, createCartCheckout,
 } = require('./lib/orders');
 const { creatorDashboard, sellerDashboard, trendingProducts } = require('./lib/dashboards');
+const {
+  createLiveShoppingEvent, getLiveShoppingEvent, listLiveShoppingEvents,
+  goLiveShoppingEvent, endLiveShoppingEvent, getLiveShoppingEventSales,
+} = require('./lib/liveShoppingEvents');
 
 const app = express();
 app.use(cors());
@@ -42,6 +46,7 @@ const PORT = process.env.PORT || 8801;
 const V3_API_URL = process.env.V3_API_URL || 'http://localhost:8811';
 const VOID_API_URL = process.env.VOID_API_URL || 'http://localhost:8793';
 const VACO_ANALYTICS_URL = process.env.VACO_ANALYTICS_URL || 'http://localhost:8790';
+const VAVLT_STVDIOS_API_URL = process.env.VAVLT_STVDIOS_API_URL || 'http://localhost:8808';
 
 // Internal services (V3, VACA, Analytics, Notify, VACON) refuse an
 // unauthenticated mutating call. This app calls them server-to-server
@@ -129,6 +134,19 @@ async function requestVoidCourierJob(sellerId, shippingCost) {
   return body;
 }
 
+// Real, live cross-app lookup -- the real channel this seller claims
+// to own, verified against Vavlt Stvdios' own real record rather than
+// trusted on the claim. Not fail-soft: an unreachable Vavlt Stvdios
+// must refuse scheduling the event, not silently accept an
+// unverified ownership claim.
+async function fetchVavltChannel(channelId) {
+  const res = await fetch(`${VAVLT_STVDIOS_API_URL}/api/channels/${channelId}`);
+  if (res.status === 404) return null;
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error || `fetchVavltChannel failed (${res.status})`);
+  return body;
+}
+
 // Fail-soft, same posture as cvnvo/server.js's own fetchYapSignal --
 // a real checkout is never held up by VACO Analytics being down.
 async function pushMetric(metric, value) {
@@ -155,6 +173,21 @@ function requireOrderBuyer() {
     if (!order) return res.status(404).json({ error: `no order with id ${req.params.id}` });
     if (order.buyerId !== req.sessionUserId) {
       return res.status(403).json({ error: 'only the buyer on this order may request fulfillment' });
+    }
+    return next();
+  });
+}
+
+// Only a live shopping event's own real seller may take it live or
+// end it -- the same resolve-then-compare resource-ownership shape
+// every other seller-only action in this app already uses.
+function requireEventSeller() {
+  const session = requireSession();
+  return (req, res, next) => session(req, res, () => {
+    const event = getLiveShoppingEvent(store, Number(req.params.id));
+    if (!event) return res.status(404).json({ error: `no live shopping event with id ${req.params.id}` });
+    if (event.sellerId !== req.sessionUserId) {
+      return res.status(403).json({ error: "only this event's own seller may change its status" });
     }
     return next();
   });
@@ -242,6 +275,57 @@ app.post('/chopz-shop/orders/:id/request-fulfillment', requireOrderBuyer(), asyn
     }));
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+// -- Live Shopping Events --------------------------------------------------
+// See lib/liveShoppingEvents.js's own header for the real gap this
+// closes (connecting Vavlt Stvdios' real channels to CHOPZ SHOP's
+// real products) and exactly what it does not claim.
+
+app.post('/chopz-shop/live-shopping-events', requireActor('sellerId'), async (req, res) => {
+  try {
+    res.status(201).json(await createLiveShoppingEvent(store, { ...req.body, vavltChannelFetchFn: fetchVavltChannel }));
+  } catch (err) {
+    res.status(err.message.startsWith('fetchVavltChannel failed') ? 502 : 400).json({ error: err.message });
+  }
+});
+
+app.get('/chopz-shop/live-shopping-events', (req, res) => {
+  res.json({ events: listLiveShoppingEvents(store, req.query) });
+});
+
+app.get('/chopz-shop/live-shopping-events/:id', (req, res) => {
+  const event = getLiveShoppingEvent(store, Number(req.params.id));
+  if (!event) return res.status(404).json({ error: `no live shopping event with id ${req.params.id}` });
+  res.json(event);
+});
+
+app.post('/chopz-shop/live-shopping-events/:id/go-live', requireEventSeller(), (req, res) => {
+  try {
+    res.json(goLiveShoppingEvent(store, { eventId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/chopz-shop/live-shopping-events/:id/end', requireEventSeller(), (req, res) => {
+  try {
+    res.json(endLiveShoppingEvent(store, { eventId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Real, measured sales -- no fabricated lift percentage, see this
+// module's own header. A public read, same posture as the dashboards
+// just below: a seller's own real numbers are not a payment
+// credential.
+app.get('/chopz-shop/live-shopping-events/:id/sales', (req, res) => {
+  try {
+    res.json(getLiveShoppingEventSales(store, Number(req.params.id)));
+  } catch (err) {
+    res.status(404).json({ error: err.message });
   }
 });
 

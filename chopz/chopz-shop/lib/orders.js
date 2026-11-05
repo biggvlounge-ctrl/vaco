@@ -39,6 +39,7 @@
 const crypto = require('crypto');
 const { getProduct } = require('./products');
 const { getAffiliateLink, findAttributedLink } = require('./affiliateLinks');
+const { getLiveShoppingEvent } = require('./liveShoppingEvents');
 const { settleOnce } = require('./settleOnce');
 
 const CHOPZ_ESCROW_ACCOUNT = 'chopz-escrow';
@@ -57,7 +58,7 @@ function computeFeePercentForCategory(category) {
 
 async function createOrder(store, options = {}) {
   const {
-    buyerId, productId, affiliateLinkId = null, feePercent, settleFn, now = Date.now(),
+    buyerId, productId, affiliateLinkId = null, liveShoppingEventId = null, feePercent, settleFn, now = Date.now(),
   } = options;
 
   if (!buyerId) throw new Error('createOrder requires a buyerId');
@@ -69,6 +70,22 @@ async function createOrder(store, options = {}) {
   }
   if (typeof settleFn !== 'function') {
     throw new Error('createOrder requires a settleFn(legs, meta)');
+  }
+
+  // Real attribution to a real live shopping event -- no new checkout
+  // path, just a tag on the exact same order, the same shape
+  // affiliateLinkId attribution already takes. Only a real, currently
+  // "live" event, featuring this exact real product, qualifies --
+  // never trusted on the caller's bare claim.
+  if (liveShoppingEventId !== null) {
+    const liveShoppingEvent = getLiveShoppingEvent(store, liveShoppingEventId);
+    if (!liveShoppingEvent) throw new Error(`createOrder: no live shopping event with id ${liveShoppingEventId}`);
+    if (liveShoppingEvent.status !== 'live') {
+      throw new Error(`createOrder: live shopping event ${liveShoppingEventId} is "${liveShoppingEvent.status}", must be "live" to attribute a purchase to it`);
+    }
+    if (!liveShoppingEvent.featuredProductIds.includes(productId)) {
+      throw new Error(`createOrder: product ${productId} is not featured in live shopping event ${liveShoppingEventId}`);
+    }
   }
 
   // Real click-through attribution: an explicit affiliateLinkId always
@@ -113,6 +130,7 @@ async function createOrder(store, options = {}) {
     // commission below, whether explicitly passed or found via real
     // click attribution, not just an echo of the caller's own input.
     affiliateLinkId: affiliateLink ? affiliateLink.id : null,
+    liveShoppingEventId,
     price,
     feePercent: resolvedFeePercent,
     platformFee,
