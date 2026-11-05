@@ -45,6 +45,7 @@
 import {
   checkInAtVenue, checkOutOfVenue, getVisibleUsersAtVenue, recordProximityEvent, getProximityFeed, sendFlashNote,
   setLocationSharingPreference, shareLocation, getVisibleLocations,
+  scheduleSpeedDate, getSpeedDateSlot, extendSpeedDate, getSpeedDateRotation,
 } from "./cvnvoClient.js";
 
 export const LOCATION_PRIVACY_TIERS = ['ghost-mode', 'my-friends', 'select-friends'];
@@ -117,4 +118,31 @@ export async function shareSnapMapLocation(userId) {
 
 export async function getSnapMapVisibleUsers(userId) {
   return getVisibleLocations(userId);
+}
+
+// Speed Dating + Group Dating, inside the Dating Village -- real,
+// deliberate choice: scheduled against two or more of the players
+// `enterDatingVillage` already found really checked in here right
+// now (the venue's own real "who's here" list), not a separate
+// matchmaking flow this district doesn't otherwise have. CVNVO's own
+// `scheduleSpeedDate` already requires every participant real-
+// verified and the caller to be one of them (`requireListedParticipant`)
+// -- no duplicate check happens here.
+export async function scheduleDatingVillageSpeedDate(format, participants, durationSec) {
+  return scheduleSpeedDate(format, participants, durationSec);
+}
+
+export async function getDatingVillageSpeedDate(slotId) {
+  return getSpeedDateSlot(slotId);
+}
+
+export async function extendDatingVillageSpeedDate(slotId, additionalSec) {
+  return extendSpeedDate(slotId, additionalSec);
+}
+
+// Only meaningful for a real group slot (3+ participants) -- CVNVO's
+// own `generateRotationSchedule` already refuses a 2-person slot with
+// a clear error, surfaced as-is rather than guarded twice here.
+export async function getDatingVillageSpeedDateRotation(slotId) {
+  return getSpeedDateRotation(slotId);
 }

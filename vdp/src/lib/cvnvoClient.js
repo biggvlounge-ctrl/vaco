@@ -84,3 +84,31 @@ export async function getVisibleLocations(viewerId) {
   const body = await requestJson(`/api/location/visible/${encodeURIComponent(viewerId)}`);
   return body.visibleLocations;
 }
+
+// Speed Dating + Group Dating -- CVNVO's own real shared SpeedDateSlot
+// entity (2 participants is Speed Dating, 3+ is Group Dating's
+// 2v1/3v1 format, same real slot, see `speedDating.js`'s own header).
+export async function scheduleSpeedDate(format, participants, durationSec) {
+  return requestJson("/api/speed-dates", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...sessionHeaders() },
+    body: JSON.stringify({ format, participants, ...(durationSec ? { durationSec } : {}) }),
+  });
+}
+
+export async function getSpeedDateSlot(slotId) {
+  return requestJson(`/api/speed-dates/${encodeURIComponent(slotId)}`);
+}
+
+export async function extendSpeedDate(slotId, additionalSec) {
+  return requestJson(`/api/speed-dates/${encodeURIComponent(slotId)}/extend`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...sessionHeaders() },
+    body: JSON.stringify({ additionalSec }),
+  });
+}
+
+export async function getSpeedDateRotation(slotId) {
+  const body = await requestJson(`/api/speed-dates/${encodeURIComponent(slotId)}/rotation`);
+  return body.rounds;
+}

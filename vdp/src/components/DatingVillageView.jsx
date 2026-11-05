@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   enterDatingVillage, leaveDatingVillage, getDatingVillageFeed, sendDatingVillageFlashNote,
   LOCATION_PRIVACY_TIERS, setSnapMapPrivacy, shareSnapMapLocation, getSnapMapVisibleUsers,
+  scheduleDatingVillageSpeedDate, extendDatingVillageSpeedDate, getDatingVillageSpeedDateRotation,
 } from "../lib/datingVillage.js";
 
 // CVNVO's real Dating Village, inhabited inside VDP -- a real BarBuddy
@@ -25,6 +26,13 @@ export default function DatingVillageView({ session }) {
   const [snapMapVisible, setSnapMapVisible] = useState([]);
   const [snapMapError, setSnapMapError] = useState(null);
   const [snapMapBusy, setSnapMapBusy] = useState(false);
+
+  const [speedDatePicked, setSpeedDatePicked] = useState([]);
+  const [speedDateFormat, setSpeedDateFormat] = useState("all-facetime");
+  const [speedDateSlot, setSpeedDateSlot] = useState(null);
+  const [speedDateRotation, setSpeedDateRotation] = useState(null);
+  const [speedDateError, setSpeedDateError] = useState(null);
+  const [speedDateBusy, setSpeedDateBusy] = useState(false);
 
   const refreshSnapMap = useCallback(() => {
     getSnapMapVisibleUsers(session.userId).then(setSnapMapVisible).catch((err) => setSnapMapError(err.message));
@@ -82,6 +90,56 @@ export default function DatingVillageView({ session }) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.userId]);
+
+  const togglePicked = (userId) => {
+    setSpeedDatePicked((prev) => (prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]));
+  };
+
+  // CVNVO's own real shared SpeedDateSlot entity: 2 total participants
+  // is Speed Dating, 3+ is Group Dating's 2v1/3v1 rotation format --
+  // same slot, same call, more picked users.
+  const handleScheduleSpeedDate = async () => {
+    if (speedDatePicked.length === 0) return;
+    setSpeedDateBusy(true);
+    setSpeedDateError(null);
+    setSpeedDateRotation(null);
+    try {
+      const slot = await scheduleDatingVillageSpeedDate(speedDateFormat, [session.userId, ...speedDatePicked]);
+      setSpeedDateSlot(slot);
+      setSpeedDatePicked([]);
+    } catch (err) {
+      setSpeedDateError(err.message);
+    } finally {
+      setSpeedDateBusy(false);
+    }
+  };
+
+  const handleExtendSpeedDate = async () => {
+    if (!speedDateSlot) return;
+    setSpeedDateBusy(true);
+    setSpeedDateError(null);
+    try {
+      const slot = await extendDatingVillageSpeedDate(speedDateSlot.id, 60);
+      setSpeedDateSlot((prev) => ({ ...prev, ...slot }));
+    } catch (err) {
+      setSpeedDateError(err.message);
+    } finally {
+      setSpeedDateBusy(false);
+    }
+  };
+
+  const handleShowRotation = async () => {
+    if (!speedDateSlot) return;
+    setSpeedDateBusy(true);
+    setSpeedDateError(null);
+    try {
+      setSpeedDateRotation(await getDatingVillageSpeedDateRotation(speedDateSlot.id));
+    } catch (err) {
+      setSpeedDateError(err.message);
+    } finally {
+      setSpeedDateBusy(false);
+    }
+  };
 
   const handleSendFlashNote = async () => {
     if (!flashTarget || !flashText.trim()) return;
@@ -171,6 +229,63 @@ export default function DatingVillageView({ session }) {
           <p key={loc.userId} style={{ fontSize: 12, margin: "2px 0" }}>{loc.userId}</p>
         ))}
         {snapMapError && <p style={{ color: "crimson" }}>Error: {snapMapError}</p>}
+      </div>
+
+      <div style={{ marginTop: 12, borderTop: "1px dashed #ccc", paddingTop: 8 }}>
+        <p style={{ fontSize: 13, fontWeight: "bold", margin: "0 0 4px" }}>Speed Dating / Group Dating</p>
+        <p style={{ fontSize: 11, color: "#888", margin: "0 0 6px" }}>
+          Pick 1 other person here for Speed Dating, or 2+ for a real rotating Group Dating slot.
+        </p>
+        {visibleUsers.length === 0 && <p style={{ fontSize: 12, color: "#888" }}>No one else here to schedule with yet.</p>}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {visibleUsers.map((userId) => (
+            <label key={userId} style={{ fontSize: 12 }}>
+              <input
+                type="checkbox"
+                checked={speedDatePicked.includes(userId)}
+                onChange={() => togglePicked(userId)}
+              />
+              {" "}{userId}
+            </label>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 4, marginTop: 6 }}>
+          <select value={speedDateFormat} onChange={(e) => setSpeedDateFormat(e.target.value)}>
+            <option value="all-facetime">all-facetime</option>
+            <option value="in-person">in-person</option>
+          </select>
+          <button onClick={handleScheduleSpeedDate} disabled={speedDateBusy || speedDatePicked.length === 0}>
+            Schedule
+          </button>
+        </div>
+
+        {speedDateSlot && (
+          <div style={{ marginTop: 8, fontSize: 12 }}>
+            <p style={{ margin: "2px 0" }}>
+              Slot #{speedDateSlot.id} ({speedDateSlot.format}, {speedDateSlot.durationSec}s, {speedDateSlot.participants.length} participants)
+            </p>
+            {speedDateSlot.media?.sessionId && <p style={{ margin: "2px 0" }}>Video session ready: {speedDateSlot.media.sessionId}</p>}
+            {speedDateSlot.media?.available === false && (
+              <p style={{ margin: "2px 0", color: "#888" }}>Scheduled without video ({speedDateSlot.media.reason}).</p>
+            )}
+            <div style={{ display: "flex", gap: 4, marginTop: 4 }}>
+              <button onClick={handleExtendSpeedDate} disabled={speedDateBusy || speedDateSlot.extended}>
+                {speedDateSlot.extended ? "Already extended" : "Extend +60s"}
+              </button>
+              {speedDateSlot.participants.length > 2 && (
+                <button onClick={handleShowRotation} disabled={speedDateBusy}>Show rotation</button>
+              )}
+            </div>
+            {speedDateRotation && (
+              <div style={{ marginTop: 4 }}>
+                {speedDateRotation.map((round, i) => (
+                  <p key={i} style={{ margin: "2px 0" }}>{round.userAId} ↔ {round.userBId}</p>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        {speedDateError && <p style={{ color: "crimson" }}>Error: {speedDateError}</p>}
       </div>
 
       {actionError && <p style={{ color: "crimson" }}>Error: {actionError}</p>}

@@ -1370,11 +1370,12 @@ VOKEN's real `/api/brand` endpoint — not hardcoded text.
   browse or join a *different*, pre-existing VXLLAGE village from
   inside VDP.
 - Dating Village: real Happn-style proximity crossings, FlashNotes,
-  and Snap Map location sharing (see "Snap Map inside the Dating
-  Village" below) are wired in — the other six CVNVO dating-format
-  extensions (Speed Dating, Long-Distance Mode, Blind Date, Group
-  Dating, Gift Dating, Hunts Dates) exist as real CVNVO APIs but have
-  no VDP-district surface of their own yet.
+  Snap Map location sharing (see "Snap Map inside the Dating Village"
+  below), and Speed Dating/Group Dating (see "Speed Dating and Group
+  Dating inside the Dating Village" below) are wired in — the
+  remaining four CVNVO dating-format extensions (Long-Distance Mode,
+  Blind Date, Gift Dating, Hunts Dates) exist as real CVNVO APIs but
+  have no VDP-district surface of their own yet.
   ~~VDP's own hardcoded single-user login meant two real distinct
   players couldn't be tested together~~ — stale: real Shield register/
   login and the shared WebSocket world (see "Jobs/Careers..." above)
@@ -1479,3 +1480,64 @@ spawned Shield + CVNVO servers: one real session set its tier to
 confirmed the named session sees it, confirmed an unnamed third
 session does not, and confirmed the real no-credential 401 on the
 sharing-preference route.
+
+## Speed Dating and Group Dating inside the Dating Village (5 Nov 2026)
+
+Closes a second one of the seven CVNVO dating-format extensions this
+project's own README named as real APIs with no VDP-district surface
+yet — Speed Dating and Group Dating, which share one real CVNVO entity
+(`SpeedDateSlot`): 2 participants is Speed Dating, 3+ is Group
+Dating's real 2v1/3v1 rotation format, per `cvnvo/lib/speedDating.js`'s
+own header. CVNVO's server side was already fully built (including a
+real `vaco-media` video-session grant on schedule) — this closes the
+VDP-side gap only.
+
+`cvnvoClient.js` gains `scheduleSpeedDate`/`getSpeedDateSlot`/
+`extendSpeedDate`/`getSpeedDateRotation`, thin wrappers over CVNVO's
+own real `/api/speed-dates` routes, the same posture every other
+cross-app client in this project already takes. `datingVillage.js`
+wraps those into `scheduleDatingVillageSpeedDate`/
+`getDatingVillageSpeedDate`/`extendDatingVillageSpeedDate`/
+`getDatingVillageSpeedDateRotation` — real, deliberate choice: a date
+is scheduled against players `enterDatingVillage` already found really
+checked in here right now (the venue's own real "who's here" list),
+not a separate matchmaking flow this district doesn't otherwise have.
+
+`DatingVillageView.jsx` gained a real Speed Dating / Group Dating
+panel under "Here right now": checkboxes to pick one (Speed Dating) or
+several (Group Dating) of the other real checked-in players, a format
+picker, a "Schedule" button showing the real resulting slot and its
+`vaco-media` video-session grant (or the honest reason it has none),
+a real one-time "Extend +60s" button, and — only once 3+ participants
+are picked — a "Show rotation" button rendering CVNVO's own real
+round-robin pairing.
+
+### Verification
+
+Both edited files individually pass a real esbuild JSX/syntax check.
+VDP's own `node --test test/*.test.js` suite: 951/951, unchanged (same
+pre-existing Vite-only `import.meta.env` limitation as every other
+`*Client.js` in this project). CVNVO's own suite: 35/35, unchanged (no
+CVNVO code was touched — the server side already existed).
+
+**Found, not fixed, while building this**: `cvnvo/lib/speedDating.js`
+has no dedicated test file anywhere in that repo's `test/` directory —
+a real, separate pre-existing gap in CVNVO itself, flagged for CVNVO's
+own next pass rather than silently absorbed into this VDP-side wiring
+task.
+
+Live-verified the exact route contract this client depends on, against
+a real spawned CVNVO server: `GET /api/speed-dates/999` on a
+non-existent slot answers a real 404; `GET /api/speed-dates/999/rotation`
+answers the real, specific `generateRotationSchedule` error rather than
+a generic one; and `POST /api/speed-dates` with no credential answers a
+real 401, confirming `requireListedParticipant`'s session gate is live.
+**Not performed**: the full schedule-through-rotation happy path, which
+needs a real verified CVNVO profile (`verifiedBadge: true`) — itself
+gated on a live VACA identity approval, which in turn needs a VACA
+human-operator credential (`requireOperator('vaca:verify')`) — a real
+four-service chain (Shield + VACA + CVNVO + vaco-media) disproportionate
+to this wiring task's actual scope, the same proportionate-effort call
+made elsewhere in this session. The code path itself is a direct,
+unmodified pass-through to CVNVO's own already-built, already-shaped
+routes, read directly from `cvnvo/server.js` rather than guessed.
