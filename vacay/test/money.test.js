@@ -182,10 +182,11 @@ test('cancelling before the cutoff refunds the guest in full, and empties escrow
     settleFn, now: NOW,
   });
   const cancelled = await bookings.cancelBooking(store, {
-    bookingId: booking.id, settleFn, now: NOW + 1 * DAY,
+    bookingId: booking.id, cancellingUserId: 'sam', settleFn, now: NOW + 1 * DAY,
   });
 
   assert.strictEqual(cancelled.refunded, true);
+  assert.strictEqual(cancelled.cancelledBy, 'guest');
   assert.strictEqual(settleFn.of('sam'), 1000, 'a full refund means whole, not nearly whole');
   assert.strictEqual(settleFn.of('ines'), 0);
   assert.ok(settleFn.isDrained(bookings.VACAY_ESCROW_ACCOUNT), 'escrow must be drained to the cent');
@@ -203,7 +204,7 @@ test('cancelling inside the cutoff pays the host as if the stay happened', async
 
   // Two hours before check-in — well inside the 24-hour cutoff.
   const cancelled = await bookings.cancelBooking(store, {
-    bookingId: booking.id, settleFn, now: checkIn - 2 * 3600000,
+    bookingId: booking.id, cancellingUserId: 'sam', settleFn, now: checkIn - 2 * 3600000,
   });
 
   assert.strictEqual(cancelled.refunded, false);
@@ -224,12 +225,96 @@ test('the cutoff boundary itself refunds — a guest exactly on the line is not 
     settleFn, now: NOW,
   });
   const cancelled = await bookings.cancelBooking(store, {
-    bookingId: booking.id, settleFn,
+    bookingId: booking.id, cancellingUserId: 'sam', settleFn,
     now: checkIn - bookings.CANCELLATION_CUTOFF_HOURS * 3600000,
   });
 
   assert.strictEqual(cancelled.refunded, true,
     'at exactly the cutoff the policy is still "at least N hours before", so it refunds');
+});
+
+// Closes VACAY_COMPARABLES.md's own directly-named asymmetry: a host
+// cancellation needs a real guarantee and a real penalty, not just the
+// guest-side cutoff rule above.
+test('a host cancellation always refunds the guest in full, even well inside the cutoff', async () => {
+  const { store, listing } = stayFixture();
+  const settleFn = ledger({ sam: 1000 });
+  const checkIn = NOW + 10 * DAY;
+
+  const booking = await bookings.createBooking(store, {
+    listingId: listing.id, guestId: 'sam', checkIn, checkOut: NOW + 13 * DAY,
+    settleFn, now: NOW,
+  });
+
+  // Two hours before check-in -- deep inside the 24-hour cutoff, where
+  // a GUEST cancellation would pay the host instead of refunding.
+  const cancelled = await bookings.cancelBooking(store, {
+    bookingId: booking.id, cancellingUserId: listing.hostId, settleFn, now: checkIn - 2 * 3600000,
+  });
+
+  assert.strictEqual(cancelled.refunded, true, 'the cutoff protects a host holding dates in good faith -- not a host who cancels');
+  assert.strictEqual(cancelled.cancelledBy, 'host');
+  assert.strictEqual(settleFn.of('sam'), 1000, 'the guest is made whole, not penalised for the host\'s own cancellation');
+  assert.strictEqual(settleFn.of(listing.hostId), 0, 'a cancelling host is never paid for a stay that never happened');
+  assert.ok(settleFn.isDrained(bookings.VACAY_ESCROW_ACCOUNT), 'escrow must be drained to the cent');
+});
+
+test('cancelBooking requires a real cancellingUserId that is this booking\'s own guest or host', async () => {
+  const { store, listing } = stayFixture();
+  const settleFn = ledger({ sam: 1000 });
+  const booking = await bookings.createBooking(store, {
+    listingId: listing.id, guestId: 'sam',
+    checkIn: NOW + 10 * DAY, checkOut: NOW + 13 * DAY, settleFn, now: NOW,
+  });
+
+  const callsBefore = settleFn.calls.length;
+  await assert.rejects(
+    () => bookings.cancelBooking(store, { bookingId: booking.id, settleFn }),
+    /requires a cancellingUserId/,
+  );
+  await assert.rejects(
+    () => bookings.cancelBooking(store, { bookingId: booking.id, cancellingUserId: 'a-stranger', settleFn }),
+    /requires a cancellingUserId/,
+  );
+  assert.strictEqual(settleFn.calls.length, callsBefore, 'no money moves on a rejected cancellation attempt');
+});
+
+test('a host who repeatedly cancels confirmed stays is real-penalised: blocked from new bookings', async () => {
+  const { store, listing } = stayFixture();
+  const settleFn = ledger({ sam: 1000, ada: 1000, finn: 1000 });
+  const guests = ['sam', 'ada', 'finn'];
+
+  for (const guestId of guests) {
+    const booking = await bookings.createBooking(store, {
+      listingId: listing.id, guestId,
+      checkIn: NOW + 10 * DAY, checkOut: NOW + 13 * DAY, settleFn, now: NOW,
+    });
+    // eslint-disable-next-line no-await-in-loop
+    await bookings.cancelBooking(store, { bookingId: booking.id, cancellingUserId: listing.hostId, settleFn, now: NOW });
+  }
+
+  assert.strictEqual(bookings.getHostCancellationCount(store, listing.hostId), bookings.HOST_CANCELLATION_STRIKE_LIMIT);
+  assert.strictEqual(bookings.isHostCancellationLimited(store, listing.hostId), true);
+
+  await assert.rejects(
+    () => bookings.createBooking(store, {
+      listingId: listing.id, guestId: 'one-more-guest',
+      checkIn: NOW + 30 * DAY, checkOut: NOW + 33 * DAY, settleFn, now: NOW,
+    }),
+    /cancelled 3\+ confirmed stays/,
+  );
+});
+
+test('a guest cancellation never counts as a host strike', async () => {
+  const { store, listing } = stayFixture();
+  const settleFn = ledger({ sam: 1000 });
+  const booking = await bookings.createBooking(store, {
+    listingId: listing.id, guestId: 'sam',
+    checkIn: NOW + 10 * DAY, checkOut: NOW + 13 * DAY, settleFn, now: NOW,
+  });
+  await bookings.cancelBooking(store, { bookingId: booking.id, cancellingUserId: 'sam', settleFn, now: NOW });
+
+  assert.strictEqual(bookings.getHostCancellationCount(store, listing.hostId), 0);
 });
 
 test('two guests cannot hold the same listing on overlapping nights', async () => {
@@ -277,7 +362,7 @@ test('a cancelled booking frees its dates for someone else', async () => {
     listingId: listing.id, guestId: 'sam',
     checkIn: NOW + 10 * DAY, checkOut: NOW + 14 * DAY, settleFn, now: NOW,
   });
-  await bookings.cancelBooking(store, { bookingId: first.id, settleFn, now: NOW + DAY });
+  await bookings.cancelBooking(store, { bookingId: first.id, cancellingUserId: 'sam', settleFn, now: NOW + DAY });
 
   const second = await bookings.createBooking(store, {
     listingId: listing.id, guestId: 'ada',
@@ -343,7 +428,7 @@ test('completeStay and cancelBooking cannot both settle the same booking', async
   const checkIn = NOW + 10 * DAY;
   const results = await Promise.allSettled([
     bookings.completeStay(store, { bookingId: booking.id, settleFn, now: checkIn + 4 * DAY }),
-    bookings.cancelBooking(store, { bookingId: booking.id, settleFn, now: checkIn - 2 * 3600000 }),
+    bookings.cancelBooking(store, { bookingId: booking.id, cancellingUserId: 'sam', settleFn, now: checkIn - 2 * 3600000 }),
   ]);
 
   const fulfilled = results.filter((r) => r.status === 'fulfilled');

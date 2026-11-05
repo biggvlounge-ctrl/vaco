@@ -245,7 +245,9 @@ function createBookingsRouter(deps) {
 
   router.post('/:id/cancel', requireStayParty(), async (req, res) => {
     try {
-      res.json(await cancelBooking(store, { bookingId: Number(req.params.id), settleFn: settleVCoin }));
+      res.json(await cancelBooking(store, {
+        bookingId: Number(req.params.id), cancellingUserId: req.sessionUserId, settleFn: settleVCoin,
+      }));
     } catch (err) {
       res.status(400).json({ error: err.message });
     }

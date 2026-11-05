@@ -52,6 +52,12 @@ async function createBooking(store, options = {}) {
   const listing = getListing(store, listingId);
   if (!listing) throw new Error(`createBooking: no listing with id ${listingId}`);
   if (listing.status !== 'active') throw new Error(`createBooking: listing ${listingId} is not active (status: ${listing.status})`);
+  // The real penalty half of the host-cancellation guarantee below --
+  // a host who has repeatedly backed out of confirmed stays cannot
+  // keep taking new bookings cost-free.
+  if (isHostCancellationLimited(store, listing.hostId)) {
+    throw new Error(`createBooking: listing ${listingId}'s host has cancelled ${HOST_CANCELLATION_STRIKE_LIMIT}+ confirmed stays and cannot take new bookings`);
+  }
   if (!guestId) throw new Error('createBooking requires a guestId');
   if (!Number.isInteger(checkIn) || checkIn < now) throw new Error('createBooking requires a real, present-or-future checkIn timestamp');
   if (!Number.isInteger(checkOut) || checkOut <= checkIn) throw new Error('createBooking requires a checkOut timestamp after checkIn');
@@ -158,8 +164,35 @@ async function completeStay(store, options = {}) {
 // the same real economic position as if the stay had completed.
 const CANCELLATION_CUTOFF_HOURS = 24;
 
+// Real host-cancellation guarantee, closing VACAY_COMPARABLES.md's own
+// directly-named asymmetry: "a guest cancelling needs a refund rule,
+// while a host cancelling needs a *replacement* and a penalty, and a
+// refund alone is precisely the response that generates the 1-star
+// reviews this research is citing." The time-based cutoff above exists
+// to protect a host who held dates in good faith -- it has no
+// business protecting a host who is the one backing out. A real
+// "replacement" (finding the guest an actual alternate stay) needs a
+// listing-search-and-match system this codebase doesn't have, the
+// same honest limit as VPLAN; what's real and buildable here is the
+// other half: the guest is always made whole, and a host who does
+// this repeatedly faces a real, structural consequence rather than a
+// cost-free option.
+//
+// `cancellingUserId` is checked against the booking's own real
+// guestId and the listing's own real hostId -- never trusted as a
+// bare claim of which side is cancelling.
+const HOST_CANCELLATION_STRIKE_LIMIT = 3; // real, flagged, bounded -- no exact number is given in any source doc
+
+function getHostCancellationCount(store, hostId) {
+  return (store.hostCancellationCounts || {})[hostId] || 0;
+}
+
+function isHostCancellationLimited(store, hostId) {
+  return getHostCancellationCount(store, hostId) >= HOST_CANCELLATION_STRIKE_LIMIT;
+}
+
 async function cancelBooking(store, options = {}) {
-  const { bookingId, settleFn, now = Date.now() } = options;
+  const { bookingId, cancellingUserId, settleFn, now = Date.now() } = options;
   const booking = getBooking(store, bookingId);
   if (!booking) throw new Error(`cancelBooking: no booking with id ${bookingId}`);
   if (booking.status === 'cancelled') throw new Error(`cancelBooking: booking ${bookingId} is already cancelled`);
@@ -170,8 +203,16 @@ async function cancelBooking(store, options = {}) {
   if (typeof settleFn !== 'function') throw new Error('cancelBooking requires a settleFn(fromUserId, toUserId, amount, reason)');
 
   const listing = getListing(store, booking.listingId);
+  const isHostCancelling = !!cancellingUserId && listing && cancellingUserId === listing.hostId;
+  if (!cancellingUserId || (cancellingUserId !== booking.guestId && !isHostCancelling)) {
+    throw new Error('cancelBooking requires a cancellingUserId that is either this booking\'s guest or its listing\'s host');
+  }
+
   const hoursUntilCheckIn = (booking.checkIn - now) / 3600000;
-  const refundEligible = hoursUntilCheckIn >= CANCELLATION_CUTOFF_HOURS;
+  // A host cancellation is always fully refunded, regardless of
+  // timing -- the cutoff protects a host holding dates in good faith,
+  // which is not what's happening here.
+  const refundEligible = isHostCancelling || hoursUntilCheckIn >= CANCELLATION_CUTOFF_HOURS;
 
   booking.status = 'settling';
   let hostPayout = null;
@@ -203,9 +244,19 @@ async function cancelBooking(store, options = {}) {
   booking.status = 'cancelled';
   booking.cancelledAt = now;
   booking.refunded = refundEligible;
+  booking.cancelledBy = isHostCancelling ? 'host' : 'guest';
+
+  // The real penalty half: a host cancellation is a real strike
+  // against that host, independent of this one booking's own refund.
+  if (isHostCancelling) {
+    if (!store.hostCancellationCounts) store.hostCancellationCounts = {};
+    store.hostCancellationCounts[listing.hostId] = getHostCancellationCount(store, listing.hostId) + 1;
+  }
+
   return booking;
 }
 
 module.exports = {
-  VACAY_ESCROW_ACCOUNT, FEE_PERCENT, CANCELLATION_CUTOFF_HOURS, createBooking, getBooking, completeStay, cancelBooking,
+  VACAY_ESCROW_ACCOUNT, FEE_PERCENT, CANCELLATION_CUTOFF_HOURS, HOST_CANCELLATION_STRIKE_LIMIT,
+  createBooking, getBooking, completeStay, cancelBooking, getHostCancellationCount, isHostCancellationLimited,
 };

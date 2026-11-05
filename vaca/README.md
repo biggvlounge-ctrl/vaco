@@ -224,6 +224,17 @@ each one independently verified live against a spawned server:
   approve path with the same real payload shape.
 
 ## Not yet built
-- Wiring VACA into VEX (VOKEN's own trading floor) or anywhere else in
-  the ecosystem "VACA-verified" is referenced but not yet backed by a
-  real call.
+- ~~Wiring VACA into VEX (VOKEN's own trading floor) or anywhere else
+  in the ecosystem "VACA-verified" is referenced but not yet backed by
+  a real call.~~ **Stale — this is done.** VOKEN is VEX's own canonical
+  home (per `voken/README.md`'s own "VEX/VADO" note), and VOKEN's real
+  value algorithm already fetches the card's real, live authenticity
+  grade from here, not a caller-supplied value: `server.js`'s own
+  `GET /api/card/:id/value-score` and `GET /api/card/:id/full` both
+  call `fetchAuthenticityGrade` against this app's own
+  `GET /api/authenticity-grade/:subjectType/:subjectId`, and
+  `lib/valueAlgorithm.js`'s own header confirms `authenticityGrade` is
+  "the real 'VACA-verified' part" of the card's actual trade-relevant
+  value, not cosmetic — see VOKEN's own "Real, visible VACA
+  verification badge (1 Nov 2026)" section for the fail-soft-on-outage
+  design and its own verification record.

@@ -293,13 +293,17 @@ refused with a real 401 before reaching anyone.
 
 ## Not yet built
 - VPLAN itinerary generation — doesn't exist as code anywhere yet.
-- The real, evidence-based differentiation opportunities the
-  comparables doc names directly: a stronger host-cancellation
-  guarantee and photo/condition verification (failure pattern #3,
-  double-booking, is already structurally solved via the interval-
-  overlap guard, reused five times now across this one app: VACAY
-  Stays, VACAY Experiences, VACAY Auto/Turo, VACAY Auto/Fleet, and
-  originally VOID MAGIC).
+- Of the comparables doc's three named differentiation opportunities:
+  double-booking (failure pattern #3) is already structurally solved
+  via the interval-overlap guard, reused five times now across this
+  one app (VACAY Stays, VACAY Experiences, VACAY Auto/Turo, VACAY
+  Auto/Fleet, and originally VOID MAGIC), and the host-cancellation
+  guarantee (failure pattern #1) is now also real — see "Real
+  host-cancellation guarantee" below. Photo/condition verification
+  (failure pattern #2) is still not addressed — the comparables doc's
+  own analysis names VACA as the natural home for it (a new
+  `vacay-listing` subjectType on an attestation loop that already
+  exists), not a new system inside VACAY itself.
 - `hostType` is a plain field with no different real behavior attached
   yet (no professional-only verification/insurance requirements, no
   different search ranking).
@@ -312,3 +316,54 @@ refused with a real 401 before reaching anyone.
   is honestly caller-supplied, not computed from any real aggregated
   data (none exists in this session).
 - Any UI, for any section.
+
+## Real host-cancellation guarantee (5 Nov 2026)
+
+Closes `VACAY_COMPARABLES.md`'s own directly-named asymmetry: "a guest
+cancelling needs a refund rule, while a host cancelling needs a
+*replacement* and a penalty, and a refund alone is precisely the
+response that generates the 1-star reviews this research is citing."
+Before this, `cancelBooking` applied the same 24-hour, time-based
+cutoff regardless of which side cancelled — a host who cancelled 2
+hours before check-in kept the guest's money and paid nothing, the
+exact backwards outcome the comparables doc flags.
+
+`cancelBooking` now takes a real `cancellingUserId`, checked against
+the booking's own real `guestId` and the listing's own real `hostId`
+(never trusted as a bare claim of which side is cancelling — refused
+otherwise). A host cancellation is **always** fully refunded to the
+guest, regardless of timing — the time cutoff exists to protect a host
+who held dates in good faith, which doesn't apply to a host who is the
+one backing out. The real penalty half: each host cancellation is a
+real, counted strike (`getHostCancellationCount`), and a host with
+`HOST_CANCELLATION_STRIKE_LIMIT` (3, a real, flagged, bounded choice —
+no exact number is given in any source doc) or more strikes is
+refused new bookings outright by `createBooking`, a real structural
+consequence rather than a cost-free option. `booking.cancelledBy`
+('guest' or 'host') is now a real, visible field.
+
+**Honestly out of scope**: the "replacement" half the doc names — an
+actual search for the guest's alternate stay — needs a real listing-
+search-and-match system this codebase doesn't have, the same honest
+limit as VPLAN above. What's built here is the refund guarantee and
+the penalty, not an automated rebooking flow.
+
+### Verification
+
+`test/money.test.js` grew by 4: a host cancellation refunding in full
+deep inside the cutoff (where a guest cancellation would not), the
+real `cancellingUserId` validation refusing both an absent value and a
+stranger's claim, a host hitting the real strike limit and being
+refused new bookings, and confirming a guest's own cancellation never
+counts as a host strike. Full suite: 42/42 → 46/46. Mutation-verified
+twice: replacing the host-cancellation bypass with the plain guest-side
+cutoff check turned the "deep inside the cutoff" test red; separately,
+replacing the strike-limit refusal with `false` turned the repeated-
+cancellation test red — both restored and reconfirmed green.
+
+Live-verified end to end against real spawned Shield + V3 + VACAY
+servers: a real host registered a listing, a real guest booked a stay
+with check-in 2 hours out, the host (not the guest) cancelled it, and
+the guest's real V3 balance returned to its original 1000 VCoin while
+the host's stayed at 0 — confirmed via `GET /api/vcoin/balance/:userId`
+on both accounts, not just the response body.
