@@ -2044,6 +2044,143 @@ real, separate, future work.
 Simulation and Multiplayer modes remain deferred and untouched — only
 the one mode named in the instruction was reopened.
 
+**A forty-eighth, and it is two things built together because the
+second was always going to gate the first: an influence economy over
+two real, dormant schema columns, and character creation, built by
+explicit instruction on 5 Nov 2026.**
+
+`relationships.influence` (NUMERIC DEFAULT 0) and `families.
+political_influence` (NUMERIC DEFAULT 0) had been in `VACANCY_
+POSTGRESQL_SCHEMA.sql` since this project's first version, read or
+written by nothing beyond their own generation-time default —
+`grep -rn "\.influence\b" server/*.js` before this returned exactly one
+place either was ever touched, and that was `migrate.js`'s own
+round-trip persistence reading back whatever was already there.
+`server/influence.js` is what finally reads and writes them for real.
+
+**The first version of this would have started every brand-new
+relationship at a flat 0, and a direct correction arrived before it
+shipped: starting influence has to vary by real, existing statistics —
+a gang leader starts with meaningfully more real influence than a
+janitor, derived from stats the engine already has, never an invented
+flag.** `influenceRatingOf(worldState, entityId)` is the real, derived,
+NEVER-STORED rating that closes this (standing rule 3's own treatment,
+exactly what `getNetWorth`/`getFamilyWealth` already get) — three real
+components, weighted to sum to 1.0 so the result stays on the same
+0-100 scale every other relationship dimension uses: occupation tier
+(`occupations.tierOf`, 0.3), real organization leadership scaled by
+that org's own `influence` column and real member count
+(`membership.memberCount`, capped at 20 the same order of magnitude
+`meetings.js`'s own `MAXIMUM_ATTENDANCE` draws the "crowd, not a
+leadership" line at, 0.4), and real social traits — Charisma,
+Persuasion, Reputation, Network Reach, averaged, defaulting to the
+trait scale's own centre (50) when none have been generated, never a
+zero (0.3). `raiseInfluence`/`lowerInfluence` apply this rating to seed
+a pair's relationship the FIRST time it is ever touched, rather than
+leaving `worldStore.getOrCreateRelationship`'s own generic default
+underneath a real event — `worldStore.js` itself is unchanged, so
+every other caller keeps the exact behaviour every existing test
+already asserts about it.
+
+**Influence moves down from real actions too, not only up — the
+second half of the same correction.** `relationships.influence` is a
+SINGLE SHARED VALUE per pair, the same model this engine already uses
+for `trust`/`respect`/`loyalty` — `leadership.js`'s own `directMission`
+already reads a subordinate's `loyalty` "toward their leader" from
+that same single-field, order-independent table, which is the
+precedent followed here rather than inventing a second, directional
+influence table the schema does not have. One consequence worth
+stating plainly: a contest's resolution calls `raiseInfluence(winner,
+loser)` exactly ONCE, never a second, opposite-signed call for "the
+loser's influence falls" — that second call would cancel the first on
+the identical stored field, which is a mistake worth naming rather than
+silently almost making. Three other real events now move it down for
+real: a refused `direct-mission` order (on BOTH its paths, see below);
+a `meetings.js` `negotiate` between two people with real bad history,
+on the same sign as the real (negative) `trustDelta` that purpose's
+own `keys.feelingToward` call can already produce — checked directly
+rather than assumed, and `recruit` was checked the same way and found
+to have no contested branch in `PURPOSES` at all, so it only ever
+raises influence, which is reported here rather than quietly inventing
+a failure mode that purpose does not have.
+
+**`leadership.js#directMission` gained a second real path, additive to
+the org-leader one.** `organizationId` is now optional: given, nothing
+changes (compliance still gated on the subordinate's real `loyalty`
+toward their leader, membership still required). Omitted, there is no
+organization and no membership check at all — compliance gates
+instead on the pair's own real, growing `relationships.influence`
+(or, for a brand-new pair, the acting entity's own `influenceRatingOf`).
+Either way the gate is `seededDraw` against the gating value mapped
+straight onto `[0,1]`, never a fitted cutoff — the seventeenth standing
+rule's own `resolveAggression` case study, applied before the mistake
+could be made rather than after.
+
+**`server/characterCreation.js#createCharacter` (`POST
+/api/characters`) is the other half, built to the same brief: a player
+picks a few real things, and everything else — especially family — is
+randomly generated and REVEALED, never chosen.** Player-chosen:
+occupation (validated through the exact real qualification gate any
+NPC's own hire already goes through — `occupations.qualifiedFor`/
+`tierReachable` — refused with a specific reason rather than a silent
+fallback when no real employer exists or the character is not really
+qualified), country (`countryPacks.js`'s own real keys — checked
+directly and confirmed to have no structural link to this engine's own
+generated cities, so this is real-world context, not geography), and
+community (an existing real one, or a real random draw across whatever
+the world actually has). Random and revealed: whether each parent is
+alive or dead (a real draw, recorded through `mortality.recordDeath`
+on the same real status transition and estate settlement any other
+death in this engine goes through — never a second "is dead" flag); a
+living parent's own real occupation, drawn the identical way any NPC's
+is; a real sibling count; and real cousins — per explicit instruction,
+each one a FULLY SIMULATED NPC, not a count. A cousin is the child of
+the player's own living parent's own sibling, and that aunt or uncle is
+a real NPC heading an ENTIRELY SEPARATE real family record of their
+own, at its own real, independently-drawn (possibly different)
+location — cross-linked to the player's own family through the
+schema's own real `relationships.relationship_type` value `'family'`,
+never a role invented on the wrong table. Grandparents, and any
+generation beyond parents/siblings/cousins, are explicitly out of
+scope for this round, named here rather than silently omitted.
+
+**Why every generator `characterCreation.js` calls is INJECTED rather
+than required** — `generateNpc`/`generateFamily`/`addFamilyMember`
+have no separate module the way `missions.js` or `territory.js` do;
+their real logic lives directly inside `engine.js`, which is this
+file's own caller, so requiring it back would be circular. The exact
+same seam `missions.js#resolveMission` already uses for `payReward`,
+for the identical stated reason: keeping the module taking `worldState`
+explicitly rather than reaching into the module that wraps it.
+
+`GET /api/entities/:id/influence-rating`, `GET /api/entities/:id/
+personal-influence` and `GET /api/families/:id/political-influence`
+are real, computed reads, never stored — the same posture `GET
+/api/entities/:id/net-worth` already has.
+
+**Found live-verifying this, not in a fixture: the real player-facing
+dispatcher still refused the path it was built to add.**
+`leadership.js#directMission` makes `organizationId` optional, but
+`server/actions.js`'s `'direct-mission'` verb still listed it in
+`requires` and forced it through `Number(body.organizationId)` — so
+every call through the one interface an actual player uses
+(`POST /api/players/:id/action`) turned an omitted organization into
+`Number(undefined)` (`NaN`) before `leadership.js` ever saw a real
+`null`, and the dispatcher's own `requires` check 400'd the request
+before that. The module-level function was correct and reachable only
+by calling it directly — the eighteenth standing rule's own shape
+("a fixture checks what a function returns; nothing checks what its
+caller does with it") one layer closer to the player than usual, since
+here the "caller" is the one route a real person calls through.
+Fixed in `actions.js` itself: `organizationId` dropped from `requires`,
+and passed through as `null` rather than `NaN` when omitted. Confirmed
+live through the real dispatcher, not just the module: a leader with no
+shared organization and a real `influenceRatingOf` of 44.5 complied
+once end-to-end (`issuing_organization_id: null`, influence rising from
+44.5 to 46.5), and a leader with a real, pre-existing zero-influence
+relationship was refused deterministically with influence held at its
+real floor.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

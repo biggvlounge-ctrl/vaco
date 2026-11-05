@@ -70,6 +70,20 @@
 // it. Wiring that into `succession.js`'s own leader_id-clearing path is
 // real, separate, future work, named here rather than silently
 // assumed.
+//
+// **A second way to direct someone, added later, with no organization
+// involved at all.** See `influence.js`'s own header for the full
+// design. `directMission` now takes an OPTIONAL `organizationId`: when
+// given, everything above is unchanged exactly as built (an org leader
+// directing their own real member, compliance gated on that person's
+// real `loyalty`); when omitted, compliance is instead gated on the
+// pair's own real, growing `relationships.influence` — no organization,
+// no membership check, and no invented cutoff on how much influence is
+// "enough", for the same reason loyalty was never tested against one.
+// Either way, a compliance raises real influence between the two of
+// them and a refusal lowers it — directing someone is itself now one
+// of the real events that grows or costs you influence, not just a
+// consumer of it.
 
 'use strict';
 
@@ -78,6 +92,7 @@ const worldStore = require('./worldStore.js');
 const membership = require('./membership.js');
 const missions = require('./missions.js');
 const media = require('./media.js');
+const influence = require('./influence.js');
 const { seededDraw } = require('./seeded.js');
 
 function clamp01(x) {
@@ -202,54 +217,84 @@ function getLeaderDashboard(worldState, playerId) {
 // themselves, through the actor their own record names.
 function directMission(worldState, leaderEntityId, options = {}) {
   const {
-    organizationId, subordinateEntityId, objective = null, reward = null,
+    organizationId = null, subordinateEntityId, objective = null, reward = null,
     artifactId = null, locationId = null, tick = worldState.tick ?? 0,
   } = options;
 
-  if (organizationId == null) throw new Error('directMission requires an organizationId.');
   if (subordinateEntityId == null) throw new Error('directMission requires a subordinateEntityId.');
-
-  const organization = (worldState.organizations || [])
-    .find((o) => o.id === Number(organizationId));
-  if (!organization) throw new Error(`directMission: no organization with id ${organizationId}.`);
-  if (organization.leader_id !== Number(leaderEntityId)) {
-    throw new Error(
-      `directMission: entity ${leaderEntityId} does not lead organization ${organizationId} `
-      + `(organizations.leader_id is ${organization.leader_id ?? 'nobody'}) — a leader can only `
-      + 'direct the organization they actually head.',
-    );
-  }
-
   const subordinateId = Number(subordinateEntityId);
   if (subordinateId === Number(leaderEntityId)) {
     throw new Error('directMission: a leader cannot direct themselves — that is just accepting a mission.');
   }
-
-  const membershipRow = membership.findMembership(worldState, subordinateId, organization.id);
-  if (!membershipRow) {
-    throw new Error(
-      `directMission: entity ${subordinateId} is not a member of organization ${organization.id} `
-      + '— a leader can only direct their own people.',
-    );
-  }
   const subordinate = (worldState.npcs || []).find((n) => n.id === subordinateId);
   if (!subordinate) throw new Error(`directMission: ${subordinateId} is not among the living.`);
 
-  // Compliance — see the header. loyalty's real default (50, from
-  // worldStore.getOrCreateRelationship) is the unread-relationship
-  // fallback here too, so a leader and a subordinate who have never
-  // interacted start at an even chance rather than an invented zero.
-  const relationship = worldStore.findRelationship(worldState, leaderEntityId, subordinateId);
-  const loyalty = relationship ? Number(relationship.loyalty) : 50;
-  const complianceChance = clamp01(loyalty / 100);
+  let organization = null;
+  let basis;
+  let complianceChance;
+  let gatingValue;
+
+  if (organizationId != null) {
+    // The original path: an organization's own real leader, directing
+    // a real member of it. Unchanged.
+    organization = (worldState.organizations || [])
+      .find((o) => o.id === Number(organizationId));
+    if (!organization) throw new Error(`directMission: no organization with id ${organizationId}.`);
+    if (organization.leader_id !== Number(leaderEntityId)) {
+      throw new Error(
+        `directMission: entity ${leaderEntityId} does not lead organization ${organizationId} `
+        + `(organizations.leader_id is ${organization.leader_id ?? 'nobody'}) — a leader can only `
+        + 'direct the organization they actually head.',
+      );
+    }
+    const membershipRow = membership.findMembership(worldState, subordinateId, organization.id);
+    if (!membershipRow) {
+      throw new Error(
+        `directMission: entity ${subordinateId} is not a member of organization ${organization.id} `
+        + '— a leader can only direct their own people.',
+      );
+    }
+
+    // loyalty's real default (50, from worldStore.getOrCreateRelationship)
+    // is the unread-relationship fallback here too, so a leader and a
+    // subordinate who have never interacted start at an even chance
+    // rather than an invented zero.
+    const relationship = worldStore.findRelationship(worldState, leaderEntityId, subordinateId);
+    basis = 'loyalty';
+    gatingValue = relationship ? Number(relationship.loyalty) : 50;
+    complianceChance = clamp01(gatingValue / 100);
+  } else {
+    // The organization-free path — see influence.js's own header and
+    // this file's. No membership to check, because there is no
+    // organization; the real, growing influence this specific leader
+    // already holds over this specific person is the only gate, and it
+    // is never tested against an invented cutoff — mapped straight to
+    // a probability instead.
+    const relationship = worldStore.findRelationship(worldState, leaderEntityId, subordinateId);
+    basis = 'influence';
+    gatingValue = relationship
+      ? Number(relationship.influence)
+      : influence.influenceRatingOf(worldState, leaderEntityId);
+    complianceChance = clamp01(gatingValue / 100);
+  }
+
   const draw = seededDraw([
     worldState.seed ?? 'world', 'direct-mission', leaderEntityId, subordinateId, tick,
   ]);
   const complied = draw < complianceChance;
 
+  // Directing someone is itself a real event now: a compliance grows
+  // real influence between the two of them, a refusal costs it — true
+  // on both paths, including the org-leader one, where this is new.
+  if (complied) {
+    influence.raiseInfluence(worldState, leaderEntityId, subordinateId);
+  } else {
+    influence.lowerInfluence(worldState, leaderEntityId, subordinateId);
+  }
+
   if (!complied) {
     return {
-      complied: false, loyalty, complianceChance, refusedBy: subordinateId, mission: null,
+      complied: false, basis, gatingValue, complianceChance, refusedBy: subordinateId, mission: null,
     };
   }
 
@@ -258,10 +303,10 @@ function directMission(worldState, leaderEntityId, options = {}) {
   const mission = missions.generateMission(worldState, { artifactId, locationId, objective, reward });
   missions.acceptMission(worldState, mission.id, subordinateId);
   mission.issued_by_entity_id = Number(leaderEntityId);
-  mission.issuing_organization_id = organization.id;
+  mission.issuing_organization_id = organization ? organization.id : null;
 
   return {
-    complied: true, loyalty, complianceChance, refusedBy: null, mission,
+    complied: true, basis, gatingValue, complianceChance, refusedBy: null, mission,
   };
 }
 
@@ -292,7 +337,19 @@ function broadcastMessage(worldState, leaderEntityId, options = {}) {
     );
   }
 
-  return media.broadcast(worldState, { ...rest, sourceEntityId: Number(leaderEntityId) });
+  const written = media.broadcast(worldState, { ...rest, sourceEntityId: Number(leaderEntityId) });
+  // Each real person actually reached (media.js already decided who
+  // that is — share, era-gating, the draw against reach) is one more
+  // real event raising the leader's real influence over them, at the
+  // broadcast's own, lighter weight. See influence.js's header for why
+  // this is half a direct interaction's weight rather than the same.
+  for (const row of written) {
+    if (row.entity_id === Number(leaderEntityId)) continue;
+    influence.raiseInfluence(
+      worldState, Number(leaderEntityId), row.entity_id, influence.BROADCAST_INFLUENCE_DELTA,
+    );
+  }
+  return written;
 }
 
 module.exports = {

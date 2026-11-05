@@ -18,6 +18,7 @@ const membership = require('../server/membership.js');
 const worldStore = require('../server/worldStore.js');
 const players = require('../server/players.js');
 const leadership = require('../server/leadership.js');
+const influence = require('../server/influence.js');
 
 let nextId = 900000;
 
@@ -350,6 +351,107 @@ test('broadcastMessage refuses a leader whose organization is not actually media
     () => leadership.broadcastMessage(w, leader.id, { organizationId: org.id, factContent: 'state of the union' }),
     /not "media"/,
   );
+});
+
+// -- directMission, the organization-free path (influence.js) ------------
+
+test('directMission with no organizationId needs no membership at all -- compliance gates on real influence instead', () => {
+  const w = world();
+  const bigShot = person(w);
+  const stranger = person(w); // no shared organization, never met
+  worldStore.getOrCreateRelationship(w, bigShot.id, stranger.id, 'social').influence = 100;
+  const relic = artifact(w, 'Loose Relic');
+
+  const result = leadership.directMission(w, bigShot.id, {
+    subordinateEntityId: stranger.id, artifactId: relic.id,
+  });
+  assert.equal(result.basis, 'influence');
+  assert.equal(result.gatingValue, 100);
+  assert.equal(result.complied, true);
+  assert.equal(result.mission.issuing_organization_id, null, 'no organization was involved');
+});
+
+test('directMission with no organizationId and no prior relationship gates on the real influenceRatingOf baseline, not an invented default', () => {
+  const w = world();
+  const nobody = person(w);
+  const stranger = person(w);
+  const relic = artifact(w, 'Fresh Relic');
+
+  const expectedRating = influence.influenceRatingOf(w, nobody.id);
+  const result = leadership.directMission(w, nobody.id, {
+    subordinateEntityId: stranger.id, artifactId: relic.id,
+  });
+  assert.equal(result.basis, 'influence');
+  assert.equal(result.gatingValue, expectedRating);
+});
+
+test('directMission zero-influence stranger never complies on the organization-free path, same deterministic shape as zero loyalty', () => {
+  const w = world();
+  const nobody = person(w);
+  const stranger = person(w);
+  worldStore.getOrCreateRelationship(w, nobody.id, stranger.id, 'social').influence = 0;
+
+  for (let tick = 0; tick < 10; tick += 1) {
+    const relic = artifact(w, `Relic ${tick}`);
+    const result = leadership.directMission(w, nobody.id, {
+      subordinateEntityId: stranger.id, artifactId: relic.id, tick,
+    });
+    assert.equal(result.complied, false);
+    assert.equal(result.mission, null);
+  }
+});
+
+test('a compliance (either path) really raises influence between leader and subordinate -- directing is itself an event now', () => {
+  const w = world();
+  const leader = person(w);
+  const subordinate = person(w);
+  const org = organization(w, { leaderId: leader.id });
+  join(w, subordinate.id, org.id);
+  worldStore.getOrCreateRelationship(w, leader.id, subordinate.id, 'social').loyalty = 100;
+  const before = worldStore.getOrCreateRelationship(w, leader.id, subordinate.id, 'social').influence;
+
+  const relic = artifact(w, 'Relic');
+  leadership.directMission(w, leader.id, {
+    organizationId: org.id, subordinateEntityId: subordinate.id, artifactId: relic.id,
+  });
+
+  const after = worldStore.findRelationship(w, leader.id, subordinate.id).influence;
+  assert.ok(after > before, `compliance must raise real influence: ${before} -> ${after}`);
+});
+
+test('a REFUSED order really lowers the leader\'s influence over that subordinate -- being refused costs real sway', () => {
+  const w = world();
+  const leader = person(w);
+  const subordinate = person(w);
+  const org = organization(w, { leaderId: leader.id });
+  join(w, subordinate.id, org.id);
+  worldStore.getOrCreateRelationship(w, leader.id, subordinate.id, 'social').loyalty = 0;
+  const rel = worldStore.getOrCreateRelationship(w, leader.id, subordinate.id, 'social');
+  rel.influence = 50; // a real, pre-existing value, so the drop is unambiguous
+
+  const relic = artifact(w, 'Relic');
+  const result = leadership.directMission(w, leader.id, {
+    organizationId: org.id, subordinateEntityId: subordinate.id, artifactId: relic.id,
+  });
+
+  assert.equal(result.complied, false);
+  assert.ok(rel.influence < 50, `a refusal must really lower influence, got ${rel.influence}`);
+});
+
+test('a refusal on the organization-free path also lowers real influence, the identical shape as the org path', () => {
+  const w = world();
+  const nobody = person(w);
+  const stranger = person(w);
+  const rel = worldStore.getOrCreateRelationship(w, nobody.id, stranger.id, 'social');
+  rel.influence = 50;
+
+  const relic = artifact(w, 'Relic');
+  const result = leadership.directMission(w, nobody.id, {
+    subordinateEntityId: stranger.id, artifactId: relic.id,
+  });
+
+  assert.equal(result.complied, false);
+  assert.ok(rel.influence < 50);
 });
 
 test('broadcastMessage puts a real, attributed fact through the real media.broadcast pipeline', () => {

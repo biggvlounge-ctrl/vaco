@@ -354,12 +354,17 @@ const ACTIONS = {
   // succeed just because the actor holds the seat.
 
   'direct-mission': {
-    summary: 'Order one of your own organization\'s members onto a real mission.',
+    // `organizationId` is deliberately not in `requires` any more --
+    // leadership.js's own organization-free path (influence.js) needs
+    // none. Omitted here means omitted there; this dispatcher still
+    // decides nothing, it only stops forcing a `Number(undefined)`
+    // (NaN) through where leadership.js wants a real `null`.
+    summary: 'Order a subordinate onto a real mission -- your own organization\'s real member, or anyone you hold real influence over.',
     modes: ['leader'],
-    requires: ['organizationId', 'subordinateEntityId'],
+    requires: ['subordinateEntityId'],
     verbs: ['directMission'],
     run: (verbs, actorId, body) => verbs.directMission(actorId, {
-      organizationId: Number(body.organizationId),
+      organizationId: body.organizationId != null ? Number(body.organizationId) : null,
       subordinateEntityId: Number(body.subordinateEntityId),
       objective: body.objective ?? null,
       reward: body.reward ?? null,

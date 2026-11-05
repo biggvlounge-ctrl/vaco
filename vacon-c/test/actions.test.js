@@ -122,6 +122,27 @@ test('leader mode was reopened by explicit instruction, and its menu proves it',
   assert.ok(!citizenMenu.includes('broadcast-message'));
 });
 
+test('direct-mission does not require organizationId at the dispatcher -- leadership.js\'s organization-free path (influence.js) must actually be reachable through the one real player interface', () => {
+  const leaderNpc = engine.generateNPC();
+  const subordinate = engine.generateNPC();
+  const org = engine.generateOrganization({ type: 'gang', leaderId: leaderNpc.id });
+  const player = engine.generatePlayer({ linkedEntityId: leaderNpc.id });
+  engine.promoteToLeader(player.id);
+  const relic = engine.generateArtifact({ name: `No-Org Relic ${subordinate.id}` });
+
+  // No organizationId in the body at all -- this must not 400 on a
+  // missing required field, and must not pass Number(undefined) (NaN)
+  // through to leadership.js where it expects a real null.
+  const out = engine.dispatchAction(player.id, {
+    action: 'direct-mission', subordinateEntityId: subordinate.id, artifactId: relic.id,
+  });
+  assert.equal(out.result.basis, 'influence');
+  assert.ok(Number.isFinite(out.result.gatingValue), 'gatingValue must be a real number, not NaN');
+  if (out.result.mission) {
+    assert.equal(out.result.mission.issuing_organization_id, null);
+  }
+});
+
 // ---------------------------------------------------------------------------
 // A player acts as themselves
 // ---------------------------------------------------------------------------

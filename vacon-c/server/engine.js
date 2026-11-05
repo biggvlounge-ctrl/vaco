@@ -65,6 +65,8 @@ const investments = require('./investments.js');
 const tick = require('./tick.js');
 const players = require('./players.js');
 const leadership = require('./leadership.js');
+const influence = require('./influence.js');
+const characterCreation = require('./characterCreation.js');
 const territory = require('./territory.js');
 const missions = require('./missions.js');
 const property = require('./property.js');
@@ -805,6 +807,39 @@ function broadcastMessage(entityId, options = {}) {
   return leadership.broadcastMessage(WorldState, entityId, options);
 }
 
+// Character creation — see characterCreation.js's own header for the
+// full design. `generateNPC`/`generateFamily`/`addFamilyMember` are
+// injected rather than required back from that module, because their
+// real logic lives directly in THIS file (there is no separate
+// npcs.js/families.js to require) and requiring engine.js from a
+// module engine.js itself requires would be circular.
+// Real, computed reads over the influence economy — never stored,
+// same posture as getNetWorth/getFamilyWealth. See influence.js.
+function getInfluenceRating(entityId) {
+  return influence.influenceRatingOf(WorldState, entityId);
+}
+
+function getPersonalInfluence(entityId) {
+  return influence.personalInfluenceOf(WorldState, entityId);
+}
+
+function getFamilyPoliticalInfluence(familyId) {
+  return influence.familyPoliticalInfluenceOf(WorldState, familyId);
+}
+
+function createCharacter(options = {}) {
+  return characterCreation.createCharacter(WorldState, {
+    ...options,
+    generators: {
+      generateNpc: (npcOptions) => generateNPC(npcOptions),
+      generateFamily: (familyOptions) => generateFamily(familyOptions),
+      addFamilyMember: (familyId, entityId, role, generationNumber) => (
+        addFamilyMember(familyId, entityId, role, generationNumber)
+      ),
+    },
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Territory/Community (block-tier)
 // ---------------------------------------------------------------------------
@@ -1055,6 +1090,18 @@ const SHOWDOWN_SPARRING_REINFORCEMENT = 2;
 
 function resolveContest(options) {
   const result = contest.resolveContest(WorldState, options);
+
+  // Real influence growth on ANY resolved contest, not just combat —
+  // winning is winning. `relationships.influence` is a single shared
+  // value per pair (influence.js's own header), so one raise per real
+  // loser already is the loss from their own side; a second, opposite
+  // call on the same event would cancel itself out, so there is
+  // deliberately only one.
+  for (const { entityId: loserId } of result.ratings) {
+    if (loserId === result.winnerId) continue;
+    influence.raiseInfluence(WorldState, result.winnerId, loserId);
+  }
+
   if (result.discipline !== 'combat') return result;
 
   const now = WorldState.tick;
@@ -1427,10 +1474,25 @@ function attemptTakeover(entityId, options = {}) {
 }
 
 function resolveMission(missionId, options = {}) {
-  return missions.resolveMission(WorldState, missionId, {
+  const result = missions.resolveMission(WorldState, missionId, {
     ...options,
     payReward: payMissionReward,
   });
+  // A directed mission's own real completion raises real influence
+  // between whoever issued it and whoever carried it out — see
+  // leadership.js/influence.js. Only completion, not failure or
+  // abandonment: that was the real event asked for, and this file does
+  // not invent a matching decrease nobody asked for.
+  const { mission } = result;
+  if (
+    mission.status === 'completed'
+    && mission.issued_by_entity_id != null
+    && mission.assigned_entity_id != null
+    && mission.issued_by_entity_id !== mission.assigned_entity_id
+  ) {
+    influence.raiseInfluence(WorldState, mission.issued_by_entity_id, mission.assigned_entity_id);
+  }
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -1592,6 +1654,10 @@ module.exports = {
   getCitizenDashboard,
   promoteToLeader,
   getLeaderDashboard,
+  createCharacter,
+  getInfluenceRating,
+  getPersonalInfluence,
+  getFamilyPoliticalInfluence,
   generateCity,
   generateCommunity,
   generateTerritoryBlock,

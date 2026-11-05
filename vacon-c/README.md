@@ -142,6 +142,35 @@ organization, `broadcast-message` (put a real fact in front of their
 outlet's real audience) through the same `POST /api/players/:id/action`
 dispatcher every other player verb already uses.
 
+## The influence economy and character creation (5 Nov 2026)
+See `CLAUDE.md`'s own forty-eighth standing rule for the full design.
+`relationships.influence` and `families.political_influence` were real
+schema columns nothing read or wrote beyond their generation-time
+default; this is what finally does. Every entity — NPC or player avatar
+— has real, growing influence over the specific people they actually
+interact with, starting from a real baseline (`influenceRatingOf`:
+occupation tier, real organization leadership scaled by its own size
+and reach, real social traits) rather than a flat zero, and moving down
+from real refusals and losses exactly as it moves up from real
+successes (a lost contest, a refused `direct-mission` order, a
+negotiation between people with real bad history). `direct-mission` now
+has a second real path: an entity with real, high `relationships
+.influence` over a target can attempt to direct them with no
+organization involved at all, gated the same probability-draw way as
+the org path — never a guessed cutoff.
+
+`server/characterCreation.js`'s `createCharacter` (`POST
+/api/characters`) is the other half: a player picks a few real things
+— occupation (validated against the real qualification gate any NPC's
+hire is held to), country, community — and everything else, especially
+family, is randomly generated and revealed rather than chosen: whether
+each parent is alive or dead (the real mortality pipeline, never a
+second "is dead" flag), a living parent's own real occupation, real
+siblings, and real cousins — each one a fully simulated NPC, child of a
+real aunt/uncle who heads an entirely separate real family of their own
+at its own real, possibly different, location. Grandparents and
+anything beyond parents/siblings/cousins are explicitly out of scope.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

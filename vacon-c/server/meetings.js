@@ -81,6 +81,7 @@ const knowledge = require('./knowledge.js');
 const occupations = require('./occupations.js');
 const keys = require('./keys.js');
 const mortality = require('./mortality.js');
+const influence = require('./influence.js');
 
 // ---------------------------------------------------------------------
 // The purposes
@@ -116,6 +117,13 @@ const PURPOSES = {
     // The only purpose whose outcome depends on what the parties
     // already think of each other.
     contested: true,
+    // `influence.js` raises or lowers real influence on this purpose
+    // alongside trust — negotiate is the one purpose with a real
+    // failure branch (trustDelta can come back negative for two
+    // people with real bad history), so it is also the one purpose
+    // that can lower influence, on the same sign as the trust it
+    // actually moved.
+    movesInfluence: true,
   },
   teach: {
     source: 'spec NPC vocabulary: "learn, teach"',
@@ -128,6 +136,11 @@ const PURPOSES = {
     trust: 2,
     teaches: false,
     shares: true,
+    // Unlike negotiate, `recruit` has no `contested` branch at all —
+    // its trustDelta is always the flat positive figure above. So it
+    // only ever RAISES influence; there is no real failure mode here
+    // to lower it on, and this file does not invent one.
+    movesInfluence: true,
   },
   'form alliance': {
     source: 'spec decision vocabulary: "form alliance"',
@@ -237,6 +250,17 @@ function hold(worldState, options = {}) {
       // `control.attempt` needs, for the same reason.
       rel.trust = Math.max(0, Math.min(100, rel.trust));
       moved.relationships += 1;
+
+      // Real influence growth/decay, on the same sign as the real
+      // trust delta this purpose just produced — see PURPOSES'
+      // `movesInfluence` flag and influence.js's own header.
+      if (definition.movesInfluence && delta !== 0) {
+        if (delta > 0) {
+          influence.raiseInfluence(worldState, attendees[i].id, attendees[j].id);
+        } else {
+          influence.lowerInfluence(worldState, attendees[i].id, attendees[j].id);
+        }
+      }
     }
   }
 

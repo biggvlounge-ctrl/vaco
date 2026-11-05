@@ -111,6 +111,22 @@ GET  /api/players/:id/simulation-controls  — Simulation mode: world variable a
 GET  /api/missions/available/:entityId    — missions available to a specific player's linked entity
 ```
 
+**The influence economy and character creation, built 5 Nov 2026**
+(`server/influence.js`, `server/characterCreation.js`) — see
+`CLAUDE.md`'s forty-eighth standing rule. `relationships.influence` and
+`families.political_influence` were real schema columns with no reader
+or writer anywhere before this; `net-worth`'s own route above is the
+precedent these four reads follow (computed on read, never stored).
+`POST /api/characters` is the one new write — everything else here is
+a real, computed read.
+
+```
+GET  /api/entities/:id/influence-rating       — influenceRatingOf: the real, derived baseline a brand-new relationship seeds from
+GET  /api/entities/:id/personal-influence     — personalInfluenceOf: real influence accumulated across every real relationship
+GET  /api/families/:id/political-influence    — familyPoliticalInfluenceOf: the mean of living members' own personal influence
+POST /api/characters                          — createCharacter: player picks occupation/country/community; family is random and revealed
+```
+
 ## Phase 4 — Digital Planet (ecosystem link-outs, not built here)
 
 **These are outbound link generators, not functional endpoints** —

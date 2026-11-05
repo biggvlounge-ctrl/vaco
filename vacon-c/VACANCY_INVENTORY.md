@@ -20,7 +20,7 @@ There is a working simulation — traits across four tiers, seven Key
 resolvers, family, economy, territory, tick, players, artifacts and
 missions, plus Property, Culture DNA, Named Flow Templates, contest
 resolution and the Behavior Engine — and its HTTP surface is real:
-**98 routes**, up from 8 before any of this -- 92 plus the two
+**104 routes**, up from 8 before any of this -- 92 plus the two
 cross-cutting reads (`/api/historical-records`,
 `/api/decision-log/:entityId`) a later audit found documented in
 `VACANCY_API_ENDPOINT_MAP.md` as built and missing from `server.js`,
@@ -28,7 +28,15 @@ plus four more (`GET`/`POST /api/regions`, `GET /api/regions/:id`,
 `GET /api/country-packs/:key`) added to make `migration.js`'s and
 `countryPacks.js`'s real, cited country/region data -- built up over
 many rounds -- reachable over HTTP at all, closing a gap where neither
-file was even `require`d by `server.js`.
+file was even `require`d by `server.js`, plus two more from Leader
+mode (`GET /api/players/:id/leader-dashboard`,
+`POST /api/players/:id/promote-to-leader`, CLAUDE.md's forty-seventh
+standing rule) that were built but never counted here, plus four more
+from the influence economy and character creation (CLAUDE.md's
+forty-eighth standing rule): `GET /api/entities/:id/influence-rating`,
+`GET /api/entities/:id/personal-influence`,
+`GET /api/families/:id/political-influence`, and
+`POST /api/characters`.
 
 Since then, and not in the phase plan because nothing anticipated them:
 world generation, the uniform statistics catalogue, crime and policing,
@@ -55,7 +63,7 @@ the Postgres schema that already exists.
 
 ## 1. Server code — `vacon-c/server/`
 
-All 110 files present on disk, all committed, largest first.
+All 113 files present on disk, all committed, largest first.
 
 **`test/inventory.test.js` now fails when this table and `server/` disagree**, which is the guard this document has needed through three separate drifts (see the note below). The count and the file list are checked against the tree rather than typed.
 
@@ -69,6 +77,9 @@ read off disk, not recalled.
 
 | File | Size | What it holds | State |
 |---|---|---|---|
+| `leadership.js` | 16,788 | **Leader mode (CLAUDE.md's forty-seventh standing rule) — missing from this table since it was built, found when `test/inventory.test.js` was finally written against the real tree.** `organizations.leader_id` is the seat; directing a subordinate is a real probability draw against their own `loyalty` (or, on the organization-free path added with the influence economy, their own real `influence`), never a guaranteed command. `broadcastMessage` is a leader of a `media` organization putting a real fact through `media.broadcast`. | Built |
+| `influence.js` | 15,409 | **The influence economy, over two real schema columns — `relationships.influence` and `families.political_influence` — that sat at their generation-time default, read and written by nothing, since this project's first version.** `influenceRatingOf` is a real, derived, never-stored starting baseline (occupation tier, real organization leadership, real social traits) rather than a flat zero; `raiseInfluence`/`lowerInfluence` are the one real write path, moving the single shared value a relationship's `trust`/`respect`/`loyalty` already model this way. See CLAUDE.md's forty-eighth standing rule. | Built |
+| `characterCreation.js` | 19,970 | **Character creation — a player picks occupation/country/community (real, validated), and everything else, especially family, is randomly generated and REVEALED, never chosen.** Real parents (alive-or-dead through the real `mortality.recordDeath` pipeline, never a second flag), real siblings, and real cousins — each a fully simulated NPC, child of a real aunt/uncle heading an entirely separate real family of their own. Grandparents and anything beyond are explicitly out of scope. See CLAUDE.md's forty-eighth standing rule. | Built |
 | `migrate.js` | 57,000 | WorldState → PostgreSQL migration. | Built, see §4 |
 | `tick.js` | 56,547 | The eleven-phase tick pipeline, environmental conditions, and the cross-cutting slot. **Conditions now give back what they took** — see CLAUDE.md, thirteenth standing rule. | Built |
 | `statistics.js` | 60,429 | The uniform statistics catalogue — every reading an area can give about itself, in one shape, with declared absences as data. | Built |

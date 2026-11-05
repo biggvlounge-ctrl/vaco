@@ -393,3 +393,56 @@ test('describeMeetings reports zero rather than assuming', () => {
   assert.equal(described.held, 0);
   assert.equal(described.purposes, meetings.PURPOSE_NAMES.length);
 });
+
+// ---------------------------------------------------------------------
+// movesInfluence -- influence.js's own wiring into negotiate/recruit
+// ---------------------------------------------------------------------
+
+test('negotiate and recruit are flagged movesInfluence; most other purposes are not', () => {
+  assert.equal(meetings.PURPOSES.negotiate.movesInfluence, true);
+  assert.equal(meetings.PURPOSES.recruit.movesInfluence, true);
+  assert.ok(!meetings.PURPOSES['sit-down'].movesInfluence);
+});
+
+test('a friendly negotiation really raises real influence between the two attendees', () => {
+  const w = room({ people: 2 });
+  assert.equal(worldStore.findRelationship(w, 1, 2), undefined);
+  meetings.hold(w, { attendeeIds: [1, 2], purpose: 'negotiate' });
+  const rel = worldStore.findRelationship(w, 1, 2);
+  assert.ok(rel, 'negotiating must create or touch the real relationship');
+  assert.ok(Number(rel.influence) > 0);
+});
+
+test('a negotiation between people who have already wronged each other really LOWERS real influence -- the one purpose with a real failure branch', () => {
+  // `trustDelta` for negotiate reads `keys.feelingToward`, which can
+  // come back negative for two people with real bad history -- the
+  // real failure branch this file's own header names. influence.js
+  // moves on the SAME sign, never a separately-invented failure mode.
+  const w = room({ people: 2 });
+  w.memories.push({
+    id: 1,
+    entity_id: 1,
+    memory_type: 'negative',
+    category: 'conflict',
+    description: 'was robbed by them',
+    importance: 80,
+    emotion_level: -80,
+    related_entity_ids: [2],
+    tick: 9000,
+    reinforcement_count: 0,
+  });
+  const rel = worldStore.getOrCreateRelationship(w, 1, 2, 'social');
+  rel.influence = 50; // a real, pre-existing value, so the drop is unambiguous
+
+  meetings.hold(w, { attendeeIds: [1, 2], purpose: 'negotiate' });
+  assert.ok(rel.influence < 50, `a hostile negotiation must really lower influence, got ${rel.influence}`);
+});
+
+test('recruit has no contested branch in PURPOSES -- it only ever raises influence, never invents a failure mode', () => {
+  assert.equal(meetings.PURPOSES.recruit.contested, undefined);
+  const w = room({ people: 2 });
+  meetings.hold(w, { attendeeIds: [1, 2], purpose: 'recruit' });
+  const rel = worldStore.findRelationship(w, 1, 2);
+  assert.ok(rel);
+  assert.ok(Number(rel.influence) > 0);
+});

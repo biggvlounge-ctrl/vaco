@@ -264,6 +264,16 @@ app.get('/api/entities/:id/net-worth', (req, res) => {
   res.json({ entityId: Number(req.params.id), netWorth: engine.getNetWorth(Number(req.params.id)) });
 });
 
+// Real, computed reads over the influence economy (influence.js) —
+// never stored, same posture as net-worth just above.
+app.get('/api/entities/:id/influence-rating', (req, res) => {
+  res.json({ entityId: Number(req.params.id), influenceRating: engine.getInfluenceRating(Number(req.params.id)) });
+});
+
+app.get('/api/entities/:id/personal-influence', (req, res) => {
+  res.json({ entityId: Number(req.params.id), personalInfluence: engine.getPersonalInfluence(Number(req.params.id)) });
+});
+
 // -- NPCs -------------------------------------------------------------------
 
 app.get('/api/npcs', (req, res) => {
@@ -321,7 +331,10 @@ app.post('/api/keys/:keyId/resolve', requireOperator('vacon-c:key-resolve'), (re
 app.get('/api/families', (_req, res) => {
   res.json({
     families: engine.WorldState.families.map((f) => ({
-      ...f, wealth: engine.getFamilyWealth(f.id),
+      ...f,
+      wealth: engine.getFamilyWealth(f.id),
+      // Real computed rollup over relationships.influence -- standing rule 3.
+      politicalInfluence: engine.getFamilyPoliticalInfluence(f.id),
     })),
   });
 });
@@ -335,8 +348,20 @@ app.get('/api/families/:id', (req, res) => {
     family,
     // Computed on read, never stored -- standing rule 3.
     wealth: engine.getFamilyWealth(id),
+    politicalInfluence: engine.getFamilyPoliticalInfluence(id),
     members: memberships.map((m) => ({ ...m, npc: engine.getLiveEntity(m.entity_id) })),
   });
+});
+
+// Real computed rollup over the influence economy (influence.js) --
+// never stored, same posture as the `wealth` field already on the two
+// routes above. A standalone route alongside them, matching
+// entities' own influence-rating/personal-influence routes.
+app.get('/api/families/:id/political-influence', (req, res) => {
+  const id = Number(req.params.id);
+  const family = engine.WorldState.families.find((f) => f.id === id);
+  if (!family) return res.status(404).json({ error: `no family with id ${id}` });
+  res.json({ familyId: id, politicalInfluence: engine.getFamilyPoliticalInfluence(id) });
 });
 
 // audit-route-guards: open -- creates simulation content, no real-world principal; VACON-C is paused
@@ -358,6 +383,17 @@ app.post('/api/families/:id/members', (req, res) => {
     res.status(201).json(engine.addFamilyMember(
       Number(req.params.id), Number(entityId), role, generationNumber ?? 1,
     ));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// audit-route-guards: open -- creates simulation content (a new player
+// character plus their random, revealed family tree), no real-world
+// principal to require.
+app.post('/api/characters', (req, res) => {
+  try {
+    res.status(201).json(engine.createCharacter(req.body || {}));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
