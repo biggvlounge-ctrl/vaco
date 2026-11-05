@@ -373,6 +373,47 @@ query, a non-matching query (empty list, not an error), the real
 intensity filter, and an invalid intensity level's honest 400 all
 confirmed over HTTP.
 
+## Hunt time limits and scheduling (5 Nov 2026)
+
+Closes this project's own long-flagged gap: "no drone routing between
+hunt checkpoints, no hunt time limits or scheduling — hunts are
+budget-bounded, not clock-bounded." No source doc specifies a shape
+for this, so it's a real, flagged interpretive choice: `createHunt`
+gains an optional `startsAt` (defaults to now — most hunts are "open
+now," scheduling ahead is the exception) and an optional
+`timeLimitMinutes`, from which a real `endsAt` is computed once at
+creation, the same "compute once, store the real deadline" shape
+`marketplace.js`'s own `retryDelivery`/`failedAt` already uses
+elsewhere in this ecosystem. A hunt with no `timeLimitMinutes` has
+`endsAt: null` and can never expire — exactly as budget-bounded as
+before; this is additive, not a forced clock on every hunt.
+
+`getHuntTimeStatus(hunt, now)` (new, `lib/hunts.js`) computes
+`started`/`expired` fresh against the real clock rather than caching a
+flag that could drift. `checkInAtCheckpoint` now refuses with a clear
+error both before a scheduled hunt's `startsAt` and after a
+time-limited hunt's `endsAt` — the same shape as its existing
+budget-refusal message, checked before any real settlement happens.
+`GET /api/hunt/:huntId/time-status` (new) surfaces the same computed
+status a frontend would need for a live countdown, the same granular-
+route shape `getHuntProgress`'s own dedicated route already uses.
+
+### Verification
+
+`test/huntTimeLimits.test.js` (new, 6 tests): an unset time limit
+never expires, a non-positive `timeLimitMinutes` refused,
+`endsAt`/`expired` computed correctly from `startsAt +
+timeLimitMinutes`, check-in refused before a scheduled hunt starts,
+check-in refused once a time-limited hunt has expired, and check-in
+succeeding inside a real, open window. Full suite: 136/136 → 142/142.
+Mutation-verified: replacing the `expired` refusal's condition with
+`false` turned the expiry test red; restored and reconfirmed green.
+Live-verified against a real spawned server: the seeded demo hunt's
+own `GET /api/hunt/1` now carries the real new `startsAt` (a real
+timestamp, set at seed time) and `endsAt: null` fields (no time limit
+was set on it), and the new `GET /api/hunt/1/time-status` answered
+`{"started":true,"expired":false,...}` over real HTTP.
+
 ## Not yet built
 - Drone routing/dispatch algorithms (explicitly priced as separate,
   genuinely novel Tier-A work in the pricing doc — not attempted).
@@ -390,8 +431,10 @@ confirmed over HTTP.
 - Digital Twin level is computed (Phase 2), but not yet wired to
   `venvs`'s CHOPZ system — that Digital Twin Level system doesn't
   exist there as working code yet.
-- No drone routing between hunt checkpoints, no hunt time limits or
-  scheduling — hunts (Phase 3) are budget-bounded, not clock-bounded.
+- No drone routing between hunt checkpoints. Hunt time limits/
+  scheduling are now real — see "Hunt time limits and scheduling"
+  below; a hunt with neither set stays exactly as budget-bounded as
+  before.
 - No analytics time-windowing (daily/weekly breakdowns) — Screen
   Analytics (Phase 4) is an all-time rollup; no source doc specifies a
   reporting period.

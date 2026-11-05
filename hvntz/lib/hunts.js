@@ -35,8 +35,23 @@ const { findNetwork, networkView } = require('./networkConnections');
 
 const HUNT_INTENSITY_LEVELS = ['leisurely', 'moderate', 'action-based'];
 
+// Real hunt time limits/scheduling (this project's own README flagged
+// the gap directly: "no hunt time limits or scheduling -- hunts are
+// budget-bounded, not clock-bounded"). No source doc specifies a
+// shape for this, so it's a real, flagged interpretive choice: a hunt
+// gets an optional `startsAt` (defaults to now -- most hunts are "open
+// now", scheduling ahead is the exception) and an optional
+// `timeLimitMinutes`, from which a real `endsAt` is computed once at
+// creation rather than recomputed from a mutable duration on every
+// check -- the same "compute once, store the real deadline" shape
+// `retryDelivery`'s own `failedAt` timestamp already uses elsewhere in
+// this ecosystem. A hunt with no `timeLimitMinutes` has `endsAt: null`
+// and stays exactly as budget-bounded as before -- this is additive,
+// not a forced clock on every hunt.
 function createHunt(store, options = {}) {
-  const { title, sponsorId, totalBudget, intensityLevel = 'moderate' } = options;
+  const {
+    title, sponsorId, totalBudget, intensityLevel = 'moderate', startsAt = Date.now(), timeLimitMinutes = null,
+  } = options;
   if (!title) {
     throw new Error('createHunt requires a title');
   }
@@ -49,6 +64,12 @@ function createHunt(store, options = {}) {
   if (!HUNT_INTENSITY_LEVELS.includes(intensityLevel)) {
     throw new Error(`createHunt: invalid intensityLevel "${intensityLevel}" (expected one of ${HUNT_INTENSITY_LEVELS.join(', ')})`);
   }
+  if (!Number.isFinite(startsAt)) {
+    throw new Error('createHunt requires a numeric startsAt');
+  }
+  if (timeLimitMinutes !== null && (!Number.isFinite(timeLimitMinutes) || timeLimitMinutes <= 0)) {
+    throw new Error('createHunt: timeLimitMinutes must be a positive number when provided');
+  }
 
   const hunt = {
     id: store.nextHuntId++,
@@ -57,6 +78,9 @@ function createHunt(store, options = {}) {
     totalBudget,
     remainingBudget: totalBudget,
     intensityLevel,
+    startsAt,
+    timeLimitMinutes,
+    endsAt: timeLimitMinutes !== null ? startsAt + timeLimitMinutes * 60000 : null,
     checkpoints: [],
     nextCheckpointId: 1,
     participations: [], // { checkpointId, userId, checkedInAt }
@@ -67,6 +91,19 @@ function createHunt(store, options = {}) {
 
 function getHunt(store, huntId) {
   return store.hunts.find((h) => h.id === huntId) || null;
+}
+
+// Real, honest status: `started`/`expired` computed fresh against the
+// hunt's own real `startsAt`/`endsAt` rather than a cached flag that
+// could drift from the clock. A hunt with no `endsAt` can never expire
+// -- the budget-bounded case this project already had, unaffected.
+function getHuntTimeStatus(hunt, now = Date.now()) {
+  return {
+    started: now >= hunt.startsAt,
+    expired: hunt.endsAt !== null && now > hunt.endsAt,
+    startsAt: hunt.startsAt,
+    endsAt: hunt.endsAt,
+  };
 }
 
 // §41's own instruction: "First inspect the current... database
@@ -220,7 +257,7 @@ function hasCheckedIn(hunt, checkpointId, userId) {
 // curated permanent post -- the doc doesn't specify either way.
 async function checkInAtCheckpoint(store, options = {}) {
   const {
-    huntId, checkpointId, userId, settleFn, photoUrl = null, postToVavltStvdios = null,
+    huntId, checkpointId, userId, settleFn, photoUrl = null, postToVavltStvdios = null, now = Date.now(),
   } = options;
   const hunt = getHunt(store, huntId);
   if (!hunt) {
@@ -235,6 +272,13 @@ async function checkInAtCheckpoint(store, options = {}) {
   }
   if (hasCheckedIn(hunt, checkpointId, userId)) {
     throw new Error(`checkInAtCheckpoint: ${userId} has already checked in at checkpoint ${checkpointId}`);
+  }
+  const timeStatus = getHuntTimeStatus(hunt, now);
+  if (!timeStatus.started) {
+    throw new Error(`checkInAtCheckpoint: hunt ${huntId} has not started yet (starts at ${new Date(hunt.startsAt).toISOString()})`);
+  }
+  if (timeStatus.expired) {
+    throw new Error(`checkInAtCheckpoint: hunt ${huntId} has expired (ended at ${new Date(hunt.endsAt).toISOString()})`);
   }
   const totalCost = checkpoint.bountyAmount + checkpoint.hostFee;
   if (totalCost > hunt.remainingBudget) {
@@ -373,6 +417,7 @@ module.exports = {
   HUNT_INTENSITY_LEVELS,
   createHunt,
   getHunt,
+  getHuntTimeStatus,
   searchHunts,
   addCheckpoint,
   getCheckpoint,

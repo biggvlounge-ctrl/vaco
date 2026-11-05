@@ -36,7 +36,7 @@ const {
 } = require('./lib/neighborProgram');
 const { PACKAGE_TIERS, setCvnvoPlacement, getCvnvoPlacement } = require('./lib/cvnvoPlacement');
 const {
-  HUNT_INTENSITY_LEVELS, createHunt, getHunt, searchHunts, addCheckpoint, getCheckpoint,
+  HUNT_INTENSITY_LEVELS, createHunt, getHunt, getHuntTimeStatus, searchHunts, addCheckpoint, getCheckpoint,
   linkCheckpointNetwork, unlinkCheckpointNetwork, checkpointLiveNetwork,
   checkInAtCheckpoint, getHuntProgress, recommendBreak,
 } = require('./lib/hunts');
@@ -662,6 +662,18 @@ app.get('/api/hunt/:huntId', (req, res) => {
   const hunt = getHunt(store, Number(req.params.huntId));
   if (!hunt) return res.status(404).json({ error: `no hunt with id ${req.params.huntId}` });
   res.json(hunt);
+});
+
+// Real, computed-fresh time status -- closes this project's own
+// flagged "no hunt time limits or scheduling" gap. The hunt record
+// itself already carries the real `startsAt`/`endsAt`; this is the
+// honest `started`/`expired` read against the current clock, the same
+// shape `getHuntProgress`'s own dedicated route already gives for
+// budget/checkpoint progress.
+app.get('/api/hunt/:huntId/time-status', (req, res) => {
+  const hunt = getHunt(store, Number(req.params.huntId));
+  if (!hunt) return res.status(404).json({ error: `no hunt with id ${req.params.huntId}` });
+  res.json(getHuntTimeStatus(hunt));
 });
 
 // Closes this project's own flagged "no hunt discovery beyond the
