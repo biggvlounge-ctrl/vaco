@@ -1,22 +1,26 @@
-// CHOPZ -- Engagement: likes, comments, shares.
+// CHOPZ -- Engagement: likes, comments, shares, plays.
 // Source of truth: this project's own README "Not yet built" list,
 // which named "likes/comments/shares/duets/For You ranking" as
 // everything else TikTok's own feed has beyond a bare video record.
-// This closes the smallest real slice of that: the three engagement
-// primitives every short-form feed is read against, deliberately
-// leaving duets (a real video-composition feature) and For You
-// ranking (a real recommendation algorithm) as their own, separately
-// large builds -- the same "smallest real slice first" scoping
-// `videos.js`'s own header already used for this app.
+// This closed the smallest real slice of that first (likes/comments/
+// shares), deliberately leaving duets (a real video-composition
+// feature) and For You ranking (a real recommendation algorithm) as
+// their own, separately large builds -- the same "smallest real slice
+// first" scoping `videos.js`'s own header already used for this app.
+// `recordPlay`/`getPlayCount` joined the original three (5 Nov 2026)
+// specifically to give `lib/forYou.js`'s real ranking a real "plays"
+// signal to read -- TikTok's own public engagement list, not this
+// file's invention.
 //
 // A like is a real toggle, not a counter a caller can push past 1 for
 // the same user -- one real (videoId, userId) pair, present or not.
 // A comment is permanent (no edit/delete modeled, same posture most
 // of this ecosystem's other comment-shaped features take at this
-// phase). A share is a fire-and-forget event: TikTok's own share
-// sheet does not ask "are you sure," and there is no real state a
-// second share from the same person would conflict with, so it is not
-// deduplicated the way a like is.
+// phase). A share and a play are both fire-and-forget events: TikTok's
+// own share sheet does not ask "are you sure," and rewatching a clip
+// is a second real play -- neither has real state a repeat from the
+// same person would conflict with, so neither is deduplicated the way
+// a like is.
 
 function requireVideo(store, videoId, action) {
   const video = store.videos.find((v) => v.id === videoId);
@@ -89,13 +93,33 @@ function getShareCount(store, videoId) {
   return store.shares.filter((s) => s.videoId === videoId).length;
 }
 
+// A play, same fire-and-forget shape as a share -- rewatching a clip
+// is a second real play, not a toggle. Recorded by the caller (see
+// server.js's own `/play` route) only once a viewer was actually
+// handed a real, ready playback credential, never on a bare click
+// against media that isn't there yet.
+function recordPlay(store, options = {}) {
+  const { videoId, viewerId } = options;
+  if (!viewerId) throw new Error('recordPlay requires a viewerId');
+  requireVideo(store, videoId, 'recordPlay');
+
+  store.plays.push({ videoId, viewerId, createdAt: options.now ?? Date.now() });
+  return { playCount: getPlayCount(store, videoId) };
+}
+
+function getPlayCount(store, videoId) {
+  return store.plays.filter((p) => p.videoId === videoId).length;
+}
+
 // The real feed-card shape a browse view actually needs -- one call
-// rather than three round trips per video.
+// rather than four round trips per video. `playCount` joined the other
+// three (5 Nov 2026) once a real play event existed to count.
 function getEngagementSummary(store, videoId) {
   return {
     likeCount: getLikeCount(store, videoId),
     commentCount: getCommentCount(store, videoId),
     shareCount: getShareCount(store, videoId),
+    playCount: getPlayCount(store, videoId),
   };
 }
 
@@ -108,5 +132,7 @@ module.exports = {
   getCommentCount,
   recordShare,
   getShareCount,
+  recordPlay,
+  getPlayCount,
   getEngagementSummary,
 };

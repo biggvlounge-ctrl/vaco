@@ -11,7 +11,9 @@ const { createChopzVideo: publishVideo } = require('../lib/videos');
 const {
   toggleLike, hasLiked, getLikeCount,
   addComment, listComments, getCommentCount,
-  recordShare, getShareCount, getEngagementSummary,
+  recordShare, getShareCount,
+  recordPlay, getPlayCount,
+  getEngagementSummary,
 } = require('../lib/engagement');
 
 function seedVideo(store) {
@@ -110,16 +112,17 @@ test('sharing with no userId, or a video that does not exist, is refused', () =>
 
 // -- The combined summary a feed card actually reads -----------------------
 
-test('getEngagementSummary reports real, independent counts for likes, comments, and shares', () => {
+test('getEngagementSummary reports real, independent counts for likes, comments, shares, and plays', () => {
   const store = createChopzStore();
   const video = seedVideo(store);
   toggleLike(store, { videoId: video.id, userId: 'reader-1' });
   toggleLike(store, { videoId: video.id, userId: 'reader-2' });
   addComment(store, { videoId: video.id, authorId: 'reader-1', text: 'nice' });
   recordShare(store, { videoId: video.id, userId: 'reader-1' });
+  recordPlay(store, { videoId: video.id, viewerId: 'reader-1' });
 
   assert.deepStrictEqual(getEngagementSummary(store, video.id), {
-    likeCount: 2, commentCount: 1, shareCount: 1,
+    likeCount: 2, commentCount: 1, shareCount: 1, playCount: 1,
   });
 });
 
@@ -127,6 +130,26 @@ test('a fresh video has an honest, zeroed-out engagement summary, not an absent 
   const store = createChopzStore();
   const video = seedVideo(store);
   assert.deepStrictEqual(getEngagementSummary(store, video.id), {
-    likeCount: 0, commentCount: 0, shareCount: 0,
+    likeCount: 0, commentCount: 0, shareCount: 0, playCount: 0,
   });
+});
+
+// -- Plays: fire-and-forget, same shape as a share ------------------------
+
+test('a play is recorded, and the same viewer playing twice counts twice -- a real rewatch', () => {
+  const store = createChopzStore();
+  const video = seedVideo(store);
+
+  const first = recordPlay(store, { videoId: video.id, viewerId: 'reader-1' });
+  assert.equal(first.playCount, 1);
+  const second = recordPlay(store, { videoId: video.id, viewerId: 'reader-1' });
+  assert.equal(second.playCount, 2, 'a play is not a toggle -- a rewatch is a second real play');
+  assert.equal(getPlayCount(store, video.id), 2);
+});
+
+test('playing with no viewerId, or a video that does not exist, is refused', () => {
+  const store = createChopzStore();
+  const video = seedVideo(store);
+  assert.throws(() => recordPlay(store, { videoId: video.id }), /viewerId/);
+  assert.throws(() => recordPlay(store, { videoId: 9999, viewerId: 'reader-1' }), /no video/i);
 });

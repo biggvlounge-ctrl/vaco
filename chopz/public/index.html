@@ -57,36 +57,34 @@ function playChopzVideo(videoId, host) {
     .catch(VACO.error);
 }
 
-function renderFeed(body) {
-  var out = el('div', 'vaco-stack');
-  out.appendChild(VACO.notice(
-    'Each card is a real record with a real playback path to vaco-media. '
-    + '<strong>No object store is configured yet</strong>, so Play currently shows an honest '
-    + '"nothing stored" note instead of video — the same code plays the real file once one is. '
-    + 'The linked-product check below is real: it verifies against CHOPZ SHOP’s catalogue, '
-    + 'so a tagged product either exists or the tag is refused.', 'warn'));
-
-  return VACO.api('/chopz/videos').then(function (data) {
-    var videos = data.videos || data || [];
-    if (!videos.length) {
-      out.appendChild(el('div', 'vaco-empty', 'No videos yet.'));
-      return VACO.mount(body, out);
-    }
-
-    var grid = el('div', 'feed-grid');
-    videos.forEach(function (v) {
+// Shared per-video card -- both the plain Feed and the For You tab
+// render the real same card for a video, so there is exactly one
+// place that knows how to draw a video, not two that can drift apart.
+function buildVideoCard(v) {
       var cell = el('div', 'vaco-stack-sm');
       var reel = el('div', 'reel');
       reel.appendChild(el('strong', null, v.creatorId || ''));
       reel.appendChild(el('span', 'vaco-small vaco-dim', v.mediaUrl || ''));
       cell.appendChild(reel);
 
+      // Only present on a For You card -- the real score breakdown
+      // GET /chopz/for-you returns, not fabricated client-side.
+      if (v.forYou) {
+        var scoreRow = el('div', 'vaco-row-tight');
+        scoreRow.appendChild(VACO.badge('score ' + v.forYou.score.toFixed(1)));
+        if (v.forYou.affinityMultiplier > 1) {
+          scoreRow.appendChild(VACO.badge('you like ' + v.creatorId, 'money'));
+        }
+        cell.appendChild(scoreRow);
+      }
+
       var playerHost = el('div', 'vaco-stack-sm');
       cell.appendChild(VACO.button('Play', function () { playChopzVideo(v.id, playerHost); }, 'sm'));
       cell.appendChild(playerHost);
 
-      var engagement = v.engagement || { likeCount: 0, commentCount: 0, shareCount: 0 };
+      var engagement = v.engagement || { likeCount: 0, commentCount: 0, shareCount: 0, playCount: 0 };
       var engagementRow = el('div', 'vaco-row-tight');
+      engagementRow.appendChild(VACO.badge('▶ ' + engagement.playCount));
       var likeBtn = VACO.button('♥ ' + engagement.likeCount, function () {
         var userId = VACO.userId();
         if (!userId) { VACO.toast('Sign in to like.', 'danger'); return; }
@@ -170,10 +168,48 @@ function renderFeed(body) {
         meta.appendChild(VACO.badge('no product'));
       }
       cell.appendChild(meta);
-      grid.appendChild(cell);
-    });
-    out.appendChild(grid);
-    VACO.mount(body, out);
+      return cell;
+}
+
+function renderVideoGrid(out, body, videos) {
+  if (!videos.length) {
+    out.appendChild(el('div', 'vaco-empty', 'No videos yet.'));
+    return VACO.mount(body, out);
+  }
+  var grid = el('div', 'feed-grid');
+  videos.forEach(function (v) { grid.appendChild(buildVideoCard(v)); });
+  out.appendChild(grid);
+  VACO.mount(body, out);
+}
+
+function renderFeed(body) {
+  var out = el('div', 'vaco-stack');
+  out.appendChild(VACO.notice(
+    'Each card is a real record with a real playback path to vaco-media. '
+    + '<strong>No object store is configured yet</strong>, so Play currently shows an honest '
+    + '"nothing stored" note instead of video — the same code plays the real file once one is. '
+    + 'The linked-product check below is real: it verifies against CHOPZ SHOP’s catalogue, '
+    + 'so a tagged product either exists or the tag is refused.', 'warn'));
+
+  return VACO.api('/chopz/videos').then(function (data) {
+    renderVideoGrid(out, body, data.videos || data || []);
+  });
+}
+
+function renderForYou(body) {
+  var out = el('div', 'vaco-stack');
+  var viewerId = VACO.userId();
+  out.appendChild(VACO.notice(
+    'A real, deterministic ranking over real engagement (plays/likes/comments/shares, '
+    + 'rarer actions weighted higher), decayed on a real 48-hour half-life. '
+    + (viewerId
+      ? 'Signed in as <strong>' + viewerId + '</strong> — videos from creators you\'ve engaged with before rank higher.'
+      : 'Sign in to see creator-affinity boosts; this is the unpersonalized ranking.'),
+    'warn'));
+
+  var qs = viewerId ? ('?viewerId=' + encodeURIComponent(viewerId)) : '';
+  return VACO.api('/chopz/for-you' + qs).then(function (data) {
+    renderVideoGrid(out, body, data.videos || data || []);
   });
 }
 
@@ -204,6 +240,7 @@ VACO.app({
   accentInk: '#04140b',
   tabs: [
     { id: 'feed', label: 'Feed', heading: 'The feed', render: renderFeed },
+    { id: 'for-you', label: 'For You', heading: 'For You', render: renderForYou },
     { id: 'post', label: 'Post', heading: 'Add a video', render: renderPost },
   ],
 });

@@ -24,7 +24,7 @@
 // into the upload path itself.
 
 function createChopzVideo(store, options = {}) {
-  const { creatorId, mediaUrl, linkedProductId = null } = options;
+  const { creatorId, mediaUrl, linkedProductId = null, now = Date.now() } = options;
 
   if (!creatorId) throw new Error('createChopzVideo requires a creatorId');
   if (!mediaUrl) throw new Error('createChopzVideo requires a mediaUrl');
@@ -35,7 +35,7 @@ function createChopzVideo(store, options = {}) {
     mediaUrl,
     linkedProductId,
     linkedProductVerified: false,
-    createdAt: Date.now(),
+    createdAt: now,
   };
   store.videos.push(video);
   return video;

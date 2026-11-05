@@ -24,8 +24,9 @@ const { attachStore } = require('./lib/storeBackend');
 const { createMediaClient } = require('./lib/mediaClient.cjs');
 const { createChopzVideo, getChopzVideo, verifyLinkedProduct } = require('./lib/videos');
 const {
-  toggleLike, hasLiked, addComment, listComments, recordShare, getEngagementSummary,
+  toggleLike, hasLiked, addComment, listComments, recordShare, recordPlay, getEngagementSummary,
 } = require('./lib/engagement');
+const { getForYouFeed } = require('./lib/forYou');
 
 const app = express();
 
@@ -178,6 +179,25 @@ app.get('/chopz/videos/:id/comments', (req, res) => {
   res.json({ comments: listComments(store, Number(req.params.id)) });
 });
 
+// -- For You: a real, deterministic ranking over real engagement -------
+// See lib/forYou.js's own header for exactly what this does and does
+// not claim to be. `viewerId` is optional -- personalization applies
+// only when one is given; an anonymous call still gets a real,
+// engagement-and-recency-ranked feed, just not creator-affinity-boosted.
+app.get('/chopz/for-you', (req, res) => {
+  try {
+    const { viewerId } = req.query;
+    const limit = req.query.limit !== undefined ? Number(req.query.limit) : undefined;
+    const feed = getForYouFeed(store, {
+      viewerId: viewerId || null,
+      ...(limit !== undefined ? { limit } : {}),
+    }).map((v) => ({ ...v, engagement: getEngagementSummary(store, v.id) }));
+    res.json({ videos: feed });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // Fire-and-forget, deliberately not deduplicated -- see
 // lib/engagement.js's own header for why a share is not a like.
 app.post('/chopz/videos/:id/share', requireActor('userId'), (req, res) => {
@@ -208,6 +228,16 @@ app.post('/chopz/videos/:id/play', requireActor('viewerId'), async (req, res) =>
   const playback = asset && asset.status === 'ready'
     ? await media.grantPlayback(asset.id, (req.body || {}).viewerId)
     : null;
+
+  // A real play is recorded only here, once a real, ready credential
+  // was actually handed out -- the same "a real event only counts
+  // once something real actually happened" posture this ecosystem's
+  // other engagement counters already take, never on a bare click
+  // against media that isn't there yet. See lib/forYou.js's own
+  // header for the one real signal this unlocks.
+  if (playback) {
+    recordPlay(store, { videoId, viewerId: (req.body || {}).viewerId });
+  }
 
   res.json({
     media: playback

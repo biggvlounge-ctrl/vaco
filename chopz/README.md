@@ -171,10 +171,93 @@ single-video and list routes matched, confirmed liking again un-likes
 and the unknown-video refusal (400, honest message) on the real
 `/like` route.
 
+## For You ranking (5 Nov 2026)
+
+Closes this project's own flagged "For You ranking (a real
+recommendation algorithm)" gap — the one piece `lib/engagement.js`'s
+own header deliberately left out as separately large.
+
+**What this honestly is, and is not.** TikTok's own real ranking is
+proprietary; its public "How TikTok recommends videos For You"
+explainer names real signal categories (completion rate strongest,
+then comments/likes/shares/plays) but publishes no numeric weights —
+there is nothing to cite beyond the signal *names*. `lib/forYou.js`'s
+own header says so plainly: this is a real, deterministic, stated
+heuristic over this app's own real data, not a reconstruction of
+TikTok's secret formula, and it does not invent a completion-rate
+signal this app has no real watch-duration data for.
+
+**A real fourth engagement signal added first: plays.** `lib/
+engagement.js` gained `recordPlay`/`getPlayCount`, wired into the
+existing `POST /chopz/videos/:id/play` route — but only in the branch
+where a real, ready playback credential was actually handed out,
+never on a bare click against unregistered media. `getEngagementSummary`
+now reports `playCount` alongside the other three.
+
+**The ranking itself (`lib/forYou.js`):**
+- `computeEngagementScore` — a weighted sum (play 1, like 3, comment 5,
+  share 8). The ordering (rarer, higher-effort actions count more) is
+  the real, stated principle; the exact numbers are this file's own
+  chosen heuristic, said so directly rather than dressed up as a
+  citation.
+- `computeRecencyMultiplier` — a real 48-hour half-life decay, never
+  reaching zero, so a video with enormous real engagement can still
+  outrank a brand-new one.
+- `computeAffinityMultiplier` — a signed-in viewer's own real prior
+  likes/comments/shares/plays on a creator's *other* videos (the video
+  being scored is always excluded, so a video can never be boosted by
+  the viewer's own interaction with that same video) lift that
+  creator's new videos, bounded at 2×. No follow mechanism exists in
+  this app, so this is derived entirely from the viewer's own real
+  interaction history, not an invented social graph. An anonymous call
+  (no `viewerId`) gets exactly 1× — no personalization, not a fabricated
+  default history.
+- `getForYouFeed` — scores every video, sorts by score then by
+  `createdAt` (a deterministic tie-break, not array order).
+
+**One honest, named limitation.** A video with zero real engagement
+scores exactly zero and sorts last, regardless of age — there is no
+cold-start/exploration mechanism (TikTok's real one seeds a new video
+to a small test audience first). That is a real, separate, larger
+mechanism this file does not claim to solve.
+
+New route: `GET /chopz/for-you` (`?viewerId=` optional,
+`?limit=` optional, default 20). The frontend gained a "For You" tab
+(`public/index.html`), sharing the exact same per-video card the Feed
+tab already used (refactored into `buildVideoCard` so the two views
+cannot drift apart) plus a real score badge and a "you like X" badge
+when the real affinity multiplier is above 1.
+
+### Verification
+
+`test/forYou.test.js` (new, 14 tests) plus 2 new tests in
+`test/engagement.test.js` for the play primitive. Full suite: 18/18 →
+34/34. Mutation-verified both of the riskiest lines independently:
+removing the self-exclusion in the affinity lookup (`v.id !==
+excludeVideoId` → `true`) turned exactly the two tests that check it
+red (12/14 passing); restored, 14/14 green. Replacing the recency
+decay formula with a flat `1` turned exactly the half-life test red
+(13/14 passing); restored, 34/34 green across the full suite.
+
+Live-verified against a real spawned Shield + this server: created two
+videos by different real creators, gave one two real shares (score 16)
+and left the other at zero (score 0) — confirmed the engagement-only
+feed ranked them correctly. Gave a real viewer a real like + comment on
+one creator's video, then posted that same creator a second, newly
+shared video — confirmed the real personalized feed's affinity
+multiplier read exactly 1.05/1.10 (1 + 0.05 × 1 and × 2 real prior
+interactions respectively, cross-checked by hand), still correctly
+ranked below a much more heavily-engaged stranger's video rather than
+unrealistically leapfrogging it. Confirmed a `/play` call against a
+video with no real registered media asset recorded no play at all
+(`playCount` stayed 0) — the honest negative path, not a fabricated
+count.
+
 ## Not yet built
-- Duets (real video-composition/response clips) and For You ranking (a
-  real recommendation algorithm) — each a separately large build, not
-  started.
+- Duets (real video-composition/response clips) — a separately large
+  build, not started.
+- ~~For You ranking (a real recommendation algorithm)~~ **Done (5 Nov
+  2026) — see "For You ranking" below.**
 - Live shopping formats and the four real ad formats named in
   `CHOPZ_TIKTOK_COMPARABLES.md`.
 - The VENVM/Storytime engine integration the user's intro message
