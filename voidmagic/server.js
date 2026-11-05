@@ -22,7 +22,7 @@ const {
   VOID_MAGIC_ESCROW_ACCOUNT, PLATFORM_TAKE_RATE, CANCELLATION_CUTOFF_HOURS, bookExperience, getBooking, checkIn, completeExperience, cancelBooking, getPostEventSummary,
 } = require('./lib/bookings');
 const {
-  EVENT_SERVICE_TYPES, requestEventService, getEventServiceRequest, listEventServiceRequests,
+  EVENT_SERVICE_TYPES, requestEventService, getEventServiceRequest, listEventServiceRequests, pollEventServiceJobStatuses,
 } = require('./lib/eventServices');
 const {
   WAITING_ROOM_STATUSES, enterWaitingRoom, getWaitingRoomSession, verifyIdentity, admitToExperience, exitExperience,
@@ -151,6 +151,16 @@ async function requestVoidJob(verticalId, customerId, quantity, unitPrice) {
   });
   const body = await res.json();
   if (!res.ok) throw new Error(body.error || `requestVoidJob failed (${res.status})`);
+  return body;
+}
+
+// The real, direct read side of the same connection: VOID's own
+// `GET /api/job/:id` (no auth -- it's a status lookup, not a mutation)
+// is the live source `pollEventServiceJobStatuses` polls against.
+async function getVoidJob(jobId) {
+  const res = await fetch(`${VOID_API_URL}/api/job/${jobId}`);
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error || `getVoidJob failed (${res.status})`);
   return body;
 }
 
@@ -342,6 +352,31 @@ app.get('/api/experiences/:id/event-services', (req, res) => {
     res.status(400).json({ error: err.message });
   }
 });
+
+// The real poll loop, same shape as VOID's own retry-sweep and
+// vaco-analytics' evaluation sweep: a directly callable,
+// `requireCallingService()`-gated route (so it's testable without
+// waiting out a real interval) plus a `setInterval` calling the exact
+// same function on a real cadence.
+app.post('/api/event-services/poll-job-statuses', requireCallingService(), async (_req, res) => {
+  try {
+    res.json(await pollEventServiceJobStatuses(store, { getVoidJobFn: getVoidJob }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+const EVENT_SERVICE_POLL_INTERVAL_MS = Number(process.env.VOID_MAGIC_EVENT_SERVICE_POLL_INTERVAL_MS) || 60 * 1000;
+setInterval(async () => {
+  try {
+    const result = await pollEventServiceJobStatuses(store, { getVoidJobFn: getVoidJob });
+    if (result.updated.length > 0) {
+      console.log(`[event-service-poll] ${result.updated.length} request(s) changed status`);
+    }
+  } catch (err) {
+    console.error(`[event-service-poll] failed: ${err.message}`);
+  }
+}, EVENT_SERVICE_POLL_INTERVAL_MS).unref();
 
 app.post('/api/waiting-room/enter', requireActor('customerId'), (req, res) => {
   try {

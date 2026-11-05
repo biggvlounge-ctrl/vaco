@@ -10,20 +10,22 @@
 // of notification-adjacent systems (VSAFE's own safety escalations):
 // this module computes real, correct trigger logic and a real
 // recipient -- actual delivery (push/SMS/email) is separate
-// infrastructure, not built here. Of the 14 real types, four are
-// wired to genuine, already-built state transitions in this codebase
+// infrastructure, not built here. Of the 14 real types, six are now
+// wired to genuine, already-built triggers in this codebase
 // (`booking-confirmation`/`payment-confirmation` at booking,
 // `experience-starting` at waiting-room admission,
-// `experience-ending`/`post-event-follow-up` at completion) --
-// the rest (schedule/travel/venue/check-in reminders, delay
-// notifications, transportation updates) genuinely need a
-// time-based scheduler or a live poll of VOID Event Services' job
-// status, neither of which exists in this codebase yet, so they're
-// not faked here; `host-updates`/`security-instructions`/
-// `media-ready` have no automatic trigger point built yet either
-// (Media itself, Section 13, is still unbuilt) -- all fourteen types
-// remain real and constructible via the general `createNotification`,
-// just not all auto-triggered.
+// `experience-ending`/`post-event-follow-up` at completion, and
+// `delay-notification`/`transportation-update` -- see
+// `eventServices.js`'s `pollEventServiceJobStatuses`, a real live poll
+// of VOID Event Services' job status via VOID's own
+// `GET /api/job/:id`) -- the rest (schedule/travel/venue/check-in
+// reminders) genuinely need a time-based scheduler, which doesn't
+// exist in this codebase yet, so they're not faked here;
+// `host-updates`/`security-instructions`/`media-ready` have no
+// automatic trigger point built yet either (Media itself, Section 13,
+// is still unbuilt) -- all fourteen types remain real and
+// constructible via the general `createNotification`, just not all
+// auto-triggered.
 
 const NOTIFICATION_TYPES = [
   'booking-confirmation', 'payment-confirmation', 'schedule-reminder', 'travel-reminder',

@@ -44,6 +44,7 @@
 // customer-to-host Experience payment, a separate real transaction).
 
 const { getExperience } = require('./experiences');
+const { createNotification } = require('./notifications');
 
 const EVENT_SERVICE_TYPES = ['security', 'transport', 'space', 'staffing', 'fulfillment'];
 
@@ -96,6 +97,81 @@ function listEventServiceRequests(store, experienceId) {
   return store.eventServiceRequests.filter((r) => r.experienceId === experienceId);
 }
 
+// Real poll against VOID's own job status (`GET /api/job/:id`), closing
+// the exact gap `lib/notifications.js`'s own header names: the
+// 'delay-notification' and 'transportation-update' types "genuinely
+// need ... a live poll of VOID Event Services' job status," which
+// didn't exist anywhere in this codebase until now.
+//
+// Walks every request not already in a terminal state, and notifies
+// only on a genuine status change -- not on every tick -- by
+// comparing the live job against the request's own last-recorded
+// status and overwriting it, the same compare-then-write shape
+// `marketplace.js`'s own job records use.
+//
+// VOID's real `JOB_STATUSES` has no "delayed" state; the one concrete
+// "something is actually wrong" signal it does have is
+// 'delivery-failed' (a real driver-couldn't-complete-it status, not
+// invented here), so that maps to 'delay-notification'. Every other
+// change (matched/accepted/completed/cancelled) maps to the more
+// general 'transportation-update' -- VOID Event Services spans five
+// verticals (security/transport/space/staffing/fulfillment), not
+// transportation alone, and this module's own header already treats
+// both notification types as covering the whole poll, not transport
+// specifically.
+//
+// The recipient is the experience's own `hostId`: `requestEventService`
+// above already establishes the host, not the attendee, as the real
+// payer/orchestrator of event logistics, so the host is who a job
+// going sideways actually belongs to.
+async function pollEventServiceJobStatuses(store, options = {}) {
+  const { getVoidJobFn, now = Date.now() } = options;
+  if (typeof getVoidJobFn !== 'function') {
+    throw new Error('pollEventServiceJobStatuses requires a getVoidJobFn(voidJobId)');
+  }
+
+  const pending = store.eventServiceRequests.filter((r) => !['completed', 'cancelled'].includes(r.status));
+  const updated = [];
+  const errors = [];
+
+  for (const request of pending) {
+    let job;
+    try {
+      job = await getVoidJobFn(request.voidJobId);
+    } catch (err) {
+      errors.push({ requestId: request.id, error: err.message });
+      continue;
+    }
+    if (!job || job.status === request.status) continue;
+
+    const previousStatus = request.status;
+    request.status = job.status;
+    request.statusUpdatedAt = now;
+
+    const experience = getExperience(store, request.experienceId);
+    if (experience) {
+      const isDelay = job.status === 'delivery-failed';
+      createNotification(store, {
+        recipientId: experience.hostId,
+        type: isDelay ? 'delay-notification' : 'transportation-update',
+        subject: isDelay
+          ? `Delay: your ${request.serviceType} request needs attention`
+          : `Update: your ${request.serviceType} request is now "${job.status}"`,
+        message: isDelay
+          ? `Your ${request.serviceType} request for experience ${request.experienceId} failed delivery and needs a retry.`
+          : `Your ${request.serviceType} request for experience ${request.experienceId} moved from "${previousStatus}" to "${job.status}".`,
+        relatedId: request.id,
+        now,
+      });
+    }
+
+    updated.push({ requestId: request.id, from: previousStatus, to: job.status });
+  }
+
+  return { updated, errors };
+}
+
 module.exports = {
   EVENT_SERVICE_TYPES, EVENT_SERVICE_TO_VOID_VERTICAL, requestEventService, getEventServiceRequest, listEventServiceRequests,
+  pollEventServiceJobStatuses,
 };

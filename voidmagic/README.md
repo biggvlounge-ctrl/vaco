@@ -323,9 +323,11 @@ came back from a real GET. See `dev-docs/phase-3-real-persistence/`.
   DREAMS ad-performance integration — the reason conversion,
   geographic demand, venue performance, and advertising performance
   stay in Creator Analytics' own `notComputable` list.
-- Real delivery (push/SMS/email) for notifications, time-based
-  reminder scheduling, and a live poll of VOID Event Services' job
-  status for delay/transportation-update triggers.
+- Real delivery (push/SMS/email) for notifications, and time-based
+  reminder scheduling (schedule/travel/venue/check-in reminders). The
+  live poll of VOID Event Services' job status for delay/
+  transportation-update triggers is now built — see "Real VOID
+  Event Service job-status polling" below.
 - V4 AI Event Builder ("Build My Experience"), DREAMS advertising,
   Vvltvre Touring & Tix / Vavlt Stvdios / CHOPZ integration, dynamic
   pricing, enterprise events, sponsorship marketplace — Phase 3.
@@ -421,3 +423,73 @@ payload shape.
   /api/customers/:customerId/favorites/:creatorId` (a single favorited
   check the Favorites list already answers for every creator at
   once).
+
+## Real VOID Event Service job-status polling (5 Nov 2026)
+
+Closes the exact gap `lib/notifications.js`'s own header named:
+`delay-notification` and `transportation-update` "genuinely need ...
+a live poll of VOID Event Services' job status," which didn't exist
+anywhere in this codebase.
+
+`eventServices.js` gains `pollEventServiceJobStatuses(store, {
+getVoidJobFn })` — walks every `eventServiceRequest` not already
+`completed`/`cancelled`, fetches the live job from VOID (`GET
+/api/job/:id`, injected as `getVoidJobFn`, same pattern as every other
+cross-app call in this ecosystem), and notifies the experience's
+`hostId` — already the real payer/orchestrator of event logistics —
+only on a genuine status change, never on every tick.
+
+VOID's own `JOB_STATUSES` has no "delayed" state; the one real,
+concrete "something is actually wrong" signal it has is
+`delivery-failed` (a genuine driver-couldn't-complete-it status, not
+invented here), so that maps to `delay-notification`. Every other
+change (`matched`/`accepted`/`completed`/`cancelled`) maps to the more
+general `transportation-update` — VOID Event Services spans five
+verticals (security/transport/space/staffing/fulfillment), not
+transportation alone, and `notifications.js`'s own header already
+treats both types as covering the whole poll, not transport
+specifically.
+
+Wired into `server.js` the same real shape VOID's own retry-sweep and
+vaco-analytics' evaluation sweep already use: a directly callable,
+`requireCallingService()`-gated `POST
+/api/event-services/poll-job-statuses` route, plus a `setInterval`
+(`VOID_MAGIC_EVENT_SERVICE_POLL_INTERVAL_MS`, default 60s) calling the
+identical function on a real cadence. `getVoidJob(jobId)` is the real
+fetch against VOID's own unauthenticated `GET /api/job/:id`.
+
+**Known, pre-existing, separate gap, not fixed here**: this app's
+existing `requestVoidJob` (used by `POST
+/api/experiences/:id/event-services` to create the job this poll later
+tracks) forwards no credential at all to VOID's own `POST /api/job`,
+which is `requireActor('customerId')`-gated — the identical shape of
+cross-app auth gap already documented in VENVS's own CLAUDE.md for its
+`requestFulfillment`. Fixing it needs either a VOID-side
+service-credential path for a caller creating a job on a host's
+behalf, or a real session-forwarding redesign — a cross-app design
+question, not a one-file patch, and out of scope for this poll.
+
+### Verification
+
+27/27 → 38/38 (the suite grew by one new file,
+`test/eventServicePoll.test.js`, 6 tests: the `getVoidJobFn`
+requirement, a no-op on an unchanged status, a real
+`transportation-update` on a status change, the `delivery-failed` →
+`delay-notification` mapping, the terminal-status stop condition
+(mutation-verified: removing the `completed`/`cancelled` filter turned
+that test red, restored and reconfirmed green), and fail-soft behavior
+when one request's live lookup throws).
+
+Live-verified against a real spawned VOID server (`PORT=8793`): a real
+seeded courier job (`id: 1`) was advanced for real from `requested` to
+`matched` via VOID's own `POST /api/job/1/match` (a service-credential
+route, `X-Service-Name`/`X-Service-Token` configured on both apps via
+`VACO_SERVICE_TOKENS`). A voidmagic store with a real `experience` and
+an `eventServiceRequest` pointing at that same live job id was then
+polled with `getVoidJobFn` performing a real `fetch` against the live
+VOID server — the poll correctly detected the real `requested ->
+matched` transition and recorded a real `transportation-update`
+notification for the host. Also confirmed the real spawned voidmagic
+server's own `POST /api/event-services/poll-job-statuses` route
+answers `200 {"updated":[],"errors":[]}` for an empty store when
+called with a matching service credential, and `401` without one.
