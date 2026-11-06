@@ -274,6 +274,13 @@ app.get('/api/entities/:id/personal-influence', (req, res) => {
   res.json({ entityId: Number(req.params.id), personalInfluence: engine.getPersonalInfluence(Number(req.params.id)) });
 });
 
+// Real, computed read of parents/siblings/cousins for ANY entity, live
+// — characterCreation.js's own return value is otherwise the only
+// place this shape is ever returned, and only once, at creation time.
+app.get('/api/entities/:id/family-tree', (req, res) => {
+  res.json(engine.getFamilyTree(Number(req.params.id)));
+});
+
 // -- NPCs -------------------------------------------------------------------
 
 app.get('/api/npcs', (req, res) => {

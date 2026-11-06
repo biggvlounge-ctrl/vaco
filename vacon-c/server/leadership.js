@@ -93,6 +93,7 @@ const membership = require('./membership.js');
 const missions = require('./missions.js');
 const media = require('./media.js');
 const influence = require('./influence.js');
+const characterCreation = require('./characterCreation.js');
 const { seededDraw } = require('./seeded.js');
 
 function clamp01(x) {
@@ -205,6 +206,11 @@ function getLeaderDashboard(worldState, playerId) {
   return {
     player: { id: player.id, mode: player.mode, linkedEntityId: entityId },
     npc: { id: live.id, status: live.status, role: live.role },
+    // Same two fields as players.js#getCitizenDashboard, read live for
+    // the same reason — a leader's own standing and family are real
+    // facts about them regardless of which mode they're playing.
+    influenceRating: influence.influenceRatingOf(worldState, entityId),
+    extendedFamily: characterCreation.describeFamilyTree(worldState, entityId),
     organizations,
   };
 }

@@ -183,6 +183,18 @@ test('getLeaderDashboard reports real members, their real loyalty, and directed 
   assert.ok(!orgView.members.some((m) => m.id === civilian.id));
 });
 
+test('getLeaderDashboard surfaces the leader\'s own real influenceRating and extendedFamily, read live, same as getCitizenDashboard', () => {
+  const w = world();
+  const leaderNpc = person(w);
+  organization(w, { type: 'business', leaderId: leaderNpc.id, influence: 40 });
+  const player = players.generatePlayer(w, { linkedEntityId: leaderNpc.id, mode: 'leader' });
+
+  const dashboard = leadership.getLeaderDashboard(w, player.id);
+
+  assert.equal(dashboard.influenceRating, influence.influenceRatingOf(w, leaderNpc.id));
+  assert.deepEqual(dashboard.extendedFamily, { entityId: leaderNpc.id, family: null, parents: [], siblings: [], cousins: [] });
+});
+
 // -- directMission ----------------------------------------------------------
 
 test('directMission refuses an entity who does not actually lead the named organization', () => {

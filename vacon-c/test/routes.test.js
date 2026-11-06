@@ -891,6 +891,33 @@ test('the citizen dashboard reaches every system the cascade touches', { skip: S
   const after = await (await get(`/players/${player.id}/citizen-dashboard`)).json();
   assert.ok(after.behavior.state.currentMood, 'and now it can say how they are');
   assert.equal(after.behavior.schedule.length, 1);
+
+  // The citizen's own real standing and extended family -- the two
+  // fields neither dashboard surfaced before, both read live.
+  assert.equal(typeof dash.influenceRating, 'number');
+  assert.ok(dash.extendedFamily, 'extendedFamily must be present, even for a family-less NPC');
+  assert.deepEqual(dash.extendedFamily, {
+    entityId: npcId, family: null, parents: [], siblings: [], cousins: [],
+  });
+});
+
+test('GET /entities/:id/family-tree returns the same real family data createCharacter reported, looked up live, for ANY entity', async () => {
+  const created = await (await post('/characters', {})).json();
+
+  const tree = await (await get(`/entities/${created.player.id}/family-tree`)).json();
+  assert.equal(tree.family.id, created.family.id);
+  assert.equal(tree.parents.length, created.family.parents.length);
+  assert.equal(tree.siblings.length, created.family.siblings.length);
+
+  const expectedCousinIds = new Set(created.cousins.flatMap((au) => au.children.map((c) => c.id)));
+  const actualCousinIds = new Set(tree.cousins.flatMap((au) => au.children.map((c) => c.id)));
+  assert.deepEqual(actualCousinIds, expectedCousinIds);
+
+  // And it works for an ORDINARY npc with no family at all -- the
+  // honest empty shape, not a throw or a 404.
+  const npc = await (await post('/npc/generate')).json();
+  const stray = await (await get(`/entities/${npc.npc.id}/family-tree`)).json();
+  assert.equal(stray.family, null);
 });
 
 test('a citizen does something, and the world reflects it back', { skip: SKIP }, async () => {

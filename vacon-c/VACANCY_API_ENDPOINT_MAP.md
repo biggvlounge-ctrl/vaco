@@ -127,6 +127,18 @@ GET  /api/families/:id/political-influence    — familyPoliticalInfluenceOf: th
 POST /api/characters                          — createCharacter: player picks occupation/country/community; family is random and revealed
 ```
 
+**Three gaps closed and one extension, 6 Nov 2026 — see CLAUDE.md's
+forty-ninth standing rule.** Parents/siblings now get a seeded `family`
+relationship with a real, named bonus over a cousin's own baseline
+(`influence.seedFamilyBond`); both dashboards above now also carry
+`influenceRating` and `extendedFamily`, read live; and ordinary NPCs
+`worldgen.js` generates can now get real aunts/uncles/cousins too
+(`config.extendedFamily`, opt-in).
+
+```
+GET  /api/entities/:id/family-tree            — describeFamilyTree: the same real parents/siblings/cousins shape, looked up live for ANY entity
+```
+
 ## Phase 4 — Digital Planet (ecosystem link-outs, not built here)
 
 **These are outbound link generators, not functional endpoints** —

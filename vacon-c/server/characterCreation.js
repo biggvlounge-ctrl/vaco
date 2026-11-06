@@ -113,8 +113,8 @@
 const occupations = require('./occupations.js');
 const economy = require('./economy.js');
 const mortality = require('./mortality.js');
-const worldStore = require('./worldStore.js');
 const countryPacks = require('./countryPacks.js');
+const influence = require('./influence.js');
 const { seededDraw } = require('./seeded.js');
 
 //: A living parent is deceased in roughly this real-world-plausible
@@ -273,6 +273,13 @@ function generateParent(worldState, options) {
 function generateAuntOrUncle(worldState, options) {
   const {
     generators, seed, tick, parentEntityId, surname, index,
+    // Tighter than this file's own default when a caller needs one —
+    // `worldgen.js` reuses this exact function for ORDINARY NPCs, once
+    // per generated family rather than once per player, and needs a
+    // smaller cap for exactly that reason (see that file's own header
+    // on the measured population cost). Every existing caller omits
+    // this and gets the unchanged default.
+    maxCousins = MAX_COUSINS_PER_AUNT_UNCLE,
   } = options;
 
   const auntUncle = generators.generateNpc({});
@@ -281,13 +288,17 @@ function generateAuntOrUncle(worldState, options) {
   economy.generateIndividualFinances(worldState, auntUncle.id, { tick });
 
   if (parentEntityId != null) {
-    worldStore.adjustRelationship(worldState, parentEntityId, auntUncle.id, 'family', {});
+    // Baseline only, no immediate-family bonus — an aunt/uncle is real
+    // kin, not a stranger, but the direct instruction behind
+    // `IMMEDIATE_FAMILY_BOND_BONUS` is specifically that a player's own
+    // parents and siblings start CLOSER than this.
+    influence.seedFamilyBond(worldState, parentEntityId, auntUncle.id);
   }
 
   const auntUncleCommunity = resolveCommunity(worldState, null, [seed, 'aunt-uncle-community', index]);
   auntUncle.communityId = auntUncleCommunity ? auntUncleCommunity.id : null;
 
-  const cousinCount = seededInt([seed, 'cousin-count', index], MAX_COUSINS_PER_AUNT_UNCLE + 1);
+  const cousinCount = seededInt([seed, 'cousin-count', index], maxCousins + 1);
   const cousins = [];
   for (let c = 0; c < cousinCount; c += 1) {
     const cousin = generators.generateNpc({ communityId: auntUncle.communityId });
@@ -392,9 +403,24 @@ function createCharacter(worldState, options = {}) {
   }
   const cousins = auntsUncles.flatMap((au) => au.cousins);
   // The player is really related to every real cousin — the schema's
-  // own real `'family'` relationship_type, one row per real cousin.
+  // own real `'family'` relationship_type, one row per real cousin, at
+  // the real baseline rating (no bonus — see `seedFamilyBond`'s header).
   for (const cousin of cousins) {
-    worldStore.adjustRelationship(worldState, player.id, cousin.id, 'family', {});
+    influence.seedFamilyBond(worldState, player.id, cousin.id);
+  }
+
+  // The player's own parents and siblings — closer kin than a cousin,
+  // and seeded with the real `IMMEDIATE_FAMILY_BOND_BONUS` on top of
+  // the baseline rating, by direct instruction: "the user's family
+  // should have priority and have upper scales" over extended family.
+  // Seeded regardless of whether a parent is alive or deceased — the
+  // bond the row represents existed in life either way, same as a
+  // `relationships` row for anyone else who has since died is still
+  // read, never deleted, elsewhere in this engine.
+  influence.seedFamilyBond(worldState, player.id, mother.entity.id, { immediate: true });
+  influence.seedFamilyBond(worldState, player.id, father.entity.id, { immediate: true });
+  for (const sibling of siblings) {
+    influence.seedFamilyBond(worldState, player.id, sibling.id, { immediate: true });
   }
 
   return {
@@ -425,10 +451,112 @@ function createCharacter(worldState, options = {}) {
   };
 }
 
+// ---------------------------------------------------------------------
+// describeFamilyTree — the real LOOKUP, as opposed to createCharacter's
+// real GENERATOR
+// ---------------------------------------------------------------------
+// `createCharacter`'s own return value is the only place this data was
+// ever reported — asked once, at creation, and never again. This reads
+// the same real, already-stored facts back for ANY entity (a player's
+// own, or any ordinary NPC's), live, every time it is called, never
+// from a cached snapshot — the same "observe and be affected by"
+// posture `players.js#getCitizenDashboard` already holds itself to.
+//
+// Deliberately a pure read over `family_memberships`/`relationships`/
+// `families`, not a second copy of `createCharacter`'s own generation
+// logic — this function never calls `generateNpc`/`generateFamily`,
+// it only looks at rows those functions (or `worldgen.js`'s own
+// extended-family pass, see below) already wrote.
+function entityBasics(worldState, entityId) {
+  if (entityId == null) return null;
+  const npc = (worldState.npcs || []).find((n) => n.id === entityId);
+  if (npc) {
+    return {
+      id: entityId, name: npc.name, alive: true,
+      occupation: occupations.occupationOf(worldState, entityId),
+    };
+  }
+  const deceasedRecord = (worldState.deceased || []).find((n) => n.id === entityId);
+  return {
+    id: entityId, name: deceasedRecord ? deceasedRecord.name : null, alive: false, occupation: null,
+  };
+}
+
+function communityOf(worldState, entityId) {
+  const npc = (worldState.npcs || []).find((n) => n.id === entityId);
+  if (!npc || npc.communityId == null) return null;
+  const community = (worldState.communities || []).find((c) => c.id === npc.communityId);
+  return community ? { id: community.id, name: community.name } : null;
+}
+
+function familyIdFor(worldState, entityId) {
+  const row = (worldState.familyMemberships || []).find((m) => m.entity_id === entityId);
+  return row ? row.family_id : null;
+}
+
+function familyMembersWithRole(worldState, familyId, role) {
+  return (worldState.familyMemberships || [])
+    .filter((m) => m.family_id === familyId && m.role === role)
+    .map((m) => m.entity_id);
+}
+
+// Real cousins for a real parent: every `relationship_type: 'family'`
+// row touching that parent whose OTHER party heads a REAL, DIFFERENT
+// family record is that parent's own sibling — a real aunt or uncle —
+// and that family's own `role: 'child'` members are the real cousins.
+// The inverse of what `generateAuntOrUncle` builds, read back rather
+// than re-derived.
+function cousinsThroughParent(worldState, parentEntityId, ownFamilyId) {
+  const groups = [];
+  const touching = (worldState.relationships || []).filter(
+    (r) => r.relationship_type === 'family'
+      && (r.entity_a_id === parentEntityId || r.entity_b_id === parentEntityId),
+  );
+  for (const rel of touching) {
+    const otherId = rel.entity_a_id === parentEntityId ? rel.entity_b_id : rel.entity_a_id;
+    const auntUncleFamily = (worldState.families || []).find((f) => f.head_npc_id === otherId);
+    if (!auntUncleFamily || auntUncleFamily.id === ownFamilyId) continue;
+    const cousinIds = familyMembersWithRole(worldState, auntUncleFamily.id, 'child');
+    groups.push({
+      auntOrUncle: entityBasics(worldState, otherId),
+      community: communityOf(worldState, otherId),
+      children: cousinIds.map((id) => entityBasics(worldState, id)),
+    });
+  }
+  return groups;
+}
+
+function describeFamilyTree(worldState, entityId) {
+  const familyId = familyIdFor(worldState, entityId);
+  if (familyId == null) {
+    return { entityId, family: null, parents: [], siblings: [], cousins: [] };
+  }
+  const family = (worldState.families || []).find((f) => f.id === familyId);
+  const parentIds = familyMembersWithRole(worldState, familyId, 'parent');
+  const siblingIds = familyMembersWithRole(worldState, familyId, 'sibling');
+
+  const cousins = parentIds.flatMap((pid) => cousinsThroughParent(worldState, pid, familyId));
+
+  return {
+    entityId,
+    family: family ? { id: family.id, surname: family.surname } : null,
+    parents: parentIds.map((pid) => entityBasics(worldState, pid)),
+    siblings: siblingIds.map((sid) => entityBasics(worldState, sid)),
+    cousins,
+  };
+}
+
 module.exports = {
   PARENT_DECEASED_CHANCE,
   MAX_SIBLINGS,
   MAX_PARENT_SIBLINGS,
   MAX_COUSINS_PER_AUNT_UNCLE,
   createCharacter,
+  describeFamilyTree,
+  // Exported for `worldgen.js` to reuse directly — see that file's own
+  // extended-family block for why this is the one piece of real
+  // generation logic ordinary NPCs needed and createCharacter() already
+  // had, rather than a second copy of "a new NPC, a new family, a
+  // cross-family 'family' relationship link" living in worldgen.js too.
+  generateAuntOrUncle,
 };

@@ -20,11 +20,18 @@
 //     node vacon-c/scripts/measure-world.mjs --ticks 400 --empty
 //
 // Flags:
-//     --ticks N   how long to run the world (default 200)
-//     --empty     skip world generation, to reproduce the original
-//                 measurement: people in a field, nothing built
-//     --seed S    world seed (default 'measure')
-//     --json      machine-readable output
+//     --ticks N          how long to run the world (default 200)
+//     --empty            skip world generation, to reproduce the original
+//                        measurement: people in a field, nothing built
+//     --seed S           world seed (default 'measure')
+//     --json             machine-readable output
+//     --extended-family  turn on worldgen.js's opt-in real aunts/
+//                        uncles + cousins for ordinary NPCs
+//                        (`config.extendedFamily`) — omitted, a world
+//                        generates exactly as it always has. This is
+//                        the flag the measured before/after numbers in
+//                        CLAUDE.md's own standing rule on this came
+//                        from: run once without it, once with.
 
 import { createRequire } from 'node:module';
 
@@ -47,6 +54,7 @@ const TICKS = Number(flag('ticks', 200));
 const EMPTY = flag('empty', false) === true;
 const SEED = flag('seed', 'measure');
 const JSON_OUT = flag('json', false) === true;
+const EXTENDED_FAMILY = flag('extended-family', false) === true;
 
 const w = engine.WorldState;
 
@@ -67,7 +75,9 @@ function buildEmptyWorld() {
   return { people: 150, communities: 5, note: 'no properties, infrastructure, jobs or demographics' };
 }
 
-const summary = EMPTY ? buildEmptyWorld() : worldgen.generateWorld({ seed: SEED });
+const summary = EMPTY
+  ? buildEmptyWorld()
+  : worldgen.generateWorld({ seed: SEED, extendedFamily: EXTENDED_FAMILY });
 for (let t = 0; t < TICKS; t += 1) engine.advanceTick();
 
 const structural = new Set(statistics.unavailable().map((e) => e.key));

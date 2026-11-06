@@ -179,6 +179,19 @@ const INFLUENCE_DELTA = 2;
 //: see the header.
 const BROADCAST_INFLUENCE_DELTA = 1;
 
+//: How much more a parent or sibling starts with than the baseline
+//: `influenceRatingOf` already gives a brand-new relationship (which a
+//: cousin or aunt/uncle gets as-is, no bonus — see
+//: `characterCreation.js`'s own header: cousins are real people, not
+//: strangers, but immediate family is closer still, by direct
+//: instruction). Five real `INFLUENCE_DELTA`-sized events' worth,
+//: reused rather than re-guessed for the same reason `INFLUENCE_DELTA`
+//: itself is reused from `meetings.js`/`control.SHARED_UNDERTAKING`: a
+//: childhood of small, ordinary moments is not literally five events,
+//: but it is not zero either, and the number is named here rather than
+//: hidden inside an unlabelled bonus.
+const IMMEDIATE_FAMILY_BOND_BONUS = INFLUENCE_DELTA * 5;
+
 // ---------------------------------------------------------------------
 // influenceRatingOf — a real, derived, NEVER-STORED baseline
 // ---------------------------------------------------------------------
@@ -276,6 +289,36 @@ function lowerInfluence(worldState, actorId, targetId, delta = INFLUENCE_DELTA) 
   return raiseInfluence(worldState, actorId, targetId, -Math.abs(delta));
 }
 
+// ---------------------------------------------------------------------
+// seedFamilyBond — the real `relationships.relationship_type: 'family'`
+// link `characterCreation.js` needs, seeded from the real baseline
+// (and, for immediate family, the real bonus) rather than left at the
+// schema's flat `influence: 0` — see IMMEDIATE_FAMILY_BOND_BONUS above.
+// ---------------------------------------------------------------------
+// Deliberately NOT built on `raiseInfluence`: that function always
+// creates a brand-new pair under `relationship_type: 'social'` (see its
+// own header), and a family link is correctly `'family'` instead — a
+// different real schema value, not an oversight to route around.
+// Seeded exactly once per pair, the same "existedAlready" guard every
+// other seeding path here already uses, so calling this a second time
+// on the same real pair never clobbers whatever has genuinely
+// accumulated since.
+function seedFamilyBond(worldState, entityAId, entityBId, options = {}) {
+  const { immediate = false } = options;
+  const existedAlready = !!worldStore.findRelationship(worldState, entityAId, entityBId);
+  const rel = worldStore.adjustRelationship(worldState, entityAId, entityBId, 'family', {});
+  if (!existedAlready) {
+    const bonus = immediate ? IMMEDIATE_FAMILY_BOND_BONUS : 0;
+    rel.influence = clamp0to100(influenceRatingOf(worldState, entityAId) + bonus);
+    if (immediate) {
+      rel.trust = clamp0to100(Number(rel.trust) + IMMEDIATE_FAMILY_BOND_BONUS);
+      rel.respect = clamp0to100(Number(rel.respect) + IMMEDIATE_FAMILY_BOND_BONUS);
+      rel.loyalty = clamp0to100(Number(rel.loyalty) + IMMEDIATE_FAMILY_BOND_BONUS);
+    }
+  }
+  return rel;
+}
+
 module.exports = {
   OCCUPATION_WEIGHT,
   ORG_WEIGHT,
@@ -284,9 +327,11 @@ module.exports = {
   SOCIAL_TRAITS,
   INFLUENCE_DELTA,
   BROADCAST_INFLUENCE_DELTA,
+  IMMEDIATE_FAMILY_BOND_BONUS,
   influenceRatingOf,
   personalInfluenceOf,
   familyPoliticalInfluenceOf,
   raiseInfluence,
   lowerInfluence,
+  seedFamilyBond,
 };

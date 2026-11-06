@@ -128,6 +128,7 @@ const veteranPacks = require('./veteranPacks.js');
 const buildingPacks = require('./buildingPacks.js');
 const merchandise = require('./merchandise.js');
 const worldStore = require('./worldStore.js');
+const characterCreation = require('./characterCreation.js');
 const { hashSeed, seededUnit } = require('./seeded.js');
 
 //: Everything below is flagged interpretive. No document specifies a
@@ -141,6 +142,28 @@ const DEFAULTS = {
   // Households per community; the rest of a community's residents are
   // unattached adults.
   familiesPerCommunity: 6,
+  // **Real aunts/uncles + cousins for ORDINARY NPCs, not just a
+  // player's own createCharacter() — opt-in, same posture as every
+  // other real-data pack in this file (populationPack, religionPack,
+  // ancestryPack, ...): every existing call to generateWorld() omits
+  // this and gets the unchanged default, so the 50+ test files already
+  // asserting exact npc/family counts against a world built the old
+  // way stay exactly as they were.** See the extended-family block
+  // below (and CLAUDE.md's own standing rule on this) for the measured
+  // population cost of turning it on, and why the caps here are
+  // tighter than `characterCreation.js`'s own (0..3 aunts/uncles per
+  // living parent, 0..4 cousins each) — this runs once per FAMILY in
+  // EVERY community a world generates, not once for a single player.
+  extendedFamily: false,
+  // Per-family odds of generating ONE real aunt/uncle (+ their own
+  // cousins) at all — gated per family, never per member, because an
+  // aunt/uncle belongs to the family as a whole: generating one for
+  // every member would multiply the same two people once per sibling.
+  extendedFamilyChance: 0.5,
+  // Cousins per generated aunt/uncle, 0..this inclusive — tighter than
+  // `characterCreation.MAX_COUSINS_PER_AUNT_UNCLE` (4) for the reason
+  // stated above.
+  maxCousinsPerAuntUncle: 2,
   businessesPerCommunity: 2,
   factionsPerCity: 2,
   // Homes are generated to house everybody with a margin, which is
@@ -451,6 +474,9 @@ function generateWorld(options = {}) {
     cities: [], communities: 0, people: 0, families: 0, properties: 0,
     infrastructure: 0, organizations: 0, employed: 0, gangMembers: 0,
     languages: 0, resources: 0, territoryBlocks: 0, motivated: 0,
+    // Real aunts/uncles + cousins generated for ordinary NPCs — 0
+    // whenever `config.extendedFamily` stays at its default `false`.
+    extendedFamilyAdults: 0, extendedFamilyChildren: 0,
   };
 
   // **A new world is not in the middle of the last one's weather.**
@@ -1245,6 +1271,80 @@ function generateWorld(options = {}) {
         family.head_npc_id = members.reduce(
           (eldest, n) => ((n.createdTick ?? 0) < (eldest.createdTick ?? 0) ? n : eldest),
         ).id;
+      }
+
+      // ---- extended family: real aunts/uncles + cousins, opt-in --------
+      // **Reuses `characterCreation.generateAuntOrUncle` — the exact
+      // generator a player's own `createCharacter()` already calls for
+      // this — rather than a second copy of "a new NPC, a new family,
+      // a cross-family `relationships.relationship_type='family'`
+      // link" living here too.** Gated per FAMILY (using the head just
+      // computed above as the aunt/uncle's sibling), never per member —
+      // see `config.extendedFamily`'s own comment in DEFAULTS for why,
+      // and for why this is opt-in at all.
+      //
+      // **No recursion.** `generateAuntOrUncle` only ever calls
+      // `generators.generateNpc`/`generateFamily`/`addFamilyMember`
+      // and `influence.seedFamilyBond` — never `createCharacter` or
+      // itself — so the generated aunt/uncle and cousins are plain
+      // NPCs this loop never revisits: there is no second round of
+      // extended-family generation for them, by construction rather
+      // than by a guard that could be bypassed.
+      if (config.extendedFamily) {
+        // **Seeded exactly like every other generator in this file —
+        // never the plain `engine.generateNPC(npcOptions)` pass-through
+        // `engine.js#createCharacter` injects for a PLAYER's own,
+        // intentionally-unseeded action.** `generateNPC`/`generateFamily`
+        // fall back to `Math.random()` (traits) and `generateName()`
+        // (also `Math.random()`) whenever `traitValueFor`/`name` are
+        // omitted — fine for a player creating one character at an
+        // arbitrary moment, but worldgen's own "same seed, same world"
+        // guarantee (§88) covers this opt-in path too. `extendedCall`
+        // increments once per generated person (aunt/uncle, then each
+        // cousin) so every draw is still keyed on POSITION, never on a
+        // generated id.
+        let extendedCall = 0;
+        const ccGenerators = {
+          generateNpc: (npcOptions) => {
+            const call = extendedCall;
+            extendedCall += 1;
+            return engine.generateNPC({
+              ...npcOptions,
+              name: npcOptions.name
+                || `${random.pick(GIVEN_NAMES, 'ext-given', c, b, call)} `
+                  + `${random.pick(SURNAMES, 'ext-surname', c, b, call)}`,
+              traitValueFor: (def) => Math.round(
+                random.range(10, 95, 'ext-trait', c, b, call, def.family, def.name),
+              ),
+            });
+          },
+          generateFamily: (familyOptions) => engine.generateFamily({
+            ...familyOptions,
+            traitValueFor: (def) => Math.round(
+              random.range(25, 85, 'ext-fam-trait', c, b, extendedCall, def.family, def.name),
+            ),
+          }),
+          addFamilyMember: (familyId, entityId, role, generationNumber) => (
+            engine.addFamilyMember(familyId, entityId, role, generationNumber)
+          ),
+        };
+        families.forEach((family, f) => {
+          if (family.head_npc_id == null) return;
+          if (random.unit('has-extended-family', c, b, f) > config.extendedFamilyChance) return;
+          const extended = characterCreation.generateAuntOrUncle(w, {
+            generators: ccGenerators,
+            seed: config.seed,
+            tick,
+            parentEntityId: family.head_npc_id,
+            surname: family.surname,
+            index: `${c}-${b}-${f}`,
+            maxCousins: config.maxCousinsPerAuntUncle,
+          });
+          made.people.push(extended.auntOrUncle, ...extended.cousins);
+          summary.extendedFamilyAdults += 1;
+          summary.extendedFamilyChildren += extended.cousins.length;
+          summary.families += 1;
+        });
       }
 
       // ---- work ----------------------------------------------------------

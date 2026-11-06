@@ -2181,6 +2181,106 @@ once end-to-end (`issuing_organization_id: null`, influence rising from
 relationship was refused deterministically with influence held at its
 real floor.
 
+**A forty-ninth, closing three concrete gaps the forty-eighth left
+behind, plus the extension explicitly asked for once they were found:
+"the user's family should have priority and have upper scales, but for
+the game to be accurate... everybody, all the NPCs should advance so
+all the worlds would advance accurately."**
+
+**Gap 1 — the player's own parents and siblings had NO seeded
+relationship at all, while cousins/aunts-uncles got one at the flat
+schema default.** `grep -n "raiseInfluence\|lowerInfluence\|influence\."
+server/characterCreation.js` before this returned nothing — the
+forty-eighth's own `influenceRatingOf`-derived baseline was never
+actually wired into `characterCreation.js`; every family link there
+still called `worldStore.adjustRelationship(..., 'family', {})`
+directly, and parents/siblings got no call at all. `influence.js#
+seedFamilyBond(worldState, a, b, { immediate })` is the fix — seeded
+once per pair (same `existedAlready` guard `raiseInfluence` already
+uses), from the real `influenceRatingOf`, with `relationship_type:
+'family'` (never `raiseInfluence` itself, which hardcodes
+`'social'` — wrong for kin). `immediate: true` (parents, siblings)
+adds `IMMEDIATE_FAMILY_BOND_BONUS` on top; omitted (cousins,
+aunts/uncles), the baseline is untouched. The bonus is
+`INFLUENCE_DELTA * 5` (= 10) — five real `INFLUENCE_DELTA`-sized
+events' worth of closeness, named as a multiple of an already-justified
+constant rather than an invented number, the same documentation
+discipline `PARENT_DECEASED_CHANCE` already states its own figure with.
+
+**Gap 2 — neither dashboard surfaced an entity's own `influenceRatingOf`
+or `characterCreation.describeFamilyTree`.** Both
+`players.js#getCitizenDashboard` and `leadership.js#getLeaderDashboard`
+now carry `influenceRating` and `extendedFamily`, read live on every
+call exactly like `netWorth`/`familyWealth` beside them (standing rule
+3) — never cached from generation time.
+
+**Gap 3 — `characterCreation.createCharacter`'s own return value was
+the only place a family tree was ever reported, once, at creation.**
+`characterCreation.describeFamilyTree(worldState, entityId)` is a new,
+separate LOOKUP function (never a refactor of `createCharacter`'s own
+return-construction code, which `test/characterCreation.test.js`
+already asserts a specific shape against — `parents[].role` in
+`['mother', 'father']` order, among others) that reads the same real
+`family_memberships`/`relationships`/`families.head_npc_id` rows back
+for ANY entity, live, whether or not they were ever created through
+`createCharacter`. `GET /api/entities/:id/family-tree` (`server.js` →
+`engine.getFamilyTree` → this function) exposes it.
+
+**Gap 4 — extended family (siblings, aunts/uncles, cousins) existed
+only for a player's own `createCharacter()`; every ordinary NPC
+`worldgen.js` generates had none.** Read end to end first: ordinary
+NPCs are assigned to a `familiesPerCommunity`-sized household roster
+with a flat `'member'` role, round-robin, no parent/child/sibling
+structure and no aunts/uncles/cousins at all — a different, much
+simpler mechanism than `characterCreation.js`'s own generator.
+
+**Measured before touching anything** (`node scripts/measure-world.mjs
+--seed measure-gap4 --ticks 1`, the DEFAULTS-sized world:
+1 city, 5 communities, 30 residents each): **150 people, 30 families,
+0 extended family** — the same world every one of the 50+ test files
+calling `worldgen.generateWorld()` already builds and asserts exact
+counts against (`test/worldgen.test.js` itself asserts
+`added.npcs === 24` on its own `SMALL` fixture).
+
+**That measured fact is why this is opt-in** (`config.extendedFamily`,
+default `false`) — the same posture every other real-data pack in this
+file already has (`populationPack`, `religionPack`, `ancestryPack`,
+`racePack`, ...): every existing call to `generateWorld()` omits it and
+gets the byte-for-byte unchanged world those 50+ files already assert
+against, rather than a silent default-on change rippling through
+assertions this closure has no way to re-verify one by one. Turned on
+(`--extended-family`, same seed): **183 people (+33, +22%), 46 families
+(+16), 16 real aunts/uncles, 17 real cousins** — `summary.
+extendedFamilyAdults`/`extendedFamilyChildren` report the real counts
+either way, 0 when off.
+
+**Reuses `characterCreation.generateAuntOrUncle` directly — now
+exported — rather than a second copy of "a new NPC, a new family, a
+cross-family `relationship_type: 'family'` link."** That function
+gained one new optional parameter, `maxCousins` (default
+`MAX_COUSINS_PER_AUNT_UNCLE`, so every existing caller is unchanged):
+`worldgen.js` passes a tighter `maxCousinsPerAuntUncle` (default 2, vs.
+character creation's own 4), because this runs once per FAMILY in
+EVERY community a world generates, not once for a single player.
+Generated **once per family, never per member** — an aunt/uncle
+belongs to the family as a whole, and generating one for every sibling
+would multiply the same two people once per child; `extendedFamilyChance`
+(default 0.5) gates whether a given family gets one at all, using the
+family's own just-computed `head_npc_id` as the aunt/uncle's sibling.
+
+**No recursion, by construction rather than by a guard that could be
+bypassed.** `generateAuntOrUncle` only ever calls
+`generators.generateNpc`/`generateFamily`/`addFamilyMember` and
+`influence.seedFamilyBond` — never `createCharacter` or itself — and
+the loop that calls it iterates the community's own original `families`
+array, built before this block runs, never the families this block
+itself creates. Mutation-verified: temporarily made the block also
+generate a second round of extended family FOR the aunt/uncle it had
+just created (the exact bug this guards against) and confirmed
+`test/worldgen.test.js`'s "never recurses" test catches it
+(`extendedFamilyAdults` doubled, 24 vs. the expected 12) before
+reverting the mutation.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

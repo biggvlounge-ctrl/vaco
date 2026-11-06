@@ -381,3 +381,108 @@ test('every family has a head, or nothing can ever succeed to it', () => {
     assert.ok(living.has(family.head_npc_id), 'a family is headed by somebody who is not there');
   }
 });
+
+// ---------------------------------------------------------------------
+// Extended family for ORDINARY NPCs (Gap 4) -- opt-in, same posture as
+// every other real-data pack in this file. Reuses
+// characterCreation.generateAuntOrUncle directly rather than a second
+// copy of "a new NPC, a new family, a cross-family relationship link".
+// ---------------------------------------------------------------------
+
+const DEFAULTS_FAMILIES_PER_COMMUNITY = 6;
+
+test('extendedFamily: true still replays byte-for-byte from its seed -- the real generators it reuses are threaded seeded traits/names, never engine.generateNPC\'s own Math.random fallback', () => {
+  function run(seed) {
+    const { before } = delta(() => worldgen.generateWorld({
+      ...SMALL, seed, extendedFamily: true, extendedFamilyChance: 1,
+    }));
+    return w.npcs.slice(before.npcs).map((n) => `${n.name}|${JSON.stringify(n.traits)}`).join(',');
+  }
+  const first = run('extended-replay');
+  const second = run('extended-replay');
+  assert.ok(first.length > 0);
+  assert.deepEqual(first, second, 'the same seed produced two different extended-family worlds');
+});
+
+test('extendedFamily defaults to false -- a generated world is byte-for-byte unchanged from before this feature existed', () => {
+  const { summary, added } = delta(() => worldgen.generateWorld({ ...SMALL, seed: 'no-extended' }));
+  assert.equal(added.npcs, 24, 'the default world must still generate exactly the old population');
+  assert.equal(summary.people, 24);
+  assert.equal(summary.extendedFamilyAdults, 0);
+  assert.equal(summary.extendedFamilyChildren, 0);
+});
+
+test('extendedFamily: true generates real aunts/uncles each heading a separate real family, with real cousins, cross-linked by a real family relationship', () => {
+  const { summary, before } = delta(() => worldgen.generateWorld({
+    ...SMALL, seed: 'extended-on', extendedFamily: true, extendedFamilyChance: 1,
+  }));
+  assert.ok(summary.extendedFamilyAdults > 0, 'extendedFamilyChance:1 generated no aunts/uncles at all');
+
+  const freshFamilies = w.families.slice(before.families);
+  // A real, separately-headed aunt/uncle family: head_npc_id set, and
+  // that same head is a 'parent'-role member of their OWN family (the
+  // real shape `generateAuntOrUncle` builds, never the player/original
+  // family's own 'member' rows).
+  const auntUncleFamilies = freshFamilies.filter((f) => f.head_npc_id != null
+    && w.familyMemberships.some((m) => m.entity_id === f.head_npc_id && m.family_id === f.id && m.role === 'parent'));
+  assert.ok(auntUncleFamilies.length > 0, 'no separately-headed aunt/uncle family was found among the fresh families');
+
+  for (const auFamily of auntUncleFamilies) {
+    const auntUncleId = auFamily.head_npc_id;
+    const rel = w.relationships.find(
+      (r) => (r.entity_a_id === auntUncleId || r.entity_b_id === auntUncleId)
+        && r.relationship_type === 'family',
+    );
+    assert.ok(rel, 'a generated aunt/uncle must be really related (relationship_type family) to someone');
+  }
+});
+
+test('extendedFamily cousin count respects the tighter maxCousinsPerAuntUncle cap, not characterCreation\'s own larger default', () => {
+  const { summary } = delta(() => worldgen.generateWorld({
+    ...SMALL, seed: 'extended-capped', extendedFamily: true, extendedFamilyChance: 1, maxCousinsPerAuntUncle: 2,
+  }));
+  assert.ok(summary.extendedFamilyAdults > 0);
+  const avgCousinsPerAuntUncle = summary.extendedFamilyChildren / summary.extendedFamilyAdults;
+  assert.ok(
+    avgCousinsPerAuntUncle <= 2,
+    `average cousins per aunt/uncle (${avgCousinsPerAuntUncle}) exceeds the configured cap of 2`,
+  );
+});
+
+test('extended family generation never recurses -- a generated aunt/uncle or cousin never themselves anchor another round', () => {
+  const { summary, before } = delta(() => worldgen.generateWorld({
+    ...SMALL, seed: 'no-recursion', extendedFamily: true, extendedFamilyChance: 1, maxCousinsPerAuntUncle: 2,
+  }));
+  // If generation recursed, the number of aunt/uncle units would
+  // multiply across communities rather than stay at exactly one per
+  // original community family -- bounded, not exponential.
+  const originalFamilyCount = DEFAULTS_FAMILIES_PER_COMMUNITY * SMALL.communitiesPerCity;
+  assert.equal(
+    summary.extendedFamilyAdults, originalFamilyCount,
+    'exactly one aunt/uncle per original family, at chance 1 -- any more means a second round ran',
+  );
+  // And none of the generated aunts/uncles/cousins themselves head a
+  // family that got its OWN aunt/uncle -- the loop that generates
+  // extended family only ever iterates the original community
+  // `families` array, never the families this block itself creates.
+  const freshFamilies = w.families.slice(before.families);
+  const auntUncleHeadIds = new Set(
+    freshFamilies
+      .filter((f) => w.familyMemberships.some(
+        (m) => m.family_id === f.id && m.entity_id === f.head_npc_id && m.role === 'parent',
+      ))
+      .map((f) => f.head_npc_id),
+  );
+  for (const headId of auntUncleHeadIds) {
+    const asAnchorRelationships = w.relationships.filter(
+      (r) => r.relationship_type === 'family' && (r.entity_a_id === headId || r.entity_b_id === headId),
+    );
+    // An aunt/uncle has exactly one real family link (to the sibling
+    // whose family anchored them) -- more than one would mean they
+    // were themselves used to generate a further round.
+    assert.ok(
+      asAnchorRelationships.length <= 1,
+      `aunt/uncle ${headId} has ${asAnchorRelationships.length} family relationships -- recursion suspected`,
+    );
+  }
+});

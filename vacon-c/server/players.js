@@ -29,6 +29,8 @@ const economy = require('./economy.js');
 const property = require('./property.js');
 const behavior = require('./behavior.js');
 const gifts = require('./gifts.js');
+const influence = require('./influence.js');
+const characterCreation = require('./characterCreation.js');
 
 let nextPlayerId = 1;
 
@@ -172,6 +174,16 @@ function getCitizenDashboard(worldState, playerId) {
       : null,
     propertySummary,
     netWorth,
+    // Real, derived, never stored (standing rule 3) — the real baseline
+    // a brand-new relationship of theirs would start from right now,
+    // read live so it moves as their occupation/leadership/traits do.
+    // See `server/influence.js`'s own header.
+    influenceRating: influence.influenceRatingOf(worldState, npcId),
+    // The real cousins/aunts-uncles `characterCreation.js` generates,
+    // read back live rather than only ever reported once at creation
+    // — same shared lookup `GET /api/entities/:id/family-tree` uses,
+    // so there is one real source of truth for this, not two.
+    extendedFamily: characterCreation.describeFamilyTree(worldState, npcId),
     // **What this person is FOR**, which is the one thing the dashboard
     // could not say. It showed what a citizen owned, who they knew and
     // how they were doing, and nothing about what they are good at.

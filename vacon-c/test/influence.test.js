@@ -337,6 +337,77 @@ test('lowerInfluence on a brand-new pair still seeds from the real rating before
 });
 
 // ---------------------------------------------------------------------
+// seedFamilyBond -- the real `relationship_type: 'family'` seeding
+// characterCreation.js uses for parents/siblings/aunts-uncles/cousins,
+// closing the gap where those links landed at the schema's flat
+// `influence: 0` instead of a real baseline.
+// ---------------------------------------------------------------------
+
+test('seedFamilyBond seeds a real family-typed relationship from the real influence rating, baseline only when not immediate', () => {
+  const w = world();
+  const cousinA = person(w);
+  const bigGang = organization(w, { type: 'gang', leaderId: cousinA.id, influenceColumn: 80 });
+  for (let i = 0; i < 5; i += 1) join(w, person(w).id, bigGang.id);
+  const cousinB = person(w);
+
+  const rating = influence.influenceRatingOf(w, cousinA.id);
+  const rel = influence.seedFamilyBond(w, cousinA.id, cousinB.id);
+
+  assert.equal(rel.relationship_type, 'family');
+  assert.equal(rel.influence, rating);
+  assert.equal(rel.trust, 50, 'baseline (non-immediate) bond does not touch trust/respect/loyalty');
+  assert.equal(rel.respect, 50);
+  assert.equal(rel.loyalty, 50);
+});
+
+test('seedFamilyBond with immediate:true adds IMMEDIATE_FAMILY_BOND_BONUS on top of the baseline -- closer than a cousin\'s', () => {
+  const w = world();
+  const child = person(w);
+  const parent = person(w);
+
+  const rating = influence.influenceRatingOf(w, child.id);
+  const rel = influence.seedFamilyBond(w, child.id, parent.id, { immediate: true });
+
+  assert.equal(rel.relationship_type, 'family');
+  assert.equal(rel.influence, Math.min(100, rating + influence.IMMEDIATE_FAMILY_BOND_BONUS));
+  assert.equal(rel.trust, Math.min(100, 50 + influence.IMMEDIATE_FAMILY_BOND_BONUS));
+  assert.equal(rel.respect, Math.min(100, 50 + influence.IMMEDIATE_FAMILY_BOND_BONUS));
+  assert.equal(rel.loyalty, Math.min(100, 50 + influence.IMMEDIATE_FAMILY_BOND_BONUS));
+});
+
+test('an immediate family bond really does rate higher than a baseline (cousin) bond seeded from the same rating', () => {
+  const w = world();
+  const anchor = person(w);
+  const sibling = person(w);
+  const cousin = person(w);
+
+  const siblingRel = influence.seedFamilyBond(w, anchor.id, sibling.id, { immediate: true });
+  const cousinRel = influence.seedFamilyBond(w, anchor.id, cousin.id);
+
+  assert.ok(
+    siblingRel.influence > cousinRel.influence,
+    `immediate family (${siblingRel.influence}) should rate above extended family (${cousinRel.influence})`,
+  );
+});
+
+test('seedFamilyBond on an EXISTING pair does not re-seed or re-apply the bonus -- same existedAlready guard as raiseInfluence', () => {
+  const w = world();
+  const a = person(w);
+  const b = person(w);
+  const rel = worldStore.getOrCreateRelationship(w, a.id, b.id, 'family');
+  rel.influence = 33;
+  rel.trust = 33;
+
+  influence.seedFamilyBond(w, a.id, b.id, { immediate: true });
+  assert.equal(rel.influence, 33, 'an existing relationship is left alone, never re-seeded');
+  assert.equal(rel.trust, 33);
+});
+
+test('IMMEDIATE_FAMILY_BOND_BONUS is a named multiple of INFLUENCE_DELTA, not an unrelated invented number', () => {
+  assert.equal(influence.IMMEDIATE_FAMILY_BOND_BONUS, influence.INFLUENCE_DELTA * 5);
+});
+
+// ---------------------------------------------------------------------
 // Integration -- wired into real, already-existing events via
 // engine.js. These run against engine.js's own live WorldState
 // singleton, the same convention test/missions.test.js and

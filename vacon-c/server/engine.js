@@ -840,6 +840,14 @@ function createCharacter(options = {}) {
   });
 }
 
+// The lookup half of characterCreation.js — reads back parents/
+// siblings/cousins for ANY entity, live, whether or not that entity
+// was ever created through createCharacter() above. Backs
+// `GET /api/entities/:id/family-tree`.
+function getFamilyTree(entityId) {
+  return characterCreation.describeFamilyTree(WorldState, entityId);
+}
+
 // ---------------------------------------------------------------------------
 // Territory/Community (block-tier)
 // ---------------------------------------------------------------------------
@@ -1655,6 +1663,7 @@ module.exports = {
   promoteToLeader,
   getLeaderDashboard,
   createCharacter,
+  getFamilyTree,
   getInfluenceRating,
   getPersonalInfluence,
   getFamilyPoliticalInfluence,

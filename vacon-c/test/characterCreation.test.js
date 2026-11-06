@@ -240,3 +240,115 @@ test('grandparents and any generation beyond parents/siblings/cousins are never 
     assert.ok(members.every((m) => m.role === 'parent' || m.role === 'child'));
   }
 });
+
+// ---------------------------------------------------------------------
+// Immediate family gets a real, named bonus over extended family --
+// the gap where parents/siblings got NO relationship at all, while
+// cousins/aunts-uncles got the flat schema default, and the direct
+// instruction that the player's own family "should have priority and
+// have upper scales."
+// ---------------------------------------------------------------------
+
+const influenceForBonus = require('../server/influence.js');
+
+test('the player really has a seeded family relationship with both parents and every sibling -- the gap this closes', () => {
+  const result = makeCharacter({ name: 'Close Kin' });
+  for (const parent of result.family.parents) {
+    const rel = worldStore.findRelationship(engine.WorldState, result.player.id, parent.entityId);
+    assert.ok(rel, `no relationship seeded between the player and their own ${parent.role}`);
+    assert.equal(rel.relationship_type, 'family');
+  }
+  for (const sibling of result.family.siblings) {
+    const rel = worldStore.findRelationship(engine.WorldState, result.player.id, sibling.id);
+    assert.ok(rel, 'no relationship seeded between the player and a real sibling');
+    assert.equal(rel.relationship_type, 'family');
+  }
+});
+
+test('a parent/sibling relationship rates above a cousin\'s own baseline -- immediate family starts closer, by direct instruction', () => {
+  // Run until a character with both at least one sibling and at least
+  // one cousin turns up, so the two real numbers can be compared on
+  // the SAME player rather than across different draws.
+  let compared = false;
+  for (let i = 0; i < 25 && !compared; i += 1) {
+    const result = makeCharacter({ name: `Compare Kin ${i}` });
+    const cousinIds = result.cousins.flatMap((au) => au.children.map((c) => c.id));
+    if (result.family.siblings.length === 0 || cousinIds.length === 0) continue;
+    compared = true;
+
+    const siblingRel = worldStore.findRelationship(
+      engine.WorldState, result.player.id, result.family.siblings[0].id,
+    );
+    const cousinRel = worldStore.findRelationship(engine.WorldState, result.player.id, cousinIds[0]);
+    assert.ok(
+      siblingRel.influence > cousinRel.influence,
+      `a sibling (${siblingRel.influence}) should rate above a cousin (${cousinRel.influence})`,
+    );
+    // Both sides are `clamp0to100(rating + bonus)` over the same real
+    // float rating, so the gap is the bonus exactly in principle --
+    // within float tolerance in practice (repeated subtraction/addition
+    // on the components behind `influenceRatingOf` can leave noise in
+    // the fifteenth decimal place, the same binary-float shape
+    // `property.advancePropertyLifecycle`'s own rounding bug was built
+    // on, CLAUDE.md's twenty-third standing rule).
+    assert.ok(
+      Math.abs((siblingRel.influence - cousinRel.influence) - influenceForBonus.IMMEDIATE_FAMILY_BOND_BONUS) < 1e-9,
+      'the gap between immediate and extended family should be exactly the named bonus, both seeded from the same player rating',
+    );
+  }
+  assert.ok(compared, 'in 25 characters, never got both a sibling and a cousin to compare -- widen the draw');
+});
+
+// ---------------------------------------------------------------------
+// describeFamilyTree -- the real LOOKUP, as opposed to createCharacter's
+// GENERATOR. Backs `GET /api/entities/:id/family-tree`.
+// ---------------------------------------------------------------------
+
+test('describeFamilyTree reads back the same real parents/siblings/cousins for a created character, live, after the fact', () => {
+  const characterCreation = require('../server/characterCreation.js');
+  const result = makeCharacter({ name: 'Looked Up Later' });
+
+  const tree = characterCreation.describeFamilyTree(engine.WorldState, result.player.id);
+
+  assert.equal(tree.family.id, result.family.id);
+  assert.equal(tree.parents.length, result.family.parents.length);
+  assert.equal(tree.siblings.length, result.family.siblings.length);
+  const expectedCousinIds = new Set(result.cousins.flatMap((au) => au.children.map((c) => c.id)));
+  const actualCousinIds = new Set(tree.cousins.flatMap((au) => au.children.map((c) => c.id)));
+  assert.deepEqual(actualCousinIds, expectedCousinIds);
+});
+
+test('describeFamilyTree on an entity with no family membership returns the honest empty shape, not a throw', () => {
+  const characterCreation = require('../server/characterCreation.js');
+  const stray = engine.generateNPC({ name: 'Nobody\'s Kin' });
+  const tree = characterCreation.describeFamilyTree(engine.WorldState, stray.id);
+  assert.equal(tree.family, null);
+  assert.deepEqual(tree.parents, []);
+  assert.deepEqual(tree.siblings, []);
+  assert.deepEqual(tree.cousins, []);
+});
+
+test('generateAuntOrUncle honors an explicit tighter maxCousins cap -- the cap worldgen.js reuses for ordinary NPCs', () => {
+  const characterCreation = require('../server/characterCreation.js');
+  const ccGenerators = {
+    generateNpc: (opts) => engine.generateNPC(opts),
+    generateFamily: (opts) => engine.generateFamily(opts),
+    addFamilyMember: (familyId, entityId, role, gen) => engine.addFamilyMember(familyId, entityId, role, gen),
+  };
+  const anchor = engine.generateNPC({ name: 'Capped Anchor' });
+  let sawMoreThanZero = false;
+  for (let i = 0; i < 25; i += 1) {
+    const extended = characterCreation.generateAuntOrUncle(engine.WorldState, {
+      generators: ccGenerators,
+      seed: 'cap-test',
+      tick: engine.WorldState.tick ?? 0,
+      parentEntityId: anchor.id,
+      surname: 'Capped',
+      index: `cap-${i}`,
+      maxCousins: 2,
+    });
+    assert.ok(extended.cousins.length <= 2, `maxCousins:2 was not honored -- got ${extended.cousins.length}`);
+    if (extended.cousins.length > 0) sawMoreThanZero = true;
+  }
+  assert.ok(sawMoreThanZero, 'in 25 draws capped at 2, never saw a single cousin -- the draw is not real');
+});
