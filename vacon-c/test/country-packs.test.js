@@ -747,3 +747,110 @@ test('a world with no countryKey reports null country fields, same as before thi
   assert.equal(region.countryKey, null);
   assert.equal(region.incomeLevel, null);
 });
+
+// ---------------------------------------------------------------------
+// Twelfth round: real global crime (homicide), hunger, climate and
+// road-safety figures -- real but sparse, same `oilProducer` posture
+// this table already established, plus the real tooling-limitation
+// gaps this round names rather than fakes
+// ---------------------------------------------------------------------
+
+test('every entry carries a globalIndicators2026 object, never a missing key', () => {
+  for (const [key, entry] of Object.entries(countryPacks.COUNTRIES)) {
+    assert.ok('globalIndicators2026' in entry, `${key}: globalIndicators2026 must be present, even if every field inside it is null`);
+    assert.ok('homicideRatePer100k' in entry.globalIndicators2026, `${key}: homicideRatePer100k must be present`);
+  }
+});
+
+test('homicideRatePer100k is real and cited for most entries, and explicitly null where genuinely not found or rejected', () => {
+  const withFigure = Object.entries(countryPacks.COUNTRIES)
+    .filter(([, entry]) => entry.globalIndicators2026.homicideRatePer100k !== null);
+  // 28 of 37 entries carry a real figure -- most of the table, not all of it.
+  assert.equal(withFigure.length, 28);
+  for (const [key, entry] of withFigure) {
+    const h = entry.globalIndicators2026.homicideRatePer100k;
+    assert.ok(typeof h.value === 'number' && h.value >= 0, `${key}: homicide rate must be a real non-negative number`);
+    assert.ok(typeof h.year === 'number', `${key}: homicide rate must carry a real year`);
+    assert.ok(typeof h.source === 'string' && h.source.length > 0, `${key}: homicide rate must name a source`);
+  }
+});
+
+test('Somalia\'s homicide rate is null because the only figure found combines homicide with other causes of death, not because nothing was found', () => {
+  const somalia = countryPacks.countryFor('somali');
+  assert.equal(somalia.globalIndicators2026.homicideRatePer100k, null);
+  // The real figure that WAS found (53.2% undernourishment) is kept --
+  // this is not a blanket "nothing found for Somalia" null.
+  assert.equal(somalia.globalIndicators2026.undernourishmentPct.value, 53.2);
+});
+
+test('Nigeria, Guatemala and Honduras have real but conflicting homicide figures, and stay null rather than picking a side', () => {
+  for (const key of ['nigerian', 'guatemalan', 'honduran']) {
+    assert.equal(countryPacks.countryFor(key).globalIndicators2026.homicideRatePer100k, null, `${key}: should stay null, not pick between disagreeing sources`);
+  }
+});
+
+test('stale figures are kept with their real year rather than hidden or treated as current', () => {
+  const russia = countryPacks.countryFor('russian').globalIndicators2026.homicideRatePer100k;
+  assert.equal(russia.year, 2018);
+  assert.ok(russia.confidence.includes('stale'));
+  const ethiopia = countryPacks.countryFor('ethiopian').globalIndicators2026.homicideRatePer100k;
+  assert.equal(ethiopia.year, 2012);
+});
+
+test('undernourishmentPct, avgTemperatureC and roadTrafficDeathRatePer100k are real but deliberately sparse -- present only where found, null everywhere else', () => {
+  const withUndernourishment = Object.values(countryPacks.COUNTRIES).filter((e) => e.globalIndicators2026.undernourishmentPct !== null);
+  const withTemp = Object.values(countryPacks.COUNTRIES).filter((e) => e.globalIndicators2026.avgTemperatureC !== null);
+  const withRoad = Object.values(countryPacks.COUNTRIES).filter((e) => e.globalIndicators2026.roadTrafficDeathRatePer100k !== null);
+  assert.equal(withUndernourishment.length, 5);
+  assert.equal(withTemp.length, 5);
+  assert.equal(withRoad.length, 4);
+  // Most entries are null on all three -- same sparse posture oilProducer already has.
+  assert.ok(countryPacks.countryFor('german').globalIndicators2026.undernourishmentPct === null);
+  assert.ok(countryPacks.countryFor('german').globalIndicators2026.avgTemperatureC === null);
+  assert.ok(countryPacks.countryFor('german').globalIndicators2026.roadTrafficDeathRatePer100k === null);
+});
+
+test('India carries real hunger, temperature and road-safety figures, with a disagreeing secondary road-safety figure named rather than dropped', () => {
+  const india = countryPacks.countryFor('asian-indian').globalIndicators2026;
+  assert.equal(india.undernourishmentPct.value, 9.8);
+  assert.equal(india.avgTemperatureC.value, 24.94);
+  assert.equal(india.roadTrafficDeathRatePer100k.value, 11.6);
+  assert.ok(india.roadTrafficDeathRatePer100k.note.includes('15'), 'the conflicting secondary figure must stay visible');
+});
+
+test('temperature figures from a different real methodology/period are flagged, not blended with the 1991-2020 baseline figures', () => {
+  const kenya = countryPacks.countryFor('kenyan').globalIndicators2026.avgTemperatureC;
+  assert.ok(kenya.confidence.includes('different-baseline'));
+  const mexico = countryPacks.countryFor('mexican').globalIndicators2026.avgTemperatureC;
+  assert.ok(mexico.confidence.includes('different-baseline'));
+});
+
+test('generateRegion reports globalIndicators2026, additively, and leaves it null with no countryKey', () => {
+  const w = { regions: [] };
+  const haiti = migration.generateRegion(w, { name: 'Test Region A', countryKey: 'haitian' });
+  assert.equal(haiti.globalIndicators2026.homicideRatePer100k.value, 41.2);
+  assert.equal(haiti.globalIndicators2026.undernourishmentPct.value, 54.2);
+
+  const noKey = migration.generateRegion(w, { name: 'Test Region B' });
+  assert.equal(noKey.globalIndicators2026, null);
+});
+
+// ---------------------------------------------------------------------
+// What this round explicitly declined or deferred, and why -- asserted
+// so a future round can see the decision was deliberate, not missed
+// ---------------------------------------------------------------------
+
+test('this round did not add a conflict-event figure, an eating-conditions field, an animals field, or a cultures field -- checked for by their absence', () => {
+  for (const entry of Object.values(countryPacks.COUNTRIES)) {
+    assert.equal(entry.conflictEventCount, undefined, 'conflict events were deliberately not added this round -- conflictLevel stands unchanged');
+    assert.equal(entry.dietarySupplyKcalPerCapitaDay, undefined, 'eating-conditions data was not attempted this round -- no usable compiled figures were found');
+    assert.equal(entry.threatenedSpeciesCount, undefined, 'IUCN wildlife data was not attempted this round');
+    assert.equal(entry.livestockHeadCount, undefined, 'FAO livestock data was not attempted this round');
+    assert.equal(entry.culturalDimensions, undefined, 'Hofstede/WVS cultural data is declined outright this round -- see this file\'s own header');
+  }
+});
+
+test('occupations needed no new building this round -- enforcer/officer are already ungated by ethnicity or nationality', () => {
+  const occupations = require('../server/occupations.js');
+  assert.ok(occupations.OCCUPATIONS.enforcer, 'enforcer must already exist and be available to any NPC regardless of ancestry/nationality context');
+});

@@ -335,6 +335,150 @@
 // `server/` reads these to decide an outcome yet.
 //
 // ---------------------------------------------------------------------
+// Twelfth round: real global crime, conflict, climate, hunger and
+// road-safety figures, asked for "all over the globe" -- and an
+// honest account of why this round covers less than that phrase asks
+// for, rather than a thin pass presented as complete
+// ---------------------------------------------------------------------
+// Asked directly for crime, conflicts/wars, "temperature... from
+// Africa, the Middle East, Europe", occupations, hunger, road
+// conditions, animals, eating conditions and cultures, globally, with
+// an explicit instruction to make everything precise and accurate. A
+// read-only research pass first checked what real source exists for
+// each ask (see that pass's own report, carried into this round): six
+// real candidates (UNODC/World Bank homicide rate; UCDP/ACLED conflict
+// events; World Bank Climate Change Knowledge Portal/Beck et al.
+// temperature; ILOSTAT occupations; FAOSTAT undernourishment; WHO road
+// safety) and two genuinely ambiguous asks resolved by direct
+// instruction (`animals` -> IUCN Red List wildlife status AND FAO
+// livestock, kept as two separate real things, not one; `cultures` ->
+// declined outright this round, see below).
+//
+// **`homicideRatePer100k` is the one field built at real breadth this
+// round** -- `globalIndicators2026.homicideRatePer100k` on every
+// `COUNTRIES` entry, UNODC/World-Bank-sourced (indicator
+// `VC.IHR.PSRC.P5`), found and cross-checked for 28 of this table's 37
+// entries. Scoped honestly to HOMICIDE, not crime broadly -- no global
+// source publishes a comparable burglary/assault/theft rate for most
+// of the world, the same honest-scoping `crime.js` itself already
+// practices for its own internal categories. Where two real sources
+// disagreed outside rounding noise (`nigerian`: 15.7 with no stated
+// year against 34.52 for 2016; `guatemalan`: ~20 against ~23 for the
+// same year; `honduran`: a roughly 31-38 range across sources), both
+// are reported rather than one being picked, same discipline this
+// file already applies to Haiti's street-death count and France's
+// theft trend. Where a figure exists but is years stale (`russian`:
+// 2018 is the most recent found; `ethiopian`: 2012; `chinese`: 2020),
+// it is kept and flagged with its real year rather than omitted or
+// silently presented as current. `somali`'s only found figure (14.7)
+// combines homicide with other causes of intentional death and is NOT
+// homicide-specific -- checked directly and excluded rather than
+// mistaken for the real thing, the same care this file already took
+// distinguishing Statistics-of-the-World's "intentional death rate"
+// page from its separate "homicide rate" page. `portuguese` and
+// `vietnamese` are `null`: genuinely not found this round, not
+// invented to fill the row.
+//
+// **Three more fields are real but deliberately SPARSE, the same
+// `oilProducer` posture this table already established** -- present
+// only where a real, checkable figure was actually found, `null`
+// everywhere else rather than a forced estimate:
+//
+// - `undernourishmentPct` (FAOSTAT SDG indicator 2.1.1): `haitian`
+//   (54.2%, 2023), `somali` (53.2%, 2023), `nigerian` (22.2%, year not
+//   stated in the source found), `'asian-indian'` (9.8%, year not
+//   stated), `irish` (reported as exactly 2.5%, which FAO's own
+//   methodology note says can mean the true prevalence is anywhere AT
+//   OR BELOW that threshold, not literally 2.50 -- carried with that
+//   caveat rather than presented as a precise figure).
+// - `avgTemperatureC` (World Bank Climate Change Knowledge Portal, via
+//   the Wikipedia compilation of the same underlying 1991-2020 World
+//   Bank series, except where noted): `'asian-indian'` (24.94,
+//   1991-2020), `vietnamese` (24.79, 1991-2020, same baseline),
+//   `kenyan` (24.6, a DIFFERENT real source using a 1924-2024
+//   hundred-year average -- flagged, not blended with the other two
+//   baselines), `mexican` (21.2) and `israeli` (21.0) (both from a
+//   2016 single-year compilation, a third real but non-equivalent
+//   basis, flagged the same way). Four different real methodologies
+//   across five countries, each named rather than silently treated as
+//   one consistent series -- the alternative (forcing them onto one
+//   baseline without the primary table to re-derive from) would be
+//   the exact "plausible wrong number" the thirteenth standing rule
+//   warns against.
+// - `roadTrafficDeathRatePer100k` (WHO Global Status Report on Road
+//   Safety 2023, 2021 data -- the real, current substitute for a
+//   literal road-CONDITION index, which is discontinued and stale;
+//   named here as answering a safety-OUTCOME question, not a
+//   pavement-quality one, the same distinction this file already
+//   draws between `healthBaseline` and `overdoseBaseline`): `haitian`
+//   (31.3), `kenyan` (28.2), `'asian-indian'` (11.6, with a
+//   conflicting secondary figure of 15 for the same year named rather
+//   than silently dropped), `russian` (18.0, year/exact methodology
+//   not confirmed in the source found -- flagged).
+//
+// **What this round could NOT responsibly build, and the real reason
+// is a tooling limitation, named rather than hidden behind a thin
+// pass.** This round had WebSearch only -- no direct page retrieval
+// (WebFetch) and no further research subagent -- so every number
+// above came from WebSearch's own synthesized snippets, which surface
+// secondary aggregator sites (statisticsoftheworld.com, macrotrends,
+// nationmaster, and similar) far more often than the primary UNODC/
+// World Bank/FAOSTAT/WHO tables themselves. For homicide that still
+// produced real, cross-checkable figures for most of this table,
+// because those aggregators mirror the UNODC/World Bank series
+// closely and consistently. For road safety and climate, repeated,
+// differently-worded searches surfaced a clean figure for only 3-5 of
+// this table's 37 countries each -- below any threshold worth calling
+// "global coverage" -- and attempting to fill the rest would have
+// meant either fabricating numbers this file's whole discipline exists
+// to refuse, or presenting a handful of real data points as a
+// completed world survey, which is its own kind of dishonesty (the
+// twenty-fifth standing rule's shape, one level up: a thin real result
+// is not its own completeness). So:
+//
+// - **Conflicts/wars**: NOT extended with UCDP/ACLED EVENT-level data
+//   this round. The existing `conflictLevel` qualitative band (already
+//   UCDP-derived, already report-only) stands unchanged -- a real,
+//   finer-grained event count or fatality figure per country is left
+//   for a future round with actual table access, not built on
+//   WebSearch snippets alone.
+// - **Occupations**: checked, not built, because the honest finding is
+//   that nothing needs building. `occupations.js`/`labourPacks.js`
+//   draw occupations independent of ethnicity/nationality by design
+//   (the forty-second standing rule already confirmed "Mexican police
+//   officer" needs no new occupation because `enforcer`/`officer` are
+//   ungated), so this table's own occupation coverage is already
+//   global by construction -- a real finding, not a skipped task.
+// - **Eating conditions** (FAO Food Balance Sheets -- per-capita
+//   dietary energy/protein supply) and **animals** (IUCN Red List
+//   wildlife status; FAO livestock head-counts, kept as two separate
+//   real things by direct instruction rather than one dataset forced
+//   to answer both) were not attempted at all this round -- WebSearch
+//   turned up no usable compiled figures for either across this
+//   table's countries in the searches tried, and a field with zero
+//   real entries is better left unbuilt than added as an all-null
+//   placeholder nobody asked for.
+// - **Cultures** (Hofstede's country dimensions; the World Values
+//   Survey) are declined OUTRIGHT, not deferred for a tooling reason
+//   like the three above -- a prior read-only research pass found
+//   WVS's own terms explicitly non-redistributable and Hofstede's
+//   current bulk-licensing terms unconfirmed, the same "a real source
+//   exists but its access terms are not clean enough to use" posture
+//   this file already takes declining the Chicago gang-boundary FOIA
+//   release as a live source.
+// - **New country entries for Africa/Middle-East/Europe gaps** (Spain,
+//   Egypt, Saudi Arabia and similar were considered) are declined this
+//   round too: a new `COUNTRIES` key needs a real `ancestryPacks.
+//   GROUPS` entry first (the same structural prerequisite the Israel
+//   addition needed), which means verifying a real Census ACS ancestry
+//   code the way that addition did -- a separate piece of real
+//   research this round's tooling could not do with confidence, not a
+//   shortcut worth taking to look more global.
+//
+// Same report-only posture as every other field here: nothing in
+// `server/` reads `globalIndicators2026` to decide an outcome.
+//
+// ---------------------------------------------------------------------
 // What this is a first step TOWARD, and what it does not attempt yet
 // ---------------------------------------------------------------------
 // Asked to expand this engine beyond the United States — other
@@ -537,6 +681,10 @@ const COUNTRIES = {
     regimeType: 'full-democracy', regimeScore: 8.73,
     militaryExpenditurePctGDP: { value: 1.84, year: 2024, confidence: 'secondary-estimate' },
     oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: { value: 0.91, year: 2023, source: 'unodc-via-world-bank-secondary-compilation', confidence: 'secondary-compilation' },
+      undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
     // Germany led the EU on total 2025 asylum applications, and hosts
     // by far the largest Ukrainian temporary-protection population.
     immigration: {
@@ -557,6 +705,14 @@ const COUNTRIES = {
     regimeType: 'full-democracy', regimeScore: 9.19,
     militaryExpenditurePctGDP: null,
     oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: { value: 0.7, year: 2023, source: 'world-bank-wdi-via-secondary-compilation', confidence: 'secondary-compilation' },
+      undernourishmentPct: {
+        value: 2.5, year: 2023, source: 'faostat-sdg-2.1.1-via-secondary-compilation',
+        note: 'FAO reports any true prevalence at or below 2.5% as exactly "2.5" -- the real figure may be lower, not necessarily this value',
+      },
+      avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
   },
   english: {
     country: 'United Kingdom', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary constitutional monarchy',
@@ -566,6 +722,16 @@ const COUNTRIES = {
     // 2024 production figure was found, so this flags the status without a number.
     oilProducer: { status: 'minor-and-declining-producer', dailyProductionBbl: null, exportValueUsd2024: null },
     immigration: UK_IMMIGRATION_2026,
+    // No clean 2022-2023 UNODC/World Bank homicide rate was found this
+    // round -- the UK stopped contributing comparable figures to
+    // Eurostat's own series in 2019, and the only figure found
+    // (England & Wales, ~1.17 per 100,000, 2021) is both partial
+    // (excludes Scotland/Wales as separate jurisdictions despite this
+    // table's own english/scottish/welsh split) and two years stale.
+    // Left null rather than used.
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
   },
   scottish: {
     country: 'United Kingdom', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary constitutional monarchy',
@@ -573,6 +739,11 @@ const COUNTRIES = {
     militaryExpenditurePctGDP: { value: 2.44, year: 2024, confidence: 'secondary-estimate' },
     oilProducer: { status: 'minor-and-declining-producer', dailyProductionBbl: null, exportValueUsd2024: null },
     immigration: UK_IMMIGRATION_2026,
+    // Same real gap as the english entry's own note -- not duplicated
+    // in full here, see that entry.
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
   },
   welsh: {
     country: 'United Kingdom', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary constitutional monarchy',
@@ -580,12 +751,25 @@ const COUNTRIES = {
     militaryExpenditurePctGDP: { value: 2.44, year: 2024, confidence: 'secondary-estimate' },
     oilProducer: { status: 'minor-and-declining-producer', dailyProductionBbl: null, exportValueUsd2024: null },
     immigration: UK_IMMIGRATION_2026,
+    // Same real gap as the english entry's own note -- not duplicated
+    // in full here, see that entry.
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
   },
   italian: {
     country: 'Italy', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary republic',
     regimeType: 'flawed-democracy', regimeScore: 7.58,
     militaryExpenditurePctGDP: null,
     oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: {
+        value: 0.57, year: 2023, source: 'unodc-via-world-bank-secondary-compilation',
+        note: 'one aggregator rounds this to 0.6, ranked #131 of 145 countries; both describe the same real figure',
+        confidence: 'secondary-compilation',
+      },
+      undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
     // Sea arrivals fell sharply in 2026. Two real UNHCR-sourced figures
     // for the same roughly-7-month window disagree (14,388 vs ~16,567)
     // and both are kept rather than picking one.
@@ -611,6 +795,14 @@ const COUNTRIES = {
     // specific figure was confirmed this round — left null rather than guessed.
     militaryExpenditurePctGDP: null,
     oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: {
+        value: 0.8, year: 2023, source: 'world-bank-via-secondary-compilation',
+        note: 'a 2021 compilation gives 0.68 for that earlier year; both real, different years, not reconciled',
+        confidence: 'secondary-compilation',
+      },
+      undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
     notableFigures: [{ name: 'Donald Tusk', role: 'Prime Minister of Poland', note: 'in office since 13 Dec 2023; his government survived a confidence vote (243-in-favour) after a conservative, Karol Nawrocki, won the June 2025 presidential runoff' }],
     politicalParties: {
       ruling: { name: 'Civic Coalition (KO)', leader: 'Donald Tusk', note: 'Civic Platform, Modern and Polish Initiative merged into one party at a 25-26 Oct 2025 unification congress; Tusk was confirmed leader unopposed (98% of a March 2026 vote)' },
@@ -627,6 +819,14 @@ const COUNTRIES = {
     regimeType: 'flawed-democracy', regimeScore: null,
     militaryExpenditurePctGDP: { value: 2.01, year: 2024, confidence: 'secondary-estimate' },
     oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: {
+        value: 1.3, year: 2023, source: 'world-bank-via-secondary-compilation',
+        note: 'a UNODC-via-Statista series gives 1.34 for the same year -- same real figure, rounding difference',
+        confidence: 'secondary-compilation',
+      },
+      undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
     // Foundation estimate (shelter + street counts), not a government
     // census. 350,000 was also the 2024 figure in last year's report —
     // kept as reported rather than smoothed into a single trend line.
@@ -840,24 +1040,47 @@ const COUNTRIES = {
     regimeType: 'full-democracy', regimeScore: 9.00,
     militaryExpenditurePctGDP: null,
     oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: { value: 0.69, year: 2023, source: 'world-bank-via-secondary-compilation', note: '125 homicides in 2023 per the same compilation', confidence: 'secondary-compilation' },
+      undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
   },
   norwegian: {
     country: 'Norway', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary constitutional monarchy',
     regimeType: 'full-democracy', regimeScore: 9.81,
     militaryExpenditurePctGDP: null,
     oilProducer: { status: 'major-exporter', dailyProductionBbl: 1690000, exportValueUsd2024: 49700000000 },
+    globalIndicators2026: {
+      homicideRatePer100k: {
+        value: 0.72, year: 2023, source: 'world-bank-via-secondary-compilation',
+        note: '40 homicides in 2023 per that compilation; a separate 2021-dated secondary figure gives 0.55 for that earlier year -- kept apart, not reconciled',
+        confidence: 'secondary-compilation',
+      },
+      undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
   },
   swedish: {
     country: 'Sweden', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary constitutional monarchy',
     regimeType: 'full-democracy', regimeScore: 9.39,
     militaryExpenditurePctGDP: null,
     oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: {
+        value: 1.1, year: 2021, source: 'secondary-compilation', confidence: 'secondary-compilation',
+        note: 'no 2022/2023 figure was found this round; this is the most recent year confirmed',
+      },
+      undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
   },
   greek: {
     country: 'Greece', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary republic',
     regimeType: 'full-democracy', regimeScore: 8.07,
     militaryExpenditurePctGDP: null,
     oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: { value: 0.84, year: 2023, source: 'secondary-compilation', confidence: 'secondary-compilation' },
+      undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
   },
   portuguese: {
     country: 'Portugal', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary republic',
@@ -865,12 +1088,21 @@ const COUNTRIES = {
     regimeType: 'full-democracy', regimeScore: null,
     militaryExpenditurePctGDP: null,
     oilProducer: null,
+    // No 2022/2023 homicide figure was found this round for Portugal
+    // specifically -- left null rather than guessed.
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
   },
   hungarian: {
     country: 'Hungary', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary republic',
     regimeType: 'flawed-democracy', regimeScore: 6.51,
     militaryExpenditurePctGDP: null,
     oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: { value: 0.7, year: 2023, source: 'secondary-compilation', note: 'a second compilation gives 0.77 for the same year', confidence: 'secondary-compilation' },
+      undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
   },
   czech: {
     country: 'Czech Republic', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary republic',
@@ -878,18 +1110,30 @@ const COUNTRIES = {
     regimeType: 'full-democracy', regimeScore: null,
     militaryExpenditurePctGDP: null,
     oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: { value: 0.8, year: 2023, source: 'secondary-compilation', note: 'a second compilation gives 0.77 for the same year', confidence: 'secondary-compilation' },
+      undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
   },
   swiss: {
     country: 'Switzerland', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'federal semi-direct democratic republic',
     regimeType: 'full-democracy', regimeScore: 9.32,
     militaryExpenditurePctGDP: null,
     oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: { value: 0.6, year: 2023, source: 'secondary-compilation', note: '53 homicides in 2023 per that compilation', confidence: 'secondary-compilation' },
+      undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
   },
   lithuanian: {
     country: 'Lithuania', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary republic',
     regimeType: 'flawed-democracy', regimeScore: 7.59,
     militaryExpenditurePctGDP: null,
     oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: { value: 2.6, year: 2023, source: 'secondary-compilation', confidence: 'secondary-compilation' },
+      undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
   },
   // **Russia and Ukraine, checked directly: this is an active,
   // ongoing, state-based war, among the most documented in the world
@@ -900,6 +1144,11 @@ const COUNTRIES = {
     regimeType: 'authoritarian-regime', regimeScore: 2.03,
     militaryExpenditurePctGDP: { value: 7.1, year: 2024, confidence: 'sipri-official' },
     oilProducer: { status: 'major-exporter', dailyProductionBbl: 4500000, exportValueUsd2024: 122500000000 },
+    globalIndicators2026: {
+      homicideRatePer100k: { value: 8.21, year: 2018, source: 'rosstat-via-secondary-compilation', note: 'the most recent figure found this round; no newer confirmed value, kept rather than omitted', confidence: 'secondary-compilation-stale' },
+      undernourishmentPct: null, avgTemperatureC: null,
+      roadTrafficDeathRatePer100k: { value: 18.0, year: null, source: 'secondary-compilation', note: 'exact year/methodology not confirmed in the source found this round', confidence: 'secondary-compilation-unverified-year' },
+    },
     warStatus: RUSSIA_UKRAINE_WAR_STATUS_OCT2026,
     // The named head of state driving `warStatus` above -- the real-
     // world "representation" the war-status object itself is about.
@@ -922,6 +1171,10 @@ const COUNTRIES = {
     regimeType: 'hybrid-regime', regimeScore: 4.90,
     militaryExpenditurePctGDP: { value: 34, year: 2024, confidence: 'sipri-official' },
     oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: { value: 3.8, year: 2021, source: 'world-bank-via-secondary-compilation', note: 'the most recent figure found this round, pre-dating the full-scale invasion', confidence: 'secondary-compilation' },
+      undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
     warStatus: RUSSIA_UKRAINE_WAR_STATUS_OCT2026,
     notableFigures: [{ name: 'Volodymyr Zelenskyy', role: 'President of Ukraine', note: 'quoted (per warStatus.frontLine) claiming Russian forces outnumber Ukrainian ones 6-8x in parts of the front -- a partisan claim, not independently verified' }],
     politicalParties: {
@@ -938,18 +1191,42 @@ const COUNTRIES = {
     regimeType: null, regimeScore: null,
     militaryExpenditurePctGDP: null,
     oilProducer: null,
+    // The only homicide-adjacent figure found this round for Somalia
+    // (14.7) is a COMBINED intentional-death rate, not a homicide-only
+    // count -- checked directly and excluded rather than mistaken for
+    // the real thing. undernourishmentPct and roadTrafficDeathRatePer100k
+    // ARE real, homicide-unrelated figures and are kept.
+    globalIndicators2026: {
+      homicideRatePer100k: null,
+      undernourishmentPct: { value: 53.2, year: 2023, source: 'faostat-sdg-2.1.1-via-secondary-compilation', confidence: 'secondary-compilation' },
+      avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
   },
   'bosnian': {
     country: 'Bosnia and Herzegovina', incomeLevel: 'upper-middle-income', conflictLevel: 'no-active-conflict', governmentType: 'federal parliamentary republic',
     regimeType: 'hybrid-regime', regimeScore: 5.06,
     militaryExpenditurePctGDP: null,
     oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: { value: 1.2, year: 2023, source: 'world-bank-via-secondary-compilation', note: 'macrotrends gives 1.22 for the same year -- same real figure, rounding difference', confidence: 'secondary-compilation' },
+      undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
   },
   nigerian: {
     country: 'Nigeria', incomeLevel: 'lower-middle-income', conflictLevel: 'localized-conflict', governmentType: 'federal presidential republic',
     regimeType: 'hybrid-regime', regimeScore: 4.16,
     militaryExpenditurePctGDP: null,
     oilProducer: { status: 'major-exporter', dailyProductionBbl: 1520000, exportValueUsd2024: 38400000000 },
+    // Homicide figures found this round genuinely disagree outside
+    // rounding noise (15.7 with no stated year, vs. 34.52 for 2016) --
+    // too wide a spread and too uncertain a basis to call either "the"
+    // figure, so this is left null rather than picking one. undernourishmentPct
+    // is a separate, real figure with a different source lineage.
+    globalIndicators2026: {
+      homicideRatePer100k: null,
+      undernourishmentPct: { value: 22.2, year: null, source: 'faostat-sdg-2.1.1-via-secondary-compilation', note: 'year not stated in the source found this round', confidence: 'secondary-compilation' },
+      avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
     notableFigures: [{ name: 'Bola Tinubu', role: 'President of Nigeria', note: 'vowed to defeat Boko Haram/ISWAP after a March 2026 triple bombing in Maiduguri and renewed Borno attacks' }],
     politicalParties: {
       ruling: { name: 'APC (All Progressives Congress)', leader: 'Bola Tinubu', note: 'controls 31 of 36 states as of mid-2026, up from 21 in 2023, after a wave of opposition-governor defections' },
@@ -983,6 +1260,10 @@ const COUNTRIES = {
     regimeType: 'authoritarian-regime', regimeScore: 3.24,
     militaryExpenditurePctGDP: null,
     oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: { value: 8.63, year: 2012, source: 'unodc-via-secondary-compilation', note: 'the most recent figure found this round -- a real limitation, not re-estimated to look current', confidence: 'secondary-compilation-stale' },
+      undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
     politicalParties: {
       ruling: { name: 'Prosperity Party', leader: 'Abiy Ahmed', note: 'Abiy has been PM since 2018; Prosperity Party formed in 2019 from the former EPRDF coalition -- a stable structural fact, not re-verified live this round' },
       source: 'standard, stable party-system facts, not re-verified live this round',
@@ -1009,6 +1290,10 @@ const COUNTRIES = {
     regimeType: 'flawed-democracy', regimeScore: 6.24,
     militaryExpenditurePctGDP: null,
     oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: { value: 1.8, year: 2022, source: 'unodc-via-secondary-compilation', confidence: 'secondary-compilation' },
+      undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
   },
   kenyan: {
     country: 'Kenya', incomeLevel: 'lower-middle-income', conflictLevel: 'no-active-conflict', governmentType: 'unitary presidential republic',
@@ -1016,18 +1301,39 @@ const COUNTRIES = {
     regimeType: 'hybrid-regime', regimeScore: 5.05,
     militaryExpenditurePctGDP: null,
     oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: { value: 4.9, year: 2022, source: 'unodc-via-secondary-compilation', confidence: 'secondary-compilation' },
+      undernourishmentPct: null,
+      avgTemperatureC: { value: 24.6, source: 'world-economics-1924-2024-hundred-year-average', note: 'a different real methodology/period than this round\'s other temperature figures -- not blended with them', confidence: 'secondary-compilation-different-baseline' },
+      roadTrafficDeathRatePer100k: { value: 28.2, year: 2023, source: 'who-global-status-report-on-road-safety-2023-via-secondary-compilation', confidence: 'secondary-compilation' },
+    },
   },
   jamaican: {
     country: 'Jamaica', incomeLevel: 'upper-middle-income', conflictLevel: 'no-active-conflict', governmentType: 'parliamentary constitutional monarchy',
     regimeType: 'flawed-democracy', regimeScore: 6.74,
     militaryExpenditurePctGDP: null,
     oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: { value: 49.4, year: 2023, source: 'unodc-via-world-bank-secondary-compilation', confidence: 'secondary-compilation' },
+      undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
   },
   haitian: {
     country: 'Haiti', incomeLevel: 'low-income', conflictLevel: 'localized-conflict', governmentType: 'unitary semi-presidential republic',
     regimeType: 'authoritarian-regime', regimeScore: 2.74,
     militaryExpenditurePctGDP: null,
     oilProducer: null,
+    // These four are independent of (and real alongside) the detailed
+    // gangCrisis2026 block below -- the UNODC/World-Bank homicide
+    // figure, the FAOSTAT hunger figure and the WHO road-safety figure
+    // are each a different real institution's own measurement, not
+    // derived from the gang-crisis narrative.
+    globalIndicators2026: {
+      homicideRatePer100k: { value: 41.2, year: 2023, source: 'unodc-via-world-bank-secondary-compilation', confidence: 'secondary-compilation' },
+      undernourishmentPct: { value: 54.2, year: 2023, source: 'faostat-sdg-2.1.1-via-secondary-compilation', confidence: 'secondary-compilation' },
+      avgTemperatureC: null,
+      roadTrafficDeathRatePer100k: { value: 31.3, year: 2023, source: 'who-global-status-report-on-road-safety-2023-via-secondary-compilation', confidence: 'secondary-compilation' },
+    },
     // Real, current, and the sharpest gang/humanitarian crisis this
     // module reports on. Figures come from UN agencies (IOM, WFP,
     // BINUH, UNODC) and real press, not estimated here. Several real
@@ -1074,6 +1380,13 @@ const COUNTRIES = {
     regimeType: 'authoritarian-regime', regimeScore: 2.62,
     militaryExpenditurePctGDP: null,
     oilProducer: null,
+    // No recent (2020s) homicide figure was found this round -- the
+    // only one found dates to 2011, too stale to carry even flagged.
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null,
+      avgTemperatureC: { value: 24.79, source: 'world-bank-1991-2020-via-wikipedia-compilation', confidence: 'secondary-compilation' },
+      roadTrafficDeathRatePer100k: null,
+    },
     notableFigures: [{ name: 'To Lam', role: 'Communist Party General Secretary and State President', note: 'became General Secretary 3 Aug 2024 succeeding the late Nguyen Phu Trong; re-elected General Secretary 23 Jan 2026 (14th National Party Congress, unanimous 180-member Central Committee); elected State President 7 Apr 2026 for the 2026-2031 term -- the first modern Vietnamese leader to hold both posts from the start of a term' }],
     politicalParties: {
       ruling: { name: 'Communist Party of Vietnam', leader: 'To Lam', note: 'one-party state; AP-sourced reporting compares his concentrated power to Xi Jinping\'s' },
@@ -1089,6 +1402,10 @@ const COUNTRIES = {
     // China is the world's largest crude IMPORTER despite large domestic production —
     // not a net exporter, so this is deliberately null rather than misleadingly "producer".
     oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: { value: 0.5, year: 2020, source: 'secondary-compilation', note: 'the most recent figure found this round', confidence: 'secondary-compilation-stale' },
+      undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
     notableFigures: [{ name: 'Xi Jinping', role: 'General Secretary of the Communist Party, President, Chairman of the Central Military Commission', note: 'holds all three posts as of mid-2026 reporting; his "core leader" status was written into party rules at the 2022 Congress' }],
     politicalParties: {
       ruling: { name: 'Communist Party of China', leader: 'Xi Jinping' },
@@ -1102,6 +1419,10 @@ const COUNTRIES = {
     regimeType: 'flawed-democracy', regimeScore: 6.63,
     militaryExpenditurePctGDP: null,
     oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: { value: 4.35, year: 2023, source: 'secondary-compilation', confidence: 'secondary-compilation' },
+      undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
     notableFigures: [
       { name: 'Ferdinand Marcos Jr.', role: 'President of the Philippines', note: 'constitutionally limited to a single term; said 14 Aug 2026 he will back a 2028 presidential candidate but had not chosen one' },
       { name: 'Sara Duterte', role: 'Vice President', note: 'has announced her own 2028 presidential bid while facing an impeachment trial in the Senate' },
@@ -1118,6 +1439,16 @@ const COUNTRIES = {
     regimeType: 'flawed-democracy', regimeScore: 7.3,
     militaryExpenditurePctGDP: { value: 2.22, year: 2024, confidence: 'secondary-estimate' },
     oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: { value: 2.8, year: 2022, source: 'secondary-compilation', confidence: 'secondary-compilation' },
+      undernourishmentPct: { value: 9.8, year: null, source: 'faostat-sdg-2.1.1-via-secondary-compilation', note: 'year not stated in the source found this round', confidence: 'secondary-compilation' },
+      avgTemperatureC: { value: 24.94, source: 'world-bank-1991-2020-via-wikipedia-compilation', confidence: 'secondary-compilation' },
+      roadTrafficDeathRatePer100k: {
+        value: 11.6, year: 2021, source: 'who-south-east-asia-regional-summary',
+        note: 'a separate press account of the same WHO release gives 15 per 100,000 for the same year -- both real, not reconciled',
+        confidence: 'secondary-compilation',
+      },
+    },
     notableFigures: [{ name: 'Narendra Modi', role: 'Prime Minister of India', note: 'began a third term in 2024 leaning on coalition allies after the BJP fell 32 seats short of a majority on its own' }],
     politicalParties: {
       ruling: { name: 'BJP (Bharatiya Janata Party)', leader: 'Narendra Modi', note: 'won 240 of 543 Lok Sabha seats in 2024, short of the 272 needed alone' },
@@ -1133,6 +1464,12 @@ const COUNTRIES = {
     regimeType: 'hybrid-regime', regimeScore: 5.3,
     militaryExpenditurePctGDP: null,
     oilProducer: { status: 'exporter', dailyProductionBbl: 848000, exportValueUsd2024: 21700000000 },
+    globalIndicators2026: {
+      homicideRatePer100k: { value: 25.9, year: 2022, source: 'secondary-compilation', confidence: 'secondary-compilation' },
+      undernourishmentPct: null,
+      avgTemperatureC: { value: 21.2, source: '2016-single-year-world-bank-via-secondary-compilation', note: 'a different real year/basis than this round\'s 1991-2020-baseline figures -- not blended with them', confidence: 'secondary-compilation-different-baseline' },
+      roadTrafficDeathRatePer100k: null,
+    },
     // Real, current cartel leadership and territorial-conflict data --
     // the real "criminal organization representation" asked for.
     cartelsAndGangs2026: {
@@ -1161,6 +1498,12 @@ const COUNTRIES = {
     regimeType: 'hybrid-regime', regimeScore: 4.55,
     militaryExpenditurePctGDP: null,
     oilProducer: null,
+    // Two real homicide figures found this round for the same year
+    // disagree by a meaningful margin (roughly 20 vs 23 per 100,000) --
+    // left null rather than picking one.
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
     cartelsAndGangs2026: { note: 'no current (2025/2026) gang/cartel-specific reporting found this round -- a real gap, not filled with an invented figure' },
   },
   honduran: {
@@ -1168,6 +1511,13 @@ const COUNTRIES = {
     regimeType: 'hybrid-regime', regimeScore: 4.98,
     militaryExpenditurePctGDP: null,
     oilProducer: null,
+    // Real sources found this round disagree widely for Honduras --
+    // roughly 31 (2023) to 38 (2022) per 100,000 depending on source
+    // and year -- too wide a real disagreement to resolve to one
+    // number, so left null rather than picking an endpoint.
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
     cartelsAndGangs2026: { note: 'no current (2025/2026) gang/cartel-specific reporting found this round -- a real gap, not filled with an invented figure' },
   },
   // **El Salvador is flagged explicitly as fast-moving.** The 2022
@@ -1180,6 +1530,10 @@ const COUNTRIES = {
     regimeType: 'hybrid-regime', regimeScore: 4.61,
     militaryExpenditurePctGDP: { value: 1.39, year: 2024, confidence: 'secondary-estimate' },
     oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: { value: 7.9, year: 2022, source: 'secondary-compilation', note: 'reflects the post-2022-crackdown period, per this entry\'s own cartelsAndGangs2026 note -- not the country\'s earlier, much higher-violence years', confidence: 'secondary-compilation' },
+      undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
     // Real, current status of the crackdown named directly -- real
     // sources disagree on whether MS-13/Barrio 18 are actually
     // dismantled, dormant, or rebuilding abroad, and both views kept.
@@ -1205,6 +1559,10 @@ const COUNTRIES = {
     regimeType: 'flawed-democracy', regimeScore: null,
     militaryExpenditurePctGDP: { value: 3.4, year: 2024, confidence: 'secondary-estimate' },
     oilProducer: { status: 'major-exporter', dailyProductionBbl: 4100000, exportValueUsd2024: 118500000000 },
+    globalIndicators2026: {
+      homicideRatePer100k: { value: 5.8, year: 2023, source: 'unodc-via-world-bank-secondary-compilation', note: 'a UNODC-derived ranking gives 5.76 with 19,796 homicides for the same year -- same real figure, rounding difference', confidence: 'secondary-compilation' },
+      undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
   },
   // **Added after a direct question: "why did you build the United
   // States entry but not Israel?"** The honest answer was structural,
@@ -1234,6 +1592,12 @@ const COUNTRIES = {
     regimeType: 'flawed-democracy', regimeScore: 7.80,
     militaryExpenditurePctGDP: { value: 8.8, year: 2024, confidence: 'secondary-estimate' },
     oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: { value: 1.6, year: 2022, source: 'secondary-compilation', confidence: 'secondary-compilation' },
+      undernourishmentPct: null,
+      avgTemperatureC: { value: 21.0, source: '2016-single-year-world-bank-via-secondary-compilation', note: 'a different real year/basis than this round\'s 1991-2020-baseline figures -- not blended with them', confidence: 'secondary-compilation-different-baseline' },
+      roadTrafficDeathRatePer100k: null,
+    },
     // A second, real, distinct war from the Gaza war `conflictLevel`
     // already covers -- `conflictLevel` stays as-is since it is
     // already correctly `active-armed-conflict` for either reason.

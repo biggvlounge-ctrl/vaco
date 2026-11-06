@@ -2474,6 +2474,93 @@ reuses that identical real contact (`generated: false`) on the second
 — the whole search-before-generate claim, confirmed end to end rather
 than only in a fixture.
 
+**A fifty-first, and it is the most honest round yet about this file's
+own real limits — asked for "crime all over the globe... conflicts,
+wars... temperature... hunger... road conditions, animals, eating
+conditions, cultures, all over the globe," and the right answer was to
+build a real but SMALLER thing than the phrase asks for, and say so.**
+
+A read-only research pass first checked what real source exists for
+each of those nine asks, the same discipline this file's own thirty-
+second rule's Antifa section and thirty-ninth rule's "not all 190-odd
+countries" already model: never guess a source exists, check. It found
+six real candidates (UNODC/World Bank homicide rate; UCDP/ACLED
+conflict events; World Bank Climate Change Knowledge Portal/Beck et
+al. temperature; ILOSTAT occupations; FAOSTAT undernourishment; WHO
+road safety) and resolved two genuinely ambiguous asks by direct
+instruction (`animals` → IUCN Red List wildlife status AND FAO
+livestock, kept separate; `cultures` → declined outright).
+
+**The real finding that reshaped this round: this session's own
+tooling (WebSearch only, no direct page retrieval and no further
+research subagent) could not reach the primary tables for most of
+those six candidates — only their secondary mirrors, which disagree
+with each other and are incomplete.** For `homicideRatePer100k` that
+still produced real, cross-checkable figures for 28 of this table's 37
+`COUNTRIES` entries, because secondary aggregators mirror the UNODC/
+World Bank homicide series closely. For climate and road safety,
+repeated differently-worded searches surfaced a usable figure for only
+3-5 countries each — so `globalIndicators2026.avgTemperatureC` and
+`.roadTrafficDeathRatePer100k` are built the same deliberately SPARSE
+way `oilProducer` already was (present only where a real figure was
+actually found, `null` everywhere else), rather than either faked to
+look complete or abandoned to look like nothing was tried.
+`undernourishmentPct` (FAOSTAT) is the same shape, 5 real entries.
+
+**Attempting the rest at the same thin coverage would have been its
+own kind of dishonesty, one level up from this file's usual mistake.**
+Every other entry here declares a real fact sitting unread; this round
+found facts that mostly weren't REACHABLE with the tools at hand, and
+the twenty-fifth standing rule's lesson — a measurement is not its own
+consequence — has a sibling here: a handful of real data points is not
+its own completeness. So conflicts/wars, eating conditions and animals
+were not attempted at all this round (the existing `conflictLevel`
+band stands unchanged; FAO Food Balance Sheets and IUCN/FAO animal
+data turned up no usable compiled figures in the searches tried), and
+cultures (Hofstede; World Values Survey) is declined outright rather
+than deferred — the research pass found WVS's own terms explicitly
+non-redistributable and Hofstede's bulk-licensing terms unconfirmed,
+the same "a real source exists but its access terms are not clean
+enough" posture this file already took declining the Chicago gang-
+boundary FOIA release.
+
+**Occupations needed no building at all, and that is itself the
+finding.** `occupations.js`'s `enforcer`/`officer` are already ungated
+by ethnicity or nationality — the forty-second standing rule already
+confirmed this checking "Mexican police officer" — so this table's own
+occupation coverage is global by construction. A request is not
+automatically a gap; sometimes the honest answer is that the thing
+asked for was already built for an unrelated reason.
+
+**New `COUNTRIES` entries for Africa/Middle-East/Europe gaps (Spain,
+Egypt, Saudi Arabia) were considered and declined this round too** —
+a new key needs a real `ancestryPacks.GROUPS` entry first, the Israel
+addition's own real prerequisite (verifying a real Census ACS ancestry
+code), and that is a separate piece of research this round's tooling
+could not do with confidence.
+
+**A found-and-fixed process mistake, worth recording because it cost
+the whole round once and was recovered rather than silently
+re-derived from memory.** Mutation-verifying the riskiest new check
+(a fabricated homicide figure on an entry that should read `null`)
+was done correctly the first time — but reverting that mutation used
+`git checkout -- server/countryPacks.js` instead of undoing the one
+edit, which discarded the ENTIRE round's uncommitted work on that
+file, not just the mutation. `git status` immediately after showed
+the file back at its last-committed state; `grep -c globalIndicators`
+confirmed zero. The fix was mechanical — replay the same edits in the
+same order against the now-reverted file, which matched cleanly
+because the file was back to the exact state those edits were
+originally written against — but the general form is worth keeping
+as its own rule: **`git checkout -- <file>` discards every uncommitted
+change to that file, not just the one you're trying to undo** — it is
+the twenty-second standing rule's sibling, about a different way an
+uncommitted change can vanish without `git status` ever looking
+wrong. Revert a single mutation with a targeted edit (or `git diff`
+reviewed before a stash/checkout touches the whole file), never a
+whole-file checkout, while real uncommitted work sits in the same
+file.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

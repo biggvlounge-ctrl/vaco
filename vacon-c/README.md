@@ -220,6 +220,33 @@ aunts/uncles — only once nothing real qualifies. "Outside home region"
 is honestly scoped to the city, the one geography grain this engine
 generates more than one of.
 
+## Real global crime, hunger, climate and road-safety data (twelfth round)
+See `CLAUDE.md`'s own fifty-first standing rule for the full account,
+including the real tooling limitation that scoped this round down.
+`countryPacks.js`'s `globalIndicators2026` adds a real UNODC/World
+Bank homicide rate to 28 of 37 `COUNTRIES` entries — scoped honestly
+to homicide, not crime broadly, with real source disagreements kept
+visible rather than resolved (Nigeria, Guatemala, Honduras stay
+`null`) and stale-but-real figures kept with their real year rather
+than hidden (Russia 2018, Ethiopia 2012). `undernourishmentPct`
+(FAOSTAT), `avgTemperatureC` (World Bank/Wikipedia, flagged where a
+different real baseline was the only one found) and
+`roadTrafficDeathRatePer100k` (WHO) are the same deliberately SPARSE
+shape `oilProducer` already established — present only where a real
+figure was actually found (5, 5 and 4 countries respectively), `null`
+everywhere else.
+
+**What this round explicitly did not build, and why**: real conflict-
+event data (UCDP/ACLED) beyond the existing `conflictLevel` band, FAO
+Food Balance Sheets (eating conditions), IUCN Red List wildlife status
+and FAO livestock head-counts (animals), new `COUNTRIES` entries for
+Spain/Egypt/Saudi Arabia, and — declined outright, not deferred —
+Hofstede/World Values Survey cultural dimensions, whose licensing
+terms a prior research pass found unclean. Occupations needed no
+building at all: `occupations.js`'s `enforcer`/`officer` are already
+ungated by ethnicity or nationality, so this table's own occupation
+coverage was already global by construction.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

@@ -265,6 +265,10 @@ function generateRegion(worldState, options = {}) {
     politicalParties: country?.politicalParties ?? null,
     securitySituation2026: country?.securitySituation2026 ?? null,
     tigrayConflict2026: country?.tigrayConflict2026 ?? null,
+    // Real global crime/hunger/climate/road-safety figures -- see
+    // `countryPacks.js`'s own "Twelfth round" header for what this
+    // covers and what it honestly does not.
+    globalIndicators2026: country?.globalIndicators2026 ?? null,
     regionalContext: countryKey ? countryPacks.regionalContextFor(countryKey) : null,
     temperamentKey,
     temperamentCluster: temperament,
