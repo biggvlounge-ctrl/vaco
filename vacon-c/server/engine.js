@@ -68,6 +68,7 @@ const leadership = require('./leadership.js');
 const influence = require('./influence.js');
 const characterCreation = require('./characterCreation.js');
 const contacts = require('./contacts.js');
+const bluff = require('./bluff.js');
 const territory = require('./territory.js');
 const missions = require('./missions.js');
 const property = require('./property.js');
@@ -868,6 +869,25 @@ function findOrCreateContact(entityId, options = {}) {
   });
 }
 
+// `bluff.js`'s three player-facing verbs — see that file's own header
+// for why `assessThreat` never reveals `weapons.isFunctioningFirearm`'s
+// real answer and why `callBluff`'s two branches are deterministic.
+function intimidate(actorId, options = {}) {
+  return bluff.intimidate(WorldState, {
+    actorId, targetId: options.targetId, tick: WorldState.tick,
+  });
+}
+
+function assessThreat(entityId, options = {}) {
+  return bluff.assessThreat(WorldState, { entityId, targetId: options.targetId });
+}
+
+function callBluff(challengerId, options = {}) {
+  return bluff.callBluff(WorldState, {
+    challengerId, targetId: options.targetId, tick: WorldState.tick,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Territory/Community (block-tier)
 // ---------------------------------------------------------------------------
@@ -1027,6 +1047,9 @@ const ACTION_VERBS = {
   investInTarget: (...args) => investInTarget(...args),
   manufactureAmmunition: (...args) => manufactureAmmunition(...args),
   findOrCreateContact: (...args) => findOrCreateContact(...args),
+  intimidate: (...args) => intimidate(...args),
+  assessThreat: (...args) => assessThreat(...args),
+  callBluff: (...args) => callBluff(...args),
 };
 
 function dispatchAction(playerId, body) {
@@ -1696,6 +1719,9 @@ module.exports = {
   createCharacter,
   getFamilyTree,
   findOrCreateContact,
+  intimidate,
+  assessThreat,
+  callBluff,
   getInfluenceRating,
   getPersonalInfluence,
   getFamilyPoliticalInfluence,

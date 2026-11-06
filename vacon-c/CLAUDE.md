@@ -2561,6 +2561,92 @@ reviewed before a stash/checkout touches the whole file), never a
 whole-file checkout, while real uncommitted work sits in the same
 file.
 
+**A fifty-second, and it is the bluffing mechanic asked for by name:**
+"a lot of the initial power will come from people thinking there are
+guns and ammunition, but that will soon change. People realize those
+guns aren't used, but people will try to fake it. But a lot of people
+will realize the con, and that's when things will change."
+
+**The real divergence this needed was already named in the fiftieth
+rule's own closure, one function away.** `weapons.isFunctioningFirearm`
+is the real, verified ground truth for "is this person actually armed"
+— equipped AND a held round of its own real ammunition. A bluff is
+exactly the gap between that real fact and what somebody else BELIEVES
+about it, and `server/bluff.js` is built to never duplicate that
+question, only ever read its answer at the one moment (`callBluff`)
+that is allowed to.
+
+**What creates the belief is not a new persuasion system — it is
+`perception.receivedConfidence`, already built for `tick.js`'s scarcity
+broadcasts and `politics.js`'s election results, read a second way.**
+That function already answers "the confidence THIS person ends up
+holding a fact at, given the confidence it was broadcast with."
+`intimidate` treats the bluffer's own real `Deception`/`Charisma`/
+`Persuasion` traits as the broadcast confidence and lets that function's
+own already-calibrated math decide how much the target actually takes
+in — never a second, disagreeing modifier, which is the exact mistake
+`meetings.js`'s own header already argues against for persuasion in
+general.
+
+**`relationships.fear` turned out to already carry the real, directed
+meaning this needed, written by a resolver nobody had connected to
+bluffing.** `keys.js#resolveFear` already writes "entity's fear of a
+named source entity" onto this column, `relationship_type: 'social'`,
+the moment a source entity is known — its own comment says so
+("targets that entity's `fear` column directly instead of a self-
+relationship"). `raiseFear`/`lowerFear` in the new file follow that
+exact precedent rather than inventing a parallel one, reusing its own
+threshold (fear above 50 moves the relationship) and its own magnitude
+(`fear / 10`) rather than guessing a second pair of numbers for the
+identical underlying quantity — the seventeenth standing rule's
+four-attempt case study is exactly the cost of skipping this step, and
+this file introduces no new threshold or rate of its own to pay it
+twice.
+
+**A real, already-accepted limitation carried over rather than
+discovered fresh**: `fear`, like `influence`/`trust`/`respect`, is a
+single shared value per pair — the schema gives it no second column,
+the same limitation `influence.js`'s own header already states for
+itself. "How much A fears B" and "how much B fears A" are the same
+stored number, and this file's own header says so rather than quietly
+inheriting a simplification nobody wrote down twice.
+
+**`callBluff` is the one check, and it is deterministic — no second
+random draw was added anywhere in this file.** The real fact either
+holds or it does not, and the two branches are real and asymmetric,
+exactly as asked: an actually-armed target's bluff was never a bluff,
+and calling it escalates through `crime.recordEscalation` — the
+identical real mechanism `tick.js#runSecurityPhase` already uses for an
+armed confrontation, reused rather than building a second combat
+outcome that would disagree with it. An empty gun's bluff is exposed:
+the challenger's own standing fear resets, and the bluffer's real
+social standing with the challenger falls through `influence
+.lowerInfluence`, at `INFLUENCE_DELTA` — the same magnitude every other
+single real social event in this registry already uses, not a second
+number invented for this one.
+
+**`assessThreat` is read-only, and the thing it deliberately never
+returns is the whole point.** It reports only the real, standing `fear`
+value already on record — never `weapons.isFunctioningFirearm`'s
+ground truth. `assess-takeover`'s own precedent is "look before you
+commit" at the level of odds, never at the level of the hidden roll
+itself; revealing the real armed answer here would let a player always
+check first, and the bluff would never be a bluff. Mutation-verified
+directly: temporarily added the real ground truth to `assessThreat`'s
+return value and confirmed a real test catches it before reverting.
+
+**A real ritual gap closed as a byproduct, not a regression this round
+introduced.** `test/actions.test.js`'s own `REQUIRED_VERBS` fixture is
+a hand-written list asserted against the dispatcher's real, derived
+verb set — the exact "a list lives in two places and one of them goes
+stale" risk `engine.js`'s own Phase 3 section already names for the
+player verb generally. Three new real verbs (`intimidate`, `assess-
+threat`, `call-bluff`) needed that fixture updated in the same commit,
+the same way `VACANCY_INVENTORY.md`'s own file-count and per-file row
+checks (twenty-second standing rule) needed a row and a recount for
+`bluff.js` itself — both caught by the full suite, neither a defect in
+the new mechanism.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

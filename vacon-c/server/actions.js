@@ -282,6 +282,34 @@ const ACTIONS = {
   // contact) and why "outside home region" is honestly scoped to the
   // CITY, the one geography grain this engine actually generates more
   // than one of.
+  // **`bluff.js`'s three real verbs** — see that file's own header for
+  // why `assess-threat` never reveals the real `isFunctioningFirearm`
+  // ground truth and why `call-bluff` has two deterministic, real
+  // branches rather than a second invented draw.
+  intimidate: {
+    summary: 'Brandish the firearm you have equipped, real or empty, to make someone afraid of you.',
+    modes: ['citizen', 'leader'],
+    requires: ['targetId'],
+    verbs: ['intimidate'],
+    run: (verbs, actorId, body) => verbs.intimidate(actorId, { targetId: Number(body.targetId) }),
+  },
+
+  'assess-threat': {
+    summary: 'Check how afraid you currently are of someone, without finding out whether their threat is real.',
+    modes: ['citizen', 'leader'],
+    requires: ['targetId'],
+    verbs: ['assessThreat'],
+    run: (verbs, actorId, body) => verbs.assessThreat(actorId, { targetId: Number(body.targetId) }),
+  },
+
+  'call-bluff': {
+    summary: 'Challenge someone\'s threat for real. If they are actually armed, this goes badly; if not, their standing with you falls.',
+    modes: ['citizen', 'leader'],
+    requires: ['targetId'],
+    verbs: ['callBluff'],
+    run: (verbs, actorId, body) => verbs.callBluff(actorId, { targetId: Number(body.targetId) }),
+  },
+
   'find-contact': {
     summary: 'Find a real friend, classmate, associate or family member matching what you need -- or, failing that, meet somebody new who fits.',
     modes: ['citizen', 'leader'],

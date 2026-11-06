@@ -154,7 +154,16 @@ POST /api/players/:id/action { "action": "manufacture-ammunition", "ammoName": "
                                           — weapons.manufactureAmmunition: one bounded batch, era- and occupation-gated
 POST /api/players/:id/action { "action": "find-contact", "relationshipTypes": [...], "outsideHomeCity": true|false }
                                           — contacts.findOrCreateContact: real search first, generation only once nothing qualifies
+POST /api/players/:id/action { "action": "intimidate", "targetId": 123 }
+                                          — bluff.intimidate: brandish an equipped firearm, real or empty; raises real fear through perception.js's own calibrated belief math
+POST /api/players/:id/action { "action": "assess-threat", "targetId": 123 }
+                                          — bluff.assessThreat: read-only, reports only the real standing fear value, never the real armed ground truth
+POST /api/players/:id/action { "action": "call-bluff", "targetId": 123 }
+                                          — bluff.callBluff: deterministic and real both ways — a bluff's exposure costs real standing; a real threat called escalates through crime.recordEscalation
 ```
+
+Bluffing (`bluff.js`) is likewise **not a separate endpoint** — same
+dispatcher-only posture as the row above it, for the same reason.
 
 Alt-policing (`policing.factionCapacityOf`) and multi-faction heat
 (`heat.js`) are **not separate endpoints at all** — both are real,

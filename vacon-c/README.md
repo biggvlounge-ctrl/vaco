@@ -247,6 +247,27 @@ building at all: `occupations.js`'s `enforcer`/`officer` are already
 ungated by ethnicity or nationality, so this table's own occupation
 coverage was already global by construction.
 
+## Bluffing and its exposure
+See `CLAUDE.md`'s own fifty-second standing rule for the full design.
+`server/bluff.js` models the gap between what `weapons
+.isFunctioningFirearm` actually verifies and what somebody else
+believes. `POST /api/players/:id/action` gains three verbs:
+`intimidate` requires a real equipped firearm, loaded or not, and runs
+the bluffer's real `Deception`/`Charisma`/`Persuasion` traits through
+`perception.receivedConfidence` — the same already-calibrated belief
+model `tick.js`'s scarcity broadcasts and `politics.js`'s election
+results already use — to raise a target's real, shared
+`relationships.fear`, never a second, invented persuasion modifier.
+`assess-threat` is read-only and reports only that real standing fear
+value — it never reveals the real armed ground truth, or the whole
+mechanic collapses. `call-bluff` is the one place that is checked, and
+it is deterministic and real both ways: an actually-armed target's
+bluff was never a bluff, and calling it escalates through the real
+`crime.recordEscalation`; an empty gun's bluff is exposed, resetting
+the challenger's fear and costing the bluffer real standing through
+`influence.lowerInfluence`. No new random draw is introduced anywhere
+in this file.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a
