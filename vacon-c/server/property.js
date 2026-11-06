@@ -366,6 +366,48 @@ function getHoldings(worldState, ownerEntityId) {
 const CONDITION_DECAY_PER_TICK = 0.4;
 const BUILD_TICKS = 3;
 
+// ---------------------------------------------------------------------------
+// Chaos ripple effects, part one: a dangerous area's buildings actually
+// decline — by direct instruction, after the engine already had a real
+// danger measurement (`crime.dangerByCommunity`) that nothing outside
+// `motivation.js`'s `safety` need read.
+// ---------------------------------------------------------------------------
+// **This compounds onto the existing flat decay term; it does not
+// replace it, and it does not touch upkeep.** Same discipline every
+// other real-signal multiplier in this project already follows
+// (`landCoverPacks.HOME_VALUE_MULTIPLIER_BOUNDS`,
+// `nightLightsPacks.ACTIVITY_MULTIPLIER_BOUNDS`) — narrow or scale an
+// existing real mechanism, never invent a second, disagreeing
+// devaluation pathway. `crime.DANGER_REFERENCE_PER_1K` and
+// `keys.resolveAggression`'s own calibrated floor/rate are untouched;
+// this reads `crime.dangerByCommunity`'s already-computed 0..1 output
+// and goes no further upstream than that.
+//
+// **One-sided, unlike `landCoverPacks`'s bounds.** A land-cover class
+// can plausibly raise OR lower a home's value, so that pack's bound is
+// symmetric around 1. Danger has no protective direction for a
+// building — a dangerous area only ever accelerates decay, never slows
+// it — so this bound starts AT 1 (no danger measured, or none present,
+// changes nothing) and only ever goes up.
+const DANGER_DECAY_MULTIPLIER_BOUNDS = [1, 1.15];
+
+// `dangerByCommunity` is the same `Map<communityId, 0..1>`
+// `crime.dangerByCommunity` already builds once per pass for
+// `motivation.js`/`migration.js` — passed in rather than recomputed per
+// property, the same "built once for a whole pass" discipline
+// `crime.js`'s own header gives for why that map exists in the first
+// place. No map, no community, or a community absent from the map (an
+// empty block — unmeasured, not safe) all read as the neutral floor:
+// **a world where this option is never passed is byte-for-byte
+// unchanged from before this round.**
+function dangerDecayMultiplier(dangerByCommunity, communityId) {
+  const [floor, ceiling] = DANGER_DECAY_MULTIPLIER_BOUNDS;
+  if (!dangerByCommunity || communityId === null || communityId === undefined) return floor;
+  const danger = dangerByCommunity.get(communityId);
+  if (danger === undefined || danger === null) return floor;
+  return clamp(floor + (ceiling - floor) * danger, floor, ceiling);
+}
+
 // **And upkeep, because decay with no inverse has no equilibrium.**
 //
 // Measured before this existed: 38 properties in a generated world, all
@@ -399,7 +441,7 @@ const BUILD_TICKS = 3;
 const OCCUPANT_UPKEEP_PER_TICK = 0.3;
 const OWNER_UPKEEP_PER_TICK = 0.15;
 
-function advancePropertyLifecycle(worldState, property, tick) {
+function advancePropertyLifecycle(worldState, property, tick, options = {}) {
   property.age = (property.age ?? 0) + 1;
 
   if (property.lifecycle_stage === 'planning' || property.lifecycle_stage === 'construction') {
@@ -431,8 +473,10 @@ function advancePropertyLifecycle(worldState, property, tick) {
   // Two decimals is the smallest quantum smaller than the smallest real
   // per-tick change, so 0.05 accumulates as 0.05. The noise it was
   // added for is still gone, and `condition` still reads cleanly.
+  const decayMultiplier = dangerDecayMultiplier(options.dangerByCommunity, property.community_id);
   property.condition = Math.round(clamp(
-    Number(property.condition ?? 100) - CONDITION_DECAY_PER_TICK + upkeepFor(worldState, property),
+    Number(property.condition ?? 100) - CONDITION_DECAY_PER_TICK * decayMultiplier
+      + upkeepFor(worldState, property),
     0, 100,
   ) * 100) / 100;
   return property;
@@ -497,6 +541,8 @@ module.exports = {
   CONDITION_DECAY_PER_TICK,
   OCCUPANT_UPKEEP_PER_TICK,
   OWNER_UPKEEP_PER_TICK,
+  DANGER_DECAY_MULTIPLIER_BOUNDS,
+  dangerDecayMultiplier,
   upkeepFor,
   reseedIds,
   PROPERTY_TYPES,

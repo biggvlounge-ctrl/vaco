@@ -268,6 +268,25 @@ the challenger's fear and costing the bluffer real standing through
 `influence.lowerInfluence`. No new random draw is introduced anywhere
 in this file.
 
+## Chaos ripple effects
+See `CLAUDE.md`'s own fifty-third standing rule for the full design and
+the real measured numbers. Out-migration from a violent area was
+already real before this round — `motivation.js#safety` already read
+`crime.dangerByCommunity` to push people out via an unmet safety need,
+and `migration.js#desirability` already steered them away from
+dangerous destinations. The genuinely missing half was property:
+`property.dangerDecayMultiplier` (bounded `[1, 1.15]`, one-sided —
+danger has no protective direction for a building) compounds onto the
+existing flat decay term in `advancePropertyLifecycle`, read from
+`crime.dangerByCommunity` computed once per tick in `tick.js`'s
+Environment phase and passed in as a new optional argument. A world
+that never passes it — every pre-existing call site, including five
+test files — decays exactly as it always has. `heat.worstHeat` (a
+person's own worst standing heat with any one real faction, never a
+sum) is a second, genuinely separate signal wired into the same
+`safety` need, because it is scoped to the PERSON a faction actually
+acted on rather than their neighbourhood, and is 0 for almost everyone.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

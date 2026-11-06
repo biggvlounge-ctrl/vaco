@@ -38,6 +38,7 @@ const path = require('node:path');
 const motivation = require('../server/motivation.js');
 const engine = require('../server/engine.js');
 const worldgen = require('../server/worldgen.js');
+const heat = require('../server/heat.js');
 
 const SCHEMA = fs.readFileSync(
   path.join(__dirname, '..', 'VACANCY_POSTGRESQL_SCHEMA.sql'), 'utf8',
@@ -380,6 +381,35 @@ test('the world can say why somebody is doing anything', () => {
   assert.ok(Array.isArray(described.values) && described.values.length === 3);
   assert.ok(described.needs.mostPressing);
   assert.ok(Array.isArray(described.pursuing));
+});
+
+// ---------------------------------------------------------------------------
+// Chaos ripple effects, part two -- heat lowers safety independent of area
+// danger, and is a real no-op for the overwhelming majority
+// ---------------------------------------------------------------------------
+
+test('safety is unaffected by heat for an ordinary person who has never been on any faction\'s radar', () => {
+  const w = world();
+  const npc = { id: 1, home_property_id: 5, communityId: null };
+  w.npcs.push(npc);
+  const ctx = motivation.contextFor(w);
+  assert.equal(motivation.SATISFIERS.safety(ctx, npc), 1,
+    'home, no area danger measured, no heat -- the pre-existing baseline must be unchanged');
+});
+
+test('real personal heat with a faction lowers safety even in an area with no measured danger at all', () => {
+  const w = world();
+  const npc = { id: 1, home_property_id: 5, communityId: null };
+  const gang = { id: 2, name: 'Holders', type: 'gang', isFaction: true };
+  w.npcs.push(npc);
+  w.organizations.push(gang);
+
+  const before = motivation.SATISFIERS.safety(motivation.contextFor(w), npc);
+  heat.raiseHeat(w, { entityId: npc.id, factionOrganizationId: gang.id, amount: 60 });
+  const after = motivation.SATISFIERS.safety(motivation.contextFor(w), npc);
+
+  assert.equal(before, 1);
+  assert.equal(after, 1 - 0.6, 'safety should fall by exactly the real worstHeat fraction');
 });
 
 test('ids survive a reseed', () => {

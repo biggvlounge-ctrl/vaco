@@ -543,3 +543,57 @@ test('condition stays a clean number however many ticks it wears', () => {
   assert.equal(String(shop.condition).replace('.', '').length <= 4, true,
     `condition should read cleanly, got ${shop.condition}`);
 });
+
+// ---------------------------------------------------------------------------
+// Chaos ripple effects, part one — danger-driven decay
+// ---------------------------------------------------------------------------
+
+test('dangerDecayMultiplier is the neutral floor with no map, no community, or an unmeasured one', () => {
+  assert.equal(property.dangerDecayMultiplier(null, 7), 1);
+  assert.equal(property.dangerDecayMultiplier(new Map([[7, 0.9]]), null), 1);
+  assert.equal(property.dangerDecayMultiplier(new Map([[7, 0.9]]), 8), 1,
+    'a community absent from the map is unmeasured, not safe');
+});
+
+test('dangerDecayMultiplier scales linearly within its bounds and never exceeds them', () => {
+  const [floor, ceiling] = property.DANGER_DECAY_MULTIPLIER_BOUNDS;
+  assert.equal(property.dangerDecayMultiplier(new Map([[1, 0]]), 1), floor);
+  assert.equal(property.dangerDecayMultiplier(new Map([[1, 1]]), 1), ceiling);
+  const half = property.dangerDecayMultiplier(new Map([[1, 0.5]]), 1);
+  assert.ok(half > floor && half < ceiling, `0.5 danger should sit strictly between the bounds, got ${half}`);
+  // Out-of-range inputs still clamp to the bounds rather than escaping them.
+  assert.equal(property.dangerDecayMultiplier(new Map([[1, 5]]), 1), ceiling);
+});
+
+test('a property in a dangerous community decays faster than the identical one with no danger signal', () => {
+  const quiet = freshWorld();
+  const dangerous = freshWorld();
+  const quietShop = property.generateProperty(quiet, {
+    type: 'commercial', value: 100000, lifecycleStage: 'operation', communityId: 1,
+  });
+  const dangerousShop = property.generateProperty(dangerous, {
+    type: 'commercial', value: 100000, lifecycleStage: 'operation', communityId: 1,
+  });
+
+  const noDanger = new Map([[1, 0]]);
+  const fullDanger = new Map([[1, 1]]);
+  for (let i = 0; i < 20; i += 1) {
+    property.advancePropertyLifecycle(quiet, quietShop, i, { dangerByCommunity: noDanger });
+    property.advancePropertyLifecycle(dangerous, dangerousShop, i, { dangerByCommunity: fullDanger });
+  }
+
+  assert.ok(dangerousShop.condition < quietShop.condition,
+    `the dangerous community's property should have worn down further (${dangerousShop.condition} vs ${quietShop.condition})`);
+
+  // And the same world run again with NO map at all must reproduce the
+  // zero-danger run exactly -- the "no elevated danger signal anywhere
+  // changes nothing" guarantee the whole mechanism depends on.
+  const unmeasured = freshWorld();
+  const unmeasuredShop = property.generateProperty(unmeasured, {
+    type: 'commercial', value: 100000, lifecycleStage: 'operation', communityId: 1,
+  });
+  for (let i = 0; i < 20; i += 1) {
+    property.advancePropertyLifecycle(unmeasured, unmeasuredShop, i);
+  }
+  assert.equal(unmeasuredShop.condition, quietShop.condition);
+});

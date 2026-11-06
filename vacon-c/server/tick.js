@@ -212,9 +212,18 @@ function runEnvironmentPhase(worldState) {
   // here demolishes a property or restates its assessed value; both are
   // decisions, and decisions belong to the Decision phase or to a
   // person. See server/property.js.
+  //
+  // **Chaos ripple effects, part one.** `crime.dangerByCommunity` —
+  // built once for the whole phase, the same discipline that map's own
+  // header already states for why it exists rather than being asked
+  // per person — is the real signal `property.dangerDecayMultiplier`
+  // compounds into decay below. A world with no danger measured
+  // anywhere reads every community absent from this map, which
+  // `dangerDecayMultiplier` already treats as the neutral floor.
+  const dangerByCommunity = crime.dangerByCommunity(worldState);
   for (const prop of worldState.properties || []) {
     const priorStage = prop.lifecycle_stage;
-    property.advancePropertyLifecycle(worldState, prop, worldState.tick);
+    property.advancePropertyLifecycle(worldState, prop, worldState.tick, { dangerByCommunity });
 
     if (prop.lifecycle_stage !== priorStage) {
       events.push({

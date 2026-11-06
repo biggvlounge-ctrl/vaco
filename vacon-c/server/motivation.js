@@ -75,6 +75,7 @@ const areaStats = require('./areaStats.js');
 const crime = require('./crime.js');
 const economy = require('./economy.js');
 const infrastructure = require('./infrastructure.js');
+const heat = require('./heat.js');
 
 let nextGoalId = 1;
 
@@ -475,9 +476,15 @@ const SATISFIERS = {
   // was looking at the resource at all.
   water: (ctx, npc) => ctx.availabilityOf('water', npc.communityId),
   sleep: (ctx, npc) => ctx.habitStrength(npc.id, 'rest'),
-  // Somewhere to be, and how dangerous it is there.
+  // Somewhere to be, how dangerous it is there, and — see
+  // `ctx.heatOf`'s own header — whether a real faction has personally
+  // marked this person out, independent of their neighbourhood's own
+  // reading. Zero for almost everybody, so an ordinary resident of a
+  // dangerous-reading block is affected by `dangerIn` alone, exactly as
+  // before this term existed.
   safety: (ctx, npc) => (npc.home_property_id == null ? 0.2 : 1)
-    * (1 - ctx.dangerIn(npc.communityId)),
+    * (1 - ctx.dangerIn(npc.communityId))
+    * (1 - ctx.heatOf(npc.id)),
   income: (ctx, npc) => (ctx.employed.has(npc.id) ? 1 : 0.15),
   housing: (ctx, npc) => (npc.home_property_id == null ? 0 : 1),
   // **Infrastructure the city already builds.** `CITY_INFRASTRUCTURE`
@@ -637,6 +644,13 @@ function contextFor(worldState) {
       return Math.max(0, Math.min(1, 1 - value));
     },
     dangerIn: (communityId) => Math.max(0, Math.min(1, danger.get(communityId) ?? 0)),
+    // **Chaos ripple effects, part two — see `heat.worstHeat`'s own
+    // header.** A person's own worst standing heat with any one real
+    // faction, 0 for the overwhelming majority who have never had one
+    // raised against them, which is the honest shape: this is a
+    // targeted fact about THEM, not an area-wide one `dangerIn` already
+    // covers.
+    heatOf: (entityId) => heat.worstHeat(worldState, entityId),
 
     // Capacity per resident, capped at 1. A null capacity — nothing
     // built, or nothing stating a headcount — reads as unserved,

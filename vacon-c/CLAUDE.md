@@ -2647,6 +2647,93 @@ checks (twenty-second standing rule) needed a row and a recount for
 `bluff.js` itself — both caught by the full suite, neither a defect in
 the new mechanism.
 
+**A fifty-third, and it closes "chaos ripple effects" by finding that
+half of it was already real, naming the half that was not, and adding
+exactly that half rather than a second, disagreeing mechanism.**
+
+**Out-migration from a violent area was NOT a gap — it was already
+real, and checking before building found it.** `motivation.js#safety`
+already read `crime.dangerByCommunity` (`(1 - ctx.dangerIn(...))`) a
+full round before this one, and `migration.js#desirability` already
+weighs that same `danger` map choosing where somebody goes. So an
+unmet `safety` need was already a real `forced` push
+(`migration.PUSH_BY_NEED`) out of a dangerous community, into
+somewhere that reads safer — this file's own thirty-ninth standing
+rule's shape, pointed at my own assumption instead of at code: the
+request read like a gap, and one look at the consumer said it was not.
+Building a second migration pathway for the identical fact would have
+been the third standing rule's mistake with a new name.
+
+**What was genuinely missing, and the only thing built: a dangerous
+area's BUILDINGS do not decline, only its PEOPLE'S safety need does.**
+`property.js#advancePropertyLifecycle` read occupancy and ownership and
+nothing else — `crime.dangerByCommunity` existed, was real, and had
+exactly one reader in the whole engine before this. `property.
+dangerDecayMultiplier` closes it the way every other real-signal
+multiplier in this registry already does — compounding onto the
+existing flat `CONDITION_DECAY_PER_TICK` term, never replacing it, and
+never touching `crime.DANGER_REFERENCE_PER_1K` or
+`keys.resolveAggression`'s own four-attempt calibrated floor/rate.
+**One-sided, unlike `landCoverPacks.HOME_VALUE_MULTIPLIER_BOUNDS`**: a
+land-cover class can raise or lower a home's value, but danger has no
+protective direction for a building, so `DANGER_DECAY_MULTIPLIER_
+BOUNDS` is `[1, 1.15]` rather than symmetric around 1 — neutral at zero
+danger, never better. `crime.dangerByCommunity` is computed once per
+tick in `tick.js`'s own Environment phase, the same "built once for a
+whole pass" discipline that map's own header already states for why it
+exists, and passed into `advancePropertyLifecycle` as a new, OPTIONAL
+fourth argument — every existing call site (including five test files)
+omits it and gets the exact byte-for-byte unchanged decay this engine
+has always produced, which the new `dangerDecayMultiplier` tests assert
+directly rather than trusting the argument's optionality to make it true.
+
+**A second, genuinely separate real signal, added because it is not
+redundant with the first.** `heat.js` (last round) is scoped to the
+PERSON a faction actually acted on, not their neighbourhood —
+`crime.dangerByCommunity` cannot see it, because every heat-raising
+event is also a counted crime incident that already feeds the
+community rate, so folding heat INTO that same map would double-count
+the identical fact under two names. A person personally targeted by a
+real faction has a real reason to want out that is independent of
+whether their block reads as dangerous on paper, and the reverse holds
+too — an uninvolved resident of a dangerous-reading block carries none
+of it. `heat.worstHeat` is the WORST single faction's heat, 0..1, never
+a sum — the same "take the worst, not the total" reduction `migration.
+pushFor` already uses picking one need to act on, because this file
+has no measurement to justify a mechanic where three factions' radars
+at once is three times as motivating as one. Wired into `motivation.
+js#safety` as a second multiplicative term, zero for the overwhelming
+majority who have never had heat raised against them — the twelfth
+standing rule's own discipline, applied to a brand-new term rather than
+relearned: a modifier that is 0 for almost everyone is the correct
+shape, not a sign that it does nothing.
+
+**Measured on a real generated world, not asserted from the formula
+alone.** Two communities, 30 residents each: one seeded with 60 real
+violent incidents via `crime.recordCrime` (danger 1.000), the other
+left at the world's own ambient rate (danger 0.571 — worth recording
+plainly, because it means there is no such thing as a zero-danger
+control community in a generated world; every area carries some real
+crime). Run 300 ticks forward on `engine.advanceTick()` (the identical
+function every real route this engine exposes already calls): the
+seeded community's average property condition fell 61.87 points
+against the ambient community's 53.01 — the right direction, a real
+and attributable gap, but smaller than the formula's own bound would
+suggest in isolation, because BOTH communities' buildings are also
+subject to the pre-existing, separately-documented upkeep collapse
+this project's own dev-docs already measured (most generated homes
+settle on low staffing ratios, so the flat decay term dominates
+regardless of this round's multiplier). Net migration moved in
+opposite directions (the seeded community net-emptied; the ambient one
+had a real net inflow) — the pre-existing push/pull mechanism
+responding to the real data exactly as designed, not a new mechanism
+being proven. The raw per-1,000 magnitude on the seeded side is not
+meaningful on its own once a community's population falls this far —
+`migration.netRatePer1k` has no shrinkage treatment the way `crime.
+dangerByCommunity`'s own `SHRINKAGE_EXPOSURE` already gives the
+identical small-sample problem for a different statistic, a real,
+separate, future gap named here rather than smoothed over.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

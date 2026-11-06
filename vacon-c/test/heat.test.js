@@ -183,3 +183,32 @@ test('two different factions dealing with the same offender build independent he
   assert.ok(heat.heatWith(w, offender.id, gangB.id) > 0);
   assert.equal(heat.heatProfile(w, offender.id).length, 2, 'both factions must track this offender independently, on their own radar each');
 });
+
+// -- worstHeat: chaos ripple effects, part two ----------------------------
+
+test('worstHeat is a real zero for a person who has never been on any faction\'s radar', () => {
+  const w = world();
+  const p = person(w);
+  assert.equal(heat.worstHeat(w, p.id), 0);
+});
+
+test('worstHeat is the WORST single faction, never a sum across factions', () => {
+  const w = world();
+  const p = person(w);
+  const gangA = faction(w);
+  const gangB = faction(w);
+  heat.raiseHeat(w, { entityId: p.id, factionOrganizationId: gangA.id, amount: 30 });
+  heat.raiseHeat(w, { entityId: p.id, factionOrganizationId: gangB.id, amount: 70 });
+
+  assert.equal(heat.worstHeat(w, p.id), 0.7,
+    'the worst of 30 and 70 is 70, not their sum (which would exceed the 0..1 scale)');
+});
+
+test('worstHeat is bounded to 0..1 against the same 0..100 scale relationships.conflict uses elsewhere', () => {
+  const w = world();
+  const p = person(w);
+  const f = faction(w);
+  heat.raiseHeat(w, { entityId: p.id, factionOrganizationId: f.id, amount: 95 });
+  heat.raiseHeat(w, { entityId: p.id, factionOrganizationId: f.id, amount: 95 });
+  assert.equal(heat.worstHeat(w, p.id), 1, 'clamped heat of 100 must read as exactly 1, never over');
+});

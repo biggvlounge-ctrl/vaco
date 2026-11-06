@@ -102,6 +102,30 @@ function heatProfile(worldState, entityId) {
     .filter((row) => organizationIds.has(row.factionOrganizationId) && row.heat > 0);
 }
 
+// **Chaos ripple effects, part two: a person's OWN worst standing
+// heat, 0..1 — not a community average, and not summed across
+// factions.** `motivation.js#safety` already reads
+// `crime.dangerByCommunity` for the area somebody lives in; this is a
+// genuinely separate real fact, because heat is scoped to the PERSON
+// `raiseHeat` was actually called on, not their neighbourhood. Someone
+// a specific gang has personally targeted has a real reason to want
+// out even if the block they live on reads as quiet on paper, and the
+// reverse is just as real: a quiet, uninvolved resident of a
+// dangerous-reading block carries none of this term.
+//
+// The WORST single faction's heat, not the sum — the same "let worst
+// = ... if pressure > worst.pressure" reduction `migration.pushFor`
+// already uses picking one need to act on, rather than a sum that
+// would make being on three factions' radars at once three times as
+// motivating as one, a multiplier this file has no measurement to
+// justify. Scaled to 0..1 against the same 0..100 ceiling
+// `relationships.conflict` already uses everywhere else in this file.
+function worstHeat(worldState, entityId) {
+  const rows = heatProfile(worldState, entityId);
+  if (rows.length === 0) return 0;
+  return Math.max(0, Math.min(1, Math.max(...rows.map((r) => r.heat)) / 100));
+}
+
 // Raise real heat between a person and a real faction organization,
 // clamped to the same 0..100 scale `relationships.conflict` already
 // uses everywhere else, the identical clamp shape
@@ -123,5 +147,6 @@ module.exports = {
   HEAT_GAIN,
   heatWith,
   heatProfile,
+  worstHeat,
   raiseHeat,
 };
