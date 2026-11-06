@@ -127,6 +127,7 @@ const disabilityPacks = require('./disabilityPacks.js');
 const veteranPacks = require('./veteranPacks.js');
 const buildingPacks = require('./buildingPacks.js');
 const merchandise = require('./merchandise.js');
+const weapons = require('./weapons.js');
 const worldStore = require('./worldStore.js');
 const characterCreation = require('./characterCreation.js');
 const { hashSeed, seededUnit } = require('./seeded.js');
@@ -2288,6 +2289,13 @@ function generateWorld(options = {}) {
   // real pools draw on and no item in any world belonged to, so a
   // grocery store search found nothing, every time.
   summary.merchandiseItems = merchandise.registerItems(w);
+  // **Firearms, real ammunition and the switch — registered, never
+  // handed out.** Same reasoning as every other catalogue above:
+  // `inventory.give` has to know the name before anybody can be given
+  // one, and a world starts with nobody armed, same as nobody starts
+  // with a pile of scrap. See `weapons.js`'s own header for the three
+  // interpretive calls this closes.
+  summary.weaponsItems = weapons.registerItems(w);
   summary.knowledgeItems = 0;
   made.people.forEach((npc, pi) => {
     if (random.unit('book', pi) > config.survivingBookRate) return;

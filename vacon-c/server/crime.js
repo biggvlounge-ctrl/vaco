@@ -101,6 +101,7 @@ const mortality = require('./mortality.js');
 const worldStore = require('./worldStore.js');
 const inventory = require('./inventory.js');
 const items = require('./items.js');
+const weapons = require('./weapons.js');
 
 // An item's base worth, for choosing what a thief takes. Deliberately
 // the BASE value rather than the local barter score: a thief in the
@@ -187,6 +188,16 @@ const SEVERITY = {
   violent: 70, domestic: 65, sex_offense: 85, gun: 80,
   theft: 30, property: 35, drug: 25, fraud: 40,
 };
+
+// **Derived, not invented.** How much worse an armed offence already
+// reads than an unarmed one, in this file's own severity currency —
+// reused twice: `tick.js#runSecurityPhase` scales how OFTEN a flashpoint
+// fires when the aggressor is armed by this same ratio, and
+// `recordEscalation` below scales severity again when a real switch
+// turns a semi-automatic into a burst. Two different questions
+// (frequency, severity), the same one real number, rather than a second
+// ratio guessed for the second question.
+const GUN_SEVERITY_RATIO = SEVERITY.gun / SEVERITY.violent;
 
 // A crime this significant is also world history. Same threshold
 // `runHistoryPhase` uses for events, for the same reason: history is
@@ -486,27 +497,44 @@ function sharesFamily(worldState, aId, bId) {
 function recordEscalation(worldState, options = {}) {
   const { perpetratorId, victimId, tick = worldState.tick ?? 0, responseLevel = null } = options;
 
-  // **Armed or not, asked literally.** §9 lists `gun` as its own
-  // category and this file declared it ungeneratable for exactly one
-  // reason, in its own words: nothing in the schema could distinguish
-  // an armed offence from an unarmed one. `inventory.hasEquippedCategory`
-  // can — §26's `protection` category is what somebody has about them
-  // for that purpose.
+  // **Armed or not, asked literally — and asked of the right thing.**
+  // §9 lists `gun` as its own category and this file declared it
+  // ungeneratable for exactly one reason, in its own words: nothing in
+  // the schema could distinguish an armed offence from an unarmed one.
+  // `weapons.isFunctioningFirearm` can — a real firearm, equipped, AND
+  // a held round of its own real ammunition (`weapons.js`'s own
+  // header). A plain `inventory.hasEquippedCategory(..., 'protection')`
+  // would have called an equipped `shield` a gun the day one existed,
+  // and would have called an unloaded firearm armed; this is the
+  // narrower, correct question, and a gun with no bullets falls back to
+  // whatever this would have classified as unarmed.
   //
   // It takes precedence over `domestic` and `violent` because it is
   // the more specific fact: a §9 crime report that recorded an armed
   // assault as a plain one would lose the thing the category exists to
   // count.
-  const armed = inventory.hasEquippedCategory(worldState, perpetratorId, 'protection');
-  const category = armed
+  const functioning = weapons.isFunctioningFirearm(worldState, perpetratorId);
+  const category = functioning
     ? 'gun'
     : sharesFamily(worldState, perpetratorId, victimId) ? 'domestic' : 'violent';
+
+  // The real round(s) this incident just spent — never more than what
+  // is actually held. A real switch (`weapons.isSwitchModified`) spends
+  // a full burst instead of one round and reads at the same
+  // `GUN_SEVERITY_RATIO` bump below, rather than a second invented
+  // category for "automatic".
+  if (functioning) weapons.fireRound(worldState, perpetratorId);
+  const switched = functioning && weapons.isSwitchModified(worldState, perpetratorId);
+  const severityFloor = switched
+    ? Math.round(SEVERITY[category] * GUN_SEVERITY_RATIO)
+    : SEVERITY[category];
+
   return recordCrime(worldState, {
     category,
     perpetratorId,
     victimId,
     tick,
-    severity: responseLevel === null ? SEVERITY[category] : Math.max(SEVERITY[category], responseLevel),
+    severity: responseLevel === null ? severityFloor : Math.max(severityFloor, responseLevel),
     detail: 'escalated from standing conflict',
   });
 }
@@ -888,6 +916,7 @@ module.exports = {
   advanceFriction,
   SCARCITY_WEIGHT,
   SEVERITY,
+  GUN_SEVERITY_RATIO,
   HISTORY_SIGNIFICANCE_FLOOR,
   reseedIds,
   recordCrime,

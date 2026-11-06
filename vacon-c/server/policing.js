@@ -93,6 +93,86 @@ const TRUST_PER_UNCLEARED = -0.9;
 //: investigation, and the delay is what makes the backlog visible.
 const INVESTIGATION_DELAY_TICKS = 7;
 
+// ---------------------------------------------------------------------
+// Fifth decision, added on direct instruction: government does not have
+// to be what polices an area.
+//
+// **The real gap, found by reading what was already here rather than
+// building something new beside it.** `authority.js` already computes
+// a real `governed`/`contested`/`lawless` regime per area from four
+// measured readings, and `authority.holderOf` already names the real
+// faction holding the ground when the state does not — `justice.js`'s
+// `answerByGroup` already has that faction make real restitution,
+// expel its own, or start a real feud, instead of nothing happening.
+// The alt-policing mechanism this request asks for was already half
+// built, under a different name, in two files that were never asked
+// whether a LAWLESS area with no `public_safety` infrastructure at all
+// could ever reach either of them.
+//
+// It could not. `answerByGroup` only ever runs from inside
+// `justice.runJustice`, which only ever looks at incidents where
+// `incident.cleared === true` — and `cleared` is `policing.investigate`'s
+// own word, set true only when a seeded draw beats a `clearanceChance`
+// that is a hard 0 whenever `policingCapacity` reads `null`.
+// `policingCapacity` reads `null` with NO `public_safety` infrastructure
+// in the city at all, which is exactly the area this whole feature is
+// supposed to be about. This is the fourteenth standing rule's own
+// shape one file over: a threshold (clearance) that gates a mechanism
+// (group law) sat entirely behind a gate (government capacity) that the
+// mechanism exists specifically to answer the ABSENCE of. A gang-held
+// block with no government station nearby could hold the ground
+// forever and never once get the chance `answerByGroup` already gives
+// it, because nothing ever cleared a case there to hand it.
+//
+// **The fix adds no new mechanism — it gives clearance a second real
+// source.** A faction that actually holds this ground
+// (`authority.holderOf`, the identical function `justice.js` already
+// calls) has its own real capability to notice what its own members or
+// territory were hit by, derived the identical way `authority.gripTerm`
+// already rates a hold: the faction's own live `organization.power`
+// trait (control.js/territory.js's real substrate, never a value this
+// file invents), scaled by the same `fortified`/`controlled`/
+// `contested` block-status weights `gripTerm` already uses for the
+// identical reason — a fortified gang enforces harder than a merely
+// controlled one, and a contested hold barely at all.
+const FACTION_STATUS_WEIGHT = { fortified: 1, controlled: 0.8, contested: 0.5 };
+
+// How much the faction actually holding this ground (if any) can bring
+// to noticing and answering what happens here, 0..1 — or null, which
+// means one of two different, honest things: nobody holds this ground
+// at all (`authority.holderOf` found nothing), or the one that does has
+// no readable `organization.power` trait. Neither is a faction with
+// zero capability; both are "there is no alternative to measure here",
+// the same distinction `policingCapacity` already draws for government
+// infrastructure.
+//
+// **Never a second opinion about WHETHER a faction holds this
+// ground.** `authority.holderOf` already answers that, from the real
+// territory-control machinery `territory.resolveTerritoryControl`
+// writes every tick; this only asks how much that same real hold is
+// worth as policing capacity.
+function factionCapacityOf(worldState, communityId) {
+  // Required at call time, not at module scope. `authority.js` already
+  // requires `policing.js` at module scope (it reads `trustIn`), so the
+  // reverse at module scope hands one of the two a half-built module —
+  // the identical cycle `authority.js#gripTerm` already documents
+  // taking `statecraft.js` the same way, for the same reason.
+  // eslint-disable-next-line global-require
+  const authority = require('./authority.js');
+  const holderId = authority.holderOf(worldState, communityId);
+  if (holderId === null) return null;
+
+  const live = getLiveEntity(worldState, holderId);
+  const power = Number(live?.traits?.organization?.power);
+  if (!Number.isFinite(power)) return null;
+
+  const blocks = (worldState.territoryBlocks || [])
+    .filter((b) => b.community_id === communityId && b.faction_id === holderId);
+  if (blocks.length === 0) return null;
+  const weight = Math.max(...blocks.map((b) => FACTION_STATUS_WEIGHT[b.status] ?? 0.8));
+  return Math.max(0, Math.min(1, (power / 100) * weight));
+}
+
 // -- capacity -----------------------------------------------------------
 
 // A city's policing capacity per resident, 0..1, scaled by the
@@ -195,7 +275,15 @@ function investigate(worldState, options = {}) {
 
   const community = worldState.communities.find((c) => c.id === incident.community_id) || null;
   const residents = worldState.npcs.filter((n) => n.communityId === incident.community_id);
-  const capacity = policingCapacity(worldState, community?.city_id ?? null, residents.length);
+  const governmentCapacity = policingCapacity(worldState, community?.city_id ?? null, residents.length);
+  const factionCapacity = factionCapacityOf(worldState, incident.community_id);
+  // The better of the two real sources — never summed, since a case is
+  // noticed once, not twice. `null` only when NEITHER answers: no
+  // government infrastructure here AND nobody holds the ground, which
+  // is the one honest case nothing can clear this.
+  const capacity = governmentCapacity === null
+    ? factionCapacity
+    : (factionCapacity === null ? governmentCapacity : Math.max(governmentCapacity, factionCapacity));
   const chance = clearanceChance(worldState, incident, { capacity });
 
   const cleared = seededDraw([incident.id, tick, 'clearance']) < chance;
@@ -207,18 +295,38 @@ function investigate(worldState, options = {}) {
   // somebody trusts the police. `shiftBelief` creates the belief at
   // neutral on first contact, which is exactly right: an opinion forms
   // the first time something happens.
-  const delta = cleared ? TRUST_PER_CLEARED : TRUST_PER_UNCLEARED;
-  for (const resident of residents) {
-    beliefs.shiftBelief(worldState, {
-      entityId: resident.id,
-      beliefType: TRUST_BELIEF_TYPE,
-      beliefName: TRUST_BELIEF,
-      delta,
-      tick,
-    });
+  //
+  // **Gated on real government infrastructure existing at all.**
+  // `TRUST_BELIEF` is named "trust in public safety" and
+  // `TRUST_BELIEF_TYPE` is `political` — a belief about the STATE's own
+  // police, the same institution `authority.js#standingTerm` reads
+  // approval of. A faction clearing a case in a block with no
+  // `public_safety` infrastructure at all is not the state doing
+  // anything, and moving a belief about the state from an event the
+  // state had no part in would conflate the two real institutions this
+  // file and `justice.js#answerByGroup` already keep separate — the
+  // same distinction the header draws between clearance (a fact about
+  // whether the true offender became known, which either real source
+  // can supply) and policing (an institution, which only one of them
+  // is). A real limitation, stated rather than blurred: this file has
+  // no reading of what residents come to believe about a faction's own
+  // enforcement, only about the government's.
+  if (governmentCapacity !== null) {
+    const delta = cleared ? TRUST_PER_CLEARED : TRUST_PER_UNCLEARED;
+    for (const resident of residents) {
+      beliefs.shiftBelief(worldState, {
+        entityId: resident.id,
+        beliefType: TRUST_BELIEF_TYPE,
+        beliefName: TRUST_BELIEF,
+        delta,
+        tick,
+      });
+    }
   }
 
-  return { incident, cleared, chance, capacity };
+  return {
+    incident, cleared, chance, capacity, governmentCapacity, factionCapacity,
+  };
 }
 
 // Every case that has come of age, once per tick.
@@ -334,6 +442,8 @@ module.exports = {
   TRUST_PER_CLEARED,
   TRUST_PER_UNCLEARED,
   INVESTIGATION_DELAY_TICKS,
+  FACTION_STATUS_WEIGHT,
+  factionCapacityOf,
   policingCapacity,
   clearanceChance,
   investigate,

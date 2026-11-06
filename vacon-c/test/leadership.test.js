@@ -19,6 +19,7 @@ const worldStore = require('../server/worldStore.js');
 const players = require('../server/players.js');
 const leadership = require('../server/leadership.js');
 const influence = require('../server/influence.js');
+const heat = require('../server/heat.js');
 
 let nextId = 900000;
 
@@ -193,6 +194,7 @@ test('getLeaderDashboard surfaces the leader\'s own real influenceRating and ext
 
   assert.equal(dashboard.influenceRating, influence.influenceRatingOf(w, leaderNpc.id));
   assert.deepEqual(dashboard.extendedFamily, { entityId: leaderNpc.id, family: null, parents: [], siblings: [], cousins: [] });
+  assert.deepEqual(dashboard.heat, [], 'a leader nobody has crossed yet has no real heat with anybody');
 });
 
 // -- directMission ----------------------------------------------------------
@@ -484,4 +486,25 @@ test('broadcastMessage puts a real, attributed fact through the real media.broad
   for (const row of written) {
     assert.equal(row.source_entity_id, leader.id, 'the broadcast is attributed to the real leader, not anonymous');
   }
+});
+
+// Appended at the end of the file on purpose -- every test above this
+// point shares one module-level `nextId` counter, and some of them seed
+// a probability draw from the entity ids `person()`/`organization()`
+// hand out with no explicit tick. Inserting a new test earlier in the
+// file shifts every id after it, which silently changed which way a
+// later 50/50 draw fell and failed a test this one has nothing to do
+// with. Appending here is what keeps every existing test's ids exactly
+// as they were.
+test('getLeaderDashboard surfaces real, independent per-faction heat -- see server/heat.js', () => {
+  const w = world();
+  const leaderNpc = person(w);
+  organization(w, { type: 'business', leaderId: leaderNpc.id, influence: 40 });
+  const rivalGang = organization(w, { type: 'faction', leaderId: null, influence: 0 });
+  const player = players.generatePlayer(w, { linkedEntityId: leaderNpc.id, mode: 'leader' });
+
+  heat.raiseHeat(w, { entityId: leaderNpc.id, factionOrganizationId: rivalGang.id, amount: 30 });
+
+  const dashboard = leadership.getLeaderDashboard(w, player.id);
+  assert.deepEqual(dashboard.heat, [{ factionOrganizationId: rivalGang.id, heat: 30 }]);
 });

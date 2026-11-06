@@ -31,6 +31,7 @@ const behavior = require('./behavior.js');
 const gifts = require('./gifts.js');
 const influence = require('./influence.js');
 const characterCreation = require('./characterCreation.js');
+const heat = require('./heat.js');
 
 let nextPlayerId = 1;
 
@@ -184,6 +185,11 @@ function getCitizenDashboard(worldState, playerId) {
     // — same shared lookup `GET /api/entities/:id/family-tree` uses,
     // so there is one real source of truth for this, not two.
     extendedFamily: characterCreation.describeFamilyTree(worldState, npcId),
+    // Real, independent per-faction heat — see `server/heat.js`'s own
+    // header. Read live for the identical reason every other dashboard
+    // field above it is: a value nothing stores is a value nothing can
+    // go stale.
+    heat: heat.heatProfile(worldState, npcId),
     // **What this person is FOR**, which is the one thing the dashboard
     // could not say. It showed what a citizen owned, who they knew and
     // how they were doing, and nothing about what they are good at.

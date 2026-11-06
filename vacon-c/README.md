@@ -171,6 +171,55 @@ real aunt/uncle who heads an entirely separate real family of their own
 at its own real, possibly different, location. Grandparents and
 anything beyond parents/siblings/cousins are explicitly out of scope.
 
+## Weapons, alt-policing, multi-faction heat and real contacts
+See `CLAUDE.md`'s own fiftieth standing rule for the full design.
+`server/weapons.js` is real firearms (`pistol`/`rifle`, remnant-only;
+`machine_gun`, remnant-only AND restricted to a `government-building`
+in a region with a real, tracked `countryPacks.militaryExpenditurePctGDP`
+— global, never US-only) and real, finite ammunition
+(`pistol_rounds`/`rifle_rounds`), kept deliberately separate: a gun
+with no held round of its own ammunition is a real object that does
+nothing. `zip_gun`, the street-level firearm, is a real Tier 2
+craftable in `salvage.js`; `auto_sear_switch` turns a semi-auto into
+`machine_gun`'s burst and is never a discovery location. Missiles and
+drones are explicitly out of scope. `POST /api/players/:id/action`
+gains `manufacture-ammunition` — era-gated (`industrialization`) and
+occupation-gated (a real `engineer` at a real `business`), one bounded
+batch per call, never a passive regen.
+
+**Government does not have to be what polices an area.**
+`policing.factionCapacityOf` gives a real faction holding real ground
+(`authority.holderOf`) its own real clearance capability, derived from
+its own live `organization.power` and block-status weight — so a
+lawless area with no `public_safety` infrastructure at all can finally
+have an offence noticed and, through the already-real
+`justice.answerByGroup`, answered by whoever actually holds the
+ground. The real belief this file moves ("trust in public safety")
+still only ever moves when government infrastructure genuinely
+existed.
+
+**Multi-faction heat is real and independent per faction** — never one
+"wanted" scalar. `server/heat.js` reuses the real shared `entities(id)`
+space between people and organizations and the real
+`relationships.conflict` column; the one real trigger is
+`justice.answerByGroup` actually acting, never omniscience about every
+offence in a faction's own territory. Government/police heat is
+deliberately out of scope — that chain already ends in a real
+conviction, a stronger mechanism a parallel heat bar would only
+disagree with. Surfaced live as `heat` on both the citizen and leader
+dashboards.
+
+**Friends, classmates and associates are searched for before they are
+ever generated.** `POST /api/players/:id/action` gains `find-contact`
+(`server/contacts.js#findOrCreateContact`): real existing
+`friend`/`business`/`educational`/`neighbor`/`student` relationships
+and real extended family (cousins/aunts-uncles) are checked first, and
+a brand-new real NPC is generated — placed in a real, different city
+via the same cross-world draw `characterCreation.js` already uses for
+aunts/uncles — only once nothing real qualifies. "Outside home region"
+is honestly scoped to the city, the one geography grain this engine
+generates more than one of.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

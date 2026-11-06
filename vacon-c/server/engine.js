@@ -67,6 +67,7 @@ const players = require('./players.js');
 const leadership = require('./leadership.js');
 const influence = require('./influence.js');
 const characterCreation = require('./characterCreation.js');
+const contacts = require('./contacts.js');
 const territory = require('./territory.js');
 const missions = require('./missions.js');
 const property = require('./property.js');
@@ -78,6 +79,7 @@ const meetings = require('./meetings.js');
 const landmarks = require('./landmarks.js');
 const salvage = require('./salvage.js');
 const discovery = require('./discovery.js');
+const weapons = require('./weapons.js');
 const knowledge = require('./knowledge.js');
 const barter = require('./barter.js');
 const mortality = require('./mortality.js');
@@ -848,6 +850,24 @@ function getFamilyTree(entityId) {
   return characterCreation.describeFamilyTree(WorldState, entityId);
 }
 
+// `contacts.js#findOrCreateContact`'s player-facing half — the same
+// injected-generators seam `createCharacter` above already uses, for
+// the identical reason: the real generation logic lives directly in
+// this file, so requiring it back into `contacts.js` would be
+// circular.
+function findOrCreateContact(entityId, options = {}) {
+  return contacts.findOrCreateContact(WorldState, entityId, {
+    ...options,
+    generators: {
+      generateNpc: (npcOptions) => generateNPC(npcOptions),
+      generateFamily: (familyOptions) => generateFamily(familyOptions),
+      addFamilyMember: (familyId, memberId, role, generationNumber) => (
+        addFamilyMember(familyId, memberId, role, generationNumber)
+      ),
+    },
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Territory/Community (block-tier)
 // ---------------------------------------------------------------------------
@@ -1005,6 +1025,8 @@ const ACTION_VERBS = {
   quoteTrade: (...args) => quoteTrade(...args),
   tradeWith: (...args) => tradeWith(...args),
   investInTarget: (...args) => investInTarget(...args),
+  manufactureAmmunition: (...args) => manufactureAmmunition(...args),
+  findOrCreateContact: (...args) => findOrCreateContact(...args),
 };
 
 function dispatchAction(playerId, body) {
@@ -1317,6 +1339,15 @@ function canMakeThing(entityId, options = {}) {
 
 function searchLocation(entityId, options = {}) {
   return discovery.search(WorldState, entityId, Number(options.propertyId), {
+    tick: WorldState.tick,
+  });
+}
+
+// `weapons.js`'s manufacturing gate, the player-facing half — see its
+// own header for why this is era-gated and occupation-gated rather
+// than a passive regen.
+function manufactureAmmunition(entityId, options = {}) {
+  return weapons.manufactureAmmunition(WorldState, entityId, options.ammoName, {
     tick: WorldState.tick,
   });
 }
@@ -1664,6 +1695,7 @@ module.exports = {
   getLeaderDashboard,
   createCharacter,
   getFamilyTree,
+  findOrCreateContact,
   getInfluenceRating,
   getPersonalInfluence,
   getFamilyPoliticalInfluence,

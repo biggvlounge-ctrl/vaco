@@ -94,6 +94,7 @@ const missions = require('./missions.js');
 const media = require('./media.js');
 const influence = require('./influence.js');
 const characterCreation = require('./characterCreation.js');
+const heat = require('./heat.js');
 const { seededDraw } = require('./seeded.js');
 
 function clamp01(x) {
@@ -206,11 +207,14 @@ function getLeaderDashboard(worldState, playerId) {
   return {
     player: { id: player.id, mode: player.mode, linkedEntityId: entityId },
     npc: { id: live.id, status: live.status, role: live.role },
-    // Same two fields as players.js#getCitizenDashboard, read live for
-    // the same reason — a leader's own standing and family are real
-    // facts about them regardless of which mode they're playing.
+    // Same three fields as players.js#getCitizenDashboard, read live for
+    // the same reason — a leader's own standing, family and real
+    // per-faction heat are facts about them regardless of which mode
+    // they're playing. A leader with enemies on a rival faction's own
+    // radar needs to see that as much as a citizen does.
     influenceRating: influence.influenceRatingOf(worldState, entityId),
     extendedFamily: characterCreation.describeFamilyTree(worldState, entityId),
+    heat: heat.heatProfile(worldState, entityId),
     organizations,
   };
 }

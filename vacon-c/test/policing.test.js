@@ -20,6 +20,7 @@ const infrastructure = require('../server/infrastructure.js');
 const policing = require('../server/policing.js');
 const statistics = require('../server/statistics.js');
 const territory = require('../server/territory.js');
+const engine = require('../server/engine.js');
 
 let nextId = 200000;
 
@@ -244,6 +245,104 @@ test('the same world clears the same cases', () => {
   assert.ok(first.length > 0);
   assert.deepEqual(first, second);
   nextId = 400000;
+});
+
+// -- alt-policing: a faction's own real capability --------------------
+//
+// government does not have to be what polices an area. See
+// `policing.js`'s own header for the real gap this closes:
+// `justice.answerByGroup` already existed for a faction to answer an
+// offence the state did not, but could never be REACHED in a lawless
+// area with no government infrastructure at all, because clearance
+// itself read government capacity only.
+
+// A faction actually holding this ground, through the real generator
+// -- same reasoning test/authority.test.js's own `stateWorld` gives:
+// `factionCapacityOf` reads traits through `getLiveEntity`, so a
+// fixture that set `organization.power` directly on the row would be
+// testing a field nothing reads.
+function faction(w, { communityId, power, status = 'fortified' }) {
+  const org = engine.generateFaction({
+    name: `Holders ${nextId}`, type: 'gang', traitValueFor: () => power,
+  });
+  w.organizations.push(org);
+  w.entityTraits.push(
+    ...engine.WorldState.entityTraits.filter((r) => r.entity_id === org.id),
+  );
+  w.territoryBlocks.push({
+    id: nextId++, faction_id: org.id, city_id: null, community_id: communityId, status,
+  });
+  return org;
+}
+
+test('factionCapacityOf is honest absence when nobody holds this ground at all', () => {
+  const w = world();
+  const { community } = place(w, { residents: 10 });
+  assert.equal(policing.factionCapacityOf(w, community.id), null);
+});
+
+test('factionCapacityOf reads the real holder\'s own power trait, scaled by its real hold status', () => {
+  const w = world();
+  const { community } = place(w, { residents: 10 });
+  faction(w, { communityId: community.id, power: 80, status: 'fortified' });
+  assert.equal(policing.factionCapacityOf(w, community.id), 0.8);
+
+  const w2 = world();
+  const { community: c2 } = place(w2, { residents: 10 });
+  faction(w2, { communityId: c2.id, power: 80, status: 'controlled' });
+  assert.equal(
+    policing.factionCapacityOf(w2, c2.id),
+    0.8 * policing.FACTION_STATUS_WEIGHT.controlled,
+    'a merely controlled hold brings less real capability than a fortified one at the same power',
+  );
+});
+
+test('factionCapacityOf is honest absence (not a weak faction) at a CONTESTED block -- authority.holderOf itself recognises nobody definitively holds contested ground', () => {
+  const w = world();
+  const { community } = place(w, { residents: 10 });
+  faction(w, { communityId: community.id, power: 80, status: 'contested' });
+  assert.equal(policing.factionCapacityOf(w, community.id), null);
+});
+
+test('a lawless block with NO government infrastructure at all still gets answered once a real faction holds it -- the gap this file\'s header names', () => {
+  // Before this round: `policingCapacity` reads null with no
+  // public_safety infrastructure, `clearanceChance` is a hard 0 against
+  // a null capacity, and nothing downstream (government OR group law)
+  // could ever be reached. That is the literal gap.
+  const w = world();
+  const { community, people } = place(w, { residents: 50, capacity: null });
+  faction(w, { communityId: community.id, power: 90, status: 'fortified' });
+
+  for (let i = 0; i < 60; i += 1) {
+    crime.recordCrime(w, {
+      category: 'theft', perpetratorId: people[i % 50].id,
+      victimId: people[(i + 1) % 50].id, tick: i,
+    });
+  }
+  policing.runPolicing(w, 500);
+  const result = policing.caseload(w, community.id);
+  assert.equal(result.investigated, 60);
+  assert.ok(result.cleared > 0, 'a strong, fortified holder should clear some cases where government infrastructure never existed to');
+});
+
+test('a faction-only clearance does NOT move trust in the STATE\'s public safety -- the belief this file moves is about an institution that had no part in it', () => {
+  const w = world();
+  const { community, people } = place(w, { residents: 10, capacity: null });
+  faction(w, { communityId: community.id, power: 100, status: 'fortified' });
+
+  crime.recordCrime(w, { category: 'theft', perpetratorId: people[0].id, victimId: people[1].id, tick: 0 });
+  policing.runPolicing(w, 500);
+  assert.equal(policing.trustIn(w, community.id), null, 'nobody should have formed any belief about the STATE\'s police from a faction clearing this');
+});
+
+test('the same real faction hold, alongside government capacity, still only moves trust once and attributes it to the state when the state had any real presence at all', () => {
+  const w = world();
+  const { community, people } = place(w, { residents: 10, capacity: 1 });
+  faction(w, { communityId: community.id, power: 100, status: 'fortified' });
+
+  crime.recordCrime(w, { category: 'theft', perpetratorId: people[0].id, victimId: people[1].id, tick: 0 });
+  policing.runPolicing(w, 500);
+  assert.ok(policing.trustIn(w, community.id) !== null, 'real government infrastructure existed here, so a real belief should have formed');
 });
 
 // -- trust --------------------------------------------------------------

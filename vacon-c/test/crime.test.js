@@ -23,6 +23,8 @@ const areaStats = require('../server/areaStats.js');
 const economy = require('../server/economy.js');
 const territory = require('../server/territory.js');
 const engine = require('../server/engine.js');
+const weapons = require('../server/weapons.js');
+const inventory = require('../server/inventory.js');
 
 function world({ tick = 100 } = {}) {
   const worldState = {
@@ -247,6 +249,73 @@ test('an escalation inside a family is domestic, and outside it is violent', () 
   assert.equal(
     crime.recordEscalation(w, { perpetratorId: a.id, victimId: stranger.id }).category,
     'violent',
+  );
+});
+
+// -- weapons.js's real gate: equipped AND loaded, never just equipped --
+
+test('recordEscalation does NOT classify an equipped-but-UNLOADED gun as "gun" -- weapons.isFunctioningFirearm is the real gate, not inventory.hasEquippedCategory', () => {
+  const w = world();
+  w.inventory = [];
+  w.barterItems = [];
+  weapons.registerItems(w);
+  const c = territory.generateCommunity(w, {});
+  const a = person(w, { communityId: c.id });
+  const stranger = person(w, { communityId: c.id });
+
+  inventory.give(w, { entityId: a.id, itemName: 'pistol' });
+  inventory.equip(w, { entityId: a.id, itemName: 'pistol' });
+  // Deliberately no pistol_rounds given -- a real object that does
+  // nothing, per weapons.js's own header.
+
+  assert.equal(
+    crime.recordEscalation(w, { perpetratorId: a.id, victimId: stranger.id }).category,
+    'violent',
+    'an unloaded gun falls back to whatever an unarmed offence would classify as',
+  );
+});
+
+test('recordEscalation classifies a loaded, equipped gun as "gun", scales severity, and fires one real round', () => {
+  const w = world();
+  w.inventory = [];
+  w.barterItems = [];
+  weapons.registerItems(w);
+  const c = territory.generateCommunity(w, {});
+  const a = person(w, { communityId: c.id });
+  const stranger = person(w, { communityId: c.id });
+
+  inventory.give(w, { entityId: a.id, itemName: 'pistol' });
+  inventory.equip(w, { entityId: a.id, itemName: 'pistol' });
+  inventory.give(w, { entityId: a.id, itemName: 'pistol_rounds', quantity: 3 });
+
+  const incident = crime.recordEscalation(w, { perpetratorId: a.id, victimId: stranger.id });
+  assert.equal(incident.category, 'gun');
+  assert.equal(incident.severity, crime.SEVERITY.gun, 'no switch -- the plain gun severity floor');
+  assert.equal(inventory.quantityOf(w, a.id, 'pistol_rounds'), 2, 'one real round was fired by the incident itself');
+});
+
+test('recordEscalation scales severity further when the gun is switch-modified -- GUN_SEVERITY_RATIO applied a second time, not a second invented category', () => {
+  const w = world();
+  w.inventory = [];
+  w.barterItems = [];
+  weapons.registerItems(w);
+  const c = territory.generateCommunity(w, {});
+  const a = person(w, { communityId: c.id });
+  const stranger = person(w, { communityId: c.id });
+
+  inventory.give(w, { entityId: a.id, itemName: 'pistol' });
+  inventory.equip(w, { entityId: a.id, itemName: 'pistol' });
+  inventory.give(w, { entityId: a.id, itemName: 'pistol_rounds', quantity: 20 });
+  inventory.give(w, { entityId: a.id, itemName: weapons.SWITCH_ITEM });
+  inventory.equip(w, { entityId: a.id, itemName: weapons.SWITCH_ITEM });
+
+  const incident = crime.recordEscalation(w, { perpetratorId: a.id, victimId: stranger.id });
+  assert.equal(incident.category, 'gun');
+  assert.equal(incident.severity, Math.round(crime.SEVERITY.gun * crime.GUN_SEVERITY_RATIO));
+  assert.equal(
+    inventory.quantityOf(w, a.id, 'pistol_rounds'),
+    20 - weapons.ROUNDS_PER_SHOT.machine_gun,
+    'a switch spends the real machine_gun burst, not one round',
   );
 });
 

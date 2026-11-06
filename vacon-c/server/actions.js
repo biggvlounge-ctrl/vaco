@@ -262,6 +262,37 @@ const ACTIONS = {
     }),
   },
 
+  // **`weapons.js`'s manufacturing gate, the player-facing half.** Real
+  // business employment as `MANUFACTURING_OCCUPATION`, a real era
+  // reached, one real bounded batch — see that file's own header for
+  // why ammunition does not craft through `make-thing`'s ordinary loop.
+  'manufacture-ammunition': {
+    summary: 'Produce a bounded batch of ammunition, if you work at a real manufacturing business and the world has reached the industrial era.',
+    modes: ['citizen', 'leader'],
+    requires: ['ammoName'],
+    verbs: ['manufactureAmmunition'],
+    run: (verbs, actorId, body) => verbs.manufactureAmmunition(actorId, { ammoName: body.ammoName }),
+  },
+
+  // **`contacts.js#findOrCreateContact`'s player-facing half.** Real
+  // existing friends/classmates/associates/family are searched first;
+  // a new one is only ever generated when none qualifies — see that
+  // file's own header for the worked example this closes (a cousin
+  // outside the player's home city standing in for a real distribution
+  // contact) and why "outside home region" is honestly scoped to the
+  // CITY, the one geography grain this engine actually generates more
+  // than one of.
+  'find-contact': {
+    summary: 'Find a real friend, classmate, associate or family member matching what you need -- or, failing that, meet somebody new who fits.',
+    modes: ['citizen', 'leader'],
+    requires: [],
+    verbs: ['findOrCreateContact'],
+    run: (verbs, actorId, body) => verbs.findOrCreateContact(actorId, {
+      relationshipTypes: body.relationshipTypes,
+      outsideHomeCity: !!body.outsideHomeCity,
+    }),
+  },
+
   'make-thing': {
     summary: 'Make something from the materials you carry.',
     modes: ['citizen', 'leader'],

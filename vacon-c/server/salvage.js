@@ -117,6 +117,12 @@ const PRODUCTS = {
   blade: { category: 'protection', origin: 'producible' },
   club: { category: 'protection', origin: 'producible' },
   shield: { category: 'protection', origin: 'producible' },
+  // The street-level firearm `weapons.js` names in its own taxonomy —
+  // crude, illegal, improvised, and genuinely Tier 1-2 craftable, which
+  // is exactly this file's remit. `weapons.js` knows its name as a
+  // firearm; this file knows how to build one, the same split every
+  // other product here already has from its consuming module.
+  zip_gun: { category: 'protection', origin: 'producible' },
   hand_tool: { category: 'tools', origin: 'producible' },
   furniture: { category: 'materials', origin: 'producible' },
   container: { category: 'tools', origin: 'producible' },
@@ -176,6 +182,14 @@ const RECIPES = {
     from: [{ timber: 2 }, { scrap_metal: 1, junk: 2 }],
     skill: 'Crafting',
     tier: 1,
+  },
+  // One tier above `club` — a barrel, a firing pin and a spring is more
+  // than a sharpened edge, and `weapons.js`'s own header names this as
+  // the deliberately low-floor, street-level firearm in its taxonomy.
+  zip_gun: {
+    from: [{ scrap_metal: 2, wire: 2 }, { scrap_metal: 3, rubber: 1 }],
+    skill: 'Crafting',
+    tier: 2,
   },
   shield: {
     from: [{ timber: 2, scrap_metal: 1 }, { scrap_metal: 3 }],

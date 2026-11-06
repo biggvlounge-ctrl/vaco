@@ -498,6 +498,20 @@ function answerByGroup(worldState, options = {}) {
 
   if (acts.length === 0) return null;
 
+  // **The faction's own side of the identical event — real,
+  // independent heat, not folded into the victim's feud above.**
+  // `heat.js`'s own header explains why this is the one real trigger
+  // for multi-faction heat: a faction that actually did something
+  // about an offence (this line only runs once `acts.length > 0`) now
+  // has this offender on its own real radar, tracked separately from
+  // any other faction's. Required here rather than at module scope —
+  // `heat.js` requires `justice.js` at module scope for
+  // `GROUP_FEUD_GAIN`, so the reverse at module scope would hand one of
+  // them a half-built module, the identical cycle `authority.js`
+  // already documents taking `statecraft.js` the same way.
+  // eslint-disable-next-line global-require
+  require('./heat.js').raiseHeat(worldState, { entityId: offenderId, factionOrganizationId: holderId });
+
   worldStore.addMemory(worldState, {
     entityId: offenderId,
     memoryType: 'experience',

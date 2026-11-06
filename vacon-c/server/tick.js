@@ -88,6 +88,7 @@ const salvage = require('./salvage.js');
 const discovery = require('./discovery.js');
 const knowledge = require('./knowledge.js');
 const snapshots = require('./snapshots.js');
+const weapons = require('./weapons.js');
 const { seededDraw } = require('./seeded.js');
 
 let nextEventId = 1;
@@ -1045,6 +1046,19 @@ const FAMILY_DISCORD_THRESHOLD = 32;
 //: functioning state.
 const AGGRESSION_FLASHPOINT_RATE = 0.0006;
 
+// **Chaos, once guns come back into play — derived, not guessed.**
+// An aggressor who is actually armed (`weapons.isFunctioningFirearm`:
+// a real firearm, equipped, loaded with a real round of its own
+// ammunition — see `weapons.js`'s header) does not merely do more
+// damage when a flashpoint fires; a weapon in hand is what tips an
+// argument someone would otherwise have walked away from into one that
+// does not get walked away from. `crime.GUN_SEVERITY_RATIO`
+// (`SEVERITY.gun / SEVERITY.violent`) is the one real number this file
+// already has for "how much worse armed reads than unarmed" — reused
+// here as the frequency multiplier rather than inventing a second,
+// disagreeing ratio for the same underlying fact.
+const GUN_CHAOS_MULTIPLIER = crime.GUN_SEVERITY_RATIO;
+
 function runSecurityPhase(worldState) {
   const events = [];
   const boundApplyKeyModifier = (entityId, family, name, delta, tick) => applyKeyModifier(worldState, entityId, family, name, delta, tick);
@@ -1056,8 +1070,12 @@ function runSecurityPhase(worldState) {
 
     // Does anything actually happen between them today? See
     // AGGRESSION_FLASHPOINT_RATE. Seeded on the pair and the tick, not
-    // on a counter, so the same world replays (§88).
-    const chance = (Number(relationship.conflict) / 100) * AGGRESSION_FLASHPOINT_RATE;
+    // on a counter, so the same world replays (§88). An aggressor who
+    // is actually armed (see GUN_CHAOS_MULTIPLIER above) is that much
+    // more likely to turn today's tension into today's flashpoint.
+    const armed = weapons.isFunctioningFirearm(worldState, relationship.entity_a_id);
+    const chance = (Number(relationship.conflict) / 100) * AGGRESSION_FLASHPOINT_RATE
+      * (armed ? GUN_CHAOS_MULTIPLIER : 1);
     if (seededDraw([
       worldState.seed ?? 'world', 'flashpoint',
       relationship.entity_a_id, relationship.entity_b_id, worldState.tick,
@@ -1591,6 +1609,13 @@ module.exports = {
   // and the row shape.
   recordEvents: runEventPhase,
   advanceTick,
+  // **Exported so GUN_CHAOS_MULTIPLIER's real effect on flashpoint
+  // frequency can be measured on a fixture rather than only inferred
+  // from a full generated world.** Same reasoning as every other phase
+  // export above: the alternative is routing through `advanceTick`'s
+  // other ten phases just to isolate one multiplier's effect on one.
+  runSecurityPhase,
+  GUN_CHAOS_MULTIPLIER,
   // **Exported so the scarcity broadcast/pricing can be tested on a
   // fixture rather than only through a full generated world.** The
   // city-scoping bug this guards — one city's shortage silently

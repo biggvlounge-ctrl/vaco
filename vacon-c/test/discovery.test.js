@@ -53,6 +53,7 @@ const knowledge = require('../server/knowledge.js');
 const items = require('../server/items.js');
 const inventory = require('../server/inventory.js');
 const actions = require('../server/actions.js');
+const weapons = require('../server/weapons.js');
 
 const YEAR = 365;
 
@@ -149,7 +150,10 @@ test('a category the documents give no pool is null, not an empty pool', () => {
   // here" are different facts. `landmarks.js` already drew this line
   // for the same rows and this keeps it.
   assert.equal(discovery.POOLS.prison, null);
-  assert.equal(discovery.POOLS['gun-store'], null);
+  // `gun-store` is no longer one of these — see weapons.js's own
+  // header for why it was closed by direct instruction rather than
+  // left null like the rest.
+  assert.deepEqual(discovery.POOLS['gun-store'], { itemCategories: ['protection'] });
   assert.equal(discovery.POOLS['department-store'], null);
   // And a poolless landmark holds nothing rather than throwing.
   const w = world();
@@ -274,6 +278,59 @@ test('a pool drawing on a category no item belongs to finds nothing, and still c
   const result = discovery.search(w, p.id, 10);
   assert.equal(result.found, null);
   assert.equal(discovery.remainingAt(w, 10), before - 1);
+});
+
+// -- a real civilian gun-store search never leaks a restricted item --
+
+// Many independent landmarks rather than exhausting one property's own
+// capacity: `seededDraw` is keyed on `propertyId` among other things, so
+// 40 distinct properties are 40 independent draws over the same real
+// candidate set -- enough that a name truly in the pool turns up, and
+// one genuinely excluded never does, without relying on exhausting a
+// single place's limited find count.
+function manyFinds(w, p, category, { allowed = true } = {}) {
+  const seen = new Set();
+  for (let i = 0; i < 40; i += 1) {
+    const id = 1000 + i;
+    const place = landmark(w, id, category, 95);
+    if (!allowed) place.city_id = undefined;
+    const found = discovery.search(w, p.id, id, { tick: w.tick + i }).found;
+    if (found) seen.add(found.itemName);
+  }
+  return seen;
+}
+
+test('gun-store never yields machine_gun or the switch at a property with no tracked military capability', () => {
+  const w = world();
+  weapons.registerItems(w);
+  require('../server/salvage.js').registerItems(w);
+  const p = person(w, 1);
+  // No city_id at all on any of these properties -- the honest-absence
+  // case weapons.regionHasTrackedMilitaryCapability's own header names.
+  const seen = manyFinds(w, p, 'gun-store', { allowed: false });
+  assert.ok(!seen.has('machine_gun'), 'machine_gun must never leak into an ordinary civilian search here');
+  assert.ok(!seen.has(weapons.SWITCH_ITEM), 'the switch is never a discovery location, anywhere');
+});
+
+test('gun-store CAN yield machine_gun once availableAt genuinely allows it -- a real government-building in a militarily tracked region', () => {
+  const w = world();
+  weapons.registerItems(w);
+  w.regions = [{ id: 1, country_key: 'russian' }];
+  w.cities = [{ id: 1, region_id: 1 }];
+  const p = person(w, 1);
+  const place = landmark(w, 10, 'government-building', 95);
+  place.city_id = 1;
+  assert.equal(weapons.availableAt(w, 10, 'machine_gun'), true, 'the real chain does allow it here');
+
+  const seen = new Set();
+  for (let i = 0; i < 40; i += 1) {
+    const id = 2000 + i;
+    const gov = landmark(w, id, 'government-building', 95);
+    gov.city_id = 1;
+    const found = discovery.search(w, p.id, id, { tick: w.tick + i }).found;
+    if (found) seen.add(found.itemName);
+  }
+  assert.ok(seen.has('machine_gun'), 'with a real chain allowing it, it must actually be reachable, not filtered out regardless');
 });
 
 test('searching is deterministic for the same world, tick and place', () => {

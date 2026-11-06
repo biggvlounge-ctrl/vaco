@@ -2281,6 +2281,199 @@ just created (the exact bug this guards against) and confirmed
 (`extendedFamilyAdults` doubled, 24 vs. the expected 12) before
 reverting the mutation.
 
+**A fiftieth, closing four real gaps opened in the same round by
+direct instruction: real weapons and finite, era-gated ammunition,
+alt-policing where government does not reach, multi-faction heat, and
+friends/classmates/associates surfaced on demand rather than
+front-loaded.**
+
+**Weapons and ammunition, kept separate on purpose, because the first
+draft of this conflated them and was corrected before it shipped.**
+`server/weapons.js` closes a gap `crime.js` had declared explicitly in
+its own words: "no weapon exists anywhere in the schema... so nothing
+distinguishes an armed offence from an unarmed one." `pistol`/`rifle`
+are remnant-only, same reasoning `items.js` already gives gold ingots
+and cut gems; `machine_gun` is remnant-only AND restricted to a
+`government-building` in a region with a real, tracked
+`countryPacks.militaryExpenditurePctGDP` — global by construction,
+never a US-only ATF/FFL assumption, read through the one real chain
+that already existed from a landmark to a country
+(`properties.city_id` → `cities.region_id` → `regions.country_key` →
+`countryPacks.countryFor`). `zip_gun`, the street-level firearm, lives
+in `salvage.js`'s own `PRODUCTS`/`RECIPES` as a real Tier 2 craftable
+— reusing that machinery rather than duplicating `canMake`/`make` — and
+`weapons.js` only adds its name to the firearm vocabulary.
+`auto_sear_switch` ("a switch") is a real, separate item that turns a
+semi-automatic firearm's fire into `machine_gun`'s burst; it is
+registered so the rest of the engine recognises it by name and
+deliberately placed in no `discovery.js` loot pool at all — a real
+thing this round does not build an acquisition path for, named rather
+than left to look like an oversight. **Missiles and drones are
+explicitly out of scope**, named as a real, deliberate boundary in
+`weapons.js`'s own header rather than a silently missed request —
+both are organisation/military-asset-tier capabilities that do not fit
+the holder/item/quantity/equipped shape everything else here uses, and
+drones specifically fall inside this file's own already-locked
+Transportation deferral.
+
+**A firearm with no held ammunition is a real object that does
+nothing — `isFunctioningFirearm` is equipped AND a held round of its
+own real ammunition, and this is the question `crime.js#recordEscalation`
+now asks instead of a plain `inventory.hasEquippedCategory(...,
+'protection')`, which would have called an equipped `shield` a gun the
+day one existed and would have called an unloaded firearm armed.** An
+unloaded gun falls back to whatever an unarmed offence would classify
+as. `GUN_SEVERITY_RATIO` (`SEVERITY.gun / SEVERITY.violent`, measured
+at ~1.14, not an invented "guns double everything" number) is reused
+twice rather than guessed twice: `tick.js#GUN_CHAOS_MULTIPLIER` scales
+how often an armed aggressor's flashpoint fires, and
+`recordEscalation` scales severity again when a real switch turns the
+burst up. Pinned with a boundary draw rather than a statistical trial
+— the real multiplier is modest enough that a sample average would
+need an impractical number of ticks to separate from noise with
+confidence — a specific, found-not-chosen tick where the real seeded
+draw lands between the unarmed chance and the armed one, so the
+identical pair at the identical tick must flash when armed and must
+not when unarmed (`test/tick-security.test.js`).
+
+**Ammunition is finite from world start and manufacturing is real,
+bounded and gated** — `MANUFACTURING_ERA = 'industrialization'`, the
+first era on `technology.ERA_NAMES` with the industrial capacity a
+cartridge factory needs, and `manufactureAmmunition` reuses the exact
+real-employment-record gate `produce.js#harvest` already established:
+a real `engineer` at a real `business`, one small bounded batch per
+call, never a passive per-tick regen. `discovery.js`'s own
+`'gun-store': null` entry — named in the type union, given no pool,
+same as `landmarks.js` recorded it — is closed to `{ itemCategories:
+['protection'] }`, with `weapons.RESTRICTED_DISCOVERY_NAMES` keeping a
+`machine_gun` or the switch out of an ordinary civilian search even
+though they share that category; `government-building`'s own existing
+pool is the honest substrate for "a military/security installation,"
+since `landmarks.js` has no separate military-base category and none
+is invented here.
+
+**Alt-policing: government does not have to be what polices an area,
+and the real mechanism for the alternative was already half built
+under a different name.** `server/authority.js` already computed a
+real `governed`/`contested`/`lawless` regime per area, and
+`server/justice.js#answerByGroup` already let the real faction holding
+the ground (`authority.holderOf`) make real restitution, expel its
+own, or start a real feud instead of nothing happening where the state
+does not answer. Neither had ever been asked whether a LAWLESS area
+with NO `public_safety` infrastructure at all could ever actually
+reach either of them — and it could not: `policing.investigate` only
+ever marks `cleared` from a `clearanceChance` that is a hard 0 against
+a null `policingCapacity`, and `answerByGroup` only ever runs from
+`runJustice`'s own `incident.cleared === true` filter. A gang holding a
+block with no nearby government station forever could hold that
+ground and never once get the chance group law already gives it. This
+is the fourteenth standing rule's own shape one file over: a threshold
+(clearance) gating a mechanism (group law) sat entirely behind a gate
+(government capacity) that the mechanism exists specifically to answer
+the absence of.
+
+`policing.factionCapacityOf` is the fix, and it adds no new mechanism
+— it gives clearance a second real source. A faction that actually
+holds this ground has its own real capability derived the identical
+way `authority.gripTerm` already rates a hold: the faction's own live
+`organization.power` trait, scaled by the same
+`fortified`/`controlled`/`contested` block-status weights `gripTerm`
+already uses, for the identical reason a fortified gang enforces
+harder than a merely controlled one. `investigate` now reads
+`Math.max(governmentCapacity, factionCapacity)` (treating either
+`null` as absent, not zero) rather than government capacity alone, so
+a case in a lawless area with a strong holding faction can finally be
+cleared and reach `answerByGroup` the way the model always intended.
+**A stated real limitation, not blurred over**: the `TRUST_BELIEF`
+("trust in public safety") this file moves is a belief about the
+STATE's own police, and a faction-only clearance (no government
+infrastructure existed here at all) does not move it — conflating the
+two would be reporting a belief about an institution that had no part
+in the event. Mutation-verified: temporarily removed that gate and
+confirmed a real test caught a faction-only clearance moving state
+trust it had no business moving.
+
+**Multi-faction heat: real, independent per faction, never one
+"wanted" scalar — by direct instruction** ("it could be a heat bar,
+but not just for the police... you could be on a gang's radar").
+`organizations.leader_id REFERENCES entities(id)` means organisations
+and people already share the same `entities(id)` space, so a
+`relationships` row between a person and an organisation-as-entity was
+already structurally valid; `grep -rn "adjustRelationship"
+server/*.js` against "organization" before this round returned
+nothing, so `server/heat.js` is the first thing in this engine to
+actually use that. `relationships.conflict` is the real column reused
+as the heat value — the same column `crime.js`/`tick.js` already read
+as "tension that can escalate" one relationship type over —
+`relationship_type: 'enemy'` is the real, already-enumerated value
+that fits a person a faction now targets, and `HEAT_GAIN` is
+`justice.GROUP_FEUD_GAIN`, the identical real magnitude that file
+already assigns to the victim's own side of the identical event, not a
+second number for it. **The one real trigger is
+`justice.answerByGroup` actually acting** (`acts.length > 0`) — never
+omniscience about every offence that happens inside a faction's own
+territory, a real, stated scope boundary rather than an invented
+detection mechanism. Mutation-verified: temporarily raised heat
+unconditionally, before that gate, and confirmed a real test caught an
+offender gaining heat for an offence the faction had genuinely done
+nothing about.
+
+**Government/police heat is deliberately out of scope, and the reason
+is that the state's own mechanism is already stronger, not missing.**
+`justice.js`'s real chain — `judge` → `imprison` — already resolves a
+governed area's answer immediately and completely: a prosecuted
+offence ends in a real conviction and sentence, not a growing
+suspicion level. A parallel "heat with the government" would either
+duplicate that chain or disagree with it. `heatProfile` is surfaced
+live on both dashboards (`players.js#getCitizenDashboard`,
+`leadership.js#getLeaderDashboard`), same posture every other
+never-stored dashboard field here already has.
+
+**Friends, classmates and associates — real relationships, searched
+for before they are ever front-loaded or generated**, closing the
+worked example given directly: "a cousin in Arkansas isn't 'in effect'
+until the player needs a real distribution contact outside their home
+region — the engine should check for a real existing match first, and
+only generate a new one if none exists." `server/contacts.js#findOrCreateContact`
+reuses the real, already-enumerated `friend|business|educational|
+neighbor|student` values (`VACANCY_POSTGRESQL_SCHEMA.sql`'s own
+comment on `relationships.relationship_type`) — a classmate is
+`educational`/`student`, an associate is `business`/`friend` — rather
+than inventing a vocabulary for them, and real extended family
+(`characterCreation.describeFamilyTree`'s own cousins/aunts-uncles) is
+read as an ordinary candidate pool alongside them, never a special
+case in this file's own logic. Only once nothing real qualifies is a
+brand-new NPC actually generated, placed via the identical real
+cross-world community draw `characterCreation.js#generateAuntOrUncle`
+already uses — never a fixed default community.
+
+**"Outside home region" is honestly scoped to what this engine's real
+geography actually supports, and said so rather than overclaimed.**
+The thirty-ninth standing rule already named the real constraint: this
+engine generates exactly ONE region per world. There is no second real
+region for a generated NPC to live in, so the option is
+`outsideHomeCity` — the one geography grain `worldgen.js` routinely
+generates more than one of — and a world with only one real city
+refuses the request outright rather than silently handing back a
+home-city contact. **A refusal leaves no partial state behind it**:
+the "no other real city" check runs before any NPC is generated, not
+after, a real ordering bug caught by mutation-verifying with a
+`generateNpc` stub that throws if generation is ever reached in that
+case.
+
+`manufacture-ammunition` and `find-contact` are two new `actions.js`
+verbs, both reachable only through the real player dispatcher
+(`POST /api/players/:id/action`) — same posture `direct-mission` and
+`broadcast-message` already have, with no dedicated REST route of
+their own, because nothing besides a player action calls for one.
+Live-verified through that real dispatcher, not just the modules: a
+real generated world where `manufacture-ammunition` is refused with
+the real "industrialization era, not yet reached" reason, and
+`find-contact` generates a real new contact on its first call and
+reuses that identical real contact (`generated: false`) on the second
+— the whole search-before-generate claim, confirmed end to end rather
+than only in a fixture.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

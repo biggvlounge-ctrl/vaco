@@ -139,6 +139,32 @@ relationship with a real, named bonus over a cousin's own baseline
 GET  /api/entities/:id/family-tree            — describeFamilyTree: the same real parents/siblings/cousins shape, looked up live for ANY entity
 ```
 
+**Weapons/ammo, alt-policing, multi-faction heat and real contacts,
+built on direct instruction — see CLAUDE.md's fiftieth standing rule.**
+Two new player verbs, both **deliberately NOT given a dedicated REST
+route**: each is reachable only through the real player dispatcher
+(`POST /api/players/:id/action`), the identical posture
+`direct-mission`/`broadcast-message` already have, because nothing
+besides a player action calls for either one — a player manufactures
+ammunition or finds a contact, a dashboard or an external caller never
+needs to.
+
+```
+POST /api/players/:id/action { "action": "manufacture-ammunition", "ammoName": "pistol_rounds" }
+                                          — weapons.manufactureAmmunition: one bounded batch, era- and occupation-gated
+POST /api/players/:id/action { "action": "find-contact", "relationshipTypes": [...], "outsideHomeCity": true|false }
+                                          — contacts.findOrCreateContact: real search first, generation only once nothing qualifies
+```
+
+Alt-policing (`policing.factionCapacityOf`) and multi-faction heat
+(`heat.js`) are **not separate endpoints at all** — both are real,
+tick-driven mechanics with no player-initiated action of their own.
+Heat is surfaced as a new `heat` field on both existing dashboard
+routes (`GET /api/players/:id/citizen-dashboard`,
+`GET /api/players/:id/leader-dashboard`), the identical posture
+`influenceRating`/`extendedFamily` already have there — read live,
+never stored, never a route of its own.
+
 ## Phase 4 — Digital Planet (ecosystem link-outs, not built here)
 
 **These are outbound link generators, not functional endpoints** —

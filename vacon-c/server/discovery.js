@@ -113,8 +113,10 @@ const POOLS = {
   //: materials", "clothing, fabric, protective gear", "medicine,
   //: medical supplies". `gun-store` and `department-store` appear in
   //: the type union and not in the prose list, so the document gives
-  //: them no pool; `landmarks.js` recorded that with a null and this
-  //: does the same rather than inventing one.
+  //: them no pool; `landmarks.js` recorded that with a null, and this
+  //: file did the same until `gun-store`'s was closed by direct
+  //: instruction rather than invented silently — see `weapons.js`'s
+  //: own header. `department-store` still has none.
   'hardware-store': { itemCategories: ['tools', 'materials'] },
   'clothing-store': { itemCategories: ['clothing', 'textiles', 'protection'] },
   'grocery-store': { itemCategories: ['food'] },
@@ -123,7 +125,12 @@ const POOLS = {
   'electronics-store': { itemCategories: ['tools'], books: ['technology'] },
   'auto-parts-store': { itemCategories: ['repair', 'transport'] },
   bookstore: { books: 'all' },
-  'gun-store': null,
+  // A real civilian stockpile — guns, ammunition, and whatever else
+  // this world has registered under §26's `protection` category.
+  // `weapons.RESTRICTED_DISCOVERY_NAMES` keeps a `machine_gun` or a
+  // real switch out of an ordinary civilian search even though they
+  // share this category — see `search`'s own filter below.
+  'gun-store': { itemCategories: ['protection'] },
   'department-store': null,
 };
 
@@ -256,10 +263,18 @@ function search(worldState, entityId, propertyId, options = {}) {
     const category = categories[
       Math.floor(seeded.seededDraw(['find-cat', tick, propertyId]) * categories.length)
     ];
+    // eslint-disable-next-line global-require
+    const weapons = require('./weapons.js');
     // Against the LIVE catalogue, so a world that registered salvage's
     // materials finds them and one that did not does not — rather than
-    // this file holding a second opinion about what exists.
-    const candidates = items.itemsFor(worldState).filter((i) => i.category === category);
+    // this file holding a second opinion about what exists. A name in
+    // `weapons.RESTRICTED_DISCOVERY_NAMES` (a real switch; a
+    // `machine_gun` outside a military-capable region's
+    // `government-building`) is excluded even though it shares this
+    // category — see `weapons.availableAt`'s own header for why.
+    const candidates = items.itemsFor(worldState).filter((i) => i.category === category
+      && (!weapons.RESTRICTED_DISCOVERY_NAMES.includes(i.name)
+        || weapons.availableAt(worldState, propertyId, i.name)));
     if (candidates.length === 0) {
       // Nothing of that kind exists in this world. Honest, and not an
       // error: the search happened and turned up nothing, which is a
