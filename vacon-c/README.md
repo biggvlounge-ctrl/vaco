@@ -287,6 +287,25 @@ sum) is a second, genuinely separate signal wired into the same
 `safety` need, because it is scoped to the PERSON a faction actually
 acted on rather than their neighbourhood, and is 0 for almost everyone.
 
+## Local-area events
+See `CLAUDE.md`'s own fifty-fourth standing rule for the full design.
+`server/events.js` gives the tick-level `events` log a real geographic
+anchor it never had — the schema's own `events` table has no location
+column at all, so a player could only ever see what named them
+directly via `affected_entity_ids`, never what happened two blocks
+over. `locationOfEvent` derives `community_id`/`city_id` (in-memory
+only, same posture as `city.healthBaseline`) from the real entities an
+event already names — `npcs.communityId`, or an organization's own
+operated property — preferring a real `territoryBlockId` hint when
+`global_effects` carries one, resolved once at the moment of storage so
+a later move never rewrites where an event actually happened. Both
+dashboards gain a `nearbyEvents` field (same real `city` grain
+`heatProfile` already reports on), and `GET /api/events` gains `near`,
+`communityId`, `cityId` and `scope` filters additive to the existing
+`sinceTick` — a call with none of them behaves exactly as before. An
+event naming nobody with a resolvable community, or naming the viewer
+directly from anywhere, is handled honestly rather than guessed.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

@@ -2734,6 +2734,106 @@ dangerByCommunity`'s own `SHRINKAGE_EXPOSURE` already gives the
 identical small-sample problem for a different statistic, a real,
 separate, future gap named here rather than smoothed over.
 
+**A fifty-fourth, closing the gap this file's own sixteenth standing
+rule's spirit names directly — a player could be standing next to real
+chaos and never see it, because the event log only ever showed events
+that named them.** `VACANCY_POSTGRESQL_SCHEMA.sql`'s own `events` table
+has no location column at all, checked directly rather than assumed —
+not even a dormant one, unlike `historical_records.where_location_id`,
+which exists and is hardcoded `null` on every write in `tick.js
+#runHistoryPhase`. So "something happened two blocks over" had no
+substrate to even ask the question from.
+
+**`server/events.js#locationOfEvent` invents no second location
+mechanism — it generalises one that already existed in one file.**
+`crime.js#communityForIncident` already derives a crime incident's
+`community_id` from its victim, falling back to its perpetrator,
+reading the real `npcs.communityId` each carries. This file asks the
+identical question of EVERY candidate event's `affected_entity_ids`
+array, not just crime's two named roles, and adds one more real path
+for the cases a person can't answer: an ORGANIZATION-named event (a
+business founded or closed) resolves through a property that
+organization actually operates (`properties.operating_organization_id`
+→ its own real `community_id`), and a `territory_status_change` event
+prefers its own explicit `territoryBlockId` hint over reaching through
+the faction that holds it, since a faction can hold several blocks in
+several communities at once and the block's own stored `community_id`
+is the more direct fact. `communities.cityId` (set once, at generation,
+by `territory.generateCommunity`) is the one further step from
+community to city. An event naming nobody with any of these — or
+naming only entities with none of them resolvable — stores `{null,
+null}`, the honest absence this registry's own thirtieth standing rule
+already argues for, never a guessed location.
+
+**Resolved once, at the moment of storage, inside `tick.js
+#runEventPhase` — not re-derived later.** An entity's own community can
+move (`migration.js`'s real push/pull), and an event re-asked "where
+did this happen" after that move would answer with wherever the entity
+is NOW, not where the event actually occurred. Mutation-verified: a
+test asserts the stored `community_id` survives an entity's later
+`communityId` change unchanged.
+
+**The read side is `eventsNear`/`eventsIn`, surfaced three ways, and
+the one real design question — what grain counts as "nearby" — was
+answered from what this engine's own geography actually supports, not
+invented.** This engine has no per-property coordinate system real
+enough to support a numeric distance radius; `community` and `city`
+are the two real, available containment tiers `crime.dangerByCommunity`
+and `heat.worstHeat` already report at, so those are the two scopes
+`eventsNear` takes, defaulting to `city` — narrower than "the whole
+world," wider than "the one block," and genuinely the grain this engine
+generates more than one of. An event naming the viewer directly is
+always included regardless of scope, the one guarantee every existing
+caller of `GET /api/events` already relied on and this file does not
+narrow. Both dashboards gain a `nearbyEvents` field, same live-read
+posture as `heatProfile`/`influenceRating` beside it; `GET /api/events`
+gains `near`/`communityId`/`cityId`/`scope` filters additive to the
+existing `sinceTick` — a call using none of them is bit-for-bit the
+same route it was before this round. Mutation-verified: the scope
+filter's own exclusion check was disabled and three tests caught events
+leaking across communities/cities that should have been excluded.
+
+**A smaller, real finding from the same pass, corrected rather than
+left wrong in the map: `VACANCY_API_ENDPOINT_MAP.md`'s own `/api/events`
+line claimed it was "filterable by tick range/severity."** It never
+was — checked directly against `server.js`, which has only ever
+supported `sinceTick`. A citation-is-not-presence mistake in this
+project's OWN map, not a third party's, caught while adding the filters
+the line should have already described.
+
+**Also checked, per the queued claim that "organization-membership
+milestones, ordinary price changes don't fire events at all yet": true,
+and not a dropped-output bug like the eighteenth standing rule's own
+case.** `businesses.js`/`economy.js` both construct and correctly
+return real events (`business_founded`, `business_closed`, `hired`,
+`laid_off`, `payroll_missed`, ...) that DO reach `candidateEvents` and
+DO get stored — the pipeline itself is sound. There simply is no event
+TYPE for an ordinary price change or a membership-count milestone
+anywhere in this engine; nobody ever built one. A real, smaller,
+separate gap, left for its own round rather than folded into this one,
+which was about where an event happened, not which events exist.
+
+**An operational finding about THIS environment, worth recording
+because it cost real time and will cost it again if not written down:
+`node --test`'s default concurrency starves itself in a CPU-constrained
+sandbox.** Running the full suite as `node --test test/*.test.js` (or
+the equivalent bare `node --test`/`npm test`) repeatedly appeared to
+hang at the identical test — always the same ~71st test printed,
+regardless of which files were in the run — because several genuinely
+CPU-bound test files (`authority.test.js`, `businesses.test.js`,
+`construction.test.js` among them) were scheduled to run truly in
+parallel by the test runner's own default concurrency, and this
+sandbox's CPU allocation could not actually run them in parallel
+without each one starving the others, so wall-clock time per file grew
+far past what it costs run alone. It was not a hang, a regression, or a
+deadlock — `--test-concurrency=1` (sequential) finished the entire
+2029-test suite cleanly in about twenty minutes, where the default
+concurrency setting never finished at all across several real attempts.
+Also confirmed this is pre-existing and unrelated to any change in this
+round: reproduces identically on the clean, unmodified tree (`git
+stash` and re-run). Use `--test-concurrency=1` for a full run in this
+environment.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

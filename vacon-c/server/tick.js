@@ -89,6 +89,7 @@ const discovery = require('./discovery.js');
 const knowledge = require('./knowledge.js');
 const snapshots = require('./snapshots.js');
 const weapons = require('./weapons.js');
+const events = require('./events.js');
 const { seededDraw } = require('./seeded.js');
 
 let nextEventId = 1;
@@ -1287,6 +1288,15 @@ function applyConditionStress(worldState, options = {}) {
 function runEventPhase(worldState, candidateEvents) {
   const stored = [];
   for (const candidate of candidateEvents) {
+    // **A real geographic anchor, resolved once, here, at the moment
+    // of storage.** `events.js`'s own header on why this is derived
+    // from the SAME entities the event already names rather than a
+    // second, invented location field — and why it is resolved now
+    // rather than later: an entity's own community can move
+    // (migration) after the event that named them has already
+    // happened, and this event should keep describing where it
+    // actually occurred.
+    const location = events.locationOfEvent(worldState, candidate);
     const event = {
       id: nextEventId++,
       type: candidate.type,
@@ -1295,6 +1305,8 @@ function runEventPhase(worldState, candidateEvents) {
       tick: candidate.tick,
       affected_entity_ids: candidate.affected_entity_ids ?? [],
       global_effects: candidate.global_effects ?? {},
+      community_id: location.communityId,
+      city_id: location.cityId,
     };
     worldState.events.push(event);
     stored.push(event);

@@ -32,6 +32,7 @@ const gifts = require('./gifts.js');
 const influence = require('./influence.js');
 const characterCreation = require('./characterCreation.js');
 const heat = require('./heat.js');
+const localEvents = require('./events.js');
 
 let nextPlayerId = 1;
 
@@ -224,6 +225,15 @@ function getCitizenDashboard(worldState, playerId) {
     })(),
     recentMemories,
     recentEvents,
+    // **Everything that happened nearby, not just to them.**
+    // `recentEvents` above only ever showed what `affected_entity_ids`
+    // already named this citizen in — chaos two blocks over (a feud,
+    // a territory flip, a business closing) was invisible to anyone
+    // not personally in it. `events.js#eventsNear`'s own header on
+    // why "city" is the real, available geographic grain rather than
+    // an invented distance metric, and on the honest `[]` a homeless
+    // citizen (no resolvable `communityId`) gets instead of a guess.
+    nearbyEvents: localEvents.eventsNear(worldState, npcId, { scope: 'city', limit: 10 }),
     migrationRisk,
   };
 }

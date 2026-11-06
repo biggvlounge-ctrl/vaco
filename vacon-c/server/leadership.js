@@ -95,6 +95,7 @@ const media = require('./media.js');
 const influence = require('./influence.js');
 const characterCreation = require('./characterCreation.js');
 const heat = require('./heat.js');
+const localEvents = require('./events.js');
 const { seededDraw } = require('./seeded.js');
 
 function clamp01(x) {
@@ -215,6 +216,11 @@ function getLeaderDashboard(worldState, playerId) {
     influenceRating: influence.influenceRatingOf(worldState, entityId),
     extendedFamily: characterCreation.describeFamilyTree(worldState, entityId),
     heat: heat.heatProfile(worldState, entityId),
+    // Same field, same real grain, as `players.js#getCitizenDashboard`
+    // — a leader needs to see what's happening nearby as much as a
+    // citizen does, and `events.js#eventsNear`'s own header on why
+    // "city" is the real available grain rather than an invented one.
+    nearbyEvents: localEvents.eventsNear(worldState, entityId, { scope: 'city', limit: 10 }),
     organizations,
   };
 }

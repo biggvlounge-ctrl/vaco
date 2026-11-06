@@ -59,7 +59,7 @@ GET  /api/factions/:id/territory          — territory_blocks controlled by thi
 GET  /api/economy/snapshot                — current economy_snapshots for a given entity/tier
 POST /api/economy/tick                    — resolve one Economy phase (called internally by /api/tick, exposed for testing)
 
-GET  /api/events                          — recent events, filterable by tick range/severity
+GET  /api/events                          — recent events; filterable by tick range (`sinceTick`), by an entity's own real community/city (`near=<entityId>`, with `scope=community|city`, default `city`), or by an explicit `communityId`/`cityId` — not by severity, despite this line's prior claim (checked directly against `server.js`, never supported)
 GET  /api/artifacts                       — list artifacts
 GET  /api/missions                        — list missions, filterable by status
 ```

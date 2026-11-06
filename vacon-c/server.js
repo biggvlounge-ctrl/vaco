@@ -181,6 +181,7 @@ const keys = require('./server/keys.js');
 const worldStore = require('./server/worldStore.js');
 const orgArchetypes = require('./server/orgArchetypes.js');
 const decisions = require('./server/decisions.js');
+const localEvents = require('./server/events.js');
 
 // The seven, by the id the API map uses in POST /api/keys/:keyId/resolve.
 const KEY_RESOLVERS = {
@@ -1482,11 +1483,36 @@ app.get('/api/decision-log/:entityId', (req, res) => {
 
 // -- events and missions ----------------------------------------------------
 
+// **`near`/`communityId`/`cityId` are additive filters, not a second
+// route** — `sinceTick` alone keeps its exact prior behavior
+// (`VACANCY_API_ENDPOINT_MAP.md`'s own contract on existing endpoints).
+// `near=<entityId>` resolves that entity's own real community/city the
+// identical way `players.js#getCitizenDashboard`'s `nearbyEvents`
+// field does (`events.js#eventsNear`) and always includes events
+// naming that entity directly, regardless of scope. `communityId`/
+// `cityId` go straight to `events.js#eventsIn` for a caller that
+// already knows the area rather than an entity.
 app.get('/api/events', (req, res) => {
-  const { sinceTick } = req.query;
-  const events = sinceTick
-    ? engine.WorldState.events.filter((e) => e.tick >= Number(sinceTick))
-    : engine.WorldState.events;
+  const { sinceTick, near, communityId, cityId, scope } = req.query;
+  let events;
+  if (near !== undefined) {
+    events = localEvents.eventsNear(engine.WorldState, Number(near), {
+      scope: scope === 'community' ? 'community' : 'city',
+      sinceTick: sinceTick === undefined ? null : Number(sinceTick),
+      limit: Infinity,
+    });
+  } else if (communityId !== undefined || cityId !== undefined) {
+    events = localEvents.eventsIn(engine.WorldState, {
+      communityId: communityId === undefined ? null : Number(communityId),
+      cityId: cityId === undefined ? null : Number(cityId),
+      sinceTick: sinceTick === undefined ? null : Number(sinceTick),
+      limit: Infinity,
+    });
+  } else {
+    events = sinceTick
+      ? engine.WorldState.events.filter((e) => e.tick >= Number(sinceTick))
+      : engine.WorldState.events;
+  }
   res.json({ events, total: events.length });
 });
 
