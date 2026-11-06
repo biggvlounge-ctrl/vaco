@@ -316,6 +316,62 @@ test('a sentence ends, and what they come out to is the point', () => {
   assert.ok(w.historicalRecords.some((r) => r.event_type === 'release'));
 });
 
+test('a conviction with no real prison in its city stays placeless, as before', () => {
+  const w = courtWorld();
+  justice.runJustice(w, { tick: 10 });
+  const [caseRow] = w.courtCases;
+  assert.equal(caseRow.prison_property_id, null);
+  const conviction = w.historicalRecords.find((r) => r.event_type === 'conviction');
+  assert.equal(conviction.where_location_id, null);
+});
+
+test('a conviction points at the real prison standing in the same city', () => {
+  const w = courtWorld();
+  w.properties.push({ id: 200, city_id: 9, landmark_category: 'prison', name: 'Riverside Correctional' });
+  justice.runJustice(w, { tick: 10 });
+
+  const [caseRow] = w.courtCases;
+  assert.equal(caseRow.prison_property_id, 200);
+  const conviction = w.historicalRecords.find((r) => r.event_type === 'conviction');
+  assert.equal(conviction.where_location_id, 200);
+  assert.match(conviction.description, /Riverside Correctional/);
+});
+
+test('a prison in a DIFFERENT city is never used — proximity is real, not assumed', () => {
+  const w = courtWorld();
+  w.properties.push({ id: 201, city_id: 999, landmark_category: 'prison', name: 'Out-of-Town Pen' });
+  justice.runJustice(w, { tick: 10 });
+
+  const [caseRow] = w.courtCases;
+  assert.equal(caseRow.prison_property_id, null, 'a prison in another city was used anyway');
+  const conviction = w.historicalRecords.find((r) => r.event_type === 'conviction');
+  assert.equal(conviction.where_location_id, null);
+});
+
+test('prisonFor is deterministic — the lowest real id wins, not a draw', () => {
+  const w = courtWorld();
+  w.properties.push(
+    { id: 300, city_id: 9, landmark_category: 'prison', name: 'Second Built' },
+    { id: 150, city_id: 9, landmark_category: 'prison', name: 'First Built' },
+  );
+  const first = justice.prisonFor(w, 9);
+  assert.equal(first.id, 150);
+  // Called again, same real world, same answer — nothing here is a seeded draw.
+  assert.equal(justice.prisonFor(w, 9).id, 150);
+});
+
+test('a real prison is named in the release record it corresponds to', () => {
+  const w = courtWorld();
+  w.properties.push({ id: 200, city_id: 9, landmark_category: 'prison', name: 'Riverside Correctional' });
+  justice.runJustice(w, { tick: 10 });
+  const sentence = justice.SENTENCE_TICKS.theft;
+  justice.runJustice(w, { tick: 10 + sentence });
+
+  const release = w.historicalRecords.find((r) => r.event_type === 'release');
+  assert.equal(release.where_location_id, 200);
+  assert.match(release.description, /Riverside Correctional/);
+});
+
 test('one incident, one case, however many ticks run', () => {
   // **Standing rule 7.** A pass over the whole history every tick would
   // re-charge everybody every tick forever.

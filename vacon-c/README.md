@@ -306,6 +306,26 @@ dashboards gain a `nearbyEvents` field (same real `city` grain
 event naming nobody with a resolvable community, or naming the viewer
 directly from anywhere, is handled honestly rather than guessed.
 
+## Prison institution system
+See `CLAUDE.md`'s own fifty-fifth standing rule. The premise this
+round was asked to fix — "`property.js` has no prison type" — was
+checked directly and found stale: `landmarks.js`'s real `prison` Key
+category, its real NRHP/Overture-imported location data, and its real
+`officer` staffing at generation were all already wired and running.
+The real gap was one system over: `justice.js#imprison`/`release`
+wrote `where_location_id: null` on every conviction and release,
+unconditionally, because nothing connected a sentence to an actual
+place. `justice.prisonFor(worldState, cityId)` finds the real prison
+standing in the same city `judge` already recorded on the case —
+deterministic (lowest real id), never a seeded draw, because the city
+is already decided and a real prison either stands there or does not.
+A city with no real prison keeps exactly the behaviour it always had.
+Prison capacity stays exactly as excluded as this file's own header
+already declared it — not reopened, and a real reason checked and
+written down for why it stays that way (HIFLD's real `prisons`
+capacity would currently land in the same bucket as police capacity,
+in incompatible units).
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

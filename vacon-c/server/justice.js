@@ -113,6 +113,48 @@
 // parole.** All of them need an evidence model, and this engine records
 // ground truth: `crime_incidents.perpetrator_entity_id` is who did it,
 // not who somebody believes did it. See `judge`.
+//
+// ---------------------------------------------------------------------
+// §7 Prison, closed one level further: WHERE, not how many cells
+// ---------------------------------------------------------------------
+// The capacity exclusion above still stands, unchanged — nothing here
+// adds a number a cell can overflow. What was still missing is
+// narrower and was never excluded on purpose: `imprison` changed a
+// person's status and wrote `where_location_id: null` on their own
+// conviction record, every time, because nothing connected a sentence
+// to an actual place. `server/landmarks.js` has carried a real
+// `prison` Key category since before this file existed — real
+// significance band, `propertyType: 'government'`, staffed with a
+// real `officer` at generation exactly like every other hero-tier
+// building — and `world-layer/exportRegion.js`'s own `KEY_CATEGORIES`
+// already lists it, so a real NRHP/Overture-imported prison already
+// lands on a real `properties` row with `landmark_category ===
+// 'prison'` wherever a region pack supplies one, with an invented one
+// filling the gap exactly like every other Key category does when it
+// doesn't. **That whole pipeline was already real and already
+// running** — checked directly, not assumed, before writing a single
+// line here — so the fix below is the one real wire it was missing: a
+// sentenced person's own `city_id`, which `judge` already records on
+// every case, is enough to find the real prison standing in that same
+// city and point the conviction at it.
+//
+// `prisonFor` is deliberately deterministic (lowest `id` among a
+// city's real prisons), never a seeded draw — a sentence is a single
+// real event with a single real city already decided by `judge`, and
+// a real city either has a real prison standing in it or it does not;
+// there is nothing here for randomness to decide. A city with none
+// keeps today's behaviour exactly: `where_location_id: null`, an
+// honest absence rather than an invented building.
+//
+// `caseRow.prison_property_id` is new and, like `community.
+// fertilityRates`/`city.healthBaseline` before it, in-memory only —
+// `court_cases` is a real table `migrate.js`/`restore.js` already
+// round-trip, and adding a column to it is real, separate schema work
+// this round does not take on. A world rebuilt from Postgres loses
+// the reference and falls back to the same `null` a world with no
+// prison in that city already gets — not a silent loss, the same
+// declared, known-limitation posture every other in-memory-only field
+// in this registry already carries.
 
 'use strict';
 
@@ -301,6 +343,18 @@ function judge(worldState, options = {}) {
   return row;
 }
 
+// The real prison standing in a city, or null for an honest absence.
+// Deterministic (lowest real `id`) rather than seeded — see the header
+// note on why a draw has nothing to decide here.
+function prisonFor(worldState, cityId) {
+  if (cityId === null || cityId === undefined) return null;
+  const candidates = (worldState.properties || []).filter(
+    (p) => p.landmark_category === 'prison' && p.city_id === cityId,
+  );
+  if (candidates.length === 0) return null;
+  return candidates.reduce((lowest, p) => (p.id < lowest.id ? p : lowest));
+}
+
 // Put somebody inside, and take away what being inside takes away.
 //
 // **The consequences are the system.** A status field nothing reads is
@@ -312,6 +366,12 @@ function imprison(worldState, caseRow, options = {}) {
   if (!npc) return null;
 
   npc.status = 'imprisoned';
+
+  // **Where, not just that.** A real prison in the same city the
+  // offence and conviction already happened in — see the header note
+  // above. `null` when this city has none, same as always.
+  const prison = prisonFor(worldState, caseRow.city_id);
+  caseRow.prison_property_id = prison?.id ?? null;
 
   // 1. The job is gone. `economy.js` reads `status === 'active'` to
   //    decide who is employed, and `motivation.SATISFIERS.income` reads
@@ -347,10 +407,16 @@ function imprison(worldState, caseRow, options = {}) {
   //    on the person.
   worldStore.addHistoricalRecord(worldState, {
     event_type: 'conviction',
-    description: `convicted of ${caseRow.category} under law ${caseRow.law_id}`,
+    description: prison
+      ? `convicted of ${caseRow.category} under law ${caseRow.law_id}, sent to ${prison.name}`
+      : `convicted of ${caseRow.category} under law ${caseRow.law_id}`,
     when_tick: tick,
     participants: [npc.id],
-    where_location_id: null,
+    // **The FK `properties` was added for, one system over from
+    // `landmarks.designate`'s own use of it.** A real prison in this
+    // case's own city; `null` for a city with none, same as before
+    // this change — never a placeholder building invented to fill it.
+    where_location_id: prison?.id ?? null,
   });
 
   // 4. And they remember it.
@@ -387,12 +453,20 @@ function release(worldState, entityId, options = {}) {
   // rather than a penalty applied on top.
   behavior.seedRoutine(worldState, entityId, { tick });
 
+  // Same real prison the conviction pointed at, if any — the release
+  // is leaving the place the sentence actually named, not a second,
+  // independently-decided location.
+  const prison = (worldState.properties || []).find(
+    (p) => p.id === caseRow.prison_property_id,
+  ) ?? null;
   worldStore.addHistoricalRecord(worldState, {
     event_type: 'release',
-    description: `released after ${caseRow.sentence_ticks} ticks for ${caseRow.category}`,
+    description: prison
+      ? `released from ${prison.name} after ${caseRow.sentence_ticks} ticks for ${caseRow.category}`
+      : `released after ${caseRow.sentence_ticks} ticks for ${caseRow.category}`,
     when_tick: tick,
     participants: [entityId],
-    where_location_id: null,
+    where_location_id: prison?.id ?? null,
   });
 
   return caseRow;
@@ -811,6 +885,7 @@ module.exports = {
   servingCase,
   lawCovering,
   judge,
+  prisonFor,
   imprison,
   release,
   runJustice,

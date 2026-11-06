@@ -2834,6 +2834,102 @@ round: reproduces identically on the clean, unmodified tree (`git
 stash` and re-run). Use `--test-concurrency=1` for a full run in this
 environment.
 
+**A fifty-fifth, and the premise it was asked to fix turned out to be
+stale — the real gap was one system over from where it was pointed.**
+
+**"`property.js` has no `prison` type" was checked directly and found
+false before a line was written.** `server/landmarks.js` has carried a
+real `prison` Key category since before this round — real significance
+band, `propertyType: 'government'`, staffed with a real `officer` at
+generation exactly like every other hero-tier building — and
+`world-layer/exportRegion.js`'s own `KEY_CATEGORIES` already lists it,
+so a real NRHP/Overture-imported prison already lands on a real
+`properties` row wherever a region pack supplies one, with an invented
+one filling the gap exactly like every other Key category does when it
+doesn't. That whole pipeline — generation, staffing, real-data import —
+was already running. Building a second property type for a landmark
+category that already exists and already works would have been the
+third standing rule's mistake with a new name.
+
+**The real gap was narrower and had already been written down.**
+`server/justice.js`'s own header carries three quotes from
+`urbanSystems.js` naming "§7 Prison is absent" because `imprisoned` had
+nowhere to point, and `imprison` closed the STATUS half of that months
+ago — `npcs.status = 'imprisoned'`, real — while leaving
+`where_location_id: null` on every conviction's own historical record,
+unconditionally, forever. A sentence changed what somebody was; it
+never said where. `justice.prisonFor(worldState, cityId)` is the fix:
+the real prison standing in the SAME city `judge` already recorded on
+the case (`caseRow.city_id`, set from the incident's own community weeks
+before this round), found deterministically (lowest real `id` — see
+below for why this is not a seeded draw) rather than searched city-blind.
+`imprison` and `release` both now point their historical record's
+`where_location_id` at it, and name it in the record's own description,
+when one exists; a city with no real prison keeps exactly the behaviour
+it already had, `null`, an honest absence rather than an invented
+building.
+
+**Deterministic on purpose, not a missing seed.** Every other draw in
+this registry that picks among several real candidates is a seeded
+draw, because the thing being decided is genuinely uncertain. This is
+not one of those: `judge` has already decided the one real city a
+conviction happened in, and a city either has a real prison standing in
+it or it does not. There is nothing left for randomness to resolve, and
+reaching for `seededDraw` here would have been inventing a coin flip
+over a question the world has already answered.
+
+**Warden/staffing needed no new code, and that absence is itself the
+finding — the forty-second standing rule's shape, one round later.**
+`landmarks.js#KEY_BUILDING_TYPES.prison.staff` has always been
+`'officer'`, and every hero-tier building is staffed at generation, not
+on request — so a generated prison already has a real `officer` working
+there before this round touched anything. A "warden" occupation was
+asked about in the conversation that queued this work and was not
+built, because the honest answer, checked rather than assumed, is that
+the role this engine can actually represent already exists under a name
+it already uses elsewhere.
+
+**Prison capacity stays exactly as excluded as it already was — this
+round did not re-open that question, because it was never this round's
+to re-open.** `justice.js`'s own header has said, since before this
+round, that `infrastructure.INFRASTRUCTURE_TYPES` is a fixed ten and
+none of them is a prison, so nothing in this engine can overflow, queue,
+or release early for want of a cell, and that the document naming real
+capacity figures is not in this repository. That stays true. Checked
+separately while scoping this round: `world-layer/imports/
+hifldImport.js`'s own real `prisons` facility entry (a real `capacity`
+field, unit `inmates`) would land in `infrastructurePacks.js`'s single
+`public_safety` bucket alongside police and sheriff facilities whose
+own capacity (officers, not inmates) means something else entirely —
+wiring it in now would silently blend two incompatible units into one
+number, which is a worse mistake than the honest absence this file
+already declares. Closing that for real is a structural change to how
+`infrastructurePacks.js` groups facilities, not a line added here.
+
+**`caseRow.prison_property_id` is new and in-memory only, the same
+documented posture `community.fertilityRates`/`city.healthBaseline`
+already carry and for the identical reason.** `court_cases` is a real
+table `migrate.js`/`restore.js` already round-trip; adding a column to
+it is real, separate schema work this round does not take on. A world
+rebuilt from Postgres falls back to the same `null` a city with no real
+prison already produces — not a silent loss, the same known, stated
+limitation every other in-memory-only field in this registry already
+carries.
+
+**Mutation-verified the one check that actually matters here**: with
+the city-scoping condition in `prisonFor` removed, a real prison
+standing in a different city was used anyway, and the test asserting a
+prison never crosses city lines caught it immediately; reverted, the
+full suite returned to green. Live-verified on a real generated world
+(two cities, `worldgen.generateWorld`): a real `prison` landmark
+generated in city 1, a real resident convicted of theft under a real
+enacted law, `imprison` called directly — `caseRow.prison_property_id`
+and the conviction's `where_location_id` both pointed at the real
+prison's own id, and its name appeared in the record's own description.
+Full suite on the merged tree, after rebasing onto the local-area
+events round above: 2034 tests, 2017 pass, 0 fail, 17 skipped — this
+file's own 5 new tests included, zero regressions from either round.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and
