@@ -23,8 +23,21 @@ goes, whether it has already been filed, and what is actually coded.
 
 ## Part 1 — The filing form
 
-**Every file lands in exactly one of eighteen homes. There is no
-nineteenth.**
+**Every file lands in exactly one of nineteen homes. There is no
+twentieth.**
+
+**The nineteenth, VDEX, is a deliberate exception to "no nineteenth"
+— not a quiet bend of the rule.** Every home through #18 was filed
+because it already had running code occupying real ground; VDEX is
+the first home opened for a platform that did not exist yet anywhere
+in this repo, on direct instruction, because its own scope (nationwide
+property acquisition, foreclosure intelligence, development
+underwriting) is a standalone-platform scale — the same scale as
+VACON-C, VAGO, VDP, VOID, VOKEN — not a satellite feature like DREAMS/
+VENVM/YAP, which file under a parent precisely because they are not
+that scale. Recorded here, at the moment the exception was made,
+rather than left for whoever reads this table next to wonder whether
+"no twentieth" means anything.
 
 | # | Home | Directory | Holds |
 |---|---|---|---|
@@ -46,6 +59,7 @@ nineteenth.**
 | 16 | Vvltvre | `vulture-music/` | + `-flix`, `-pods`, `-studios`, `venvm` |
 | 17 | **VACON** | `vacon/` | The operating network + `shield`, `vaco-analytics` |
 | 18 | **VACO Shell** | `vaco-shell/` | Launcher, registry, session host |
+| 19 | **VDEX** | `vdex/` | Nationwide property acquisition, foreclosure intelligence, development underwriting, deal exchange — new, opened 11 Nov 2026 |
 
 **Sub-apps do not get their own home.** They file under their parent.
 VENVM files under Vvltvre. DREAMS files under HVNTZ. YAP files under
@@ -92,7 +106,7 @@ later mistaking a cost table for a build spec.
 
 A file is complete when it has:
 
-1. A home under one of the eighteen.
+1. A home under one of the nineteen.
 2. An **Implementation status** section stating what is actually built,
    verified against code — not against another document.
 3. Its unbuilt items named specifically enough to act on.
@@ -129,8 +143,10 @@ and route counts are from source.
 
 **Totals: 239 modules, ~700 routes, 24 apps persisting to disk.**
 
-**Every one of the eighteen has running code.** None are empty. The
-thinnest is VACAY.
+**Every one of the first eighteen has running code.** None are empty.
+The thinnest is VACAY. VDEX (#19, opened 11 Nov 2026) does not yet —
+it is new, and this table gets a real row once there is real code to
+boot and count, not before.
 
 Per-app ports, volumes, and the deployment chain: see
 `dev-docs/DEPLOYMENT_INVENTORY.md`. Directory dispositions and the

@@ -201,6 +201,7 @@ APPS=(
   # whole array, comments included, and a stray pair would be read as
   # a malformed entry (that mistake is exactly why this note exists).
   "vdp-server:vdp:node server.cjs:8827:/api/health"
+  "vdex:vdex:node server.js:8829:/api/health"
 )
 
 if [ "$WITH_MOCK" = "1" ]; then
