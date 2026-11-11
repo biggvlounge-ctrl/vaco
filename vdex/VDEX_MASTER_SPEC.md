@@ -23,7 +23,7 @@ spec is genuine new engineering, filed as such.
 | 7. Assembly/geospatial | Parcel mapping, multi-parcel projects | Not started |
 | 8. VACAY connection | Listing sync adapter | Not started — real target confirmed to exist (`vacay/` Home section) |
 | 9. DREAMS connection | Distribution adapter | Not started — real target confirmed to exist (`dreams/`, filed under HVNTZ) |
-| 10. VULCAN/VACA/VASH/VCoin/VOKEN | Per-service adapters | **VULCAN does not exist anywhere in this account's repos** — that adapter cannot be built against a real service yet. VACA/VASH/VOKEN are real; adapters not started |
+| 10. VACA/VASH/VCoin/VOKEN | Per-service adapters | **VULCAN is disregarded** — per direct correction, it was a mistaken reference and VOKEN is the real entity for tokenization/credentials/trust. VACA/VASH/VCoin/VOKEN are real; adapters not started |
 | 11. VACO/VACON platform | Shared auth/permissions/events | Not started — real substrate confirmed (`shared/serviceAuth.js`) |
 | 12. AI/automation | Research, scoring, alerts | Not started |
 | 13. Supporting marketplaces | Contractors, vendors, PM | Not started |
@@ -42,7 +42,7 @@ spec is genuine new engineering, filed as such.
 ## What needed correcting, found rather than assumed
 
 - **"Continue from the existing VDEX 0.3.24 codebase"** — no such codebase exists anywhere this session can reach (checked: this repo, every other repo on the account). Treated as a genuine greenfield build.
-- **VULCAN "approved tokenization infrastructure"** — does not exist in this repo or account. Any tokenization adapter is necessarily `UNVERIFIED` and stays that way until a real VULCAN exists to verify against.
+- **VULCAN "approved tokenization infrastructure"** — disregarded entirely per direct correction (it was a mistaken reference; VOKEN is the real entity for this role, not a second, separate service). No VULCAN adapter exists or is planned.
 - **"Same constellation as VACAY and VOID"** — revised on direct follow-up instruction to a new, standalone 19th home in `VACO.md`, with Vex (`vex-trading/`) as the closer functional sibling by actual deal-evaluation shape.
 
 ## The full original instruction (reproduced verbatim, for the record)

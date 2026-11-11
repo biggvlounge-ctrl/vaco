@@ -21,10 +21,14 @@ applies to Cvltvre Cards and futures research, here applied to real
 property instead. The real downstream connection is VACAY's own
 `Home` section (`vacay/`), which already runs a Zillow-style
 listings model (agents pay for leads) — a disposed/developed VDEX
-property is meant to surface there, not be re-built there. VULCAN
-(the tokenization infrastructure VDEX's own spec names as a
-dependency) does not exist anywhere in this repo yet — that
-integration stays `UNVERIFIED`/not-yet-buildable until it does.
+property is meant to surface there, not be re-built there.
+
+**VULCAN is disregarded — per direct correction, it was a mistaken
+reference and VOKEN is the real entity.** Every integration this app
+needs for tokenization/credentials/trust goes through `voken/`, which
+is real and already exists in this repo (`VACO.md` home #12). No
+VULCAN adapter is built, planned, or referenced anywhere in this app
+going forward.
 
 **Source doc**: `VDEX_MASTER_SPEC.md` — the full instruction this app
 was opened from, filed with a real implementation-status section per
