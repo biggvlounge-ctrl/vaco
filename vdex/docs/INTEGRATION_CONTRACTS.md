@@ -11,11 +11,10 @@ The current runtime exposes `GET /api/integrations` as a readiness inventory. It
 |---|---|---|
 | VACAY | Authorized listing discovery, seller/owner workflow handoffs, leads, inquiries, viewing requests and transaction handoffs | VACAY owns its marketplace listings and workflows; VDEX remains separate |
 | DREAMS Network | Approved project distribution, discovery and referral handoffs | DREAMS owns its distribution and community surfaces; publication requires human approval |
-| VULCAN | Approved tokenization request and status | VULCAN owns tokenization and issuance; VDEX does not create tokens or securities offerings |
 | VACA | Person and organization verification requests/results | VACA owns identity and verification |
 | VASH | Financing referral and permitted status | VASH owns financial products, eligibility and underwriting |
 | VCoin | Authorized settlement request/reference and status | VCoin owns balances, ledger and settlement |
-| VOKEN | Supported credential/trust references | VOKEN owns supported credential/trust records |
+| VOKEN | Supported credential/trust references, plus approved tokenization request and status (corrected -- "VULCAN" was a mistaken reference to a separate service; VOKEN is the real, sole entity for both roles) | VOKEN owns supported credential/trust records and owns tokenization and issuance under its own VDAS standard; VDEX does not create tokens or securities offerings |
 | VACO / VACON | App registration, account context and approved orchestration | VACO/VACON own platform identity context and orchestration |
 | VOID | Approved cross-app discovery and service referrals | VOID remains separate; only approved and rights-cleared records are shared |
 
@@ -61,4 +60,4 @@ The example is a schema illustration, not a real event, live API route, provider
 
 ## Next implementation gate
 
-The next code increment should implement a transactional outbox and event delivery worker only after the production PostgreSQL repository/transaction boundary is available. Do not implement a JSON-file outbox as if it were safe for multi-process delivery. In parallel, obtain the actual VACAY, DREAMS and VULCAN service contracts and sandbox credentials; those three are the primary product workflow connections requested for VDEX.
+The next code increment should implement a transactional outbox and event delivery worker only after the production PostgreSQL repository/transaction boundary is available. Do not implement a JSON-file outbox as if it were safe for multi-process delivery. In parallel, obtain the actual VACAY, DREAMS and VOKEN service contracts and sandbox credentials; those three are the primary product workflow connections requested for VDEX (VOKEN covers the tokenization role an earlier "VULCAN" reference mistakenly assigned to a nonexistent separate service).

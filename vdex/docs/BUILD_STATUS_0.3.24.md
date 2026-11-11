@@ -1,7 +1,7 @@
 # VDEX Build Status 0.3.24
 
 ## Implemented
-- Contract-first integration registry for VACAY, DREAMS Network, VULCAN, VACA, VASH, VCoin, VOKEN, VACO/VACON and VOID.
+- Contract-first integration registry for VACAY, DREAMS Network, VACA, VASH, VCoin, VOKEN, VACO/VACON and VOID (eight services -- corrected post-0.3.24: an earlier "VULCAN" entry was a mistaken reference and has been folded into VOKEN, the real, sole entity for tokenization/credentials/trust).
 - Each service has a purpose, capability scope, required environment configuration and explicit anti-duplication / approval boundaries.
 - `GET /api/integrations` returns readiness without exposing secret values.
 - HTTPS endpoint validation; configured endpoints remain `configured_unverified`. No registry entry can report a live connection.

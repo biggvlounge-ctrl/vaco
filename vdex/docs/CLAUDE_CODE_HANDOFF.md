@@ -291,14 +291,14 @@ Connect trusted identity-provider claims to active organization memberships, add
 ## Implemented in 0.3.23 — completeness audit and integration scope
 - Added `docs/CLAUDE_CODE_START_HERE.md` and `docs/VDEX_COMPLETENESS_AUDIT_0.3.23.md`.
 - The audit inventories all modules actually present, all catalog-only data sources, and the major unimplemented product pillars.
-- Binding architecture decisions: VDEX remains independent and grouped with VACAY/VOID; VACAY listing/workflow integration, DREAMS Network attachment and VULCAN tokenization handoff are required but not connected. Reuse VACA/VASH/VCoin/VOKEN/VACO/VACON through real contracts. VEX trading remains separate.
+- Binding architecture decisions: VDEX remains independent and grouped with VACAY/VOID; VACAY listing/workflow integration, DREAMS Network attachment and VULCAN tokenization handoff are required but not connected. Reuse VACA/VASH/VCoin/VOKEN/VACO/VACON through real contracts. VEX trading remains separate. **[Corrected 11 Nov 2026: "VULCAN" was a mistaken reference to a separate service that does not exist. VOKEN is the real, sole entity for tokenization/credentials/trust -- see the 0.3.24 registry entry below, now merged.]**
 - B. VXLA is preserved as an exact project name; role/permissions require owner confirmation.
 - Historical VACO DEX rename and VASH fundraising references are explicitly subordinate to current VDEX scope.
 - No new provider connection or production feature is claimed in this documentation-only increment.
 
 
 ## Implemented in 0.3.24 — contract-first ecosystem integration registry
-- Added `backend/ecosystem-integrations.js` with explicit service boundaries, purposes, capability scopes and required configuration fields for VACAY, DREAMS Network, VULCAN, VACA, VASH, VCoin, VOKEN, VACO/VACON and VOID.
+- Added `backend/ecosystem-integrations.js` with explicit service boundaries, purposes, capability scopes and required configuration fields for VACAY, DREAMS Network, VULCAN, VACA, VASH, VCoin, VOKEN, VACO/VACON and VOID. **[Corrected 11 Nov 2026: "VULCAN" was a mistaken reference; its tokenization capability is now part of VOKEN's own registry entry, bringing the real count to eight services, not nine.]**
 - Added `GET /api/integrations`; authenticated mode requires `properties:read`. The endpoint reports `not_configured`, `configuration_invalid` or `configured_unverified`; it always reports `liveConnectionVerified:false` because no provider health check or outbound call exists yet.
 - Configuration uses endpoint, contract identifier and opaque credential-reference environment variables. Secret values are not accepted or stored by this registry. HTTPS is required.
 - Added automated module and API tests. This is an integration readiness registry and contract boundary, not a live connector.

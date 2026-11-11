@@ -1,5 +1,7 @@
 # VDEX 0.3.23 build status
 
+**Correction, 11 Nov 2026 (kept as a forward note, not a rewrite of this historical snapshot):** the "VULCAN" reference below was a mistaken name for a separate service that does not exist. VOKEN is the real, sole entity for tokenization/credentials/trust. See `docs/RECONCILIATION_11_NOV_2026.md` for the current, verified state.
+
 ## Purpose
 Documentation and handoff completeness release. This update does not claim new live provider integrations or production functionality.
 

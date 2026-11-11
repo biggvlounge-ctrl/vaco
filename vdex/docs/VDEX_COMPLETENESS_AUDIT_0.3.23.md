@@ -1,5 +1,7 @@
 # VDEX Completeness Audit — 0.3.23
 
+**Correction, 11 Nov 2026 (kept as a forward note, not a rewrite of this historical snapshot):** every "VULCAN" reference below was a mistaken name for a separate service that does not exist. VOKEN is the real, sole entity for tokenization/credentials/trust -- its capability now covers both roles in the live registry (`backend/ecosystem-integrations.js`), bringing the real service count to eight, not nine. See `docs/RECONCILIATION_11_NOV_2026.md` for the current, verified state.
+
 **Purpose:** authoritative inventory of what is in this pre-Claude package, what is only described/cataloged, what is partially implemented, and what remains to complete. This audit prevents Claude Code from treating roadmap text, sample data, source catalogs, or test fixtures as live integrations.
 
 ## 1. Product identity and architecture — binding decisions

@@ -5,10 +5,11 @@ const {INTEGRATIONS,integrationStatus,listIntegrations,integrationSummary}=requi
 
 test('integration registry covers required Vertical Vision services without merging app boundaries',()=>{
  const keys=new Set(INTEGRATIONS.map(x=>x.key));
- for(const key of ['vacay','dreams_network','vulcan','vaca','vash','vcoin','voken','vacon','void'])assert.ok(keys.has(key));
+ for(const key of ['vacay','dreams_network','vaca','vash','vcoin','voken','vacon','void'])assert.ok(keys.has(key));
+ assert.ok(!keys.has('vulcan'),'VULCAN was a mistaken reference and must not exist as a separate entry -- VOKEN is the real entity for its role');
  const vacay=INTEGRATIONS.find(x=>x.key==='vacay');
  assert.ok(vacay.boundaries.some(x=>x.includes('separate application')));
- assert.ok(INTEGRATIONS.find(x=>x.key==='vulcan').boundaries.some(x=>x.includes('owns tokenization')));
+ assert.ok(INTEGRATIONS.find(x=>x.key==='voken').boundaries.some(x=>x.includes('owns tokenization')));
  assert.ok(INTEGRATIONS.find(x=>x.key==='vcoin').boundaries.some(x=>x.includes('ledger')));
 });
 
@@ -27,8 +28,8 @@ test('invalid non-HTTPS endpoint is not marked configured',()=>{
 
 test('summary reports all services as not connected by default',()=>{
  const summary=integrationSummary({});
- assert.equal(summary.total,9);
+ assert.equal(summary.total,8);
  assert.equal(summary.liveConnected,0);
- assert.equal(summary.notConfigured,9);
- assert.equal(listIntegrations({}).length,9);
+ assert.equal(summary.notConfigured,8);
+ assert.equal(listIntegrations({}).length,8);
 });

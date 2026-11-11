@@ -4,7 +4,7 @@
 
 **VDEX — Vertical Vision Development Exchange**  
 Proposed application slot: **App 22 (provisional; verify against the official parent-app register).**  
-Technology development/ownership alignment: VEDA. Commercial alignment: VEGA. Real estate operations integration: VRG. Investment integrations: VIG and PPG as authorized. VEX stocks/trading remains separate from VDEX. VDEX is an independent app grouped with VACAY and VOID; it must integrate with VACAY for authorized listing/discovery and owner/seller workflow handoffs, attach to DREAMS Network, and use VULCAN for approved tokenization handoffs. Reuse VACO/VACON, VACA, VASH, VCoin and applicable VOKEN services through verified contracts; do not duplicate identity, finance, wallets, ledgers or token systems.
+Technology development/ownership alignment: VEDA. Commercial alignment: VEGA. Real estate operations integration: VRG. Investment integrations: VIG and PPG as authorized. VEX stocks/trading remains separate from VDEX. VDEX is an independent app grouped with VACAY and VOID; it must integrate with VACAY for authorized listing/discovery and owner/seller workflow handoffs, attach to DREAMS Network, and use VOKEN for approved tokenization handoffs (corrected -- "VULCAN" was a mistaken reference; VOKEN is the real, sole entity for tokenization, credentials and trust). Reuse VACO/VACON, VACA, VASH, VCoin and applicable VOKEN services through verified contracts; do not duplicate identity, finance, wallets, ledgers or token systems.
 
 ## Product mission
 

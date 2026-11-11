@@ -1,3 +1,11 @@
+## 0.3.24 (post-release) — 2026-11-11 — VULCAN/VOKEN reconciliation
+- Corrected a mistaken reference: "VULCAN" was never a real, separate service. Merged its tokenization capability into VOKEN's own real ecosystem-integration registry entry (`backend/ecosystem-integrations.js`) -- the real service count is eight, not nine.
+- Updated `tests/ecosystem-integrations.test.js` and `tests/api.test.js` to match (count, boundary checks, key lookups); added an explicit assertion that `vulcan` must never exist as a registry key.
+- Updated `config/integrations.env.example` and the live docs (`CLAUDE_CODE_START_HERE.md`, `MASTER_SPEC.md`, `INTEGRATION_CONTRACTS.md`, `BUILD_STATUS_0.3.24.md`, `CLAUDE_CODE_HANDOFF.md`); added forward-pointing correction notes to the two historical snapshots (`VDEX_COMPLETENESS_AUDIT_0.3.23.md`, `BUILD_STATUS_0.3.23.md`) rather than rewriting them.
+- Added `docs/RECONCILIATION_11_NOV_2026.md`: verified the handoff's own claims against the real code (consent-withdrawal tokens, evidence-linked highlights, jurisdiction/county counts, JWT verification, RLS migrations, fail-closed acquisition authorization all confirmed real). Found one real discrepancy: the national source catalog has 36 entries, not the claimed 41 -- a loose `total>=35` test assertion had not caught it.
+- Confirmed the Cold-to-Hot Potential Index's "previously agreed twenty categories" do not exist anywhere in this package; stays blocked rather than inventing a replacement list.
+- `npm run check` and `npm test` both verified green (81/81) before and after every change in this round.
+
 ## 0.3.15 — county-equivalent directory and coverage tracking
 - Added a Missouri pilot inventory of 114 counties plus the independent City of St. Louis, keyed by Census GEOID.
 - Added nine source-coverage categories per county-equivalent and API filters/summary endpoints; all statuses start `not_assessed`.
