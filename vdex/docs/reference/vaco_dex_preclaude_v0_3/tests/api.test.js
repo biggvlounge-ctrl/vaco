@@ -1,0 +1,15 @@
+'use strict';
+const test=require('node:test'); const assert=require('node:assert/strict');
+const api=require('../src/api/property-intelligence');
+function fixture(){return {properties:[{id:'p-1'}],propertyEvidence:[],propertyHighlights:[],propertyAssessments:[],developmentScenarios:[]};}
+test('evidence requires statement, category and source',()=>{assert.throws(()=>api.addEvidence(fixture(),'p-1',{}),/required/)});
+test('evidence rejects unsafe URL protocols',()=>{assert.throws(()=>api.addEvidence(fixture(),'p-1',{statement:'x',category:'historic',sourceName:'x',sourceUrl:'javascript:alert(1)'}),/HTTP or HTTPS/)});
+test('evidence is linked to property and source provenance',()=>{const db=fixture();const e=api.addEvidence(db,'p-1',{statement:'Built in 1920',category:'historic',sourceName:'County archive',status:'reported'});assert.equal(e.propertyId,'p-1');assert.equal(e.source.name,'County archive');});
+test('highlights only cite evidence belonging to property',()=>{const db=fixture();const e=api.addEvidence(db,'p-1',{statement:'Recorded historic district',category:'historic',sourceName:'Register'});const h=api.saveHighlights(db,'p-1',[{headline:'Historic district location',explanation:'The source lists the parcel in a district.',category:'property_feature',evidenceIds:[e.id,'foreign-id'],priority:10}]);assert.equal(h.length,3);assert.deepEqual(h[0].evidenceIds,[e.id]);assert.equal(h[1].verificationStatus,'insufficient_information');});
+test('highlight history increments version',()=>{const db=fixture();api.saveHighlights(db,'p-1',[]);api.saveHighlights(db,'p-1',[]);assert.equal(api.latestHighlights(db,'p-1')[0].version,2);});
+test('assessment type is constrained',()=>{assert.throws(()=>api.addAssessment(fixture(),'p-1',{type:'made_up',status:'unknown'}),/Unsupported/)});
+test('assessment records professional review requirement',()=>{const db=fixture();const x=api.addAssessment(db,'p-1',{type:'environmental',status:'potential_concern',professionalReviewRequired:true});assert.equal(x.professionalReviewRequired,true)});
+test('development scenario rejects negative costs',()=>{assert.throws(()=>api.addDevelopmentScenario(fixture(),'p-1',{name:'Plan A',proposedUse:'Multifamily',assumptions:{constructionCost:-1}}),/non-negative/)});
+test('development scenario saves separate assumptions',()=>{const db=fixture();const x=api.addDevelopmentScenario(db,'p-1',{name:'Plan A',proposedUse:'Multifamily',assumptions:{units:12,constructionCost:1200000}});assert.equal(x.assumptions.units,12);assert.equal(x.assumptions.constructionCost,1200000)});
+test('route handler returns 404 for unknown property',async()=>{const result=await api.handlePropertyIntelligence({method:'GET',pathname:'/api/properties/nope/evidence',body:{},db:fixture(),writeDb(){}});assert.equal(result.status,404)});
+test('route handler persists evidence on POST',async()=>{const db=fixture();let writes=0;const result=await api.handlePropertyIntelligence({method:'POST',pathname:'/api/properties/p-1/evidence',body:{statement:'Parcel map',category:'parcel',sourceName:'County GIS'},db,writeDb(){writes++}});assert.equal(result.status,201);assert.equal(writes,1)});

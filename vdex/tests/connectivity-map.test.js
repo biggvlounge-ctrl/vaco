@@ -1,0 +1,6 @@
+'use strict';
+const test=require('node:test');const assert=require('node:assert/strict');
+const {listDomains,listRelationships,connectivitySummary}=require('../backend/connectivity-map');
+test('national connectivity map covers all core participant and data domains',()=>{const domains=listDomains();const keys=new Set(domains.map(x=>x.key));for(const key of ['property_supply','distressed_supply','buyer_demand','seller_owner','property_identity','development_pipeline','workforce','supplier_network','capital_and_finance','transactions','market_context','governance_provenance'])assert.ok(keys.has(key));for(const d of domains){assert.ok(d.records.length>0);assert.ok(d.sourceFamilies.length>0);assert.ok(d.safeguards.length>0)}});
+test('connectivity relationships reference known domains or the governance wildcard',()=>{const keys=new Set(listDomains().map(x=>x.key));for(const r of listRelationships()){assert.ok(keys.has(r.from));assert.ok(keys.has(r.to)||r.to==='all_domains');assert.ok(r.purpose)}});
+test('summary explicitly distinguishes architecture from connected sources',()=>{const s=connectivitySummary();assert.equal(s.domainCount,12);assert.equal(s.status,'architecture_defined_sources_not_connected')});

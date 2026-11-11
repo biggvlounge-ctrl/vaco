@@ -1,0 +1,12 @@
+'use strict';
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const os=require('node:os');
+const path=require('node:path');
+const {csvRows,normalizeFeature,parseTIGER,importTIGERFile}=require('../backend/tiger-import');
+const sample=[{STATEFP:'29',COUNTYFP:'510',GEOID:'29510',NAME:'St. Louis city',NAMELSAD:'St. Louis city',LSAD:'25',COUNTYNS:'007679',FUNCSTAT:'F',ALAND:'160000000',AWATER:'1000000',INTPTLAT:'38.6357',INTPTLON:'-90.2446'}];
+test('CSV parser preserves quoted commas, quotes and line breaks',()=>{assert.deepEqual(csvRows('GEOID,NAME\n01001,"Autauga, County"\n01003,"He said ""hello"""'),[{GEOID:'01001',NAME:'Autauga, County'},{GEOID:'01003',NAME:'He said "hello"'}]);});
+test('TIGER normalizer preserves FIPS as strings and identifies independent cities',()=>{const x=normalizeFeature(sample[0]);assert.equal(x.geoid,'29510');assert.equal(x.state,'MO');assert.equal(x.entityType,'independent_city');assert.equal(x.internalPoint.latitude,'38.6357');});
+test('TIGER parser accepts CSV, JSON rows and GeoJSON features and rejects duplicate or malformed GEOIDs',()=>{assert.equal(parseTIGER(sample).length,1);assert.equal(parseTIGER({type:'FeatureCollection',features:sample.map(properties=>({type:'Feature',properties,geometry:null}))})[0].geoid,'29510');assert.equal(parseTIGER('STATEFP,COUNTYFP,GEOID,NAME,STUSAB\n29,510,29510,St. Louis city,MO')[0].name,'St. Louis city');assert.throws(()=>parseTIGER([...sample,...sample]),/Duplicate GEOID/);assert.throws(()=>normalizeFeature({...sample[0],GEOID:'2951'}),/Invalid TIGER/);});
+test('TIGER importer writes an atomic, provenance-labelled geography payload',()=>{const dir=fs.mkdtempSync(path.join(os.tmpdir(),'vdex-tiger-'));try{const input=path.join(dir,'counties.json'),output=path.join(dir,'national.json');fs.writeFileSync(input,JSON.stringify(sample));const result=importTIGERFile(input,{outputPath:output});const saved=JSON.parse(fs.readFileSync(output,'utf8'));assert.equal(result.recordCount,1);assert.deepEqual(result.states,['MO']);assert.equal(saved.source,'U.S. Census Bureau TIGER/Line County and Equivalent Entities');assert.equal(saved.records[0].geoid,'29510');}finally{fs.rmSync(dir,{recursive:true,force:true});}});
