@@ -135,13 +135,13 @@ and route counts are from source.
 | **V4** | **Yes** | 4 + 0 | 17 + 2 | Agent interface, twin profiles, 5 surfaces, call flow, cross-app search |
 | **VACON** | **Yes** | 4 + 4 | 6 + 12 | 14 agents, routing, invoke. Shield (tests), VACO Analytics |
 | **CHOPZ** | **Yes** | 3 + 5 | 4 + 10 | Native checkout, category fees, affiliate splits |
-| **VDP** | **Yes — frontend** | 33 | — | The walkable world. Districts for most apps |
+| **VDP** | **Yes — frontend + backend** | 33 | 211 | The walkable world. Districts for most apps. `server.cjs` (3,872 lines) is a substantial real backend, not frontend-only — corrected 12 Nov 2026 after the route count was found undercounted as "—" |
 | **VENVS** | **Yes — frontend** | 9 | — | Marketplace, shop, publishing |
 | **Vex** | **Yes** | 5 + 127 files | 7 + 3 | Brokerage (gated). Vex Business is a Python monorepo, **deploys separately** |
 | **VACAY** | **Thin** | 2 | 1 | 5 sections real, fewest modules of any built app |
 | **VACO Shell** | **Yes** | 2 | 10 | Launcher, registry, session host |
 
-**Totals: 239 modules, ~700 routes, 24 apps persisting to disk.**
+**Totals: 239 modules, ~900 routes (was "~700" before VDP's own 211 real routes were found undercounted as "—" on 12 Nov 2026), 24 apps persisting to disk.**
 
 **Every one of the first eighteen has running code.** None are empty.
 The thinnest is VACAY. VDEX (#19, opened 11 Nov 2026) does not yet —
