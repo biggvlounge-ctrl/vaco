@@ -94,14 +94,15 @@ test('the shell is registered in vaco-shell at its own real port', () => {
   assert.equal(new URL(entry[1]).port, ownPort, 'vaco-shell points at the wrong port for this app');
 });
 
-test('no sub-app claims to be a UI this shell does not own', () => {
-  // The registry's own header is explicit that neither sub-app has a UI
-  // Vex Trading renders, and that VEX's uiUrl deliberately points at
-  // VDP. That honesty is load-bearing — a note saying "opens VDP" is
-  // the difference between a helpful link and a broken promise.
+test('VEX\'s own real frontend is correctly linked, with VDP named as the in-world alternate', () => {
+  // VEX now has its own real frontend (served statically from its own
+  // API port) -- the registry's uiUrl must point there, not at VDP,
+  // while still naming VDP's own VEX district as the second, real,
+  // in-world surface onto the same API (neither link is a stand-in
+  // for a missing other).
   const vex = getSubApp('vex');
-  assert.match(vex.uiNote, /VDP/, 'VEX\'s uiUrl points elsewhere and must say so');
-  assert.match(vex.description, /backend only/i);
+  assert.equal(new URL(vex.uiUrl).port, new URL(vex.apiUrl).port, 'VEX\'s uiUrl should point at its own real frontend, served from its own API port');
+  assert.match(vex.uiNote, /VDP/, 'VDP\'s in-world VEX district must still be named as the real alternate surface');
 });
 
 // ---------------------------------------------------------------------------

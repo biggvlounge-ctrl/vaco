@@ -4,21 +4,24 @@
 // the whole ecosystem.
 //
 // Neither sub-app is a UI Vex Trading owns or renders itself:
-// - VEX's real trading-floor UI lives inside VDP's own VEX district
-//   (`../vdp`, VexView.jsx) -- VEX itself is an API-only backend
-//   (`../vex`). `uiUrl` points at VDP, honestly labeled as "not VEX's
-//   own UI," rather than pretending VEX has a dedicated frontend it
-//   doesn't.
+// - VEX now has its own real frontend (`../vex/public/index.html`,
+//   served statically from its own API port, 8816) -- compliance
+//   gates, accounts, order entry, the VXC coin market. VDP's own VEX
+//   district (`../vdp`, VexView.jsx) is still real too and still the
+//   in-world trading floor -- the two are different real surfaces onto
+//   the same API, not one standing in for a missing other. `uiUrl`
+//   points at VEX's own frontend as the primary surface; `uiNote`
+//   still names VDP as the in-world alternate.
 // - Vex Business has its own real dashboard (`../vex-business/apps/web`).
 
 export const SUB_APPS = [
   {
     id: 'vex',
     name: 'VEX',
-    description: 'Robinhood-style Cvltvre Card brokerage. Real backend only -- its live trading-floor UI is VDP\'s own VEX district.',
+    description: 'Robinhood-style Cvltvre Card brokerage. Has its own real frontend (compliance gates, accounts, order entry) -- VDP\'s own VEX district is a second, real, in-world trading-floor surface onto the same API.',
     apiUrl: 'http://localhost:8816',
-    uiUrl: 'http://localhost:5174',
-    uiNote: 'Opens VDP -- walk into the VEX district for the real trading floor.',
+    uiUrl: 'http://localhost:8816',
+    uiNote: 'Opens VEX\'s own real frontend. VDP\'s VEX district (walk in at localhost:5174) is the same API\'s in-world trading floor.',
   },
   {
     id: 'vex-business',

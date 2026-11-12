@@ -523,17 +523,27 @@ GETs (`GET /api/channel-groups/:id`, `/api/channels/:id`,
 superseded by the list/detail reads each new tab already uses, so no
 second, redundant single-item lookup control was added for them.
 
-**Known pre-existing gap, found but deliberately not fixed in this
-pass**: the Live tab's own Tip control (added before this pass) posts
-`{fromUserId, amount}`, but `POST /api/channels/:id/tips` is guarded by
-`requireActor('tipperId')` and `tipChannel` requires
-`tipperId`/`amountVCoin`/`recipientPersonId` — none of which match, so
-every tip sent from that control fails server-side (`400`, missing
-actor). Left alone here since fixing an existing tab's own bug is a
-different task from closing a frontend-coverage gap, flagged directly
-rather than silently worked around; the new Channels tab's tip-ledger
-and tip-earnings-lookup views at least give a real, correct way to see
-tip totals in the meantime.
+**Fixed (12 Nov 2026, doc-reconciliation pass)**: the gap named above
+as "found but deliberately not fixed" — the Live tab's Tip control
+posted `{fromUserId, amount}` against a route requiring
+`tipperId`/`recipientPersonId`/`amountVCoin`. Fixed to send the real
+field names, with `recipientPersonId` set to the channel's own real
+`ownerId` — correct per `lib/channels.js`'s own data model, where a
+channel has exactly one owner field and no separate owner-vs-person
+distinction: an individual's own channel (the doorman example) already
+has that individual as its `ownerId`, so tipping a channel's `ownerId`
+is tipping the real specific person on camera, not a business
+abstraction. Live-verified against real spawned Shield + V3-mock +
+this server: the old payload confirmed failing with the exact
+documented 400 (`requireActor: request body must name the acting user
+in one of: tipperId`), the new payload confirmed passing that same
+validation. The actual money transfer itself surfaced a second, wholly
+separate, pre-existing environment gap — `venvs-mock-backend` only
+implements the older `/api/vcoin/transfer`, not the atomic
+`/api/vcoin/settle` endpoint `settleVCoin` now calls — the same
+"mock/cross-service config, not an app bug" category already
+documented elsewhere in this ecosystem's VACAY and VDEX rounds, not a
+defect in this file.
 
 
 ## VENVS storefront tie-in (31 Oct 2026)

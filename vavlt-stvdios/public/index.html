@@ -79,7 +79,7 @@ function renderLive(body) {
       tip.appendChild(VACO.button('Tip', function () {
         if (!VACO.userId()) throw new Error('Sign in to tip.');
         return VACO.post('/api/channels/' + c.id + '/tips', {
-          fromUserId: VACO.userId(), amount: Number(amount.value),
+          tipperId: VACO.userId(), recipientPersonId: c.ownerId, amountVCoin: Number(amount.value),
         }).then(function () {
           VACO.toast('Tipped ' + amount.value + ' to ' + c.name, 'money');
           VACO.refreshBalances().then(VACO.renderIdentity);
