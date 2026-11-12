@@ -45,6 +45,24 @@ genuine greenfield build, not a continuation, and is filed here under
 that honest premise rather than a fabricated "audit" of code that
 does not exist.
 
+## Real connections, not just registry entries
+
+Checking VOID's actual code (not just its name on a dependency list)
+surfaced two real capabilities VDEX would otherwise have duplicated:
+`void/lib/staffing.js` is a real, payment-settled labor marketplace
+already running through VOID's own shared request→match→accept→
+complete→pay→rate loop, and `void/lib/realEstateMedia.js` is a real
+HomeJab-style photo/video/drone/3D-tour/floor-plan service with
+proximity auto-assignment. `backend/void-staffing-adapter.js` and
+`backend/void-real-estate-media-adapter.js` request these real VOID
+capabilities directly rather than VDEX building a second payment
+system or a second media-capture pipeline — live-verified end to end
+against real spawned Shield + VOID servers (see `CHANGELOG.md`'s
+"real VOID connections" entry for the exact result, including the one
+leg that reached VOID and authenticated correctly but was then
+honestly refused by VOID's own real "no available provider" rule, not
+a wiring failure).
+
 ## Scope discipline this app inherits from the rest of the ecosystem
 
 - **Real data, cited, access method and licensing stated per source —
