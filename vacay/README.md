@@ -315,7 +315,68 @@ refused with a real 401 before reaching anyone.
 - CarGurus' own real market-average computation — `marketAveragePrice`
   is honestly caller-supplied, not computed from any real aggregated
   data (none exists in this session).
-- Any UI, for any section.
+
+## UI (11/12 Nov 2026) — the "Any UI, for any section" line above was stale, not true
+
+A real `public/index.html` already existed, calling real endpoints —
+checked directly rather than trusting that claim, and it was wrong.
+What it actually had was mostly **broken**, not missing: it predated
+several real features this README itself documents elsewhere, and
+nobody had gone back to update it when those landed.
+
+**Three real bugs, confirmed live against a real spawned Shield + V3
++ VACAY, not just read in the code:**
+- Stays booking called `POST /api/bookings/bookings` — the booking
+  resource moved to this section's own root (`POST /api/bookings`)
+  back when "booking and stay should be the same thing" was decided;
+  the UI was never updated and every stay booking click has been
+  failing outright since. Fixed, and confirmed live: a real listing
+  booked, escrowed, and refunded on cancellation.
+- Stays and Auto/Turo rentals never sent `checkIn`/`checkOut` or
+  `startDate`/`endDate` at all, both of which `createBooking`/
+  `bookRental` require unconditionally — every click on those two
+  "Book"/"Rent" buttons has also been failing outright. Fixed with a
+  minimal day-offset prompt (no calendar widget exists in the shared
+  UI shell to reuse).
+- Home's "Request info" sent `{ listingId, buyerId }`; the real route
+  requires `{ listingId, requesterId, contactInfo }` — wrong field
+  name and a missing required field, so every click 400'd. Fixed.
+
+**What was genuinely missing, not broken, and is now wired in:**
+cancel actions for every cancellable booking type (Stays, Experiences,
+Auto/Turo, Auto/Fleet, Flights), each surfaced through a new "Your
+X" list — which needed its own small, real, tested gap closed first:
+every section but Flights had no way to find a booking again after
+creating it. `listBookingsForGuest`/`listExperienceBookingsForGuest`/
+`listRentalsForRenter`/`listFleetRentalsForRenter` (4 new tests,
+`test/listByActor.test.js`) mirror the one real precedent that already
+existed, `reservations.js#listBookingsForPassenger`, and back 4 new
+thin GET routes. Also newly wired: the CarGurus for-sale marketplace
+and VACAY's own fleet rental (both real since early in this app's
+history, never reachable from the UI at all), and
+`POST /api/flights/bundles` (real and tested for a while, same gap).
+
+**Still genuinely missing after this round, named rather than left
+under a blanket claim**: no UI anywhere for a host/agent/seller side
+(listing creation, the host-cancellation-guarantee's strike count,
+reviewing a seller lead or a job application) — this round closed the
+guest/renter/buyer side only. No calendar widget — every date in this
+UI is a "days from now" prompt. No map/photo UI for any listing.
+
+### Verification
+`npm test`: 46 → 50 (the 4 new list-by-actor tests), zero regressions.
+Live-verified against real spawned Shield (8812) + V3 (8811) + VACAY
+(8803) servers, exercising the real UI's exact request shapes end to
+end: a real stay booked/listed/cancelled with a confirmed refund back
+to the guest's real V3 balance; a real fleet vehicle rented with real
+dates; a real CarGurus listing charging the real $25 fee with the
+correct `great-price` rating; a real flight+stay bundle booking both
+legs with the real 10% bundle discount applied to the flight leg. One
+environment-level gap found and worked around rather than a code
+defect: VACAY's own cross-service calls to V3 for settlement need a
+shared `VACO_SERVICE_TOKENS`/`VACO_SERVICE_TOKEN` pair configured on
+both sides to pass V3's own trusted-service gate — undocumented here
+until now, not a bug in either app.
 
 ## Real host-cancellation guarantee (5 Nov 2026)
 

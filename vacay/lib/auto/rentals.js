@@ -93,6 +93,12 @@ function getRental(store, rentalId) {
   return store.rentals.find((r) => r.id === rentalId) || null;
 }
 
+// Same real gap as bookings.js's own listBookingsForGuest -- see its
+// comment.
+function listRentalsForRenter(store, renterId) {
+  return store.rentals.filter((r) => r.renterId === renterId);
+}
+
 async function completeRental(store, options = {}) {
   const { rentalId, settleFn, now = Date.now() } = options;
   const rental = getRental(store, rentalId);
@@ -199,5 +205,5 @@ async function cancelRental(store, options = {}) {
 }
 
 module.exports = {
-  VACAY_AUTO_ESCROW_ACCOUNT, VACAY_AUTO_PLATFORM_ACCOUNT, CANCELLATION_CUTOFF_HOURS, bookRental, getRental, completeRental, cancelRental,
+  VACAY_AUTO_ESCROW_ACCOUNT, VACAY_AUTO_PLATFORM_ACCOUNT, CANCELLATION_CUTOFF_HOURS, bookRental, getRental, listRentalsForRenter, completeRental, cancelRental,
 };

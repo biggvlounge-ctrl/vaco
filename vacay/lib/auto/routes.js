@@ -10,13 +10,13 @@ const {
   VEHICLE_TYPES, PROTECTION_PLANS, listVehicle, getVehicle, listVehiclesForOwner,
 } = require('./vehicles');
 const {
-  VACAY_AUTO_ESCROW_ACCOUNT, bookRental, getRental, completeRental, cancelRental,
+  VACAY_AUTO_ESCROW_ACCOUNT, bookRental, getRental, listRentalsForRenter, completeRental, cancelRental,
 } = require('./rentals');
 const {
   PRICE_RATINGS, LISTING_FEE, createForSaleListing, getForSaleListing, searchForSaleListings, markSold,
 } = require('./carListings');
 const {
-  FLEET_VEHICLE_TYPES, addFleetVehicle, getFleetVehicle, searchFleetVehicles, bookFleetRental, getFleetRental, completeFleetRental, cancelFleetRental,
+  FLEET_VEHICLE_TYPES, addFleetVehicle, getFleetVehicle, searchFleetVehicles, bookFleetRental, getFleetRental, listFleetRentalsForRenter, completeFleetRental, cancelFleetRental,
 } = require('./fleetRentals');
 
 const {
@@ -100,6 +100,17 @@ function createAutoRouter(deps) {
 
   });
 
+
+  // Mirrors flights' own `/passengers/:passengerId/flight-bookings` --
+  // closes the same real gap bookings/routes.js just closed: no way
+  // for a renter to find their own rentals again after booking.
+  router.get('/renters/:renterId/rentals', (req, res) => {
+    res.json({ rentals: listRentalsForRenter(store, req.params.renterId) });
+  });
+
+  router.get('/renters/:renterId/fleet-rentals', (req, res) => {
+    res.json({ rentals: listFleetRentalsForRenter(store, req.params.renterId) });
+  });
 
   router.get('/owners/:ownerId/vehicles', (req, res) => {
     res.json({ vehicles: listVehiclesForOwner(store, req.params.ownerId) });

@@ -26,13 +26,13 @@ const {
   LISTING_TYPES, HOST_TYPES, createListing, getListing,
 } = require('./listings');
 const {
-  VACAY_ESCROW_ACCOUNT, FEE_PERCENT, createBooking, getBooking, completeStay, cancelBooking,
+  VACAY_ESCROW_ACCOUNT, FEE_PERCENT, createBooking, getBooking, listBookingsForGuest, completeStay, cancelBooking,
 } = require('./bookings');
 const {
   EXPERIENCE_STATUSES, createExperience, getExperience, discoverExperiences,
 } = require('./experiences');
 const {
-  bookExperience, getExperienceBooking, completeExperienceBooking, cancelExperienceBooking,
+  bookExperience, getExperienceBooking, listExperienceBookingsForGuest, completeExperienceBooking, cancelExperienceBooking,
 } = require('./experienceBookings');
 const {
   VOID_SERVICE_TYPES, requestVoidService, getVoidServiceRequest, listVoidServiceRequests,
@@ -169,6 +169,18 @@ function createBookingsRouter(deps) {
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
+  });
+
+  // Mirrors flights' own `/passengers/:passengerId/flight-bookings` --
+  // closes the real gap this section otherwise had: no way for a
+  // guest to find their own bookings again after the initial booking
+  // response, which also made cancellation unreachable from the UI.
+  router.get('/guests/:guestId/bookings', (req, res) => {
+    res.json({ bookings: listBookingsForGuest(store, req.params.guestId) });
+  });
+
+  router.get('/guests/:guestId/experience-bookings', (req, res) => {
+    res.json({ bookings: listExperienceBookingsForGuest(store, req.params.guestId) });
   });
 
   router.get('/void-services/:id', (req, res) => {

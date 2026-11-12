@@ -127,6 +127,12 @@ function getFleetRental(store, rentalId) {
   return store.fleetRentals.find((r) => r.id === rentalId) || null;
 }
 
+// Same real gap as bookings.js's own listBookingsForGuest -- see its
+// comment.
+function listFleetRentalsForRenter(store, renterId) {
+  return store.fleetRentals.filter((r) => r.renterId === renterId);
+}
+
 async function completeFleetRental(store, options = {}) {
   const { rentalId, settleFn, now = Date.now() } = options;
   const rental = getFleetRental(store, rentalId);
@@ -218,6 +224,7 @@ module.exports = {
   searchFleetVehicles,
   bookFleetRental,
   getFleetRental,
+  listFleetRentalsForRenter,
   completeFleetRental,
   cancelFleetRental,
 };

@@ -65,6 +65,12 @@ function getExperienceBooking(store, bookingId) {
   return store.experienceBookings.find((b) => b.id === bookingId) || null;
 }
 
+// Same real gap as bookings.js's own listBookingsForGuest -- see its
+// comment.
+function listExperienceBookingsForGuest(store, guestId) {
+  return store.experienceBookings.filter((b) => b.guestId === guestId);
+}
+
 async function completeExperienceBooking(store, options = {}) {
   const { bookingId, settleFn, now = Date.now() } = options;
   const booking = getExperienceBooking(store, bookingId);
@@ -170,5 +176,5 @@ async function cancelExperienceBooking(store, options = {}) {
 }
 
 module.exports = {
-  VACAY_ESCROW_ACCOUNT, FEE_PERCENT, CANCELLATION_CUTOFF_HOURS, bookExperience, getExperienceBooking, completeExperienceBooking, cancelExperienceBooking,
+  VACAY_ESCROW_ACCOUNT, FEE_PERCENT, CANCELLATION_CUTOFF_HOURS, bookExperience, getExperienceBooking, listExperienceBookingsForGuest, completeExperienceBooking, cancelExperienceBooking,
 };

@@ -106,6 +106,15 @@ function getBooking(store, bookingId) {
   return store.bookings.find((b) => b.id === bookingId) || null;
 }
 
+// Mirrors flights' own `listBookingsForPassenger` -- the same real
+// gap flagged in this app's README: every section but flights had no
+// way for a guest to find their own bookings again after the initial
+// booking response, which also made cancellation unreachable from the
+// UI (nothing to cancel if nothing lists what you hold).
+function listBookingsForGuest(store, guestId) {
+  return store.bookings.filter((b) => b.guestId === guestId);
+}
+
 async function completeStay(store, options = {}) {
   const { bookingId, settleFn, now = Date.now() } = options;
   const booking = getBooking(store, bookingId);
@@ -258,5 +267,5 @@ async function cancelBooking(store, options = {}) {
 
 module.exports = {
   VACAY_ESCROW_ACCOUNT, FEE_PERCENT, CANCELLATION_CUTOFF_HOURS, HOST_CANCELLATION_STRIKE_LIMIT,
-  createBooking, getBooking, completeStay, cancelBooking, getHostCancellationCount, isHostCancellationLimited,
+  createBooking, getBooking, listBookingsForGuest, completeStay, cancelBooking, getHostCancellationCount, isHostCancellationLimited,
 };
