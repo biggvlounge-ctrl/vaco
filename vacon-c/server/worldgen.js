@@ -82,6 +82,8 @@ const behavior = require('./behavior.js');
 const property = require('./property.js');
 const technology = require('./technology.js');
 const politics = require('./politics.js');
+const orgArchetypes = require('./orgArchetypes.js');
+const influence = require('./influence.js');
 const culture = require('./culture.js');
 const missions = require('./missions.js');
 const inventory = require('./inventory.js');
@@ -181,6 +183,16 @@ const DEFAULTS = {
   // or event-count assertion built before this round has no way to
   // have anticipated.
   scopedGovernments: false,
+  // **One real `'religious order'` organization per community —
+  // opt-in, same posture as `extendedFamily`/`scopedGovernments` just
+  // above, for the same reason.** `orgArchetypes.js`'s own
+  // `describeArchetypes` header records that nothing in `worldgen`
+  // has ever founded any archetype at all; this is the first real
+  // caller, by direct instruction ("the strongest religious party...
+  // a power hierarchy in every town"). Off, every existing call to
+  // `generateWorld()` gets the exact unchanged world the whole test
+  // suite already asserts counts against.
+  religiousOrdersPerCommunity: false,
   businessesPerCommunity: 2,
   factionsPerCity: 2,
   // Homes are generated to house everybody with a margin, which is
@@ -1288,6 +1300,63 @@ function generateWorld(options = {}) {
         family.head_npc_id = members.reduce(
           (eldest, n) => ((n.createdTick ?? 0) < (eldest.createdTick ?? 0) ? n : eldest),
         ).id;
+      }
+
+      // **One real `'religious order'` organization per community —
+      // opt-in (config.religiousOrdersPerCommunity), by direct
+      // instruction: "the strongest religious party... a power
+      // hierarchy in every town." Placed here, after family heads are
+      // computed just above, specifically so it can be given a REAL
+      // founding leader rather than the `leader_id: null` every other
+      // organization in this engine starts with (`generateOrganization`
+      // only ever writes a real leader when a caller passes one, and
+      // checked directly: no caller anywhere in `worldgen.js` —
+      // businesses, gangs, governments — ever does; `leader_id` is
+      // only ever written later, by a real election
+      // (`politics.js:704`) or a real takeover (`control.js`'s own
+      // `seize`). That is a real, separate, pre-existing gap this
+      // round does not fix for those other three — retroactively
+      // changing how every existing organization gets its initial
+      // leader risks the 50+ tests already asserting generation counts
+      // and behavior against the current, leaderless-at-birth shape.
+      // This round only gives ITS OWN new organization type a real
+      // leader from the start, since nothing about it is pre-existing.**
+      //
+      // The real highest-`influenceRatingOf` family head in this
+      // community — not the eldest (that is `head_npc_id`'s own rule,
+      // already a different real question) and not an invented
+      // "charisma" draw. `orgArchetypes.found` names nothing itself, so
+      // this community's own name carries the congregation's identity,
+      // the same way `${city.name} City Council` does for a scoped
+      // government.
+      //
+      // **Known, stated limitation: in-memory only.** `organizations`
+      // has no `community_id` column — `orgArchetypes.found`'s own
+      // `organization.archetype` field is the established precedent
+      // for exactly this kind of in-memory-only enrichment — so
+      // `mainCharacters.js#religiousLeaderOf` finds this live rather
+      // than reading a stored link, and it does not survive a Postgres
+      // round-trip, same posture as `community.fertilityRates` above.
+      if (config.religiousOrdersPerCommunity) {
+        const familyHeads = families
+          .map((family) => w.npcs.find((n) => n.id === family.head_npc_id))
+          .filter(Boolean);
+        let foundingLeaderId = null;
+        let bestInfluence = -Infinity;
+        for (const head of familyHeads) {
+          const rating = influence.influenceRatingOf(w, head.id);
+          if (rating > bestInfluence) { bestInfluence = rating; foundingLeaderId = head.id; }
+        }
+        const religiousOrder = orgArchetypes.found(w, {
+          archetype: 'religious order',
+          name: `${community.name ?? `Block ${b + 1}`} Congregation`,
+          seed: config.seed,
+          key: c * config.communitiesPerCity + b,
+          generateOrganization: engine.generateOrganization,
+        });
+        religiousOrder.community_id = community.id;
+        religiousOrder.leader_id = foundingLeaderId;
+        summary.organizations += 1;
       }
 
       // ---- extended family: real aunts/uncles + cousins, opt-in --------

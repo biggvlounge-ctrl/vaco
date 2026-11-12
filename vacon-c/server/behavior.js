@@ -328,13 +328,24 @@ function listHabits(worldState, entityId) {
 // different traits for the two cases is the point — a disciplined person
 // keeps up a routine AND resists an addiction, and one number cannot say
 // both.
+// `locationPropertyId` is deliberately NOT stored on the `habits` row
+// — there is no schema column for it (`habits` has none, unlike
+// `schedule_events.location_property_id`), and a habit is reinforced
+// repeatedly, often at a different place each time, so a per-habit
+// field would misrepresent a per-EVENT fact as a durable one. It
+// exists only so this one call can say where this one reinforcement
+// happened — `missionTriggers.js`'s own reason for wanting it.
 function reinforceHabit(worldState, entityId, name, options = {}) {
   const live = getLiveEntity(worldState, entityId);
   if (!live) throw new Error(`reinforceHabit: no entity with id ${entityId}.`);
   if (!name || typeof name !== 'string') {
     throw new Error('reinforceHabit: a habit needs a name.');
   }
-  const { harmful = false, amount = 5 } = options;
+  const { harmful = false, amount = 5, locationPropertyId = null } = options;
+  if (locationPropertyId !== null
+      && !worldState.properties.some((p) => p.id === locationPropertyId)) {
+    throw new Error(`reinforceHabit: no property with id ${locationPropertyId}.`);
+  }
 
   const driver = harmful
     ? (traitOr(live, 'psychological', 'Compulsiveness', 50)

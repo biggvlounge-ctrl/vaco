@@ -73,6 +73,7 @@ POST /api/properties/:id/ownership        — { ownerEntityId, ownerType, method
 
 GET  /api/communities                     — list communities, filterable by city
 GET  /api/communities/:id                 — detail: population, safety, reputation rollup
+GET  /api/communities/:id/main-characters — real, computed local power hierarchy (criminal/political/religious/business leader), never stored — mainCharacters.js
 
 GET  /api/cities/:id                      — city detail: reemergence_index, infrastructure rollup, economy
 GET  /api/cities/:id/reemergence          — reemergence composite breakdown (sub-indices)

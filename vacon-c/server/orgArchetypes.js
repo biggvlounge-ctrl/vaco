@@ -278,6 +278,46 @@ const ARCHETYPES = {
     },
     posts: ['labourer', 'manager'],
   },
+
+  // **Genuinely new: the schema's own real `type: 'religion'` has had
+  // zero archetypes and zero callers anywhere in this engine until
+  // now** (`organizations.type`'s own comment already named `religion`
+  // alongside `gang`/`government`/`library`/`museum`, unused). Direct
+  // instruction: "the strongest religious party... a power hierarchy
+  // in every town." `reach: 'community'`, the same grain `militia`
+  // holds its own neighbourhood at, since a congregation is a
+  // neighbourhood institution first.
+  //
+  // **The §9 firewall holds here exactly as it holds for `npc.religion`
+  // itself.** This archetype generates and leads the identical generic,
+  // trait-driven way every other organization here does —
+  // `generateOrganization`'s own caller never reads any NPC's own real
+  // `npc.religion` field to decide who founds, joins or leads one. A
+  // world's in-game religious institutions and its NPCs' own private,
+  // real-Census-sourced religious identity stay two deliberately
+  // unconnected facts, same as `npc.ethnicity`/`npc.politicalTypology`
+  // already are everywhere else in this engine.
+  'religious order': {
+    type: 'religion',
+    reach: 'community',
+    note: 'A congregation with real institutional weight — high internal loyalty by '
+      + 'construction (the thing a religious order most durably has), real but modest '
+      + 'resources, and no claim on territory (a `militia`\'s counterpart that persuades '
+      + 'rather than holds ground).',
+    traits: {
+      internalLoyalty: [60, 90],
+      diplomacy: [40, 70],
+      resources: [15, 45],
+      territory: [0, 10],
+    },
+    // `teacher` is this file's own closest real occupation to
+    // "someone who leads a congregation" (`occupations.js` has no
+    // `priest`/`clergy` role) — named here rather than invented, the
+    // same honesty `aid organization`'s own posts already apply
+    // choosing `physician`/`orderly` over a role this engine does not
+    // have.
+    posts: ['teacher'],
+  },
 };
 
 const ARCHETYPE_NAMES = Object.keys(ARCHETYPES);

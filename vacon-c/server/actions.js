@@ -124,6 +124,7 @@ const ACTIONS = {
     run: (verbs, actorId, body) => verbs.reinforceHabit(actorId, body.name, {
       harmful: body.harmful,
       amount: body.amount,
+      locationPropertyId: body.locationPropertyId ?? null,
     }),
   },
 

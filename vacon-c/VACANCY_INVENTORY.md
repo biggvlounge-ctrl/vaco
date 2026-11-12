@@ -20,7 +20,7 @@ There is a working simulation — traits across four tiers, seven Key
 resolvers, family, economy, territory, tick, players, artifacts and
 missions, plus Property, Culture DNA, Named Flow Templates, contest
 resolution and the Behavior Engine — and its HTTP surface is real:
-**109 routes**, up from 8 before any of this -- 92 plus the two
+**110 routes**, up from 8 before any of this -- 92 plus the two
 cross-cutting reads (`/api/historical-records`,
 `/api/decision-log/:entityId`) a later audit found documented in
 `VACANCY_API_ENDPOINT_MAP.md` as built and missing from `server.js`,
@@ -47,7 +47,9 @@ ecosystem link-outs (CLAUDE.md's fifty-eighth standing rule):
 fifth line, `vozzana-link`, folded into the fourth rather than built
 separately, since SVMIKO DEGVCHI (the renamed "Vozzana da Gucci")
 turned out to live inside VENVS as ordinary sellers with no separate
-product-id namespace to address.
+product-id namespace to address, plus one more for the real local
+power hierarchy (CLAUDE.md's fifty-ninth standing rule):
+`GET /api/communities/:id/main-characters`.
 
 Since then, and not in the phase plan because nothing anticipated them:
 world generation, the uniform statistics catalogue, crime and policing,
@@ -74,7 +76,7 @@ the Postgres schema that already exists.
 
 ## 1. Server code — `vacon-c/server/`
 
-All 120 files present on disk, all committed, largest first.
+All 122 files present on disk, all committed, largest first.
 
 **`test/inventory.test.js` now fails when this table and `server/` disagree**, which is the guard this document has needed through three separate drifts (see the note below). The count and the file list are checked against the tree rather than typed.
 
@@ -208,6 +210,8 @@ read off disk, not recalled.
 | `seeded.js` | 2,016 | **§88 determinism** — `hashSeed`, `seededUnit`, `seededDraw`. Seed on position, never on identity. | Built |
 | `nextAfter.js` | 1,004 | The next value after a given one in a sequence. | Built |
 | `ecosystemLinks.js` | 9,558 | **Phase 4 "Digital Planet" — four real link generators, not five.** Gates on `media.js`'s own `social_media` channel (`computing` era + a real, non-failed `internet` row in the requester's city) — the same "is the internet back" question, read once. Each destination checked against the sibling's own real route table: Vavlt Stvdios' channels, Vvltvre's Music/Flix releases/titles, DREAMS' screens, VENVS' sellers. "Vozzana da Gucci" turned out to be a stale name for SVMIKO DEGVCHI, a real brand house living inside VENVS as ordinary sellers — no fifth route; `venvs-link` already covers it. See CLAUDE.md's fifty-eighth standing rule. | Built |
+| `mainCharacters.js` | 7,472 | **The real local power hierarchy — criminal (`authority.holderOf`), political (the government whose scope covers this community), religious (a genuinely new `'religious order'` archetype), business (highest-influence operator here) — never stored.** `GET /api/communities/:id/main-characters`. See CLAUDE.md's fifty-ninth standing rule. | Built |
+| `missionTriggers.js` | 8,927 | **A real, measured 0.1-per-visit chance that `search-location` or a now-location-aware `practise-habit` generates a real mission from the real criminal main character controlling that ground.** A location already carrying an open job from its own main character never stacks a second. See CLAUDE.md's fifty-ninth standing rule. | Built |
 
 ### Shared middleware — `vacon-c/lib/`
 
@@ -258,7 +262,7 @@ seven entries out of date when it arrived.
 **Still outstanding:** the React app Document 4 says already exists.
 See §5.
 
-## 3. The API — 49 map lines built of 57, across 109 registered routes
+## 3. The API — 49 map lines built of 57, across 110 registered routes
 
 ### The five-endpoint contract, unchanged
 
@@ -283,18 +287,21 @@ them; `test/routes.test.js` asserts it.
 | Cross-cutting | 3 | 0 | 3 |
 | **Total** | **57** | **49** | **8** |
 
-**109 routes are registered in `server.js`** (recounted this round:
-`grep -cE "^app\.(get|post|put|patch|delete)\(" server.js`). This
-section's own two prior figures (a "79" in the heading above and a
-"92" here) already disagreed with each other and with the real count
-before this round touched anything — flagged rather than silently
-carried forward, since re-publishing either would restate a number
-already proven wrong. The "38 have no line anywhere in the map" tally
-below is NOT recounted this round (the four routes this round added
-all have real map lines, so they do not change that figure, but
-whatever drift produced the 79/92 mismatch may also have added
-unmapped routes since this list was last true) — a real, separate
-reconciliation this round did not take on. The list itself, as it
+**110 routes are registered in `server.js`** (recounted again this
+round, after the "main characters" round added one —
+`GET /api/communities/:id/main-characters`, unmapped, same posture as
+`net-worth`/`family-tree` below: `grep -cE
+"^app\.(get|post|put|patch|delete)\(" server.js`). This section's own
+two prior figures (a "79" in the heading above and a "92" here)
+already disagreed with each other and with the real count before this
+round touched anything — flagged rather than silently carried
+forward, since re-publishing either would restate a number already
+proven wrong. The "38 have no line anywhere in the map" tally
+below is NOT recounted this round (the four routes a prior round added
+all have real map lines, and this round's own new route is simply one
+more added to the unmapped side without a full reconciliation pass) —
+a real, separate reconciliation this round did not take on either. The
+list itself, as it
 stood before this round:
 
 `GET /api/artifacts/:id`, `GET` and `POST /api/conditions`,

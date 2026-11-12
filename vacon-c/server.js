@@ -660,6 +660,18 @@ app.get('/api/communities/:id', (req, res) => {
   return res.json(community);
 });
 
+// Real, computed local power hierarchy for this community — never
+// stored, same posture as GET /api/entities/:id/net-worth. `null`
+// means this id is not a real community, not that the hierarchy is
+// empty — an existing community with no faction/government/religious
+// order/business yet still gets a real object with honest `null`
+// categories.
+app.get('/api/communities/:id/main-characters', (req, res) => {
+  const result = engine.getMainCharacters(Number(req.params.id));
+  if (!result) return res.status(404).json({ error: 'community not found' });
+  return res.json(result);
+});
+
 app.get('/api/territory-blocks', (_req, res) => {
   const blocks = engine.WorldState.territoryBlocks || [];
   res.json({ blocks, total: blocks.length });

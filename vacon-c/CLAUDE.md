@@ -3332,6 +3332,126 @@ pre-existing flake in `tutorialMissions.test.js` — passes in isolation,
 23/23, and passed clean on this round's own final full run; not this
 round's doing, named rather than quietly ignored).
 
+**A fifty-ninth, and it is two systems built together because the
+founder's own request fused them: a real local power hierarchy, and
+real missions that fall out of a player simply visiting what it
+controls.**
+
+"There'll be a kingpin, there'll be the strongest gangs, the strongest
+political party, the strongest religious party... a power hierarchy
+in every town" is `server/mainCharacters.js` — four real leader
+lookups, computed live, never stored (standing rule 3), over four
+genuinely different real substrates. Criminal reuses `authority
+.holderOf` outright — the faction already holding this community's
+ground, scored by its own live territory/power. Political reads the
+real installed leader of whichever real `governments` row's scope
+actually covers this community (its city, else its region, else the
+civilization every world always has one of) — the office-holder, not
+an archetype's own leader, since `politics.js#candidatesFor` already
+runs this engine's one real election cycle directly on a government
+organization. Business is the real highest-influence (ties broken by
+assets) business organization actually operating a property here.
+
+**Religious needed real building, because nothing of its kind had
+ever existed.** `orgArchetypes.js` had eleven archetypes and zero of
+type `'religion'`; its own `describeArchetypes` header already
+recorded that nothing in `worldgen.js` founds ANY archetype at all.
+The new `'religious order'` archetype (`posts: ['teacher']` — no
+priest/clergy occupation exists, the same honest-substitute posture
+`aid organization`'s own posts already take) is the first real caller
+of `orgArchetypes.found()` from `worldgen.js`, opt-in
+(`config.religiousOrdersPerCommunity`, default `false`, same posture
+as `extendedFamily`/`scopedGovernments`), and it is given a REAL
+founding leader — the community's own highest-`influence
+.influenceRatingOf` family head — rather than the `leader_id: null`
+every other organization in this engine starts with. **The §9
+firewall holds here exactly as everywhere else**: nothing in the new
+archetype, or in the code that founds one, ever reads an NPC's own
+`npc.religion` field to decide who founds, leads or joins it — a
+world's real institutions and its NPCs' own private real-world-sourced
+religious identity stay the two deliberately unconnected facts they
+already were. Mutation-verified: injecting a real `head.religion`
+read into the founding block was caught immediately by
+`test/mainCharacters.test.js`'s own comment-stripped scan
+(`test/ethnicity.test.js`'s established pattern), and reverting it
+restored a clean thirteen-test baseline.
+
+**A real, pre-existing gap surfaced rather than retroactively fixed.**
+Checked directly: `generateOrganization` only ever writes a real
+`leader_id` when a caller passes one, and no caller anywhere in
+`worldgen.js` — businesses, gangs, governments — ever does; the ONLY
+two places `organizations.leader_id` is written anywhere in this
+engine are a real election (`politics.js:704`) and a real takeover
+(`control.js`'s own `seize`), and neither runs automatically from the
+tick pipeline. So on a freshly generated, never-ticked world, the
+criminal and business categories resolve honestly `null` almost
+always — measured directly, a six-community generated world produced
+real faction holders and real business operators with `leader_id` set
+on none of them. This round fixes that only for its own new religious
+archetype; fixing it retroactively for the three pre-existing
+categories is real, separate, future work, named here rather than
+guessed at. `GET /api/communities/:id/main-characters` exposes all
+four, honestly, live.
+
+**The second half — "explore skyscraper, explore library... every
+time we learn how to fish, we read a book... finding [main characters]
+will help us build missions" — is `server/missionTriggers.js`.**
+`missions.generateMission`'s own `controllingFactionId` validation
+requires `organizations.isFaction === true`, which is the schema's own
+reason this wires to the criminal category alone, not political/
+religious/business — a government, a religious order and a business
+are none of them a faction, and the founder's own worked example (a
+kingpin, a gang) is exactly the one category that is. `search-location`
+needed no new wiring to cover the two named examples: `landmarks.js`
+already has real `skyscraper` and `library` categories among its
+thirty-three, and `discovery.search` already runs against any of
+them, so the trigger covers both, and every other landmark category,
+as a direct consequence of being general rather than special-cased.
+`practise-habit` had no location at all, and — checked directly —
+`habits.habit_name` is free text with no controlled vocabulary
+anywhere in this engine, so gating the trigger on habit-name strings
+like "fishing" or "reading" would have invented a vocabulary this
+engine has never had. The honest wiring is the one `adopt-routine`
+already established: an optional `locationPropertyId`, mirroring that
+verb's own real field, added to `reinforceHabit` without being stored
+on the `habits` row itself — there is no schema column for it, and a
+habit is reinforced repeatedly, often at a different place each time,
+so a per-habit field would misrepresent a per-EVENT fact as a durable
+one. A dedicated fishing-spot landmark category and gating by habit
+name are both named here as deliberately deferred, not silently
+missing.
+
+**The rate is measured, not guessed — standing rule 17's own
+discipline, applied to a mechanism with a different risk shape.**
+Unlike `resolveAggression`'s per-tick draw against every eligible pair,
+this draw only ever runs on an explicit player action, and a location
+already carrying an open job from its own main character is skipped
+outright (`missionTriggers.hasOpenMissionAt`) — so there is no
+feedback loop to guard against, only how CHANCE maps to calls-to-
+first-trigger to choose well. Measured over 200 distinct draws per
+candidate rate: 0.05 → mean 19.9/median 12 calls; 0.10 → mean 10.2/
+median 7; 0.20 → mean 5.1/median 4; 0.30 → mean 3.5/median 3. `0.1` is
+chosen: a real job shows up after a handful of visits to a real
+controlled location, neither instant nor decorative, the same judgment
+`discovery.js`'s own depletion rate was picked against, pointed at a
+different real distribution. Mutation-verified: disabling the
+no-duplicate-mission cap was caught immediately by
+`test/missionTriggers.test.js`; reverting it restored a clean
+six-test baseline. Live-verified end to end through the real player
+dispatcher (`POST /api/players/:id/action`) for both `search-location`
+and a location-aware `practise-habit`, not only through the modules
+directly: a real faction holding real ground with a real installed
+leader eventually handed out a real, location-tied job with a real
+`controlling_faction_id`, at the measured rate, and a bare
+`practise-habit` with no location never did, however many times it
+was tried.
+
+Full suite, this round's own final run: 2086 tests, 2069 pass, 0
+fail, 17 skipped — exactly the prior round's 2066 tests (2049 pass, 17
+skipped) plus this round's own 20 new ones (13 in
+`test/mainCharacters.test.js`, 6 in `test/missionTriggers.test.js`,
+one new route test in `test/routes.test.js`), zero regressions.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

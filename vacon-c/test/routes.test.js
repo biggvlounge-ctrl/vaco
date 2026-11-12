@@ -936,6 +936,24 @@ test('GET /entities/:id/family-tree returns the same real family data createChar
   assert.equal(stray.family, null);
 });
 
+test('GET /communities/:id/main-characters returns the real local power hierarchy, live', { skip: SKIP }, async () => {
+  const community = await (await post('/communities', {})).json();
+
+  const hierarchy = await (await get(`/communities/${community.id}/main-characters`)).json();
+  assert.equal(hierarchy.communityId, community.id);
+  // A freshly created community, hand-built by this one route rather
+  // than a full worldgen pass, has no faction/government/religious
+  // order/business yet -- all four categories are honestly null,
+  // never an error or an empty-but-truthy placeholder.
+  assert.equal(hierarchy.criminal, null);
+  assert.equal(hierarchy.political, null);
+  assert.equal(hierarchy.religious, null);
+  assert.equal(hierarchy.business, null);
+
+  const missing = await get('/communities/999999/main-characters');
+  assert.equal(missing.status, 404);
+});
+
 test('a citizen does something, and the world reflects it back', { skip: SKIP }, async () => {
   // **The Phase 1 Definition of Done, over HTTP, in one test.** CLAUDE.md
   // says Phase 1 is not done until a Citizen-mode player can "observe

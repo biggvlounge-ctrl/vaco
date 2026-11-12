@@ -67,6 +67,8 @@ const players = require('./players.js');
 const leadership = require('./leadership.js');
 const influence = require('./influence.js');
 const characterCreation = require('./characterCreation.js');
+const mainCharacters = require('./mainCharacters.js');
+const missionTriggers = require('./missionTriggers.js');
 const contacts = require('./contacts.js');
 const bluff = require('./bluff.js');
 const territory = require('./territory.js');
@@ -853,6 +855,14 @@ function getFamilyTree(entityId) {
   return characterCreation.describeFamilyTree(WorldState, entityId);
 }
 
+// Real, computed local power hierarchy — criminal/political/religious/
+// business — for ANY community, live, never stored. See
+// `mainCharacters.js`'s own header for what each of the four reuses.
+// Backs `GET /api/communities/:id/main-characters`.
+function getMainCharacters(communityId) {
+  return mainCharacters.mainCharactersOf(WorldState, communityId);
+}
+
 // `contacts.js#findOrCreateContact`'s player-facing half — the same
 // injected-generators seam `createCharacter` above already uses, for
 // the identical reason: the real generation logic lives directly in
@@ -1023,8 +1033,21 @@ function applyStress(entityId, delta) {
   return behavior.applyStress(WorldState, entityId, delta);
 }
 
-function reinforceHabit(entityId, name, options) {
-  return behavior.reinforceHabit(WorldState, entityId, name, options);
+// `missionGenerated` is only ever non-null when the caller names a
+// real `locationPropertyId` AND that location's community has a real
+// criminal main character — see `missionTriggers.js`'s own header for
+// why this is scoped to the criminal category and to an explicit
+// location, never guessed from the habit's name. Every existing call
+// (showdown's own sparring reinforcement, every direct `behavior
+// .reinforceHabit` test) passes no `locationPropertyId` and gets
+// `missionGenerated: null`, so this is additive, not a behavior change.
+function reinforceHabit(entityId, name, options = {}) {
+  const habit = behavior.reinforceHabit(WorldState, entityId, name, options);
+  const locationPropertyId = options?.locationPropertyId ?? null;
+  const missionGenerated = locationPropertyId == null
+    ? null
+    : missionTriggers.maybeTriggerMission(WorldState, entityId, locationPropertyId, { tick: WorldState.tick });
+  return { ...habit, missionGenerated };
 }
 
 function listHabits(entityId) {
@@ -1391,10 +1414,20 @@ function canMakeThing(entityId, options = {}) {
   return salvage.canMake(WorldState, entityId, options.product);
 }
 
+// A real location always has a real propertyId, so — unlike
+// `reinforceHabit` above — the mission-trigger check always runs
+// here; `missionTriggers.js` itself is what returns `null` honestly
+// when this location's community has no real criminal main character,
+// or already has an open job, or the draw just does not land.
 function searchLocation(entityId, options = {}) {
-  return discovery.search(WorldState, entityId, Number(options.propertyId), {
+  const propertyId = Number(options.propertyId);
+  const result = discovery.search(WorldState, entityId, propertyId, {
     tick: WorldState.tick,
   });
+  const missionGenerated = missionTriggers.maybeTriggerMission(WorldState, entityId, propertyId, {
+    tick: WorldState.tick,
+  });
+  return { ...result, missionGenerated };
 }
 
 // `weapons.js`'s manufacturing gate, the player-facing half — see its
@@ -1749,6 +1782,7 @@ module.exports = {
   getLeaderDashboard,
   createCharacter,
   getFamilyTree,
+  getMainCharacters,
   findOrCreateContact,
   vaultStudiosLink,
   vultureLink,

@@ -408,6 +408,40 @@ storefront is a real VENVS seller with a runtime id and no separate
 product-id namespace to address. Four real link generators this
 round, not five.
 
+## Main characters — a real local power hierarchy, and real missions from it
+See `CLAUDE.md`'s own fifty-ninth standing rule for the full reasoning.
+"There'll be a kingpin... the strongest gangs, the strongest political
+party, the strongest religious party... a power hierarchy in every
+town" — by direct instruction. `server/mainCharacters.js` is the real,
+computed (never stored, standing rule 3) read: criminal via
+`authority.holderOf`, political via the real government whose scope
+actually covers this community (city, else region, else civilization),
+religious via a genuinely new `'religious order'` archetype
+(`orgArchetypes.js`), business via the highest-influence business
+actually operating a property here. `GET /api/communities/:id/
+main-characters` exposes it. All four can be honestly `null` — most
+sharply for criminal, since no faction gets a real `leader_id` from
+generation alone; only a real `attempt-takeover` (or an election, for
+political) ever installs one, a pre-existing gap this round documents
+rather than retroactively fixes for anything but its own new religious
+archetype.
+
+The second half — "explore skyscraper, explore library... every time
+we learn how to fish, we read a book... finding [main characters] will
+help us build missions" — is `server/missionTriggers.js`: a real,
+measured-rate chance (0.1 per visit; see that file's own header for
+the measured calls-to-first-mission table) that `search-location` (any
+landmark, `skyscraper`/`library` included, with no new wiring needed)
+or a now-location-aware `practise-habit` (a new optional
+`locationPropertyId`, mirroring `adopt-routine`'s existing one — no
+habit-name vocabulary exists to gate "fishing"/"reading" on) generates
+a real mission from the real criminal main character controlling that
+ground, via `generateMission({ locationId, controllingFactionId })`.
+A location already carrying an open job from its own main character
+never gets a second one stacked on top. Dedicated fishing-spot
+landmarks and gating by habit name are named as deliberately
+out of scope, not silently missing.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a
