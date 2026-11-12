@@ -3226,6 +3226,112 @@ Full suite after rebasing onto the political hierarchy's landed tip:
 being exactly this round's own in-flight state) + 12 (this round's own
 new tests) = 2058, exactly.
 
+**A fifty-eighth, and it closes the API map's own Phase 4 — the five
+"ecosystem link-outs" named since the earliest handoff document and
+never built, because the map's own words are explicit that they are
+link generators, not functional endpoints: "VACANCY should never
+implement the actual streaming/commerce/fashion logic itself."**
+
+**The gate is reused, not invented — the fourth time this round that a
+new threshold reaches for an existing one rather than guessing a
+number.** `media.js`'s own `CHANNELS.social_media` is already exactly
+"the internet is back, world-reaching, needs a real `internet`
+infrastructure row standing in this specific city" — one tier past
+`radio` (`electricity`) on the same `technology.ERA_NAMES` ladder
+`weapons.js#MANUFACTURING_ERA` already reuses. `media
+.availableChannels(worldState, cityId).includes('social_media')` is
+the entire real check — `computing` reached AND a real, non-failed
+`internet` row in that city, read once rather than re-derived.
+`server/ecosystemLinks.js#digitalPlanetReady` is that one call, named
+for what it answers; a `cityId` that cannot be resolved (no community,
+no city) is refused outright rather than defaulted to ready, the same
+posture `events.js#communityIdForEntity`'s own null case already
+holds.
+
+**Each destination was checked against the sibling's own real route
+table before a link into it was generated, not invented in isolation.**
+Vavlt Stvdios' real addressable unit is a channel
+(`GET /api/channels/:id`); Vvltvre is three real sub-apps sharing one
+home, so the map's own `:contentType` param (not `:contentId`) is taken
+literally and dispatches to Music's real `GET /api/releases/:id` or
+Flix's real `GET /api/titles/:id` — "touring" has no dedicated app in
+this repo yet and is refused rather than guessed; DREAMS' real unit is
+a screen (`GET /api/screens/:id`); VENVS' real unit is a seller
+(`GET /api/marketplace/sellers/:id`). No frontend deep-link convention
+(hash routes, a resolver) exists anywhere in this ecosystem yet —
+checked directly — so every link generated is a resource locator into
+the sibling's own real API, stated as such in its own response rather
+than implied to be a confirmed UI route.
+
+**"Vozzana da Gucci," named in the map since the original handoff, was
+a stale name — corrected directly, mid-build: it is SVMIKO DEGVCHI, a
+real 17-brand fashion house that lives INSIDE VENVS
+(`venvs/src/lib/svmikoDegvchi.js`), not a separate app, and never was
+one to build a fifth route toward.** Checked before deciding what to
+build, not assumed from the correction alone:
+`seedSvmikoDegvchiStorefronts` registers every brand as an ordinary
+VENVS marketplace seller through the identical real `registerSeller`
+call every other seller uses, which assigns a runtime integer
+`seller.id` — `brand.slug` (`'degvchi'`, `'vvlgari'`, …) is a
+human-readable label on the brand's own data definition, never stored
+as or usable as a real lookup key, and VENVS exposes no slug-to-id
+resolution route anywhere in its own code. So there is no separate,
+stable product-id namespace a fifth route could honestly address
+beyond what `venvs-link` already covers — a SVMIKO DEGVCHI brand's
+storefront IS a real VENVS seller, at the identical granularity as any
+other. Building a separate, more-specific route would have meant
+fabricating a slug-resolution capability VENVS does not actually have,
+the exact mistake this file already declined once for VULCAN not
+existing. **Folded entirely into `venvsLink`; there are four real link
+generators this round, not five**, and the map's original fifth line is
+closed by the fourth rather than left unclosed or faked.
+
+**A real, unrelated conflict found while sourcing VENVS' own real base
+URL, flagged rather than silently fixed** (out of this task's own
+files): `venvs/server.cjs` defaults to `PORT = process.env.PORT ||
+8829` — the exact port `start-ecosystem.sh` separately assigns to VDEX
+(home #19, a wholly different app) — and VENVS' real backend is not in
+that manifest's boot list at all, only its Vite dev server is. Both are
+real, pre-existing mistakes in two files neither belonging to this
+round; named here so they are not mistaken for something this change
+caused.
+
+**Verification.** `test/ecosystemLinks.test.js` (7 tests) follows
+`test/media.test.js`'s own fixture shape exactly, since the gate reused
+here reads the identical era/infrastructure/organization rows — a real
+mistake surfaced immediately the first time the suite ran: the fixture
+carried no `type: 'media'` organization, and `social_media` (like
+`radio`/`local_news`) also requires a real outlet to exist, not only
+the era and the infrastructure; every "ready" case failed until the
+fixture carried one, the same way a fixture missing a real row has
+silently hidden a gap elsewhere in this file before. Mutation-verified
+the gate itself: weakening `GATE_CHANNEL` to `'word_of_mouth'` (always
+available) turned three tests red immediately; reverted, confirmed
+green. Live-verified through the real `server/engine.js` wrapper
+(`cityOf` → `events.locationOfEvent` → `ecosystemLinks.*Link`, the
+identical call chain `server.js`'s own routes make) against a real
+constructed civilization at both sides of the threshold — refused with
+the real reason pre-`computing`, and all four generators returning
+their real sibling URLs once the gate passed — plus the real HTTP
+route confirmed live for the `entityId`-missing and
+unresolvable-city refusals.
+
+**A second, real regression caught by the full suite rather than by
+this round's own new tests**: `VACANCY_INVENTORY.md`'s own
+self-checking guard (`test/inventory.test.js`) failed twice the moment
+this round's new file and routes existed — its stated file count (121,
+a plain directory-entry count) disagreed with the test's own real
+definition (`.js` files only, excluding `server/schema-extensions.sql`,
+the one non-`.js` entry — 120), and its stated route count (105, the
+document's own running headline) had simply never been updated past an
+earlier round. Both are the exact three-time drift this file's own
+header already names as its reason for existing; fixed to the real,
+counted numbers rather than left for a fourth. Full suite: 2066 tests,
+2049 pass, 0 fail, 17 skipped, zero regressions (one unrelated,
+pre-existing flake in `tutorialMissions.test.js` — passes in isolation,
+23/23, and passed clean on this round's own final full run; not this
+round's doing, named rather than quietly ignored).
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

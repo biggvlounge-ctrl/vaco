@@ -386,6 +386,28 @@ to force a second axis. Corrections officers needed no new occupation:
 .describeFamilyTree` (filtered to the living) so somebody released, or
 broken out, heads to real family on record where this engine has one.
 
+## Phase 4: Digital Planet (ecosystem link-outs)
+See `CLAUDE.md`'s own fifty-eighth standing rule for the full
+reasoning. Closes the API map's own Phase 4 — five named link
+generators, none built until now, because the map's own words say
+"VACANCY should never implement the actual streaming/commerce/fashion
+logic itself." `server/ecosystemLinks.js` gates all four real
+generators on `media.js`'s own `social_media` channel (`computing` era
++ a real, non-failed `internet` row in the requester's city) — the
+same "is the internet back" question `media.js` already answers, read
+once rather than re-derived. Each destination was checked against the
+sibling's own real route table first: Vavlt Stvdios' real channels,
+Vvltvre's real Music/Flix releases/titles, DREAMS' real screens,
+VENVS' real sellers.
+
+The map's fifth line, "Vozzana da Gucci," turned out to be a stale
+name for SVMIKO DEGVCHI — a real 17-brand fashion house living INSIDE
+VENVS as ordinary marketplace sellers, not a separate app, so there is
+no fifth route: `venvs-link` already covers it, since a brand
+storefront is a real VENVS seller with a runtime id and no separate
+product-id namespace to address. Four real link generators this
+round, not five.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

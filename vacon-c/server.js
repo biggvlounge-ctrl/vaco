@@ -282,6 +282,52 @@ app.get('/api/entities/:id/family-tree', (req, res) => {
   res.json(engine.getFamilyTree(Number(req.params.id)));
 });
 
+// -- Phase 4: Digital Planet (ecosystem link-outs) --------------------------
+// VACANCY_API_ENDPOINT_MAP.md's own words: "outbound link generators,
+// not functional endpoints." Each one refuses rather than guessing
+// when entityId is missing, same convention GET /api/economy/snapshots
+// already established.
+
+function requireEntityId(req, res) {
+  const entityId = Number(req.query.entityId);
+  if (!Number.isFinite(entityId)) {
+    res.status(400).json({ error: 'entityId query parameter is required and must be a number' });
+    return null;
+  }
+  return entityId;
+}
+
+app.get('/api/ecosystem/vault-studios-link/:contentId', (req, res) => {
+  const entityId = requireEntityId(req, res);
+  if (entityId === null) return;
+  res.json(engine.vaultStudiosLink(entityId, req.params.contentId));
+});
+
+app.get('/api/ecosystem/vulture-link/:contentType', (req, res) => {
+  const entityId = requireEntityId(req, res);
+  if (entityId === null) return;
+  res.json(engine.vultureLink(entityId, req.params.contentType, req.query.contentId));
+});
+
+app.get('/api/ecosystem/dreams-link/:screenId', (req, res) => {
+  const entityId = requireEntityId(req, res);
+  if (entityId === null) return;
+  res.json(engine.dreamsLink(entityId, req.params.screenId));
+});
+
+// Covers SVMIKO DEGVCHI brand storefronts too -- the original map's
+// separate "vozzana-link" (Vozzana da Gucci, now renamed SVMIKO
+// DEGVCHI) is folded in here rather than built as a fifth route, since
+// each brand is a real VENVS seller (`registerSeller`) with a runtime
+// integer id and no separate, stable product-id namespace to link
+// into -- see `ecosystemLinks.js`'s own header for the real check
+// behind this decision.
+app.get('/api/ecosystem/venvs-link/:storefrontId', (req, res) => {
+  const entityId = requireEntityId(req, res);
+  if (entityId === null) return;
+  res.json(engine.venvsLink(entityId, req.params.storefrontId));
+});
+
 // -- NPCs -------------------------------------------------------------------
 
 app.get('/api/npcs', (req, res) => {

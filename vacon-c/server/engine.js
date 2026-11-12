@@ -87,6 +87,8 @@ const mortality = require('./mortality.js');
 const areaStats = require('./areaStats.js');
 const worldStore = require('./worldStore.js');
 const tutorialMissions = require('./tutorialMissions.js');
+const events = require('./events.js');
+const ecosystemLinks = require('./ecosystemLinks.js');
 const behavior = require('./behavior.js');
 const actions = require('./actions.js');
 const politics = require('./politics.js');
@@ -867,6 +869,35 @@ function findOrCreateContact(entityId, options = {}) {
       ),
     },
   });
+}
+
+// `ecosystemLinks.js`'s real gate needs the requesting entity's own
+// city — reuses `events.locationOfEvent`'s real community->city
+// resolution with a synthetic one-entity candidate, rather than
+// re-deriving the same lookup a second time in this file.
+function cityOf(entityId) {
+  return events.locationOfEvent(WorldState, { affected_entity_ids: [entityId] }).cityId;
+}
+
+// Phase 4 "Digital Planet" — five real link generators, gated on
+// `ecosystemLinks.digitalPlanetReady`. `entityId` identifies WHERE the
+// request is being made from (the requester's own city), never a
+// second identity check — these are outbound links, not an action
+// that moves anything in this world.
+function vaultStudiosLink(entityId, contentId) {
+  return ecosystemLinks.vaultStudiosLink(WorldState, cityOf(entityId), contentId);
+}
+
+function vultureLink(entityId, contentType, contentId) {
+  return ecosystemLinks.vultureLink(WorldState, cityOf(entityId), contentType, contentId);
+}
+
+function dreamsLink(entityId, screenId) {
+  return ecosystemLinks.dreamsLink(WorldState, cityOf(entityId), screenId);
+}
+
+function venvsLink(entityId, storefrontId) {
+  return ecosystemLinks.venvsLink(WorldState, cityOf(entityId), storefrontId);
 }
 
 // `bluff.js`'s three player-facing verbs — see that file's own header
@@ -1719,6 +1750,10 @@ module.exports = {
   createCharacter,
   getFamilyTree,
   findOrCreateContact,
+  vaultStudiosLink,
+  vultureLink,
+  dreamsLink,
+  venvsLink,
   intimidate,
   assessThreat,
   callBluff,

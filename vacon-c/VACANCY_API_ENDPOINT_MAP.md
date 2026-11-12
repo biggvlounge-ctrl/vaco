@@ -174,19 +174,36 @@ routes (`GET /api/players/:id/citizen-dashboard`,
 `influenceRating`/`extendedFamily` already have there — read live,
 never stored, never a route of its own.
 
-## Phase 4 — Digital Planet (ecosystem link-outs, not built here)
+## Phase 4 — Digital Planet (ecosystem link-outs) — built
 
 **These are outbound link generators, not functional endpoints** —
-VACANCY should never implement the actual streaming/commerce/fashion
-logic itself.
+VACANCY never implements the actual streaming/commerce/fashion logic
+itself; see `server/ecosystemLinks.js` and `CLAUDE.md`'s fifty-eighth
+standing rule for the real tech-era gate and the per-sibling route
+verification behind each line below.
 
 ```
-GET  /api/ecosystem/vault-studios-link/:contentId   — generates a deep link into Vavlt Stvdios
-GET  /api/ecosystem/vulture-link/:contentType        — generates a deep link into Vvltvre (Music/Flicks/Tix&Touring)
-GET  /api/ecosystem/dreams-link/:screenId            — generates a deep link into DREAMS
-GET  /api/ecosystem/venvs-link/:storefrontId         — generates a deep link into VENVS
-GET  /api/ecosystem/vozzana-link/:productId          — generates a deep link into Vozzana da Gucci
+GET  /api/ecosystem/vault-studios-link/:contentId?entityId=  — real deep link into Vavlt Stvdios' GET /api/channels/:id
+GET  /api/ecosystem/vulture-link/:contentType?entityId=&contentId=  — real deep link into Vvltvre's Music (/api/releases/:id) or Flix (/api/titles/:id); "touring" refused, no dedicated app exists yet
+GET  /api/ecosystem/dreams-link/:screenId?entityId=  — real deep link into DREAMS' GET /api/screens/:id
+GET  /api/ecosystem/venvs-link/:storefrontId?entityId=  — real deep link into VENVS' GET /api/marketplace/sellers/:id; also covers every SVMIKO DEGVCHI brand storefront (the same route named "vozzana-link" below)
 ```
+
+**"Vozzana da Gucci" was a stale name — it is SVMIKO DEGVCHI, a real
+17-brand fashion house living INSIDE VENVS as ordinary marketplace
+sellers, not a separate app.** There is no `vozzana-link` route: a
+brand storefront is addressed by the exact same `venvs-link` route
+above, since it is a real VENVS seller with a runtime-assigned id and
+no separate product-id namespace to address. Building a fifth route
+would have meant fabricating a slug-resolution capability VENVS does
+not have.
+
+Every route above refuses with a specific reason (missing `entityId`,
+an unresolvable city, or the `computing` era/real `internet`
+infrastructure not yet reached in the requester's own city) rather
+than defaulting to a link. All generated URLs are resource locators
+into the sibling's own real API — no deep-link/hash-route convention
+exists anywhere in this ecosystem yet, so none is claimed.
 
 ## Phase 5 — Multiplayer endpoints
 

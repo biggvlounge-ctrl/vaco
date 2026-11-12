@@ -322,6 +322,22 @@ test('GET /api/economy/snapshots requires an entityId rather than guessing one',
     'an entity with no snapshot yet (not a quarter boundary) still gets an array, empty rather than missing');
 });
 
+// -- Phase 4: Digital Planet (ecosystem link-outs) --------------------------
+
+test('GET /api/ecosystem/*-link routes require entityId, and honestly refuse a request from nowhere resolvable', { skip: SKIP }, async () => {
+  const missing = await get('/ecosystem/vault-studios-link/42');
+  assert.equal(missing.status, 400, 'no entityId must not silently generate a link for nobody in particular');
+
+  // A freshly generated standalone NPC has no community/city at all --
+  // the real, honest case this route refuses rather than defaults.
+  const { npc } = await (await post('/npc/generate', {})).json();
+  const res = await get(`/ecosystem/vault-studios-link/42?entityId=${npc.id}`);
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.ok, false);
+  assert.match(body.reason, /no resolvable city/);
+});
+
 test('GET /api/analytics/:tick answers a real reading, and 404s rather than guessing for one it has none of', { skip: SKIP }, async () => {
   // `/api/tick` is operator-gated, so this uses the open server
   // throughout rather than mixing it with the guarded one's world —

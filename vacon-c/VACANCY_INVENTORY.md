@@ -20,7 +20,7 @@ There is a working simulation — traits across four tiers, seven Key
 resolvers, family, economy, territory, tick, players, artifacts and
 missions, plus Property, Culture DNA, Named Flow Templates, contest
 resolution and the Behavior Engine — and its HTTP surface is real:
-**105 routes**, up from 8 before any of this -- 92 plus the two
+**109 routes**, up from 8 before any of this -- 92 plus the two
 cross-cutting reads (`/api/historical-records`,
 `/api/decision-log/:entityId`) a later audit found documented in
 `VACANCY_API_ENDPOINT_MAP.md` as built and missing from `server.js`,
@@ -38,7 +38,16 @@ forty-eighth standing rule): `GET /api/entities/:id/influence-rating`,
 `GET /api/families/:id/political-influence`, and
 `POST /api/characters`, plus one more closing a gap the forty-eighth
 left behind (CLAUDE.md's forty-ninth standing rule):
-`GET /api/entities/:id/family-tree`.
+`GET /api/entities/:id/family-tree`, plus four more closing Phase 4's
+ecosystem link-outs (CLAUDE.md's fifty-eighth standing rule):
+`GET /api/ecosystem/vault-studios-link/:contentId`,
+`GET /api/ecosystem/vulture-link/:contentType`,
+`GET /api/ecosystem/dreams-link/:screenId`,
+`GET /api/ecosystem/venvs-link/:storefrontId` — the map's original
+fifth line, `vozzana-link`, folded into the fourth rather than built
+separately, since SVMIKO DEGVCHI (the renamed "Vozzana da Gucci")
+turned out to live inside VENVS as ordinary sellers with no separate
+product-id namespace to address.
 
 Since then, and not in the phase plan because nothing anticipated them:
 world generation, the uniform statistics catalogue, crime and policing,
@@ -55,9 +64,9 @@ registered. Re-checked directly on 17 Sep 2026, which is the only way
 any line in this file should be trusted.
 
 What actually remains: Phase 3's player experience beyond the citizen
-dashboard, Phase 4's ecosystem link-outs, Phase 5 multiplayer, and the
-Leader/Simulation modes — all deferred by CLAUDE.md rather than
-half-finished. The one genuinely large piece of engineering left is the
+dashboard, Phase 5 multiplayer, and the Leader/Simulation modes — all
+deferred by CLAUDE.md rather than half-finished. Phase 4's ecosystem
+link-outs are built (CLAUDE.md's fifty-eighth standing rule). The one genuinely large piece of engineering left is the
 sync-to-async conversion behind moving off in-memory `WorldState` onto
 the Postgres schema that already exists.
 
@@ -65,7 +74,7 @@ the Postgres schema that already exists.
 
 ## 1. Server code — `vacon-c/server/`
 
-All 119 files present on disk, all committed, largest first.
+All 120 files present on disk, all committed, largest first.
 
 **`test/inventory.test.js` now fails when this table and `server/` disagree**, which is the guard this document has needed through three separate drifts (see the note below). The count and the file list are checked against the tree rather than typed.
 
@@ -198,6 +207,7 @@ read off disk, not recalled.
 | `db.js` | 2,017 | Postgres connection and `query()` helper. | Built, see §4 |
 | `seeded.js` | 2,016 | **§88 determinism** — `hashSeed`, `seededUnit`, `seededDraw`. Seed on position, never on identity. | Built |
 | `nextAfter.js` | 1,004 | The next value after a given one in a sequence. | Built |
+| `ecosystemLinks.js` | 9,558 | **Phase 4 "Digital Planet" — four real link generators, not five.** Gates on `media.js`'s own `social_media` channel (`computing` era + a real, non-failed `internet` row in the requester's city) — the same "is the internet back" question, read once. Each destination checked against the sibling's own real route table: Vavlt Stvdios' channels, Vvltvre's Music/Flix releases/titles, DREAMS' screens, VENVS' sellers. "Vozzana da Gucci" turned out to be a stale name for SVMIKO DEGVCHI, a real brand house living inside VENVS as ordinary sellers — no fifth route; `venvs-link` already covers it. See CLAUDE.md's fifty-eighth standing rule. | Built |
 
 ### Shared middleware — `vacon-c/lib/`
 
@@ -248,7 +258,7 @@ seven entries out of date when it arrived.
 **Still outstanding:** the React app Document 4 says already exists.
 See §5.
 
-## 3. The API — 45 map lines built of 58, across 79 registered routes
+## 3. The API — 49 map lines built of 57, across 109 registered routes
 
 ### The five-endpoint contract, unchanged
 
@@ -268,16 +278,24 @@ them; `test/routes.test.js` asserts it.
 | Phase 1 — DNA Prototype | 22 | **22** | **0** |
 | Phase 2 — World Expansion | 13 | **13** | **0** |
 | Phase 3 — Player Experience | 7 | **5** | 2 |
-| Phase 4 — Digital Planet link-outs | 5 | 0 | 5 |
+| Phase 4 — Digital Planet link-outs | 4 | **4** | **0** |
 | Phase 5 — Multiplayer | 3 | 0 | 3 |
 | Cross-cutting | 3 | 0 | 3 |
-| **Total** | **58** | **45** | **13** |
+| **Total** | **57** | **49** | **8** |
 
-**92 routes are registered in `server.js`** (counted, not remembered:
-`grep -cE "^app\.(get|post|put|patch|delete)\(" server.js`). Of those,
-**38 have no line anywhere in the map** — every path below was checked
-against the map text with `:param` names normalised, so a rename cannot
-hide one:
+**109 routes are registered in `server.js`** (recounted this round:
+`grep -cE "^app\.(get|post|put|patch|delete)\(" server.js`). This
+section's own two prior figures (a "79" in the heading above and a
+"92" here) already disagreed with each other and with the real count
+before this round touched anything — flagged rather than silently
+carried forward, since re-publishing either would restate a number
+already proven wrong. The "38 have no line anywhere in the map" tally
+below is NOT recounted this round (the four routes this round added
+all have real map lines, so they do not change that figure, but
+whatever drift produced the 79/92 mismatch may also have added
+unmapped routes since this list was last true) — a real, separate
+reconciliation this round did not take on. The list itself, as it
+stood before this round:
 
 `GET /api/artifacts/:id`, `GET` and `POST /api/conditions`,
 `POST /api/resources`, `GET` and `POST /api/territory-blocks`,
