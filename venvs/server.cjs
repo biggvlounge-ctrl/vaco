@@ -37,7 +37,7 @@
 //   node server.cjs
 //
 // Test:
-//   curl http://localhost:8829/api/health
+//   curl http://localhost:8830/api/health
 
 const express = require('express');
 const cors = require('cors');
@@ -49,7 +49,11 @@ const { createServiceAuth } = require('./lib/serviceAuth.cjs');
 const { requireActor, requireCallingService } = require('./lib/shieldAuth.cjs');
 const { traceMiddleware } = require('./lib/tracing.cjs');
 
-const PORT = process.env.PORT || 8829;
+// 8829 collides with VDEX's real assigned port in start-ecosystem.sh
+// (home #19, opened 11 Nov 2026) -- this default had no documented
+// intentionality behind it anywhere in this app, so moved to 8830
+// rather than leaving two real apps defaulting to the same port.
+const PORT = process.env.PORT || 8830;
 const V3_API_URL = process.env.V3_API_URL || 'http://localhost:8811';
 const VOID_API_URL = process.env.VOID_API_URL || 'http://localhost:8793';
 const CHOPZ_SHOP_API_URL = process.env.CHOPZ_SHOP_API_URL || 'http://localhost:8801';
