@@ -272,6 +272,14 @@ function generateRegion(worldState, options = {}) {
     regionalContext: countryKey ? countryPacks.regionalContextFor(countryKey) : null,
     temperamentKey,
     temperamentCluster: temperament,
+    // The full political hierarchy round's new leader field — this
+    // engine's real state-equivalent tier (see
+    // `politics.GOVERNMENT_SCOPE_TYPES`'s own header). Explicit null,
+    // the same convention `territory.js`'s `mayor_npc_id`/
+    // `leadership_npc_id` already use, vacated on death by
+    // `succession.js` and set by a real election when
+    // `config.scopedGovernments` is on.
+    governor_npc_id: null,
   };
   (worldState.regions || (worldState.regions = [])).push(region);
   return region;

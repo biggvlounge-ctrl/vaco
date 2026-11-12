@@ -165,6 +165,22 @@ const DEFAULTS = {
   // `characterCreation.MAX_COUSINS_PER_AUNT_UNCLE` (4) for the reason
   // stated above.
   maxCousinsPerAuntUncle: 2,
+  // **Real city- and region-level governments — opt-in, same posture
+  // as `extendedFamily` just above, for the same reason.** Before
+  // this round, `worldgen.js` founded exactly one civilization-wide
+  // government organization and `politics.js`'s already-generic
+  // election/legislature/revolution cycle ran it alone. Turning this
+  // on founds one additional REAL government per city and one per
+  // region (the schema's own state-equivalent tier — see
+  // `politics.GOVERNMENT_SCOPE_TYPES`'s own header), each with its own
+  // real scoped election cycle. Off, every existing call to
+  // `generateWorld()` gets the exact unchanged world the whole test
+  // suite already asserts counts against — more governments means
+  // more elections, more laws enacted per tick, and more events in a
+  // long-running world, all of which a bare `summary.organizations`
+  // or event-count assertion built before this round has no way to
+  // have anticipated.
+  scopedGovernments: false,
   businessesPerCommunity: 2,
   factionsPerCity: 2,
   // Homes are generated to house everybody with a margin, which is
@@ -2008,8 +2024,58 @@ function generateWorld(options = {}) {
   politics.foundGovernment(w, {
     organizationId: state.id,
     systemType: random.pick(politics.SYSTEM_TYPES, 'gov', 'system'),
+    scopeType: 'civilization',
+    scopeId: civilization.id,
   });
   summary.governmentId = state.id;
+
+  // ---- the full political hierarchy, opt-in (config.scopedGovernments) --
+  // One real government per city and one per region, each with its
+  // own real, scoped election/legislature/revolution cycle — see
+  // `config.scopedGovernments`'s own header above for why this is
+  // opt-in, and `politics.js#GOVERNMENT_SCOPE_TYPES`'s header for why
+  // `region` (not a new table) is this engine's real state-equivalent
+  // tier. `community` is deliberately NOT given one — see that same
+  // header.
+  summary.cityGovernmentIds = [];
+  summary.regionGovernmentIds = [];
+  if (config.scopedGovernments) {
+    for (const cityId of summary.cities) {
+      const city = w.cities.find((x) => x.id === cityId);
+      if (!city) continue;
+      const cityGov = engine.generateOrganization({
+        name: `${city.name} City Council`,
+        type: 'government',
+        traitValueFor: (def) => Math.round(
+          random.range(30, 85, 'gov-trait', 'city', city.id, def.family, def.name),
+        ),
+      });
+      summary.organizations += 1;
+      politics.foundGovernment(w, {
+        organizationId: cityGov.id,
+        systemType: random.pick(politics.SYSTEM_TYPES, 'gov-city', city.id, 'system'),
+        scopeType: 'city',
+        scopeId: city.id,
+      });
+      summary.cityGovernmentIds.push(cityGov.id);
+    }
+
+    const regionGov = engine.generateOrganization({
+      name: `${region.name} Statehouse`,
+      type: 'government',
+      traitValueFor: (def) => Math.round(
+        random.range(30, 85, 'gov-trait', 'region', region.id, def.family, def.name),
+      ),
+    });
+    summary.organizations += 1;
+    politics.foundGovernment(w, {
+      organizationId: regionGov.id,
+      systemType: random.pick(politics.SYSTEM_TYPES, 'gov-region', region.id, 'system'),
+      scopeType: 'region',
+      scopeId: region.id,
+    });
+    summary.regionGovernmentIds.push(regionGov.id);
+  }
 
   // **A seat, because an announcement has to be made somewhere.**
   // `properties.operating_organization_id` is the schema's own link

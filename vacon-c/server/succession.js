@@ -284,6 +284,21 @@ function settleEstate(worldState, options = {}) {
       report.postsVacated.push({ kind: 'city', id: city.id });
     }
   }
+  // The two new leader fields the full political hierarchy round
+  // adds — same vacate-on-death treatment `city.mayor_npc_id`/
+  // `community.leadership_npc_id` already get.
+  for (const region of worldState.regions || []) {
+    if (region.governor_npc_id === entityId) {
+      region.governor_npc_id = null;
+      report.postsVacated.push({ kind: 'region', id: region.id });
+    }
+  }
+  for (const civilization of worldState.civilizations || []) {
+    if (civilization.head_of_state_npc_id === entityId) {
+      civilization.head_of_state_npc_id = null;
+      report.postsVacated.push({ kind: 'civilization', id: civilization.id });
+    }
+  }
 
   // ---- the family ----------------------------------------------------
   // A family whose head has died gets the heir as head and advances a

@@ -393,7 +393,18 @@ CREATE TABLE businesses (
 -- Government = another Organization subtype
 CREATE TABLE governments (
     organization_id     BIGINT PRIMARY KEY REFERENCES organizations(id) ON DELETE CASCADE,
-    system_type         TEXT -- democracy|monarchy|council|corporate|tribal|technocracy|military|religious|hybrid
+    system_type         TEXT, -- democracy|monarchy|council|corporate|tribal|technocracy|military|religious|hybrid
+    -- Added for the full political hierarchy (town/city/state/
+    -- country): a government's own real jurisdiction, so the one
+    -- election/legislature/revolution cycle `server/politics.js`
+    -- already runs generically over every row in this table can be
+    -- handed more than the single civilization-wide government
+    -- `worldgen.js` used to found. NULL on every pre-existing row
+    -- (the old, unscoped civ-wide government), which every scoping
+    -- reader in `politics.js` treats as "the whole world" -- the
+    -- exact behaviour this table already had.
+    scope_type           TEXT, -- city|region|civilization
+    scope_id             BIGINT
 );
 
 CREATE TABLE elections (
@@ -553,14 +564,27 @@ CREATE TABLE regions (
     name                TEXT NOT NULL,
     civilization_id     BIGINT, -- FK added after civilizations table exists
     geography_key       TEXT,
-    climate_key         TEXT
+    climate_key         TEXT,
+    -- Added for the full political hierarchy: a region sits directly
+    -- between a civilization and its cities, exactly where a
+    -- US-style "state" sits between a country and its cities, and had
+    -- no leader field at all -- `cities.mayor_npc_id` and
+    -- `communities.leadership_npc_id` both already have one. Cleared
+    -- on death the same way those two already are (`succession.js`).
+    governor_npc_id     BIGINT REFERENCES entities(id)
 );
 
 CREATE TABLE civilizations (
     id                  BIGSERIAL PRIMARY KEY,
     name                TEXT NOT NULL,
     era                 TEXT,
-    stability_index     NUMERIC DEFAULT 50
+    stability_index     NUMERIC DEFAULT 50,
+    -- Same real gap, one tier up: `worldgen.js` has always founded
+    -- exactly one civilization-wide government organization (the
+    -- "`${civilizationName} Assembly`"), and `politics.js#runElections`
+    -- already runs a real election cycle for it -- but its winner had
+    -- nowhere of its own to land beyond `organizations.leader_id`.
+    head_of_state_npc_id BIGINT REFERENCES entities(id)
 );
 
 ALTER TABLE regions ADD CONSTRAINT fk_regions_civ FOREIGN KEY (civilization_id) REFERENCES civilizations(id);

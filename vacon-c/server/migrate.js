@@ -347,9 +347,9 @@ async function migrateWorldStateToPostgres(worldState) {
       // stays deliberate.
       for (const r of worldState.regions) {
         await client.query(
-          `INSERT INTO regions (id, name, geography_key, climate_key)
-           VALUES ($1,$2,$3,$4)`,
-          [r.id, r.name, r.geography_key, r.climate_key]
+          `INSERT INTO regions (id, name, geography_key, climate_key, governor_npc_id)
+           VALUES ($1,$2,$3,$4,$5)`,
+          [r.id, r.name, r.geography_key, r.climate_key, r.governor_npc_id ?? null]
         );
       }
       summary.regions = worldState.regions.length;
@@ -666,12 +666,12 @@ async function migrateWorldStateToPostgres(worldState) {
       // passed as an object.
       for (const c of worldState.civilizations) {
         await client.query(
-          `INSERT INTO civilizations (id, name, era, stability_index, traits)
-           VALUES ($1,$2,$3,$4,$5)`,
+          `INSERT INTO civilizations (id, name, era, stability_index, traits, head_of_state_npc_id)
+           VALUES ($1,$2,$3,$4,$5,$6)`,
           // `traits` is the state's four spending priorities — see
           // server/tierTraits.js. Dropping them on a restore would put
           // the state back on an even split it never chose.
-          [c.id, c.name, c.era, c.stability_index, c.traits ?? null]
+          [c.id, c.name, c.era, c.stability_index, c.traits ?? null, c.head_of_state_npc_id ?? null]
         );
       }
       summary.civilizations = worldState.civilizations.length;
@@ -807,8 +807,9 @@ async function migrateWorldStateToPostgres(worldState) {
 
       for (const g of worldState.governments) {
         await client.query(
-          `INSERT INTO governments (organization_id, system_type) VALUES ($1,$2)`,
-          [g.organization_id, g.system_type]
+          `INSERT INTO governments (organization_id, system_type, scope_type, scope_id)
+           VALUES ($1,$2,$3,$4)`,
+          [g.organization_id, g.system_type, g.scope_type ?? null, g.scope_id ?? null]
         );
       }
       summary.governments = worldState.governments.length;

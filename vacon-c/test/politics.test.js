@@ -46,9 +46,15 @@ function world({ npcs = 4, loyalty = 50, paranoia = 50, threshold = 50 } = {}) {
     tick: 10,
     npcs: Array.from({ length: npcs }, (_, i) => ({ id: i + 1 })),
     organizations: [
-      { id: 100, type: 'government', leader_npc_id: null },
-      { id: 200, type: 'government', leader_npc_id: null },
-      { id: 300, type: 'business', leader_npc_id: null },
+      // `leader_id` — the real schema column, the one
+      // `leadership.js`/`control.js`/`succession.js` actually read.
+      // This fixture used to say `leader_npc_id`, the exact phantom
+      // field name `closeElection` wrote to before this round's fix —
+      // the fixture and the bug agreed, which is why 300+ runs of this
+      // suite never caught it.
+      { id: 100, type: 'government', leader_id: null },
+      { id: 200, type: 'government', leader_id: null },
+      { id: 300, type: 'business', leader_id: null },
     ],
     families: [],
     entityTraits: [],
@@ -300,7 +306,7 @@ test('an election runs scheduled, open, closed, and tallies its votes', () => {
 
   // The winner takes the organization's leadership — the point of
   // holding an election.
-  assert.equal(w.organizations.find((o) => o.id === 100).leader_npc_id, 3);
+  assert.equal(w.organizations.find((o) => o.id === 100).leader_id, 3);
 });
 
 test('one vote per voter per election, because that is the primary key', () => {
@@ -332,7 +338,7 @@ test('a tied election elects nobody rather than the first candidate found', () =
   const result = politics.closeElection(w, { electionId: e.id });
   assert.equal(result.tied, true);
   assert.equal(result.winnerId, null);
-  assert.equal(w.organizations.find((o) => o.id === 100).leader_npc_id, null,
+  assert.equal(w.organizations.find((o) => o.id === 100).leader_id, null,
     'a tie installed a leader anyway');
 });
 
@@ -497,4 +503,186 @@ test('id counters survive a reseed, which is what a restore calls', () => {
   // on the next write.
   assert.notEqual(politics.enactLaw(w, { category: 'family' }).id, law.id);
   assert.notEqual(politics.scheduleElection(w, { organizationId: 100 }).id, election.id);
+});
+
+// -------------------------------------------------------------------------
+// The full political hierarchy — town/city/state(region)/country
+// (civilization). `runElections`/`runLegislation`/`assessRevolutions`
+// were already generic over `worldState.governments`; these tests are
+// about the NEW scoping that makes handing them more than one
+// government safe, not about the election cycle itself (already
+// covered above).
+// -------------------------------------------------------------------------
+
+// Two cities in one region, each with its own community and NPCs — the
+// real geography a scoped government has to be resolvable through,
+// the same shape `events.js`'s own resolution chain reads.
+function geoWorld() {
+  const w = world({ npcs: 0 });
+  w.regions = [{ id: 900, name: 'Test Region', civilization_id: 950, governor_npc_id: null }];
+  w.civilizations = [{ id: 950, name: 'Test Civ', head_of_state_npc_id: null }];
+  w.cities = [
+    { id: 910, name: 'City A', region_id: 900, mayor_npc_id: null },
+    { id: 920, name: 'City B', region_id: 900, mayor_npc_id: null },
+  ];
+  w.communities = [
+    { id: 911, city_id: 910 },
+    { id: 921, city_id: 920 },
+  ];
+  // Empty but present — `enactLaw`'s own `broadcastGovernmentKnowledge`
+  // path reaches into `media.js`'s real channel/era machinery, which
+  // reads these two unconditionally.
+  w.technologyEras = [];
+  w.civilizationTechnologyProgress = [];
+  w.properties = [];
+  // Two residents of City A, one of City B.
+  w.npcs = [
+    { id: 1, communityId: 911 },
+    { id: 2, communityId: 911 },
+    { id: 3, communityId: 921 },
+  ];
+  return w;
+}
+
+test('scopeCitiesOf/scopePopulationOf: civilization scope (and no scope at all) is the whole world, unchanged', () => {
+  const w = geoWorld();
+  assert.deepEqual(
+    politics.scopeCitiesOf(w, null).map((c) => c.id).sort(),
+    [910, 920],
+  );
+  assert.deepEqual(
+    politics.scopePopulationOf(w, null).map((n) => n.id).sort(),
+    [1, 2, 3],
+  );
+  const civWide = { organization_id: 500, scope_type: 'civilization', scope_id: null };
+  assert.deepEqual(politics.scopeCitiesOf(w, civWide).map((c) => c.id).sort(), [910, 920]);
+  assert.deepEqual(politics.scopePopulationOf(w, civWide).map((n) => n.id).sort(), [1, 2, 3]);
+});
+
+test('scopeCitiesOf/scopePopulationOf: a city-scoped government sees only its own city and residents', () => {
+  const w = geoWorld();
+  const cityGov = { organization_id: 501, scope_type: 'city', scope_id: 910 };
+  assert.deepEqual(politics.scopeCitiesOf(w, cityGov).map((c) => c.id), [910]);
+  assert.deepEqual(politics.scopePopulationOf(w, cityGov).map((n) => n.id).sort(), [1, 2]);
+});
+
+test('scopeCitiesOf/scopePopulationOf: a region-scoped government sees every city in that region', () => {
+  const w = geoWorld();
+  const regionGov = { organization_id: 502, scope_type: 'region', scope_id: 900 };
+  assert.deepEqual(politics.scopeCitiesOf(w, regionGov).map((c) => c.id).sort(), [910, 920]);
+  assert.deepEqual(politics.scopePopulationOf(w, regionGov).map((n) => n.id).sort(), [1, 2, 3]);
+});
+
+test('foundGovernment: scopeType defaults to civilization/null, and rejects an invalid scope', () => {
+  const w = world();
+  const gov = politics.foundGovernment(w, { organizationId: 100, systemType: 'council' });
+  assert.equal(gov.scope_type, 'civilization');
+  assert.equal(gov.scope_id, null);
+
+  assert.throws(() => politics.foundGovernment(w, {
+    organizationId: 200, systemType: 'council', scopeType: 'community',
+  }), /scopeType must be one of/, 'a community is deliberately not a valid scope — see the header');
+});
+
+test('installScopedLeader: a city-scoped winner becomes that city\'s real mayor, not any other city\'s', () => {
+  const w = geoWorld();
+  const cityGov = { organization_id: 501, scope_type: 'city', scope_id: 910 };
+  politics.installScopedLeader(w, cityGov, 1);
+  assert.equal(w.cities.find((c) => c.id === 910).mayor_npc_id, 1);
+  assert.equal(w.cities.find((c) => c.id === 920).mayor_npc_id, null);
+});
+
+test('installScopedLeader: a region-scoped winner becomes the region\'s real governor', () => {
+  const w = geoWorld();
+  const regionGov = { organization_id: 502, scope_type: 'region', scope_id: 900 };
+  politics.installScopedLeader(w, regionGov, 3);
+  assert.equal(w.regions.find((r) => r.id === 900).governor_npc_id, 3);
+});
+
+test('installScopedLeader: a civilization-scoped winner with a real scopeId becomes the head of state', () => {
+  const w = geoWorld();
+  const civGov = { organization_id: 503, scope_type: 'civilization', scope_id: 950 };
+  politics.installScopedLeader(w, civGov, 2);
+  assert.equal(w.civilizations.find((c) => c.id === 950).head_of_state_npc_id, 2);
+});
+
+test('installScopedLeader: the OLD civ-wide government (scopeId null) installs nowhere beyond the organization itself — exact pre-existing behaviour', () => {
+  const w = geoWorld();
+  const civWide = { organization_id: 100, scope_type: 'civilization', scope_id: null };
+  politics.installScopedLeader(w, civWide, 1);
+  assert.equal(w.civilizations.find((c) => c.id === 950).head_of_state_npc_id, null,
+    'no real civilization to point at, so nothing beyond organizations.leader_id should move');
+});
+
+test('closeElection: a city-scoped government installs its winner onto that city AND organizations.leader_id, with turnout scoped to that city alone', () => {
+  const w = geoWorld();
+  w.organizations.push({ id: 510, type: 'government', leader_id: null });
+  politics.foundGovernment(w, {
+    organizationId: 510, systemType: 'democracy', scopeType: 'city', scopeId: 910,
+  });
+  const election = politics.scheduleElection(w, { organizationId: 510, startTick: 0 });
+  politics.openElection(w, { electionId: election.id });
+  // Only City A's two residents (1, 2) vote — City B's resident (3)
+  // is not part of this election's real population at all.
+  politics.castVote(w, { electionId: election.id, voterEntityId: 1, candidateEntityId: 1 });
+  politics.castVote(w, { electionId: election.id, voterEntityId: 2, candidateEntityId: 1 });
+
+  const result = politics.closeElection(w, { electionId: election.id, tick: 1 });
+  assert.equal(result.winnerId, 1);
+  // Turnout against City A's own 2 residents, not the whole world's 3.
+  assert.equal(result.turnout, 1);
+  assert.equal(w.organizations.find((o) => o.id === 510).leader_id, 1);
+  assert.equal(w.cities.find((c) => c.id === 910).mayor_npc_id, 1);
+  assert.equal(w.cities.find((c) => c.id === 920).mayor_npc_id, null,
+    'City B never had an election and must not be touched by City A\'s');
+});
+
+test('candidatesFor: a city-scoped government\'s fallback ranking never reaches into another city', () => {
+  const w = geoWorld();
+  w.organizations.push({ id: 511, type: 'government', leader_id: null });
+  politics.foundGovernment(w, {
+    organizationId: 511, systemType: 'democracy', scopeType: 'city', scopeId: 910,
+  });
+  const candidates = politics.candidatesFor(w, 511);
+  assert.ok(candidates.every((id) => [1, 2].includes(id)),
+    `City A's candidates must come only from City A's own residents, got ${candidates}`);
+});
+
+test('runLegislation: a city-scoped government only legislates for its own city, never another one', () => {
+  const w = geoWorld();
+  w.organizations.push({ id: 512, type: 'government', leader_id: null });
+  politics.foundGovernment(w, {
+    organizationId: 512, systemType: 'council', scopeType: 'city', scopeId: 910,
+  });
+  politics.runLegislation(w, politics.LEGISLATION_INTERVAL_TICKS);
+  const lawCityIds = w.laws.map((l) => l.jurisdiction_city_id);
+  assert.ok(lawCityIds.every((id) => id === 910),
+    `a city-910-scoped government must never enact a law for any other city, got ${lawCityIds}`);
+  assert.ok(lawCityIds.length > 0, 'it should have enacted at least one real law for its own city');
+});
+
+test('assessRevolutions: a city-scoped government\'s spread is measured against its OWN population, not the whole world', () => {
+  // The same seventeenth-standing-rule shape `computeApproval`'s own
+  // header names: an unscoped denominator would make a small city's
+  // revolt floor structurally unreachable. One informed, maximally
+  // disapproving resident out of City A's real population of 2 is a
+  // spread of 0.5 — well above the floor — and would read as a
+  // negligible 0.33 against the whole world's population of 3 before
+  // this fix (still, coincidentally, above 0.25 here, so the stronger
+  // assertion is on the NUMBER itself, not just the pass/fail).
+  const w = geoWorld();
+  w.organizations.push({ id: 513, type: 'government', leader_id: null });
+  politics.foundGovernment(w, {
+    organizationId: 513, systemType: 'council', scopeType: 'city', scopeId: 910,
+  });
+  w.entityKnowledge.push({
+    entity_id: 1, fact_content: 'government:513 is terrible', fact_type: 'known',
+    confidence_level: 1,
+  });
+  w.beliefs.push({
+    belief_type: 'political', belief_name: 'government:513', strength: -100, entity_id: 1,
+  });
+  const { started } = politics.assessRevolutions(w, 1);
+  assert.equal(started.length, 1, 'City A\'s own scoped population should be enough to cross the spread floor');
+  assert.equal(started[0].target_government_organization_id, 513);
 });

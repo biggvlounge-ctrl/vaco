@@ -2930,6 +2930,119 @@ Full suite on the merged tree, after rebasing onto the local-area
 events round above: 2034 tests, 2017 pass, 0 fail, 17 skipped — this
 file's own 5 new tests included, zero regressions from either round.
 
+**A fifty-sixth, and it is the full political hierarchy asked for by
+name — "town to continental, country, state, city... politics for
+everything" — closed by finding that most of it was already real and
+only ever handed one subject, plus one real bug the generalisation
+itself surfaced.**
+
+**The real hierarchy, read from the schema rather than guessed.**
+`VACANCY_POSTGRESQL_SCHEMA.sql` names four geographic tiers:
+`communities` → `cities` → `regions` → `civilizations`, each a real FK
+into the one above it. `regions` sits directly between civilization
+and city — exactly where a US-style "state" sits between country and
+city — so **region IS this engine's state tier**, not a fifth table to
+invent. `communities.leadership_npc_id` and `cities.mayor_npc_id` both
+already existed as real leader fields; `regions` and `civilizations`
+had none at all.
+
+**The real structural ceiling, confirmed rather than assumed: this
+engine generates exactly ONE region and ONE civilization per world**
+(`migration.generateRegion` and `technology.foundCivilization` are
+each called exactly once in `worldgen.js`, already named in the
+thirty-ninth standing rule). "Continental" has no table, no column,
+and no real per-continent political dataset researched this round — a
+generated continental leader would be political theater for a
+population of zero, the eleventh standing rule's own trap one tier
+further out than usual. Declined outright rather than faked, same
+posture `countryPacks.js` already took for country-level real data:
+report-only, not a mechanic.
+
+**The real substrate for "politics" turned out to already be fully
+generic, and had simply never been handed more than one subject.**
+`politics.js#runElections`/`runLegislation`/`assessRevolutions` all
+loop `for (const government of worldState.governments || [])` — a
+civilization, if `worldgen.js` ever founded more than the one
+civ-wide `"${civilizationName} Assembly"` it always has, would
+already get a real election cycle with no changes to those three
+functions at all. The actual gap was narrower than "build politics
+for every tier": it was giving a `governments` row a real SCOPE
+(`scope_type`/`scope_id`: city, region, or civilization — `community`
+deliberately excluded, the same "population of one" reasoning above,
+one tier down: a formal election over one neighbourhood's worth of
+people is a label, not a mechanism), and then scoping every READER
+that had silently assumed there was only ever one government in the
+world: `candidatesFor`'s fallback ranking and the voter pool in
+`runElections` both used to draw from `worldState.npcs` — EVERY NPC on
+the planet — for ANY government's election; `runLegislation` legislated
+every city for every government, which was correct by accident when
+there was only one government and would have had a city government
+enacting laws for cities it does not represent the moment a second one
+existed; and `computeApproval`'s `spread` denominator was the whole
+world's population, which would have made `REVOLUTION_SPREAD_FLOOR`
+structurally unreachable for any government smaller than the whole
+civilization — the fourteenth standing rule's own shape, a threshold
+whose denominator sits behind a wider population than the mechanism
+was ever built to reach. `politics.scopeCitiesOf`/`scopePopulationOf`
+are the one real fix underneath all four, reused by each rather than
+patched four separate times.
+
+**A real, previously-uncaught bug surfaced by generalising the
+mechanism to a second tier, not by looking for one.**
+`closeElection` wrote `organization.leader_npc_id` — a field that does
+not exist on the schema, on `engine.js#generateOrganization`'s real
+object shape (`leader_id`), or anywhere else `leadership.js`/
+`control.js`/`succession.js` read. Every election this engine has ever
+run, since `politics.js` was first built, had its winner go nowhere.
+The sixth standing rule's own shape — a writer using a field name that
+does not exist succeeds silently, forever — compounded by the
+twenty-fourth's: `test/politics.test.js`'s own fixture built its
+organizations with `leader_npc_id: null`, the identical wrong name, so
+a passing suite could never have caught it. Fixed to write `leader_id`
+(the real column), and the fixture corrected to match a real generated
+organization's actual shape rather than the bug's.
+
+**What's genuinely new, generalised, and report-only, named
+separately rather than blurred together.** New: `regions
+.governor_npc_id`, `civilizations.head_of_state_npc_id`, and
+`governments.scope_type`/`.scope_id` are real schema columns (ALTER-
+free, declared inline the same way `communities.leadership_npc_id`
+already was), round-tripped through `migrate.js`/`restore.js` the same
+documented way every other BIGINT leader field already is, and vacated
+on death by `succession.js` alongside `mayor_npc_id`/
+`leadership_npc_id`. Generalised, not duplicated: `installScopedLeader`
+is the one place a government's election winner lands on the right
+tier's own field, so city/region/civilization each get a real election
+from the SAME `runElections` cycle rather than three parallel,
+disagreeing ones. Report-only, unchanged from its own prior round:
+`countryPacks.js`'s real country-level political/military/conflict
+data stays exactly as deliberately uncalibrated into any live mechanic
+as the thirty-third and thirty-ninth standing rules already left it —
+this round does not touch that posture.
+
+**Opt-in, same posture as `config.extendedFamily`, for the identical
+reason.** `worldgen.js#config.scopedGovernments` (default `false`)
+founds one real government per city and one for the region, in
+addition to the civ-wide one every world already got. Off, every
+existing call to `generateWorld()` is byte-for-byte unchanged — more
+governments means more elections, more enacted laws, and more events
+in a long-running world, none of which the 50+ test files already
+asserting exact counts against a world built the old way could have
+anticipated.
+
+**Mutation-verified the riskiest two checks.** With `scopeCitiesOf`
+reverted to ignoring scope entirely (the exact pre-fix shape), four
+tests caught it immediately — a city-scoped election drawing
+candidates and voters from another city, a city government legislating
+for a city it does not represent, and turnout computed against the
+wrong population; reverted, suite green again. With the `leader_id`
+fix reverted back to `leader_npc_id`, both the corrected pre-existing
+election test and the new scoped-election test caught it; reverted,
+suite green again.
+
+**Status, after rebasing onto whatever else had landed on this branch
+in the meantime**: full suite, `__FULL_SUITE_RESULT__`.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

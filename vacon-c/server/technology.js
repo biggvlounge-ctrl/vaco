@@ -111,6 +111,12 @@ function foundCivilization(worldState, options = {}) {
     // security — which are the state's spending priorities on one
     // budget. `statecraft.js` is what reads them.
     traits: require('./tierTraits.js').civilizationTraits(options.traits ?? {}),
+    // The full political hierarchy round's new leader field. Explicit
+    // null, vacated on death by `succession.js`, set by a real
+    // election through the existing civ-wide government this file's
+    // own caller (`worldgen.js`) always founds — see
+    // `politics.installScopedLeader`.
+    head_of_state_npc_id: null,
   };
   worldState.civilizations.push(civilization);
   return civilization;

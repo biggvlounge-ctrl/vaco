@@ -306,7 +306,7 @@ async function restoreWorldStateFromPostgres(worldState) {
   // calling JSON.parse on an object throws, and wrapping that in a
   // try/catch would hide a real shape change.
   worldState.civilizations = (await q('SELECT * FROM civilizations ORDER BY id')).map((c) => ({
-    ...nums(c, ['id', 'stability_index']),
+    ...nums(c, ['id', 'stability_index', 'head_of_state_npc_id']),
     // The state's four spending priorities. JSONB, guarded like every
     // other JSONB column here — a string comes back with no
     // `military` key, `statecraft.sharesOf` returns null for it, and
@@ -338,7 +338,7 @@ async function restoreWorldStateFromPostgres(worldState) {
   summary.environment_state = worldState.environmentState.length;
 
   worldState.regions = (await q('SELECT * FROM regions ORDER BY id')).map((r) =>
-    nums(r, ['id', 'civilization_id']));
+    nums(r, ['id', 'civilization_id', 'governor_npc_id']));
   summary.regions = worldState.regions.length;
 
   worldState.migrationEvents = (await q('SELECT * FROM migration_events ORDER BY id')).map((m) =>
@@ -404,7 +404,7 @@ async function restoreWorldStateFromPostgres(worldState) {
   summary.beliefs = worldState.beliefs.length;
 
   worldState.governments = (await q('SELECT * FROM governments')).map((g) =>
-    nums(g, ['organization_id']));
+    nums(g, ['organization_id', 'scope_id']));
   summary.governments = worldState.governments.length;
 
   worldState.elections = (await q('SELECT * FROM elections ORDER BY id')).map((e) =>

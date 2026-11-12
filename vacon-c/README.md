@@ -326,6 +326,31 @@ written down for why it stays that way (HIFLD's real `prisons`
 capacity would currently land in the same bucket as police capacity,
 in incompatible units).
 
+## The full political hierarchy (town/city/state/country)
+See `CLAUDE.md`'s own fifty-sixth standing rule. "Region" in
+`VACANCY_POSTGRESQL_SCHEMA.sql` already sits directly between
+civilization and city — this engine's real state-equivalent tier, not
+a new table — and `politics.js`'s election/legislature/revolution
+cycle was already generic over `worldState.governments`, just never
+handed more than the one civilization-wide government `worldgen.js`
+founds. `regions.governor_npc_id` and `civilizations
+.head_of_state_npc_id` are two new real leader fields (parallel to
+`cities.mayor_npc_id`/`communities.leadership_npc_id`, vacated on
+death the same way), and a government row's new `scope_type`/
+`scope_id` (city\|region\|civilization) is what `scopeCitiesOf`/
+`scopePopulationOf` read to keep a scoped election, its candidate
+pool, its turnout, and its revolt-spread denominator confined to its
+own real jurisdiction rather than the whole world. A real,
+previously-uncaught bug came out of the same pass: `closeElection` had
+written a field (`leader_npc_id`) that does not exist anywhere else in
+the engine, so no election's winner had ever actually installed
+anywhere — fixed to the real column (`leader_id`). Continental has no
+real tier (this engine generates one civilization per world) and no
+real per-continent political dataset researched this round, so it is
+declined outright rather than faked. `config.scopedGovernments`
+(opt-in, default `false`) founds the new per-city and per-region
+governments; off, every existing generated world is unchanged.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

@@ -109,6 +109,28 @@ const LAW_CATEGORIES = [
   'family', 'financial', 'trade', 'international',
 ];
 
+// **Added for the full political hierarchy (town/city/state/country),
+// by direct instruction.** `runElections`/`runLegislation`/
+// `assessRevolutions` below were already generic over
+// `worldState.governments` — every one of them loops `for (const
+// government of worldState.governments || [])` and had simply never
+// been handed more than the one civilization-wide government
+// `worldgen.js` founds. `GOVERNMENT_SCOPE_TYPES` is what a NEW
+// government row names as its own real jurisdiction, using the
+// engine's own existing geography rather than a fourth, invented tier:
+// `regions` already sits between `civilizations` and `cities` in
+// `VACANCY_POSTGRESQL_SCHEMA.sql` — exactly where a US-style "state"
+// sits between country and city — so `region` IS this engine's state
+// tier, not a new table. `community` is deliberately NOT a scope here
+// — see `foundGovernment`'s own header for why.
+//
+// A government founded with no scope (every existing caller, before
+// this round) defaults to `'civilization'` with `scope_id: null`,
+// which every scoping helper below treats as "the whole world" — the
+// exact behaviour this file already had. Only a government founded
+// WITH a real `scopeId` changes anything.
+const GOVERNMENT_SCOPE_TYPES = ['city', 'region', 'civilization'];
+
 // `elections.status` defaults to 'scheduled' in the schema; the rest
 // are the states it has to pass through to be tallied.
 const ELECTION_STATUSES = ['scheduled', 'open', 'closed', 'cancelled'];
@@ -135,11 +157,26 @@ function topicForGovernment(organizationId) {
 
 // -- governments --------------------------------------------------------
 
+// `scopeType`/`scopeId` are new, in-memory-only fields on the
+// `governments` row (real schema columns too — see
+// `VACANCY_POSTGRESQL_SCHEMA.sql`'s `governments.scope_type`/
+// `.scope_id`, added this round). `community` is deliberately NOT a
+// valid scope: a community's own real `leadership_npc_id` stays
+// appointment-only, the same posture it already had, because a formal
+// election/legislature/revolution cycle over a population the size of
+// one neighbourhood is the eleventh standing rule's own trap — a
+// mechanism with nothing real to contest is indistinguishable from a
+// label glued onto one NPC.
 function foundGovernment(worldState, options = {}) {
-  const { organizationId, systemType } = options;
+  const {
+    organizationId, systemType, scopeType = 'civilization', scopeId = null,
+  } = options;
   if (!organizationId) throw new Error('foundGovernment requires an organizationId');
   if (!SYSTEM_TYPES.includes(systemType)) {
     throw new Error(`foundGovernment: systemType must be one of ${SYSTEM_TYPES.join(', ')}`);
+  }
+  if (!GOVERNMENT_SCOPE_TYPES.includes(scopeType)) {
+    throw new Error(`foundGovernment: scopeType must be one of ${GOVERNMENT_SCOPE_TYPES.join(', ')}`);
   }
 
   const organization = worldState.organizations.find((o) => o.id === organizationId);
@@ -158,13 +195,77 @@ function foundGovernment(worldState, options = {}) {
     throw new Error(`foundGovernment: organization ${organizationId} is already a government`);
   }
 
-  const row = { organization_id: organizationId, system_type: systemType };
+  const row = {
+    organization_id: organizationId, system_type: systemType,
+    scope_type: scopeType, scope_id: scopeId,
+  };
   worldState.governments.push(row);
   return row;
 }
 
 function getGovernment(worldState, organizationId) {
   return worldState.governments.find((g) => g.organization_id === organizationId) || null;
+}
+
+// The real cities a government's own jurisdiction actually covers.
+// `'civilization'` (the default, and every pre-existing caller's
+// behaviour) is every city in the world — unchanged from before this
+// round. A government founded WITH a real `scopeId` narrows to
+// exactly that city, or every city in that one region
+// (`cities.region_id`, the real FK already in the schema).
+function scopeCitiesOf(worldState, government) {
+  const cities = worldState.cities || [];
+  if (!government || government.scope_type == null || government.scope_type === 'civilization') {
+    return cities;
+  }
+  if (government.scope_type === 'city') {
+    return cities.filter((c) => c.id === government.scope_id);
+  }
+  return cities.filter((c) => c.region_id === government.scope_id);
+}
+
+// The real population a government's own election/legislature should
+// draw from — through `communities.city_id`, the identical real field
+// `events.js#cityIdForCommunity` already resolves, rather than a
+// second location mechanism. `'civilization'` scope (and anything with
+// no scope at all) is every NPC in the world, the exact pre-existing
+// behaviour.
+function scopePopulationOf(worldState, government) {
+  if (!government || government.scope_type == null || government.scope_type === 'civilization') {
+    return worldState.npcs || [];
+  }
+  const cityIds = new Set(scopeCitiesOf(worldState, government).map((c) => c.id));
+  const communityIds = new Set(
+    (worldState.communities || [])
+      .filter((c) => cityIds.has(c.city_id))
+      .map((c) => c.id),
+  );
+  return (worldState.npcs || []).filter((n) => communityIds.has(n.communityId));
+}
+
+// Where a government's own election winner is actually installed,
+// beyond `organizations.leader_id` (every scope gets that — see the
+// fix in `closeElection` below). A `'city'`-scoped government's winner
+// is also that city's real `mayor_npc_id`; `'region'` is the new
+// `governor_npc_id` this round adds (the schema's own state-equivalent
+// tier — see `GOVERNMENT_SCOPE_TYPES` above); `'civilization'` is the
+// new `head_of_state_npc_id` this round adds, and ONLY when a real
+// `scopeId` was given — a civ-wide government founded the old way
+// (`scopeId: null`) has no single civilization row to point at and
+// correctly installs nowhere beyond the organization itself, the exact
+// pre-existing behaviour.
+function installScopedLeader(worldState, government, winnerId) {
+  if (!government) return;
+  if (government.scope_type === 'city') {
+    const city = (worldState.cities || []).find((c) => c.id === government.scope_id);
+    if (city) city.mayor_npc_id = winnerId;
+  } else if (government.scope_type === 'region') {
+    const region = (worldState.regions || []).find((r) => r.id === government.scope_id);
+    if (region) region.governor_npc_id = winnerId;
+  } else if (government.scope_type === 'civilization' && government.scope_id !== null) {
+    const civ = (worldState.civilizations || []).find((c) => c.id === government.scope_id);
+    if (civ) civ.head_of_state_npc_id = winnerId;
+  }
 }
 
 // -- laws ---------------------------------------------------------------
@@ -368,8 +469,21 @@ function stanceOf(worldState, entityId, confidence, topic) {
 // made a person nobody had observed read as "content". Here, a zero
 // would mean total disapproval and would trigger a revolution against
 // a government nobody has heard of.
+// **`populationIds`, added for the full political hierarchy round.**
+// Every pre-existing caller omits it and gets the exact old behaviour
+// — the whole world's living population as the denominator, correct
+// for a civilization-wide government, whose real audience IS
+// everyone. A city- or region-scoped government's real audience is
+// only its own residents (`scopePopulationOf`, the identical real
+// scoping `closeElection`'s turnout and `candidatesFor`'s fallback
+// already use) — without this, `spread` for a sub-civilization
+// government would divide its own small number of informed residents
+// by the ENTIRE WORLD'S population and could never cross
+// `REVOLUTION_SPREAD_FLOOR`, the fourteenth standing rule's own shape:
+// a threshold whose denominator sits behind a wider population than
+// the mechanism it gates was ever built to reach.
 function computeApproval(worldState, options = {}) {
-  const { topic } = options;
+  const { topic, populationIds = null } = options;
   if (!topic) throw new Error('computeApproval requires a topic');
 
   // **`spread` could exceed 1, and did — measured at 1.0272.** The
@@ -383,7 +497,10 @@ function computeApproval(worldState, options = {}) {
   // The living only, on both sides. The same argument `runPayroll`
   // makes about walking contracts rather than people: this walks facts,
   // and it has to ask.
-  const living = new Set(worldState.npcs.map((n) => n.id));
+  const livingIds = populationIds === null
+    ? worldState.npcs.map((n) => n.id)
+    : populationIds;
+  const living = new Set(livingIds);
   const people = living.size;
   const byEntity = new Map();
   for (const row of worldState.entityKnowledge) {
@@ -551,17 +668,41 @@ function closeElection(worldState, options = {}) {
 
   const sorted = [...tally.entries()].sort((a, b) => b[1] - a[1]);
   const tied = sorted.length > 1 && sorted[0][1] === sorted[1][1];
-  const turnout = worldState.npcs.length === 0
+  // Turnout is a share of the government's OWN real population — the
+  // whole world for a civ-wide government (unchanged), but a city- or
+  // region-scoped one would otherwise report a turnout artificially
+  // crushed toward zero against every NPC on the planet, most of whom
+  // were never eligible to vote in it at all.
+  const government = getGovernment(worldState, election.organization_id);
+  const eligible = scopePopulationOf(worldState, government).length;
+  const turnout = eligible === 0
     ? null
-    : Math.round(([...tally.values()].reduce((a, b) => a + b, 0) / worldState.npcs.length) * 10000) / 10000;
+    : Math.round(([...tally.values()].reduce((a, b) => a + b, 0) / eligible) * 10000) / 10000;
 
   // A tied election elects nobody. The organization's leader is only
   // set on a clear result — a leader installed by sort order would be
   // indistinguishable from one the world chose.
+  //
+  // **`leader_npc_id` was this file's own real bug, found while
+  // generalising it to more than one tier.** `organizations.leader_id`
+  // is the real schema column, the one `leadership.js`, `control.js`
+  // and `succession.js` all actually read — `leader_npc_id` does not
+  // exist on the schema or on a real generated organization
+  // (`engine.js#generateOrganization` sets `leader_id`), so every
+  // election this engine had ever run wrote to a phantom property an
+  // election's own winner never reached anywhere else in the engine.
+  // The sixth standing rule's shape: a writer using a field name that
+  // does not exist succeeds silently, forever. This file's own test
+  // fixture had encoded the identical mistake (`leader_npc_id: null`
+  // on a hand-built organization, never `leader_id`), which is why a
+  // passing suite never caught it — the twenty-fourth standing rule's
+  // own shape, a test whose fixture matches the bug it should have
+  // found.
   const winnerId = tied ? null : sorted[0][0];
   if (winnerId !== null) {
     const organization = worldState.organizations.find((o) => o.id === election.organization_id);
-    if (organization) organization.leader_npc_id = winnerId;
+    if (organization) organization.leader_id = winnerId;
+    installScopedLeader(worldState, government, winnerId);
   }
 
   return {
@@ -590,7 +731,12 @@ function assessRevolutions(worldState, tick, options = {}) {
   for (const government of worldState.governments) {
     const organizationId = government.organization_id;
     const topic = topicForGovernment(organizationId);
-    const { approval, spread, informed } = computeApproval(worldState, { topic });
+    // Scoped to the government's own real audience — see
+    // `computeApproval`'s own header for why an unscoped civ-wide
+    // denominator would make a sub-civilization government's revolt
+    // floor structurally unreachable.
+    const populationIds = scopePopulationOf(worldState, government).map((n) => n.id);
+    const { approval, spread, informed } = computeApproval(worldState, { topic, populationIds });
 
     if (approval === null || spread === null) continue;
     if (approval >= approvalFloor || spread < spreadFloor) continue;
@@ -692,6 +838,14 @@ const CANDIDATES = 3;
 // obvious candidates. Falling back to the strongest `leadership` traits
 // in the world, because a government with no roster still has to be
 // able to hold an election rather than silently skip one.
+// **Scoped to the government's own real population, not the whole
+// world.** Explicit members are candidates regardless of where they
+// live — real membership in the government organization already says
+// so — but the FALLBACK ranking (no roster to draw from) used to rank
+// every NPC on the planet by Command Presence, which would hand a
+// brand-new city-level election a candidate who had never set foot in
+// that city. `scopePopulationOf` is the identical real scoping
+// `closeElection`'s own turnout fix uses.
 function candidatesFor(worldState, organizationId) {
   const living = new Map(worldState.npcs.map((n) => [n.id, n]));
   const members = (worldState.entityOrganizationMemberships || [])
@@ -700,7 +854,8 @@ function candidatesFor(worldState, organizationId) {
     .filter(Boolean);
   if (members.length >= 2) return members.slice(0, CANDIDATES).map((n) => n.id);
 
-  const ranked = worldState.npcs
+  const government = getGovernment(worldState, organizationId);
+  const ranked = scopePopulationOf(worldState, government)
     .map((npc) => {
       const live = entityTraits.getLiveEntity(worldState, npc.id);
       const presence = Number(live?.traits?.leadership?.['Command Presence'] ?? 50);
@@ -796,7 +951,10 @@ function runElections(worldState, tick) {
         closeElection(worldState, { electionId: scheduled.id, tick });
         continue;
       }
-      for (const npc of worldState.npcs) {
+      // Scoped the identical way `candidatesFor`'s own fallback is —
+      // a city's election is decided by that city, not by every NPC
+      // on the planet voting in every government's election at once.
+      for (const npc of scopePopulationOf(worldState, government)) {
         const choice = voteOf(worldState, npc.id, candidates);
         if (choice === null) continue;
         castVote(worldState, {
@@ -866,7 +1024,14 @@ function runLegislation(worldState, tick) {
   if (tick <= 0 || tick % LEGISLATION_INTERVAL_TICKS !== 0) return events;
 
   for (const government of worldState.governments || []) {
-    for (const city of worldState.cities || []) {
+    // **Scoped to the government's own real jurisdiction.** Before
+    // this round there was only ever one government in the world (the
+    // civ-wide Assembly), so looping every city for it was correct by
+    // accident — a civilization genuinely does legislate for every
+    // city. A city- or region-scoped government legislating for cities
+    // outside its own jurisdiction would be exactly that accident
+    // breaking the moment a second government exists.
+    for (const city of scopeCitiesOf(worldState, government)) {
       const available = unlegislatedCategories(worldState, city.id);
       if (available.length === 0) continue;
       // Seeded on the city and the tick, never on an id — §88, and the
@@ -918,6 +1083,10 @@ function reseedIds(worldState) {
 module.exports = {
   SYSTEM_TYPES,
   LAW_CATEGORIES,
+  GOVERNMENT_SCOPE_TYPES,
+  scopeCitiesOf,
+  scopePopulationOf,
+  installScopedLeader,
   LEGISLATION_INTERVAL_TICKS,
   unlegislatedCategories,
   runLegislation,
