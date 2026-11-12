@@ -90,6 +90,16 @@
 // absence-means-nothing-to-sell-yet convention this list already
 // held for VvLGARI before its own positioning existed, not three rows
 // with an invented identity.
+//
+// **Updated 12 Nov 2026 to the real 20-brand roster**, the same real
+// update `venvs/src/lib/svmikoDegvchi.js` took (see that module's own
+// header). SVRPENTS Stone -> SVRPENTS & STONES, VAISON / △AISON ->
+// VITO VAISON, and VIC VALENCIAGO -> VIC VALENCI are renamed in
+// place, slug moving with each rename per this file's own precedent.
+// BARRAGE, ARROGANT ANGEL, and SANTOS VENDETTA (the 18th-20th brands)
+// carry no row here either, same real absence as THRONES AND BONES/
+// MYSTERY AND MASTERY/CVLT -- no positioning given yet for any of the
+// three.
 
 import { registerWearable } from './degvchi.js';
 
@@ -98,14 +108,14 @@ export const SVMIKO_DEGVCHI_HOUSE = 'svmiko-degvchi-fashion-house';
 export const SUB_BRAND_WEARABLES = [
   { slug: 'degvchi', name: 'DEGVCHI Virtual Heritage-Weave Bomber', category: 'clothing', price: 30 },
   { slug: 'lvcii', name: 'LVCII Virtual Handkerchief Set', category: 'accessories', price: 14 },
-  { slug: 'svrpents-stone', name: 'SVRPENTS Stone Virtual Concrete Bone-Buckle Jacket', category: 'clothing', price: 34 },
-  { slug: 'svrpents-stone', name: 'SVRPENTS Stone Virtual Emerald-Inlay Bone Chain', category: 'accessories', price: 26 },
+  { slug: 'svrpents-stones', name: 'SVRPENTS & STONES Virtual Concrete Bone-Buckle Jacket', category: 'clothing', price: 34 },
+  { slug: 'svrpents-stones', name: 'SVRPENTS & STONES Virtual Emerald-Inlay Bone Chain', category: 'accessories', price: 26 },
   { slug: 'bovlevard-xchange', name: 'BOVLEVARD Xchange Virtual Capsule Hoodie', category: 'clothing', price: 16 },
   { slug: 'jacqve', name: 'JACQVÉ Virtual Detachable-Jewelry Tote', category: 'accessories', price: 28 },
   { slug: 'zv', name: 'ZV Virtual Signature-Silhouette Tee', category: 'clothing', price: 9 },
   { slug: 'rojo-velo', name: 'ROJO VELO Virtual Accent Trench Coat', category: 'clothing', price: 36 },
   { slug: 'vedellin', name: 'VEDELLÍN Virtual Rare-Material Jacket', category: 'clothing', price: 40 },
-  { slug: 'vaison', name: '△AISON Virtual Transformation Pendant', category: 'accessories', price: 28 },
+  { slug: 'vito-vaison', name: 'VITO VAISON Virtual Transformation Pendant', category: 'accessories', price: 28 },
   { slug: 'ancor', name: 'ANCÓR Virtual Blended-Material Jacket', category: 'clothing', price: 20 },
   { slug: 'seven-even', name: '7EVEN Virtual Everyday Track Jacket', category: 'clothing', price: 18 },
   { slug: 'vvlgari', name: 'VvLGARI Virtual Pour Homme Fragrance', category: 'cosmetics', price: 11 },
@@ -114,7 +124,7 @@ export const SUB_BRAND_WEARABLES = [
   { slug: 'vvlgari', name: "VvLGARI Virtual Women's Structured Tote", category: 'accessories', price: 42 },
   { slug: 'vvlgari', name: "VvLGARI Virtual Men's Weekender Bag", category: 'accessories', price: 38 },
   { slug: 'sa-vior', name: 'SA VIOR Virtual Structured Bar-Silhouette Jacket', category: 'clothing', price: 35 },
-  { slug: 'vic-valenciago', name: 'VIC VALENCIAGO Virtual ∧-Mark Minimalist Wool Coat', category: 'clothing', price: 42 },
+  { slug: 'vic-valenci', name: 'VIC VALENCI Virtual ∧-Mark Minimalist Wool Coat', category: 'clothing', price: 42 },
 ];
 
 // Matches VENVS's own `ownerIdFor()` exactly -- kept as a real,

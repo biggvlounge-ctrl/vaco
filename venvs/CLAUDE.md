@@ -121,34 +121,38 @@ rewired to call it yet — that remains real, separate frontend work.
   with the real KDP/ACX-derived royalty math in
   `src/lib/royalties.js` (70% band at $2.99–$9.99, 35% outside;
   print at 60% minus print cost), per `VENVS_PUBLISHING_ADDITION.md`.
-- **SVMIKO DEGVCHI Fashion House** — the fashion *house* and its 17
+- **SVMIKO DEGVCHI Fashion House** — the fashion *house* and its 20
   real sub-brands (updated 22 Oct 2026 from the original 13, then
   twice more on 1 Nov 2026 — first 12 to 16, then corrected/extended
-  to 17; see `src/lib/svmikoDegvchi.js`'s own header) live here as
-  real branded sellers inside the Marketplace storefront system
-  (`src/lib/svmikoDegvchi.js`). 14 of the 17 have a real, open
+  to 17 — then again on 12 Nov 2026 to 20, with three renames and
+  three new brands; see `src/lib/svmikoDegvchi.js`'s own header) live
+  here as real branded sellers inside the Marketplace storefront
+  system (`src/lib/svmikoDegvchi.js`). 14 of the 20 have a real, open
   storefront — VvLGARI's own positioning was given directly on 22 Oct
   2026 (a luxury accessories house: cologne, perfume, sunglasses, and a
   handbag for each of men and women) and is no longer "to be
-  established." SVRPENTS Stone (renamed from STONE BONES, 1 Nov 2026 —
-  same brand, same products) carries a second real product too (an
-  emerald-inlay bone chain, alongside its flagship jacket) — a later
-  correction gave it genuine natural stone/gemstone inlay as part of
-  its own material signature. Both SVRPENTS Stone and VvLGARI list
-  more than one item under their single real storefront; 12 others
-  carry one each. SA VIOR and VIC VALENCIAGO have real, confirmed
-  positioning now too, given directly the same day as a correction to
-  this module's own earlier name-only guesses: SA VIOR is "like our
-  Christian Dior" (French-couture-inspired, a Bar-Suit-style cinched
-  waist), VIC VALENCIAGO is "similar to the Balenciaga brand, luxury,
-  simple" (restrained minimalism, not the module's earlier avant-garde
-  guess). THRONES AND BONES, MYSTERY AND MASTERY, and CVLT (the 17th
-  brand) are real, confirmed names with **no** positioning — the first
-  two confirmed directly as genuinely undecided ("I have not figured
-  out yet"), not merely unsent — so all three carry `flagshipProducts:
-  []` and are honestly real-skipped at seeding rather than given an
-  invented identity. Note the split: the **brands/storefronts** are
-  VENVS commerce; the **avatar wearables** economy is VDP's.
+  established." SVRPENTS & STONES (renamed from STONE BONES, then
+  SVRPENTS Stone, now SVRPENTS & STONES — same brand, same products
+  throughout) carries a second real product too (an emerald-inlay
+  bone chain, alongside its flagship jacket) — a later correction gave
+  it genuine natural stone/gemstone inlay as part of its own material
+  signature. Both SVRPENTS & STONES and VvLGARI list more than one
+  item under their single real storefront; 12 others carry one each.
+  SA VIOR and VIC VALENCI (renamed from VIC VALENCIAGO, 12 Nov 2026)
+  have real, confirmed positioning: SA VIOR is "like our Christian
+  Dior" (French-couture-inspired, a Bar-Suit-style cinched waist), VIC
+  VALENCI is "similar to the Balenciaga brand, luxury, simple"
+  (restrained minimalism, not the module's earlier avant-garde guess).
+  VAISON / △AISON is now VITO VAISON (12 Nov 2026, rename only — same
+  product/positioning). THRONES AND BONES, MYSTERY AND MASTERY, CVLT,
+  BARRAGE, ARROGANT ANGEL, and SANTOS VENDETTA (the 18th-20th brands,
+  12 Nov 2026) are real, confirmed names with **no** positioning — the
+  first two confirmed directly as genuinely undecided ("I have not
+  figured out yet"), not merely unsent — so all six carry
+  `flagshipProducts: []` and are honestly real-skipped at seeding
+  rather than given an invented identity. Note the split: the
+  **brands/storefronts** are VENVS commerce; the **avatar wearables**
+  economy is VDP's.
 
 **Not here anymore** (don't re-add): the walkable world, CHOPZ
 District, avatar wearables → all in `../vdp/`. VEX (trading floor)

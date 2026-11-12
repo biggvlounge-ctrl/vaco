@@ -183,6 +183,41 @@ Stone carries 2 and VvLGARI carries 5).
 
 ---
 
+**Updated 12 Nov 2026 — the real 20-brand roster.** Given directly as
+an updated copy of the clothing lines, with two renames called out
+explicitly and one further name change included in the same list:
+
+- **SVRPENTS & STONES** (renamed from SVRPENTS Stone — "using the
+  ampersand, with SVRPENTS spelled as established"). Same brand, same
+  two real products (the concrete bone-buckle jacket and the
+  emerald-inlay bone chain), same positioning — rename only.
+- **VITO VAISON** (renamed from VAISON / △AISON — spelled
+  letter-by-letter, "V-I-T-O VAISON"). Same brand, same product
+  (the Transformable Deconstructed Coat / Transformation Pendant),
+  same positioning — rename only.
+- **VIC VALENCI** (the updated list's spelling for VIC VALENCIAGO —
+  not individually flagged as a rename the way the other two were,
+  so a future correction to this one specifically wouldn't be
+  surprising). Same real confirmed positioning ("similar to the
+  Balenciaga brand, luxury, simple") and product carry over unchanged.
+- **VEDELLÍN** was absent from the founder's own typed list this
+  round — confirmed directly as an omission, not a retirement, and
+  kept unchanged in the real code.
+- **BARRAGE**, **ARROGANT ANGEL**, **SANTOS VENDETTA** — three
+  genuinely new brands (the 18th-20th), no positioning given yet for
+  any of them, joining THRONES AND BONES/MYSTERY AND MASTERY/CVLT on
+  the same real "to be established" placeholder.
+
+The real roster is now 20 brands. 14 have a real, open storefront in
+VENVS (6 real-skipped: THRONES AND BONES, MYSTERY AND MASTERY, CVLT,
+BARRAGE, ARROGANT ANGEL, SANTOS VENDETTA) and a matching real virtual
+wearable in VDP's own avatar-wearable economy (19 real pieces across
+those same 14 brands, since SVRPENTS & STONES carries 2 and VvLGARI
+carries 5 — unchanged from the 17-brand count, since no renamed or
+newly-added brand this round carries a real product).
+
+---
+
 ## Implementation status (added when this file was placed into the repo)
 
 **Superseded 22 Oct 2026 — read the section above first.** Everything

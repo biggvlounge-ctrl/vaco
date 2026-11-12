@@ -829,3 +829,64 @@ it reappeared in the public list and could be added to a cart; and
 confirmed a second real session claiming a different `ownerId` got a
 real 403 ("only this product's own seller can change its listing
 status") when it tried to delist the first seller's product.
+
+## Phase 21: SVMIKO DEGVCHI's real 20-brand roster (12 Nov 2026)
+
+Updated directly from the founder as "a new copy of the clothing
+line's updated versions." Two renames called out explicitly, one more
+included in the same list without being individually flagged, and
+three genuinely new brands:
+
+- **SVRPENTS & STONES** (renamed from SVRPENTS Stone — "using the
+  ampersand, with SVRPENTS spelled as established"). Same brand, same
+  two real products, same positioning — rename only, slug moving with
+  it per this file's own established rename precedent (Devil in
+  Details → STONE BONES → SVRPENTS Stone → SVRPENTS & STONES, same
+  brand continuing under successive names).
+- **VITO VAISON** (renamed from VAISON / △AISON, spelled
+  letter-by-letter: "V-I-T-O VAISON"). Same brand/product/positioning,
+  slug moving with it.
+- **VIC VALENCI** (renamed from VIC VALENCIAGO — given as part of the
+  same updated list but not individually flagged as a rename the way
+  the other two were). Same real confirmed positioning ("similar to
+  the Balenciaga brand, luxury, simple") and product carry over
+  unchanged.
+- **VEDELLÍN** confirmed kept — absent from the founder's own typed
+  list this round, confirmed directly as an omission, not a
+  retirement.
+- **BARRAGE**, **ARROGANT ANGEL**, **SANTOS VENDETTA** — three
+  genuinely new brands (18th-20th), no positioning given yet for any
+  of them, real-skipped at seeding the same way THRONES AND
+  BONES/MYSTERY AND MASTERY/CVLT already are.
+
+`venvs/src/lib/svmikoDegvchi.js` and `vdp/src/lib/
+svmikoDegvchiWearables.js` both updated to match — the three renames
+each carry their slug and real product/positioning forward unchanged;
+the three new brands join the existing honest-skip placeholder
+(`flagshipProducts: []`, `positioning: 'Positioning to be
+established.'`).
+
+### Verification
+
+`test/venvs.test.js`: the storefront-seeding test's own exact skip-set
+assertion updated from 3 brands to 6 (adding `barrage`,
+`arrogant-angel`, `santos-vendetta` alongside the existing `cvlt`,
+`mystery-and-mastery`, `thrones-and-bones`), and the dedicated
+real-skip test renamed/expanded to cover all six by name. `test/
+server.test.js`'s own health-route comment corrected (20 real brands,
+6 real-skipped, sellers count unchanged at 16 since no renamed or
+newly-added brand this round carries a real product). Full suite:
+117/117 → 117/117 (test count unchanged; existing tests updated in
+place to match the real new roster rather than growing in number).
+
+Live-verified against a real spawned VENVS server: `GET
+/api/marketplace/sellers` confirmed `SVRPENTS & STONES`, `VITO
+VAISON`, `VIC VALENCI`, and `VEDELLÍN` all seeded correctly, and `GET
+/api/health` reported `sellers: 16`, unchanged from before this round
+(2 demo + 14 real SVMIKO DEGVCHI storefronts) — confirming the three
+new brands landed in the honest skip set rather than crashing seeding
+or opening an empty storefront.
+
+VDP's own `test/commerce.test.js` and `test/seedDemoData.test.js`
+updated the same way (renamed slugs/assertions, expanded skip-set
+test); full VDP suite: 951/951, unchanged in count, all green.

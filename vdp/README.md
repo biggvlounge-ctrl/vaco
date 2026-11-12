@@ -1153,6 +1153,16 @@ MYSTERY AND MASTERY, and CVLT have no positioning yet and carry none).
 this phase's own "13"/"20" figures above are its original,
 historically-accurate counts at the time, left as-is.
 
+**Updated again, 12 Nov 2026, to the real 20-brand roster** — matching
+VENVS's own same-day update. Three renames (SVRPENTS Stone →
+SVRPENTS & STONES, VAISON / △AISON → VITO VAISON, VIC VALENCIAGO →
+VIC VALENCI, each carrying its slug forward unchanged, same real
+product/positioning), VEDELLÍN confirmed kept, and three genuinely
+new brands (BARRAGE, ARROGANT ANGEL, SANTOS VENDETTA) joining the
+existing honest "no positioning yet" set — still 14 with a real
+virtual piece (19 total), now 6 brands with none instead of 3. Full
+VDP suite: 951/951, unchanged in count, all green after the update.
+
 **Phase 3 (Food District flagships)**: 17 plain-Node checks (11 unique
 brands, unique slugs, every menu item priced, 10 brands confirmed-name
 vs. 1 honestly unconfirmed, WEDGE's two named toppings present,

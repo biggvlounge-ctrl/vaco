@@ -830,12 +830,12 @@ test('seeding registers every sub-brand WITH a real flagship product as a real s
   // validation, it would throw here rather than when a shopper first
   // opened the storefront.
   //
-  // 14 of the 17 brands carry at least one real `flagshipProducts`
-  // entry today — THRONES AND BONES, MYSTERY AND MASTERY, and CVLT
-  // are genuinely undecided ("I have not figured out yet" / no
-  // positioning given at all) and real-skipped, the same real "to be
-  // established" path VvLGARI itself once used before its own real
-  // positioning was given directly.
+  // 14 of the 20 brands carry at least one real `flagshipProducts`
+  // entry today — THRONES AND BONES, MYSTERY AND MASTERY, CVLT,
+  // BARRAGE, ARROGANT ANGEL, and SANTOS VENDETTA are genuinely
+  // undecided/not-yet-positioned and real-skipped, the same real "to
+  // be established" path VvLGARI itself once used before its own
+  // real positioning was given directly.
   const brandsWithProduct = SUB_BRANDS.filter((b) => b.flagshipProducts && b.flagshipProducts.length > 0);
   const totalProducts = SUB_BRANDS.reduce((sum, b) => sum + (b.flagshipProducts ? b.flagshipProducts.length : 0), 0);
   const m = createMarketplace();
@@ -846,8 +846,8 @@ test('seeding registers every sub-brand WITH a real flagship product as a real s
   assert.equal(m.products.length, totalProducts, 'VvLGARI alone lists five products under one storefront');
   assert.deepEqual(
     seeded.skipped.map((s) => s.brand).sort(),
-    ['cvlt', 'mystery-and-mastery', 'thrones-and-bones'],
-    'exactly the 3 brands with no positioning yet should be skipped, no others',
+    ['arrogant-angel', 'barrage', 'cvlt', 'mystery-and-mastery', 'santos-vendetta', 'thrones-and-bones'],
+    'exactly the 6 brands with no positioning yet should be skipped, no others',
   );
 
   for (const seller of m.sellers) {
@@ -879,7 +879,7 @@ test('VvLGARI carries all five of its real products under one storefront', () =>
   assert.ok(categories.includes('luxury-handbags-women'));
 });
 
-test('SVRPENTS Stone carries both its flagship jacket and its emerald-inlay bone chain', () => {
+test('SVRPENTS & STONES carries both its flagship jacket and its emerald-inlay bone chain', () => {
   // The natural-stone/gemstone correction gave this brand (renamed
   // from STONE BONES, 1 Nov 2026 -- same storefront, same products)
   // a second real product -- a standalone jewelry-grade accessory
@@ -887,8 +887,8 @@ test('SVRPENTS Stone carries both its flagship jacket and its emerald-inlay bone
   // item under one brand" shape VvLGARI already has.
   const m = createMarketplace();
   seedSvmikoDegvchiStorefronts(m);
-  const svrpentsStoneSeller = m.sellers.find((s) => s.name === 'SVRPENTS Stone');
-  assert.ok(svrpentsStoneSeller, 'SVRPENTS Stone should have its own real storefront');
+  const svrpentsStoneSeller = m.sellers.find((s) => s.name === 'SVRPENTS & STONES');
+  assert.ok(svrpentsStoneSeller, 'SVRPENTS & STONES should have its own real storefront');
 
   const front = getSellerStorefront(m, svrpentsStoneSeller.id);
   assert.equal(front.products.length, 2, 'the concrete bone-buckle jacket and the emerald-inlay bone chain');
@@ -899,7 +899,7 @@ test('SVRPENTS Stone carries both its flagship jacket and its emerald-inlay bone
   assert.ok(categories.includes('luxury-outerwear'));
   assert.ok(categories.includes('luxury-accessories'));
 
-  // Every real SVRPENTS Stone piece is a limited run, not just priced
+  // Every real SVRPENTS & STONES piece is a limited run, not just priced
   // like one -- seeding must carry `editionSize` through to the real
   // product, not drop it on the way from `svmikoDegvchi.js` into
   // `listProduct`.
@@ -911,13 +911,13 @@ test('SVRPENTS Stone carries both its flagship jacket and its emerald-inlay bone
 });
 
 test('every other seeded SVMIKO DEGVCHI product stays genuinely unlimited', () => {
-  // SVRPENTS Stone is the one brand with limited runs today; nothing
+  // SVRPENTS & STONES is the one brand with limited runs today; nothing
   // about seeding should impose that on a brand that never asked for
   // it.
   const m = createMarketplace();
   const seeded = seedSvmikoDegvchiStorefronts(m);
   const nonSvrpentsStoneProducts = seeded
-    .filter((s) => s.brand !== 'svrpents-stone')
+    .filter((s) => s.brand !== 'svrpents-stones')
     .flatMap((s) => s.products);
   for (const product of nonSvrpentsStoneProducts) {
     assert.equal(product.editionSize, null, `${product.title} should not have an edition cap`);
@@ -925,7 +925,7 @@ test('every other seeded SVMIKO DEGVCHI product stays genuinely unlimited', () =
   }
 });
 
-test('SA VIOR and VIC VALENCIAGO (real positioning given 1 Nov 2026) each seed a real storefront', () => {
+test('SA VIOR and VIC VALENCI (real positioning given 1 Nov 2026) each seed a real storefront', () => {
   // SA VIOR's real positioning is "like our Christian Dior"; VIC
   // VALENCIAGO's is "similar to the Balenciaga brand, luxury, simple"
   // -- both confirmed directly, replacing this file's own earlier,
@@ -933,7 +933,7 @@ test('SA VIOR and VIC VALENCIAGO (real positioning given 1 Nov 2026) each seed a
   // each one actually seeds with its corrected product.
   const m = createMarketplace();
   seedSvmikoDegvchiStorefronts(m);
-  for (const name of ['SA VIOR', 'VIC VALENCIAGO']) {
+  for (const name of ['SA VIOR', 'VIC VALENCI']) {
     const seller = m.sellers.find((s) => s.name === name);
     assert.ok(seller, `${name} should have its own real storefront`);
     const front = getSellerStorefront(m, seller.id);
@@ -942,20 +942,22 @@ test('SA VIOR and VIC VALENCIAGO (real positioning given 1 Nov 2026) each seed a
   }
 });
 
-test('THRONES AND BONES, MYSTERY AND MASTERY, and CVLT are honestly real-skipped, not seeded with an invented identity', () => {
+test('THRONES AND BONES, MYSTERY AND MASTERY, CVLT, BARRAGE, ARROGANT ANGEL, and SANTOS VENDETTA are honestly real-skipped, not seeded with an invented identity', () => {
   // Confirmed directly (1 Nov 2026): THRONES AND BONES and MYSTERY
   // AND MASTERY are genuinely undecided ("I have not figured out
   // yet"), and CVLT (the house's 17th brand, also confirmed directly)
-  // has no positioning given at all. None of the three should have a
-  // real storefront -- an unseeded brand is an honest "not ready,"
-  // not a worse state than a seeded one with a guessed identity (same
+  // has no positioning given at all. BARRAGE, ARROGANT ANGEL, and
+  // SANTOS VENDETTA (12 Nov 2026, the 18th-20th brands) join them on
+  // the same real placeholder. None of the six should have a real
+  // storefront -- an unseeded brand is an honest "not ready," not a
+  // worse state than a seeded one with a guessed identity (same
   // standing rule this file's own header already states).
   const m = createMarketplace();
   const seeded = seedSvmikoDegvchiStorefronts(m);
-  for (const name of ['THRONES AND BONES', 'MYSTERY AND MASTERY', 'CVLT']) {
+  for (const name of ['THRONES AND BONES', 'MYSTERY AND MASTERY', 'CVLT', 'BARRAGE', 'ARROGANT ANGEL', 'SANTOS VENDETTA']) {
     assert.equal(m.sellers.find((s) => s.name === name), undefined, `${name} should not have a storefront yet`);
   }
-  assert.equal(seeded.skipped.length, 3);
+  assert.equal(seeded.skipped.length, 6);
 });
 
 test('a seeded storefront can actually take an order end to end', () => {

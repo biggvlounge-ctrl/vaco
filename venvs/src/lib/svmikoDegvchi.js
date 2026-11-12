@@ -74,6 +74,25 @@
 // real, confirmed vowel-dropped spelling of "CULT") is a genuinely
 // new, 17th brand with no positioning given yet either, so it joins
 // them on the same placeholder.
+//
+// **Updated 12 Nov 2026 to the real 20-brand roster.** Three renames,
+// per direct instruction, each carrying its slug forward (same
+// precedent this header already set: a rename is the same brand
+// continuing under a new name, not a new entity) -- SVRPENTS Stone ->
+// **SVRPENTS & STONES** ("using the ampersand, with SVRPENTS spelled
+// as established"), VAISON / △AISON -> **VITO VAISON** (spelled
+// letter-by-letter, "V-I-T-O VAISON"), and VIC VALENCIAGO -> **VIC
+// VALENCI** (given as part of the same updated list but not
+// individually flagged as a rename the way the other two were -- a
+// future correction to this one specifically wouldn't be surprising).
+// All three keep their real products/positioning exactly as before;
+// only the name/slug moved. VEDELLÍN was absent from the founder's
+// own typed list this round -- confirmed directly as an omission, not
+// a retirement, and kept unchanged. Three genuinely new brands join
+// on the same honest "to be established" placeholder THRONES AND
+// BONES/MYSTERY AND MASTERY/CVLT already use: **BARRAGE**,
+// **ARROGANT ANGEL**, **SANTOS VENDETTA** -- no positioning given yet
+// for any of the three.
 
 import { registerSeller, listProduct } from './marketplace.js';
 
@@ -101,8 +120,8 @@ export const SUB_BRANDS = [
     ],
   },
   {
-    slug: 'svrpents-stone',
-    name: 'SVRPENTS Stone',
+    slug: 'svrpents-stones',
+    name: 'SVRPENTS & STONES',
     // Renamed from STONE BONES, 1 Nov 2026 -- confirmed directly as a
     // rename of the existing brand (same storefront, same two real
     // products, same positioning), not a new entity, so everything
@@ -139,8 +158,8 @@ export const SUB_BRANDS = [
       + 'also be traded.',
     signatureElement: 'Bone-shaped hardware (buckles, charms, chain links) -- cast in stone/concrete, accented with real natural stones and colored gemstones -- not chrome or silver; every piece an original, limited-run design',
     flagshipProducts: [
-      { title: 'SVRPENTS Stone Concrete Bone-Buckle Jacket', price: 520, category: 'luxury-outerwear', editionSize: 150 },
-      { title: 'SVRPENTS Stone Emerald-Inlay Bone Chain', price: 380, category: 'luxury-accessories', editionSize: 75 },
+      { title: 'SVRPENTS & STONES Concrete Bone-Buckle Jacket', price: 520, category: 'luxury-outerwear', editionSize: 150 },
+      { title: 'SVRPENTS & STONES Emerald-Inlay Bone Chain', price: 380, category: 'luxury-accessories', editionSize: 75 },
     ],
   },
   {
@@ -189,12 +208,12 @@ export const SUB_BRANDS = [
     ],
   },
   {
-    slug: 'vaison',
-    name: 'VAISON / △AISON',
+    slug: 'vito-vaison',
+    name: 'VITO VAISON',
     positioning: 'Avant-garde luxury.',
     signatureElement: 'Transformation',
     flagshipProducts: [
-      { title: '△AISON Transformable Deconstructed Coat', price: 610, category: 'avant-garde-luxury' },
+      { title: 'VITO VAISON Transformable Deconstructed Coat', price: 610, category: 'avant-garde-luxury' },
     ],
   },
   {
@@ -284,8 +303,8 @@ export const SUB_BRANDS = [
     ],
   },
   {
-    slug: 'vic-valenciago',
-    name: 'VIC VALENCIAGO',
+    slug: 'vic-valenci',
+    name: 'VIC VALENCI',
     // Real positioning confirmed directly (1 Nov 2026): "similar to
     // the Balenciaga brand, luxury, simple" -- replacing a prior,
     // withdrawn avant-garde/deconstructed/oversized reading of the
@@ -300,7 +319,7 @@ export const SUB_BRANDS = [
       + 'sparingly as its one real signature mark.',
     signatureElement: 'Custom crossbar-free ∧ wordmark, used sparingly as a single embossed mark on otherwise restrained, minimalist tailoring',
     flagshipProducts: [
-      { title: 'VIC VALENCIAGO ∧-Mark Minimalist Wool Coat', price: 650, category: 'luxury-outerwear' },
+      { title: 'VIC VALENCI ∧-Mark Minimalist Wool Coat', price: 650, category: 'luxury-outerwear' },
     ],
   },
   {
@@ -310,6 +329,33 @@ export const SUB_BRANDS = [
     // SVMIKO/SVRPENTS/BOVLEVARD. No positioning given yet.
     slug: 'cvlt',
     name: 'CVLT',
+    positioning: 'Positioning to be established.',
+    signatureElement: 'To be established',
+    flagshipProducts: [],
+  },
+  {
+    // Genuinely new, 18th brand, given directly (12 Nov 2026) as part
+    // of the updated 20-brand roster. No positioning given yet --
+    // same real "to be established" placeholder as CVLT/THRONES AND
+    // BONES/MYSTERY AND MASTERY.
+    slug: 'barrage',
+    name: 'BARRAGE',
+    positioning: 'Positioning to be established.',
+    signatureElement: 'To be established',
+    flagshipProducts: [],
+  },
+  {
+    // Genuinely new, 19th brand, given directly (12 Nov 2026).
+    slug: 'arrogant-angel',
+    name: 'ARROGANT ANGEL',
+    positioning: 'Positioning to be established.',
+    signatureElement: 'To be established',
+    flagshipProducts: [],
+  },
+  {
+    // Genuinely new, 20th brand, given directly (12 Nov 2026).
+    slug: 'santos-vendetta',
+    name: 'SANTOS VENDETTA',
     positioning: 'Positioning to be established.',
     signatureElement: 'To be established',
     flagshipProducts: [],
@@ -325,9 +371,10 @@ export function ownerIdFor(slug) {
 }
 
 // Every brand in `SUB_BRANDS` is real identity; not every brand is
-// guaranteed to have a real product -- today 14 of the 17 do (THRONES
-// AND BONES, MYSTERY AND MASTERY, and CVLT are genuinely undecided
-// and real-skipped), but the
+// guaranteed to have a real product -- today 14 of the 20 do (THRONES
+// AND BONES, MYSTERY AND MASTERY, CVLT, BARRAGE, ARROGANT ANGEL, and
+// SANTOS VENDETTA are genuinely undecided/not-yet-positioned and
+// real-skipped), but the
 // skip stays real rather than removed, for the same reason a brand
 // might arrive again with its positioning still "to be established."
 // Opening a storefront with nothing to sell is a worse state than not

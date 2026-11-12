@@ -559,27 +559,28 @@ test('VvLGARI carries five real items, all still paying the same account', () =>
   assert.equal(new Set(names).size, names.length, 'VvLGARI lists the same item twice');
 });
 
-test('SVRPENTS Stone carries two real items -- a jacket and a separate jewelry-grade piece', () => {
+test('SVRPENTS & STONES carries two real items -- a jacket and a separate jewelry-grade piece', () => {
   // The natural-stone/gemstone correction gave this brand (renamed
   // from STONE BONES, 1 Nov 2026 -- same products) a real, standalone
   // accessory distinct from its flagship jacket, the same "more than
   // one item under one brand" shape VvLGARI already has.
-  const svrpentsStoneItems = SUB_BRAND_WEARABLES.filter((i) => i.slug === 'svrpents-stone');
+  const svrpentsStoneItems = SUB_BRAND_WEARABLES.filter((i) => i.slug === 'svrpents-stones');
   assert.equal(svrpentsStoneItems.length, 2, 'the concrete bone-buckle jacket and the emerald-inlay bone chain');
   for (const item of svrpentsStoneItems) {
-    assert.equal(creatorIdFor(item.slug), creatorIdFor('svrpents-stone'));
+    assert.equal(creatorIdFor(item.slug), creatorIdFor('svrpents-stones'));
   }
   const categories = svrpentsStoneItems.map((i) => i.category);
   assert.ok(categories.includes('clothing'), 'the jacket should still be clothing');
   assert.ok(categories.includes('accessories'), 'the chain should be its own standalone accessory, not folded into the jacket');
 });
 
-test('SA VIOR and VIC VALENCIAGO (real positioning given 1 Nov 2026) each carry one real virtual item', () => {
+test('SA VIOR and VIC VALENCI (real positioning given 1 Nov 2026) each carry one real virtual item', () => {
   // SA VIOR's real positioning is "like our Christian Dior"; VIC
-  // VALENCIAGO's is "similar to the Balenciaga brand, luxury, simple"
-  // -- both confirmed directly, replacing this file's own earlier,
-  // withdrawn name-only guesses.
-  for (const slug of ['sa-vior', 'vic-valenciago']) {
+  // VALENCI's (renamed from VIC VALENCIAGO, 12 Nov 2026) is "similar
+  // to the Balenciaga brand, luxury, simple" -- both confirmed
+  // directly, replacing this file's own earlier, withdrawn name-only
+  // guesses.
+  for (const slug of ['sa-vior', 'vic-valenci']) {
     const items = SUB_BRAND_WEARABLES.filter((i) => i.slug === slug);
     assert.equal(items.length, 1, `${slug} should carry exactly one real virtual item`);
     assert.ok(items[0].price > 0);
@@ -587,14 +588,16 @@ test('SA VIOR and VIC VALENCIAGO (real positioning given 1 Nov 2026) each carry 
   }
 });
 
-test('THRONES AND BONES, MYSTERY AND MASTERY, and CVLT carry no virtual item yet', () => {
+test('THRONES AND BONES, MYSTERY AND MASTERY, CVLT, BARRAGE, ARROGANT ANGEL, and SANTOS VENDETTA carry no virtual item yet', () => {
   // Confirmed directly (1 Nov 2026): THRONES AND BONES and MYSTERY
   // AND MASTERY are genuinely undecided ("I have not figured out
   // yet"), and CVLT (the house's 17th brand) has no positioning given
-  // at all -- none of the three has a real product in VENVS either,
-  // so none gets a row here, the same real absence this list already
-  // held for VvLGARI before its own positioning existed.
-  for (const slug of ['thrones-and-bones', 'mystery-and-mastery', 'cvlt']) {
+  // at all. BARRAGE, ARROGANT ANGEL, and SANTOS VENDETTA (12 Nov
+  // 2026, the 18th-20th brands) join them on the same real absence --
+  // none of the six has a real product in VENVS either, so none gets
+  // a row here, the same real absence this list already held for
+  // VvLGARI before its own positioning existed.
+  for (const slug of ['thrones-and-bones', 'mystery-and-mastery', 'cvlt', 'barrage', 'arrogant-angel', 'santos-vendetta']) {
     assert.equal(SUB_BRAND_WEARABLES.filter((i) => i.slug === slug).length, 0);
   }
 });

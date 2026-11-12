@@ -97,9 +97,10 @@ test('the server starts, serves health, and has already seeded the real demo sto
   assert.equal(health.ok, true);
   assert.equal(health.service, 'venvs');
   // 2 demo sellers (Cherokee Hardware, Riverfront Vinyl) + 14 real
-  // SVMIKO DEGVCHI storefronts (17 real brands, 3 real-skipped --
-  // THRONES AND BONES, MYSTERY AND MASTERY, CVLT -- pending real
-  // positioning) -- see server.cjs's own onReady seed.
+  // SVMIKO DEGVCHI storefronts (20 real brands, 6 real-skipped --
+  // THRONES AND BONES, MYSTERY AND MASTERY, CVLT, BARRAGE, ARROGANT
+  // ANGEL, SANTOS VENDETTA -- pending real positioning) -- see
+  // server.cjs's own onReady seed.
   assert.equal(health.sellers, 16);
   assert.ok(health.products > 0);
 });
