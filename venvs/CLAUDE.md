@@ -94,8 +94,9 @@ already uses for its own ESM `src/lib`) gives `marketplace.js`'s own
 `registerSeller`/`listProduct`/`getSellerStorefront`/`checkout` a real
 persisted store and real Shield-authenticated routes. See this app's
 own README's "Phase 14" section for the full route list and
-verification record. `MarketplaceView.jsx` itself has not been
-rewired to call it yet — that remains real, separate frontend work.
+verification record.
+
+**Stale claim corrected (12 Nov 2026 reconciliation pass): `MarketplaceView.jsx` IS rewired.** This section used to end "that remains real, separate frontend work" — true when first written, but the README's own same-day Phase 14 follow-on already rewired it, and this file was never updated to match. Confirmed directly in the current code: `src/components/MarketplaceView.jsx` imports from `../lib/marketplaceClient.js` and makes real HTTP calls against this backend, not `createMarketplace()`. Phase 20 (5 Nov 2026) went further — seller onboarding and inventory management forms are real UI here too. See README's own Phase 14/20 sections for the full record; this file's own earlier claim was simply never reconciled against it.
 
 ---
 
