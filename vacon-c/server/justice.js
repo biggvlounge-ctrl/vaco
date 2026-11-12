@@ -165,6 +165,10 @@ const economy = require('./economy.js');
 const authority = require('./authority.js');
 const membership = require('./membership.js');
 const inventory = require('./inventory.js');
+const mortality = require('./mortality.js');
+const characterCreation = require('./characterCreation.js');
+const orgArchetypes = require('./orgArchetypes.js');
+const prisonPacks = require('./prisonPacks.js');
 
 // ---------------------------------------------------------------------
 // Vocabulary
@@ -346,13 +350,38 @@ function judge(worldState, options = {}) {
 // The real prison standing in a city, or null for an honest absence.
 // Deterministic (lowest real `id`) rather than seeded — see the header
 // note on why a draw has nothing to decide here.
-function prisonFor(worldState, cityId) {
+//
+// **`options.ageYears`, and what it closes.** Every real prison this
+// engine designates is typed `'state-or-federal-prison'` — an adult
+// facility, see `landmarks.js`'s own header on `facilityType` for why
+// no juvenile-, women's- or jail-specific building exists to route to
+// instead. A known minor (`ageYears < 18`, from `mortality.
+// ageInYears` — the same function `control.ageOf`/`roleOf` already
+// use for every other age-gated decision in this engine) is refused a
+// placement in that adult building rather than silently imprisoned in
+// it: this returns `null`, the identical honest-absence this function
+// already returns for a city with no real prison at all, because
+// "this city has no facility that may legally hold this person" is
+// the same kind of fact as "this city has no prison standing in it."
+// **What this deliberately does NOT do**: route a minor to a REAL
+// juvenile facility, because none is generated — see
+// `prisonPacks.js`'s header for why a believable facility-type split
+// was not invented this round. `ageYears === null` (unknown) is not
+// treated as a minor, the same `Number(null)` corollary this file's
+// own registry already states elsewhere — an unobserved age places
+// exactly as it always has.
+function prisonFor(worldState, cityId, options = {}) {
+  const { ageYears = null } = options;
   if (cityId === null || cityId === undefined) return null;
   const candidates = (worldState.properties || []).filter(
     (p) => p.landmark_category === 'prison' && p.city_id === cityId,
   );
   if (candidates.length === 0) return null;
-  return candidates.reduce((lowest, p) => (p.id < lowest.id ? p : lowest));
+  const chosen = candidates.reduce((lowest, p) => (p.id < lowest.id ? p : lowest));
+  if (Number.isFinite(ageYears) && ageYears < 18 && chosen.facilityType !== 'juvenile-detention') {
+    return null;
+  }
+  return chosen;
 }
 
 // Put somebody inside, and take away what being inside takes away.
@@ -369,9 +398,16 @@ function imprison(worldState, caseRow, options = {}) {
 
   // **Where, not just that.** A real prison in the same city the
   // offence and conviction already happened in — see the header note
-  // above. `null` when this city has none, same as always.
-  const prison = prisonFor(worldState, caseRow.city_id);
+  // above. `null` when this city has none, OR when this person is a
+  // known minor and the one real prison this city has is not typed to
+  // hold one — see `prisonFor`'s own header.
+  const ageYears = mortality.ageInYears(worldState, npc, tick);
+  const prison = prisonFor(worldState, caseRow.city_id, { ageYears });
   caseRow.prison_property_id = prison?.id ?? null;
+
+  // **Gang politics, where there is now more than one person inside
+  // to have politics with.** See `ensurePrisonGang`'s own header.
+  if (prison) ensurePrisonGang(worldState, prison.id, tick);
 
   // 1. The job is gone. `economy.js` reads `status === 'active'` to
   //    decide who is employed, and `motivation.SATISFIERS.income` reads
@@ -436,8 +472,24 @@ function imprison(worldState, caseRow, options = {}) {
 
 // Let somebody out. Returns the case, or null if there was nothing to
 // release them from.
+//
+// **"After the reset, they head to their family."** Real, not
+// invented: `characterCreation.describeFamilyTree` is the one real
+// lookup this engine already has for a person's actual parents,
+// siblings and cousins — never a second family system, and never a
+// guess about who is related to whom. A release with nobody real to
+// return to says so rather than inventing a reunion; this is a
+// report on what the engine's own family data already holds, not a
+// new mechanic that creates a bond on the way out the door.
+//
+// `options.reason` distinguishes a sentence that actually ran out
+// (`'sentence-served'`, the default — everything before this round's
+// own behaviour) from one cut short by `runPrisonBreaks` below
+// (`'prison-break'`) — the same event, a release, with an honestly
+// different cause recorded on it rather than one description standing
+// in for two different real things.
 function release(worldState, entityId, options = {}) {
-  const { tick = worldState.tick ?? 0 } = options;
+  const { tick = worldState.tick ?? 0, reason = 'sentence-served' } = options;
   const npc = (worldState.npcs || []).find((n) => n.id === entityId);
   const caseRow = servingCase(worldState, entityId);
   if (!npc || !caseRow) return null;
@@ -459,17 +511,278 @@ function release(worldState, entityId, options = {}) {
   const prison = (worldState.properties || []).find(
     (p) => p.id === caseRow.prison_property_id,
   ) ?? null;
+
+  // **`describeFamilyTree` reports the dead too** — `entityBasics`
+  // returns `alive: false` for a deceased parent or sibling rather
+  // than omitting them, so a release that did not filter on it would
+  // send somebody "home" to a parent `mortality.recordDeath` already
+  // closed out. Filtered here, the same living-only discipline
+  // `answerByGroup`'s own header already names for a different reach
+  // into this exact family data.
+  const family = characterCreation.describeFamilyTree(worldState, entityId);
+  const livingFamily = [...family.parents, ...family.siblings].filter((f) => f?.alive === true);
+  const familyClause = livingFamily.length > 0
+    ? ` — heads for ${family.family?.surname ? `the ${family.family.surname} family` : 'family'} `
+      + `(${livingFamily.length} real living member${livingFamily.length === 1 ? '' : 's'})`
+    : ' — no living family this engine has any record of';
+
+  const causeClause = reason === 'prison-break'
+    ? `broke out of ${prison ? prison.name : 'custody'} after ${caseRow.sentence_ticks
+    } ticks for ${caseRow.category}, sentence unserved`
+    : prison
+      ? `released from ${prison.name} after ${caseRow.sentence_ticks} ticks for ${caseRow.category}`
+      : `released after ${caseRow.sentence_ticks} ticks for ${caseRow.category}`;
+
   worldStore.addHistoricalRecord(worldState, {
     event_type: 'release',
-    description: prison
-      ? `released from ${prison.name} after ${caseRow.sentence_ticks} ticks for ${caseRow.category}`
-      : `released after ${caseRow.sentence_ticks} ticks for ${caseRow.category}`,
+    description: `${causeClause}${familyClause}`,
     when_tick: tick,
     participants: [entityId],
     where_location_id: prison?.id ?? null,
   });
 
+  if (livingFamily.length > 0) {
+    worldStore.addMemory(worldState, {
+      entityId,
+      memoryType: 'experience',
+      category: 'family',
+      description: reason === 'prison-break' ? 'broke out and went to find family' : 'released and went home to family',
+      importance: 70,
+      emotionLevel: 60,
+      relatedEntityIds: livingFamily.map((f) => f.id).filter((id) => id !== undefined && id !== null),
+      tick,
+    });
+  }
+
   return caseRow;
+}
+
+// ---------------------------------------------------------------------
+// Gang politics, inside one real prison
+// ---------------------------------------------------------------------
+//
+// **Reuses `control.js`'s real takeover machinery and `orgArchetypes.
+// js`'s real archetype system — this is not a second, prison-specific
+// mechanism.** `'prison gang'` (orgArchetypes.js) is `type: 'gang'`,
+// `isFaction: true`, the identical shape `militia`/`insurgent cell`
+// already have, so `organizations.leader_id` is the real leader this
+// engine already tracks for every other faction, and a real
+// `territory_blocks` row can hold the prison's own COMMUNITY exactly
+// the way one already holds any other neighbourhood — `control.js`
+// and `authority.js` need no new code at all to let a prison gang
+// contest, hold or lose ground once it exists.
+//
+// **Scoped to a real prison's COMMUNITY, never a "wing" or "cell
+// block".** `justice.js`'s own earlier header on `prisonFor` already
+// checked this directly: `territory_blocks.community_id` is the
+// finest geography this schema has, and no interior-building
+// subdivision exists anywhere in it. Inventing one here would be
+// exactly the geography this file's own `prisonFor` note already
+// declined to invent for a facility type the schema cannot support —
+// so "taking over a prison" is the real prison's own community
+// crossing into `authority.REGIMES`' `lawless` band, the SAME regime
+// mechanic every other area of this engine already uses, not a
+// parallel status invented for prisons alone. See `runPrisonBreaks`.
+//
+// **Membership is structural, not drawn.** A prison gang's members
+// are, by construction, whoever this engine has actually imprisoned
+// at that one real property right now — `inmatesOf` reads
+// `courtCases`/`npcs` directly, never a separate roster. **Leadership
+// is deterministic (lowest real id among current inmates), the same
+// "nothing here for randomness to decide" reasoning `prisonFor`'s own
+// header already gives** — nothing in this engine's substrate (no
+// `npc.combat` reader that survives imprisonment, no prison-specific
+// reputation score) is real enough to seed a contested draw from, and
+// a draw dressed as one would be worse than an honest deterministic
+// rule, the same shape this file's own `judge` already argues for
+// declining to invent a coin-flip verdict.
+const PRISON_GANG_MIN_MEMBERS = 2;
+
+// Everyone currently, actually serving time at this one real property.
+function inmatesOf(worldState, prisonPropertyId) {
+  const servingIds = new Set(
+    (worldState.courtCases || [])
+      .filter((c) => c.status === 'convicted' && c.released_tick === null
+        && c.prison_property_id === prisonPropertyId)
+      .map((c) => c.defendant_entity_id),
+  );
+  // Living only — `judge`/`imprison` already refuse a dead defendant,
+  // but a death INSIDE is a separate real event (`mortality.js`) this
+  // file does not own, so the filter is re-asserted here rather than
+  // assumed from the case row alone.
+  return (worldState.npcs || [])
+    .filter((n) => servingIds.has(n.id) && n.status === 'imprisoned')
+    .map((n) => n.id);
+}
+
+function ensurePrisonGang(worldState, prisonPropertyId, tick) {
+  const gangs = worldState.prisonGangs || (worldState.prisonGangs = {});
+  const inmates = inmatesOf(worldState, prisonPropertyId);
+
+  const existingId = gangs[prisonPropertyId] ?? null;
+  const existing = existingId
+    ? (worldState.organizations || []).find((o) => o.id === existingId) ?? null
+    : null;
+
+  if (existing) {
+    // New arrivals join the same real org under the same real leader —
+    // `succession.js`, not this file, decides what happens if that
+    // leader is ever released or dies, the same separation of
+    // concerns `control.js`'s own takeover code already keeps.
+    worldState.entityOrganizationMemberships = worldState.entityOrganizationMemberships || [];
+    for (const inmateId of inmates) {
+      membership.joinOrganization(worldState, { entityId: inmateId, organizationId: existingId, tick });
+    }
+    return existing;
+  }
+
+  // Not founded yet, and nothing to found with fewer than two people —
+  // a "gang" of one inmate is just an inmate.
+  if (inmates.length < PRISON_GANG_MIN_MEMBERS) return null;
+
+  const prison = (worldState.properties || []).find((p) => p.id === prisonPropertyId) ?? null;
+  const leaderId = inmates.reduce((lowest, id) => (id < lowest ? id : lowest));
+
+  // `orgArchetypes.found` needs `generateOrganization`/`generateFaction`
+  // injected rather than required at module scope — `engine.js`
+  // requires `tick.js`, which requires THIS file, so a module-scope
+  // `require('./engine.js')` here would be the identical half-built-
+  // module cycle `answerByGroup`'s own header already names for
+  // `heat.js`, fixed the identical way: required lazily, inside the
+  // function, the moment it is actually needed.
+  // eslint-disable-next-line global-require
+  const engine = require('./engine.js');
+  // **`generateFaction`/`generateOrganization` write to `engine.
+  // WorldState` itself, not to whatever `worldState` object this call
+  // was handed.** Every real, generated world IS that same singleton
+  // (`worldgen.js`'s own header: "a world is a process-level thing
+  // here"), so this is usually a no-op — but a constructed test
+  // fixture is deliberately its own plain object (standing rule 8),
+  // and `membership.joinOrganization` below reads `worldState.
+  // organizations` by the array it was actually given. Ensuring the
+  // array exists and holds the real founded row — never a second,
+  // different object standing in for it — makes this correct either
+  // way instead of correct only when the two happen to be the same
+  // reference.
+  worldState.organizations = worldState.organizations || [];
+  const founded = orgArchetypes.found(worldState, {
+    archetype: 'prison gang',
+    name: `${prison ? prison.name : 'the prison'} yard`,
+    seed: worldState.seed ?? 'world',
+    // §88: seeded on the prison's own real id, never on an inmate's —
+    // an inmate roster changes tick to tick and a trait draw keyed on
+    // one would not be reproducible from the same world twice.
+    key: prisonPropertyId,
+    generateOrganization: engine.generateOrganization,
+    generateFaction: engine.generateFaction,
+  });
+  if (!worldState.organizations.includes(founded)) worldState.organizations.push(founded);
+  founded.leader_id = leaderId;
+  gangs[prisonPropertyId] = founded.id;
+
+  worldState.entityOrganizationMemberships = worldState.entityOrganizationMemberships || [];
+  for (const inmateId of inmates) {
+    membership.joinOrganization(worldState, {
+      entityId: inmateId,
+      organizationId: founded.id,
+      role: inmateId === leaderId ? 'leader' : 'member',
+      tick,
+    });
+  }
+
+  worldStore.addHistoricalRecord(worldState, {
+    event_type: 'prison_gang_founded',
+    description: `${founded.name} forms inside ${prison ? prison.name : 'a prison'}, `
+      + `led by ${leaderId}`,
+    when_tick: tick,
+    participants: inmates,
+    where_location_id: prisonPropertyId,
+  });
+
+  return founded;
+}
+
+// ---------------------------------------------------------------------
+// Prison breaks and takeovers
+// ---------------------------------------------------------------------
+//
+// **"Taking over a prison" is the same regime mechanic every other
+// area already has, not a new status.** `authority.regimeFor` already
+// computes `governed`/`contested`/`lawless` for a prison's own
+// community exactly as it does for any other — a prison gang growing
+// strong enough to hold that community's blocks IS the state losing
+// its grip there, the same `gripTerm` calculation, nothing new to
+// write.
+//
+// **A crossing, not a condition — the seventh standing rule, in a new
+// place.** A community sitting at `lawless` every tick must not break
+// the same prison open again every tick forever; `worldState.
+// prisonRegimeState` is the real, in-memory, per-prison memory of the
+// last regime this function itself observed, so a break fires exactly
+// once per transition INTO `lawless`, never on every tick the area
+// happens to stay there. The very first time a prison is ever
+// observed, whatever its regime, is recorded as the baseline and
+// never treated as a crossing — there is nothing to have crossed FROM
+// yet, the same reasoning `authority.js`'s own "unobserved is not a
+// zero" note gives for a different value.
+//
+// **What actually happens on a break: real, not invented.** Everyone
+// CURRENTLY serving at that one real prison is released early through
+// the same real `release` function an ordinary completed sentence
+// uses, tagged `reason: 'prison-break'` so the historical record says
+// the sentence was not served rather than silently looking identical
+// to one that was.
+function runPrisonBreaks(worldState, options = {}) {
+  const { tick = worldState.tick ?? 0, writ = authority.writByCommunity(worldState) } = options;
+  const events = [];
+  const regimeState = worldState.prisonRegimeState || (worldState.prisonRegimeState = {});
+
+  const prisons = (worldState.properties || []).filter((p) => p.landmark_category === 'prison');
+  for (const prison of prisons) {
+    if (prison.community_id === null || prison.community_id === undefined) continue;
+    const reading = writ.get(prison.community_id)
+      ?? authority.writOf(worldState, prison.community_id);
+    // **An unmeasured area is recorded as its own real baseline, not
+    // skipped.** A world that starts with no reading at all and only
+    // later becomes measured enough to read `lawless` on its FIRST
+    // real reading must still cross into it from something — treating
+    // "never observed" and "observed, and governed/contested" as the
+    // same prior state would make that first real lawless reading
+    // look like a crossing from nowhere, which is not a crossing at
+    // all. `regimeState` therefore stores `null` as a real prior value
+    // the moment this prison is checked once, distinct from never
+    // having been checked.
+    const regime = reading.regime ?? null;
+    const seenBefore = Object.prototype.hasOwnProperty.call(regimeState, prison.id);
+    const previous = regimeState[prison.id] ?? null;
+    regimeState[prison.id] = regime;
+    if (!seenBefore) continue; // first observation ever — baseline only
+    if (regime !== 'lawless' || previous === 'lawless') continue; // no fresh crossing
+
+    const holderId = authority.holderOf(worldState, prison.community_id);
+    const brokenOut = [];
+    for (const entityId of inmatesOf(worldState, prison.id)) {
+      const released = release(worldState, entityId, { tick, reason: 'prison-break' });
+      if (released) brokenOut.push(entityId);
+    }
+    if (brokenOut.length === 0) continue;
+
+    events.push({
+      type: 'prison_break',
+      severity: 'high',
+      note: `${prison.name} breaks open as its own ground goes lawless — `
+        + `${brokenOut.length} released unserved${holderId ? ` under organization ${holderId}` : ''}`,
+      tick,
+      affected_entity_ids: brokenOut,
+      global_effects: {
+        prisonPropertyId: prison.id,
+        communityId: prison.community_id,
+        holderId,
+        releasedEntityIds: brokenOut,
+      },
+    });
+  }
+  return events;
 }
 
 // ---------------------------------------------------------------------
@@ -739,6 +1052,10 @@ function runJustice(worldState, options = {}) {
     });
   }
 
+  // Taking over a prison, closed with the one real reading already
+  // computed for this whole pass — see `runPrisonBreaks`'s own header.
+  events.push(...runPrisonBreaks(worldState, { tick, writ }));
+
   return events;
 }
 
@@ -826,6 +1143,30 @@ function describeCase(worldState, caseId) {
     ...row,
     law: law ? { id: law.id, category: law.category, description: law.description } : null,
     serving: row.status === 'convicted' && row.released_tick === null,
+    prison: row.prison_property_id ? describePrison(worldState, row.prison_property_id) : null,
+  };
+}
+
+// The real facility a case's own `prison_property_id` points at, with
+// the real, cited BJS/OJJDP composition data `prisonPacks.js` reports
+// for a facility of that kind — the "information on races in all the
+// penitentiaries, county jails... juvenile and women's facilities"
+// half of task #151, surfaced the one place this engine already names
+// a specific real prison rather than duplicated across every caller.
+// Reporting only: nothing downstream of this function's return value
+// decides anything from it — see `prisonPacks.js`'s own header and
+// `test/prison-packs.test.js`'s firewall.
+function describePrison(worldState, prisonPropertyId) {
+  const property = (worldState.properties || []).find((p) => p.id === prisonPropertyId);
+  if (!property) return null;
+  return {
+    id: property.id,
+    name: property.name ?? null,
+    facilityType: property.facilityType ?? null,
+    demographics: property.facilityType
+      ? prisonPacks.describeFacilityDemographics(property.facilityType)
+      : null,
+    gangOrganizationId: (worldState.prisonGangs || {})[prisonPropertyId] ?? null,
   };
 }
 
@@ -899,5 +1240,10 @@ module.exports = {
   convictionRate,
   unlegislatedShare,
   describeCase,
+  describePrison,
   assertVocabulariesLineUp,
+  PRISON_GANG_MIN_MEMBERS,
+  inmatesOf,
+  ensurePrisonGang,
+  runPrisonBreaks,
 };

@@ -731,3 +731,147 @@ test('a law with no jurisdiction counts as held everywhere', () => {
   assert.equal(politics.unlegislatedCategories(w, 5).includes('criminal'), false,
     'a national statute was re-enacted city by city');
 });
+
+// ---------------------------------------------------------------------
+// Task #151 — gang politics, juvenile-safety routing, breaks, family
+// ---------------------------------------------------------------------
+
+test('a known minor is never routed into the one adult facility this city has', () => {
+  const w = courtWorld();
+  w.properties.push({ id: 200, city_id: 9, landmark_category: 'prison', name: 'Riverside Correctional' });
+  // age = (tick - createdTick) / TICKS_PER_YEAR, mortality.ageInYears —
+  // createdTick 0, tick 10, with a TICKS_PER_YEAR large enough that this
+  // reads as a real child rather than an adult.
+  w.npcs[0].createdTick = 10 - 1; // ~1 day old in ticks, far under 18 years
+  justice.runJustice(w, { tick: 10 });
+
+  const [caseRow] = w.courtCases;
+  assert.equal(caseRow.status, 'convicted', 'a minor cannot be convicted at all');
+  assert.equal(caseRow.prison_property_id, null,
+    'a minor was pointed at the one real prison this city has, which this engine only ever '
+    + 'types as an adult facility');
+  const conviction = w.historicalRecords.find((r) => r.event_type === 'conviction');
+  assert.equal(conviction.where_location_id, null);
+
+  // The identical city, the identical prison, an adult (unknown age,
+  // same as every other test in this file) — still placed normally.
+  const adultWorld = courtWorld();
+  adultWorld.properties.push({ id: 200, city_id: 9, landmark_category: 'prison', name: 'Riverside Correctional' });
+  justice.runJustice(adultWorld, { tick: 10 });
+  assert.equal(adultWorld.courtCases[0].prison_property_id, 200);
+});
+
+test('prisonFor refuses an adult building for a minor directly, and still answers for an adult', () => {
+  const w = courtWorld();
+  w.properties.push({ id: 200, city_id: 9, landmark_category: 'prison', name: 'Riverside Correctional' });
+  assert.equal(justice.prisonFor(w, 9, { ageYears: 12 }), null);
+  assert.equal(justice.prisonFor(w, 9, { ageYears: 35 }).id, 200);
+  assert.equal(justice.prisonFor(w, 9, { ageYears: null }).id, 200, 'unknown age is not a minor');
+});
+
+test('two inmates at the same real prison form a real gang, with a real deterministic leader', () => {
+  const w = courtWorld();
+  w.properties.push({ id: 200, city_id: 9, landmark_category: 'prison', name: 'Riverside Correctional' });
+  w.npcs.push({ id: 2, communityId: 5, status: 'active', home_property_id: 78 });
+  w.crimeIncidents.push({
+    id: 2, category: 'theft', perpetrator_entity_id: 2, victim_entity_id: null,
+    community_id: 5, tick: 9, severity: 30, investigated_tick: 10, cleared: true,
+  });
+
+  justice.runJustice(w, { tick: 10 });
+
+  assert.equal(w.courtCases.length, 2);
+  assert.ok(w.courtCases.every((c) => c.prison_property_id === 200));
+
+  const gangId = w.prisonGangs[200];
+  assert.ok(gangId, 'no gang was founded with two real inmates at the same prison');
+  const gang = w.organizations.find((o) => o.id === gangId);
+  assert.equal(gang.type, 'gang');
+  assert.equal(gang.archetype, 'prison gang');
+  assert.equal(gang.leader_id, 1, 'leadership is deterministic (lowest id), not a draw');
+
+  const members = w.entityOrganizationMemberships
+    .filter((m) => m.organization_id === gangId)
+    .map((m) => m.entity_id);
+  assert.deepEqual(new Set(members), new Set([1, 2]));
+
+  assert.ok(w.historicalRecords.some((r) => r.event_type === 'prison_gang_founded'));
+});
+
+test('one inmate alone founds no gang — a gang of one is just an inmate', () => {
+  const w = courtWorld();
+  w.properties.push({ id: 200, city_id: 9, landmark_category: 'prison', name: 'Riverside Correctional' });
+  justice.runJustice(w, { tick: 10 });
+  assert.equal(w.prisonGangs?.[200], undefined);
+});
+
+test('a prison breaks open exactly once, on the crossing into lawless, never on every tick it stays there', () => {
+  const policing = require('../server/policing.js');
+  const w = {
+    tick: 100,
+    npcs: [{ id: 1, communityId: 9, status: 'imprisoned', createdTick: 0 }],
+    communities: [{ id: 9, city_id: 1 }],
+    cities: [{ id: 1 }],
+    properties: [{ id: 500, city_id: 1, community_id: 9, landmark_category: 'prison', name: 'Lawless Pen' }],
+    infrastructure: [], territoryBlocks: [], organizations: [],
+    entityTraits: [], beliefs: [], publicOpinion: [], governments: [],
+    crimeIncidents: [],
+    courtCases: [{
+      id: 1, defendant_entity_id: 1, status: 'convicted', released_tick: null,
+      prison_property_id: 500, city_id: 1, community_id: 9, category: 'theft',
+      sentence_ticks: 999999, charged_tick: 0, incident_id: 1, law_id: 100,
+    }],
+    groupSanctions: [], scheduleEvents: [], habits: [], memories: [], historicalRecords: [],
+    familyMemberships: [], families: [],
+  };
+
+  // First check: unmeasured, recorded as a baseline, never a crossing.
+  let events = justice.runPrisonBreaks(w, { tick: 100 });
+  assert.equal(events.length, 0);
+  assert.equal(w.npcs[0].status, 'imprisoned');
+
+  // The state's own writ there collapses to lawless.
+  w.beliefs = [{
+    id: 1, entity_id: 1, belief_name: policing.TRUST_BELIEF,
+    belief_type: policing.TRUST_BELIEF_TYPE, strength: 10, tick: 0,
+  }];
+  w.infrastructure = [{
+    id: 1, city_id: 1, type: 'public_safety', capacity: 1, condition: 10,
+    maintenance_level: 50, age: 0,
+  }];
+  w.governments = [{ organization_id: 70, system_type: 'council' }];
+  w.publicOpinion = [{ city_id: null, topic: 'government:70', approval_score: 15, tick: 1 }];
+
+  events = justice.runPrisonBreaks(w, { tick: 101 });
+  assert.equal(w.npcs[0].status, 'active', 'the prison stayed lawless and nobody broke out');
+  assert.equal(w.courtCases[0].released_tick, 101);
+  assert.ok(events.some((e) => e.type === 'prison_break'));
+  const release = w.historicalRecords.find((r) => r.event_type === 'release');
+  assert.match(release.description, /broke out/);
+  assert.equal(release.description.includes('no living family'), true);
+
+  // Staying lawless a second tick does not break the (now-empty) prison
+  // again — the seventh standing rule, in this new place.
+  events = justice.runPrisonBreaks(w, { tick: 102 });
+  assert.equal(events.filter((e) => e.type === 'prison_break').length, 0);
+});
+
+test('release notes real living family when this engine actually has one on record', () => {
+  const w = courtWorld();
+  // A real parent, through the real family substrate this engine
+  // already has — `families`/`familyMemberships`, not a second system.
+  w.families = [{ id: 1, surname: 'Okafor' }];
+  w.familyMemberships = [
+    { entity_id: 1, family_id: 1, role: 'child' },
+    { entity_id: 9, family_id: 1, role: 'parent' },
+  ];
+  w.npcs.push({ id: 9, communityId: 5, status: 'active' });
+
+  justice.runJustice(w, { tick: 10 });
+  const sentence = justice.SENTENCE_TICKS.theft;
+  justice.runJustice(w, { tick: 10 + sentence });
+
+  const release = w.historicalRecords.find((r) => r.event_type === 'release');
+  assert.match(release.description, /Okafor family/);
+  assert.ok(w.memories.some((m) => m.entity_id === 1 && m.category === 'family'));
+});

@@ -192,6 +192,35 @@ const ARCHETYPES = {
     posts: ['enforcer'],
   },
 
+  // **Prison gang, and it is the SAME archetype shape as `militia`,
+  // not a separate mechanism.** Task #151's own gang-politics ask is
+  // answered by reusing `control.js`'s real takeover machinery and
+  // `authority.js`'s real regime system, scoped to the community a
+  // real prison stands in (`justice.js`'s own header explains why: no
+  // interior-building geography — a "wing" or "cell block" — exists
+  // anywhere in this schema, so territory stays at the grain the
+  // engine actually supports). `isFaction: true` for the identical
+  // reason `militia` has it: a prison gang that could not hold a real
+  // `territory_blocks` row could not be "taken over" or "taken over
+  // from" by anything real either.
+  'prison gang': {
+    type: 'gang',
+    reach: 'community',
+    note: 'Holds what it can inside one real prison\'s own community rather than a city — '
+      + 'small, bounded membership (its members are, structurally, people this engine has '
+      + 'actually imprisoned at one real property), high internal loyalty for the same reason '
+      + 'an `insurgent cell`\'s is high: there is nowhere to recruit from but who is already '
+      + 'inside.',
+    isFaction: true,
+    traits: {
+      internalLoyalty: [65, 95],
+      territory: [20, 55],
+      membership: [5, 35],
+      production: [0, 10],
+    },
+    posts: ['enforcer'],
+  },
+
   clan: {
     type: 'club',
     reach: 'community',

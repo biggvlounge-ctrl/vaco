@@ -607,6 +607,33 @@ function designate(worldState, options = {}) {
   // point of `landmarkPacks.js` is that a world can do better.
   if (name !== null) property.name = name;
   else if (!property.name) property.name = what ?? `the ${category.replace(/-/g, ' ')}`;
+  // **`facilityType`, prison only, and deliberately one honest default
+  // rather than an invented distribution.** The real counterpart this
+  // engine would need to assign a believable state-prison/federal-
+  // prison/county-jail/juvenile-detention/women's-facility/camp split
+  // at GENERATION time is a real national count of facilities by kind
+  // (BJS's own Census of State and Federal Adult Correctional
+  // Facilities, plus OJJDP's juvenile facility census) — checked this
+  // round and not found at a confidence this file would stand behind;
+  // see `server/prisonPacks.js`'s own header for what WAS found and
+  // wired (real demographic composition BY facility type, as data).
+  // So every real prison this engine designates reads as the one kind
+  // it has always implicitly been — `'state-or-federal-prison'`, an
+  // adult facility — rather than silently inventing county-jail or
+  // women's-facility counts with no source behind them. `null` would
+  // be the honest alternative; a named default is chosen instead
+  // because `justice.prisonFor`'s juvenile-safety check (see its own
+  // header) needs a concrete value to compare against, and declaring
+  // "every real prison is presently typed as an adult facility" is the
+  // plain truth about what this pipeline generates today.
+  //
+  // Left open for a real import: a region pack naming a real facility
+  // kind can set this directly. `landmarkPacks.js` carries no such
+  // field yet (checked before writing this) — a declared hook, not a
+  // claim that one is wired.
+  if (category === 'prison' && !property.facilityType) {
+    property.facilityType = 'state-or-federal-prison';
+  }
   // **`hero_tier` is NOT stored**, and an earlier version of this line
   // stored it. It is `isHeroTier(landmark_category)` and nothing else —
   // standing rule 3, never duplicate a computable rollup. Storing it
