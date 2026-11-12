@@ -3052,6 +3052,180 @@ file's own inventory row did not exist yet either, which is the other
 two. 2034 (this branch's own last landed count) + 12 (this round's own
 new tests) = 2046, exactly.
 
+**A fifty-seventh, and it is task #151 — "prison gang politics... prison
+gang leaders... COs... after the reset, they head to their family.
+Prison breaks. Taking over prisons... races in all the penitentiaries,
+county jails... juvenile and women's facilities... camps... all the
+crimes" — closed by reusing four systems already built rather than
+inventing a fifth, and one hard line held for exactly the reason it is
+held everywhere else in this file.**
+
+**The line, stated before anything else, because it was decided before
+anything else was designed.** Real incarceration demographics BY RACE
+are real, public, well-known government statistics — the Bureau of
+Justice Statistics publishes exactly this, by facility type, the same
+kind of fact `racePacks.js`/`religionPacks.js`/`ancestryPacks.js`
+already report elsewhere — and reporting them is fine, with the
+identical §9 firewall every one of those already carries. Race must
+never determine which prison gang an NPC joins, never feed a prison
+violence or conflict mechanic, and never otherwise decide an outcome.
+That is not a data-availability question; it is the same boundary this
+project has already drawn and held for ethnicity, religion, sect and
+tribe across dozens of these entries, and a prison is not a setting
+that gets to redraw it. `server/prisonPacks.js` reports the real
+demographic composition of three real facility kinds; nothing reads it
+to decide anything.
+
+**What was found, at what grain, and what was left `null` rather than
+guessed.** BJS's own summary of *Prisoners in 2022* gives sentenced
+state-and-federal composition (32% Black, 31% White, 23% Hispanic —
+BJS's own published figure, cross-checked against EPI's chart of the
+same BJS table, not a third party's invention) and a newer, separately-
+dated female share (7.3% of the combined population at yearend 2023).
+BJS's own *Jail Inmates* series gives local jails (49% White, 35%
+Black, 14% Hispanic at midyear 2021; 14% female at midyear 2022).
+OJJDP's Census of Juveniles in Residential Placement gives the one real
+source for juvenile facilities specifically — 2021's own published
+race-by-age counts, divided here into percentages since OJJDP's own
+page does not print them directly, and a separately-dated 2023 female
+share (14.5% of committed youth) kept at its own year rather than
+blended with 2021's, because OJJDP's own release note says the two
+waves are not directly comparable. A *Prisoners in 2023* report exists
+and its own race table could not be retrieved this round — named as a
+real gap rather than silently worked around with the 2022 figure
+passed off as current. A believable facility-COUNT distribution (how
+many of each real kind exist, which is what `landmarks.js` would need
+to assign county-jail/women's-facility/camp sub-types at generation
+with any real backing) was checked for and not found at a confidence
+this round would stand behind, so `property.facilityType` carries one
+honest default — `'state-or-federal-prison'` — rather than an invented
+split. The same sparse-rather-than-guessed posture `countryPacks.js`'s
+`globalIndicators2026` already took.
+
+**Every crime this engine actually tracks, named rather than quietly
+narrowed.** `prisonPacks.describePopulationCaveat` cross-checks against
+`crime.CATEGORIES` at call time and names all eight — the five this
+engine can actually generate a perpetrator for (violent, property,
+theft, gun, domestic) against the three that stay a declared absence
+(drug, fraud, sex_offense, per `crime.js`'s own header, from before this
+round and not reopened by it) — so a reader of a population this engine
+reports is never left assuming a narrower taxonomy exists than the
+engine's own vocabulary already names.
+
+**COs needed no new occupation, the forty-second standing rule's own
+precedent, checked rather than assumed a second time.**
+`landmarks.js#KEY_BUILDING_TYPES.prison.staff` has been `'officer'`
+since before this round, and `officer` is not ethnicity- or role-
+gated — the identical fact that already closed "Mexican police
+officer" with no new occupation closes "corrections officer" too.
+
+**Gang politics, leaders, "taking over a prison" and prison breaks are
+four consequences of ONE reused mechanism, not four new ones.** The
+real question — whether a prison needs its own interior geography (a
+"wing" or "cell block") to model a takeover — was checked against the
+schema before anything else was designed, and the schema's answer is
+no: `territory_blocks.community_id` is the finest geography this
+engine has, with no building-interior subdivision anywhere in it.
+So a prison gang is `orgArchetypes.js`'s new `'prison gang'` archetype
+(`type: 'gang'`, `isFaction: true`, the identical shape `militia`/
+`insurgent cell` already have), scoped to the prison's own real
+COMMUNITY — `control.js`'s real takeover machinery and `authority.js`'s
+real `governed`/`contested`/`lawless` regime need no new code at all to
+let it contest, hold, or lose that ground, because a prison is a real,
+bounded, government-controlled area by default and "taking it over" IS
+that area's regime crossing into `lawless`, the same mechanic every
+other neighbourhood in this engine already has. Membership is
+structural (whoever this engine has actually imprisoned at that one
+real property, read live every time a new conviction lands there) and
+leadership is deterministic — lowest real id among current inmates —
+for the identical reason `justice.prisonFor`'s own header already gives
+for declining a seeded draw: nothing in this engine's substrate
+survives imprisonment real enough to weight a contested choice from
+(no occupation, no `npc.combat` reader this file owns), and a draw
+dressed as one would be worse than an honest rule. `runPrisonBreaks` is
+the other half of the same reused mechanism: a crossing, not a
+condition — the seventh standing rule, in a new place — fires exactly
+once per transition into `lawless` for a prison's own community and
+releases everyone currently serving there, unserved, through the same
+real `release` function an ordinary completed sentence already uses,
+tagged so the historical record says so rather than looking identical
+to a sentence that actually ran out.
+
+**"After the reset, they head to their family" is a release that finally
+asks a question this engine already had an answer to.** `justice.release`
+now calls `characterCreation.describeFamilyTree` — filtered to the
+living, because that function reports the dead too and an early version
+of this did not filter on it, which would have sent somebody "home" to
+a parent `mortality.recordDeath` had already closed out — and names the
+real family on record, or says plainly that this engine has none,
+rather than inventing a reunion. Not a new family system; the one this
+engine already built for `characterCreation.js`, asked a question
+nothing had asked it from this direction before.
+
+**A new per-NPC field was deliberately NOT added this round, and the
+reason is the same complexity class this file has already named four
+times for the other demographic dimensions.** This engine has no
+`npc.sex`/`npc.gender` field anywhere — checked directly, not assumed —
+so a male-adult-never-in-a-women's-facility correctness property is not
+buildable without inventing one, the identical "new per-NPC field"
+complexity class race/marital-status/disability/veteran status were
+each already their own round for. What the real substrate DOES support
+is age (`mortality.ageInYears`, already read by `control.ageOf`/
+`roleOf` for every other age-gated decision in this engine), so that is
+the one individual-routing axis this round actually closes: a known
+minor is never routed into the one adult-typed facility a city has —
+`prisonFor` returns `null`, the same honest absence a city with no
+prison at all already gets, rather than a fabricated juvenile building
+or a silently-wrong placement. Sex-based routing stays a declared,
+named gap, not a quietly narrower claim.
+
+**Mutation-verified two checks, one of them caught live during
+development rather than staged afterward.** With the juvenile-safety
+condition in `prisonFor` disabled, both tests that depend on it failed
+immediately; reverted, suite green again. And `race-packs.test.js`'s
+own forbidden-word firewall caught a real false positive while this
+module was still being written — a single occurrence of the standalone
+word "race" inside a string literal in `prisonPacks.js` (a sentence
+about the 2021 and 2023 census waves, nothing to do with `npc.race`),
+tripped the exact same scan `racePacks.js`'s own §9 test holds. Fixed
+by rewording the sentence rather than relaxing the test's allowlist —
+the firewall is supposed to be strict about the word, not about intent,
+and a module that reports real-world race statistics for an unrelated
+reason earning a second look is the test doing its job, not a false
+alarm to code around.
+
+**A concurrent sibling fork (task #150, the full political hierarchy)
+caught this same in-flight bug independently, from the other side,
+while this round's own commit was still uncommitted — see this file's
+own fifty-sixth entry, written before this one landed, naming
+`server/prisonPacks.js` and the exact word that tripped it. Both forks
+reached the same diagnosis from opposite directions and neither one
+touched the other's files**, the same collision discipline a prior
+two-fork round on this branch already established and this round
+followed again: this file, `README.md`, `VACANCY_API_ENDPOINT_MAP.md`
+and `VACANCY_INVENTORY.md` were re-fetched and re-read fresh from
+origin immediately before this entry was written, rather than from
+whatever was on disk when this round started, and this round's own
+commit rebased cleanly onto the political hierarchy's landed tip with
+no merge conflict in any file either round touched.
+
+**Tests and status.** `test/justice.test.js` (+6: juvenile-safety
+routing both through the full `runJustice` pass and directly through
+`prisonFor`, gang formation with a real deterministic leader, the
+one-inmate-founds-nothing floor, a prison break on a real regime
+crossing that does not repeat on a second lawless tick, and a release
+that names real family on record) and `test/prison-packs.test.js` (new,
+6: every real facility entry resolves and an unknown one does not, no
+share is fabricated past what BJS/OJJDP actually published, the real
+under-100% BJS/FBOP reporting gap is reported rather than normalised
+away, `landmarks.js`'s own default lines up with this module's own
+entries, the crime taxonomy is named honestly, and the §9 firewall).
+Full suite after rebasing onto the political hierarchy's landed tip:
+2058 tests, 2039 pass, 0 fail attributable to this round, 17 skipped —
+2046 (that round's own landed count, the three failures it reported
+being exactly this round's own in-flight state) + 12 (this round's own
+new tests) = 2058, exactly.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

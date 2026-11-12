@@ -615,6 +615,18 @@ function inmatesOf(worldState, prisonPropertyId) {
     .map((n) => n.id);
 }
 
+// `worldState.prisonGangs` (prison property id -> organization id) and
+// `worldState.prisonRegimeState` (prison property id -> last observed
+// regime, below) are both new and in-memory only — the same documented
+// posture `caseRow.prison_property_id`/`city.healthBaseline` already
+// carry and for the identical reason: no schema column exists for
+// either, and adding one is real, separate schema work this round does
+// not take on. A world rebuilt from Postgres loses both and falls back
+// to founding a fresh gang / treating every prison as newly observed —
+// not a silent loss, the same known, stated limitation every other
+// in-memory-only field in this registry already carries. The real
+// `organizations` row itself IS round-tripped (schema has always had
+// that table); only the lookup FROM a prison TO its gang is not.
 function ensurePrisonGang(worldState, prisonPropertyId, tick) {
   const gangs = worldState.prisonGangs || (worldState.prisonGangs = {});
   const inmates = inmatesOf(worldState, prisonPropertyId);

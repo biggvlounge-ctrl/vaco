@@ -351,6 +351,41 @@ declined outright rather than faked. `config.scopedGovernments`
 (opt-in, default `false`) founds the new per-city and per-region
 governments; off, every existing generated world is unchanged.
 
+## Prison depth: gangs, breaks, real demographics, family
+See `CLAUDE.md`'s own fifty-seventh standing rule for the full
+reasoning. A real prison's gang politics, takeover and breaks are four
+consequences of ONE reused mechanism rather than four new ones:
+`orgArchetypes.js`'s new `'prison gang'` archetype scopes a real
+`organizations` row to the prison's own COMMUNITY (the finest geography
+`territory_blocks` has — no "wing"/"cell block" concept exists
+anywhere in this schema, so none was invented), and "taking over a
+prison" is that community's `authority.js` regime crossing into
+`lawless`, the identical mechanic every other neighbourhood already
+has. `justice.runPrisonBreaks` fires exactly once on that crossing and
+releases everyone currently serving there, unserved, through the same
+real `release` path a completed sentence already uses.
+
+Real BJS/OJJDP incarceration demographics by facility type (state/
+federal prison, local jail, juvenile residential placement) are in
+`server/prisonPacks.js` — a cited reference table, never a per-NPC
+draw, with the identical §9 firewall `racePacks.js`/`religionPacks.js`
+already carry: race must never decide which gang an inmate joins, feed
+a prison conflict mechanic, or decide anything else. A believable
+facility-type COUNT distribution (how many of each real kind exist, to
+split a generated prison into county-jail/women's-facility/camp
+sub-types) was checked for and not found at a confidence this round
+would stand behind, so `property.facilityType` carries one honest
+default. A known minor is never routed into the one adult-typed
+facility a city has (`mortality.ageInYears`, `prisonFor` returns
+`null` the same way a city with no prison already does) — the one
+individual-routing axis this engine's real substrate supports, since
+`npc.sex` does not exist anywhere in this engine and was not invented
+to force a second axis. Corrections officers needed no new occupation:
+`officer` has staffed every generated prison since before this round.
+`justice.release` now calls the real `characterCreation
+.describeFamilyTree` (filtered to the living) so somebody released, or
+broken out, heads to real family on record where this engine has one.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a
