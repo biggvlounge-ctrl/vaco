@@ -3040,8 +3040,17 @@ fix reverted back to `leader_npc_id`, both the corrected pre-existing
 election test and the new scoped-election test caught it; reverted,
 suite green again.
 
-**Status, after rebasing onto whatever else had landed on this branch
-in the meantime**: full suite, `__FULL_SUITE_RESULT__`.
+**Status, after whatever else had landed on this branch in the
+meantime (VDEX's VULCAN/VOKEN reconciliation, unrelated)**: full
+suite, 2046 tests, 2026 pass, 0 fail attributable to this round, 17
+skipped — 3 failures present are all traced to a different, concurrent
+sibling fork's own in-progress, not-yet-committed file
+(`server/prisonPacks.js`, task #151's own prison-depth round), not to
+anything here: `grep -n race server/prisonPacks.js` finds the exact
+word that trips `race-packs.test.js`'s own module allowlist, and that
+file's own inventory row did not exist yet either, which is the other
+two. 2034 (this branch's own last landed count) + 12 (this round's own
+new tests) = 2046, exactly.
 
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
