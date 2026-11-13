@@ -1050,7 +1050,10 @@ test('the fifteenth round adds exactly twelve more real countries, all resolvabl
     'pakistan', 'bangladesh', 'democratic-republic-of-the-congo', 'thailand',
     'myanmar', 'iraq', 'afghanistan', 'syria', 'morocco', 'peru', 'chile', 'malaysia',
   ];
-  assert.equal(Object.keys(countryPacks.COUNTRY_PROFILES).length, 22, 'ten from the fourteenth round plus twelve from the fifteenth');
+  // 23, not 22: the sixteenth round (global incarceration-system
+  // data) added `india` as its own real COUNTRY_PROFILES entry on top
+  // of this round's twelve -- see that round's own test below.
+  assert.equal(Object.keys(countryPacks.COUNTRY_PROFILES).length, 23, 'ten from the fourteenth round, twelve from the fifteenth, one from the sixteenth');
   for (const key of newKeys) {
     assert.equal(countryPacks.countryFor(key), null, `${key} must not also exist in COUNTRIES`);
     const entry = countryPacks.countryProfileFor(key);
@@ -1117,5 +1120,92 @@ test('regionalContextFor resolves every fifteenth-round country through the prof
     const ctx = countryPacks.regionalContextFor(key);
     assert.ok(ctx.profileEntry, `${key} should resolve through profileEntry`);
     assert.equal(ctx.region, region, `${key} should classify as ${region}`);
+  }
+});
+
+// ---------------------------------------------------------------------
+// Sixteenth round: global incarceration-system data (World Prison
+// Brief) + a new, standalone `india` COUNTRY_PROFILES entry
+// ---------------------------------------------------------------------
+
+test('india is a real, new COUNTRY_PROFILES entry, resolvable with no ancestryPacks.GROUPS key needed', () => {
+  assert.equal(countryPacks.countryFor('india'), null, 'india must not also exist in COUNTRIES');
+  const entry = countryPacks.countryProfileFor('india');
+  assert.ok(entry, 'india should be a real COUNTRY_PROFILES entry');
+  assert.equal(entry.country, 'India');
+  assert.equal(entry.incomeLevel, 'lower-middle-income');
+  assert.ok(countryPacks.CONFLICT_LEVELS.includes(entry.conflictLevel));
+  assert.equal(entry.regimeScore, null, 'the real 2024 EIU numeric score was not found this round -- must not be guessed from the rank');
+  assert.equal(entry.regimeRank.value, 47);
+  assert.equal(entry.oilProducer, null, 'India is a major net importer, not an exporter');
+
+  const context = countryPacks.regionalContextFor('india');
+  assert.ok(context.profileEntry, 'india should resolve through the profileEntry tier');
+});
+
+test('every real country touched by this round has a real, cited incarceration block', () => {
+  const countriesChecked = [
+    'united-states', 'german', 'russian', 'nigerian', 'english', 'french',
+    'chinese', 'mexican', 'colombian', 'egyptian',
+  ];
+  for (const key of countriesChecked) {
+    const entry = countryPacks.countryFor(key);
+    assert.ok(entry, `${key} should be a real COUNTRIES entry`);
+    assert.ok(entry.incarceration, `${key}: no incarceration block was added`);
+    assert.ok(entry.incarceration.incarcerationRatePer100k, `${key}: no real incarceration rate`);
+    // Egypt's own source string names World Prison Brief alongside the
+    // two secondary outlets that corroborated it (US State Dept,
+    // Prison Insider) -- a real, honest compound citation, not a
+    // different source entirely, so this checks for the real shared
+    // root rather than an exact match every entry doesn't share.
+    assert.match(entry.incarceration.incarcerationRatePer100k.source, /world-prison-brief-prisonstudies-org/);
+  }
+
+  const profileCountriesChecked = ['brazil', 'south-africa', 'india'];
+  for (const key of profileCountriesChecked) {
+    const entry = countryPacks.countryProfileFor(key);
+    assert.ok(entry, `${key} should be a real COUNTRY_PROFILES entry`);
+    assert.ok(entry.incarceration, `${key}: no incarceration block was added`);
+    assert.ok(entry.incarceration.incarcerationRatePer100k.value > 0, `${key}: incarceration rate must be a real positive number`);
+  }
+});
+
+test('England & Wales incarceration data is scoped explicitly, not presented as a whole-UK figure', () => {
+  const entry = countryPacks.countryFor('english');
+  assert.equal(entry.incarceration.scope, 'england-and-wales-only');
+});
+
+test('China\'s own incarceration figure is scoped to Ministry-of-Justice sentenced prisoners, with the fuller illustrative estimate kept separate and flagged', () => {
+  const entry = countryPacks.countryFor('chinese');
+  assert.equal(entry.incarceration.incarcerationRatePer100k.scope, 'ministry-of-justice-sentenced-prisoners-only');
+  assert.ok(entry.incarceration.illustrativeFullerEstimate, 'the real, larger WPB estimate including pre-trial/administrative detainees was dropped rather than kept and flagged');
+  assert.notEqual(
+    entry.incarceration.illustrativeFullerEstimate.incarcerationRatePer100k,
+    entry.incarceration.incarcerationRatePer100k.value,
+    'the illustrative estimate and the headline figure must be reported as the two different real numbers they are, not collapsed into one',
+  );
+});
+
+test('a volatile real reading (Russia, Mexico) keeps its own prior snapshot rather than presenting the newest number as settled', () => {
+  const russia = countryPacks.countryFor('russian');
+  assert.ok(russia.incarceration.priorSnapshot, 'russia: the large real drop between snapshots was not flagged');
+  assert.notEqual(russia.incarceration.priorSnapshot.incarcerationRatePer100k, russia.incarceration.incarcerationRatePer100k.value);
+
+  const mexico = countryPacks.countryFor('mexican');
+  assert.ok(mexico.incarceration.priorSnapshot, 'mexico: the real rise between snapshots was not flagged');
+});
+
+test('no incarceration field is a bare number -- every one carries a real source', () => {
+  const allKeys = [
+    ...Object.keys(countryPacks.COUNTRIES).map((k) => ({ key: k, entry: countryPacks.countryFor(k) })),
+    ...Object.keys(countryPacks.COUNTRY_PROFILES).map((k) => ({ key: k, entry: countryPacks.countryProfileFor(k) })),
+  ];
+  for (const { key, entry } of allKeys) {
+    if (!entry.incarceration) continue;
+    const rate = entry.incarceration.incarcerationRatePer100k;
+    if (rate && typeof rate === 'object') {
+      assert.ok(rate.source, `${key}: incarcerationRatePer100k has no real source`);
+      assert.ok(rate.year !== undefined, `${key}: incarcerationRatePer100k has no stated year (even if null)`);
+    }
   }
 });

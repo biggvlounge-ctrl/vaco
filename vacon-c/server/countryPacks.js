@@ -911,6 +911,14 @@ const COUNTRIES = {
       homicideRatePer100k: { value: 0.91, year: 2023, source: 'unodc-via-world-bank-secondary-compilation', confidence: 'secondary-compilation' },
       undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
     },
+    // World Prison Brief, 31 Jan 2024 -- the one entry in this batch
+    // with both a real rate AND a real, dated occupancy figure from
+    // the same primary snapshot, not pieced together from two.
+    incarceration: {
+      incarcerationRatePer100k: { value: 71, year: 2024, source: 'world-prison-brief-prisonstudies-org', confidence: 'secondary-estimate' },
+      prisonPopulationTotal: { value: 59413, year: 2024, source: 'world-prison-brief-prisonstudies-org' },
+      occupancyPctOfCapacity: { value: 82.2, year: 2024, officialCapacity: 72258, source: 'world-prison-brief-prisonstudies-org' },
+    },
     // Germany led the EU on total 2025 asylum applications, and hosts
     // by far the largest Ukrainian temporary-protection population.
     immigration: {
@@ -957,6 +965,16 @@ const COUNTRIES = {
     // Left null rather than used.
     globalIndicators2026: {
       homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+    // World Prison Brief's own figures are for England & Wales
+    // specifically, not the UK as a whole -- Scotland and Northern
+    // Ireland run separate prison systems (see the `scottish` entry
+    // below for its own, same real UK-level fields otherwise). Not
+    // duplicated there since it is the identical real fact either way.
+    incarceration: {
+      incarcerationRatePer100k: { value: 145, year: 2024, source: 'world-prison-brief-prisonstudies-org', confidence: 'secondary-estimate' },
+      occupancyPctOfCapacity: { value: 104.8, year: 2026, source: 'world-prison-brief-prisonstudies-org', note: 'falling from 110.5% (Feb 2024) to 107.2% (Oct 2025) to 104.8% (Apr 2026) across three real snapshots' },
+      scope: 'england-and-wales-only',
     },
   },
   scottish: {
@@ -1052,6 +1070,13 @@ const COUNTRIES = {
         confidence: 'secondary-compilation',
       },
       undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+    // World Prison Brief, 1 Dec 2025 -- covers France including its
+    // overseas departments and territories, people held in penal
+    // institutions only.
+    incarceration: {
+      incarcerationRatePer100k: { value: 126, year: 2025, source: 'world-prison-brief-prisonstudies-org', confidence: 'secondary-estimate' },
+      occupancyPctOfCapacity: { value: 135.6, year: 2025, officialCapacity: 63613, source: 'world-prison-brief-prisonstudies-org', note: 'up from 122.9% (1 Jan 2024, capacity 61,767) -- a real, worsening trend across two snapshots' },
     },
     // Foundation estimate (shelter + street counts), not a government
     // census. 350,000 was also the 2024 figure in last year's report —
@@ -1375,6 +1400,17 @@ const COUNTRIES = {
       undernourishmentPct: null, avgTemperatureC: null,
       roadTrafficDeathRatePer100k: { value: 18.0, year: null, source: 'secondary-compilation', note: 'exact year/methodology not confirmed in the source found this round', confidence: 'secondary-compilation-unverified-year' },
     },
+    // World Prison Brief's own figure moved sharply between snapshots
+    // (300 per 100k, Jan 2023, total 433,006 -> 197 per 100k, May
+    // 2026, total 282,000) -- both kept rather than one picked, the
+    // drop is real and large enough to flag rather than silently use
+    // the newest number as settled.
+    incarceration: {
+      incarcerationRatePer100k: { value: 197, year: 2026, source: 'world-prison-brief-prisonstudies-org', confidence: 'secondary-estimate' },
+      prisonPopulationTotal: { value: 282000, year: 2026, source: 'world-prison-brief-prisonstudies-org' },
+      priorSnapshot: { incarcerationRatePer100k: 300, prisonPopulationTotal: 433006, year: 2023 },
+      note: 'a roughly one-third drop between the 2023 and 2026 WPB snapshots -- real, but not independently explained in the source found this round, so treated cautiously rather than as a settled trend',
+    },
     warStatus: RUSSIA_UKRAINE_WAR_STATUS_OCT2026,
     // The named head of state driving `warStatus` above -- the real-
     // world "representation" the war-status object itself is about.
@@ -1452,6 +1488,14 @@ const COUNTRIES = {
       homicideRatePer100k: null,
       undernourishmentPct: { value: 22.2, year: null, source: 'faostat-sdg-2.1.1-via-secondary-compilation', note: 'year not stated in the source found this round', confidence: 'secondary-compilation' },
       avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+    // World Prison Brief, 29 Dec 2025 -- one of the lowest real rates
+    // in this incarceration batch, and the pre-trial share is
+    // separately real and very high (68.5%, Apr 2024 snapshot).
+    incarceration: {
+      incarcerationRatePer100k: { value: 33, year: 2025, source: 'world-prison-brief-prisonstudies-org', confidence: 'secondary-estimate' },
+      pretrialDetaineeSharePct: { value: 68.5, year: 2024, source: 'world-prison-brief-prisonstudies-org' },
+      note: 'nearby snapshots give 34-35 depending on the exact date/population base used -- real range, not reconciled to one figure',
     },
     notableFigures: [{ name: 'Bola Tinubu', role: 'President of Nigeria', note: 'vowed to defeat Boko Haram/ISWAP after a March 2026 triple bombing in Maiduguri and renewed Borno attacks' }],
     politicalParties: {
@@ -1632,6 +1676,17 @@ const COUNTRIES = {
       homicideRatePer100k: { value: 0.5, year: 2020, source: 'secondary-compilation', note: 'the most recent figure found this round', confidence: 'secondary-compilation-stale' },
       undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
     },
+    // World Prison Brief's own headline rate covers Ministry of
+    // Justice prisons (sentenced prisoners) only -- it explicitly
+    // excludes pre-trial and "administrative" detention under the
+    // Ministry of Public Security, and says so itself. Its own
+    // illustrative estimate of a fuller total is kept separate and
+    // flagged as illustrative, never blended into the headline figure.
+    incarceration: {
+      incarcerationRatePer100k: { value: 121, year: null, source: 'world-prison-brief-prisonstudies-org', confidence: 'secondary-estimate', scope: 'ministry-of-justice-sentenced-prisoners-only' },
+      prisonPopulationTotal: { value: 1656773, source: 'world-prison-brief-prisonstudies-org', scope: 'ministry-of-justice-sentenced-prisoners-only' },
+      illustrativeFullerEstimate: { prisonPopulationTotal: 2340000, incarcerationRatePer100k: 165, note: 'World Prison Brief\'s own illustrative estimate if pre-trial/administrative detainees were included -- explicitly not an official count' },
+    },
     notableFigures: [{ name: 'Xi Jinping', role: 'General Secretary of the Communist Party, President, Chairman of the Central Military Commission', note: 'holds all three posts as of mid-2026 reporting; his "core leader" status was written into party rules at the 2022 Congress' }],
     politicalParties: {
       ruling: { name: 'Communist Party of China', leader: 'Xi Jinping' },
@@ -1648,6 +1703,16 @@ const COUNTRIES = {
     globalIndicators2026: {
       homicideRatePer100k: { value: 4.35, year: 2023, source: 'secondary-compilation', confidence: 'secondary-compilation' },
       undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+    // World Prison Brief, 1 Jun 2024 -- the rate covers both BuCor
+    // prisons and BJMP jails together; the occupancy figure is a real,
+    // separately-dated snapshot (31 May 2021) kept rather than
+    // reconciled to the same date, since no later national occupancy
+    // figure was found this round.
+    incarceration: {
+      incarcerationRatePer100k: { value: 149, year: 2024, source: 'world-prison-brief-prisonstudies-org', confidence: 'secondary-estimate' },
+      prisonPopulationTotal: { bucorPrisons: 53397, bjmpJails: 117850, year: 2024, source: 'world-prison-brief-prisonstudies-org' },
+      occupancyPctOfCapacity: { value: 362.0, year: 2021, source: 'world-prison-brief-prisonstudies-org', note: 'a different, earlier snapshot (May 2018) gave 463.6%; both real, neither current' },
     },
     notableFigures: [
       { name: 'Ferdinand Marcos Jr.', role: 'President of the Philippines', note: 'constitutionally limited to a single term; said 14 Aug 2026 he will back a 2028 presidential candidate but had not chosen one' },
@@ -1695,6 +1760,16 @@ const COUNTRIES = {
       undernourishmentPct: null,
       avgTemperatureC: { value: 21.2, source: '2016-single-year-world-bank-via-secondary-compilation', note: 'a different real year/basis than this round\'s 1991-2020-baseline figures -- not blended with them', confidence: 'secondary-compilation-different-baseline' },
       roadTrafficDeathRatePer100k: null,
+    },
+    // World Prison Brief's own most recent snapshot (31 Jul 2026, rate
+    // 200, total 272,448) jumped sharply from an earlier 2024 snapshot
+    // (rate 174) -- both kept rather than reconciled, the gap is real
+    // but not independently explained in the source found this round.
+    incarceration: {
+      incarcerationRatePer100k: { value: 200, year: 2026, source: 'world-prison-brief-prisonstudies-org', confidence: 'secondary-estimate' },
+      prisonPopulationTotal: { value: 272448, year: 2026, source: 'world-prison-brief-prisonstudies-org' },
+      priorSnapshot: { incarcerationRatePer100k: 174, year: 2024 },
+      note: 'a roughly 15% rise between the 2024 and 2026 snapshots -- treated cautiously, not as a confirmed settled trend',
     },
     // Real, current cartel leadership and territorial-conflict data --
     // the real "criminal organization representation" asked for.
@@ -1788,6 +1863,14 @@ const COUNTRIES = {
     globalIndicators2026: {
       homicideRatePer100k: { value: 5.8, year: 2023, source: 'unodc-via-world-bank-secondary-compilation', note: 'a UNODC-derived ranking gives 5.76 with 19,796 homicides for the same year -- same real figure, rounding difference', confidence: 'secondary-compilation' },
       undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+    // World Prison Brief (prisonstudies.org) -- its own current
+    // headline figure, 2023 BJS-derived pre-trial share kept separate
+    // rather than blended into the overall rate.
+    incarceration: {
+      incarcerationRatePer100k: { value: 542, year: 2023, source: 'world-prison-brief-prisonstudies-org', confidence: 'secondary-estimate' },
+      pretrialDetaineeSharePct: { value: 25.5, year: 2023, source: 'world-prison-brief-prisonstudies-org' },
+      note: 'secondary WPB-citing sources give 541 for the same period -- same real figure, rounding difference; a current total prison-population count was not confirmed this round',
     },
   },
   // **Added after a direct question: "why did you build the United
@@ -1982,6 +2065,12 @@ const COUNTRIES = {
     // null and points there, same `crimeRef` pattern as the rest of
     // this entry.
     globalIndicators2026: { homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null },
+    // World Prison Brief, 31 Dec 2023 -- the most recent real snapshot found this round.
+    incarceration: {
+      incarcerationRatePer100k: { value: 198, year: 2023, source: 'world-prison-brief-prisonstudies-org', confidence: 'secondary-estimate' },
+      prisonPopulationTotal: { value: 101622, year: 2023, source: 'world-prison-brief-prisonstudies-org' },
+      occupancyPctOfCapacity: { value: 124.3, year: 2023, officialCapacity: 81740, source: 'world-prison-brief-prisonstudies-org' },
+    },
     crimeRef: 'see COLOMBIA_CRIME_2026 for the real, dated crime and armed-group narrative',
     source: 'world-bank-country-and-lending-groups; eiu-democracy-index-2024; cia-world-factbook-2023; rystad-energy-2024; bp-statistical-review-2024',
     confidence: 'regime-score-and-oil-production-both-directly-sourced-military-spend-pct-gdp-is-a-third-party-estimate',
@@ -2029,6 +2118,14 @@ const COUNTRIES = {
       confidence: 'secondary-estimate',
     },
     globalIndicators2026: { homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null },
+    // World Prison Brief, 2022 (via a U.S. State Department human-
+    // rights report and corroborated by Prison Insider, both citing WPB) --
+    // no 2024/2025 figure was found this round.
+    incarceration: {
+      incarcerationRatePer100k: { value: 116, year: 2022, source: 'world-prison-brief-prisonstudies-org-via-us-state-dept-and-prison-insider', confidence: 'secondary-estimate' },
+      prisonPopulationTotal: { value: 120000, year: 2022, source: 'us-state-department-human-rights-report' },
+      pretrialDetaineeSharePct: { value: 33.3, year: 2022, source: 'world-prison-brief-prisonstudies-org' },
+    },
     source: 'world-bank-country-and-lending-groups-fy2026; ahram-online-2026-gti; sipri-via-theglobaleconomy-2024; enterpriseam-mees-2025; spglobal-2025',
     confidence: 'income-classification-and-oil-gas-reversal-well-sourced-exact-eiu-regime-score-not-found-this-round',
   },
@@ -2476,6 +2573,17 @@ const COUNTRY_PROFILES = {
       },
       undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
     },
+    // World Prison Brief, 31 Dec 2025 -- Brazil's own real occupancy
+    // trend is improving (141.4% down from 173.9% in a 2022 snapshot,
+    // though that older figure used a different capacity basis and
+    // is not directly comparable), real third-largest prison
+    // population in the world by total count.
+    incarceration: {
+      incarcerationRatePer100k: { value: 439, year: 2025, source: 'world-prison-brief-prisonstudies-org', confidence: 'secondary-estimate' },
+      prisonPopulationTotal: { value: 964668, year: 2025, source: 'world-prison-brief-prisonstudies-org' },
+      occupancyPctOfCapacity: { value: 141.4, year: 2025, officialCapacity: 679763, source: 'world-prison-brief-prisonstudies-org', note: 'down from 135.6% at 31.12.2024 on one cached snapshot, and from 173.9% in June 2022 on a different capacity basis -- not directly comparable across all three' },
+      pretrialDetaineeSharePct: { value: 23.6, year: 2024, source: 'world-prison-brief-prisonstudies-org' },
+    },
   },
   argentina: {
     country: 'Argentina', incomeLevel: 'upper-middle-income', conflictLevel: 'no-active-conflict',
@@ -2610,6 +2718,13 @@ const COUNTRY_PROFILES = {
         note: 'a national-data source gives 43.5 for the 2023/24 reporting year instead; both real, neither picked over the other',
       },
       undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+    // World Prison Brief, July 2025 -- a rate well off this country's
+    // own historical 2004 peak (403 per 100k), real and current.
+    incarceration: {
+      incarcerationRatePer100k: { value: 260, year: 2025, source: 'world-prison-brief-prisonstudies-org', confidence: 'secondary-estimate' },
+      pretrialDetaineeSharePct: { value: 35.6, year: 2023, source: 'world-prison-brief-prisonstudies-org' },
+      note: 'an earlier 2024 snapshot gives 249 -- same real trend, slightly different reference date/population base',
     },
   },
   // Fifteenth round: twelve more real countries -- see this file's own
@@ -2894,6 +3009,56 @@ const COUNTRY_PROFILES = {
     oilProducer: null,
     globalIndicators2026: {
       homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  // Sixteenth round: India, added because a direct instruction named
+  // it separately from "Asia" when asking for global incarceration-
+  // system coverage ("North America, South America, Africa, Europe,
+  // India, Asia"), and because it had no `COUNTRY_PROFILES` entry of
+  // its own until now -- checked, not assumed, the way every other
+  // gap in this round's own header was.
+  india: {
+    country: 'India', incomeLevel: 'lower-middle-income',
+    // Checked directly, World Bank FY2026-27 classifications (GNI per
+    // capita data for 2025, $2,760 -- well inside the lower-middle
+    // band of $1,176-$4,635): India has held this status since 2009.
+    // Two real, longstanding, localized conflicts (the Jammu and
+    // Kashmir insurgency; the Naxalite-Maoist insurgency across
+    // central and eastern India) justify this band over
+    // no-active-conflict -- neither is nationwide or state-based in
+    // UCDP's "active-armed-conflict" sense.
+    conflictLevel: 'localized-conflict',
+    governmentType: 'federal parliamentary republic',
+    // EIU Democracy Index 2024: rank 47 of 165, "flawed democracy" --
+    // confirmed directly. The real NUMERIC 2024 score was not found by
+    // this round's tooling (only the rank and category); the 2023
+    // score (7.18, rank 41) is a real, different year's figure and is
+    // NOT used as a stand-in -- regimeScore stays null rather than
+    // guessed from the rank or borrowed from a different year.
+    regimeType: 'flawed-democracy', regimeScore: null, regimeRank: { value: 47, of: 165, year: 2024 },
+    // SIPRI-derived: $86.1B total 2024 spend (5th-largest in the
+    // world, after the US/China/Russia/Germany), 2.3% of GDP -- a
+    // World-Bank-published SIPRI-sourced series, not SIPRI's own fact
+    // sheet page directly, so flagged the same as every other
+    // non-primary figure in this file.
+    militaryExpenditurePctGDP: { value: 2.3, year: 2024, confidence: 'secondary-estimate' },
+    // India is a major net crude IMPORTER, not an exporter -- the
+    // identical China/UK-style distinction this file already draws
+    // between domestic production and exporter status.
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+    // World Prison Brief -- real figures found this round disagree in
+    // the 35-38 per 100k range depending on snapshot/source; the WPB's
+    // own latest trend-table row (35, total 488,511) is kept as the
+    // primary figure, with the real range named rather than hidden.
+    incarceration: {
+      incarcerationRatePer100k: { value: 35, year: 2024, source: 'world-prison-brief-prisonstudies-org', confidence: 'secondary-estimate' },
+      prisonPopulationTotal: { value: 488511, year: 2024, source: 'world-prison-brief-prisonstudies-org', note: 'exact as-of date within 2024 not confirmed in the source found this round' },
+      occupancyPctOfCapacity: { value: 112.7, year: 2024, source: 'world-prison-brief-prisonstudies-org', note: 'down from 120.8% (31.12.2023) and 131.4% (31.12.2022) across three real snapshots' },
+      pretrialDetaineeSharePct: { value: 75.8, year: 2022, source: 'world-prison-brief-prisonstudies-org' },
+      note: 'a 2023 WPB snapshot gives 37 per 100k and Data For India independently reports 38 for the same year -- a real 35-38 range, not reconciled to one figure',
     },
   },
 };
