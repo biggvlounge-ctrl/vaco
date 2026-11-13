@@ -4675,6 +4675,39 @@ own.
 6 new tests. Full suite: 2245 tests, 2228 pass, 0 fail, 0 cancelled,
 17 skipped.
 
+**A seventy-seventh, and it closes the forty-eighth standing rule's own
+measured gap: "on a freshly generated, never-ticked world, the
+criminal and business categories resolve honestly null almost
+always."** Only the religious-order archetype ever installed a real
+founding leader at generation; gangs, governments, and businesses all
+waited on a real election or a real takeover, neither of which runs
+automatically from the tick pipeline. `config.foundingLeaders`
+(opt-in, default false, the identical posture `extendedFamily`/
+`scopedGovernments`/`religiousOrdersPerCommunity` already hold)
+generalizes the religious order's own real `influenceRatingOf`
+selection to the three remaining types.
+
+**No new bookkeeping was added to find each organization's real
+scope** -- every scope is read from a real, already-existing link,
+never inferred or guessed: a gang's scope is the communities it
+actually holds real territory in (`territoryBlocks.faction_id`); a
+business's scope is the community of a real property it actually
+operates (`properties.operating_organization_id`, this file's own
+long-standing link and the seventy-sixth standing rule's own
+landmark-operator pass's output); a government's scope is its own
+real `governments.scope_type`/`.scope_id` row. An organization with no
+real scope to read -- a gang holding no territory, a business
+operating no building -- gets no founding leader this round, an
+honest gap rather than a guess.
+
+5 new tests, including a dedicated two-real-city check proving the
+city-government scoping is real rather than vacuously true against a
+world that can only ever generate one city (`cities: 1` is this
+file's own real default). Mutation-verified directly: disabling the
+city-scoping branch broke exactly the two tests written to prove it.
+
+Full suite: 2250 tests, 2233 pass, 0 fail, 0 cancelled, 17 skipped.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

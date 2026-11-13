@@ -598,6 +598,20 @@ interaction was found, not caused: a commercial landmark can already
 be claimed by the city's own school/hospital/library institutions or
 a faction, which this round's pass correctly leaves alone.
 
+## Real founding leaders for gangs, governments, and businesses (seventy-seventh standing rule)
+See `CLAUDE.md`'s own seventy-seventh standing rule for the full
+account. Closes the forty-eighth standing rule's own measured gap —
+only the religious order ever got a real founding leader at
+generation; gangs, governments, and businesses waited on a real
+election or takeover that never runs automatically. `config
+.foundingLeaders` (opt-in, default false) generalizes the religious
+order's own real `influenceRatingOf` selection to all three, scoped
+from real, already-existing links only — a gang's real territory, a
+business's real operated property, a government's real scope row —
+never invented. An organization with no real scope gets no founding
+leader this round, an honest gap. Off, every existing world is
+byte-for-byte unaffected.
+
 ## Bluffing and its exposure
 See `CLAUDE.md`'s own fifty-second standing rule for the full design.
 `server/bluff.js` models the gap between what `weapons
