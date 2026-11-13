@@ -2163,6 +2163,32 @@ function generateWorld(options = {}) {
     summary.regionGovernmentIds.push(regionGov.id);
   }
 
+  // **Real prisons need a real operator too, or a Correctional
+  // Officer/Warden/prison nurse has nowhere to actually work.**
+  // `landmarks.designate` never sets `operating_organization_id` for
+  // ANY hero landmark category — that is a real, broader, honest gap
+  // left exactly where `landmarks.js`'s own header leaves it, not
+  // fixed here. Prisons are the one category this round actually
+  // needs wired, because `occupations.js`'s new `guard`/`warden`/
+  // `nurse` entries name `government` as their only real employer
+  // (prisons have no `organizations.type` of their own to name
+  // instead — see those entries' own header), and
+  // `behavior.workplaceOf` resolves a job to a WORKPLACE by matching
+  // `properties.operating_organization_id` to the job's own employer.
+  // Without this, a guard could be really hired into the government
+  // and have no real building to be at.
+  //
+  // The region's own government when one was generated (this engine
+  // generates exactly one region per world, so there is at most one to
+  // pick), otherwise the civilization-level government — the only one
+  // that always exists.
+  const prisonOperatorId = summary.regionGovernmentIds[0] ?? state.id;
+  for (const prisonProperty of (w.properties || [])) {
+    if (prisonProperty.landmark_category !== 'prison') continue;
+    if (prisonProperty.operating_organization_id != null) continue;
+    prisonProperty.operating_organization_id = prisonOperatorId;
+  }
+
   // **A seat, because an announcement has to be made somewhere.**
   // `properties.operating_organization_id` is the schema's own link
   // from a building to whoever runs it — `worldgen` already uses it for

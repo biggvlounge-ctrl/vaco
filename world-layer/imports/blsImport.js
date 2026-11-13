@@ -75,11 +75,17 @@ const SOC_GROUP_BY_OCCUPATION = {
   // closest real category is this same media/communication group)
   curator: '27', athlete: '27', reporter: '27', entertainer: '27', influencer: '27',
   // 29-0000 Healthcare practitioners
-  physician: '29',
+  // `nurse` is SOC 29-1141 "Registered Nurses" — added for real
+  // penitentiary-staff coverage, a different real code from `orderly`
+  // below (31-1133), not a duplicate.
+  physician: '29', nurse: '29',
   // 31-0000 Healthcare support
   orderly: '31',
   // 33-0000 Protective service
-  officer: '33', enforcer: '33',
+  // `guard` (33-3012 "Correctional Officers and Jailers") and `warden`
+  // (33-1011 "First-Line Supervisors of Correctional Officers") added
+  // for real penitentiary-staff coverage.
+  officer: '33', enforcer: '33', guard: '33', warden: '33',
   // 35-0000 Food preparation and serving
   cook: '35',
   // 37-0000 Building and grounds cleaning and maintenance

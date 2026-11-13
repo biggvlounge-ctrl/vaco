@@ -23,6 +23,9 @@ const engine = require('../server/engine.js');
 const membership = require('../server/membership.js');
 const infrastructure = require('../server/infrastructure.js');
 const demographics = require('../server/demographics.js');
+const economy = require('../server/economy.js');
+const occupations = require('../server/occupations.js');
+const behavior = require('../server/behavior.js');
 
 const w = engine.WorldState;
 
@@ -485,4 +488,88 @@ test('extended family generation never recurses -- a generated aunt/uncle or cou
       `aunt/uncle ${headId} has ${asAnchorRelationships.length} family relationships -- recursion suspected`,
     );
   }
+});
+
+// ---------------------------------------------------------------------
+// Real prison-staff occupations need a real workplace to resolve to
+// ---------------------------------------------------------------------
+// `occupations.js`'s new `guard`/`warden`/`nurse` entries name
+// `government` as their only real prison-relevant employer, because
+// prisons have no `organizations.type` of their own. But
+// `landmarks.designate` never sets `operating_organization_id` for ANY
+// hero landmark -- so without this round's own fix, a real prison
+// this engine generates would have no operator at all, and a guard
+// hired into the government would have nowhere real to be. 24
+// (`landmarksPerCity`) guarantees every one of `landmarks
+// .KEY_BUILDING_CATEGORIES`' real categories gets placed, including
+// `prison`, rather than leaving it to a draw that might not produce
+// one.
+
+test('every real prison this engine generates gets a real government operator, not left null', () => {
+  const { before } = delta(() => worldgen.generateWorld({
+    ...SMALL, seed: 'prison-operator', landmarksPerCity: 24,
+  }));
+  const newProperties = w.properties.slice(before.properties);
+  const prisons = newProperties.filter((p) => p.landmark_category === 'prison');
+  assert.ok(prisons.length > 0, 'landmarksPerCity: 24 should guarantee at least one generated prison');
+  for (const prison of prisons) {
+    assert.ok(prison.operating_organization_id != null, `prison ${prison.id} has no operating_organization_id`);
+    const operator = w.organizations.find((o) => o.id === prison.operating_organization_id);
+    assert.ok(operator, `prison ${prison.id}'s operator ${prison.operating_organization_id} does not exist`);
+    assert.equal(operator.type, 'government', `prison ${prison.id}'s operator must be a real government, got ${operator.type}`);
+  }
+});
+
+test('a real guard can actually be hired into the government that operates a real prison', () => {
+  const { before, summary } = delta(() => worldgen.generateWorld({
+    ...SMALL, seed: 'prison-guard-hire', landmarksPerCity: 24,
+  }));
+  const government = w.organizations.find((o) => o.id === summary.governmentId);
+  assert.ok(government, 'generateWorld should always found a civilization government');
+  const newProperties = w.properties.slice(before.properties);
+  const prison = newProperties.find((p) => p.landmark_category === 'prison');
+  assert.ok(prison, 'this seed should produce a real prison at landmarksPerCity: 24');
+  assert.equal(
+    prison.operating_organization_id, government.id,
+    'with no scoped region government in this config, the prison should be operated by the civilization government',
+  );
+  // A candidate who is not already employed, is of working age, and
+  // is tier-reachable for `guard` (tier 2 -- the lowest real bar, same
+  // shape `tierReachable` already gates every other hire on).
+  const candidate = w.npcs.find(
+    (n) => !economy.getEmployment(w, n.id)
+      && occupations.tierReachable(n, occupations.OCCUPATIONS.guard.tier),
+  );
+  assert.ok(candidate, 'a generated world this size should have at least one tier-2-reachable candidate');
+  const record = economy.hireEntity(w, {
+    entityId: candidate.id, employerOrganizationId: government.id, wage: 40, position: 'guard', tick: w.tick ?? 0,
+  });
+  assert.equal(record.position, 'guard');
+  assert.equal(record.employer_organization_id, government.id);
+  // The real point of the wiring, stated precisely rather than
+  // overclaimed: the government now really operates the prison, so a
+  // guard hired into it has a real, non-null workplace -- not
+  // nothing. `workplaceOf` returns the FIRST property sharing that
+  // operator by array order, which may be the prison or another
+  // government-operated building (the "seat", for one) -- that
+  // ambiguity is `workplaceOf`'s own, pre-existing and general to
+  // every multi-property employer this engine has, not specific to
+  // prisons, and is not what this test is about.
+  const workplaceId = behavior.workplaceOf(w, candidate.id);
+  assert.ok(workplaceId != null, 'a guard hired into a government that operates a real prison should have SOME real workplace');
+  const workplace = w.properties.find((p) => p.id === workplaceId);
+  assert.equal(workplace.operating_organization_id, government.id);
+});
+
+test('guard, warden and nurse are real, drawable occupations at a government employer', () => {
+  for (const name of ['guard', 'warden', 'nurse']) {
+    assert.ok(occupations.OCCUPATIONS[name], `${name} should be a real occupation`);
+    assert.ok(occupations.occupationsFor('government').includes(name), `${name} should be drawable at a government`);
+  }
+  // `nurse` is real BLS SOC major group 29, same as `physician` -- a
+  // different code from `orderly` (31), not a duplicate of either.
+  const labourPacks = require('../server/labourPacks.js');
+  assert.equal(labourPacks.SOC_GROUP_BY_OCCUPATION.nurse, '29');
+  assert.equal(labourPacks.SOC_GROUP_BY_OCCUPATION.guard, '33');
+  assert.equal(labourPacks.SOC_GROUP_BY_OCCUPATION.warden, '33');
 });

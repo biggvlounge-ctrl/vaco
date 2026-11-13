@@ -71,9 +71,18 @@ const SOC_GROUP_BY_OCCUPATION = {
   // distinct "influencer" SOC code as of the 2018 classification) both
   // sit in major group 27 alongside the occupations already there.
   curator: '27', athlete: '27', reporter: '27', entertainer: '27', influencer: '27',
-  physician: '29',
+  // `nurse` is SOC 29-1141 "Registered Nurses", the same major group
+  // 29 `physician` already sits in — real BLS group, a new occupation
+  // added for real penitentiary-staff coverage, not a duplicate of
+  // `orderly` (a different real code, major group 31).
+  physician: '29', nurse: '29',
   orderly: '31',
-  officer: '33', enforcer: '33',
+  // `guard` (SOC 33-3012 "Correctional Officers and Jailers") and
+  // `warden` (SOC 33-1011 "First-Line Supervisors of Correctional
+  // Officers") are both real BLS major group 33 (Protective Service),
+  // the same group `officer`/`enforcer` already sit in — added for
+  // real penitentiary-staff coverage.
+  officer: '33', enforcer: '33', guard: '33', warden: '33',
   cook: '35',
   // `custodian` is major group 37 (Building and Grounds Cleaning and
   // Maintenance) — real BLS group, previously mapped to by nothing.

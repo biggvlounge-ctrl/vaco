@@ -364,6 +364,63 @@ const OCCUPATIONS = {
     tier: 2, skill: 'Management', source: 'BLS SOC 43 (Office/Administrative Support)',
     employers: ['business', 'government', 'corporation', 'school', 'hospital'],
   },
+
+  // ---- outside §25 again, by direct request: "COs, nurses, warden —
+  // all the professions of the penitentiary" ----------------------------
+  //: `organizations.type` has no `prison` value at all — a real prison
+  //: in this engine is a `properties` row (`landmark_category ===
+  //: 'prison'`, see `justice.prisonFor`), never an organization — so
+  //: none of these three can name a dedicated institution employer the
+  //: way `physician`/`teacher` name `hospital`/`school`. `government`
+  //: is the real, honest employer instead: U.S. corrections are
+  //: overwhelmingly government-run (BJS counts private facilities at
+  //: roughly 8% of the national prison population in recent years),
+  //: and this engine's own `worldgen.js` wires every generated prison's
+  //: `operating_organization_id` to a real government organization for
+  //: exactly this reason, immediately after this round. A private-
+  //: operator employer path is a real, citable minority case and is
+  //: deliberately not built here — named rather than silently skipped.
+  guard: {
+    // Real SOC 33-3012 "Correctional Officers and Jailers" — major
+    // group 33 (Protective Service), the same group `officer`/
+    // `enforcer` already sit in. Tiered with `enforcer`, not
+    // `officer`: BLS's own entry requirements for this occupation are
+    // typically a high-school diploma plus short academy training, the
+    // same grain as `enforcer`'s "basic trades", not `officer`'s
+    // "advanced technical/strategic" military-officer tier.
+    tier: 2, skill: 'Combat', source: 'BLS SOC 33 (Protective Service)',
+    employers: ['government'],
+  },
+  warden: {
+    // Real SOC 33-1011 "First-Line Supervisors of Correctional
+    // Officers" — checked directly rather than assumed: BLS has no
+    // distinct "prison warden" title at all. 33-1011 (alternate O*NET
+    // titles include "Correctional Officer Captain", "Correctional
+    // Supervisor") is the real, closest-fitting supervisory code, and
+    // is used here as the honest stand-in a founder's "warden" maps
+    // onto, stated plainly rather than presented as an exact title
+    // match. Tiered one above `guard`, same relationship `officer`
+    // (tier 5) has over an ordinary soldier, scaled down to this
+    // occupation's own real, lower entry bar.
+    tier: 3, skill: 'Leadership', source: 'BLS SOC 33 (Protective Service)',
+    employers: ['government'],
+  },
+  nurse: {
+    // Real SOC 29-1141 "Registered Nurses" — major group 29
+    // (Healthcare Practitioners and Technical), the same group
+    // `physician` already sits in. Tiered WITH `physician` rather than
+    // below `orderly`: nursing is a distinct, credentialed professional
+    // role (29-1141), not the same real occupation as `orderly`'s
+    // lower-skill SOC 31-1133 "Orderlies" (Healthcare Support) — two
+    // real, different BLS codes, so this is a new occupation rather
+    // than a rename or a duplicate of either existing hospital role.
+    // `hospital` is kept as a real employer alongside `government`
+    // because nursing is not prison-specific in reality — the same
+    // "general role, specific employer added" shape `manager`'s own
+    // employer list already takes.
+    tier: 4, skill: 'Medicine', source: 'BLS SOC 29 (Healthcare Practitioners)',
+    employers: ['government', 'hospital'],
+  },
 };
 
 const OCCUPATION_NAMES = Object.keys(OCCUPATIONS);
