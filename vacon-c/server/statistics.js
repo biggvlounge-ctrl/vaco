@@ -118,6 +118,7 @@ const landmarks = require('./landmarks.js');
 const salvage = require('./salvage.js');
 const discovery = require('./discovery.js');
 const inventory = require('./inventory.js');
+const recruitment = require('./recruitment.js');
 
 // §9's MASTER BLOCK KEY, in its order. Every statistic belongs to one.
 const CATEGORIES = [
@@ -1146,6 +1147,26 @@ const CATALOGUE = [
         .filter((v) => Number.isFinite(v));
       return values.length === 0 ? null : Math.max(...values);
     },
+  },
+  // "These things should be put into our statistics as organizations,
+  // gangs, tribes, families grow" — the real, all-time count of
+  // `recruitment.js`'s own chaos-driven recruitment events for this
+  // community, computed from that file's real log (standing rule 3),
+  // never a second stored counter. Covers the one real group shape
+  // this engine actually lets a stranger JOIN after the fact — see
+  // `recruitment.js`'s own header for why tribes and families are the
+  // next entry, not this one.
+  {
+    key: 'chaos_recruitment_events', category: 'organization', unit: 'count', scope: 'community',
+    compute: (ctx) => recruitment.recruitmentEventsFor(ctx.worldState, ctx.communityId).length,
+  },
+  {
+    key: 'tribe_family_recruitment_growth', category: 'organization', unit: 'count', scope: 'community',
+    unavailable: 'extended-family (characterCreation.js aunts/uncles/cousins) and the families '
+      + 'table have no real "a stranger joins after the fact" mechanism anywhere in this engine — '
+      + 'membership is fixed at birth or at generation time, never recruited into. Reported here as '
+      + 'an open, named gap rather than a fabricated adoption mechanic; see recruitment.js\'s own '
+      + 'header for the direct instruction this answers in part.',
   },
 
   // ---- territory -----------------------------------------------------

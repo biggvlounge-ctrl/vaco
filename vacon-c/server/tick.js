@@ -75,6 +75,7 @@ const motivation = require('./motivation.js');
 const archetypes = require('./archetypes.js');
 const competition = require('./competition.js');
 const justice = require('./justice.js');
+const recruitment = require('./recruitment.js');
 const households = require('./households.js');
 const tribeMissions = require('./tribeMissions.js');
 const migration = require('./migration.js');
@@ -1198,6 +1199,14 @@ function runSecurityPhase(worldState) {
   // prison are what security DOES with what it found, and the pipeline
   // is locked at eleven.
   events.push(...justice.runJustice(worldState, { tick: worldState.tick }));
+
+  // Still the Security phase, not a twelfth: "once chaos starts to
+  // erupt, there will be a lot of recruitment" is a real consequence
+  // of this phase's own danger measure, not a separate concern. See
+  // `recruitment.js`'s own header for why there is no "chaos has
+  // erupted" threshold to calibrate — the real danger score scales
+  // the rate directly.
+  recruitment.runChaosRecruitment(worldState, { tick: worldState.tick });
 
   return events;
 }
