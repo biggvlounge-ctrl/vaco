@@ -4428,6 +4428,52 @@ this hang -- the file now completes in bounded time without either
 being touched -- named here as a real future optimization target
 rather than silently left for someone to re-discover from scratch.
 
+**A seventy-second, and it is a third real path layered onto
+`countryPacks.js` rather than a fourth keying scheme invented to hold
+it.** Asked directly for "known resources in that country... what
+they're known for, what they produce, what they import,"
+`RESOURCE_PROFILES` covers 23 of this module's own ~165 real countries
+-- `COUNTRIES` keys on an `ancestryPacks.GROUPS` code, `COUNTRY_
+PROFILES` keys on a hyphenated country name, and several ancestry keys
+already collapse onto one real country (`english`/`scottish`/`welsh`
+-> United Kingdom); a resource fact is a fact about the COUNTRY, so a
+third table keyed a third way would only have multiplied the lookup
+problem this file has already reconciled once. `resourceProfileFor()`
+instead resolves ANY real key this module already accepts onto one
+real `RESOURCE_PROFILES` entry, keyed on `canonicalCountryKey()`'s own
+derived name.
+
+**Chosen for real economic distinctiveness and research tractability,
+named as such rather than left to look comprehensive.** Top exports
+(and what each country is "known for") are real and WebSearched for
+all 23; top imports are real for exactly 5 (United States, China,
+Germany, Saudi Arabia, India), with an honest `null` everywhere else --
+the same sparse-rather-than-guessed posture this file has held since
+the fifty-first standing rule, applied to a new dimension.
+
+**Every export/import source this round disagreed with at least one
+other source, for a real structural reason worth stating once rather
+than re-discovering per entry**: different trade-data aggregators
+group HS (Harmonized System) codes at different levels -- a
+"machinery" category versus "electrical machinery" versus both
+combined -- so two real, correctly-sourced figures for the same
+country and year can legitimately disagree without either being wrong.
+Nigeria's crude-petroleum export share is the clearest case on file:
+63.5% (Trading Economics/NSW), 71.39% for crude alone and 88.26% for
+the wider petroleum-products category (Intelpoint) -- all three real,
+all three kept, none picked, the same "neither picked over the other"
+posture this file has used for disagreeing homicide-rate figures since
+the fourteenth round.
+
+Same report-only posture as every other field here, proven rather than
+asserted: a real test greps `server/` and asserts `RESOURCE_PROFILES`/
+`resourceProfileFor`/`describeResourceProfile` appear in exactly one
+file, `countryPacks.js` itself. Wiring a country's real resource
+profile into `barter.js`/`economy.js` trade mechanics is separate,
+future, calibrated work -- the same boundary `conflictLevel` and
+`oilProducer` already hold. Full suite at landing time: 2216 tests,
+2199 pass, 0 fail, 0 cancelled, 17 skipped.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

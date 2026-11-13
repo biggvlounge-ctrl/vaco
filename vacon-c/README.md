@@ -524,6 +524,22 @@ ever. Full suite, genuinely complete for the first time this session
 with no exclusion or timeout workaround: 2199 pass, 0 fail, 0
 cancelled, 17 skipped.
 
+## Real resource profiles per country (seventy-second standing rule)
+See `CLAUDE.md`'s own seventy-second standing rule for the full
+account. `countryPacks.js#RESOURCE_PROFILES` is a third real,
+independent path — what a country is known for, its real top exports,
+and (for 5 of them) its real top imports — keyed on a canonical
+country name and resolved from any key this module already accepts,
+rather than a fourth scheme invented to hold it. 23 of this module's
+~165 real countries covered, chosen for economic distinctiveness and
+research tractability. Every export/import source this round
+disagreed with at least one other on the exact figure — a real,
+structural fact about how trade-data aggregators group HS codes
+differently — so disagreeing real figures are kept side by side with
+their own sources, never silently averaged or picked. Report-only,
+proven by a real grep-based test: nothing outside `countryPacks.js`
+itself reads it.
+
 ## Bluffing and its exposure
 See `CLAUDE.md`'s own fifty-second standing rule for the full design.
 `server/bluff.js` models the gap between what `weapons
