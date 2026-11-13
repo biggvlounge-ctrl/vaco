@@ -3970,6 +3970,115 @@ through a generated world was not available in this environment for
 the same pre-existing reason every round since this project's own
 ninth standing rule has named -- Postgres unreachable here.
 
+**A sixty-fifth, three related mechanics answering three instructions
+given across one conversation: a real prison-to-street gang pipeline,
+real danger-scaled recruitment with no invented threshold, and real
+global incarceration data.**
+
+**Part 1 -- "let certain gangs branch from the prisons to the
+streets... connected depending on area, connections, organizations
+that are connected."** `server/justice.js#ensureStreetAffiliate`/
+`joinStreetAffiliate` reuse the exact substrate `ensurePrisonGang`
+already established -- `engine.generateFaction` (the identical call
+`worldgen.js`'s own ordinary street-gang generation makes, no new
+archetype invented) and `membership.joinOrganization`, never a second
+founding mechanism. `worldState.streetAffiliates` keys on
+`${prisonGangOrganizationId}:${communityId}` -- one real affiliate
+per (prison gang, community) pair, in-memory only, same posture
+`worldState.prisonGangs` already carries. "Connected depending on
+area" is the real, already-tracked `npc.communityId` a released
+person is actually in -- nothing in this engine relocates a released
+person, so this reports where they already are rather than inventing
+a reunion mechanic. Wired into `release()`: a released prison-gang
+member is connected to -- founding if necessary -- the real street
+affiliate for their own gang in their own community; releasing a
+non-member is a real no-op. Mutation-verified the area-branching
+claim by collapsing the key to drop community scoping and confirming
+three tests caught it.
+
+**Part 2 -- "once the chaos starts to erupt, there will be a lot of
+recruitment and added members for safety. This will depend on the
+characteristics of people that they encounter. These things should
+be put into our statistics as organizations, gangs, tribes, families
+grow."** `server/recruitment.js#runChaosRecruitment` scales a flat
+base rate (`crime.BASE_DEPRIVATION_RISK * 10`, a multiple of an
+already-justified constant, the same documentation discipline
+`influence.js`'s own `IMMEDIATE_FAMILY_BOND_BONUS` already holds)
+directly by `crime.dangerByCommunity`'s own real 0..1 score --
+deliberately no "chaos has erupted" threshold to calibrate, the
+seventeenth standing rule's own four-attempt `resolveAggression`
+lesson applied before the mistake rather than after. WHETHER a
+recruitment happens is that danger-scaled seeded draw; WHO is
+recruited is never that same draw -- it is the real eligible
+candidate (resident, not already a member, not currently imprisoned)
+with the highest real `influence.influenceRatingOf`, the literal
+"characteristics of people they encounter," deterministic rather than
+a second lottery. Scoped to real gangs only
+(`membership.organizationPresence`'s own `isGang` flag) -- tribes
+(`characterCreation.js`'s extended-family generation) and families
+have no real "a stranger joins after the fact" mechanism anywhere in
+this engine, named as an open, undone gap in both the module's own
+header and a new `statistics.js` entry
+(`tribe_family_recruitment_growth`, `unavailable`) rather than a
+fabricated adoption mechanic. `chaos_recruitment_events` is the real
+growth-over-time figure asked for, computed from a real in-memory
+event log (standing rule 3), never a second stored counter. Wired
+into `tick.js`'s existing Security phase, right after
+`justice.runJustice` -- not a twelfth phase. The first mutation test
+written for the deterministic-selection claim accidentally passed
+against a broken version, because the planted high-influence
+candidate happened to be first in iteration order anyway -- caught
+and fixed by moving it to the last position before re-mutating, which
+the fixed test then did catch. A second mutation (dropping the
+imprisoned-exclusion filter) was also caught and reverted.
+
+**Part 3 -- "tie this into the entire country prison system and out
+the country prison system... in and out of the United States, North
+America, South America, Africa, Europe, India, Asia."** A real
+incarceration block (World Prison Brief / prisonstudies.org,
+WebSearched fresh) was added to thirteen already-covered countries,
+one representing each named region: `united-states`/`mexican` (North
+America), `brazil`/`colombian` (South America), `nigerian`/
+`south-africa`/`egyptian` (Africa), `german`/`russian`/`english`/
+`french` (Europe -- `english` scoped explicitly to England & Wales,
+not the whole UK, since Scotland and Northern Ireland run separate
+prison systems), `chinese`/`filipino` (Asia). `india` is a new,
+standalone `COUNTRY_PROFILES` entry -- no `ancestryPacks.GROUPS` key
+needed, the fourteenth standing rule's own decoupled path -- added
+because the instruction named it separately from "Asia" and it had no
+entry of any kind in this file before now (World Bank
+lower-middle-income FY2026-27; EIU rank 47/165, 2024, flawed
+democracy, the real numeric score not found and left `null` rather
+than guessed from the rank; SIPRI-derived 2.3% of GDP military spend;
+a real net oil importer, not a producer). Same honest-sparseness
+discipline as every prior round: Russia's and Mexico's own real
+snapshots moved sharply between dates and both are kept side by side
+rather than one picked; China's own headline rate is explicitly
+scoped to Ministry-of-Justice sentenced prisoners only, with World
+Prison Brief's own illustrative fuller estimate (pre-trial/
+administrative detainees included) kept separate and flagged as
+illustrative, never blended in. Mutation-verified by collapsing
+China's scoped-vs-illustrative distinction and confirming a test
+caught it.
+
+**A real, unrelated gap the full suite caught, not introduced by this
+round's own logic**: `server/recruitment.js` (Part 2, above) was
+built and tested correctly and never added to
+`VACANCY_INVENTORY.md` -- `test/inventory.test.js`'s own "every file
+in server/ has a row" and "the stated file count is the real one"
+caught it immediately or this would have been the two real failures
+exactly the kind this file's own twenty-second standing rule already
+warns about ("an ignored file is invisible, not untracked" -- this is
+its sibling: a real, tracked, correct file simply never described).
+Row added, count corrected 123 -> 124.
+
+Full suite, this round's own final run across all three parts: 2028
+tests, 2003 pass, 0 fail, 8 cancelled (the pre-existing, already-
+documented `worldgen.test.js` hang plus seven collateral timeouts
+under full concurrent load -- re-confirmed unrelated to any of this
+round's own changes, same eight files every recent round has named),
+17 skipped.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

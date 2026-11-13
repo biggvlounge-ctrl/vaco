@@ -384,6 +384,30 @@ already uses — every OTHER hero landmark category still has the same
 missing link, named as the open, broader version of this gap rather
 than fixed here.
 
+## Prison-to-street pipeline, chaos recruitment, and global incarceration data
+See `CLAUDE.md`'s own sixty-fifth standing rule for the full account.
+Three related mechanics. **(1)** `justice.js#ensureStreetAffiliate`/
+`joinStreetAffiliate` connect a released prison-gang member to a real
+street-side counterpart gang in their own real community — founding
+one if necessary, reusing `engine.generateFaction`/
+`membership.joinOrganization` rather than a second mechanism. **(2)**
+`recruitment.js#runChaosRecruitment` scales a flat base rate directly
+by `crime.dangerByCommunity`'s own real score — no "chaos has erupted"
+threshold to calibrate — and recruits the real eligible candidate
+with the highest `influence.influenceRatingOf`, never a lottery;
+`statistics.js`'s new `chaos_recruitment_events` is the real
+growth-over-time figure, and `tribe_family_recruitment_growth` is
+reported `unavailable` since neither tribes nor families have a real
+"stranger joins after the fact" mechanism in this engine. **(3)** A
+real World Prison Brief incarceration block was added to thirteen
+already-covered countries across North America, South America,
+Africa, Europe and Asia, plus a brand-new `india` entry (named
+separately in the instruction, and previously missing from this file
+entirely) — same honest-sparseness discipline as every other round,
+including two real volatile snapshots (Russia, Mexico) kept side by
+side rather than reconciled, and China's headline rate explicitly
+scoped away from its own larger illustrative estimate.
+
 ## Bluffing and its exposure
 See `CLAUDE.md`'s own fifty-second standing rule for the full design.
 `server/bluff.js` models the gap between what `weapons
