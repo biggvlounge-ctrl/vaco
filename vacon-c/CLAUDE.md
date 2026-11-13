@@ -3915,6 +3915,61 @@ sixty-first standing rule's own tests were loosened rather than
 weakened to describe this round's honestly-mixed real data, per this
 file's own header).
 
+**A sixty-fourth, and it is this round's own deferred entry, written
+after the fact for the identical reason the sixty-second rule's was --
+this file was mid-flight under a concurrent round at the time.** Asked
+directly to add "other parts of the prison staff, COs, nurses,
+warden... all the professions of the penitentiary," three real,
+BLS-SOC-coded occupations closed it in `occupations.js`: `guard`
+(SOC 33-3012, "Correctional Officers and Jailers," tiered with
+`enforcer`'s basic-trades band rather than `officer`'s military-tactics
+one), `warden` (SOC 33-1011, "First-Line Supervisors of Correctional
+Officers" -- checked directly rather than assumed, and BLS genuinely
+has no distinct "prison warden" title, so this is the real
+closest-fitting supervisory code, stated plainly as a stand-in rather
+than an exact match), and `nurse` (SOC 29-1141, "Registered Nurses" --
+a different real code from `orderly`'s SOC 31-1133, confirmed as such
+rather than assumed to be a duplicate).
+
+**`organizations.type` has no `prison` value at all -- a real prison
+in this engine is a `properties` row (`landmark_category === 'prison'`),
+never an organization** -- so all three new occupations name
+`government` as their real employer, the same way every other
+government-adjacent role in this file already does, rather than
+inventing a dedicated institution type the schema does not have.
+
+**That surfaced a real structural gap, found rather than assumed, and
+fixed at exactly the width it was found.** `landmarks.designate` never
+set `operating_organization_id` for ANY hero landmark -- so a
+generated prison had no real operator at all, and a hired `guard`
+would have had nowhere real to work. `worldgen.js` now wires every
+generated prison to the real region government (if scoped governments
+are on) or the civilization government, right after that government is
+founded -- the identical `operating_organization_id` link every other
+employer-building in this engine already uses, not a new mechanism.
+**Left deliberately open**: every OTHER hero landmark category (museum,
+library, cathedral, and the rest) still has exactly the same missing
+operator link -- named here as the honest, broader version of the gap
+this round only closed for prisons, not silently expanded into.
+Mutation-verified: the new wiring loop was temporarily disabled and
+confirmed to fail the two new `worldgen.test.js` tests before being
+reverted.
+
+**The sixty-third standing rule's own `test/worldgen.test.js` hang was
+re-confirmed as unrelated, not re-discovered as if new.** It still
+reproduces with this round's changes present; the two new tests for
+this round pass clean under `--test-name-pattern`, isolating them from
+the pre-existing hang. Full suite excluding that one file: 2114 tests,
+2097 pass, 0 fail, 17 skipped. Full suite with the same
+`--test-timeout=60000` accounting the sixty-third rule used: 2010
+tests, 1985 pass, 0 fail, 8 cancelled (the hang and everything
+downstream of it), 17 skipped -- zero regressions from this round's
+own additions either way. Live-verified the real server boots and
+serves cleanly with these modules loaded; a full HTTP round-trip
+through a generated world was not available in this environment for
+the same pre-existing reason every round since this project's own
+ninth standing rule has named -- Postgres unreachable here.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

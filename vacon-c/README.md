@@ -363,6 +363,27 @@ already gives for `npc.religion`, reasoned through on the page rather
 than picked silently, and enforced by the same forbidden-file-scan
 tests every other demographic firewall in this registry carries.
 
+## Real penitentiary-staff occupations (guard, warden, nurse)
+See `CLAUDE.md`'s own sixty-fourth standing rule for the full account
+(written after the fact for the same reason the sixty-second rule's
+was — this file was mid-flight under the country-coverage round at the
+time). Three new, real BLS-SOC-coded `occupations.js` entries: `guard`
+(SOC 33-3012, Correctional Officers and Jailers), `warden` (SOC
+33-1011, First-Line Supervisors of Correctional Officers — BLS has no
+distinct "prison warden" title, so this is the real closest-fitting
+code, stated as a stand-in rather than an exact match), and `nurse`
+(SOC 29-1141, Registered Nurses — a different real code from
+`orderly`'s). All three employ through `government`, since
+`organizations.type` has no `prison` value — a prison here is a real
+`properties` row, never an organization. Closing this surfaced a real
+gap: no hero landmark, prison included, ever got a real operator from
+generation alone. `worldgen.js` now wires every generated prison to
+its real region or civilization government right after founding, the
+same `operating_organization_id` link every other employer-building
+already uses — every OTHER hero landmark category still has the same
+missing link, named as the open, broader version of this gap rather
+than fixed here.
+
 ## Bluffing and its exposure
 See `CLAUDE.md`'s own fifty-second standing rule for the full design.
 `server/bluff.js` models the gap between what `weapons
