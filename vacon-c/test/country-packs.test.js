@@ -564,11 +564,12 @@ test('Latin America is a real, classified region, and now has a real overview (f
 });
 
 test('regionalContextFor is honest about a key it has never classified at all', () => {
-  // `brazil` was this example through the ninth round, but the
-  // fourteenth round gave it a real COUNTRY_PROFILES entry and a real
-  // region classification -- `peru` is the still-genuinely-
-  // unclassified stand-in now, not a re-pick made to dodge the point.
-  const ctx = countryPacks.regionalContextFor('peru');
+  // `brazil` was this example through the ninth round, then `peru`
+  // through the fourteenth -- both now have real COUNTRY_PROFILES
+  // entries and real region classifications. `ecuador` is the still-
+  // genuinely-unclassified stand-in now, not a re-pick made to dodge
+  // the point.
+  const ctx = countryPacks.regionalContextFor('ecuador');
   assert.equal(ctx.dedicatedEntry, null);
   assert.equal(ctx.profileEntry, null);
   assert.equal(ctx.standaloneEntry, null);
@@ -922,7 +923,10 @@ test('the six new entries all carry a present-but-null globalIndicators2026, sam
 
 test('COUNTRY_PROFILES entries need no matching ancestryPacks.GROUPS key -- the whole point of this round', () => {
   const profileKeys = Object.keys(countryPacks.COUNTRY_PROFILES);
-  assert.equal(profileKeys.length, 10, 'this round added exactly ten real countries');
+  // Ten from the fourteenth round, twelve more from the fifteenth --
+  // the fifteenth round's own test asserts the running total stays in
+  // sync going forward, so this count is not re-asserted rigidly here.
+  assert.ok(profileKeys.length >= 10, 'at least the original ten must still be present');
   for (const key of profileKeys) {
     // The real point: several of these keys are NOT real ancestry
     // groups at all (south-korea, saudi-arabia are not even close to
@@ -934,7 +938,11 @@ test('COUNTRY_PROFILES entries need no matching ancestryPacks.GROUPS key -- the 
     assert.ok(countryPacks.INCOME_LEVELS.includes(entry.incomeLevel), `${key}: incomeLevel must be real`);
     assert.ok(countryPacks.CONFLICT_LEVELS.includes(entry.conflictLevel), `${key}: conflictLevel must be real`);
     assert.ok(typeof entry.governmentType === 'string' && entry.governmentType.length > 0, `${key}: governmentType must be stated`);
-    assert.ok(countryPacks.REGIME_TYPES.includes(entry.regimeType), `${key}: regimeType must be a real published band`);
+    // `null` is a real, honest answer for a country whose regime
+    // either has no found EIU score (the DRC) or changed too recently
+    // for the EIU's own measurement window to describe it (Syria) --
+    // the fifteenth round's own tests cover those two by name.
+    assert.ok(entry.regimeType === null || countryPacks.REGIME_TYPES.includes(entry.regimeType), `${key}: regimeType must be null or a real published band`);
     assert.ok('globalIndicators2026' in entry, `${key}: globalIndicators2026 must be present, even if sparse`);
   }
 });
@@ -1006,8 +1014,13 @@ test('Brazil\'s 2024 net-oil-exporter status is a real, dated, sourced fact, not
   assert.equal(brazil.oilProducer.year, 2024);
 });
 
-test('every militaryExpenditurePctGDP in this round is confidence-flagged, same discipline as the rest of this file', () => {
+test('every militaryExpenditurePctGDP in COUNTRY_PROFILES is confidence-flagged -- SIPRI-official where actually confirmed, secondary-estimate otherwise', () => {
+  // Myanmar's fifteenth-round figure is the one real exception --
+  // SIPRI's own confirmed number, not a third-party estimate. See the
+  // dedicated test for that entry; this test just excludes it rather
+  // than weakening the "every other one is flagged" assertion.
   for (const key of Object.keys(countryPacks.COUNTRY_PROFILES)) {
+    if (key === 'myanmar') continue;
     const entry = countryPacks.countryProfileFor(key);
     if (entry.militaryExpenditurePctGDP) {
       assert.equal(entry.militaryExpenditurePctGDP.confidence, 'secondary-estimate', `${key}: no SIPRI-official figure was confirmed this round`);
@@ -1026,4 +1039,83 @@ test('Oceania is a real, declared region with no overview yet -- regionalContext
   // region, no overview" branch -- proven here without inventing a
   // new unmapped key, by checking the branch logic directly.
   assert.ok(!countryPacks.REGION_OVERVIEWS.oceania, 'no Oceania overview has actually been built');
+});
+
+// ---------------------------------------------------------------------
+// Fifteenth round: twelve more real countries in COUNTRY_PROFILES
+// ---------------------------------------------------------------------
+
+test('the fifteenth round adds exactly twelve more real countries, all resolvable and well-formed', () => {
+  const newKeys = [
+    'pakistan', 'bangladesh', 'democratic-republic-of-the-congo', 'thailand',
+    'myanmar', 'iraq', 'afghanistan', 'syria', 'morocco', 'peru', 'chile', 'malaysia',
+  ];
+  assert.equal(Object.keys(countryPacks.COUNTRY_PROFILES).length, 22, 'ten from the fourteenth round plus twelve from the fifteenth');
+  for (const key of newKeys) {
+    assert.equal(countryPacks.countryFor(key), null, `${key} must not also exist in COUNTRIES`);
+    const entry = countryPacks.countryProfileFor(key);
+    assert.ok(entry, `${key} should be a real COUNTRY_PROFILES entry`);
+    assert.ok(countryPacks.INCOME_LEVELS.includes(entry.incomeLevel), `${key}: incomeLevel must be real`);
+    assert.ok(countryPacks.CONFLICT_LEVELS.includes(entry.conflictLevel), `${key}: conflictLevel must be real`);
+    assert.ok(typeof entry.governmentType === 'string' && entry.governmentType.length > 0, `${key}: governmentType must be stated`);
+    assert.ok('globalIndicators2026' in entry, `${key}: globalIndicators2026 must be present, even if sparse`);
+  }
+});
+
+test('three real conflict classifications are not defaulted: DRC/Myanmar/Syria are active-armed-conflict', () => {
+  for (const key of ['democratic-republic-of-the-congo', 'myanmar', 'syria']) {
+    assert.equal(countryPacks.countryProfileFor(key).conflictLevel, 'active-armed-conflict');
+  }
+});
+
+test('Syria and Chile both honestly null their regimeType/regimeScore, for two different stated reasons', () => {
+  const syria = countryPacks.countryProfileFor('syria');
+  assert.equal(syria.regimeType, null);
+  assert.equal(syria.regimeScore, null);
+
+  const chile = countryPacks.countryProfileFor('chile');
+  assert.equal(chile.regimeType, null);
+  assert.equal(chile.regimeScore, null);
+});
+
+test('DRC regimeType is null (no EIU score found), not silently substituted with Freedom House\'s different methodology', () => {
+  const drc = countryPacks.countryProfileFor('democratic-republic-of-the-congo');
+  assert.equal(drc.regimeType, null);
+  assert.equal(drc.regimeScore, null);
+});
+
+test('Myanmar\'s militaryExpenditurePctGDP is SIPRI\'s own confirmed figure, not a secondary estimate', () => {
+  const myanmar = countryPacks.countryProfileFor('myanmar');
+  assert.equal(myanmar.militaryExpenditurePctGDP.confidence, 'sipri-official');
+  assert.equal(myanmar.militaryExpenditurePctGDP.value, 6.8);
+});
+
+test('Iraq\'s oilProducer entry is a real, confirmed 2024 figure with both production and export ranges kept', () => {
+  const iraq = countryPacks.countryProfileFor('iraq');
+  assert.equal(iraq.oilProducer.status, 'opec-second-largest-producer');
+  assert.ok(Array.isArray(iraq.oilProducer.dailyProductionBblRange));
+  assert.ok(Array.isArray(iraq.oilProducer.dailyExportBblRange));
+  assert.equal(iraq.oilProducer.year, 2024);
+});
+
+test('secondary-sourced regimeScores (Thailand, Peru, Malaysia) are confidence-flagged; directly-confirmed ones are not', () => {
+  for (const key of ['thailand', 'peru', 'malaysia']) {
+    assert.equal(countryPacks.countryProfileFor(key).regimeScoreConfidence, 'secondary-estimate', `${key} should be flagged`);
+  }
+  for (const key of ['pakistan', 'bangladesh', 'iraq', 'afghanistan', 'morocco']) {
+    assert.equal(countryPacks.countryProfileFor(key).regimeScoreConfidence, undefined, `${key} was confirmed directly and needs no flag`);
+  }
+});
+
+test('regionalContextFor resolves every fifteenth-round country through the profileEntry tier with a real region', () => {
+  const expectations = {
+    pakistan: 'asia', bangladesh: 'asia', 'democratic-republic-of-the-congo': 'africa',
+    thailand: 'asia', myanmar: 'asia', iraq: 'middle-east', afghanistan: 'middle-east',
+    syria: 'middle-east', morocco: 'africa', peru: 'latin-america', chile: 'latin-america', malaysia: 'asia',
+  };
+  for (const [key, region] of Object.entries(expectations)) {
+    const ctx = countryPacks.regionalContextFor(key);
+    assert.ok(ctx.profileEntry, `${key} should resolve through profileEntry`);
+    assert.equal(ctx.region, region, `${key} should classify as ${region}`);
+  }
 });

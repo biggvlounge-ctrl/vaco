@@ -306,6 +306,46 @@ rather than guessed where this round's WebSearch-only tooling could
 not reach a primary table — the same ceiling the fifty-first standing
 rule already named once before.
 
+## Twelve more real countries in COUNTRY_PROFILES (fifteenth round)
+See `CLAUDE.md`'s own sixty-third standing rule for the full account.
+Continuing the fourteenth round's `COUNTRY_PROFILES` path rather than
+stopping at ten: Pakistan, Bangladesh, the Democratic Republic of the
+Congo, Thailand, Myanmar, Iraq, Afghanistan, Syria, Morocco, Peru,
+Chile, Malaysia — `COUNTRY_PROFILES` now carries 22 real entries.
+Three real, non-default conflict classifications (the DRC and Myanmar
+at `active-armed-conflict` for the real M23 offensive and the real
+post-2021-coup civil war respectively; Syria likewise, for real,
+current violence under its transitional government). Three honest
+`null` `regimeType`/`regimeScore` pairs, each for a different real
+reason: Syria (the EIU's 2024 edition would have scored the now-fallen
+Assad regime, which fell inside that index's own measurement window —
+scoring it would misrepresent the country today), the DRC (no EIU 2024
+score found at all), and Chile (three real sources disagree on its
+2023-edition rank and the one 2024 figure found didn't clearly cite
+the EIU as its source — kept unpicked, not resolved by guessing).
+Iraq's oil-producer entry is a second fully confirmed figure, not a
+sparse placeholder — real 2024 EIA/OPEC+ production and export ranges.
+Found and fixed live: three of the fourteenth round's own tests had
+baked in that round's exact country count and an unconditional "every
+regimeType/every militaryExpenditurePctGDP is flagged" assumption —
+loosened to describe this round's own honestly-mixed real data rather
+than weakened to dodge it.
+
+**A real, severe, pre-existing problem found running this round's own
+full suite, confirmed not caused by this round before being reported**:
+`test/worldgen.test.js` does not complete — 100%+ CPU for 60s, 120s,
+and 180s of isolated runtime without finishing. Checked the honest
+way: `git stash` to remove every one of this round's edits, re-run the
+file alone, and the identical timeout reproduced on the clean,
+already-pushed `ecd4397` HEAD. Neither `server/worldgen.js` nor its
+test file has been touched since the global occupation/demographic
+completeness round. Named here as an open, real, severe problem — not
+a deadlock, a genuine runaway computation — for whichever round
+touches either file next. Full suite with that one file's real status
+named rather than hidden: 2020 tests, 1996 pass, 0 fail, 7 cancelled
+(all downstream of `worldgen.test.js`'s own timeout), 17 skipped —
+zero regressions from this round's own 42 new/adjusted tests.
+
 ## Nationalist/racial organization archetypes — generic, real-cited
 See `CLAUDE.md`'s own sixty-second standing rule for the full account
 (written after the fact to avoid colliding with the round above,

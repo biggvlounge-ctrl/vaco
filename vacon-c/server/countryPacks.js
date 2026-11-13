@@ -659,6 +659,115 @@
 // outcome. Wiring any of it into a mechanic is the same separate,
 // future, calibrated round every other real input here has been held
 // to.
+//
+// ---------------------------------------------------------------------
+// Fifteenth round: twelve more real countries in COUNTRY_PROFILES,
+// continuing by population and significance rather than stopping at
+// the first ten
+// ---------------------------------------------------------------------
+// Direct instruction to keep pushing coverage "as far as you can
+// genuinely" toward the real ~195-country world, same discipline as
+// the fourteenth round: real WebSearched figures only, confidence-
+// flagged where a source is secondary, honest `null` where nothing
+// citable was found, no fabrication regardless of how large the ask
+// is. Twelve added this round, prioritised by population and real
+// current significance: Pakistan, Bangladesh, the Democratic Republic
+// of the Congo, Thailand, Myanmar, Iraq, Afghanistan, Syria, Morocco,
+// Peru, Chile, Malaysia.
+//
+// **Three real conflict classifications made rather than defaulted,
+// each checked rather than assumed.** The DRC is `active-armed-
+// conflict` -- the real, ongoing M23 offensive (Goma captured Jan
+// 2025, Walikale Feb 2025, 500,000+ newly displaced, Rwandan backing
+// alleged and disputed, mediation efforts repeatedly collapsing) is
+// unambiguous. Myanmar is `active-armed-conflict` -- the real civil
+// war between the 2021 coup junta and resistance/ethnic armed
+// organisations continues, and SIPRI's own confirmed figure (military
+// spending +66% in 2024, 6.8% of GDP, the highest military burden in
+// the Asia-Pacific) is itself evidence of an active war economy.
+// Syria is `active-armed-conflict` -- real, current violence continues
+// under the transitional government (the March 2025 Latakia/Tartous/
+// Hama clashes, Israeli strikes on military targets, Aleppo clashes
+// with the SDF), not a settled peace. Pakistan, Thailand and Morocco
+// are `localized-conflict` -- real, long-running, sub-national
+// insurgencies (Balochistan and TTP violence in Pakistan; the
+// Malay-Muslim separatist insurgency in Thailand's deep south;
+// Western Sahara's low-level, post-2020 Polisario Front clashes for
+// Morocco, kept distinct from Morocco's own domestic conflict level
+// the same way Saudi Arabia's combatant role in Yemen is reported on
+// Yemen's own entry, not folded into Saudi Arabia's) rather than a
+// forced "no active conflict" default. Afghanistan is also
+// `localized-conflict`, not `no-active-conflict` or `active-armed-
+// conflict` -- the large-scale war ended with the 2021 Taliban
+// takeover, but the real, ongoing ISIS-Khorasan insurgency against
+// Taliban rule continues, and neither extreme would describe that
+// honestly. Iraq is `localized-conflict` for the same reason -- large-
+// scale war has ended, ISIS remnant and periodic sectarian violence
+// has not.
+//
+// **Syria could not get a real `regimeType`/`regimeScore`, and the
+// reason is structural, not a research gap.** The EIU's 2024 edition
+// reflects conditions as of 2024, and the Assad regime it would have
+// scored fell on 8 Dec 2024 -- in the index's own final measurement
+// window, replaced by Ahmed al-Sharaa's transitional government (a
+// five-year transitional period, a real October 2025 parliamentary
+// election, uneven territorial control with the SDF-held northeast).
+// Scoring the fallen Assad government would misrepresent the country
+// TODAY; no post-transition EIU score exists yet as of this round.
+// `regimeType`/`regimeScore` are both `null` with this reasoning
+// stated directly in the entry, the same honest-null posture
+// `Somalia`'s own entry already set a precedent for.
+//
+// **Chile's regimeType/regimeScore are also `null`, for a different,
+// source-conflict reason this round found rather than papered over.**
+// Three separately-sourced claims about Chile's 2023-edition rank
+// (15th/7.98, 19th/"full democracy", 25th/"flawed democracy") actively
+// disagree with each other, and the one 2024 figure found (7.83) came
+// from a secondary site that did not clearly cite the EIU as its
+// source at all. Rather than pick one disagreeing claim or present an
+// unconfirmed secondary number as settled, both are left out and the
+// real disagreement is stated in the entry's own comment -- the same
+// "both kept, neither picked" discipline this file has held since its
+// very first France entries.
+//
+// **Iraq's oil-producer entry is the second fully confirmed figure in
+// this file's COUNTRY_PROFILES table, not a sparse placeholder.** Real
+// 2024 EIA/OPEC+ figures: ~4.2-4.4M bpd produced (sources differ on
+// whether condensates are included), ~3.26-3.36M bpd exported -- a
+// nine-year low, driven by OPEC+ quota compliance and a real pipeline
+// outage, with Iraq itself pledging to compensate 1.44M bpd of 2024
+// overproduction through September 2025. Both the production and
+// export ranges are kept rather than collapsed to one number, since
+// the real sources differ on methodology, not on the underlying fact.
+//
+// **Three entries carry an honest sourcing caveat on `incomeLevel`
+// that no entry in the fourteenth round needed.** The DRC (low-
+// income), Iraq (upper-middle-income) and Afghanistan (low-income)
+// are each stated from well-established general knowledge of the
+// standard World Bank classification, NOT from a primary table this
+// round's searches actually surfaced -- flagged in each entry's own
+// comment rather than presented with the same confidence as Bangladesh/
+// Morocco/Peru/Chile, whose classifications this round did find and
+// confirm directly against a real July-2025 World Bank list. Myanmar's
+// `lower-middle-income` carries the identical caveat, inherited
+// directly from the search result that surfaced it rather than
+// independently re-verified.
+//
+// Several `regimeScore` values this round (Thailand, Peru, Malaysia)
+// come from secondary ranking-site compilations that were never cross-
+// checked against the EIU's own primary 2024 table -- flagged
+// `regimeScoreConfidence: 'secondary-estimate'`, reusing this file's
+// existing confidence vocabulary rather than inventing a new flag for
+// the same real gap `militaryExpenditurePctGDP` already names.
+// Pakistan, Bangladesh, Iraq, Afghanistan and Morocco's regime scores,
+// by contrast, are confirmed directly across multiple independent news
+// sources naming the real score, rank and reasoning together -- no
+// flag needed, same confidence tier the fourteenth round's Argentina/
+// Turkey/South-Africa entries already carry.
+//
+// Same report-only posture as every other field in this module:
+// nothing in `server/` reads a `COUNTRY_PROFILES` field to decide an
+// outcome.
 
 'use strict';
 
@@ -2503,6 +2612,290 @@ const COUNTRY_PROFILES = {
       undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
     },
   },
+  // Fifteenth round: twelve more real countries -- see this file's own
+  // header for the full reasoning behind every honest null, confidence
+  // flag, and conflict classification below.
+  pakistan: {
+    country: 'Pakistan', incomeLevel: 'lower-middle-income',
+    // Real, long-running sub-national insurgencies (Balochistan
+    // separatist violence; TTP/Tehrik-i-Taliban Pakistan activity in
+    // Khyber Pakhtunkhwa) -- not a nationwide state-based war.
+    conflictLevel: 'localized-conflict',
+    governmentType: 'federal parliamentary republic',
+    // Confirmed directly: 2024 score 2.84 (down from 3.25 in 2023),
+    // rank 124th of 167, authoritarian regime -- the EIU's own stated
+    // reasoning cites the jailing of Imran Khan shortly before the
+    // February 2024 election and real election-day violence.
+    regimeType: 'authoritarian-regime', regimeScore: 2.84,
+    militaryExpenditurePctGDP: {
+      value: 2.7, year: 2024, confidence: 'secondary-estimate',
+      note: 'a second secondary source gives 2.67% for the same year',
+    },
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  bangladesh: {
+    country: 'Bangladesh', incomeLevel: 'lower-middle-income',
+    conflictLevel: 'no-active-conflict',
+    governmentType: 'unitary parliamentary republic',
+    // Confirmed directly: 2024 score 4.44, the largest single-year
+    // decline (-1.44) of any country that edition, rank 100th of 167
+    // (down 25 places) -- the EIU's own stated reasoning cites a
+    // rigged election, the prime minister's ouster in the mid-2024
+    // uprising, and the political unrest that followed. Real political
+    // unrest, not a UCDP state-based armed conflict -- conflictLevel
+    // stays `no-active-conflict` on that distinction.
+    regimeType: 'hybrid-regime', regimeScore: 4.44,
+    militaryExpenditurePctGDP: {
+      value: 0.94, year: 2024, confidence: 'secondary-estimate',
+      note: 'a second secondary source gives 0.861% for the same year',
+    },
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  'democratic-republic-of-the-congo': {
+    country: 'Democratic Republic of the Congo',
+    // Stated from well-established general knowledge of the standard
+    // World Bank classification, NOT independently confirmed against a
+    // primary table this round -- flagged honestly rather than
+    // presented with the same confidence as this round's directly-
+    // confirmed entries.
+    incomeLevel: 'low-income',
+    // Real, current, large-scale: the M23 offensive captured Goma (Jan
+    // 2025) and Walikale (Feb 2025), displaced 500,000+ people in early
+    // 2025 alone, and repeated regional mediation efforts (the 5-day
+    // ceasefire ultimatum, Angola's mediation) have collapsed. Rwandan
+    // backing of M23 is alleged by the DRC government and the UN and
+    // disputed by Rwanda.
+    conflictLevel: 'active-armed-conflict',
+    governmentType: 'semi-presidential republic',
+    // No real EIU Democracy Index 2024 score was found this round.
+    // Freedom House's 2024 report rates the DRC 19/100, "Not Free" --
+    // a different methodology, not substituted here as though it were
+    // the same measurement.
+    regimeType: null, regimeScore: null,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  thailand: {
+    country: 'Thailand', incomeLevel: 'upper-middle-income',
+    // The real, decades-long Malay-Muslim separatist insurgency in
+    // Thailand's deep south (Pattani/Yala/Narathiwat) -- not a
+    // nationwide conflict.
+    conflictLevel: 'localized-conflict',
+    governmentType: 'unitary parliamentary constitutional monarchy',
+    // Two secondary sources agree on 6.27 for 2024 (down from 6.35 in
+    // 2023, unchanged rank-wise per one source), but neither is the
+    // EIU's own primary table -- flagged rather than presented as
+    // confirmed the way Pakistan/Bangladesh's scores above are.
+    regimeType: 'flawed-democracy', regimeScore: 6.27, regimeScoreConfidence: 'secondary-estimate',
+    militaryExpenditurePctGDP: {
+      value: 1.08, year: 2024, confidence: 'secondary-estimate',
+      note: 'a second secondary source gives 1.05% for the same year',
+    },
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  myanmar: {
+    country: 'Myanmar',
+    // Carries the same honest sourcing caveat as the DRC's entry --
+    // inherited directly from the search result that surfaced it,
+    // not independently re-verified against a primary table.
+    incomeLevel: 'lower-middle-income',
+    // Real, ongoing civil war between the February 2021 coup junta and
+    // resistance/ethnic armed organisations -- SIPRI's own confirmed
+    // figure below (military spending +66% in 2024) is itself evidence
+    // of a real active war economy, not just a conflict-tracker label.
+    conflictLevel: 'active-armed-conflict',
+    governmentType: 'military junta (State Administration Council, ruling since the Feb 2021 coup; the 2008 constitution formally describes a unitary presidential republic)',
+    // Confirmed directly: 0.96, authoritarian regime, second-lowest in
+    // the world after Afghanistan.
+    regimeType: 'authoritarian-regime', regimeScore: 0.96,
+    // SIPRI's own confirmed figure, not a secondary estimate -- the
+    // highest military burden in the Asia-Pacific, spending +66% in
+    // 2024.
+    militaryExpenditurePctGDP: { value: 6.8, year: 2024, confidence: 'sipri-official' },
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  iraq: {
+    country: 'Iraq',
+    // Same honest sourcing caveat as the DRC's entry above -- a well-
+    // established classification, not independently confirmed against
+    // a primary table this round.
+    incomeLevel: 'upper-middle-income',
+    // Large-scale war has ended; real ISIS remnant activity and
+    // periodic sectarian violence has not -- neither a forced "no
+    // active conflict" nor an overstated "active armed conflict"
+    // describes this honestly.
+    conflictLevel: 'localized-conflict',
+    governmentType: 'federal parliamentary republic',
+    // Confirmed directly: 2.80, authoritarian regime, rank 126th of
+    // 167 (11th in the MENA region) -- down from 4.0 in 2018.
+    regimeType: 'authoritarian-regime', regimeScore: 2.80,
+    militaryExpenditurePctGDP: {
+      value: 2.36, year: 2024, confidence: 'secondary-estimate',
+      note: 'a second secondary source gives 2.273% for the same year',
+    },
+    // The second fully confirmed oil figure in this table, not a
+    // sparse placeholder -- real 2024 EIA/OPEC+ figures, both
+    // production and export measures kept since the real sources
+    // differ on methodology (condensates included or not), not on the
+    // underlying fact.
+    oilProducer: {
+      status: 'opec-second-largest-producer', dailyProductionBblRange: [4200000, 4400000],
+      dailyExportBblRange: [3260000, 3360000], year: 2024,
+      source: 'eia-iraq-country-analysis-2024; iraq-oil-report; arab-energy-organisation; ceic',
+      note: 'exports hit a 9-year low, driven by OPEC+ quota compliance and a real pipeline outage; Iraq pledged to compensate 1.44M bpd of its own 2024 overproduction through Sep 2025',
+    },
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  afghanistan: {
+    country: 'Afghanistan', incomeLevel: 'low-income',
+    // The large-scale war ended with the 2021 Taliban takeover; the
+    // real, ongoing ISIS-Khorasan insurgency against Taliban rule has
+    // not -- neither extreme describes this honestly.
+    conflictLevel: 'localized-conflict',
+    governmentType: 'Taliban-led Islamic Emirate (de facto; not recognised internationally by most states)',
+    // Confirmed directly: 0.25, ranked LAST of 167 countries, the
+    // EIU's own "worst among authoritarian regimes worldwide."
+    regimeType: 'authoritarian-regime', regimeScore: 0.25,
+    // Not found this round -- Afghanistan's military spending under a
+    // government most states do not recognise is not tracked by SIPRI
+    // the way an ordinary state's is, a real gap rather than an
+    // oversight.
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  syria: {
+    country: 'Syria',
+    // Same honest sourcing caveat as the DRC's and Iraq's entries --
+    // a well-established classification for a war-devastated economy,
+    // not independently confirmed against a primary table this round.
+    incomeLevel: 'low-income',
+    // Real, current violence continues under the transitional
+    // government -- the March 2025 Latakia/Tartous/Hama clashes
+    // (hundreds of civilian deaths, summary executions reported on
+    // both sides), Israeli strikes on military targets, and Aleppo
+    // clashes with the SDF. Not a settled peace.
+    conflictLevel: 'active-armed-conflict',
+    governmentType: 'transitional government (Ahmed al-Sharaa, since the 8 Dec 2024 fall of the Assad regime; a five-year transitional period; a real Oct 2025 parliamentary election; territorial control uneven, with the SDF holding Hasakah/Qamishli/Kobane)',
+    // Deliberately `null`, and the reason is structural, not a
+    // research gap: the EIU's 2024 edition would have scored the
+    // Assad regime, which fell inside that index's own measurement
+    // window (8 Dec 2024). Scoring the fallen government would
+    // misrepresent the country today, and no post-transition EIU
+    // score exists yet as of this round -- the same honest-null
+    // posture Somalia's own regimeType already set a precedent for.
+    regimeType: null, regimeScore: null,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  morocco: {
+    country: 'Morocco', incomeLevel: 'lower-middle-income',
+    // Western Sahara's low-level, post-Nov-2020 Polisario Front
+    // clashes are real and ongoing -- kept distinct from treating
+    // Morocco's own entry as conflict-free, the same way Saudi
+    // Arabia's combatant role in Yemen is reported on Yemen's own
+    // entry rather than folded into Saudi Arabia's.
+    conflictLevel: 'localized-conflict',
+    governmentType: 'unitary parliamentary constitutional monarchy',
+    // Confirmed directly: 4.97, hybrid regime, rank 91st of 167 (up
+    // from 93rd in 2023) -- widely reported as the leading hybrid
+    // regime in the Arab world.
+    regimeType: 'hybrid-regime', regimeScore: 4.97,
+    militaryExpenditurePctGDP: {
+      value: 3.52, year: 2024, confidence: 'secondary-estimate',
+      note: 'a second secondary source gives 3.435% for the same year',
+    },
+    // Morocco is a real net energy importer, not a producer -- unlike
+    // most `null` entries in this table, this is a stated fact, not
+    // an unresearched gap.
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  peru: {
+    country: 'Peru', incomeLevel: 'upper-middle-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'unitary presidential republic',
+    // One secondary source gives 5.69 for 2024; a second, separately-
+    // sourced report instead describes a fall from 6.5 to 5.9 -- the
+    // two do not match and neither was confirmed against the EIU's own
+    // primary table, so this is flagged rather than presented as
+    // settled.
+    regimeType: 'hybrid-regime', regimeScore: 5.69, regimeScoreConfidence: 'secondary-estimate',
+    militaryExpenditurePctGDP: {
+      value: 0.91, year: 2024, confidence: 'secondary-estimate',
+      note: 'sources disagree on 2023 too (1.1212% vs 1.24%), underscoring how unsettled this figure is across compilers',
+    },
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: {
+        value: 6, year: 2024, source: 'insight-crime-2024-homicide-round-up', confidence: 'secondary-compilation',
+        note: 'up from 4.4 in 2023 (+35.9%) per the same source; a separate Statista figure of 3.2 for 2023 disagrees and is kept alongside rather than reconciled',
+      },
+      undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  chile: {
+    country: 'Chile', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'unitary presidential republic',
+    // Deliberately `null` -- three separately-sourced claims about
+    // Chile's 2023-edition rank actively disagree (15th/7.98,
+    // 19th/"full democracy", 25th/"flawed democracy"), and the one
+    // 2024 figure found (7.83) came from a secondary site that did not
+    // clearly cite the EIU as its source at all. Rather than pick one
+    // disagreeing claim or present an unconfirmed number as settled,
+    // both are left null and the real disagreement is stated here --
+    // the same "both kept, neither picked" discipline this file has
+    // held since its very first France entries.
+    regimeType: null, regimeScore: null,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  malaysia: {
+    country: 'Malaysia', incomeLevel: 'upper-middle-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'federal constitutional elective monarchy, parliamentary democracy',
+    // One secondary source gives 7.11 for 2024 (down from 7.29 in
+    // 2023), not cross-checked against the EIU's own primary table --
+    // flagged the same way Thailand's and Peru's scores above are.
+    regimeType: 'flawed-democracy', regimeScore: 7.11, regimeScoreConfidence: 'secondary-estimate',
+    militaryExpenditurePctGDP: {
+      value: 0.99, year: 2024, confidence: 'secondary-estimate',
+      note: 'a second secondary source gives 1.037% for the same year',
+    },
+    // Malaysia is a real, established oil/gas producer (Petronas), but
+    // no specific 2024 production/export figure was confirmed to this
+    // file's own standard this round -- left null rather than
+    // estimated, same discipline as every other sparse field here.
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
 };
 
 // **Checked once, at load time.** A COUNTRY_PROFILES key must not
@@ -2555,18 +2948,25 @@ const REGION_BY_KEY = {
   spain: 'europe',
   // Middle East
   israeli: 'middle-east', yemen: 'middle-east', 'saudi-arabia': 'middle-east', turkey: 'middle-east',
-  // Africa
+  iraq: 'middle-east', afghanistan: 'middle-east', syria: 'middle-east',
+  // Africa (UN-geoscheme Northern Africa, including Morocco, is
+  // classified here for continental consistency with this file's own
+  // existing Africa bucket, even though MENA groupings colloquially
+  // pair it with the Middle East)
   somali: 'africa', nigerian: 'africa', ethiopian: 'africa', ghanaian: 'africa', kenyan: 'africa',
   'subsaharan-african': 'africa', 'cape-verde': 'africa', 'south-africa': 'africa',
+  morocco: 'africa', 'democratic-republic-of-the-congo': 'africa',
   // Caribbean
   'west-indian': 'caribbean', jamaican: 'caribbean', haitian: 'caribbean', 'dominican-republic': 'caribbean',
   cuba: 'caribbean', 'puerto-rico': 'caribbean', 'virgin-islands': 'caribbean',
   // Asia
   vietnamese: 'asia', chinese: 'asia', filipino: 'asia', 'asian-indian': 'asia',
   japan: 'asia', 'south-korea': 'asia', indonesia: 'asia',
+  pakistan: 'asia', bangladesh: 'asia', thailand: 'asia', myanmar: 'asia', malaysia: 'asia',
   // Latin America (Central/South America, excluding the Caribbean above)
   mexican: 'latin-america', guatemalan: 'latin-america', honduran: 'latin-america', salvadoran: 'latin-america',
   venezuela: 'latin-america', colombia: 'latin-america', brazil: 'latin-america', argentina: 'latin-america',
+  peru: 'latin-america', chile: 'latin-america',
   // North America -- the explicit baseline; no "North America overview"
   // exists because the baseline itself is the dedicated entry.
   'united-states': 'north-america', canada: 'north-america',
