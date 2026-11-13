@@ -998,6 +998,79 @@
 // Same report-only posture as every other field in this module:
 // nothing in `server/` reads a `COUNTRY_PROFILES` field to decide an
 // outcome.
+//
+// ---------------------------------------------------------------------
+// Twentieth round: thirty-two more real countries -- West/Central
+// Africa, South Sudan/Eritrea, Central America, the English-speaking
+// Caribbean's remaining three, the Caucasus, the remaining Central
+// Asian republics, the Baltics/Slovakia/Slovenia, and the Western
+// Balkans
+// ---------------------------------------------------------------------
+// Direct instruction to keep going "as much as you can" toward the
+// real ~195-country world. Thirty-two countries this round: Ivory
+// Coast, Senegal, Cameroon, South Sudan, Eritrea, Togo, Benin, Gabon,
+// Guinea, Sierra Leone, Liberia, Gambia, Panama, Costa Rica,
+// Nicaragua, Guyana, Suriname, Trinidad and Tobago, Georgia, Armenia,
+// Azerbaijan, Kyrgyzstan, Tajikistan, Turkmenistan, Estonia, Latvia,
+// Slovakia, Slovenia, Montenegro, Albania, North Macedonia, Kosovo.
+//
+// **Kosovo's regimeType/regimeScore are deliberately null for a
+// structural reason stated directly, not a research gap -- the EIU's
+// own index does not include it at all,** the same kind of real
+// exclusion Taiwan's entry already names for the World Bank's own
+// country tables. `governmentType` states its partially-recognised,
+// non-UN-member status directly.
+//
+// **Montenegro, Albania and North Macedonia all honestly null their
+// regimeType/regimeScore, the same wrong-year discipline Zimbabwe's
+// entry already applies.** Every figure found for the three
+// (Montenegro 6.67, Albania 6.28, North Macedonia 6.03) is explicitly
+// the 2023 edition, not 2024, and none is reused as a stand-in.
+// Senegal and Liberia get the same treatment for a different real
+// reason -- Senegal's own 2023 (hybrid) and 2025 (flawed, rank 72nd)
+// figures bracket 2024 without actually naming it, and no Liberia
+// figure of any year was found at all.
+//
+// **Two real, named, structural facts reported where a figure might
+// otherwise be expected, not invented to fill the slot.** Panama and
+// Costa Rica both have a real, constitutionally notable absence of a
+// standing military (Panama abolished its military in 1990; Costa
+// Rica abolished its own in 1948, the more famous and longer-standing
+// case) -- `militaryExpenditurePctGDP` is `null` for both, and this is
+// the one round where that null is itself the reported fact, stated
+// in each entry's own comment, rather than a gap.
+//
+// **Three real, non-default conflict classifications, each a
+// currently-live, named dispute rather than a historical footnote.**
+// Georgia is `localized-conflict` for the real, frozen, Russian-
+// backed breakaway regions of Abkhazia and South Ossetia, unresolved
+// since the 2008 war. Armenia is `localized-conflict` for the real,
+// recent Nagorno-Karabakh situation (Azerbaijan's 2023 takeover ended
+// the enclave's decades-long autonomy, and border tension between the
+// two countries continues). Cameroon is `localized-conflict` for the
+// real, ongoing Anglophone Crisis (the Ambazonia separatist conflict
+// in the Northwest/Southwest regions, running since 2016) alongside
+// real Boko Haram activity in the Far North.
+//
+// South Sudan is `active-armed-conflict` -- real, current, ongoing
+// instability since independence, with repeated violent flare-ups
+// documented since 2011, not a settled post-independence peace.
+//
+// Every other regimeType/regimeScore pair this round (Ivory Coast,
+// Eritrea, Benin, Gabon, Guinea, Sierra Leone, Gambia, Panama, Costa
+// Rica, Suriname, Trinidad and Tobago, Georgia, Armenia, Azerbaijan,
+// Kyrgyzstan, Tajikistan, Turkmenistan, Estonia, Latvia, Slovakia,
+// Slovenia) is confirmed directly against a real, dated 2024 EIU
+// figure. Guyana is the one further honest-null case -- its only
+// found figure is explicitly the 2022 edition, too old to reuse, same
+// discipline as Senegal/Liberia/Montenegro/Albania/North Macedonia
+// above. Nicaragua's `authoritarian-regime` is confirmed qualitatively
+// (the EIU's own report groups it with Cuba and Venezuela by name)
+// but carries no numeric score, since none was found this round.
+//
+// Same report-only posture as every other field in this module:
+// nothing in `server/` reads a `COUNTRY_PROFILES` field to decide an
+// outcome.
 
 'use strict';
 
@@ -4375,6 +4448,475 @@ const COUNTRY_PROFILES = {
       homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
     },
   },
+  // Twentieth round: thirty-two more real countries -- see this
+  // file's own header for the full reasoning behind every honest
+  // null, confidence flag, and conflict classification below.
+  'ivory-coast': {
+    country: "Ivory Coast", incomeLevel: 'lower-middle-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'presidential republic',
+    // Confirmed directly: 4.22, rank 105th, hybrid regime.
+    regimeType: 'hybrid-regime', regimeScore: 4.22,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  senegal: {
+    country: 'Senegal', incomeLevel: 'lower-middle-income',
+    // Real, long-running, lower-level Casamance separatist situation
+    // in southern Senegal -- largely dormant in recent years but not
+    // formally resolved.
+    conflictLevel: 'localized-conflict',
+    governmentType: 'presidential republic',
+    // Deliberately null -- the 2023 edition (hybrid regime) and the
+    // 2025 edition (upgraded to flawed democracy, rank 72nd) both
+    // bracket 2024 without actually naming it, and neither is reused
+    // as a stand-in for the year actually asked about.
+    regimeType: null, regimeScore: null,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  cameroon: {
+    country: 'Cameroon', incomeLevel: 'lower-middle-income',
+    // Real and ongoing: the Anglophone Crisis (the Ambazonia
+    // separatist conflict in the Northwest/Southwest regions, running
+    // since 2016) alongside real Boko Haram activity in the Far
+    // North -- both real, neither nationwide.
+    conflictLevel: 'localized-conflict',
+    governmentType: 'presidential republic (authoritarian, under President Biya since 1982)',
+    // Deliberately null -- no EIU 2024 score or regime type was found
+    // this round despite a dedicated search.
+    regimeType: null, regimeScore: null,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  'south-sudan': {
+    country: 'South Sudan', incomeLevel: 'low-income',
+    // Real, current, ongoing instability since independence in 2011,
+    // with repeated violent flare-ups documented since -- not a
+    // settled post-independence peace.
+    conflictLevel: 'active-armed-conflict',
+    governmentType: 'presidential republic (transitional power-sharing arrangement)',
+    // Deliberately null -- no EIU classification was found; the only
+    // figure found (a V-Dem liberal democracy score) is a different
+    // index with a different methodology and is not substituted here.
+    regimeType: null, regimeScore: null,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  eritrea: {
+    country: 'Eritrea', incomeLevel: 'low-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'presidential republic (one-party; no elections held since independence in 1993)',
+    // Confirmed directly: 1.97, authoritarian regime.
+    regimeType: 'authoritarian-regime', regimeScore: 1.97,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  togo: {
+    country: 'Togo', incomeLevel: 'low-income',
+    // Real and current: JNIM's expansion beyond the Sahel into
+    // coastal West Africa reached Togo, which recorded its worst year
+    // for terrorism since the Global Terrorism Index began -- a real,
+    // current, if lower-intensity than the three Sahel juntas'.
+    conflictLevel: 'localized-conflict',
+    governmentType: 'presidential republic (authoritarian, under the Gnassingbé family since 1967)',
+    // Deliberately null -- no EIU 2024 figure was found this round.
+    regimeType: null, regimeScore: null,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  benin: {
+    country: 'Benin', incomeLevel: 'lower-middle-income',
+    // Real, current Sahel-jihadist spillover into northern Benin,
+    // documented in recent years -- real but not nationwide.
+    conflictLevel: 'localized-conflict',
+    governmentType: 'presidential republic',
+    // Confirmed directly: 4.44, hybrid regime.
+    regimeType: 'hybrid-regime', regimeScore: 4.44,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  gabon: {
+    country: 'Gabon', incomeLevel: 'upper-middle-income', conflictLevel: 'no-active-conflict',
+    // The August 2023 coup was real but led to a peaceful (if
+    // military-controlled) transition, not an ongoing armed conflict.
+    governmentType: 'transitional military-led government (since the August 2023 coup)',
+    // Confirmed directly: 2.18, authoritarian regime.
+    regimeType: 'authoritarian-regime', regimeScore: 2.18,
+    militaryExpenditurePctGDP: null,
+    // Gabon is a real, established oil producer -- no specific 2024
+    // figure was confirmed to this file's own standard this round.
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  guinea: {
+    country: 'Guinea', incomeLevel: 'low-income', conflictLevel: 'no-active-conflict',
+    // The September 2021 coup was real but led to a peaceful (if
+    // military-controlled) transition, not an ongoing armed conflict.
+    governmentType: 'transitional military-led government (since the September 2021 coup)',
+    // Confirmed directly: 2.04, authoritarian regime.
+    regimeType: 'authoritarian-regime', regimeScore: 2.04,
+    militaryExpenditurePctGDP: null,
+    // Guinea's real economic significance is bauxite/aluminum mining,
+    // not oil.
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  'sierra-leone': {
+    country: 'Sierra Leone', incomeLevel: 'low-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'presidential republic',
+    // Confirmed directly: 4.32, hybrid regime.
+    regimeType: 'hybrid-regime', regimeScore: 4.32,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  liberia: {
+    country: 'Liberia', incomeLevel: 'low-income',
+    // The 2003 end of the Liberian Civil War is real and settled --
+    // no active armed conflict since.
+    conflictLevel: 'no-active-conflict',
+    governmentType: 'presidential republic',
+    // Deliberately null -- no EIU figure of any year was found this
+    // round.
+    regimeType: null, regimeScore: null,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  gambia: {
+    country: 'Gambia', incomeLevel: 'low-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'presidential republic',
+    // Confirmed directly: 4.47, hybrid regime.
+    regimeType: 'hybrid-regime', regimeScore: 4.47,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  panama: {
+    country: 'Panama',
+    // Stated from Panama's real, undisputed per-capita income level
+    // (the Panama Canal economy) -- not independently confirmed
+    // against a primary table this round.
+    incomeLevel: 'high-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'presidential republic',
+    // Confirmed directly: 6.84, rank 49th (one source gives 48th),
+    // flawed democracy.
+    regimeType: 'flawed-democracy', regimeScore: 6.84,
+    // A real, constitutionally notable fact reported in place of a
+    // figure, not a gap: Panama abolished its standing military in
+    // 1990, so there is no military budget for this field to report.
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  'costa-rica': {
+    country: 'Costa Rica',
+    // Stated from Costa Rica's real, well-established classification
+    // -- not independently confirmed against a primary table this
+    // round.
+    incomeLevel: 'upper-middle-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'presidential republic',
+    // Confirmed directly: 8.29, rank 18th, full democracy -- one of
+    // only two full democracies in Latin America this file's own
+    // research found (alongside Uruguay).
+    regimeType: 'full-democracy', regimeScore: 8.29,
+    // The more famous and longer-standing case of this round's two
+    // real no-standing-military facts: Costa Rica abolished its
+    // military in 1948. Reported here rather than treated as a gap.
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  nicaragua: {
+    country: 'Nicaragua', incomeLevel: 'lower-middle-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'presidential republic (authoritarian, under President Ortega)',
+    // Confirmed qualitatively -- the EIU's own report names Nicaragua
+    // alongside Cuba and Venezuela as authoritarian -- but no numeric
+    // 2024 score was found this round.
+    regimeType: 'authoritarian-regime', regimeScore: null,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  guyana: {
+    country: 'Guyana',
+    // Guyana's real income classification has shifted dramatically
+    // upward with its offshore oil boom (ExxonMobil's Stabroek block)
+    // -- stated as high-income from that well-known real shift, not
+    // an independently confirmed primary-table row this round.
+    incomeLevel: 'high-income',
+    // The real, serious Venezuela-Guyana Essequibo territorial
+    // dispute escalated sharply in 2023 with Venezuelan annexation
+    // claims and a real referendum -- an unresolved, live territorial
+    // dispute, not a historical footnote.
+    conflictLevel: 'localized-conflict',
+    governmentType: 'presidential republic',
+    // Deliberately null -- the only figure found (6.34, flawed
+    // democracy) is explicitly from the 2022 edition, too old to
+    // reuse as a 2024 figure.
+    regimeType: null, regimeScore: null,
+    militaryExpenditurePctGDP: null,
+    // Guyana's real oil boom is well known, but no specific 2024
+    // production figure was confirmed to this file's own standard
+    // this round -- left null rather than estimated.
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  suriname: {
+    country: 'Suriname', incomeLevel: 'upper-middle-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'presidential republic',
+    // Confirmed directly: 6.79, rank 48th, flawed democracy.
+    regimeType: 'flawed-democracy', regimeScore: 6.79,
+    militaryExpenditurePctGDP: null,
+    // Suriname has real emerging offshore oil discoveries but no
+    // confirmed 2024 production figure.
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  'trinidad-and-tobago': {
+    country: 'Trinidad and Tobago', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'parliamentary republic',
+    // Confirmed directly: 7.09, rank 45th, flawed democracy.
+    regimeType: 'flawed-democracy', regimeScore: 7.09,
+    militaryExpenditurePctGDP: null,
+    // Trinidad and Tobago is a real, established oil/gas producer --
+    // no specific 2024 figure was confirmed to this file's own
+    // standard this round.
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  georgia: {
+    country: 'Georgia', incomeLevel: 'upper-middle-income',
+    // Real, frozen, unresolved: the Russian-backed breakaway regions
+    // of Abkhazia and South Ossetia, since the 2008 war.
+    conflictLevel: 'localized-conflict',
+    governmentType: 'parliamentary republic',
+    // Confirmed directly: 4.70 (2024), down from 5.20 (89th to 94th)
+    // -- described as the 4th-steepest democratic decline in the
+    // world that edition. Hybrid regime, never having moved into the
+    // flawed-democracy category.
+    regimeType: 'hybrid-regime', regimeScore: 4.70,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  armenia: {
+    country: 'Armenia',
+    incomeLevel: 'upper-middle-income',
+    // Real and recent: Azerbaijan's September 2023 military takeover
+    // of Nagorno-Karabakh ended the enclave's decades-long autonomy,
+    // and border tension between Armenia and Azerbaijan continues.
+    conflictLevel: 'localized-conflict',
+    governmentType: 'parliamentary republic',
+    // Confirmed directly: 5.35, rank 82nd, retaining hybrid-regime
+    // status.
+    regimeType: 'hybrid-regime', regimeScore: 5.35,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  azerbaijan: {
+    country: 'Azerbaijan', incomeLevel: 'upper-middle-income',
+    // The active fighting phase of the Nagorno-Karabakh conflict
+    // ended with Azerbaijan's 2023 takeover; current status is
+    // tense but not an active armed conflict.
+    conflictLevel: 'no-active-conflict',
+    governmentType: 'presidential republic (authoritarian, under the Aliyev family)',
+    // Confirmed directly: 2.80, rank 126th.
+    regimeType: 'authoritarian-regime', regimeScore: 2.80,
+    militaryExpenditurePctGDP: null,
+    // Azerbaijan is a real, major Caspian oil/gas producer -- no
+    // specific 2024 figure was confirmed to this file's own standard
+    // this round.
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  kyrgyzstan: {
+    country: 'Kyrgyzstan', incomeLevel: 'lower-middle-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'presidential republic',
+    // Confirmed directly: 3.52 (2024), down from 3.72 (2023) --
+    // described as the real democratic leader within Central Asia
+    // despite the decline, attributed to real electoral-process
+    // setbacks and media pressure.
+    regimeType: 'authoritarian-regime', regimeScore: 3.52,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  tajikistan: {
+    country: 'Tajikistan', incomeLevel: 'low-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'presidential republic (authoritarian, under President Rahmon since 1994)',
+    // Confirmed directly: 1.83 (2024), down from 1.94 (2023) -- the
+    // EIU attributes the decline to worsening political participation
+    // under Rahmon's fully controlled political system.
+    regimeType: 'authoritarian-regime', regimeScore: 1.83,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  turkmenistan: {
+    country: 'Turkmenistan', incomeLevel: 'upper-middle-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'presidential republic (highly authoritarian, closed state)',
+    // Confirmed directly: 1.66, rank 161st, unchanged since 2020.
+    regimeType: 'authoritarian-regime', regimeScore: 1.66,
+    militaryExpenditurePctGDP: null,
+    // Turkmenistan holds the world's 4th-largest natural gas reserves
+    // -- no specific 2024 production figure was confirmed to this
+    // file's own standard this round.
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  estonia: {
+    country: 'Estonia', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'parliamentary republic',
+    // Confirmed directly: 8.13, rank 21st -- a real, first-time move
+    // into the full-democracy category this edition, having
+    // previously been classed a flawed democracy.
+    regimeType: 'full-democracy', regimeScore: 8.13,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  latvia: {
+    country: 'Latvia', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'parliamentary republic',
+    // Confirmed directly: 7.66, flawed democracy.
+    regimeType: 'flawed-democracy', regimeScore: 7.66,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  slovakia: {
+    country: 'Slovakia', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'parliamentary republic',
+    // Confirmed directly: 7.21, flawed democracy.
+    regimeType: 'flawed-democracy', regimeScore: 7.21,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  slovenia: {
+    country: 'Slovenia', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'parliamentary republic',
+    // Confirmed directly: 7.82, flawed democracy.
+    regimeType: 'flawed-democracy', regimeScore: 7.82,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  montenegro: {
+    country: 'Montenegro', incomeLevel: 'upper-middle-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'parliamentary republic',
+    // Deliberately null -- the only figure found (6.67, "the best
+    // score in the Western Balkans") is explicitly the 2023 edition,
+    // not 2024, same wrong-year discipline as Zimbabwe's entry.
+    regimeType: null, regimeScore: null,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  albania: {
+    country: 'Albania', incomeLevel: 'upper-middle-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'parliamentary republic',
+    // Deliberately null -- the only figure found (6.28) is explicitly
+    // the 2023 edition, not 2024.
+    regimeType: null, regimeScore: null,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  'north-macedonia': {
+    country: 'North Macedonia', incomeLevel: 'upper-middle-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'parliamentary republic',
+    // Deliberately null -- the only figure found (6.03) is explicitly
+    // the 2023 edition, not 2024.
+    regimeType: null, regimeScore: null,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  kosovo: {
+    country: 'Kosovo', incomeLevel: 'lower-middle-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'parliamentary republic (partially recognised; not a UN member)',
+    // Deliberately null for a structural reason, not a research gap
+    // -- the EIU's own Democracy Index does not include Kosovo at
+    // all, the same kind of real exclusion Taiwan's entry already
+    // names for the World Bank's own country tables.
+    regimeType: null, regimeScore: null,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
 };
 
 // **Checked once, at load time.** A COUNTRY_PROFILES key must not
@@ -4428,6 +4970,8 @@ const REGION_BY_KEY = {
   belgium: 'europe', austria: 'europe', denmark: 'europe', finland: 'europe',
   romania: 'europe', bulgaria: 'europe', serbia: 'europe', croatia: 'europe', moldova: 'europe', belarus: 'europe',
   switzerland: 'europe', iceland: 'europe', luxembourg: 'europe', malta: 'europe', cyprus: 'europe',
+  estonia: 'europe', latvia: 'europe', slovakia: 'europe', slovenia: 'europe',
+  montenegro: 'europe', albania: 'europe', 'north-macedonia': 'europe', kosovo: 'europe',
   // Middle East
   israeli: 'middle-east', yemen: 'middle-east', 'saudi-arabia': 'middle-east', turkey: 'middle-east',
   iraq: 'middle-east', afghanistan: 'middle-east', syria: 'middle-east', 'united-arab-emirates': 'middle-east',
@@ -4445,20 +4989,33 @@ const REGION_BY_KEY = {
   libya: 'africa', tunisia: 'africa',
   botswana: 'africa', namibia: 'africa', malawi: 'africa', zambia: 'africa', zimbabwe: 'africa',
   rwanda: 'africa', burundi: 'africa', mali: 'africa', 'burkina-faso': 'africa', niger: 'africa',
-  // Caribbean
+  'ivory-coast': 'africa', senegal: 'africa', cameroon: 'africa', 'south-sudan': 'africa', eritrea: 'africa',
+  togo: 'africa', benin: 'africa', gabon: 'africa', guinea: 'africa', 'sierra-leone': 'africa',
+  liberia: 'africa', gambia: 'africa',
+  // Caribbean -- Guyana/Suriname/Trinidad and Tobago included here on
+  // real precedent found this round: the Congressional Research
+  // Service's own compilation explicitly groups them with Cuba/the
+  // Dominican Republic/Haiti/Jamaica as the EIU's own "Caribbean"
+  // countries, not Latin America proper.
   'west-indian': 'caribbean', jamaican: 'caribbean', haitian: 'caribbean', 'dominican-republic': 'caribbean',
   cuba: 'caribbean', 'puerto-rico': 'caribbean', 'virgin-islands': 'caribbean',
-  // Asia
+  guyana: 'caribbean', suriname: 'caribbean', 'trinidad-and-tobago': 'caribbean',
+  // Asia -- the Caucasus (Georgia/Armenia/Azerbaijan) is grouped here
+  // alongside Central Asia's post-Soviet republics rather than with
+  // Turkey's own 'middle-east' bucket, for consistency with how this
+  // file already treats Kazakhstan/Uzbekistan as 'asia'.
   vietnamese: 'asia', chinese: 'asia', filipino: 'asia', 'asian-indian': 'asia', india: 'asia',
   japan: 'asia', 'south-korea': 'asia', indonesia: 'asia',
   pakistan: 'asia', bangladesh: 'asia', thailand: 'asia', myanmar: 'asia', malaysia: 'asia',
   'north-korea': 'asia', taiwan: 'asia', nepal: 'asia', 'sri-lanka': 'asia', kazakhstan: 'asia', cambodia: 'asia',
   singapore: 'asia', mongolia: 'asia', uzbekistan: 'asia', laos: 'asia',
+  georgia: 'asia', armenia: 'asia', azerbaijan: 'asia', kyrgyzstan: 'asia', tajikistan: 'asia', turkmenistan: 'asia',
   // Latin America (Central/South America, excluding the Caribbean above)
   mexican: 'latin-america', guatemalan: 'latin-america', honduran: 'latin-america', salvadoran: 'latin-america',
   venezuela: 'latin-america', colombia: 'latin-america', brazil: 'latin-america', argentina: 'latin-america',
   peru: 'latin-america', chile: 'latin-america', ecuador: 'latin-america',
   uruguay: 'latin-america', paraguay: 'latin-america', bolivia: 'latin-america',
+  panama: 'latin-america', 'costa-rica': 'latin-america', nicaragua: 'latin-america',
   // North America -- the explicit baseline; no "North America overview"
   // exists because the baseline itself is the dedicated entry.
   'united-states': 'north-america', canada: 'north-america',

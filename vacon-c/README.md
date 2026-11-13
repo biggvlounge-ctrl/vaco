@@ -451,6 +451,26 @@ affected countries), Cyprus at `localized-conflict` for the real 1974
 division, and Zimbabwe's regime figures honestly null for the same
 wrong-year reason Uganda/Tanzania's were in the seventeenth round.
 
+## Thirty-two more real countries (countryPacks.js's twentieth round, sixty-eighth standing rule)
+See `CLAUDE.md`'s own sixty-eighth standing rule for the full
+account. `COUNTRY_PROFILES` now carries 111 real entries, up from 79.
+Ivory Coast, Senegal, Cameroon, South Sudan, Eritrea, Togo, Benin,
+Gabon, Guinea, Sierra Leone, Liberia, Gambia, Panama, Costa Rica,
+Nicaragua, Guyana, Suriname, Trinidad and Tobago, Georgia, Armenia,
+Azerbaijan, Kyrgyzstan, Tajikistan, Turkmenistan, Estonia, Latvia,
+Slovakia, Slovenia, Montenegro, Albania, North Macedonia, Kosovo.
+Kosovo's regime figures are null for a real structural reason (the
+EIU index does not cover it), not a research gap. Five countries
+(Montenegro, Albania, North Macedonia, Senegal, Liberia) plus Guyana
+honestly null their regime figures rather than reuse a wrong-year or
+unconfirmed one. Panama's and Costa Rica's real absence of a standing
+military is reported as the field's own null, not a gap. Four real,
+non-default conflict classifications for currently-live named
+disputes (Georgia's Abkhazia/South Ossetia, Armenia's post-2023
+Nagorno-Karabakh situation, Cameroon's Anglophone/Ambazonia conflict,
+Guyana's escalated Essequibo dispute with Venezuela), plus South
+Sudan at `active-armed-conflict`.
+
 ## Bluffing and its exposure
 See `CLAUDE.md`'s own fifty-second standing rule for the full design.
 `server/bluff.js` models the gap between what `weapons

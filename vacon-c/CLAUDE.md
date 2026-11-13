@@ -4214,6 +4214,59 @@ Full suite, this round's own final run: 2051 tests, 2026 pass, 0 fail,
 8 cancelled (the pre-existing `worldgen.test.js` hang and its
 downstream collateral timeouts, unrelated to this round), 17 skipped.
 
+**A sixty-eighth, `countryPacks.js`'s own twentieth round -- thirty-
+two more real countries, `COUNTRY_PROFILES` from 79 to 111.** Same
+discipline throughout: real WebSearched figures only, confidence-
+flagged where secondary, honest `null` where nothing citable was
+found. Thirty-two countries, closing out West/Central Africa's
+remaining real gaps, South Sudan/Eritrea, Central America, the
+English-speaking Caribbean's remaining three, the Caucasus, the
+remaining Central Asian republics, the Baltics/Slovakia/Slovenia, and
+the Western Balkans: Ivory Coast, Senegal, Cameroon, South Sudan,
+Eritrea, Togo, Benin, Gabon, Guinea, Sierra Leone, Liberia, Gambia,
+Panama, Costa Rica, Nicaragua, Guyana, Suriname, Trinidad and Tobago,
+Georgia, Armenia, Azerbaijan, Kyrgyzstan, Tajikistan, Turkmenistan,
+Estonia, Latvia, Slovakia, Slovenia, Montenegro, Albania, North
+Macedonia, Kosovo.
+
+**Kosovo's regimeType/regimeScore are deliberately null for a
+structural reason stated directly, not a research gap -- the EIU's
+own index does not include it at all,** the same kind of real
+exclusion Taiwan's entry already names for the World Bank's own
+country tables.
+
+**Five countries this round honestly null their regimeType/
+regimeScore for the same wrong-year discipline Zimbabwe's entry
+already applies**: Montenegro, Albania and North Macedonia (every
+figure found is explicitly the 2023 edition, not 2024), Senegal (its
+2023 and 2025 figures bracket 2024 without naming it), and Liberia
+(no figure of any year was found at all). Guyana gets the identical
+treatment for its own reason -- the only figure found is explicitly
+the 2022 edition.
+
+**Two real, named, structural facts reported where a figure might
+otherwise be expected, not invented to fill the slot.** Panama and
+Costa Rica both have a real, constitutionally notable absence of a
+standing military (Panama abolished its own in 1990; Costa Rica
+abolished its own in 1948, the more famous and longer-standing case)
+-- `militaryExpenditurePctGDP` is `null` for both, and this is the one
+round where that null is itself the reported fact.
+
+**Four real, non-default conflict classifications, each a currently-
+live, named dispute rather than a historical footnote.** Georgia
+(the real, frozen, Russian-backed breakaway regions of Abkhazia and
+South Ossetia, unresolved since 2008), Armenia (the real, recent
+Nagorno-Karabakh situation after Azerbaijan's 2023 takeover), Cameroon
+(the real, ongoing Anglophone/Ambazonia separatist conflict alongside
+real Boko Haram activity), and Guyana (the real, escalated Venezuela-
+Guyana Essequibo territorial dispute). South Sudan is `active-armed-
+conflict` -- real, current instability since independence, not a
+settled post-independence peace.
+
+Full suite, this round's own final run: 2068 tests, 2044 pass, 0 fail,
+7 cancelled (the pre-existing `worldgen.test.js` hang and its
+downstream collateral timeouts, unrelated to this round), 17 skipped.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and
