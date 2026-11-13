@@ -425,6 +425,16 @@ with its own top-level `VDP_*.md` spec doc, not a gap:
   Vacancy District: a real, thin client into VACON-C's own simulation
   server (real tick/NPC/property/culture numbers), extended 29 Aug 2026
   once VACON-C grew past its original 5-endpoint contract.
+  **Corrected 13 Nov 2026**: the 29 Aug 2026 extension built real
+  functions for VACON-C's shared entity types and never-before-seen
+  world readouts, and nothing in this app actually called most of
+  them — `VacancyView.jsx` still only used the original five. The
+  component now reads properties, organizations, cultures, events, the
+  economy snapshot, a community's real main-characters power
+  hierarchy, and active environmental conditions; three more real
+  routes (main-characters, conditions, historical-records) closed the
+  newer gap between this file and VACON-C's then-current ~150-route
+  API, same "resource locator, not a rebuild" posture throughout.
 - `src/lib/venusResort.js` / `src/components/VenusResortView.jsx` —
   the Venus Resort Complex, the casino as a real walkable place per
   `VDP_CASINO_FIRST_STARTER_WORLD.md`; VDP owns the walkable card and

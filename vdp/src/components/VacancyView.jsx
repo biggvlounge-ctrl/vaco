@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   getWorldState, advanceTick, generateNPC, generateArtifact, generateMission,
+  listProperties, listOrganizations, listCultures, listEvents,
+  getEconomySnapshot, getMainCharacters, listConditions,
 } from "../lib/vacancyClient.js";
 
 // VDP's real VACON-C district -- a live client of VACON-C's own
@@ -11,10 +13,18 @@ import {
 // frontend for VACON-C -- the one confirmed gap the ecosystem audit
 // found among the 16 real parents.
 //
-// Scope matches VACON-C's own real, currently-live API exactly (5
-// endpoints: state/tick/npc/artifacts/mission) -- its own locked
-// Phase 1 roadmap names ~40 further endpoints across later phases;
-// this view doesn't pretend any of those exist yet.
+// **Corrected 13 Nov 2026.** This header used to say scope matched
+// VACON-C's "real, currently-live API exactly (5 endpoints)" -- stale
+// the moment `vacancyClient.js` was extended on 29 Aug 2026 to cover
+// the shared entity types, and still stale more than two months after
+// that, because this component kept calling only the original five
+// functions. The shared-entity-type section below reads real
+// properties (resort venues), organizations (promotions/operators),
+// cultures (district DNA), events (Combat Sports matches VACON-C's
+// tick pipeline actually produced), the real economy snapshot, a
+// community's real local power hierarchy, and real active
+// environmental conditions -- all of it already built in
+// `vacancyClient.js` and, until now, called by nothing.
 
 export default function VacancyView() {
   const [state, setState] = useState(null);
@@ -26,6 +36,8 @@ export default function VacancyView() {
   const [lastArtifact, setLastArtifact] = useState(null);
   const [missionObjective, setMissionObjective] = useState("");
   const [lastMission, setLastMission] = useState(null);
+  const [world, setWorld] = useState(null);
+  const [worldError, setWorldError] = useState(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -36,6 +48,26 @@ export default function VacancyView() {
       setError(err.message);
     }
   }, []);
+
+  // The shared entity types and world readouts -- a second, separate
+  // fetch so one being unreachable (or a world with no communities
+  // yet) never blocks the tick/NPC/artifact/mission panel above it.
+  const refreshWorld = useCallback(async (firstCommunityId) => {
+    try {
+      const [properties, organizations, cultures, events, economy, conditions] = await Promise.all([
+        listProperties(), listOrganizations(), listCultures(), listEvents(), getEconomySnapshot(), listConditions(),
+      ]);
+      const mainCharacters = firstCommunityId != null ? await getMainCharacters(firstCommunityId) : null;
+      setWorld({ properties, organizations, cultures, events, economy, conditions, mainCharacters });
+      setWorldError(null);
+    } catch (err) {
+      setWorldError(err.message);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (state?.communities?.[0]) refreshWorld(state.communities[0].id);
+  }, [state?.communities, refreshWorld]);
 
   useEffect(() => {
     refresh();
@@ -144,6 +176,28 @@ export default function VacancyView() {
           Generate mission
         </button>
         {lastMission && <p>Mission #{lastMission.id} for artifact #{lastMission.artifact_id}: {lastMission.objective || "(no objective set)"} — status {lastMission.status}</p>}
+      </section>
+
+      <section>
+        <h3>World — shared entity types &amp; readouts</h3>
+        {worldError && <p style={{ color: "#c0392b" }}>{worldError}</p>}
+        {!world && !worldError && <p>Loading…</p>}
+        {world && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+            <div><strong>Properties:</strong> {world.properties.total} ({world.properties.properties.slice(0, 3).map((p) => p.type).join(", ") || "none"}{world.properties.total > 3 ? ", …" : ""})</div>
+            <div><strong>Organizations:</strong> {world.organizations.total} ({world.organizations.organizations.slice(0, 3).map((o) => `${o.name} (${o.type})`).join(", ") || "none"})</div>
+            <div><strong>Cultures:</strong> {world.cultures.total}</div>
+            <div><strong>Recent events:</strong> {world.events.total} ({world.events.events.slice(-3).reverse().map((e) => `${e.type}@${e.tick}`).join(", ") || "none"})</div>
+            <div><strong>Active conditions:</strong> {world.conditions.conditions.length} ({world.conditions.conditions.slice(0, 3).map((c) => c.type || c.conditionType || c.name).join(", ") || "none"})</div>
+            <div><strong>Resources tracked:</strong> {world.economy.resources.length}</div>
+            {world.mainCharacters && (
+              <div>
+                <strong>This community's main characters:</strong>{" "}
+                criminal {world.mainCharacters.criminal ? `org #${world.mainCharacters.criminal.organizationId}` : "none yet"}, political {world.mainCharacters.political ? `org #${world.mainCharacters.political.organizationId}` : "none yet"}, religious {world.mainCharacters.religious ? `org #${world.mainCharacters.religious.organizationId}` : "none yet"}, business {world.mainCharacters.business ? `org #${world.mainCharacters.business.organizationId}` : "none yet"}
+              </div>
+            )}
+          </div>
+        )}
       </section>
     </div>
   );

@@ -27,6 +27,12 @@
 // **Still over HTTP, not a shared import.** `vdp` must not import from
 // `vacon-c` -- separate Docker build contexts, see
 // `sync-shared-runtime.sh`'s header. The API is the seam.
+//
+// **Extended again 13 Nov 2026 -- see this file's own tail for what
+// closed and why.** The real problem by then was not that VACON-C had
+// outgrown this file a second time (it had: 150+ routes against this
+// file's ~25 functions) but that nothing in VDP imported most of what
+// was already here.
 
 import { sessionHeaders } from "./shieldAuth.js";
 
@@ -177,4 +183,47 @@ export async function listEvents(params = {}) {
 
 export async function getEconomySnapshot() {
   return requestJson("/api/economy/snapshot");
+}
+
+// ---------------------------------------------------------------------------
+// Extended 13 Nov 2026 -- the real gap was not another contract boundary.
+// ---------------------------------------------------------------------------
+// This file's own 29 Aug 2026 extension already built every function
+// above, and `grep -rln "vacancyClient" vdp/src` before this pass found
+// nobody importing them except `VacancyView.jsx` -- and that component
+// still only called the original five (state/tick/npc/artifact/mission),
+// its own header still claiming "Scope matches VACON-C's own real,
+// currently-live API exactly (5 endpoints)" more than two months after
+// that stopped being true. VACON-C's own eleventh standing rule, pointed
+// at this file: a generator nothing calls is indistinguishable from one
+// that does not exist, and every shared-entity-type function here was
+// exactly that -- built, exported, never once imported.
+//
+// `VacancyView.jsx` is fixed in the same pass to actually read these.
+// Three more real routes close the newer gap, each checked against
+// VACON-C's own current `server.js` route table rather than guessed:
+
+// A community's real local power hierarchy -- criminal (holds real
+// territory), political (real government scoped here), religious (a
+// real order), business (highest-influence operator of a real
+// property). Any of the four can be honestly `null`; VACON-C's own
+// sixtieth standing rule covers why.
+export async function getMainCharacters(communityId) {
+  return requestJson(`/api/communities/${communityId}/main-characters`);
+}
+
+// Real, tick-driven environmental conditions (drought, storm, and so
+// on) currently active somewhere in the world -- real backdrop color
+// for a simulated resort district, not a VDP-side invention.
+export async function listConditions() {
+  return requestJson("/api/conditions");
+}
+
+// Searchable real history -- `VACANCY_API_ENDPOINT_MAP.md`'s own
+// cross-cutting section. A fighter or promotion's own real record,
+// filterable by entity/location/tick range, never a second log kept
+// here.
+export async function listHistoricalRecords(params = {}) {
+  const query = new URLSearchParams(params).toString();
+  return requestJson(`/api/historical-records${query ? `?${query}` : ""}`);
 }
