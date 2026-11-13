@@ -76,7 +76,37 @@ either, the algorithm should be a config value from day one rather
 than a literal. Recorded here so that decision isn't missed when it
 arrives.
 
+**Correction, 13 Nov 2026 — doc-vs-code reconciliation.** This is now
+done, in both apps, and cites this exact section as its source.
+Checked directly: `v3/lib/cryptoAgility.js` and `vaca/lib/
+cryptoAgility.js` both exist, both quote this section's own
+recommendation verbatim in their header, and both implement it as
+written — a named algorithm registry (classical: `ed25519`,
+`ecdsa-p256`; post-quantum: `ml-dsa-65`/FIPS 204 and
+`ml-kem-768`/FIPS 203, marked `available: false` since Node 22 does
+not ship them, rather than silently faked or downgraded) resolved from
+configuration at call time, with the rule that nothing in either app
+calls a crypto primitive directly. The "nothing hardcoded to retrofit
+yet" framing was accurate at the time and is the reason this was cheap
+to do before either app had a real signing layer to migrate.
+
 **DREAMS local fallback** — also not built. `dreams/` has no offline
 content cache; a screen losing connectivity has no defined behavior.
 Real, small, and genuinely worth doing before any physical screen is
 deployed.
+
+**Correction, 13 Nov 2026 — doc-vs-code reconciliation.** This is now
+built, and cites this exact document as its source. Checked directly:
+`dreams/lib/offlineCache.js` exists, its own header quotes this
+section's own line ("physical screens should have a real local
+fallback — cached ad content during a brief connectivity loss, rather
+than going blank") as its source of truth, and it is wired into real
+routes in `dreams/server.js` (`GET /api/screens/:id/offline-content`,
+`POST /api/screens/:id/offline-plays`, `GET /api/offline-plays`).
+Honestly scoped the same way this document is: the server decides
+which creatives a screen should cache and records what played while
+offline (billed with `wasOffline: true` rather than silently folded
+into live impressions); the actual on-device caching happens on
+hardware that does not exist in this repo, same split this document's
+own BCDR section draws between what this repo implements and what you
+buy and configure.

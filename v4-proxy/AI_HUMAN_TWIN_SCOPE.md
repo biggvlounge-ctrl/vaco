@@ -156,6 +156,24 @@ belongs to a fictional agent persona in this ecosystem. Nothing in this
 layer generates, stores, or reproduces a real individual's face or
 voice.
 
+**Addition, 13 Nov 2026 — real code this section didn't yet cover.**
+`POST /api/calls/:id/answer` in `server.js` now calls `vaco-media`
+(`lib/mediaClient.cjs`) to open a real session and invite the caller
+before returning — checked directly against both files. This does not
+change the "no media and no rendering" claim above: `vaco-media`'s own
+header says its media plane (actual audio/video bytes, an SFU behind
+`lib/transport/`) is not deployed yet, so the call still carries no
+real audio or video. What it does add is a real, fail-soft *join
+confirmation* — `ring → connected` was previously a state change
+nobody outside this process could verify; now a connected call either
+carries a real `vaco-media` session id and join credential, or comes
+back with `media: { available: false, reason: ... }` naming exactly
+why, rather than asserting "connected" on faith. If `vaco-media` is
+down or unreachable, the call still proceeds on the text fallback —
+same fail-soft posture `lib/mediaClient.cjs`'s own header argues for.
+Worth recording here specifically because no top-level doc in this
+app mentions `vaco-media` at all today.
+
 ## Verified live
 
 Boot-tested against a running server, not asserted: full-body held on

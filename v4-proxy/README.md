@@ -94,6 +94,32 @@ gaps), persistent logging, or per-user quotas. Add those once real
 auth exists — right now every request is anonymous, same as the rest
 of the prototype.
 
+**Correction, 13 Nov 2026 — doc-vs-code reconciliation.** "Does not
+include auth" / "every request is anonymous" is stale. Checked
+directly against `server.js`: real auth was added — `lib/shieldAuth.cjs`
+and `lib/serviceAuth.cjs` gate nearly every route with `requireSession`,
+`requireActor`, `requireCallParty`, or `requireCallingService` (most
+wrapped in `actorOrService(...)` so a signed-in person or a named
+internal service may both satisfy it). Only the LLM/maps-proxy reads
+`server.js` itself marks `audit-route-guards: open` stay anonymous, on
+purpose — there is no VACO principal to require on a pure-arithmetic
+or pass-through query. What is still true, and the thing this note was
+actually trying to say: there is no *V4-specific* auth here, no login
+of its own, and no per-user quota — V4 relies entirely on Shield
+sessions and the service-token allowlist other apps already use, per
+`V4_CLAUDE.md`'s own gap-5 correction.
+
+Two environment variables that follow from this and are not yet
+listed in `.env.example`, both already read by this server with safe
+defaults: `SHIELD_API_URL` (`lib/shieldAuth.cjs`, defaults to
+`http://localhost:8812`) and `VACO_SERVICE_TOKENS` /
+`VACO_SERVICE_AUTH_MODE` (`lib/serviceAuth.cjs`, which an internal
+caller like VACON must be issued a token under to invoke `/api/agent`
+as a service rather than as a session). `VACO_MEDIA_URL`,
+`VACO_SERVICE_NAME`, and `VACO_SERVICE_TOKEN` (`lib/mediaClient.cjs`,
+this server's own outbound call to `vaco-media` on call answer — see
+`AI_HUMAN_TWIN_SCOPE.md`'s 13 Nov 2026 addition) round out the list.
+
 ## Frontend coverage pass (31 Oct 2026)
 
 An audit found `public/index.html` making real calls against only 11

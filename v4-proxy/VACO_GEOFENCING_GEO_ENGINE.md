@@ -111,3 +111,47 @@ model would have to either match or consciously break.
 **Genuinely unbuilt**, and correctly listed as such: the zone
 database, transition events, the trigger system, and the developer
 API. The VACANCY tie is real in concept but VACON-C is paused.
+
+### Correction, 13 Nov 2026 — doc-vs-code reconciliation
+
+**The status table above never mentions `v4-proxy/lib/maps.js`, and
+it should — this document lives in the app that built it.** Checked
+directly: that module is a real, REST-reachable location service
+(`registerPlace`/`getPlace`/`removePlace`, `nearby`, `withinBounds`,
+`findCrossings`, `footTraffic`, `routeThrough`), consolidating the
+same Haversine math this table counts three times over into a fourth,
+canonical implementation — its own header says so explicitly, and
+`server.js`'s comments describe it as closing exactly the "shared VACO
+location service" gap this document proposed, for four VACON agents
+(Kevin/Kay/Gibson/DREA) who already told users it existed.
+
+This changes two cells, carefully:
+
+- **"Cross-app developer API | Not built"** is no longer quite right.
+  The API itself is real and callable (`POST /api/maps/*`, `GET
+  /api/maps/place/:id`) — the mechanism this document asked for
+  exists. What is still accurate is that no sibling app actually calls
+  it yet: checked directly, `grep -rl "api/maps"` across every app
+  outside `v4-proxy/` returns nothing. So: built, not yet adopted —
+  a different gap than "not built."
+- **"Point-in-radius check | Real — `isWithinGeofence()`"** has a
+  second, independent real implementation now: `maps.nearby()`'s own
+  `distanceKm <= radiusKm` filter is the same check, over the shared
+  registry rather than one app's own points.
+
+**The "Where it lives" question is partly answered by this, too.**
+`lib/maps.js` already gave V4 a places/sightings store — the
+"location database" this section worried would make V4 "two things"
+already exists here, alongside the agent-interface role. That does
+not resolve whether it *should* stay here long-term (the module's own
+header is explicit about what it is not: no tile server, no road
+routing), but "V4 has no location database today" is no longer true
+as a reason to move it elsewhere.
+
+**Still accurate, and the actual remaining gap:** named/reusable
+zones and enter/exit/dwell transitions. `lib/maps.js` stores points
+(`places`) and instantaneous sightings, not zones with a radius and a
+lifecycle, and `findCrossings`/`footTraffic` answer "who was near
+whom" and "how much traffic", not "did someone just cross a
+boundary." The statefulness this document correctly identifies as the
+hard remaining part is still unbuilt, here as much as anywhere else.

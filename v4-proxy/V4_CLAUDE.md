@@ -137,6 +137,24 @@ VACON rather than maintain a copy — the same argument
 six-agent union. Not done here, because this file has no build and the
 change is unverifiable in a live browser.
 
+### Correction, 13 Nov 2026 — doc-vs-code reconciliation
+
+**The "12 domain agents" count two paragraphs above is itself now
+stale, by exactly the mechanism this section just described.**
+`vacon/lib/agents.js` later registered a thirteenth domain agent,
+**Jake** (Production Executive, VENVM) — recorded in that file's own
+header and in `vacon/README.md`'s "A note on 'Jake'" section, which
+was itself corrected a second time once VENVM gained the real
+capability (`lib/scriptEngine.js`'s `JAKE_SYSTEM_PROMPT`) Jake's
+addition was conditioned on. `V4Prototype.jsx`'s local `AGENTS` array
+had the same display-only mirror problem this section warns about: it
+went 13 entries behind VACON's registry for the same reason the
+original 10-vs-12 drift happened, and has since been corrected —
+`AGENTS` now carries all 13 domain agents (Jake's `systemPrompt`
+copied verbatim from `vacon/lib/agents.js`, the same convention every
+other entry already follows). Checked directly:
+`grep -c "systemPrompt:" V4Prototype.jsx` → 13.
+
 ### The rest of the gap list
 
 | # | Gap | Status |
@@ -163,6 +181,24 @@ should read from the real services or be dropped, not built out.
 shared infrastructure with four consumers queued behind it — see
 `dev-docs/REALTIME_MEDIA_SHARED_INFRASTRUCTURE.md` and task #106. V4's
 call flow is one of them.
+
+### Correction, 13 Nov 2026 — doc-vs-code reconciliation
+
+**Gap 5's status line undersells what is actually in `server.js`.**
+"Available, not wired here — Shield is real and used by other apps"
+is only true of `V4Prototype.jsx`'s own `Login` screen, which is
+still exactly the mock this file's gap list originally described
+("any email/password works, no real account" — checked directly,
+unchanged). It is not true of the backend any more: `v4-proxy/server.js`
+imports `lib/shieldAuth.cjs` and gates nearly every real route behind
+`requireSession`, `requireActor`, `requireCallParty`, or
+`requireCallingService` (`actorOrService(...)` wraps most of them so
+an internal service may act too) — only the LLM/maps-proxy routes
+server.js itself marks `audit-route-guards: open` are unauthenticated,
+and that is a deliberate, documented posture, not an absence of
+auth. So: backend auth is **closed**; the frontend prototype's own
+login remains **open**, same as gaps 1–2. Both halves of gap 5 are now
+named explicitly rather than folded into one ambiguous line.
 
 ### What was built beyond this document
 

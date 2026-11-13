@@ -121,3 +121,19 @@ names `"jake"`. No agent named Jake exists in VACON's roster —
 project is VENVM's production-stack lead, a different thing entirely.
 The claim that these surfaces are "already proven for Jake" therefore
 rested on an agent that was never there.
+
+**Correction, 13 Nov 2026 — doc-vs-code reconciliation.** The paragraph
+directly above is now itself stale, and contradicted by this same
+document's own "All three agents are real" section above it, which
+already lists `jake` as one of the real 14-agent roster. `vacon/
+README.md`'s "no agent named Jake exists" note — what this paragraph
+cites — was itself corrected a second time: VENVM later gained a real
+production-executive capability (`venvm/lib/scriptEngine.js`'s
+`JAKE_SYSTEM_PROMPT`), and Jake was registered in `vacon/lib/agents.js`
+for real on the strength of it, not invented to match the name. Jake
+was then added to `V4Prototype.jsx`'s own `AGENTS` array too, so the
+surfaces described in this document are, as of that fix, genuinely
+reachable for Jake the way the original (then-wrong-for-different-
+reasons) claim asserted. Kept rather than deleted, per this repo's own
+convention — the paragraph above was a correct correction at the time
+it was written; the fact underneath it has since changed again.
