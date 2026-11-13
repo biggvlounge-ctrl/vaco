@@ -4535,6 +4535,84 @@ least one family or organization): this multiplier ranges 0.841-1.172
 `test/organization-traits.test.js`). Full suite: 2230 tests, 2213
 pass, 0 fail, 0 cancelled, 17 skipped.
 
+**A seventy-fourth: mission triggers, open to all four main-character
+categories, through two real fields instead of one.** The per-location
+power hierarchy round scoped `missionTriggers.js` to criminal only,
+because `missions.generateMission`'s own `controllingFactionId`
+validation requires `organizations.isFaction === true` -- never a
+government, religious order, or business. Asked to close that gap, the
+other three categories route through a different real field instead of
+forcing a faction check they could never pass: no `controllingFactionId`
+at all, then `mission.issuing_organization_id`/`.issued_by_entity_id`
+set directly -- the identical in-memory-only pair
+`leadership.js#directMission` already established for exactly this "a
+real organization is behind this job, and it is not a faction" shape.
+Reused rather than duplicated, and confirmed to have no schema column
+either (`migrate.js`'s own `missions` INSERT does not name them, the
+same honest posture `city.healthBaseline`-class fields already hold
+elsewhere in this registry).
+
+`maybeTriggerMission` checks `mainCharacters.mainCharactersOf`'s four
+categories in that function's own listed order (criminal, political,
+religious, business) and uses the first one with a real, installed
+leader. **One combined roll, not four** -- the overall trigger rate is
+unchanged from the criminal-only version, so this widens WHO a job can
+come from without widening HOW OFTEN one appears, the same discipline
+the fifty-first standing rule's own country-coverage work held for a
+different kind of expansion. 8 new tests, including all three
+real priority-order permutations; mutation-verified directly by
+reversing `CATEGORY_ORDER`, which broke exactly the 3 tests written to
+prove it.
+
+**A seventy-fifth: the two hot functions the seventy-first standing
+rule's own `--cpu-prof` run named and declared, now actually fixed.**
+`technicalSkillIn` (10% of samples) and `ownedPropertyValue` (7%) share
+the identical root shape the `entityTraits.js` fix already closed one
+layer down: a full-array rescan repeated far more often than the
+underlying data actually changes.
+
+`infrastructure.technicalSkillIn` now caches its result per
+(`worldState`, `cityId`, `tick`) in a `WeakMap` keyed on `worldState`
+itself. `advanceInfrastructure` calls `effectiveMaintenance` once per
+infrastructure ROW, and a city ordinarily has several, so the full NPC
+scan ran once per row per city per tick instead of once per city per
+tick. **This cache needed a different invalidation rule than
+`entityTraits.js`'s own, and the reason is stated rather than copied
+blindly**: it caches a computed AGGREGATE (a mean over live traits),
+which an in-place trait write changes without touching any array's
+length -- so it invalidates on the TICK NUMBER changing, not on array
+identity or length, correct specifically because trait drift runs as
+its own, separate tick phase, never interleaved with the
+infrastructure pass that reads this.
+
+`property.getCurrentOwner` now reads a real per-worldState index (one
+pass over `ownershipRecords`, grouped by property id) instead of
+rescanning the whole array on every call -- `economy.ownedPropertyValue`
+calls it once per property in the world for a SINGLE entity's net
+worth, the real O(properties × records) cost the profile caught. This
+one DOES use `entityTraits.js`'s own array-identity/length invalidation,
+because the underlying fact is different in exactly the way that
+matters: `ownershipRecords` is append-only everywhere in this engine
+(confirmed via `grep`, one real writer, no splice or reassignment), and
+an ownership record is never edited in place once written -- so there
+is no in-place mutation this index could ever miss, unlike the live
+trait sheet `technicalSkillIn` reads. `property.getHoldings` benefits
+from the same fix for free, since it already calls `getCurrentOwner`
+once per property too, and was not touched separately.
+
+**Both caches are tested for invalidation, not just for the values
+they return** -- a real in-place trait mutation confirmed invisible
+within the same tick and visible the moment the tick advances; a real
+new ownership record confirmed to invalidate the cached owner rather
+than ever serving a stale one. Mutation-verified twice each: disabling
+caching entirely, and disabling the invalidation condition specifically,
+each broke the test written to prove the corresponding property.
+
+Full suite: 2240 tests, 2223 pass, 0 fail, 0 cancelled, 17 skipped --
+measurably faster end to end (roughly 266s this run against roughly
+357s the round before, same machine, not a controlled benchmark but
+consistent with the fix doing real work).
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

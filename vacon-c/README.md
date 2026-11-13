@@ -556,6 +556,31 @@ directly contradicting its own documented design, and the test written
 to prove that exact property failed against it immediately. Fixed and
 re-measured against the corrected version.
 
+## Mission triggers open to all four main characters (seventy-fourth standing rule)
+See `CLAUDE.md`'s own seventy-fourth standing rule for the full
+account. The per-location power hierarchy round scoped mission
+triggers to criminal only, since `generateMission`'s
+`controllingFactionId` requires a real faction. Political, religious,
+and business missions now route through `issuing_organization_id`/
+`issued_by_entity_id` instead — the same real fields
+`leadership.js#directMission` already uses for a non-faction
+organization behind a job. `maybeTriggerMission` checks all four
+categories in a fixed priority order (criminal, political, religious,
+business) with one combined roll — the trigger rate is unchanged,
+only who a job can come from.
+
+## Two hot functions, actually fixed (seventy-fifth standing rule)
+See `CLAUDE.md`'s own seventy-fifth standing rule for the full
+account. `technicalSkillIn` and `ownedPropertyValue`, both flagged
+during the `worldgen.test.js` hang-fix profile, are fixed now rather
+than left declared. `technicalSkillIn` caches per (city, tick) since
+`advanceInfrastructure` recomputed the same city's mean technical
+skill once per infrastructure row. `getCurrentOwner` reads a real
+per-worldState ownership index instead of rescanning every record on
+every call. Both caches are tested for invalidation, not just values,
+and mutation-verified. Full suite genuinely faster end to end as a
+result, not just by test count.
+
 ## Bluffing and its exposure
 See `CLAUDE.md`'s own fifty-second standing rule for the full design.
 `server/bluff.js` models the gap between what `weapons
