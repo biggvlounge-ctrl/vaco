@@ -4474,6 +4474,67 @@ future, calibrated work -- the same boundary `conflictLevel` and
 `oilProducer` already hold. Full suite at landing time: 2216 tests,
 2199 pass, 0 fail, 0 cancelled, 17 skipped.
 
+**A seventy-third, and it is the real training-loop design discussed
+and queued earlier this session, built now -- plus a real bug caught
+by its own test before it ever committed.** Asked directly for "a
+progression of a person could depend on who they're around... a small
+organization that is congruent and all act as one is more valuable
+than a large organization... that don't act as one," this generalizes
+the real, already-existing `familyTraits.cohesionOf` rather than
+inventing a second, disagreeing "group synergy" score.
+
+**`organizationTraits.cohesionOf` is the organization-tier sibling,
+with one real, stated asymmetry rather than a silently-approximated
+copy.** `familyTraits.cohesionOf` reads `families.unity`/`.conflict`
+-- STORED, slow-moving stocks `advanceCohesion` nudges a little at a
+time. Organizations have no equivalent column, and adding one is a
+real, separate, future schema change, not folded into this round. So
+the organization version computes its unity/conflict terms LIVE, off
+`relationships.trust`/`.conflict` between the org's own real current
+members, every call -- an organization's cohesion can swing in a
+single tick where a family's cannot, an honest consequence of what
+each entity type's schema actually offers rather than an inconsistency
+to paper over. `internalLoyalty` (the real, already-generated
+organization trait) stands in for `cooperation`'s role, read through
+`getLiveEntity` per the ninth standing rule, never the frozen sheet.
+
+**`traitDrift.groupCohesionMultiplierFor` is the actual mechanism,
+and it changes RATE, not direction, deliberately not touching the
+file nearby that already models direction.** `driftRelationships`'s
+own header already says widening its influence list further would be
+"inventing a theory of influence" -- this is a narrower, different
+claim: practising a habit pays off faster inside a cohesive group,
+exactly like a real training partner or a well-drilled team, and
+touches only `driftExperience`'s existing growth-rate calculation.
+Reads the MAX cohesion score across an entity's family and every
+organization they belong to (never an average -- a person training
+inside their one genuinely tight-knit crew should get that crew's
+benefit, not have it diluted by also belonging to a loose, uninvolved
+group) and shifts it to centre on 1 (`0.5 + cohesion`), so an ordinary
+person in an ordinary group trains at exactly the rate they always
+did -- the twelfth standing rule's first clause, carried into a third
+place.
+
+**The bug, caught by the test written to prove the MAX claim, before
+this round ever committed.** The first version of this function
+computed the AVERAGE of available cohesion scores -- the literal
+opposite of its own header's stated reasoning, and the test named
+"takes the MAX cohesion across every group, never an average" failed
+against it immediately: `1.025 !== 1.25` on a world built specifically
+so the organization was the more cohesive group. A test that states
+the property it is proving, the way this one does in its own name,
+is what caught a real implementation bug a vaguer assertion would
+have missed. Fixed to `Math.max(...scores)`, and the header's own
+measured distribution was re-measured against the corrected version
+rather than left describing the one that shipped with the bug still
+in it -- measured on a real generated world (180 NPCs, 152 in at
+least one family or organization): this multiplier ranges 0.841-1.172
+(p10 0.92, p50 1.078, p90 1.16) across that population.
+
+28 tests (`test/trait-drift.test.js` extended, plus the new
+`test/organization-traits.test.js`). Full suite: 2230 tests, 2213
+pass, 0 fail, 0 cancelled, 17 skipped.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

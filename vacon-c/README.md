@@ -540,6 +540,22 @@ their own sources, never silently averaged or picked. Report-only,
 proven by a real grep-based test: nothing outside `countryPacks.js`
 itself reads it.
 
+## Training loop: practice pays off faster in a cohesive group (seventy-third standing rule)
+See `CLAUDE.md`'s own seventy-third standing rule for the full
+account. `organizationTraits.cohesionOf` generalizes the real
+`familyTraits.cohesionOf` to organizations (computed live off member
+relationships rather than a stored stock, since organizations have no
+unity/conflict columns). `traitDrift.groupCohesionMultiplierFor` reads
+the MAX cohesion across an entity's family and every organization they
+belong to and scales `driftExperience`'s growth rate by it, centred on
+1 so an ordinary person in an ordinary group is unaffected — a small,
+congruent group speeds up practice more than a large, incohesive one.
+**A real bug was caught before this landed**: the first version
+averaged the available cohesion scores instead of taking the max,
+directly contradicting its own documented design, and the test written
+to prove that exact property failed against it immediately. Fixed and
+re-measured against the corrected version.
+
 ## Bluffing and its exposure
 See `CLAUDE.md`'s own fifty-second standing rule for the full design.
 `server/bluff.js` models the gap between what `weapons
