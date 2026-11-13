@@ -5314,6 +5314,399 @@ function regionalContextFor(key) {
   return { key, dedicatedEntry, profileEntry, standaloneEntry, region, regionalOverview, coverageNote };
 }
 
+// ---------------------------------------------------------------------
+// RESOURCE_PROFILES -- "what a country is known for, produces, and
+// imports," by direct instruction. A third real, additive path,
+// keyed differently from both existing tables on purpose.
+// ---------------------------------------------------------------------
+// `COUNTRIES` is keyed on an `ancestryPacks.GROUPS` code (`german`,
+// `irish`); `COUNTRY_PROFILES` is keyed on a hyphenated country name
+// (`japan`, `south-korea`). A resource fact is a fact about the
+// COUNTRY, not about either keying scheme, and several ancestry keys
+// already collapse onto one real country (`english`/`scottish`/
+// `welsh` -> United Kingdom) -- so a third parallel table keyed a
+// third way would only multiply the lookup problem. Instead,
+// `RESOURCE_PROFILES` is keyed on the canonical lowercase-hyphenated
+// COUNTRY NAME (`united-states`, `united-kingdom`, `south-africa`),
+// derived once by `canonicalCountryKey()`, and `resourceProfileFor()`
+// resolves ANY real key already accepted elsewhere in this module --
+// an ancestry code, a `COUNTRY_PROFILES` key, or the canonical name
+// itself -- onto that one real entry. This is the same reasoning
+// `COUNTRY_PROFILES` itself used to decide its own keying in the
+// fourteenth round's header, carried one step further now that two
+// different keying schemes already exist to reconcile.
+//
+// **Scope, stated plainly rather than implied by the entry count**:
+// this round covers 23 of this module's own ~165 real countries,
+// chosen for real economic distinctiveness and research
+// tractability, not alphabetically or by existing-entry order. Top
+// EXPORTS (and what each is "known for") are real and WebSearched for
+// all 23. Top IMPORTS are real and WebSearched for 5 (United States,
+// China, Germany, Saudi Arabia, India) -- the rest carry `topImports:
+// null` with a note, an honest gap rather than a guess, the same
+// posture `countryPacks.js` has held for every sparse field since the
+// fifty-first standing rule. No FAO/USGS commodity-PRODUCTION figure
+// distinct from an export figure was separately researched this round
+// -- where production and export are the same real fact (Chile's
+// copper, Saudi Arabia's crude, Ghana's gold), the export figure
+// stands for both and says so; a true production/export split (a
+// country that produces far more of something than it exports, or
+// imports raw material to export a finished good) is NOT covered here
+// and would need its own research pass.
+//
+// **Every export/import source this round disagreed with at least
+// one other source on the exact share or dollar value** -- a pattern
+// this file's own fifty-first standing rule already named for climate
+// and road-safety data, now recurring for trade data for a structural
+// reason worth stating once: different trade-data aggregators group
+// HS (Harmonized System) codes at different levels (a "machinery"
+// category versus "electrical machinery" versus both combined), so
+// two real, correctly-sourced figures for the same country and year
+// can legitimately disagree without either being wrong. Where this
+// round's own WebSearches surfaced that disagreement, BOTH real
+// figures are kept side by side with their own sources, the same
+// "neither picked over the other" posture this file has used for
+// disagreeing homicide-rate figures since the fourteenth round --
+// never silently averaged or arbitrarily chosen.
+//
+// Same report-only, §9-unaffected posture as every other field here:
+// nothing in `server/` reads `RESOURCE_PROFILES` to decide an
+// outcome. Wiring a country's real resource profile into `barter.js`
+// or `economy.js` trade mechanics is separate, future, calibrated
+// work -- exactly the same boundary `conflictLevel` and `oilProducer`
+// already hold.
+const RESOURCE_PROFILES = {
+  'united-states': {
+    country: 'United States',
+    knownFor: ['petroleum and natural gas', 'aerospace', 'advanced machinery', 'pharmaceuticals'],
+    topExports: [
+      { item: 'mineral fuels and oils (crude petroleum, refined petroleum, petroleum gas)', shareOfExportsPct: 15.51, valueUsdBillion: 320.13, year: 2024, confidence: 'secondary-estimate' },
+      { item: 'machinery, nuclear reactors and boilers', shareOfExportsPct: 12.23, valueUsdBillion: 252.42, year: 2024, confidence: 'secondary-estimate' },
+      { item: 'electrical machinery and equipment', shareOfExportsPct: 10.36, valueUsdBillion: 213.92, year: 2024, confidence: 'secondary-estimate' },
+      { item: 'vehicles', shareOfExportsPct: 6.96, valueUsdBillion: 143.76, year: 2024, confidence: 'secondary-estimate' },
+      { item: 'aircraft, spacecraft and parts', shareOfExportsPct: 6.5, valueUsdBillion: 134.23, year: 2024, confidence: 'secondary-estimate' },
+    ],
+    topImports: [
+      { item: 'machinery (incl. computers, nuclear reactors)', shareOfImportsPct: 15.81, valueUsdBillion: 531.15, year: 2024, confidence: 'secondary-estimate', note: 'a second source gives 14.49% / $459.2B for the same category -- both real, neither picked' },
+      { item: 'electrical equipment', valueUsdBillion: 485.88, year: 2024, confidence: 'secondary-estimate' },
+      { item: 'vehicles', shareOfImportsPct: 11.65, valueUsdBillion: 391.46, year: 2024, confidence: 'secondary-estimate' },
+      { item: 'pharmaceuticals', shareOfImportsPct: 6.3, valueUsdBillion: 212.67, year: 2024, confidence: 'secondary-estimate', note: 'fastest-growing of the top categories, +19.6% vs 2023' },
+    ],
+    source: 'trading-economics-un-comtrade-2024; worldstopexports; tendata',
+  },
+  germany: {
+    country: 'Germany',
+    knownFor: ['automobiles', 'industrial machinery', 'pharmaceuticals'],
+    topExports: [
+      { item: 'cars', valueUsdBillion: 174, year: null, confidence: 'secondary-compilation', note: 'OEC country-profile figure; page did not state its reference year' },
+      { item: 'motor vehicle parts and accessories', valueUsdBillion: 69.4, year: null, confidence: 'secondary-compilation' },
+      { item: 'packaged medicaments', valueUsdBillion: 66.4, year: null, confidence: 'secondary-compilation' },
+      { item: 'vaccines, blood, antisera, toxins and cultures', valueUsdBillion: 43.5, year: null, confidence: 'secondary-compilation' },
+      { item: 'motor vehicles and parts (broad category)', shareOfExportsPct: 17, valueEurBillion: 263, year: 2024, confidence: 'secondary-estimate', note: 'a differently-grouped 2024 figure (TradingView); machinery 14%, chemicals 9% by the same source' },
+    ],
+    topImports: [
+      { item: 'electrical and electronic equipment', shareOfImportsPct: 15.12, valueUsdBillion: 222.11, year: 2024, confidence: 'secondary-estimate' },
+      { item: 'machinery, nuclear reactors and boilers', shareOfImportsPct: 12.03, valueUsdBillion: 176.74, year: 2024, confidence: 'secondary-estimate' },
+      { item: 'vehicles', shareOfImportsPct: 10.84, valueUsdBillion: 159.23, year: 2024, confidence: 'secondary-estimate' },
+    ],
+    source: 'oec.world; tendata-2024; tradingview',
+  },
+  chile: {
+    country: 'Chile',
+    knownFor: ['copper', 'lithium'],
+    topExports: [
+      { item: 'copper', shareOfExportsPct: 50, valueUsdBillion: 50, year: 2024, confidence: 'secondary-estimate', source: 'usgs-national-minerals-information-center; andaman-partners', note: 'USGS puts copper at 82% of mineral exports specifically and 50% of total exports' },
+      { item: 'lithium', valueUsdBillion: 2.9, year: 2024, confidence: 'secondary-estimate', source: 'andaman-partners' },
+    ],
+    topImports: null,
+    totalExportsUsdBillion: { value: 99, year: 2024, note: '-2.6% vs the USD 104.5B exported in 2023' },
+    destinationNote: 'China receives ~52% of Chile\'s copper exports, followed by the US (11%), Japan (10%), South Korea (6%)',
+    source: 'usgs; andaman-partners-2025; plusmining',
+  },
+  nigeria: {
+    country: 'Nigeria',
+    knownFor: ['crude petroleum', 'cocoa'],
+    topExports: [
+      { item: 'crude petroleum', shareOfExportsPct: 63.5, valueUsdBillion: 40.61, year: 2024, confidence: 'secondary-estimate', note: 'Trading Economics/NSW figure; a separate Intelpoint figure gives 71.39% for crude alone, and 88.26% for the WIDER petroleum-products category including crude -- all three kept, none picked, since they likely reflect different product-category boundaries' },
+      { item: 'petroleum gas', shareOfExportsPct: 16.9, valueUsdBillion: 10.78, year: 2024, confidence: 'secondary-estimate' },
+      { item: 'cocoa', shareOfExportsPct: 4.6, year: 2024, confidence: 'secondary-estimate', note: 'the country\'s second-largest export after oil' },
+    ],
+    topImports: null,
+    source: 'trading-economics-via-nsw-trade-profile; intelpoint-2024',
+  },
+  vietnam: {
+    country: 'Vietnam',
+    knownFor: ['electronics assembly', 'textiles and garments'],
+    topExports: [
+      { item: 'electronics and computers (broadcasting equipment, integrated circuits)', valueUsdBillion: 57.3, year: 2023, confidence: 'secondary-estimate', note: 'OEC country-profile detail (Broadcasting Equipment $83.2B, Integrated Circuits $32.5B) did not state its own year; this $57.3B figure is a separately-dated 2023 "electronic goods and computers" total, kept distinct rather than merged' },
+      { item: 'textiles and garments', valueUsdBillion: 33.3, year: 2023, confidence: 'secondary-estimate' },
+      { item: 'telephones and mobile phones', confidence: 'secondary-estimate', note: 'OEC data-update note: +4.62% / +$234.9M in the most recent period measured' },
+    ],
+    topImports: null,
+    note: 'a 2024-25 customs-based source gives electrical machinery $121.70B, apparel $40.90B, footwear $25.40B for a different period -- kept separate rather than reconciled against the OEC-derived figures above',
+    source: 'oec.world; vietnam-briefing; vcci',
+  },
+  france: {
+    country: 'France',
+    knownFor: ['aerospace', 'automobiles', 'pharmaceuticals'],
+    topExports: [
+      { item: 'planes, helicopters and/or spacecraft', valueUsdBillion: 33.7, year: 2023, confidence: 'secondary-compilation', note: 'OEC visualizations labeled 2023' },
+      { item: 'cars', valueUsdBillion: 27.2, year: 2023, confidence: 'secondary-compilation' },
+      { item: 'packaged medicaments', valueUsdBillion: 26.9, year: 2023, confidence: 'secondary-compilation' },
+      { item: 'gas turbines', valueUsdBillion: 19.2, year: 2023, confidence: 'secondary-compilation' },
+    ],
+    topImports: null,
+    totalExportsUsdBillion: { value: 645.96, year: 2024, source: 'un-comtrade-via-trading-economics' },
+    note: 'wine/spirits did not appear in the OEC top-5 despite being a well-known French export; beverages/spirits/vinegar to the US alone were $4.45B in 2024, a narrower slice than the whole-world figure this entry otherwise reports',
+    source: 'oec.world; trading-economics',
+  },
+  italy: {
+    country: 'Italy',
+    knownFor: ['machinery', 'fashion and luxury goods', 'pharmaceuticals'],
+    topExports: [
+      { item: 'packaged medicaments', valueUsdBillion: 34.4, year: null, confidence: 'secondary-compilation', note: 'OEC narrow-product-code ranking; year unstated' },
+      { item: 'machinery, nuclear reactors and boilers', valueUsdBillion: 116.02, year: 2024, confidence: 'secondary-estimate', note: 'Trading Economics broader-category figure -- the two sources rank differently because OEC\'s product codes are narrower than Trading Economics\' chapter-level grouping' },
+      { item: 'pharmaceutical products', valueUsdBillion: 55.55, year: 2024, confidence: 'secondary-estimate' },
+      { item: 'vehicles (other than railway/tramway)', valueUsdBillion: 47.01, year: 2024, confidence: 'secondary-estimate' },
+      { item: 'fashion, luxury and lifestyle goods', valueEurBillion: 83.1, year: 2024, confidence: 'official', source: 'italian-government-trade-promotion', note: 'a broader sector grouping than the HS product categories above, not directly comparable to them' },
+    ],
+    topImports: null,
+    totalExportsUsdBillion: { value: 674.87, year: 2024, source: 'un-comtrade-via-trading-economics' },
+    source: 'oec.world; trading-economics; opportunitaly.gov.it',
+  },
+  russia: {
+    country: 'Russia',
+    knownFor: ['crude oil', 'natural gas', 'wheat'],
+    topExports: [
+      { item: 'crude oil', valueUsdBillion: 122.8, year: 2024, confidence: 'secondary-estimate', note: 'one source puts crude oil, refined petroleum, petroleum gas, coal and unwrought gold together at 62.7% of total exports; a 2023 OEC figure for crude alone was 31%, and other sources give crude-plus-refined at 63.8% -- all real, kept distinct rather than reconciled into one number' },
+      { item: 'mineral products overall (oil, gas, coal, ores)', shareOfExportsPct: 61.5, year: 2024, confidence: 'secondary-estimate' },
+      { item: 'wheat and agriculture overall', shareOfExportsPct: 7, year: 2024, confidence: 'secondary-estimate', note: 'agriculture\'s share grew from ~6% in the late 2010s to ~10% in 2022-2024; wheat itself specifically dropped -55.5% year-over-year in this round\'s own measured period' },
+    ],
+    topImports: null,
+    totalExportsUsdBillion: { value: null, note: 'sources range from $433.9B to $491.9B for 2024 -- kept as a stated range rather than one figure picked' },
+    source: 'worldstopexports; tendata; re-russia.net',
+  },
+  brazil: {
+    country: 'Brazil',
+    knownFor: ['crude oil (since 2024, see countryProfileFor)', 'soybeans', 'iron ore'],
+    topExports: [
+      { item: 'crude oil', shareOfExportsPct: 13.3, valueUsdBillion: 44.8, year: 2024, confidence: 'official', source: 'brazil-trade-ministry', note: 'the first year oil led all of Brazil\'s exports -- see countryProfileFor(\'brazil\').oilProducer for the full net-exporter finding' },
+      { item: 'soybeans', shareOfExportsPct: 12.7, valueUsdBillion: 42.9, year: 2024, confidence: 'official', note: 'down from a 15.7% share / $53.2B in 2023' },
+      { item: 'iron ore', valueUsdBillion: 29.84, year: null, confidence: 'secondary-estimate', note: 'third of the three commodities (with oil and soybeans) that have anchored Brazil\'s top exports every year since 2017' },
+    ],
+    topImports: null,
+    source: 'brazil-trade-ministry-2024; datamar-news',
+  },
+  'south-africa': {
+    country: 'South Africa',
+    knownFor: ['gold', 'platinum', 'coal'],
+    topExports: [
+      { item: 'gold', valueUsdBillion: 25.9, year: 2023, confidence: 'secondary-compilation', note: 'OEC 2023 figure; 2024 sources disagree sharply -- one gives gold at $8.21B/first among minerals, another $8.15B (-7.7%), a Trendeconomy 2023 breakdown gives 5.68%/$6.29B -- all kept, none picked, since they use different product boundaries and years' },
+      { item: 'platinum', valueUsdBillion: 16.2, year: 2023, confidence: 'secondary-compilation', note: '2024 sources give platinum as low as $9.97B; a Trendeconomy 2023 share gives 9.68%/$10.7B' },
+      { item: 'coal briquettes', valueUsdBillion: 9.84, year: 2023, confidence: 'secondary-compilation', note: 'a 2024 source gives coal/fuels at $5.75B, +2.5%' },
+    ],
+    topImports: null,
+    source: 'oec.world; intelpoint; trendeconomy; tradeint',
+  },
+  australia: {
+    country: 'Australia',
+    knownFor: ['iron ore', 'coal', 'natural gas'],
+    topExports: [
+      { item: 'iron ore and concentrates', shareOfExportsPct: 19.3, valueAudBillion: 124.5, year: 2024, confidence: 'official', source: 'dfat' },
+      { item: 'coal', shareOfExportsPct: 13.2, valueAudBillion: 85.2, year: 2024, confidence: 'official', source: 'dfat' },
+      { item: 'natural gas', valueAudBillion: 67.4, year: 2024, confidence: 'official', source: 'dfat', note: 'share (~10.5%) is this entry\'s own division of the value by the 2024 total, not a figure DFAT itself published' },
+    ],
+    topImports: null,
+    note: 'a differently-sourced figure gives iron ore at $87.5B USD and petroleum gas at $49B USD for the same year, likely a different currency/methodology than the official DFAT AUD figures above -- kept separate, not reconciled',
+    source: 'dfat-australias-goods-and-services-by-top-25-exports-2024',
+  },
+  japan: {
+    country: 'Japan',
+    knownFor: ['automobiles', 'industrial machinery', 'electronics'],
+    topExports: [
+      { item: 'vehicles (other than railway/tramway)', shareOfExportsPct: 21.3, valueUsdBillion: 150.9, year: 2024, confidence: 'secondary-estimate' },
+      { item: 'machinery including computers', shareOfExportsPct: 17.8, valueUsdBillion: 125.7, year: 2024, confidence: 'secondary-estimate' },
+      { item: 'electrical machinery and electronics', shareOfExportsPct: 14.3, valueUsdBillion: 101.1, year: 2024, confidence: 'secondary-estimate' },
+      { item: 'integrated circuits', valueUsdBillion: 36.9, year: 2022, confidence: 'secondary-compilation', note: 'OEC\'s own figure was dated 2022, not 2024; semiconductor-making equipment and ICs appear in other 2024 top-5 product lists without a stated value' },
+    ],
+    topImports: null,
+    source: 'worldstopexports; trading-economics-2024; oec.world',
+  },
+  'south-korea': {
+    country: 'South Korea',
+    knownFor: ['semiconductors', 'automobiles'],
+    topExports: [
+      { item: 'semiconductors', valueUsdBillion: 141.9, year: 2024, confidence: 'official', source: 'south-korea-ministry-of-trade-industry-and-energy', note: '+43.9% YoY, surpassing the prior record of $129.2B set in 2022; ~21% of the year\'s total exports (this entry\'s own calculation against the official $683.8B total)' },
+      { item: 'automobiles', valueUsdBillion: 70.8, year: 2024, confidence: 'official', note: '-0.1% YoY, due to auto-parts-maker strikes; ~10% of total (calculated)' },
+    ],
+    topImports: null,
+    totalExportsUsdBillion: { value: 683.8, year: 2024, confidence: 'official', note: 'a record, +8.2% YoY; a third-party source gives $721B instead -- kept as a stated discrepancy' },
+    source: 'south-korea-ministry-of-trade-industry-and-energy-2024',
+  },
+  china: {
+    country: 'China',
+    knownFor: ['electronics and electrical machinery manufacturing', 'general manufactured goods'],
+    topExports: [
+      { item: 'electrical machinery and electronics', valueUsdBillion: 928, shareOfExportsPct: 26, year: 2024, confidence: 'secondary-estimate', note: 'a second source gives 26.54% / ~$896.42B for the same category -- both real, neither picked' },
+      { item: 'machinery and electronics combined (broader grouping)', valueUsdBillion: 1500, shareOfExportsPct: 42, year: 2024, confidence: 'secondary-estimate', note: 'this broader category is NOT additive with the line above -- it is a different, wider product boundary covering the same underlying goods' },
+      { item: 'mobile phones', valueUsdBillion: 215, year: 2024, confidence: 'secondary-estimate' },
+      { item: 'computers (data processing machines)', valueUsdBillion: 161, year: 2024, confidence: 'secondary-estimate' },
+      { item: 'integrated circuits', valueUsdBillion: 160, year: 2024, confidence: 'secondary-estimate' },
+    ],
+    topImports: [
+      { item: 'electronic integrated circuits and microassemblies', year: 2024, confidence: 'secondary-estimate', note: 'together with crude petroleum, these two products alone were >27.5% of China\'s total imports in 2024' },
+      { item: 'crude petroleum oil', valueUsdBillion: 325, year: 2024, confidence: 'secondary-estimate', note: 'a conflicting source reports a 3.9% YoY decline instead of the implied rise -- kept as a stated discrepancy, not resolved' },
+      { item: 'iron ores and concentrates', valueUsdBillion: 132, year: 2024, confidence: 'secondary-estimate' },
+      { item: 'unwrought gold', year: 2024, confidence: 'secondary-estimate' },
+      { item: 'petroleum gases', year: 2024, confidence: 'secondary-estimate' },
+    ],
+    source: 'andaman-partners-2025; tendata; worldstopexports',
+  },
+  india: {
+    country: 'India',
+    knownFor: ['refined petroleum products', 'pharmaceuticals (generics)', 'information-technology services'],
+    topExports: [
+      { item: 'refined petroleum oils', shareOfExportsPct: 16, valueUsdBillion: 69, year: 2024, confidence: 'secondary-estimate', note: 'consistently 15-20% of exports most years; a differently-sourced mineral-fuels-and-oils figure gives $74.27B for the same year' },
+      { item: 'drugs and pharmaceuticals', shareOfExportsPct: 7.01, valueUsdBillion: 30.37, year: null, confidence: 'secondary-estimate', note: 'Commerce Ministry-based figure, but the period may be fiscal-year rather than calendar 2024, so not strictly comparable to the petroleum figure above' },
+    ],
+    topImports: [
+      { item: 'crude oil', shareOfImportsPct: 16.6, valueUsdBillion: 141.5, year: 2024, confidence: 'official', source: 'india-dgcis-q3-fy2024-25', note: 'this is a Jul-Sep 2024 quarterly figure, the most authoritative found, NOT a confirmed full-year number; other sources claim 20-30% for the full year but are less reliable' },
+      { item: 'gold and silver', shareOfImportsPct: 11.1, valueUsdBillion: 57.3, year: 2024, confidence: 'official', source: 'india-dgcis-q3-fy2024-25' },
+      { item: 'electronic goods', shareOfImportsPct: 14.1, year: 2024, confidence: 'official', source: 'india-dgcis-q3-fy2024-25' },
+    ],
+    source: 'india-dgcis-quarterly-report-jul-sep-2024; andaman-partners',
+  },
+  mexico: {
+    country: 'Mexico',
+    knownFor: ['automotive manufacturing (maquiladora assembly)'],
+    topExports: [
+      { item: 'automotive (vehicles and parts)', shareOfExportsPct: 31, valueUsdBillion: 194, year: 2024, confidence: 'official', source: 'mexico-inegi', note: 'the first year automotive revenue reached this level, per INEGI; a differently-sourced HS-chapter breakdown (Volza) gives vehicles+parts at 26.2% instead -- both real, the gap reflecting different category definitions' },
+      { item: 'electrical machinery and equipment', shareOfExportsPct: 17.5, year: 2024, confidence: 'secondary-estimate' },
+      { item: 'machinery and equipment', shareOfExportsPct: 15.8, year: 2024, confidence: 'secondary-estimate' },
+      { item: 'crude oil', valueUsdBillion: 28.42, year: 2024, confidence: 'official', note: '-14.4% vs 2023' },
+    ],
+    topImports: null,
+    totalExportsUsdBillion: { value: 617, year: 2024, confidence: 'official', source: 'mexico-inegi', note: 'a record, +4.1% YoY' },
+    destinationNote: 'the United States receives over 80% of all Mexican exports',
+    source: 'mexico-inegi-via-mexico-news-daily-2024; volza',
+  },
+  egypt: {
+    country: 'Egypt',
+    knownFor: ['ready-made garments', 'gold and platinum-group metals'],
+    topExports: [
+      { item: 'ready-made garments', valueUsdBillion: 2.8, year: 2024, confidence: 'official', source: 'egypt-capmas', note: '+17.2% YoY' },
+      { item: 'gold and platinum-coated raw forms', valueUsdBillion: 3.2, year: 2024, confidence: 'official', source: 'egypt-capmas', note: '+77.7% YoY' },
+      { item: 'petroleum and electricity', valueUsdBillion: 5.5, year: 2024, confidence: 'official', source: 'egypt-capmas', note: 'fell 29.1% YoY per CAPMAS -- directly contradicts third-party trade-data sites claiming petroleum was Egypt\'s TOP export at 19-20.5% of the total for the same year; this contradiction is stated rather than resolved, since CAPMAS is Egypt\'s own state statistics agency and the more authoritative source here' },
+    ],
+    topImports: null,
+    totalExportsUsdBillion: { value: 45.3, year: 2024, confidence: 'official', source: 'egypt-capmas', note: '+6.5% YoY; non-oil exports specifically rose 14.4% to $39.9B' },
+    source: 'egypt-capmas-2024',
+  },
+  israel: {
+    country: 'Israel',
+    knownFor: ['polished diamonds', 'high-technology electronics', 'pharmaceuticals'],
+    topExports: [
+      { item: 'electrical machinery, electronics and mechanical appliances', valueUsdBillion: 18, year: 2024, confidence: 'secondary-estimate', source: 'al-jazeera', note: 'a second source (Trading Economics, UN Comtrade-based) gives a narrower $13.15B for electrical/electronic equipment alone' },
+      { item: 'diamonds (polished/unmounted)', valueUsdBillion: 9, year: 2024, confidence: 'secondary-estimate', note: 'an OEC figure gives $10.5B instead; a product-level detail elsewhere gives 9.2% of total exports for unmounted diamonds specifically -- all real, none picked over the others' },
+      { item: 'chemical products including pharmaceuticals', valueUsdBillion: 10, year: 2024, confidence: 'secondary-estimate', note: 'the largest single category by this source\'s own grouping; a narrower pharmaceutical-products-only figure from a different source gives just 2.9% of exports, consistent with its tighter product definition' },
+    ],
+    topImports: null,
+    totalExportsUsdBillion: { value: 61.7, year: 2024, confidence: 'secondary-estimate', source: 'al-jazeera' },
+    note: 'no single authoritative percentage breakdown across all three categories was found this round -- figures differ by classification level (broad chapter vs. detailed product code) and by provider',
+    source: 'al-jazeera-2025; oec.world; trading-economics; volza',
+  },
+  colombia: {
+    country: 'Colombia',
+    knownFor: ['coffee', 'crude oil', 'coal'],
+    topExports: [
+      { item: 'crude oil', shareOfExportsPct: 24.3, year: 2024, confidence: 'secondary-estimate' },
+      { item: 'coal and solid coal fuels', shareOfExportsPct: 12.1, year: 2024, confidence: 'secondary-estimate' },
+      { item: 'unwrought gold', shareOfExportsPct: 8.3, year: 2024, confidence: 'secondary-estimate' },
+      { item: 'coffee', shareOfExportsPct: 7.2, year: 2024, confidence: 'secondary-estimate', note: 'coffee prices stayed high in 2024 while oil and coal both declined on lower international prices; fuels\' overall share fell from 52.5% (2023) to 47.2% (2024)' },
+    ],
+    topImports: null,
+    totalExportsUsdBillion: { value: 49.5, year: 2024, confidence: 'secondary-estimate', note: 'a second source gives $49.6B -- both kept, the gap is immaterial' },
+    source: 'scotiabank-2025; datasur',
+  },
+  indonesia: {
+    country: 'Indonesia',
+    knownFor: ['coal', 'palm oil', 'nickel'],
+    topExports: [
+      { item: 'coal', valueUsdBillion: 31, year: 2024, confidence: 'secondary-estimate', note: 'a second source gives $22.5B for the same year -- both kept, neither picked' },
+      { item: 'crude palm oil and derivatives', valueUsdBillion: 20, year: 2024, confidence: 'secondary-estimate', note: '-11.8% YoY; a differently-worded figure confirms a -11.7% value / -17% volume decline' },
+      { item: 'iron ferroalloys (includes ferronickel)', valueUsdBillion: 14.07, year: 2024, confidence: 'secondary-estimate', note: 'nickel itself is not a standalone line item in the sources found this round; this category is the closest real proxy, and its ferronickel content is this entry\'s own inference, not a source\'s explicit statement' },
+    ],
+    topImports: null,
+    note: 'coal, iron/steel, and crude-palm-oil-with-derivatives together make up close to 40% of total exports per one official-adjacent source (Jakarta Post); a different listing site claims 65.5% for its own top-10 category set, not independently confirmed this round',
+    source: 'jakarta-post-2025; worldstopexports; katadata',
+  },
+  ghana: {
+    country: 'Ghana',
+    knownFor: ['gold', 'cocoa', 'crude oil'],
+    topExports: [
+      { item: 'gold bullion', shareOfExportsPct: 55.3, year: 2024, confidence: 'official', source: 'ghana-statistical-service' },
+      { item: 'crude petroleum', shareOfExportsPct: 17.8, year: 2024, confidence: 'official', source: 'ghana-statistical-service' },
+      { item: 'cocoa beans and cocoa paste', shareOfExportsPct: 8.4, year: 2024, confidence: 'official', source: 'ghana-statistical-service', note: 'a second GSS-based report groups cocoa differently and gives it a larger share, with the top-3-products total at 83.4% instead of the 78.2% this breakdown implies -- both real, the gap reflects different category boundaries, not a correction' },
+    ],
+    topImports: null,
+    source: 'ghana-statistical-service-2024-2025',
+  },
+  switzerland: {
+    country: 'Switzerland',
+    knownFor: ['pharmaceuticals and chemicals', 'precision watches', 'gold and precious-metal refining'],
+    topExports: [
+      { item: 'chemical and pharmaceutical products', shareOfExportsPct: 49, year: 2024, confidence: 'official', source: 'switzerland-federal-customs-administration', note: 'a second official-adjacent source gives "about 50%" for the combined category -- consistent' },
+      { item: 'pearls, precious stones, metals and coins', valueUsdBillion: 136.47, year: 2024, confidence: 'secondary-estimate', note: 'trade-data sites rank this category FIRST by value (ahead of pharmaceuticals at $110.44B the same year); official Swiss classification instead ranks pharmaceuticals first -- the two rankings disagree because of classification choice, not a factual error on either side' },
+      { item: 'watches', shareOfExportsPct: 10, valueUsdBillion: 29.53, year: 2024, confidence: 'official', note: '-2.8% YoY; a different source gives watches a 7% share instead' },
+      { item: 'machinery', shareOfExportsPct: 12, year: 2024, confidence: 'official' },
+    ],
+    topImports: null,
+    totalExportsUsdBillion: { value: 282.9, year: 2024, confidence: 'official', source: 'switzerland-federal-customs-administration', note: 'an all-time high, +3.2% YoY' },
+    source: 'switzerland-federal-customs-administration-2024',
+  },
+  'saudi-arabia': {
+    country: 'Saudi Arabia',
+    knownFor: ['crude petroleum', 'petrochemicals'],
+    topExports: [
+      { item: 'crude petroleum', valueUsdBillion: 236, confidence: 'secondary-compilation', note: 'OEC country-profile figure; page did not state its own reference year' },
+      { item: 'refined petroleum', valueUsdBillion: 45.3, confidence: 'secondary-compilation' },
+      { item: 'ethylene polymers', valueUsdBillion: 13.1, confidence: 'secondary-compilation' },
+      { item: 'oil overall, share of total exports', shareOfExportsPct: 70.5, year: 2024, confidence: 'official', source: 'saudi-gastat', note: 'Q4 2024, down from 76.4% in Q4 2023 as non-oil exports grew; see countryProfileFor(\'saudi-arabia\').oilProducer for the full oil-producer figures' },
+      { item: 'non-oil exports (record)', valueUsdBillion: 137, year: 2024, confidence: 'official', source: 'saudi-gastat' },
+    ],
+    topImports: [
+      { item: 'machinery and electrical equipment', shareOfImportsPct: 23, year: 2024, confidence: 'official', source: 'saudi-gastat-quarterly', note: 'ranged 23-30% across the quarters measured in 2024 (Q1 23%, July 30%, December 25%) -- a genuine within-year range, not a single settled figure' },
+      { item: 'vehicles and transport equipment', shareOfImportsPct: 13, year: 2024, confidence: 'official', source: 'saudi-gastat-quarterly', note: 'ranged up to ~15% across 2024 quarters' },
+    ],
+    totalImportsUsdBillion: { value: 232.81, year: 2024, source: 'un-comtrade' },
+    source: 'oec.world; saudi-gastat-via-argaam-2024',
+  },
+};
+
+function canonicalCountryKey(name) {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+// Resolves ANY real key this module already accepts (an
+// ancestryPacks.GROUPS code, a COUNTRY_PROFILES key, or the canonical
+// resource-profile key itself) onto a real RESOURCE_PROFILES entry.
+// See this section's own header for why a third keying scheme would
+// have made this worse, not better.
+function resourceProfileFor(key) {
+  if (RESOURCE_PROFILES[key]) return RESOURCE_PROFILES[key];
+  const fromCountries = countryFor(key);
+  if (fromCountries) return RESOURCE_PROFILES[canonicalCountryKey(fromCountries.country)] ?? null;
+  const fromProfiles = countryProfileFor(key);
+  if (fromProfiles) return RESOURCE_PROFILES[canonicalCountryKey(fromProfiles.country)] ?? null;
+  return null;
+}
+
+function describeResourceProfile(key) {
+  const entry = resourceProfileFor(key);
+  if (!entry) return null;
+  return { key, ...entry };
+}
+
 module.exports = {
   INCOME_THRESHOLDS_USD,
   INCOME_LEVELS,
@@ -5347,4 +5740,8 @@ module.exports = {
   countryFor,
   describeCountry,
   regionalContextFor,
+  RESOURCE_PROFILES,
+  canonicalCountryKey,
+  resourceProfileFor,
+  describeResourceProfile,
 };

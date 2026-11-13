@@ -1636,3 +1636,104 @@ test('regionalContextFor resolves every twenty-first-round country through the p
     assert.equal(ctx.region, region, `${key} should classify as ${region}`);
   }
 });
+
+// ---------------------------------------------------------------------
+// RESOURCE_PROFILES -- "what a country is known for, produces, and
+// imports," by direct instruction. See countryPacks.js's own header
+// above the RESOURCE_PROFILES declaration for the full account.
+// ---------------------------------------------------------------------
+
+test('RESOURCE_PROFILES covers exactly the 23 real countries this round researched', () => {
+  const keys = Object.keys(countryPacks.RESOURCE_PROFILES);
+  assert.equal(keys.length, 23, 'this round covers 23 real countries, not an unverified round number');
+  for (const key of keys) {
+    const entry = countryPacks.RESOURCE_PROFILES[key];
+    assert.ok(typeof entry.country === 'string' && entry.country.length > 0, `${key}: country name must be stated`);
+    assert.ok(Array.isArray(entry.knownFor) && entry.knownFor.length > 0, `${key}: knownFor must be a real, non-empty list`);
+    assert.ok(Array.isArray(entry.topExports) && entry.topExports.length > 0, `${key}: topExports must be real and non-empty`);
+    assert.ok('topImports' in entry, `${key}: topImports must be present, even if honestly null`);
+    assert.ok(typeof entry.source === 'string' && entry.source.length > 0, `${key}: a real source citation must be stated`);
+  }
+});
+
+test('canonicalCountryKey derives the same lowercase-hyphenated form this module already uses for multi-word COUNTRY_PROFILES keys', () => {
+  assert.equal(countryPacks.canonicalCountryKey('United States'), 'united-states');
+  assert.equal(countryPacks.canonicalCountryKey('South Korea'), 'south-korea');
+  assert.equal(countryPacks.canonicalCountryKey('United Kingdom'), 'united-kingdom');
+  assert.equal(countryPacks.canonicalCountryKey('Saudi Arabia'), 'saudi-arabia');
+});
+
+test('resourceProfileFor resolves a real ancestryPacks.GROUPS (COUNTRIES) key onto the same entry as the canonical key', () => {
+  const viaAncestryKey = countryPacks.resourceProfileFor('german');
+  const viaCanonicalKey = countryPacks.resourceProfileFor('germany');
+  assert.ok(viaAncestryKey, 'german should resolve to a real entry');
+  assert.equal(viaAncestryKey, viaCanonicalKey, 'both paths must return the exact same real entry object');
+  assert.equal(viaAncestryKey.country, 'Germany');
+});
+
+test('resourceProfileFor resolves a real COUNTRY_PROFILES key directly, since COUNTRY_PROFILES already keys on the canonical country name', () => {
+  const entry = countryPacks.resourceProfileFor('japan');
+  assert.ok(entry);
+  assert.equal(entry.country, 'Japan');
+  assert.equal(entry, countryPacks.RESOURCE_PROFILES.japan, 'must be the literal same entry, not a reconstructed copy');
+});
+
+test('resourceProfileFor is honest when a real, covered COUNTRIES/COUNTRY_PROFILES key has no resource entry -- English/Scottish/Welsh all map to the United Kingdom, which was not researched this round', () => {
+  for (const key of ['english', 'scottish', 'welsh']) {
+    assert.equal(countryPacks.countryFor(key).country, 'United Kingdom', `${key} must still resolve to the UK in COUNTRIES`);
+    assert.equal(countryPacks.resourceProfileFor(key), null, `${key}: no UK resource entry exists yet, so this must be an honest null, never a guess`);
+  }
+});
+
+test('resourceProfileFor returns null for a key with no real coverage anywhere in this module, not an exception', () => {
+  assert.equal(countryPacks.resourceProfileFor('not-a-real-key-at-all'), null);
+});
+
+test('describeResourceProfile wraps the real entry with its own lookup key, the same shape describeCountry/describeCountryProfile already take', () => {
+  const described = countryPacks.describeResourceProfile('china');
+  assert.equal(described.key, 'china');
+  assert.equal(described.country, 'China');
+  assert.ok(Array.isArray(described.topImports) && described.topImports.length > 0, 'China is one of the 5 countries with real researched imports this round');
+});
+
+test('only 5 of the 23 entries have real researched topImports -- the other 18 are an honest, named gap, not a silent omission', () => {
+  const withImports = Object.values(countryPacks.RESOURCE_PROFILES).filter((e) => e.topImports !== null);
+  const withoutImports = Object.values(countryPacks.RESOURCE_PROFILES).filter((e) => e.topImports === null);
+  assert.equal(withImports.length, 5, 'exactly United States, China, Germany, Saudi Arabia, India should have real topImports');
+  assert.equal(withoutImports.length, 18);
+  const importedCountries = withImports.map((e) => e.country).sort();
+  assert.deepEqual(importedCountries, ['China', 'Germany', 'India', 'Saudi Arabia', 'United States']);
+});
+
+test('a RESOURCE_PROFILES key colliding with a COUNTRY_PROFILES or COUNTRIES key under the SAME canonical name is not silently duplicated -- Japan and Chile are the real, deliberate example', () => {
+  // RESOURCE_PROFILES is additive on top of entries that already exist
+  // in COUNTRY_PROFILES (japan, chile, 'south-korea', ...) or map onto
+  // one via COUNTRIES (german -> germany, 'united-states' is itself a
+  // COUNTRIES key AND the canonical RESOURCE_PROFILES key). This is
+  // intentional layering, not drift -- unlike the real
+  // COUNTRIES/COUNTRY_PROFILES collision guard (which refuses two
+  // DIFFERENT country-fact tables disagreeing about the same country),
+  // RESOURCE_PROFILES is a third, independent DIMENSION on the same
+  // real countries, so no collision guard applies here -- confirmed by
+  // checking that japan's resource entry and its COUNTRY_PROFILES
+  // entry both exist and both describe the real same country.
+  assert.equal(countryPacks.COUNTRY_PROFILES.japan.country, 'Japan');
+  assert.equal(countryPacks.RESOURCE_PROFILES.japan.country, 'Japan');
+  assert.equal(countryPacks.COUNTRIES.german.country, 'Germany');
+  assert.equal(countryPacks.RESOURCE_PROFILES.germany.country, 'Germany');
+});
+
+test('disagreeing real sources are kept side by side with a note, never silently averaged or picked -- Nigeria\'s crude-petroleum share is the clearest real example', () => {
+  const nigeria = countryPacks.resourceProfileFor('nigerian');
+  const crudeEntry = nigeria.topExports.find((e) => e.item === 'crude petroleum');
+  assert.equal(crudeEntry.shareOfExportsPct, 63.5);
+  assert.match(crudeEntry.note, /71\.39%/, 'the disagreeing 71.39% figure must be stated in the note, not discarded');
+  assert.match(crudeEntry.note, /88\.26%/, 'the disagreeing 88.26% wider-category figure must also be stated');
+});
+
+test('report-only discipline: nothing outside countryPacks.js itself reads RESOURCE_PROFILES to decide an outcome', () => {
+  const { execSync } = require('node:child_process');
+  const out = execSync('grep -rln "RESOURCE_PROFILES\\|resourceProfileFor\\|describeResourceProfile" server/ --include=*.js', { cwd: __dirname + '/..' }).toString();
+  const files = out.split('\n').filter(Boolean).map((p) => p.replace(/^server\//, ''));
+  assert.deepEqual(files.sort(), ['countryPacks.js'], 'only countryPacks.js itself should reference the new resource-profile symbols this round -- wiring it into a mechanic is separate, future, calibrated work');
+});
