@@ -127,7 +127,7 @@ and route counts are from source.
 | **VXLLAGE** | **Yes** | 19 | 64 | Posts, feed, profiles, follows, villages, search, cosmetics |
 | **CVNVO** | **Yes** | 19 + 3 | 59 + 5 | Gale-Shapley matching, 11 dating formats, BarBuddy, VSAFE-backed. YAP decoupled |
 | **Vault** | **Yes** | 18 | 57 | Multi-channel streaming, 8-screen sessions, VOD, casino events |
-| **VACON-C** | **Yes** (`vsafe`) / **paused** (civ-sim) | 15 + 0 | 43 + 7 | VSAFE: check-ins, ID verification, 6 source apps. Civ-sim paused |
+| **VACON-C** | **Yes** (`vsafe`) / **Yes — most active app this session** (civ-sim) | 124 + 20 | 110 + 43 | VSAFE: check-ins, ID verification, 6 source apps. Civ-sim: NPC/org/family/politics/economy/justice simulation, now 20+ real-world data packs (Census, BLS, FBI/NYGS, World Bank/EIU/SIPRI, World Prison Brief, 165+ countries), prison gangs + street affiliates, chaos-driven recruitment, 2100+ tests — corrected 13 Nov 2026; this row previously said "paused," which was stale and had been for the entire session's worth of real builds |
 | **HVNTZ** | **Yes** | 13 + 6 | 40 + 22 | 14 revenue streams, businesses, hunts. DREAMS: screens, campaigns, offline cache |
 | **VAGO** | **Yes** | 13 | 39 | Prediction markets, sportsbook, esports, casino, Gold Coin, AMOE, provably-fair |
 | **Vvltvre** | **Yes** | 23 across 5 | 84 | Music (royalties, labels, beats), Flix, Pods, Studios, VENVM |
@@ -136,12 +136,12 @@ and route counts are from source.
 | **VACON** | **Yes** | 4 + 4 | 6 + 12 | 14 agents, routing, invoke. Shield (tests), VACO Analytics |
 | **CHOPZ** | **Yes** | 3 + 5 | 4 + 10 | Native checkout, category fees, affiliate splits |
 | **VDP** | **Yes — frontend + backend** | 33 | 211 | The walkable world. Districts for most apps. `server.cjs` (3,872 lines) is a substantial real backend, not frontend-only — corrected 12 Nov 2026 after the route count was found undercounted as "—" |
-| **VENVS** | **Yes — frontend** | 9 | — | Marketplace, shop, publishing |
+| **VENVS** | **Yes — frontend + backend** | 12 | 29 | Marketplace, shop, publishing. `server.cjs` is a real backend with real routes — corrected 13 Nov 2026, same "—" undercount VDP's own row already caught once |
 | **Vex** | **Yes** | 5 + 127 files | 7 + 3 | Brokerage (gated). Vex Business is a Python monorepo, **deploys separately** |
 | **VACAY** | **Thin** | 2 | 1 | 5 sections real, fewest modules of any built app |
 | **VACO Shell** | **Yes** | 2 | 10 | Launcher, registry, session host |
 
-**Totals: 239 modules, ~900 routes (was "~700" before VDP's own 211 real routes were found undercounted as "—" on 12 Nov 2026), 24 apps persisting to disk.**
+**Totals: ~371 modules, ~1,030 routes (was "239 modules, ~900 routes" before VACON-C's real civ-sim build and VENVS's own "—" undercount were both corrected on 13 Nov 2026), 24 apps persisting to disk.**
 
 **Every one of the first eighteen has running code.** None are empty.
 The thinnest is VACAY. VDEX (#19, opened 11 Nov 2026) does not yet —
@@ -183,6 +183,17 @@ them.**
 | VDP | 2 | 0 |
 
 Plus `dev-docs/` (8), `world-layer/` (4), root README (1).
+
+**VENVS, Vault, Vex, and VDP's "Reconciled" counts above are stale as
+of 13 Nov 2026** — all four went through a real doc-vs-code
+reconciliation pass this session (found and fixed: a stale
+`MarketplaceView.jsx` claim in VENVS, a real tip-control field-name
+bug in Vault, three real bugs in the Vex family, and VDP's own
+undercounted route count), but the fixes mostly landed as direct
+corrections in README/CLAUDE.md rather than a formal
+"Implementation status" section on every filed doc, so the exact
+reconciled count per app needs a real recount rather than a guess —
+flagged here rather than silently left at the pre-session "0".
 
 **Against the 259 available**: 110 are filed at app level. That count
 is not a claim about which 259 — some filed docs were written here
