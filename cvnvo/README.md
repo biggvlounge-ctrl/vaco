@@ -623,7 +623,14 @@ logic itself would mean rebuilding that guard as async first, a real
 architectural change the message-screening half never needed.
 
 `test/messages.test.js` (new, 5 tests; full suite 77 -> 82, all
-passing): the injected fn is required rather than silently optional,
+passing). **Corrected 13 Nov 2026**: the "77 -> 82" figure was wrong
+even at the time this paragraph was written -- counted directly from
+this same commit, the real suite was 35 tests before this file
+(`server.test.js` 7 + `money.test.js` 16 + `dateEvents.test.js` 12,
+matching the "Full suite: 35/35" this file's own "Snap Map test
+coverage" section above already states) and 40 after it, not 77/82.
+Running `node --test test/*.test.js` today still reports 40 passing
+(7 + 16 + 12 + 5), zero failing: the injected fn is required rather than silently optional,
 the real flagged/severity/reasons VSAFE returns are stored as-is (never
 a fabricated verdict), a high-severity message is still delivered
 (VSAFE flags for real human review -- this layer never silently

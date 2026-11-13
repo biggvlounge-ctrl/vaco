@@ -54,3 +54,34 @@ Dispute/appeal flow, removal process, identity verification of
 reviewers, and any fraud or brigading resistance. Every comparable
 above has all four, and the ones that added them late did so under
 pressure.
+
+**Corrected 13 Nov 2026**: three of these four are now real, built in
+`lib/moderation.js` (its own header cites this document by name and
+quotes this exact "Not built" line). A real moderator-only queue
+(`listModerationQueue`/`queueDepth`), a real publish/reject decision
+that always requires a `moderatorId` (never automatic — no timer, no
+report-count threshold, no keyword classifier), a real dispute path
+(`disputeYapReport`, subject-only, re-queues rather than hides), and a
+real takedown (`removeReport`, marked removed rather than deleted) are
+all live behind a real `yap:moderate` operator scope — see
+`README.md`'s own "What's here" entry for `lib/moderation.js`.
+**Identity verification of reviewers was already real** when this
+section was first written: `yap.js` already refused a report from any
+reporter without CVNVO's own live-fetched `verifiedBadge`, so that gap
+was misclassified here rather than closed later.
+
+**Fraud/brigading resistance remains the one real gap, and it is only
+partial.** `detectBrigading` flags a subject hit by 3+ distinct
+reporters inside a 24-hour window — but it only flags, for a human to
+review; nothing is auto-hidden, auto-rejected, or rate-limited on the
+strength of it, and no reviewer-identity-fraud detection (e.g.
+coordinated fake accounts) exists at all. This document's closing
+line — "every comparable above has all four, and the ones that added
+them late did so under pressure" — is still accurate for this
+remaining quarter.
+
+This needs Deskins before launch regardless of what is built: nothing
+above resolves the underlying legal-review requirement this document
+raises, and `lib/moderation.js`'s own header says the same thing in
+its own words ("it does not decide the policy... nothing here
+substitutes for that").

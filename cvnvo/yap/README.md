@@ -45,6 +45,32 @@ curl -X POST http://localhost:8802/yap/reports -H "Content-Type: application/jso
   action taken on it), `getSafetyLookup` (the real, standalone Tea-
   style lookup — works before any match exists, combining a live-
   fetched verification badge with the real Yap summary).
+- `lib/moderation.js` — **the real moderation queue, dispute path, and
+  takedown**, not documented in this file until now (added
+  13 Nov 2026; the code itself predates this entry). Closes three of
+  the four gaps `YAP_REVIEW_PLATFORM_COMPARABLES.md` named as
+  "Not built" (dispute/appeal flow, removal process, identity
+  verification of reviewers — the fourth, fraud/brigading resistance,
+  is partially closed: see below). `listModerationQueue`/`queueDepth`
+  give a moderator a real, oldest-first pending+disputed backlog;
+  `publishReport`/`rejectReport` require a real `moderatorId` and
+  (for rejection) a real reason — there is no automatic publication
+  anywhere, no timer, no keyword classifier; `disputeYapReport` lets
+  only the report's real subject contest it, which re-queues the
+  report (still visible, dispute attached) rather than hiding it;
+  `removeReport` takes a published report down for good, marked
+  removed rather than deleted so the moderation record survives; and
+  `detectBrigading` flags a subject hit by 3+ distinct reporters
+  inside a 24-hour window for human review only — it takes no
+  automatic action, so brigading/fraud resistance is a real detection
+  signal, not full resistance. All four moderation routes
+  (`GET /yap/moderation/queue`, `POST .../:id/publish`,
+  `POST .../:id/reject`, `POST .../:id/remove`,
+  `GET .../brigading`) are gated behind a real `yap:moderate` operator
+  scope (`requireOperator`, this app's own `lib/operatorAuth.cjs`), and
+  publish/reject/remove each page ops via `vaco-notify` — a real,
+  separate gap from notifying the reporter/subject themselves, which
+  this app still has no inbox feature for.
 - `server.js` — a real Express API (CommonJS) with a real injected
   `fetchCvnvoProfile` cross-app call, mirroring CVNVO's own
   `voidFetchFn`/`vsafeCreateFn` pattern in the reverse direction.
@@ -65,6 +91,16 @@ the safety lookup confirmed combining the subject's live `verifiedBadge`
 with the real report summary. CVNVO's own remaining endpoints
 (compatibility scoring) reconfirmed still working after Yap's removal
 from its codebase. See `dev-docs/` for the full record.
+
+**Corrected 13 Nov 2026**: "9 plain-Node checks" describes only this
+app's original Phase 1 split and is long stale — it was already stale
+even in the single commit that added `moderation.test.js`/`yap.test.js`
+at their current size. Counted directly: `test/yap.test.js` (20),
+`test/server.test.js` (6), `test/moderation.test.js` (16) — 42 tests
+total, all passing (`node --test test/*.test.js`), covering the Tea-
+model reporting additions and the full moderation queue/dispute/
+takedown/brigading-detection surface above, none of which this
+original count could have included.
 
 ## Real persistence
 `lib/persistence.js` wraps `server.js`'s own store in a real file-backed
