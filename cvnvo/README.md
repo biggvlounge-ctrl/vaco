@@ -57,10 +57,17 @@ CVNVO" section.
 ## Run
 Four processes — VACA (real identity verification on profile
 creation), V3 (real VCoin for Gift Dating/Blind Date tokens), HVNTZ
-(real hunt validation for Hunts Dates), and this service:
+(real hunt validation for Hunts Dates), and this service. **Corrected
+13 Nov 2026**: this previously pointed at `venvs-mock-backend`
+(port 8791) — a real, explicit mock stand-in for V3, built "since
+neither real service exists in this environment" at the time it was
+written. V3 is real and standalone now (`v3/server.js`, its own real
+VCoin/VASH ledger), and `server.js`'s own `V3_API_URL` already defaults
+to V3's real port (8811) — the mock was never actually what this code
+calls, so the old instructions would have started the wrong process:
 ```
 cd ../vaca && npm install && npm start                 # localhost:8804
-cd ../venvs-mock-backend && npm install && npm start     # localhost:8791
+cd ../v3 && npm install && npm start                    # localhost:8811
 cd ../hvntz && npm install && npm start                  # localhost:8792
 cd cvnvo && npm install && npm start                      # localhost:8798
 ```

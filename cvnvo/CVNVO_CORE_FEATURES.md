@@ -103,11 +103,22 @@ has been paid.** "Gale-Shapley in practice requires real preference-
 ranking data at scale — a genuine backend/algorithm build, not a UI
 decision." It was built as exactly that.
 
-**Messaging.** Real: expiry, `messageSafety.js` for spam/scam
-filtering, `messageSocket.js` for real WebSocket push rather than
-polling, and `communicationControls.js` for anonymous contact before
-phone numbers are exchanged. That last file is candid about its
-ceiling — no real telephony or SIP relay exists behind it, which is
+**Messaging.** Real: expiry, real spam/scam filtering,
+`messageSocket.js` for real WebSocket push rather than polling, and
+`communicationControls.js` for anonymous contact before phone numbers
+are exchanged. **Corrected 13 Nov 2026**: this section previously named
+a local `messageSafety.js` — that file no longer exists. `messages.js`
+used to call a local copy of this logic, but it was a real, deliberate
+dedup rather than a regression: VSAFE's own `lib/aiMonitoring.js`
+generalized the identical contact-solicitation/phone-number/link/
+character-flood pattern set into its shared, app-agnostic
+`/api/monitor/screen` route (with a real threat/self-harm category
+CVNVO's local copy never had), so `sendMessage` now screens every
+message through an injected `vsafeScreenMessageFn`, the same real
+cross-app-call shape `server.js` already uses for VSAFE's check-ins —
+see `server.js`'s own `vsafeScreenMessage` and `messages.js`'s header
+for the real account. `communicationControls.js` is candid about its
+own ceiling — no real telephony or SIP relay exists behind it, which is
 now tracked as shared infrastructure (task #106) rather than a CVNVO
 gap.
 
