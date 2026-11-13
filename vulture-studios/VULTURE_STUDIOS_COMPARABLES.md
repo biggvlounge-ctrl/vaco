@@ -51,3 +51,14 @@ good selection fixes small-n variance.
 Fund-and-produce financing, project investment and revenue
 distribution, real distribution into Vvltvre Music and Pods, and a VDP
 district. Persisted.
+
+## Implementation status (verified 13 Nov 2026)
+
+Checked directly against real code. `lib/projects.js` confirms real
+distribution into `vulture-music` (branching on
+`project.distributionApp === 'vulture-music'`) reusing
+`vulture-music/lib/releases.js`'s own exact-sum rounding. The VOKEN
+`fractional-ownership` gating asymmetry this doc raises is still real
+and still unresolved — re-checked, not just re-asserted; it remains an
+open, named legal question rather than an engineering gap. Nothing
+else stale found; no changes needed.

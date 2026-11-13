@@ -86,12 +86,25 @@ curl -X POST http://localhost:8813/api/reformat -H "Content-Type: application/js
 - `server.js` — the real Express API tying all three together.
 
 ## Verified
-8 real unit tests across all three lib modules (a video that fits vs.
-one that doesn't and gets a real recommended trim, an unknown-platform
+**This section's own claim could not be confirmed and is flagged
+rather than silently trusted (checked 13 Nov 2026).** It describes 8
+real unit tests across `crossPlatformReformat.js` and
+`productionPipeline.js` specifically — a video that fits vs. one that
+doesn't and gets a real recommended trim, an unknown-platform
 rejection, the full production-stage progression enforced in order,
-`markRendered` staying honestly `null` with no supplied URL, a real
-successful script generation, and a real completion failure marking
-the request `failed` with the real error — no fabricated script).
+`markRendered` staying honestly `null` with no supplied URL. A direct
+search of the current `test/` directory and git history found no test
+file exercising `markRendered`, `advanceToStoryboard`, or any
+reformat-fit/trim behavior by name — `test/scriptEngine.test.js` (4
+tests) covers script generation only, and `test/contentRouting.test.js`
+(30 tests) covers content-routing allocation/tier logic, not these two
+modules. The real functions (`markRendered`, `advanceToStoryboard` in
+`lib/productionPipeline.js`) do exist in code; what's missing is the
+test coverage this section describes. Either the tests were lost in a
+prior reorganization or this section was written ahead of the code
+being committed — not determined which. **A real, open gap**: write
+the real unit tests this section describes, or correct the claim to
+match what the suite actually covers.
 
 Then live, against the real running server: a real reformat call
 (confirmed correct fits/doesn't-fit/aspect-change flags across all 4

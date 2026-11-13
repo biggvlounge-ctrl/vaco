@@ -49,3 +49,14 @@ VDP embed, feeding VACO Analytics. Persisted.
 
 Video delivery. Same real-time media gap as Vavlt Stvdios — the
 economics are modeled, the transport is not built.
+
+## Implementation status (verified 13 Nov 2026)
+
+Every "what is genuinely built" claim above checked directly against
+real code, not assumed from this doc's own prose. Three real
+subscription tiers confirmed in `lib/subscriptions.js`. The VDP embed
+is real: `vdp/src/components/VultureFlixView.jsx` and
+`vdp/src/lib/vultureFlixClient.js`. The VACO Analytics feed is real
+and confirmed optional, not a hard dependency — `server.js`'s own
+comment: "a real subscription payment is never held up by VACO
+Analytics." Nothing stale found; no changes needed.

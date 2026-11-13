@@ -38,3 +38,11 @@ measured anywhere.
 
 10 show categories, subscriptions with the 10% take, video cross-links
 to Vavlt Stvdios, distribution from Vvltvre Studios. Persisted.
+
+## Implementation status (verified 13 Nov 2026)
+
+Checked directly against real code. `PLATFORM_TAKE_PERCENT = 0.10` is
+exactly as stated in `lib/subscriptions.js`. `lib/shows.js#SHOW_CATEGORIES`
+has exactly 10 real entries (news, comedy, true-crime, business,
+technology, sports, culture, education, fiction, other). Nothing stale
+found; no changes needed.

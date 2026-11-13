@@ -67,3 +67,12 @@ Generation of any kind — no scene generation, no avatar rendering, no
 nothing maps a VENVM production to a DREAMS creative, a VACAY listing,
 or a VENVS storefront. Three separate VENVM documents arrive at that
 missing join independently, and it remains the most tractable item.
+
+## Implementation status (verified 13 Nov 2026)
+
+Checked directly against real code. Jake is confirmed real in
+`vacon/lib/agents.js` (that file's own header records the correction:
+"Jake is named in the source docs... nothing named Jake existed in
+code" before Jake was built for real). `venvm/test/likenessConsent
+.test.js` has exactly 15 real tests, matching this doc's own count.
+Nothing stale found; no changes needed.
