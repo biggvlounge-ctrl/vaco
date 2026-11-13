@@ -3727,6 +3727,65 @@ world, not a claim of comprehensive coverage -- the same honest-ceiling
 posture the fifty-first standing rule already set for this exact
 phrase ("all over the globe"/"all the countries") once before.
 
+**A sixty-second, and it is the record of a round that landed before
+this one but deliberately left its own entry unwritten to avoid
+colliding with the round above, written now rather than left
+missing.** Asked directly to add "certain racial organizations, well,
+nationalist organizations," confirmed in scope to cover both a
+civilian archetype and the existing prison-gang system, two new
+`orgArchetypes.js` entries closed it: `'nationalist movement'`
+(`type: 'club'`, dispersed rather than territorial, citing ADL's own
+H.E.A.T. Map FAQ -- "membership draws from fairly wide geographic
+areas... cannot be accurately represented by a single point" -- for
+that choice) and `'racially-affiliated prison gang'` (a sub-category
+of the existing `'prison gang'`, same community-scoped faction shape,
+cited cohesion raised on real academic literature rather than a
+specific current membership dataset).
+
+**No real, named organization appears anywhere in either entry, by
+the same discipline this file has held for real named individuals all
+session.** Every real source -- SPLC's 2024 hate-group count, ADL's
+2024 extremist-murder report, DHS's Racially or Ethnically Motivated
+Violent Extremism threat category, FBI UCR hate-crime bias statistics,
+and the real academic literature on racially-organized prison gangs
+(Skarbek; a 2014 *Prison Journal* Texas segregation study; Infante,
+Morse, Fahmy & Wright 2023; the *SAGE Encyclopedia of Race and Crime*)
+-- is cited in the module's own header as real-world grounding for a
+structural number (growth band, cohesion band, which posts an
+archetype carries), never as the name of a generated entity. The
+thirty-sixth standing rule's own finding on prison-gang racial-
+validation data was re-checked rather than trusted this round, and
+still holds: no current public STG dataset exists (CDCR abandoned its
+validation approach after *Ashker v. Brown*; LA County's own
+Inspector General found its jail gang data too unreliable to
+release). A real 2014-2025 CDCR gang-enhancement chart was found and
+is named in `prisonPacks.js`'s own header as a declared, deliberately
+unused fact -- a different real measurement (sentencing enhancement,
+not STG validation) that would have misrepresented itself if wired in
+as a stand-in for the thing that doesn't exist.
+
+**The real §9 question -- whether a real-world-documented,
+race-restricted recruitment pattern can gate who may join one of
+these two archetypes -- was reasoned through on the page rather than
+picked silently, and the answer is no, on the identical precedent
+`'religious order'` already set for `npc.religion`.** Two real,
+true facts about a person (what they believe; what they are) do not
+have to be wired together just because a real-world analogue often
+correlates them -- `orgArchetypes.js` founds and staffs both new
+archetypes exactly as it does every other one, blind to
+`npc.race`/`npc.ethnicity`. `orgArchetypes.js` was added to both
+`test/ethnicity.test.js`'s and `test/race-packs.test.js`'s own
+forbidden-file-scan lists, and mutation-verified the same way every
+other firewall addition in this file has been: a real `.race` read
+was injected, and all three guards -- those two plus a new,
+file-local test -- caught it before being reverted.
+
+This round's own targeted run (org-archetypes, ethnicity, race-packs,
+prison-packs) passed 44 of 44 at landing time; this file's own
+subsequent full-suite run (the sixty-first standing rule's own 2124
+tests, 2107 pass, 0 fail) is the real, confirming result for the
+whole repository with both rounds in it together.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

@@ -306,6 +306,23 @@ rather than guessed where this round's WebSearch-only tooling could
 not reach a primary table — the same ceiling the fifty-first standing
 rule already named once before.
 
+## Nationalist/racial organization archetypes — generic, real-cited
+See `CLAUDE.md`'s own sixty-second standing rule for the full account
+(written after the fact to avoid colliding with the round above,
+which was mid-flight on this same file at the time). Two new
+`orgArchetypes.js` entries: `'nationalist movement'` (civilian,
+dispersed rather than territorial) and `'racially-affiliated prison
+gang'` (a sub-category of the existing `'prison gang'`). No real,
+named organization appears anywhere in either — every real source
+(SPLC, ADL, DHS's RMVE category, FBI UCR hate-crime data, and real
+academic literature on racially-organized prison gangs) is cited as
+structural grounding in the module's own header, never as the name of
+a generated entity. Neither archetype gates membership on
+`npc.race`/`npc.ethnicity` — the same answer `'religious order'`
+already gives for `npc.religion`, reasoned through on the page rather
+than picked silently, and enforced by the same forbidden-file-scan
+tests every other demographic firewall in this registry carries.
+
 ## Bluffing and its exposure
 See `CLAUDE.md`'s own fifty-second standing rule for the full design.
 `server/bluff.js` models the gap between what `weapons
