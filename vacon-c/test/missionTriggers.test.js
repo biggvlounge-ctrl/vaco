@@ -2,11 +2,13 @@
 // fish, we read a book... finding [main characters] will help us
 // build missions that will happen in normal situations" — by direct
 // instruction. `server/missionTriggers.js` is the real, bounded-chance
-// wiring between a player visiting a real location and the real
-// criminal main character controlling it (`mainCharacters.
-// criminalLeaderOf`). See that file's own header for the measured
-// rate and the honest scope (criminal only; `search-location` always,
-// `practise-habit` only with an explicit `locationPropertyId`).
+// wiring between a player visiting a real location and the real main
+// character controlling it — now all four categories
+// (`mainCharacters.mainCharactersOf`), not criminal alone. See that
+// file's own header for the measured rate, the fixed category-priority
+// order, and the honest per-category leadership-availability scope
+// (`search-location` always, `practise-habit` only with an explicit
+// `locationPropertyId`).
 
 'use strict';
 
@@ -24,9 +26,11 @@ const engine = require('../server/engine.js');
 function baseWorld() {
   return {
     tick: 0,
+    cities: [{ id: 1, region_id: null }],
     communities: [{ id: 9, city_id: 1 }],
     properties: [{ id: 501, community_id: 9, landmark_category: 'library', name: 'Central Library' }],
     organizations: [],
+    governments: [],
     territoryBlocks: [],
     entityTraits: [],
     missions: [],
@@ -45,6 +49,38 @@ function withControllingFaction(w, { leaderId = 701 } = {}) {
   w.entityTraits = engine.WorldState.entityTraits.filter((r) => r.entity_id === faction.id);
   w.territoryBlocks = [{ id: 1, faction_id: faction.id, city_id: 1, community_id: 9, status: 'controlled' }];
   return faction;
+}
+
+// Real substrate for `mainCharacters.politicalLeaderOf`: a government
+// organization plus the real `governments` row that scopes it to this
+// community's city.
+function withGovernment(w, { organizationId = 601, leaderId = 801, name = 'City Hall' } = {}) {
+  const government = { id: organizationId, type: 'government', name, leader_id: leaderId };
+  w.organizations.push(government);
+  w.governments.push({ organization_id: organizationId, scope_type: 'city', scope_id: 1 });
+  return government;
+}
+
+// Real substrate for `mainCharacters.religiousLeaderOf`: a real
+// `type: 'religion'` organization scoped directly to this community —
+// the forty-eighth standing rule's own `community_id` convention.
+function withReligiousOrder(w, { organizationId = 602, leaderId = 802, name = 'The Chapel' } = {}) {
+  const order = {
+    id: organizationId, type: 'religion', name, community_id: 9, leader_id: leaderId,
+  };
+  w.organizations.push(order);
+  return order;
+}
+
+// Real substrate for `mainCharacters.businessLeaderOf`: a real business
+// organization actually operating a real property in this community.
+function withBusiness(w, { organizationId = 603, leaderId = 803, name = 'The Corner Store' } = {}) {
+  const business = {
+    id: organizationId, type: 'business', name, influence: 50, assets: 0, leader_id: leaderId,
+  };
+  w.organizations.push(business);
+  w.properties[0].operating_organization_id = organizationId;
+  return business;
 }
 
 test('no faction holding this ground: honestly nothing, never thrown', () => {
@@ -137,4 +173,123 @@ test('reinforceHabit: practising at a real controlled location can generate a mi
   }
   assert.ok(found, 'expected practise-habit with a real controlled location to eventually generate a mission');
   assert.equal(found.location_property_id, property.id);
+});
+
+// ---------------------------------------------------------------------
+// Political, religious, and business — the three categories this
+// mechanism was originally scoped away from, now wired through
+// issuing_organization_id/issued_by_entity_id instead of
+// controllingFactionId, since none of the three is a real faction.
+// ---------------------------------------------------------------------
+
+test('a real government with a real leader: repeated visits eventually generate a real mission, routed through issuing_organization_id, never controlling_faction_id', () => {
+  const w = baseWorld();
+  const government = withGovernment(w);
+
+  let generated = null;
+  for (let tick = 0; tick < 50 && !generated; tick += 1) {
+    generated = missionTriggers.maybeTriggerMission(w, 1, 501, { tick });
+  }
+  assert.ok(generated, 'expected a mission to have generated within 50 visits');
+  assert.equal(generated.location_property_id, 501);
+  assert.equal(generated.controlling_faction_id, null, 'a government is never a real controlling faction');
+  assert.equal(generated.issuing_organization_id, government.id);
+  assert.equal(generated.issued_by_entity_id, 801);
+  assert.match(generated.objective, /constituent matter/);
+});
+
+test('a real religious order with a real leader: same real mechanism, religious objective text', () => {
+  const w = baseWorld();
+  const order = withReligiousOrder(w);
+
+  let generated = null;
+  for (let tick = 0; tick < 50 && !generated; tick += 1) {
+    generated = missionTriggers.maybeTriggerMission(w, 1, 501, { tick });
+  }
+  assert.ok(generated);
+  assert.equal(generated.controlling_faction_id, null);
+  assert.equal(generated.issuing_organization_id, order.id);
+  assert.equal(generated.issued_by_entity_id, 802);
+  assert.match(generated.objective, /favor for/);
+});
+
+test('a real business operating here with a real leader: same real mechanism, business objective text', () => {
+  const w = baseWorld();
+  const business = withBusiness(w);
+
+  let generated = null;
+  for (let tick = 0; tick < 50 && !generated; tick += 1) {
+    generated = missionTriggers.maybeTriggerMission(w, 1, 501, { tick });
+  }
+  assert.ok(generated);
+  assert.equal(generated.controlling_faction_id, null);
+  assert.equal(generated.issuing_organization_id, business.id);
+  assert.equal(generated.issued_by_entity_id, 803);
+  assert.match(generated.objective, /Pick up some work/);
+});
+
+test('no category anywhere has a real installed leader: honestly nothing, across all four', () => {
+  const w = baseWorld();
+  // A government and a religious order both exist, neither with a
+  // real leader yet — the same "ground is held, nobody installed"
+  // shape the original criminal-only test already covered, now
+  // checked for the other two categories too.
+  withGovernment(w, { leaderId: null });
+  withReligiousOrder(w, { leaderId: null });
+  for (let tick = 0; tick < 50; tick += 1) {
+    assert.equal(missionTriggers.maybeTriggerMission(w, 1, 501, { tick }), null);
+  }
+});
+
+test('priority order: a criminal hold wins over a real government, even though both have real leaders', () => {
+  const w = baseWorld();
+  const faction = withControllingFaction(w);
+  withGovernment(w);
+
+  let generated = null;
+  for (let tick = 0; tick < 50 && !generated; tick += 1) {
+    generated = missionTriggers.maybeTriggerMission(w, 1, 501, { tick });
+  }
+  assert.ok(generated);
+  assert.equal(generated.controlling_faction_id, faction.id, 'criminal must win priority over political');
+  assert.equal(generated.issuing_organization_id, undefined, 'the criminal path never sets issuing_organization_id at all -- same as every mission before this round');
+});
+
+test('priority order: political wins over religious and business when no criminal hold exists', () => {
+  const w = baseWorld();
+  const government = withGovernment(w);
+  withReligiousOrder(w);
+  withBusiness(w);
+
+  let generated = null;
+  for (let tick = 0; tick < 50 && !generated; tick += 1) {
+    generated = missionTriggers.maybeTriggerMission(w, 1, 501, { tick });
+  }
+  assert.ok(generated);
+  assert.equal(generated.issuing_organization_id, government.id, 'political must win priority over religious and business');
+});
+
+test('priority order: religious wins over business when no criminal or political leader exists', () => {
+  const w = baseWorld();
+  const order = withReligiousOrder(w);
+  withBusiness(w);
+
+  let generated = null;
+  for (let tick = 0; tick < 50 && !generated; tick += 1) {
+    generated = missionTriggers.maybeTriggerMission(w, 1, 501, { tick });
+  }
+  assert.ok(generated);
+  assert.equal(generated.issuing_organization_id, order.id, 'religious must win priority over business');
+});
+
+test('a mission from a political/religious/business main character still respects the one-open-mission-per-location cap', () => {
+  const w = baseWorld();
+  withGovernment(w);
+  missions.generateMission(w, { locationId: 501, objective: 'already working this one' });
+  assert.equal(w.missions.length, 1);
+
+  for (let tick = 0; tick < 100; tick += 1) {
+    assert.equal(missionTriggers.maybeTriggerMission(w, 1, 501, { tick }), null);
+  }
+  assert.equal(w.missions.length, 1);
 });

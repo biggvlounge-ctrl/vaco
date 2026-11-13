@@ -47,37 +47,67 @@
 // would reward planning instead of doing).
 //
 // ---------------------------------------------------------------------
-// Why criminal, not political/religious/business
+// Criminal, political, religious, and business — all four now, through
+// two different real mission fields
 // ---------------------------------------------------------------------
 //
 // `missions.generateMission`'s own `controllingFactionId` validation
 // requires `organizations.isFaction === true` — a real gang/faction,
 // never a government, religious order or business. That is the
-// schema's own distinction, not one invented here, and it matches the
-// founder's own worked example exactly: "a kingpin... the strongest
-// gangs" is the GTA-style job-giver, not the mayor or a shopkeeper.
-// `mainCharacters.criminalLeaderOf` is the one category of the four
-// built for exactly this shape.
+// schema's own distinction, not one invented here: `controlling_
+// faction_id` means a faction genuinely controls this ground by force,
+// which is true of a criminal hold and not of a government seat, a
+// religious order, or a shop.
+//
+// The other three categories are not locked out by that — they are
+// routed through a DIFFERENT real field instead.
+// `leadership.js#directMission` already established the shape a real,
+// non-faction organization needs to stand behind a mission: generate
+// it with no `controllingFactionId` at all, then set
+// `mission.issuing_organization_id`/`.issued_by_entity_id` directly,
+// the same in-memory-only pair that file already writes (no schema
+// column exists for either — `migrate.js`'s own `missions` INSERT
+// does not name them, the identical "real field, no persistence yet"
+// posture this file's own `city.healthBaseline`-class fields already
+// hold elsewhere in this registry). Reused here rather than inventing
+// a second convention for the identical real situation: a real
+// organization is behind this job, and it is not a faction.
+//
+// `mainCharacters.mainCharactersOf` already resolves all four
+// categories per community; `maybeTriggerMission` checks them in that
+// function's own listed order (criminal, political, religious,
+// business) and uses the first one with a real, installed leader. One
+// combined roll decides whether a mission triggers at all — the
+// overall rate is unchanged from the criminal-only version — so
+// opening this to four categories widens WHO a job can come from
+// without widening HOW OFTEN one appears.
 //
 // ---------------------------------------------------------------------
 // A found, honest limitation, not a guess papered over
 // ---------------------------------------------------------------------
 //
 // **On a freshly generated, never-ticked world, this almost never
-// fires** — checked directly before calibrating anything, the
-// seventeenth standing rule's own discipline. `organizations.leader_id`
-// is written at generation for nothing worldgen creates except this
-// round's own religious order (the forty-eighth standing rule's
-// documented gap); a faction's `leader_id` is written only by a real
-// election-equivalent for gangs, which is `control.js`'s own `seize` —
-// itself only ever called from the real `attempt-takeover` player
-// verb, never from the tick pipeline. Measured directly: a 6-community,
-// 240-resident generated world produced authority.holderOf() holders
-// in several communities and `leader_id` set on NONE of them. So the
-// real sequence this mechanism rewards is: a real faction takes real
-// ground (`attempt-takeover`, already a real verb), and ONLY THEN does
-// visiting that ground start offering jobs from whoever just took it —
-// which is the GTA shape being asked for, not a bug in this one.
+// fires for three of the four categories** — checked directly before
+// calibrating anything, the seventeenth standing rule's own
+// discipline. `organizations.leader_id` is written at generation for
+// nothing worldgen creates except the religious-order archetype (the
+// forty-eighth standing rule's documented gap) — a gang's `leader_id`
+// is written only by `control.js#seize`, itself only ever called from
+// the real `attempt-takeover` player verb; a government's and a
+// business's are written only by a real election or takeover
+// equivalent, neither of which runs automatically from the tick
+// pipeline either. Measured directly: a 6-community, 240-resident
+// generated world produced `authority.holderOf()` holders in several
+// communities and `leader_id` set on NONE of them. So the real
+// sequence criminal, political, and business missions reward is: a
+// real faction takes real ground, a real government seat or business
+// changes real hands (whichever mechanism each already has), and ONLY
+// THEN does visiting that ground start offering jobs from whoever just
+// took it. Religious missions are the one category reachable from a
+// freshly generated world, because that archetype alone installs a
+// real founding leader immediately — not a bug in the other three,
+// the honest shape of what each category's own leadership mechanism
+// actually is.
 //
 // ---------------------------------------------------------------------
 // The rate — measured, not guessed (standing rule 17)
@@ -129,11 +159,30 @@ function hasOpenMissionAt(worldState, propertyId) {
   );
 }
 
+// Checked in this fixed order — the same order `mainCharacters
+// .mainCharactersOf` itself lists its four fields in — so a location
+// with more than one real, led category still produces exactly one
+// mission from exactly one of them, deterministically, never a
+// surprise pick that changes between two reads of the same world.
+const CATEGORY_ORDER = ['criminal', 'political', 'religious', 'business'];
+
+// One line of real flavor text per category. `org` is the real
+// organization behind the job, or `null` when `mainCharacters` found a
+// leader but this lookup somehow misses the organization row (should
+// not happen against real state, handled the same honest way a
+// missing name is handled everywhere else in this file).
+const OBJECTIVE_BY_CATEGORY = {
+  criminal: (org, place) => `Run an errand for ${org?.name ?? 'whoever runs this block'} at ${place}`,
+  political: (org, place) => `Handle a constituent matter for ${org?.name ?? 'the local government'} at ${place}`,
+  religious: (org, place) => `Do a favor for ${org?.name ?? 'the local religious order'} at ${place}`,
+  business: (org, place) => `Pick up some work for ${org?.name ?? 'whoever runs this place'} at ${place}`,
+};
+
 // The one real entry point both `search-location` and a location-aware
 // `practise-habit` call. Returns the generated mission, or `null` —
 // honestly, for any of several real reasons (no such property, no
-// faction holding this ground, this ground's hold has no leader yet,
-// a mission here is already open, or simply the draw not landing) —
+// category with a real, installed leader controls this ground, a
+// mission here is already open, or simply the draw not landing) —
 // never an error, since "nothing happened this time" is this
 // mechanism's own ordinary, intended outcome.
 function maybeTriggerMission(worldState, entityId, propertyId, options = {}) {
@@ -142,8 +191,20 @@ function maybeTriggerMission(worldState, entityId, propertyId, options = {}) {
   if (!property || property.community_id == null) return null;
   if (hasOpenMissionAt(worldState, propertyId)) return null;
 
-  const criminal = mainCharacters.criminalLeaderOf(worldState, property.community_id);
-  if (!criminal || criminal.leaderId == null) return null;
+  const characters = mainCharacters.mainCharactersOf(worldState, property.community_id);
+  if (!characters) return null;
+
+  let category = null;
+  let leader = null;
+  for (const candidate of CATEGORY_ORDER) {
+    const found = characters[candidate];
+    if (found && found.leaderId != null) {
+      category = candidate;
+      leader = found;
+      break;
+    }
+  }
+  if (!category) return null;
 
   const roll = seeded.seededDraw(['mission-trigger', tick, propertyId, entityId]);
   if (roll >= MISSION_TRIGGER_CHANCE) return null;
@@ -156,14 +217,28 @@ function maybeTriggerMission(worldState, entityId, propertyId, options = {}) {
     seeded.seededDraw(['mission-trigger-reward', propertyId]) * spread,
   );
 
-  const faction = worldState.organizations.find((o) => o.id === criminal.organizationId);
+  const organization = worldState.organizations.find((o) => o.id === leader.organizationId);
   const place = property.name ?? `location ${property.id}`;
-  return missions.generateMission(worldState, {
-    locationId: propertyId,
-    controllingFactionId: criminal.organizationId,
-    objective: `Run an errand for ${faction?.name ?? 'whoever runs this block'} at ${place}`,
-    reward,
-  });
+  const objective = OBJECTIVE_BY_CATEGORY[category](organization, place);
+
+  const missionOptions = { locationId: propertyId, objective, reward };
+  // Only a real faction can be a `controllingFactionId` — see this
+  // file's own header. The other three categories route the real
+  // organization behind the job through `issuing_organization_id`/
+  // `issued_by_entity_id` instead, the same in-memory-only pair
+  // `leadership.js#directMission` already established for exactly this
+  // shape, reused rather than duplicated.
+  if (category === 'criminal') {
+    missionOptions.controllingFactionId = leader.organizationId;
+  }
+  const mission = missions.generateMission(worldState, missionOptions);
+  if (category !== 'criminal') {
+    mission.issuing_organization_id = leader.organizationId;
+    mission.issued_by_entity_id = leader.leaderId;
+  }
+  return mission;
 }
 
-module.exports = { MISSION_TRIGGER_CHANCE, hasOpenMissionAt, maybeTriggerMission };
+module.exports = {
+  MISSION_TRIGGER_CHANCE, CATEGORY_ORDER, hasOpenMissionAt, maybeTriggerMission,
+};
