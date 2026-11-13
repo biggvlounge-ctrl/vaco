@@ -20,13 +20,16 @@ There is a working simulation — traits across four tiers, seven Key
 resolvers, family, economy, territory, tick, players, artifacts and
 missions, plus Property, Culture DNA, Named Flow Templates, contest
 resolution and the Behavior Engine — and its HTTP surface is real:
-**110 routes**, up from 8 before any of this -- 92 plus the two
+**112 routes**, up from 8 before any of this -- 92 plus the two
 cross-cutting reads (`/api/historical-records`,
 `/api/decision-log/:entityId`) a later audit found documented in
 `VACANCY_API_ENDPOINT_MAP.md` as built and missing from `server.js`,
 plus four more (`GET`/`POST /api/regions`, `GET /api/regions/:id`,
 `GET /api/country-packs/:key`) added to make `migration.js`'s and
-`countryPacks.js`'s real, cited country/region data -- built up over
+`countryPacks.js`'s real, cited country/region data, plus the two
+V4/VASH ecosystem-link routes (`GET /api/ecosystem/v4-twin-link/
+:agentId`, `GET /api/ecosystem/vash-tap-link/:tapCode`) that closed
+standing rule 5's own long-standing gap -- built up over
 many rounds -- reachable over HTTP at all, closing a gap where neither
 file was even `require`d by `server.js`, plus two more from Leader
 mode (`GET /api/players/:id/leader-dashboard`,
