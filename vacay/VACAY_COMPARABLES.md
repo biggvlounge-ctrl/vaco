@@ -60,21 +60,35 @@ fee anchor is settled.
 is the part with the least code behind it.** The three failure patterns
 are named as design opportunities; here is where each actually stands.
 
-**1. Host cancellations on confirmed stays — partially addressed, and
-the existing work shows the right shape.** `vacay/lib/auto/rentals.js`
-implements a real cancellation policy: `CANCELLATION_CUTOFF_HOURS = 24`
-with real refund eligibility, modelled on Turo's actual free-
-cancellation window. That is a *guest* cancelling a car.
+**1. Host cancellations on confirmed stays — the refund-and-penalty
+half is now real; the replacement half is still open.**
 
-The failure pattern this document describes is the opposite and worse:
-a **host** cancelling a confirmed stay, leaving a guest with no
-comparable replacement. Nothing in VACAY handles that asymmetry. The
-distinction matters because the remedies are different — a guest
-cancelling needs a refund rule, while a host cancelling needs a
-*replacement* and a penalty, and a refund alone is precisely the
-response that generates the 1-star reviews this research is citing.
-The existing rentals policy is a good template for the mechanism, not
-for the terms.
+> *Correction, added during this round's doc-vs-code reconciliation.*
+> The paragraph below originally said "nothing in VACAY handles that
+> asymmetry." That stopped being true on 5 Nov 2026 and this file was
+> never updated to say so — see `README.md`'s own "Real host-
+> cancellation guarantee" section and `lib/bookings/bookings.js#cancelBooking`
+> for the real, current mechanism, confirmed directly rather than
+> trusted from either doc: a host cancellation is always fully
+> refunded to the guest regardless of timing (`isHostCancelling`
+> bypasses the guest-side `CANCELLATION_CUTOFF_HOURS` check entirely),
+> and each one counts as a real strike against that host —
+> `HOST_CANCELLATION_STRIKE_LIMIT` (3) bars a host with that many
+> cancellations from taking new bookings at all, enforced in
+> `createBooking` itself.
+>
+> What the distinction below still correctly identifies as missing:
+> this is the refund-and-penalty remedy, not a **replacement** —
+> nothing in VACAY finds or offers the guest a comparable alternative
+> stay when their host backs out. That half of the gap is real and
+> still open.
+
+`vacay/lib/auto/rentals.js` also implements a real cancellation
+policy for a *guest* cancelling a car (`CANCELLATION_CUTOFF_HOURS = 24`
+with real refund eligibility, modelled on Turo's actual free-
+cancellation window) — a different asymmetry from the host-cancelling-
+a-stay case above, already correctly distinguished in this document
+before this correction and left as originally written.
 
 **2. Misrepresented or unready properties — not addressed.** No photo
 or condition verification exists. Worth noting that VACA is the natural
@@ -118,11 +132,13 @@ prerequisite and it is done. It is a separate, larger piece of work
 requiring iCal import/export and a reconciliation policy for conflicts
 discovered after the fact.
 
-**Recommended ordering, revised:** host-cancellation terms first
-(policy decision, cheap once decided, and the failure pattern with
-nothing at all behind it), then listing verification (needs VACA work
-and a human review process), then external calendar sync (largest, and
-only worth doing once hosts genuinely dual-list).
+**Recommended ordering, revised again during this round's
+reconciliation**: the host-cancellation refund-and-strike terms this
+section once listed first are built (5 Nov 2026, see the correction
+above) — remaining open work is the host-cancellation **replacement**
+mechanic, then listing verification (needs VACA work and a human
+review process), then external calendar sync (largest, and only worth
+doing once hosts genuinely dual-list).
 
 **On the fee anchor — one honest note.** "Airbnb 15.5% flat host-only"
 is cited as validated by Booking.com and Expedia's ranges, but those
