@@ -20,15 +20,21 @@ VACON. This project is the real, missing piece: the roster made
 queryable over HTTP, MIA's own real routing logic, and a real invoke
 path that proxies to `v4-proxy` for the actual completion.
 
-**A note on "Jake"**: named directly alongside MIA/Qvan/Leslie/Deskins/
-Gibson as one of VACON's real agents. No agent named Jake exists
-anywhere in this session's source docs or in `V4Prototype.jsx`'s own
-roster — the only real "Jake" found anywhere is VENVM's own
-production-stack lead (a human/tool credit in
-`vacon-c/PHOTO_GROUNDED_SCENE_GENERATION_CAMERA_CONTROL.md`), a
-different real thing entirely. Flagged honestly rather than
-fabricating an eleventh agent to match the name — the roster below is
-exactly what `V4Prototype.jsx` already established.
+**A note on "Jake," corrected from this file's own earlier claim.**
+This README once said no agent named Jake existed anywhere and that
+building one would mean fabricating an eleventh agent to match a name
+— true at the time, no longer true now, and this section is stale
+until corrected here. `venvm/lib/scriptEngine.js` later gained a real
+`JAKE_SYSTEM_PROMPT` and a real callable capability behind it, which
+changed the situation: Jake was not invented to match the name, he was
+*registered* once a real capability existed to register. `lib/
+agents.js`'s own header carries the fuller account, including the
+structural argument that made it worth doing — every other consumer
+app already has a VACON representative (V3/Leslie, VOID/Gibson,
+DREAMS/DREA, VACAY/Kay, CVNVO/Kevin, VOID MAGIC/Anderson, Vex
+Business/Stephanie, Vvltvre/Ava+Autumn+Jacobi); VENVM was the only one
+with none, so MIA could not hand off production work to anyone. See
+"Jake (Phase 5)" below for the real registry/verification record.
 
 Source docs: `V4Prototype.jsx` (the real, original roster + Command
 Center UI this project's registry is copied from verbatim),
