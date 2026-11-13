@@ -60,9 +60,14 @@ curl "http://localhost:8789/api/insight?query=hunt%20sponsor%20budget"
 ```
 
 ## What's here
-- `lib/registry.js` — the real app registry: 24 entries, each checked
-  directly against that app's own `server.js`/README for its real dev
-  port, not guessed. ~~`url: null` for VACON-C specifically...~~
+- `lib/registry.js` — the real app registry: ~~24 entries~~ **Stale —
+  checked directly, 13 Nov 2026: `APPS.length` is 42, not 24. The
+  registry has grown (CVLLEX, `vash-tap`, `vaco-passport`,
+  `vaco-operator`, `vaco-media`, `vaco-audit`, `vaco-notify`,
+  `vaco-assistant`, and others folded in since this line was written)
+  and the count was never bumped alongside it.** Each entry is still
+  checked directly against that app's own `server.js`/README for its
+  real dev port, not guessed. ~~`url: null` for VACON-C specifically...~~
   **Stale — checked directly, 5 Nov 2026.** `vacon-c`'s entry already
   carries a real `url: 'http://localhost:8809'`, not `null`; its tile
   is not disabled. `server.js` there is real (Phase 11 onward — see
@@ -105,10 +110,23 @@ curl "http://localhost:8789/api/insight?query=hunt%20sponsor%20budget"
   `../vaco-assistant/`, next to VACON and v4-proxy in the systems
   tier, so other apps can reach the same real assistant too — see
   that app's own README for the mechanism and how any app calls it.
-  The five `/api/assistant/*` routes here are now a thin proxy:
+  ~~The five `/api/assistant/*` routes here are now a thin proxy~~
+  **Stale — checked directly, 13 Nov 2026: `server.js` now proxies 11
+  `/api/assistant/*` routes, not 5.** The original five (`tones`,
+  `profile` GET/POST, `history`, `chat`) are still a thin proxy exactly
+  as described below; six more were added afterward for the
+  FaceTime-style call flow (`POST /api/assistant/calls`,
+  `GET /api/assistant/calls`, `GET /api/assistant/calls/:id`, and the
+  `:id/decline`, `:id/events`, `:id/end` actions) and this line was
+  never updated to count them. All eleven are the same kind of proxy:
   same relative paths, same frontend, but each one forwards the real
   request (Authorization header included) straight through to
-  `vaco-assistant` and returns its real response. **Also fixed the
+  `vaco-assistant` and returns its real response. The call routes back
+  a real "ring → live call → text fallback" flow (`public/index.html`'s
+  own "personal assistant: FaceTime-style call" section) — place a
+  call, your assistant auto-answers, a real connected-duration timer
+  runs, and the card shows exactly what V4's own media check reported
+  rather than a stand-in video stream. **Also fixed the
   same pass this was first built**: this page's own bespoke `api()`
   helper never attached the `Authorization: Bearer` header
   Shield-gated writes require — unlike every other app's shared
@@ -129,8 +147,11 @@ curl "http://localhost:8789/api/insight?query=hunt%20sponsor%20budget"
 
 ## Verified
 Live, with `venvs-mock-backend`, `vacon`, and `vaco-shell` all running
-together: the real 24-app registry served and rendered as 24 tiles,
-with VACON-C's own entry correctly shown disabled (no live server);
+together: the real app registry served and rendered as tiles
+~~(24 apps/tiles at the time)~~ — **the registry has since grown to 42
+entries (checked directly, 13 Nov 2026), so the exact count here is a
+snapshot of that pass, not a current figure** — with VACON-C's own
+entry correctly shown disabled (no live server);
 a real login round-tripping through this app's own `/api/session` into
 Shield's real session store and back; the resulting Shield token
 confirmed present on an outbound tile link exactly as

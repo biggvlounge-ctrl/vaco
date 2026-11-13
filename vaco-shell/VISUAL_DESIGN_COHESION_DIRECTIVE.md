@@ -162,6 +162,41 @@ stylesheet (it is a separate Vite origin; a shared npm-style package or
 a build-time copy is the real fix). Per-app palettes remain undecided
 except VACAY's, which is still a decision rather than an implementation.
 
+### Update, 13 Nov 2026 — the above is now substantially stale
+
+**The build-time copy this document asked for has happened.** Checked
+directly: `public/vaco-design.css` and `public/vaco-ui.js` are no
+longer private to the shell — byte-for-byte identical copies now live
+in `public/` for every app that has a frontend (`chopz`,
+`chopz-shop`, `cvllex`, `cvnvo`, `cvnvo/yap`, `dreams`, `hvntz`,
+`shield`, `v3`, `v4-proxy`, `v4-search`, `vaca`, `vacay`,
+`vaco-analytics`, `vaco-assistant`, `vaco-notify`, `vaco-passport`,
+`vacon`, `vacon-c`, `vago`, `vash-tap`, `vavlt-stvdios`, `vdp`,
+`venvm`, `vex`, `vex-trading`, `void`, `voidmagic`, `voken`, `vsafe`,
+`vulture-flix`, `vulture-music`, `vulture-pods`, `vulture-studios`,
+`vxllage` — 34 apps, not "thirteen-plus" still owing a conversion).
+`diff` against this shell's own copy comes back empty for every one
+checked, so this is the "shared npm-style package or a build-time
+copy" the document called "the real fix," not a divergent fork.
+
+**Per-app palettes are no longer undecided either.** Every one of
+those 34 apps' own `index.html` calls `VACO.app({ … accent, accentDim,
+accentInk … })` with its own real hex values, each with a one-line
+rationale comment in the source — not just VACAY's. `VACO_PALETTE_REGISTER.md`
+is the register of record for these; as of this pass it is missing
+rows for four of them (CVLLEX, YAP, VACO Analytics, VACO Passport),
+corrected there in the same pass that found this.
+
+What is genuinely still open: VDP (a separate Vite origin) takes only
+the CSS half. `vdp/index.html` links `vaco-design.css` as a plain
+static file (not a bundled/npm import) and sets its own accent via an
+inline `style` attribute rather than calling `VACO.app()` — `vdp/index.html`'s
+own comment explains why: `vaco-ui.js` manipulates the DOM directly and
+would fight React for it, so VDP skips that half and hand-builds the
+equivalent in `App.jsx`. That is a real, deliberate exception, not an
+oversight, but it means VDP is not a full second consumer of the shared
+runtime the way the single-origin Express apps are.
+
 ### One thing to decide before starting
 
 The directive asks for both a unifying family look *and* a distinct

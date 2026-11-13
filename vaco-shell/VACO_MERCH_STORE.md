@@ -57,7 +57,10 @@ commerce surface, no product model, and no fulfillment integration.
 **Filed under VACO Shell because this document places it there**
 ("inside Vaco Shell"), and that placement is right for a reason worth
 stating: the Shell is the only surface that already knows about every
-app. `registry.js` holds all 31 entries with their parent groupings.
+app. ~~`registry.js` holds all 31 entries~~ **Stale — checked directly,
+13 Nov 2026: `registry.js`'s `APPS` array now holds 42 entries, not 31
+(the registry has grown since this line was written and the count was
+never bumped).** It still holds every entry with its parent grouping.
 A merch store spanning every brand needs exactly that list, and the
 Shell is the one place it exists without duplication.
 

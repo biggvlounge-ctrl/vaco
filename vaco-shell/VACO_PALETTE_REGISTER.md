@@ -44,6 +44,8 @@ sorted by it.
 | 16° | VACAY | `#f0845e` | Sunset coral — the "dusk navy + sunset coral + brass" direction the design directive recorded as decided but which appeared in no file until now. |
 | 25° | Vvltvre Pods | `#e08a4f` | Radio-studio rust. |
 | 26° | Vex Trading | `#a89080` | Brushed bronze — the register's only *warm neutral*, and the low saturation is what keeps it clear of Vvltvre Pods one degree away. A lobby rather than a terminal: like VACON it routes to the apps that do the work, so it stays quieter than either. Chosen over a blue-grey sibling of VEX because a user launching VEX from here has both open at once, and hue separation had to be real rather than a shade difference. |
+| 30° | CVLLEX | `#b8732e` | Forge-bronze, per `cvllex/public/index.html`'s own comment: distinct from VOKEN's square/star hue. **Added 13 Nov 2026 — real in code since before this register last listed CVLLEX's row; sits closer to Vex Trading (26°) and VAGO (40°) than the ~10° rule below asks for, worth a look if a fifth warm neutral is ever added here.** |
+| 36° | YAP | `#d99a3f` | Sober amber, per `cvnvo/yap/public/index.html`'s own comment: a warning signal by nature, deliberately not CVNVO's dating-app coral. **Added 13 Nov 2026 — same note as CVLLEX above: this stretch of the wheel (CVLLEX/YAP/VAGO, 30°–40°) is tightly packed.** |
 | 40° | VAGO | `#d9a23f` | Casino brass, without the garishness. Deliberately distinct from the money-green semantic token so a payout never reads as brand chrome. |
 | 52° | VACO Notify | `#d8b24a` | Signal amber — the one place a warm alerting colour is the *subject* rather than a semantic overlay. Chosen over red because this service is not an emergency, it is the thing that tells you about one, and a console that always looks alarming stops being read. |
 | 78° | HVNTZ | `#a3c94f` | Lime-olive. Outdoors and searching. |
@@ -56,6 +58,8 @@ sorted by it.
 | 190° | VACA | `#2f9fb8` | Teal-blue. Trust infrastructure, adjacent to VSAFE but greener so the two consoles are never confused. |
 | 192° | DREAMS | `#3fbde0` | Backlit-display cyan. |
 | 205° | VEX | `#6b8299` | Graphite-blue. Trading-terminal restraint; must not read as VOKEN, whose cards it trades. |
+| 206° | VACO Analytics | `#6f8fa8` | Desaturated blue-grey, per `vaco-analytics/public/index.html`'s own comment: a dashboard should let its data carry the colour, so the chrome stays quiet. **Added 13 Nov 2026 — real in code, missing from this register until now; sits almost on top of VEX (205°) above and VACO Passport just below, worth a look if these three ever need to be told apart at a glance.** |
+| 206° | VACO Passport | `#3f6b8f` | Steel-blue, per `vaco-passport/public/index.html`'s own comment: passport-adjacent trust and verification, distinct from the warmer teals above. **Added 13 Nov 2026 — real in code, missing from this register until now.** |
 | 210° | VSAFE | `#4d94e8` | Signal blue. Calm authority rather than alarm red — the colour of a service you want to be boring. |
 | 215° | Vvltvre Studios | `#5a8fd6` | Steel blue. This is the arm that writes cheques; it should not look like the label. |
 | 230° | VACON | `#8a90b8` | Slate-indigo. Infrastructure, deliberately quieter than the apps it routes to. |
@@ -94,3 +98,12 @@ character" per app. None of the apps use a distinct typeface, and the
 shared type scale is the same everywhere. That is the conservative
 reading and can be revisited once the family look is established rather
 than aspirational.
+
+## Reconciliation, 13 Nov 2026
+
+Checked every app's own `public/index.html` `VACO.app({...})` call
+against this register directly. Four real, already-shipped accents had
+no row here — CVLLEX, YAP, VACO Analytics, and VACO Passport — added
+above with their own hue computed from the real hex value and the
+rationale already written in each app's own source comment. No colour
+was invented for this pass; all four were already live in code.
