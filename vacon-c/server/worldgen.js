@@ -2209,6 +2209,116 @@ function generateWorld(options = {}) {
     summary.governmentSeatPropertyId = seat.id;
   }
 
+  // ---- every OTHER real hero landmark gets a real operator too -----------
+  // **The broader, honestly-named gap the prison-staff round left open
+  // on purpose, closed now rather than left for someone to
+  // rediscover**: "every OTHER hero landmark category (museum,
+  // library, cathedral, and the rest) still has exactly the same
+  // missing operator link." Run AFTER the civilization seat is chosen
+  // above, deliberately — the seat picks "the first property with no
+  // operator yet", and wiring more landmarks before that check would
+  // change which property becomes the seat on worlds that already
+  // generate one today. Three real shapes, one per landmark CATEGORY
+  // of staff, read from `landmarks.KEY_BUILDING_TYPES` itself rather
+  // than a second, hand-copied list:
+  const RELIGIOUS_LANDMARK_TITLES = {
+    church: 'priest', mosque: 'imam', synagogue: 'rabbi', temple: 'religious leader',
+  };
+  {
+    const unoperatedLandmarks = (w.properties || []).filter(
+      (p) => p.operating_organization_id == null && p.landmark_category
+        && landmarks.KEY_BUILDING_TYPES[p.landmark_category],
+    );
+
+    unoperatedLandmarks.forEach((landmarkProperty, i) => {
+      const category = landmarkProperty.landmark_category;
+      const definition = landmarks.KEY_BUILDING_TYPES[category];
+      // No real occupation slot at all (a monument, a notable bridge,
+      // a cave system, ...) — nobody works here, so there is nothing
+      // to wire an employer for. Leaving `operating_organization_id`
+      // null is the honest answer, not a gap.
+      if (!definition.staff) return;
+
+      if (definition.propertyType === 'government') {
+        // The same real operator prisons and the civilization seat
+        // already use: the region's own government when one was
+        // generated (this engine generates exactly one region per
+        // world), otherwise the civilization-level one, which always
+        // exists.
+        landmarkProperty.operating_organization_id = summary.regionGovernmentIds[0] ?? state.id;
+        return;
+      }
+
+      if (category in RELIGIOUS_LANDMARK_TITLES) {
+        // Reuse the community's own real religious order
+        // (`config.religiousOrdersPerCommunity`) if one was founded
+        // for it — never a second, competing religious organization
+        // for the same community. A community with no real religious
+        // order (the option is off, or `mainCharactersOf` would
+        // already report this community has none) gets no operator
+        // here either — an honest, reported gap, not a guess.
+        const order = (w.organizations || []).find(
+          (o) => o.archetype === 'religious order' && o.community_id === landmarkProperty.community_id,
+        );
+        if (!order) return;
+        // **First real religious landmark claims the order; a second,
+        // DIFFERENT one in the same community is left unoperated,
+        // deliberately, not wired to the same organization under the
+        // wrong title.** One real organization cannot coherently be
+        // both "the synagogue" and "the mosque" — a single shared
+        // `religiousTitle` would be wrong for whichever building lost
+        // the race, which is worse than an honest gap. Measured
+        // directly before this guard existed: a community with a
+        // temple, a synagogue, AND a church (the random hero-landmark
+        // draw does not cap how many a community can get) left all
+        // three pointing at the one order, with a title matching only
+        // whichever was processed first. Gating on `order.religiousTitle`
+        // already being set catches this at the source rather than
+        // disambiguating it after the fact.
+        if (order.religiousTitle) return;
+        landmarkProperty.operating_organization_id = order.id;
+        // **"We need the imams... the priests... the rabbis," by
+        // direct instruction — a real, reported title matching what
+        // this specific building actually is.** The underlying
+        // EMPLOYABLE occupation stays `preacher` throughout this
+        // engine, the same single-grain discipline `athlete`/
+        // `entertainer` already hold (a title does not need its own
+        // tier/skill/employer set to be real) — this is the
+        // DISPLAYED, real-world-accurate name for whoever holds it,
+        // carried on the organization itself so it reads the same way
+        // from every caller rather than being re-derived at read time.
+        order.religiousTitle = RELIGIOUS_LANDMARK_TITLES[category];
+        return;
+      }
+
+      // Everything else with a real staff slot (skyscraper, airport,
+      // train-station, art-museum, theater-concert-hall, zoo-aquarium,
+      // stadium-arena) — a real business organization, the identical
+      // shape this file's own ordinary business generation already
+      // uses a few hundred lines above. `leader_id` is left null on
+      // purpose: giving every organization in this engine a real
+      // founding leader at generation — gangs, governments, and
+      // businesses alike — is real, separate, future work (already
+      // named in this file's own header for the forty-eighth standing
+      // rule's influence-economy round), not folded into this one.
+      // Seeded on this pass's own iteration POSITION (`i`), never on
+      // `landmarkProperty.id` — standing rule 8's "seed on position,
+      // never on identity," since an id comes from a counter whose
+      // state depends on everything already built before it.
+      const business = engine.generateOrganization({
+        name: `${landmarkProperty.name} Management`,
+        type: 'business',
+        traitValueFor: (def) => Math.round(
+          random.range(20, 90, 'landmark-biz-trait', i, def.family, def.name),
+        ),
+      });
+      business.assets = Math.round(random.range(50000, 500000, 'landmark-biz-assets', i));
+      business.influence = Math.round(random.range(10, 70, 'landmark-biz-influence', i));
+      landmarkProperty.operating_organization_id = business.id;
+      summary.organizations += 1;
+    });
+  }
+
   // ---- who works for the press and the state -----------------------------
   // **Two organizations that acted on the world and employed nobody.**
   // The press broadcasts, the assembly announces, funds services and
