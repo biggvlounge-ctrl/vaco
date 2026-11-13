@@ -1488,7 +1488,10 @@ test('the twentieth round adds thirty-two more real countries, all resolvable an
     'slovakia', 'slovenia', 'montenegro', 'albania', 'north-macedonia', 'kosovo',
   ];
   assert.equal(newKeys.length, 32);
-  assert.equal(Object.keys(countryPacks.COUNTRY_PROFILES).length, 111, '14th(10)+15th(12)+16th(india,1)+17th(15)+18th(23)+19th(18)+20th(32)');
+  // Loosened from an exact count to a floor once the 21st round added
+  // eleven more real entries on top of these -- same pattern every
+  // prior round's own count assertion has followed.
+  assert.ok(Object.keys(countryPacks.COUNTRY_PROFILES).length >= 111, '14th(10)+15th(12)+16th(india,1)+17th(15)+18th(23)+19th(18)+20th(32)');
   for (const key of newKeys) {
     assert.equal(countryPacks.countryFor(key), null, `${key} must not also exist in COUNTRIES`);
     const entry = countryPacks.countryProfileFor(key);
@@ -1542,6 +1545,90 @@ test('regionalContextFor resolves every twentieth-round country through the prof
     tajikistan: 'asia', turkmenistan: 'asia',
     estonia: 'europe', latvia: 'europe', slovakia: 'europe', slovenia: 'europe',
     montenegro: 'europe', albania: 'europe', 'north-macedonia': 'europe', kosovo: 'europe',
+  };
+  for (const [key, region] of Object.entries(expectations)) {
+    const ctx = countryPacks.regionalContextFor(key);
+    assert.ok(ctx.profileEntry, `${key} should resolve through profileEntry`);
+    assert.equal(ctx.region, region, `${key} should classify as ${region}`);
+  }
+});
+
+// ---------------------------------------------------------------------
+// Twenty-first round: eleven more real countries, plus nine real,
+// honest declines -- this round's own research found more candidates
+// it could not responsibly build than ones it could, the first time
+// that has happened across this whole multi-round effort.
+// ---------------------------------------------------------------------
+
+test('the twenty-first round adds eleven more real countries, all resolvable and well-formed', () => {
+  const newKeys = [
+    'chad', 'central-african-republic', 'congo-republic', 'equatorial-guinea',
+    'djibouti', 'mauritania', 'mauritius', 'lesotho', 'papua-new-guinea', 'fiji',
+    'timor-leste',
+  ];
+  assert.equal(newKeys.length, 11);
+  assert.equal(Object.keys(countryPacks.COUNTRY_PROFILES).length, 122, '111 (through the 20th round) + 11 (21st round)');
+  for (const key of newKeys) {
+    assert.equal(countryPacks.countryFor(key), null, `${key} must not also exist in COUNTRIES`);
+    const entry = countryPacks.countryProfileFor(key);
+    assert.ok(entry, `${key} should be a real COUNTRY_PROFILES entry`);
+    assert.ok(countryPacks.INCOME_LEVELS.includes(entry.incomeLevel), `${key}: incomeLevel must be real`);
+    assert.ok(countryPacks.CONFLICT_LEVELS.includes(entry.conflictLevel), `${key}: conflictLevel must be real`);
+    assert.ok(typeof entry.governmentType === 'string' && entry.governmentType.length > 0, `${key}: governmentType must be stated`);
+    assert.ok(entry.regimeType === null || countryPacks.REGIME_TYPES.includes(entry.regimeType), `${key}: regimeType must be null or a real published band`);
+    assert.ok('globalIndicators2026' in entry, `${key}: globalIndicators2026 must be present`);
+  }
+});
+
+test('Chad, the Central African Republic, and Congo-Republic all keep authoritarian-regime but null their score rather than pick one of three disagreeing real sources', () => {
+  for (const key of ['chad', 'central-african-republic', 'congo-republic']) {
+    const entry = countryPacks.countryProfileFor(key);
+    assert.equal(entry.regimeType, 'authoritarian-regime', `${key} should be authoritarian-regime`);
+    assert.equal(entry.regimeScore, null, `${key} should null its disputed score`);
+  }
+});
+
+test('the Central African Republic is active-armed-conflict, a real finding given its documented post-coup instability', () => {
+  assert.equal(countryPacks.countryProfileFor('central-african-republic').conflictLevel, 'active-armed-conflict');
+});
+
+test('Mauritius is a real full-democracy, the only one this file has found in Africa', () => {
+  const entry = countryPacks.countryProfileFor('mauritius');
+  assert.equal(entry.regimeType, 'full-democracy');
+  assert.equal(entry.regimeScore, 8.23);
+});
+
+test('Fiji is flagged secondary-estimate, since its hybrid-regime score was not confirmed against the EIU\'s own primary table', () => {
+  const entry = countryPacks.countryProfileFor('fiji');
+  assert.equal(entry.regimeType, 'hybrid-regime');
+  assert.equal(entry.regimeScore, 5.39);
+  assert.equal(entry.regimeScoreConfidence, 'secondary-estimate');
+});
+
+test('Papua New Guinea is a real hybrid-regime, a documented downgrade from the prior edition\'s flawed-democracy, not a reused stale figure', () => {
+  const entry = countryPacks.countryProfileFor('papua-new-guinea');
+  assert.equal(entry.regimeType, 'hybrid-regime');
+  assert.equal(entry.regimeScore, 5.97);
+});
+
+test('nine real candidates this round are honestly declined rather than built thin -- countryProfileFor returns null for all nine', () => {
+  const declined = [
+    'seychelles', 'comoros', 'eswatini', 'bhutan', 'maldives', 'brunei',
+    'bahamas', 'barbados', 'belize',
+  ];
+  for (const key of declined) {
+    assert.equal(countryPacks.countryProfileFor(key), null, `${key} should have been declined, not built`);
+    assert.equal(countryPacks.countryFor(key), null, `${key} should not exist in COUNTRIES either`);
+  }
+});
+
+test('regionalContextFor resolves every twenty-first-round country through the profileEntry tier with a real region', () => {
+  const expectations = {
+    chad: 'africa', 'central-african-republic': 'africa', 'congo-republic': 'africa',
+    'equatorial-guinea': 'africa', djibouti: 'africa', mauritania: 'africa',
+    mauritius: 'africa', lesotho: 'africa',
+    'papua-new-guinea': 'oceania', fiji: 'oceania',
+    'timor-leste': 'asia',
   };
   for (const [key, region] of Object.entries(expectations)) {
     const ctx = countryPacks.regionalContextFor(key);

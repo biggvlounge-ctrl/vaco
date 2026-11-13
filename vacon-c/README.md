@@ -471,6 +471,25 @@ Nagorno-Karabakh situation, Cameroon's Anglophone/Ambazonia conflict,
 Guyana's escalated Essequibo dispute with Venezuela), plus South
 Sudan at `active-armed-conflict`.
 
+## Eleven more real countries, and nine honest declines (countryPacks.js's twenty-first round, sixty-ninth standing rule)
+See `CLAUDE.md`'s own sixty-ninth standing rule for the full account.
+`COUNTRY_PROFILES` now carries 122 real entries, up from 111: Chad,
+the Central African Republic, the Republic of the Congo, Equatorial
+Guinea, Djibouti, Mauritania, Mauritius, Lesotho, Papua New Guinea,
+Fiji, and Timor-Leste. Chad, the Central African Republic, and the
+Republic of the Congo all keep `authoritarian-regime` but null their
+`regimeScore`, since three real sources disagree on the exact figure
+for each. Mauritius is a real `full-democracy` at 8.23, the only one
+found anywhere in Africa. Fiji's score is flagged `secondary-estimate`
+and Papua New Guinea's is a real, documented downgrade from the prior
+edition. This round is also the first in the whole multi-round effort
+where honest research returned more declines than builds: Seychelles,
+Comoros, Eswatini (no EIU data at all), Bhutan, the Maldives, Brunei
+(only V-Dem data found, not substituted), and the Bahamas, Barbados,
+Belize (a real CRS-sourced finding that the EIU's own Caribbean
+coverage excludes them). This is reported as a real, reproducible
+coverage ceiling, not a stopping point chosen out of fatigue.
+
 ## Bluffing and its exposure
 See `CLAUDE.md`'s own fifty-second standing rule for the full design.
 `server/bluff.js` models the gap between what `weapons

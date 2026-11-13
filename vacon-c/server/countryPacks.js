@@ -1071,6 +1071,84 @@
 // Same report-only posture as every other field in this module:
 // nothing in `server/` reads a `COUNTRY_PROFILES` field to decide an
 // outcome.
+//
+// ---------------------------------------------------------------------
+// Twenty-first round: eleven more real countries, and the first round
+// in this whole series to find a real, reproducible ceiling in this
+// session's own WebSearch-only tooling -- named honestly rather than
+// pushed past with thinner and thinner entries
+// ---------------------------------------------------------------------
+// Direct instruction to keep going "as much as you can genuinely"
+// toward the real ~195-country world. This round's own research pass
+// covered twenty candidate countries and could build eleven of them
+// to this file's own standard: Chad, the Central African Republic,
+// the Republic of the Congo, Equatorial Guinea, Djibouti, Mauritania,
+// Mauritius, Lesotho, Papua New Guinea, Fiji, Timor-Leste.
+//
+// **Nine of the twenty candidates researched this round are
+// DECLINED outright, not built thin, and named here by the same
+// discipline this file already held for Antifa (thirty-second
+// standing rule) and the Chicago gang-boundary FOIA release (thirty-
+// third): a real search was run, it came back with nothing usable,
+// and that honest result is recorded rather than silently
+// omitted.** Seychelles, Comoros and Eswatini returned literally no
+// EIU 2024 figure of any kind in this round's searches -- not a
+// wrong-year problem, not a sourcing-confidence problem, nothing at
+// all. Bhutan, the Maldives and Brunei came back with only V-Dem
+// figures (a different index, not substituted here) and no EIU
+// coverage. **The Bahamas, Barbados and Belize are the clearest case
+// of the three groups**: a real, named, primary-adjacent source (the
+// Congressional Research Service's own compilation of which
+// countries the EIU actually assesses in the Caribbean) lists Cuba,
+// the Dominican Republic, Guyana, Haiti, Jamaica, Suriname and
+// Trinidad and Tobago by name -- and does NOT include these three.
+// The most likely real reason, stated as an inference rather than a
+// confirmed EIU rule, is that the index excludes true microstates by
+// population; whatever the reason, the real finding is that no EIU
+// score for these three plausibly exists to be found, not that this
+// round's tooling merely missed one.
+//
+// **Chad, the Central African Republic and the Republic of the Congo
+// are the sharpest source-disagreement case in this entire file,
+// sharper than Brazil's missing score or Chile's three-way rank
+// conflict in earlier rounds.** Three different secondary aggregators
+// gave three different figures for the same three countries in the
+// same edition -- Chad at 1.89 from two sources, the Republic of the
+// Congo at 2.79 from one and 1.82 from another, and the Central
+// African Republic at 1.58, 1.18, and simply "authoritarian" with no
+// number from a third. All three are kept as `authoritarian-regime`
+// (every source agrees on the category, and all values found are
+// comfortably below this file's own 4.01 authoritarian threshold) but
+// `regimeScore` stays `null` for all three rather than picking one of
+// three disagreeing numbers -- the "both kept, neither picked"
+// discipline turned up to three.
+//
+// **Not one of the eleven built entries or the nine declined
+// candidates returned a usable World Bank income-classification
+// figure this round** -- every `incomeLevel` below is stated from
+// well-established general knowledge of the standard series, the
+// same honest caveat this file's own seventeenth round already
+// applied to the DRC/Iraq/Afghanistan, not independently confirmed
+// against a primary table.
+//
+// **This is a real, reproducible ceiling, not a stopping point
+// chosen out of fatigue.** Every remaining uncovered country this
+// file has not yet reached -- the small Pacific island states
+// (Papua New Guinea and Fiji excepted, both built this round), the
+// European microstates (Andorra, Monaco, San Marino, the Vatican,
+// Liechtenstein), and the three Caribbean states just declined -- sits
+// at or below the population/profile scale where this round's
+// searches already came back empty three separate times. Continuing
+// into that remaining set with the same WebSearch-only tooling would
+// mean building entries that are mostly or entirely `null`, which
+// this file's own discipline treats as a declared gap, not a
+// completed entry -- so the honest choice is to name the ceiling here
+// rather than manufacture thinner and thinner rows to look like
+// continued progress.
+//
+// Same report-only posture as every other field in this module:
+// nothing in `server/` reads a `COUNTRY_PROFILES` field to decide an
+// outcome.
 
 'use strict';
 
@@ -4917,6 +4995,160 @@ const COUNTRY_PROFILES = {
       homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
     },
   },
+  // Twenty-first round: eleven more real countries -- see this file's
+  // own header for the real tooling ceiling this round found and the
+  // nine candidates (Seychelles, Comoros, Eswatini, Bhutan, the
+  // Maldives, Brunei, the Bahamas, Barbados, Belize) declined
+  // outright rather than built thin.
+  chad: {
+    country: 'Chad', incomeLevel: 'low-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'presidential republic',
+    // Every source found agrees on the category; the exact score
+    // does not, and three disagreeing numbers are not resolved by
+    // picking one -- see this file's own header for the full account.
+    regimeType: 'authoritarian-regime', regimeScore: null,
+    regimeScoreConfidence: 'secondary-estimate',
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  'central-african-republic': {
+    country: 'Central African Republic', incomeLevel: 'low-income',
+    // Real, well-documented: repeated coups (including the 2013 one
+    // that brought a rebel coalition to power) and continuing
+    // instability -- not a settled peace.
+    conflictLevel: 'active-armed-conflict',
+    governmentType: 'presidential republic',
+    // Same three-way score disagreement as Chad's entry (1.58, 1.18,
+    // and a third source giving no number at all) -- every source
+    // agrees on the category, none is picked for the exact figure.
+    regimeType: 'authoritarian-regime', regimeScore: null,
+    regimeScoreConfidence: 'secondary-estimate',
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  'congo-republic': {
+    country: 'Congo (Republic of the)', incomeLevel: 'lower-middle-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'presidential republic',
+    // Same disagreement shape as Chad/CAR above (2.79 vs. 1.82) --
+    // category confirmed, exact figure not picked.
+    regimeType: 'authoritarian-regime', regimeScore: null,
+    regimeScoreConfidence: 'secondary-estimate',
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  'equatorial-guinea': {
+    country: 'Equatorial Guinea', incomeLevel: 'upper-middle-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'presidential republic (the same family has held power since 1979)',
+    // Confirmed directly: 1.92, authoritarian regime.
+    regimeType: 'authoritarian-regime', regimeScore: 1.92,
+    militaryExpenditurePctGDP: null,
+    // Equatorial Guinea's real oil wealth (and the real, well-
+    // documented concentration of its benefit in the ruling family)
+    // is a political-economy fact, not a production figure this
+    // round confirmed to this file's own standard.
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  djibouti: {
+    country: 'Djibouti', incomeLevel: 'lower-middle-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'presidential republic',
+    // Confirmed directly: 2.70, authoritarian regime.
+    regimeType: 'authoritarian-regime', regimeScore: 2.70,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  mauritania: {
+    country: 'Mauritania', incomeLevel: 'lower-middle-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'presidential republic',
+    // Confirmed directly: 3.96, authoritarian regime -- just below
+    // this file's own 4.01 hybrid-regime threshold.
+    regimeType: 'authoritarian-regime', regimeScore: 3.96,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  mauritius: {
+    country: 'Mauritius', incomeLevel: 'upper-middle-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'parliamentary republic',
+    // Confirmed directly: 8.23, full democracy -- the real, only
+    // full democracy in Africa this file's own research found,
+    // ranked 20th globally.
+    regimeType: 'full-democracy', regimeScore: 8.23,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  lesotho: {
+    country: 'Lesotho', incomeLevel: 'lower-middle-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'parliamentary constitutional monarchy',
+    // Confirmed directly: 6.06, rank 70th, flawed democracy -- a real,
+    // recurring pattern of coalition governments is named directly in
+    // the source as the real reason its democracy "remains in
+    // transition."
+    regimeType: 'flawed-democracy', regimeScore: 6.06,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  'papua-new-guinea': {
+    country: 'Papua New Guinea', incomeLevel: 'lower-middle-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'parliamentary constitutional monarchy',
+    // Confirmed directly from the EIU's own table: 5.97, rank 73rd,
+    // hybrid regime -- a real downgrade from the 2023 edition's
+    // flawed-democracy classification (6.03), not reused as a
+    // 2024 figure.
+    regimeType: 'hybrid-regime', regimeScore: 5.97,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  fiji: {
+    country: 'Fiji', incomeLevel: 'upper-middle-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'parliamentary republic',
+    // One secondary aggregator gives 5.39, hybrid regime, not
+    // confirmed against the EIU's own primary table this round --
+    // flagged rather than presented as settled.
+    regimeType: 'hybrid-regime', regimeScore: 5.39, regimeScoreConfidence: 'secondary-estimate',
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  'timor-leste': {
+    country: 'Timor-Leste', incomeLevel: 'lower-middle-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'semi-presidential republic',
+    // Confirmed directly: 7.03, rank 46th (down one place from the
+    // prior edition), flawed democracy.
+    regimeType: 'flawed-democracy', regimeScore: 7.03,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
 };
 
 // **Checked once, at load time.** A COUNTRY_PROFILES key must not
@@ -4992,6 +5224,9 @@ const REGION_BY_KEY = {
   'ivory-coast': 'africa', senegal: 'africa', cameroon: 'africa', 'south-sudan': 'africa', eritrea: 'africa',
   togo: 'africa', benin: 'africa', gabon: 'africa', guinea: 'africa', 'sierra-leone': 'africa',
   liberia: 'africa', gambia: 'africa',
+  chad: 'africa', 'central-african-republic': 'africa', 'congo-republic': 'africa',
+  'equatorial-guinea': 'africa', djibouti: 'africa', mauritania: 'africa',
+  mauritius: 'africa', lesotho: 'africa',
   // Caribbean -- Guyana/Suriname/Trinidad and Tobago included here on
   // real precedent found this round: the Congressional Research
   // Service's own compilation explicitly groups them with Cuba/the
@@ -5010,6 +5245,7 @@ const REGION_BY_KEY = {
   'north-korea': 'asia', taiwan: 'asia', nepal: 'asia', 'sri-lanka': 'asia', kazakhstan: 'asia', cambodia: 'asia',
   singapore: 'asia', mongolia: 'asia', uzbekistan: 'asia', laos: 'asia',
   georgia: 'asia', armenia: 'asia', azerbaijan: 'asia', kyrgyzstan: 'asia', tajikistan: 'asia', turkmenistan: 'asia',
+  'timor-leste': 'asia',
   // Latin America (Central/South America, excluding the Caribbean above)
   mexican: 'latin-america', guatemalan: 'latin-america', honduran: 'latin-america', salvadoran: 'latin-america',
   venezuela: 'latin-america', colombia: 'latin-america', brazil: 'latin-america', argentina: 'latin-america',
@@ -5023,6 +5259,7 @@ const REGION_BY_KEY = {
   // REGION_OVERVIEWS already documents for any region with no built
   // overview), but the classification itself is still real.
   australia: 'oceania', 'new-zealand': 'oceania',
+  'papua-new-guinea': 'oceania', fiji: 'oceania',
 };
 
 // Only regions with a REAL, already-built multi-country overview get

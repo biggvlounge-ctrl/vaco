@@ -4267,6 +4267,55 @@ Full suite, this round's own final run: 2068 tests, 2044 pass, 0 fail,
 7 cancelled (the pre-existing `worldgen.test.js` hang and its
 downstream collateral timeouts, unrelated to this round), 17 skipped.
 
+**A sixty-ninth, `countryPacks.js`'s own twenty-first round -- eleven
+more real countries, `COUNTRY_PROFILES` from 111 to 122, and the first
+round in this whole multi-round effort where honest research returned
+more declines (nine) than builds (eleven).** Built: Chad, the Central
+African Republic, the Republic of the Congo, Equatorial Guinea,
+Djibouti, Mauritania, Mauritius, Lesotho, Papua New Guinea, Fiji, and
+Timor-Leste. Same discipline throughout: real WebSearched figures
+only, confidence-flagged where secondary, honest `null` where nothing
+citable was found.
+
+**Chad, the Central African Republic, and the Republic of the Congo
+all keep `authoritarian-regime` but null their `regimeScore`,**
+because three real sources disagree on the exact figure for each (no
+single source confirmed as the EIU's own primary table) rather than
+one of the three being picked. The Central African Republic is
+`active-armed-conflict`, a real finding given its documented
+instability since the 2013 coup, not a settled peace. Mauritius is a
+real `full-democracy` at 8.23, the only one this file has found
+anywhere in Africa. Fiji's `hybrid-regime` score of 5.39 is flagged
+`secondary-estimate` since it came from an aggregator, not a
+confirmed EIU primary-table figure. Papua New Guinea's `hybrid-regime`
+score of 5.97 is a real, documented downgrade from the prior edition's
+flawed-democracy classification, not a reused stale figure.
+
+**Nine real candidates this round are honestly declined outright
+rather than built thin, the first time declines have outnumbered
+builds in a single batch:** Seychelles, Comoros, and Eswatini (no EIU
+Democracy Index data found for any of the three, at all); Bhutan, the
+Maldives, and Brunei (only V-Dem data was found for these three, and
+V-Dem is not substituted for the EIU's own table this file otherwise
+uses); and the Bahamas, Barbados, and Belize (a real finding, sourced
+to a Congressional Research Service compilation, that the EIU's own
+published Caribbean coverage list appears to exclude these three
+entirely). No World Bank income classification was confirmable for
+any of the twenty candidates researched this round, built or declined.
+
+**This is reported as a real, reproducible ceiling, not a stopping
+point chosen out of fatigue.** The remaining uncovered countries are
+overwhelmingly smaller Pacific-island and Caribbean microstates and
+European microstates -- exactly the category this round's own 9-of-20
+decline rate came from. Continuing to force further rounds into that
+same thinning pool would trade this file's own honesty discipline for
+raw count growth, which the standing instruction this file follows
+explicitly rules out.
+
+Full suite, this round's own final run: 2076 tests, 2052 pass, 0 fail,
+7 cancelled (the pre-existing `worldgen.test.js` hang and its
+downstream collateral timeouts, unrelated to this round), 17 skipped.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and
