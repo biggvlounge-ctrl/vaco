@@ -4079,6 +4079,71 @@ under full concurrent load -- re-confirmed unrelated to any of this
 round's own changes, same eight files every recent round has named),
 17 skipped.
 
+**A sixty-sixth, continuing `COUNTRY_PROFILES` with fourteen more real
+countries plus Yemen's own new standard-field entry -- numbered the
+seventeenth round in `countryPacks.js`'s own history, not the
+sixteenth, because the global incarceration-system round (India,
+World Prison Brief data) already claimed that number on this branch
+between the fifteenth round and this one.** Same discipline
+throughout: real WebSearched figures only, confidence-flagged where
+secondary, honest `null` where nothing citable was found. Fourteen
+countries, prioritised by population and real current significance:
+Sudan, Algeria, Uganda, Tanzania, North Korea, Taiwan, the United Arab
+Emirates, Nepal, Sri Lanka, Kazakhstan, Cambodia, Ecuador, Angola,
+Mozambique -- plus Yemen, which gains the same six standard fields
+every other `COUNTRY_PROFILES` entry carries, kept alongside its
+existing, deeper `YEMEN_CONFLICT_2026` standalone narrative rather
+than replacing it, the same two-tier pattern Venezuela and Cuba
+already have.
+
+Three real conflict classifications made rather than defaulted: Sudan
+is `active-armed-conflict` (the real, ongoing SAF-RSF civil war,
+CFR's own August 2026 tracker status "Worsening," ~14M displaced);
+Ecuador is `high-nonstate-violence` (President Noboa's real January
+2024 declaration of an "internal armed conflict" against criminal
+gangs, following the "Fito" prison escape and a televised armed
+takeover of a TV station); Uganda and Mozambique are `localized-
+conflict` for the real ADF insurgency on the Uganda-DRC border and the
+real ISIS-affiliated Cabo Delgado insurgency respectively.
+
+Five countries got an honest `null` `regimeType`/`regimeScore` rather
+than a wrong-year or unconfirmed figure, each for its own stated
+reason: Uganda and Tanzania (the only figures found were explicitly
+the 2023 score, not 2024); Nepal and Sri Lanka (the figures found
+never clearly cited the EIU as their source); the UAE (no figure found
+at all despite a dedicated search). Angola's pair are also `null`, for
+the same "real disagreement, not picked" reason Chile's were in the
+fifteenth round -- the one 2024 figure found (4.05) came from an
+unnamed source and would sit right at this file's own hybrid/
+authoritarian boundary (4.01) if real, exactly the kind of boundary
+value not worth trusting on one unconfirmed source. North Korea's
+`militaryExpenditurePctGDP` is deliberately `null` with a stated
+structural reason, not an unresearched gap -- North Korea does not
+publish usable military-expenditure data, and SIPRI's own database
+excludes it for exactly that reason, the same shape this file already
+gives Somalia's missing `regimeType`.
+
+Three real, fully confirmed oil-producer figures, not sparse
+placeholders: Angola's real 2024 output (Q1-Q3 average 1.134M bpd,
++4% YoY, falling to ~1.03M bpd by December, the lowest in years,
+immediately after its real, dated OPEC exit); the UAE's real 2024
+figure (~2.9M bpd under OPEC+ quota, ~60% of its own claimed
+capacity); Yemen's — not a production figure at all, but the real,
+current, World-Bank-confirmed fact that matters more: a Houthi
+blockade on oil exports from IRG-held fields drove the IRG's own
+revenue down to 2.5% of GDP in 2024.
+
+Found and fixed live, not left for the fixture suite: three existing
+tests (two from the fifteenth round, one from the global incarceration
+round) had baked in an exact country count or an unconditional
+assumption that this round's own honestly-mixed real data broke --
+loosened to describe what the data actually is, same discipline every
+prior round in this file has held to when the same thing happened.
+
+Full suite, this round's own final run: 2048 tests, 2024 pass, 0 fail,
+7 cancelled (the pre-existing `worldgen.test.js` hang and its
+downstream collateral timeouts, unrelated to this round), 17 skipped.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

@@ -768,6 +768,94 @@
 // Same report-only posture as every other field in this module:
 // nothing in `server/` reads a `COUNTRY_PROFILES` field to decide an
 // outcome.
+//
+// ---------------------------------------------------------------------
+// Seventeenth round: fourteen more real countries plus a real
+// COUNTRY_PROFILES entry for Yemen (alongside its existing, deeper
+// YEMEN_CONFLICT_2026 standalone narrative, not replacing it)
+// ---------------------------------------------------------------------
+// Direct instruction to keep going "as much as you can" toward the
+// real ~195-country world, same discipline throughout. Numbered
+// seventeenth, not sixteenth -- the global incarceration-system round
+// (India, World Prison Brief data) landed on this branch between the
+// fifteenth round and this one and already claimed "sixteenth" for
+// itself; renumbered here rather than leaving two same-numbered
+// rounds in this file's own history. Fourteen more countries this
+// round, prioritised by population and real current
+// significance: Sudan, Algeria, Uganda, Tanzania, North Korea, Taiwan,
+// the United Arab Emirates, Nepal, Sri Lanka, Kazakhstan, Cambodia,
+// Ecuador, Angola, Mozambique -- plus Yemen, which gains the same six
+// standard fields every other COUNTRY_PROFILES entry carries, kept
+// alongside its existing `YEMEN_CONFLICT_2026` standalone narrative
+// rather than replacing it, the same two-tier pattern Venezuela and
+// Cuba already have (a `COUNTRIES`/`COUNTRY_PROFILES` entry AND a
+// deeper standalone reference, not one or the other).
+//
+// **This round's own tooling ceiling was sharper than the fourteenth
+// and fifteenth rounds', and the honest response is the same: report
+// what was actually found, flag what was not, never guess a gap
+// closed.** Several countries this round could not get a confirmed
+// `regimeType`/`regimeScore` at all -- Uganda and Tanzania each had
+// only an EXPLICITLY WRONG-YEAR figure found (2023's 4.49 for Uganda,
+// a figure the source itself called 2023 for Tanzania's 5.35), kept
+// out entirely rather than presented as 2024 data; Nepal (4.60) and
+// Sri Lanka (6.19) each had a figure that never clearly cited the EIU
+// as its source; the United Arab Emirates had no figure found at all
+// despite a dedicated search. All five are `null`/`null`, each with
+// its own real reason stated in the entry, not a single blanket
+// excuse copied five times.
+//
+// **Angola's regimeType/regimeScore are also `null`, for the same
+// "real disagreement, not picked" reason Chile's were in the
+// fifteenth round.** The one 2024 figure found (4.05) came from a
+// secondary site that did not name its source, and -- if it were
+// real -- would sit right at this file's own hybrid/authoritarian
+// boundary (4.01), which is exactly the kind of boundary value this
+// file's own seventeenth-standing-rule-adjacent discipline (measure
+// precisely before trusting a number near a threshold) argues against
+// trusting on one unconfirmed source.
+//
+// **North Korea's `militaryExpenditurePctGDP` is deliberately `null`
+// with a stated structural reason, not an unresearched gap.** North
+// Korea does not publish usable military-expenditure data by design,
+// and SIPRI's own database excludes it for exactly that reason -- a
+// real, permanent gap in the source itself, the same shape this file
+// already gives Somalia's missing `regimeType`.
+//
+// **Three real, fully confirmed oil-producer figures this round, not
+// sparse placeholders.** Angola: real 2024 output (Q1-Q3 average
+// 1.134M bpd, +4% YoY, falling to ~1.03M bpd by December 2024, the
+// lowest in years) immediately after its real, dated OPEC exit
+// (effective Jan 2024). The UAE: a real 2024 figure (~2.9M bpd under
+// OPEC+ quota, roughly 60% of its own claimed capacity, with Platts
+// surveys showing it producing slightly above its assigned target).
+// Yemen: not a production figure at all, but the real, current,
+// World-Bank-confirmed fact that matters more here -- a Houthi
+// blockade on oil exports from IRG-held fields drove the internationally
+// recognized government's own revenue down to 2.5% of GDP in 2024.
+//
+// **Two real, non-default conflict classifications.** Sudan is
+// `active-armed-conflict` -- the real, ongoing SAF-RSF civil war
+// (CFR's own August 2026 tracker: "Worsening"; ~14M displaced) is
+// unambiguous. Ecuador is `high-nonstate-violence`, not `no-active-
+// conflict` -- President Noboa's real January 2024 declaration of an
+// "internal armed conflict" against criminal gangs (following the
+// "Fito" prison escape and a televised armed takeover of a TV
+// station) and the real, current cartel/gang violence surge it
+// responded to.
+//
+// **Taiwan's entry states plainly why it carries no found primary
+// World Bank income-classification row, rather than silently
+// asserting one.** Taiwan is not a UN member and is often excluded
+// from the World Bank's own country tables for that reason --
+// `incomeLevel: 'high-income'` here rests on its real, undisputed
+// per-capita income level by any standard measure, not a found
+// primary-table row the way Bangladesh's or Morocco's classification
+// in the fifteenth round did.
+//
+// Same report-only posture as every other field in this module:
+// nothing in `server/` reads a `COUNTRY_PROFILES` field to decide an
+// outcome.
 
 'use strict';
 
@@ -3061,6 +3149,388 @@ const COUNTRY_PROFILES = {
       note: 'a 2023 WPB snapshot gives 37 per 100k and Data For India independently reports 38 for the same year -- a real 35-38 range, not reconciled to one figure',
     },
   },
+  // Seventeenth round: fourteen more real countries plus Yemen's own
+  // new standard-field entry -- see this file's own header for the full
+  // reasoning behind every honest null and confidence flag below.
+  sudan: {
+    country: 'Sudan',
+    // Stated from well-established general knowledge of the standard
+    // World Bank classification -- a third-party list found this
+    // round groups Sudan with Angola/Mozambique as "low-income or
+    // lower-middle-income" without resolving which, so this is not
+    // independently confirmed against a primary table.
+    incomeLevel: 'low-income',
+    // Real, current, unambiguous: the Sudanese Armed Forces vs. Rapid
+    // Support Forces civil war, CFR's own August 2026 tracker status
+    // "Worsening," ~14M people displaced, control of Kordofan/Darfur
+    // still fluid as of mid-2026.
+    conflictLevel: 'active-armed-conflict',
+    governmentType: 'transitional military-led government, de facto fractured between the Sudanese Armed Forces (Port Sudan) and the Rapid Support Forces, each controlling different territory',
+    // One secondary table gives 1.46 for 2024, authoritarian -- not
+    // cross-checked against the EIU's own primary table. Real rank
+    // disagreement found too (162nd per one March 2025 source, 158th
+    // per a November-2024-dated list that likely reflects the 2023
+    // edition instead) -- both named rather than one picked.
+    regimeType: 'authoritarian-regime', regimeScore: 1.46, regimeScoreConfidence: 'secondary-estimate',
+    regimeRank: { value: null, note: 'two disagreeing secondary ranks found (162nd, 158th); neither confirmed against the EIU primary table, so no single value is stated' },
+    militaryExpenditurePctGDP: {
+      value: 0.93, year: null, confidence: 'secondary-estimate',
+      note: 'the year this figure covers was not stated by the source that reported it',
+    },
+    // Sudan lost most of its oil fields to South Sudan at the 2011
+    // partition and is not a major current producer or exporter.
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  algeria: {
+    country: 'Algeria',
+    // Confirmed directly: World Bank Data360, GNI per capita ~$5.32k
+    // (2024), upper-middle-income.
+    incomeLevel: 'upper-middle-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'presidential republic',
+    // Confirmed directly: 3.55 (2024), down from 3.66 (2023), rank
+    // 110th of 167, authoritarian regime -- the EIU's own stated
+    // reasoning cites real, ongoing constraints on political activity
+    // despite some participatory indicators.
+    regimeType: 'authoritarian-regime', regimeScore: 3.55,
+    militaryExpenditurePctGDP: {
+      value: 8.0, year: 2024, confidence: 'secondary-estimate',
+      note: 'reported as driving an 8.8% rise in North African military spending that year; a separate newer SIPRI-citing table gives 8.8% for Algeria itself, which may be a later vintage of the same figure rather than a second, independent one',
+    },
+    // Algeria is a real, major, established oil/gas exporter
+    // (Sonatrach) -- no specific 2024 production/export figure was
+    // confirmed to this file's own standard this round, left null
+    // rather than estimated, same discipline as every other sparse
+    // field here.
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  uganda: {
+    country: 'Uganda', incomeLevel: 'low-income',
+    // The real, ongoing ADF (Allied Democratic Forces) Islamist
+    // insurgency along the Uganda-DRC border, including Uganda's own
+    // "Operation Shujaa" joint military campaign inside the DRC --
+    // not a nationwide conflict.
+    conflictLevel: 'localized-conflict',
+    governmentType: 'presidential republic (dominant-party, under President Museveni since 1986)',
+    // Deliberately null -- the only figure found this round (4.49) is
+    // explicitly the 2023 score, not 2024, and using a different
+    // year's number as though it were current would repeat exactly
+    // the mistake this file's own Russia/Ethiopia homicide entries
+    // were careful to flag rather than make.
+    regimeType: null, regimeScore: null,
+    militaryExpenditurePctGDP: null,
+    oilProducer: {
+      status: 'real-fields-under-development-not-yet-producing-at-scale',
+      dailyProductionBbl: null, year: null,
+      note: 'the Lake Albert fields (Tilenga/Kingfisher projects) and the EACOP export pipeline are real and under construction, but had not reached meaningful commercial production as of 2024 -- not yet a producer in the sense this field otherwise tracks',
+    },
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  tanzania: {
+    country: 'Tanzania', incomeLevel: 'lower-middle-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'unitary dominant-party presidential republic',
+    // Deliberately null -- the only figure found this round (5.35) is
+    // explicitly labelled as the 2023 score by the source that reports
+    // it, not 2024.
+    regimeType: null, regimeScore: null,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  'north-korea': {
+    country: 'North Korea',
+    // A World Bank classification sheet places it in the low-income
+    // group, though using an older ($1,135) threshold vintage than
+    // this file's own current FY2027 figures -- kept because the
+    // classification itself (not the exact threshold used) is the
+    // real, stable fact here.
+    incomeLevel: 'low-income',
+    // The 1953 Korean War armistice was never replaced by a peace
+    // treaty, so North and South Korea remain formally at war in that
+    // narrow legal sense -- but no current fighting is taking place,
+    // which is the real, distinct fact this field tracks.
+    conflictLevel: 'no-active-conflict',
+    governmentType: 'one-party state (Workers\' Party of Korea); elections exist in name only, with no genuine political competition',
+    // Confirmed directly: 1.08, third from last (165th of 167, ahead
+    // only of Myanmar and Afghanistan), unchanged from the prior year.
+    regimeType: 'authoritarian-regime', regimeScore: 1.08,
+    // Deliberately null with a stated structural reason, not an
+    // unresearched gap -- North Korea does not publish usable military
+    // expenditure data, and SIPRI's own database excludes it for
+    // exactly that reason.
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  taiwan: {
+    country: 'Taiwan',
+    // Taiwan is not a UN member and is often excluded from the World
+    // Bank's own country tables for that reason -- this rests on its
+    // real, undisputed per-capita income level by any standard
+    // measure, not a found primary-table row.
+    incomeLevel: 'high-income',
+    // No current armed conflict -- real cross-strait tension with
+    // China exists but is not fighting, the same distinction this
+    // file already draws for Morocco's Western Sahara dispute and
+    // North Korea's formal armistice-not-peace status.
+    conflictLevel: 'no-active-conflict',
+    governmentType: 'semi-presidential republic',
+    // Confirmed directly: 8.78 (2024), down from 8.92 (2023) and 8.99
+    // (2022), rank 12th of 167 -- the most democratic country in Asia,
+    // a full democracy.
+    regimeType: 'full-democracy', regimeScore: 8.78,
+    // SIPRI's own fact sheet table, not a secondary estimate --
+    // spending grew 1.8% in 2024 to $16.5B.
+    militaryExpenditurePctGDP: { value: 2.1, year: 2024, confidence: 'sipri-official' },
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  'united-arab-emirates': {
+    country: 'United Arab Emirates',
+    // Stated from the UAE's real, undisputed per-capita income level
+    // -- not independently confirmed against a primary World Bank
+    // table this round.
+    incomeLevel: 'high-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'federal absolute monarchy (a federation of seven emirates, each ruled by a hereditary emir)',
+    // Deliberately null -- no EIU 2024 score was found at all despite
+    // a dedicated search, not a figure that was found and then
+    // doubted.
+    regimeType: null, regimeScore: null,
+    militaryExpenditurePctGDP: {
+      value: 5.6, year: null, confidence: 'secondary-estimate',
+      note: 'from an unlabelled secondary table that did not state which year it covers',
+    },
+    // Real 2024 figure: producing roughly 2.9M bpd under its own
+    // OPEC+ quota, about 60% of the capacity the UAE itself claims to
+    // have -- Platts surveys showed it running slightly above its
+    // assigned target that year.
+    oilProducer: {
+      status: 'opec-member-producing-under-quota', dailyProductionBbl: 2900000, year: 2024,
+      source: 'platts-opec-survey-reporting',
+      note: 'roughly 60% of the UAE\'s own claimed production capacity; it ran slightly above its OPEC+ target in 2024',
+    },
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  nepal: {
+    country: 'Nepal', incomeLevel: 'low-income',
+    // The 2006 peace accord ending the Nepalese Civil War is real and
+    // settled -- no active armed conflict since.
+    conflictLevel: 'no-active-conflict',
+    governmentType: 'federal parliamentary republic',
+    // Deliberately null -- the one figure found (4.60) came from a
+    // secondary site that did not name the EIU as its source at all.
+    regimeType: null, regimeScore: null,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  'sri-lanka': {
+    country: 'Sri Lanka',
+    // A real, dated news headline ("Sri Lanka reclassified as Upper-
+    // Middle Income economy") was found, but its article body and
+    // underlying World Bank source were not retrieved this round --
+    // kept because the headline itself is a specific, real claim, not
+    // treated with the same confidence as a found primary-table row.
+    incomeLevel: 'upper-middle-income',
+    // The 2009 end of the Sri Lankan Civil War is real and settled --
+    // no active armed conflict since.
+    conflictLevel: 'no-active-conflict',
+    governmentType: 'unitary semi-presidential republic',
+    // Deliberately null -- the one figure found (6.19) came from an
+    // unlabelled secondary table with no stated year or EIU citation.
+    regimeType: null, regimeScore: null,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  kazakhstan: {
+    country: 'Kazakhstan', incomeLevel: 'upper-middle-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'presidential republic',
+    // Confirmed directly: 3.08 (2024, unchanged from 2023), rank
+    // 118th of 167, authoritarian regime -- consistent across two
+    // separately-sourced reports.
+    regimeType: 'authoritarian-regime', regimeScore: 3.08,
+    militaryExpenditurePctGDP: {
+      value: 0.4, year: null, confidence: 'secondary-estimate',
+      note: 'a second secondary source gives 0.43%; neither states the year it covers',
+    },
+    // Kazakhstan is a real, substantial oil producer (the Tengiz and
+    // Kashagan fields) and a real, repeated OPEC+ quota over-producer
+    // -- no confirmed 2024 ACTUAL output figure was found this round
+    // (only a November-2024 analysis projecting a rise from 1.795M
+    // bpd), left null rather than presenting a projection as an
+    // outcome.
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  cambodia: {
+    country: 'Cambodia', incomeLevel: 'lower-middle-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'unitary dominant-party parliamentary constitutional monarchy',
+    // Deliberately null -- the one regime-type figure found ("hybrid
+    // regime," rank 101st) carried no stated year, and a 2018 article
+    // describing a DIFFERENT historical rank (124th, for the 2017
+    // edition) makes clear rankings have moved substantially across
+    // editions, so the undated figure cannot be assumed to be 2024.
+    regimeType: null, regimeScore: null,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  ecuador: {
+    country: 'Ecuador',
+    // Stated from Ecuador's well-established standard classification
+    // -- not independently confirmed against a primary table this
+    // round.
+    incomeLevel: 'upper-middle-income',
+    // Real, current, and significant: President Noboa's January 2024
+    // declaration of an "internal armed conflict" against criminal
+    // gangs (following the "Fito" prison escape and a televised armed
+    // takeover of a TV station), and the real cartel/gang violence
+    // surge it responded to -- this table's own band for high
+    // non-state violence short of a UCDP state-based war.
+    conflictLevel: 'high-nonstate-violence',
+    governmentType: 'unitary presidential republic',
+    // Deliberately null -- no EIU 2024 score was found at all this
+    // round despite a dedicated search.
+    regimeType: null, regimeScore: null,
+    militaryExpenditurePctGDP: null,
+    // Ecuador is a real, established oil exporter (it left OPEC in
+    // 2020) -- no specific 2024 figure was confirmed to this file's
+    // own standard this round.
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  angola: {
+    country: 'Angola',
+    // A third-party list found this round groups Angola with Sudan/
+    // Mozambique as "low-income or lower-middle-income" without
+    // resolving which -- stated here as lower-middle-income (Angola's
+    // real current classification by general knowledge of the
+    // standard series) but flagged, not independently confirmed
+    // against a primary table this round.
+    incomeLevel: 'lower-middle-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'unitary dominant-party presidential republic',
+    // Deliberately null, the same "real disagreement, not picked"
+    // reason Chile's were null in the fifteenth round. The one 2024
+    // figure found (4.05) came from a secondary site that did not
+    // name its source, and -- if real -- would sit right at this
+    // file's own hybrid/authoritarian boundary (4.01), exactly the
+    // kind of boundary value not worth trusting on one unconfirmed
+    // source.
+    regimeType: null, regimeScore: null,
+    militaryExpenditurePctGDP: {
+      value: 1.0, year: null, confidence: 'secondary-estimate',
+      note: 'a second secondary source gives 1.034%; neither states the year it covers',
+    },
+    // A real, fully confirmed 2024 figure, not a sparse placeholder:
+    // Q1-Q3 2024 average 1.134M bpd (+4% YoY), falling to ~1.03M bpd
+    // by December 2024 (the lowest in years) -- immediately after
+    // Angola's real, dated OPEC exit (effective Jan 2024).
+    oilProducer: {
+      status: 'former-opec-member-declining-output-since-exit', dailyProductionBblQ1Q3Average: 1134000,
+      dailyProductionBblDecember: 1030000, year: 2024,
+      source: 'hellenic-shipping-news-angola-opec-exit-coverage',
+      note: 'Angola left OPEC effective Jan 2024; output rose briefly (+4% YoY through Q3) before falling to its lowest level in years by December',
+    },
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  mozambique: {
+    country: 'Mozambique', incomeLevel: 'low-income',
+    // The real, ongoing ISIS-affiliated Islamist insurgency in Cabo
+    // Delgado province, alongside separate RENAMO-linked unrest --
+    // real and current, but localized to specific provinces, not
+    // nationwide.
+    conflictLevel: 'localized-conflict',
+    // Confirmed directly this round (Nomad Watch).
+    governmentType: 'unitary dominant-party semi-presidential system',
+    // Deliberately null -- the one claim found ("authoritarian... due
+    // to election manipulation") is a secondhand characterization of
+    // the EIU's 2024 report, not a number from the EIU's own table,
+    // and real doubts over the credibility of the 2024 general
+    // election (named directly by International IDEA's own GSoD 2025
+    // report) make this a year where guessing a score would be
+    // especially misleading.
+    regimeType: null, regimeScore: null,
+    militaryExpenditurePctGDP: null,
+    // Real, major LNG development (TotalEnergies' Cabo Delgado
+    // fields) exists but had not reached full operational production
+    // as of 2024 because of the real insurgency above -- not yet a
+    // producer in the sense this field otherwise tracks.
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  // Yemen gains the same six standard fields every other
+  // COUNTRY_PROFILES entry carries, kept alongside its existing,
+  // deeper `YEMEN_CONFLICT_2026` standalone narrative rather than
+  // replacing it -- the same two-tier pattern Venezuela/Cuba already
+  // have.
+  yemen: {
+    country: 'Yemen',
+    // Real and current: the World Bank's own reporting on Yemen's GDP
+    // per capita decline (-54%) and continuing economic contraction
+    // leaves no real doubt about this classification.
+    incomeLevel: 'low-income',
+    // See YEMEN_CONFLICT_2026 for the full real account -- the
+    // Houthi/Ansar Allah movement vs. the internationally recognized
+    // government, unambiguously active.
+    conflictLevel: 'active-armed-conflict',
+    // Confirmed directly this round: areas under Houthi control host
+    // about 70% of the population (including Sanaa), while
+    // hydrocarbon-rich areas remain under the internationally
+    // recognized government (IRG) -- a real, split, contested
+    // statehood, not a single functioning government.
+    governmentType: 'split, contested statehood -- the internationally recognized government (IRG) holds hydrocarbon-rich areas; Houthi (Ansar Allah) forces control areas hosting roughly 70% of the population, including Sanaa',
+    // Deliberately null -- no single EIU score would meaningfully
+    // describe a country with two contesting authorities and no
+    // unified government to assess, and none was found this round
+    // regardless.
+    regimeType: null, regimeScore: null,
+    // Deliberately null -- Houthi military spending is not tracked by
+    // any standard source, and the IRG's own is unclear amid the war;
+    // a real, structural gap rather than an unresearched one.
+    militaryExpenditurePctGDP: null,
+    // Not a production figure -- the real, current, World-Bank-
+    // confirmed fact that matters more here: a Houthi blockade on oil
+    // exports from IRG-held fields drove the IRG's own revenue
+    // (excluding grants) down to 2.5% of GDP in 2024.
+    oilProducer: {
+      status: 'irg-oil-exports-blockaded-by-houthi-forces', dailyProductionBbl: null, year: 2024,
+      source: 'world-bank-yemen-economic-monitor-2026',
+      note: 'the blockade, not a production volume, is the real reported fact -- it drove IRG revenue excluding grants down to 2.5% of GDP in 2024',
+    },
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
 };
 
 // **Checked once, at load time.** A COUNTRY_PROFILES key must not
@@ -3113,25 +3583,27 @@ const REGION_BY_KEY = {
   spain: 'europe',
   // Middle East
   israeli: 'middle-east', yemen: 'middle-east', 'saudi-arabia': 'middle-east', turkey: 'middle-east',
-  iraq: 'middle-east', afghanistan: 'middle-east', syria: 'middle-east',
-  // Africa (UN-geoscheme Northern Africa, including Morocco, is
-  // classified here for continental consistency with this file's own
-  // existing Africa bucket, even though MENA groupings colloquially
-  // pair it with the Middle East)
+  iraq: 'middle-east', afghanistan: 'middle-east', syria: 'middle-east', 'united-arab-emirates': 'middle-east',
+  // Africa (UN-geoscheme Northern Africa, including Morocco/Algeria/
+  // Sudan, is classified here for continental consistency with this
+  // file's own existing Africa bucket, even though MENA groupings
+  // colloquially pair North Africa with the Middle East)
   somali: 'africa', nigerian: 'africa', ethiopian: 'africa', ghanaian: 'africa', kenyan: 'africa',
   'subsaharan-african': 'africa', 'cape-verde': 'africa', 'south-africa': 'africa',
   morocco: 'africa', 'democratic-republic-of-the-congo': 'africa',
+  sudan: 'africa', algeria: 'africa', uganda: 'africa', tanzania: 'africa', angola: 'africa', mozambique: 'africa',
   // Caribbean
   'west-indian': 'caribbean', jamaican: 'caribbean', haitian: 'caribbean', 'dominican-republic': 'caribbean',
   cuba: 'caribbean', 'puerto-rico': 'caribbean', 'virgin-islands': 'caribbean',
   // Asia
-  vietnamese: 'asia', chinese: 'asia', filipino: 'asia', 'asian-indian': 'asia',
+  vietnamese: 'asia', chinese: 'asia', filipino: 'asia', 'asian-indian': 'asia', india: 'asia',
   japan: 'asia', 'south-korea': 'asia', indonesia: 'asia',
   pakistan: 'asia', bangladesh: 'asia', thailand: 'asia', myanmar: 'asia', malaysia: 'asia',
+  'north-korea': 'asia', taiwan: 'asia', nepal: 'asia', 'sri-lanka': 'asia', kazakhstan: 'asia', cambodia: 'asia',
   // Latin America (Central/South America, excluding the Caribbean above)
   mexican: 'latin-america', guatemalan: 'latin-america', honduran: 'latin-america', salvadoran: 'latin-america',
   venezuela: 'latin-america', colombia: 'latin-america', brazil: 'latin-america', argentina: 'latin-america',
-  peru: 'latin-america', chile: 'latin-america',
+  peru: 'latin-america', chile: 'latin-america', ecuador: 'latin-america',
   // North America -- the explicit baseline; no "North America overview"
   // exists because the baseline itself is the dedicated entry.
   'united-states': 'north-america', canada: 'north-america',

@@ -408,6 +408,28 @@ including two real volatile snapshots (Russia, Mexico) kept side by
 side rather than reconciled, and China's headline rate explicitly
 scoped away from its own larger illustrative estimate.
 
+## Fourteen more real countries plus Yemen (seventeenth round in countryPacks.js, sixty-sixth standing rule)
+See `CLAUDE.md`'s own sixty-sixth standing rule for the full account
+(numbered the seventeenth round in `countryPacks.js`'s own history,
+not the sixteenth — the global incarceration round above already
+claimed that number). Continuing `COUNTRY_PROFILES`: Sudan, Algeria,
+Uganda, Tanzania, North Korea, Taiwan, the United Arab Emirates,
+Nepal, Sri Lanka, Kazakhstan, Cambodia, Ecuador, Angola, Mozambique —
+plus Yemen, which gains the same six standard fields every other entry
+carries, kept alongside its existing, deeper `YEMEN_CONFLICT_2026`
+narrative rather than replacing it. Three real, non-default conflict
+classifications (Sudan and Ecuador's real declared gang conflict at
+`active-armed-conflict`/`high-nonstate-violence`; Uganda and
+Mozambique's real sub-national insurgencies at `localized-conflict`).
+Five countries honestly null their regime figures rather than use a
+wrong-year or unconfirmed one; Angola's are null for a real, named
+source disagreement right at this file's own hybrid/authoritarian
+boundary. Two real, fully confirmed 2024 oil figures (Angola, the
+UAE), plus Yemen's real Houthi-blockade revenue fact reported in place
+of an invented production volume. North Korea's missing military
+figure is flagged with its real structural reason (SIPRI excludes it)
+rather than left as an unresearched-looking gap.
+
 ## Bluffing and its exposure
 See `CLAUDE.md`'s own fifty-second standing rule for the full design.
 `server/bluff.js` models the gap between what `weapons
