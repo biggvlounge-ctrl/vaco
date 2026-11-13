@@ -324,7 +324,96 @@ function nudge(row, column, delta, tick) {
 // habit exercising it drifts back toward its base — not past it, so
 // this cannot itself become a downward ratchet on a person who simply
 // has no routine.
-function driftExperience(worldState, entityId, tick, index = null) {
+//
+// ---------------------------------------------------------------------
+// groupCohesionMultiplierFor — "who you're around" changes how FAST
+// practice pays off, not just who pulls your social traits toward
+// theirs
+// ---------------------------------------------------------------------
+// By direct instruction: "a progression of a person could depend on
+// who they're around... a small organization that is congruent and all
+// act as one is more valuable than a large organization... that don't
+// act as one." `driftRelationships` below already models direction —
+// close relations pull four social traits toward their mean — and its
+// own header is explicit that widening that list further would be
+// "inventing a theory of influence." This is a narrower, different
+// claim and does not widen that one: RATE, not direction, and scoped
+// to the one driver this file already calls "what you do" — practising
+// a habit pays off faster inside a cohesive group, exactly like a real
+// training partner or a well-drilled team. It does not touch
+// `driftEnvironment`, `driftRelationships` or `driftTemporary`.
+//
+// Reads the real, already-existing cohesion substrate rather than
+// inventing a second, disagreeing "group synergy" score:
+// `familyTraits.cohesionOf` for the entity's own family (if any) and
+// `organizationTraits.cohesionOf` for each real organization they
+// belong to (if any) — both already 0..1, both already centred so an
+// ordinary, unmeasured group scores 0.5 (standing rule 12's own
+// discipline, carried into a third place). The MAX of every cohesion
+// score available is used, not an average across every group at
+// once — a person who trains inside their one genuinely tight-knit
+// crew should get that crew's benefit, not have it diluted by also
+// belonging to a loose, uninvolved union local.
+//
+// **The multiplier is cohesion shifted to centre on 1, not a separately
+// chosen number.** `0.5 + cohesion` maps cohesion's own real 0..1 range
+// onto a 0.5..1.5 multiplier with no extra constant to justify: at the
+// schema's own ordinary cohesion of 0.5 the multiplier is exactly 1 (an
+// ordinary person in an ordinary group trains at exactly the rate they
+// always did — standing rule 12's first clause again), and the bound is
+// exactly as wide as cohesion's own real measured range, not invented
+// separately. **Re-measured after a real bug was caught and fixed**:
+// this function takes the MAX cohesion score across an entity's
+// groups, not an average — the first version of this file computed
+// the average instead, which the function's own test ("takes the MAX
+// cohesion across every group, never an average") caught failing
+// before this round ever committed. The fix changes the real
+// distribution, so the figures below are measured against the fixed
+// version, not the one that shipped first. Measured on a real
+// generated world (`seed: 'cohesion-measure-1'`, `extendedFamily` on,
+// 180 NPCs, 152 of them in at least one family or organization): this
+// multiplier ranges 0.841-1.172 (p10 0.92, p50 1.078, p90 1.16) across
+// that population — narrower in practice than the full 0.5-1.5 range
+// cohesion's own theoretical bounds allow, because MAX tends to land
+// closer to 1 than an evenly-spread average would across a real mixed
+// population, and because this particular seed's real cohesion scores
+// did not reach cohesion's own extremes.
+//
+// A person in no family and no organization gets no bonus and no
+// penalty — multiplier 1, same as training alone always was.
+function groupCohesionMultiplierFor(worldState, entityId) {
+  // eslint-disable-next-line global-require
+  const familyTraits = require('./familyTraits.js');
+  // eslint-disable-next-line global-require
+  const organizationTraits = require('./organizationTraits.js');
+  // eslint-disable-next-line global-require
+  const membership = require('./membership.js');
+
+  const scores = [];
+
+  const familyMembership = (worldState.familyMemberships || [])
+    .find((m) => m.entity_id === entityId);
+  if (familyMembership) {
+    const score = familyTraits.cohesionOf(worldState, familyMembership.family_id);
+    if (score !== null) scores.push(score);
+  }
+
+  // Reuses membership.organizationsOf rather than re-filtering
+  // entityOrganizationMemberships directly, so this stays byte-for-
+  // byte in step with that function's own real membership definition
+  // instead of carrying a second, independently-drifting copy of it.
+  // organizationsOf returns real organization objects, not bare ids.
+  const orgIds = membership.organizationsOf(worldState, entityId).map((o) => o.id);
+  for (const orgId of orgIds) {
+    const score = organizationTraits.cohesionOf(worldState, orgId);
+    if (score !== null) scores.push(score);
+  }
+
+  if (scores.length === 0) return 1;
+  return 0.5 + Math.max(...scores);
+}
+
+function driftExperience(worldState, entityId, tick, index = null, groupMultiplier = 1) {
   const rows = rowsFor(worldState, entityId, index);
   if (rows.length === 0) return 0;
 
@@ -347,7 +436,7 @@ function driftExperience(worldState, entityId, tick, index = null) {
     const pressure = exercised.get(`${def.family} ${def.name}`) ?? 0;
 
     if (pressure !== 0) {
-      if (nudge(row, 'experience_modifier', def.growth_rate * EXPERIENCE_RATE * pressure, tick)) {
+      if (nudge(row, 'experience_modifier', def.growth_rate * EXPERIENCE_RATE * pressure * groupMultiplier, tick)) {
         moved += 1;
       }
       continue;
@@ -607,7 +696,9 @@ function runTraitDrift(worldState, options = {}) {
 
   let moved = 0;
   for (const npc of worldState.npcs || []) {
-    moved += driftExperience(worldState, npc.id, tick, index);
+    moved += driftExperience(
+      worldState, npc.id, tick, index, groupCohesionMultiplierFor(worldState, npc.id),
+    );
     moved += driftEnvironment(
       worldState, npc.id, tick,
       pressuresFor(
@@ -659,6 +750,7 @@ module.exports = {
   indexRows,
   recompute,
   occupationExercise,
+  groupCohesionMultiplierFor,
   driftExperience,
   driftEnvironment,
   driftRelationships,

@@ -357,3 +357,135 @@ test('a world that runs changes the people in it', () => {
     assert.ok(count > 0, `${column} never moved in a real world — nothing reaches it`);
   }
 });
+
+// -- groupCohesionMultiplierFor ------------------------------------------
+//
+// "a progression of a person could depend on who they're around... a
+// small organization that is congruent and all act as one is more
+// valuable than a large organization... that don't act as one." Rate,
+// not direction — see this function's own header in traitDrift.js for
+// why it does not widen `driftRelationships`'s own narrower claim.
+
+const familyTraits = require('../server/familyTraits.js');
+const organizationTraits = require('../server/organizationTraits.js');
+const membership = require('../server/membership.js');
+const { ORGANIZATION_DEFINITIONS } = require('../server/traitDefinitions.js');
+
+function orgEntity(w, loyalty = 50) {
+  const id = nextId += 1;
+  w.entityTraits.push(...generateEntityTraits(
+    id, w.tick, ORGANIZATION_DEFINITIONS, (def) => (def.name === 'internalLoyalty' ? loyalty : 50),
+  ));
+  w.organizations.push({ id, type: 'club' });
+  return id;
+}
+
+test('groupCohesionMultiplierFor is 1 for a person in no family and no organization', () => {
+  const w = world({ familyMemberships: [], entityOrganizationMemberships: [] });
+  const id = person(w, 50);
+  assert.equal(drift.groupCohesionMultiplierFor(w, id), 1);
+});
+
+test('groupCohesionMultiplierFor is 0.5 + cohesion for a person whose only group is their family', () => {
+  const w = world({
+    families: [{ id: 1, unity: 80, conflict: 0 }],
+    familyMemberships: [],
+    entityOrganizationMemberships: [],
+  });
+  const id = person(w, 50);
+  w.familyMemberships.push({ entity_id: id, family_id: 1 });
+  // cohesionOf: cooperation defaults to 50 (no `family cooperation` trait
+  // generated on this bare fixture), pull = ((80+50)/2)/100 = 0.65, drag = 1.
+  const expected = 0.5 + familyTraits.cohesionOf(w, 1);
+  assert.equal(drift.groupCohesionMultiplierFor(w, id), expected);
+  assert.equal(Math.round(expected * 100) / 100, 1.15);
+});
+
+test('groupCohesionMultiplierFor is 0.5 + cohesion for a person whose only group is an organization', () => {
+  const w = world({ familyMemberships: [], entityOrganizationMemberships: [] });
+  const id = person(w, 50);
+  const orgId = orgEntity(w, 20);
+  membership.joinOrganization(w, { entityId: id, organizationId: orgId });
+  const expected = 0.5 + organizationTraits.cohesionOf(w, orgId);
+  assert.equal(drift.groupCohesionMultiplierFor(w, id), expected);
+  assert.equal(Math.round(expected * 100) / 100, 0.85);
+});
+
+test('groupCohesionMultiplierFor takes the MAX cohesion across every group, never an average', () => {
+  const w = world({
+    families: [{ id: 1, unity: 10, conflict: 0 }],
+    familyMemberships: [],
+    entityOrganizationMemberships: [],
+  });
+  const id = person(w, 50);
+  w.familyMemberships.push({ entity_id: id, family_id: 1 });
+  const orgId = orgEntity(w, 100);
+  membership.joinOrganization(w, { entityId: id, organizationId: orgId });
+
+  const familyScore = familyTraits.cohesionOf(w, 1);
+  const orgScore = organizationTraits.cohesionOf(w, orgId);
+  assert.ok(orgScore > familyScore, 'the org must be the more cohesive group for this test to prove MAX, not something else');
+  assert.equal(drift.groupCohesionMultiplierFor(w, id), 0.5 + orgScore,
+    'a loose family must not drag down the benefit of a genuinely tight-knit organization');
+});
+
+// -- driftExperience actually reads the multiplier -----------------------
+
+test('a cohesive group makes practice pay off faster -- same habit, same ticks, bigger gain', () => {
+  const lowW = world();
+  const lowId = person(lowW, 50);
+  lowW.habits.push({ entity_id: lowId, habit_name: 'work', strength: 100, harmful: false });
+
+  const highW = world();
+  const highId = person(highW, 50);
+  highW.habits.push({ entity_id: highId, habit_name: 'work', strength: 100, harmful: false });
+
+  for (let t = 0; t < 60; t += 1) {
+    drift.driftExperience(lowW, lowId, lowW.tick + t, null, 0.5);
+    drift.driftExperience(highW, highId, highW.tick + t, null, 1.5);
+  }
+
+  const lowGain = valueOf(lowW, lowId, 'physical', 'Endurance').experience_modifier;
+  const highGain = valueOf(highW, highId, 'physical', 'Endurance').experience_modifier;
+  assert.ok(lowGain > 0 && highGain > 0, 'both should still grow — only the RATE should differ');
+  assert.ok(highGain > lowGain,
+    `a 1.5x group multiplier (${highGain}) did not outgrow a 0.5x one (${lowGain})`);
+});
+
+test('groupMultiplier defaults to 1 when omitted -- every existing call site is unaffected', () => {
+  const w = world();
+  const id = person(w, 50);
+  w.habits.push({ entity_id: id, habit_name: 'work', strength: 100, harmful: false });
+  for (let t = 0; t < 60; t += 1) drift.driftExperience(w, id, w.tick + t);
+  const defaultGain = valueOf(w, id, 'physical', 'Endurance').experience_modifier;
+
+  const w2 = world();
+  const id2 = person(w2, 50);
+  w2.habits.push({ entity_id: id2, habit_name: 'work', strength: 100, harmful: false });
+  for (let t = 0; t < 60; t += 1) drift.driftExperience(w2, id2, w2.tick + t, null, 1);
+  const explicitOneGain = valueOf(w2, id2, 'physical', 'Endurance').experience_modifier;
+
+  assert.equal(defaultGain, explicitOneGain, 'an omitted multiplier must behave exactly like an explicit 1');
+});
+
+test('the group multiplier speeds up PRACTICE, not forgetting -- the decay step is identical regardless of multiplier', () => {
+  // Two people with the IDENTICAL starting experience_modifier (set
+  // directly, not grown, so the comparison isn't confounded by two
+  // different starting points) and no habit at all -- only the fade
+  // path can run. One ticks at groupMultiplier 1, the other at 1.5.
+  const w1 = world();
+  const id1 = person(w1, 50);
+  valueOf(w1, id1, 'physical', 'Endurance').experience_modifier = 5;
+  drift.driftExperience(w1, id1, w1.tick, null, 1);
+  const afterOne = valueOf(w1, id1, 'physical', 'Endurance').experience_modifier;
+
+  const w2 = world();
+  const id2 = person(w2, 50);
+  valueOf(w2, id2, 'physical', 'Endurance').experience_modifier = 5;
+  drift.driftExperience(w2, id2, w2.tick, null, 1.5);
+  const afterOnePointFive = valueOf(w2, id2, 'physical', 'Endurance').experience_modifier;
+
+  assert.ok(afterOne < 5, 'fading did not happen at all');
+  assert.equal(afterOne, afterOnePointFive,
+    'the decay step moved by a different amount under a different group multiplier -- it must not');
+});
