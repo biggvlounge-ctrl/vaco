@@ -3,9 +3,10 @@
 // Phase 4 "Digital Planet" — VACANCY_API_ENDPOINT_MAP.md's own words:
 // "outbound link generators, not functional endpoints... VACANCY
 // should never implement the actual streaming/commerce/fashion logic
-// itself." Five real routes, each doing exactly two things: check a
+// itself." Seven real routes, each doing exactly two things: check a
 // real in-world gate, then hand back a real URL into the real sibling
-// app. Nothing here plays music, lists a product, or runs a channel.
+// app. Nothing here plays music, lists a product, runs a channel, or
+// moves money.
 //
 // ---------------------------------------------------------------------
 // The gate — reused, not invented
@@ -64,6 +65,28 @@
 //   VULCAN. **Folded entirely into `venvsLink`; there is no separate
 //   `vozzanaLink`/fifth route.**
 //
+// - V4: the naming note at the top of this project's own CLAUDE.md
+//   already says it plainly — "the real operating network V4 and its
+//   named agents run inside, with V4 as the interface layer to it."
+//   A real, addressable unit there is a named agent's twin profile
+//   (`GET /api/twins/:agentId` in `../v4-proxy/server.js`, public, no
+//   auth) — the map's `:agentId` is that twin's real agent id, the
+//   same route `../v4-proxy/README.md`'s own frontend-coverage pass
+//   already names as "Look up a twin profile."
+// - VASH: this project's own standing rule 5 lists VASH among the
+//   ecosystem apps to link to, and the "What NOT to build" section
+//   says a VACANCY banking API should "route through VASH
+//   conceptually, not a parallel banking API" — a link-out IS that
+//   routing. A real, addressable, UNAUTHENTICATED unit is a Tap's own
+//   public resolution (`GET /api/taps/:tapCode/resolve` in
+//   `../vash-tap/server.js`) — §6 resolution (id, status, assignment,
+//   identity, business), the one VASH route with no session
+//   requirement at all, same posture every other link here already
+//   has (no caller identity is proven, only a resource is located).
+//   The plain record lookup (`GET /api/taps/:tapCode`) is also public
+//   but returns less — resolution is the real, meaningful unit a
+//   player-facing link should point at.
+//
 // A real, separate finding, worth recording rather than silently
 // worked around: VENVS's own real backend (`venvs/server.cjs`)
 // defaults to `PORT = process.env.PORT || 8829` — the exact port
@@ -98,6 +121,8 @@ const BASE_URLS = {
   vultureFlix: () => envUrl('VULTURE_FLIX_URL', 'http://localhost:8807'),
   dreams: () => envUrl('DREAMS_URL', 'http://localhost:8814'),
   venvs: () => envUrl('VENVS_URL', 'http://localhost:8829'),
+  v4Proxy: () => envUrl('V4_PROXY_URL', 'http://localhost:8787'),
+  vashTap: () => envUrl('VASH_TAP_URL', 'http://localhost:8825'),
 };
 
 // The one real check every link-out shares: has this specific city's
@@ -187,6 +212,24 @@ function venvsLink(worldState, cityId, storefrontId) {
   }));
 }
 
+function v4TwinLink(worldState, cityId, agentId) {
+  return gatedLink(worldState, cityId, () => ({
+    app: 'v4-proxy',
+    url: `${BASE_URLS.v4Proxy()}/api/twins/${encodeURIComponent(agentId)}`,
+    verified: true,
+    note: 'Resource locator into V4’s real named-agent twin profile; not a confirmed UI deep link.',
+  }));
+}
+
+function vashTapLink(worldState, cityId, tapCode) {
+  return gatedLink(worldState, cityId, () => ({
+    app: 'vash-tap',
+    url: `${BASE_URLS.vashTap()}/api/taps/${encodeURIComponent(tapCode)}/resolve`,
+    verified: true,
+    note: 'Resource locator into VASH’s real Tap resolution (id, status, assignment, identity, business); the one VASH route with no session requirement. Not a confirmed UI deep link, and not a payment call — see /api/taps/:tapCode/pay in vash-tap/server.js for that, which this file deliberately does not wrap.',
+  }));
+}
+
 module.exports = {
   GATE_ERA,
   GATE_CHANNEL,
@@ -195,5 +238,7 @@ module.exports = {
   vultureLink,
   dreamsLink,
   venvsLink,
+  v4TwinLink,
+  vashTapLink,
   VULTURE_CONTENT_TYPES,
 };

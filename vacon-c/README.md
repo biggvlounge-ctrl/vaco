@@ -773,6 +773,17 @@ storefront is a real VENVS seller with a runtime id and no separate
 product-id namespace to address. Four real link generators this
 round, not five.
 
+## V4 and VASH ecosystem link-outs close standing rule 5
+See `CLAUDE.md`'s own seventy-eighth standing rule for the full
+reasoning. Standing rule 5 has always named six apps to link to —
+Vavlt Stvdios, Vvltvre, DREAMS, VENVS, V4, VASH — but the Phase 4
+round above only ever built four. `v4TwinLink` and `vashTapLink` close
+the other two, same `ecosystemLinks.js` gate, same "resource locator,
+not a confirmed deep link" posture: V4's real named-agent twin profile
+(`GET /api/twins/:agentId`) and VASH's real, public Tap resolution
+(`GET /api/taps/:tapCode/resolve` — never the payment route, which
+stays a sibling app's own concern).
+
 ## Main characters — a real local power hierarchy, and real missions from it
 See `CLAUDE.md`'s own fifty-ninth standing rule for the full reasoning.
 "There'll be a kingpin... the strongest gangs, the strongest political

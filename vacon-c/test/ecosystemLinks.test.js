@@ -153,3 +153,29 @@ test('venvsLink: covers a SVMIKO DEGVCHI brand storefront identically, since it 
   assert.equal(peerSeller.app, degvchiBrandSeller.app);
   assert.match(degvchiBrandSeller.url, /\/api\/marketplace\/sellers\/47$/);
 });
+
+test('v4TwinLink: refused pre-threshold, real twin-profile URL post-threshold', () => {
+  const notYet = linksWorld({ eras: ['electricity'] });
+  const refused = ecosystemLinks.v4TwinLink(notYet, 1, 'qvan');
+  assert.equal(refused.ok, false);
+
+  const ready = linksWorld(READY);
+  const link = ecosystemLinks.v4TwinLink(ready, 1, 'qvan');
+  assert.equal(link.ok, true);
+  assert.equal(link.app, 'v4-proxy');
+  assert.match(link.url, /\/api\/twins\/qvan$/);
+  assert.equal(link.verified, true);
+});
+
+test('vashTapLink: refused pre-threshold, real tap-resolution URL post-threshold', () => {
+  const notYet = linksWorld({ eras: ['electricity'] });
+  const refused = ecosystemLinks.vashTapLink(notYet, 1, 'VT-000001');
+  assert.equal(refused.ok, false);
+
+  const ready = linksWorld(READY);
+  const link = ecosystemLinks.vashTapLink(ready, 1, 'VT-000001');
+  assert.equal(link.ok, true);
+  assert.equal(link.app, 'vash-tap');
+  assert.match(link.url, /\/api\/taps\/VT-000001\/resolve$/);
+  assert.equal(link.verified, true);
+});

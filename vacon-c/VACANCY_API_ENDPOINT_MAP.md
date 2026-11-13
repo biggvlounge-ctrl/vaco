@@ -188,6 +188,8 @@ GET  /api/ecosystem/vault-studios-link/:contentId?entityId=  — real deep link 
 GET  /api/ecosystem/vulture-link/:contentType?entityId=&contentId=  — real deep link into Vvltvre's Music (/api/releases/:id) or Flix (/api/titles/:id); "touring" refused, no dedicated app exists yet
 GET  /api/ecosystem/dreams-link/:screenId?entityId=  — real deep link into DREAMS' GET /api/screens/:id
 GET  /api/ecosystem/venvs-link/:storefrontId?entityId=  — real deep link into VENVS' GET /api/marketplace/sellers/:id; also covers every SVMIKO DEGVCHI brand storefront (the same route named "vozzana-link" below)
+GET  /api/ecosystem/v4-twin-link/:agentId?entityId=  — real deep link into V4's GET /api/twins/:agentId (a named agent's own twin profile)
+GET  /api/ecosystem/vash-tap-link/:tapCode?entityId=  — real deep link into VASH's GET /api/taps/:tapCode/resolve (public Tap resolution, never the payment route)
 ```
 
 **"Vozzana da Gucci" was a stale name — it is SVMIKO DEGVCHI, a real

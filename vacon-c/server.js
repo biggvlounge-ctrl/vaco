@@ -328,6 +328,21 @@ app.get('/api/ecosystem/venvs-link/:storefrontId', (req, res) => {
   res.json(engine.venvsLink(entityId, req.params.storefrontId));
 });
 
+// Standing rule 5 names V4 and VASH alongside the four apps above;
+// these two close that gap. See `ecosystemLinks.js`'s own header for
+// why each real address was chosen.
+app.get('/api/ecosystem/v4-twin-link/:agentId', (req, res) => {
+  const entityId = requireEntityId(req, res);
+  if (entityId === null) return;
+  res.json(engine.v4TwinLink(entityId, req.params.agentId));
+});
+
+app.get('/api/ecosystem/vash-tap-link/:tapCode', (req, res) => {
+  const entityId = requireEntityId(req, res);
+  if (entityId === null) return;
+  res.json(engine.vashTapLink(entityId, req.params.tapCode));
+});
+
 // -- NPCs -------------------------------------------------------------------
 
 app.get('/api/npcs', (req, res) => {

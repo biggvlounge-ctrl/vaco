@@ -894,11 +894,11 @@ function cityOf(entityId) {
   return events.locationOfEvent(WorldState, { affected_entity_ids: [entityId] }).cityId;
 }
 
-// Phase 4 "Digital Planet" — five real link generators, gated on
-// `ecosystemLinks.digitalPlanetReady`. `entityId` identifies WHERE the
-// request is being made from (the requester's own city), never a
-// second identity check — these are outbound links, not an action
-// that moves anything in this world.
+// Phase 4 "Digital Planet" — seven real link generators across six
+// route functions, gated on `ecosystemLinks.digitalPlanetReady`.
+// `entityId` identifies WHERE the request is being made from (the
+// requester's own city), never a second identity check — these are
+// outbound links, not an action that moves anything in this world.
 function vaultStudiosLink(entityId, contentId) {
   return ecosystemLinks.vaultStudiosLink(WorldState, cityOf(entityId), contentId);
 }
@@ -913,6 +913,14 @@ function dreamsLink(entityId, screenId) {
 
 function venvsLink(entityId, storefrontId) {
   return ecosystemLinks.venvsLink(WorldState, cityOf(entityId), storefrontId);
+}
+
+function v4TwinLink(entityId, agentId) {
+  return ecosystemLinks.v4TwinLink(WorldState, cityOf(entityId), agentId);
+}
+
+function vashTapLink(entityId, tapCode) {
+  return ecosystemLinks.vashTapLink(WorldState, cityOf(entityId), tapCode);
 }
 
 // `bluff.js`'s three player-facing verbs — see that file's own header
@@ -1793,6 +1801,8 @@ module.exports = {
   vultureLink,
   dreamsLink,
   venvsLink,
+  v4TwinLink,
+  vashTapLink,
   intimidate,
   assessThreat,
   callBluff,

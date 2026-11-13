@@ -4728,6 +4728,44 @@ city-scoping branch broke exactly the two tests written to prove it.
 
 Full suite: 2250 tests, 2233 pass, 0 fail, 0 cancelled, 17 skipped.
 
+**A seventy-eighth, and it closes a gap standing rule 5 itself had
+named since before this file had a numbered rule at all.** That rule
+has always listed six ecosystem apps to link to, never rebuild:
+"Vavlt Stvdios, Vvltvre, DREAMS, VENVS, V4, VASH." The Phase 4
+"Digital Planet" round (see this file's own fifty-eighth standing
+rule) built real routes for only four of the six and said so plainly
+at the time -- "four real link generators this round, not five"
+(counting Vvltvre's two sub-apps as one line). V4 and VASH sat
+unlinked the whole time, found again only when asked directly to
+check everything this ecosystem touches.
+
+**Each real address was checked against the sibling's own route table
+first, the same discipline every other line in `ecosystemLinks.js`
+already holds -- neither was guessed.** V4: this file's own naming
+note at the very top already says "the real operating network V4 and
+its named agents run inside, with V4 as the interface layer to it" --
+a real, addressable unit there is a named agent's own twin profile,
+`GET /api/twins/:agentId` in `../v4-proxy/server.js`, public, no auth,
+the exact route that app's own frontend-coverage pass already named
+"Look up a twin profile." VASH: this file's own "What NOT to build"
+section already says a VACANCY banking API should "route through VASH
+conceptually, not a parallel banking API" -- a link-out is exactly
+that routing, so building one is following that line, not working
+around it. The real, addressable, UNAUTHENTICATED unit is a Tap's own
+public resolution, `GET /api/taps/:tapCode/resolve` in
+`../vash-tap/server.js` -- the one VASH route with no session
+requirement at all, deliberately NOT the plain record lookup (which
+returns less) and deliberately NOT `.../pay` (which moves money and
+requires a real session this file's link generators have never
+asked for).
+
+**`v4TwinLink`/`vashTapLink` reuse the identical `gatedLink` helper
+every other generator in this file already calls** -- no second gate,
+no new threshold. Mutation-verified directly: temporarily had
+`v4TwinLink` build its response without going through `gatedLink` at
+all, confirmed the dedicated "refused pre-threshold" test caught it
+immediately, then reverted.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and
