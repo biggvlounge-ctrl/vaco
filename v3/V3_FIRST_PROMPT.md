@@ -122,13 +122,26 @@ implementation, not a guarantee. **Postgres remains genuinely
 unstarted and genuinely worth doing** — it is the single highest-value
 item still open on V3.
 
-**3. Idempotency — not built.** Searched directly: zero occurrences of
-"idempot" anywhere in `v3/`. A retried `POST /api/vcoin/transfer`
-will charge twice. This is real, it is unmitigated, and given that
-eighteen backend services call this route over a network, it is the
-second-highest-value open item after Postgres. Input validation *is*
-real — every operation validates required fields and rejects
-non-positive amounts — but validation is not idempotency.
+**3. Idempotency — built since this was written, corrected here rather
+than left stale.** `lib/idempotency.js` (in-memory) and
+`lib/idempotencyPg.js` (Postgres-backed, real schema in
+`vaco.v3_idempotency`) both exist and are real: a caller sends an
+`Idempotency-Key` header or an `idempotencyKey` body field, the first
+request with that key executes and is recorded, and a retry with the
+same key replays the stored response with `idempotentReplay: true`
+rather than re-executing. `server.js`'s own `idempotentFor(routeName)`
+wraps every money-moving route with it —
+`/api/vcoin/transfer`, `/api/vcoin/settle`, `/api/vash/cashout`,
+`/api/vash-mortgage/:id/payment`, `/api/vash-insurance/purchase`, and
+`/api/vash-insurance/claim/:id/pay` — confirmed directly in `server.js`,
+not inferred from the module existing. Real tests cover it
+(`test/idempotency.test.js`, `test/idempotencyPg.test.js`; the
+Postgres-backed suite's own rows skip rather than fail when Postgres is
+unreachable, same posture every other Postgres-dependent test in this
+repo takes). A retried `POST /api/vcoin/transfer` with the same
+Idempotency-Key no longer charges twice. Input validation is also
+real, as this section already said, and is now a second, separate
+layer alongside idempotency rather than a stand-in for it.
 
 **4. Rate limiting — done, at a different layer than specified.** Not
 in-process; `deploy/nginx-docker.conf` applies
