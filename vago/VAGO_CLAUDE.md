@@ -184,7 +184,7 @@ document asked for — VENVS linking *out* to VAGO rather than owning it
 real modules: `predictionMarkets.js`, `sportsbook.js`,
 `esportsStaking.js`, `casinoSession.js`, `goldCoin.js`, `amoe.js`,
 `originals.js`, `fantasy.js`, `provablyFair.js`, plus `store.js`,
-`persistence.js`, `shieldAuth.js`, and `seedDemoData.js`. State
+`persistence.js`, `shieldAuth.cjs`, and `seedDemoData.js`. State
 persists to disk. The "single file, resets on reload" architecture
 described above is gone.
 
@@ -260,3 +260,11 @@ routes" — also stale against the real current count (24 modules,
 `grep -cE "app\.(get|post|put|delete|patch)\("`). Not fixed here —
 that is a shared root file other concurrent work may be touching —
 flagged for whoever next updates that ledger.
+
+One filename in this document's own "Implementation status" section
+above (`shieldAuth.js`, in the thirteen-module list) was also wrong —
+the real file is `lib/shieldAuth.cjs` (checked directly against
+`server.js`'s own `require('./lib/shieldAuth.cjs')`), corrected in
+place above since it is a plain filename typo, not a claim about what
+exists or works. `dev-docs/phase-real-caller-authorization/plan.md`
+has the same typo, left as its own historical record.

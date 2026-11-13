@@ -135,3 +135,40 @@ behavior for markets that already exist.
 **Genuinely unbuilt**: `vacancy-in-game` prediction sources. VACON-C is
 paused, so there is no in-game state to predict against. `vdp-in-world`
 is the reachable half of that differentiator today.
+
+### Correction, 13 Nov 2026 — doc-vs-code reconciliation
+
+**The "genuinely unbuilt" claim directly above is stale and was checked
+against the real repo rather than trusted.** `vacancy-in-game` is a
+real, seeded market source, not an unbuilt one: `lib/predictionMarkets.js`
+has always accepted it in `MARKET_SOURCES`, `server.js` exposes it on
+its own dedicated feed (`GET /api/predictions/vacancy`), and
+`lib/seedDemoData.js`'s `IN_WORLD_MARKETS` seeds a real
+`vacancy-in-game` market ("Will VACON-C's settlement population pass
+its next in-game tick without a famine event?") with real trades on
+both sides via the real `createPredictionMarket`/`buyContract` calls —
+so it is genuinely non-50/50 on first boot, the same as the
+`vdp-in-world` market this document already credits as built.
+
+The "VACON-C is paused" premise is also stale at the sibling-app level,
+checked directly: `vacon-c/VACANCY_INVENTORY.md` states "The pause is
+lifted (28 Aug 2026). VACANCY is active work," and `vacon-c/CLAUDE.md`
+likewise corrects an earlier "VACON-C is paused" claim in that repo
+("**VACON-C is not paused.** It is the most built thing in this
+repo..."). Not touched here since it is sibling-app content — flagged
+only as the reason this document's premise no longer holds.
+
+**The API map above (§ "API map") is also stale.** It lists routes
+under a `/vago/...` prefix (`POST /vago/markets`, `POST
+/vago/sports/:eventId/bet`, `POST /vago/casino/sessions`, etc.). The
+real, current `server.js` serves none of those paths — every real
+route is under `/api/...` (`POST /api/markets`, `POST
+/api/sports/:eventId/bet`, `POST /api/casino/sessions`, confirmed
+directly against `server.js`), and there are 67 real route handlers
+today (`grep -cE "app\.(get|post|put|delete|patch)\(" server.js`), far
+more than the eight this doc's API map lists — group wagers,
+competitions, BLIND rounds, and most of casino/fantasy/esports aren't
+in this map at all. The data models above remain a reasonable
+description of the shapes in play; the API map was written before
+implementation and was never updated to match the real paths, and
+should not be read as current.
